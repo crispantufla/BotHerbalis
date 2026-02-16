@@ -25,7 +25,7 @@ let pausedUsers = new Set();
 // Variables for API / Dashboard State
 let qrCodeData = null;
 let sessionAlerts = [];
-let config = { alertNumber: '' };
+let config = { alertNumbers: [] };
 let isConnected = false;
 
 // --- PERSISTENCE HELPERS ---
@@ -71,7 +71,13 @@ function loadState() {
             Object.assign(userState, data.userState || {});
             lastAlertUser = data.lastAlertUser || null;
             pausedUsers = new Set(data.pausedUsers || []);
-            config = data.config || { alertNumber: '' };
+            config = data.config || { alertNumbers: [] };
+            // Migrate from old single alertNumber to array
+            if (config.alertNumber && !config.alertNumbers) {
+                config.alertNumbers = [config.alertNumber];
+                delete config.alertNumber;
+            }
+            if (!config.alertNumbers) config.alertNumbers = [];
             console.log('✅ State loaded from persistence.json');
         }
     } catch (e) {
@@ -196,10 +202,12 @@ async function notifyAdmin(reason, userPhone, details = null) {
 
     if (sharedState.io) sharedState.io.emit('new_alert', newAlert);
 
-    if (config.alertNumber) {
-        const targetAlert = `${config.alertNumber}@c.us`;
+    if (config.alertNumbers && config.alertNumbers.length > 0) {
         const alertMsg = `⚠️ *ALERTA SISTEMA*\n\n*Motivo:* ${reason}\n*Cliente:* ${userPhone}\n*Detalles:* ${details || "Sin detalles"}`;
-        client.sendMessage(targetAlert, alertMsg).catch(e => console.error(`[ALERT] Failed to forward:`, e.message));
+        for (const num of config.alertNumbers) {
+            const targetAlert = `${num}@c.us`;
+            client.sendMessage(targetAlert, alertMsg).catch(e => console.error(`[ALERT] Failed to forward to ${num}:`, e.message));
+        }
     }
 }
 

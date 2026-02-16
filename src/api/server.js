@@ -323,16 +323,37 @@ function startServer(client, sharedState) {
     });
 
     app.post('/api/config', async (req, res) => {
-        const { alertNumber } = req.body;
-        if (alertNumber !== undefined) {
-            const previousAlertNumber = config.alertNumber;
-            const newAlertNumber = alertNumber ? alertNumber.replace(/\D/g, '') : null;
-            config.alertNumber = newAlertNumber;
+        const { alertNumber, action, number } = req.body;
+
+        // New array-based API: { action: 'add'|'remove', number: '5493411234567' }
+        if (action && number) {
+            if (!config.alertNumbers) config.alertNumbers = [];
+            const cleanNum = number.replace(/\D/g, '');
+
+            if (action === 'add') {
+                if (!config.alertNumbers.includes(cleanNum)) {
+                    config.alertNumbers.push(cleanNum);
+                }
+            } else if (action === 'remove') {
+                config.alertNumbers = config.alertNumbers.filter(n => n !== cleanNum);
+            }
+
             saveState();
-            res.json({ success: true, config });
-        } else {
-            res.status(400).json({ error: "Missing alertNumber" });
+            return res.json({ success: true, config });
         }
+
+        // Legacy single alertNumber support (backwards compat)
+        if (alertNumber !== undefined) {
+            if (!config.alertNumbers) config.alertNumbers = [];
+            const newNum = alertNumber ? alertNumber.replace(/\D/g, '') : null;
+            if (newNum && !config.alertNumbers.includes(newNum)) {
+                config.alertNumbers.push(newNum);
+            }
+            saveState();
+            return res.json({ success: true, config });
+        }
+
+        res.status(400).json({ error: "Missing action/number or alertNumber" });
     });
 
     // Logout

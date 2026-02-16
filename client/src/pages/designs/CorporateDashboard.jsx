@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useSocket } from '../../context/SocketContext';
 import { Link } from 'react-router-dom';
 import { API_URL } from '../../config/api';
+import { useToast } from '../../components/ui/Toast';
 
 // View Imports
 import DashboardView from '../../components/corporate/views/DashboardView';
@@ -25,13 +26,19 @@ const Icons = {
 
 const CorporateDashboard = () => {
     const { socket } = useSocket();
+    const { toast } = useToast();
     const [status, setStatus] = useState('initializing');
     const [alerts, setAlerts] = useState([]);
     const [activeTab, setActiveTab] = useState('dashboard');
     const [qrData, setQrData] = useState(null);
+    const [config, setConfig] = useState({ alertNumbers: [] });
 
-    // Config State for Admin Sync
-    const [config, setConfig] = useState({ alertNumber: '' });
+    const fetchConfig = useCallback(async () => {
+        try {
+            const res = await axios.get(`${API_URL}/api/status`);
+            if (res.data.config) setConfig(res.data.config);
+        } catch (e) { }
+    }, []);
 
     useEffect(() => {
         if (socket) {
@@ -52,14 +59,19 @@ const CorporateDashboard = () => {
             } catch (e) { }
         }
         loadData();
-    }, [socket]);
+
+        // Listen for config updates from child components
+        const handleConfigUpdate = () => fetchConfig();
+        window.addEventListener('config-updated', handleConfigUpdate);
+        return () => window.removeEventListener('config-updated', handleConfigUpdate);
+    }, [socket, fetchConfig]);
 
     const handleQuickAction = async (chatId, action) => {
         try {
             await axios.post(`${API_URL}/api/admin-command`, { chatId, command: action });
             setAlerts(prev => prev.filter(a => a.userPhone !== chatId));
-            alert(`Acción ejecutada: ${action}`);
-        } catch (e) { alert('Error executing action'); }
+            toast.success(`Acción ejecutada: ${action}`);
+        } catch (e) { toast.error('Error ejecutando acción'); }
     };
 
     const renderContent = () => {
