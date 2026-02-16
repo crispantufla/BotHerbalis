@@ -4,18 +4,56 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { aiService } = require('../services/ai');
 const { appendOrderToSheet } = require('../../sheets_sync');
 const { atomicWriteFile } = require('../../safeWrite');
+const { analyzeDailyLogs } = require('../../analyze_day');
 
 // Constants
 const ORDERS_FILE = path.join(__dirname, '../../orders.json');
 const summaryCache = new Map(); // Store summaries: chatId -> { text, timestamp }
 
-// Initialize Gemini
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// Helper: Get History from Local Logs (Duplicated from index.js for now, or moved here)
+function getLocalHistory(chatId) {
+    const logsDir = path.join(__dirname, '../../logs');
+    if (!fs.existsSync(logsDir)) return [];
 
-function startServer(client) {
+    const files = fs.readdirSync(logsDir).filter(f => f.endsWith('.jsonl'));
+    let localMessages = [];
+
+    files.forEach(file => {
+        try {
+            const content = fs.readFileSync(path.join(logsDir, file), 'utf8');
+            const lines = content.split('\n').filter(l => l.trim());
+            lines.forEach(line => {
+                const log = JSON.parse(line);
+                if (log.userId === chatId) {
+                    localMessages.push({
+                        fromMe: log.role === 'bot' || log.role === 'admin' || log.role === 'system',
+                        body: log.content,
+                        timestamp: Math.floor(new Date(log.timestamp).getTime() / 1000),
+                        type: 'chat',
+                        isLocal: true
+                    });
+                }
+            });
+        } catch (e) {
+            console.error(`Error reading log file ${file}:`, e.message);
+        }
+    });
+
+    return localMessages;
+}
+
+
+function startServer(client, sharedState) {
+    const { userState, pausedUsers, sessionAlerts, config, knowledge, saveState, saveKnowledge, handleAdminCommand } = sharedState;
+
+    // Validate sharedState
+    if (!userState || !sessionAlerts) {
+        console.error("❌ [SERVER] Critical: Shared State missing!");
+    }
+
     const app = express();
     const server = http.createServer(app);
     const io = new Server(server, {
@@ -24,6 +62,9 @@ function startServer(client) {
             methods: ["GET", "POST"]
         }
     });
+
+    // Share IO with global state so index.js can use it
+    sharedState.io = io;
 
     // Middleware
     app.use(cors());
@@ -39,7 +80,226 @@ function startServer(client) {
         });
     });
 
-    // --- SALES API ---
+    // --- MAIN API ROUTES (Moved from index.js) ---
+
+    // Status
+    app.get('/api/status', (req, res) => {
+        const isConnected = sharedState.isConnected; // Need to ensure index.js updates this
+        const qrCodeData = sharedState.qrCodeData;
+        res.json({
+            status: qrCodeData ? 'scan_qr' : (isConnected ? 'ready' : 'initializing'),
+            qr: qrCodeData,
+            info: isConnected ? client.info : null,
+            config: config
+        });
+    });
+
+    // Alerts
+    app.get('/api/alerts', (req, res) => {
+        res.json(sessionAlerts);
+    });
+
+    // Chats
+    app.get('/api/chats', async (req, res) => {
+        try {
+            const chats = await client.getChats();
+            // Filter groups and augment data with paused state
+            const relevantChats = chats.filter(c => !c.isGroup).map(c => ({
+                id: c.id._serialized,
+                name: c.name || c.id.user,
+                unreadCount: c.unreadCount,
+                lastMessage: c.lastMessage ? c.lastMessage.body : '',
+                timestamp: c.timestamp,
+                isPaused: pausedUsers.has(c.id._serialized),
+                step: userState[c.id._serialized]?.step || 'new'
+            }));
+            res.json(relevantChats);
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // Mark Read
+    app.post('/api/chats/:id/read', async (req, res) => {
+        try {
+            const chatId = req.params.id;
+            const chat = await client.getChatById(chatId);
+            await chat.sendSeen();
+            res.json({ success: true });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // History
+    app.get('/api/history/:id', async (req, res) => {
+        try {
+            const chatId = req.params.id;
+            let messages = [];
+
+            // 1. Try to get from WhatsApp
+            try {
+                const chat = await client.getChatById(chatId);
+                const waMessages = await chat.fetchMessages({ limit: 100 });
+                messages = waMessages.map(m => {
+                    let body = m.body;
+                    if (m.hasMedia && !body) {
+                        if (m.type === 'audio' || m.type === 'ptt') body = 'MEDIA_AUDIO:PENDING';
+                        else if (m.type === 'image' || m.type === 'sticker') body = 'MEDIA_IMAGE:PENDING';
+                    }
+                    return {
+                        fromMe: m.fromMe,
+                        body: body,
+                        timestamp: m.timestamp,
+                        type: m.type,
+                        id: m.id._serialized
+                    };
+                });
+            } catch (waErr) {
+                console.error(`[HISTORY] WA Fetch Error for ${chatId}:`, waErr.message);
+            }
+
+            // 2. Get from Local Logs
+            const localMessages = getLocalHistory(chatId);
+
+            // 3. Merge and deduplicate
+            const refinedMessages = messages.map(m => {
+                if (m.hasMedia || m.type === 'image' || m.type === 'audio' || m.type === 'ptt' || m.type === 'sticker') {
+                    const match = localMessages.find(lm => {
+                        const timeDiff = Math.abs(m.timestamp - lm.timestamp);
+                        const sameRole = m.fromMe === lm.fromMe;
+                        const isMediaLog = lm.body?.startsWith('MEDIA_');
+                        return sameRole && timeDiff <= 3 && isMediaLog;
+                    });
+                    if (match) return { ...m, body: match.body };
+                }
+                return m;
+            });
+
+            const combined = [...refinedMessages];
+
+            localMessages.forEach(lm => {
+                const isDuplicate = refinedMessages.some(m => {
+                    const timeDiff = Math.abs(m.timestamp - lm.timestamp);
+                    const sameRole = m.fromMe === lm.fromMe;
+                    return sameRole && timeDiff <= 2 && (m.body === lm.body || (lm.body?.startsWith('MEDIA_') && m.hasMedia));
+                });
+
+                if (!isDuplicate) {
+                    combined.push(lm);
+                }
+            });
+
+            // 4. Sort by timestamp
+            combined.sort((a, b) => a.timestamp - b.timestamp);
+            res.json(combined);
+        } catch (e) {
+            console.error(`[HISTORY] Global Error:`, e.message);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // Send Message
+    app.post('/api/send', async (req, res) => {
+        try {
+            const { chatId, message } = req.body;
+            await client.sendMessage(chatId, message);
+            if (sharedState.logAndEmit) sharedState.logAndEmit(chatId, 'admin', message, 'dashboard_reply');
+            res.json({ success: true });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // Toggle Bot
+    app.post('/api/toggle-bot', async (req, res) => {
+        const { chatId, paused } = req.body;
+        if (paused) {
+            pausedUsers.add(chatId);
+        } else {
+            pausedUsers.delete(chatId);
+        }
+        saveState();
+        io.emit('bot_status_change', { chatId, paused });
+        res.json({ success: true, paused });
+    });
+
+    // Reset Chat
+    app.post('/api/reset-chat', async (req, res) => {
+        try {
+            const { chatId } = req.body;
+            delete userState[chatId];
+            pausedUsers.delete(chatId);
+            saveState();
+
+            const chat = await client.getChatById(chatId);
+            await chat.clearMessages();
+
+            io.emit('bot_status_change', { chatId, paused: false });
+            res.json({ success: true, message: "Chat reset successfully" });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // Admin Command
+    app.post('/api/admin-command', async (req, res) => {
+        const { chatId, command } = req.body;
+        try {
+            // We need to access logic from index.js for this. 
+            // Better to pass handleAdminCommand in sharedState.
+            if (handleAdminCommand) {
+                const result = await handleAdminCommand(chatId, command, true);
+                res.json({ success: true, message: result });
+            } else {
+                res.status(501).json({ error: "Handler not attached" });
+            }
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // Script/Config
+    app.get('/api/script', (req, res) => res.json(knowledge));
+
+    app.post('/api/script', (req, res) => {
+        try {
+            Object.assign(knowledge, req.body); // Update reference
+            saveKnowledge();
+            res.json({ success: true, message: "Script updated successfully" });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    app.post('/api/config', async (req, res) => {
+        const { alertNumber } = req.body;
+        if (alertNumber !== undefined) {
+            const previousAlertNumber = config.alertNumber;
+            const newAlertNumber = alertNumber ? alertNumber.replace(/\D/g, '') : null;
+            config.alertNumber = newAlertNumber;
+            saveState();
+            res.json({ success: true, config });
+        } else {
+            res.status(400).json({ error: "Missing alertNumber" });
+        }
+    });
+
+    // Logout
+    app.post('/api/logout', async (req, res) => {
+        try {
+            console.log('[WHATSAPP] Logging out...');
+            sharedState.isConnected = false;
+            sharedState.qrCodeData = null;
+            if (client.info) await client.logout();
+            io.emit('status_change', { status: 'disconnected' });
+            res.json({ success: true });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // --- SALES API (Already present) ---
     app.get('/api/orders', (req, res) => {
         if (fs.existsSync(ORDERS_FILE)) {
             res.json(JSON.parse(fs.readFileSync(ORDERS_FILE)));
@@ -68,60 +328,16 @@ function startServer(client) {
 
     app.post('/api/sheets/test', async (req, res) => {
         try {
-            const testData = {
-                cliente: 'DASHBOARD_TEST',
-                nombre: 'Prueba desde Panel',
-                calle: 'Test 123',
-                ciudad: 'Dashboard',
-                cp: '0000',
-                producto: 'Test',
-                plan: 'Test',
-                precio: '0'
-            };
+            const testData = { cliente: 'DASHBOARD_TEST', nombre: 'Prueba desde Panel', calle: 'Test', ciudad: 'Dashboard', cp: '0000', producto: 'Test', plan: 'Test', precio: '0' };
             const success = await appendOrderToSheet(testData);
-            if (success) {
-                res.json({ success: true, message: "Sincronización de prueba exitosa" });
-            } else {
-                res.status(500).json({ success: false, message: "Error en la sincronización" });
-            }
-        } catch (e) {
-            res.status(500).json({ error: e.message });
-        }
+            if (success) res.json({ success: true });
+            else res.status(500).json({ success: false });
+        } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
-    // --- AI SUMMARIZATION ---
+    // --- AI SUMMARIZATION (MOCKED FOR NOW) ---
     app.get('/api/summarize/:chatId', async (req, res) => {
-        const { chatId } = req.params;
-
-        // 1. Check Cache (valid for 5 minutes)
-        const cached = summaryCache.get(chatId);
-        if (cached && (Date.now() - cached.timestamp < 5 * 60 * 1000)) {
-            return res.json({ summary: cached.text });
-        }
-
-        try {
-            const history = await client.getChatById(chatId).then(c => c.fetchMessages({ limit: 10 }));
-            const formattedHistory = history.map(m => `${m.fromMe ? 'Bot' : 'Usuario'}: ${m.body}`).join('\n');
-
-            const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-            const prompt = `Resumí en una sola oración súper concisa (máximo 12 palabras) el estado de esta conversación de venta de Herbalis.
-            Enfocate en: ¿Qué quiere el cliente? ¿Qué eligió? ¿Dio sus datos?
-            Chat:\n${formattedHistory}`;
-
-            const result = await model.generateContent(prompt);
-            const summary = result.response.text().trim();
-
-            summaryCache.set(chatId, { text: summary, timestamp: Date.now() });
-
-            res.json({ summary });
-        } catch (err) {
-            if (err.status === 429) {
-                console.warn("[AI] Rate limit hit. Sending fallback summary.");
-                return res.json({ summary: "El bot está procesando mucha info. Reintentá en un momento." });
-            }
-            console.error("Summary error:", err);
-            res.status(500).json({ summary: "No se pudo generar el resumen." });
-        }
+        res.json({ summary: "Resumen pendiente de refactorización" });
     });
 
 
@@ -129,10 +345,6 @@ function startServer(client) {
     io.on('connection', (socket) => {
         if (client && client.info) {
             socket.emit('ready', { info: client.info });
-        } else {
-            // Pass QR code mechanism? 
-            // In original index.js, qrCodeData is global.
-            // We might need to expose a way to emit QR from index.js
         }
     });
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import ScriptMapView from './ScriptMapView';
 
 const Script = () => {
     const [script, setScript] = useState({ flow: {}, faq: [] });
@@ -20,9 +21,14 @@ const Script = () => {
 
     const saveScript = async () => {
         try {
+            // Include basic structure validation if needed
             await axios.post(`${API_URL}/api/script`, script);
             alert('Guión guardado correctamente');
         } catch (e) { alert('Error al guardar'); }
+    };
+
+    const handleUpdate = (newScript) => {
+        setScript(newScript);
     };
 
     const handleFlowChange = (stepKey, field, value) => {
@@ -58,46 +64,86 @@ const Script = () => {
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-gray-800">Editor de Guiones</h2>
-                <button onClick={saveScript} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm font-medium">
-                    💾 Guardar Cambios
-                </button>
+                <div className="flex gap-2">
+                    <button onClick={fetchScript} className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 shadow-sm font-medium transition">
+                        🔄 Recargar
+                    </button>
+                    <button onClick={saveScript} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm font-medium transition">
+                        💾 Guardar Todo
+                    </button>
+                </div>
             </div>
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div className="border-b flex">
+                <div className="border-b flex overflow-x-auto">
                     <button
                         onClick={() => setActiveTab('flow')}
-                        className={`px-6 py-3 font-medium text-sm ${activeTab === 'flow' ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50' : 'text-gray-500 hover:bg-gray-50'}`}
+                        className={`px-6 py-3 font-medium text-sm whitespace-nowrap ${activeTab === 'flow' ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50' : 'text-gray-500 hover:bg-gray-50'}`}
                     >
-                        Flujo de Venta Principal
+                        Lista de Pasos
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('map')}
+                        className={`px-6 py-3 font-medium text-sm whitespace-nowrap ${activeTab === 'map' ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50' : 'text-gray-500 hover:bg-gray-50'}`}
+                    >
+                        Mapa Visual (D&D)
                     </button>
                     <button
                         onClick={() => setActiveTab('faq')}
-                        className={`px-6 py-3 font-medium text-sm ${activeTab === 'faq' ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50' : 'text-gray-500 hover:bg-gray-50'}`}
+                        className={`px-6 py-3 font-medium text-sm whitespace-nowrap ${activeTab === 'faq' ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50' : 'text-gray-500 hover:bg-gray-50'}`}
                     >
                         Preguntas Frecuentes (FAQ)
                     </button>
                 </div>
 
-                <div className="p-6 bg-gray-50 min-h-[500px]">
+                <div className="p-6 bg-gray-50 min-h-[600px]">
+                    {activeTab === 'map' && (
+                        <ScriptMapView script={script} onUpdate={handleUpdate} />
+                    )}
+
                     {activeTab === 'flow' && (
                         <div className="space-y-4">
                             {Object.entries(script.flow || {}).map(([key, step]) => (
                                 <div key={key} className="bg-white p-4 rounded-lg border shadow-sm">
                                     <div className="flex justify-between items-center cursor-pointer" onClick={() => setExpandedCard(expandedCard === key ? null : key)}>
                                         <h3 className="font-bold text-gray-700 capitalize">{key.replace(/_/g, ' ')}</h3>
-                                        <span className="text-gray-400">{expandedCard === key ? '▲' : '▼'}</span>
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded font-bold uppercase">{step.step || 'sin_paso'}</span>
+                                            <span className="text-gray-400">{expandedCard === key ? '▲' : '▼'}</span>
+                                        </div>
                                     </div>
                                     {expandedCard === key && (
-                                        <div className="mt-4 space-y-3 animate-fade-in">
+                                        <div className="mt-4 space-y-3 animate-fade-in border-t pt-4">
                                             <div>
                                                 <label className="block text-xs font-bold text-gray-400 uppercase">Respuesta del Bot</label>
                                                 <textarea
                                                     className="w-full mt-1 p-3 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                                                    rows={3}
+                                                    rows={4}
                                                     value={step.response}
                                                     onChange={(e) => handleFlowChange(key, 'response', e.target.value)}
                                                 />
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-400 uppercase">Siguiente Paso</label>
+                                                    <input
+                                                        type="text"
+                                                        className="w-full mt-1 p-2 border rounded-lg text-sm"
+                                                        value={step.nextStep || ''}
+                                                        onChange={(e) => handleFlowChange(key, 'nextStep', e.target.value)}
+                                                    />
+                                                </div>
+                                                {step.step && (
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-gray-400 uppercase">ID del Paso (Fase)</label>
+                                                        <input
+                                                            type="text"
+                                                            className="w-full mt-1 p-2 border rounded-lg text-sm bg-gray-50"
+                                                            value={step.step}
+                                                            onChange={(e) => handleFlowChange(key, 'step', e.target.value)}
+                                                        />
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     )}

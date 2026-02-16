@@ -35,7 +35,7 @@
         "liquido"
       ],
       "response": "Perfecto. Las cápsulas se toman 1 por día, media hora antes del almuerzo o de la cena.\n\nEs un plan súper práctico, ideal si buscás constancia sin complicaciones.\nTe recomendamos comenzar con el plan de 60 días.\n\n📦 Envío por Correo Argentino sin gastos de envío y pagás recién cuando lo recibís.\n\n¿Querés que te pase los precios? ¡¡Son muy accesibles!!",
-      "nextStep": "waiting_price_confirmation"
+      "nextStep": "price_capsulas"
     },
     "preference_semillas": {
       "step": "waiting_preference",
@@ -51,13 +51,15 @@
         "yuyos"
       ],
       "response": "Perfecto. La semilla es la opción más tradicional y natural. Se toma un pedacito por día y es excelente para pérdidas de peso más marcadas.\n\nPara tu objetivo recomendamos comenzar con el plan de 60 días.\n\n📦 Envío gratis por Correo Argentino y pegás al recibir.\n\n¿Querés que te pase los precios? ¡¡Son muy accesibles!!",
-      "nextStep": "waiting_price_confirmation"
+      "nextStep": "price_semillas"
     },
     "price_capsulas": {
+      "step": "waiting_price_confirmation",
       "response": "Te paso precios!! El plan de 60 días en cápsulas $45.900\nEl plan de 120 días $ 82.600.-\n📦 Envío gratis + pagás al recibir.\n\n¿Con que plan te gustaría avanzar?",
       "nextStep": "waiting_plan_choice"
     },
     "price_semillas": {
+      "step": "waiting_price_confirmation",
       "response": "Te paso precios!! \nEl plan de 60 días en semillas $34.900.-\nEl plan de 120 días $ 61.900.-\n📦 Envío gratis + pagás al recibir. ¿Con que plan te gustaría avanzar?",
       "nextStep": "waiting_plan_choice"
     },
