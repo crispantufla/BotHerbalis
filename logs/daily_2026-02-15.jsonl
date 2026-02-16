@@ -1,0 +1,121 @@
+{"timestamp":"2026-02-15T13:37:24.626Z","userId":"92273161334887@lid","role":"user","content":"Hola","step":"waiting_weight"}
+{"timestamp":"2026-02-15T13:37:32.121Z","userId":"92273161334887@lid","role":"bot","content":"La nuez de la india y sus derivados son el mejor producto natural para perder peso que existe. Hace 12 años que los distribuimos en varios países, mas de 70 mil clientes y casos de mas de 60 kilos perdidos.\n\nEse objetivo es totalmente alcanzable con nuestros planes.\nAntes de recomendarte el producto ideal, necesito saber que preferis:\n\n👉 algo:\n1️⃣ Súper práctico (cápsulas o gotas)\n2️⃣ Más natural/tradicional (semillas e infusiones)? Esta opcion requiere una preparacion diaria.","step":"waiting_weight"}
+{"timestamp":"2026-02-15T13:37:41.752Z","userId":"92273161334887@lid","role":"user","content":"1","step":"waiting_preference"}
+{"timestamp":"2026-02-15T13:37:44.789Z","userId":"92273161334887@lid","role":"bot","content":"Genial 👍 Entonces cápsulas es la mejor opción para vos.\n\n💊 Cómo se toman:\n* 1 cápsula por día\n* 30 min antes del almuerzo o la cena\nEs un plan muy práctico, ideal para mantener constancia.\n\n* Plan 60 días: $45.900\n* Plan 120 días: $82.600\n📦 Envío gratis a todo el país\n💵 Pagás recién cuando lo recibís\n\n👉 ¿Con cuál te gustaría avanzar? (Escribí \"60\" o \"120\")","step":"waiting_preference"}
+{"timestamp":"2026-02-15T13:38:07.134Z","userId":"92273161334887@lid","role":"user","content":"60","step":"waiting_plan_choice"}
+{"timestamp":"2026-02-15T13:38:10.146Z","userId":"92273161334887@lid","role":"bot","content":"Perfecto 👍 Antes de continuar necesito confirmarte algo importante sobre el envío 👇\n\n📦 Enviamos por Correo Argentino\n* Demora: 7 a 10 días hábiles\n* Pago: SOLO en efectivo al recibir\n* El envio va a tu domicilio pero a veces el correo solicita retiro por sucursal\n\n👉 En ese caso: si el correo así lo dispone, ¿nos asegurás que podés llegarte al correo a retirar dentro de las 72 hs?.\n\nSi dan el Ok, pedimos los datos.","step":"waiting_plan_choice"}
+{"timestamp":"2026-02-15T13:38:17.035Z","userId":"92273161334887@lid","role":"user","content":"Ok","step":"waiting_ok"}
+{"timestamp":"2026-02-15T13:38:20.042Z","userId":"92273161334887@lid","role":"bot","content":"Perfecto 🙌 Entonces tomamos el pedido.\n\n📦 Datos para el envío:\n* Nombre completo:\n* Calle y número:\n* Ciudad:\n* Código postal:\n\nCuando el cliente confirma que si, adjuntamos el detalle de la compra.","step":"waiting_ok"}
+{"timestamp":"2026-02-15T13:38:48.664Z","userId":"92273161334887@lid","role":"user","content":"Horacio giosue benegas 77 rosario 2000","step":"waiting_data"}
+{"timestamp":"2026-02-15T13:38:52.485Z","userId":"92273161334887@lid","role":"bot","content":"Gracias por los datos 🙌 Estoy verificando todo, te confirmo en un momento.","step":"waiting_admin_ok"}
+{"timestamp":"2026-02-15T13:38:57.537Z","userId":"92273161334887@lid","role":"user","content":"Ok","step":"waiting_admin_ok"}
+{"timestamp":"2026-02-15T13:39:00.551Z","userId":"92273161334887@lid","role":"bot","content":"Estamos revisando tu pedido, te confirmo en breve 😊","step":"waiting_admin_ok"}
+{"timestamp":"2026-02-15T13:44:14.287Z","userId":"92273161334887@lid","role":"user","content":"Hola","step":"new_user"}
+{"timestamp":"2026-02-15T13:44:17.292Z","userId":"92273161334887@lid","role":"bot","content":"Hola! 😊 Gracias por escribir a HERBALIS 🌿\n\nTrabajamos con Nuez de la India y sus derivados:\n✔ Cápsulas\n✔ Gotas\n✔ Semillas\n\nEs un método natural para bajar de peso sin dietas extremas.\n📦 Envíos a todo el país | Pagás al recibir\n\n*Adjuntar 3 imagenes sin precio (Simulado)*\n\nLas tres opciones son igualmente efectivas y el tratamiento de 60 dias tiene un valor promedio de $ 40 mil. NO HAY COSTOS DE ENVIO.\n\nDecime por favor cuantos kilos queres perder y te recomiendo la mejor opcion para tu caso.","step":"greeting"}
+{"timestamp":"2026-02-15T13:45:12.133Z","userId":"92273161334887@lid","role":"user","content":"12","step":"waiting_weight"}
+{"timestamp":"2026-02-15T13:45:15.705Z","userId":"92273161334887@lid","role":"bot","content":"La nuez de la india y sus derivados son el mejor producto natural para perder peso que existe. Hace 12 años que los distribuimos en varios países, mas de 70 mil clientes y casos de mas de 60 kilos perdidos.\n\nEse objetivo es totalmente alcanzable con nuestros planes.\nAntes de recomendarte el producto ideal, necesito saber que preferis:\n\n👉 algo:\n1️⃣ Súper práctico (cápsulas o gotas)\n2️⃣ Más natural/tradicional (semillas e infusiones)? Esta opcion requiere una preparacion diaria.","step":"waiting_weight"}
+{"timestamp":"2026-02-15T13:45:23.233Z","userId":"92273161334887@lid","role":"user","content":"1","step":"waiting_preference"}
+{"timestamp":"2026-02-15T13:45:26.244Z","userId":"92273161334887@lid","role":"bot","content":"Genial 👍 Entonces cápsulas es la mejor opción para vos.\n\n💊 Cómo se toman:\n* 1 cápsula por día\n* 30 min antes del almuerzo o la cena\nEs un plan muy práctico, ideal para mantener constancia.\n\n* Plan 60 días: $45.900\n* Plan 120 días: $82.600\n📦 Envío gratis a todo el país\n💵 Pagás recién cuando lo recibís\n\n👉 ¿Con cuál te gustaría avanzar? (Escribí \"60\" o \"120\")","step":"waiting_preference"}
+{"timestamp":"2026-02-15T13:45:33.799Z","userId":"92273161334887@lid","role":"user","content":"60","step":"waiting_plan_choice"}
+{"timestamp":"2026-02-15T13:45:36.804Z","userId":"92273161334887@lid","role":"bot","content":"Perfecto 👍 Antes de continuar necesito confirmarte algo importante sobre el envío 👇\n\n📦 Enviamos por Correo Argentino\n* Demora: 7 a 10 días hábiles\n* Pago: SOLO en efectivo al recibir\n* El envio va a tu domicilio pero a veces el correo solicita retiro por sucursal\n\n👉 En ese caso: si el correo así lo dispone, ¿nos asegurás que podés llegarte al correo a retirar dentro de las 72 hs?.\n\nSi dan el Ok, pedimos los datos.","step":"waiting_plan_choice"}
+{"timestamp":"2026-02-15T13:45:49.859Z","userId":"92273161334887@lid","role":"user","content":"Ok","step":"waiting_ok"}
+{"timestamp":"2026-02-15T13:45:52.873Z","userId":"92273161334887@lid","role":"bot","content":"Perfecto 🙌 Entonces tomamos el pedido.\n\n📦 Datos para el envío:\n* Nombre completo:\n* Calle y número:\n* Ciudad:\n* Código postal:\n\nCuando el cliente confirma que si, adjuntamos el detalle de la compra.","step":"waiting_ok"}
+{"timestamp":"2026-02-15T13:46:08.755Z","userId":"92273161334887@lid","role":"user","content":"Horacio giosue benegas 77 rosario 2000","step":"waiting_data"}
+{"timestamp":"2026-02-15T13:46:12.632Z","userId":"92273161334887@lid","role":"bot","content":"Gracias por los datos 🙌 Estoy verificando todo, te confirmo en un momento.","step":"waiting_admin_ok"}
+{"timestamp":"2026-02-15T13:47:22.727Z","userId":"92273161334887@lid","role":"bot","content":"📦 *INFORMACIÓN FINAL DE ENVÍO – IMPORTANTE*\n\n*Producto:* Cápsulas de nuez de la india\n*Cantidad:* Plan de 60 días\n*Precio:* $ 45.900 .-\n\n✔ Correo Argentino\n✔ Pago en efectivo al recibir\n✔ 7 a 10 días hábiles\n\n* Si el cartero no te encuentra, puede pedir retiro en sucursal\n* Plazo de retiro: 72 hs hábiles\n. Sin costos de envío.\n\nTe recordamos que el rechazo del pedido o el no retiro dentro de las 72 hs generará un gasto de $ 18.000.- Damos por hecho que estás aceptando esta condición.\n\n¡Gracias por elegir Herbalis! Nuestro horario de atención es de lunes a lunes de 9 a 21 hs. Quedamos a tu disposición.\n\n📞 *Número de contacto alternativo:* 3413755757","step":"order_confirmed"}
+{"timestamp":"2026-02-15T13:52:53.983Z","userId":"92273161334887@lid","role":"user","content":"Hola","step":"new_user"}
+{"timestamp":"2026-02-15T13:52:56.988Z","userId":"92273161334887@lid","role":"bot","content":"Hola! 😊 Gracias por escribir a HERBALIS 🌿\n\nTrabajamos con Nuez de la India y sus derivados:\n✔ Cápsulas\n✔ Gotas\n✔ Semillas\n\nEs un método natural para bajar de peso sin dietas extremas.\n📦 Envíos a todo el país | Pagás al recibir\n\n*Adjuntar 3 imagenes sin precio (Simulado)*\n\nLas tres opciones son igualmente efectivas y el tratamiento de 60 dias tiene un valor promedio de $ 40 mil. NO HAY COSTOS DE ENVIO.\n\nDecime por favor cuantos kilos queres perder y te recomiendo la mejor opcion para tu caso.","step":"greeting"}
+{"timestamp":"2026-02-15T13:54:13.661Z","userId":"92273161334887@lid","role":"user","content":"12","step":"waiting_weight"}
+{"timestamp":"2026-02-15T13:54:17.342Z","userId":"92273161334887@lid","role":"bot","content":"La nuez de la india y sus derivados son el mejor producto natural para perder peso que existe. Hace 12 años que los distribuimos en varios países, mas de 70 mil clientes y casos de mas de 60 kilos perdidos.\n\nEse objetivo es totalmente alcanzable con nuestros planes.\nAntes de recomendarte el producto ideal, necesito saber que preferis:\n\n👉 algo:\n1️⃣ Súper práctico (cápsulas o gotas)\n2️⃣ Más natural/tradicional (semillas e infusiones)? Esta opcion requiere una preparacion diaria.","step":"waiting_weight"}
+{"timestamp":"2026-02-15T13:54:24.463Z","userId":"92273161334887@lid","role":"user","content":"1","step":"waiting_preference"}
+{"timestamp":"2026-02-15T13:54:27.472Z","userId":"92273161334887@lid","role":"bot","content":"Genial 👍 Entonces cápsulas es la mejor opción para vos.\n\n💊 Cómo se toman:\n* 1 cápsula por día\n* 30 min antes del almuerzo o la cena\nEs un plan muy práctico, ideal para mantener constancia.\n\n* Plan 60 días: $45.900\n* Plan 120 días: $82.600\n📦 Envío gratis a todo el país\n💵 Pagás recién cuando lo recibís\n\n👉 ¿Con cuál te gustaría avanzar? (Escribí \"60\" o \"120\")","step":"waiting_preference"}
+{"timestamp":"2026-02-15T13:54:32.877Z","userId":"92273161334887@lid","role":"user","content":"60","step":"waiting_plan_choice"}
+{"timestamp":"2026-02-15T13:54:35.884Z","userId":"92273161334887@lid","role":"bot","content":"Perfecto 👍 Antes de continuar necesito confirmarte algo importante sobre el envío 👇\n\n📦 Enviamos por Correo Argentino\n* Demora: 7 a 10 días hábiles\n* Pago: SOLO en efectivo al recibir\n* El envio va a tu domicilio pero a veces el correo solicita retiro por sucursal\n\n👉 En ese caso: si el correo así lo dispone, ¿nos asegurás que podés llegarte al correo a retirar dentro de las 72 hs?.","step":"waiting_plan_choice"}
+{"timestamp":"2026-02-15T13:54:43.371Z","userId":"92273161334887@lid","role":"user","content":"Si","step":"waiting_ok"}
+{"timestamp":"2026-02-15T13:54:46.387Z","userId":"92273161334887@lid","role":"bot","content":"Perfecto 🙌 Entonces tomamos el pedido.\n\n📦 Datos para el envío:\n* Nombre completo:\n* Calle y número:\n* Ciudad:\n* Código postal:\n\nCuando el cliente confirma que si, adjuntamos el detalle de la compra.","step":"waiting_ok"}
+{"timestamp":"2026-02-15T13:55:42.654Z","userId":"92273161334887@lid","role":"user","content":"Horacio giosue benegas 77 rosario 2000","step":"waiting_data"}
+{"timestamp":"2026-02-15T13:55:46.449Z","userId":"92273161334887@lid","role":"bot","content":"Gracias por los datos 🙌 Estoy verificando todo, te confirmo en un momento.","step":"waiting_admin_ok"}
+{"timestamp":"2026-02-15T13:56:04.885Z","userId":"92273161334887@lid","role":"bot","content":"📦 *INFORMACIÓN FINAL DE ENVÍO – IMPORTANTE*\n\n*Producto:* Cápsulas de nuez de la india\n*Cantidad:* Plan de 60 días\n*Precio:* $ 45.900 .-\n\n✔ Correo Argentino\n✔ Pago en efectivo al recibir\n✔ 7 a 10 días hábiles\n\n* Si el cartero no te encuentra, puede pedir retiro en sucursal\n* Plazo de retiro: 72 hs hábiles\n. Sin costos de envío.\n\nTe recordamos que el rechazo del pedido o el no retiro dentro de las 72 hs generará un gasto de $ 18.000.- Damos por hecho que estás aceptando esta condición.\n\n¡Gracias por elegir Herbalis! Nuestro horario de atención es de lunes a lunes de 9 a 21 hs. Quedamos a tu disposición.\n\n📞 *Número de contacto alternativo:* 3413755757","step":"order_confirmed"}
+{"timestamp":"2026-02-15T14:58:56.422Z","userId":"92273161334887@lid","role":"user","content":"MEDIA_AUDIO:/media/audio_1771167536421_92273161334887.ogg; codecs=opus","step":"completed"}
+{"timestamp":"2026-02-15T15:13:23.724Z","userId":"92273161334887@lid","role":"user","content":"Hola","step":"completed"}
+{"timestamp":"2026-02-15T15:13:26.736Z","userId":"92273161334887@lid","role":"system","content":"Bot paused - admin handling","step":"paused"}
+{"timestamp":"2026-02-15T15:13:36.991Z","userId":"92273161334887@lid","role":"user","content":"","step":"completed"}
+{"timestamp":"2026-02-15T15:13:40.006Z","userId":"92273161334887@lid","role":"system","content":"Bot paused - admin handling","step":"paused"}
+{"timestamp":"2026-02-15T15:14:49.149Z","userId":"92273161334887@lid","role":"user","content":"MEDIA_IMAGE:/media/sticker_1771168489148_92273161334887.webp","step":"completed"}
+{"timestamp":"2026-02-15T15:15:01.902Z","userId":"92273161334887@lid","role":"user","content":"Asd","step":"completed"}
+{"timestamp":"2026-02-15T15:15:04.910Z","userId":"92273161334887@lid","role":"system","content":"Bot paused - admin handling","step":"paused"}
+{"timestamp":"2026-02-15T22:34:14.516Z","userId":"system","role":"system","content":"Server running on port 3001","step":"startup"}
+{"timestamp":"2026-02-15T22:34:26.992Z","userId":"system","role":"system","content":"Client is ready!","step":"init"}
+{"timestamp":"2026-02-15T22:34:50.634Z","userId":"system","role":"system","content":"Server running on port 3001","step":"startup"}
+{"timestamp":"2026-02-15T22:34:54.333Z","userId":"system","role":"system","content":"Client is ready!","step":"init"}
+{"timestamp":"2026-02-15T22:35:23.434Z","userId":"system","role":"system","content":"Server running on port 3001","step":"startup"}
+{"timestamp":"2026-02-15T22:35:26.921Z","userId":"system","role":"system","content":"Client is ready!","step":"init"}
+{"timestamp":"2026-02-15T22:36:31.187Z","userId":"system","role":"system","content":"Server running on port 3001","step":"startup"}
+{"timestamp":"2026-02-15T22:36:34.967Z","userId":"system","role":"system","content":"Client is ready!","step":"init"}
+{"timestamp":"2026-02-15T22:38:10.747Z","userId":"92273161334887@lid","role":"user","content":"Hola","step":"new_message"}
+{"timestamp":"2026-02-15T22:38:13.765Z","userId":"92273161334887@lid","role":"system","content":"Bot paused - admin handling","step":"paused"}
+{"timestamp":"2026-02-15T23:03:11.632Z","userId":"system","role":"system","content":"Creating session: client1","step":"init"}
+{"timestamp":"2026-02-15T23:03:11.636Z","userId":"system","role":"system","content":"Creating session: client2","step":"init"}
+{"timestamp":"2026-02-15T23:03:11.638Z","userId":"system","role":"system","content":"Server running on port 3001","step":"startup"}
+{"timestamp":"2026-02-15T23:03:20.284Z","userId":"system","role":"system","content":"QR for client1","step":"init"}
+{"timestamp":"2026-02-15T23:03:20.442Z","userId":"system","role":"system","content":"QR for client2","step":"init"}
+{"timestamp":"2026-02-15T23:04:20.062Z","userId":"system","role":"system","content":"QR for client1","step":"init"}
+{"timestamp":"2026-02-15T23:04:20.139Z","userId":"system","role":"system","content":"QR for client2","step":"init"}
+{"timestamp":"2026-02-15T23:04:40.076Z","userId":"system","role":"system","content":"QR for client1","step":"init"}
+{"timestamp":"2026-02-15T23:04:40.144Z","userId":"system","role":"system","content":"QR for client2","step":"init"}
+{"timestamp":"2026-02-15T23:05:00.091Z","userId":"system","role":"system","content":"QR for client1","step":"init"}
+{"timestamp":"2026-02-15T23:05:00.153Z","userId":"system","role":"system","content":"QR for client2","step":"init"}
+{"timestamp":"2026-02-15T23:05:20.104Z","userId":"system","role":"system","content":"QR for client1","step":"init"}
+{"timestamp":"2026-02-15T23:05:20.166Z","userId":"system","role":"system","content":"QR for client2","step":"init"}
+{"timestamp":"2026-02-15T23:05:40.118Z","userId":"system","role":"system","content":"QR for client1","step":"init"}
+{"timestamp":"2026-02-15T23:05:40.181Z","userId":"system","role":"system","content":"QR for client2","step":"init"}
+{"timestamp":"2026-02-15T23:05:50.577Z","userId":"system","role":"system","content":"Creating session: client1","step":"init"}
+{"timestamp":"2026-02-15T23:05:50.581Z","userId":"system","role":"system","content":"Creating session: client2","step":"init"}
+{"timestamp":"2026-02-15T23:05:50.585Z","userId":"system","role":"system","content":"Server running on port 3001","step":"startup"}
+{"timestamp":"2026-02-15T23:05:56.793Z","userId":"system","role":"system","content":"QR for client1","step":"init"}
+{"timestamp":"2026-02-15T23:05:57.230Z","userId":"system","role":"system","content":"QR for client2","step":"init"}
+{"timestamp":"2026-02-15T23:06:56.646Z","userId":"system","role":"system","content":"QR for client1","step":"init"}
+{"timestamp":"2026-02-15T23:06:57.113Z","userId":"system","role":"system","content":"QR for client2","step":"init"}
+{"timestamp":"2026-02-15T23:07:21.210Z","userId":"system","role":"system","content":"Creating session: client1","step":"init"}
+{"timestamp":"2026-02-15T23:07:21.214Z","userId":"system","role":"system","content":"Creating session: client2","step":"init"}
+{"timestamp":"2026-02-15T23:07:21.218Z","userId":"system","role":"system","content":"Server running on port 3001","step":"startup"}
+{"timestamp":"2026-02-15T23:07:27.742Z","userId":"system","role":"system","content":"QR for client1","step":"init"}
+{"timestamp":"2026-02-15T23:07:28.037Z","userId":"system","role":"system","content":"QR for client2","step":"init"}
+{"timestamp":"2026-02-15T23:08:27.610Z","userId":"system","role":"system","content":"QR for client1","step":"init"}
+{"timestamp":"2026-02-15T23:08:27.937Z","userId":"system","role":"system","content":"QR for client2","step":"init"}
+{"timestamp":"2026-02-15T23:08:47.613Z","userId":"system","role":"system","content":"QR for client1","step":"init"}
+{"timestamp":"2026-02-15T23:08:47.938Z","userId":"system","role":"system","content":"QR for client2","step":"init"}
+{"timestamp":"2026-02-15T23:09:07.619Z","userId":"system","role":"system","content":"QR for client1","step":"init"}
+{"timestamp":"2026-02-15T23:09:07.941Z","userId":"system","role":"system","content":"QR for client2","step":"init"}
+{"timestamp":"2026-02-15T23:09:27.630Z","userId":"system","role":"system","content":"QR for client1","step":"init"}
+{"timestamp":"2026-02-15T23:09:27.955Z","userId":"system","role":"system","content":"QR for client2","step":"init"}
+{"timestamp":"2026-02-15T23:09:51.600Z","userId":"system","role":"system","content":"Creating session: client1","step":"init"}
+{"timestamp":"2026-02-15T23:09:51.602Z","userId":"system","role":"system","content":"Creating session: client2","step":"init"}
+{"timestamp":"2026-02-15T23:09:51.605Z","userId":"system","role":"system","content":"Server running on port 3001","step":"startup"}
+{"timestamp":"2026-02-15T23:09:58.660Z","userId":"system","role":"system","content":"QR for client1","step":"init"}
+{"timestamp":"2026-02-15T23:09:59.010Z","userId":"system","role":"system","content":"QR for client2","step":"init"}
+{"timestamp":"2026-02-15T23:10:58.515Z","userId":"system","role":"system","content":"QR for client1","step":"init"}
+{"timestamp":"2026-02-15T23:10:58.885Z","userId":"system","role":"system","content":"QR for client2","step":"init"}
+{"timestamp":"2026-02-15T23:11:18.526Z","userId":"system","role":"system","content":"QR for client1","step":"init"}
+{"timestamp":"2026-02-15T23:11:18.897Z","userId":"system","role":"system","content":"QR for client2","step":"init"}
+{"timestamp":"2026-02-15T23:11:38.531Z","userId":"system","role":"system","content":"QR for client1","step":"init"}
+{"timestamp":"2026-02-15T23:11:38.902Z","userId":"system","role":"system","content":"QR for client2","step":"init"}
+{"timestamp":"2026-02-15T23:11:58.546Z","userId":"system","role":"system","content":"QR for client1","step":"init"}
+{"timestamp":"2026-02-15T23:11:58.915Z","userId":"system","role":"system","content":"QR for client2","step":"init"}
+{"timestamp":"2026-02-15T23:12:18.551Z","userId":"system","role":"system","content":"QR for client1","step":"init"}
+{"timestamp":"2026-02-15T23:12:18.915Z","userId":"system","role":"system","content":"QR for client2","step":"init"}
+{"timestamp":"2026-02-15T23:12:31.114Z","userId":"system","role":"system","content":"Creating session: client1","step":"init"}
+{"timestamp":"2026-02-15T23:12:31.120Z","userId":"system","role":"system","content":"Server running on port 3001","step":"startup"}
+{"timestamp":"2026-02-15T23:12:36.291Z","userId":"system","role":"system","content":"QR for client1","step":"init"}
+{"timestamp":"2026-02-15T23:13:36.169Z","userId":"system","role":"system","content":"QR for client1","step":"init"}
+{"timestamp":"2026-02-15T23:13:51.596Z","userId":"system","role":"system","content":"Creating session: client1","step":"init"}
+{"timestamp":"2026-02-15T23:13:51.604Z","userId":"system","role":"system","content":"Server running on port 3001","step":"startup"}
+{"timestamp":"2026-02-15T23:13:56.348Z","userId":"system","role":"system","content":"QR for client1","step":"init"}
+{"timestamp":"2026-02-15T23:14:56.225Z","userId":"system","role":"system","content":"QR for client1","step":"init"}
+{"timestamp":"2026-02-15T23:15:09.279Z","userId":"system","role":"system","content":"Creating session: client1","step":"init"}
+{"timestamp":"2026-02-15T23:15:09.291Z","userId":"system","role":"system","content":"Server running on port 3001","step":"startup"}
+{"timestamp":"2026-02-15T23:15:14.170Z","userId":"system","role":"system","content":"QR for client1","step":"init"}
+{"timestamp":"2026-02-15T23:16:14.058Z","userId":"system","role":"system","content":"QR for client1","step":"init"}
+{"timestamp":"2026-02-15T23:16:29.183Z","userId":"system","role":"system","content":"Session client1 ready!","step":"init"}
+{"timestamp":"2026-02-15T23:17:12.240Z","userId":"92273161334887@lid","role":"user","content":"Buenas","step":"new_message [client1]"}
+{"timestamp":"2026-02-15T23:17:15.246Z","userId":"92273161334887@lid","role":"bot","content":"[client1] ¡Hola! 👋 Bienvenido a Herbalis.","step":"greeting"}

@@ -1,0 +1,13 @@
+{
+  "userState": {
+    "92273161334887@lid": {
+      "step": "waiting_weight",
+      "lastMessage": "[client1] ¡Hola! 👋 Bienvenido a Herbalis."
+    }
+  },
+  "lastAlertUser": null,
+  "pausedUsers": [],
+  "config": {
+    "alertNumber": null
+  }
+}

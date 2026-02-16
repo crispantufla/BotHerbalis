@@ -1,0 +1,41 @@
+{
+  "userState": {
+    "5493413459765@c.us": {
+      "step": "waiting_weight",
+      "lastMessage": "Hola! 😊 Gracias por escribir a HERBALIS 🌿\n\nTrabajamos con Nuez de la India y sus derivados:\n✔ Cápsulas\n✔ Gotas\n✔ Semillas\n\nEs un método natural para bajar de peso sin dietas extremas.\n📦 Envíos a todo el país | Pagás al recibir\n\n*Adjuntar 3 imagenes sin precio (Simulado)*\n\nLas tres opciones son igualmente efectivas y el tratamiento de 60 dias tiene un valor promedio de $ 40 mil. NO HAY COSTOS DE ENVIO.\n\nDecime por favor cuantos kilos queres perder y te recomiendo la mejor opcion para tu caso.",
+      "addressAttempts": 0,
+      "partialAddress": {}
+    },
+    "21122800185466@lid": {
+      "step": "waiting_weight",
+      "lastMessage": "Hola! 😊 Gracias por escribir a HERBALIS 🌿\n\nTrabajamos con Nuez de la India y sus derivados:\n✔ Cápsulas\n✔ Gotas\n✔ Semillas\n\nEs un método natural para bajar de peso sin dietas extremas.\n📦 Envíos a todo el país | Pagás al recibir\n\n*Adjuntar 3 imagenes sin precio (Simulado)*\n\nLas tres opciones son igualmente efectivas y el tratamiento de 60 dias tiene un valor promedio de $ 40 mil. NO HAY COSTOS DE ENVIO.\n\nDecime por favor cuantos kilos queres perder y te recomiendo la mejor opcion para tu caso.",
+      "addressAttempts": 0,
+      "partialAddress": {}
+    },
+    "92273161334887@lid": {
+      "step": "waiting_ok",
+      "lastMessage": "¡Che, mirá, lamento mucho que te sientas así! ¡Mi intención es ayudarte!\n\nAhora, para poder coordinar la entrega, ¿me confirmás si podrías retirar el paquete en la sucursal del correo si te lo solicitan, dale? Así nos aseguramos de que todo llegue perfecto.\n",
+      "addressAttempts": 1,
+      "partialAddress": {
+        "nombre": "Horacio Giosue",
+        "calle": "Benegas 77",
+        "ciudad": "Rosario",
+        "cp": "2000"
+      },
+      "selectedProduct": "Cápsulas de nuez de la india",
+      "selectedPlan": "60",
+      "price": "45.900",
+      "pendingOrder": {
+        "nombre": "Horacio Giosue",
+        "calle": "Benegas 77",
+        "ciudad": "Rosario",
+        "cp": "2000"
+      }
+    }
+  },
+  "lastAlertUser": "92273161334887@lid",
+  "pausedUsers": [],
+  "config": {
+    "alertNumber": "34621332862"
+  }
+}
