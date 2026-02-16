@@ -296,10 +296,9 @@ function startServer(client, sharedState) {
     app.post('/api/admin-command', async (req, res) => {
         const { chatId, command } = req.body;
         try {
-            // We need to access logic from index.js for this. 
-            // Better to pass handleAdminCommand in sharedState.
-            if (handleAdminCommand) {
-                const result = await handleAdminCommand(chatId, command, true);
+            // Access handleAdminCommand dynamically from sharedState
+            if (sharedState.handleAdminCommand) {
+                const result = await sharedState.handleAdminCommand(chatId, command, true);
                 res.json({ success: true, message: result });
             } else {
                 res.status(501).json({ error: "Handler not attached" });

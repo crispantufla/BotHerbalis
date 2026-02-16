@@ -297,15 +297,25 @@ class AIService {
      */
     async parseAddress(text) {
         const prompt = `
-        Extraé una dirección postal de Argentina de este texto: "${text}".
-        Devolver JSON:
+        Analizá el siguiente texto y extraé una dirección postal de Argentina.
+        El texto puede estar desordenado o sin etiquetas (ej: "juan perez av libertador 1234 caba 1425").
+        
+        TEXTO DEL USUARIO: "${text}"
+
+        DETALLES DE EXTRACCIÓN:
+        - nombre: Si hay un nombre de persona al inicio, extraelo.
+        - calle: La calle y la altura (ej: "Benegas 77", "Av. Santa Fe 1234").
+        - ciudad: La localidad o ciudad (ej: "Rosario", "CABA").
+        - cp: El código postal numérico (ej: "2000", "1414").
+        
+        Devolver JSON PURO:
         {
-          "nombre": "nombre completo o null",
+          "nombre": "nombre detectado o null",
           "calle": "calle y altura o null",
           "ciudad": "ciudad/localidad o null",
           "cp": "código postal o null",
-          "direccion_valida": boolean,
-          "comentario": "razón si es invalida"
+          "direccion_valida": boolean (true si hay al menos calle y altura),
+          "comentario": "razón si es invalida o falta algo"
         }
         `;
         try {
