@@ -188,13 +188,22 @@ app.get('/api/history/:id', async (req, res) => {
         try {
             const chat = await client.getChatById(chatId);
             const waMessages = await chat.fetchMessages({ limit: 100 });
-            messages = waMessages.map(m => ({
-                fromMe: m.fromMe,
-                body: m.body,
-                timestamp: m.timestamp,
-                type: m.type,
-                id: m.id._serialized
-            }));
+            messages = waMessages.map(m => {
+                let body = m.body;
+                // If it's a media message and has no body (WhatsApp standard), 
+                // we mark it so the frontend can try to find it in local logs or at least show it's media.
+                if (m.hasMedia && !body) {
+                    if (m.type === 'audio' || m.type === 'ptt') body = 'MEDIA_AUDIO:PENDING';
+                    else if (m.type === 'image' || m.type === 'sticker') body = 'MEDIA_IMAGE:PENDING';
+                }
+                return {
+                    fromMe: m.fromMe,
+                    body: body,
+                    timestamp: m.timestamp,
+                    type: m.type,
+                    id: m.id._serialized
+                };
+            });
         } catch (waErr) {
             console.error(`[HISTORY] WA Fetch Error for ${chatId}:`, waErr.message);
         }
@@ -203,20 +212,28 @@ app.get('/api/history/:id', async (req, res) => {
         const localMessages = getLocalHistory(chatId);
 
         // 3. Merge and deduplicate
-        // Fuzzy matching: ignore if same body/sender within a 2-second window
-        const combined = [...messages];
+        // We want to PRIORITIZE local logs for media messages because they contain the file paths.
+        // We'll iterate through WA messages and "upgrade" them if we find a matching local media log.
+        const refinedMessages = messages.map(m => {
+            if (m.hasMedia || m.type === 'image' || m.type === 'audio' || m.type === 'ptt' || m.type === 'sticker') {
+                const match = localMessages.find(lm => {
+                    const timeDiff = Math.abs(m.timestamp - lm.timestamp);
+                    const sameRole = m.fromMe === lm.fromMe;
+                    const isMediaLog = lm.body?.startsWith('MEDIA_');
+                    return sameRole && timeDiff <= 3 && isMediaLog;
+                });
+                if (match) return { ...m, body: match.body }; // Enhance with local tag
+            }
+            return m;
+        });
+
+        const combined = [...refinedMessages];
 
         localMessages.forEach(lm => {
-            const isDuplicate = messages.some(m => {
+            const isDuplicate = refinedMessages.some(m => {
                 const timeDiff = Math.abs(m.timestamp - lm.timestamp);
                 const sameRole = m.fromMe === lm.fromMe;
-
-                // Exact body match or media tag/type match
-                const bodyMatch = m.body === lm.body ||
-                    (lm.body?.startsWith('MEDIA_AUDIO:') && (m.type === 'audio' || m.type === 'ptt')) ||
-                    (lm.body?.startsWith('MEDIA_IMAGE:') && (m.type === 'image' || m.type === 'sticker'));
-
-                return sameRole && timeDiff <= 2 && bodyMatch;
+                return sameRole && timeDiff <= 2 && (m.body === lm.body || (lm.body?.startsWith('MEDIA_') && m.hasMedia));
             });
 
             if (!isDuplicate) {
@@ -568,48 +585,24 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false) {
         const clientState = userState[actualTarget];
         if (clientState && clientState.step === 'waiting_admin_ok' && clientState.pendingOrder) {
             const o = clientState.pendingOrder;
-            const productName = clientState.selectedProduct || "Nuez de la India (a confirmar)";
-            const planName = clientState.selectedPlan ? `Plan de ${clientState.selectedPlan} días` : "Plan a confirmar";
-            const price = clientState.price || "A confirmar";
+            const product = clientState.selectedProduct || "Nuez de la India";
+            const plan = clientState.selectedPlan || "60";
+            const price = clientState.price || (product.includes("Cápsulas") ? "45.900" : "34.900");
 
-            const confirmMsg = `📦 *INFORMACIÓN FINAL DE ENVÍO – IMPORTANTE*\n\n` +
-                `*Producto:* ${productName}\n` +
-                `*Cantidad:* ${planName}\n` +
-                `*Precio:* $ ${price} .-\n\n` +
-                `✔ Correo Argentino\n` +
-                `✔ Pago en efectivo al recibir\n` +
-                `✔ 7 a 10 días hábiles\n\n` +
-                `* Si el cartero no te encuentra, puede pedir retiro en sucursal\n` +
-                `* Plazo de retiro: 72 hs hábiles\n` +
-                `. Sin costos de envío.\n\n` +
-                `Te recordamos que el rechazo del pedido o el no retiro dentro de las 72 hs generará un gasto de $ 18.000.- Damos por hecho que estás aceptando esta condición.\n\n` +
-                `¡Gracias por elegir Herbalis! Nuestro horario de atención es de lunes a lunes de 9 a 21 hs. Quedamos a tu disposición.\n\n` +
-                `📞 *Número de contacto alternativo:* 3413755757`;
+            const summary = `✅ *PEDIDO CASI LISTO* 😊\n\n📌 *Resumen de tu compra:*\n• Producto: ${product}\n• Plan: ${plan} días\n• Total a pagar: *$${price}* (en efectivo al recibir)\n\n📦 *Envío por Correo Argentino*\n⏳ Demora estimada: 7 a 10 días hábiles\n\n📍 *A tener en cuenta:*\n• Si el cartero no te encuentra, el correo puede pedir retiro en sucursal\n• El plazo de retiro es de 72 hs hábiles\n• Rechazar el pedido genera un costo de $16.500\n\n👉 Para confirmar el despacho respondé por favor: *“LEÍ Y ACEPTO LAS CONDICIONES DE ENVÍO”*`;
 
-            await client.sendMessage(actualTarget, confirmMsg);
-            logAndEmit(actualTarget, 'bot', confirmMsg, 'order_confirmed');
-            clientState.step = 'completed';
+            await client.sendMessage(actualTarget, summary);
+            logAndEmit(actualTarget, 'bot', summary, 'waiting_legal_acceptance');
+            clientState.step = 'waiting_legal_acceptance';
             saveState();
-
-            saveOrderToLocal({
-                cliente: actualTarget,
-                nombre: o.nombre, calle: o.calle, ciudad: o.ciudad, cp: o.cp,
-                producto: productName, plan: planName, precio: price
-            });
-
-            appendOrderToSheet({
-                cliente: actualTarget,
-                nombre: o.nombre, calle: o.calle, ciudad: o.ciudad, cp: o.cp,
-                producto: productName, plan: planName, precio: price
-            }).catch(e => console.error('🔴 [SHEETS] Async log failed:', e.message));
 
             // Clear alerts for this user
             const index = sessionAlerts.findIndex(a => a.userPhone === actualTarget);
             if (index !== -1) sessionAlerts.splice(index, 1);
 
-            return `✅ Pedido confirmado para ${actualTarget}`;
+            return `✅ Resumen enviado a ${actualTarget}. Esperando aceptación legal.`;
         }
-        return "⚠️ No hay pedido pendiente.";
+        return "⚠️ No hay pedido pendiente de aprobación.";
     }
 
     // 3. Pause
@@ -806,14 +799,15 @@ client.on('message', async msg => {
     // --- SAFETY FILTERS ---
 
     // 1. Multimedia Handler (Audio, Stickers, Images)
-    if (msg.type === 'ptt' || msg.type === 'audio' || msg.type === 'sticker' || msg.type === 'image') {
+    if (msg.hasMedia || msg.type === 'ptt' || msg.type === 'audio' || msg.type === 'sticker' || msg.type === 'image') {
         console.log(`[MEDIA] ${msg.type.toUpperCase()} received from ${userId}. Processing...`);
 
         try {
             const media = await msg.downloadMedia();
             if (media) {
                 // Determine extension and filename
-                const extension = media.mimetype.split('/')[1]?.split(';')[0] || (msg.type === 'sticker' ? 'webp' : 'jpg');
+                let extension = media.mimetype.split('/')[1]?.split(';')[0] || (msg.type === 'sticker' ? 'webp' : 'jpg');
+                extension = extension.replace(/[^a-z0-9]/gi, ''); // Sanitize extension
                 const filename = `${msg.type}_${Date.now()}_${userId.split('@')[0]}.${extension}`;
                 const filePath = path.join(__dirname, 'public', 'media', filename);
                 fs.writeFileSync(filePath, Buffer.from(media.data, 'base64'));
@@ -948,6 +942,7 @@ async function handleConversation(userId, text) {
         saveState();
     }
     const currentState = userState[userId];
+    let matched = false;
 
     // 1. Check Global FAQs (Priority 1)
     for (const faq of knowledge.faq) {
@@ -997,9 +992,42 @@ async function handleConversation(userId, text) {
         logAndEmit(userId, 'system', 'Triggering AI Smart Response', currentState.step);
 
         // Generating Response
-        const aiResponse = await generateSmartResponse(text, currentState);
-        if (aiResponse) {
-            await sendMessageWithDelay(userId, aiResponse);
+        console.log(`[AI SMART] Requesting response for step: ${currentState.step}`);
+        const aiData = await generateSmartResponse(text, currentState);
+
+        if (aiData && aiData.response) {
+            console.log(`[AI SMART RESULT] goalMet: ${aiData.goalMet}`);
+
+            // If the AI confirms the user met the goal of the current step, advance the flow
+            if (aiData.goalMet) {
+                // Return to SCRIPT logic
+                const currentStep = currentState.step;
+
+                // Heuristic: Find the node that corresponds to this step
+                const nodeRecord = Object.entries(knowledge.flow).find(([key, val]) => val.step === currentStep);
+                const nextStep = nodeRecord ? nodeRecord[1].nextStep : null;
+
+                if (nextStep) {
+                    // Find the node for the NEXT step to get its script response
+                    const nextNodeRecord = Object.entries(knowledge.flow).find(([key, val]) => key === nextStep || val.step === nextStep);
+                    const nextNode = nextNodeRecord ? nextNodeRecord[1] : null;
+
+                    if (nextNode) {
+                        console.log(`[AI SUCCESS] Returning to script: ${nextStep}`);
+                        await sendMessageWithDelay(userId, nextNode.response);
+                        userState[userId].step = nextNode.nextStep || nextStep;
+                        saveState();
+                        return;
+                    }
+                }
+            }
+
+            // If goal NOT met (or script node found), send the AI's smart fallback response
+            await sendMessageWithDelay(userId, aiData.response);
+        } else {
+            // SAFE FALLBACK: If AI fails (e.g. 429 or error), send a friendly generic message
+            const fallbackMsg = "¡Hola! Perdón, estoy con muchas consultas en este momento. 😅 ¿Me podrías repetir tu pregunta o decirme cuántos kilos buscás bajar así te asesoro mejor? 🙏";
+            await sendMessageWithDelay(userId, fallbackMsg);
         }
     }
 }

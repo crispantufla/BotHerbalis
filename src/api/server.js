@@ -28,7 +28,7 @@ function startServer(client) {
     // Middleware
     app.use(cors());
     app.use(express.json());
-    app.use(express.static('public'));
+    app.use(express.static(path.join(__dirname, '../../public')));
 
     // 1. Health Check
     app.get('/health', (req, res) => {
@@ -124,25 +124,6 @@ function startServer(client) {
         }
     });
 
-    // --- ADMIN COMMAND API (NEW for PDF) ---
-    // Extracting this from handleAdminCommand logic for dashboard testing
-    app.post('/api/admin-command', async (req, res) => {
-        const { command } = req.body;
-        // Re-implement basic analyzeDailyLogs logic here or import it?
-        // Ideally import it, but analyze_day.js is in root.
-        // For now, let's allow it to be simple or require it.
-        try {
-            const { analyzeDailyLogs } = require('../../analyze_day');
-            if (command === '!resumen' || command === '!analisis') {
-                const report = await analyzeDailyLogs();
-                res.json({ message: report || "No hay logs para hoy." });
-            } else {
-                res.json({ message: "Comando no reconocido" });
-            }
-        } catch (e) {
-            res.status(500).json({ error: e.message });
-        }
-    });
 
     // --- SOCKET SYNC ---
     io.on('connection', (socket) => {

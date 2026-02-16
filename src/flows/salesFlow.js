@@ -3,10 +3,32 @@ const { atomicWriteFile } = require('../../safeWrite');
 const { appendOrderToSheet } = require('../../sheets_sync');
 const path = require('path');
 const fs = require('fs');
+const { generateSmartResponse } = require('../services/ai');
 
 // Initialize Gemini (re-using env var)
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+// Helper: Call Gemini with Retries (for 429 errors)
+async function callGeminiWithRetry(prompt, maxRetries = 3) {
+    let lastError = null;
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            const result = await model.generateContent(prompt);
+            return result;
+        } catch (e) {
+            lastError = e;
+            if (e.message?.includes('429') || e.status === 429) {
+                const wait = (i + 1) * 3000; // 3s, 6s, 9s...
+                console.warn(`⚠️ [AI RETRY] Gemini 429. Attempt ${i + 1}/${maxRetries}. Waiting ${wait / 1000}s...`);
+                await new Promise(res => setTimeout(res, wait));
+                continue;
+            }
+            throw e; // Non-429 error, throw immediately
+        }
+    }
+    throw lastError;
+}
 
 /**
  * processSalesFlow
@@ -56,30 +78,22 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             break;
 
         case 'waiting_weight':
-            // AI Check for weight/goal validity
-            const weightCheckPrompt = `
-            Al usuario se le preguntó: "¿Cuántos kilos querés perder?".
-            El usuario respondió: "${text}".
-            ¿Es esto una respuesta válida sobre peso/objetivo? (ej: "10kg", "mucho", "no se", "la panza", "20")
-            ¿O es una pregunta/comentario no relacionado? (ej: "¿cuánto sale?", "¿dónde están?")
-            Devolvé un JSON: {"is_goal": true/false}
-            `;
-            let isGoal = true;
-            try {
-                const result = await model.generateContent(weightCheckPrompt);
-                const jsonText = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
-                const json = JSON.parse(jsonText);
-                isGoal = json.is_goal;
-            } catch (e) {
-                console.error("🔴 [AI CHECK ERROR] weightCheckPrompt failed:", e);
-            }
+            console.log(`[AI ANALYSIS] Requesting deep check for weight: "${text}"`);
+            const aiData = await generateSmartResponse(text, currentState);
 
-            if (isGoal) {
-                await sendMessageWithDelay(userId, knowledge.flow.recommendation.response);
-                userState[userId].step = knowledge.flow.recommendation.nextStep;
+            if (aiData?.goalMet) {
+                // Return to script response for the next step (recommendation)
+                const recNode = knowledge.flow.recommendation;
+                await sendMessageWithDelay(userId, recNode.response);
+                userState[userId].step = recNode.nextStep;
+                saveState();
                 matched = true;
+            } else if (aiData?.response) {
+                // Goal not met (off-script), send AI's guiding response
+                await sendMessageWithDelay(userId, aiData.response);
+                matched = true; // Handled by AI
             } else {
-                matched = false;
+                matched = false; // System error fallback
             }
             break;
 
@@ -100,7 +114,8 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             break;
 
         case 'waiting_price_confirmation':
-            const isYes = lowerText.includes('si') || lowerText.includes('precio') || lowerText.includes('favor') || lowerText.includes('dale') || lowerText.includes('bueno');
+            // Use regex to avoid greedy matches (e.g., "psicologo" containing "si")
+            const isYes = /\b(si|sisi|precio|precios|por favor|favor|dale|bueno|ok|acepto)\b/.test(lowerText);
 
             if (isYes) {
                 if (userState[userId].selectedProduct && userState[userId].selectedProduct.includes("Cápsulas")) {
@@ -118,23 +133,32 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             break;
 
         case 'waiting_plan_choice':
+            let planSelected = false;
             if (lowerText.includes('60')) {
                 userState[userId].selectedPlan = "60";
                 userState[userId].price = (userState[userId].selectedProduct === "Cápsulas de nuez de la india") ? "45.900" : "34.900";
+                planSelected = true;
             } else if (lowerText.includes('120')) {
                 userState[userId].selectedPlan = "120";
                 userState[userId].price = (userState[userId].selectedProduct === "Cápsulas de nuez de la india") ? "82.600" : "61.900";
+                planSelected = true;
             }
 
-            await sendMessageWithDelay(userId, knowledge.flow.closing.response);
-            userState[userId].step = knowledge.flow.closing.nextStep;
-            saveState();
-            matched = true;
+            if (planSelected) {
+                const closingNode = knowledge.flow.closing || knowledge.flow[currentState.step];
+                await sendMessageWithDelay(userId, closingNode.response);
+                userState[userId].step = closingNode.nextStep || currentState.step;
+                saveState();
+                matched = true;
+            } else {
+                // If they didn't specify 60/120, let AI handle the question (like "vendes leche?")
+                matched = false;
+            }
             break;
 
         case 'waiting_ok':
-            const isPositive = knowledge.flow.data_request.match.some(k => lowerText.includes(k)) || lowerText === 'ok';
-            const hasDoubts = lowerText.includes('pero') || lowerText.includes('duda') || lowerText.includes('?') || lowerText.includes('pregunta');
+            const isPositive = /\b(si|sisi|dale|bueno|puedo|retiro|joya|de una|está bien|esta bien|ok|listo)\b/.test(lowerText);
+            const hasDoubts = /\b(pero|duda|pregunta)\b/.test(lowerText) || lowerText.includes('?');
 
             if (isPositive && !hasDoubts) {
                 await sendMessageWithDelay(userId, knowledge.flow.data_request.response);
@@ -165,26 +189,28 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             if (!addr.cp) missing.push('Código postal');
 
             if (missing.length === 0 || (addr.calle && addr.ciudad && missing.length <= 1) || data?._ai_failed) {
-                // ... (Summary Logic)
-                const summary = `IMAGEN DEL PRODUCTO SOLICITADO (TODO: Add Image)\n\n¡Perfecto! 😊\n\n✔ Pedido confirmado:\n• ${currentState.selectedProduct}\n• Plan ${currentState.selectedPlan} días\n• Total a pagar: $${currentState.price} (en efectivo)\n\n📦 Envío por Correo Argentino\n⏳ Demora estimada: 7 a 10 días hábiles\n\n📍 A tener en cuenta:\n• Si el cartero no te encuentra, el correo puede pedir retiro en sucursal\n• El plazo de retiro es de 72 hs hábiles\n• Rechazar el pedido genera un costo de $16.500\n\n👉 Para confirmar el despacho respondé por favor: “LEÍ Y ACEPTO LAS CONDICIONES DE ENVÍO”`;
+                // Determine display values with fallbacks
+                const product = currentState.selectedProduct || "Nuez de la India";
+                const plan = currentState.selectedPlan || "60";
+                const price = currentState.price || (product.includes("Cápsulas") ? "45.900" : "34.900");
 
                 currentState.pendingOrder = { ...addr };
-                userState[userId].step = 'waiting_legal_acceptance';
+                // Ensure the determined values are saved in the state for the next step (legal acceptance)
+                currentState.selectedProduct = product;
+                currentState.selectedPlan = plan;
+                currentState.price = price;
 
-                // Update global alert tracker if possible, or return it? 
-                // It's passed by reference in index.js but here it's trickier.
-                // Ideally dependencies should include a way to setLastAlertUser
-
+                userState[userId].step = 'waiting_admin_ok';
                 saveState();
 
-                await notifyAdmin(`Pedido CASI completo, esperando aceptación legal`, userId, `Datos: ${addr.nombre}, ${addr.calle}, ${addr.ciudad}, ${addr.cp}`);
-                await sendMessageWithDelay(userId, summary);
+                await notifyAdmin(`Pedido CASI completo, ESPERANDO APROBACIÓN ADMIN`, userId, `Datos: ${addr.nombre}, ${addr.calle}, ${addr.ciudad}, ${addr.cp}`);
+                await sendMessageWithDelay(userId, `¡Gracias por los datos! 🙌 Mi compañero va a revisar tu pedido y te confirma en breve. ¡Ya queda poco!`);
                 matched = true;
             } else if (currentState.addressAttempts >= 2) {
                 const rawInfo = `Texto: "${text}"\nParse: ${addr.nombre || '?'}, ${addr.calle || '?'}, ${addr.ciudad || '?'}, ${addr.cp || '?'}`;
                 await notifyAdmin(`No pude parsear la dirección`, userId, rawInfo);
                 await sendMessageWithDelay(userId, `Gracias por los datos 🙌 Mi compañero va a revisar tu pedido y te confirma en breve. ¡Ya queda poco!`);
-                userState[userId].step = 'waiting_legal_acceptance';
+                userState[userId].step = 'waiting_admin_ok';
                 saveState();
                 matched = true;
             } else {
@@ -199,7 +225,13 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             break;
 
         case 'waiting_legal_acceptance':
-            const acceptance = lowerText.includes('lei') && lowerText.includes('acepto') && lowerText.includes('condiciones');
+            // Use Unicode-aware boundaries to support accented characters like 'leí'
+            const boundaryStart = '(?<!\\p{L})';
+            const boundaryEnd = '(?![\\p{L}\\p{M}])';
+
+            const acceptance = new RegExp(`${boundaryStart}(leí|lei)${boundaryEnd}`, 'ui').test(lowerText) &&
+                new RegExp(`${boundaryStart}acepto${boundaryEnd}`, 'ui').test(lowerText) &&
+                new RegExp(`${boundaryStart}condiciones${boundaryEnd}`, 'ui').test(lowerText);
 
             if (acceptance) {
                 await sendMessageWithDelay(userId, "Tu envío está en curso, gracias");
@@ -232,7 +264,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 saveState();
                 matched = true;
             } else {
-                if (lowerText.includes('ok') || lowerText.includes('listo') || lowerText.includes('sisi')) {
+                if (/\b(ok|listo|sisi|si|vale)\b/.test(lowerText)) {
                     await sendMessageWithDelay(userId, "Por favor, para confirmar necesito que escribas textual: “LEÍ Y ACEPTO LAS CONDICIONES DE ENVÍO”");
                     matched = true;
                 }
@@ -279,11 +311,11 @@ async function parseAddressWithAI(text) {
     `;
 
     try {
-        const result = await model.generateContent(prompt);
+        const result = await callGeminiWithRetry(prompt);
         const jsonText = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
         return JSON.parse(jsonText);
     } catch (e) {
-        console.error("🔴 AI Parse Error:", e.message);
+        console.error("🔴 AI Parse Error after retries:", e.message);
         return { _ai_failed: true };
     }
 }
