@@ -210,11 +210,18 @@ class AIService {
         let knowledgeContext = "";
         if (context.knowledge && context.knowledge.flow) {
             const f = context.knowledge.flow;
+            const faq = context.knowledge.faq || [];
+
             const pCaps = f.price_capsulas?.response || "";
             const pSem = f.price_semillas?.response || "";
-            if (pCaps || pSem) {
-                knowledgeContext = `INFORMACIÓN ACTUALIZADA DE PRECIOS:\n${pCaps}\n${pSem}\n(Usar estos valores sobre cualquier otro)`;
-            }
+
+            // Extract the critical Pathology FAQ if it exists
+            const pathInfo = faq.find(q => q.keywords.includes('diabetes'))?.response || "";
+
+            knowledgeContext = `INFORMACIÓN DE PRODUCTO Y SALUD:\n`;
+            if (pCaps || pSem) knowledgeContext += `- PRECIOS: ${pCaps} | ${pSem}\n`;
+            if (pathInfo) knowledgeContext += `- SOBRE PATOLOGÍAS (Diabetes/Tiroides/Presión): "${pathInfo}" (Usar esta lógica para dar confianza al cliente)\n`;
+            knowledgeContext += `(No inventes datos, usá siempre esta base)`;
         }
 
         const prompt = `
