@@ -289,7 +289,34 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false) {
         return "No hay clientes pausados.";
     }
 
-    return "Comando no reconocido.";
+    // 5. AI Instruction (Default Fallback)
+    const actualTarget = targetChatId || lastAlertUser;
+    if (actualTarget) {
+        try {
+            const history = (userState[actualTarget]?.history || [])
+                .map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n');
+            const suggestion = await aiService.generateSuggestion(commandText, history);
+
+            if (suggestion) {
+                await client.sendMessage(actualTarget, suggestion);
+                logAndEmit(actualTarget, 'admin', suggestion, 'admin_instruction');
+
+                // Clear Alert on Action
+                const index = sessionAlerts.findIndex(a => a.userPhone === actualTarget);
+                if (index !== -1) {
+                    sessionAlerts.splice(index, 1);
+                    if (sharedState.io) sharedState.io.emit('alerts_updated', sessionAlerts);
+                }
+
+                return `✅ Instrucción enviada: "${suggestion}"`;
+            }
+        } catch (e) {
+            console.error('AI Suggestion Error:', e);
+            return "⚠️ Error generando sugerencia IA.";
+        }
+    }
+
+    return "⚠️ Comando no reconocido o sin usuario activo.";
 }
 sharedState.handleAdminCommand = handleAdminCommand; // Expose to server
 
@@ -365,18 +392,7 @@ client.on('message', async msg => {
 
         // 3. Natural Language Admin
         const result = await handleAdminCommand(lastAlertUser, msgText);
-        if (result === "Comando no reconocido." && lastAlertUser) {
-            // AI SUGGESTION
-            const history = (userState[lastAlertUser]?.history || [])
-                .map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n');
-            const suggestion = await aiService.generateSuggestion(msgText, history);
-
-            await client.sendMessage(lastAlertUser, suggestion);
-            logAndEmit(lastAlertUser, 'admin', suggestion, 'admin_instruction');
-            await client.sendMessage(msg.from, `✅ Enviado a ${lastAlertUser}:\n"${suggestion}"`);
-        } else {
-            await client.sendMessage(msg.from, result);
-        }
+        if (result) await client.sendMessage(msg.from, result);
         return;
     }
 
