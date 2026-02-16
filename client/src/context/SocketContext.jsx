@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import io from 'socket.io-client';
+import { API_URL } from '../config/api';
 
 const SocketContext = createContext();
 
@@ -12,8 +13,7 @@ export const SocketProvider = ({ children }) => {
     const [isConnected, setIsConnected] = useState(false);
 
     useEffect(() => {
-        // Assuming backend is on port 3001 as per index.js
-        const newSocket = io('http://localhost:3000');
+        const newSocket = io(API_URL);
 
         newSocket.on('connect', () => {
             console.log('Socket connected');

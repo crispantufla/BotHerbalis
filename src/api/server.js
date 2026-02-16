@@ -99,6 +99,56 @@ function startServer(client, sharedState) {
         res.json(sessionAlerts);
     });
 
+    // Stats (Real KPIs)
+    app.get('/api/stats', (req, res) => {
+        try {
+            // Today's revenue
+            let todayRevenue = 0;
+            let totalOrders = 0;
+            let todayOrders = 0;
+            const today = new Date().toISOString().split('T')[0];
+
+            if (fs.existsSync(ORDERS_FILE)) {
+                const orders = JSON.parse(fs.readFileSync(ORDERS_FILE));
+                totalOrders = orders.length;
+                orders.forEach(o => {
+                    const orderDate = o.createdAt ? new Date(o.createdAt).toISOString().split('T')[0] : '';
+                    if (orderDate === today) {
+                        todayOrders++;
+                        const price = parseFloat(String(o.precio || '0').replace(/[^0-9.]/g, ''));
+                        if (!isNaN(price)) todayRevenue += price;
+                    }
+                });
+            }
+
+            // Active sessions
+            const activeSessions = Object.keys(userState).length;
+            const activeConversations = Object.values(userState).filter(
+                s => s.step && s.step !== 'completed' && s.step !== 'greeting'
+            ).length;
+
+            // Conversion rate
+            const completedToday = fs.existsSync(ORDERS_FILE)
+                ? JSON.parse(fs.readFileSync(ORDERS_FILE)).filter(o => {
+                    const d = o.createdAt ? new Date(o.createdAt).toISOString().split('T')[0] : '';
+                    return d === today && o.status !== 'Cancelado';
+                }).length
+                : 0;
+
+            res.json({
+                todayRevenue,
+                todayOrders,
+                totalOrders,
+                activeSessions,
+                activeConversations,
+                conversionRate: activeSessions > 0 ? Math.round((completedToday / activeSessions) * 100) : 0,
+                pausedUsers: pausedUsers.size
+            });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     // Chats
     app.get('/api/chats', async (req, res) => {
         try {

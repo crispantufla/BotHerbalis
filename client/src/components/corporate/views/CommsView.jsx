@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useSocket } from '../../../context/SocketContext';
+import { API_URL } from '../../../config/api';
 
 // Icons
 const Icons = {
@@ -28,7 +29,7 @@ const CommsView = () => {
     useEffect(() => {
         const fetchChats = async () => {
             try {
-                const res = await axios.get('http://localhost:3000/api/chats');
+                const res = await axios.get(`${API_URL}/api/chats`);
                 setChats(res.data);
             } catch (e) {
                 console.error("Error fetching chats:", e);
@@ -58,7 +59,7 @@ const CommsView = () => {
         const fetchMessages = async () => {
             setLoading(true);
             try {
-                const res = await axios.get(`http://localhost:3000/api/history/${selectedChat.id}`);
+                const res = await axios.get(`${API_URL}/api/history/${selectedChat.id}`);
                 setMessages(res.data);
             } catch (e) {
                 console.error("Failed to load history", e);
@@ -87,7 +88,7 @@ const CommsView = () => {
         setMessages(prev => [...prev, newMessage]);
 
         try {
-            await axios.post('http://localhost:3000/api/send', {
+            await axios.post(`${API_URL}/api/send`, {
                 chatId: selectedChat.id,
                 message: text
             });
@@ -101,7 +102,7 @@ const CommsView = () => {
         if (!selectedChat) return;
         const newStatus = !selectedChat.isPaused;
         try {
-            await axios.post('http://localhost:3000/api/toggle-bot', {
+            await axios.post(`${API_URL}/api/toggle-bot`, {
                 chatId: selectedChat.id,
                 paused: newStatus
             });
@@ -114,7 +115,7 @@ const CommsView = () => {
     const handleClearChat = async () => {
         if (!selectedChat || !window.confirm("¿Seguro que querés borrar el historial y reiniciar el bot para este usuario?")) return;
         try {
-            await axios.post('http://localhost:3000/api/reset-chat', { chatId: selectedChat.id });
+            await axios.post(`${API_URL}/api/reset-chat`, { chatId: selectedChat.id });
             setMessages([]);
             alert('Chat reiniciado.');
         } catch (e) { alert('Error resetting chat'); }
@@ -124,7 +125,7 @@ const CommsView = () => {
     const renderMessageBody = (msg) => {
         if (msg.body && msg.body.startsWith('MEDIA_IMAGE:')) {
             const url = msg.body.split('|')[0].replace('MEDIA_IMAGE:', '');
-            const fullUrl = `http://localhost:3000${url}`;
+            const fullUrl = `${API_URL}${url}`;
             return (
                 <div className="space-y-1">
                     <img src={fullUrl} alt="Received Media" className="rounded-lg max-w-full h-auto max-h-60 border border-slate-200/20" />
@@ -137,7 +138,7 @@ const CommsView = () => {
             const parts = msg.body.split('|');
             const url = parts[0].replace('MEDIA_AUDIO:', '');
             const transcription = parts[1] ? parts[1].replace('TRANSCRIPTION:', '') : null;
-            const fullUrl = `http://localhost:3000${url}`;
+            const fullUrl = `${API_URL}${url}`;
             return (
                 <div className="space-y-2 min-w-[200px]">
                     <audio controls className="h-8 w-full max-w-[240px]">

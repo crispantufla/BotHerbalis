@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useSocket } from '../../context/SocketContext';
 import { Link } from 'react-router-dom';
+import { API_URL } from '../../config/api';
 
 // View Imports
 import DashboardView from '../../components/corporate/views/DashboardView';
@@ -27,14 +28,14 @@ const CorporateDashboard = () => {
     const [status, setStatus] = useState('initializing');
     const [alerts, setAlerts] = useState([]);
     const [activeTab, setActiveTab] = useState('dashboard');
+    const [qrData, setQrData] = useState(null);
 
     // Config State for Admin Sync
     const [config, setConfig] = useState({ alertNumber: '' });
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
     useEffect(() => {
         if (socket) {
-            socket.on('qr', () => setStatus('scan_qr'));
+            socket.on('qr', (data) => { setStatus('scan_qr'); setQrData(data); });
             socket.on('ready', () => setStatus('ready'));
             socket.on('status_change', ({ status }) => setStatus(status));
             socket.on('new_alert', (newAlert) => setAlerts(prev => [newAlert, ...prev]));
@@ -64,7 +65,7 @@ const CorporateDashboard = () => {
     const renderContent = () => {
         switch (activeTab) {
             case 'dashboard':
-                return <DashboardView alerts={alerts} config={config} handleQuickAction={handleQuickAction} status={status} />;
+                return <DashboardView alerts={alerts} config={config} handleQuickAction={handleQuickAction} status={status} qrData={qrData} />;
             case 'comms':
                 return <CommsView />;
             case 'logistics':
@@ -74,9 +75,9 @@ const CorporateDashboard = () => {
             case 'settings':
                 return <SettingsView status={status} />;
             case 'security':
-                return <DashboardView alerts={alerts} config={config} handleQuickAction={handleQuickAction} status={status} />; // Re-use for now or specific view
+                return <DashboardView alerts={alerts} config={config} handleQuickAction={handleQuickAction} status={status} qrData={qrData} />; // Re-use for now or specific view
             default:
-                return <DashboardView alerts={alerts} config={config} handleQuickAction={handleQuickAction} status={status} />;
+                return <DashboardView alerts={alerts} config={config} handleQuickAction={handleQuickAction} status={status} qrData={qrData} />;
         }
     };
 

@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import ScriptMapView from './ScriptMapView';
+import { API_URL } from '../../../config/api';
 
 const Script = () => {
     const [script, setScript] = useState({ flow: {}, faq: [] });
     const [activeTab, setActiveTab] = useState('flow');
     const [expandedCard, setExpandedCard] = useState(null);
-    const API_URL = 'http://localhost:3000';
 
     useEffect(() => {
         fetchScript();
