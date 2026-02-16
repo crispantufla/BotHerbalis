@@ -9,11 +9,12 @@ const Icons = {
     Send: () => <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>,
     Attach: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>,
     Search: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
-    More: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg>,
     Pause: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
     Play: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
     Trash: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
     AI: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>,
+    Script: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
+    ChevronDown: () => <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>,
 };
 
 const CommsView = () => {
@@ -27,6 +28,8 @@ const CommsView = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [summarizing, setSummarizing] = useState(false);
     const [summaryText, setSummaryText] = useState(null);
+    const [scriptFlow, setScriptFlow] = useState({});
+    const [showScriptPanel, setShowScriptPanel] = useState(false);
 
     const messagesEndRef = useRef(null);
 
@@ -64,6 +67,17 @@ const CommsView = () => {
             }
         };
     }, [socket]);
+
+    // Load Script Flow
+    useEffect(() => {
+        const fetchScript = async () => {
+            try {
+                const res = await axios.get(`${API_URL}/api/script`);
+                if (res.data?.flow) setScriptFlow(res.data.flow);
+            } catch (e) { console.error('Failed to load script:', e); }
+        };
+        fetchScript();
+    }, []);
 
     // Load Messages
     useEffect(() => {
@@ -107,6 +121,27 @@ const CommsView = () => {
             });
         } catch (e) {
             toast.error('Error al enviar mensaje');
+        }
+    };
+
+    // Send script step response directly
+    const handleSendScriptStep = async (stepKey) => {
+        if (!selectedChat) return;
+        const step = scriptFlow[stepKey];
+        if (!step?.response) return;
+
+        const text = step.response;
+        const newMessage = { fromMe: true, body: text, type: 'chat', timestamp: Date.now() };
+        setMessages(prev => [...prev, newMessage]);
+
+        try {
+            await axios.post(`${API_URL}/api/send`, {
+                chatId: selectedChat.id,
+                message: text
+            });
+            toast.success(`Paso "${stepKey}" enviado`);
+        } catch (e) {
+            toast.error('Error enviando paso del guión');
         }
     };
 
@@ -308,6 +343,17 @@ const CommsView = () => {
                                 >
                                     <Icons.Trash />
                                 </button>
+
+                                {/* Script Panel Toggle */}
+                                <button
+                                    onClick={() => setShowScriptPanel(!showScriptPanel)}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition ${showScriptPanel ? 'bg-teal-600 text-white' : 'bg-teal-100 text-teal-700 hover:bg-teal-200'}`}
+                                    title="Mostrar pasos del guión para envío rápido"
+                                >
+                                    <Icons.Script />
+                                    GUIÓN
+                                    <span className={`transition-transform ${showScriptPanel ? 'rotate-180' : ''}`}><Icons.ChevronDown /></span>
+                                </button>
                             </div>
                         </div>
 
@@ -323,6 +369,30 @@ const CommsView = () => {
                                     <div>
                                         <p className="text-xs font-bold text-violet-700 uppercase tracking-wide mb-1">Resumen IA</p>
                                         <p className="text-sm text-violet-800 whitespace-pre-wrap leading-relaxed">{summaryText}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Script Steps Panel */}
+                        {showScriptPanel && Object.keys(scriptFlow).length > 0 && (
+                            <div className="border-b border-slate-200 bg-teal-50/50 animate-fade-in">
+                                <div className="px-4 py-3">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <p className="text-[10px] font-bold text-teal-700 uppercase tracking-wider">📋 Pasos del Guión — Click para enviar</p>
+                                        <span className="text-[10px] text-teal-500 font-mono">{Object.keys(scriptFlow).length} pasos</span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {Object.entries(scriptFlow).map(([key, step]) => (
+                                            <button
+                                                key={key}
+                                                onClick={() => handleSendScriptStep(key)}
+                                                className="px-2.5 py-1.5 bg-white border border-teal-200 rounded text-[11px] font-medium text-teal-800 hover:bg-teal-100 hover:border-teal-300 transition truncate max-w-[180px] shadow-sm"
+                                                title={step.response?.substring(0, 100) + '...'}
+                                            >
+                                                {key.replace(/_/g, ' ')}
+                                            </button>
+                                        ))}
                                     </div>
                                 </div>
                             </div>

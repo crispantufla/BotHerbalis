@@ -333,9 +333,25 @@ function startServer(client, sharedState) {
             if (action === 'add') {
                 if (!config.alertNumbers.includes(cleanNum)) {
                     config.alertNumbers.push(cleanNum);
+
+                    // Send welcome message to the new admin number
+                    try {
+                        const target = `${cleanNum}@c.us`;
+                        await client.sendMessage(target, '✅ *HERBALIS BOT*\n\nEste número fue registrado como *administrador*.\n\nRecibiras alertas de:\n• 🛒 Nuevos pedidos\n• ⚠️ Intervenciones requeridas\n• 🔧 Errores del sistema\n\n_Podés ser removido desde el panel de control._');
+                    } catch (e) {
+                        console.error(`[CONFIG] Failed to send welcome to ${cleanNum}:`, e.message);
+                    }
                 }
             } else if (action === 'remove') {
                 config.alertNumbers = config.alertNumbers.filter(n => n !== cleanNum);
+
+                // Send goodbye message
+                try {
+                    const target = `${cleanNum}@c.us`;
+                    await client.sendMessage(target, '🔕 *HERBALIS BOT*\n\nEste número fue *removido* de la lista de administradores.\n\nYa no recibirás alertas del sistema.\n\n_Si fue un error, podés ser agregado nuevamente desde el panel de control._');
+                } catch (e) {
+                    console.error(`[CONFIG] Failed to send removal notice to ${cleanNum}:`, e.message);
+                }
             }
 
             saveState();
