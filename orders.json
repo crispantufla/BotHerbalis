@@ -96,5 +96,19 @@
     "producto": "Cápsulas de nuez de la india",
     "plan": "Plan de 60 días",
     "precio": "45.900"
+  },
+  {
+    "id": "1771206830053",
+    "createdAt": "2026-02-16T01:53:50.053Z",
+    "status": "Pendiente",
+    "tracking": "",
+    "cliente": "92273161334887@lid",
+    "nombre": "Horaacio Gisoeu",
+    "calle": "Benegas 77",
+    "ciudad": "Rosario",
+    "cp": "200",
+    "producto": "Cápsulas de nuez de la india",
+    "plan": "Plan de 60 días",
+    "precio": "45.900"
   }
 ]

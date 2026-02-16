@@ -12,6 +12,9 @@ const path = require('path');
 const STATE_FILE = path.join(__dirname, 'persistence.json');
 const ORDERS_FILE = path.join(__dirname, 'orders.json');
 const KNOWLEDGE_FILE = path.join(__dirname, 'knowledge.json');
+const { atomicWriteFile } = require('./safeWrite');
+const { processSalesFlow } = require('./src/flows/salesFlow');
+const { generateSmartResponse } = require('./src/services/ai');
 
 // Helper: Load knowledge from JSON
 function loadKnowledge() {
@@ -29,7 +32,7 @@ loadKnowledge();
 
 function saveKnowledge() {
     try {
-        fs.writeFileSync(KNOWLEDGE_FILE, JSON.stringify(knowledge, null, 2));
+        atomicWriteFile(KNOWLEDGE_FILE, JSON.stringify(knowledge, null, 2));
     } catch (e) {
         console.error('🔴 Error saving knowledge:', e.message);
     }
@@ -52,7 +55,7 @@ function saveOrderToLocal(order) {
         ...order
     };
     orders.push(newOrder);
-    fs.writeFileSync(ORDERS_FILE, JSON.stringify(orders, null, 2));
+    atomicWriteFile(ORDERS_FILE, JSON.stringify(orders, null, 2));
     if (io) io.emit('new_order', newOrder);
 }
 
@@ -103,50 +106,34 @@ function getLocalHistory(chatId) {
 }
 
 
-// --- DASHBOARD DEPENDENCIES ---
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const cors = require('cors');
+// Initialize Gemini
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server, {
-    cors: {
-        origin: "*", // Allow all origins for dev simplicity
-        methods: ["GET", "POST"]
+// Initialize WhatsApp Client
+const client = new Client({
+    authStrategy: new LocalAuth(),
+    puppeteer: {
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
     }
 });
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.static('public')); // Serve media files
+// State & Buffer Storage
+const userState = {};
+const messageBuffer = {};
+let lastAlertUser = null;
+let pausedUsers = new Set();
+// Variables for API / Dashboard State
+let qrCodeData = null;
+let sessionAlerts = [];
+let config = { alertNumber: '' };
+let isConnected = false;
 
-// API State
-let qrCodeData = null; // Store QR for frontend
-const sessionAlerts = []; // Store alerts for current session
-const summaryCache = new Map(); // Store summaries: chatId -> { text, timestamp }
-let isConnected = false; // Connection state
-let config = {
-    alertNumber: null
-};
-
-// Load config if it exists in persistence
-function loadConfig() {
-    try {
-        if (fs.existsSync(STATE_FILE)) {
-            const raw = fs.readFileSync(STATE_FILE);
-            const data = JSON.parse(raw);
-            if (data.config) {
-                config = { ...config, ...data.config };
-            }
-        }
-    } catch (e) {
-        console.error('🔴 Error loading config:', e.message);
-    }
-}
-loadConfig();
+// --- SERVER START ---
+const { startServer } = require('./src/api/server');
+// Initialize Server
+const { io, app } = startServer(client);
 
 // API Routes
 app.get('/api/status', (req, res) => {
@@ -386,11 +373,7 @@ app.post('/api/script', (req, res) => {
 });
 
 
-// Start Server
-const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
-    console.log(`🚀 Dashboard API running on http://localhost:${PORT}`);
-});
+
 
 
 // Global Error Handlers
@@ -401,36 +384,17 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error('🔴 UNHANDLED REJECTION:', reason);
 });
 
-// Initialize Gemini
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-
-// Initialize WhatsApp Client
-const client = new Client({
-    authStrategy: new LocalAuth(),
-    puppeteer: {
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
-    }
-});
-
-// State & Buffer Storage
-// userState: { 'phone': { step: 'greeting', data: {} } }
-// messageBuffer: { 'phone': { timer: null, text: [] } }
-const userState = {};
-const messageBuffer = {};
-let lastAlertUser = null; // Track last client that triggered an admin alert
-let pausedUsers = new Set(); // Users where admin said "yo me encargo"
+// (Moved to top)
 
 function saveState() {
     try {
-        const data = {
+        const stateToSave = {
             userState,
             lastAlertUser,
             pausedUsers: Array.from(pausedUsers),
             config
         };
-        fs.writeFileSync(STATE_FILE, JSON.stringify(data, null, 2));
+        atomicWriteFile(STATE_FILE, JSON.stringify(stateToSave, null, 2));
         // console.log('[STORAGE] State saved.');
     } catch (e) {
         console.error('🔴 Error saving state:', e.message);
@@ -724,50 +688,7 @@ async function parseAddressWithAI(text) {
     }
 }
 
-// AI Helper: Generate Contextual Response (Off-Script)
-async function generateSmartResponse(userInput, currentState) {
-    // Define the "steering" goal based on current step
-    let steeringGoal = "Preguntale cómo podés ayudarlo a empezar.";
-    if (currentState) {
-        switch (currentState.step) {
-            case 'greeting': steeringGoal = "Motivarlos a que digan cuántos kilos quieren bajar."; break;
-            case 'waiting_weight': steeringGoal = "Preguntales amablemente de nuevo cuántos kilos quieren perder."; break;
-            case 'waiting_preference': steeringGoal = "Preguntales si prefieren Opción 1 (Cápsulas) u Opción 2 (Semillas)."; break;
-            case 'waiting_plan_choice': steeringGoal = "Preguntales qué plan prefieren (60 o 120 días)."; break;
-            case 'waiting_ok': steeringGoal = "Preguntale si nos asegura que podrá retirar por sucursal si el correo lo solicita."; break;
-            case 'waiting_data': steeringGoal = "Pedile sus datos de envío (Nombre, Dirección, CP)."; break;
-        }
-    }
 
-    const prompt = `
-    Sos un asistente de ventas de "Herbalis" (Nuez de la India).
-    Contexto:
-    - Productos: Cápsulas, Gotas, Semillas (Adelgazamiento natural).
-    - Precios: Plan 60 días ~$40-45k, Plan 120 días ~$62-82k. Sin costo de envío.
-    - Pagos: Solo efectivo contra reembolso (pagás al recibir).
-    
-    Tu objetivo actual: ${steeringGoal}
-    
-    El usuario dice: "${userInput}"
-    
-    Instrucciones:
-    1. Respondé a la duda del usuario de forma breve y amigable.
-    2. INMEDIATAMENTE después de responder, hacé una pregunta para volver al "Objetivo actual".
-    3. Mantenelo corto (menos de 50 palabras).
-    4. **IMPORTANTE**: Hablá siempre en español argentino (voseo), de forma natural y vendedora. No respondas en inglés bajo ninguna circunstancia.
-    5. **REGLA DE PRECIOS**: SOLO existen planes de 60 días ($45.900/$34.900) y 120 días ($82.600/$62.900). 
-    6. Si el usuario pide "70 días", "30 días" o algo que no existe, decile amablemente que NO existe y volvé a ofrecer 60 o 120. JAMÁS INVENTES UN PRECIO o PLAN.
-    7. Si el usuario dice algo que no entendés o un número fuera de rango, guialo de nuevo a las opciones 1 o 2.
-    `;
-    const response = await safeAICall(prompt, null);
-    if (!response) {
-        console.error("🔴 [AI ERROR] generateSmartResponse failed");
-        // Don't notify admin on rate limits, just skip
-        if (aiAvailable) notifyAdmin("Fallo de IA / Sin respuesta", userInput);
-        return null;
-    }
-    return response;
-}
 
 if (!process.env.GEMINI_API_KEY) {
     console.error("❌ CRITICAL: GEMINI_API_KEY is missing in .env!");
@@ -959,7 +880,7 @@ client.on('message', async msg => {
     }
 
     // 3. Offensive Language Filter
-    const OFENSIVAS = ['puto', 'pito', 'chupa', 'idiota', 'estupido', 'mierda', 'verga', 'concha', 'tarado', 'salame', 'boludo', 'trolo', 'culo', 'pija', 'orto'];
+    const OFENSIVAS = ['puto', 'puta', 'hdp', 'hijo de p', 'pito', 'chupa', 'idiota', 'estupido', 'mierda', 'verga', 'concha', 'tarado', 'salame', 'boludo', 'trolo', 'culo', 'pija', 'orto', 'mogolico', 'imbecil', 'cagada', 'basura', 'estafa', 'ladron', 'chorro'];
     if (OFENSIVAS.some(word => lowerMsg.includes(word))) {
         // ... (existing logic)
         console.log(`[SAFETY] Offensive content from ${userId}: "${messageBody}"`);
@@ -1044,179 +965,33 @@ async function handleConversation(userId, text) {
         }
     }
 
-    // 2. Step Logic
-    let matched = false;
 
-    switch (currentState.step) {
-        case 'greeting':
-            // Assume any first interaction is a greeting or intent to buy
-            await sendMessageWithDelay(userId, knowledge.flow.greeting.response);
-            userState[userId].step = knowledge.flow.greeting.nextStep;
-            saveState();
+    // 2. Step Logic (Delegate to SalesModule)
+    try {
+        const dependencies = {
+            client,
+            notifyAdmin,
+            saveState,
+            sendMessageWithDelay,
+            logAndEmit,
+            saveOrderToLocal
+        };
+
+        const result = await processSalesFlow(userId, text, userState, knowledge, dependencies);
+
+        if (result.matched) {
             matched = true;
-            break;
+        }
 
-        case 'waiting_weight':
-            // Usar IA para chequear si el mensaje es un objetivo de peso o una duda
-            const weightCheckPrompt = `
-            Al usuario se le preguntó: "¿Cuántos kilos querés perder?".
-            El usuario respondió: "${text}".
-            ¿Es esto una respuesta válida sobre peso/objetivo? (ej: "10kg", "mucho", "no se", "la panza", "20")
-            ¿O es una pregunta/comentario no relacionado? (ej: "¿cuánto sale?", "¿dónde están?")
-            Devolvé un JSON: {"is_goal": true/false}
-            `;
-            let isGoal = true; // Default to true to be permissive, unless AI says otherwise
-            try {
-                const result = await model.generateContent(weightCheckPrompt);
-                const json = JSON.parse(result.response.text().replace(/```json/g, '').replace(/```/g, '').trim());
-                isGoal = json.is_goal;
-            } catch (e) {
-                console.error("🔴 [AI CHECK ERROR] weightCheckPrompt failed:", e);
-                console.log("AI Check failed, assuming goal.");
-            }
-
-            if (isGoal) {
-                await sendMessageWithDelay(userId, knowledge.flow.recommendation.response);
-                userState[userId].step = knowledge.flow.recommendation.nextStep;
-                matched = true;
-            } else {
-                // If not a goal, maybe it's a question the FAQ didn't catch?
-                // Let "matched = false" so Off-Script AI handles it.
-                matched = false;
-            }
-            break;
-
-        case 'waiting_preference':
-            // Simple keyword check for 1 vs 2
-            if (knowledge.flow.preference_capsulas.match.some(k => lowerText.includes(k))) {
-                userState[userId].selectedProduct = "Cápsulas de nuez de la india";
-                await sendMessageWithDelay(userId, knowledge.flow.preference_capsulas.response);
-                userState[userId].step = knowledge.flow.preference_capsulas.nextStep;
-                saveState();
-                matched = true;
-            } else if (knowledge.flow.preference_semillas.match.some(k => lowerText.includes(k))) {
-                userState[userId].selectedProduct = "Semillas de nuez de la india";
-                await sendMessageWithDelay(userId, knowledge.flow.preference_semillas.response);
-                userState[userId].step = knowledge.flow.preference_semillas.nextStep;
-                saveState();
-                matched = true;
-            }
-            break;
-
-        case 'waiting_plan_choice':
-            // Determine plan and price
-            if (lowerText.includes('60')) {
-                userState[userId].selectedPlan = "60";
-                userState[userId].price = (userState[userId].selectedProduct === "Cápsulas de nuez de la india") ? "45.900" : "34.900";
-            } else if (lowerText.includes('120')) {
-                userState[userId].selectedPlan = "120";
-                userState[userId].price = (userState[userId].selectedProduct === "Cápsulas de nuez de la india") ? "82.600" : "62.900";
-            }
-
-            await sendMessageWithDelay(userId, knowledge.flow.closing.response);
-            userState[userId].step = knowledge.flow.closing.nextStep;
-            saveState();
-            matched = true;
-            break;
-
-        case 'waiting_ok':
-            // Any positive confirmation - but check for doubts!
-            const isPositive = knowledge.flow.data_request.match.some(k => lowerText.includes(k)) || lowerText === 'ok';
-            const hasDoubts = lowerText.includes('pero') || lowerText.includes('duda') || lowerText.includes('?') || lowerText.includes('pregunta');
-
-            if (isPositive && !hasDoubts) {
-                await sendMessageWithDelay(userId, knowledge.flow.data_request.response);
-                userState[userId].step = knowledge.flow.data_request.nextStep;
-                saveState();
-                matched = true;
-            }
-            // If hasDoubts, let it fall through to Off-Script AI
-            break;
-
-        case 'waiting_data':
-            // THIS IS WHERE AI SHINES - Smart incremental parsing
-            console.log("Analyzing address data with AI...");
-            const data = await parseAddressWithAI(text);
-
-            // Merge new data with any partial data from previous attempts
-            if (data) {
-                if (data.nombre) currentState.partialAddress.nombre = data.nombre;
-                if (data.calle) currentState.partialAddress.calle = data.calle;
-                if (data.ciudad) currentState.partialAddress.ciudad = data.ciudad;
-                if (data.cp) currentState.partialAddress.cp = data.cp;
-            }
-
-            const addr = currentState.partialAddress;
-            currentState.addressAttempts = (currentState.addressAttempts || 0) + 1;
-
-            // Check what we have and what we're missing
-            const missing = [];
-            if (!addr.nombre) missing.push('Nombre completo');
-            if (!addr.calle) missing.push('Calle y número');
-            if (!addr.ciudad) missing.push('Ciudad');
-            if (!addr.cp) missing.push('Código postal');
-
-            if (missing.length === 0 || (addr.calle && addr.ciudad && missing.length <= 1) || data?._ai_failed) {
-                // Determine if there are sanity warnings
-                let validationWarning = "";
-                if (data && data.direccion_valida === false) {
-                    validationWarning = `\n⚠️ *AVISO:* ${data.comentario_validez || "Dirección sospechosa o incompleta"}\n`;
-                }
-
-                const isError = data?._ai_failed ? "⚠️ (Fallo IA - Revisar manual)" : "";
-                const productInfo = currentState.selectedProduct ? `\n*Producto:* ${currentState.selectedProduct}\n*Plan:* ${currentState.selectedPlan} días ($${currentState.price})` : "";
-                const summary = `📦 *RESUMEN DE PEDIDO* ${isError}\n${validationWarning}${productInfo}\n\n*Datos:* ${addr.nombre || '?'}, ${addr.calle || '?'}, ${addr.ciudad || '?'}, ${addr.cp || '?'}\n\n¿Está bien? Respondé *"ok"* para confirmar.`;
-
-                currentState.pendingOrder = { ...addr };
-                userState[userId].step = 'waiting_admin_ok';
-                lastAlertUser = userId;
-
-                saveState();
-
-                // Centralized Notification
-                await notifyAdmin(`Pedido completo esperando confirmación`, userId, summary);
-
-                await sendMessageWithDelay(userId, `Gracias por los datos 🙌 Estoy verificando todo, te confirmo en un momento.`);
-                matched = true;
-            } else if (currentState.addressAttempts >= 2) {
-                const rawInfo = `Texto: "${text}"\nParse: ${addr.nombre || '?'}, ${addr.calle || '?'}, ${addr.ciudad || '?'}, ${addr.cp || '?'}`;
-                await notifyAdmin(`No pude parsear la dirección`, userId, rawInfo);
-                await sendMessageWithDelay(userId, `Gracias por los datos 🙌 Mi compañero va a revisar tu pedido y te confirma en breve. ¡Ya queda poco!`);
-                userState[userId].step = 'waiting_admin_ok';
-                saveState();
-                matched = true;
-            } else {
-                // Only pester if AI actually found SOME data, or if it really looks like an attempt to give address
-                const looksLikeAddress = /\d/.test(text) || text.length > 20;
-                if (data || looksLikeAddress) {
-                    await sendMessageWithDelay(userId, `Gracias! Ya tengo algunos datos. Solo me falta: *${missing.join(', ')}*. ¿Me los pasás?`);
-                    matched = true;
-                } else {
-                    // Fall back to AI to answer their question
-                    matched = false;
-                }
-            }
-            break;
-
-        case 'waiting_admin_ok':
-            // Client is messaging while we wait for admin approval
-            await sendMessageWithDelay(userId, `Estamos revisando tu pedido, te confirmo en breve 😊`);
-            matched = true;
-            break;
-
-        case 'completed':
-            // Reset if specific keywords
-            if (lowerText.includes('hola')) {
-                userState[userId].step = 'greeting';
-                await sendMessageWithDelay(userId, knowledge.flow.greeting.response);
-                userState[userId].step = knowledge.flow.greeting.nextStep;
-                saveState();
-                matched = true;
-            }
+    } catch (e) {
+        console.error("🔴 Error in Sales Flow:", e);
+        matched = false;
     }
 
     // 3. Off-Script / Manual Fallback with AI
     if (!matched) {
+        // ... (Existing AI Fallback)
+
         console.log(`[OFF-SCRIPT] Generating AI response for: ${text}`);
         // Log intent to use AI
         logAndEmit(userId, 'system', 'Triggering AI Smart Response', currentState.step);
@@ -1229,100 +1004,11 @@ async function handleConversation(userId, text) {
     }
 }
 
-// --- SALES API ---
-app.get('/api/orders', (req, res) => {
-    if (fs.existsSync(ORDERS_FILE)) {
-        res.json(JSON.parse(fs.readFileSync(ORDERS_FILE)));
-    } else {
-        res.json([]);
-    }
-});
-
-app.post('/api/orders/:id/status', (req, res) => {
-    const { id } = req.params;
-    const { status, tracking } = req.body;
-
-    if (!fs.existsSync(ORDERS_FILE)) return res.status(404).json({ error: "No orders found" });
-
-    let orders = JSON.parse(fs.readFileSync(ORDERS_FILE));
-    const index = orders.findIndex(o => o.id === id);
-    if (index === -1) return res.status(404).json({ error: "Order not found" });
-
-    if (status) orders[index].status = status;
-    if (tracking !== undefined) orders[index].tracking = tracking;
-
-    fs.writeFileSync(ORDERS_FILE, JSON.stringify(orders, null, 2));
-    io.emit('order_update', orders[index]);
-    res.json({ success: true, order: orders[index] });
-});
-
-app.post('/api/sheets/test', async (req, res) => {
-    try {
-        const testData = {
-            cliente: 'DASHBOARD_TEST',
-            nombre: 'Prueba desde Panel',
-            calle: 'Test 123',
-            ciudad: 'Dashboard',
-            cp: '0000',
-            producto: 'Test',
-            plan: 'Test',
-            precio: '0'
-        };
-        const success = await appendOrderToSheet(testData);
-        if (success) {
-            res.json({ success: true, message: "Sincronización de prueba exitosa" });
-        } else {
-            res.status(500).json({ success: false, message: "Error en la sincronización" });
-        }
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
-// --- AI SUMMARIZATION ---
-app.get('/api/summarize/:chatId', async (req, res) => {
-    const { chatId } = req.params;
-
-    // 1. Check Cache (valid for 5 minutes)
-    const cached = summaryCache.get(chatId);
-    if (cached && (Date.now() - cached.timestamp < 5 * 60 * 1000)) {
-        return res.json({ summary: cached.text });
-    }
-
-    try {
-        const history = await client.getChatById(chatId).then(c => c.fetchMessages({ limit: 10 })); // Reduced limit to 10 for speed/cost
-        const formattedHistory = history.map(m => `${m.fromMe ? 'Bot' : 'Usuario'}: ${m.body}`).join('\n');
-
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-        const prompt = `Resumí en una sola oración súper concisa (máximo 12 palabras) el estado de esta conversación de venta de Herbalis.
-        Enfocate en: ¿Qué quiere el cliente? ¿Qué eligió? ¿Dio sus datos?
-        Chat:\n${formattedHistory}`;
-
-        const result = await model.generateContent(prompt);
-        const summary = result.response.text().trim();
-
-        // Update Cache
-        summaryCache.set(chatId, { text: summary, timestamp: Date.now() });
-
-        res.json({ summary });
-    } catch (err) {
-        if (err.status === 429) {
-            console.warn("[AI] Rate limit hit. Sending fallback summary.");
-            return res.json({ summary: "El bot está procesando mucha info. Reintentá en un momento." });
-        }
-        console.error("Summary error:", err);
-        res.status(500).json({ summary: "No se pudo generar el resumen." });
-    }
-});
-
-// --- SOCKET SYNC ---
-io.on('connection', (socket) => {
-    if (client && client.info) {
-        socket.emit('ready', { info: client.info });
-    } else if (qrCodeData) {
-        socket.emit('qr', qrCodeData);
-    }
-});
+// --- BACKUP SERVICE ---
+const { performBackup } = require('./backupService');
+setInterval(() => {
+    performBackup();
+}, 60 * 60 * 1000); // Every 1 hour
 
 client.initialize().catch(err => {
     console.error("🔴 FAILURE DURING INITIALIZATION:", err);

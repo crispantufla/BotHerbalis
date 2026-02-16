@@ -12,12 +12,12 @@
         "kilos",
         "bajar"
       ],
-      "response": "Hola! 😊 Gracias por escribir a HERBALIS 🌿\n\nTrabajamos con Nuez de la India y sus derivados:\n✔ Cápsulas\n✔ Gotas\n✔ Semillas\n\nEs un método natural para bajar de peso sin dietas extremas.\n📦 Envíos a todo el país | Pagás al recibir\n\n*Adjuntar 3 imagenes sin precio (Simulado)*\n\nLas tres opciones son igualmente efectivas y el tratamiento de 60 dias tiene un valor promedio de $ 40 mil. NO HAY COSTOS DE ENVIO.\n\nDecime por favor cuantos kilos queres perder y te recomiendo la mejor opcion para tu caso.",
+      "response": "¡Hola! 😊 Gracias por escribir a HERBALIS\n\n🌿 Trabajamos con Nuez de la India y sus derivados:\n✔ Cápsulas\n✔ Gotas\n✔ Semillas\n\nEs un método natural para bajar de peso sin dietas extremas.\n📦 Envíos a todo el país | Pagás al recibir\n\n👉 Para recomendarte bien: ¿Cuántos kilos querés bajar aproximadamente?",
       "nextStep": "waiting_weight"
     },
     "recommendation": {
       "step": "waiting_weight",
-      "response": "La nuez de la india y sus derivados son el mejor producto natural para perder peso que existe. Hace 12 años que los distribuimos en varios países, mas de 70 mil clientes y casos de mas de 60 kilos perdidos.\n\nEse objetivo es totalmente alcanzable con nuestros planes.\nAntes de recomendarte el producto ideal, necesito saber que preferis:\n\n👉 algo:\n1️⃣ Súper práctico (cápsulas o gotas)\n2️⃣ Más natural/tradicional (semillas e infusiones)? Esta opcion requiere una preparacion diaria.",
+      "response": "Perfecto\n\n👌 Ese objetivo es totalmente alcanzable con nuestros planes. Antes de recomendarte el producto ideal, necesito saber algo:\n\n👉 ¿Preferís algo:\n1️⃣ Súper práctico (cápsulas o gotas)\n2️⃣ Más natural/tradicional (semillas e infusión)?",
       "nextStep": "waiting_preference"
     },
     "preference_capsulas": {
@@ -34,8 +34,8 @@
         "gotas",
         "liquido"
       ],
-      "response": "Genial 👍 Entonces cápsulas es la mejor opción para vos.\n\n💊 Cómo se toman:\n* 1 cápsula por día\n* 30 min antes del almuerzo o la cena\nEs un plan muy práctico, ideal para mantener constancia.\n\n* Plan 60 días: $45.900\n* Plan 120 días: $82.600\n📦 Envío gratis a todo el país\n💵 Pagás recién cuando lo recibís\n\n👉 ¿Con cuál te gustaría avanzar? (Escribí \"60\" o \"120\")",
-      "nextStep": "waiting_plan_choice"
+      "response": "Perfecto. Las cápsulas se toman 1 por día, media hora antes del almuerzo o de la cena.\n\nEs un plan súper práctico, ideal si buscás constancia sin complicaciones.\nTe recomendamos comenzar con el plan de 60 días.\n\n📦 Envío por Correo Argentino sin gastos de envío y pagás recién cuando lo recibís.\n\n¿Querés que te pase los precios? ¡¡Son muy accesibles!!",
+      "nextStep": "waiting_price_confirmation"
     },
     "preference_semillas": {
       "step": "waiting_preference",
@@ -50,23 +50,29 @@
         "te",
         "yuyos"
       ],
-      "response": "Genial 🌿 La opción más natural son las semillas/infusión.\nEs el producto mas pedido por nuestros clientes.\nSe toma en forma de infusión cada noche antes de acostarte.\n\n* Plan 60 días: $34.900\n* Plan 120 días: $62.900\n📦 Envío gratis a todo el país\n💵 Pagás recién cuando lo recibís\n\n👉 ¿Con cuál te gustaría avanzar? (Escribí \"60\" o \"120\")",
+      "response": "Perfecto. La semilla es la opción más tradicional y natural. Se toma un pedacito por día y es excelente para pérdidas de peso más marcadas.\n\nPara tu objetivo recomendamos comenzar con el plan de 60 días.\n\n📦 Envío gratis por Correo Argentino y pegás al recibir.\n\n¿Querés que te pase los precios? ¡¡Son muy accesibles!!",
+      "nextStep": "waiting_price_confirmation"
+    },
+    "price_capsulas": {
+      "response": "Te paso precios!! El plan de 60 días en cápsulas $45.900\nEl plan de 120 días $ 82.600.-\n📦 Envío gratis + pagás al recibir.\n\n¿Con que plan te gustaría avanzar?",
+      "nextStep": "waiting_plan_choice"
+    },
+    "price_semillas": {
+      "response": "Te paso precios!! \nEl plan de 60 días en semillas $34.900.-\nEl plan de 120 días $ 61.900.-\n📦 Envío gratis + pagás al recibir. ¿Con que plan te gustaría avanzar?",
       "nextStep": "waiting_plan_choice"
     },
     "closing": {
       "step": "waiting_plan_choice",
       "match": [
-        "60",
-        "120",
-        "sesenta",
-        "ciento",
-        "veinte",
-        "mes",
-        "quiero",
-        "avanzar",
-        "plan"
+        "si",
+        "sisi",
+        "precio",
+        "precios",
+        "dale",
+        "bueno",
+        "ok"
       ],
-      "response": "Perfecto 👍 Antes de continuar necesito confirmarte algo importante sobre el envío 👇\n\n📦 Enviamos por Correo Argentino\n* Demora: 7 a 10 días hábiles\n* Pago: SOLO en efectivo al recibir\n* El envio va a tu domicilio pero a veces el correo solicita retiro por sucursal\n\n👉 En ese caso: si el correo así lo dispone, ¿nos asegurás que podés llegarte al correo a retirar dentro de las 72 hs?.",
+      "response": "Perfecto 👍 Antes de continuar necesito confirmarte algo importante sobre el envío 👇\n\n📦 Enviamos por Correo Argentino\n• Demora estimada: 7 a 10 días hábiles\n• Pago: SOLO en efectivo al recibir\n• En algunos casos el correo solicita retiro por sucursal\n\n👉 En ese caso es obligatorio retirar el pedido. ¿Esto te resulta posible?\nrespóndeme por favor: SÍ o NO",
       "nextStep": "waiting_ok"
     },
     "data_request": {
@@ -82,7 +88,7 @@
         "de una",
         "esta bien"
       ],
-      "response": "Perfecto 🙌 Entonces tomamos el pedido.\n\n📦 Datos para el envío:\n* Nombre completo:\n* Calle y número:\n* Ciudad:\n* Código postal:",
+      "response": "Genial 👩‍💻 Entonces tomamos el pedido.\n\n📦 Pasame por favor los datos para el envío:\n• Nombre completo:\n• Calle y número:\n• Ciudad:\n• Código postal:",
       "nextStep": "waiting_data"
     },
     "confirmation": {
@@ -175,6 +181,15 @@
         "en 60 dias"
       ],
       "response": "“Cada cuerpo tiene su propio ritmo.”\nLa velocidad y el volumen de descenso pueden variar según cada persona, ya que dependen de varios factores.\nComo referencia, quienes tienen un exceso de peso importante (por ejemplo, alrededor de 40 kilos) suelen notar una pérdida de 10 a 12 kilos en el primer mes, mientras que quienes necesitan bajar menos (unos 10 kilos) pueden reducir 3 a 5 kilos en ese mismo período.\nLo más importante es que el cambio sea progresivo, natural y sostenido en el tiempo. 🙌"
+    },
+    {
+      "keywords": [
+        "que medio",
+        "que correo",
+        "por donde",
+        "empresa de envio"
+      ],
+      "response": "Realizamos los envíos exclusivamente por Correo Argentino 📦."
     }
   ]
 }

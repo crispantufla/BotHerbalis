@@ -13,7 +13,7 @@ export const SocketProvider = ({ children }) => {
 
     useEffect(() => {
         // Assuming backend is on port 3001 as per index.js
-        const newSocket = io('http://localhost:3001');
+        const newSocket = io('http://localhost:3000');
 
         newSocket.on('connect', () => {
             console.log('Socket connected');

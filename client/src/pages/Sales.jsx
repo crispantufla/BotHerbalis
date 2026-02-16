@@ -3,7 +3,7 @@ import axios from 'axios';
 
 const Sales = () => {
     const [orders, setOrders] = useState([]);
-    const API_URL = 'http://localhost:3001';
+    const API_URL = 'http://localhost:3000';
 
     useEffect(() => {
         fetchOrders();
@@ -55,8 +55,8 @@ const Sales = () => {
                                         <td className="p-4 text-gray-800 font-bold">${order.precio}</td>
                                         <td className="p-4">
                                             <span className={`px-2 py-1 rounded-full text-xs font-bold ${order.status === 'Enviado' ? 'bg-blue-100 text-blue-700' :
-                                                    order.status === 'Entregado' ? 'bg-green-100 text-green-700' :
-                                                        'bg-yellow-100 text-yellow-700'
+                                                order.status === 'Entregado' ? 'bg-green-100 text-green-700' :
+                                                    'bg-yellow-100 text-yellow-700'
                                                 }`}>
                                                 {order.status}
                                             </span>

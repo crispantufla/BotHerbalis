@@ -13,7 +13,7 @@ const Chats = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [showRightPanel, setShowRightPanel] = useState(false);
 
-    const API_URL = 'http://localhost:3001';
+    const API_URL = 'http://localhost:3000';
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

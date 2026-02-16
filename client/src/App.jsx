@@ -1,27 +1,22 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { SocketProvider } from './context/SocketContext';
-import Layout from './components/layout/Layout';
-import Dashboard from './pages/Dashboard';
-import Chats from './pages/Chats';
-import Sales from './pages/Sales';
-import Script from './pages/Script';
+import CorporateDashboard from './pages/designs/CorporateDashboard';
 
 function App() {
     return (
         <SocketProvider>
-            <BrowserRouter>
-                <Routes>
-                    <Route path="/" element={<Layout />}>
-                        <Route index element={<Dashboard />} />
-                        <Route path="chats" element={<Chats />} />
-                        <Route path="ventas" element={<Sales />} />
-                        <Route path="script" element={<Script />} />
-                        <Route path="settings" element={<div className="p-8">Configuración (En construcción)</div>} />
+            <Router>
+                <div className="h-screen w-screen bg-slate-50 text-slate-900">
+                    <Routes>
+                        {/* Main Route - Corporate Enterprise */}
+                        <Route path="/" element={<CorporateDashboard />} />
+
+                        {/* Catch all - Redirect to Home */}
                         <Route path="*" element={<Navigate to="/" replace />} />
-                    </Route>
-                </Routes>
-            </BrowserRouter>
+                    </Routes>
+                </div>
+            </Router>
         </SocketProvider>
     );
 }
