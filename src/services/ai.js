@@ -6,8 +6,8 @@ const MAX_RETRIES = 4;
 const MAX_HISTORY_LENGTH = 15;
 
 // --- RATE LIMIT CONFIGURATION ---
-const MAX_CONCURRENT = 2;       // Max parallel Gemini calls
-const MIN_DELAY_MS = 500;       // Min gap between requests
+const MAX_CONCURRENT_PER_KEY = 2; // Max parallel Gemini calls per key
+const MIN_DELAY_MS = 200;       // Reduced gap (queue handles throttling)
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 min cache for identical prompts
 
 // --- PERSONA DEFINITION ---
@@ -136,27 +136,44 @@ class ResponseCache {
 // ═══════════════════════════════════════════════════════
 class AIService {
     constructor() {
-        if (!process.env.GEMINI_API_KEY) {
+        const keys = (process.env.GEMINI_API_KEY || "").split(',').map(k => k.trim()).filter(Boolean);
+        if (keys.length === 0) {
             console.error("❌ CRITICAL: GEMINI_API_KEY is missing!");
         }
-        this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        this.model = this.genAI.getGenerativeModel({
+
+        console.log(`📡 [AI] Initializing with ${keys.length} API key(s)`);
+
+        this.genAIs = keys.map(k => new GoogleGenerativeAI(k));
+        this.models = this.genAIs.map(genAI => genAI.getGenerativeModel({
             model: GEN_MODEL,
             systemInstruction: SYSTEM_INSTRUCTIONS
-        });
+        }));
 
-        // Shared infrastructure
-        this.queue = new RequestQueue(MAX_CONCURRENT, MIN_DELAY_MS);
+        this.currentKeyIndex = 0;
+
+        // Shared infrastructure - Concurrency scales with keys
+        const totalConcurrent = Math.max(MAX_CONCURRENT_PER_KEY, keys.length * MAX_CONCURRENT_PER_KEY);
+        this.queue = new RequestQueue(totalConcurrent, MIN_DELAY_MS);
         this.cache = new ResponseCache(CACHE_TTL_MS);
         this.stats = { calls: 0, cached: 0, retries: 0, errors: 0 };
     }
 
     /**
+     * Get the next available model (Round-robin)
+     */
+    _getNextModel() {
+        if (this.models.length === 0) throw new Error("No API keys available");
+        const model = this.models[this.currentKeyIndex];
+        this.currentKeyIndex = (this.currentKeyIndex + 1) % this.models.length;
+        return model;
+    }
+
+    /**
      * Enqueue a Gemini call with retry + rate limit handling
-     * @param {Function} fn - The actual API call
+     * @param {Function} apiCallTarget - A function that takes a model and returns the API call promise
      * @param {string} cacheKey - Optional prompt hash for caching (null = no cache)
      */
-    async _callQueued(fn, cacheKey = null) {
+    async _callQueued(apiCallTarget, cacheKey = null) {
         // Check cache first
         if (cacheKey) {
             const cached = this.cache.get(cacheKey);
@@ -169,16 +186,17 @@ class AIService {
         this.stats.calls++;
 
         // Enqueue with retry logic
-        const result = await this.queue.enqueue(async () => {
+        return await this.queue.enqueue(async () => {
             for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+                const model = this._getNextModel();
                 try {
-                    return await fn();
+                    return await apiCallTarget(model);
                 } catch (e) {
                     if (e.status === 429 || (e.message && e.message.includes('429'))) {
                         this.stats.retries++;
-                        // Exponential backoff: 4s, 8s, 16s, 32s
-                        const waitTime = Math.pow(2, attempt + 2) * 1000;
-                        console.warn(`⚠️ [AI] Rate Limit (429). Attempt ${attempt + 1}/${MAX_RETRIES}. Waiting ${waitTime / 1000}s... (Queue: ${this.queue.pending} pending)`);
+                        // If we have multiple keys, we can retry faster since we rotate
+                        const waitTime = this.models.length > 1 ? 1000 : Math.pow(2, attempt + 2) * 1000;
+                        console.warn(`⚠️ [AI] Rate Limit (429) on key ${this.currentKeyIndex}. Attempt ${attempt + 1}/${MAX_RETRIES}. Rotating key... (Queue: ${this.queue.pending} pending)`);
                         await new Promise(r => setTimeout(r, waitTime));
                     } else {
                         this.stats.errors++;
@@ -249,7 +267,7 @@ class AIService {
         try {
             // No cache for chat — every conversation is unique
             const result = await this._callQueued(
-                () => this.model.generateContent(prompt),
+                (model) => model.generateContent(prompt),
                 null
             );
             const text = result.response.text();
@@ -312,7 +330,7 @@ class AIService {
 
         try {
             const result = await this._callQueued(
-                () => this.model.generateContent(prompt),
+                (model) => model.generateContent(prompt),
                 cacheKey
             );
             return result.response.text().trim();
@@ -350,7 +368,7 @@ class AIService {
         `;
         try {
             const result = await this._callQueued(
-                () => this.model.generateContent(prompt),
+                (model) => model.generateContent(prompt),
                 `addr_${text.substring(0, 100)}`
             );
             return this._parseJSON(result.response.text());
@@ -366,7 +384,7 @@ class AIService {
         try {
             // No cache for audio — always unique
             const result = await this._callQueued(
-                () => this.model.generateContent([
+                (model) => model.generateContent([
                     { inlineData: { data: mediaData, mimeType: mimeType } },
                     { text: "Transcribí este audio literalmente en español. Si no se entiende, respondé [INDESCIFRABLE]." }
                 ]),
@@ -392,7 +410,7 @@ class AIService {
         `;
         try {
             const result = await this._callQueued(
-                () => this.model.generateContent(prompt),
+                (model) => model.generateContent(prompt),
                 null
             );
             return result.response.text();
