@@ -46,6 +46,7 @@ const CorporateDashboard = () => {
             socket.on('ready', () => setStatus('ready'));
             socket.on('status_change', ({ status }) => setStatus(status));
             socket.on('new_alert', (newAlert) => setAlerts(prev => [newAlert, ...prev]));
+            socket.on('alerts_updated', (updated) => setAlerts(updated)); // Listen for updates
         }
 
         const loadData = async () => {

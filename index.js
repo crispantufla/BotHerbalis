@@ -256,7 +256,10 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false) {
 
             // Clear alerts
             const index = sessionAlerts.findIndex(a => a.userPhone === actualTarget);
-            if (index !== -1) sessionAlerts.splice(index, 1);
+            if (index !== -1) {
+                sessionAlerts.splice(index, 1);
+                if (sharedState.io) sharedState.io.emit('alerts_updated', sessionAlerts);
+            }
             return `✅ Resumen enviado a ${actualTarget}. Esperando aceptación legal.`;
         }
         return "⚠️ No hay pedido pendiente de aprobación.";
