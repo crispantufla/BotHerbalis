@@ -188,13 +188,25 @@ async function notifyAdmin(reason, userPhone, details = null) {
     if (lastAlert && lastAlert.userPhone === userPhone && lastAlert.reason === reason && (now - lastAlert.id < 8000)) return;
 
     lastAlertUser = userPhone;
+
+    // Extract order data from user state for rich alerts
+    const state = userState[userPhone] || {};
+    const orderData = {
+        product: state.selectedProduct || null,
+        plan: state.selectedPlan || null,
+        price: state.price || null,
+        address: state.partialAddress || state.pendingOrder || null,
+        step: state.step || null
+    };
+
     const newAlert = {
         id: Date.now(),
         timestamp: new Date(),
         reason,
         userPhone,
-        userName: userState[userPhone]?.userName || userPhone,
-        details: details || ""
+        userName: state.userName || userPhone,
+        details: details || "",
+        orderData
     };
 
     sessionAlerts.unshift(newAlert);
@@ -203,7 +215,8 @@ async function notifyAdmin(reason, userPhone, details = null) {
     if (sharedState.io) sharedState.io.emit('new_alert', newAlert);
 
     if (config.alertNumbers && config.alertNumbers.length > 0) {
-        const alertMsg = `⚠️ *ALERTA SISTEMA*\n\n*Motivo:* ${reason}\n*Cliente:* ${userPhone}\n*Detalles:* ${details || "Sin detalles"}`;
+        const addrStr = orderData.address ? `${orderData.address.nombre || '?'}, ${orderData.address.calle || '?'}, ${orderData.address.ciudad || '?'}, CP ${orderData.address.cp || '?'}` : 'Sin dirección';
+        const alertMsg = `⚠️ *ALERTA SISTEMA*\n\n*Motivo:* ${reason}\n*Cliente:* ${userPhone}\n${orderData.product ? `*Producto:* ${orderData.product} (${orderData.plan || '?'} días) - $${orderData.price || '?'}\n*Dirección:* ${addrStr}\n` : ''}*Detalles:* ${details || "Sin detalles"}`;
         for (const num of config.alertNumbers) {
             const targetAlert = `${num}@c.us`;
             client.sendMessage(targetAlert, alertMsg).catch(e => console.error(`[ALERT] Failed to forward to ${num}:`, e.message));
