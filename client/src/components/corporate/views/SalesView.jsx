@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { API_URL } from '../../../config/api';
+import api from '../../../config/axios';
+
 
 const SalesView = () => {
     const [orders, setOrders] = useState([]);
@@ -12,7 +12,7 @@ const SalesView = () => {
 
     const fetchOrders = async () => {
         try {
-            const res = await axios.get(`${API_URL}/api/orders`);
+            const res = await api.get('/api/orders');
             setOrders(res.data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
         } catch (e) {
             console.error("Failed to load orders", e);
@@ -68,7 +68,7 @@ const SalesView = () => {
         if (!editingOrder) return;
         setSavingOrder(true);
         try {
-            await axios.post(`${API_URL}/api/orders/${editingOrder.id}/status`, {
+            await api.post(`/api/orders/${editingOrder.id}/status`, {
                 status: editStatus,
                 tracking: editTracking
             });

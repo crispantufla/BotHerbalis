@@ -155,10 +155,18 @@ function saveOrderToLocal(order) {
     if (sharedState.io) sharedState.io.emit('new_order', newOrder);
 }
 
-// Helper: Send with Delay
-const sendMessageWithDelay = async (chatId, content) => {
-    const delay = Math.floor(Math.random() * (4000 - 2000 + 1) + 2000);
-    console.log(`[DELAY] Waiting ${delay / 1000}s before sending to ${chatId}`);
+// Helper: Send with Delay (Improved to satisfy 30-60s requirement)
+const sendMessageWithDelay = async (chatId, content, startTime = Date.now()) => {
+    // Standard human-like delay: 30 to 60 seconds
+    const targetTotalDelay = Math.floor(Math.random() * (60000 - 30000 + 1) + 30000);
+
+    // Calculate how much time has already passed (e.g. AI thinking or 429 retries)
+    const elapsedSinceStart = Date.now() - startTime;
+
+    // Remaining time to wait. If AI took 80s (429), remaining is 0.
+    const remainingDelay = Math.max(0, targetTotalDelay - elapsedSinceStart);
+
+    console.log(`[DELAY] AI took ${elapsedSinceStart / 1000}s. Waiting ${remainingDelay / 1000}s more (Target: ${targetTotalDelay / 1000}s)`);
 
     if (userState[chatId]?.lastMessage === content) {
         const lines = content.split('\n').filter(l => l.trim());
@@ -175,7 +183,7 @@ const sendMessageWithDelay = async (chatId, content) => {
         } catch (e) {
             console.error(`[ERROR] Failed to send message: ${e}`);
         }
-    }, delay);
+    }, remainingDelay);
 };
 
 // Helper: Notify Admin
@@ -328,6 +336,12 @@ if (!process.env.GEMINI_API_KEY) {
     console.log(`✅ GEMINI_API_KEY initialized.`);
 }
 
+if (!process.env.API_KEY) {
+    console.warn("⚠️ SECURITY WARNING: API_KEY not set in .env. Using default insecure key.");
+} else {
+    console.log(`🔒 Security: API_KEY configured.`);
+}
+
 // --- CLIENT EVENTS ---
 
 client.on('qr', (qr) => {
@@ -405,8 +419,9 @@ client.on('message', async msg => {
             const transcription = await aiService.transcribeAudio(media.data, media.mimetype);
             if (transcription) {
                 console.log(`[AUDIO] Transcribed: "${transcription}"`);
+                const startTime = Date.now();
                 await processSalesFlow(userId, transcription, userState, knowledge, {
-                    client, notifyAdmin, saveState, sendMessageWithDelay, logAndEmit, saveOrderToLocal
+                    client, notifyAdmin, saveState, sendMessageWithDelay: (id, text) => sendMessageWithDelay(id, text, startTime), logAndEmit, saveOrderToLocal
                 });
             } else {
                 await client.sendMessage(userId, "Disculpá, no pude escuchar bien el audio. ¿Me lo escribís?");
@@ -427,8 +442,9 @@ client.on('message', async msg => {
     }
 
     // 4. Process Flow
+    const startTime = Date.now();
     await processSalesFlow(userId, msgText, userState, knowledge, {
-        client, notifyAdmin, saveState, sendMessageWithDelay, logAndEmit, saveOrderToLocal
+        client, notifyAdmin, saveState, sendMessageWithDelay: (id, text) => sendMessageWithDelay(id, text, startTime), logAndEmit, saveOrderToLocal
     });
 });
 

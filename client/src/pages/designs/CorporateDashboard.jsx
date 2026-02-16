@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import api from '../../config/axios';
 import { useSocket } from '../../context/SocketContext';
 import { Link } from 'react-router-dom';
-import { API_URL } from '../../config/api';
+
 import { useToast } from '../../components/ui/Toast';
 
 // View Imports
@@ -35,7 +35,7 @@ const CorporateDashboard = () => {
 
     const fetchConfig = useCallback(async () => {
         try {
-            const res = await axios.get(`${API_URL}/api/status`);
+            const res = await api.get('/api/status');
             if (res.data.config) setConfig(res.data.config);
         } catch (e) { }
     }, []);
@@ -52,8 +52,8 @@ const CorporateDashboard = () => {
         const loadData = async () => {
             try {
                 const [alertRes, statusRes] = await Promise.all([
-                    axios.get(`${API_URL}/api/alerts`),
-                    axios.get(`${API_URL}/api/status`)
+                    api.get('/api/alerts'),
+                    api.get('/api/status')
                 ]);
                 setAlerts(alertRes.data);
                 if (statusRes.data.config) setConfig(statusRes.data.config);
@@ -69,7 +69,7 @@ const CorporateDashboard = () => {
 
     const handleQuickAction = async (chatId, action) => {
         try {
-            await axios.post(`${API_URL}/api/admin-command`, { chatId, command: action });
+            await api.post('/api/admin-command', { chatId, command: action });
             setAlerts(prev => prev.filter(a => a.userPhone !== chatId));
             toast.success(`Acción ejecutada: ${action}`);
         } catch (e) { toast.error('Error ejecutando acción'); }

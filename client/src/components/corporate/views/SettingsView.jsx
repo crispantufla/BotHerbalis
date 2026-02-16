@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../../../config/axios';
 import { jsPDF } from "jspdf";
 import { useSocket } from '../../../context/SocketContext';
-import { API_URL } from '../../../config/api';
+
 import { useToast } from '../../ui/Toast';
 
 const SettingsView = ({ status }) => {
@@ -15,7 +15,7 @@ const SettingsView = ({ status }) => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const confRes = await axios.get(`${API_URL}/api/status`);
+                const confRes = await api.get('/api/status');
                 if (confRes.data.config) setConfig(confRes.data.config);
             } catch (e) { console.error("Error loading settings:", e); }
         };
@@ -26,7 +26,7 @@ const SettingsView = ({ status }) => {
     const handleConfigSave = async () => {
         setSaving(true);
         try {
-            await axios.post(`${API_URL}/api/config`, { alertNumber: config.alertNumber });
+            await api.post('/api/config', { alertNumber: config.alertNumber });
             toast.success('Configuración guardada');
         } catch (e) { toast.error('Error guardando configuración'); }
         setSaving(false);
@@ -36,7 +36,7 @@ const SettingsView = ({ status }) => {
         const ok = await confirm("¿Seguro que querés desconectar el bot? Dejará de responder.");
         if (!ok) return;
         try {
-            await axios.post(`${API_URL}/api/logout`);
+            await api.post('/api/logout');
             toast.success('Bot desconectado. Escaneá el QR nuevamente si querés reconectar.');
         } catch (e) { toast.error('Error al desconectar'); }
     };
@@ -46,7 +46,7 @@ const SettingsView = ({ status }) => {
             toast.info('Generando informe PDF...');
 
             // 1. Request the report text from the API
-            const response = await axios.post(`${API_URL}/api/admin-command`, {
+            const response = await api.post('/api/admin-command', {
                 chatId: "API_TEST",
                 command: '!resumen'
             });
@@ -76,7 +76,7 @@ const SettingsView = ({ status }) => {
 
     const handleTestSheets = async () => {
         try {
-            const res = await axios.post(`${API_URL}/api/sheets/test`);
+            const res = await api.post('/api/sheets/test');
             if (res.data.success) {
                 toast.success('Conexión con Google Sheets exitosa');
             }

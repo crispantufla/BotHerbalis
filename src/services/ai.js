@@ -1,5 +1,4 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const { summarizeHistory } = require('./summarizer');
 
 // --- CONFIGURATION ---
 const GEN_MODEL = "gemini-2.0-flash";
@@ -207,8 +206,19 @@ class AIService {
             }
         }
 
+        let knowledgeContext = "";
+        if (context.knowledge && context.knowledge.flow) {
+            const f = context.knowledge.flow;
+            const pCaps = f.price_capsulas?.response || "";
+            const pSem = f.price_semillas?.response || "";
+            if (pCaps || pSem) {
+                knowledgeContext = `INFORMACIÓN ACTUALIZADA DE PRECIOS:\n${pCaps}\n${pSem}\n(Usar estos valores sobre cualquier otro)`;
+            }
+        }
+
         const prompt = `
         ${summaryContext}
+        ${knowledgeContext}
         ETAPA ACTUAL: "${context.step || 'general'}"
         OBJETIVO INMEDIATO: "${context.goal || 'Ayudar al cliente'}"
         
@@ -254,6 +264,13 @@ class AIService {
             }
         }
         return null;
+    }
+
+    /**
+     * Manual Summary Trigger (for API)
+     */
+    async generateManualSummary(history) {
+        return await this._callQueuedSummarize(history);
     }
 
     /**

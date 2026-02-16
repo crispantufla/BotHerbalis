@@ -23,13 +23,10 @@
     "preference_capsulas": {
       "step": "waiting_preference",
       "match": [
-        "1",
-        "uno",
         "capsula",
         "capsulas",
         "pastilla",
         "pastillas",
-        "una",
         "practico",
         "gotas",
         "liquido"
@@ -40,15 +37,10 @@
     "preference_semillas": {
       "step": "waiting_preference",
       "match": [
-        "2",
-        "dos",
-        "semilla",
-        "semillas",
-        "nuez",
         "infusion",
-        "natural",
-        "te",
-        "yuyos"
+        "té",
+        "yuyos",
+        "semillas"
       ],
       "response": "Perfecto. La semilla es la opción más tradicional y natural. Se toma un pedacito por día y es excelente para pérdidas de peso más marcadas.\n\nPara tu objetivo recomendamos comenzar con el plan de 60 días.\n\n📦 Envío gratis por Correo Argentino y pegás al recibir.\n\n¿Querés que te pase los precios? ¡¡Son muy accesibles!!",
       "nextStep": "price_semillas"

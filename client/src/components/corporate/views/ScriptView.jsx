@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../../../config/axios';
 import ScriptMapView from './ScriptMapView';
-import { API_URL } from '../../../config/api';
+
 import { useToast } from '../../ui/Toast';
 
 const Script = () => {
@@ -9,22 +9,29 @@ const Script = () => {
     const [script, setScript] = useState({ flow: {}, faq: [] });
     const [activeTab, setActiveTab] = useState('flow');
     const [expandedCard, setExpandedCard] = useState(null);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         fetchScript();
     }, []);
 
     const fetchScript = async () => {
+        setLoading(true);
         try {
-            const res = await axios.get(`${API_URL}/api/script`);
+            const res = await api.get('/api/script');
             setScript(res.data);
-        } catch (e) { console.error(e); }
+        } catch (e) {
+            console.error(e);
+            toast.error('Error al cargar el guión');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const saveScript = async () => {
         try {
             // Include basic structure validation if needed
-            await axios.post(`${API_URL}/api/script`, script);
+            await api.post('/api/script', script);
             toast.success('Guión guardado correctamente');
         } catch (e) { toast.error('Error al guardar'); }
     };
@@ -62,129 +69,159 @@ const Script = () => {
         }));
     };
 
+    const SkeletonLoader = () => (
+        <div className="space-y-4 animate-pulse">
+            {[1, 2, 3, 4, 5].map(i => (
+                <div key={i} className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
+                    <div className="flex justify-between items-center">
+                        <div className="h-4 bg-gray-200 rounded w-1/3"></div>
+                        <div className="flex gap-2">
+                            <div className="h-4 bg-gray-200 rounded w-16"></div>
+                            <div className="h-4 bg-gray-100 rounded w-4"></div>
+                        </div>
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-gray-800">Editor de Guiones</h2>
+                <h2 className="text-2xl font-bold text-gray-800 tracking-tight">Editor de Guiones</h2>
                 <div className="flex gap-2">
-                    <button onClick={fetchScript} className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 shadow-sm font-medium transition">
-                        🔄 Recargar
+                    <button onClick={fetchScript} className="px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 shadow-sm font-medium transition flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                        Recargar
                     </button>
-                    <button onClick={saveScript} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm font-medium transition">
-                        💾 Guardar Todo
+                    <button onClick={saveScript} className="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-black shadow-sm font-bold transition">
+                        Guardar Cambios
                     </button>
                 </div>
             </div>
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div className="border-b flex overflow-x-auto">
+                <div className="border-b flex overflow-x-auto bg-gray-50/50">
                     <button
                         onClick={() => setActiveTab('flow')}
-                        className={`px-6 py-3 font-medium text-sm whitespace-nowrap ${activeTab === 'flow' ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50' : 'text-gray-500 hover:bg-gray-50'}`}
+                        className={`px-6 py-4 font-bold text-xs uppercase tracking-wider whitespace-nowrap transition-all ${activeTab === 'flow' ? 'border-b-2 border-blue-600 text-blue-600 bg-white' : 'text-gray-400 hover:text-gray-600'}`}
                     >
-                        Lista de Pasos
+                        Pasos del Flujo
                     </button>
                     <button
                         onClick={() => setActiveTab('map')}
-                        className={`px-6 py-3 font-medium text-sm whitespace-nowrap ${activeTab === 'map' ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50' : 'text-gray-500 hover:bg-gray-50'}`}
+                        className={`px-6 py-4 font-bold text-xs uppercase tracking-wider whitespace-nowrap transition-all ${activeTab === 'map' ? 'border-b-2 border-blue-600 text-blue-600 bg-white' : 'text-gray-400 hover:text-gray-600'}`}
                     >
-                        Mapa Visual (D&D)
+                        Mapa Visual
                     </button>
                     <button
                         onClick={() => setActiveTab('faq')}
-                        className={`px-6 py-3 font-medium text-sm whitespace-nowrap ${activeTab === 'faq' ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50' : 'text-gray-500 hover:bg-gray-50'}`}
+                        className={`px-6 py-4 font-bold text-xs uppercase tracking-wider whitespace-nowrap transition-all ${activeTab === 'faq' ? 'border-b-2 border-blue-600 text-blue-600 bg-white' : 'text-gray-400 hover:text-gray-600'}`}
                     >
-                        Preguntas Frecuentes (FAQ)
+                        Preguntas (FAQ)
                     </button>
                 </div>
 
-                <div className="p-6 bg-gray-50 min-h-[600px]">
-                    {activeTab === 'map' && (
-                        <ScriptMapView script={script} onUpdate={handleUpdate} />
-                    )}
+                <div className="p-6 bg-[#f8fafc] min-h-[500px]">
+                    {loading ? (
+                        <SkeletonLoader />
+                    ) : (
+                        <>
+                            {activeTab === 'map' && (
+                                <ScriptMapView script={script} onUpdate={handleUpdate} />
+                            )}
 
-                    {activeTab === 'flow' && (
-                        <div className="space-y-4">
-                            {Object.entries(script.flow || {}).map(([key, step]) => (
-                                <div key={key} className="bg-white p-4 rounded-lg border shadow-sm">
-                                    <div className="flex justify-between items-center cursor-pointer" onClick={() => setExpandedCard(expandedCard === key ? null : key)}>
-                                        <h3 className="font-bold text-gray-700 capitalize">{key.replace(/_/g, ' ')}</h3>
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded font-bold uppercase">{step.step || 'sin_paso'}</span>
-                                            <span className="text-gray-400">{expandedCard === key ? '▲' : '▼'}</span>
-                                        </div>
-                                    </div>
-                                    {expandedCard === key && (
-                                        <div className="mt-4 space-y-3 animate-fade-in border-t pt-4">
-                                            <div>
-                                                <label className="block text-xs font-bold text-gray-400 uppercase">Respuesta del Bot</label>
-                                                <textarea
-                                                    className="w-full mt-1 p-3 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                                                    rows={4}
-                                                    value={step.response}
-                                                    onChange={(e) => handleFlowChange(key, 'response', e.target.value)}
-                                                />
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <label className="block text-xs font-bold text-gray-400 uppercase">Siguiente Paso</label>
-                                                    <input
-                                                        type="text"
-                                                        className="w-full mt-1 p-2 border rounded-lg text-sm"
-                                                        value={step.nextStep || ''}
-                                                        onChange={(e) => handleFlowChange(key, 'nextStep', e.target.value)}
-                                                    />
+                            {activeTab === 'flow' && (
+                                <div className="space-y-4">
+                                    {Object.entries(script.flow || {}).map(([key, step]) => (
+                                        <div key={key} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm hover:border-blue-200 transition-colors">
+                                            <div className="flex justify-between items-center cursor-pointer" onClick={() => setExpandedCard(expandedCard === key ? null : key)}>
+                                                <h3 className="font-bold text-gray-700 capitalize">{key.replace(/_/g, ' ')}</h3>
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-[10px] bg-blue-50 text-blue-600 px-2.5 py-1 rounded border border-blue-100 font-bold uppercase tracking-wide">{step.step || 'sin_paso'}</span>
+                                                    <span className={`text-gray-300 transition-transform ${expandedCard === key ? 'rotate-180' : ''}`}>▼</span>
                                                 </div>
-                                                {step.step && (
+                                            </div>
+                                            {expandedCard === key && (
+                                                <div className="mt-4 space-y-4 animate-fade-in border-t border-gray-100 pt-4">
                                                     <div>
-                                                        <label className="block text-xs font-bold text-gray-400 uppercase">ID del Paso (Fase)</label>
-                                                        <input
-                                                            type="text"
-                                                            className="w-full mt-1 p-2 border rounded-lg text-sm bg-gray-50"
-                                                            value={step.step}
-                                                            onChange={(e) => handleFlowChange(key, 'step', e.target.value)}
+                                                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Respuesta del Bot</label>
+                                                        <textarea
+                                                            className="w-full p-3 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all leading-relaxed"
+                                                            rows={4}
+                                                            value={step.response}
+                                                            onChange={(e) => handleFlowChange(key, 'response', e.target.value)}
                                                         />
                                                     </div>
-                                                )}
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div>
+                                                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Siguiente Paso</label>
+                                                            <input
+                                                                type="text"
+                                                                className="w-full p-2.5 border border-gray-200 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500/20 outline-none"
+                                                                value={step.nextStep || ''}
+                                                                onChange={(e) => handleFlowChange(key, 'nextStep', e.target.value)}
+                                                            />
+                                                        </div>
+                                                        {step.step && (
+                                                            <div>
+                                                                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">ID del Paso (Fase)</label>
+                                                                <input
+                                                                    type="text"
+                                                                    className="w-full p-2.5 border border-gray-200 rounded-lg text-sm bg-gray-50 font-mono text-gray-500"
+                                                                    value={step.step}
+                                                                    onChange={(e) => handleFlowChange(key, 'step', e.target.value)}
+                                                                />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {activeTab === 'faq' && (
+                                <div className="space-y-4">
+                                    {script.faq.map((item, idx) => (
+                                        <div key={idx} className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm relative group hover:border-blue-200 transition-colors">
+                                            <button
+                                                onClick={() => deleteFAQ(idx)}
+                                                className="absolute top-4 right-4 text-gray-300 hover:text-red-500 transition-colors"
+                                                title="Eliminar FAQ"
+                                            >✕</button>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Palabras Clave (separadas por coma)</label>
+                                                    <input
+                                                        type="text"
+                                                        className="w-full p-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 outline-none"
+                                                        value={item.keywords.join(', ')}
+                                                        onChange={(e) => handleFAQChange(idx, 'keywords', e.target.value.split(',').map(s => s.trim()))}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Respuesta Automática</label>
+                                                    <textarea
+                                                        className="w-full p-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 outline-none"
+                                                        rows={2}
+                                                        value={item.response}
+                                                        onChange={(e) => handleFAQChange(idx, 'response', e.target.value)}
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
-                                    )}
+                                    ))}
+                                    <button
+                                        onClick={addFAQ}
+                                        className="w-full py-4 border-2 border-dashed border-gray-300 rounded-xl text-gray-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-all font-bold text-sm uppercase tracking-wide flex items-center justify-center gap-2"
+                                    >
+                                        <span className="text-xl">+</span> Agregar Nueva Pregunta
+                                    </button>
                                 </div>
-                            ))}
-                        </div>
-                    )}
-
-                    {activeTab === 'faq' && (
-                        <div className="space-y-4">
-                            {script.faq.map((item, idx) => (
-                                <div key={idx} className="bg-white p-4 rounded-lg border shadow-sm relative group">
-                                    <button onClick={() => deleteFAQ(idx)} className="absolute top-2 right-2 text-gray-300 hover:text-red-500 transition">✕</button>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-xs font-bold text-gray-400 uppercase">Keywords (coma)</label>
-                                            <input
-                                                type="text"
-                                                className="w-full mt-1 p-2 border rounded-lg text-sm"
-                                                value={item.keywords.join(', ')}
-                                                onChange={(e) => handleFAQChange(idx, 'keywords', e.target.value.split(',').map(s => s.trim()))}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-gray-400 uppercase">Respuesta</label>
-                                            <textarea
-                                                className="w-full mt-1 p-2 border rounded-lg text-sm"
-                                                rows={1}
-                                                value={item.response}
-                                                onChange={(e) => handleFAQChange(idx, 'response', e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                            <button onClick={addFAQ} className="w-full py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-400 hover:border-gray-400 hover:bg-gray-100 transition font-medium">
-                                + Agregar Nueva Pregunta
-                            </button>
-                        </div>
+                            )}
+                        </>
                     )}
                 </div>
             </div>

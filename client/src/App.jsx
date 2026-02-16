@@ -3,24 +3,43 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { SocketProvider } from './context/SocketContext';
 import { ToastProvider } from './components/ui/Toast';
 import CorporateDashboard from './pages/designs/CorporateDashboard';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import Login from './pages/Login';
+
+// Protected Route Component
+const ProtectedRoute = ({ children }) => {
+    const { user, loading } = useAuth();
+    if (loading) return <div className="h-screen flex items-center justify-center bg-slate-50"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div></div>;
+    if (!user) return <Navigate to="/login" replace />;
+    return children;
+};
 
 function App() {
     return (
-        <SocketProvider>
-            <ToastProvider>
-                <Router>
-                    <div className="h-screen w-screen bg-slate-50 text-slate-900">
-                        <Routes>
-                            {/* Main Route - Corporate Enterprise */}
-                            <Route path="/" element={<CorporateDashboard />} />
+        <ToastProvider>
+            <AuthProvider>
+                <SocketProvider>
+                    <Router>
+                        <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
+                            <Routes>
+                                {/* Public Route */}
+                                <Route path="/login" element={<Login />} />
 
-                            {/* Catch all - Redirect to Home */}
-                            <Route path="*" element={<Navigate to="/" replace />} />
-                        </Routes>
-                    </div>
-                </Router>
-            </ToastProvider>
-        </SocketProvider>
+                                {/* Protected Route - Corporate Enterprise */}
+                                <Route path="/" element={
+                                    <ProtectedRoute>
+                                        <CorporateDashboard />
+                                    </ProtectedRoute>
+                                } />
+
+                                {/* Catch all - Redirect to Home */}
+                                <Route path="*" element={<Navigate to="/" replace />} />
+                            </Routes>
+                        </div>
+                    </Router>
+                </SocketProvider>
+            </AuthProvider>
+        </ToastProvider>
     );
 }
 

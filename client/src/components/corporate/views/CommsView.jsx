@@ -1,43 +1,45 @@
 import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import api from '../../../config/axios';
 import { useSocket } from '../../../context/SocketContext';
 import { API_URL } from '../../../config/api';
 import { useToast } from '../../ui/Toast';
 
-// Icons
 const Icons = {
-    Send: () => <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>,
-    Attach: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>,
     Search: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
-    Pause: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+    AI: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>,
     Play: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+    Pause: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
     Trash: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
-    AI: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>,
     Script: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
     ChevronDown: () => <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>,
+    Send: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
 };
 
 const CommsView = () => {
     const { socket } = useSocket();
-    const { toast, confirm } = useToast();
+    const { toast } = useToast();
     const [chats, setChats] = useState([]);
     const [selectedChat, setSelectedChat] = useState(null);
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
-    const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [showScriptPanel, setShowScriptPanel] = useState(false);
+    const [scriptFlow, setScriptFlow] = useState({});
     const [summarizing, setSummarizing] = useState(false);
     const [summaryText, setSummaryText] = useState(null);
-    const [scriptFlow, setScriptFlow] = useState({});
-    const [showScriptPanel, setShowScriptPanel] = useState(false);
-
     const messagesEndRef = useRef(null);
 
-    // Load Chats — initial fetch + Socket.IO for real-time updates
+    // Filter chats
+    const filteredChats = searchTerm
+        ? chats.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()))
+        : chats;
+
+    // Load Chats
     useEffect(() => {
         const fetchChats = async () => {
             try {
-                const res = await axios.get(`${API_URL}/api/chats`);
+                const res = await api.get('/api/chats');
                 setChats(res.data);
             } catch (e) {
                 console.error("Error fetching chats:", e);
@@ -47,32 +49,50 @@ const CommsView = () => {
         fetchChats();
 
         if (socket) {
-            // Real-time chat list updates
+            socket.on('receive_message', (data) => {
+                if (selectedChat && data.chatId === selectedChat.id) {
+                    setMessages(prev => [...prev, data.message]);
+                }
+                setChats(prev => prev.map(c =>
+                    c.id === data.chatId
+                        ? { ...c, lastMessage: data.message.body, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), unread: (selectedChat && selectedChat.id === data.chatId) ? 0 : (c.unread || 0) + 1 }
+                        : c
+                ));
+            });
+
+            socket.on('message_sent', (data) => {
+                if (selectedChat && data.chatId === selectedChat.id) {
+                    setMessages(prev => [...prev, data.message]);
+                }
+                setChats(prev => prev.map(c =>
+                    c.id === data.chatId
+                        ? { ...c, lastMessage: `Tú: ${data.message.body}`, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
+                        : c
+                ));
+            });
+
             socket.on('bot_status_change', ({ chatId, paused }) => {
                 setChats(prev => prev.map(c => c.id === chatId ? { ...c, isPaused: paused } : c));
-                if (selectedChat?.id === chatId) {
-                    setSelectedChat(prev => prev ? { ...prev, isPaused: paused } : prev);
+                if (selectedChat && selectedChat.id === chatId) {
+                    setSelectedChat(prev => ({ ...prev, isPaused: paused }));
                 }
             });
-            socket.on('new_message', () => fetchChats()); // Refresh chat list on new messages
         }
 
-        // Reduced polling from 5s to 30s since Socket handles real-time
-        const interval = setInterval(fetchChats, 30000);
         return () => {
-            clearInterval(interval);
             if (socket) {
+                socket.off('receive_message');
+                socket.off('message_sent');
                 socket.off('bot_status_change');
-                socket.off('new_message');
             }
         };
-    }, [socket]);
+    }, [socket, selectedChat]);
 
     // Load Script Flow
     useEffect(() => {
         const fetchScript = async () => {
             try {
-                const res = await axios.get(`${API_URL}/api/script`);
+                const res = await api.get('/api/script');
                 if (res.data?.flow) setScriptFlow(res.data.flow);
             } catch (e) { console.error('Failed to load script:', e); }
         };
@@ -87,7 +107,7 @@ const CommsView = () => {
         const fetchMessages = async () => {
             setLoading(true);
             try {
-                const res = await axios.get(`${API_URL}/api/history/${selectedChat.id}`);
+                const res = await api.get(`/api/history/${selectedChat.id}`);
                 setMessages(res.data);
             } catch (e) {
                 console.error("Failed to load history", e);
@@ -98,10 +118,11 @@ const CommsView = () => {
         fetchMessages();
     }, [selectedChat]);
 
-    // Scroll
-    useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages]);
+    // Scroll to bottom
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
+    useEffect(scrollToBottom, [messages]);
 
     // Send
     const handleSend = async (e) => {
@@ -115,7 +136,7 @@ const CommsView = () => {
         setMessages(prev => [...prev, newMessage]);
 
         try {
-            await axios.post(`${API_URL}/api/send`, {
+            await api.post('/api/send', {
                 chatId: selectedChat.id,
                 message: text
             });
@@ -124,7 +145,7 @@ const CommsView = () => {
         }
     };
 
-    // Send script step response directly
+    // Send script step
     const handleSendScriptStep = async (stepKey) => {
         if (!selectedChat) return;
         const step = scriptFlow[stepKey];
@@ -135,7 +156,7 @@ const CommsView = () => {
         setMessages(prev => [...prev, newMessage]);
 
         try {
-            await axios.post(`${API_URL}/api/send`, {
+            await api.post('/api/send', {
                 chatId: selectedChat.id,
                 message: text
             });
@@ -150,7 +171,7 @@ const CommsView = () => {
         if (!selectedChat) return;
         const newStatus = !selectedChat.isPaused;
         try {
-            await axios.post(`${API_URL}/api/toggle-bot`, {
+            await api.post('/api/toggle-bot', {
                 chatId: selectedChat.id,
                 paused: newStatus
             });
@@ -162,10 +183,10 @@ const CommsView = () => {
     // Clear Chat Action
     const handleClearChat = async () => {
         if (!selectedChat) return;
-        const ok = await confirm("¿Seguro que querés borrar el historial y reiniciar el bot para este usuario?");
+        const ok = await window.confirm("¿Seguro que querés borrar el historial y reiniciar el bot para este usuario?");
         if (!ok) return;
         try {
-            await axios.post(`${API_URL}/api/reset-chat`, { chatId: selectedChat.id });
+            await api.post('/api/reset-chat', { chatId: selectedChat.id });
             setMessages([]);
             setSummaryText(null);
             toast.success('Chat reiniciado correctamente');
@@ -177,7 +198,7 @@ const CommsView = () => {
         if (!selectedChat) return;
         setSummarizing(true);
         try {
-            const res = await axios.get(`${API_URL}/api/summarize/${selectedChat.id}`);
+            const res = await api.get(`/api/summarize/${selectedChat.id}`);
             setSummaryText(res.data.summary || res.data.message || 'No se pudo generar resumen.');
             toast.success('Resumen IA generado');
         } catch (e) {
@@ -186,11 +207,6 @@ const CommsView = () => {
         }
         setSummarizing(false);
     };
-
-    // Filter chats
-    const filteredChats = searchTerm
-        ? chats.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()))
-        : chats;
 
     // Helper: Render Message Content
     const renderMessageBody = (msg) => {

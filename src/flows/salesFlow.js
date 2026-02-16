@@ -11,6 +11,7 @@ const fs = require('fs');
 async function processSalesFlow(userId, text, userState, knowledge, dependencies) {
     const { client, notifyAdmin, saveState, sendMessageWithDelay, logAndEmit } = dependencies;
     const lowerText = text.toLowerCase();
+    const normalizedText = lowerText.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
     // Init User State if needed
     if (!userState[userId]) {
@@ -71,7 +72,9 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             const aiWeight = await aiService.chat(text, {
                 step: 'waiting_weight',
                 goal: 'Obtener cuantos kilos quiere bajar el usuario',
-                history: currentState.history
+                history: currentState.history,
+                summary: currentState.summary,
+                knowledge: knowledge
             });
 
             if (aiWeight.goalMet || /^\d+$/.test(text.trim())) {
@@ -92,8 +95,11 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             break;
 
         case 'waiting_preference':
-            // Hybrid Approach: Check keywords first, then AI
-            if (knowledge.flow.preference_capsulas.match.some(k => lowerText.includes(k))) {
+            // Refined Matching: Use Word Boundaries + Normalized Text
+            const isMatch = (keywords, text) => keywords.some(k => new RegExp(`\\b${k}\\b`, 'i').test(text));
+
+            // Use normalizedText for keyword matching to catch "cápsulas" -> "capsulas"
+            if (isMatch(knowledge.flow.preference_capsulas.match, normalizedText)) {
                 currentState.selectedProduct = "Cápsulas de nuez de la india";
                 const msg = knowledge.flow.preference_capsulas.response;
                 await sendMessageWithDelay(userId, msg);
@@ -101,7 +107,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 currentState.history.push({ role: 'bot', content: msg });
                 saveState();
                 matched = true;
-            } else if (knowledge.flow.preference_semillas.match.some(k => lowerText.includes(k))) {
+            } else if (isMatch(knowledge.flow.preference_semillas.match, normalizedText)) { // Check normalized
                 currentState.selectedProduct = "Semillas de nuez de la india";
                 const msg = knowledge.flow.preference_semillas.response;
                 await sendMessageWithDelay(userId, msg);
@@ -109,12 +115,28 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 currentState.history.push({ role: 'bot', content: msg });
                 saveState();
                 matched = true;
+            } else {
+                // FALLBACK: Use original text for AI to preserve context/nuance
+                const aiPref = await aiService.chat(text, {
+                    step: 'waiting_preference',
+                    goal: 'Determinar si quiere cápsulas o semillas, o responder duda.',
+                    history: currentState.history,
+                    summary: currentState.summary,
+                    knowledge: knowledge
+                });
+
+                if (aiPref.response) {
+                    await sendMessageWithDelay(userId, aiPref.response);
+                    currentState.history.push({ role: 'bot', content: aiPref.response });
+                    saveState();
+                    matched = true;
+                }
             }
             break;
 
         case 'waiting_price_confirmation':
             // "Precios"
-            if (/\b(si|sisi|precio|precios|info|dale|bueno)\b/.test(lowerText)) {
+            if (/\b(si|sisi|precio|precios|info|dale|bueno)\b/.test(normalizedText)) { // Check normalized
                 let msg = "";
                 if (currentState.selectedProduct && currentState.selectedProduct.includes("Cápsulas")) {
                     msg = knowledge.flow.price_capsulas.response;
@@ -132,19 +154,22 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
         case 'waiting_plan_choice':
             // Plan logic
-            const planAI = await aiService.chat(text, {
+            const planAI = await aiService.chat(text, { // AI gets full text
                 step: 'waiting_plan_choice',
                 goal: 'Usuario debe elegir Plan 60 o Plan 120 días.',
-                history: currentState.history
+                history: currentState.history,
+                summary: currentState.summary,
+                knowledge: knowledge
             });
 
             // Use regex as reliable fallback
             let planSelected = false;
-            if (lowerText.includes('60')) {
+            // Normalize for number checks too, though less critical
+            if (normalizedText.includes('60')) {
                 currentState.selectedPlan = "60";
                 currentState.price = (currentState.selectedProduct === "Cápsulas de nuez de la india") ? "45.900" : "34.900";
                 planSelected = true;
-            } else if (lowerText.includes('120')) {
+            } else if (normalizedText.includes('120')) {
                 currentState.selectedPlan = "120";
                 currentState.price = (currentState.selectedProduct === "Cápsulas de nuez de la india") ? "82.600" : "61.900";
                 planSelected = true;
@@ -168,7 +193,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             break;
 
         case 'waiting_ok':
-            if (/\b(si|dale|bueno|puedo|retiro|ok|listo)\b/.test(lowerText)) {
+            if (/\b(si|dale|bueno|puedo|retiro|ok|listo)\b/.test(normalizedText)) {
                 const msg = knowledge.flow.data_request.response;
                 await sendMessageWithDelay(userId, msg);
                 currentState.step = knowledge.flow.data_request.nextStep;
