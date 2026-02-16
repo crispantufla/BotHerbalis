@@ -8,3 +8,4 @@ logs/
 public/media/
 *.log
 google-credentials.json
+backups/
