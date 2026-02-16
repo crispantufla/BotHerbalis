@@ -1,8 +1,10 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { summarizeHistory } = require('./summarizer');
 
 // --- CONFIGURATION ---
 const GEN_MODEL = "gemini-2.0-flash";
 const MAX_RETRIES = 3;
+const MAX_HISTORY_LENGTH = 15; // Trigger summary after 15 messages
 
 // --- PERSONA DEFINITION ---
 const SYSTEM_INSTRUCTIONS = `
@@ -70,15 +72,28 @@ class AIService {
     /**
      * Main Chat Function
      * @param {string} userText 
-     * @param {object} context - { step, history, goal }
+     * @param {object} context - { step, history, goal, summary }
      */
     async chat(userText, context = {}) {
+        let conversationHistory = context.history || [];
+        let summaryContext = "";
+
+        // RAG LITE: If we have a summary, include it and reduce history
+        if (context.summary) {
+            summaryContext = `RESUMEN PREVIO:\n"${context.summary}"\n\n`;
+            // Keep only last 5 messages if we have a summary to save context
+            if (conversationHistory.length > 5) {
+                conversationHistory = conversationHistory.slice(-5);
+            }
+        }
+
         const prompt = `
+        ${summaryContext}
         ETAPA ACTUAL: "${context.step || 'general'}"
         OBJETIVO INMEDIATO: "${context.goal || 'Ayudar al cliente'}"
         
         HISTORIAL RECIENTE:
-        ${(context.history || []).map(m => `${m.role}: ${m.content}`).join('\n')}
+        ${conversationHistory.map(m => `${m.role}: ${m.content}`).join('\n')}
         
         USUARIO: "${userText}"
         
@@ -96,6 +111,25 @@ class AIService {
             console.error("🔴 [AI] Chat Error:", e.message);
             return { response: "Estoy teniendo un pequeño problema técnico, ¿me repetís?", goalMet: false };
         }
+    }
+
+    /**
+     * Check if history needs summarization
+     * @param {Array} history 
+     */
+    async checkAndSummarize(history) {
+        if (history.length > MAX_HISTORY_LENGTH) {
+            console.log(`[AI] Summarizing history (${history.length} messages)...`);
+            const summary = await summarizeHistory(history);
+            if (summary) {
+                console.log(`[AI] Summary created: "${summary.substring(0, 50)}..."`);
+                return {
+                    summary: summary,
+                    prunedHistory: history.slice(-5) // Keep last 5
+                };
+            }
+        }
+        return null;
     }
 
     /**
@@ -160,10 +194,15 @@ class AIService {
     _parseJSON(text) {
         try {
             const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
-            return JSON.parse(jsonStr);
+            const parsed = JSON.parse(jsonStr);
+            // Ensure response is a string
+            if (typeof parsed.response !== 'string') {
+                parsed.response = String(parsed.response || "");
+            }
+            return parsed;
         } catch (e) {
             // Fallback if AI didn't return strict JSON (sometimes happens)
-            return { response: text, goalMet: false };
+            return { response: text.replace(/```/g, ''), goalMet: false };
         }
     }
 }

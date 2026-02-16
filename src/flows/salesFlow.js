@@ -25,9 +25,16 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
     }
     const currentState = userState[userId];
 
-    // Update History (Keep last 5 turns)
+    // Update History (Keep last 20 turns, but let AI service prune via summary)
     currentState.history.push({ role: 'user', content: text });
-    if (currentState.history.length > 10) currentState.history.shift();
+
+    // Check and Summarize
+    const summaryResult = await aiService.checkAndSummarize(currentState.history);
+    if (summaryResult) {
+        currentState.summary = summaryResult.summary;
+        currentState.history = summaryResult.prunedHistory;
+        saveState();
+    }
 
     // 1. Check Global FAQs (Priority 1)
     for (const faq of knowledge.faq) {
