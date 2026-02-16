@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import ScriptMapView from './ScriptMapView';
 import { API_URL } from '../../../config/api';
+import { useToast } from '../../ui/Toast';
 
 const Script = () => {
+    const { toast } = useToast();
     const [script, setScript] = useState({ flow: {}, faq: [] });
     const [activeTab, setActiveTab] = useState('flow');
     const [expandedCard, setExpandedCard] = useState(null);
@@ -23,8 +25,8 @@ const Script = () => {
         try {
             // Include basic structure validation if needed
             await axios.post(`${API_URL}/api/script`, script);
-            alert('Guión guardado correctamente');
-        } catch (e) { alert('Error al guardar'); }
+            toast.success('Guión guardado correctamente');
+        } catch (e) { toast.error('Error al guardar'); }
     };
 
     const handleUpdate = (newScript) => {

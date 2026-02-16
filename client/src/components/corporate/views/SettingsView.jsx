@@ -3,9 +3,11 @@ import axios from 'axios';
 import { jsPDF } from "jspdf";
 import { useSocket } from '../../../context/SocketContext';
 import { API_URL } from '../../../config/api';
+import { useToast } from '../../ui/Toast';
 
 const SettingsView = ({ status }) => {
     const { socket } = useSocket();
+    const { toast, confirm } = useToast();
     const [config, setConfig] = useState({ alertNumber: '' });
     const [saving, setSaving] = useState(false);
 
@@ -25,22 +27,23 @@ const SettingsView = ({ status }) => {
         setSaving(true);
         try {
             await axios.post(`${API_URL}/api/config`, { alertNumber: config.alertNumber });
-            alert('Configuración guardada ✅');
-        } catch (e) { alert('Error guardando configuración ❌'); }
+            toast.success('Configuración guardada');
+        } catch (e) { toast.error('Error guardando configuración'); }
         setSaving(false);
     };
 
     const handleLogout = async () => {
-        if (!window.confirm("¿Seguro que querés desconectar el bot? Dejará de responder.")) return;
+        const ok = await confirm("¿Seguro que querés desconectar el bot? Dejará de responder.");
+        if (!ok) return;
         try {
             await axios.post(`${API_URL}/api/logout`);
-            alert('Bot desconectado 👋. Escaneá el QR nuevamente si querés reconectar.');
-        } catch (e) { alert('Error al desconectar'); }
+            toast.success('Bot desconectado. Escaneá el QR nuevamente si querés reconectar.');
+        } catch (e) { toast.error('Error al desconectar'); }
     };
 
     const handleTestReport = async () => {
         try {
-            alert('Generando informe PDF... aguarde unos segundos.');
+            toast.info('Generando informe PDF...');
 
             // 1. Request the report text from the API
             const response = await axios.post(`${API_URL}/api/admin-command`, {
@@ -51,7 +54,7 @@ const SettingsView = ({ status }) => {
             const reportText = response.data.message;
 
             if (!reportText || reportText.includes("No hay logs")) {
-                alert("No hay información suficiente para generar el reporte hoy.");
+                toast.warning('No hay información suficiente para el reporte de hoy.');
                 return;
             }
 
@@ -64,10 +67,10 @@ const SettingsView = ({ status }) => {
             doc.text(splitText, 10, 20);
             doc.save(`resumen_${new Date().toISOString().split('T')[0]}.pdf`);
 
-            alert('PDF Generado y descargado ✅');
+            toast.success('PDF Generado y descargado');
         } catch (e) {
             console.error(e);
-            alert('Error generando el reporte PDF');
+            toast.error('Error generando el reporte PDF');
         }
     };
 
@@ -75,10 +78,10 @@ const SettingsView = ({ status }) => {
         try {
             const res = await axios.post(`${API_URL}/api/sheets/test`);
             if (res.data.success) {
-                alert('✅ Conexión con Google Sheets exitosa. Se agregó una fila de prueba.');
+                toast.success('Conexión con Google Sheets exitosa');
             }
         } catch (e) {
-            alert('❌ Error conectando con Google Sheets: ' + (e.response?.data?.error || e.message));
+            toast.error('Error conectando con Google Sheets: ' + (e.response?.data?.error || e.message));
         }
     };
 
