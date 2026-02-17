@@ -4,18 +4,46 @@ const { appendOrderToSheet } = require('../../sheets_sync');
 const path = require('path');
 const fs = require('fs');
 
-// --- CENTRALIZED PRICE TABLE ---
-// All prices in one place. Update ONLY here when prices change.
-const PRICES = {
-    'Cápsulas': { '60': '45.900', '120': '66.900' },
-    'Semillas': { '60': '36.900', '120': '49.900' },
-    'Gotas': { '60': '48.900', '120': '68.900' }
-};
+const PRICES_PATH = path.join(__dirname, '../../data/prices.json');
+
+function _getPrices() {
+    try {
+        if (fs.existsSync(PRICES_PATH)) {
+            const data = fs.readFileSync(PRICES_PATH, 'utf8');
+            return JSON.parse(data);
+        }
+    } catch (e) {
+        console.error("Error reading prices.json:", e);
+    }
+    // Fallback defaults if file missing/error
+    return {
+        'Cápsulas': { '60': '45.900', '120': '66.900' },
+        'Semillas': { '60': '36.900', '120': '49.900' },
+        'Gotas': { '60': '48.900', '120': '68.900' }
+    };
+}
 
 function _getPrice(product, plan) {
-    if (product && product.includes('Cápsulas')) return PRICES['Cápsulas'][plan] || PRICES['Cápsulas']['60'];
-    if (product && product.includes('Gotas')) return PRICES['Gotas'][plan] || PRICES['Gotas']['60'];
-    return PRICES['Semillas'][plan] || PRICES['Semillas']['60'];
+    const prices = _getPrices();
+    if (product && product.includes('Cápsulas')) return prices['Cápsulas'][plan] || prices['Cápsulas']['60'];
+    if (product && product.includes('Gotas')) return prices['Gotas'][plan] || prices['Gotas']['60'];
+    return prices['Semillas'][plan] || prices['Semillas']['60'];
+}
+
+function _formatMessage(text) {
+    if (!text) return "";
+    const prices = _getPrices();
+
+    let formatted = text;
+    // Replace {{PRICE_PRODUCT_PLAN}}
+    formatted = formatted.replace(/{{PRICE_CAPSULAS_60}}/g, prices['Cápsulas']['60']);
+    formatted = formatted.replace(/{{PRICE_CAPSULAS_120}}/g, prices['Cápsulas']['120']);
+    formatted = formatted.replace(/{{PRICE_SEMILLAS_60}}/g, prices['Semillas']['60']);
+    formatted = formatted.replace(/{{PRICE_SEMILLAS_120}}/g, prices['Semillas']['120']);
+    formatted = formatted.replace(/{{PRICE_GOTAS_60}}/g, prices['Gotas']['60']);
+    formatted = formatted.replace(/{{PRICE_GOTAS_120}}/g, prices['Gotas']['120']);
+
+    return formatted;
 }
 
 /**
@@ -104,6 +132,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             lastMessage: null,
             addressAttempts: 0,
             partialAddress: {},
+            cart: [], // NEW: Support for multiple items
             history: []
         };
         saveState();
@@ -127,6 +156,27 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
     // 1. Check Global FAQs (Priority 1 — NO AI needed)
     //    AFTER answering, ALWAYS redirect back to the current step
     // ─────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────
+    // 1. Check Global FAQs (Priority 1 — NO AI needed)
+    //    AFTER answering, ALWAYS redirect back to the current step
+    // ─────────────────────────────────────────────────
+
+    // NEW: Global Delivery Constraint Check (specific user request)
+    // Matches: "estoy el sabado", "solo puedo el lunes", "estoy en casa el..."
+    if (/(estoy|estar.|voy a estar|puedo).*(lunes|martes|miercoles|jueves|viernes|sabado|domingo|fin de semana|finde)/i.test(normalizedText)) {
+        const deliveryMsg = "Tené en cuenta que enviamos por Correo Argentino 📦.\n• La demora es de 7 a 10 días hábiles.\n• No tenemos control sobre el día exacto ni la hora de visita del cartero.\n\nSi no estás, el correo deja un aviso para que retires en la sucursal más cercana.";
+        await sendMessageWithDelay(userId, deliveryMsg);
+        currentState.history.push({ role: 'bot', content: deliveryMsg });
+
+        // Redirect back to current question
+        const redirect = _getStepRedirect(currentState.step, currentState);
+        if (redirect) {
+            await sendMessageWithDelay(userId, redirect);
+            currentState.history.push({ role: 'bot', content: redirect });
+        }
+        return { matched: true };
+    }
+
     for (const faq of knowledge.faq) {
         if (faq.keywords.some(k => lowerText.includes(k))) {
             await sendMessageWithDelay(userId, faq.response);
@@ -168,6 +218,11 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
         case 'waiting_weight': {
             // SCRIPT FIRST: Check if user gave a number
             const hasNumber = /\d+/.test(text.trim());
+
+            // CHECK REFUSAL or SKIP
+            // If user says "no quiero decir", "prefiero no", "decime precios", etc.
+            const isRefusal = /\b(no (quiero|voy|puedo)|prefiero no|pasame|decime|precio|que tenes|mostrame)\b/i.test(normalizedText);
+
             if (hasNumber) {
                 // Direct script response — NO AI
                 const recNode = knowledge.flow.recommendation;
@@ -177,30 +232,45 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 saveState();
                 matched = true;
             } else {
-                // AI FALLBACK: Try to steer back to script
-                console.log(`[AI-FALLBACK] waiting_weight: No number detected for ${userId}`);
-                const aiWeight = await aiService.chat(text, {
-                    step: 'waiting_weight',
-                    goal: 'El usuario debe decir cuántos kilos quiere bajar. Si pregunta otra cosa, respondé brevemente y volvé a preguntar cuántos kilos quiere bajar.',
-                    history: currentState.history,
-                    summary: currentState.summary,
-                    knowledge: knowledge
-                });
+                // Increment refusal counter
+                currentState.weightRefusals = (currentState.weightRefusals || 0) + 1;
 
-                if (aiWeight.goalMet) {
-                    // AI detected a weight goal we missed with regex
-                    const recNode = knowledge.flow.recommendation;
-                    await sendMessageWithDelay(userId, recNode.response);
-                    currentState.step = recNode.nextStep;
-                    currentState.history.push({ role: 'bot', content: recNode.response });
+                if (isRefusal || currentState.weightRefusals >= 2) {
+                    // USER REFUSED or FAILED TWICE -> SKIP TO PRODUCTS
+                    console.log(`[LOGIC] User ${userId} refused/failed weight question. Skipping to preference.`);
+
+                    const skipMsg = "¡Entiendo, no hay problema! 👌 Pasemos directo a ver qué opción es mejor para vos.\n\nTenemos:\n1️⃣ Cápsulas (Súper práctico)\n2️⃣ Semillas/Infusión (Más natural)\n\n¿Cuál te gustaría probar? (Respondé 1 o 2)";
+                    await sendMessageWithDelay(userId, skipMsg);
+
+                    currentState.step = 'waiting_preference'; // Manually set next step
+                    currentState.history.push({ role: 'bot', content: skipMsg });
                     saveState();
                     matched = true;
-                } else if (aiWeight.response) {
-                    await sendMessageWithDelay(userId, aiWeight.response);
-                    currentState.history.push({ role: 'bot', content: aiWeight.response });
-                    matched = true;
+                } else {
+                    // AI FALLBACK: Try to steer back to script (1st attempt)
+                    console.log(`[AI-FALLBACK] waiting_weight: No number detected for ${userId}`);
+                    const aiWeight = await aiService.chat(text, {
+                        step: 'waiting_weight',
+                        goal: 'El usuario debe decir cuántos kilos quiere bajar. Si pregunta otra cosa, respondé brevemente y volvé a preguntar cuántos kilos quiere bajar.',
+                        history: currentState.history,
+                        summary: currentState.summary,
+                        knowledge: knowledge
+                    });
+
+                    if (aiWeight.goalMet) {
+                        // AI detected a weight goal we missed with regex
+                        const recNode = knowledge.flow.recommendation;
+                        await sendMessageWithDelay(userId, recNode.response);
+                        currentState.step = recNode.nextStep;
+                        currentState.history.push({ role: 'bot', content: recNode.response });
+                        saveState();
+                        matched = true;
+                    } else if (aiWeight.response) {
+                        await sendMessageWithDelay(userId, aiWeight.response);
+                        currentState.history.push({ role: 'bot', content: aiWeight.response });
+                        matched = true;
+                    }
                 }
-                // If AI also failed, matched stays false → will trigger pause+alert below
             }
             break;
         }
@@ -241,7 +311,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 console.log(`[AI-FALLBACK] waiting_preference: No keyword match for ${userId}`);
                 const aiPref = await aiService.chat(text, {
                     step: 'waiting_preference',
-                    goal: 'Determinar si quiere cápsulas/gotas (opción práctica) o semillas (opción natural). Si pregunta otra cosa, respondé brevemente y volvé a ofrecer las opciones.',
+                    goal: 'Determinar si quiere cápsulas/gotas (opción práctica), semillas (opción natural) o AMBAS. El usuario puede pedir varias cosas. Si pregunta otra cosa, respondé brevemente y volvé a ofrecer las opciones.',
                     history: currentState.history,
                     summary: currentState.summary,
                     knowledge: knowledge
@@ -299,14 +369,69 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
         case 'waiting_plan_choice': {
             // SCRIPT FIRST: Check for "60" or "120" with regex
+            // NEW: Multi-product parser
+            const products = [
+                { match: /c[áa]psula|pastilla/i, name: 'Cápsulas' },
+                { match: /semilla|infusi[óo]n|t[ée]|yuyo/i, name: 'Semillas' },
+                { match: /gota/i, name: 'Gotas' },
+                { match: /nuez|nueces/i, name: 'Semillas' } // "nueces" usually implies seeds/natural
+            ];
+
+            const plans = [
+                { match: /60/, id: '60' },
+                { match: /120/, id: '120' }
+            ];
+
+            // 1. Check for specific "MIXED" orders first (e.g. "120 capsulas y 60 nueces")
+            // We look for patterns like "120 [product]"
+            let foundItems = [];
+            // Split by conjunctions BUT only if they are whole words
+            const parts = normalizedText.split(/\b(y|e|con|mas)\b|,|\+/);
+
+            for (const part of parts) {
+                if (!part || part.trim().length < 3) continue; // Skip empty or short parts
+                let p = null;
+                let pl = null;
+
+                for (const prod of products) if (prod.match.test(part)) p = prod.name;
+                for (const plan of plans) if (plan.match.test(part)) pl = plan.id;
+
+                if (p && pl) {
+                    foundItems.push({
+                        product: p,
+                        plan: pl,
+                        price: _getPrice(p, pl)
+                    });
+                }
+            }
+
+            // If found complex items, use them
+            if (foundItems.length > 0) {
+                currentState.cart = foundItems;
+                // Confirm with closing
+                const closingNode = knowledge.flow.closing;
+                await sendMessageWithDelay(userId, closingNode.response);
+                currentState.step = closingNode.nextStep;
+                currentState.history.push({ role: 'bot', content: closingNode.response });
+                saveState();
+                matched = true;
+                return { matched: true };
+            }
+
+            // 2. Fallback to Single Item logic (legacy but compatible)
             let planSelected = false;
-            if (normalizedText.includes('60')) {
-                currentState.selectedPlan = "60";
-                currentState.price = _getPrice(currentState.selectedProduct, '60');
-                planSelected = true;
-            } else if (normalizedText.includes('120')) {
-                currentState.selectedPlan = "120";
-                currentState.price = _getPrice(currentState.selectedProduct, '120');
+            let selectedPlanId = null;
+            if (normalizedText.includes('60')) selectedPlanId = '60';
+            else if (normalizedText.includes('120')) selectedPlanId = '120';
+
+            if (selectedPlanId) {
+                // If we have a selectedProduct from previous step, use it
+                const product = currentState.selectedProduct || "Nuez de la India"; // Default
+                currentState.cart = [{
+                    product: product,
+                    plan: selectedPlanId,
+                    price: _getPrice(product, selectedPlanId)
+                }];
                 planSelected = true;
             }
 
@@ -323,7 +448,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 console.log(`[AI-FALLBACK] waiting_plan_choice: No plan number detected for ${userId}`);
                 const planAI = await aiService.chat(text, {
                     step: 'waiting_plan_choice',
-                    goal: 'El usuario debe elegir Plan 60 o Plan 120 días. Si tiene dudas, respondé brevemente y volvé a preguntar qué plan prefiere.',
+                    goal: 'El usuario debe elegir Plan 60 o Plan 120 días. IMPORTANTE: El usuario puede elegir VARIOS planes (ej: "120 capsulas y 60 semillas"). Si pide eso, confirmá que entendiste ambos productos y planes. Si tiene dudas, explicá y repreguntá.',
                     history: currentState.history,
                     summary: currentState.summary,
                     knowledge: knowledge
@@ -332,8 +457,13 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 if (planAI.goalMet && planAI.extractedData) {
                     // AI detected a plan choice
                     const plan = planAI.extractedData.includes('120') ? '120' : '60';
-                    currentState.selectedPlan = plan;
-                    currentState.price = _getPrice(currentState.selectedProduct, plan);
+                    const product = currentState.selectedProduct || "Nuez de la India";
+                    currentState.cart = [{
+                        product: product,
+                        plan: plan,
+                        price: _getPrice(product, plan)
+                    }];
+
                     const closingNode = knowledge.flow.closing;
                     await sendMessageWithDelay(userId, closingNode.response);
                     currentState.step = closingNode.nextStep;
@@ -455,19 +585,25 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             if (!addr.cp) missing.push('Código postal');
 
             if (missing.length === 0 || (addr.calle && addr.ciudad && missing.length <= 1)) {
-                const product = currentState.selectedProduct || "Nuez de la India";
-                const plan = currentState.selectedPlan || "60";
-                const price = currentState.price || _getPrice(product, plan);
 
-                currentState.pendingOrder = { ...addr };
-                currentState.selectedProduct = product;
-                currentState.selectedPlan = plan;
-                currentState.price = price;
+                // Ensure cart exists (compatibility)
+                if (!currentState.cart || currentState.cart.length === 0) {
+                    const product = currentState.selectedProduct || "Nuez de la India";
+                    const plan = currentState.selectedPlan || "60";
+                    const price = currentState.price || _getPrice(product, plan);
+                    currentState.cart = [{ product, plan, price }];
+                }
+
+                currentState.pendingOrder = { ...addr, cart: currentState.cart };
 
                 currentState.step = 'waiting_admin_ok';
                 saveState();
 
-                await notifyAdmin(`Pedido CASI completo, ESPERANDO APROBACIÓN ADMIN`, userId, `Datos: ${addr.nombre}, ${addr.calle}, ${addr.ciudad}, ${addr.cp}`);
+                // Format Cart for Admin
+                const cartSummary = currentState.cart.map(i => `${i.product} (${i.plan} días)`).join(', ');
+                const total = currentState.cart.reduce((sum, i) => sum + parseInt(i.price.replace('.', '')), 0);
+
+                await notifyAdmin(`Pedido CASI completo`, userId, `Datos: ${addr.nombre}, ${addr.calle}\nItems: ${cartSummary}\nTotal: $${total}`);
                 const msg = `¡Gracias por los datos! 🙌 Mi compañero va a revisar tu pedido y te confirma en breve. ¡Ya queda poco!`;
                 await sendMessageWithDelay(userId, msg);
                 currentState.history.push({ role: 'bot', content: msg });
@@ -500,12 +636,19 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 // Save Order
                 if (currentState.pendingOrder) {
                     const o = currentState.pendingOrder;
+                    const cart = o.cart || [];
+
+                    // Flatten Cart for Sheet/Log
+                    const prodStr = cart.map(i => i.product).join(' + ');
+                    const planStr = cart.map(i => `${i.plan} días`).join(' + ');
+                    const finalPrice = cart.reduce((sum, i) => sum + parseInt(i.price.replace('.', '')), 0);
+
                     const orderData = {
                         cliente: userId,
                         nombre: o.nombre, calle: o.calle, ciudad: o.ciudad, cp: o.cp,
-                        producto: currentState.selectedProduct || "Nuez",
-                        plan: `Plan ${currentState.selectedPlan || "60"}`,
-                        precio: currentState.price || "0"
+                        producto: prodStr,
+                        plan: planStr,
+                        precio: finalPrice.toString()
                     };
 
                     if (dependencies.saveOrderToLocal) dependencies.saveOrderToLocal(orderData);

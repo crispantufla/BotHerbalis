@@ -38,7 +38,7 @@ REGLAS ESTRICTAS:
 1. Respuestas MUY CORTAS: 1-2 oraciones máximo. Nada de párrafos largos.
 2. NO inventes pasos nuevos ni ofrezcas cosas que no están en el guión.
 3. Si preguntan por servicios ajenos: "Solo manejamos productos Herbalis" y volvé al tema.
-4. Si desconfían: "El envío es gratis y pagás solo al recibir, riesgo cero para vos."
+4. Si desconfían: "El envío es gratis y pagás solo al recibir"
 5. Siempre terminá volviendo a la pregunta del paso actual (se te indica en cada mensaje).
 6. NO repitas información que ya se dio en el historial.
 
@@ -292,6 +292,7 @@ class AIService {
                 const pCaps = f.price_capsulas?.response || "";
                 const pSem = f.price_semillas?.response || "";
                 if (pCaps || pSem) knowledgeContext += `- PRECIOS: ${pCaps} | ${pSem}\n`;
+                knowledgeContext += `- DESCUENTOS POR CANTIDAD: 3ª unidad (30% off), 4ª unidad (40% off), 5ª unidad (50% off).\n`;
                 knowledgeContext += `- Envío gratis por Correo Argentino, pago en efectivo al recibir\n`;
             } else if (step === 'waiting_data') {
                 knowledgeContext += `- Necesitamos: nombre completo, calle y número, ciudad, código postal\n`;
@@ -395,6 +396,23 @@ INSTRUCCIONES:
         } catch (e) {
             console.error("🔴 [AI] Summary Error:", e.message);
             return null;
+        }
+    }
+
+    /**
+     * Generate Report (for analyze_day.js)
+     */
+    async generateReport(prompt) {
+        try {
+            // Reports are long, so we use the queue to match rate limits
+            const result = await this._callQueued(
+                (model) => model.generateContent(prompt),
+                null
+            );
+            return result.response.text();
+        } catch (e) {
+            console.error("🔴 [AI] Report Error:", e.message);
+            throw e;
         }
     }
 

@@ -1,10 +1,8 @@
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { aiService } = require('./src/services/ai');
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
 const logDir = path.join(__dirname, 'logs');
 
@@ -92,8 +90,7 @@ Formato: Markdown. Sé conciso pero específico. Incluye ejemplos del texto real
 `;
 
     try {
-        const result = await model.generateContent(prompt);
-        const report = result.response.text();
+        const report = await aiService.generateReport(prompt);
 
         // Save report
         const reportFile = path.join(logDir, `report_${dateStr}.md`);

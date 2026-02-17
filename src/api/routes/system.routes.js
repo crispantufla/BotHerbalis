@@ -153,10 +153,6 @@ module.exports = (client, sharedState) => {
                 return res.status(404).json({ error: 'Script no encontrado' });
             }
 
-            // Need access to KNOWLEDGE_FILES from index.js? 
-            // Better to use a lookup here or expose it.
-            // Since we can't easily import KNOWLEDGE_FILES from index.js without exporting it,
-            // let's reconstruct the path safely.
             const filename = version === 'v2' ? 'knowledge_v2.json' : 'knowledge.json';
             const filePath = path.join(__dirname, '../../../', filename);
 
@@ -166,6 +162,49 @@ module.exports = (client, sharedState) => {
             } else {
                 res.status(404).json({ error: 'Archivo no encontrado' });
             }
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // --- PRICES API ---
+    const PRICES_FILE = path.join(__dirname, '../../../data/prices.json');
+
+    // GET /prices
+    router.get('/prices', (req, res) => {
+        try {
+            if (fs.existsSync(PRICES_FILE)) {
+                res.json(JSON.parse(fs.readFileSync(PRICES_FILE)));
+            } else {
+                // Return default structure if file missing
+                res.json({
+                    'Cápsulas': { '60': '45.900', '120': '66.900' },
+                    'Semillas': { '60': '36.900', '120': '49.900' },
+                    'Gotas': { '60': '48.900', '120': '68.900' }
+                });
+            }
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // POST /prices
+    router.post('/prices', authMiddleware, (req, res) => {
+        try {
+            const newPrices = req.body;
+            if (!newPrices || typeof newPrices !== 'object') {
+                return res.status(400).json({ error: 'Invalid data' });
+            }
+            // Ensure directory exists
+            const dir = path.dirname(PRICES_FILE);
+            if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+            fs.writeFileSync(PRICES_FILE, JSON.stringify(newPrices, null, 2));
+
+            // Notify clients via Socket (optional but good for realtime UI)
+            if (io) io.emit('prices_updated', newPrices);
+
+            res.json({ success: true });
         } catch (e) {
             res.status(500).json({ error: e.message });
         }

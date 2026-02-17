@@ -62,17 +62,17 @@
     },
     "price_capsulas": {
       "step": "waiting_price_confirmation",
-      "response": "Te paso precios!! El plan de 60 días en cápsulas $45.900.-\nEl plan de 120 días $66.900.-\n📦 Envío gratis + pagás al recibir.\n\n¿Con que plan te gustaría avanzar?",
+      "response": "Te paso precios!! El plan de 60 días en cápsulas ${{PRICE_CAPSULAS_60}}.-\nEl plan de 120 días ${{PRICE_CAPSULAS_120}}.-\n📦 Envío gratis + pagás al recibir.\n\n¿Con que plan te gustaría avanzar?",
       "nextStep": "waiting_plan_choice"
     },
     "price_semillas": {
       "step": "waiting_price_confirmation",
-      "response": "Te paso precios!!\nEl plan de 60 días en semillas $36.900.-\nEl plan de 120 días $49.900.-\n📦 Envío gratis + pagás al recibir. ¿Con que plan te gustaría avanzar?",
+      "response": "Te paso precios!!\nEl plan de 60 días en semillas ${{PRICE_SEMILLAS_60}}.-\nEl plan de 120 días ${{PRICE_SEMILLAS_120}}.-\n📦 Envío gratis + pagás al recibir. ¿Con que plan te gustaría avanzar?",
       "nextStep": "waiting_plan_choice"
     },
     "price_gotas": {
       "step": "waiting_price_confirmation",
-      "response": "Te paso precios!!\nEl plan de 60 días en gotas $48.900.-\nEl plan de 120 días $68.900.-\n📦 Envío gratis + pagás al recibir. ¿Con que plan te gustaría avanzar?",
+      "response": "Te paso precios!!\nEl plan de 60 días en gotas ${{PRICE_GOTAS_60}}.-\nEl plan de 120 días ${{PRICE_GOTAS_120}}.-\n📦 Envío gratis + pagás al recibir. ¿Con que plan te gustaría avanzar?",
       "nextStep": "waiting_plan_choice"
     },
     "closing": {
@@ -180,7 +180,7 @@
         "valor",
         "sale"
       ],
-      "response": "Los tratamientos de 60 días arrancan desde $36.900. NO HAY COSTOS DE ENVIO.\n\nDecime por favor cuantos kilos querés perder y te recomiendo la mejor opción para tu caso.",
+      "response": "Los tratamientos de 60 días arrancan desde ${{PRICE_SEMILLAS_60}}. NO HAY COSTOS DE ENVIO.\n\nDecime por favor cuantos kilos querés perder y te recomiendo la mejor opción para tu caso.",
       "triggerStep": "waiting_weight"
     },
     {

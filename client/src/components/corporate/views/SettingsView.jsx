@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../../../config/axios';
 import { jsPDF } from "jspdf";
 import { useSocket } from '../../../context/SocketContext';
+import PriceEditor from '../../PriceEditor';
 
 import { useToast } from '../../ui/Toast';
 
@@ -114,11 +115,20 @@ const SettingsView = ({ status }) => {
             const lineHeight = 7;
             const pageHeight = doc.internal.pageSize.height;
 
+            // Helper to clean text for jsPDF (Standard fonts don't support UTF-8/Emojis)
+            const cleanText = (str) => {
+                if (!str) return "";
+                return str
+                    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove accents
+                    .replace(/[^\x00-\x7F]/g, ""); // Remove non-ASCII (emojis, etc)
+            };
+
             // Helper to add text with auto-page break
             const addText = (text, size = 10, isBold = false) => {
+                const safeText = cleanText(text); // Clean encoding
                 doc.setFontSize(size);
                 doc.setFont("helvetica", isBold ? "bold" : "normal");
-                const splitText = doc.splitTextToSize(text, 180);
+                const splitText = doc.splitTextToSize(safeText, 180);
                 if (y + (splitText.length * lineHeight) > pageHeight - 20) {
                     doc.addPage();
                     y = 20;
@@ -128,9 +138,9 @@ const SettingsView = ({ status }) => {
             };
 
             // Title
-            addText(`Guión de Ventas - ${label}`, 18, true);
+            addText(`Guion de Ventas - ${label}`, 18, true); // Removed accent manually for title
             y += 5;
-            addText(script.meta?.description || "Sin descripción", 10, false);
+            addText(script.meta?.description || "Sin descripcion", 10, false);
             y += 10;
             doc.line(15, y, 195, y);
             y += 10;
@@ -139,19 +149,19 @@ const SettingsView = ({ status }) => {
             const flowOrder = [
                 { key: 'greeting', title: '1. Saludo Inicial' },
                 { key: 'recommendation', title: '2. Pregunta de Peso' },
-                { key: 'preference_capsulas', title: '3A. Opción Cápsulas' },
-                { key: 'preference_semillas', title: '3B. Opción Semillas' },
-                { key: 'preference_gotas', title: '3C. Opción Gotas' },
-                { key: 'price_capsulas', title: '4A. Precio Cápsulas' },
+                { key: 'preference_capsulas', title: '3A. Opcion Capsulas' },
+                { key: 'preference_semillas', title: '3B. Opcion Semillas' },
+                { key: 'preference_gotas', title: '3C. Opcion Gotas' },
+                { key: 'price_capsulas', title: '4A. Precio Capsulas' },
                 { key: 'price_semillas', title: '4B. Precio Semillas' },
                 { key: 'price_gotas', title: '4C. Precio Gotas' },
-                { key: 'closing', title: '5. Cierre / Envío' },
+                { key: 'closing', title: '5. Cierre / Envio' },
                 { key: 'data_request', title: '6. Pedido de Datos' },
-                { key: 'confirmation', title: '7. Confirmación Final' }
+                { key: 'confirmation', title: '7. Confirmacion Final' }
             ];
 
             // Render Flow
-            addText("FLUJO DE CONVERSACIÓN", 14, true);
+            addText("FLUJO DE CONVERSACION", 14, true);
             y += 5;
 
             flowOrder.forEach(step => {
@@ -162,7 +172,8 @@ const SettingsView = ({ status }) => {
                         doc.setFont("courier", "normal");
                         doc.setFontSize(9);
                         doc.setTextColor(100);
-                        doc.text(`Keywords: ${(item.keywords || item.match).join(', ')}`, 15, y);
+                        const kws = (item.keywords || item.match).join(', ');
+                        doc.text(`Keywords: ${cleanText(kws)}`, 15, y);
                         doc.setTextColor(0);
                         y += 6;
                     }
@@ -220,6 +231,9 @@ const SettingsView = ({ status }) => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+
+                {/* 0. Price Editor (New) */}
+                <PriceEditor />
 
                 {/* 2. Tools & Reports */}
                 <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm">
