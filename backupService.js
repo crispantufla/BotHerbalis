@@ -10,7 +10,7 @@ if (!fs.existsSync(BACKUP_DIR)) {
 
 function performBackup() {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filesToBackup = ['orders.json', 'persistence.json', 'knowledge.json'];
+    const filesToBackup = ['orders.json', 'persistence.json', 'knowledge_v3.json'];
 
     console.log(`[BACKUP] Starting backup at ${timestamp}...`);
 

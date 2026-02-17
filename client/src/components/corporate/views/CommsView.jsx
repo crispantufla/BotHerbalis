@@ -62,7 +62,14 @@ const CommsView = () => {
 
             socket.on('message_sent', (data) => {
                 if (selectedChat && data.chatId === selectedChat.id) {
-                    setMessages(prev => [...prev, data.message]);
+                    // Deduplicate: skip if already added optimistically from handleSend/handleSendScriptStep
+                    setMessages(prev => {
+                        const isDupe = prev.some(m =>
+                            m.fromMe && m.body === data.message.body &&
+                            Math.abs((m.timestamp || 0) - (data.message.timestamp || 0)) < 5000
+                        );
+                        return isDupe ? prev : [...prev, data.message];
+                    });
                 }
                 setChats(prev => prev.map(c =>
                     c.id === data.chatId

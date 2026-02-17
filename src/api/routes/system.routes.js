@@ -109,12 +109,10 @@ module.exports = (client, sharedState) => {
     // GET /script/active — show current script and available options
     router.get('/script/active', authMiddleware, (req, res) => {
         res.json({
-            active: config.activeScript || 'v1',
-            available: sharedState.availableScripts || ['v1', 'v2', 'v3'],
+            active: config.activeScript || 'v3',
+            available: sharedState.availableScripts || ['v3'],
             labels: {
-                'v1': 'Guión Original',
-                'v2': 'Guión V2 — Empático + Accesible',
-                'v3': 'Guión V3 — Profesional + CRM MAX'
+                'v3': 'Guión Profesional + CRM MAX'
             }
         });
     });
@@ -125,7 +123,7 @@ module.exports = (client, sharedState) => {
             const { script } = req.body;
             if (!script) return res.status(400).json({ error: 'Falta el campo "script" (v1, v2 o v3)' });
 
-            const available = sharedState.availableScripts || ['v1', 'v2', 'v3'];
+            const available = sharedState.availableScripts || ['v3'];
             if (!available.includes(script)) {
                 return res.status(400).json({ error: `Script "${script}" no existe. Disponibles: ${available.join(', ')}` });
             }
@@ -148,13 +146,13 @@ module.exports = (client, sharedState) => {
     router.get('/script/:version', authMiddleware, (req, res) => {
         try {
             const { version } = req.params;
-            const available = sharedState.availableScripts || ['v1', 'v2'];
+            const available = sharedState.availableScripts || ['v3'];
 
             if (!available.includes(version)) {
                 return res.status(404).json({ error: 'Script no encontrado' });
             }
 
-            const filename = version === 'v2' ? 'knowledge_v2.json' : 'knowledge.json';
+            const filename = 'knowledge_v3.json';
             const filePath = path.join(__dirname, '../../../', filename);
 
             if (fs.existsSync(filePath)) {

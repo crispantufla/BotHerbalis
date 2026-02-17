@@ -130,7 +130,9 @@ module.exports = (client, sharedState) => {
                 const isDuplicate = refinedMessages.some(m => {
                     const timeDiff = Math.abs(m.timestamp - lm.timestamp);
                     const sameRole = m.fromMe === lm.fromMe;
-                    return sameRole && timeDiff <= 2 && (m.body === lm.body || (lm.body?.startsWith('MEDIA_') && m.hasMedia));
+                    // Tolerance 30s: logAndEmit logs instantly but sendMessageWithDelay
+                    // sends 10-25s later, so WA timestamp is much later than local log
+                    return sameRole && timeDiff <= 30 && (m.body === lm.body || (lm.body?.startsWith('MEDIA_') && m.hasMedia));
                 });
                 if (!isDuplicate) combined.push(lm);
             });

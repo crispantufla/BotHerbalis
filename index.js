@@ -16,8 +16,6 @@ const { startServer } = require('./src/api/server'); // Centralized Server
 const STATE_FILE = path.join(__dirname, 'persistence.json');
 const ORDERS_FILE = path.join(__dirname, 'orders.json');
 const KNOWLEDGE_FILES = {
-    'v1': path.join(__dirname, 'knowledge.json'),
-    'v2': path.join(__dirname, 'knowledge_v2.json'),
     'v3': path.join(__dirname, 'knowledge_v3.json')
 };
 
@@ -30,14 +28,14 @@ let pausedUsers = new Set();
 // Variables for API / Dashboard State
 let qrCodeData = null;
 let sessionAlerts = [];
-let config = { alertNumbers: [], activeScript: 'v1' };
+let config = { alertNumbers: [], activeScript: 'v3' };
 let isConnected = false;
 
 // --- PERSISTENCE HELPERS ---
 function loadKnowledge(scriptName) {
     try {
-        const name = scriptName || config.activeScript || 'v1';
-        const filePath = KNOWLEDGE_FILES[name] || KNOWLEDGE_FILES['v1'];
+        const name = scriptName || config.activeScript || 'v3';
+        const filePath = KNOWLEDGE_FILES[name] || KNOWLEDGE_FILES['v3'];
         if (fs.existsSync(filePath)) {
             const raw = fs.readFileSync(filePath);
             const parsed = JSON.parse(raw);
@@ -55,7 +53,7 @@ function loadKnowledge(scriptName) {
 
 function saveKnowledge() {
     try {
-        const filePath = KNOWLEDGE_FILES[config.activeScript] || KNOWLEDGE_FILES['v1'];
+        const filePath = KNOWLEDGE_FILES[config.activeScript] || KNOWLEDGE_FILES['v3'];
         atomicWriteFile(filePath, JSON.stringify(knowledge, null, 2));
     } catch (e) {
         console.error('🔴 Error saving knowledge:', e.message);

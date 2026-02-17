@@ -278,74 +278,23 @@ const SettingsView = ({ status }) => {
                         <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                         Guión de Ventas
                     </h3>
-                    <p className="text-sm text-slate-500 mb-4">Elegí qué guión usa el bot para las conversaciones nuevas. Podés alternar para hacer pruebas A/B.</p>
+                    <p className="text-sm text-slate-500 mb-4">Guión activo para todas las conversaciones.</p>
 
                     <div className="flex gap-2">
-                        <button
-                            onClick={() => handleSwitchScript('v1')}
-                            disabled={switchingScript}
-                            className={`flex-1 px-4 py-3 rounded-lg text-sm font-bold transition-all border-2 ${activeScript === 'v1'
-                                ? 'bg-indigo-50 border-indigo-500 text-indigo-700 shadow-sm'
-                                : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'
-                                }`}
-                        >
+                        <div className="flex-1 px-4 py-3 rounded-lg text-sm font-bold border-2 bg-amber-50 border-amber-500 text-amber-700 shadow-sm flex flex-col items-center">
                             <div className="flex items-center justify-center gap-2">
-                                {activeScript === 'v1' && <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>}
-                                📋 Original (V1)
-                            </div>
-                            <div className="text-xs font-normal mt-1 opacity-70">Guión estándar</div>
-                            <div
-                                onClick={(e) => { e.stopPropagation(); handleDownloadScript('v1', 'Guión Original'); }}
-                                className="mt-2 text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded hover:bg-indigo-200 transition"
-                            >
-                                ⬇️ Descargar PDF
-                            </div>
-                        </button>
-                        <button
-                            onClick={() => handleSwitchScript('v2')}
-                            disabled={switchingScript}
-                            className={`flex-1 px-4 py-3 rounded-lg text-sm font-bold transition-all border-2 flex flex-col items-center ${activeScript === 'v2'
-                                ? 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-sm'
-                                : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'
-                                }`}
-                        >
-                            <div className="flex items-center justify-center gap-2">
-                                {activeScript === 'v2' && <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>}
-                                💚 Empático (V2)
-                            </div>
-                            <div className="text-xs font-normal mt-1 opacity-70">Optimizado para accesibilidad</div>
-                            <div
-                                onClick={(e) => { e.stopPropagation(); handleDownloadScript('v2', 'Guión Empático (V2)'); }}
-                                className="mt-2 text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded hover:bg-emerald-200 transition"
-                            >
-                                ⬇️ Descargar PDF
-                            </div>
-                        </button>
-                        <button
-                            onClick={() => handleSwitchScript('v3')}
-                            disabled={switchingScript}
-                            className={`flex-1 px-4 py-3 rounded-lg text-sm font-bold transition-all border-2 flex flex-col items-center ${activeScript === 'v3'
-                                ? 'bg-amber-50 border-amber-500 text-amber-700 shadow-sm'
-                                : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'
-                                }`}
-                        >
-                            <div className="flex items-center justify-center gap-2">
-                                {activeScript === 'v3' && <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>}
-                                🔥 Profesional (V3)
+                                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                                🔥 Guión Profesional
                             </div>
                             <div className="text-xs font-normal mt-1 opacity-70">Con Contra Reembolso MAX</div>
                             <div
-                                onClick={(e) => { e.stopPropagation(); handleDownloadScript('v3', 'Guión Profesional (V3)'); }}
-                                className="mt-2 text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded hover:bg-amber-200 transition"
+                                onClick={() => handleDownloadScript('v3', 'Guión Profesional')}
+                                className="mt-2 text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded hover:bg-amber-200 transition cursor-pointer"
                             >
                                 ⬇️ Descargar PDF
                             </div>
-                        </button>
+                        </div>
                     </div>
-
-                    {switchingScript && (
-                        <p className="text-xs text-slate-400 mt-2 text-center animate-pulse">Cambiando guión...</p>
-                    )}
                 </div>
 
                 {/* 5. Dangerous Zone */}
