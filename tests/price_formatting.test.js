@@ -16,8 +16,8 @@ const mockDependencies = {
     sharedState: { io: { emit: jest.fn() }, pausedUsers: new Set() }
 };
 
-// LOAD KNOWLEDGE (Real file with placeholders)
-const knowledge = JSON.parse(fs.readFileSync(path.join(__dirname, '../knowledge.json'), 'utf8'));
+// LOAD KNOWLEDGE V3 (Primary test target)
+const knowledge = JSON.parse(fs.readFileSync(path.join(__dirname, '../knowledge_v3.json'), 'utf8'));
 
 // MOCKS
 jest.mock('../src/services/ai', () => ({
@@ -31,9 +31,9 @@ jest.mock('../src/services/ai', () => ({
 jest.mock('../safeWrite', () => ({ atomicWriteFile: jest.fn() }), { virtual: true });
 jest.mock('../sheets_sync', () => ({ appendOrderToSheet: jest.fn() }), { virtual: true });
 jest.mock('google-spreadsheet', () => ({}), { virtual: true });
-jest.mock('@google/generative-ai', () => ({}), { virtual: true });
+jest.mock('openai', () => { return jest.fn().mockImplementation(() => ({})); }, { virtual: true });
 
-describe('Price Centralization', () => {
+describe('V3 Script — Price Centralization', () => {
     let userState;
     const userId = 'test_price';
 
@@ -42,12 +42,11 @@ describe('Price Centralization', () => {
         mockSendMessage.mockClear();
     });
 
-    // TEST 1: Verify Price Formatting
-    test('Should replace {{PRICE_...}} placeholders with real values', async () => {
-        userState[userId] = { step: 'waiting_price_confirmation', history: [], selectedProduct: 'Semillas' };
+    test('Should replace {{PRICE_...}} placeholders with real values (Semillas via preference)', async () => {
+        userState[userId] = { step: 'waiting_preference', history: [] };
 
-        // User asks for price
-        await processSalesFlow(userId, "precio", userState, knowledge, mockDependencies);
+        // User picks semillas => V3 shows prices directly in the preference response
+        await processSalesFlow(userId, "semillas", userState, knowledge, mockDependencies);
 
         // Expect message to contain real numbers, NOT placeholders
         expect(mockSendMessage).toHaveBeenCalledWith(
@@ -57,6 +56,122 @@ describe('Price Centralization', () => {
         // Expect specific price for Semillas 60 days
         expect(mockSendMessage).toHaveBeenCalledWith(
             userId, expect.stringMatching(/36\.900/)
+        );
+    });
+
+    test('Should show updated Cápsulas 60 price ($46.900)', async () => {
+        userState[userId] = { step: 'waiting_preference', history: [] };
+
+        // User picks capsulas => V3 shows prices directly in the preference response
+        await processSalesFlow(userId, "capsulas", userState, knowledge, mockDependencies);
+
+        expect(mockSendMessage).toHaveBeenCalledWith(
+            userId, expect.stringMatching(/46\.900/)
+        );
+    });
+});
+
+describe('V3 Script — Contra Reembolso MAX', () => {
+    let userState;
+    const userId = 'test_crm';
+
+    beforeEach(() => {
+        userState = {};
+        mockSendMessage.mockClear();
+        mockNotifyAdmin.mockClear();
+    });
+
+    test('Plan 60 should set isContraReembolsoMAX = true and adicionalMAX = 6000', async () => {
+        userState[userId] = {
+            step: 'waiting_plan_choice',
+            history: [],
+            selectedProduct: 'Cápsulas de nuez de la india',
+            cart: []
+        };
+
+        await processSalesFlow(userId, "60", userState, knowledge, mockDependencies);
+
+        expect(userState[userId].isContraReembolsoMAX).toBe(true);
+        expect(userState[userId].adicionalMAX).toBe(6000);
+    });
+
+    test('Plan 120 should set isContraReembolsoMAX = false and adicionalMAX = 0', async () => {
+        userState[userId] = {
+            step: 'waiting_plan_choice',
+            history: [],
+            selectedProduct: 'Cápsulas de nuez de la india',
+            cart: []
+        };
+
+        await processSalesFlow(userId, "120", userState, knowledge, mockDependencies);
+
+        expect(userState[userId].isContraReembolsoMAX).toBe(false);
+        expect(userState[userId].adicionalMAX).toBe(0);
+    });
+
+    test('Mixed order with 60-day plan should activate CRM MAX', async () => {
+        userState[userId] = {
+            step: 'waiting_plan_choice',
+            history: [],
+            selectedProduct: 'Cápsulas',
+            cart: []
+        };
+
+        await processSalesFlow(userId, "60 capsulas y 120 semillas", userState, knowledge, mockDependencies);
+
+        expect(userState[userId].isContraReembolsoMAX).toBe(true);
+        expect(userState[userId].adicionalMAX).toBe(6000);
+        expect(userState[userId].cart.length).toBe(2);
+    });
+});
+
+describe('V3 Script — FAQ Keywords', () => {
+    let userState;
+    const userId = 'test_faq';
+
+    beforeEach(() => {
+        userState = {};
+        mockSendMessage.mockClear();
+    });
+
+    test('FAQ: "estafa" should trigger trust response', async () => {
+        userState[userId] = { step: 'waiting_weight', history: [] };
+
+        await processSalesFlow(userId, "esto es una estafa", userState, knowledge, mockDependencies);
+
+        expect(mockSendMessage).toHaveBeenCalledWith(
+            userId, expect.stringContaining("pago al recibir")
+        );
+    });
+
+    test('FAQ: "tarjeta" should respond with payment info', async () => {
+        userState[userId] = { step: 'waiting_plan_choice', history: [] };
+
+        await processSalesFlow(userId, "aceptan tarjeta?", userState, knowledge, mockDependencies);
+
+        expect(mockSendMessage).toHaveBeenCalledWith(
+            userId, expect.stringContaining("pago al recibir")
+        );
+    });
+
+    test('FAQ: "contraindicaciones" should respond about pregnancy', async () => {
+        userState[userId] = { step: 'waiting_preference', history: [] };
+
+        await processSalesFlow(userId, "tiene contraindicaciones?", userState, knowledge, mockDependencies);
+
+        expect(mockSendMessage).toHaveBeenCalledWith(
+            userId, expect.stringContaining("embarazo")
+        );
+    });
+
+    test('FAQ: "costo de envio" should respond about free shipping', async () => {
+        userState[userId] = { step: 'waiting_preference', history: [] };
+
+        // Use exact FAQ keyword to avoid overlap with pricing FAQ
+        await processSalesFlow(userId, "gastos de envio", userState, knowledge, mockDependencies);
+
+        expect(mockSendMessage).toHaveBeenCalledWith(
+            userId, expect.stringContaining("gratuito")
         );
     });
 });

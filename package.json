@@ -22,6 +22,7 @@
     "express": "^5.2.1",
     "google-auth-library": "^10.5.0",
     "google-spreadsheet": "^5.1.0",
+    "openai": "^6.22.0",
     "qrcode-terminal": "^0.12.0",
     "socket.io": "^4.8.3",
     "whatsapp-web.js": "^1.34.6"

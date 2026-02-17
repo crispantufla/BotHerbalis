@@ -95,7 +95,8 @@ const SettingsView = ({ status }) => {
         try {
             await api.post('/api/script/switch', { script });
             setActiveScript(script);
-            toast.success(`Guión cambiado a ${script === 'v1' ? 'Original' : 'V2 — Empático'}`);
+            const labels = { 'v1': 'Original', 'v2': 'V2 — Empático', 'v3': 'V3 — Profesional' };
+            toast.success(`Guión cambiado a ${labels[script] || script}`);
         } catch (e) {
             toast.error('Error al cambiar el guión: ' + (e.response?.data?.error || e.message));
         }
@@ -316,6 +317,26 @@ const SettingsView = ({ status }) => {
                             <div
                                 onClick={(e) => { e.stopPropagation(); handleDownloadScript('v2', 'Guión Empático (V2)'); }}
                                 className="mt-2 text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded hover:bg-emerald-200 transition"
+                            >
+                                ⬇️ Descargar PDF
+                            </div>
+                        </button>
+                        <button
+                            onClick={() => handleSwitchScript('v3')}
+                            disabled={switchingScript}
+                            className={`flex-1 px-4 py-3 rounded-lg text-sm font-bold transition-all border-2 flex flex-col items-center ${activeScript === 'v3'
+                                ? 'bg-amber-50 border-amber-500 text-amber-700 shadow-sm'
+                                : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'
+                                }`}
+                        >
+                            <div className="flex items-center justify-center gap-2">
+                                {activeScript === 'v3' && <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>}
+                                🔥 Profesional (V3)
+                            </div>
+                            <div className="text-xs font-normal mt-1 opacity-70">Con Contra Reembolso MAX</div>
+                            <div
+                                onClick={(e) => { e.stopPropagation(); handleDownloadScript('v3', 'Guión Profesional (V3)'); }}
+                                className="mt-2 text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded hover:bg-amber-200 transition"
                             >
                                 ⬇️ Descargar PDF
                             </div>

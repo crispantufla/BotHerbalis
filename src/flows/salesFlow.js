@@ -6,6 +6,9 @@ const fs = require('fs');
 
 const PRICES_PATH = path.join(__dirname, '../../data/prices.json');
 
+// Contra Reembolso MAX — adicional para planes de 60 días
+const ADICIONAL_MAX = 6000;
+
 function _getPrices() {
     try {
         if (fs.existsSync(PRICES_PATH)) {
@@ -17,7 +20,7 @@ function _getPrices() {
     }
     // Fallback defaults if file missing/error
     return {
-        'Cápsulas': { '60': '45.900', '120': '66.900' },
+        'Cápsulas': { '60': '46.900', '120': '66.900' },
         'Semillas': { '60': '36.900', '120': '49.900' },
         'Gotas': { '60': '48.900', '120': '68.900' }
     };
@@ -30,7 +33,7 @@ function _getPrice(product, plan) {
     return prices['Semillas'][plan] || prices['Semillas']['60'];
 }
 
-function _formatMessage(text) {
+function _formatMessage(text, state) {
     if (!text) return "";
     const prices = _getPrices();
 
@@ -42,6 +45,19 @@ function _formatMessage(text) {
     formatted = formatted.replace(/{{PRICE_SEMILLAS_120}}/g, prices['Semillas']['120']);
     formatted = formatted.replace(/{{PRICE_GOTAS_60}}/g, prices['Gotas']['60']);
     formatted = formatted.replace(/{{PRICE_GOTAS_120}}/g, prices['Gotas']['120']);
+
+    // Replace dynamic order placeholders if state is provided
+    if (state) {
+        if (state.selectedProduct) {
+            formatted = formatted.replace(/{{PRODUCT}}/g, state.selectedProduct);
+        }
+        if (state.selectedPlan) {
+            formatted = formatted.replace(/{{PLAN}}/g, state.selectedPlan);
+        }
+        if (state.totalPrice) {
+            formatted = formatted.replace(/{{TOTAL}}/g, state.totalPrice);
+        }
+    }
 
     return formatted;
 }
@@ -179,8 +195,8 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
     for (const faq of knowledge.faq) {
         if (faq.keywords.some(k => lowerText.includes(k))) {
-            await sendMessageWithDelay(userId, faq.response);
-            currentState.history.push({ role: 'bot', content: faq.response });
+            await sendMessageWithDelay(userId, _formatMessage(faq.response));
+            currentState.history.push({ role: 'bot', content: _formatMessage(faq.response) });
 
             if (faq.triggerStep) {
                 currentState.step = faq.triggerStep;
@@ -207,7 +223,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
     switch (logicStage) {
         case 'greeting':
-            const greetMsg = knowledge.flow.greeting.response;
+            const greetMsg = _formatMessage(knowledge.flow.greeting.response);
             await sendMessageWithDelay(userId, greetMsg);
             currentState.step = knowledge.flow.greeting.nextStep;
             currentState.history.push({ role: 'bot', content: greetMsg });
@@ -226,9 +242,9 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             if (hasNumber) {
                 // Direct script response — NO AI
                 const recNode = knowledge.flow.recommendation;
-                await sendMessageWithDelay(userId, recNode.response);
+                await sendMessageWithDelay(userId, _formatMessage(recNode.response));
                 currentState.step = recNode.nextStep;
-                currentState.history.push({ role: 'bot', content: recNode.response });
+                currentState.history.push({ role: 'bot', content: _formatMessage(recNode.response) });
                 saveState();
                 matched = true;
             } else {
@@ -260,9 +276,9 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     if (aiWeight.goalMet) {
                         // AI detected a weight goal we missed with regex
                         const recNode = knowledge.flow.recommendation;
-                        await sendMessageWithDelay(userId, recNode.response);
+                        await sendMessageWithDelay(userId, _formatMessage(recNode.response));
                         currentState.step = recNode.nextStep;
-                        currentState.history.push({ role: 'bot', content: recNode.response });
+                        currentState.history.push({ role: 'bot', content: _formatMessage(recNode.response) });
                         saveState();
                         matched = true;
                     } else if (aiWeight.response) {
@@ -282,7 +298,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             if (isMatch(knowledge.flow.preference_capsulas.match, normalizedText)) {
                 // Direct script — cápsulas
                 currentState.selectedProduct = "Cápsulas de nuez de la india";
-                const msg = knowledge.flow.preference_capsulas.response;
+                const msg = _formatMessage(knowledge.flow.preference_capsulas.response);
                 await sendMessageWithDelay(userId, msg);
                 currentState.step = knowledge.flow.preference_capsulas.nextStep;
                 currentState.history.push({ role: 'bot', content: msg });
@@ -291,7 +307,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             } else if (isMatch(knowledge.flow.preference_semillas.match, normalizedText)) {
                 // Direct script — semillas
                 currentState.selectedProduct = "Semillas de nuez de la india";
-                const msg = knowledge.flow.preference_semillas.response;
+                const msg = _formatMessage(knowledge.flow.preference_semillas.response);
                 await sendMessageWithDelay(userId, msg);
                 currentState.step = knowledge.flow.preference_semillas.nextStep;
                 currentState.history.push({ role: 'bot', content: msg });
@@ -300,7 +316,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             } else if (knowledge.flow.preference_gotas && isMatch(knowledge.flow.preference_gotas.match, normalizedText)) {
                 // Direct script — gotas
                 currentState.selectedProduct = "Gotas de nuez de la india";
-                const msg = knowledge.flow.preference_gotas.response;
+                const msg = _formatMessage(knowledge.flow.preference_gotas.response);
                 await sendMessageWithDelay(userId, msg);
                 currentState.step = knowledge.flow.preference_gotas.nextStep;
                 currentState.history.push({ role: 'bot', content: msg });
@@ -334,13 +350,13 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             if (wantsPrices || _isAffirmative(normalizedText)) {
                 let msg = "";
                 if (currentState.selectedProduct && currentState.selectedProduct.includes("Cápsulas")) {
-                    msg = knowledge.flow.price_capsulas.response;
+                    msg = _formatMessage(knowledge.flow.price_capsulas.response);
                     currentState.step = knowledge.flow.price_capsulas.nextStep;
                 } else if (currentState.selectedProduct && currentState.selectedProduct.includes("Gotas")) {
-                    msg = knowledge.flow.price_gotas.response;
+                    msg = _formatMessage(knowledge.flow.price_gotas.response);
                     currentState.step = knowledge.flow.price_gotas.nextStep;
                 } else {
-                    msg = knowledge.flow.price_semillas.response;
+                    msg = _formatMessage(knowledge.flow.price_semillas.response);
                     currentState.step = knowledge.flow.price_semillas.nextStep;
                 }
                 await sendMessageWithDelay(userId, msg);
@@ -405,8 +421,11 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 }
             }
 
-            // If found complex items, use them
+            // If found complex items, apply Contra Reembolso MAX
             if (foundItems.length > 0) {
+                const has60 = foundItems.some(i => i.plan === '60');
+                currentState.isContraReembolsoMAX = has60;
+                currentState.adicionalMAX = has60 ? ADICIONAL_MAX : 0;
                 currentState.cart = foundItems;
                 // Confirm with closing
                 const closingNode = knowledge.flow.closing;
@@ -427,11 +446,20 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             if (selectedPlanId) {
                 // If we have a selectedProduct from previous step, use it
                 const product = currentState.selectedProduct || "Nuez de la India"; // Default
+                const basePrice = _getPrice(product, selectedPlanId);
                 currentState.cart = [{
                     product: product,
                     plan: selectedPlanId,
-                    price: _getPrice(product, selectedPlanId)
+                    price: basePrice
                 }];
+                // Contra Reembolso MAX: plan 60 has additional charge
+                if (selectedPlanId === '60') {
+                    currentState.isContraReembolsoMAX = true;
+                    currentState.adicionalMAX = ADICIONAL_MAX;
+                } else {
+                    currentState.isContraReembolsoMAX = false;
+                    currentState.adicionalMAX = 0;
+                }
                 planSelected = true;
             }
 
@@ -507,7 +535,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             }
             // SCRIPT FIRST: Clear affirmative confirmation
             else if (_isAffirmative(normalizedText)) {
-                const msg = knowledge.flow.data_request.response;
+                const msg = _formatMessage(knowledge.flow.data_request.response);
                 await sendMessageWithDelay(userId, msg);
                 currentState.step = knowledge.flow.data_request.nextStep;
                 currentState.history.push({ role: 'bot', content: msg });
@@ -599,11 +627,14 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 currentState.step = 'waiting_admin_ok';
                 saveState();
 
-                // Format Cart for Admin
+                // Format Cart for Admin — include Contra Reembolso MAX
                 const cartSummary = currentState.cart.map(i => `${i.product} (${i.plan} días)`).join(', ');
-                const total = currentState.cart.reduce((sum, i) => sum + parseInt(i.price.replace('.', '')), 0);
+                const subtotal = currentState.cart.reduce((sum, i) => sum + parseInt(i.price.replace('.', '')), 0);
+                const adicional = currentState.adicionalMAX || 0;
+                const total = subtotal + adicional;
+                const maxLabel = adicional > 0 ? ` + $${adicional.toLocaleString('es-AR')} (MAX)` : '';
 
-                await notifyAdmin(`Pedido CASI completo`, userId, `Datos: ${addr.nombre}, ${addr.calle}\nItems: ${cartSummary}\nTotal: $${total}`);
+                await notifyAdmin(`Pedido CASI completo`, userId, `Datos: ${addr.nombre}, ${addr.calle}\nItems: ${cartSummary}\nSubtotal: $${subtotal}${maxLabel}\nTotal: $${total}`);
                 const msg = `¡Gracias por los datos! 🙌 Mi compañero va a revisar tu pedido y te confirma en breve. ¡Ya queda poco!`;
                 await sendMessageWithDelay(userId, msg);
                 currentState.history.push({ role: 'bot', content: msg });
@@ -681,7 +712,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
         case 'completed':
             if (lowerText.includes('hola')) {
                 currentState.step = 'greeting';
-                const msg = knowledge.flow.greeting.response;
+                const msg = _formatMessage(knowledge.flow.greeting.response);
                 await sendMessageWithDelay(userId, msg);
                 currentState.step = knowledge.flow.greeting.nextStep;
                 currentState.history.push({ role: 'bot', content: msg });

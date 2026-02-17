@@ -1,0 +1,398 @@
+{
+    "meta": {
+        "name": "Guión V3 — Profesional + Contra Reembolso MAX",
+        "description": "Guión profesional con estructura de árbol de decisiones, Contra Reembolso MAX para planes de 60 días, y FAQ expandida.",
+        "version": "3.0"
+    },
+    "flow": {
+        "greeting": {
+            "step": "greeting",
+            "keywords": [
+                "hola",
+                "precio",
+                "info",
+                "buenas",
+                "herbalis",
+                "nuez",
+                "kilos",
+                "bajar",
+                "cuanto",
+                "vale",
+                "costo",
+                "gotas"
+            ],
+            "response": "¡Hola! 😊\n\nLos tratamientos con Nuez de la India están entre $37.000 y $69.000,\nsegún duración y formato.\n\nTrabajamos hace más de 13 años con:\n✔ Cápsulas\n✔ Gotas\n✔ Semillas\n\n📦 Enviamos a todo el país\n🛍️ Pago al recibir\n\nPara recomendarte bien:\n¿Buscás bajar hasta 10 kg, entre 10 y 20 kg o más de 20 kg?",
+            "nextStep": "waiting_weight"
+        },
+        "recommendation": {
+            "step": "waiting_weight",
+            "response": "Perfecto 👌\n\nEse objetivo es totalmente posible.\n\n¿Preferís algo súper práctico (cápsulas o gotas)\no más natural (semillas)?",
+            "nextStep": "waiting_preference"
+        },
+        "preference_capsulas": {
+            "step": "waiting_preference",
+            "match": [
+                "capsula",
+                "capsulas",
+                "pastilla",
+                "pastillas",
+                "practico",
+                "practica",
+                "1"
+            ],
+            "response": "Genial 👍 Cápsulas es la mejor opción para vos.\n\n💊 Se toman:\n• 1 cápsula por día\n• 30 min antes del almuerzo o la cena\n\nTenés dos opciones:\n\n🔹 60 días → ${{PRICE_CAPSULAS_60}}\n🔹 120 días → ${{PRICE_CAPSULAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl plan de 120 días permite pagar 100% al recibir SIN costo adicional.\nEl plan de 60 días con pago al recibir tiene un adicional de $6.000 (Modalidad MAX).\n\n👉 ¿Avanzamos con 60 o 120 días?",
+            "nextStep": "waiting_plan_choice"
+        },
+        "preference_semillas": {
+            "step": "waiting_preference",
+            "match": [
+                "infusion",
+                "té",
+                "yuyos",
+                "semillas",
+                "semilla",
+                "natural",
+                "tradicional"
+            ],
+            "response": "Genial 🌿 La semilla en estado natural es la opción más elegida.\n\nSe consume en forma de infusión cada noche.\n\n🔹 60 días → ${{PRICE_SEMILLAS_60}}\n🔹 120 días → ${{PRICE_SEMILLAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl plan de 120 días permite pago al recibir sin costo adicional.\nEl plan de 60 días con pago al recibir tiene un adicional de $6.000.\n\n👉 ¿Avanzamos con 60 o 120 días?",
+            "nextStep": "waiting_plan_choice"
+        },
+        "preference_gotas": {
+            "step": "waiting_preference",
+            "match": [
+                "gotas",
+                "liquido",
+                "gotero"
+            ],
+            "response": "Genial 🌿 Las gotas son prácticas y discretas.\n\n🔹 60 días → ${{PRICE_GOTAS_60}}\n🔹 120 días → ${{PRICE_GOTAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl plan de 120 días permite pago al recibir sin costo adicional.\nEl plan de 60 días con pago al recibir tiene un adicional de $6.000.\n\n👉 ¿Avanzamos con 60 o 120 días?",
+            "nextStep": "waiting_plan_choice"
+        },
+        "price_capsulas": {
+            "step": "waiting_price_confirmation",
+            "response": "💊 CÁPSULAS:\n\n🔹 Plan 60 días → ${{PRICE_CAPSULAS_60}}\n🔹 Plan 120 días → ${{PRICE_CAPSULAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl plan de 120 días permite pagar 100% al recibir SIN costo adicional.\nEl plan de 60 días con pago al recibir tiene un adicional de $6.000 (Modalidad MAX).\n\n👉 ¿Avanzamos con 60 o 120 días?",
+            "nextStep": "waiting_plan_choice"
+        },
+        "price_semillas": {
+            "step": "waiting_price_confirmation",
+            "response": "🌱 SEMILLAS:\n\n🔹 Plan 60 días → ${{PRICE_SEMILLAS_60}}\n🔹 Plan 120 días → ${{PRICE_SEMILLAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl plan de 120 días permite pago al recibir sin costo adicional.\nEl plan de 60 días con pago al recibir tiene un adicional de $6.000.\n\n👉 ¿Avanzamos con 60 o 120 días?",
+            "nextStep": "waiting_plan_choice"
+        },
+        "price_gotas": {
+            "step": "waiting_price_confirmation",
+            "response": "💧 GOTAS:\n\n🔹 Plan 60 días → ${{PRICE_GOTAS_60}}\n🔹 Plan 120 días → ${{PRICE_GOTAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl plan de 120 días permite pago al recibir sin costo adicional.\nEl plan de 60 días con pago al recibir tiene un adicional de $6.000.\n\n👉 ¿Avanzamos con 60 o 120 días?",
+            "nextStep": "waiting_plan_choice"
+        },
+        "closing": {
+            "step": "waiting_plan_choice",
+            "match": [
+                "si",
+                "sisi",
+                "precio",
+                "precios",
+                "dale",
+                "bueno",
+                "ok"
+            ],
+            "response": "Perfecto 👍\n\nTomamos los datos para el envío 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(La dirección debe ser exacta, sin esquinas ni \"aprox\")",
+            "nextStep": "waiting_data"
+        },
+        "data_request": {
+            "step": "waiting_ok",
+            "match": [
+                "si",
+                "dale",
+                "bueno",
+                "sisi",
+                "joya",
+                "de una",
+                "esta bien"
+            ],
+            "response": "Tomamos los datos para el envío 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(La dirección debe ser exacta, sin esquinas ni \"aprox\")",
+            "nextStep": "waiting_data"
+        },
+        "confirmation": {
+            "step": "waiting_data",
+            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT}}\nPlan: {{PLAN}} días\nTotal a pagar al recibir: ${{TOTAL}}\n\n✔ Correo Argentino\n✔ Entrega estimada: 7 a 10 días hábiles\n✔ Pago en efectivo al recibir\n\nImportante:\nSi el cartero no encuentra a nadie,\nel correo puede solicitar retiro en sucursal.\nPlazo: 72 hs.\n\nEl rechazo o no retiro genera un costo logístico de $18.000.\n\n👉 Confirmame que podrás recibir o retirar el pedido sin inconvenientes.",
+            "nextStep": "completed"
+        }
+    },
+    "faq": [
+        {
+            "keywords": [
+                "envio",
+                "costo de envio",
+                "cuanto el envio",
+                "gastos de envio"
+            ],
+            "response": "El envío es gratuito."
+        },
+        {
+            "keywords": [
+                "que medio",
+                "que correo",
+                "por donde",
+                "empresa de envio"
+            ],
+            "response": "Realizamos los envíos exclusivamente por Correo Argentino 📦."
+        },
+        {
+            "keywords": [
+                "demora",
+                "tarda",
+                "tiempo",
+                "llega",
+                "cuanto demora"
+            ],
+            "response": "La entrega es de 7 a 10 días hábiles o a partir de la fecha que nos indiques."
+        },
+        {
+            "keywords": [
+                "programar",
+                "agendar",
+                "fecha"
+            ],
+            "response": "Sí.\n\nPodemos enviarlo dentro de 7 a 10 días o programarlo para una fecha posterior que te quede cómoda."
+        },
+        {
+            "keywords": [
+                "avisa",
+                "cartero",
+                "llaman",
+                "visita"
+            ],
+            "response": "No tenemos control sobre el momento exacto de la visita del cartero.\n\nSi no te encuentra, puede dejar aviso para retirar en sucursal."
+        },
+        {
+            "keywords": [
+                "sucursal",
+                "no quiero retirar",
+                "no puedo retirar"
+            ],
+            "response": "El envío va a domicilio.\n\nSolo en algunos casos el correo solicita retiro. El plazo es de 72 hs."
+        },
+        {
+            "keywords": [
+                "que pasa si no retiro",
+                "rechazo",
+                "no retiro"
+            ],
+            "response": "El rechazo o no retiro genera un costo logístico de $18.000."
+        },
+        {
+            "keywords": [
+                "tarjeta",
+                "cuotas",
+                "mercadopago",
+                "mp",
+                "cbu",
+                "alias",
+                "transferencia"
+            ],
+            "response": "Por el momento trabajamos únicamente con pago al recibir.\n\n¿Preferís 60 o 120 días?"
+        },
+        {
+            "keywords": [
+                "pago",
+                "pagar",
+                "como se paga"
+            ],
+            "response": "Se paga al recibir el producto.\n\nEl plan de 120 días no tiene costo adicional.\nEl plan de 60 días tiene modalidad Contra Reembolso MAX con adicional de $6.000."
+        },
+        {
+            "keywords": [
+                "no tengo",
+                "no me alcanza",
+                "cobro",
+                "quincena",
+                "fin de mes"
+            ],
+            "response": "Podemos programar la entrega para después de la fecha que cobrás.\n\n¿Desde qué día te queda cómodo recibirlo?"
+        },
+        {
+            "keywords": [
+                "muy caro",
+                "es mucho",
+                "mucha plata",
+                "sale un monton"
+            ],
+            "response": "Entiendo 😊\n\nEs un tratamiento completo para 60 o 120 días con envío incluido.\n\n¿Preferís 60 o 120 días?"
+        },
+        {
+            "keywords": [
+                "lo pienso",
+                "despues veo",
+                "mas tarde"
+            ],
+            "response": "Perfecto 😊\n\n¿Hay algo puntual que te genere duda?"
+        },
+        {
+            "keywords": [
+                "cuantos kilos",
+                "cuanto bajo",
+                "cuanto se pierde",
+                "en un mes",
+                "en 60 dias"
+            ],
+            "response": "Cada cuerpo tiene su ritmo.\n\nQuienes tienen más kilos para bajar suelen notar cambios más visibles al inicio, y quienes necesitan bajar menos ven descensos más progresivos.\n\nLo importante es que el descenso sea natural y sostenido."
+        },
+        {
+            "keywords": [
+                "cuanto cuesta",
+                "cuanto sale",
+                "que precio"
+            ],
+            "response": "Los tratamientos están entre $37.000 y $69.000,\nsegún duración y formato.\n\n¿Buscás bajar hasta 10 kg, entre 10 y 20 kg o más de 20 kg?",
+            "triggerStep": "waiting_weight"
+        },
+        {
+            "keywords": [
+                "que hace",
+                "para que sirve",
+                "de que se trata"
+            ],
+            "response": "Ayuda al cuerpo a eliminar excesos de forma natural, favoreciendo un descenso progresivo de peso.\n\n¿Querés que te recomiende la mejor opción para tu objetivo?"
+        },
+        {
+            "keywords": [
+                "como funciona",
+                "como actua"
+            ],
+            "response": "Acompaña el proceso natural del cuerpo, ayudando a eliminar excesos de manera progresiva.\n\n¿Buscás algo práctico o más natural?"
+        },
+        {
+            "keywords": [
+                "dieta",
+                "comer",
+                "comida"
+            ],
+            "response": "No necesitás dietas estrictas.\n\nSi además cuidás un poco la alimentación o sumás movimiento, los resultados suelen verse más rápido."
+        },
+        {
+            "keywords": [
+                "rebote"
+            ],
+            "response": "No.\n\nEl rebote suele aparecer con métodos agresivos. La Nuez es natural y el descenso es progresivo."
+        },
+        {
+            "keywords": [
+                "diabetes",
+                "hipotiroidismo",
+                "tiroides",
+                "presion",
+                "hipertension"
+            ],
+            "response": "Muchas personas con esas condiciones lo consumen sin inconvenientes.\n\nEs natural y no interfiere con tratamientos habituales.\nLa única contraindicación es embarazo o lactancia."
+        },
+        {
+            "keywords": [
+                "contraindicaciones",
+                "embarazo",
+                "lactancia"
+            ],
+            "response": "Solo no se recomienda durante embarazo o lactancia."
+        },
+        {
+            "keywords": [
+                "peligrosa",
+                "mala",
+                "me dijeron"
+            ],
+            "response": "En redes circula información mezclada con productos distintos.\n\nTrabajamos hace más de 13 años con este producto en distintos países."
+        },
+        {
+            "keywords": [
+                "medico",
+                "doctor"
+            ],
+            "response": "Perfecto 😊\n\nEs un producto natural y no tiene contraindicaciones más allá de embarazo o lactancia.\n\nCuando decidas avanzar, lo dejamos programado."
+        },
+        {
+            "keywords": [
+                "como se toman",
+                "como tomo",
+                "como se usa"
+            ],
+            "response": "Las cápsulas: 1 cápsula por día, 30 minutos antes del almuerzo o la cena.\n\nLas semillas: se prepara en infusión cada noche antes de acostarte. Es natural y no tiene gusto."
+        },
+        {
+            "keywords": [
+                "30 dias",
+                "un mes",
+                "menos tiempo"
+            ],
+            "response": "Trabajamos con planes completos de 60 o 120 días."
+        },
+        {
+            "keywords": [
+                "de donde son",
+                "quienes son",
+                "empresa"
+            ],
+            "response": "Somos Herbalis.\n\nTrabajamos hace más de 13 años con este producto y enviamos a todo el país."
+        },
+        {
+            "keywords": [
+                "estafa",
+                "trucho",
+                "mentira",
+                "robo",
+                "engaño",
+                "chanta"
+            ],
+            "response": "Entiendo la duda.\n\nPor eso trabajamos con pago al recibir."
+        },
+        {
+            "keywords": [
+                "farmacia",
+                "suplemento",
+                "pastillas de farmacia",
+                "otro producto",
+                "marca"
+            ],
+            "response": "Los productos de farmacia generalmente son químicos. La Nuez de la India es 100% natural, no tiene efecto rebote y las únicas contraindicaciones son embarazo y lactancia.\n\nAdemás, te enviamos a domicilio gratis y pagás al recibir 😊"
+        },
+        {
+            "keywords": [
+                "funciona",
+                "sirve",
+                "verdad",
+                "posta"
+            ],
+            "response": "Trabajamos hace más de 13 años con este producto. Es natural y el descenso es progresivo.\n\nPagás al recibir, así no arriesgás nada 😊"
+        },
+        {
+            "keywords": [
+                "whatsapp",
+                "este numero",
+                "numero de herbalis"
+            ],
+            "response": "Sí, este es el WhatsApp oficial de Herbalis 😊\n\n¿En qué te puedo ayudar?"
+        },
+        {
+            "keywords": [
+                "gusto",
+                "sabor",
+                "feo",
+                "rico"
+            ],
+            "response": "Las cápsulas no tienen gusto, se tragan con agua.\nLas semillas se preparan en infusión y son suaves, sin sabor fuerte.\nLas gotas tienen sabor neutro."
+        }
+    ],
+    "rules": {
+        "alwaysEndWithQuestion": true,
+        "maxFollowUps": 1,
+        "noNegotiatePrice": true,
+        "noDiscounts": true,
+        "noCreditCard": true,
+        "noArgue": true,
+        "keepResponsesShort": true,
+        "contraReembolsoMAX": {
+            "enabled": true,
+            "adicional": 6000,
+            "appliesTo": "60",
+            "description": "Modalidad Contra Reembolso MAX — adicional de $6.000 en planes de 60 días"
+        },
+        "costoLogisticoRechazo": 18000,
+        "closeIfNotAccepted": "Trabajamos bajo estas modalidades.\n\nSi en algún momento te resulta cómodo avanzar, acá estamos 😊"
+    }
+}

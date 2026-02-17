@@ -1,14 +1,16 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const OpenAI = require('openai');
+const fs = require('fs');
+const path = require('path');
 
 // --- CONFIGURATION ---
-const GEN_MODELS = ["gemini-2.0-flash", "gemini-1.5-flash-8b", "gemini-1.5-flash-001"];
-const MAX_RETRIES = 15; // Increased to try all combinations of keys and models
+const MODEL = "gpt-4o-mini";
+const MAX_RETRIES = 5;
 const MAX_HISTORY_LENGTH = 15;
 
 // --- RATE LIMIT CONFIGURATION ---
-const MAX_CONCURRENT_PER_KEY = 1; // Reduced to avoid hammering Free Tier
-const MIN_DELAY_MS = 800;       // increased gap to spread requests
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 min cache for identical prompts
+const MAX_CONCURRENT = 3;
+const MIN_DELAY_MS = 200;
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 min cache
 
 // --- PERSONA DEFINITION ---
 // IMPORTANT: The AI is ONLY used as a FALLBACK when the scripted flow can't handle 
@@ -27,12 +29,19 @@ IDENTIDAD (CRÍTICO):
 - Hablás en ESPAÑOL ARGENTINO con voseo ("querés", "podés", "mirá").
 
 INFORMACIÓN DE PRODUCTO:
-- Cápsulas: $45.900 (60 días) / $66.900 (120 días)
+- Cápsulas: $46.900 (60 días) / $66.900 (120 días)
 - Semillas: $36.900 (60 días) / $49.900 (120 días)
-- Gotas: (Mencionar solo si preguntan). $48.900 (69 dias) / $68.900 (120 dias)
+- Gotas: (Mencionar solo si preguntan). $48.900 (60 dias) / $68.900 (120 dias)
 - Envío gratis por Correo Argentino, pago en efectivo al recibir
 - Contraindicaciones: solo embarazo y lactancia
 - Sin efecto rebote (es 100% natural)
+
+MODALIDAD DE PAGO:
+- Pago al recibir (Contra Reembolso)
+- Plan 120 días: SIN costo adicional
+- Plan 60 días: tiene un adicional de $6.000 (Modalidad Contra Reembolso MAX)
+- NO aceptamos tarjeta, transferencia ni MercadoPago
+- Costo logístico por rechazo o no retiro: $18.000
 
 REGLAS ESTRICTAS:
 1. Respuestas MUY CORTAS: 1-2 oraciones máximo. Nada de párrafos largos.
@@ -41,12 +50,16 @@ REGLAS ESTRICTAS:
 4. Si desconfían: "El envío es gratis y pagás solo al recibir"
 5. Siempre terminá volviendo a la pregunta del paso actual (se te indica en cada mensaje).
 6. NO repitas información que ya se dio en el historial.
+7. Siempre terminá con una PREGUNTA cuando sea posible.
+8. NO insistas más de una vez si el cliente no responde.
+9. NO negocies precio. NO ofrezcas descuentos. NO ofrezcas tarjeta.
+10. NO discutas con el cliente.
 
 REGLAS DE EMPATÍA Y CONTENCIÓN:
-7. Si el usuario comparte algo EMOCIONAL o PERSONAL (hijos, problemas de salud, bullying, autoestima), mostrá EMPATÍA PRIMERO con 1 oración comprensiva. Después volvé al paso actual.
-8. NUNCA respondas con información de un paso futuro (precios, pagos, envíos) si el paso actual no lo pide.
-9. Si no sabés qué responder, respondé con empatía y repetí la pregunta del paso actual.
-10. PROHIBIDO inventar respuestas sobre temas que no están en tu información. Si no sabés, decí "Dejame consultar con mi compañero" y goalMet = false.
+11. Si el usuario comparte algo EMOCIONAL o PERSONAL (hijos, problemas de salud, bullying, autoestima), mostrá EMPATÍA PRIMERO con 1 oración comprensiva. Después volvé al paso actual.
+12. NUNCA respondas con información de un paso futuro (precios, pagos, envíos) si el paso actual no lo pide.
+13. Si no sabés qué responder, respondé con empatía y repetí la pregunta del paso actual.
+14. PROHIBIDO inventar respuestas sobre temas que no están en tu información. Si no sabés, decí "Dejame consultar con mi compañero" y goalMet = false.
 `;
 
 // ═══════════════════════════════════════════════════════
@@ -107,7 +120,6 @@ class ResponseCache {
     }
 
     _hash(str) {
-        // Simple fast hash for cache keys
         let hash = 0;
         for (let i = 0; i < str.length; i++) {
             hash = ((hash << 5) - hash) + str.charCodeAt(i);
@@ -129,7 +141,6 @@ class ResponseCache {
     set(prompt, value) {
         const key = this._hash(prompt);
         this.cache.set(key, { value, time: Date.now() });
-        // Evict old entries periodically
         if (this.cache.size > 200) {
             const now = Date.now();
             for (const [k, v] of this.cache) {
@@ -142,61 +153,29 @@ class ResponseCache {
 }
 
 // ═══════════════════════════════════════════════════════
-// AI SERVICE — with queue, cache, and smart retry
+// AI SERVICE — OpenAI GPT-4o-mini
 // ═══════════════════════════════════════════════════════
 class AIService {
     constructor() {
-        const keys = (process.env.GEMINI_API_KEY || "").split(',').map(k => k.trim()).filter(Boolean);
-        if (keys.length === 0) {
-            console.error("❌ CRITICAL: GEMINI_API_KEY is missing!");
+        const apiKey = process.env.OPENAI_API_KEY || "";
+        if (!apiKey) {
+            console.error("❌ CRITICAL: OPENAI_API_KEY is missing!");
         }
 
-        console.log(`📡 [AI] Initializing with ${keys.length} API key(s) and ${GEN_MODELS.length} models`);
+        console.log(`📡 [AI] Initializing OpenAI (model: ${MODEL})`);
 
-        this.genAIs = keys.map(k => new GoogleGenerativeAI(k));
-        // Table of models: [keyIndex][modelIndex]
-        this.modelTable = this.genAIs.map(genAI =>
-            GEN_MODELS.map(mName => genAI.getGenerativeModel({
-                model: mName,
-                systemInstruction: SYSTEM_INSTRUCTIONS
-            }))
-        );
+        this.client = new OpenAI({ apiKey });
+        this.model = MODEL;
 
-        this.currentKeyIndex = 0;
-
-        // Shared infrastructure - Concurrency scales with keys
-        const totalConcurrent = Math.max(MAX_CONCURRENT_PER_KEY, keys.length * MAX_CONCURRENT_PER_KEY);
-        this.queue = new RequestQueue(totalConcurrent, MIN_DELAY_MS);
+        this.queue = new RequestQueue(MAX_CONCURRENT, MIN_DELAY_MS);
         this.cache = new ResponseCache(CACHE_TTL_MS);
         this.stats = { calls: 0, cached: 0, retries: 0, errors: 0 };
     }
 
     /**
-     * Get the next model instance for a specific attempt
+     * Core API call with retry + rate limit handling
      */
-    _getModelForAttempt(attempt) {
-        if (this.genAIs.length === 0) throw new Error("No API keys available");
-
-        // Key rotates every attempt
-        const keyIndex = (this.currentKeyIndex + attempt) % this.genAIs.length;
-
-        // Model rotates after we've tried all keys with the previous model
-        const modelIndex = Math.floor(attempt / this.genAIs.length) % GEN_MODELS.length;
-
-        const modelName = GEN_MODELS[modelIndex];
-        return {
-            model: this.modelTable[keyIndex][modelIndex],
-            modelName,
-            keyIndex
-        };
-    }
-
-    /**
-     * Enqueue a Gemini call with retry + rate limit handling
-     * @param {Function} apiCallTarget - A function that takes a model and returns the API call promise
-     * @param {string} cacheKey - Optional prompt hash for caching (null = no cache)
-     */
-    async _callQueued(apiCallTarget, cacheKey = null) {
+    async _callQueued(apiCallFn, cacheKey = null) {
         // Check cache first
         if (cacheKey) {
             const cached = this.cache.get(cacheKey);
@@ -208,31 +187,16 @@ class AIService {
 
         this.stats.calls++;
 
-        // Enqueue with retry logic
-        return await this.queue.enqueue(async () => {
+        const result = await this.queue.enqueue(async () => {
             for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-                const { model, modelName, keyIndex } = this._getModelForAttempt(attempt);
                 try {
-                    return await apiCallTarget(model);
+                    return await apiCallFn();
                 } catch (e) {
-                    if (e.status === 429 || (e.message && e.message.includes('429'))) {
+                    const status = e.status || e.statusCode;
+                    if (status === 429) {
                         this.stats.retries++;
-
-                        // Smarter backoff: 
-                        // 1. If we have keys left to try, wait 1s and rotate.
-                        // 2. If we already tried all keys once, start exponential backoff.
-                        let waitTime = 1000;
-                        if (attempt >= this.genAIs.length) {
-                            const backoffStage = attempt - this.genAIs.length;
-                            waitTime = Math.pow(2, backoffStage + 1) * 2000; // 4s, 8s, 16s...
-                        }
-                        waitTime += Math.floor(Math.random() * 1000); // Add jitter
-
-                        const errorDetail = e.message || "";
-                        console.warn(`⚠️ [AI] Rate Limit (429) on key ${keyIndex} [${modelName}]. Attempt ${attempt + 1}/${MAX_RETRIES}. Backing off ${waitTime / 1000}s... (Queue: ${this.queue.pending} pending)`);
-                        if (errorDetail.includes('FreeTier')) {
-                            console.warn(`💡 [DIAGNÓSTICO] Google dice que este proyecto es "FreeTier". Verificá que el Billing esté vinculado a este proyecto específico.`);
-                        }
+                        const waitTime = Math.pow(2, attempt + 1) * 1000 + Math.floor(Math.random() * 1000);
+                        console.warn(`⚠️ [AI] Rate Limit (429). Attempt ${attempt + 1}/${MAX_RETRIES}. Backing off ${waitTime / 1000}s...`);
                         await new Promise(r => setTimeout(r, waitTime));
                     } else {
                         this.stats.errors++;
@@ -245,8 +209,9 @@ class AIService {
         });
 
         // Cache the result
-        // Update key index for next message spread
-        this.currentKeyIndex = (this.currentKeyIndex + 1) % this.genAIs.length;
+        if (cacheKey && result) {
+            this.cache.set(cacheKey, result);
+        }
 
         return result;
     }
@@ -271,15 +236,11 @@ class AIService {
             const faq = context.knowledge.faq || [];
             const step = context.step || 'general';
 
-            // DYNAMIC CONTEXT: Only inject info relevant to the current step
-            // This prevents the AI from hallucinating about topics not yet discussed
             knowledgeContext = `INFORMACIÓN RELEVANTE PARA ESTE PASO:\n`;
 
-            // Pathology FAQ — always useful (customers ask about health at any point)
             const pathInfo = faq.find(q => q.keywords.includes('diabetes'))?.response || "";
             if (pathInfo) knowledgeContext += `- SOBRE PATOLOGÍAS: "${pathInfo}"\n`;
 
-            // Step-specific context
             if (['waiting_weight', 'waiting_preference'].includes(step)) {
                 knowledgeContext += `- Productos disponibles: Cápsulas (prácticas), Semillas (naturales), Gotas (líquidas)\n`;
                 knowledgeContext += `- Contraindicaciones: solo embarazo y lactancia. NO menores de edad.\n`;
@@ -292,7 +253,7 @@ class AIService {
                 const pCaps = f.price_capsulas?.response || "";
                 const pSem = f.price_semillas?.response || "";
                 if (pCaps || pSem) knowledgeContext += `- PRECIOS: ${pCaps} | ${pSem}\n`;
-                knowledgeContext += `- DESCUENTOS POR CANTIDAD: 3ª unidad (30% off), 4ª unidad (40% off), 5ª unidad (50% off).\n`;
+                knowledgeContext += `- Plan 120 días sin adicional. Plan 60 días con Contra Reembolso MAX (+$6.000).\n`;
                 knowledgeContext += `- Envío gratis por Correo Argentino, pago en efectivo al recibir\n`;
             } else if (step === 'waiting_data') {
                 knowledgeContext += `- Necesitamos: nombre completo, calle y número, ciudad, código postal\n`;
@@ -302,7 +263,7 @@ class AIService {
             knowledgeContext += `(No inventes datos, usá siempre esta base)`;
         }
 
-        const prompt = `
+        const userPrompt = `
 ${summaryContext}
 ${knowledgeContext}
 ETAPA ACTUAL: "${context.step || 'general'}"
@@ -324,12 +285,19 @@ INSTRUCCIONES:
 `;
 
         try {
-            // No cache for chat — every conversation is unique
             const result = await this._callQueued(
-                (model) => model.generateContent(prompt),
-                null
+                () => this.client.chat.completions.create({
+                    model: this.model,
+                    messages: [
+                        { role: "system", content: SYSTEM_INSTRUCTIONS },
+                        { role: "user", content: userPrompt }
+                    ],
+                    temperature: 0.7,
+                    max_tokens: 300
+                }),
+                null // No cache for chat — every conversation is unique
             );
-            const text = result.response.text();
+            const text = result.choices[0].message.content;
             return this._parseJSON(text);
         } catch (e) {
             console.error("🔴 [AI] Chat Error:", e.message);
@@ -343,7 +311,6 @@ INSTRUCCIONES:
     async checkAndSummarize(history) {
         if (history.length > MAX_HISTORY_LENGTH) {
             console.log(`[AI] Summarizing history (${history.length} messages)...`);
-            // Use the queued summarizer instead of direct call
             const summary = await this._callQueuedSummarize(history);
             if (summary) {
                 console.log(`[AI] Summary created: "${summary.substring(0, 50)}..."`);
@@ -364,14 +331,13 @@ INSTRUCCIONES:
     }
 
     /**
-     * Summarize history through the queue (avoids raw unthrottled calls)
+     * Summarize history through the queue
      */
     async _callQueuedSummarize(history) {
         const conversationText = history.map(msg =>
             `${msg.role === 'user' ? 'Cliente' : 'Vendedor'}: ${msg.content}`
         ).join('\n');
 
-        // Cache key based on last few messages
         const cacheKey = `summary_${history.length}_${history.slice(-3).map(m => m.content).join('|')}`;
 
         const prompt = `
@@ -389,10 +355,18 @@ INSTRUCCIONES:
 
         try {
             const result = await this._callQueued(
-                (model) => model.generateContent(prompt),
+                () => this.client.chat.completions.create({
+                    model: this.model,
+                    messages: [
+                        { role: "system", content: "Sos un asistente que resume conversaciones de ventas de forma concisa." },
+                        { role: "user", content: prompt }
+                    ],
+                    temperature: 0.3,
+                    max_tokens: 200
+                }),
                 cacheKey
             );
-            return result.response.text().trim();
+            return result.choices[0].message.content.trim();
         } catch (e) {
             console.error("🔴 [AI] Summary Error:", e.message);
             return null;
@@ -404,12 +378,19 @@ INSTRUCCIONES:
      */
     async generateReport(prompt) {
         try {
-            // Reports are long, so we use the queue to match rate limits
             const result = await this._callQueued(
-                (model) => model.generateContent(prompt),
+                () => this.client.chat.completions.create({
+                    model: this.model,
+                    messages: [
+                        { role: "system", content: "Sos un analista de datos de ventas. Generá reportes claros y concisos." },
+                        { role: "user", content: prompt }
+                    ],
+                    temperature: 0.3,
+                    max_tokens: 1500
+                }),
                 null
             );
-            return result.response.text();
+            return result.choices[0].message.content;
         } catch (e) {
             console.error("🔴 [AI] Report Error:", e.message);
             throw e;
@@ -444,29 +425,48 @@ INSTRUCCIONES:
         `;
         try {
             const result = await this._callQueued(
-                (model) => model.generateContent(prompt),
+                () => this.client.chat.completions.create({
+                    model: this.model,
+                    messages: [
+                        { role: "system", content: "Sos un parser de direcciones postales argentinas. Respondé SOLO con JSON puro." },
+                        { role: "user", content: prompt }
+                    ],
+                    temperature: 0,
+                    max_tokens: 200
+                }),
                 `addr_${text.substring(0, 100)}`
             );
-            return this._parseJSON(result.response.text());
+            return this._parseJSON(result.choices[0].message.content);
         } catch (e) {
             return { _error: true };
         }
     }
 
     /**
-     * Transcribe Audio
+     * Transcribe Audio — Uses OpenAI Whisper API
      */
     async transcribeAudio(mediaData, mimeType) {
         try {
-            // No cache for audio — always unique
+            // Convert base64 to buffer and write temp file (Whisper needs a file)
+            const buffer = Buffer.from(mediaData, 'base64');
+            const ext = mimeType.includes('ogg') ? 'ogg' : mimeType.includes('mp4') ? 'mp4' : 'webm';
+            const tmpPath = path.join(__dirname, `../../tmp_audio_${Date.now()}.${ext}`);
+
+            fs.writeFileSync(tmpPath, buffer);
+
             const result = await this._callQueued(
-                (model) => model.generateContent([
-                    { inlineData: { data: mediaData, mimeType: mimeType } },
-                    { text: "Transcribí este audio literalmente en español. Si no se entiende, respondé [INDESCIFRABLE]." }
-                ]),
+                () => this.client.audio.transcriptions.create({
+                    model: "whisper-1",
+                    file: fs.createReadStream(tmpPath),
+                    language: "es"
+                }),
                 null
             );
-            return result.response.text();
+
+            // Cleanup temp file
+            try { fs.unlinkSync(tmpPath); } catch (e) { /* ignore */ }
+
+            return result.text || null;
         } catch (e) {
             console.error("🔴 [AI] Transcribe Error:", e.message);
             return null;
@@ -486,10 +486,18 @@ INSTRUCCIONES:
         `;
         try {
             const result = await this._callQueued(
-                (model) => model.generateContent(prompt),
+                () => this.client.chat.completions.create({
+                    model: this.model,
+                    messages: [
+                        { role: "system", content: SYSTEM_INSTRUCTIONS },
+                        { role: "user", content: prompt }
+                    ],
+                    temperature: 0.7,
+                    max_tokens: 300
+                }),
                 null
             );
-            return result.response.text();
+            return result.choices[0].message.content;
         } catch (e) {
             return instruction; // Fallback to raw instruction
         }

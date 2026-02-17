@@ -17,7 +17,8 @@ const STATE_FILE = path.join(__dirname, 'persistence.json');
 const ORDERS_FILE = path.join(__dirname, 'orders.json');
 const KNOWLEDGE_FILES = {
     'v1': path.join(__dirname, 'knowledge.json'),
-    'v2': path.join(__dirname, 'knowledge_v2.json')
+    'v2': path.join(__dirname, 'knowledge_v2.json'),
+    'v3': path.join(__dirname, 'knowledge_v3.json')
 };
 
 // --- STATE MANAGEMENT ---
@@ -352,11 +353,11 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false) {
 sharedState.handleAdminCommand = handleAdminCommand; // Expose to server
 
 
-if (!process.env.GEMINI_API_KEY) {
-    console.error("❌ CRITICAL: GEMINI_API_KEY is missing in .env!");
+if (!process.env.OPENAI_API_KEY) {
+    console.error("❌ CRITICAL: OPENAI_API_KEY is missing in .env!");
 } else {
     // Basic mask check log
-    console.log(`✅ GEMINI_API_KEY initialized.`);
+    console.log(`✅ OPENAI_API_KEY initialized.`);
 }
 
 if (!process.env.API_KEY) {

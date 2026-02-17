@@ -110,10 +110,11 @@ module.exports = (client, sharedState) => {
     router.get('/script/active', authMiddleware, (req, res) => {
         res.json({
             active: config.activeScript || 'v1',
-            available: sharedState.availableScripts || ['v1', 'v2'],
+            available: sharedState.availableScripts || ['v1', 'v2', 'v3'],
             labels: {
                 'v1': 'Guión Original',
-                'v2': 'Guión V2 — Empático + Accesible'
+                'v2': 'Guión V2 — Empático + Accesible',
+                'v3': 'Guión V3 — Profesional + CRM MAX'
             }
         });
     });
@@ -122,9 +123,9 @@ module.exports = (client, sharedState) => {
     router.post('/script/switch', authMiddleware, (req, res) => {
         try {
             const { script } = req.body;
-            if (!script) return res.status(400).json({ error: 'Falta el campo "script" (v1 o v2)' });
+            if (!script) return res.status(400).json({ error: 'Falta el campo "script" (v1, v2 o v3)' });
 
-            const available = sharedState.availableScripts || ['v1', 'v2'];
+            const available = sharedState.availableScripts || ['v1', 'v2', 'v3'];
             if (!available.includes(script)) {
                 return res.status(400).json({ error: `Script "${script}" no existe. Disponibles: ${available.join(', ')}` });
             }
