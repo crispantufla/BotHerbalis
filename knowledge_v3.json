@@ -112,7 +112,7 @@
         },
         "confirmation": {
             "step": "waiting_data",
-            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT}}\nPlan: {{PLAN}} días\nTotal a pagar al recibir: ${{TOTAL}}\n\n✔ Correo Argentino\n✔ Entrega estimada: 7 a 10 días hábiles\n✔ Pago en efectivo al recibir\n\nImportante:\nSi el cartero no encuentra a nadie,\nel correo puede solicitar retiro en sucursal.\nPlazo: 72 hs.\n\nEl rechazo o no retiro genera un costo logístico de $18.000.\n\n👉 Confirmame que podrás recibir o retirar el pedido sin inconvenientes.",
+            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT}}\nPlan: {{PLAN}} días\nTotal a pagar al recibir: {{TOTAL}}\n\n✔ Correo Argentino\n✔ Entrega estimada: 7 a 10 días hábiles\n✔ Pago en efectivo al recibir\n\nImportante:\nSi el cartero no encuentra a nadie,\nel correo puede solicitar retiro en sucursal.\nPlazo: 72 hs.\n\nEl rechazo o no retiro genera un costo logístico de ${{COSTO_LOGISTICO}}.\n\n👉 Confirmame que podrás recibir o retirar el pedido sin inconvenientes.",
             "nextStep": "completed"
         }
     },

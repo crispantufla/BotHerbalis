@@ -6,24 +6,34 @@ const fs = require('fs');
 
 const PRICES_PATH = path.join(__dirname, '../../data/prices.json');
 
-// Contra Reembolso MAX — adicional para planes de 60 días
-const ADICIONAL_MAX = 6000;
+// Read adicional MAX and costo logístico from centralized prices
+function _getAdicionalMAX() {
+    try {
+        const prices = JSON.parse(fs.readFileSync(PRICES_PATH, 'utf8'));
+        return parseInt((prices.adicionalMAX || '6.000').replace('.', ''));
+    } catch (e) { return 6000; }
+}
+
+function _getCostoLogistico() {
+    try {
+        const prices = JSON.parse(fs.readFileSync(PRICES_PATH, 'utf8'));
+        return prices.costoLogistico || '18.000';
+    } catch (e) { return '18.000'; }
+}
 
 function _getPrices() {
     try {
-        if (fs.existsSync(PRICES_PATH)) {
-            const data = fs.readFileSync(PRICES_PATH, 'utf8');
-            return JSON.parse(data);
-        }
+        return JSON.parse(fs.readFileSync(PRICES_PATH, 'utf8'));
     } catch (e) {
-        console.error("Error reading prices.json:", e);
+        console.error('🔴 Error formatting prices:', e);
+        return {
+            'Cápsulas': { '60': '46.900', '120': '66.900' },
+            'Semillas': { '60': '36.900', '120': '49.900' },
+            'Gotas': { '60': '48.900', '120': '68.900' },
+            'adicionalMAX': '6.000',
+            'costoLogistico': '18.000'
+        };
     }
-    // Fallback defaults if file missing/error
-    return {
-        'Cápsulas': { '60': '46.900', '120': '66.900' },
-        'Semillas': { '60': '36.900', '120': '49.900' },
-        'Gotas': { '60': '48.900', '120': '68.900' }
-    };
 }
 
 function _getPrice(product, plan) {
@@ -45,6 +55,8 @@ function _formatMessage(text, state) {
     formatted = formatted.replace(/{{PRICE_SEMILLAS_120}}/g, prices['Semillas']['120']);
     formatted = formatted.replace(/{{PRICE_GOTAS_60}}/g, prices['Gotas']['60']);
     formatted = formatted.replace(/{{PRICE_GOTAS_120}}/g, prices['Gotas']['120']);
+    formatted = formatted.replace(/{{ADICIONAL_MAX}}/g, prices.adicionalMAX || '6.000');
+    formatted = formatted.replace(/{{COSTO_LOGISTICO}}/g, prices.costoLogistico || '18.000');
 
     // Replace dynamic order placeholders if state is provided
     if (state) {
@@ -55,7 +67,15 @@ function _formatMessage(text, state) {
             formatted = formatted.replace(/{{PLAN}}/g, state.selectedPlan);
         }
         if (state.totalPrice) {
-            formatted = formatted.replace(/{{TOTAL}}/g, state.totalPrice);
+            let displayPrice = state.totalPrice;
+            // If Contra Reembolso MAX, show breakdown
+            if (state.isContraReembolsoMAX && state.adicionalMAX > 0) {
+                const basePriceInt = parseInt(state.totalPrice.replace(/\./g, '')) - state.adicionalMAX;
+                const basePrice = basePriceInt.toLocaleString('es-AR').replace(/,/g, '.'); // Format back to 00.000
+                const adicional = state.adicionalMAX.toLocaleString('es-AR').replace(/,/g, '.');
+                displayPrice = `$${basePrice} + $${adicional}`;
+            }
+            formatted = formatted.replace(/{{TOTAL}}/g, displayPrice);
         }
     }
 
@@ -165,6 +185,34 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             currentState.summary = summaryResult.summary;
             currentState.history = summaryResult.prunedHistory;
             saveState();
+        }
+    }
+
+    // ─────────────────────────────────────────────────
+    // 0. SAFETY CHECK (Priority 0 — HIGHEST)
+    //    If user mentions "hija", "menor", "embarazo", etc. FORCE AI CHECK.
+    // ─────────────────────────────────────────────────
+    const SAFETY_REGEX = /\b(hija|hijo|niñ[oa]s?|menor(es)?|bebe|embaraz[oa]|lactanc?ia|1[0-7]\s*años?)\b/i;
+    if (SAFETY_REGEX.test(normalizedText)) {
+        console.log(`[SAFETY] Potential Red Flag detected: "${text}"`);
+        const safetyCheck = await aiService.chat(text, {
+            step: 'safety_check',
+            goal: 'Verificar si hay contraindicación o riesgo para menor de edad. Si es así, rechazar venta amablemente explicando la razón. Si NO hay riesgo (ej: "tengo un hijo pero es para mí"), responder normalmente.',
+            history: currentState.history,
+            summary: currentState.summary,
+            knowledge: knowledge
+        });
+
+        // If AI detects a safety issue, it will respond with the rejection message.
+        // We trust the AI's judgment here because of the strict system prompt.
+        if (safetyCheck.response) {
+            await sendMessageWithDelay(userId, safetyCheck.response);
+            currentState.history.push({ role: 'bot', content: safetyCheck.response });
+
+            // If the response indicates refusal/prohibition, we should probably pause or stop.
+            // But for now, just replying is enough to break the flow of "giving data".
+            // The AI is instructed to goalMet=false for refusals.
+            return;
         }
     }
 
@@ -425,7 +473,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             if (foundItems.length > 0) {
                 const has60 = foundItems.some(i => i.plan === '60');
                 currentState.isContraReembolsoMAX = has60;
-                currentState.adicionalMAX = has60 ? ADICIONAL_MAX : 0;
+                currentState.adicionalMAX = has60 ? _getAdicionalMAX() : 0;
                 currentState.cart = foundItems;
                 // Confirm with closing
                 const closingNode = knowledge.flow.closing;
@@ -452,10 +500,12 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     plan: selectedPlanId,
                     price: basePrice
                 }];
+                currentState.selectedPlan = selectedPlanId;
+                currentState.selectedProduct = product;
                 // Contra Reembolso MAX: plan 60 has additional charge
                 if (selectedPlanId === '60') {
                     currentState.isContraReembolsoMAX = true;
-                    currentState.adicionalMAX = ADICIONAL_MAX;
+                    currentState.adicionalMAX = _getAdicionalMAX();
                 } else {
                     currentState.isContraReembolsoMAX = false;
                     currentState.adicionalMAX = 0;
@@ -486,6 +536,10 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     // AI detected a plan choice
                     const plan = planAI.extractedData.includes('120') ? '120' : '60';
                     const product = currentState.selectedProduct || "Nuez de la India";
+                    // SAVE STATE for placeholders
+                    currentState.selectedPlan = plan;
+                    currentState.selectedProduct = product;
+
                     currentState.cart = [{
                         product: product,
                         plan: plan,
@@ -624,7 +678,8 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
                 currentState.pendingOrder = { ...addr, cart: currentState.cart };
 
-                currentState.step = 'waiting_admin_ok';
+                // OLD: currentState.step = 'waiting_admin_ok';
+                // NEW: We will transition to final confirmation below
                 saveState();
 
                 // Format Cart for Admin — include Contra Reembolso MAX
@@ -632,12 +687,19 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 const subtotal = currentState.cart.reduce((sum, i) => sum + parseInt(i.price.replace('.', '')), 0);
                 const adicional = currentState.adicionalMAX || 0;
                 const total = subtotal + adicional;
-                const maxLabel = adicional > 0 ? ` + $${adicional.toLocaleString('es-AR')} (MAX)` : '';
+                currentState.totalPrice = total.toLocaleString('es-AR').replace(/,/g, '.'); // Ensure total is saved in state
+                const maxLabel = adicional > 0 ? ` + $${adicional.toLocaleString('es-AR')}` : '';
 
-                await notifyAdmin(`Pedido CASI completo`, userId, `Datos: ${addr.nombre}, ${addr.calle}\nItems: ${cartSummary}\nSubtotal: $${subtotal}${maxLabel}\nTotal: $${total}`);
-                const msg = `¡Gracias por los datos! 🙌 Mi compañero va a revisar tu pedido y te confirma en breve. ¡Ya queda poco!`;
+                await notifyAdmin(`Pedido CASI completo`, userId, `Datos: ${addr.nombre}, ${addr.calle}\nItems: ${cartSummary}\nSubtotal: $${subtotal}${maxLabel}\nTotal: $${currentState.totalPrice}`);
+
+                // Send Confirmation Summary directly
+                const confirmationNode = knowledge.flow.confirmation;
+                const msg = _formatMessage(confirmationNode.response, currentState);
                 await sendMessageWithDelay(userId, msg);
+
+                currentState.step = 'waiting_final_confirmation';
                 currentState.history.push({ role: 'bot', content: msg });
+                saveState();
                 matched = true;
             } else if (currentState.addressAttempts >= 3) {
                 // Too many attempts — pause and alert admin
@@ -645,7 +707,12 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 await _pauseAndAlert(userId, currentState, dependencies, text, `Cliente no logra dar dirección completa. Faltan: ${missing.join(', ')}`);
                 matched = true;
             } else {
-                const msg = `Gracias! Ya tengo algunos datos. Solo me falta: *${missing.join(', ')}*. ¿Me los pasás?`;
+                let msg;
+                if (missing.length >= 3) {
+                    msg = `Para prepararte el envío necesito que me pases: Nombre completo, Calle y número, Ciudad y Código postal.`;
+                } else {
+                    msg = `Gracias! Ya tengo algunos datos. Solo me falta: *${missing.join(', ')}*. ¿Me los pasás?`;
+                }
                 await sendMessageWithDelay(userId, msg);
                 currentState.history.push({ role: 'bot', content: msg });
                 matched = true;
@@ -653,51 +720,42 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             break;
         }
 
-        case 'waiting_legal_acceptance': {
-            const boundaryStart = '(?<!\\p{L})';
-            const boundaryEnd = '(?![\\p{L}\\p{M}])';
-            const acceptance = new RegExp(`${boundaryStart}(leí|lei)${boundaryEnd}`, 'ui').test(lowerText) &&
-                new RegExp(`${boundaryStart}acepto${boundaryEnd}`, 'ui').test(lowerText) &&
-                new RegExp(`${boundaryStart}condiciones${boundaryEnd}`, 'ui').test(lowerText);
-
-            if (acceptance) {
-                const msg = "Tu envío está en curso, gracias";
+        case 'waiting_final_confirmation': {
+            if (_isAffirmative(normalizedText) || /\b(si|dale|ok|listo|confirmo|correcto|acepto|bueno|joya|de una)\b/i.test(normalizedText)) {
+                // FINAL SUCCESS
+                const msg = "¡Excelente! Tu pedido ya fue ingresado 🚀\n\nTe vamos a avisar cuando lo despachemos con el número de seguimiento.\n\n¡Muchas gracias por confiar en Herbalis!";
                 await sendMessageWithDelay(userId, msg);
 
                 // Save Order
                 if (currentState.pendingOrder) {
                     const o = currentState.pendingOrder;
                     const cart = o.cart || [];
-
-                    // Flatten Cart for Sheet/Log
                     const prodStr = cart.map(i => i.product).join(' + ');
                     const planStr = cart.map(i => `${i.plan} días`).join(' + ');
-                    const finalPrice = cart.reduce((sum, i) => sum + parseInt(i.price.replace('.', '')), 0);
+                    const finalPrice = currentState.totalPrice || "0";
 
                     const orderData = {
                         cliente: userId,
                         nombre: o.nombre, calle: o.calle, ciudad: o.ciudad, cp: o.cp,
                         producto: prodStr,
                         plan: planStr,
-                        precio: finalPrice.toString()
+                        precio: finalPrice
                     };
 
                     if (dependencies.saveOrderToLocal) dependencies.saveOrderToLocal(orderData);
                     appendOrderToSheet(orderData).catch(e => console.error('🔴 [SHEETS] Async log failed:', e.message));
-                    await notifyAdmin(`✅ PEDIDO CONFIRMADO y ACEPTADO`, userId, `Cliente aceptó condiciones.`);
+                    await notifyAdmin(`✅ PEDIDO CONFIRMADO`, userId, `Cliente confirmó envío.\nTotal: $${finalPrice}`);
                 }
 
                 currentState.step = 'completed';
+                currentState.history.push({ role: 'bot', content: msg });
                 saveState();
                 matched = true;
-            } else if (/\b(ok|listo|sisi|si|vale|acepto|lei)\b/.test(lowerText)) {
-                // Close but not exact — guide them
-                const msg = "Por favor, para confirmar necesito que escribas textual: \u201CLEÍ Y ACEPTO LAS CONDICIONES DE ENVÍO\u201D";
-                await sendMessageWithDelay(userId, msg);
-                currentState.history.push({ role: 'bot', content: msg });
+            } else if (_isNegative(normalizedText)) {
+                // User cancel at the very end??
+                await _pauseAndAlert(userId, currentState, dependencies, text, 'Cliente canceló en confirmación final.');
                 matched = true;
             }
-            // If no match at all → will trigger pause+alert below
             break;
         }
 
@@ -748,10 +806,10 @@ async function _pauseAndAlert(userId, currentState, dependencies, userMessage, r
         saveState();
     }
 
-    // Send a polite hold message
-    const holdMsg = "Un momento por favor, te comunico con un asesor para que te ayude mejor 😊";
-    await sendMessageWithDelay(userId, holdMsg);
-    currentState.history.push({ role: 'bot', content: holdMsg });
+    // Send a polite hold message — SILENCED PER USER REQUEST
+    // const holdMsg = "Un momento por favor, te comunico con un asesor para que te ayude mejor 😊";
+    // await sendMessageWithDelay(userId, holdMsg);
+    // currentState.history.push({ role: 'bot', content: holdMsg });
 
     // Alert admin
     await notifyAdmin(

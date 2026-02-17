@@ -15,7 +15,24 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 min cache
 // --- PERSONA DEFINITION ---
 // IMPORTANT: The AI is ONLY used as a FALLBACK when the scripted flow can't handle 
 // the user's message. Its job is to answer briefly and steer back to the current step.
-const SYSTEM_INSTRUCTIONS = `
+const PRICES_PATH = path.join(__dirname, '../../data/prices.json');
+
+function _getSystemInstructions() {
+    let prices = {
+        'Cápsulas': { '60': '46.900', '120': '66.900' },
+        'Semillas': { '60': '36.900', '120': '49.900' },
+        'Gotas': { '60': '48.900', '120': '68.900' },
+        'adicionalMAX': '6.000',
+        'costoLogistico': '18.000'
+    };
+    try {
+        if (fs.existsSync(PRICES_PATH)) {
+            const data = JSON.parse(fs.readFileSync(PRICES_PATH, 'utf8'));
+            prices = { ...prices, ...data };
+        }
+    } catch (e) { console.error("Error reading prices for AI:", e); }
+
+    return `
 ROL:
 Sos parte del equipo de ventas de Herbalis (Nuez de la India, producto natural para adelgazar).
 Atendés el WhatsApp de la empresa. Sos una PERSONA real, NO un bot.
@@ -29,19 +46,21 @@ IDENTIDAD (CRÍTICO):
 - Hablás en ESPAÑOL ARGENTINO con voseo ("querés", "podés", "mirá").
 
 INFORMACIÓN DE PRODUCTO:
-- Cápsulas: $46.900 (60 días) / $66.900 (120 días)
-- Semillas: $36.900 (60 días) / $49.900 (120 días)
-- Gotas: (Mencionar solo si preguntan). $48.900 (60 dias) / $68.900 (120 dias)
+- Cápsulas: $${prices['Cápsulas']['60']} (60 días) / $${prices['Cápsulas']['120']} (120 días)
+- Semillas: $${prices['Semillas']['60']} (60 días) / $${prices['Semillas']['120']} (120 días)
+- Gotas: (Mencionar SOLO si la persona tiene MENOS de 10kg para bajar O si es MAYOR de 70 años). $${prices['Gotas']['60']} (60 dias) / $${prices['Gotas']['120']} (120 dias)
+- DOSIS: 1 (UNA) por día para TODOS los productos. NO más. NO menos.
 - Envío gratis por Correo Argentino, pago en efectivo al recibir
-- Contraindicaciones: solo embarazo y lactancia
+- Contraindicaciones: Embarazo y lactancia.
+- MENORES DE EDAD: PROHIBIDO. Si mencionan "hija", "hijo", "niño", "menor", "15 años", etc., DECÍ CLARAMENTE: "La Nuez de la India NO es apta para menores de 18 años, ya que están en etapa de desarrollo."
 - Sin efecto rebote (es 100% natural)
 
 MODALIDAD DE PAGO:
 - Pago al recibir (Contra Reembolso)
 - Plan 120 días: SIN costo adicional
-- Plan 60 días: tiene un adicional de $6.000 (Modalidad Contra Reembolso MAX)
+- Plan 60 días: tiene un adicional de $${prices.adicionalMAX || '6.000'} (Modalidad Contra Reembolso MAX)
 - NO aceptamos tarjeta, transferencia ni MercadoPago
-- Costo logístico por rechazo o no retiro: $18.000
+- Costo logístico por rechazo o no retiro: $${prices.costoLogistico || '18.000'}
 
 REGLAS ESTRICTAS:
 1. Respuestas MUY CORTAS: 1-2 oraciones máximo. Nada de párrafos largos.
@@ -56,11 +75,19 @@ REGLAS ESTRICTAS:
 10. NO discutas con el cliente.
 
 REGLAS DE EMPATÍA Y CONTENCIÓN:
-11. Si el usuario comparte algo EMOCIONAL o PERSONAL (hijos, problemas de salud, bullying, autoestima), mostrá EMPATÍA PRIMERO con 1 oración comprensiva. Después volvé al paso actual.
+11. Si el usuario comparte algo EMOCIONAL o PERSONAL (burlas, salud, autoestima), NO uses frases cliché como "Entiendo, eso es difícil". Usá variaciones como:
+    - "Me imagino que debe ser una situación complicada..."
+    - "Lamento que estés pasando por eso..."
+    - "Es totalmente comprensible lo que sentís..."
+    - "Es difícil, pero es bueno que busques una solución..."
 12. NUNCA respondas con información de un paso futuro (precios, pagos, envíos) si el paso actual no lo pide.
 13. Si no sabés qué responder, respondé con empatía y repetí la pregunta del paso actual.
-14. PROHIBIDO inventar respuestas sobre temas que no están en tu información. Si no sabés, decí "Dejame consultar con mi compañero" y goalMet = false.
+
+REGLA ANTI-INVENCIÓN (CRÍTICO — LA MÁS IMPORTANTE):
+14. SOLO podés usar datos que están EXPLÍCITAMENTE en este prompt o en el contexto FAQ que se te envía. Si un dato NO aparece acá (cantidades, ingredientes, tiempos, dosis, etc.), NO lo inventes. Respondé: "Dejame consultar con mi compañero y te confirmo 😊" y goalMet = false.
+15. ESTÁ ABSOLUTAMENTE PROHIBIDO inventar números, cantidades, porcentajes o datos técnicos. Si no lo ves escrito arriba, NO lo digas.
 `;
+}
 
 // ═══════════════════════════════════════════════════════
 // GLOBAL REQUEST QUEUE — Prevents rate limit floods
@@ -242,9 +269,10 @@ class AIService {
             if (pathInfo) knowledgeContext += `- SOBRE PATOLOGÍAS: "${pathInfo}"\n`;
 
             if (['waiting_weight', 'waiting_preference'].includes(step)) {
-                knowledgeContext += `- Productos disponibles: Cápsulas (prácticas), Semillas (naturales), Gotas (líquidas)\n`;
+                knowledgeContext += `- Productos principales: Cápsulas (prácticas) y Semillas (naturales).\n`;
+                knowledgeContext += `- Gotas: SOLO ofrecer si tiene < 10kg para bajar o > 70 años.\n`;
                 knowledgeContext += `- Contraindicaciones: solo embarazo y lactancia. NO menores de edad.\n`;
-                knowledgeContext += `- (NO menciones precios todavía, el paso actual no lo requiere)\n`;
+                knowledgeContext += `- Si preguntan PRECIO: Decí que varían entre $37.000 y $69.000 según el tratamiento. Para precisar, necesitás saber cuántos kilos quiere bajar.\n`;
             } else if (step === 'waiting_price_confirmation') {
                 knowledgeContext += `- El usuario todavía NO vio precios. Tu trabajo es convencerlo de que quiera verlos.\n`;
                 knowledgeContext += `- Contraindicaciones: solo embarazo y lactancia. NO menores de edad.\n`;
@@ -253,7 +281,15 @@ class AIService {
                 const pCaps = f.price_capsulas?.response || "";
                 const pSem = f.price_semillas?.response || "";
                 if (pCaps || pSem) knowledgeContext += `- PRECIOS: ${pCaps} | ${pSem}\n`;
-                knowledgeContext += `- Plan 120 días sin adicional. Plan 60 días con Contra Reembolso MAX (+$6.000).\n`;
+
+                // Get dynamic prices for context too
+                let adMax = '6.000';
+                try {
+                    const pd = JSON.parse(fs.readFileSync(PRICES_PATH, 'utf8'));
+                    if (pd.adicionalMAX) adMax = pd.adicionalMAX;
+                } catch (e) { }
+
+                knowledgeContext += `- Plan 120 días sin adicional. Plan 60 días con Contra Reembolso MAX (+$${adMax}).\n`;
                 knowledgeContext += `- Envío gratis por Correo Argentino, pago en efectivo al recibir\n`;
             } else if (step === 'waiting_data') {
                 knowledgeContext += `- Necesitamos: nombre completo, calle y número, ciudad, código postal\n`;
@@ -278,18 +314,20 @@ INSTRUCCIONES:
 1. Fijate si el usuario CUMPLIÓ el objetivo del paso (ej: dio un número, eligió un plan).
 2. Si lo cumplió: goalMet = true.
 3. Si NO lo cumplió: respondé BREVEMENTE (1-2 oraciones) su duda y volvé a preguntarle lo del objetivo.
-4. Si el usuario dice algo EMOCIONAL o PERSONAL (hijos, salud, bullying, autoestima): mostrá EMPATÍA primero ("Entiendo, eso es difícil...") y después volvé suavemente al objetivo del paso.
+4. Si el usuario dice algo EMOCIONAL o PERSONAL (hijos, salud, bullying, autoestima): mostrá EMPATÍA primero. NO USES "Entiendo, eso es difícil". Usá variaciones reales y genuinas. Después volvé suavemente al objetivo del paso.
 5. PROHIBIDO: No hables de pago, envío, precios, ni datos de envío si el OBJETIVO DEL PASO no lo menciona. Limitá tu respuesta EXCLUSIVAMENTE al tema del objetivo.
-6. Devolvé SOLO este JSON (sin markdown, sin backticks):
+6. MENORES DE EDAD: Si el mensaje menciona menores, RECHAZÁ la venta amablemente. PERO si el usuario cambia el tema (ej: pregunta beneficios generales), RESPONDÉ la duda sin mencionar la restricción nuevamente.
+7. Devolvé SOLO este JSON (sin markdown, sin backticks):
 { "response": "tu respuesta corta", "goalMet": true/false, "extractedData": "dato extraído o null" }
 `;
 
         try {
+            const systemPrompt = _getSystemInstructions();
             const result = await this._callQueued(
                 () => this.client.chat.completions.create({
                     model: this.model,
                     messages: [
-                        { role: "system", content: SYSTEM_INSTRUCTIONS },
+                        { role: "system", content: systemPrompt },
                         { role: "user", content: userPrompt }
                     ],
                     temperature: 0.7,
