@@ -1,8 +1,8 @@
 {
     "meta": {
-        "name": "Guión V3 — Profesional + Contra Reembolso MAX",
-        "description": "Guión profesional con estructura de árbol de decisiones, Contra Reembolso MAX para planes de 60 días, y FAQ expandida.",
-        "version": "3.0"
+        "name": "Guión V4 — Psicología de Ventas (Agresivo)",
+        "description": "Guión optimizado con autoridad, anclaje de precios y escasez.",
+        "version": "4.0"
     },
     "flow": {
         "greeting": {
@@ -21,12 +21,12 @@
                 "costo",
                 "gotas"
             ],
-            "response": "¡Hola! 😊\n\nLos tratamientos con Nuez de la India están entre $37.000 y $69.000,\nsegún duración y formato.\n\nTrabajamos hace más de 13 años con:\n✔ Cápsulas\n✔ Gotas\n✔ Semillas\n\n📦 Enviamos a todo el país\n🛍️ Pago al recibir\n\nPara recomendarte bien:\n¿Buscás bajar hasta 10 kg, entre 10 y 20 kg o más de 20 kg?",
+            "response": "¡Hola! 👋 Te cuento, somos *Herbalis*, especialistas en descenso de peso natural hace *13 años*. Ya ayudamos a más de *15.000 personas* a lograr su objetivo.\n\nLos tratamientos rondan entre $37.000 y $69.000 (según duración), pero para recomendarte el ideal para vos:\n¿Qué buscás bajar? ¿Hasta 10 kg, entre 10 y 20 kg o más?",
             "nextStep": "waiting_weight"
         },
         "recommendation": {
             "step": "waiting_weight",
-            "response": "Perfecto 👌\n\nEse objetivo es totalmente posible.\n\n¿Preferís algo súper práctico (cápsulas o gotas)\no más natural (semillas)?",
+            "response": "Genial 👌\n\nQuedate tranqui que ese objetivo es re posible.\n\n¿Te queda más cómodo algo súper práctico (cápsulas o gotas)\no preferís lo más natural y tradicional (semillas)?",
             "nextStep": "waiting_preference"
         },
         "preference_capsulas": {
@@ -40,7 +40,7 @@
                 "practica",
                 "1"
             ],
-            "response": "Genial 👍 Cápsulas es la mejor opción para vos.\n\n💊 Se toman:\n• 1 cápsula por día\n• 30 min antes del almuerzo o la cena\n\nTenés dos opciones:\n\n🔹 60 días → ${{PRICE_CAPSULAS_60}}\n🔹 120 días → ${{PRICE_CAPSULAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl plan de 120 días permite pagar 100% al recibir SIN costo adicional.\nEl plan de 60 días con pago al recibir tiene un adicional de $6.000 (Modalidad MAX).\n\n👉 ¿Avanzamos con 60 o 120 días?",
+            "response": "Dale, buenísimo 👍 Cápsulas es lo más práctico que hay.\n\n💊 Se toman así:\n• 1 cápsula por día\n• 30 min antes de cenar\n\nMirá, tenés dos opciones para tu objetivo:\n\n🏆 *OPCIÓN RECOMENDADA (120 días)*: Hacés el tratamiento completo y te asegurás el resultado.\n💲 *$68.900* (Te queda en *$574 por día* — ¡Menos que un alfajor!)\n*Beneficio: Envío Gratis + Pagás al recibir SIN recargo.*\n\n🔸 *OPCIÓN INICIO (60 días)*:\n💲 *$48.900* (+ $6.000 de recargo administrativo por cobro en domicilio).\n\n👉 ¿Querés asegurar resultado con el de 120 o preferís probar con 60?",
             "nextStep": "waiting_plan_choice"
         },
         "preference_semillas": {
@@ -54,7 +54,7 @@
                 "natural",
                 "tradicional"
             ],
-            "response": "Genial 🌿 La semilla en estado natural es la opción más elegida.\n\nSe consume en forma de infusión cada noche.\n\n🔹 60 días → ${{PRICE_SEMILLAS_60}}\n🔹 120 días → ${{PRICE_SEMILLAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl plan de 120 días permite pago al recibir sin costo adicional.\nEl plan de 60 días con pago al recibir tiene un adicional de $6.000.\n\n👉 ¿Avanzamos con 60 o 120 días?",
+            "response": "Dale, buenísimo 🌿 La semilla natural es la clásica, súper potente.\n\nSe prepara como una infusión a la noche, re fácil.\n\nMirá, tenés dos opciones:\n\n🏆 *OPCIÓN RECOMENDADA (120 días)*: Tratamiento completo.\n💲 *$68.900* (Te queda en *$574 por día*)\n*Beneficio: Envío Gratis + Pagás al recibir SIN recargo.*\n\n🔸 *OPCIÓN INICIO (60 días)*:\n💲 *$48.900* (+ $6.000 de recargo administrativo).\n\n💡 *Tip: Si llevás 3 unidades (para amigas/os), tenés 30% DE DESCUENTO.*\n\n👉 ¿Le metemos con 120 o arrancamos con 60?",
             "nextStep": "waiting_plan_choice"
         },
         "preference_gotas": {
@@ -64,22 +64,22 @@
                 "liquido",
                 "gotero"
             ],
-            "response": "Genial 🌿 Las gotas son prácticas y discretas.\n\n🔹 60 días → ${{PRICE_GOTAS_60}}\n🔹 120 días → ${{PRICE_GOTAS_120}}\n\n� Envío gratis a todo el país.\n\nImportante 👇\nEl plan de 120 días permite pago al recibir sin costo adicional.\nEl plan de 60 días con pago al recibir tiene un adicional de $6.000.\n\n👉 ¿Avanzamos con 60 o 120 días?",
+            "response": "Dale, buenísimo 🌿 Las gotas son discretas y se absorben rápido.\n\nMirá, tenés dos opciones:\n\n🏆 *OPCIÓN RECOMENDADA (120 días)*\n💲 *$68.900* (Te queda en *$574 por día*)\n*Beneficio: Envío Gratis + Pagás al recibir SIN recargo.*\n\n🔸 *OPCIÓN INICIO (60 días)*:\n💲 *$48.900* (+ $6.000 de recargo administrativo).\n\n👉 ¿Le metemos con 120 o arrancamos con 60?",
             "nextStep": "waiting_plan_choice"
         },
         "price_capsulas": {
             "step": "waiting_price_confirmation",
-            "response": "💊 CÁPSULAS:\n\n🔹 Plan 60 días → ${{PRICE_CAPSULAS_60}}\n🔹 Plan 120 días → ${{PRICE_CAPSULAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl plan de 120 días permite pagar 100% al recibir SIN costo adicional.\nEl plan de 60 días con pago al recibir tiene un adicional de $6.000 (Modalidad MAX).\n\n👉 ¿Avanzamos con 60 o 120 días?",
+            "response": "💊 CÁPSULAS:\n\n🏆 *Plan 120 días* → *$68.900* (Envío Gratis + Sin Recargo)\n🔸 *Plan 60 días* → *$48.900* (+ $6.000 recargo)\n\n👉 ¿Con cuál avanzamos?",
             "nextStep": "waiting_plan_choice"
         },
         "price_semillas": {
             "step": "waiting_price_confirmation",
-            "response": "🌱 SEMILLAS:\n\n🔹 Plan 60 días → ${{PRICE_SEMILLAS_60}}\n🔹 Plan 120 días → ${{PRICE_SEMILLAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl plan de 120 días permite pago al recibir sin costo adicional.\nEl plan de 60 días con pago al recibir tiene un adicional de $6.000.\n\n👉 ¿Avanzamos con 60 o 120 días?",
+            "response": "🌱 SEMILLAS:\n\n🏆 *Plan 120 días* → *$68.900* (Envío Gratis + Sin Recargo)\n🔸 *Plan 60 días* → *$48.900* (+ $6.000 recargo)\n\n👉 ¿Con cuál avanzamos?",
             "nextStep": "waiting_plan_choice"
         },
         "price_gotas": {
             "step": "waiting_price_confirmation",
-            "response": "💧 GOTAS:\n\n🔹 Plan 60 días → ${{PRICE_GOTAS_60}}\n🔹 Plan 120 días → ${{PRICE_GOTAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl plan de 120 días permite pago al recibir sin costo adicional.\nEl plan de 60 días con pago al recibir tiene un adicional de $6.000.\n\n👉 ¿Avanzamos con 60 o 120 días?",
+            "response": "💧 GOTAS:\n\n🏆 *Plan 120 días* → *$68.900* (Envío Gratis + Sin Recargo)\n🔸 *Plan 60 días* → *$48.900* (+ $6.000 recargo)\n\n👉 ¿Con cuál avanzamos?",
             "nextStep": "waiting_plan_choice"
         },
         "closing": {
@@ -93,7 +93,7 @@
                 "bueno",
                 "ok"
             ],
-            "response": "Perfecto 👍\n\nTomamos los datos para el envío 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(La dirección debe ser exacta, sin esquinas ni \"aprox\")",
+            "response": "¡Excelente decisión! 🎉\n\nChe, voy a *separar tu stock* ahora mismo así sale en el próximo despacho.\n\nPara confirmarlo, pasame por favor:\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(Fijate que la dirección sea exacta, sin esquinas ni \"aprox\" 🙏)",
             "nextStep": "waiting_data"
         },
         "data_request": {
@@ -107,12 +107,12 @@
                 "de una",
                 "esta bien"
             ],
-            "response": "Tomamos los datos para el envío 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(La dirección debe ser exacta, sin esquinas ni \"aprox\")",
+            "response": "¡Genial! Tomamos los datos para separar tu pedido 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(Fijate que la dirección sea exacta, sin esquinas ni \"aprox\" 🙏)",
             "nextStep": "waiting_data"
         },
         "confirmation": {
             "step": "waiting_data",
-            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT}}\nPlan: {{PLAN}} días\nTotal a pagar al recibir: {{TOTAL}}\n\n✔ Correo Argentino\n✔ Entrega estimada: 7 a 10 días hábiles\n✔ Pago en efectivo al recibir\n\nImportante:\nSi el cartero no encuentra a nadie,\nel correo puede solicitar retiro en sucursal.\nPlazo: 72 hs.\n\nEl rechazo o no retiro genera un costo logístico de ${{COSTO_LOGISTICO}}.\n\n👉 Confirmame que podrás recibir o retirar el pedido sin inconvenientes.",
+            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT}}\nPlan: {{PLAN}} días\nTotal a pagar al recibir: {{TOTAL}}\n\n✔ Correo Argentino\n✔ Entrega estimada: 7 a 10 días hábiles\n✔ Pago en efectivo al recibir\n\nImportante:\nSi el cartero no encuentra a nadie,\nel correo puede solicitar retiro en sucursal.\nPlazo: 72 hs.\n\nEl rechazo o no retiro genera un costo logístico de ${{COSTO_LOGISTICO}}.\n\n👉 Confirmame con un \"SÍ\" o un \"DALE\" para despachar YA mismo.",
             "nextStep": "completed"
         }
     },

@@ -46,50 +46,85 @@ const CommsView = () => {
                 setChats([]);
             }
         };
+
         fetchChats();
 
         if (socket) {
-            socket.on('receive_message', (data) => {
-                if (selectedChat && data.chatId === selectedChat.id) {
-                    setMessages(prev => [...prev, data.message]);
-                }
-                setChats(prev => prev.map(c =>
-                    c.id === data.chatId
-                        ? { ...c, lastMessage: data.message.body, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), unread: (selectedChat && selectedChat.id === data.chatId) ? 0 : (c.unread || 0) + 1 }
-                        : c
-                ));
-            });
+            // Listen for new messages (logAndEmit from backend)
+            socket.on('new_log', (data) => {
+                try {
+                    if (!data || !data.chatId) return;
+                    console.log("[SOCKET] Received new_log:", data);
 
-            socket.on('message_sent', (data) => {
-                if (selectedChat && data.chatId === selectedChat.id) {
-                    // Deduplicate: skip if already added optimistically from handleSend/handleSendScriptStep
-                    setMessages(prev => {
-                        const isDupe = prev.some(m =>
-                            m.fromMe && m.body === data.message.body &&
-                            Math.abs((m.timestamp || 0) - (data.message.timestamp || 0)) < 5000
-                        );
-                        return isDupe ? prev : [...prev, data.message];
+                    let timestamp = Date.now();
+                    if (data.timestamp) {
+                        const parsed = new Date(data.timestamp).getTime();
+                        if (!isNaN(parsed)) timestamp = parsed;
+                    }
+
+                    // 1. Update active chat messages
+                    if (selectedChat && selectedChat.id === data.chatId) {
+                        const isMe = data.sender === 'bot' || data.sender === 'admin';
+                        const newMsg = {
+                            fromMe: isMe,
+                            body: data.text || '',
+                            type: 'chat',
+                            timestamp: timestamp
+                        };
+                        setMessages((prev) => {
+                            // Avoid duplicates if possible
+                            if (!Array.isArray(prev)) return [newMsg];
+                            const exists = prev.some(m => m.timestamp === timestamp && m.body === newMsg.body);
+                            if (exists) return prev;
+                            return [...prev, newMsg];
+                        });
+                    }
+
+                    // 2. Update chat list preview
+                    setChats((prev) => {
+                        if (!Array.isArray(prev)) return [];
+                        const existingChat = prev.find((c) => c.id === data.chatId);
+                        if (existingChat) {
+                            return prev.map((c) =>
+                                c.id === data.chatId
+                                    ? {
+                                        ...c,
+                                        lastMessage: {
+                                            body: data.text || '',
+                                            timestamp: timestamp,
+                                        },
+                                        unreadCount: selectedChat?.id === data.chatId ? 0 : (c.unreadCount || 0) + 1,
+                                        time: new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                    }
+                                    : c
+                            );
+                        } else {
+                            return prev;
+                        }
                     });
+                } catch (err) {
+                    console.error("[SOCKET] Error processing new_log:", err);
                 }
-                setChats(prev => prev.map(c =>
-                    c.id === data.chatId
-                        ? { ...c, lastMessage: `Tú: ${data.message.body}`, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
-                        : c
-                ));
             });
 
-            socket.on('bot_status_change', ({ chatId, paused }) => {
-                setChats(prev => prev.map(c => c.id === chatId ? { ...c, isPaused: paused } : c));
-                if (selectedChat && selectedChat.id === chatId) {
-                    setSelectedChat(prev => ({ ...prev, isPaused: paused }));
-                }
+            // Update bot status
+            socket.on('bot_status_change', (data) => {
+                try {
+                    if (!data) return;
+                    const { chatId, paused } = data;
+                    setChats((prev) =>
+                        Array.isArray(prev) ? prev.map((c) => (c.id === chatId ? { ...c, isPaused: paused } : c)) : []
+                    );
+                    if (selectedChat && selectedChat.id === chatId) {
+                        setSelectedChat((prev) => ({ ...prev, isPaused: paused }));
+                    }
+                } catch (err) { console.error("[SOCKET] Error processing bot_status_change:", err); }
             });
         }
 
         return () => {
             if (socket) {
-                socket.off('receive_message');
-                socket.off('message_sent');
+                socket.off('new_log');
                 socket.off('bot_status_change');
             }
         };
@@ -297,7 +332,7 @@ const CommsView = () => {
                                         <h3 className={`font-semibold text-sm truncate ${selectedChat?.id === chat.id ? 'text-blue-700' : 'text-slate-700'}`}>{chat.name}</h3>
                                         <span className="text-[10px] text-slate-400 font-medium font-mono">{chat.time}</span>
                                     </div>
-                                    <p className="text-xs text-slate-500 truncate font-medium">{chat.lastMessage || 'Sin mensajes'}</p>
+                                    <p className="text-xs text-slate-500 truncate font-medium">{chat.lastMessage?.body || (typeof chat.lastMessage === 'string' ? chat.lastMessage : '') || 'Sin mensajes'}</p>
                                 </div>
                                 {chat.unread > 0 && (
                                     <div className="flex flex-col justify-center items-end">
@@ -443,7 +478,12 @@ const CommsView = () => {
                                             }`}>
                                             {renderMessageBody(msg)}
                                             <span className={`text-[10px] block text-right mt-1 font-mono opacity-80 ${msg.fromMe ? 'text-blue-100' : 'text-slate-400'}`}>
-                                                {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                {(() => {
+                                                    try {
+                                                        const d = new Date(msg.timestamp);
+                                                        return isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                                    } catch (e) { return ''; }
+                                                })()}
                                             </span>
                                         </div>
                                     </div>

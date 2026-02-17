@@ -95,7 +95,12 @@ const SettingsView = ({ status }) => {
         try {
             await api.post('/api/script/switch', { script });
             setActiveScript(script);
-            const labels = { 'v1': 'Original', 'v2': 'V2 — Empático', 'v3': 'V3 — Profesional' };
+            const labels = {
+                'v1': 'Original',
+                'v2': 'V2 — Empático',
+                'v3': 'V3 — Profesional',
+                'v4': 'V4 — Psicología (Agresivo)'
+            };
             toast.success(`Guión cambiado a ${labels[script] || script}`);
         } catch (e) {
             toast.error('Error al cambiar el guión: ' + (e.response?.data?.error || e.message));
@@ -280,19 +285,27 @@ const SettingsView = ({ status }) => {
                     </h3>
                     <p className="text-sm text-slate-500 mb-4">Guión activo para todas las conversaciones.</p>
 
-                    <div className="flex gap-2">
-                        <div className="flex-1 px-4 py-3 rounded-lg text-sm font-bold border-2 bg-amber-50 border-amber-500 text-amber-700 shadow-sm flex flex-col items-center">
-                            <div className="flex items-center justify-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-                                🔥 Guión Profesional
-                            </div>
-                            <div className="text-xs font-normal mt-1 opacity-70">Con Contra Reembolso MAX</div>
-                            <div
-                                onClick={() => handleDownloadScript('v3', 'Guión Profesional')}
-                                className="mt-2 text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded hover:bg-amber-200 transition cursor-pointer"
-                            >
-                                ⬇️ Descargar PDF
-                            </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        {/* V3: Standard */}
+                        <div
+                            onClick={() => handleSwitchScript('v3')}
+                            className={`p-4 rounded-lg border-2 cursor-pointer transition-all flex flex-col items-center text-center ${activeScript === 'v3' ? 'bg-blue-50 border-blue-500 shadow-md transform scale-105' : 'bg-white border-slate-200 hover:border-blue-300 opacity-80'}`}
+                        >
+                            <div className={`w-3 h-3 rounded-full mb-2 ${activeScript === 'v3' ? 'bg-blue-500 animate-pulse' : 'bg-slate-300'}`}></div>
+                            <h4 className={`font-bold text-sm ${activeScript === 'v3' ? 'text-blue-700' : 'text-slate-600'}`}>Guión V3 (Estándar)</h4>
+                            <p className="text-xs text-slate-500 mt-1">Profesional y directo. Ideal para empezar.</p>
+                            {activeScript === 'v3' && <span className="mt-2 text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded">ACTIVO</span>}
+                        </div>
+
+                        {/* V4: Psychology */}
+                        <div
+                            onClick={() => handleSwitchScript('v4')}
+                            className={`p-4 rounded-lg border-2 cursor-pointer transition-all flex flex-col items-center text-center ${activeScript === 'v4' ? 'bg-violet-50 border-violet-500 shadow-md transform scale-105' : 'bg-white border-slate-200 hover:border-violet-300 opacity-80'}`}
+                        >
+                            <div className={`w-3 h-3 rounded-full mb-2 ${activeScript === 'v4' ? 'bg-violet-500 animate-pulse' : 'bg-slate-300'}`}></div>
+                            <h4 className={`font-bold text-sm ${activeScript === 'v4' ? 'text-violet-700' : 'text-slate-600'}`}>Guión V4 (Psicología)</h4>
+                            <p className="text-xs text-slate-500 mt-1">Autoridad + Escasez. Maximiza conversión.</p>
+                            {activeScript === 'v4' && <span className="mt-2 text-[10px] font-bold bg-violet-100 text-violet-700 px-2 py-0.5 rounded">ACTIVO</span>}
                         </div>
                     </div>
                 </div>

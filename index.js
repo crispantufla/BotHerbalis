@@ -16,7 +16,8 @@ const { startServer } = require('./src/api/server'); // Centralized Server
 const STATE_FILE = path.join(__dirname, 'persistence.json');
 const ORDERS_FILE = path.join(__dirname, 'orders.json');
 const KNOWLEDGE_FILES = {
-    'v3': path.join(__dirname, 'knowledge_v3.json')
+    'v3': path.join(__dirname, 'knowledge_v3.json'),
+    'v4': path.join(__dirname, 'knowledge_v4.json')
 };
 
 // --- STATE MANAGEMENT ---
@@ -135,6 +136,7 @@ const sharedState = {
     saveState,
     saveKnowledge,
     loadKnowledge,
+    reloadKnowledge: loadKnowledge, // Expose this function for the API
     availableScripts: Object.keys(KNOWLEDGE_FILES),
     // Methods will be attached later
     handleAdminCommand: null,

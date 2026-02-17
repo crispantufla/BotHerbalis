@@ -526,13 +526,21 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 console.log(`[AI-FALLBACK] waiting_plan_choice: No plan number detected for ${userId}`);
                 const planAI = await aiService.chat(text, {
                     step: 'waiting_plan_choice',
-                    goal: 'El usuario debe elegir Plan 60 o Plan 120 días. IMPORTANTE: El usuario puede elegir VARIOS planes (ej: "120 capsulas y 60 semillas"). Si pide eso, confirmá que entendiste ambos productos y planes. Si tiene dudas, explicá y repreguntá.',
+                    goal: 'El usuario debe elegir Plan 60 o Plan 120 días. IMPORTANTE: 1) Si elige, goalMet=true. 2) Si CAMBIA de producto (ej: "mejor semillas"), extractedData="CHANGE_PRODUCT:Semillas", goalMet=false, y tu respuesta confirma el cambio y da los precios del nuevo producto. 3) Si duda entre dos, ofrecé llevar AMBOS (sin descuento especial por 2, pero a partir de la 3ra unidad hay 30% OFF).',
                     history: currentState.history,
                     summary: currentState.summary,
                     knowledge: knowledge
                 });
 
-                if (planAI.goalMet && planAI.extractedData) {
+                if (planAI.extractedData && typeof planAI.extractedData === 'string' && planAI.extractedData.startsWith('CHANGE_PRODUCT:')) {
+                    const newProd = planAI.extractedData.split(':')[1].trim();
+                    console.log(`[FLOW-UPDATE] User changed product to: ${newProd}`);
+                    currentState.selectedProduct = newProd;
+                    saveState();
+                    // Fallthrough to send AI response
+                }
+
+                if (planAI.goalMet && planAI.extractedData && !planAI.extractedData.startsWith('CHANGE_PRODUCT:')) {
                     // AI detected a plan choice
                     const plan = planAI.extractedData.includes('120') ? '120' : '60';
                     const product = currentState.selectedProduct || "Nuez de la India";

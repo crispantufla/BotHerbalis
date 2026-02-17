@@ -136,23 +136,43 @@ module.exports = (client, sharedState) => {
             if (io) io.emit('script_changed', { active: script });
 
             console.log(`📋 [SCRIPT] Switched to: ${script}`);
-            res.json({ success: true, active: script });
+            if (!script || !['v1', 'v2', 'v3', 'v4'].includes(script)) {
+                return res.status(400).json({ error: 'Versión de guión inválida' });
+            }
+
+            if (sharedState.reloadKnowledge) {
+                config.activeScript = script;
+                sharedState.reloadKnowledge(script);
+
+                // Notify clients
+                if (io) io.emit('script_changed', { active: script });
+
+                res.json({ success: true, active: script });
+            } else {
+                res.status(500).json({ error: 'Reload function not available' });
+            }
         } catch (e) {
+            console.error("Error switching script:", e);
             res.status(500).json({ error: e.message });
         }
     });
 
-    // GET /script/:version — fetch specific script content
+    // GET /script/:version
     router.get('/script/:version', authMiddleware, (req, res) => {
         try {
             const { version } = req.params;
-            const available = sharedState.availableScripts || ['v3'];
+            const available = ['v1', 'v2', 'v3', 'v4'];
 
             if (!available.includes(version)) {
                 return res.status(404).json({ error: 'Script no encontrado' });
             }
 
-            const filename = 'knowledge_v3.json';
+            // Map version to filename
+            let filename = 'knowledge.json'; // Default v1
+            if (version === 'v2') filename = 'knowledge_v2.json';
+            if (version === 'v3') filename = 'knowledge_v3.json';
+            if (version === 'v4') filename = 'knowledge_v4.json';
+
             const filePath = path.join(__dirname, '../../../', filename);
 
             if (fs.existsSync(filePath)) {
