@@ -10,6 +10,8 @@ const SettingsView = ({ status }) => {
     const { toast, confirm } = useToast();
     const [config, setConfig] = useState({ alertNumber: '' });
     const [saving, setSaving] = useState(false);
+    const [activeScript, setActiveScript] = useState('v1');
+    const [switchingScript, setSwitchingScript] = useState(false);
 
     // Initial Load
     useEffect(() => {
@@ -18,9 +20,21 @@ const SettingsView = ({ status }) => {
                 const confRes = await api.get('/api/status');
                 if (confRes.data.config) setConfig(confRes.data.config);
             } catch (e) { console.error("Error loading settings:", e); }
+            try {
+                const scriptRes = await api.get('/api/script/active');
+                if (scriptRes.data.active) setActiveScript(scriptRes.data.active);
+            } catch (e) { console.error("Error loading script info:", e); }
         };
         fetchData();
     }, []);
+
+    // Listen for script changes from other sessions
+    useEffect(() => {
+        if (!socket) return;
+        const handler = (data) => { if (data.active) setActiveScript(data.active); };
+        socket.on('script_changed', handler);
+        return () => socket.off('script_changed', handler);
+    }, [socket]);
 
     // Handlers
     const handleConfigSave = async () => {
@@ -71,6 +85,111 @@ const SettingsView = ({ status }) => {
         } catch (e) {
             console.error(e);
             toast.error('Error generando el reporte PDF');
+        }
+    };
+
+    const handleSwitchScript = async (script) => {
+        if (script === activeScript || switchingScript) return;
+        setSwitchingScript(true);
+        try {
+            await api.post('/api/script/switch', { script });
+            setActiveScript(script);
+            toast.success(`Guión cambiado a ${script === 'v1' ? 'Original' : 'V2 — Empático'}`);
+        } catch (e) {
+            toast.error('Error al cambiar el guión: ' + (e.response?.data?.error || e.message));
+        }
+        setSwitchingScript(false);
+    };
+
+
+
+    const handleDownloadScript = async (version, label) => {
+        try {
+            toast.info(`Generando PDF para ${label}...`);
+            const res = await api.get(`/api/script/${version}`);
+            const script = res.data;
+
+            const doc = new jsPDF();
+            let y = 20;
+            const lineHeight = 7;
+            const pageHeight = doc.internal.pageSize.height;
+
+            // Helper to add text with auto-page break
+            const addText = (text, size = 10, isBold = false) => {
+                doc.setFontSize(size);
+                doc.setFont("helvetica", isBold ? "bold" : "normal");
+                const splitText = doc.splitTextToSize(text, 180);
+                if (y + (splitText.length * lineHeight) > pageHeight - 20) {
+                    doc.addPage();
+                    y = 20;
+                }
+                doc.text(splitText, 15, y);
+                y += (splitText.length * 5) + 5;
+            };
+
+            // Title
+            addText(`Guión de Ventas - ${label}`, 18, true);
+            y += 5;
+            addText(script.meta?.description || "Sin descripción", 10, false);
+            y += 10;
+            doc.line(15, y, 195, y);
+            y += 10;
+
+            // Define Flow Order
+            const flowOrder = [
+                { key: 'greeting', title: '1. Saludo Inicial' },
+                { key: 'recommendation', title: '2. Pregunta de Peso' },
+                { key: 'preference_capsulas', title: '3A. Opción Cápsulas' },
+                { key: 'preference_semillas', title: '3B. Opción Semillas' },
+                { key: 'preference_gotas', title: '3C. Opción Gotas' },
+                { key: 'price_capsulas', title: '4A. Precio Cápsulas' },
+                { key: 'price_semillas', title: '4B. Precio Semillas' },
+                { key: 'price_gotas', title: '4C. Precio Gotas' },
+                { key: 'closing', title: '5. Cierre / Envío' },
+                { key: 'data_request', title: '6. Pedido de Datos' },
+                { key: 'confirmation', title: '7. Confirmación Final' }
+            ];
+
+            // Render Flow
+            addText("FLUJO DE CONVERSACIÓN", 14, true);
+            y += 5;
+
+            flowOrder.forEach(step => {
+                const item = script.flow[step.key];
+                if (item) {
+                    addText(step.title, 11, true);
+                    if (item.keywords || item.match) {
+                        doc.setFont("courier", "normal");
+                        doc.setFontSize(9);
+                        doc.setTextColor(100);
+                        doc.text(`Keywords: ${(item.keywords || item.match).join(', ')}`, 15, y);
+                        doc.setTextColor(0);
+                        y += 6;
+                    }
+                    addText(item.response, 10, false);
+                    y += 5;
+                }
+            });
+
+            // Render FAQ
+            doc.addPage();
+            y = 20;
+            addText("PREGUNTAS FRECUENTES (FAQ)", 14, true);
+            y += 5;
+
+            if (script.faq && script.faq.length > 0) {
+                script.faq.forEach((item, index) => {
+                    addText(`Q${index + 1}: ${(item.keywords || []).join(', ')}`, 11, true);
+                    addText(item.response, 10, false);
+                    y += 5;
+                });
+            }
+
+            doc.save(`Guion_${version}_${new Date().toISOString().split('T')[0]}.pdf`);
+            toast.success('PDF descargado correctamente');
+        } catch (e) {
+            console.error(e);
+            toast.error('Error generando PDF: ' + (e.response?.data?.error || e.message));
         }
     };
 
@@ -138,7 +257,63 @@ const SettingsView = ({ status }) => {
                     </button>
                 </div>
 
-                {/* 4. Dangerous Zone */}
+                {/* 4. Script Switcher */}
+                <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm">
+                    <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        Guión de Ventas
+                    </h3>
+                    <p className="text-sm text-slate-500 mb-4">Elegí qué guión usa el bot para las conversaciones nuevas. Podés alternar para hacer pruebas A/B.</p>
+
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => handleSwitchScript('v1')}
+                            disabled={switchingScript}
+                            className={`flex-1 px-4 py-3 rounded-lg text-sm font-bold transition-all border-2 ${activeScript === 'v1'
+                                ? 'bg-indigo-50 border-indigo-500 text-indigo-700 shadow-sm'
+                                : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'
+                                }`}
+                        >
+                            <div className="flex items-center justify-center gap-2">
+                                {activeScript === 'v1' && <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>}
+                                📋 Original (V1)
+                            </div>
+                            <div className="text-xs font-normal mt-1 opacity-70">Guión estándar</div>
+                            <div
+                                onClick={(e) => { e.stopPropagation(); handleDownloadScript('v1', 'Guión Original'); }}
+                                className="mt-2 text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded hover:bg-indigo-200 transition"
+                            >
+                                ⬇️ Descargar PDF
+                            </div>
+                        </button>
+                        <button
+                            onClick={() => handleSwitchScript('v2')}
+                            disabled={switchingScript}
+                            className={`flex-1 px-4 py-3 rounded-lg text-sm font-bold transition-all border-2 flex flex-col items-center ${activeScript === 'v2'
+                                ? 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-sm'
+                                : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'
+                                }`}
+                        >
+                            <div className="flex items-center justify-center gap-2">
+                                {activeScript === 'v2' && <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>}
+                                💚 Empático (V2)
+                            </div>
+                            <div className="text-xs font-normal mt-1 opacity-70">Optimizado para accesibilidad</div>
+                            <div
+                                onClick={(e) => { e.stopPropagation(); handleDownloadScript('v2', 'Guión Empático (V2)'); }}
+                                className="mt-2 text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded hover:bg-emerald-200 transition"
+                            >
+                                ⬇️ Descargar PDF
+                            </div>
+                        </button>
+                    </div>
+
+                    {switchingScript && (
+                        <p className="text-xs text-slate-400 mt-2 text-center animate-pulse">Cambiando guión...</p>
+                    )}
+                </div>
+
+                {/* 5. Dangerous Zone */}
                 <div className="bg-white p-6 rounded-lg border border-red-100 shadow-sm relative overflow-hidden md:col-span-2">
                     <div className="absolute top-0 left-0 w-1 h-full bg-red-500"></div>
                     <h3 className="font-bold text-red-700 mb-4 flex items-center gap-2">

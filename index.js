@@ -15,26 +15,37 @@ const { startServer } = require('./src/api/server'); // Centralized Server
 // Paths
 const STATE_FILE = path.join(__dirname, 'persistence.json');
 const ORDERS_FILE = path.join(__dirname, 'orders.json');
-const KNOWLEDGE_FILE = path.join(__dirname, 'knowledge.json');
+const KNOWLEDGE_FILES = {
+    'v1': path.join(__dirname, 'knowledge.json'),
+    'v2': path.join(__dirname, 'knowledge_v2.json')
+};
 
 // --- STATE MANAGEMENT ---
 let knowledge = { flow: {}, faq: [] };
 const userState = {};
+const chatResets = {}; // Tracks timestamp of last history clear per user
 let lastAlertUser = null;
 let pausedUsers = new Set();
 // Variables for API / Dashboard State
 let qrCodeData = null;
 let sessionAlerts = [];
-let config = { alertNumbers: [] };
+let config = { alertNumbers: [], activeScript: 'v1' };
 let isConnected = false;
 
 // --- PERSISTENCE HELPERS ---
-function loadKnowledge() {
+function loadKnowledge(scriptName) {
     try {
-        if (fs.existsSync(KNOWLEDGE_FILE)) {
-            const raw = fs.readFileSync(KNOWLEDGE_FILE);
-            knowledge = JSON.parse(raw);
-            console.log('✅ Knowledge loaded from JSON');
+        const name = scriptName || config.activeScript || 'v1';
+        const filePath = KNOWLEDGE_FILES[name] || KNOWLEDGE_FILES['v1'];
+        if (fs.existsSync(filePath)) {
+            const raw = fs.readFileSync(filePath);
+            const parsed = JSON.parse(raw);
+            // IMPORTANT: Mutate the existing object instead of replacing the reference
+            // This keeps sharedState.knowledge in sync
+            Object.keys(knowledge).forEach(k => delete knowledge[k]);
+            Object.assign(knowledge, parsed);
+            config.activeScript = name;
+            console.log(`✅ Knowledge loaded: ${name} (${path.basename(filePath)})`);
         }
     } catch (e) {
         console.error('🔴 Error loading knowledge:', e.message);
@@ -43,7 +54,8 @@ function loadKnowledge() {
 
 function saveKnowledge() {
     try {
-        atomicWriteFile(KNOWLEDGE_FILE, JSON.stringify(knowledge, null, 2));
+        const filePath = KNOWLEDGE_FILES[config.activeScript] || KNOWLEDGE_FILES['v1'];
+        atomicWriteFile(filePath, JSON.stringify(knowledge, null, 2));
     } catch (e) {
         console.error('🔴 Error saving knowledge:', e.message);
     }
@@ -53,6 +65,7 @@ function saveState() {
     try {
         const stateToSave = {
             userState,
+            chatResets,
             lastAlertUser,
             pausedUsers: Array.from(pausedUsers),
             config
@@ -69,15 +82,26 @@ function loadState() {
             const raw = fs.readFileSync(STATE_FILE);
             const data = JSON.parse(raw);
             Object.assign(userState, data.userState || {});
+            Object.assign(chatResets, data.chatResets || {});
+
             lastAlertUser = data.lastAlertUser || null;
             pausedUsers = new Set(data.pausedUsers || []);
-            config = data.config || { alertNumbers: [] };
+
+            // IMPORTANT: Mutate config instead of replacing reference to keep sharedState sync
+            if (data.config) {
+                // Clear existing keys? Optional, but safer to just assign
+                // Actually, let's just merge. If we want to replace, we should clear.
+                // For this simple config, merging is likely fine, but activeScript MUST be updated.
+                Object.assign(config, data.config);
+            }
+
             // Migrate from old single alertNumber to array
             if (config.alertNumber && !config.alertNumbers) {
                 config.alertNumbers = [config.alertNumber];
                 delete config.alertNumber;
             }
             if (!config.alertNumbers) config.alertNumbers = [];
+
             console.log('✅ State loaded from persistence.json');
         }
     } catch (e) {
@@ -86,8 +110,8 @@ function loadState() {
 }
 
 // Initial Load
-loadKnowledge();
 loadState();
+loadKnowledge();
 
 // --- WHATSAPP CLIENT ---
 const client = new Client({
@@ -102,6 +126,7 @@ const client = new Client({
 // This allows the API server to access and modify the bot's state
 const sharedState = {
     userState,
+    chatResets,
     pausedUsers,
     sessionAlerts,
     config,
@@ -110,6 +135,8 @@ const sharedState = {
     qrCodeData,
     saveState,
     saveKnowledge,
+    loadKnowledge,
+    availableScripts: Object.keys(KNOWLEDGE_FILES),
     // Methods will be attached later
     handleAdminCommand: null,
     logAndEmit: null,
@@ -157,8 +184,8 @@ function saveOrderToLocal(order) {
 
 // Helper: Send with Delay (Improved to satisfy 30-60s requirement)
 const sendMessageWithDelay = async (chatId, content, startTime = Date.now()) => {
-    // Standard human-like delay: 30 to 60 seconds
-    const targetTotalDelay = Math.floor(Math.random() * (60000 - 30000 + 1) + 30000);
+    // Standard human-like delay: 10 to 25 seconds
+    const targetTotalDelay = Math.floor(Math.random() * (25000 - 10000 + 1) + 10000);
 
     // Calculate how much time has already passed (e.g. AI thinking or 429 retries)
     const elapsedSinceStart = Date.now() - startTime;
@@ -168,12 +195,8 @@ const sendMessageWithDelay = async (chatId, content, startTime = Date.now()) => 
 
     console.log(`[DELAY] AI took ${elapsedSinceStart / 1000}s. Waiting ${remainingDelay / 1000}s more (Target: ${targetTotalDelay / 1000}s)`);
 
-    if (userState[chatId]?.lastMessage === content) {
-        const lines = content.split('\n').filter(l => l.trim());
-        content = lines.length > 1 ? lines[lines.length - 1] : '¿Necesitás algo más? 😊';
-    }
-
-    if (userState[chatId]) userState[chatId].lastMessage = content;
+    // Note: duplicate message detection removed — bot can legitimately
+    // need to repeat the same message (e.g. re-prompting after FAQ)
     logAndEmit(chatId, 'bot', content, userState[chatId]?.step);
 
     setTimeout(async () => {
@@ -254,7 +277,7 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false) {
             const o = clientState.pendingOrder;
             const product = clientState.selectedProduct || "Nuez de la India";
             const plan = clientState.selectedPlan || "60";
-            const price = clientState.price || (product.includes("Cápsulas") ? "45.900" : "34.900");
+            const price = clientState.price || "36.900";
 
             const summary = `✅ *PEDIDO CASI LISTO* 😊\n\n📌 *Resumen de tu compra:*\n• Producto: ${product}\n• Plan: ${plan} días\n• Total a pagar: *$${price}* (en efectivo al recibir)\n\n📦 *Envío por Correo Argentino*\n⏳ Demora estimada: 7 a 10 días hábiles\n\n📍 *A tener en cuenta:*\n• Si el cartero no te encuentra, el correo puede pedir retiro en sucursal\n• El plazo de retiro es de 72 hs hábiles\n• Rechazar el pedido genera un costo de $16.500\n\n👉 Para confirmar el despacho respondé por favor: *“LEÍ Y ACEPTO LAS CONDICIONES DE ENVÍO”*`;
             await client.sendMessage(actualTarget, summary);
@@ -421,7 +444,7 @@ client.on('message', async msg => {
                 console.log(`[AUDIO] Transcribed: "${transcription}"`);
                 const startTime = Date.now();
                 await processSalesFlow(userId, transcription, userState, knowledge, {
-                    client, notifyAdmin, saveState, sendMessageWithDelay: (id, text) => sendMessageWithDelay(id, text, startTime), logAndEmit, saveOrderToLocal
+                    client, notifyAdmin, saveState, sendMessageWithDelay: (id, text) => sendMessageWithDelay(id, text, startTime), logAndEmit, saveOrderToLocal, sharedState
                 });
             } else {
                 await client.sendMessage(userId, "Disculpá, no pude escuchar bien el audio. ¿Me lo escribís?");
@@ -444,7 +467,7 @@ client.on('message', async msg => {
     // 4. Process Flow
     const startTime = Date.now();
     await processSalesFlow(userId, msgText, userState, knowledge, {
-        client, notifyAdmin, saveState, sendMessageWithDelay: (id, text) => sendMessageWithDelay(id, text, startTime), logAndEmit, saveOrderToLocal
+        client, notifyAdmin, saveState, sendMessageWithDelay: (id, text) => sendMessageWithDelay(id, text, startTime), logAndEmit, saveOrderToLocal, sharedState
     });
 });
 

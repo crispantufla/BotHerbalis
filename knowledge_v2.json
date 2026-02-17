@@ -1,0 +1,252 @@
+{
+    "meta": {
+        "name": "Guión V2 — Empático + Accesible",
+        "description": "Guión optimizado para clientes de bajos recursos. Lenguaje simple, emojis como guía visual, micro-compromisos, prueba social, riesgo cero.",
+        "version": "2.0"
+    },
+    "flow": {
+        "greeting": {
+            "step": "greeting",
+            "keywords": [
+                "hola",
+                "precio",
+                "info",
+                "buenas",
+                "herbalis",
+                "nuez",
+                "kilos",
+                "bajar"
+            ],
+            "response": "¡Hola! 👋 Qué lindo que nos escribas\n\n🌿 Te cuento: ayudamos a miles de personas a bajar de peso con un producto 100% NATURAL. Sin dietas, sin pasar hambre.\n\n✅ Te lo mandamos a tu casa GRATIS\n✅ Pagás recién cuando lo tenés en la mano\n✅ No necesitás tarjeta ni cuenta bancaria\n\n📝 Para poder ayudarte mejor necesito un datito: ¿cuántos kilos te gustaría bajar más o menos?",
+            "nextStep": "waiting_weight"
+        },
+        "recommendation": {
+            "step": "waiting_weight",
+            "response": "¡Se puede! 💪 Muchas personas como vos ya lo lograron\n\nTenemos 2 opciones:\n\n1️⃣ CÁPSULAS — Tomás 1 pastillita por día y listo, re fácil 💊\n2️⃣ SEMILLAS — La opción más económica y natural 🌱\n\n👉 ¿Cuál te gusta más? Poné 1 o 2",
+            "nextStep": "waiting_preference"
+        },
+        "preference_capsulas": {
+            "step": "waiting_preference",
+            "match": [
+                "capsula",
+                "capsulas",
+                "pastilla",
+                "pastillas",
+                "practico",
+                "practica",
+                "1"
+            ],
+            "response": "Genial 💊 Las cápsulas son lo más fácil: tomás 1 por día antes de comer y listo, no tenés que hacer nada más\n\n🔥 Es lo que más eligen nuestros clientes\n\n📦 Te llega a tu casa GRATIS y pagás al recibir, así no arriesgás nada\n\n👉 ¿Querés que te cuente cuánto sale? Los precios te van a sorprender 😉",
+            "nextStep": "price_capsulas"
+        },
+        "preference_semillas": {
+            "step": "waiting_preference",
+            "match": [
+                "infusion",
+                "té",
+                "te",
+                "yuyos",
+                "semillas",
+                "semilla",
+                "natural",
+                "tradicional",
+                "2"
+            ],
+            "response": "Buena elección 🌱 La semilla es la opción más natural y la más económica\n\nTomás un pedacito por día y el cuerpo hace el resto. Miles de personas ya bajaron así 💚\n\n📦 Te llega a tu casa GRATIS y pagás al recibir, no necesitás poner plata antes\n\n👉 ¿Querés saber cuánto sale? Te va a gustar el precio 😊",
+            "nextStep": "price_semillas"
+        },
+        "preference_gotas": {
+            "step": "waiting_preference",
+            "match": [
+                "gotas",
+                "liquido",
+                "gotero"
+            ],
+            "response": "¡Buena! 💧 Las gotas son re prácticas, unas gotitas por día y ya está\n\nIdeal si no te gustan las pastillas. Muchas personas las prefieren 👍\n\n📦 Te llega a tu casa GRATIS y pagás al recibir\n\n👉 ¿Querés que te pase los precios? Son súper accesibles 😊",
+            "nextStep": "price_gotas"
+        },
+        "price_capsulas": {
+            "step": "waiting_price_confirmation",
+            "response": "Mirá los precios 👇\n\n💊 CÁPSULAS:\n📦 Plan 60 días → $45.900\n📦 Plan 120 días → $66.900 (¡ahorrás $25.000!)\n\n✅ Envío GRATIS a tu puerta\n✅ Pagás al recibir, en efectivo\n✅ Sin sorpresas\n\n💡 Sale menos de $800 por día, menos que un alfajor 😄\n\n👉 ¿Con cuál querés arrancar? ¿60 o 120 días?",
+            "nextStep": "waiting_plan_choice"
+        },
+        "price_semillas": {
+            "step": "waiting_price_confirmation",
+            "response": "Mirá los precios 👇\n\n🌱 SEMILLAS:\n📦 Plan 60 días → $36.900\n📦 Plan 120 días → $49.900 (¡ahorrás $24.000!)\n\n✅ Envío GRATIS a tu puerta\n✅ Pagás al recibir, en efectivo\n✅ Sin sorpresas\n\n💡 Sale menos de $700 por día, ¡menos que un café! ☕\n\n👉 ¿Con cuál querés arrancar? ¿60 o 120 días?",
+            "nextStep": "waiting_plan_choice"
+        },
+        "price_gotas": {
+            "step": "waiting_price_confirmation",
+            "response": "Mirá los precios 👇\n\n💧 GOTAS:\n📦 Plan 60 días → $48.900\n📦 Plan 120 días → $68.900 (¡ahorrás $29.000!)\n\n✅ Envío GRATIS a tu puerta\n✅ Pagás al recibir, en efectivo\n✅ Sin sorpresas\n\n💡 Sale menos de $900 por día 😊\n\n👉 ¿Con cuál querés arrancar? ¿60 o 120 días?",
+            "nextStep": "waiting_plan_choice"
+        },
+        "closing": {
+            "step": "waiting_plan_choice",
+            "match": [
+                "si",
+                "sisi",
+                "precio",
+                "precios",
+                "dale",
+                "bueno",
+                "ok"
+            ],
+            "response": "¡Buenísimo! Ya casi terminamos 🙌\n\nTe cuento cómo funciona el envío, es re simple:\n\n📦 Te lo manda el Correo Argentino\n📅 Llega en 7 a 10 días\n💵 Pagás en efectivo cuando te lo traen\n\n⚠️ A veces el cartero no te encuentra y lo dejan en la sucursal del correo más cercana. En ese caso hay que ir a buscarlo\n\n👉 ¿Podés hacer eso si pasa? Decime SÍ o NO y seguimos",
+            "nextStep": "waiting_ok"
+        },
+        "data_request": {
+            "step": "waiting_ok",
+            "match": [
+                "si",
+                "dale",
+                "bueno",
+                "sisi",
+                "joya",
+                "de una",
+                "esta bien"
+            ],
+            "response": "¡Perfecto! 🎉 Ya te tomo el pedido\n\nNecesito estos datos para mandarte el paquete:\n\n📝 Nombre completo (como figura en el DNI):\n📝 Calle y número de tu casa:\n📝 Ciudad o barrio:\n📝 Código postal (si lo sabés):\n\nPodés mandarlo todo junto o de a uno, como te sea más fácil 😊",
+            "nextStep": "waiting_data"
+        },
+        "confirmation": {
+            "step": "waiting_data",
+            "response": "📦 RESUMEN DE TU PEDIDO\n\n🛒 Producto: [Producto Seleccionado]\n📅 Plan: [Plan] días\n💵 Precio: $[Precio]\n📬 Envío: GRATIS por Correo Argentino\n💰 Forma de pago: efectivo al recibir\n📅 Llega en: 7 a 10 días\n\n⚠️ IMPORTANTE: Si no retirás el paquete de la sucursal dentro de las 72 horas, se cobra un gasto de $18.000. Al continuar, aceptás esta condición.\n\n¡Gracias por confiar en Herbalis! 🌿💚",
+            "nextStep": "completed"
+        }
+    },
+    "faq": [
+        {
+            "keywords": [
+                "farmacia",
+                "suplemento",
+                "pastillas de farmacia",
+                "otro producto",
+                "marca"
+            ],
+            "response": "Los productos de farmacia muchas veces tienen químicos que cuando dejás de tomarlos te hacen engordar de nuevo (efecto rebote). La nuez es 100% natural, no pasa eso 🌱\n\nAdemás acá no tenés que pagar nada por adelantado, pagás cuando ya lo tenés en tu casa 👍"
+        },
+        {
+            "keywords": [
+                "dieta",
+                "comer",
+                "comida"
+            ],
+            "response": "¡No necesitás hacer dieta! 🙌 La nuez trabaja sola. Si además podés cuidarte un poco, vas a ver resultados más rápido, pero no es obligatorio"
+        },
+        {
+            "keywords": [
+                "rebote",
+                "efecto"
+            ],
+            "response": "El efecto rebote pasa con los productos químicos de farmacia. La nuez es 100% natural, así que eso no va a pasar 💪"
+        },
+        {
+            "keywords": [
+                "diabetes",
+                "hipotiroidismo",
+                "tiroides",
+                "presion"
+            ],
+            "response": "Muchos de esos problemas de salud mejoran cuando bajás de peso ❤️ La nuez es natural y no tiene contraindicaciones, salvo embarazo y lactancia"
+        },
+        {
+            "keywords": [
+                "contraindicaciones",
+                "embarazo",
+                "lactancia"
+            ],
+            "response": "Lo único que no se puede es durante el embarazo y la lactancia. Fuera de eso, cualquier persona puede tomarlo tranquilamente ✅"
+        },
+        {
+            "keywords": [
+                "demora",
+                "tarda",
+                "tiempo",
+                "llega"
+            ],
+            "response": "Llega en unos 10 días más o menos por Correo Argentino 📦 Te vamos avisando cómo va el envío"
+        },
+        {
+            "keywords": [
+                "avisa",
+                "cartero",
+                "llaman",
+                "visita"
+            ],
+            "response": "El cartero no avisa antes, pero no te preocupes: nosotros hacemos el seguimiento y si hay que retirar de la sucursal te avisamos 📲"
+        },
+        {
+            "keywords": [
+                "precio",
+                "vale",
+                "costo",
+                "valor",
+                "sale"
+            ],
+            "response": "Los tratamientos arrancan desde $36.900 con envío GRATIS 📦 Y pagás recién cuando lo recibís, no tenés que poner plata antes.\n\nDecime cuántos kilos querés bajar y te recomiendo la mejor opción 😊",
+            "triggerStep": "waiting_weight"
+        },
+        {
+            "keywords": [
+                "pago",
+                "pagar",
+                "tarjeta",
+                "efectivo",
+                "mp",
+                "mercadopago",
+                "cbu",
+                "alias"
+            ],
+            "response": "Es muy fácil: pagás en EFECTIVO cuando te lo traen a tu casa 💵 No necesitás tarjeta, ni cuenta bancaria, ni transferencia. Cero complicación 👍"
+        },
+        {
+            "keywords": [
+                "cuantos kilos",
+                "cuanto bajo",
+                "cuanto se pierde",
+                "en un mes",
+                "en 60 dias"
+            ],
+            "response": "Cada cuerpo es diferente 😊 Pero por ejemplo, personas que necesitan bajar mucho (40 kilos) suelen perder entre 10 y 12 kilos el primer mes. Si necesitás bajar menos (10 kilos), podés perder 3 a 5 kilos. Lo importante es que es natural y no te hace mal 💚"
+        },
+        {
+            "keywords": [
+                "que medio",
+                "que correo",
+                "por donde",
+                "empresa de envio"
+            ],
+            "response": "Te lo mandamos por Correo Argentino, que llega a todo el país 📦"
+        },
+        {
+            "keywords": [
+                "estafa",
+                "trucho",
+                "mentira",
+                "robo",
+                "engaño",
+                "chanta"
+            ],
+            "response": "Entiendo tu desconfianza 🤝 Pero mirá: vos no ponés ni un peso hasta que el producto esté en TUS manos. Si no te gusta, simplemente no lo pagás. Riesgo cero para vos ✅\n\nLlevamos años trabajando así y miles de personas ya confiaron en nosotros 💚"
+        },
+        {
+            "keywords": [
+                "caro",
+                "mucho",
+                "mucha plata",
+                "no tengo",
+                "no me alcanza"
+            ],
+            "response": "Entiendo que hay que cuidar cada peso 💛 Pero pensalo así: el plan más económico sale menos de $700 por día, menos que un café. Y los resultados duran para siempre porque es natural, no hay efecto rebote 🌱\n\nAdemás pagás al recibir, así organizás mejor tu plata 😊"
+        },
+        {
+            "keywords": [
+                "funciona",
+                "sirve",
+                "verdad",
+                "posta"
+            ],
+            "response": "¡Sí, funciona! 💪 Miles de personas ya bajaron de peso con la nuez de la india. Es un producto natural que se usa hace años. Y lo mejor: si no te convence, no pagás nada porque se paga al recibir 📦"
+        }
+    ]
+}

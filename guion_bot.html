@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Guión Bot Herbalis — Febrero 2026</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        @page {
+            size: A4;
+            margin: 15mm 18mm;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            color: #1a1a2e;
+            background: #fff;
+            line-height: 1.6;
+            font-size: 11pt;
+        }
+
+        .cover {
+            page-break-after: always;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 90vh;
+            text-align: center;
+        }
+
+        .cover h1 {
+            font-size: 36pt;
+            font-weight: 800;
+            background: linear-gradient(135deg, #16a34a, #059669);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+        }
+
+        .cover .subtitle {
+            font-size: 16pt;
+            color: #64748b;
+            font-weight: 400;
+            margin-bottom: 40px;
+        }
+
+        .cover .meta {
+            font-size: 10pt;
+            color: #94a3b8;
+        }
+
+        .cover .badge {
+            display: inline-block;
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: #16a34a;
+            padding: 6px 20px;
+            border-radius: 20px;
+            font-size: 10pt;
+            font-weight: 600;
+            margin-top: 20px;
+        }
+
+        h2 {
+            font-size: 16pt;
+            font-weight: 700;
+            color: #16a34a;
+            margin: 28px 0 12px 0;
+            padding-bottom: 6px;
+            border-bottom: 2px solid #dcfce7;
+        }
+
+        h3 {
+            font-size: 12pt;
+            font-weight: 600;
+            color: #1e293b;
+            margin: 18px 0 8px 0;
+        }
+
+        .step-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 14px 16px;
+            margin: 10px 0;
+            page-break-inside: avoid;
+        }
+
+        .step-card .step-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .step-card .step-number {
+            background: #16a34a;
+            color: white;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11pt;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .step-card .step-title {
+            font-weight: 600;
+            font-size: 11pt;
+            color: #0f172a;
+        }
+
+        .step-card .step-label {
+            display: inline-block;
+            background: #dbeafe;
+            color: #1d4ed8;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 8pt;
+            font-weight: 600;
+            margin-left: 6px;
+        }
+
+        .step-card .keywords {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin: 6px 0;
+        }
+
+        .step-card .keywords span {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: #15803d;
+            padding: 1px 8px;
+            border-radius: 12px;
+            font-size: 8pt;
+            font-weight: 500;
+        }
+
+        .bot-message {
+            background: #dcfce7;
+            border-left: 3px solid #16a34a;
+            padding: 10px 12px;
+            border-radius: 0 8px 8px 0;
+            margin: 6px 0;
+            font-size: 9.5pt;
+            white-space: pre-line;
+            line-height: 1.5;
+        }
+
+        .next-step {
+            font-size: 8pt;
+            color: #64748b;
+            margin-top: 6px;
+            font-weight: 500;
+        }
+
+        .next-step span {
+            color: #16a34a;
+            font-weight: 600;
+        }
+
+        .faq-item {
+            background: #fffbeb;
+            border: 1px solid #fde68a;
+            border-radius: 8px;
+            padding: 10px 14px;
+            margin: 8px 0;
+            page-break-inside: avoid;
+        }
+
+        .faq-item .faq-q {
+            font-weight: 600;
+            font-size: 9.5pt;
+            color: #92400e;
+            margin-bottom: 4px;
+        }
+
+        .faq-item .faq-a {
+            font-size: 9.5pt;
+            color: #451a03;
+            white-space: pre-line;
+        }
+
+        /* --- DECISION TREE --- */
+        .tree-section {
+            page-break-before: always;
+        }
+
+        .tree-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px 0;
+        }
+
+        .tree-node {
+            background: #f0fdf4;
+            border: 2px solid #16a34a;
+            border-radius: 12px;
+            padding: 10px 18px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 9.5pt;
+            color: #15803d;
+            position: relative;
+            min-width: 140px;
+        }
+
+        .tree-node.root {
+            background: #16a34a;
+            color: white;
+            font-size: 11pt;
+            border-color: #16a34a;
+        }
+
+        .tree-node.action {
+            background: #dbeafe;
+            border-color: #3b82f6;
+            color: #1d4ed8;
+        }
+
+        .tree-node.end {
+            background: #fef3c7;
+            border-color: #f59e0b;
+            color: #92400e;
+        }
+
+        .tree-node.alert {
+            background: #fee2e2;
+            border-color: #ef4444;
+            color: #b91c1c;
+        }
+
+        .tree-connector {
+            width: 2px;
+            height: 20px;
+            background: #94a3b8;
+            margin: 0 auto;
+        }
+
+        .tree-branch {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            position: relative;
+            margin-top: 0;
+        }
+
+        .tree-branch::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 15%;
+            right: 15%;
+            height: 2px;
+            background: #94a3b8;
+        }
+
+        .tree-branch-3::before {
+            left: 10%;
+            right: 10%;
+        }
+
+        .tree-branch>div {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .tree-label {
+            font-size: 7.5pt;
+            color: #64748b;
+            font-weight: 500;
+            margin: 2px 0;
+            text-align: center;
+        }
+
+        .price-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0;
+            font-size: 9.5pt;
+        }
+
+        .price-table th {
+            background: #16a34a;
+            color: white;
+            padding: 8px 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .price-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .price-table tr:nth-child(even) td {
+            background: #f8fafc;
+        }
+
+        .note-box {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 8px;
+            padding: 10px 14px;
+            margin: 12px 0;
+            font-size: 9pt;
+            color: #1e40af;
+        }
+
+        .note-box strong {
+            color: #1d4ed8;
+        }
+
+        @media print {
+            body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .step-card,
+            .faq-item {
+                break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ═══════════════════════ COVER ═══════════════════════ -->
+    <div class="cover">
+        <h1>🌿 HERBALIS</h1>
+        <div class="subtitle">Guión del Bot de Ventas por WhatsApp</div>
+        <div class="badge">Versión actualizada — Febrero 2026</div>
+        <div class="meta" style="margin-top: 60px;">
+            Documento generado automáticamente desde <code>knowledge.json</code><br>
+            Última actualización: 17/02/2026
+        </div>
+    </div>
+
+    <!-- ═══════════════════════ FLUJO PRINCIPAL ═══════════════════════ -->
+    <h2>📋 Flujo de Venta — Paso a Paso</h2>
+
+    <div class="step-card">
+        <div class="step-header">
+            <div class="step-number">1</div>
+            <div class="step-title">Saludo Inicial</div>
+            <div class="step-label">greeting</div>
+        </div>
+        <div class="keywords">
+            <span>hola</span><span>precio</span><span>info</span><span>buenas</span><span>herbalis</span><span>nuez</span><span>kilos</span><span>bajar</span>
+        </div>
+        <div class="bot-message">¡Hola! 😊 Gracias por escribir a HERBALIS
+
+            🌿 Trabajamos con Nuez de la India y sus derivados:
+            ✔ Cápsulas
+            ✔ Gotas
+            ✔ Semillas
+
+            Es un método natural para bajar de peso sin dietas extremas.
+            📦 Envíos a todo el país | Pagás al recibir
+
+            👉 Para recomendarte bien: ¿Cuántos kilos querés bajar aproximadamente?</div>
+        <div class="next-step">➡️ Siguiente: <span>waiting_weight</span></div>
+    </div>
+
+    <div class="step-card">
+        <div class="step-header">
+            <div class="step-number">2</div>
+            <div class="step-title">Recomendación (al recibir un número)</div>
+            <div class="step-label">waiting_weight</div>
+        </div>
+        <div class="keywords"><span>Cualquier número (regex)</span></div>
+        <div class="bot-message">Perfecto
+
+            👌 Ese objetivo es totalmente alcanzable con nuestros planes. Antes de recomendarte el producto ideal,
+            necesito saber algo:
+
+            👉 ¿Preferís algo:
+            1️⃣ Súper práctico (cápsulas)
+            2️⃣ Más natural/tradicional (semillas e infusión)?</div>
+        <div class="next-step">➡️ Siguiente: <span>waiting_preference</span></div>
+    </div>
+
+    <div class="step-card">
+        <div class="step-header">
+            <div class="step-number">3A</div>
+            <div class="step-title">Preferencia: Cápsulas</div>
+            <div class="step-label">waiting_preference</div>
+        </div>
+        <div class="keywords">
+            <span>capsula</span><span>capsulas</span><span>pastilla</span><span>pastillas</span><span>practico</span><span>practica</span><span>1</span>
+        </div>
+        <div class="bot-message">Perfecto. Las cápsulas se toman 1 por día, media hora antes del almuerzo o de la cena.
+
+            Es un plan súper práctico, ideal si buscás constancia sin complicaciones.
+            Te recomendamos comenzar con el plan de 60 días.
+
+            📦 Envío por Correo Argentino sin gastos de envío y pagás recién cuando lo recibís.
+
+            ¿Querés que te pase los precios? ¡¡Son muy accesibles!!</div>
+        <div class="next-step">➡️ Siguiente: <span>price_capsulas</span></div>
+    </div>
+
+    <div class="step-card">
+        <div class="step-header">
+            <div class="step-number">3B</div>
+            <div class="step-title">Preferencia: Semillas</div>
+            <div class="step-label">waiting_preference</div>
+        </div>
+        <div class="keywords">
+            <span>infusion</span><span>té</span><span>te</span><span>yuyos</span><span>semillas</span><span>semilla</span><span>natural</span><span>tradicional</span><span>2</span>
+        </div>
+        <div class="bot-message">Perfecto. La semilla es la opción más tradicional y natural. Se toma un pedacito por
+            día y es excelente para pérdidas de peso más marcadas.
+
+            Para tu objetivo recomendamos comenzar con el plan de 60 días.
+
+            📦 Envío gratis por Correo Argentino y pagás al recibir.
+
+            ¿Querés que te pase los precios? ¡¡Son muy accesibles!!</div>
+        <div class="next-step">➡️ Siguiente: <span>price_semillas</span></div>
+    </div>
+
+    <div class="step-card">
+        <div class="step-header">
+            <div class="step-number">3C</div>
+            <div class="step-title">Preferencia: Gotas <em>(solo si el cliente insiste)</em></div>
+            <div class="step-label">waiting_preference</div>
+        </div>
+        <div class="keywords">
+            <span>gotas</span><span>liquido</span><span>gotero</span>
+        </div>
+        <div class="bot-message">Perfecto. Las gotas son súper prácticas, se toman unas gotitas por día y son ideales si
+            no te gustan las pastillas.
+
+            Para tu objetivo recomendamos comenzar con el plan de 60 días.
+
+            📦 Envío gratis por Correo Argentino y pagás al recibir.
+
+            ¿Querés que te pase los precios? ¡¡Son muy accesibles!!</div>
+        <div class="next-step">➡️ Siguiente: <span>price_gotas</span></div>
+    </div>
+
+    <h3>💰 Precios por Producto</h3>
+
+    <table class="price-table">
+        <thead>
+            <tr>
+                <th>Producto</th>
+                <th>Plan 60 días</th>
+                <th>Plan 120 días</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Cápsulas</strong></td>
+                <td>$45.900</td>
+                <td>$66.900</td>
+            </tr>
+            <tr>
+                <td><strong>Semillas</strong></td>
+                <td>$36.900</td>
+                <td>$49.900</td>
+            </tr>
+            <tr>
+                <td><strong>Gotas</strong> <em>(solo si preguntan)</em></td>
+                <td>$48.900</td>
+                <td>$68.900</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="step-card">
+        <div class="step-header">
+            <div class="step-number">4</div>
+            <div class="step-title">Precios (respuesta automática por producto)</div>
+            <div class="step-label">waiting_price_confirmation</div>
+        </div>
+        <div class="bot-message"><strong>Ejemplo Cápsulas:</strong>
+            Te paso precios!! El plan de 60 días en cápsulas $45.900.-
+            El plan de 120 días $66.900.-
+            📦 Envío gratis + pagás al recibir.
+
+            ¿Con que plan te gustaría avanzar?</div>
+        <div class="next-step">➡️ Siguiente: <span>waiting_plan_choice</span></div>
+    </div>
+
+    <div class="step-card">
+        <div class="step-header">
+            <div class="step-number">5</div>
+            <div class="step-title">Cierre — Confirmación de Envío</div>
+            <div class="step-label">waiting_plan_choice</div>
+        </div>
+        <div class="keywords">
+            <span>El usuario elige "60" o "120" (regex)</span>
+        </div>
+        <div class="bot-message">Perfecto 👍 Antes de continuar necesito confirmarte algo importante sobre el envío 👇
+
+            📦 Enviamos por Correo Argentino
+            • Demora estimada: 7 a 10 días hábiles
+            • Pago: SOLO en efectivo al recibir
+            • En algunos casos el correo solicita retiro por sucursal
+
+            👉 En ese caso es obligatorio retirar el pedido. ¿Esto te resulta posible?
+            respóndeme por favor: SÍ o NO</div>
+        <div class="next-step">➡️ Siguiente: <span>waiting_ok</span></div>
+    </div>
+
+    <div class="step-card">
+        <div class="step-header">
+            <div class="step-number">6</div>
+            <div class="step-title">Pedido de Datos</div>
+            <div class="step-label">waiting_ok</div>
+        </div>
+        <div class="keywords">
+            <span>si</span><span>dale</span><span>bueno</span><span>puedo</span><span>retiro</span><span>sisi</span><span>joya</span><span>de
+                una</span><span>esta bien</span>
+        </div>
+        <div class="bot-message">Genial 👩‍💻 Entonces tomamos el pedido.
+
+            📦 Pasame por favor los datos para el envío:
+            • Nombre completo:
+            • Calle y número:
+            • Ciudad:
+            • Código postal:</div>
+        <div class="next-step">➡️ Siguiente: <span>waiting_data</span> (IA analiza la dirección)</div>
+    </div>
+
+    <div class="step-card">
+        <div class="step-header">
+            <div class="step-number">7</div>
+            <div class="step-title">Confirmación Final + Aceptación Legal</div>
+            <div class="step-label">waiting_admin_ok → waiting_legal_acceptance</div>
+        </div>
+        <div class="bot-message">✅ PEDIDO CASI LISTO 😊
+
+            📌 Resumen de tu compra:
+            • Producto: [seleccionado]
+            • Plan: [60/120] días
+            • Total a pagar: $[precio] (en efectivo al recibir)
+
+            📦 Envío por Correo Argentino
+            ⏳ Demora estimada: 7 a 10 días hábiles
+
+            📍 A tener en cuenta:
+            • Si el cartero no te encuentra → retiro en sucursal
+            • Plazo de retiro: 72 hs hábiles
+            • Rechazar pedido genera costo de $16.500
+
+            👉 Para confirmar: "LEÍ Y ACEPTO LAS CONDICIONES DE ENVÍO"</div>
+        <div class="next-step">➡️ Siguiente: <span>completed</span> ✅</div>
+    </div>
+
+    <div class="note-box">
+        <strong>🤖 Lógica del Bot:</strong> Si en cualquier paso el bot no puede manejar el mensaje:
+        1. La IA intenta responder brevemente y volver al guión.
+        2. Si la IA no puede → <strong>Se pausa al usuario</strong> y se envía alerta al admin por WhatsApp + Dashboard.
+    </div>
+
+    <!-- ═══════════════════════ FAQ ═══════════════════════ -->
+    <h2>❓ Preguntas Frecuentes (FAQ)</h2>
+    <p style="font-size: 9.5pt; color: #64748b; margin-bottom: 10px;">Estas respuestas se activan automáticamente por
+        keywords, sin importar el paso actual.</p>
+
+    <div class="faq-item">
+        <div class="faq-q">🍽️ ¿Necesito hacer dieta? → <em>dieta, comer, comida</em></div>
+        <div class="faq-a">La nuez funciona sin dietas. Obviamente que cualquier cuidado que puedas tener te aportara
+            mayores beneficios y mas rapidos.</div>
+    </div>
+
+    <div class="faq-item">
+        <div class="faq-q">🔄 ¿Tiene efecto rebote? → <em>rebote, efecto</em></div>
+        <div class="faq-a">El efecto rebote es la consecuencia de consumir quimicos o anfetaminas, la nuez y sus
+            derivados son 100 % natural por que no podrian producir efecto rebote.</div>
+    </div>
+
+    <div class="faq-item">
+        <div class="faq-q">🏥 ¿Sirve con diabetes/tiroides? → <em>diabetes, hipotiroidismo, tiroides, presion</em></div>
+        <div class="faq-a">Las patologias como diabetes, hipotiroidismo y presion alta son una consecuencia del
+            sobrepeso, perder kilos ayuda a controlarlas ❤️</div>
+    </div>
+
+    <div class="faq-item">
+        <div class="faq-q">⚠️ Contraindicaciones → <em>contraindicaciones, embarazo, lactancia</em></div>
+        <div class="faq-a">⚡La unicas contraindicaciones son: embarazo y lactancia.</div>
+    </div>
+
+    <div class="faq-item">
+        <div class="faq-q">📦 ¿Cuánto tarda? → <em>demora, tarda, tiempo, llega</em></div>
+        <div class="faq-a">La demora es de 10 dias aproximados o para la fecha que te resulte mas comoda pasados los 10
+            dias.</div>
+    </div>
+
+    <div class="faq-item">
+        <div class="faq-q">🚪 ¿El cartero avisa? → <em>avisa, cartero, llaman, visita</em></div>
+        <div class="faq-a">No tenemos ningun control sobre los carteros, no llaman ni podemos saber en que momento
+            visitaran tu domicilio. Si, nos ocupamos de hacer el seguimiento y te avisamos si tenes que retirar.</div>
+    </div>
+
+    <div class="faq-item">
+        <div class="faq-q">💰 ¿Cuánto sale? → <em>precio, vale, costo, valor, sale</em></div>
+        <div class="faq-a">Los tratamientos de 60 días arrancan desde $36.900. NO HAY COSTOS DE ENVIO.
+
+            Decime por favor cuantos kilos querés perder y te recomiendo la mejor opción para tu caso.</div>
+    </div>
+
+    <div class="faq-item">
+        <div class="faq-q">💳 ¿Cómo se paga? → <em>pago, pagar, tarjeta, efectivo, mp, mercadopago, cbu, alias</em>
+        </div>
+        <div class="faq-a">El pago es ÚNICAMENTE en efectivo al recibir el pedido (Contra Reembolso). No aceptamos
+            tarjetas ni transferencias por el momento. ¿Te queda bien esa forma de pago?</div>
+    </div>
+
+    <div class="faq-item">
+        <div class="faq-q">⚖️ ¿Cuántos kilos se bajan? → <em>cuantos kilos, cuanto bajo, en un mes, en 60 dias</em>
+        </div>
+        <div class="faq-a">"Cada cuerpo tiene su propio ritmo."
+            La velocidad y el volumen de descenso pueden variar según cada persona.
+            Como referencia, quienes tienen exceso de peso importante (~40 kilos) suelen notar 10 a 12 kilos en el
+            primer mes, mientras que quienes necesitan bajar menos (~10 kilos) pueden reducir 3 a 5 kilos.
+            Lo más importante es que el cambio sea progresivo, natural y sostenido en el tiempo. 🙌</div>
+    </div>
+
+    <div class="faq-item">
+        <div class="faq-q">🚚 ¿Qué correo usan? → <em>que medio, que correo, por donde, empresa de envio</em></div>
+        <div class="faq-a">Realizamos los envíos exclusivamente por Correo Argentino 📦.</div>
+    </div>
+
+    <!-- ═══════════════════════ ÁRBOL DE DECISIONES ═══════════════════════ -->
+    <div class="tree-section">
+        <h2>🗺️ Mapa Conceptual — Árbol de Opciones</h2>
+
+        <div class="tree-container">
+            <!-- Level 1: Start -->
+            <div class="tree-node root">🌿 Cliente escribe</div>
+            <div class="tree-connector"></div>
+
+            <!-- Level 2: Greeting -->
+            <div class="tree-node">1. Saludo + ¿Cuántos kilos?</div>
+            <div class="tree-connector"></div>
+
+            <!-- Level 3: Weight -->
+            <div class="tree-node action">2. Recibe número → Recomienda opciones</div>
+            <div class="tree-connector"></div>
+
+            <!-- Level 4: Preference Branch -->
+            <div class="tree-label" style="font-size: 8.5pt; font-weight: 600; color: #1e293b;">¿Qué producto prefiere?
+            </div>
+            <div style="height: 8px;"></div>
+
+            <div class="tree-branch tree-branch-3">
+                <!-- Capsulas -->
+                <div>
+                    <div class="tree-connector"></div>
+                    <div class="tree-node" style="font-size: 8.5pt;">
+                        3A. 💊 Cápsulas<br>
+                        <small>"1", "capsula", "práctico"</small>
+                    </div>
+                    <div class="tree-connector"></div>
+                    <div class="tree-node action" style="font-size: 8pt;">
+                        $45.900 / $66.900
+                    </div>
+                </div>
+
+                <!-- Semillas -->
+                <div>
+                    <div class="tree-connector"></div>
+                    <div class="tree-node" style="font-size: 8.5pt;">
+                        3B. 🌱 Semillas<br>
+                        <small>"2", "semilla", "natural"</small>
+                    </div>
+                    <div class="tree-connector"></div>
+                    <div class="tree-node action" style="font-size: 8pt;">
+                        $36.900 / $49.900
+                    </div>
+                </div>
+
+                <!-- Gotas -->
+                <div>
+                    <div class="tree-connector"></div>
+                    <div class="tree-node" style="font-size: 8.5pt; border-style: dashed;">
+                        3C. 💧 Gotas<br>
+                        <small>"gotas" (solo si insisten)</small>
+                    </div>
+                    <div class="tree-connector"></div>
+                    <div class="tree-node action" style="font-size: 8pt; border-style: dashed;">
+                        $48.900 / $68.900
+                    </div>
+                </div>
+            </div>
+
+            <div class="tree-connector"></div>
+            <div class="tree-label" style="font-size: 8.5pt; font-weight: 600; color: #1e293b;">↓ Todos convergen aquí ↓
+            </div>
+            <div style="height: 6px;"></div>
+
+            <!-- Level 5: Plan Choice -->
+            <div class="tree-node action">4. ¿Plan 60 o 120 días?</div>
+            <div class="tree-connector"></div>
+
+            <!-- Level 6: Closing -->
+            <div class="tree-node">5. Condiciones de envío (SÍ/NO)</div>
+            <div class="tree-connector"></div>
+
+            <div class="tree-branch">
+                <div>
+                    <div class="tree-connector"></div>
+                    <div class="tree-node" style="font-size: 8.5pt;">
+                        ✅ SÍ → Pide datos
+                    </div>
+                    <div class="tree-connector"></div>
+                    <div class="tree-node action" style="font-size: 8.5pt;">
+                        6. IA analiza dirección
+                    </div>
+                    <div class="tree-connector"></div>
+                    <div class="tree-node" style="font-size: 8.5pt;">
+                        7. Admin aprueba
+                    </div>
+                    <div class="tree-connector"></div>
+                    <div class="tree-node" style="font-size: 8.5pt;">
+                        8. "Leí y acepto condiciones"
+                    </div>
+                    <div class="tree-connector"></div>
+                    <div class="tree-node end" style="font-size: 8.5pt;">
+                        ✅ PEDIDO CONFIRMADO
+                    </div>
+                </div>
+                <div>
+                    <div class="tree-connector"></div>
+                    <div class="tree-node alert" style="font-size: 8.5pt;">
+                        ❌ NO → Pausa + Alerta Admin
+                    </div>
+                </div>
+            </div>
+
+            <div style="height: 24px;"></div>
+
+            <!-- Fallback legend -->
+            <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; margin-top: 10px;">
+                <div style="display: flex; align-items: center; gap: 6px; font-size: 8pt;">
+                    <div
+                        style="width: 14px; height: 14px; border-radius: 4px; background: #f0fdf4; border: 2px solid #16a34a;">
+                    </div>
+                    Paso del guión
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px; font-size: 8pt;">
+                    <div
+                        style="width: 14px; height: 14px; border-radius: 4px; background: #dbeafe; border: 2px solid #3b82f6;">
+                    </div>
+                    Acción / Datos
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px; font-size: 8pt;">
+                    <div
+                        style="width: 14px; height: 14px; border-radius: 4px; background: #fef3c7; border: 2px solid #f59e0b;">
+                    </div>
+                    Fin exitoso
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px; font-size: 8pt;">
+                    <div
+                        style="width: 14px; height: 14px; border-radius: 4px; background: #fee2e2; border: 2px solid #ef4444;">
+                    </div>
+                    Pausa + Alerta Admin
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px; font-size: 8pt;">
+                    <div
+                        style="width: 14px; height: 14px; border-radius: 4px; background: #f0fdf4; border: 2px dashed #16a34a;">
+                    </div>
+                    Solo si insisten
+                </div>
+            </div>
+
+            <div class="note-box" style="margin-top: 20px; max-width: 500px;">
+                <strong>⚡ Red de seguridad:</strong> Si en CUALQUIER paso el bot no encuentra match con keywords:<br>
+                1️⃣ La IA intenta responder (1-2 oraciones) y volver al guión<br>
+                2️⃣ Si la IA no puede → ⏸️ <strong>Pausa automática</strong> + 🚨 Alerta al admin
+            </div>
+        </div>
+    </div>
+
+</body>
+
+</html>

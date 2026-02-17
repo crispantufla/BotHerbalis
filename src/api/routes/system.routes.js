@@ -106,5 +106,70 @@ module.exports = (client, sharedState) => {
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
+    // GET /script/active — show current script and available options
+    router.get('/script/active', authMiddleware, (req, res) => {
+        res.json({
+            active: config.activeScript || 'v1',
+            available: sharedState.availableScripts || ['v1', 'v2'],
+            labels: {
+                'v1': 'Guión Original',
+                'v2': 'Guión V2 — Empático + Accesible'
+            }
+        });
+    });
+
+    // POST /script/switch — switch to a different script
+    router.post('/script/switch', authMiddleware, (req, res) => {
+        try {
+            const { script } = req.body;
+            if (!script) return res.status(400).json({ error: 'Falta el campo "script" (v1 o v2)' });
+
+            const available = sharedState.availableScripts || ['v1', 'v2'];
+            if (!available.includes(script)) {
+                return res.status(400).json({ error: `Script "${script}" no existe. Disponibles: ${available.join(', ')}` });
+            }
+
+            // Call loadKnowledge from sharedState
+            if (sharedState.loadKnowledge) {
+                sharedState.loadKnowledge(script);
+            }
+
+            if (io) io.emit('script_changed', { active: script });
+
+            console.log(`📋 [SCRIPT] Switched to: ${script}`);
+            res.json({ success: true, active: script });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // GET /script/:version — fetch specific script content
+    router.get('/script/:version', authMiddleware, (req, res) => {
+        try {
+            const { version } = req.params;
+            const available = sharedState.availableScripts || ['v1', 'v2'];
+
+            if (!available.includes(version)) {
+                return res.status(404).json({ error: 'Script no encontrado' });
+            }
+
+            // Need access to KNOWLEDGE_FILES from index.js? 
+            // Better to use a lookup here or expose it.
+            // Since we can't easily import KNOWLEDGE_FILES from index.js without exporting it,
+            // let's reconstruct the path safely.
+            const filename = version === 'v2' ? 'knowledge_v2.json' : 'knowledge.json';
+            const filePath = path.join(__dirname, '../../../', filename);
+
+            if (fs.existsSync(filePath)) {
+                const content = JSON.parse(fs.readFileSync(filePath));
+                res.json(content);
+            } else {
+                res.status(404).json({ error: 'Archivo no encontrado' });
+            }
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     return router;
 };

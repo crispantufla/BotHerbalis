@@ -11,8 +11,9 @@ module.exports = (client, sharedState) => {
     router.get('/summarize/:chatId', authMiddleware, async (req, res) => {
         try {
             const chatId = req.params.chatId;
+            const resetAt = sharedState.chatResets[chatId] || 0;
             // Reusing history logic (simplified for summary - we need text)
-            const localMessages = getLocalHistory(chatId);
+            const localMessages = getLocalHistory(chatId, resetAt);
 
             let waMessages = [];
             try {
@@ -83,30 +84,33 @@ module.exports = (client, sharedState) => {
     router.get('/history/:id', authMiddleware, async (req, res) => {
         try {
             const chatId = req.params.id;
+            const resetAt = sharedState.chatResets[chatId] || 0;
             let messages = [];
 
             try {
                 const chat = await client.getChatById(chatId);
                 const waMessages = await chat.fetchMessages({ limit: 100 });
-                messages = waMessages.map(m => {
-                    let body = m.body;
-                    if (m.hasMedia && !body) {
-                        if (m.type === 'audio' || m.type === 'ptt') body = 'MEDIA_AUDIO:PENDING';
-                        else if (m.type === 'image' || m.type === 'sticker') body = 'MEDIA_IMAGE:PENDING';
-                    }
-                    return {
-                        fromMe: m.fromMe,
-                        body: body,
-                        timestamp: m.timestamp,
-                        type: m.type,
-                        id: m.id._serialized
-                    };
-                });
+                messages = waMessages
+                    .filter(m => m.timestamp >= resetAt) // Filter WA messages after reset
+                    .map(m => {
+                        let body = m.body;
+                        if (m.hasMedia && !body) {
+                            if (m.type === 'audio' || m.type === 'ptt') body = 'MEDIA_AUDIO:PENDING';
+                            else if (m.type === 'image' || m.type === 'sticker') body = 'MEDIA_IMAGE:PENDING';
+                        }
+                        return {
+                            fromMe: m.fromMe,
+                            body: body,
+                            timestamp: m.timestamp,
+                            type: m.type,
+                            id: m.id._serialized
+                        };
+                    });
             } catch (waErr) {
                 console.error(`[HISTORY] WA Fetch Error for ${chatId}:`, waErr.message);
             }
 
-            const localMessages = getLocalHistory(chatId);
+            const localMessages = getLocalHistory(chatId, resetAt);
 
             const refinedMessages = messages.map(m => {
                 if (m.hasMedia || m.type === 'image' || m.type === 'audio' || m.type === 'ptt' || m.type === 'sticker') {
@@ -156,6 +160,7 @@ module.exports = (client, sharedState) => {
         try {
             const { chatId } = req.body;
             delete userState[chatId];
+            sharedState.chatResets[chatId] = Math.floor(Date.now() / 1000); // 1. Record reset timestamp
             pausedUsers.delete(chatId);
             sharedState.saveState();
 
