@@ -12,7 +12,8 @@ const Icons = {
     Trash: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
     Script: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
     ChevronDown: () => <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>,
-    Send: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+    Send: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>,
+    Clip: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
 };
 
 const CommsView = () => {
@@ -28,7 +29,10 @@ const CommsView = () => {
     const [scriptFlow, setScriptFlow] = useState({});
     const [summarizing, setSummarizing] = useState(false);
     const [summaryText, setSummaryText] = useState(null);
+    const [attachment, setAttachment] = useState(null); // { file, preview, base64, mimetype }
+    const [sendingMedia, setSendingMedia] = useState(false);
     const messagesEndRef = useRef(null);
+    const fileInputRef = useRef(null);
 
     // Filter chats
     const filteredChats = searchTerm
@@ -248,6 +252,63 @@ const CommsView = () => {
             setSummaryText(null);
         }
         setSummarizing(false);
+    };
+
+    // Handle file selection for attachment
+    const handleFileSelect = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) {
+            toast.warning('Solo se pueden adjuntar imágenes');
+            return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            toast.warning('La imagen no puede superar 5MB');
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+            const base64Full = reader.result; // data:image/jpeg;base64,...
+            const base64Data = base64Full.split(',')[1];
+            setAttachment({
+                file,
+                preview: base64Full,
+                base64: base64Data,
+                mimetype: file.type
+            });
+        };
+        reader.readAsDataURL(file);
+        // Reset input so same file can be selected again
+        e.target.value = '';
+    };
+
+    // Send media attachment
+    const handleSendMedia = async () => {
+        if (!attachment || !selectedChat) return;
+        setSendingMedia(true);
+        try {
+            await api.post('/api/send-media', {
+                chatId: selectedChat.id,
+                base64: attachment.base64,
+                mimetype: attachment.mimetype,
+                filename: attachment.file.name,
+                caption: input.trim() || ''
+            });
+            // Add to messages list
+            const newMsg = {
+                fromMe: true,
+                body: `📷 Imagen enviada${input.trim() ? ': ' + input.trim() : ''}`,
+                type: 'chat',
+                timestamp: Date.now()
+            };
+            setMessages(prev => [...prev, newMsg]);
+            setAttachment(null);
+            setInput('');
+            toast.success('Imagen enviada');
+        } catch (e) {
+            toast.error('Error al enviar imagen');
+        }
+        setSendingMedia(false);
     };
 
     // Helper: Render Message Content
@@ -494,18 +555,59 @@ const CommsView = () => {
 
                         {/* Input */}
                         <div className="p-4 bg-white border-t border-slate-200">
-                            <form onSubmit={handleSend} className="flex items-center gap-3">
+                            {/* Attachment Preview */}
+                            {attachment && (
+                                <div className="mb-3 p-3 bg-slate-50 rounded-lg border border-slate-200 flex items-center gap-3 animate-fade-in">
+                                    <img src={attachment.preview} alt="Preview" className="w-16 h-16 object-cover rounded-lg border border-slate-200 shadow-sm" />
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium text-slate-700 truncate">{attachment.file.name}</p>
+                                        <p className="text-xs text-slate-400">{(attachment.file.size / 1024).toFixed(0)} KB</p>
+                                    </div>
+                                    <button
+                                        onClick={() => setAttachment(null)}
+                                        className="p-1.5 hover:bg-rose-100 rounded-lg text-slate-400 hover:text-rose-600 transition"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                            )}
+                            <form onSubmit={attachment ? (e) => { e.preventDefault(); handleSendMedia(); } : handleSend} className="flex items-center gap-3">
+                                {/* Hidden file input */}
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleFileSelect}
+                                    className="hidden"
+                                />
+                                {/* Attachment button */}
+                                <button
+                                    type="button"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="p-2.5 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all"
+                                    title="Adjuntar imagen"
+                                >
+                                    <Icons.Clip />
+                                </button>
                                 <div className="flex-1 relative">
                                     <input
                                         type="text"
                                         value={input}
                                         onChange={(e) => setInput(e.target.value)}
-                                        placeholder="Escribe un mensaje..."
+                                        placeholder={attachment ? 'Agregar texto (opcional)...' : 'Escribe un mensaje...'}
                                         className="w-full bg-slate-50 border border-slate-200 rounded-md pl-4 pr-10 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all text-slate-700"
                                     />
                                 </div>
-                                <button type="submit" disabled={!input.trim()} className="bg-slate-900 hover:bg-black text-white p-2.5 rounded-md shadow-lg transition-all disabled:opacity-50">
-                                    <Icons.Send />
+                                <button
+                                    type="submit"
+                                    disabled={attachment ? sendingMedia : !input.trim()}
+                                    className="bg-slate-900 hover:bg-black text-white p-2.5 rounded-md shadow-lg transition-all disabled:opacity-50"
+                                >
+                                    {sendingMedia ? (
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    ) : (
+                                        <Icons.Send />
+                                    )}
                                 </button>
                             </form>
                         </div>

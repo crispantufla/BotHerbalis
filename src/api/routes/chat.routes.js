@@ -2,6 +2,7 @@ const express = require('express');
 const { authMiddleware } = require('../../middleware/auth');
 const { getLocalHistory } = require('../../utils/chatHistory');
 const { aiService } = require('../../services/ai');
+const { MessageMedia } = require('whatsapp-web.js');
 
 module.exports = (client, sharedState) => {
     const router = express.Router();
@@ -153,6 +154,25 @@ module.exports = (client, sharedState) => {
             if (sharedState.logAndEmit) sharedState.logAndEmit(chatId, 'admin', message, 'dashboard_reply');
             res.json({ success: true });
         } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // POST /send-media (send image from dashboard)
+    router.post('/send-media', authMiddleware, async (req, res) => {
+        try {
+            const { chatId, base64, mimetype, filename, caption } = req.body;
+            if (!chatId || !base64 || !mimetype) {
+                return res.status(400).json({ error: 'Missing chatId, base64, or mimetype' });
+            }
+            const media = new MessageMedia(mimetype, base64, filename || 'image.jpg');
+            await client.sendMessage(chatId, media, { caption: caption || '' });
+            if (sharedState.logAndEmit) {
+                sharedState.logAndEmit(chatId, 'admin', `📷 Imagen enviada${caption ? ': ' + caption : ''}`, 'dashboard_media');
+            }
+            res.json({ success: true });
+        } catch (e) {
+            console.error('[SEND-MEDIA] Error:', e.message);
             res.status(500).json({ error: e.message });
         }
     });

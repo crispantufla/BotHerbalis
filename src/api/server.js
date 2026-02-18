@@ -35,7 +35,7 @@ function startServer(client, sharedState) {
     app.use(cors({
         origin: process.env.DASHBOARD_URL || "http://localhost:5173"
     }));
-    app.use(express.json());
+    app.use(express.json({ limit: '10mb' }));
 
     // Serve Static Files (Production/Docker)
     const clientDistPath = path.join(__dirname, '../../client/dist');
