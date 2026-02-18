@@ -256,6 +256,42 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
     currentState.lastActivityAt = Date.now();
     currentState.staleAlerted = false; // Reset on new activity
 
+    // ─────────────────────────────────────────────────
+    // GLOBAL INTENTS (Priority 0 — Cancel/Change)
+    // ─────────────────────────────────────────────────
+    const CANCEL_REGEX = /\b(cancelar|cancelarlo|anular|dar de baja|no quiero (el|mi) pedido|baja al pedido|me arrepenti)\b/i;
+    const CHANGE_REGEX = /\b(cambiar|cambiarlo|modificar|otro producto|otra cosa|en vez de|quiero otra)\b/i;
+    const isNegative = _isNegative(normalizedText); // Re-use helper
+
+    if (CANCEL_REGEX.test(normalizedText) && !isNegative) {
+        console.log(`[GLOBAL] User ${userId} requested cancellation.`);
+        const msg = "Entiendo, le aviso a administración para que procese la baja de inmediato. Disculpá las molestias. 🙏";
+        await sendMessageWithDelay(userId, msg);
+        currentState.history.push({ role: 'bot', content: msg });
+
+        await _pauseAndAlert(userId, currentState, dependencies, text, '🚫 Solicitud de cancelación directa.');
+        return { matched: true };
+    }
+
+    // Only allow change if not in greeting (useless) and not complete
+    if (CHANGE_REGEX.test(normalizedText) && currentState.step !== 'greeting' && !isNegative) {
+        console.log(`[GLOBAL] User ${userId} requested change.`);
+        // Reset Logic
+        currentState.cart = [];
+        currentState.pendingOrder = null;
+        currentState.partialAddress = {};
+        currentState.selectedProduct = null;
+        currentState.selectedPlan = null;
+
+        const msg = "¡Ningún problema! 😊 Volvamos a elegir. ¿Qué te gustaría llevar entonces? (Cápsulas, Semillas, Gotas)";
+        await sendMessageWithDelay(userId, msg);
+        currentState.history.push({ role: 'bot', content: msg });
+
+        _setStep(currentState, 'waiting_preference');
+        saveState();
+        return { matched: true };
+    }
+
     // Summarize ONLY if history is long (avoids unnecessary AI calls)
     if (currentState.history.length > 15) {
         const summaryResult = await aiService.checkAndSummarize(currentState.history);
