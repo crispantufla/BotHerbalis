@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../../config/axios';
+import { useToast } from '../../ui/Toast';
 
 
 const SalesView = () => {
+    const { toast, confirm } = useToast();
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [editingOrder, setEditingOrder] = useState(null);
@@ -81,6 +83,22 @@ const SalesView = () => {
             console.error('Error saving order:', e);
         }
         setSavingOrder(false);
+    };
+
+    // Delete Order
+    const handleDeleteOrder = async () => {
+        if (!editingOrder) return;
+        const ok = await confirm(`¿Estás seguro de eliminar el pedido de ${editingOrder.nombre || editingOrder.cliente}?`);
+        if (!ok) return;
+        try {
+            await api.delete(`/api/orders/${editingOrder.id}`);
+            setOrders(prev => prev.filter(o => o.id !== editingOrder.id));
+            setEditingOrder(null);
+            toast.success('Pedido eliminado');
+        } catch (e) {
+            console.error('Error deleting order:', e);
+            toast.error('Error eliminando pedido');
+        }
     };
 
     const statusOptions = ['Pendiente', 'Confirmado', 'Enviado', 'Entregado', 'Cancelado'];
@@ -243,7 +261,16 @@ const SalesView = () => {
                             </div>
                         </div>
 
-                        <div className="flex gap-3 mt-6">
+                        {/* Delete button */}
+                        <button
+                            onClick={handleDeleteOrder}
+                            className="w-full mt-6 py-2 bg-white border border-rose-200 text-rose-500 rounded-lg text-xs font-medium hover:bg-rose-50 hover:text-rose-600 transition flex items-center justify-center gap-2"
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            Eliminar Pedido
+                        </button>
+
+                        <div className="flex gap-3 mt-3">
                             <button
                                 onClick={() => setEditingOrder(null)}
                                 className="flex-1 py-2.5 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-200 transition"

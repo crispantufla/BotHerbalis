@@ -39,5 +39,21 @@ module.exports = (client, sharedState) => {
         res.json({ success: true, order: orders[index] });
     });
 
+    // DELETE /orders/:id (Delete order) - Authenticated
+    router.delete('/orders/:id', authMiddleware, (req, res) => {
+        const { id } = req.params;
+
+        if (!fs.existsSync(ORDERS_FILE)) return res.status(404).json({ error: "No orders found" });
+
+        let orders = JSON.parse(fs.readFileSync(ORDERS_FILE));
+        const index = orders.findIndex(o => o.id === id);
+        if (index === -1) return res.status(404).json({ error: "Order not found" });
+
+        const deleted = orders.splice(index, 1)[0];
+        atomicWriteFile(ORDERS_FILE, JSON.stringify(orders, null, 2));
+        if (io) io.emit('order_delete', { id });
+        res.json({ success: true, deleted });
+    });
+
     return router;
 };
