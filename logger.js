@@ -1,7 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const logDir = path.join(__dirname, 'logs');
+const DATA_DIR = process.env.DATA_DIR || __dirname;
+const logDir = path.join(DATA_DIR, 'logs');
 const LOG_RETENTION_DAYS = 30;
 
 // Ensure log directory exists
