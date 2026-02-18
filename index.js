@@ -19,9 +19,11 @@ const { buildConfirmationMessage } = require('./src/utils/messageTemplates');
 const DATA_DIR = process.env.DATA_DIR || __dirname;
 const STATE_FILE = path.join(DATA_DIR, 'persistence.json');
 const ORDERS_FILE = path.join(DATA_DIR, 'orders.json');
+// Knowledge files: save to DATA_DIR (persists on Railway), load from DATA_DIR first then source code
+const KNOWLEDGE_SAVE_DIR = DATA_DIR; // Where edits are saved (persistent volume on Railway)
 const KNOWLEDGE_FILES = {
-    'v3': path.join(__dirname, 'knowledge_v3.json'),
-    'v4': path.join(__dirname, 'knowledge_v4.json')
+    'v3': { save: path.join(KNOWLEDGE_SAVE_DIR, 'knowledge_v3.json'), source: path.join(__dirname, 'knowledge_v3.json') },
+    'v4': { save: path.join(KNOWLEDGE_SAVE_DIR, 'knowledge_v4.json'), source: path.join(__dirname, 'knowledge_v4.json') }
 };
 
 // --- STATE MANAGEMENT ---
@@ -43,7 +45,9 @@ let isConnected = false;
 function loadKnowledge(scriptName) {
     try {
         const name = scriptName || config.activeScript || 'v3';
-        const filePath = KNOWLEDGE_FILES[name] || KNOWLEDGE_FILES['v3'];
+        const paths = KNOWLEDGE_FILES[name] || KNOWLEDGE_FILES['v3'];
+        // Try persistent save path first, then source code path
+        let filePath = fs.existsSync(paths.save) ? paths.save : paths.source;
         if (fs.existsSync(filePath)) {
             const raw = fs.readFileSync(filePath);
             const parsed = JSON.parse(raw);
@@ -52,19 +56,19 @@ function loadKnowledge(scriptName) {
             Object.keys(knowledge).forEach(k => delete knowledge[k]);
             Object.assign(knowledge, parsed);
             config.activeScript = name;
-            console.log(`âœ… Knowledge loaded: ${name} (${path.basename(filePath)})`);
+            console.log(`✅ Knowledge loaded: ${name} from ${path.basename(filePath)}`);
         }
     } catch (e) {
-        console.error('ðŸ”´ Error loading knowledge:', e.message);
+        console.error('🔴 Error loading knowledge:', e.message);
     }
 }
 
 function saveKnowledge() {
     try {
-        const filePath = KNOWLEDGE_FILES[config.activeScript] || KNOWLEDGE_FILES['v3'];
-        atomicWriteFile(filePath, JSON.stringify(knowledge, null, 2));
+        const paths = KNOWLEDGE_FILES[config.activeScript] || KNOWLEDGE_FILES['v3'];
+        atomicWriteFile(paths.save, JSON.stringify(knowledge, null, 2));
     } catch (e) {
-        console.error('ðŸ”´ Error saving knowledge:', e.message);
+        console.error('🔴 Error saving knowledge:', e.message);
     }
 }
 

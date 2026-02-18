@@ -204,7 +204,11 @@ module.exports = (client, sharedState) => {
             if (version === 'v3') filename = 'knowledge_v3.json';
             if (version === 'v4') filename = 'knowledge_v4.json';
 
-            const filePath = path.join(__dirname, '../../../', filename);
+            // Check DATA_DIR (persistent edits) first, then source code
+            const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../../..');
+            const persistPath = path.join(DATA_DIR, filename);
+            const sourcePath = path.join(__dirname, '../../../', filename);
+            const filePath = fs.existsSync(persistPath) ? persistPath : sourcePath;
 
             if (fs.existsSync(filePath)) {
                 const content = JSON.parse(fs.readFileSync(filePath));
