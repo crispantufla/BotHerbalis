@@ -117,18 +117,15 @@ describe('Sales Flow Logic', () => {
         expect(mockSendMessage).toHaveBeenCalledWith('user1', "¿Cuántos kilos querés bajar?");
     });
 
-    test('Should pause and alert admin when bot cannot handle message', async () => {
-        userState['user1'] = { step: 'waiting_legal_acceptance', history: [] };
+    test('Should migrate stale step and process message', async () => {
+        userState['user1'] = { step: 'waiting_legal_acceptance', history: [], cart: [], partialAddress: {} };
 
         await processSalesFlow('user1', 'algo totalmente random', userState, knowledge, deps);
 
-        // Should have paused the user
-        expect(sharedState.pausedUsers.has('user1')).toBe(true);
-        // Should have notified admin
-        expect(mockNotifyAdmin).toHaveBeenCalledWith(
-            expect.stringContaining('PAUSADO'),
-            'user1',
-            expect.any(String)
-        );
+        // Should have migrated to waiting_final_confirmation and then processed
+        // (non-affirmative at waiting_final_confirmation still completes the order)
+        expect(userState['user1'].step).toBe('completed');
+        // Should have notified admin about unexpected response
+        expect(mockNotifyAdmin).toHaveBeenCalled();
     });
 });

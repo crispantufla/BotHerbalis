@@ -40,7 +40,7 @@
                 "practica",
                 "1"
             ],
-            "response": "Dale, buenísimo 👍 Cápsulas es lo más práctico que hay.\n\n💊 Se toman así:\n• 1 cápsula por día\n• 30 min antes de cenar\n\nMirá, tenés dos opciones para tu objetivo:\n\n🏆 *OPCIÓN RECOMENDADA (120 días)*: Hacés el tratamiento completo y te asegurás el resultado.\n💲 *$68.900* (Te queda en *$574 por día* — ¡Menos que un alfajor!)\n*Beneficio: Envío Gratis + Pagás al recibir SIN recargo.*\n\n🔸 *OPCIÓN INICIO (60 días)*:\n💲 *$48.900* (+ $6.000 de recargo administrativo por cobro en domicilio).\n\n👉 ¿Querés asegurar resultado con el de 120 o preferís probar con 60?",
+            "response": "Dale, buenísimo 👍 Cápsulas es lo más práctico que hay.\n\n💊 Se toman así:\n• 1 cápsula por día\n• 30 min antes de cenar\n\nMirá, tenés dos opciones para tu objetivo:\n\n🏆 *OPCIÓN RECOMENDADA (120 días)*: Hacés el tratamiento completo y te asegurás el resultado.\n💲 *${{PRICE_CAPSULAS_120}}*\n*Beneficio: Envío Gratis + Pagás al recibir SIN recargo.*\n\n🔸 *OPCIÓN INICIO (60 días)*:\n💲 *${{PRICE_CAPSULAS_60}}* (+ ${{ADICIONAL_MAX}} de recargo administrativo por cobro en domicilio).\n\n👉 ¿Querés asegurar resultado con el de 120 o preferís probar con 60?",
             "nextStep": "waiting_plan_choice"
         },
         "preference_semillas": {
@@ -54,7 +54,7 @@
                 "natural",
                 "tradicional"
             ],
-            "response": "Dale, buenísimo 🌿 La semilla natural es la clásica, súper potente.\n\nSe prepara como una infusión a la noche, re fácil.\n\nMirá, tenés dos opciones:\n\n🏆 *OPCIÓN RECOMENDADA (120 días)*: Tratamiento completo.\n💲 *$68.900* (Te queda en *$574 por día*)\n*Beneficio: Envío Gratis + Pagás al recibir SIN recargo.*\n\n🔸 *OPCIÓN INICIO (60 días)*:\n💲 *$48.900* (+ $6.000 de recargo administrativo).\n\n💡 *Tip: Si llevás 3 unidades (para amigas/os), tenés 30% DE DESCUENTO.*\n\n👉 ¿Le metemos con 120 o arrancamos con 60?",
+            "response": "Dale, buenísimo 🌿 La semilla natural es la clásica, súper potente.\n\nSe prepara como una infusión a la noche, re fácil.\n\nMirá, tenés dos opciones:\n\n🏆 *OPCIÓN RECOMENDADA (120 días)*: Tratamiento completo.\n💲 *${{PRICE_SEMILLAS_120}}*\n*Beneficio: Envío Gratis + Pagás al recibir SIN recargo.*\n\n🔸 *OPCIÓN INICIO (60 días)*:\n💲 *${{PRICE_SEMILLAS_60}}* (+ ${{ADICIONAL_MAX}} de recargo administrativo).\n\n💡 *Tip: Si llevás 3 unidades (para amigas/os), tenés 30% DE DESCUENTO.*\n\n👉 ¿Le metemos con 120 o arrancamos con 60?",
             "nextStep": "waiting_plan_choice"
         },
         "preference_gotas": {
@@ -64,22 +64,22 @@
                 "liquido",
                 "gotero"
             ],
-            "response": "Dale, buenísimo 🌿 Las gotas son discretas y se absorben rápido.\n\nMirá, tenés dos opciones:\n\n🏆 *OPCIÓN RECOMENDADA (120 días)*\n💲 *$68.900* (Te queda en *$574 por día*)\n*Beneficio: Envío Gratis + Pagás al recibir SIN recargo.*\n\n🔸 *OPCIÓN INICIO (60 días)*:\n💲 *$48.900* (+ $6.000 de recargo administrativo).\n\n👉 ¿Le metemos con 120 o arrancamos con 60?",
+            "response": "Dale, buenísimo 🌿 Las gotas son discretas y se absorben rápido.\n\nMirá, tenés dos opciones:\n\n🏆 *OPCIÓN RECOMENDADA (120 días)*\n💲 *${{PRICE_GOTAS_120}}*\n*Beneficio: Envío Gratis + Pagás al recibir SIN recargo.*\n\n🔸 *OPCIÓN INICIO (60 días)*:\n💲 *${{PRICE_GOTAS_60}}* (+ ${{ADICIONAL_MAX}} de recargo administrativo).\n\n👉 ¿Le metemos con 120 o arrancamos con 60?",
             "nextStep": "waiting_plan_choice"
         },
         "price_capsulas": {
             "step": "waiting_price_confirmation",
-            "response": "💊 CÁPSULAS:\n\n🏆 *Plan 120 días* → *$68.900* (Envío Gratis + Sin Recargo)\n🔸 *Plan 60 días* → *$48.900* (+ $6.000 recargo)\n\n👉 ¿Con cuál avanzamos?",
+            "response": "💊 CÁPSULAS:\n\n🏆 *Plan 120 días* → *${{PRICE_CAPSULAS_120}}* (Envío Gratis + Sin Recargo)\n🔸 *Plan 60 días* → *${{PRICE_CAPSULAS_60}}* (+ ${{ADICIONAL_MAX}} recargo)\n\n👉 ¿Con cuál avanzamos?",
             "nextStep": "waiting_plan_choice"
         },
         "price_semillas": {
             "step": "waiting_price_confirmation",
-            "response": "🌱 SEMILLAS:\n\n🏆 *Plan 120 días* → *$68.900* (Envío Gratis + Sin Recargo)\n🔸 *Plan 60 días* → *$48.900* (+ $6.000 recargo)\n\n👉 ¿Con cuál avanzamos?",
+            "response": "🌱 SEMILLAS:\n\n🏆 *Plan 120 días* → *${{PRICE_SEMILLAS_120}}* (Envío Gratis + Sin Recargo)\n🔸 *Plan 60 días* → *${{PRICE_SEMILLAS_60}}* (+ ${{ADICIONAL_MAX}} recargo)\n\n👉 ¿Con cuál avanzamos?",
             "nextStep": "waiting_plan_choice"
         },
         "price_gotas": {
             "step": "waiting_price_confirmation",
-            "response": "💧 GOTAS:\n\n🏆 *Plan 120 días* → *$68.900* (Envío Gratis + Sin Recargo)\n🔸 *Plan 60 días* → *$48.900* (+ $6.000 recargo)\n\n👉 ¿Con cuál avanzamos?",
+            "response": "💧 GOTAS:\n\n🏆 *Plan 120 días* → *${{PRICE_GOTAS_120}}* (Envío Gratis + Sin Recargo)\n🔸 *Plan 60 días* → *${{PRICE_GOTAS_60}}* (+ ${{ADICIONAL_MAX}} recargo)\n\n👉 ¿Con cuál avanzamos?",
             "nextStep": "waiting_plan_choice"
         },
         "closing": {

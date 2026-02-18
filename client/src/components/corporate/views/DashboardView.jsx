@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import api from '../../../config/axios';
 
 import { useSocket } from '../../../context/SocketContext';
@@ -84,7 +85,7 @@ const CorporateDashboardView = ({ alerts, config, handleQuickAction, status, qrD
                     <h3 className="text-lg font-bold text-slate-800 mb-2">📱 Escanea el código QR</h3>
                     <p className="text-sm text-slate-500 mb-4">Abrí WhatsApp → Configuración → Dispositivos vinculados → Vincular un dispositivo</p>
                     <div className="inline-block p-4 bg-white rounded-lg border border-slate-200 shadow-sm">
-                        <img src={qrData} alt="QR Code" className="w-64 h-64" />
+                        <QRCodeSVG value={qrData} size={256} level="M" />
                     </div>
                 </div>
             )}

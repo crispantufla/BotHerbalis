@@ -64,10 +64,7 @@ const AlertsPanel = ({ alerts, onCommand, onQuickAction }) => {
                                 {/* Quick Actions */}
                                 <div className="flex items-center gap-1.5 flex-shrink-0 ml-3">
                                     <button
-                                        onClick={() => handleSend(alert, 'confirmar')} // Use handleSend for confirming too if desired, or quick action?
-                                        // Original passed 'confirmar' to handleAdminCommand.
-                                        // But handleAdminCommand takes (alert, command).
-                                        // Here we call handleSend(alert, 'confirmar').
+                                        onClick={() => onQuickAction(alert.userPhone, 'confirmar')}
                                         className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600 text-white rounded-md text-xs font-bold hover:bg-emerald-700 transition shadow-sm"
                                     >
                                         <Icons.Check /> APROBAR

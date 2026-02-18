@@ -561,7 +561,7 @@ INSTRUCCIONES:
                 () => this.client.chat.completions.create({
                     model: this.model,
                     messages: [
-                        { role: "system", content: SYSTEM_INSTRUCTIONS },
+                        { role: "system", content: _getSystemInstructions() },
                         { role: "user", content: prompt }
                     ],
                     temperature: 0.7,

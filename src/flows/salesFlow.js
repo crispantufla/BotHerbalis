@@ -95,7 +95,7 @@ function _getStepRedirect(step, state) {
         'waiting_plan_choice': '👉 Entonces, ¿con qué plan te gustaría avanzar? 60 o 120 días?',
         'waiting_ok': '👉 ¿Te resulta posible retirar en sucursal si fuera necesario? SÍ o NO',
         'waiting_data': '👉 Pasame los datos para el envío: nombre, calle y número, ciudad y código postal.',
-        'waiting_legal_acceptance': '👉 Para confirmar, respondé: "LEÍ Y ACEPTO LAS CONDICIONES DE ENVÍO"',
+        'waiting_final_confirmation': '👉 Confirmame que podrás recibir o retirar el pedido sin inconvenientes.',
     };
     return redirects[step] || null;
 }
@@ -216,10 +216,6 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
         }
     }
 
-    // ─────────────────────────────────────────────────
-    // 1. Check Global FAQs (Priority 1 — NO AI needed)
-    //    AFTER answering, ALWAYS redirect back to the current step
-    // ─────────────────────────────────────────────────
     // ─────────────────────────────────────────────────
     // 1. Check Global FAQs (Priority 1 — NO AI needed)
     //    AFTER answering, ALWAYS redirect back to the current step
@@ -686,10 +682,6 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
                 currentState.pendingOrder = { ...addr, cart: currentState.cart };
 
-                // OLD: currentState.step = 'waiting_admin_ok';
-                // NEW: We will transition to final confirmation below
-                saveState();
-
                 // Format Cart for Admin — include Contra Reembolso MAX
                 const cartSummary = currentState.cart.map(i => `${i.product} (${i.plan} días)`).join(', ');
                 const subtotal = currentState.cart.reduce((sum, i) => sum + parseInt(i.price.replace('.', '')), 0);
@@ -698,16 +690,11 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 currentState.totalPrice = total.toLocaleString('es-AR').replace(/,/g, '.'); // Ensure total is saved in state
                 const maxLabel = adicional > 0 ? ` + $${adicional.toLocaleString('es-AR')}` : '';
 
-                await notifyAdmin(`Pedido CASI completo`, userId, `Datos: ${addr.nombre}, ${addr.calle}\nItems: ${cartSummary}\nSubtotal: $${subtotal}${maxLabel}\nTotal: $${currentState.totalPrice}`);
-
-                // Send Confirmation Summary directly
-                const confirmationNode = knowledge.flow.confirmation;
-                const msg = _formatMessage(confirmationNode.response, currentState);
-                await sendMessageWithDelay(userId, msg);
-
-                currentState.step = 'waiting_final_confirmation';
-                currentState.history.push({ role: 'bot', content: msg });
+                // Set step to waiting_admin_ok — admin must APPROVE before bot sends confirmation
+                currentState.step = 'waiting_admin_ok';
                 saveState();
+
+                await notifyAdmin(`Pedido CASI completo`, userId, `Datos: ${addr.nombre}, ${addr.calle}\nItems: ${cartSummary}\nSubtotal: $${subtotal}${maxLabel}\nTotal: $${currentState.totalPrice}`);
                 matched = true;
             } else if (currentState.addressAttempts >= 3) {
                 // Too many attempts — pause and alert admin
@@ -752,16 +739,41 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
                     if (dependencies.saveOrderToLocal) dependencies.saveOrderToLocal(orderData);
                     appendOrderToSheet(orderData).catch(e => console.error('🔴 [SHEETS] Async log failed:', e.message));
-                    await notifyAdmin(`✅ PEDIDO CONFIRMADO`, userId, `Cliente confirmó envío.\nTotal: $${finalPrice}`);
+                    console.log(`✅ [PEDIDO CONFIRMADO] ${userId} — Total: $${finalPrice}`);
                 }
 
                 currentState.step = 'completed';
                 currentState.history.push({ role: 'bot', content: msg });
                 saveState();
                 matched = true;
-            } else if (_isNegative(normalizedText)) {
-                // User cancel at the very end??
-                await _pauseAndAlert(userId, currentState, dependencies, text, 'Cliente canceló en confirmación final.');
+            } else {
+                // Not affirmative — alert admin without pausing, still process the order
+                await notifyAdmin('⚠️ Respuesta inesperada en confirmación final', userId, `Cliente respondió: "${text}". El pedido se procesó igual.`);
+
+                // Still save the order — the sale is done at this point
+                const msg = "¡Tu pedido ya fue ingresado! 🚀\n\nTe vamos a avisar cuando lo despachemos con el número de seguimiento.\n\n¡Gracias por confiar en Herbalis!";
+                await sendMessageWithDelay(userId, msg);
+
+                if (currentState.pendingOrder) {
+                    const o = currentState.pendingOrder;
+                    const cart = o.cart || [];
+                    const prodStr = cart.map(i => i.product).join(' + ');
+                    const planStr = cart.map(i => `${i.plan} días`).join(' + ');
+                    const finalPrice = currentState.totalPrice || "0";
+
+                    const orderData = {
+                        cliente: userId,
+                        nombre: o.nombre, calle: o.calle, ciudad: o.ciudad, cp: o.cp,
+                        producto: prodStr, plan: planStr, precio: finalPrice,
+                        createdAt: new Date().toISOString(), status: 'Pendiente (revisar respuesta)'
+                    };
+                    if (dependencies.saveOrderToLocal) dependencies.saveOrderToLocal(orderData);
+                    appendOrderToSheet(orderData).catch(e => console.error('[SHEETS] Async log failed:', e.message));
+                }
+
+                currentState.step = 'completed';
+                currentState.history.push({ role: 'bot', content: msg });
+                saveState();
                 matched = true;
             }
             break;
@@ -775,18 +787,82 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             break;
         }
 
-        case 'completed':
-            if (lowerText.includes('hola')) {
-                currentState.step = 'greeting';
-                const msg = _formatMessage(knowledge.flow.greeting.response);
-                await sendMessageWithDelay(userId, msg);
-                currentState.step = knowledge.flow.greeting.nextStep;
-                currentState.history.push({ role: 'bot', content: msg });
+        case 'completed': {
+            // POST-SALE MODE: Customer already bought. Act as post-sale assistant.
+            console.log(`[POST-SALE] Message from completed customer ${userId}: "${text}"`);
+
+            const postSaleAI = await aiService.chat(text, {
+                step: 'post_sale',
+                goal: `Este cliente YA COMPRÓ. Sos un asistente post-venta amable. Reglas estrictas:
+1. Si saluda ("hola", "buenas"), respondé brevemente y preguntá en qué lo podés ayudar. NO reiniciar el flujo de venta.
+2. Si pregunta por su pedido (envío, seguimiento, demora), respondé que los envíos tardan de 7 a 10 días hábiles por Correo Argentino y que le van a avisar cuando lo despachen con el número de seguimiento.
+3. Si tiene un reclamo, duda compleja, o algo que no sabés resolver, respondé "NEED_ADMIN" como extractedData y avisale al cliente que lo vas a comunicar con un asesor.
+4. Si quiere VOLVER A COMPRAR (explícitamente dice que quiere otro producto, más, otro plan, etc), respondé "RE_PURCHASE" como extractedData y preguntale directamente qué producto y plan quiere (sin explicar todo de nuevo, ya conoce los productos).
+5. NUNCA inventes información sobre entregas, precios, ni stock. Ante la duda → NEED_ADMIN.`,
+                history: currentState.history,
+                summary: currentState.summary,
+                knowledge: knowledge
+            });
+
+            if (postSaleAI.extractedData === 'RE_PURCHASE') {
+                // Customer wants to buy again — skip intro, go to plan choice
+                console.log(`[POST-SALE] Customer ${userId} wants to re-purchase. Skipping to preference.`);
+                currentState.step = 'waiting_preference';
+                currentState.cart = [];
+                currentState.pendingOrder = null;
+                currentState.partialAddress = {};
+                currentState.addressAttempts = 0;
                 saveState();
+
+                if (postSaleAI.response) {
+                    await sendMessageWithDelay(userId, postSaleAI.response);
+                    currentState.history.push({ role: 'bot', content: postSaleAI.response });
+                }
+                matched = true;
+            } else if (postSaleAI.extractedData === 'NEED_ADMIN') {
+                // Complex question — alert admin
+                await _pauseAndAlert(userId, currentState, dependencies, text, 'Cliente post-venta necesita asistencia humana.');
+                if (postSaleAI.response) {
+                    await sendMessageWithDelay(userId, postSaleAI.response);
+                    currentState.history.push({ role: 'bot', content: postSaleAI.response });
+                }
+                matched = true;
+            } else if (postSaleAI.response) {
+                // Normal post-sale response (greeting, shipping question, etc.)
+                await sendMessageWithDelay(userId, postSaleAI.response);
+                currentState.history.push({ role: 'bot', content: postSaleAI.response });
                 matched = true;
             }
-            // If not "hola" → pause+alert (possible post-sale question)
             break;
+        }
+
+        // Handle stale/unknown step names (e.g. from old persistence.json)
+        default: {
+            console.log(`[STALE-STEP] User ${userId} has unknown step "${currentState.step}". Migrating...`);
+            // Migration map for renamed steps
+            const stepMigrations = {
+                'waiting_legal_acceptance': 'waiting_final_confirmation',
+            };
+            const migratedStep = stepMigrations[currentState.step];
+            if (migratedStep) {
+                console.log(`[STALE-STEP] Migrating ${currentState.step} → ${migratedStep}`);
+                currentState.step = migratedStep;
+                saveState();
+                // Re-process with the correct step (recursive, but only once)
+                return processSalesFlow(userId, text, userState, knowledge, dependencies);
+            } else {
+                // Unknown step with no migration — reset to greeting
+                console.log(`[STALE-STEP] No migration for "${currentState.step}". Resetting to greeting.`);
+                currentState.step = 'greeting';
+                currentState.cart = [];
+                currentState.pendingOrder = null;
+                currentState.partialAddress = {};
+                currentState.addressAttempts = 0;
+                saveState();
+                // Process as new greeting
+                return processSalesFlow(userId, text, userState, knowledge, dependencies);
+            }
+        }
     }
 
     // ─────────────────────────────────────────────────

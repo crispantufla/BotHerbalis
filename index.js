@@ -1,4 +1,4 @@
-require('dotenv').config();
+﻿require('dotenv').config();
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const { exec } = require('child_process'); // For sound
@@ -45,10 +45,10 @@ function loadKnowledge(scriptName) {
             Object.keys(knowledge).forEach(k => delete knowledge[k]);
             Object.assign(knowledge, parsed);
             config.activeScript = name;
-            console.log(`✅ Knowledge loaded: ${name} (${path.basename(filePath)})`);
+            console.log(`âœ… Knowledge loaded: ${name} (${path.basename(filePath)})`);
         }
     } catch (e) {
-        console.error('🔴 Error loading knowledge:', e.message);
+        console.error('ðŸ”´ Error loading knowledge:', e.message);
     }
 }
 
@@ -57,7 +57,7 @@ function saveKnowledge() {
         const filePath = KNOWLEDGE_FILES[config.activeScript] || KNOWLEDGE_FILES['v3'];
         atomicWriteFile(filePath, JSON.stringify(knowledge, null, 2));
     } catch (e) {
-        console.error('🔴 Error saving knowledge:', e.message);
+        console.error('ðŸ”´ Error saving knowledge:', e.message);
     }
 }
 
@@ -72,7 +72,7 @@ function saveState() {
         };
         atomicWriteFile(STATE_FILE, JSON.stringify(stateToSave, null, 2));
     } catch (e) {
-        console.error('🔴 Error saving state:', e.message);
+        console.error('ðŸ”´ Error saving state:', e.message);
     }
 }
 
@@ -102,10 +102,10 @@ function loadState() {
             }
             if (!config.alertNumbers) config.alertNumbers = [];
 
-            console.log('✅ State loaded from persistence.json');
+            console.log('âœ… State loaded from persistence.json');
         }
     } catch (e) {
-        console.error('🔴 Error loading state:', e.message);
+        console.error('ðŸ”´ Error loading state:', e.message);
     }
 }
 
@@ -196,7 +196,7 @@ const sendMessageWithDelay = async (chatId, content, startTime = Date.now()) => 
 
     console.log(`[DELAY] AI took ${elapsedSinceStart / 1000}s. Waiting ${remainingDelay / 1000}s more (Target: ${targetTotalDelay / 1000}s)`);
 
-    // Note: duplicate message detection removed — bot can legitimately
+    // Note: duplicate message detection removed â€” bot can legitimately
     // need to repeat the same message (e.g. re-prompting after FAQ)
     logAndEmit(chatId, 'bot', content, userState[chatId]?.step);
 
@@ -213,7 +213,7 @@ const sendMessageWithDelay = async (chatId, content, startTime = Date.now()) => 
 // Helper: Notify Admin
 async function notifyAdmin(reason, userPhone, details = null) {
     exec('powershell "[console]::beep(1000, 500)"', (err) => { if (err) console.error("Beep failed:", err); });
-    console.error(`⚠️ [ADMIN ALERT] ${reason} (User: ${userPhone})`);
+    console.error(`âš ï¸ [ADMIN ALERT] ${reason} (User: ${userPhone})`);
 
     const now = Date.now();
     const lastAlert = sessionAlerts[0];
@@ -275,15 +275,17 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false) {
         if (!actualTarget) return "No pending user.";
         const clientState = userState[actualTarget];
         if (clientState && clientState.step === 'waiting_admin_ok' && clientState.pendingOrder) {
-            const o = clientState.pendingOrder;
-            const product = clientState.selectedProduct || "Nuez de la India";
-            const plan = clientState.selectedPlan || "60";
-            const price = clientState.price || "36.900";
+            const cart = clientState.cart || [];
+            const productStr = cart.map(i => i.product).join(' + ') || clientState.selectedProduct || "Nuez de la India";
+            const planStr = cart.map(i => `${i.plan} días`).join(' + ') || `${clientState.selectedPlan || '60'} días`;
+            const totalPrice = clientState.totalPrice || "0";
 
-            const summary = `✅ *PEDIDO CASI LISTO* 😊\n\n📌 *Resumen de tu compra:*\n• Producto: ${product}\n• Plan: ${plan} días\n• Total a pagar: *$${price}* (en efectivo al recibir)\n\n📦 *Envío por Correo Argentino*\n⏳ Demora estimada: 7 a 10 días hábiles\n\n📍 *A tener en cuenta:*\n• Si el cartero no te encuentra, el correo puede pedir retiro en sucursal\n• El plazo de retiro es de 72 hs hábiles\n• Rechazar el pedido genera un costo de $16.500\n\n👉 Para confirmar el despacho respondé por favor: *“LEÍ Y ACEPTO LAS CONDICIONES DE ENVÍO”*`;
+            const summary = `📦 *CONFIRMACIÓN DE ENVÍO*\n\nProducto: ${productStr}\nPlan: ${planStr}\nTotal a pagar al recibir:\n$${totalPrice}\n\n✔ Correo Argentino\n✔ Entrega estimada: 7 a 10 días hábiles\n✔ Pago en efectivo al recibir\n\n*Importante:*\nSi el cartero no encuentra a nadie,\nel correo puede solicitar retiro en sucursal.\nPlazo: 72 hs.\n\nEl rechazo o no retiro genera un costo logístico de $18.000.\n\n👉 Confirmame que podrás recibir o retirar el pedido sin inconvenientes.`;
             await client.sendMessage(actualTarget, summary);
-            logAndEmit(actualTarget, 'bot', summary, 'waiting_legal_acceptance');
-            clientState.step = 'waiting_legal_acceptance';
+            logAndEmit(actualTarget, 'bot', summary, 'waiting_final_confirmation');
+            clientState.step = 'waiting_final_confirmation';
+            clientState.history = clientState.history || [];
+            clientState.history.push({ role: 'bot', content: summary });
             saveState();
 
             // Clear alerts
@@ -292,33 +294,9 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false) {
                 sessionAlerts.splice(index, 1);
                 if (sharedState.io) sharedState.io.emit('alerts_updated', sessionAlerts);
             }
-            return `✅ Resumen enviado a ${actualTarget}. Esperando aceptación legal.`;
+            return `✅ Confirmación enviada a ${actualTarget}. Esperando respuesta del cliente.`;
         }
         return "⚠️ No hay pedido pendiente de aprobación.";
-    }
-
-    // 3. Pause
-    if (lowerMsg.includes('lo manejo yo') || lowerMsg.includes('me encargo')) {
-        const actualTarget = targetChatId || lastAlertUser;
-        if (actualTarget) {
-            pausedUsers.add(actualTarget);
-            saveState();
-            if (sharedState.io) sharedState.io.emit('bot_status_change', { chatId: actualTarget, paused: true });
-            return `✅ Bot pausado para ${actualTarget}`;
-        }
-        return "⚠️ No hay cliente para pausar.";
-    }
-
-    // 4. Resume
-    if (lowerMsg.includes('reactivar') || lowerMsg.includes('activar bot')) {
-        const actualTarget = targetChatId || lastAlertUser;
-        if (actualTarget && pausedUsers.has(actualTarget)) {
-            pausedUsers.delete(actualTarget);
-            saveState();
-            if (sharedState.io) sharedState.io.emit('bot_status_change', { chatId: actualTarget, paused: false });
-            return `✅ Bot reactivado para ${actualTarget}`;
-        }
-        return "No hay clientes pausados.";
     }
 
     // 5. AI Instruction (Default Fallback)
@@ -326,7 +304,7 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false) {
     if (actualTarget) {
         try {
             const history = (userState[actualTarget]?.history || [])
-                .map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n');
+                .map(m => `${m.role.toUpperCase()}: ${m.content} `).join('\n');
             const suggestion = await aiService.generateSuggestion(commandText, history);
 
             if (suggestion) {
@@ -344,26 +322,26 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false) {
             }
         } catch (e) {
             console.error('AI Suggestion Error:', e);
-            return "⚠️ Error generando sugerencia IA.";
+            return "âš ï¸ Error generando sugerencia IA.";
         }
     }
 
-    return "⚠️ Comando no reconocido o sin usuario activo.";
+    return "âš ï¸ Comando no reconocido o sin usuario activo.";
 }
 sharedState.handleAdminCommand = handleAdminCommand; // Expose to server
 
 
 if (!process.env.OPENAI_API_KEY) {
-    console.error("❌ CRITICAL: OPENAI_API_KEY is missing in .env!");
+    console.error("âŒ CRITICAL: OPENAI_API_KEY is missing in .env!");
 } else {
     // Basic mask check log
-    console.log(`✅ OPENAI_API_KEY initialized.`);
+    console.log(`âœ… OPENAI_API_KEY initialized.`);
 }
 
 if (!process.env.API_KEY) {
-    console.warn("⚠️ SECURITY WARNING: API_KEY not set in .env. Using default insecure key.");
+    console.warn("âš ï¸ SECURITY WARNING: API_KEY not set in .env. Using default insecure key.");
 } else {
-    console.log(`🔒 Security: API_KEY configured.`);
+    console.log(`ðŸ”’ Security: API_KEY configured.`);
 }
 
 // --- CLIENT EVENTS ---
@@ -379,97 +357,107 @@ client.on('ready', () => {
     console.log('¡Cliente WhatsApp Listo!');
     sharedState.isConnected = true;
     sharedState.qrCodeData = null;
+    sharedState.connectedAt = Math.floor(Date.now() / 1000);
+    console.log(`[READY] connectedAt = ${sharedState.connectedAt}. Ignoring older messages.`);
     if (sharedState.io) sharedState.io.emit('ready', { info: client.info });
 });
 
 client.on('disconnected', (reason) => {
-    console.log('🔴 Cliente desconectado:', reason);
+    console.log('ðŸ”´ Cliente desconectado:', reason);
     sharedState.isConnected = false;
     sharedState.qrCodeData = null;
     if (sharedState.io) sharedState.io.emit('status_change', { status: 'disconnected' });
-    client.initialize().catch(err => console.error("🔴 Re-init failed:", err.message));
+    client.initialize().catch(err => console.error("ðŸ”´ Re-init failed:", err.message));
 });
 
 client.on('message', async msg => {
-    if (msg.from === 'status@broadcast') return;
-    const chat = await msg.getChat();
-    // if (chat.isGroup) return; // Allow groups? usually no for sales bots.
-    if (chat.isGroup) return;
+    try {
+        if (msg.from === 'status@broadcast') return;
 
-    const userId = msg.from;
-    const adminNumber = process.env.ADMIN_NUMBER;
-    const cleanAdmin = adminNumber ? adminNumber.replace(/\D/g, '') : '';
-    const isAdmin = msg.fromMe || (cleanAdmin && userId.startsWith(cleanAdmin));
-    const msgText = (msg.body || '').trim();
+        // Skip messages from BEFORE the bot connected (old history)
+        if (sharedState.connectedAt && msg.timestamp && msg.timestamp < sharedState.connectedAt) return;
 
-    // --- ADMIN COMMANDS ---
-    if (isAdmin) {
-        if (!msgText) return;
-        console.log(`[ADMIN] ${userId}: ${msgText}`);
+        const chat = await msg.getChat();
+        if (chat.isGroup) return;
 
-        // 1. !saltear
-        if (msgText.toLowerCase().startsWith('!saltear ')) {
-            // ... existing logic ...
-            const parts = msgText.split(' ');
-            const targetNumber = parts[1];
-            if (!targetNumber) return;
-            const targetChatId = targetNumber.includes('@') ? targetNumber : `${targetNumber.replace(/\D/g, '')}@c.us`;
-            if (!userState[targetChatId]) userState[targetChatId] = { step: 'greeting', partialAddress: {} };
-            userState[targetChatId].step = 'waiting_data';
-            saveState();
-            await client.sendMessage(targetChatId, knowledge.flow.data_request.response);
-            await client.sendMessage(msg.from, `✅ Usuario ${targetNumber} forzado.`);
-            return;
-        }
+        const userId = msg.from;
+        const adminNumber = process.env.ADMIN_NUMBER;
+        const cleanAdmin = adminNumber ? adminNumber.replace(/\D/g, '') : '';
+        const alertNumbers = (config.alertNumbers || []).map(n => n.replace(/\D/g, ''));
+        const isAdmin = msg.fromMe || (cleanAdmin && userId.startsWith(cleanAdmin)) || alertNumbers.some(n => userId.startsWith(n));
+        const msgText = (msg.body || '').trim();
 
-        // 2. !ayuda
-        if (msgText.toLowerCase() === '!ayuda') {
-            await client.sendMessage(msg.from, `📋 *Comandos*: !resumen, !saltear, "ok", "me encargo"`);
-            return;
-        }
+        // --- ADMIN COMMANDS ---
+        if (isAdmin) {
+            if (!msgText) return;
+            console.log(`[ADMIN] ${userId}: ${msgText} `);
 
-        // 3. Natural Language Admin
-        const result = await handleAdminCommand(lastAlertUser, msgText);
-        if (result) await client.sendMessage(msg.from, result);
-        return;
-    }
-
-    // --- USER MESSAGES ---
-
-    // 1. Media Handling (Audio)
-    if (msg.hasMedia || msg.type === 'ptt' || msg.type === 'audio') {
-        const media = await msg.downloadMedia();
-        if (media) {
-            const transcription = await aiService.transcribeAudio(media.data, media.mimetype);
-            if (transcription) {
-                console.log(`[AUDIO] Transcribed: "${transcription}"`);
-                const startTime = Date.now();
-                await processSalesFlow(userId, transcription, userState, knowledge, {
-                    client, notifyAdmin, saveState, sendMessageWithDelay: (id, text) => sendMessageWithDelay(id, text, startTime), logAndEmit, saveOrderToLocal, sharedState
-                });
-            } else {
-                await client.sendMessage(userId, "Disculpá, no pude escuchar bien el audio. ¿Me lo escribís?");
+            // 1. !saltear
+            if (msgText.toLowerCase().startsWith('!saltear ')) {
+                // ... existing logic ...
+                const parts = msgText.split(' ');
+                const targetNumber = parts[1];
+                await client.sendMessage(msg.from, `✅ Usuario ${targetNumber} forzado.`);
+                const targetChatId = targetNumber.includes('@') ? targetNumber : `${targetNumber.replace(/\D/g, '')} @c.us`;
+                if (!userState[targetChatId]) userState[targetChatId] = { step: 'greeting', partialAddress: {} };
+                userState[targetChatId].step = 'waiting_data';
+                saveState();
+                await client.sendMessage(targetChatId, knowledge.flow.data_request.response);
+                await client.sendMessage(msg.from, `📋 *Comandos*: !resumen, !saltear, "ok", "me encargo"`);
+                return;
             }
+
+            // 2. !ayuda
+            if (msgText.toLowerCase() === '!ayuda') {
+                await client.sendMessage(msg.from, `ðŸ“‹ * Comandos *: !resumen, !saltear, "ok", "me encargo"`);
+                return;
+            }
+
+            // 3. Natural Language Admin
+            const result = await handleAdminCommand(lastAlertUser, msgText);
+            if (result) await client.sendMessage(msg.from, result);
+            return;
         }
-        return;
+
+        // --- USER MESSAGES ---
+
+        // 1. Media Handling (Audio)
+        if (msg.hasMedia || msg.type === 'ptt' || msg.type === 'audio') {
+            const media = await msg.downloadMedia();
+            if (media) {
+                const transcription = await aiService.transcribeAudio(media.data, media.mimetype);
+                if (transcription) {
+                    console.log(`[AUDIO] Transcribed: "${transcription}"`);
+                    const startTime = Date.now();
+                    await processSalesFlow(userId, transcription, userState, knowledge, {
+                        client, notifyAdmin, saveState, sendMessageWithDelay: (id, text) => sendMessageWithDelay(id, text, startTime), logAndEmit, saveOrderToLocal, sharedState
+                    });
+                } else {
+                    await client.sendMessage(userId, "Disculpá, no pude escuchar bien el audio. ¿Me lo escribís?");
+                }
+            }
+            return;
+        }
+
+        if (!msgText) return;
+
+        // 2. Logging
+        logAndEmit(userId, 'user', msgText, userState[userId]?.step || 'new');
+
+        // 3. Paused Check
+        if (pausedUsers.has(userId)) {
+            console.log(`[PAUSED] Ignoring message from ${userId} `);
+            return;
+        }
+
+        // 4. Process Flow
+        const startTime = Date.now();
+        await processSalesFlow(userId, msgText, userState, knowledge, {
+            client, notifyAdmin, saveState, sendMessageWithDelay: (id, text) => sendMessageWithDelay(id, text, startTime), logAndEmit, saveOrderToLocal, sharedState
+        });
+    } catch (err) {
+        console.error(`🔴[MESSAGE HANDLER ERROR] ${err.message} `);
     }
-
-    if (!msgText) return;
-
-    // 2. Logging
-    logAndEmit(userId, 'user', msgText, userState[userId]?.step || 'new');
-
-    // 3. Paused Check
-    if (pausedUsers.has(userId)) {
-        console.log(`[PAUSED] Ignoring message from ${userId}`);
-        return;
-    }
-
-    // 4. Process Flow
-    const startTime = Date.now();
-    await processSalesFlow(userId, msgText, userState, knowledge, {
-        client, notifyAdmin, saveState, sendMessageWithDelay: (id, text) => sendMessageWithDelay(id, text, startTime), logAndEmit, saveOrderToLocal, sharedState
-    });
 });
 
 
