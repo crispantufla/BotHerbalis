@@ -1,4 +1,5 @@
 const { aiService } = require('../services/ai');
+const { MessageMedia } = require('whatsapp-web.js');
 const { validateAddress } = require('../services/addressValidator');
 const { atomicWriteFile } = require('../../safeWrite');
 const { appendOrderToSheet } = require('../../sheets_sync');
@@ -393,6 +394,18 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
     switch (logicStage) {
         case 'greeting':
+            // Send Welcome Image (if exists)
+            try {
+                const imagePath = path.join(__dirname, '../../public/media/Gretings.jfif');
+                if (fs.existsSync(imagePath)) {
+                    console.log(`[GREETING] Sending image to ${userId}`);
+                    const media = MessageMedia.fromFilePath(imagePath);
+                    await client.sendMessage(userId, media);
+                }
+            } catch (e) {
+                console.error('[GREETING] Failed to send image:', e.message);
+            }
+
             const greetMsg = _formatMessage(knowledge.flow.greeting.response);
             await sendMessageWithDelay(userId, greetMsg);
             _setStep(currentState, knowledge.flow.greeting.nextStep);
