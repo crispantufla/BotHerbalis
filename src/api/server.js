@@ -32,6 +32,7 @@ function startServer(client, sharedState) {
     sharedState.io = io;
 
     // Middleware
+    app.set('trust proxy', 1); // Trust first proxy (Railway/Load Balancer)
     app.use(cors({
         origin: process.env.DASHBOARD_URL || "http://localhost:5173"
     }));
