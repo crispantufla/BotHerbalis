@@ -397,11 +397,20 @@ client.on('ready', () => {
 });
 
 client.on('disconnected', (reason) => {
-    console.log('ðŸ”´ Cliente desconectado:', reason);
+    console.log('[WA] Cliente desconectado:', reason);
     sharedState.isConnected = false;
     sharedState.qrCodeData = null;
     if (sharedState.io) sharedState.io.emit('status_change', { status: 'disconnected' });
-    client.initialize().catch(err => console.error("ðŸ”´ Re-init failed:", err.message));
+    if (sharedState.manualDisconnect) {
+        console.log('[WA] Desconexion manual - esperando nuevo QR');
+        sharedState.manualDisconnect = false;
+        setTimeout(() => {
+            client.initialize().catch(err => console.error('[WA] Re-init failed:', err.message));
+        }, 3000);
+    } else {
+        console.log('[WA] Desconexion accidental - reconectando...');
+        client.initialize().catch(err => console.error('[WA] Re-init failed:', err.message));
+    }
 });
 
 client.on('message', async msg => {

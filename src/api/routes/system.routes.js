@@ -113,13 +113,15 @@ module.exports = (client, sharedState) => {
     // POST /logout
     router.post('/logout', authMiddleware, async (req, res) => {
         try {
-            console.log('[WHATSAPP] Logging out...');
+            console.log('[WHATSAPP] Manual logout requested...');
+            sharedState.manualDisconnect = true;
             sharedState.isConnected = false;
             sharedState.qrCodeData = null;
             if (client && client.info) await client.logout();
             if (io) io.emit('status_change', { status: 'disconnected' });
             res.json({ success: true });
         } catch (e) {
+            sharedState.manualDisconnect = false;
             res.status(500).json({ error: e.message });
         }
     });
