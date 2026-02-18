@@ -119,7 +119,10 @@ module.exports = (client, sharedState) => {
                         const timeDiff = Math.abs(m.timestamp - lm.timestamp);
                         const sameRole = m.fromMe === lm.fromMe;
                         const isMediaLog = lm.body?.startsWith('MEDIA_');
-                        return sameRole && timeDiff <= 3 && isMediaLog;
+                        // Audio messages are logged as "🎤 Audio: ..." not "MEDIA_AUDIO:..."
+                        const isAudioLog = (m.type === 'audio' || m.type === 'ptt') && lm.body?.startsWith('🎤');
+                        const isImageLog = (m.type === 'image' || m.type === 'sticker') && lm.body?.startsWith('📷');
+                        return sameRole && timeDiff <= 3 && (isMediaLog || isAudioLog || isImageLog);
                     });
                     if (match) return { ...m, body: match.body };
                 }
@@ -133,7 +136,11 @@ module.exports = (client, sharedState) => {
                     const sameRole = m.fromMe === lm.fromMe;
                     // Tolerance 30s: logAndEmit logs instantly but sendMessageWithDelay
                     // sends 10-25s later, so WA timestamp is much later than local log
-                    return sameRole && timeDiff <= 30 && (m.body === lm.body || (lm.body?.startsWith('MEDIA_') && m.hasMedia));
+                    const bodyMatch = m.body === lm.body;
+                    const mediaMatch = lm.body?.startsWith('MEDIA_') && m.hasMedia;
+                    const audioMatch = lm.body?.startsWith('🎤') && (m.type === 'audio' || m.type === 'ptt');
+                    const imageMatch = lm.body?.startsWith('📷') && (m.type === 'image' || m.type === 'sticker');
+                    return sameRole && timeDiff <= 30 && (bodyMatch || mediaMatch || audioMatch || imageMatch);
                 });
                 if (!isDuplicate) combined.push(lm);
             });
