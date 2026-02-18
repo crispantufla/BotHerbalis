@@ -97,7 +97,8 @@ const PriceEditor = () => {
                                 ))}
                             </div>
                         </div>
-                    ))}
+                    ))
+                )}
             </div>
 
             <div className="mt-6 flex justify-between items-center pt-4 border-t border-slate-100">
