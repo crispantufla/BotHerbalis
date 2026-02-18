@@ -265,11 +265,11 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
     if (CANCEL_REGEX.test(normalizedText) && !isNegative) {
         console.log(`[GLOBAL] User ${userId} requested cancellation.`);
-        const msg = "Entiendo, le aviso a administración para que procese la baja de inmediato. Disculpá las molestias. 🙏";
+        const msg = "Qué pena... 😔 ¿Por qué querés cancelarlo? (Respondeme y le aviso a mi compañero para que te ayude)";
         await sendMessageWithDelay(userId, msg);
         currentState.history.push({ role: 'bot', content: msg });
 
-        await _pauseAndAlert(userId, currentState, dependencies, text, '🚫 Solicitud de cancelación directa.');
+        await _pauseAndAlert(userId, currentState, dependencies, text, '🚫 Solicitud de cancelación. El bot preguntó motivo.');
         return { matched: true };
     }
 
