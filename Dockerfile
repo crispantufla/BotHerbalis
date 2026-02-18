@@ -30,6 +30,8 @@ RUN cd client && npm ci --production=false
 COPY . .
 
 # Build Client
+ARG VITE_API_KEY
+ENV VITE_API_KEY=$VITE_API_KEY
 RUN cd client && npm run build
 
 # Set production environment for runtime
