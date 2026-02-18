@@ -30,6 +30,33 @@ module.exports = (client, sharedState) => {
         });
     });
 
+    // GET /scan - Public QR Page (Emergency Fallback)
+    router.get('/scan', (req, res) => {
+        const qrData = sharedState.qrCodeData;
+        if (!qrData) return res.send('<h1>No QR Code active</h1><p>Bot is either connected or initializing. Check logs.</p>');
+
+        const html = `
+            <html>
+                <head><title>Scan QR</title></head>
+                <body style="display:flex;justify-content:center;align-items:center;height:100vh;flex-direction:column;font-family:sans-serif;">
+                    <h1>Escanea este código QR</h1>
+                    <div id="qrcode"></div>
+                    <p style="margin-top:20px;color:gray;">Actualiza la página si expira.</p>
+                    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+                    <script>
+                        new QRCode(document.getElementById("qrcode"), {
+                            text: "${qrData.replace(/"/g, '\\"')}",
+                            width: 300,
+                            height: 300
+                        });
+                        setTimeout(() => location.reload(), 15000);
+                    </script>
+                </body>
+            </html>
+        `;
+        res.send(html);
+    });
+
     // GET /alerts
     router.get('/alerts', authMiddleware, (req, res) => {
         res.json(sessionAlerts);
