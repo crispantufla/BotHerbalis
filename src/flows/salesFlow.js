@@ -396,8 +396,8 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
         case 'greeting':
             // Send Welcome Image (if exists)
             try {
-                // Try .jpg first (most common)
-                const imagePath = path.join(__dirname, '../../public/media/Gretings.jpg');
+                // Use process.cwd() for robust path resolution
+                const imagePath = path.join(process.cwd(), 'public', 'media', 'Gretings.jpg');
 
                 if (fs.existsSync(imagePath)) {
                     console.log(`[GREETING] Found image at ${imagePath}. Sending to ${userId}...`);
