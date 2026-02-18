@@ -383,33 +383,21 @@ const CommsView = () => {
             );
         }
 
-        if (msg.body && msg.body.startsWith('MEDIA_AUDIO:')) {
-            const parts = msg.body.split('|');
-            const url = parts[0].replace('MEDIA_AUDIO:', '');
-            const transcription = parts[1] ? parts[1].replace('TRANSCRIPTION:', '') : null;
-            const fullUrl = `${API_URL}${url}`;
-            return (
-                <div className="space-y-2 min-w-[200px]">
-                    <audio controls className="h-8 w-full max-w-[240px]">
-                        <source src={fullUrl} type="audio/ogg" />
-                        <source src={fullUrl} type="audio/mpeg" />
-                        Audio not supported
-                    </audio>
-                    {transcription && (
-                        <div className="bg-black/10 dark:bg-white/10 p-2 rounded text-xs italic">
-                            "{transcription}"
-                        </div>
-                    )}
-                </div>
-            );
-        }
+        // Audio messages — unified visual renderer (no HTML5 player, audio files aren't stored)
+        // Handles: "MEDIA_AUDIO:...", "🎤 Audio: ...", and "🎤 Audio (no se pudo transcribir)"
+        if (msg.body && (msg.body.startsWith('MEDIA_AUDIO:') || msg.body.startsWith('🎤'))) {
+            let transcription = null;
 
-        // Audio transcription messages (from logAndEmit: "🎤 Audio: ...")
-        if (msg.body && msg.body.startsWith('🎤 Audio:')) {
-            const transcription = msg.body.replace(/^🎤\s*Audio:\s*/, '').replace(/^"|"$/g, '').trim();
+            if (msg.body.startsWith('🎤 Audio:')) {
+                transcription = msg.body.replace(/^🎤\s*Audio:\s*/, '').replace(/^"|"$/g, '').trim();
+            } else if (msg.body.startsWith('MEDIA_AUDIO:')) {
+                const parts = msg.body.split('|');
+                transcription = parts[1] ? parts[1].replace('TRANSCRIPTION:', '').trim() : null;
+            }
+
             return (
                 <div className="space-y-2 min-w-[200px]">
-                    {/* Visual audio player */}
+                    {/* Visual audio bubble */}
                     <div className="flex items-center gap-2 bg-black/5 rounded-lg px-3 py-2">
                         <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
                             <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -428,10 +416,12 @@ const CommsView = () => {
                         </div>
                     </div>
                     {/* Transcription */}
-                    {transcription && (
+                    {transcription ? (
                         <div className="bg-black/5 p-2 rounded-lg text-xs italic text-slate-600 border-l-2 border-emerald-400">
                             📝 "{transcription}"
                         </div>
+                    ) : (
+                        <p className="text-[11px] text-slate-400 italic">🎤 Audio recibido</p>
                     )}
                 </div>
             );
