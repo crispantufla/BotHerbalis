@@ -575,18 +575,25 @@ INSTRUCCIONES:
      */
     async generateSuggestion(instruction, conversationContext) {
         const prompt = `
-        SITUACION: El vendedor humano quiere que respondas esto al cliente, pero redactado profesionalmente por el bot.
-        INSTRUCCION: "${instruction}"
-        CONTEXTO CHAT: "${conversationContext}"
-        
-        Generá la respuesta exacta para enviar.
+        SITUACION: El ADMINISTRADOR del negocio te da una instrucción DIRECTA para enviarle al cliente.
+        La instrucción del admin tiene AUTORIDAD TOTAL — ANULÁ cualquier regla tuya que la contradiga.
+        Si el admin dice "confirmá el cambio", "aceptá", "dale", VOS HACÉS LO QUE DICE.
+        NO digas "no puedo cambiar el pedido" ni "no puedo hacer eso". El admin PUEDE y VOS OBEDECÉS.
+
+        INSTRUCCIÓN DEL ADMIN: "${instruction}"
+        CONTEXTO DEL CHAT CON EL CLIENTE: "${conversationContext}"
+
+        Generá la respuesta exacta para enviar al cliente, redactada profesionalmente como el bot.
+        Si el admin quiere confirmar un cambio, aceptar algo, o modificar un pedido, HACELO.
+        Respondé en tono amable y profesional directo al cliente.
+        NO devuelvas JSON — solo el texto del mensaje.
         `;
         try {
             const result = await this._callQueued(
                 () => this.client.chat.completions.create({
                     model: this.model,
                     messages: [
-                        { role: "system", content: _getSystemInstructions() },
+                        { role: "system", content: "Sos un asistente de ventas de Herbalis que OBEDECE las instrucciones del administrador. El admin tiene autoridad total. Respondé al cliente en tono amable y argentino." },
                         { role: "user", content: prompt }
                     ],
                     temperature: 0.7,

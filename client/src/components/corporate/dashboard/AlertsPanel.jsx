@@ -4,8 +4,8 @@ import { Icons } from './Icons';
 const AlertsPanel = ({ alerts, onCommand, onQuickAction }) => {
     const [adminInputs, setAdminInputs] = useState({});
     const [sendingCommand, setSendingCommand] = useState({});
+    const [expandedCards, setExpandedCards] = useState({});
 
-    // Local wrapper to handle loading state and input clearing
     const handleSend = async (alert, command) => {
         if (!command.trim()) return;
         setSendingCommand(prev => ({ ...prev, [alert.id]: true }));
@@ -14,133 +14,220 @@ const AlertsPanel = ({ alerts, onCommand, onQuickAction }) => {
         setAdminInputs(prev => ({ ...prev, [alert.id]: '' }));
     };
 
+    const toggleExpand = (id) => {
+        setExpandedCards(prev => ({ ...prev, [id]: !prev[id] }));
+    };
+
+    const getTimeDiff = (timestamp) => {
+        const diff = Date.now() - new Date(timestamp).getTime();
+        const mins = Math.floor(diff / 60000);
+        if (mins < 1) return 'Ahora';
+        if (mins < 60) return `${mins}m`;
+        const hrs = Math.floor(mins / 60);
+        if (hrs < 24) return `${hrs}h`;
+        return `${Math.floor(hrs / 24)}d`;
+    };
+
+    const quickSuggestions = [
+        { label: '✅ Confirmar', cmd: 'confirmar' },
+        { label: '📦 Cambiar producto', cmd: 'confirma el cambio de producto' },
+        { label: '💬 Contactar', cmd: 'decile que me comunico por privado' },
+    ];
+
     return (
         <div className="lg:col-span-2 space-y-4">
+            {/* Header */}
             <div className="flex items-center justify-between">
-                <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wide flex items-center gap-2">
-                    <span className="p-1.5 bg-rose-100 rounded text-rose-600"><Icons.Alert /></span>
-                    Alertas de Intervención
-                </h3>
-                <span className="text-xs text-slate-400 font-mono">{alerts.length} pendientes</span>
+                <div className="flex items-center gap-3">
+                    <div className="relative">
+                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center shadow-lg shadow-rose-500/25">
+                            <Icons.Alert />
+                        </div>
+                        {alerts.length > 0 && (
+                            <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center ring-2 ring-white animate-pulse">
+                                {alerts.length}
+                            </span>
+                        )}
+                    </div>
+                    <div>
+                        <h3 className="font-bold text-slate-800 text-sm tracking-tight">Intervenciones</h3>
+                        <p className="text-[11px] text-slate-400">{alerts.length > 0 ? `${alerts.length} requieren atención` : 'Todo en orden'}</p>
+                    </div>
+                </div>
             </div>
 
+            {/* Empty State */}
             {alerts.length === 0 ? (
-                <div className="bg-white rounded-lg border border-dashed border-slate-200 p-12 text-center">
-                    <div className="text-slate-300 text-4xl mb-3">✅</div>
-                    <p className="text-slate-400 text-sm font-medium">No hay alertas pendientes</p>
-                    <p className="text-slate-300 text-xs mt-1">Las alertas aparecerán acá cuando un pedido requiera tu aprobación</p>
+                <div className="relative overflow-hidden rounded-2xl border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-10 text-center">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-emerald-50 to-transparent rounded-bl-full opacity-60" />
+                    <div className="relative">
+                        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-emerald-100 to-teal-50 flex items-center justify-center text-3xl shadow-sm">
+                            ✅
+                        </div>
+                        <p className="text-slate-600 text-sm font-semibold">Sin alertas pendientes</p>
+                        <p className="text-slate-400 text-xs mt-1.5 max-w-[220px] mx-auto leading-relaxed">
+                            Las intervenciones aparecerán acá cuando un pedido requiera tu aprobación
+                        </p>
+                    </div>
                 </div>
             ) : (
-                alerts.map(alert => {
-                    const od = alert.orderData || {};
-                    const addr = od.address || {};
-                    const hasOrder = od.product || od.price;
-                    const inputValue = adminInputs[alert.id] || '';
-                    const isSending = sendingCommand[alert.id] || false;
+                <div className="space-y-3">
+                    {alerts.map((alert, index) => {
+                        const od = alert.orderData || {};
+                        const addr = od.address || {};
+                        const hasOrder = od.product || od.price;
+                        const inputValue = adminInputs[alert.id] || '';
+                        const isSending = sendingCommand[alert.id] || false;
+                        const isExpanded = expandedCards[alert.id] !== false; // Default expanded
 
-                    return (
-                        <div key={alert.id} className="bg-white rounded-lg border-l-4 border-l-rose-500 border border-slate-200 shadow-sm overflow-hidden animate-fade-in">
+                        return (
+                            <div
+                                key={alert.id}
+                                className="group relative rounded-2xl border border-slate-200/80 bg-white shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden"
+                                style={{ animationDelay: `${index * 100}ms` }}
+                            >
+                                {/* Accent gradient bar */}
+                                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-500 via-pink-500 to-orange-400" />
 
-                            {/* Alert Header */}
-                            <div className="px-5 py-4 flex items-start justify-between bg-gradient-to-r from-rose-50/50 to-transparent">
-                                <div className="flex items-start gap-3 flex-1">
-                                    <div className="w-10 h-10 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center font-bold text-sm flex-shrink-0 mt-0.5">
-                                        ⚠️
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200 uppercase tracking-wider">
-                                                Crítico
-                                            </span>
-                                            <span className="text-xs text-slate-400 font-mono">
-                                                {new Date(alert.timestamp).toLocaleTimeString()}
-                                            </span>
-                                        </div>
-                                        <h4 className="font-bold text-slate-800 text-sm">{alert.reason}</h4>
-                                        <p className="text-xs text-slate-500 mt-0.5 font-mono">{alert.userPhone}</p>
-                                    </div>
-                                </div>
+                                {/* Header */}
+                                <div
+                                    className="px-5 pt-5 pb-3 cursor-pointer"
+                                    onClick={() => toggleExpand(alert.id)}
+                                >
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                                            {/* Priority indicator */}
+                                            <div className="flex-shrink-0 mt-0.5">
+                                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center text-white text-lg shadow-md shadow-rose-500/20">
+                                                    ⚡
+                                                </div>
+                                            </div>
 
-                                {/* Quick Actions */}
-                                <div className="flex items-center gap-1.5 flex-shrink-0 ml-3">
-                                    <button
-                                        onClick={() => onQuickAction(alert.userPhone, 'confirmar')}
-                                        className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600 text-white rounded-md text-xs font-bold hover:bg-emerald-700 transition shadow-sm"
-                                    >
-                                        <Icons.Check /> APROBAR
-                                    </button>
-                                    <button
-                                        onClick={() => onQuickAction(alert.userPhone, 'yo me encargo')}
-                                        className="flex items-center gap-1 px-3 py-1.5 bg-slate-700 text-white rounded-md text-xs font-bold hover:bg-slate-800 transition shadow-sm"
-                                    >
-                                        INTERVENIR
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Order Summary — Big and visible */}
-                            {hasOrder && (
-                                <div className="px-5 py-3 bg-slate-50 border-t border-slate-100">
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                        {/* Product & Price */}
-                                        <div className="flex items-start gap-2.5">
-                                            <span className="p-1.5 bg-blue-100 rounded text-blue-600 flex-shrink-0 mt-0.5"><Icons.Package /></span>
-                                            <div>
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pedido</p>
-                                                <p className="text-sm font-bold text-slate-800">{od.product || '—'}</p>
-                                                <p className="text-xs text-slate-500">
-                                                    Plan {od.plan || '?'} días — <span className="font-bold text-emerald-700">${od.price || '?'}</span>
-                                                </p>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-bold bg-gradient-to-r from-rose-500 to-pink-600 text-white uppercase tracking-wider shadow-sm">
+                                                        Urgente
+                                                    </span>
+                                                    <span className="text-[11px] text-slate-400 font-medium">
+                                                        {getTimeDiff(alert.timestamp)}
+                                                    </span>
+                                                </div>
+                                                <h4 className="font-bold text-slate-800 text-sm leading-snug line-clamp-2">{alert.reason}</h4>
+                                                <p className="text-xs text-slate-400 mt-0.5 font-mono tracking-tight">{alert.userPhone}</p>
                                             </div>
                                         </div>
 
-                                        {/* Address */}
-                                        <div className="flex items-start gap-2.5">
-                                            <span className="p-1.5 bg-violet-100 rounded text-violet-600 flex-shrink-0 mt-0.5"><Icons.MapPin /></span>
-                                            <div>
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Dirección</p>
-                                                <p className="text-sm font-medium text-slate-800">{addr.nombre || '—'}</p>
-                                                <p className="text-xs text-slate-500">
-                                                    {addr.calle || '?'}, {addr.ciudad || '?'} {addr.cp ? `(CP ${addr.cp})` : ''}
-                                                </p>
-                                            </div>
+                                        {/* Quick action buttons */}
+                                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); onQuickAction(alert.userPhone, 'confirmar'); }}
+                                                className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl text-xs font-bold hover:from-emerald-600 hover:to-teal-600 transition-all shadow-md shadow-emerald-500/20 hover:shadow-lg hover:shadow-emerald-500/30 active:scale-95"
+                                            >
+                                                <Icons.Check /> Aprobar
+                                            </button>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); onQuickAction(alert.userPhone, 'yo me encargo'); }}
+                                                className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-slate-700 to-slate-800 text-white rounded-xl text-xs font-bold hover:from-slate-800 hover:to-slate-900 transition-all shadow-md hover:shadow-lg active:scale-95"
+                                            >
+                                                🎯 Intervenir
+                                            </button>
                                         </div>
                                     </div>
-                                    {alert.details && (
-                                        <p className="text-xs text-slate-400 mt-2 italic border-t border-slate-100 pt-2">{alert.details}</p>
-                                    )}
                                 </div>
-                            )}
 
-                            {/* Admin Command Input */}
-                            <div className="px-5 py-3 border-t border-slate-100 bg-white">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">💬 Instrucción para la IA</p>
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={inputValue}
-                                        onChange={(e) => setAdminInputs(prev => ({ ...prev, [alert.id]: e.target.value }))}
-                                        onKeyDown={(e) => e.key === 'Enter' && handleSend(alert, inputValue)}
-                                        placeholder="Ej: decile que el envío sale mañana, ofrecele descuento..."
-                                        className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition placeholder:text-slate-300"
-                                    />
-                                    <button
-                                        onClick={() => handleSend(alert, inputValue)}
-                                        disabled={isSending || !inputValue.trim()}
-                                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition disabled:opacity-40 flex items-center gap-1.5 text-xs font-bold shadow-sm"
-                                    >
-                                        {isSending ? (
-                                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                        ) : (
-                                            <Icons.Send />
+                                {/* Expandable content */}
+                                {isExpanded && (
+                                    <>
+                                        {/* Order Details */}
+                                        {hasOrder && (
+                                            <div className="mx-5 mb-3 p-4 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100/50 border border-slate-100">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                    {/* Product */}
+                                                    <div className="flex items-start gap-3">
+                                                        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-white shadow-sm flex-shrink-0">
+                                                            <Icons.Package />
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Producto</p>
+                                                            <p className="text-sm font-bold text-slate-800">{od.product || '—'}</p>
+                                                            <p className="text-xs text-slate-500 mt-0.5">
+                                                                Plan {od.plan || '?'} días —{' '}
+                                                                <span className="font-bold text-emerald-600">${od.price || '?'}</span>
+                                                            </p>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Address */}
+                                                    <div className="flex items-start gap-3">
+                                                        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-violet-500 to-purple-500 flex items-center justify-center text-white shadow-sm flex-shrink-0">
+                                                            <Icons.MapPin />
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Envío</p>
+                                                            <p className="text-sm font-semibold text-slate-800">{addr.nombre || '—'}</p>
+                                                            <p className="text-xs text-slate-500 mt-0.5">
+                                                                {addr.calle || '?'}, {addr.ciudad || '?'}{' '}
+                                                                {addr.cp ? <span className="text-slate-400">(CP {addr.cp})</span> : ''}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {alert.details && (
+                                                    <div className="mt-3 pt-3 border-t border-slate-200/60">
+                                                        <p className="text-xs text-slate-500 italic leading-relaxed">💬 {alert.details}</p>
+                                                    </div>
+                                                )}
+                                            </div>
                                         )}
-                                        ENVIAR
-                                    </button>
-                                </div>
+
+                                        {/* Quick suggestion chips */}
+                                        <div className="px-5 pb-2 flex flex-wrap gap-1.5">
+                                            {quickSuggestions.map((s, i) => (
+                                                <button
+                                                    key={i}
+                                                    onClick={() => handleSend(alert, s.cmd)}
+                                                    disabled={isSending}
+                                                    className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-600 hover:text-slate-800 transition-all active:scale-95 disabled:opacity-40"
+                                                >
+                                                    {s.label}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        {/* Admin Input */}
+                                        <div className="px-5 pb-4">
+                                            <div className="flex gap-2">
+                                                <div className="relative flex-1">
+                                                    <input
+                                                        type="text"
+                                                        value={inputValue}
+                                                        onChange={(e) => setAdminInputs(prev => ({ ...prev, [alert.id]: e.target.value }))}
+                                                        onKeyDown={(e) => e.key === 'Enter' && handleSend(alert, inputValue)}
+                                                        placeholder="Instrucción para la IA..."
+                                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400 outline-none transition-all placeholder:text-slate-300"
+                                                    />
+                                                </div>
+                                                <button
+                                                    onClick={() => handleSend(alert, inputValue)}
+                                                    disabled={isSending || !inputValue.trim()}
+                                                    className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-5 py-2.5 rounded-xl hover:from-blue-600 hover:to-indigo-600 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-2 text-xs font-bold shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/30 active:scale-95"
+                                                >
+                                                    {isSending ? (
+                                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                                    ) : (
+                                                        <Icons.Send />
+                                                    )}
+                                                    Enviar
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
                             </div>
-                        </div>
-                    );
-                })
+                        );
+                    })}
+                </div>
             )}
         </div>
     );
