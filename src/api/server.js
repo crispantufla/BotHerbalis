@@ -37,6 +37,17 @@ function startServer(client, sharedState) {
     }));
     app.use(express.json({ limit: '10mb' }));
 
+    // Rate Limiting — Protect API from abuse (100 reqs / 15 min)
+    const { rateLimit } = require('express-rate-limit');
+    const limiter = rateLimit({
+        windowMs: 15 * 60 * 1000, // 15 minutes
+        limit: 100, // Limit each IP to 100 requests per windowMs
+        standardHeaders: 'draft-7',
+        legacyHeaders: false,
+        message: { error: 'Too many requests, please try again later.' }
+    });
+    app.use('/api', limiter);
+
     // Serve Static Files (Production/Docker)
     const clientDistPath = path.join(__dirname, '../../client/dist');
     if (require('fs').existsSync(clientDistPath)) {

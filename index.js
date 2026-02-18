@@ -13,6 +13,7 @@ const { aiService } = require('./src/services/ai'); // Centralized AI
 const { startServer } = require('./src/api/server'); // Centralized Server
 const { startScheduler } = require('./src/services/scheduler'); // P3: Stale/Re-engagement checks
 const { isBusinessHours, isDeepNight, getArgentinaHour } = require('./src/services/timeUtils');
+const { buildConfirmationMessage } = require('./src/utils/messageTemplates');
 
 // Paths — use DATA_DIR env var for Railway volume persistence, fallback to project root
 const DATA_DIR = process.env.DATA_DIR || __dirname;
@@ -168,24 +169,28 @@ function logAndEmit(chatId, sender, text, step) {
 }
 sharedState.logAndEmit = logAndEmit; // Expose to server
 
-// Helper: Save Order Locally (for Dashboard)
+// Helper: Save Order Locally (for Dashboard) — Uses write queue to prevent concurrent corruption
+let _orderWriteQueue = Promise.resolve();
 function saveOrderToLocal(order) {
-    let orders = [];
-    if (fs.existsSync(ORDERS_FILE)) {
-        try {
-            orders = JSON.parse(fs.readFileSync(ORDERS_FILE));
-        } catch (e) { orders = []; }
-    }
-    const newOrder = {
-        id: Date.now().toString(),
-        createdAt: new Date().toISOString(),
-        status: 'Pendiente',
-        tracking: '',
-        ...order
-    };
-    orders.push(newOrder);
-    atomicWriteFile(ORDERS_FILE, JSON.stringify(orders, null, 2));
-    if (sharedState.io) sharedState.io.emit('new_order', newOrder);
+    _orderWriteQueue = _orderWriteQueue.then(() => {
+        let orders = [];
+        if (fs.existsSync(ORDERS_FILE)) {
+            try {
+                orders = JSON.parse(fs.readFileSync(ORDERS_FILE));
+            } catch (e) { orders = []; }
+        }
+        const newOrder = {
+            id: Date.now().toString(),
+            createdAt: new Date().toISOString(),
+            status: 'Pendiente',
+            tracking: '',
+            ...order
+        };
+        orders.push(newOrder);
+        atomicWriteFile(ORDERS_FILE, JSON.stringify(orders, null, 2));
+        if (sharedState.io) sharedState.io.emit('new_order', newOrder);
+        return newOrder;
+    }).catch(e => console.error('[ORDER] Write queue error:', e.message));
 }
 
 // Helper: Send with Delay (async/await — messages arrive in order)
@@ -301,12 +306,7 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false) {
         if (!actualTarget) return "No pending user.";
         const clientState = userState[actualTarget];
         if (clientState && clientState.step === 'waiting_admin_ok' && clientState.pendingOrder) {
-            const cart = clientState.cart || [];
-            const productStr = cart.map(i => i.product).join(' + ') || clientState.selectedProduct || "Nuez de la India";
-            const planStr = cart.map(i => `${i.plan} días`).join(' + ') || `${clientState.selectedPlan || '60'} días`;
-            const totalPrice = clientState.totalPrice || "0";
-
-            const summary = `📦 *CONFIRMACIÓN DE ENVÍO*\n\nProducto: ${productStr}\nPlan: ${planStr}\nTotal a pagar al recibir:\n$${totalPrice}\n\n✔ Correo Argentino\n✔ Entrega estimada: 7 a 10 días hábiles\n✔ Pago en efectivo al recibir\n\n*Importante:*\nSi el cartero no encuentra a nadie,\nel correo puede solicitar retiro en sucursal.\nPlazo: 72 hs.\n\nEl rechazo o no retiro genera un costo logístico de $18.000.\n\n👉 Confirmame que podrás recibir o retirar el pedido sin inconvenientes.`;
+            const summary = buildConfirmationMessage(clientState);
             await client.sendMessage(actualTarget, summary);
             logAndEmit(actualTarget, 'bot', summary, 'waiting_final_confirmation');
             clientState.step = 'waiting_final_confirmation';
@@ -432,6 +432,19 @@ client.on('message', async msg => {
 
         // --- ADMIN COMMANDS ---
         if (isAdmin) {
+            // Admin audio: transcribe and treat as text command
+            if (msg.type === 'ptt' || msg.type === 'audio') {
+                const media = await msg.downloadMedia();
+                if (media) {
+                    const transcription = await aiService.transcribeAudio(media.data, media.mimetype);
+                    if (transcription) {
+                        console.log(`[ADMIN AUDIO] Transcribed: "${transcription}"`);
+                        const result = await handleAdminCommand(lastAlertUser, transcription, false);
+                        if (result) await client.sendMessage(msg.from, result);
+                    }
+                }
+                return;
+            }
             if (!msgText) return;
             console.log(`[ADMIN] ${userId}: ${msgText} `);
 

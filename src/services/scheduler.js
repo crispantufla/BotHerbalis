@@ -8,6 +8,7 @@
 
 const { appendOrderToSheet } = require('../../sheets_sync');
 const { isBusinessHours } = require('./timeUtils');
+const { buildConfirmationMessage } = require('../utils/messageTemplates');
 
 const RE_ENGAGEABLE_STEPS = new Set([
     'waiting_weight',
@@ -22,6 +23,7 @@ const STALE_THRESHOLD_MS = 30 * 60 * 1000;         // 30 minutes
 const COLD_LEAD_THRESHOLD_MS = 24 * 60 * 60 * 1000; // 24 hours
 const AUTO_APPROVE_THRESHOLD_MS = 15 * 60 * 1000;   // 15 minutes
 const CHECK_INTERVAL_MS = 10 * 60 * 1000;           // every 10 min
+const CLEANUP_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 const FOLLOW_UP_MESSAGES = [
     '¡Hola! 😊 Quedó algo pendiente de tu consulta. ¿Querés que te ayude a terminar?',
@@ -82,13 +84,8 @@ function autoApproveOrders(sharedState, dependencies) {
             const minutes = Math.round(elapsed / 60000);
             console.log(`[AUTO-APPROVE] Order for ${userId} auto-approved after ${minutes} min without admin review`);
 
-            // Build confirmation message
-            const confirmMsg = `📦 CONFIRMACIÓN DE ENVÍO\n\n` +
-                `${state.cart ? state.cart.map(i => `• ${i.product} (${i.plan} días)`).join('\n') : 'Producto seleccionado'}\n` +
-                `Total a pagar al recibir: $${state.totalPrice || '?'}\n\n` +
-                `✔ Correo Argentino\n✔ Entrega estimada: 7 a 10 días hábiles\n✔ Pago en efectivo al recibir\n\n` +
-                `Importante:\nSi el cartero no encuentra a nadie, el correo puede solicitar retiro en sucursal.\nPlazo: 72 hs.\n\n` +
-                `👉 Confirmame que podrás recibir o retirar el pedido sin inconvenientes.`;
+            // Build confirmation message using shared builder
+            const confirmMsg = buildConfirmationMessage(state);
 
             sendMessageWithDelay(userId, confirmMsg);
             state.history = state.history || [];
@@ -164,22 +161,50 @@ function checkColdLeads(sharedState, dependencies) {
 }
 
 /**
+ * cleanupOldUsers — Memory leak prevention
+ * Removes users inactive for >7 days from userState
+ */
+function cleanupOldUsers(sharedState, dependencies) {
+    const { userState } = sharedState;
+    const { saveState } = dependencies;
+    const now = Date.now();
+    let cleaned = 0;
+
+    for (const [userId, state] of Object.entries(userState)) {
+        const lastActivity = state.lastActivityAt || state.stepEnteredAt || 0;
+        if (lastActivity && (now - lastActivity) > CLEANUP_THRESHOLD_MS) {
+            // Keep completed orders for reference, only delete truly abandoned
+            if (state.step === 'completed') continue;
+            delete userState[userId];
+            cleaned++;
+        }
+    }
+
+    if (cleaned > 0) {
+        console.log(`[SCHEDULER] Cleaned up ${cleaned} inactive user(s) (>7 days)`);
+        saveState();
+    }
+}
+
+/**
  * startScheduler — Starts periodic checks
  */
 function startScheduler(sharedState, dependencies) {
-    console.log(`✅ [SCHEDULER] Started — checking every ${CHECK_INTERVAL_MS / 60000} min`);
+    console.log(`[SCHEDULER] Started — checking every ${CHECK_INTERVAL_MS / 60000} min`);
 
     // Run immediately on start, then on interval
     setTimeout(() => {
         checkStaleUsers(sharedState, dependencies);
         checkColdLeads(sharedState, dependencies);
         autoApproveOrders(sharedState, dependencies);
-    }, 5000); // 5s after boot to let state load
+        cleanupOldUsers(sharedState, dependencies);
+    }, 5000);
 
     setInterval(() => {
         checkStaleUsers(sharedState, dependencies);
         checkColdLeads(sharedState, dependencies);
         autoApproveOrders(sharedState, dependencies);
+        cleanupOldUsers(sharedState, dependencies);
     }, CHECK_INTERVAL_MS);
 }
 

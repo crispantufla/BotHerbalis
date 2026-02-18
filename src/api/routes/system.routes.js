@@ -10,11 +10,22 @@ module.exports = (client, sharedState) => {
     const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../../..');
     const ORDERS_FILE = path.join(DATA_DIR, 'orders.json');
 
-    // GET /health
+    // GET /health — Real system health check
     router.get('/health', (req, res) => {
+        const { aiService } = require('../../../src/services/ai');
+        const memUsage = process.memoryUsage();
         res.json({
-            status: 'ok',
-            uptime: process.uptime(),
+            status: sharedState.isConnected ? 'ok' : 'degraded',
+            whatsapp: sharedState.isConnected ? 'connected' : 'disconnected',
+            uptime: Math.round(process.uptime()),
+            activeUsers: Object.keys(userState).length,
+            pausedUsers: pausedUsers ? pausedUsers.size : 0,
+            pendingAlerts: sessionAlerts.length,
+            memory: {
+                heapUsedMB: Math.round(memUsage.heapUsed / 1024 / 1024),
+                rssMB: Math.round(memUsage.rss / 1024 / 1024)
+            },
+            ai: aiService.getStats(),
             timestamp: new Date().toISOString()
         });
     });
