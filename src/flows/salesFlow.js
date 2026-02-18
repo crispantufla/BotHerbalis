@@ -15,11 +15,22 @@ const PRICES_PATHS = [
     '/app/config/prices.json',                             // Docker safe copy (survives volume mount)
 ];
 
+const GALLERY_JSON = path.join(DATA_DIR, 'gallery.json');
+
 function _findPricesFile() {
     for (const p of PRICES_PATHS) {
         if (fs.existsSync(p)) return p;
     }
     return null;
+}
+
+function _getGallery() {
+    try {
+        if (fs.existsSync(GALLERY_JSON)) {
+            return JSON.parse(fs.readFileSync(GALLERY_JSON, 'utf8'));
+        }
+    } catch (e) { console.error('Error reading gallery:', e); }
+    return [];
 }
 
 // Read adicional MAX and costo logístico from centralized prices
@@ -399,6 +410,67 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
         return { matched: true };
     }
 
+    // NEW: Global Photo Request Handler
+    // Matches: "foto", "fotos", "imagen", "imagenes", "ver producto", "tenes fotos"
+    const PHOTOS_REGEX = /\b(foto|fotos|imagen|imagenes|ver\s*producto|ver\s*fotos)\b/i;
+    if (PHOTOS_REGEX.test(normalizedText)) {
+        console.log(`[GLOBAL] User ${userId} requested photos.`);
+        const gallery = _getGallery();
+        let targetCategory = null;
+
+        // Determine category based on current state or explicit mention
+        if (normalizedText.includes('capsula')) targetCategory = 'capsulas';
+        else if (normalizedText.includes('semilla')) targetCategory = 'semillas';
+        else if (normalizedText.includes('gota')) targetCategory = 'gotas';
+        else if (currentState.selectedProduct) {
+            if (currentState.selectedProduct.toLowerCase().includes('capsula')) targetCategory = 'capsulas';
+            if (currentState.selectedProduct.toLowerCase().includes('semilla')) targetCategory = 'semillas';
+            if (currentState.selectedProduct.toLowerCase().includes('gota')) targetCategory = 'gotas';
+        }
+
+        if (targetCategory) {
+            // Filter images by category
+            const productImages = gallery.filter(img =>
+                (img.category && img.category.toLowerCase().includes(targetCategory)) ||
+                (img.tags && img.tags.some(t => t.toLowerCase().includes(targetCategory)))
+            );
+
+            if (productImages.length > 0) {
+                // Send up to 3 random images
+                const shuffled = productImages.sort(() => 0.5 - Math.random()).slice(0, 3);
+
+                await sendMessageWithDelay(userId, `Acá tenés fotos de nuestras ${targetCategory} 👇`);
+
+                for (const img of shuffled) {
+                    try {
+                        const relativePath = img.url.replace(/^\//, '');
+                        const localPath = path.join(__dirname, '../../public', relativePath);
+                        if (fs.existsSync(localPath)) {
+                            const media = MessageMedia.fromFilePath(localPath);
+                            await client.sendMessage(userId, media);
+                        }
+                    } catch (e) { console.error('Error sending gallery image:', e); }
+                }
+
+                // Redirect logic
+                const redirect = _getStepRedirect(currentState.step, currentState);
+                if (redirect) {
+                    await sendMessageWithDelay(userId, redirect);
+                    currentState.history.push({ role: 'bot', content: redirect });
+                }
+            } else {
+                await sendMessageWithDelay(userId, "Uh, justo no tengo fotos cargadas de ese producto en este momento. 😅");
+            }
+        } else {
+            // No product identified
+            const msg = "Tenemos fotos de Cápsulas, Semillas y Gotas. ¿De cuál te gustaría ver? 📸";
+            await sendMessageWithDelay(userId, msg);
+            currentState.history.push({ role: 'bot', content: msg });
+        }
+
+        return { matched: true };
+    }
+
     for (const faq of knowledge.faq) {
         if (faq.keywords.some(k => lowerText.includes(k))) {
             await sendMessageWithDelay(userId, _formatMessage(faq.response));
@@ -433,13 +505,30 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             try {
                 const greetingNode = knowledge.flow.greeting;
                 if (greetingNode && greetingNode.image && greetingNode.imageEnabled) {
-                    const media = new MessageMedia(
-                        greetingNode.imageMimetype || 'image/jpeg',
-                        greetingNode.image,
-                        greetingNode.imageFilename || 'welcome.jpg'
-                    );
-                    await client.sendMessage(userId, media, { caption: '' });
-                    console.log(`[GREETING] Image sent to ${userId} from knowledge config`);
+                    let media;
+                    // Check if image is a path from gallery (starts with /media/)
+                    if (greetingNode.image.startsWith('/media/')) {
+                        // Strip leading slash for path.join to avoid treating as absolute
+                        const relativePath = greetingNode.image.replace(/^\//, '');
+                        const localPath = path.join(__dirname, '../../public', relativePath);
+                        if (fs.existsSync(localPath)) {
+                            media = MessageMedia.fromFilePath(localPath);
+                        } else {
+                            console.error(`[GREETING] Gallery image not found at: ${localPath}`);
+                        }
+                    } else {
+                        // Fallback to Base64
+                        media = new MessageMedia(
+                            greetingNode.imageMimetype || 'image/jpeg',
+                            greetingNode.image,
+                            greetingNode.imageFilename || 'welcome.jpg'
+                        );
+                    }
+
+                    if (media) {
+                        await client.sendMessage(userId, media, { caption: '' });
+                        console.log(`[GREETING] Image sent to ${userId} from knowledge config`);
+                    }
                 }
             } catch (e) {
                 console.error('[GREETING] Failed to send image:', e.message);

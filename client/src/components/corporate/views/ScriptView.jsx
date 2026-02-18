@@ -10,10 +10,19 @@ const Script = () => {
     const [activeTab, setActiveTab] = useState('flow');
     const [expandedCard, setExpandedCard] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [showGallery, setShowGallery] = useState(null); // stepKey when open
+    const [galleryImages, setGalleryImages] = useState([]);
 
     useEffect(() => {
         fetchScript();
     }, []);
+
+    const fetchGallery = async () => {
+        try {
+            const res = await api.get('/api/gallery');
+            setGalleryImages(res.data);
+        } catch (e) { console.error(e); }
+    };
 
     const fetchScript = async () => {
         setLoading(true);
@@ -213,29 +222,38 @@ const Script = () => {
                                                                         <p className="text-[10px] text-gray-400 mt-1">{step.imageFilename || 'imagen'}</p>
                                                                     </div>
                                                                 ) : (
-                                                                    <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition-all group">
-                                                                        <svg className="w-8 h-8 text-gray-300 group-hover:text-blue-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                                                        </svg>
-                                                                        <span className="text-xs text-gray-400 group-hover:text-blue-500 font-medium mt-1">Click para subir imagen</span>
-                                                                        <input
-                                                                            type="file"
-                                                                            accept="image/*"
-                                                                            className="hidden"
-                                                                            onChange={(e) => {
-                                                                                const file = e.target.files[0];
-                                                                                if (!file) return;
-                                                                                const reader = new FileReader();
-                                                                                reader.onload = () => {
-                                                                                    const base64 = reader.result.split(',')[1];
-                                                                                    handleFlowChange(key, 'image', base64);
-                                                                                    handleFlowChange(key, 'imageMimetype', file.type);
-                                                                                    handleFlowChange(key, 'imageFilename', file.name);
-                                                                                };
-                                                                                reader.readAsDataURL(file);
+                                                                    <div className="space-y-2">
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                setShowGallery(key);
+                                                                                fetchGallery();
                                                                             }}
-                                                                        />
-                                                                    </label>
+                                                                            className="w-full py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors flex items-center justify-center gap-2"
+                                                                        >
+                                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                                                            Seleccionar de Galería
+                                                                        </button>
+                                                                        <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition-all group">
+                                                                            <span className="text-xs text-gray-400 group-hover:text-blue-500 font-medium mt-1">O subir nueva...</span>
+                                                                            <input
+                                                                                type="file"
+                                                                                accept="image/*"
+                                                                                className="hidden"
+                                                                                onChange={(e) => {
+                                                                                    const file = e.target.files[0];
+                                                                                    if (!file) return;
+                                                                                    const reader = new FileReader();
+                                                                                    reader.onload = () => {
+                                                                                        const base64 = reader.result.split(',')[1];
+                                                                                        handleFlowChange(key, 'image', base64);
+                                                                                        handleFlowChange(key, 'imageMimetype', file.type);
+                                                                                        handleFlowChange(key, 'imageFilename', file.name);
+                                                                                    };
+                                                                                    reader.readAsDataURL(file);
+                                                                                }}
+                                                                            />
+                                                                        </label>
+                                                                    </div>
                                                                 )}
                                                             </div>
                                                         )}
@@ -290,6 +308,47 @@ const Script = () => {
                     )}
                 </div>
             </div>
+            {/* GALLERY MODAL */}
+            {showGallery && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col">
+                        <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-xl">
+                            <h3 className="font-bold text-gray-700">Seleccionar Imagen de Galería</h3>
+                            <button onClick={() => setShowGallery(null)} className="text-gray-400 hover:text-gray-600">✕</button>
+                        </div>
+                        <div className="p-4 overflow-y-auto custom-scrollbar flex-1">
+                            {galleryImages.length === 0 ? (
+                                <p className="text-center text-gray-400 py-10">No hay imágenes en la galería. Subí imágenes desde la pestaña "Galería".</p>
+                            ) : (
+                                <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                                    {galleryImages.map(img => (
+                                        <div
+                                            key={img.id}
+                                            onClick={() => {
+                                                handleFlowChange(showGallery, 'image', img.url); // Save URL path
+                                                handleFlowChange(showGallery, 'imageFilename', img.originalName);
+                                                handleFlowChange(showGallery, 'imageMimetype', null); // Auto-detect in backend
+                                                setShowGallery(null);
+                                            }}
+                                            className="cursor-pointer group relative aspect-square rounded-lg overflow-hidden border border-gray-200 hover:border-blue-500 hover:ring-2 hover:ring-blue-500/20 transition-all"
+                                        >
+                                            <img src={img.url} alt={img.originalName} className="w-full h-full object-cover" />
+                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                                            <div className="absolute bottom-0 left-0 right-0 p-1 bg-black/50 text-white text-[10px] truncate px-2">
+                                                {img.category && <span className="font-bold mr-1 uppercase text-blue-200">{img.category}</span>}
+                                                {img.originalName}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-3 border-t border-gray-100 bg-gray-50 rounded-b-xl flex justify-end">
+                            <button onClick={() => setShowGallery(null)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-200 rounded-lg transition-colors">Cancelar</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
