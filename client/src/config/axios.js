@@ -5,7 +5,7 @@ const api = axios.create({
     baseURL: API_URL,
     headers: {
         'Content-Type': 'application/json',
-        'x-api-key': import.meta.env.VITE_API_KEY || 'herbalis_secret_key_123'
+        'x-api-key': import.meta.env.VITE_API_KEY
     }
 });
 
