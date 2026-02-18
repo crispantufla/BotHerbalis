@@ -235,7 +235,9 @@ const sendMessageWithDelay = async (chatId, content, startTime = Date.now()) => 
 
 // Helper: Notify Admin
 async function notifyAdmin(reason, userPhone, details = null) {
-    exec('powershell "[console]::beep(1000, 500)"', (err) => { if (err) console.error("Beep failed:", err); });
+    if (process.platform === 'win32') {
+        exec('powershell "[console]::beep(1000, 500)"', (err) => { if (err) console.error("Beep failed:", err); });
+    }
     console.error(`âš ï¸ [ADMIN ALERT] ${reason} (User: ${userPhone})`);
 
     const now = Date.now();

@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { API_URL } from '../config/api';
 
 const PriceEditor = () => {
     const [prices, setPrices] = useState(null);
     const [loading, setLoading] = useState(true);
     const [message, setMessage] = useState('');
-
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
     useEffect(() => {
         fetchPrices();
@@ -44,7 +43,7 @@ const PriceEditor = () => {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'x-api-key': import.meta.env.VITE_API_KEY || 'herbalis_secret_key_123'
                 },
                 body: JSON.stringify(prices)
             });

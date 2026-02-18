@@ -148,14 +148,14 @@ module.exports = (client, sharedState) => {
     router.post('/script/switch', authMiddleware, (req, res) => {
         try {
             const { script } = req.body;
-            if (!script) return res.status(400).json({ error: 'Falta el campo "script" (v1, v2 o v3)' });
+            if (!script) return res.status(400).json({ error: 'Falta el campo "script"' });
 
             const available = sharedState.availableScripts || ['v3'];
             if (!available.includes(script)) {
                 return res.status(400).json({ error: `Script "${script}" no existe. Disponibles: ${available.join(', ')}` });
             }
 
-            // Call loadKnowledge from sharedState
+            config.activeScript = script;
             if (sharedState.loadKnowledge) {
                 sharedState.loadKnowledge(script);
             }
@@ -163,21 +163,7 @@ module.exports = (client, sharedState) => {
             if (io) io.emit('script_changed', { active: script });
 
             console.log(`📋 [SCRIPT] Switched to: ${script}`);
-            if (!script || !['v1', 'v2', 'v3', 'v4'].includes(script)) {
-                return res.status(400).json({ error: 'Versión de guión inválida' });
-            }
-
-            if (sharedState.reloadKnowledge) {
-                config.activeScript = script;
-                sharedState.reloadKnowledge(script);
-
-                // Notify clients
-                if (io) io.emit('script_changed', { active: script });
-
-                res.json({ success: true, active: script });
-            } else {
-                res.status(500).json({ error: 'Reload function not available' });
-            }
+            res.json({ success: true, active: script });
         } catch (e) {
             console.error("Error switching script:", e);
             res.status(500).json({ error: e.message });
