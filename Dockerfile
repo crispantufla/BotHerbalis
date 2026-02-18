@@ -29,6 +29,9 @@ RUN cd client && npm ci --production=false
 # Copy source code
 COPY . .
 
+# Copy prices.json to /app/config/ so it survives Railway volume mount at /app/data/
+RUN mkdir -p /app/config && cp /app/data/prices.json /app/config/prices.json 2>/dev/null || true
+
 # Build Client
 ARG VITE_API_KEY
 ENV VITE_API_KEY=$VITE_API_KEY
