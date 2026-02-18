@@ -11,6 +11,8 @@ const { atomicWriteFile } = require('./safeWrite');
 const { processSalesFlow } = require('./src/flows/salesFlow');
 const { aiService } = require('./src/services/ai'); // Centralized AI
 const { startServer } = require('./src/api/server'); // Centralized Server
+const { startScheduler } = require('./src/services/scheduler'); // P3: Stale/Re-engagement checks
+const { isBusinessHours, isDeepNight, getArgentinaHour } = require('./src/services/timeUtils');
 
 // Paths
 const STATE_FILE = path.join(__dirname, 'persistence.json');
@@ -26,6 +28,8 @@ const userState = {};
 const chatResets = {}; // Tracks timestamp of last history clear per user
 let lastAlertUser = null;
 let pausedUsers = new Set();
+const pendingMessages = new Map(); // Debounce: userId -> { messages: [], timer }
+const DEBOUNCE_MS = 3000; // Wait 3s for more messages before processing
 // Variables for API / Dashboard State
 let qrCodeData = null;
 let sessionAlerts = [];
@@ -183,10 +187,19 @@ function saveOrderToLocal(order) {
     if (sharedState.io) sharedState.io.emit('new_order', newOrder);
 }
 
-// Helper: Send with Delay (Improved to satisfy 30-60s requirement)
+// Helper: Send with Delay (async/await — messages arrive in order)
 const sendMessageWithDelay = async (chatId, content, startTime = Date.now()) => {
-    // Standard human-like delay: 10 to 25 seconds
-    const targetTotalDelay = Math.floor(Math.random() * (25000 - 10000 + 1) + 10000);
+    // Night mode: longer delays to seem human
+    let minDelay, maxDelay;
+    if (isDeepNight()) {
+        minDelay = 90000; maxDelay = 180000; // 1.5-3 min at deep night
+    } else if (!isBusinessHours()) {
+        minDelay = 45000; maxDelay = 90000;  // 45-90s outside hours
+    } else {
+        minDelay = 10000; maxDelay = 25000;  // 10-25s during hours
+    }
+
+    const targetTotalDelay = Math.floor(Math.random() * (maxDelay - minDelay + 1) + minDelay);
 
     // Calculate how much time has already passed (e.g. AI thinking or 429 retries)
     const elapsedSinceStart = Date.now() - startTime;
@@ -194,20 +207,30 @@ const sendMessageWithDelay = async (chatId, content, startTime = Date.now()) => 
     // Remaining time to wait. If AI took 80s (429), remaining is 0.
     const remainingDelay = Math.max(0, targetTotalDelay - elapsedSinceStart);
 
-    console.log(`[DELAY] AI took ${elapsedSinceStart / 1000}s. Waiting ${remainingDelay / 1000}s more (Target: ${targetTotalDelay / 1000}s)`);
+    const modeLabel = isDeepNight() ? 'NOCHE' : (!isBusinessHours() ? 'FUERA-HORARIO' : 'NORMAL');
+    console.log(`[DELAY-${modeLabel}] AI took ${elapsedSinceStart / 1000}s. Waiting ${remainingDelay / 1000}s more (Target: ${targetTotalDelay / 1000}s)`);
 
-    // Note: duplicate message detection removed â€” bot can legitimately
-    // need to repeat the same message (e.g. re-prompting after FAQ)
+    // Log and emit immediately (for dashboard)
     logAndEmit(chatId, 'bot', content, userState[chatId]?.step);
 
-    setTimeout(async () => {
-        try {
-            await client.sendMessage(chatId, content);
-            console.log(`[SENT] Message sent to ${chatId}`);
-        } catch (e) {
-            console.error(`[ERROR] Failed to send message: ${e}`);
-        }
-    }, remainingDelay);
+    // Show "typing..." indicator while waiting
+    try {
+        const chat = await client.getChatById(chatId);
+        if (chat) await chat.sendStateTyping();
+    } catch (e) { /* ignore typing errors */ }
+
+    // Wait the remaining delay
+    if (remainingDelay > 0) {
+        await new Promise(resolve => setTimeout(resolve, remainingDelay));
+    }
+
+    // Send the actual message
+    try {
+        await client.sendMessage(chatId, content);
+        console.log(`[SENT] Message sent to ${chatId}`);
+    } catch (e) {
+        console.error(`[ERROR] Failed to send message: ${e}`);
+    }
 };
 
 // Helper: Notify Admin
@@ -360,6 +383,14 @@ client.on('ready', () => {
     sharedState.connectedAt = Math.floor(Date.now() / 1000);
     console.log(`[READY] connectedAt = ${sharedState.connectedAt}. Ignoring older messages.`);
     if (sharedState.io) sharedState.io.emit('ready', { info: client.info });
+
+    // P3: Start scheduler for stale user alerts, re-engagement, and auto-approve
+    startScheduler(sharedState, {
+        notifyAdmin,
+        sendMessageWithDelay,
+        saveState,
+        saveOrderToLocal
+    });
 });
 
 client.on('disconnected', (reason) => {
@@ -450,15 +481,47 @@ client.on('message', async msg => {
             return;
         }
 
-        // 4. Process Flow
-        const startTime = Date.now();
-        await processSalesFlow(userId, msgText, userState, knowledge, {
-            client, notifyAdmin, saveState, sendMessageWithDelay: (id, text) => sendMessageWithDelay(id, text, startTime), logAndEmit, saveOrderToLocal, sharedState
-        });
+        // 4. Debounce: accumulate rapid-fire messages
+        if (pendingMessages.has(userId)) {
+            const pending = pendingMessages.get(userId);
+            pending.messages.push(msgText);
+            clearTimeout(pending.timer);
+            pending.timer = setTimeout(() => _processDebounced(userId), DEBOUNCE_MS);
+            console.log(`[DEBOUNCE] Queued message #${pending.messages.length} from ${userId}: "${msgText}"`);
+        } else {
+            pendingMessages.set(userId, {
+                messages: [msgText],
+                timer: setTimeout(() => _processDebounced(userId), DEBOUNCE_MS),
+                startTime: Date.now()
+            });
+            console.log(`[DEBOUNCE] New message from ${userId}: "${msgText}". Waiting ${DEBOUNCE_MS}ms...`);
+        }
     } catch (err) {
         console.error(`🔴[MESSAGE HANDLER ERROR] ${err.message} `);
     }
 });
+
+// Debounce processor: fires after DEBOUNCE_MS of silence from a user
+async function _processDebounced(userId) {
+    const pending = pendingMessages.get(userId);
+    if (!pending) return;
+
+    const combinedText = pending.messages.join(' ');
+    const startTime = pending.startTime;
+    pendingMessages.delete(userId);
+
+    console.log(`[DEBOUNCE] Processing ${pending.messages.length} message(s) from ${userId}: "${combinedText}"`);
+
+    try {
+        await processSalesFlow(userId, combinedText, userState, knowledge, {
+            client, notifyAdmin, saveState,
+            sendMessageWithDelay: (id, text) => sendMessageWithDelay(id, text, startTime),
+            logAndEmit, saveOrderToLocal, sharedState
+        });
+    } catch (err) {
+        console.error(`🔴[DEBOUNCE HANDLER ERROR] ${err.message}`);
+    }
+}
 
 
 client.initialize();

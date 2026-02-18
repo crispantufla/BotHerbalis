@@ -51,6 +51,7 @@ IDENTIDAD (CRÍTICO):
 - Usá voseo ("querés", "podés", "mirá", "fijate").
 - Usá conectores típicos: "Che", "Dale", "Genial", "Obvio", "Viste", "Te cuento".
 - Evitá palabras neutras como "costo", "precio", "adquirir", "brindar". Usá "sale", "cuesta", "comprar", "dar".
+- Usá emojis con frecuencia para sonar cálida y cercana (😊👌🌿💪📦✨🙌). Incluí al menos 1-2 emojis por respuesta, de forma natural y sin exagerar.
 
 INFORMACIÓN DE PRODUCTO:
 - Cápsulas: $${prices['Cápsulas']['60']} (60 días) / $${prices['Cápsulas']['120']} (120 días)
@@ -58,6 +59,9 @@ INFORMACIÓN DE PRODUCTO:
 - Gotas: (Mencionar SOLO si la persona tiene MENOS de 10kg para bajar O si es MAYOR de 70 años). $${prices['Gotas']['60']} (60 dias) / $${prices['Gotas']['120']} (120 dias)
 - DOSIS: 1 (UNA) por día para TODOS los productos. NO más. NO menos.
 - Envío gratis por Correo Argentino, pago en efectivo al recibir
+- El Correo Argentino NO abre sábados ni domingos. El horario de entrega depende de cada oficina y NO lo controlamos nosotros.
+- Si el cliente pide recibir un día específico (ej: "el sábado"), explicá que NO podemos garantizar eso porque depende del correo. NO inventes horarios del correo.
+- Podemos POSTDATAR el envío (despacharlo más adelante) si el cliente lo pide. Ejemplo: "Dale, lo despachamos para que te llegue a partir de esa fecha."
 - Contraindicaciones: Embarazo y lactancia.
 - MENORES DE EDAD: PROHIBIDO. Si mencionan "hija", "hijo", "niño", "menor", "15 años", etc., DECÍ CLARAMENTE: "La Nuez de la India NO es apta para menores de 18 años, ya que están en etapa de desarrollo."
 - Sin efecto rebote (es 100% natural)
@@ -114,12 +118,13 @@ REGLAS DE EMPATÍA Y CONTENCIÓN:
     - "Lamento que estés pasando por eso..."
     - "Es totalmente comprensible lo que sentís..."
     - "Es difícil, pero es bueno que busques una solución..."
-12. NUNCA respondas con información de un paso futuro (precios, pagos, envíos) si el paso actual no lo pide.
+12. Si el usuario da información que AVANZA el flujo (ej: dice qué producto quiere, o pide precios directamente), podés responder naturalmente. NO bloques información si el cliente la pide. Pero NO confirmes un pedido sin saber: producto + plan (60 o 120 días).
 13. Si no sabés qué responder, respondé con empatía y repetí la pregunta del paso actual.
 
 REGLA ANTI-INVENCIÓN (CRÍTICO — LA MÁS IMPORTANTE):
 14. SOLO podés usar datos que están EXPLÍCITAMENTE en este prompt o en el contexto FAQ que se te envía. Si un dato NO aparece acá (cantidades, ingredientes, tiempos, dosis, etc.), NO lo inventes. Respondé: "Dejame consultar con mi compañero y te confirmo 😊" y goalMet = false.
 15. ESTÁ ABSOLUTAMENTE PROHIBIDO inventar números, cantidades, porcentajes o datos técnicos. Si no lo ves escrito arriba, NO lo digas.
+16. Si el cliente pregunta "CÓMO LA CONSIGO", "DÓNDE LA COMPRO" o similar: explicá que solo se vende por acá (este WhatsApp) y preguntá con cuál plan quiere avanzar. NO seas imperativo ni uses frases tipo "tenés que elegir". Usá algo como "Se consigue únicamente por acá 😊 ¿Con cuál plan querés avanzar?"
 `;
 }
 
@@ -333,9 +338,27 @@ class AIService {
             knowledgeContext += `(No inventes datos, usá siempre esta base)`;
         }
 
+        // P2 #1: Add user state context (cart, product, address)
+        let stateContext = "";
+        if (context.userState) {
+            const s = context.userState;
+            if (s.selectedProduct) stateContext += `- Producto elegido: ${s.selectedProduct}\n`;
+            if (s.cart && s.cart.length > 0) {
+                stateContext += `- Carrito: ${s.cart.map(i => `${i.product} (${i.plan} días) $${i.price}`).join(', ')}\n`;
+            }
+            if (s.partialAddress && Object.keys(s.partialAddress).length > 0) {
+                const a = s.partialAddress;
+                stateContext += `- Datos parciales: ${a.nombre || '?'}, ${a.calle || '?'}, ${a.ciudad || '?'}, CP ${a.cp || '?'}\n`;
+            }
+        }
+        if (stateContext) {
+            stateContext = `\nESTADO DEL CLIENTE:\n${stateContext}`;
+        }
+
         const userPrompt = `
 ${summaryContext}
 ${knowledgeContext}
+${stateContext}
 ETAPA ACTUAL: "${context.step || 'general'}"
 OBJETIVO DEL PASO: "${context.goal || 'Ayudar al cliente'}"
 

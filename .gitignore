@@ -9,3 +9,7 @@ public/media/
 *.log
 google-credentials.json
 backups/
+client/dist/
+client/.env
+.DS_Store
+Thumbs.db

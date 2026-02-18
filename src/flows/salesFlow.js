@@ -1,4 +1,5 @@
 const { aiService } = require('../services/ai');
+const { validateAddress } = require('../services/addressValidator');
 const { atomicWriteFile } = require('../../safeWrite');
 const { appendOrderToSheet } = require('../../sheets_sync');
 const path = require('path');
@@ -101,6 +102,57 @@ function _getStepRedirect(step, state) {
 }
 
 /**
+ * _getAdminSuggestions
+ * Returns contextual quick-reply suggestions for the admin based on the step and user message.
+ */
+function _getAdminSuggestions(step, userMessage) {
+    const base = ['"ok" para confirmar pedido', '"me encargo" + tu instrucción'];
+    const normalized = (userMessage || '').toLowerCase();
+
+    if (/no (quiero|puedo|acepto|me interesa)/i.test(normalized)) {
+        return [
+            '"Tranqui, si cambiás de idea acá estamos 😊"',
+            '"¿Hay algo puntual que te genere duda?"',
+            ...base
+        ];
+    }
+    if (/estafa|trucho|mentira|robo|engaño|chanta/i.test(normalized)) {
+        return [
+            '"Entiendo, por eso trabajamos con pago al recibir. No tenés que adelantar nada."',
+            '"Llevamos 13 años con más de 15.000 clientes. ¿Querés seguir?"',
+            ...base
+        ];
+    }
+    if (step === 'waiting_data') {
+        return [
+            '"No te preocupes, tus datos solo se usan para el envío."',
+            ...base
+        ];
+    }
+    if (step === 'waiting_ok') {
+        return [
+            '"Podés recibir en tu domicilio o retirar en sucursal, lo que te quede mejor."',
+            ...base
+        ];
+    }
+    return base;
+}
+
+/**
+ * _setStep
+ * Helper to update the conversation step with timestamp tracking.
+ * Resets staleAlerted and reengagementSent flags when step changes.
+ */
+function _setStep(state, newStep) {
+    if (state.step !== newStep) {
+        state.staleAlerted = false;
+        state.reengagementSent = false;
+    }
+    state.step = newStep;
+    state.stepEnteredAt = Date.now();
+}
+
+/**
  * _isAffirmative / _isNegative
  * ULTRA-STRICT matchers — only catch dead-obvious, short, unambiguous messages.
  * Everything else goes to AI for intent classification (fewer false positives).
@@ -169,14 +221,18 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             addressAttempts: 0,
             partialAddress: {},
             cart: [], // NEW: Support for multiple items
-            history: []
+            history: [],
+            stepEnteredAt: Date.now(),
+            lastActivityAt: Date.now()
         };
         saveState();
     }
     const currentState = userState[userId];
 
-    // Update History
+    // Update History & Activity
     currentState.history.push({ role: 'user', content: text });
+    currentState.lastActivityAt = Date.now();
+    currentState.staleAlerted = false; // Reset on new activity
 
     // Summarize ONLY if history is long (avoids unnecessary AI calls)
     if (currentState.history.length > 15) {
@@ -222,9 +278,11 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
     // ─────────────────────────────────────────────────
 
     // NEW: Global Delivery Constraint Check (specific user request)
-    // Matches: "estoy el sabado", "solo puedo el lunes", "estoy en casa el..."
-    if (/(estoy|estar.|voy a estar|puedo).*(lunes|martes|miercoles|jueves|viernes|sabado|domingo|fin de semana|finde)/i.test(normalizedText)) {
-        const deliveryMsg = "Tené en cuenta que enviamos por Correo Argentino 📦.\n• La demora es de 7 a 10 días hábiles.\n• No tenemos control sobre el día exacto ni la hora de visita del cartero.\n\nSi no estás, el correo deja un aviso para que retires en la sucursal más cercana.";
+    // Matches: "estoy el sabado", "solo puedo el lunes", "el sabado estare en casa"
+    const DAYS_REGEX = /lunes|martes|miercoles|jueves|viernes|sabado|domingo|fin de semana|finde/i;
+    const AVAILABILITY_REGEX = /estoy|estar.|voy a estar|puedo|recib|estaré/i;
+    if (DAYS_REGEX.test(normalizedText) && AVAILABILITY_REGEX.test(normalizedText)) {
+        const deliveryMsg = "Tené en cuenta que enviamos por Correo Argentino 📦.\n• La demora es de 7 a 10 días hábiles.\n• El correo NO trabaja sábados ni domingos.\n• No tenemos control sobre el día exacto ni la hora de visita del cartero.\n\nSi no estás, el correo deja un aviso para que retires en la sucursal más cercana.";
         await sendMessageWithDelay(userId, deliveryMsg);
         currentState.history.push({ role: 'bot', content: deliveryMsg });
 
@@ -243,7 +301,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             currentState.history.push({ role: 'bot', content: _formatMessage(faq.response) });
 
             if (faq.triggerStep) {
-                currentState.step = faq.triggerStep;
+                _setStep(currentState, faq.triggerStep);
                 saveState();
             }
 
@@ -269,13 +327,40 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
         case 'greeting':
             const greetMsg = _formatMessage(knowledge.flow.greeting.response);
             await sendMessageWithDelay(userId, greetMsg);
-            currentState.step = knowledge.flow.greeting.nextStep;
+            _setStep(currentState, knowledge.flow.greeting.nextStep);
             currentState.history.push({ role: 'bot', content: greetMsg });
             saveState();
             matched = true;
             break;
 
         case 'waiting_weight': {
+            // PRIORITY 0: Detect direct product choice (skip weight question entirely)
+            const directProduct = /\b(capsula|capsulas|pastilla|pastillas|semilla|semillas|gota|gotas|infusion)\b/i.test(normalizedText);
+
+            if (directProduct) {
+                // User skipped weight and chose product directly
+                console.log(`[SKIP] User ${userId} chose product directly in waiting_weight. Skipping to preference.`);
+                let prodNode;
+                if (/capsula|pastilla/i.test(normalizedText)) {
+                    currentState.selectedProduct = "Cápsulas de nuez de la india";
+                    prodNode = knowledge.flow.preference_capsulas;
+                } else if (/gota/i.test(normalizedText)) {
+                    currentState.selectedProduct = "Gotas de nuez de la india";
+                    prodNode = knowledge.flow.preference_gotas;
+                } else {
+                    currentState.selectedProduct = "Semillas de nuez de la india";
+                    prodNode = knowledge.flow.preference_semillas;
+                }
+
+                const msg = _formatMessage(prodNode.response);
+                await sendMessageWithDelay(userId, msg);
+                _setStep(currentState, prodNode.nextStep);
+                currentState.history.push({ role: 'bot', content: msg });
+                saveState();
+                matched = true;
+                break;
+            }
+
             // SCRIPT FIRST: Check if user gave a number
             const hasNumber = /\d+/.test(text.trim());
 
@@ -287,7 +372,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 // Direct script response — NO AI
                 const recNode = knowledge.flow.recommendation;
                 await sendMessageWithDelay(userId, _formatMessage(recNode.response));
-                currentState.step = recNode.nextStep;
+                _setStep(currentState, recNode.nextStep);
                 currentState.history.push({ role: 'bot', content: _formatMessage(recNode.response) });
                 saveState();
                 matched = true;
@@ -299,10 +384,10 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     // USER REFUSED or FAILED TWICE -> SKIP TO PRODUCTS
                     console.log(`[LOGIC] User ${userId} refused/failed weight question. Skipping to preference.`);
 
-                    const skipMsg = "¡Entiendo, no hay problema! 👌 Pasemos directo a ver qué opción es mejor para vos.\n\nTenemos:\n1️⃣ Cápsulas (Súper práctico)\n2️⃣ Semillas/Infusión (Más natural)\n\n¿Cuál te gustaría probar? (Respondé 1 o 2)";
+                    const skipMsg = "¡Entiendo, no hay problema! 👌 Pasemos directo a ver qué opción es mejor para vos.\n\nTenemos:\n1️⃣ Cápsulas (Súper práctico)\n2️⃣ Semillas/Infusión (Más natural)\n3️⃣ Gotas (Prácticas y discretas)\n\n¿Cuál te gustaría probar?";
                     await sendMessageWithDelay(userId, skipMsg);
 
-                    currentState.step = 'waiting_preference'; // Manually set next step
+                    _setStep(currentState, 'waiting_preference'); // Manually set next step
                     currentState.history.push({ role: 'bot', content: skipMsg });
                     saveState();
                     matched = true;
@@ -311,17 +396,18 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     console.log(`[AI-FALLBACK] waiting_weight: No number detected for ${userId}`);
                     const aiWeight = await aiService.chat(text, {
                         step: 'waiting_weight',
-                        goal: 'El usuario debe decir cuántos kilos quiere bajar. Si pregunta otra cosa, respondé brevemente y volvé a preguntar cuántos kilos quiere bajar.',
+                        goal: 'El usuario debe decir cuántos kilos quiere bajar. Si dice qué PRODUCTO quiere directamente (cápsulas, semillas, gotas), respondé goalMet=true y extractedData con el producto. Si pregunta otra cosa, respondé brevemente y volvé a preguntar cuántos kilos quiere bajar.',
                         history: currentState.history,
                         summary: currentState.summary,
-                        knowledge: knowledge
+                        knowledge: knowledge,
+                        userState: currentState
                     });
 
                     if (aiWeight.goalMet) {
                         // AI detected a weight goal we missed with regex
                         const recNode = knowledge.flow.recommendation;
                         await sendMessageWithDelay(userId, _formatMessage(recNode.response));
-                        currentState.step = recNode.nextStep;
+                        _setStep(currentState, recNode.nextStep);
                         currentState.history.push({ role: 'bot', content: _formatMessage(recNode.response) });
                         saveState();
                         matched = true;
@@ -344,7 +430,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 currentState.selectedProduct = "Cápsulas de nuez de la india";
                 const msg = _formatMessage(knowledge.flow.preference_capsulas.response);
                 await sendMessageWithDelay(userId, msg);
-                currentState.step = knowledge.flow.preference_capsulas.nextStep;
+                _setStep(currentState, knowledge.flow.preference_capsulas.nextStep);
                 currentState.history.push({ role: 'bot', content: msg });
                 saveState();
                 matched = true;
@@ -353,7 +439,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 currentState.selectedProduct = "Semillas de nuez de la india";
                 const msg = _formatMessage(knowledge.flow.preference_semillas.response);
                 await sendMessageWithDelay(userId, msg);
-                currentState.step = knowledge.flow.preference_semillas.nextStep;
+                _setStep(currentState, knowledge.flow.preference_semillas.nextStep);
                 currentState.history.push({ role: 'bot', content: msg });
                 saveState();
                 matched = true;
@@ -362,7 +448,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 currentState.selectedProduct = "Gotas de nuez de la india";
                 const msg = _formatMessage(knowledge.flow.preference_gotas.response);
                 await sendMessageWithDelay(userId, msg);
-                currentState.step = knowledge.flow.preference_gotas.nextStep;
+                _setStep(currentState, knowledge.flow.preference_gotas.nextStep);
                 currentState.history.push({ role: 'bot', content: msg });
                 saveState();
                 matched = true;
@@ -374,7 +460,8 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     goal: 'Determinar si quiere cápsulas/gotas (opción práctica), semillas (opción natural) o AMBAS. El usuario puede pedir varias cosas. Si pregunta otra cosa, respondé brevemente y volvé a ofrecer las opciones.',
                     history: currentState.history,
                     summary: currentState.summary,
-                    knowledge: knowledge
+                    knowledge: knowledge,
+                    userState: currentState
                 });
 
                 if (aiPref.response) {
@@ -395,13 +482,13 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 let msg = "";
                 if (currentState.selectedProduct && currentState.selectedProduct.includes("Cápsulas")) {
                     msg = _formatMessage(knowledge.flow.price_capsulas.response);
-                    currentState.step = knowledge.flow.price_capsulas.nextStep;
+                    _setStep(currentState, knowledge.flow.price_capsulas.nextStep);
                 } else if (currentState.selectedProduct && currentState.selectedProduct.includes("Gotas")) {
                     msg = _formatMessage(knowledge.flow.price_gotas.response);
-                    currentState.step = knowledge.flow.price_gotas.nextStep;
+                    _setStep(currentState, knowledge.flow.price_gotas.nextStep);
                 } else {
                     msg = _formatMessage(knowledge.flow.price_semillas.response);
-                    currentState.step = knowledge.flow.price_semillas.nextStep;
+                    _setStep(currentState, knowledge.flow.price_semillas.nextStep);
                 }
                 await sendMessageWithDelay(userId, msg);
                 currentState.history.push({ role: 'bot', content: msg });
@@ -415,7 +502,8 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     goal: 'El usuario debe confirmar si quiere ver los precios. Si tiene dudas, respondé brevemente y preguntale si quiere que le pases los precios.',
                     history: currentState.history,
                     summary: currentState.summary,
-                    knowledge: knowledge
+                    knowledge: knowledge,
+                    userState: currentState
                 });
 
                 if (aiPrice.response) {
@@ -471,10 +559,17 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 currentState.isContraReembolsoMAX = has60;
                 currentState.adicionalMAX = has60 ? _getAdicionalMAX() : 0;
                 currentState.cart = foundItems;
+
+                // P2 #4: Show cart summary before asking for address
+                const cartLines = foundItems.map(i => `• ${i.product} (${i.plan} días) — $${i.price}`).join('\n');
+                const cartMsg = `📋 *Tu pedido:*\n${cartLines}`;
+                await sendMessageWithDelay(userId, cartMsg);
+                currentState.history.push({ role: 'bot', content: cartMsg });
+
                 // Confirm with closing
                 const closingNode = knowledge.flow.closing;
                 await sendMessageWithDelay(userId, closingNode.response);
-                currentState.step = closingNode.nextStep;
+                _setStep(currentState, closingNode.nextStep);
                 currentState.history.push({ role: 'bot', content: closingNode.response });
                 saveState();
                 matched = true;
@@ -510,10 +605,16 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             }
 
             if (planSelected) {
+                // P2 #4: Show cart summary before asking for address
+                const cartItem = currentState.cart[0];
+                const cartMsg = `📋 *Tu pedido:*\n• ${cartItem.product} (${cartItem.plan} días) — $${cartItem.price}`;
+                await sendMessageWithDelay(userId, cartMsg);
+                currentState.history.push({ role: 'bot', content: cartMsg });
+
                 // Direct script response
                 const closingNode = knowledge.flow.closing;
                 await sendMessageWithDelay(userId, closingNode.response);
-                currentState.step = closingNode.nextStep;
+                _setStep(currentState, closingNode.nextStep);
                 currentState.history.push({ role: 'bot', content: closingNode.response });
                 saveState();
                 matched = true;
@@ -525,7 +626,8 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     goal: 'El usuario debe elegir Plan 60 o Plan 120 días. IMPORTANTE: 1) Si elige, goalMet=true. 2) Si CAMBIA de producto (ej: "mejor semillas"), extractedData="CHANGE_PRODUCT:Semillas", goalMet=false, y tu respuesta confirma el cambio y da los precios del nuevo producto. 3) Si duda entre dos, ofrecé llevar AMBOS (sin descuento especial por 2, pero a partir de la 3ra unidad hay 30% OFF).',
                     history: currentState.history,
                     summary: currentState.summary,
-                    knowledge: knowledge
+                    knowledge: knowledge,
+                    userState: currentState
                 });
 
                 if (planAI.extractedData && typeof planAI.extractedData === 'string' && planAI.extractedData.startsWith('CHANGE_PRODUCT:')) {
@@ -552,7 +654,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
                     const closingNode = knowledge.flow.closing;
                     await sendMessageWithDelay(userId, closingNode.response);
-                    currentState.step = closingNode.nextStep;
+                    _setStep(currentState, closingNode.nextStep);
                     currentState.history.push({ role: 'bot', content: closingNode.response });
                     saveState();
                     matched = true;
@@ -583,7 +685,8 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     goal: 'El usuario tiene una duda sobre el envío. Respondé brevemente y volvé a preguntar: ¿Te resulta posible retirar en sucursal si fuera necesario? SÍ o NO.',
                     history: currentState.history,
                     summary: currentState.summary,
-                    knowledge: knowledge
+                    knowledge: knowledge,
+                    userState: currentState
                 });
                 if (aiOk.response) {
                     await sendMessageWithDelay(userId, aiOk.response);
@@ -595,7 +698,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             else if (_isAffirmative(normalizedText)) {
                 const msg = _formatMessage(knowledge.flow.data_request.response);
                 await sendMessageWithDelay(userId, msg);
-                currentState.step = knowledge.flow.data_request.nextStep;
+                _setStep(currentState, knowledge.flow.data_request.nextStep);
                 currentState.history.push({ role: 'bot', content: msg });
                 saveState();
                 matched = true;
@@ -612,7 +715,8 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     goal: 'El usuario debe confirmar que puede retirar en sucursal si es necesario. Respondé brevemente cualquier duda y volvé a preguntar SÍ o NO.',
                     history: currentState.history,
                     summary: currentState.summary,
-                    knowledge: knowledge
+                    knowledge: knowledge,
+                    userState: currentState
                 });
 
                 if (aiOk.response) {
@@ -625,6 +729,72 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
         }
 
         case 'waiting_data': {
+            // GUARD: Ensure product + plan are selected before collecting data
+            if (!currentState.selectedProduct) {
+                console.log(`[GUARD] waiting_data: No product selected for ${userId}, redirecting to preference`);
+                const skipMsg = "Antes de los datos de envío, necesito saber qué producto te interesa 😊\n\nTenemos:\n1️⃣ Cápsulas\n2️⃣ Semillas/Infusión\n3️⃣ Gotas\n\n¿Cuál preferís?";
+                await sendMessageWithDelay(userId, skipMsg);
+                _setStep(currentState, 'waiting_preference');
+                currentState.history.push({ role: 'bot', content: skipMsg });
+                saveState();
+                matched = true;
+                break;
+            }
+
+            if (!currentState.selectedPlan) {
+                console.log(`[GUARD] waiting_data: No plan selected for ${userId}, redirecting to plan_choice`);
+                let priceNode;
+                if (currentState.selectedProduct.includes('Cápsulas')) priceNode = knowledge.flow.preference_capsulas;
+                else if (currentState.selectedProduct.includes('Gotas')) priceNode = knowledge.flow.preference_gotas;
+                else priceNode = knowledge.flow.preference_semillas;
+
+                const msg = _formatMessage(priceNode.response);
+                await sendMessageWithDelay(userId, msg);
+                _setStep(currentState, 'waiting_plan_choice');
+                currentState.history.push({ role: 'bot', content: msg });
+                saveState();
+                matched = true;
+                break;
+            }
+            // PRIORITY 0: Detect product change ("mejor semillas", "quiero capsulas", "cambio a gotas")
+            const productChangeMatch = normalizedText.match(/\b(mejor|quiero|prefiero|cambio|cambia|dame|paso a|en vez)\b.*\b(capsula|capsulas|pastilla|pastillas|semilla|semillas|gota|gotas|natural|infusion)\b/i)
+                || normalizedText.match(/\b(capsula|capsulas|pastilla|pastillas|semilla|semillas|gota|gotas)\b.*\b(mejor|quiero|prefiero|cambio|en vez)\b/i);
+
+            if (productChangeMatch) {
+                // Detect which product they want
+                let newProduct = null;
+                if (/capsula|pastilla/i.test(normalizedText)) newProduct = "Cápsulas de nuez de la india";
+                else if (/semilla|natural|infusion/i.test(normalizedText)) newProduct = "Semillas de nuez de la india";
+                else if (/gota/i.test(normalizedText)) newProduct = "Gotas de nuez de la india";
+
+                if (newProduct && newProduct !== currentState.selectedProduct) {
+                    console.log(`[BACKTRACK] User ${userId} changed product from "${currentState.selectedProduct}" to "${newProduct}" during waiting_data`);
+                    currentState.selectedProduct = newProduct;
+                    currentState.cart = [];
+                    currentState.pendingOrder = null;
+                    currentState.addressAttempts = 0;
+
+                    // Show new product prices and ask for plan
+                    let priceNode;
+                    if (newProduct.includes('Cápsulas')) priceNode = knowledge.flow.preference_capsulas;
+                    else if (newProduct.includes('Gotas')) priceNode = knowledge.flow.preference_gotas;
+                    else priceNode = knowledge.flow.preference_semillas;
+
+                    const changeMsg = `¡Dale, sin problema! 😊 Cambiamos a ${newProduct.split(' de ')[0].toLowerCase()}.`;
+                    await sendMessageWithDelay(userId, changeMsg);
+                    currentState.history.push({ role: 'bot', content: changeMsg });
+
+                    const priceMsg = _formatMessage(priceNode.response);
+                    await sendMessageWithDelay(userId, priceMsg);
+                    currentState.history.push({ role: 'bot', content: priceMsg });
+
+                    _setStep(currentState, 'waiting_plan_choice');
+                    saveState();
+                    matched = true;
+                    break;
+                }
+            }
+
             // GUARD: Detect messages that are clearly NOT address data
             // (questions, objections, very short non-data text)
             const looksLikeAddress = text.length > 8 && (/\d/.test(text) || /\b(calle|av|avenida|barrio|mz|lote|piso|dpto|depto|departamento|casa|block|manzana)\b/i.test(text) || text.split(/[,\n]/).length >= 2);
@@ -638,7 +808,8 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     goal: 'El usuario tiene una duda o no quiere dar datos todavía. Respondé brevemente su duda y pedile amablemente los datos de envío: nombre completo, calle y número, ciudad, y código postal.',
                     history: currentState.history,
                     summary: currentState.summary,
-                    knowledge: knowledge
+                    knowledge: knowledge,
+                    userState: currentState
                 });
                 if (aiData.response) {
                     await sendMessageWithDelay(userId, aiData.response);
@@ -650,6 +821,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 }
                 break;
             }
+
 
             console.log("Analyzing address data with AI...");
             const data = await aiService.parseAddress(text);
@@ -672,6 +844,23 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
             if (missing.length === 0 || (addr.calle && addr.ciudad && missing.length <= 1)) {
 
+                // ── ADDRESS VALIDATION ──
+                const validation = await validateAddress(addr);
+
+                // CP invalid → ask user to correct
+                if (addr.cp && !validation.cpValid) {
+                    const cpMsg = `El código postal "${addr.cp}" no parece válido 🤔\nDebe ser de 4 dígitos (ej: 1425, 5000). ¿Me lo corregís?`;
+                    await sendMessageWithDelay(userId, cpMsg);
+                    currentState.history.push({ role: 'bot', content: cpMsg });
+                    currentState.partialAddress.cp = null; // Force re-ask
+                    matched = true;
+                    break;
+                }
+
+                // Save validated CP and province
+                if (validation.cpCleaned) addr.cp = validation.cpCleaned;
+                if (validation.province) addr.provincia = validation.province;
+
                 // Ensure cart exists (compatibility)
                 if (!currentState.cart || currentState.cart.length === 0) {
                     const product = currentState.selectedProduct || "Nuez de la India";
@@ -687,14 +876,34 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 const subtotal = currentState.cart.reduce((sum, i) => sum + parseInt(i.price.replace('.', '')), 0);
                 const adicional = currentState.adicionalMAX || 0;
                 const total = subtotal + adicional;
-                currentState.totalPrice = total.toLocaleString('es-AR').replace(/,/g, '.'); // Ensure total is saved in state
+                currentState.totalPrice = total.toLocaleString('es-AR').replace(/,/g, '.');
                 const maxLabel = adicional > 0 ? ` + $${adicional.toLocaleString('es-AR')}` : '';
 
-                // Set step to waiting_admin_ok — admin must APPROVE before bot sends confirmation
-                currentState.step = 'waiting_admin_ok';
+                // ── SHOW VALIDATED ADDRESS TO USER ──
+                let addressSummary = `📋 *Datos de envío:*\n`;
+                addressSummary += `👤 ${addr.nombre || '?'}\n`;
+                addressSummary += `📍 ${addr.calle}, ${addr.ciudad}\n`;
+                if (addr.provincia) addressSummary += `🏛️ ${addr.provincia}\n`;
+                addressSummary += `📮 CP: ${addr.cp}`;
+
+                // If Google Maps validated, show formatted address
+                if (validation.mapsFormatted) {
+                    addressSummary += `\n\n✅ Dirección verificada: ${validation.mapsFormatted}`;
+                }
+
+                // Warnings for admin (not shown to user)
+                const validationNotes = validation.warnings.length > 0
+                    ? `\n⚠️ Validación: ${validation.warnings.join(', ')}`
+                    : (validation.mapsValid ? '\n✅ Dirección verificada por Google Maps' : '');
+
+                await sendMessageWithDelay(userId, addressSummary);
+                currentState.history.push({ role: 'bot', content: addressSummary });
+
+                // Set step to waiting_admin_ok
+                _setStep(currentState, 'waiting_admin_ok');
                 saveState();
 
-                await notifyAdmin(`Pedido CASI completo`, userId, `Datos: ${addr.nombre}, ${addr.calle}\nItems: ${cartSummary}\nSubtotal: $${subtotal}${maxLabel}\nTotal: $${currentState.totalPrice}`);
+                await notifyAdmin(`Pedido CASI completo`, userId, `Datos: ${addr.nombre}, ${addr.calle}\nCiudad: ${addr.ciudad} | CP: ${addr.cp}\nProvincia: ${addr.provincia || '?'}${validationNotes}\nItems: ${cartSummary}\nSubtotal: $${subtotal}${maxLabel}\nTotal: $${currentState.totalPrice}`);
                 matched = true;
             } else if (currentState.addressAttempts >= 3) {
                 // Too many attempts — pause and alert admin
@@ -716,7 +925,43 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
         }
 
         case 'waiting_final_confirmation': {
-            if (_isAffirmative(normalizedText) || /\b(si|dale|ok|listo|confirmo|correcto|acepto|bueno|joya|de una)\b/i.test(normalizedText)) {
+            // Issue 3: Detect post-dated delivery requests ("a partir del 15 de marzo")
+            const dateMatch = text.match(/(?:a partir del?|desde el?|para el?|despu[eé]s del?)\s*(?:d[ií]a\s*)?(\d{1,2})\s*(?:de\s*)?(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
+            if (dateMatch) {
+                const postdatado = `${dateMatch[1]} de ${dateMatch[2]}`;
+                currentState.postdatado = postdatado;
+
+                const msg = `¡Perfecto! Tu pedido ya fue ingresado 🚀\n\nLo vamos a despachar para que te llegue a partir del ${postdatado}.\nTe avisamos con el número de seguimiento.\n\n¡Gracias por confiar en Herbalis!`;
+                await sendMessageWithDelay(userId, msg);
+
+                // Save Order with postdatado
+                if (currentState.pendingOrder) {
+                    const o = currentState.pendingOrder;
+                    const cart = o.cart || [];
+                    const prodStr = cart.map(i => i.product).join(' + ');
+                    const planStr = cart.map(i => `${i.plan} días`).join(' + ');
+                    const finalPrice = currentState.totalPrice || "0";
+
+                    const orderData = {
+                        cliente: userId,
+                        nombre: o.nombre, calle: o.calle, ciudad: o.ciudad, cp: o.cp,
+                        producto: prodStr, plan: planStr, precio: finalPrice,
+                        postdatado: postdatado
+                    };
+
+                    if (dependencies.saveOrderToLocal) dependencies.saveOrderToLocal(orderData);
+                    appendOrderToSheet(orderData).catch(e => console.error('[SHEETS] Async log failed:', e.message));
+                    console.log(`✅ [PEDIDO CONFIRMADO - POSTDATADO ${postdatado}] ${userId} — Total: $${finalPrice}`);
+                }
+
+                // Notify admin about postdatado
+                await notifyAdmin('📅 Pedido POSTDATADO confirmado', userId, `Fecha: a partir del ${postdatado}\nTotal: $${currentState.totalPrice || '?'}`);
+
+                _setStep(currentState, 'completed');
+                currentState.history.push({ role: 'bot', content: msg });
+                saveState();
+                matched = true;
+            } else if (_isAffirmative(normalizedText) || /\b(si|dale|ok|listo|confirmo|correcto|acepto|bueno|joya|de una)\b/i.test(normalizedText)) {
                 // FINAL SUCCESS
                 const msg = "¡Excelente! Tu pedido ya fue ingresado 🚀\n\nTe vamos a avisar cuando lo despachemos con el número de seguimiento.\n\n¡Muchas gracias por confiar en Herbalis!";
                 await sendMessageWithDelay(userId, msg);
@@ -742,7 +987,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     console.log(`✅ [PEDIDO CONFIRMADO] ${userId} — Total: $${finalPrice}`);
                 }
 
-                currentState.step = 'completed';
+                _setStep(currentState, 'completed');
                 currentState.history.push({ role: 'bot', content: msg });
                 saveState();
                 matched = true;
@@ -771,7 +1016,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     appendOrderToSheet(orderData).catch(e => console.error('[SHEETS] Async log failed:', e.message));
                 }
 
-                currentState.step = 'completed';
+                _setStep(currentState, 'completed');
                 currentState.history.push({ role: 'bot', content: msg });
                 saveState();
                 matched = true;
@@ -807,7 +1052,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             if (postSaleAI.extractedData === 'RE_PURCHASE') {
                 // Customer wants to buy again — skip intro, go to plan choice
                 console.log(`[POST-SALE] Customer ${userId} wants to re-purchase. Skipping to preference.`);
-                currentState.step = 'waiting_preference';
+                _setStep(currentState, 'waiting_preference');
                 currentState.cart = [];
                 currentState.pendingOrder = null;
                 currentState.partialAddress = {};
@@ -820,8 +1065,8 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 }
                 matched = true;
             } else if (postSaleAI.extractedData === 'NEED_ADMIN') {
-                // Complex question — alert admin
-                await _pauseAndAlert(userId, currentState, dependencies, text, 'Cliente post-venta necesita asistencia humana.');
+                // P1 #5: Post-sale — alert admin WITHOUT pausing (customer already bought)
+                await dependencies.notifyAdmin('⚠️ Cliente post-venta necesita asistencia', userId, `Mensaje: "${text}"`);
                 if (postSaleAI.response) {
                     await sendMessageWithDelay(userId, postSaleAI.response);
                     currentState.history.push({ role: 'bot', content: postSaleAI.response });
@@ -846,14 +1091,14 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             const migratedStep = stepMigrations[currentState.step];
             if (migratedStep) {
                 console.log(`[STALE-STEP] Migrating ${currentState.step} → ${migratedStep}`);
-                currentState.step = migratedStep;
+                _setStep(currentState, migratedStep);
                 saveState();
                 // Re-process with the correct step (recursive, but only once)
                 return processSalesFlow(userId, text, userState, knowledge, dependencies);
             } else {
                 // Unknown step with no migration — reset to greeting
                 console.log(`[STALE-STEP] No migration for "${currentState.step}". Resetting to greeting.`);
-                currentState.step = 'greeting';
+                _setStep(currentState, 'greeting');
                 currentState.cart = [];
                 currentState.pendingOrder = null;
                 currentState.partialAddress = {};
@@ -880,9 +1125,11 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
  * _pauseAndAlert
  * Pauses the user and sends an alert to the admin dashboard.
  * The bot will not respond to this user until an admin unpauses them.
+ * At night (outside 9-21h Argentina), sends a polite "fuera de horario" message.
  */
 async function _pauseAndAlert(userId, currentState, dependencies, userMessage, reason) {
     const { notifyAdmin, saveState, sendMessageWithDelay, sharedState } = dependencies;
+    const { isBusinessHours } = require('../services/timeUtils');
 
     // Pause the user (pausedUsers is a Set)
     if (sharedState && sharedState.pausedUsers) {
@@ -890,16 +1137,26 @@ async function _pauseAndAlert(userId, currentState, dependencies, userMessage, r
         saveState();
     }
 
-    // Send a polite hold message — SILENCED PER USER REQUEST
-    // const holdMsg = "Un momento por favor, te comunico con un asesor para que te ayude mejor 😊";
-    // await sendMessageWithDelay(userId, holdMsg);
-    // currentState.history.push({ role: 'bot', content: holdMsg });
+    // NIGHT MODE: Send polite night message
+    if (!isBusinessHours()) {
+        const nightMsg = "Necesito consultar esto con mi compañero, pero entenderás que por la hora me es imposible. Apenas pueda te respondo, ¡quedate tranquilo/a! 😊🌙";
+        await sendMessageWithDelay(userId, nightMsg);
+        currentState.history.push({ role: 'bot', content: nightMsg });
+    }
 
-    // Alert admin
+    // P2 #8: Generate contextual suggestions for admin
+    const suggestions = _getAdminSuggestions(currentState.step, userMessage);
+    const suggestionsText = suggestions.length > 0
+        ? `\n\n💡 *Sugerencias:*\n${suggestions.map((s, i) => `${i + 1}. ${s}`).join('\n')}`
+        : '';
+
+    const nightLabel = !isBusinessHours() ? ' (FUERA DE HORARIO)' : '';
+
+    // Alert admin with suggestions
     await notifyAdmin(
-        `🚨 BOT PAUSADO — Necesita intervención`,
+        `🚨 BOT PAUSADO${nightLabel} — Necesita intervención`,
         userId,
-        `Razón: ${reason}\nÚltimo mensaje del cliente: "${userMessage}"\nPaso actual: ${currentState.step}`
+        `Razón: ${reason}\nÚltimo mensaje: "${userMessage}"\nPaso: ${currentState.step}${suggestionsText}`
     );
 
     // Emit alert to dashboard
@@ -909,11 +1166,12 @@ async function _pauseAndAlert(userId, currentState, dependencies, userMessage, r
             reason,
             lastMessage: userMessage,
             step: currentState.step,
+            nightMode: !isBusinessHours(),
             timestamp: new Date()
         });
     }
 
-    console.log(`⏸️ [BOT] User ${userId} paused. Reason: ${reason}`);
+    console.log(`⏸️ [BOT] User ${userId} paused. Reason: ${reason}${nightLabel}`);
 }
 
 module.exports = { processSalesFlow };

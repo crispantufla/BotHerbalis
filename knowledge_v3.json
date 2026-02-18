@@ -52,7 +52,8 @@
                 "semillas",
                 "semilla",
                 "natural",
-                "tradicional"
+                "tradicional",
+                "2"
             ],
             "response": "Genial 🌿 La semilla en estado natural es la opción más elegida.\n\nSe consume en forma de infusión cada noche.\n\n🔹 60 días → ${{PRICE_SEMILLAS_60}}\n🔹 120 días → ${{PRICE_SEMILLAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl plan de 120 días permite pago al recibir sin costo adicional.\nEl plan de 60 días con pago al recibir tiene un adicional de $6.000.\n\n👉 ¿Avanzamos con 60 o 120 días?",
             "nextStep": "waiting_plan_choice"
@@ -62,7 +63,8 @@
             "match": [
                 "gotas",
                 "liquido",
-                "gotero"
+                "gotero",
+                "3"
             ],
             "response": "Genial 🌿 Las gotas son prácticas y discretas.\n\n🔹 60 días → ${{PRICE_GOTAS_60}}\n🔹 120 días → ${{PRICE_GOTAS_120}}\n\n� Envío gratis a todo el país.\n\nImportante 👇\nEl plan de 120 días permite pago al recibir sin costo adicional.\nEl plan de 60 días con pago al recibir tiene un adicional de $6.000.\n\n👉 ¿Avanzamos con 60 o 120 días?",
             "nextStep": "waiting_plan_choice"
@@ -139,9 +141,10 @@
             "keywords": [
                 "demora",
                 "tarda",
-                "tiempo",
-                "llega",
-                "cuanto demora"
+                "cuanto tarda",
+                "cuando llega",
+                "cuanto demora",
+                "dias habiles"
             ],
             "response": "La entrega es de 7 a 10 días hábiles o a partir de la fecha que nos indiques."
         },
@@ -295,7 +298,13 @@
             "keywords": [
                 "peligrosa",
                 "mala",
-                "me dijeron"
+                "me dijeron",
+                "hace mal",
+                "dañina",
+                "toxica",
+                "veneno",
+                "murio",
+                "muerte"
             ],
             "response": "En redes circula información mezclada con productos distintos.\n\nTrabajamos hace más de 13 años con este producto en distintos países."
         },
@@ -376,6 +385,18 @@
                 "rico"
             ],
             "response": "Las cápsulas no tienen gusto, se tragan con agua.\nLas semillas se preparan en infusión y son suaves, sin sabor fuerte.\nLas gotas tienen sabor neutro."
+        },
+        {
+            "keywords": [
+                "donde estan",
+                "tienen local",
+                "puedo ir",
+                "punto de venta",
+                "direccion",
+                "donde compro",
+                "local fisico"
+            ],
+            "response": "No tenemos local de venta al público. Trabajamos 100% online y los envíos son por Correo Argentino a todo el país 📦"
         }
     ],
     "rules": {

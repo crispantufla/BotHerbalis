@@ -36,7 +36,17 @@ function startServer(client, sharedState) {
         origin: process.env.DASHBOARD_URL || "http://localhost:5173"
     }));
     app.use(express.json());
-    app.use(express.static(path.join(__dirname, '../../public')));
+
+    // Serve Static Files (Production/Docker)
+    const clientDistPath = path.join(__dirname, '../../client/dist');
+    if (require('fs').existsSync(clientDistPath)) {
+        app.use(express.static(clientDistPath));
+        console.log(`✅ Serving static files from: ${clientDistPath}`);
+    } else {
+        // Fallback for local development if dist doesn't exist yet
+        app.use(express.static(path.join(__dirname, '../../public')));
+        console.log(`ℹ️ Client build not found. Serving public folder only.`);
+    }
 
     // --- MOUNT ROUTES ---
     // All API routes are mounted under /api to preserve existing contract
@@ -45,6 +55,21 @@ function startServer(client, sharedState) {
     app.use('/api', adminRoutes(client, sharedState));
     app.use('/api', systemRoutes(client, sharedState));
     app.use('/api', authRoutes(client, sharedState));
+
+    // Handle React Routing, return all requests to React app
+    // Express 5: using regex or * should work, but let's try a catch-all middleware at the end
+    app.use((req, res, next) => {
+        if (req.method !== 'GET') return next();
+
+        const clientDistPath = path.join(__dirname, '../../client/dist');
+        const indexPath = path.join(clientDistPath, 'index.html');
+
+        if (require('fs').existsSync(indexPath)) {
+            res.sendFile(indexPath);
+        } else {
+            next(); // Allow 404 handler to take over if index doesn't exist
+        }
+    });
 
     // --- SOCKET SYNC ---
     io.on('connection', (socket) => {

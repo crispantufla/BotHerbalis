@@ -1,0 +1,10 @@
+node_modules
+client/node_modules
+.git
+.env
+.wwebjs_auth
+.wwebjs_cache
+logs
+backups
+debug_log.txt
+npm-debug.log

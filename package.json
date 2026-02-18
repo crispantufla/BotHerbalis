@@ -7,9 +7,12 @@
     "dev:server": "node index.js",
     "dev:client": "npm run dev --prefix client",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "start": "npm run dev",
+    "start": "node index.js",
     "kill": "taskkill /F /IM node.exe",
     "test": "jest"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   },
   "keywords": [],
   "author": "",

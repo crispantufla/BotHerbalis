@@ -57,9 +57,12 @@ describe('Multi-Product Logic', () => {
             product: 'Cápsulas',
             plan: '60'
         });
-        // Expect closing message
+        // Expect cart summary first, then closing message
         expect(mockSendMessage).toHaveBeenCalledWith(
-            userId, expect.stringMatching(/confirmarte algo importante sobre el env/i)
+            userId, expect.stringMatching(/Tu pedido/i)
+        );
+        expect(mockSendMessage).toHaveBeenCalledWith(
+            userId, expect.stringMatching(/Tomamos los datos/i)
         );
     });
 
@@ -84,9 +87,12 @@ describe('Multi-Product Logic', () => {
         expect(item2).toBeDefined();
         expect(item2.plan).toBe('60');
 
-        // Expect closing message
+        // Expect cart summary first, then closing message
         expect(mockSendMessage).toHaveBeenCalledWith(
-            userId, expect.stringMatching(/confirmarte algo importante/i)
+            userId, expect.stringMatching(/Tu pedido/i)
+        );
+        expect(mockSendMessage).toHaveBeenCalledWith(
+            userId, expect.stringMatching(/Tomamos los datos/i)
         );
     });
 });
