@@ -404,6 +404,39 @@ const CommsView = () => {
             );
         }
 
+        // Audio transcription messages (from logAndEmit: "🎤 Audio: ...")
+        if (msg.body && msg.body.startsWith('🎤 Audio:')) {
+            const transcription = msg.body.replace(/^🎤\s*Audio:\s*/, '').replace(/^"|"$/g, '').trim();
+            return (
+                <div className="space-y-2 min-w-[200px]">
+                    {/* Visual audio player */}
+                    <div className="flex items-center gap-2 bg-black/5 rounded-lg px-3 py-2">
+                        <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
+                            <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+                                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+                            </svg>
+                        </div>
+                        <div className="flex items-center gap-0.5 flex-1">
+                            {[4, 12, 8, 16, 6, 14, 10, 18, 5, 13, 7, 15, 9, 17, 6, 11, 8, 14, 10, 12].map((h, i) => (
+                                <div
+                                    key={i}
+                                    className="w-1 rounded-full bg-emerald-400/60"
+                                    style={{ height: `${h}px` }}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                    {/* Transcription */}
+                    {transcription && (
+                        <div className="bg-black/5 p-2 rounded-lg text-xs italic text-slate-600 border-l-2 border-emerald-400">
+                            📝 "{transcription}"
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
         return msg.body;
     };
 

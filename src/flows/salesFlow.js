@@ -364,6 +364,23 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
         return { matched: true };
     }
 
+    // NEW: Global Payment Method Check
+    // Matches: "tarjeta", "crédito", "débito", "transferencia", "mercadopago", "visa", "mastercard", etc.
+    const PAYMENT_REGEX = /\b(tarjeta|credito|crédito|debito|débito|transferencia|mercadopago|mercado\s*pago|visa|mastercard|rapipago|pago\s*facil|pago\s*fácil|pagofacil|billetera|virtual|nequi|uala|ualá|cuenta\s*bancaria|cbu|alias|deposito|depósito)\b/i;
+    if (PAYMENT_REGEX.test(normalizedText)) {
+        const paymentMsg = "El pago es en efectivo al recibir el pedido en tu domicilio 😊\n\nEl cartero de Correo Argentino te lo entrega y ahí mismo abonás. No se paga nada por adelantado.\n\n¿Te gustaría continuar?";
+        await sendMessageWithDelay(userId, paymentMsg);
+        currentState.history.push({ role: 'bot', content: paymentMsg });
+
+        // Redirect back to current step question
+        const redirect = _getStepRedirect(currentState.step, currentState);
+        if (redirect) {
+            await sendMessageWithDelay(userId, redirect);
+            currentState.history.push({ role: 'bot', content: redirect });
+        }
+        return { matched: true };
+    }
+
     for (const faq of knowledge.faq) {
         if (faq.keywords.some(k => lowerText.includes(k))) {
             await sendMessageWithDelay(userId, _formatMessage(faq.response));

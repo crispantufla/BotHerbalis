@@ -32,6 +32,7 @@ let lastAlertUser = null;
 let pausedUsers = new Set();
 const pendingMessages = new Map(); // Debounce: userId -> { messages: [], timer }
 const DEBOUNCE_MS = 3000; // Wait 3s for more messages before processing
+let schedulerStarted = false; // Guard against duplicate scheduler on reconnect
 // Variables for API / Dashboard State
 let qrCodeData = null;
 let sessionAlerts = [];
@@ -409,12 +410,15 @@ client.on('ready', () => {
     if (sharedState.io) sharedState.io.emit('ready', { info: client.info });
 
     // P3: Start scheduler for stale user alerts, re-engagement, and auto-approve
-    startScheduler(sharedState, {
-        notifyAdmin,
-        sendMessageWithDelay,
-        saveState,
-        saveOrderToLocal
-    });
+    if (!schedulerStarted) {
+        startScheduler(sharedState, {
+            notifyAdmin,
+            sendMessageWithDelay,
+            saveState,
+            saveOrderToLocal
+        });
+        schedulerStarted = true;
+    }
 });
 
 client.on('disconnected', (reason) => {
@@ -475,7 +479,7 @@ client.on('message', async msg => {
                 const parts = msgText.split(' ');
                 const targetNumber = parts[1];
                 await client.sendMessage(msg.from, `✅ Usuario ${targetNumber} forzado.`);
-                const targetChatId = targetNumber.includes('@') ? targetNumber : `${targetNumber.replace(/\D/g, '')} @c.us`;
+                const targetChatId = targetNumber.includes('@') ? targetNumber : `${targetNumber.replace(/\D/g, '')}@c.us`;
                 if (!userState[targetChatId]) userState[targetChatId] = { step: 'greeting', partialAddress: {} };
                 userState[targetChatId].step = 'waiting_data';
                 saveState();

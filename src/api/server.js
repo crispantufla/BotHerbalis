@@ -21,9 +21,10 @@ function startServer(client, sharedState) {
 
     const app = express();
     const server = http.createServer(app);
+    const allowedOrigin = process.env.DASHBOARD_URL || '*';
     const io = new Server(server, {
         cors: {
-            origin: process.env.DASHBOARD_URL || "http://localhost:5173",
+            origin: allowedOrigin,
             methods: ["GET", "POST"]
         }
     });
@@ -34,7 +35,7 @@ function startServer(client, sharedState) {
     // Middleware
     app.set('trust proxy', 1); // Trust first proxy (Railway/Load Balancer)
     app.use(cors({
-        origin: process.env.DASHBOARD_URL || "http://localhost:5173"
+        origin: allowedOrigin
     }));
     app.use(express.json({ limit: '10mb' }));
 
@@ -42,7 +43,7 @@ function startServer(client, sharedState) {
     const { rateLimit } = require('express-rate-limit');
     const limiter = rateLimit({
         windowMs: 15 * 60 * 1000, // 15 minutes
-        limit: 100, // Limit each IP to 100 requests per windowMs
+        limit: 300, // Limit each IP to 300 requests per windowMs (dashboard needs many)
         standardHeaders: 'draft-7',
         legacyHeaders: false,
         message: { error: 'Too many requests, please try again later.' }

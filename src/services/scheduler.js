@@ -181,7 +181,7 @@ function cleanupOldUsers(sharedState, dependencies) {
     }
 
     if (cleaned > 0) {
-        console.log(`[SCHEDULER] Cleaned up ${cleaned} inactive user(s) (>7 days)`);
+        console.log(`[SCHEDULER] Cleaned up ${cleaned} inactive user(s) (>30 days)`);
         saveState();
     }
 }

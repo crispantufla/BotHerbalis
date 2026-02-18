@@ -1,4 +1,8 @@
 const express = require('express');
+const crypto = require('crypto');
+
+// Generate a random session token at startup (not hardcoded)
+const SESSION_TOKEN = crypto.randomBytes(32).toString('hex');
 
 module.exports = (client, sharedState) => {
     const router = express.Router();
@@ -13,7 +17,7 @@ module.exports = (client, sharedState) => {
         if (username === validUser && password === validPass) {
             return res.json({
                 success: true,
-                token: 'mock-admin-token-12345',
+                token: SESSION_TOKEN,
                 user: { username: validUser, role: 'admin' }
             });
         }

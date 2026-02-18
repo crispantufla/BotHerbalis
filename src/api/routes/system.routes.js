@@ -47,17 +47,26 @@ module.exports = (client, sharedState) => {
         const qrData = sharedState.qrCodeData;
         if (!qrData) return res.send('<h1>No QR Code active</h1><p>Bot is either connected or initializing. Check logs.</p>');
 
+        // Sanitize qrData to prevent XSS
+        const safeQrData = qrData
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#x27;')
+            .replace(/\\/g, '\\\\');
+
         const html = `
             <html>
                 <head><title>Scan QR</title></head>
                 <body style="display:flex;justify-content:center;align-items:center;height:100vh;flex-direction:column;font-family:sans-serif;">
-                    <h1>Escanea este código QR</h1>
+                    <h1>Escaneá este código QR</h1>
                     <div id="qrcode"></div>
                     <p style="margin-top:20px;color:gray;">Actualiza la página si expira.</p>
                     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
                     <script>
                         new QRCode(document.getElementById("qrcode"), {
-                            text: "${qrData.replace(/"/g, '\\"')}",
+                            text: "${safeQrData}",
                             width: 300,
                             height: 300
                         });
@@ -80,6 +89,7 @@ module.exports = (client, sharedState) => {
             let todayRevenue = 0;
             let totalOrders = 0;
             let todayOrders = 0;
+            let completedToday = 0;
             const today = new Date().toISOString().split('T')[0];
 
             if (fs.existsSync(ORDERS_FILE)) {
@@ -91,6 +101,7 @@ module.exports = (client, sharedState) => {
                         todayOrders++;
                         const price = parseFloat(String(o.precio || '0').replace(/[^0-9.]/g, ''));
                         if (!isNaN(price)) todayRevenue += price;
+                        if (o.status !== 'Cancelado') completedToday++;
                     }
                 });
             }
@@ -99,13 +110,6 @@ module.exports = (client, sharedState) => {
             const activeConversations = Object.values(userState).filter(
                 s => s.step && s.step !== 'completed' && s.step !== 'greeting'
             ).length;
-
-            const completedToday = fs.existsSync(ORDERS_FILE)
-                ? JSON.parse(fs.readFileSync(ORDERS_FILE)).filter(o => {
-                    const d = o.createdAt ? new Date(o.createdAt).toISOString().split('T')[0] : '';
-                    return d === today && o.status !== 'Cancelado';
-                }).length
-                : 0;
 
             res.json({
                 todayRevenue,
