@@ -456,20 +456,30 @@ client.on('message', async msg => {
         // --- USER MESSAGES ---
 
         // 1. Media Handling (Audio)
-        if (msg.hasMedia || msg.type === 'ptt' || msg.type === 'audio') {
+        if (msg.type === 'ptt' || msg.type === 'audio') {
             const media = await msg.downloadMedia();
             if (media) {
+                // Log the audio message with transcription for the dashboard
                 const transcription = await aiService.transcribeAudio(media.data, media.mimetype);
                 if (transcription) {
                     console.log(`[AUDIO] Transcribed: "${transcription}"`);
+                    // Log as audio with transcription so dashboard can display both
+                    logAndEmit(userId, 'user', `🎤 Audio: "${transcription}"`, userState[userId]?.step || 'new');
                     const startTime = Date.now();
                     await processSalesFlow(userId, transcription, userState, knowledge, {
                         client, notifyAdmin, saveState, sendMessageWithDelay: (id, text) => sendMessageWithDelay(id, text, startTime), logAndEmit, saveOrderToLocal, sharedState
                     });
                 } else {
+                    logAndEmit(userId, 'user', '🎤 Audio (no se pudo transcribir)', userState[userId]?.step || 'new');
                     await client.sendMessage(userId, "Disculpá, no pude escuchar bien el audio. ¿Me lo escribís?");
                 }
             }
+            return;
+        }
+
+        // 1b. Media Handling (Image/Sticker)
+        if (msg.type === 'image' || msg.type === 'sticker') {
+            logAndEmit(userId, 'user', `📷 ${msg.type === 'sticker' ? 'Sticker' : 'Imagen'} recibida${msg.body ? ': ' + msg.body : ''}`, userState[userId]?.step || 'new');
             return;
         }
 
