@@ -71,6 +71,19 @@ const CorporateDashboard = () => {
     }, [socket, fetchConfig]);
 
     const handleQuickAction = async (chatId, action) => {
+        if (action === 'chat') {
+            setActiveTab('comms');
+            // setTimeout to allow tab switch, then emit event or use context to select chat
+            // For now, just switching tab is the first step. Enhanced implementation requires context.
+            return;
+        }
+
+        if (action === 'descartar') {
+            // Just remove from UI
+            setAlerts(prev => prev.filter(a => a.userPhone !== chatId));
+            return;
+        }
+
         try {
             await api.post('/api/admin-command', { chatId, command: action });
             setAlerts(prev => prev.filter(a => a.userPhone !== chatId));

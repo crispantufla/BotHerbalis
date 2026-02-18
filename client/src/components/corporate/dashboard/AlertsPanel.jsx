@@ -118,18 +118,35 @@ const AlertsPanel = ({ alerts, onCommand, onQuickAction }) => {
                                         </div>
 
                                         {/* Quick action buttons */}
-                                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                                        <div className="flex flex-wrap items-center gap-1.5 mt-2 sm:mt-0">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); onQuickAction(alert.userPhone, 'chat'); }}
+                                                className="px-2.5 py-1.5 bg-white text-slate-600 border border-slate-200 rounded-lg text-xs font-medium hover:bg-slate-50 hover:text-slate-800 transition-colors shadow-sm"
+                                                title="Ir a conversación"
+                                            >
+                                                <Icons.Message />
+                                            </button>
+
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); onQuickAction(alert.userPhone, 'confirmar'); }}
-                                                className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl text-xs font-bold hover:from-emerald-600 hover:to-teal-600 transition-all shadow-md shadow-emerald-500/20 hover:shadow-lg hover:shadow-emerald-500/30 active:scale-95"
+                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg text-xs font-bold hover:from-emerald-600 hover:to-teal-600 transition-all shadow-sm shadow-emerald-500/20 active:scale-95"
                                             >
                                                 <Icons.Check /> Aprobar
                                             </button>
+
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); onQuickAction(alert.userPhone, 'yo me encargo'); }}
-                                                className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-slate-700 to-slate-800 text-white rounded-xl text-xs font-bold hover:from-slate-800 hover:to-slate-900 transition-all shadow-md hover:shadow-lg active:scale-95"
+                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-slate-700 to-slate-800 text-white rounded-lg text-xs font-bold hover:from-slate-800 hover:to-slate-900 transition-all shadow-sm active:scale-95"
                                             >
                                                 🎯 Intervenir
+                                            </button>
+
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); onQuickAction(alert.userPhone, 'descartar'); }}
+                                                className="px-2.5 py-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                                                title="Descartar alerta"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                                             </button>
                                         </div>
                                     </div>
