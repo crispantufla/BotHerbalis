@@ -84,6 +84,28 @@ function _formatMessage(text, state) {
 }
 
 /**
+ * _isDuplicate
+ * Checks if the proposed message is identical or near-identical to the last bot message.
+ * Prevents the bot from sending the same text twice in a row.
+ */
+function _isDuplicate(proposedMsg, history) {
+    if (!history || history.length === 0) return false;
+    // Find last bot message
+    for (let i = history.length - 1; i >= 0; i--) {
+        if (history[i].role === 'bot') {
+            const lastMsg = history[i].content.trim().toLowerCase();
+            const newMsg = proposedMsg.trim().toLowerCase();
+            // Exact match or very similar (within 10 chars difference)
+            if (lastMsg === newMsg) return true;
+            // Also catch near-duplicates (same start, same core message)
+            if (lastMsg.length > 30 && newMsg.length > 30 && lastMsg.substring(0, 50) === newMsg.substring(0, 50)) return true;
+            break; // Only check the LAST bot message
+        }
+    }
+    return false;
+}
+
+/**
  * _getStepRedirect
  * Returns a brief message to steer the user back to the current step's pending question.
  * This is used after FAQ answers and AI fallbacks to keep the conversation on track.
@@ -247,27 +269,37 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
     // ─────────────────────────────────────────────────
     // 0. SAFETY CHECK (Priority 0 — HIGHEST)
     //    If user mentions "hija", "menor", "embarazo", etc. FORCE AI CHECK.
+    //    BUT: If the issue was already resolved (user clarified age ≥18), SKIP.
     // ─────────────────────────────────────────────────
     const SAFETY_REGEX = /\b(hija|hijo|niñ[oa]s?|menor(es)?|bebe|embaraz[oa]|lactanc?ia|1[0-7]\s*años?)\b/i;
-    if (SAFETY_REGEX.test(normalizedText)) {
+    const AGE_CLARIFICATION = /\b(tiene|tengo|son|es)\s*(\d{2,})\b|\b(\d{2,})\s*(años|año)\b|\b(mayor|adulto|adulta|grande)\b/i;
+
+    // If user clarifies age ≥ 18, mark safety as resolved
+    const ageMatch = normalizedText.match(/\b(tiene|tengo)\s*(\d{2,})\b|\b(\d{2,})\s*(anos|ano)\b/);
+    if (ageMatch) {
+        const age = parseInt(ageMatch[2] || ageMatch[3]);
+        if (age >= 18) {
+            currentState.safetyResolved = true;
+            console.log(`[SAFETY] Age clarified: ${age} years. Safety resolved.`);
+        }
+    }
+    if (AGE_CLARIFICATION.test(normalizedText) && /\b(mayor|adulto|adulta|grande)\b/i.test(normalizedText)) {
+        currentState.safetyResolved = true;
+    }
+
+    if (SAFETY_REGEX.test(normalizedText) && !currentState.safetyResolved) {
         console.log(`[SAFETY] Potential Red Flag detected: "${text}"`);
         const safetyCheck = await aiService.chat(text, {
             step: 'safety_check',
-            goal: 'Verificar si hay contraindicación o riesgo para menor de edad. Si es así, rechazar venta amablemente explicando la razón. Si NO hay riesgo (ej: "tengo un hijo pero es para mí"), responder normalmente.',
+            goal: 'Verificar si hay contraindicación o riesgo para menor de edad. Si el usuario ya aclaró que la persona es mayor de 18 años, respondé que SÍ puede tomarla y goalMet=true. Si es menor de 18, rechazar venta amablemente.',
             history: currentState.history,
             summary: currentState.summary,
             knowledge: knowledge
         });
 
-        // If AI detects a safety issue, it will respond with the rejection message.
-        // We trust the AI's judgment here because of the strict system prompt.
         if (safetyCheck.response) {
             await sendMessageWithDelay(userId, safetyCheck.response);
             currentState.history.push({ role: 'bot', content: safetyCheck.response });
-
-            // If the response indicates refusal/prohibition, we should probably pause or stop.
-            // But for now, just replying is enough to break the flow of "giving data".
-            // The AI is instructed to goalMet=false for refusals.
             return;
         }
     }
@@ -560,13 +592,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 currentState.adicionalMAX = has60 ? _getAdicionalMAX() : 0;
                 currentState.cart = foundItems;
 
-                // P2 #4: Show cart summary before asking for address
-                const cartLines = foundItems.map(i => `• ${i.product} (${i.plan} días) — $${i.price}`).join('\n');
-                const cartMsg = `📋 *Tu pedido:*\n${cartLines}`;
-                await sendMessageWithDelay(userId, cartMsg);
-                currentState.history.push({ role: 'bot', content: cartMsg });
-
-                // Confirm with closing
+                // Confirm with closing (cart summary is internal only)
                 const closingNode = knowledge.flow.closing;
                 await sendMessageWithDelay(userId, closingNode.response);
                 _setStep(currentState, closingNode.nextStep);
@@ -605,13 +631,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             }
 
             if (planSelected) {
-                // P2 #4: Show cart summary before asking for address
-                const cartItem = currentState.cart[0];
-                const cartMsg = `📋 *Tu pedido:*\n• ${cartItem.product} (${cartItem.plan} días) — $${cartItem.price}`;
-                await sendMessageWithDelay(userId, cartMsg);
-                currentState.history.push({ role: 'bot', content: cartMsg });
-
-                // Direct script response
+                // Direct script response (cart summary is internal only)
                 const closingNode = knowledge.flow.closing;
                 await sendMessageWithDelay(userId, closingNode.response);
                 _setStep(currentState, closingNode.nextStep);
@@ -805,15 +825,19 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 console.log(`[AI-FALLBACK] waiting_data: Detected question/objection from ${userId}: "${text}"`);
                 const aiData = await aiService.chat(text, {
                     step: 'waiting_data',
-                    goal: 'El usuario tiene una duda o no quiere dar datos todavía. Respondé brevemente su duda y pedile amablemente los datos de envío: nombre completo, calle y número, ciudad, y código postal.',
+                    goal: 'El usuario tiene una duda o no quiere dar datos todavía. Respondé brevemente su duda y luego pedile los datos de envío. IMPORTANTE: NO repitas la misma frase que ya le dijiste antes. Variá la forma de pedir los datos. Si el usuario mencionó un tema ya resuelto (ej: edad de una persona), confirmá lo que ya se habló y seguí adelante.',
                     history: currentState.history,
                     summary: currentState.summary,
                     knowledge: knowledge,
                     userState: currentState
                 });
-                if (aiData.response) {
+                if (aiData.response && !_isDuplicate(aiData.response, currentState.history)) {
                     await sendMessageWithDelay(userId, aiData.response);
                     currentState.history.push({ role: 'bot', content: aiData.response });
+                    matched = true;
+                } else if (aiData.response) {
+                    // AI generated a duplicate — skip silently, don't spam
+                    console.log(`[ANTI-DUP] Skipping duplicate AI response for ${userId}`);
                     matched = true;
                 } else {
                     await _pauseAndAlert(userId, currentState, dependencies, text, `Cliente no quiere dar datos. Dice: "${text}"`);
