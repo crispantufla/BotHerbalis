@@ -6,12 +6,15 @@ module.exports = (client, sharedState) => {
     router.post('/login', (req, res) => {
         const { username, password } = req.body;
 
-        // Simple hardcoded check as requested for local dev
-        if (username === 'admin' && password === 'admin') {
+        // Check against environment variables or default to 'admin'/'admin' if not set
+        const validUser = process.env.ADMIN_USER || 'admin';
+        const validPass = process.env.ADMIN_PASSWORD || 'admin';
+
+        if (username === validUser && password === validPass) {
             return res.json({
                 success: true,
                 token: 'mock-admin-token-12345',
-                user: { username: 'admin', role: 'admin' }
+                user: { username: validUser, role: 'admin' }
             });
         }
 
