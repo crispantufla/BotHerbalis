@@ -398,11 +398,18 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             try {
                 // Use process.cwd() for robust path resolution
                 const imagePath = path.join(process.cwd(), 'public', 'media', 'Gretings.jpg');
+                console.log(`[GREETING] Attempting to send image from: ${imagePath}`);
 
                 if (fs.existsSync(imagePath)) {
-                    console.log(`[GREETING] Found image at ${imagePath}. Sending to ${userId}...`);
+                    console.log(`[GREETING] File found. Loading MessageMedia...`);
                     const media = MessageMedia.fromFilePath(imagePath);
-                    await client.sendMessage(userId, media, { caption: '' });
+                    if (media && media.data) {
+                        console.log(`[GREETING] Media loaded. Size: ${media.data.length}. Sending to ${userId}...`);
+                        await client.sendMessage(userId, media, { caption: '' });
+                        console.log(`[GREETING] Image sent successfully to ${userId}`);
+                    } else {
+                        console.error(`[GREETING] Media object is invalid or empty.`);
+                    }
                 } else {
                     console.warn(`[GREETING] Image NOT found at ${imagePath}`);
                 }
