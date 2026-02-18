@@ -383,28 +383,66 @@ const CommsView = () => {
             );
         }
 
-        // Audio messages — unified visual renderer (no HTML5 player, audio files aren't stored)
-        // Handles: "MEDIA_AUDIO:...", "🎤 Audio: ...", and "🎤 Audio (no se pudo transcribir)"
+        // Audio messages — visual renderer with playback
+        // Handles: "MEDIA_AUDIO:/url|TRANSCRIPTION:text", "MEDIA_AUDIO:/url", "🎤 Audio: ..."
         if (msg.body && (msg.body.startsWith('MEDIA_AUDIO:') || msg.body.startsWith('🎤'))) {
+            let audioUrl = null;
             let transcription = null;
 
-            if (msg.body.startsWith('🎤 Audio:')) {
-                transcription = msg.body.replace(/^🎤\s*Audio:\s*/, '').replace(/^"|"$/g, '').trim();
-            } else if (msg.body.startsWith('MEDIA_AUDIO:')) {
+            if (msg.body.startsWith('MEDIA_AUDIO:')) {
                 const parts = msg.body.split('|');
+                const rawUrl = parts[0].replace('MEDIA_AUDIO:', '').trim();
+                if (rawUrl && rawUrl !== 'PENDING') audioUrl = `${API_URL}${rawUrl}`;
                 transcription = parts[1] ? parts[1].replace('TRANSCRIPTION:', '').trim() : null;
+            } else if (msg.body.startsWith('🎤 Audio:')) {
+                transcription = msg.body.replace(/^🎤\s*Audio:\s*/, '').replace(/^"|"$/g, '').trim();
             }
 
             return (
                 <div className="space-y-2 min-w-[200px]">
-                    {/* Visual audio bubble */}
+                    {/* Visual audio bubble with play button */}
                     <div className="flex items-center gap-2 bg-black/5 rounded-lg px-3 py-2">
-                        <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
-                            <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
-                                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
-                            </svg>
-                        </div>
+                        {audioUrl ? (
+                            <button
+                                className="w-8 h-8 rounded-full bg-emerald-500 hover:bg-emerald-600 flex items-center justify-center flex-shrink-0 transition-colors cursor-pointer active:scale-95"
+                                title="Reproducir audio"
+                                onClick={(e) => {
+                                    const btn = e.currentTarget;
+                                    const container = btn.closest('.space-y-2');
+                                    let audio = container.querySelector('audio');
+                                    if (!audio) {
+                                        audio = document.createElement('audio');
+                                        audio.src = audioUrl;
+                                        audio.style.display = 'none';
+                                        container.appendChild(audio);
+                                        audio.addEventListener('ended', () => {
+                                            btn.dataset.playing = 'false';
+                                            btn.innerHTML = '<svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+                                        });
+                                    }
+                                    if (audio.paused) {
+                                        audio.play();
+                                        btn.dataset.playing = 'true';
+                                        btn.innerHTML = '<svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
+                                    } else {
+                                        audio.pause();
+                                        btn.dataset.playing = 'false';
+                                        btn.innerHTML = '<svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+                                    }
+                                }}
+                            >
+                                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M8 5v14l11-7z" />
+                                </svg>
+                            </button>
+                        ) : (
+                            <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
+                                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+                                    <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+                                </svg>
+                            </div>
+                        )}
                         <div className="flex items-center gap-0.5 flex-1">
                             {[4, 12, 8, 16, 6, 14, 10, 18, 5, 13, 7, 15, 9, 17, 6, 11, 8, 14, 10, 12].map((h, i) => (
                                 <div

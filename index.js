@@ -506,18 +506,26 @@ client.on('message', async msg => {
         if (msg.type === 'ptt' || msg.type === 'audio') {
             const media = await msg.downloadMedia();
             if (media) {
-                // Log the audio message with transcription for the dashboard
+                // Save audio file for dashboard playback
+                const audioDir = path.join(__dirname, 'public', 'media', 'audio');
+                if (!fs.existsSync(audioDir)) fs.mkdirSync(audioDir, { recursive: true });
+                const ext = media.mimetype?.includes('ogg') ? 'ogg' : 'mp3';
+                const audioFilename = `${userId.replace('@c.us', '')}_${Date.now()}.${ext}`;
+                const audioPath = path.join(audioDir, audioFilename);
+                fs.writeFileSync(audioPath, Buffer.from(media.data, 'base64'));
+                const audioUrl = `/media/audio/${audioFilename}`;
+
+                // Transcribe with Whisper
                 const transcription = await aiService.transcribeAudio(media.data, media.mimetype);
                 if (transcription) {
                     console.log(`[AUDIO] Transcribed: "${transcription}"`);
-                    // Log as audio with transcription so dashboard can display both
-                    logAndEmit(userId, 'user', `🎤 Audio: "${transcription}"`, userState[userId]?.step || 'new');
+                    logAndEmit(userId, 'user', `MEDIA_AUDIO:${audioUrl}|TRANSCRIPTION:${transcription}`, userState[userId]?.step || 'new');
                     const startTime = Date.now();
                     await processSalesFlow(userId, transcription, userState, knowledge, {
                         client, notifyAdmin, saveState, sendMessageWithDelay: (id, text) => sendMessageWithDelay(id, text, startTime), logAndEmit, saveOrderToLocal, sharedState
                     });
                 } else {
-                    logAndEmit(userId, 'user', '🎤 Audio (no se pudo transcribir)', userState[userId]?.step || 'new');
+                    logAndEmit(userId, 'user', `MEDIA_AUDIO:${audioUrl}`, userState[userId]?.step || 'new');
                     await client.sendMessage(userId, "Disculpá, no pude escuchar bien el audio. ¿Me lo escribís?");
                 }
             }

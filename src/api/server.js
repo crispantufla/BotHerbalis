@@ -61,6 +61,9 @@ function startServer(client, sharedState) {
         console.log(`ℹ️ Client build not found. Serving public folder only.`);
     }
 
+    // Always serve /media from public/ for audio files, images, etc.
+    app.use('/media', express.static(path.join(__dirname, '../../public/media')));
+
     // --- MOUNT ROUTES ---
     // All API routes are mounted under /api to preserve existing contract
     app.use('/api', chatRoutes(client, sharedState));
