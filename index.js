@@ -300,7 +300,27 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false) {
         return "Report sent to WA";
     }
 
-    // 2. Confirmation
+    // 3. Takeover ("Me encargo")
+    if (lowerMsg.includes('me encargo') || lowerMsg.includes('intervenir')) {
+        const actualTarget = targetChatId || lastAlertUser;
+        if (!actualTarget) return "No pending user.";
+
+        pausedUsers.add(actualTarget);
+        saveState();
+        if (sharedState.io) sharedState.io.emit('bot_status_change', { chatId: actualTarget, paused: true });
+
+        // Clear alerts
+        const index = sessionAlerts.findIndex(a => a.userPhone === actualTarget);
+        if (index !== -1) {
+            sessionAlerts.splice(index, 1);
+            if (sharedState.io) sharedState.io.emit('alerts_updated', sessionAlerts);
+        }
+
+        console.log(`[ADMIN] Takeover for ${actualTarget}. Bot PAUSED.`);
+        return `✅ Bot pausado. El usuario ${actualTarget} es todo tuyo.`;
+    }
+
+    // 4. Confirmation (moved down)
     if (lowerMsg === 'ok' || lowerMsg === 'dale' || lowerMsg === 'si' || lowerMsg === 'confirmar') {
         const actualTarget = targetChatId || lastAlertUser;
         if (!actualTarget) return "No pending user.";
