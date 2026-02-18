@@ -70,16 +70,36 @@ const CommsView = () => {
                     if (selectedChat && selectedChat.id === data.chatId) {
                         const isMe = data.sender === 'bot' || data.sender === 'admin';
                         const newMsg = {
+                            id: data.messageId || `socket-${timestamp}`, // Use real ID if available
                             fromMe: isMe,
                             body: data.text || '',
                             type: 'chat',
                             timestamp: timestamp
                         };
                         setMessages((prev) => {
-                            // Avoid duplicates if possible
                             if (!Array.isArray(prev)) return [newMsg];
-                            const exists = prev.some(m => m.timestamp === timestamp && m.body === newMsg.body);
+
+                            // Check for pending optimistic message to REPLACE
+                            if (isMe) {
+                                const pendingIndex = prev.findIndex(m =>
+                                    m.pending &&
+                                    m.body === newMsg.body &&
+                                    Math.abs(m.timestamp - timestamp) < 10000 // 10s tolerance
+                                );
+                                if (pendingIndex !== -1) {
+                                    const updated = [...prev];
+                                    updated[pendingIndex] = newMsg; // Replace pending with real
+                                    return updated;
+                                }
+                            }
+
+                            // Check for duplicates by ID or content/timestamp
+                            const exists = prev.some(m =>
+                                (m.id && m.id === newMsg.id) ||
+                                (m.timestamp === timestamp && m.body === newMsg.body)
+                            );
                             if (exists) return prev;
+
                             return [...prev, newMsg];
                         });
                     }
@@ -178,7 +198,16 @@ const CommsView = () => {
         const text = input;
         setInput('');
 
-        const newMessage = { fromMe: true, body: text, type: 'chat', timestamp: Date.now() };
+        // Optimistic add with temporary ID and pending flag
+        const tempId = `temp-${Date.now()}`;
+        const newMessage = {
+            id: tempId,
+            fromMe: true,
+            body: text,
+            type: 'chat',
+            timestamp: Date.now(),
+            pending: true
+        };
         setMessages(prev => [...prev, newMessage]);
 
         try {
@@ -198,7 +227,15 @@ const CommsView = () => {
         if (!step?.response) return;
 
         const text = step.response;
-        const newMessage = { fromMe: true, body: text, type: 'chat', timestamp: Date.now() };
+        // Optimistic add
+        const newMessage = {
+            id: `temp-script-${Date.now()}`,
+            fromMe: true,
+            body: text,
+            type: 'chat',
+            timestamp: Date.now(),
+            pending: true
+        };
         setMessages(prev => [...prev, newMessage]);
 
         try {
@@ -316,10 +353,12 @@ const CommsView = () => {
             });
             // Add to messages list
             const newMsg = {
+                id: `temp-media-${Date.now()}`,
                 fromMe: true,
                 body: `📷 Imagen enviada${input.trim() ? ': ' + input.trim() : ''}`,
                 type: 'chat',
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                pending: true
             };
             setMessages(prev => [...prev, newMsg]);
             setAttachment(null);

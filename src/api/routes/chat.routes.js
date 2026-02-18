@@ -150,9 +150,9 @@ module.exports = (client, sharedState) => {
     router.post('/send', authMiddleware, async (req, res) => {
         try {
             const { chatId, message } = req.body;
-            await client.sendMessage(chatId, message);
-            if (sharedState.logAndEmit) sharedState.logAndEmit(chatId, 'admin', message, 'dashboard_reply');
-            res.json({ success: true });
+            const sentMsg = await client.sendMessage(chatId, message);
+            if (sharedState.logAndEmit) sharedState.logAndEmit(chatId, 'admin', message, 'dashboard_reply', sentMsg.id._serialized);
+            res.json({ success: true, messageId: sentMsg.id._serialized });
         } catch (e) {
             res.status(500).json({ error: e.message });
         }
@@ -166,11 +166,11 @@ module.exports = (client, sharedState) => {
                 return res.status(400).json({ error: 'Missing chatId, base64, or mimetype' });
             }
             const media = new MessageMedia(mimetype, base64, filename || 'image.jpg');
-            await client.sendMessage(chatId, media, { caption: caption || '' });
+            const sentMsg = await client.sendMessage(chatId, media, { caption: caption || '' });
             if (sharedState.logAndEmit) {
-                sharedState.logAndEmit(chatId, 'admin', `📷 Imagen enviada${caption ? ': ' + caption : ''}`, 'dashboard_media');
+                sharedState.logAndEmit(chatId, 'admin', `📷 Imagen enviada${caption ? ': ' + caption : ''}`, 'dashboard_media', sentMsg.id._serialized);
             }
-            res.json({ success: true });
+            res.json({ success: true, messageId: sentMsg.id._serialized });
         } catch (e) {
             console.error('[SEND-MEDIA] Error:', e.message);
             res.status(500).json({ error: e.message });

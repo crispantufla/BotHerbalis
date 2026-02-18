@@ -155,7 +155,7 @@ const sharedState = {
 startServer(client, sharedState);
 
 // Helper: Log and Emit to Dashboard (Now uses sharedState.io)
-function logAndEmit(chatId, sender, text, step) {
+function logAndEmit(chatId, sender, text, step, messageId = null) {
     logMessage(chatId, sender, text, step);
     if (sharedState.io) {
         sharedState.io.emit('new_log', {
@@ -163,7 +163,8 @@ function logAndEmit(chatId, sender, text, step) {
             chatId,
             sender,
             text,
-            step
+            step,
+            messageId
         });
     }
 }
