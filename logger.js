@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const logDir = path.join(__dirname, 'logs');
-const LOG_RETENTION_DAYS = 7;
+const LOG_RETENTION_DAYS = 30;
 
 // Ensure log directory exists
 if (!fs.existsSync(logDir)) {

@@ -23,7 +23,7 @@ const STALE_THRESHOLD_MS = 30 * 60 * 1000;         // 30 minutes
 const COLD_LEAD_THRESHOLD_MS = 24 * 60 * 60 * 1000; // 24 hours
 const AUTO_APPROVE_THRESHOLD_MS = 15 * 60 * 1000;   // 15 minutes
 const CHECK_INTERVAL_MS = 10 * 60 * 1000;           // every 10 min
-const CLEANUP_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const CLEANUP_THRESHOLD_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 const FOLLOW_UP_MESSAGES = [
     '¡Hola! 😊 Quedó algo pendiente de tu consulta. ¿Querés que te ayude a terminar?',
