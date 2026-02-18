@@ -12,12 +12,20 @@ async function appendOrderToSheet(orderData) {
             return false;
         }
 
-        if (!fs.existsSync(CREDS_PATH)) {
-            console.error('🔴 [SHEETS] google-credentials.json not found. Please upload it to the root folder.');
+        let creds;
+        if (process.env.GOOGLE_CREDENTIALS_JSON) {
+            try {
+                creds = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
+            } catch (e) {
+                console.error('🔴 [SHEETS] Invalid JSON in GOOGLE_CREDENTIALS_JSON env var');
+                return false;
+            }
+        } else if (fs.existsSync(CREDS_PATH)) {
+            creds = JSON.parse(fs.readFileSync(CREDS_PATH));
+        } else {
+            console.error('🔴 [SHEETS] Credentials not found (env GOOGLE_CREDENTIALS_JSON or file google-credentials.json missing)');
             return false;
         }
-
-        const creds = JSON.parse(fs.readFileSync(CREDS_PATH));
 
         // Initialize Auth
         const serviceAccountAuth = new JWT({
