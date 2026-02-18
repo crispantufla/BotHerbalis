@@ -396,14 +396,18 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
         case 'greeting':
             // Send Welcome Image (if exists)
             try {
-                const imagePath = path.join(__dirname, '../../public/media/Gretings.jfif');
+                // Try .jpg first (most common)
+                const imagePath = path.join(__dirname, '../../public/media/Gretings.jpg');
+
                 if (fs.existsSync(imagePath)) {
-                    console.log(`[GREETING] Sending image to ${userId}`);
+                    console.log(`[GREETING] Found image at ${imagePath}. Sending to ${userId}...`);
                     const media = MessageMedia.fromFilePath(imagePath);
-                    await client.sendMessage(userId, media);
+                    await client.sendMessage(userId, media, { caption: '' });
+                } else {
+                    console.warn(`[GREETING] Image NOT found at ${imagePath}`);
                 }
             } catch (e) {
-                console.error('[GREETING] Failed to send image:', e.message);
+                console.error('[GREETING] Failed to send image:', e);
             }
 
             const greetMsg = _formatMessage(knowledge.flow.greeting.response);
