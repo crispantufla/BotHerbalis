@@ -12,14 +12,18 @@ const PriceEditor = () => {
     }, []);
 
     const fetchPrices = async () => {
+        setLoading(true);
         try {
             const res = await fetch(`${API_URL}/api/prices`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
-            setPrices(data);
-            setLoading(false);
+            setPrices(data || {});
         } catch (e) {
             console.error(e);
-            setMessage('Error cargando precios.');
+            setMessage('Error cargando precios. Revisa la conexión.');
+            setPrices({}); // Fallback to avoid crash
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -65,29 +69,35 @@ const PriceEditor = () => {
             </h2>
 
             <div className="space-y-6">
-                {Object.keys(prices).map(product => (
-                    <div key={product} className="pb-4 border-b border-slate-100 last:border-0">
-                        <h3 className="text-emerald-600 font-semibold mb-3">{product}</h3>
-                        <div className="grid grid-cols-2 gap-4">
-                            {Object.keys(prices[product]).map(plan => (
-                                <div key={plan}>
-                                    <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wide">
-                                        Plan {plan} días
-                                    </label>
-                                    <div className="relative">
-                                        <span className="absolute left-3 top-2 text-slate-400">$</span>
-                                        <input
-                                            type="text"
-                                            className="w-full pl-7 pr-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
-                                            value={prices[product][plan]}
-                                            onChange={(e) => handleChange(product, plan, e.target.value)}
-                                        />
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                {!prices || Object.keys(prices).length === 0 ? (
+                    <div className="text-center py-8 text-slate-400">
+                        <p>No se pudieron cargar los precios.</p>
+                        <button onClick={fetchPrices} className="mt-2 text-emerald-600 underline">Reintentar</button>
                     </div>
-                ))}
+                ) : (
+                    Object.keys(prices).map(product => (
+                        <div key={product} className="pb-4 border-b border-slate-100 last:border-0">
+                            <h3 className="text-emerald-600 font-semibold mb-3">{product}</h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                {Object.keys(prices[product]).map(plan => (
+                                    <div key={plan}>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wide">
+                                            Plan {plan} días
+                                        </label>
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-2 text-slate-400">$</span>
+                                            <input
+                                                type="text"
+                                                className="w-full pl-7 pr-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                                                value={prices[product][plan]}
+                                                onChange={(e) => handleChange(product, plan, e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
             </div>
 
             <div className="mt-6 flex justify-between items-center pt-4 border-t border-slate-100">
