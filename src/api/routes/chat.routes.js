@@ -196,5 +196,27 @@ module.exports = (client, sharedState) => {
         }
     });
 
+    // DELETE /messages (Delete for everyone)
+    router.delete('/messages', authMiddleware, async (req, res) => {
+        try {
+            const { chatId, messageId } = req.body;
+            if (!chatId || !messageId) return res.status(400).json({ error: 'Missing parameters' });
+
+            const chat = await client.getChatById(chatId);
+            const messages = await chat.fetchMessages({ limit: 50 }); // Search in last 50
+            const msgToDel = messages.find(m => m.id._serialized === messageId);
+
+            if (msgToDel) {
+                await msgToDel.delete(true); // true = delete for everyone
+                res.json({ success: true });
+            } else {
+                res.status(404).json({ error: 'Message not found in recent history' });
+            }
+        } catch (e) {
+            console.error('[DELETE-MSG] Error:', e.message);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     return router;
 };

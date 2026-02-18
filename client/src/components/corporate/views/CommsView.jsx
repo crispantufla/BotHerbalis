@@ -239,6 +239,26 @@ const CommsView = () => {
         } catch (e) { toast.error('Error reiniciando chat'); }
     };
 
+    // Delete Message Action
+    const handleDeleteMessage = async (msgId) => {
+        if (!selectedChat || !msgId) return;
+        if (!window.confirm("¿Eliminar este mensaje para todos?")) return;
+
+        try {
+            // Optimistic UI update
+            setMessages(prev => prev.filter(m => m.id !== msgId));
+
+            await api.delete('/api/messages', {
+                data: { chatId: selectedChat.id, messageId: msgId }
+            });
+            toast.success('Mensaje eliminado');
+        } catch (e) {
+            console.error(e);
+            toast.error('Error eliminando mensaje');
+            // Revert on error (optional, or just reload)
+        }
+    };
+
     // AI Summarize
     const handleSummarize = async () => {
         if (!selectedChat) return;
@@ -546,6 +566,17 @@ const CommsView = () => {
                                                     } catch (e) { return ''; }
                                                 })()}
                                             </span>
+
+                                            {/* Delete Button (Only for own messages) */}
+                                            {msg.fromMe && (
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handleDeleteMessage(msg.id); }}
+                                                    className="absolute -left-8 top-1/2 -translate-y-1/2 p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-full opacity-0 group-hover:opacity-100 transition-all"
+                                                    title="Eliminar mensaje para todos"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 ))
