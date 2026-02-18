@@ -8,7 +8,8 @@ module.exports = (client, sharedState) => {
     const router = express.Router();
     const { io } = sharedState;
 
-    const ORDERS_FILE = path.join(__dirname, '../../../orders.json');
+    const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../../..');
+    const ORDERS_FILE = path.join(DATA_DIR, 'orders.json');
 
     // GET /orders (List orders)
     router.get('/orders', authMiddleware, (req, res) => {

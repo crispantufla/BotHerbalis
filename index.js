@@ -14,9 +14,10 @@ const { startServer } = require('./src/api/server'); // Centralized Server
 const { startScheduler } = require('./src/services/scheduler'); // P3: Stale/Re-engagement checks
 const { isBusinessHours, isDeepNight, getArgentinaHour } = require('./src/services/timeUtils');
 
-// Paths
-const STATE_FILE = path.join(__dirname, 'persistence.json');
-const ORDERS_FILE = path.join(__dirname, 'orders.json');
+// Paths — use DATA_DIR env var for Railway volume persistence, fallback to project root
+const DATA_DIR = process.env.DATA_DIR || __dirname;
+const STATE_FILE = path.join(DATA_DIR, 'persistence.json');
+const ORDERS_FILE = path.join(DATA_DIR, 'orders.json');
 const KNOWLEDGE_FILES = {
     'v3': path.join(__dirname, 'knowledge_v3.json'),
     'v4': path.join(__dirname, 'knowledge_v4.json')
@@ -119,7 +120,7 @@ loadKnowledge();
 
 // --- WHATSAPP CLIENT ---
 const client = new Client({
-    authStrategy: new LocalAuth(),
+    authStrategy: new LocalAuth({ dataPath: path.join(DATA_DIR, '.wwebjs_auth') }),
     puppeteer: {
         headless: true,
         args: ['--no-sandbox', '--disable-setuid-sandbox']

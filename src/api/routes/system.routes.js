@@ -7,7 +7,8 @@ const { appendOrderToSheet } = require('../../../sheets_sync');
 module.exports = (client, sharedState) => {
     const router = express.Router();
     const { config, sessionAlerts, userState, pausedUsers, io } = sharedState;
-    const ORDERS_FILE = path.join(__dirname, '../../../orders.json');
+    const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../../..');
+    const ORDERS_FILE = path.join(DATA_DIR, 'orders.json');
 
     // GET /health
     router.get('/health', (req, res) => {
