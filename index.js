@@ -153,7 +153,8 @@ removeStaleLocks(path.join(DATA_DIR, '.wwebjs_auth'));
 const client = new Client({
     authStrategy: new LocalAuth({ dataPath: path.join(DATA_DIR, '.wwebjs_auth') }),
     puppeteer: {
-        headless: 'shell',
+        executablePath: process.platform === 'linux' ? '/usr/bin/chromium' : undefined, // Force system chromium on Linux (Railway)
+        headless: true, // Revert to classic headless for max compatibility
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -165,7 +166,8 @@ const client = new Client({
             '--no-first-run',
             '--no-default-browser-check'
         ],
-        timeout: 60000 // Increase timeout for slow container startups
+        timeout: 60000,
+        dumpio: true // LOG EVERYTHING from Chrome to stderr (Debug crash)
     }
 });
 
