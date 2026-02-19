@@ -128,7 +128,6 @@ loadKnowledge();
 // ─────────────────────────────────────────────────────────────
 // CRITICAL: Clean up stale Chrome locks from previous crashes mid-session
 // ─────────────────────────────────────────────────────────────
-const fs = require('fs');
 
 function removeStaleLocks(dir) {
     if (!fs.existsSync(dir)) return;
