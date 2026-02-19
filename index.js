@@ -125,10 +125,36 @@ loadState();
 loadKnowledge();
 
 // --- WHATSAPP CLIENT ---
+// ─────────────────────────────────────────────────────────────
+// CRITICAL: Clean up stale Chrome locks from previous crashes mid-session
+// ─────────────────────────────────────────────────────────────
+const fs = require('fs');
+
+function removeStaleLocks(dir) {
+    if (!fs.existsSync(dir)) return;
+    try {
+        const files = fs.readdirSync(dir, { withFileTypes: true });
+        for (const file of files) {
+            const fullPath = path.join(dir, file.name);
+            if (file.isDirectory()) {
+                removeStaleLocks(fullPath);
+            } else if (file.name === 'SingletonLock') {
+                console.log(`[CLEANUP] Removing stale lock file: ${fullPath}`);
+                fs.unlinkSync(fullPath);
+            }
+        }
+    } catch (error) {
+        console.error(`[CLEANUP] Error removing locks in ${dir}:`, error);
+    }
+}
+
+// Clean locks before starting client
+removeStaleLocks(path.join(DATA_DIR, '.wwebjs_auth'));
+
 const client = new Client({
     authStrategy: new LocalAuth({ dataPath: path.join(DATA_DIR, '.wwebjs_auth') }),
     puppeteer: {
-        headless: 'shell', // New headless mode, faster and more stable for containers
+        headless: 'shell',
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -136,10 +162,11 @@ const client = new Client({
             '--disable-gpu',
             '--no-zygote',
             '--single-process',
-            '--disable-features=IsolateOrigins,site-per-process', // Critical for preventing frame detachment
+            '--disable-features=IsolateOrigins,site-per-process',
             '--no-first-run',
             '--no-default-browser-check'
-        ]
+        ],
+        timeout: 60000 // Increase timeout for slow container startups
     }
 });
 
