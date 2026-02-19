@@ -762,11 +762,26 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 }
             }
 
-            // If found complex items, apply Contra Reembolso MAX
+            // If found complex items (more than 1 item or specific complex request), apply rules
+            // RULE REVISION: If it's a mixed order (e.g. 60+60), NO MAX charge.
+            // MAX only applies to SINGLE orders of 60 days.
             if (foundItems.length > 0) {
-                const has60 = foundItems.some(i => i.plan === '60');
-                currentState.isContraReembolsoMAX = has60;
-                currentState.adicionalMAX = has60 ? _getAdicionalMAX() : 0;
+                // If regex found items, we assume it's a "complex" or specific request.
+                // If user asked for "60 capsulas y 60 nueces" (2 items), MAX should be FALSE.
+                // If user asked "60 capsulas" (1 item), checks below might apply, BUT
+                // usually regex path is for complex. Single item 60 usually falls to fallback logic below.
+                // BUT if regex caught "60 capsulas", foundItems = 1.
+
+                // Logic: MAX applies ONLY if there is exactly 1 item AND it is plan '60'.
+                // If there are 2+ items, OR the item is 120, NO MAX.
+
+                let applyMax = false;
+                if (foundItems.length === 1 && foundItems[0].plan === '60') {
+                    applyMax = true;
+                }
+
+                currentState.isContraReembolsoMAX = applyMax;
+                currentState.adicionalMAX = applyMax ? _getAdicionalMAX() : 0;
                 currentState.cart = foundItems;
 
                 // Confirm with closing (cart summary is internal only)
@@ -820,7 +835,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 console.log(`[AI-FALLBACK] waiting_plan_choice: No plan number detected for ${userId}`);
                 const planAI = await aiService.chat(text, {
                     step: 'waiting_plan_choice',
-                    goal: 'El usuario debe elegir Plan 60 o Plan 120 días. IMPORTANTE: 1) Si elige, goalMet=true. 2) Si CAMBIA de producto (ej: "mejor semillas"), extractedData="CHANGE_PRODUCT:Semillas", goalMet=false, y tu respuesta confirma el cambio y da los precios del nuevo producto. 3) Si duda entre dos, ofrecé llevar AMBOS (sin descuento especial por 2, pero a partir de la 3ra unidad hay 30% OFF).',
+                    goal: 'El usuario debe elegir Plan 60 o Plan 120 días. ESTRATEGIA DE VENTA (IMPORTANTE): El Plan 60 días tiene un recargo de "Contra Reembolso MAX" ($6.000 extra). El Plan 120 días NO tiene este recargo. USÁ ESTO A TU FAVOR: Si el usuario duda o elige 60, avisale que "Para ahorrarte el costo de gestión ($6.000) te conviene el de 120 días". Si elige 120, felicitalo por la elección inteligente. Si cambia producto, confirma cambio y precios.',
                     history: currentState.history,
                     summary: currentState.summary,
                     knowledge: knowledge,
