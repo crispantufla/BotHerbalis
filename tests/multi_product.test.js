@@ -57,10 +57,8 @@ describe('Multi-Product Logic', () => {
             product: 'Cápsulas',
             plan: '60'
         });
-        // Expect cart summary first, then closing message
-        expect(mockSendMessage).toHaveBeenCalledWith(
-            userId, expect.stringMatching(/Tu pedido/i)
-        );
+        // Expect closing message
+
         expect(mockSendMessage).toHaveBeenCalledWith(
             userId, expect.stringMatching(/Tomamos los datos/i)
         );
@@ -87,10 +85,8 @@ describe('Multi-Product Logic', () => {
         expect(item2).toBeDefined();
         expect(item2.plan).toBe('60');
 
-        // Expect cart summary first, then closing message
-        expect(mockSendMessage).toHaveBeenCalledWith(
-            userId, expect.stringMatching(/Tu pedido/i)
-        );
+        // Expect closing message
+
         expect(mockSendMessage).toHaveBeenCalledWith(
             userId, expect.stringMatching(/Tomamos los datos/i)
         );

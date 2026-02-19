@@ -304,7 +304,8 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
     }
 
     // Only allow change if not in greeting (useless) and not complete
-    if (CHANGE_REGEX.test(normalizedText) && currentState.step !== 'greeting' && !isNegative) {
+    // EXCEPTION: waiting_data handles changes locally to preserve data (weightGoal)
+    if (CHANGE_REGEX.test(normalizedText) && currentState.step !== 'greeting' && currentState.step !== 'waiting_data' && !isNegative) {
         console.log(`[GLOBAL] User ${userId} requested change.`);
         // Reset Logic
         currentState.cart = [];
@@ -472,7 +473,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
     }
 
     for (const faq of knowledge.faq) {
-        if (faq.keywords.some(k => lowerText.includes(k))) {
+        if (faq.keywords.some(k => new RegExp(`\\b${k}\\b`, 'i').test(normalizedText))) {
             await sendMessageWithDelay(userId, _formatMessage(faq.response));
             currentState.history.push({ role: 'bot', content: _formatMessage(faq.response) });
 
@@ -546,7 +547,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
         case 'waiting_weight': {
             // PRIORITY 0: Detect direct product choice (skip weight question entirely)
-            const directProduct = /\b(capsula|capsulas|pastilla|pastillas|semilla|semillas|gota|gotas|infusion)\b/i.test(normalizedText);
+            const directProduct = /\b(capsula|capsulas|pastilla|pastillas|semilla|semillas|gota|gotas|infusion|natural)\b/i.test(normalizedText);
 
             if (directProduct) {
                 // User skipped weight and chose product directly
@@ -636,7 +637,43 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             // SCRIPT FIRST: Check keywords for capsulas or semillas
             const isMatch = (keywords, text) => keywords.some(k => new RegExp(`\\b${k}\\b`, 'i').test(text));
 
-            if (isMatch(knowledge.flow.preference_capsulas.match, normalizedText)) {
+            // DETECT INDECISION / COMPARISON (e.g. "estoy entre gotas y semillas", "cual es mejor")
+            const mentionsCapsulas = isMatch(knowledge.flow.preference_capsulas.match, normalizedText);
+            const mentionsSemillas = isMatch(knowledge.flow.preference_semillas.match, normalizedText);
+            const mentionsGotas = knowledge.flow.preference_gotas && isMatch(knowledge.flow.preference_gotas.match, normalizedText);
+
+            const multipleMentions = [mentionsCapsulas, mentionsSemillas, mentionsGotas].filter(Boolean).length >= 2;
+            const asksRecommendation = /\b(cual|recomendame|aconsejas|diferencia|mejor|efectiva)\b/i.test(normalizedText);
+
+            if (multipleMentions || asksRecommendation) {
+                console.log(`[INDICISION] User ${userId} compares products or asks for recommendation.`);
+
+                // Use AI to give a consultative answer based on specific rules
+                const aiRecommendation = await aiService.chat(text, {
+                    step: 'waiting_preference_consultation',
+                    goal: `El usuario está indeciso entre productos. REGLAS DE RECOMENDACIÓN (CRÍTICO):
+                    1) Si duda entre GOTAS o cualquier otra cosa: Las GOTAS son ideales para MAYORES DE 70 AÑOS o para bajar MENOS DE 10 KG (son más suaves). Si no cumple eso, recomendar la otra opción.
+                    2) Si duda entre CÁPSULAS o cualquier otra cosa: Las CÁPSULAS son SIEMPRE la opción recomendada por EFICIENCIA (aíslan los componentes activos).
+                    
+                    Respondé ayudando a decidir con estas reglas y luego PREGUNTÁ: "¿Con cuál te gustaría avanzar?"`,
+                    history: currentState.history,
+                    summary: currentState.summary,
+                    knowledge: knowledge,
+                    userState: currentState
+                });
+
+                if (aiRecommendation.response) {
+                    await sendMessageWithDelay(userId, aiRecommendation.response);
+                    currentState.history.push({ role: 'bot', content: aiRecommendation.response });
+                    // MARK CONSULTATIVE SALE
+                    currentState.consultativeSale = true;
+                    saveState();
+                    matched = true;
+                    break;
+                }
+            }
+
+            if (mentionsCapsulas) {
                 // Direct script — cápsulas
                 currentState.selectedProduct = "Cápsulas de nuez de la india";
                 const msg = _formatMessage(knowledge.flow.preference_capsulas.response);
@@ -645,7 +682,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 currentState.history.push({ role: 'bot', content: msg });
                 saveState();
                 matched = true;
-            } else if (isMatch(knowledge.flow.preference_semillas.match, normalizedText)) {
+            } else if (mentionsSemillas) {
                 // Direct script — semillas
                 currentState.selectedProduct = "Semillas de nuez de la india";
                 const msg = _formatMessage(knowledge.flow.preference_semillas.response);
@@ -654,7 +691,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 currentState.history.push({ role: 'bot', content: msg });
                 saveState();
                 matched = true;
-            } else if (knowledge.flow.preference_gotas && isMatch(knowledge.flow.preference_gotas.match, normalizedText)) {
+            } else if (knowledge.flow.preference_gotas && mentionsGotas) {
                 // Direct script — gotas
                 currentState.selectedProduct = "Gotas de nuez de la india";
                 const msg = _formatMessage(knowledge.flow.preference_gotas.response);
@@ -668,7 +705,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 console.log(`[AI-FALLBACK] waiting_preference: No keyword match for ${userId}`);
                 const aiPref = await aiService.chat(text, {
                     step: 'waiting_preference',
-                    goal: 'Determinar si quiere cápsulas/gotas (opción práctica), semillas (opción natural) o AMBAS. El usuario puede pedir varias cosas. Si pregunta otra cosa, respondé brevemente y volvé a ofrecer las opciones.',
+                    goal: 'Determinar si quiere cápsulas/gotas (opción práctica), semillas (opción natural) o AMBAS. REGLAS: Si pregunta recomendaciones: Gotas para >70 años o <10kg. Cápsulas por mayor eficiencia. Si elige, confirmá.',
                     history: currentState.history,
                     summary: currentState.summary,
                     knowledge: knowledge,
@@ -835,9 +872,17 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             } else {
                 // AI FALLBACK — only if regex didn't match
                 console.log(`[AI-FALLBACK] waiting_plan_choice: No plan number detected for ${userId}`);
+
+                const upsellOptions = [
+                    'Ojo que el de 60 tiene un recargo de $6.000 por la gestión del pago contra reembolso. En cambio el de 120 es precio final y te ahorrás esa plata. ¿Seguro querés el de 60 o pasamos al de 120?',
+                    'Acordate que el plan de 120 es precio final. El de 60, al ser contra reembolso, tiene un recargo administrativo de $6.000. ¿Preferís aprovechar el de 120 sin recargo o seguimos con el de 60?',
+                    'Te aviso por las dudas: el de 60 tiene un extra de $6.000 por el servicio de cobro. Si llevás el de 120, ese costo no corre. ¿Qué decís? ¿Vamos con el de 60 igual o querés el de 120?'
+                ];
+                const selectedUpsell = upsellOptions[Math.floor(Math.random() * upsellOptions.length)];
+
                 const planAI = await aiService.chat(text, {
                     step: 'waiting_plan_choice',
-                    goal: 'El usuario debe elegir Plan 60 o Plan 120 días. ESTRATEGIA DE VENTA (IMPORTANTE): El Plan 60 días tiene un recargo de "Contra Reembolso MAX" ($6.000 extra). El Plan 120 días NO tiene este recargo. USÁ ESTO A TU FAVOR: Si el usuario duda o elige 60, avisale que "Para ahorrarte el costo de gestión ($6.000) te conviene el de 120 días". Si elige 120, felicitalo por la elección inteligente. Si cambia producto, confirma cambio y precios.',
+                    goal: `El usuario debe elegir Plan 60 o Plan 120 días. ESTRATEGIA DE VENTA (IMPORTANTE): El Plan 60 días tiene un recargo de "Contra Reembolso MAX" ($6.000 extra). El Plan 120 días NO tiene este recargo. USÁ ESTO A TU FAVOR: Si el usuario duda o elige 60, decile: "${selectedUpsell}". Si elige 120, felicitalo por la elección inteligente. Si cambia producto, confirma cambio y precios.`,
                     history: currentState.history,
                     summary: currentState.summary,
                     knowledge: knowledge,
@@ -983,10 +1028,13 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
                 if (newProduct && newProduct !== currentState.selectedProduct) {
                     console.log(`[BACKTRACK] User ${userId} changed product from "${currentState.selectedProduct}" to "${newProduct}" during waiting_data`);
+                    const oldGoal = currentState.weightGoal; // Preserve if exists
                     currentState.selectedProduct = newProduct;
                     currentState.cart = [];
                     currentState.pendingOrder = null;
                     currentState.addressAttempts = 0;
+                    if (oldGoal) currentState.weightGoal = oldGoal; // Restore
+
 
                     // Show new product prices and ask for plan
                     let priceNode;
@@ -1027,7 +1075,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 console.log(`[AI-FALLBACK] waiting_data: Detected question/objection from ${userId}: "${text}"`);
                 const aiData = await aiService.chat(text, {
                     step: 'waiting_data',
-                    goal: 'El usuario está dudando, tiene una pregunta o quiere postergar la compra ("lo voy a pensar"). ESTRATEGIA: 1) Si dice que lo va a pensar, validá su decisión y decile algo como "Dale, tomate tu tiempo! Cualquier duda estoy acá". NO insistas en pedir datos ya. 2) Si es una duda, responé. 3) Si es una negativa, aceptala amablemente.',
+                    goal: 'El usuario está dudando, tiene una pregunta o quiere postergar la compra ("lo voy a pensar"). ESTRATEGIA: 1) Si dice que lo va a pensar, validá su decisión y decile algo como "Dale, tomate tu tiempo! Cualquier duda estoy acá". NO insistas en pedir datos ya. 2) Si es una duda, responé con tono natural y amable (Argentino), sin ser robot. 3) Si es una negativa, aceptala amablemente.',
                     history: currentState.history,
                     summary: currentState.summary,
                     knowledge: knowledge,
@@ -1050,10 +1098,12 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
 
             console.log("Analyzing address data with AI...");
+            console.log("Analyzing address data with AI...");
             const data = await aiService.parseAddress(text);
 
+            let madeProgress = false; // Moved to outer scope
+
             if (data && !data._error) {
-                let madeProgress = false;
                 if (data.nombre && !currentState.partialAddress.nombre) { currentState.partialAddress.nombre = data.nombre; madeProgress = true; }
                 if (data.calle && !currentState.partialAddress.calle) { currentState.partialAddress.calle = data.calle; madeProgress = true; }
                 if (data.ciudad && !currentState.partialAddress.ciudad) { currentState.partialAddress.ciudad = data.ciudad; madeProgress = true; }
@@ -1153,15 +1203,44 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             } else {
                 let msg;
                 if (missing.length === 4) {
-                    // All missing
-                    msg = `Para prepararte el envío necesito que me pases: Nombre completo, Calle y número, Ciudad y Código postal.`;
+                    // All missing - Randomized intro
+                    const intros = [
+                        `Para prepararte el envío necesito que me pases: Nombre completo, Calle y número, Ciudad y Código postal.`,
+                        `¡Genial! Pasame tus datos así te lo armo: Nombre, Dirección, Ciudad y CP.`,
+                        `Confirmame tus datos de envío: Nombre completo, Calle, Ciudad y Código Postal, por favor.`
+                    ];
+                    msg = intros[Math.floor(Math.random() * intros.length)];
+
+                    // Check for repetition
+                    if (currentState.lastAddressMsg === msg) {
+                        // If same as last, pick the next one (cyclic)
+                        const idx = (intros.indexOf(currentState.lastAddressMsg) + 1) % intros.length;
+                        msg = intros[idx];
+                    }
+
+                } else if (madeProgress) {
+                    // SMART ACCUMULATION: We got NEW data, but still missing some.
+                    const acks = [
+                        `¡Perfecto! Ya agendé esos datos. 👌\n\nSolo me falta: *${missing.join(', ')}*. ¿Me los pasás?`,
+                        `Buenísimo. Me queda pendiente: *${missing.join(', ')}*.`,
+                        `¡Dale! Ya casi estamos. Me faltaría: *${missing.join(', ')}*.`
+                    ];
+                    msg = acks[Math.floor(Math.random() * acks.length)];
+
                 } else if (currentState.addressAttempts > 2) {
                     // Getting frustrated? shorter
                     msg = `Me falta: *${missing.join(', ')}*. ¿Me lo pasás? 🙏`;
                 } else {
-                    msg = `Gracias! Ya tengo algunos datos. Solo me falta: *${missing.join(', ')}*. ¿Me los pasás?`;
+                    const shorts = [
+                        `Gracias! Ya tengo algunos datos. Solo me falta: *${missing.join(', ')}*. ¿Me los pasás?`,
+                        `Tengo casi todo. Me falta indicarte: *${missing.join(', ')}*.`,
+                        `Solo me estaría faltando: *${missing.join(', ')}*.`
+                    ];
+                    msg = shorts[Math.floor(Math.random() * shorts.length)];
                 }
+
                 await sendMessageWithDelay(userId, msg);
+                currentState.lastAddressMsg = msg; // Track last msg to avoid repeat
                 currentState.history.push({ role: 'bot', content: msg });
                 matched = true;
             }

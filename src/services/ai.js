@@ -330,7 +330,7 @@ class AIService {
                 knowledgeContext += `- Productos principales: Cápsulas (prácticas) y Semillas (naturales).\n`;
                 knowledgeContext += `- Gotas: SOLO ofrecer si tiene < 10kg para bajar o > 70 años.\n`;
                 knowledgeContext += `- Contraindicaciones: solo embarazo y lactancia. NO menores de edad.\n`;
-                knowledgeContext += `- Si preguntan PRECIO: Decí que varían entre $37.000 y $69.000 según el tratamiento. Para precisar, necesitás saber cuántos kilos quiere bajar.\n`;
+                knowledgeContext += `- PRECIOS: Si preguntan "precio" en general, decí "$37.000 a $69.000". PERO si preguntan "precio de todos", "lista de precios" o insisten, PASALES TODOS LOS PRECIOS detallados (Semillas: $36.900/60d, $49.900/120d; Cápsulas: $46.900/60d, $66.900/120d, etc).\n`;
             } else if (step === 'waiting_price_confirmation') {
                 knowledgeContext += `- El usuario todavía NO vio precios. Tu trabajo es convencerlo de que quiera verlos.\n`;
                 knowledgeContext += `- Contraindicaciones: solo embarazo y lactancia. NO menores de edad.\n`;
@@ -338,7 +338,7 @@ class AIService {
             } else if (['waiting_plan_choice', 'closing', 'waiting_ok'].includes(step)) {
                 const pCaps = f.price_capsulas?.response || "";
                 const pSem = f.price_semillas?.response || "";
-                if (pCaps || pSem) knowledgeContext += `- PRECIOS: ${pCaps} | ${pSem}\n`;
+                if (pCaps || pSem) knowledgeContext += `- PRECIOS: Capsulas ($46.900/$66.900) | Semillas ($36.900/$49.900)\n`;
 
                 // Get dynamic prices for context too
                 let adMax = '6.000';
@@ -382,6 +382,7 @@ ETAPA ACTUAL: "${context.step || 'general'}"
 OBJETIVO DEL PASO: "${context.goal || 'Ayudar al cliente'}"
 
 HISTORIAL RECIENTE:
+HISTORIAL RECENTE:
 ${conversationHistory.map(m => `${m.role}: ${m.content}`).join('\n')}
 
 MENSAJE DEL USUARIO: "${userText}"
@@ -390,11 +391,12 @@ INSTRUCCIONES:
 1. Fijate si el usuario CUMPLIÓ el objetivo del paso (ej: dio un número, eligió un plan).
 2. Si lo cumplió: goalMet = true.
 3. Si NO lo cumplió: respondé BREVEMENTE (1-2 oraciones) su duda y volvé a preguntarle lo del objetivo.
-4. Si el usuario dice algo EMOCIONAL o PERSONAL (hijos, salud, bullying, autoestima): mostrá EMPATÍA primero. NO USES "Entiendo, eso es difícil". Usá variaciones reales y genuinas. Después volvé suavemente al objetivo del paso.
-5. PROHIBIDO: No hables de pago, envío, precios, ni datos de envío si el OBJETIVO DEL PASO no lo menciona. Limitá tu respuesta EXCLUSIVAMENTE al tema del objetivo.
-6. MENORES DE EDAD: Si el mensaje menciona menores, VERIFICÁ EL HISTORIAL. Si ya se aclaró que la persona es mayor de 18, NO repitas la restricción. Confirmá que puede tomarla y seguí adelante.
-7. ANTI-REPETICIÓN: NUNCA repitas textualmente un mensaje que ya está en el historial. Si necesitás pedir los mismos datos, usá una frase DIFERENTE.
-8. Devolvé SOLO este JSON (sin markdown, sin backticks):
+4. Excepción a la Regla 3 (POSTERGACIÓN): Si el usuario dice que "no puede hablar ahora", "está trabajando", "después te aviso" o similar: SOLO confirmá con amabilidad (ej: "Dale, tranqui. Avisame cuando puedas!"). NO le vuelvas a preguntar el objetivo. Dejalo en paz por ahora.
+5. Si el usuario dice algo EMOCIONAL o PERSONAL (hijos, salud, bullying, autoestima): mostrá EMPATÍA primero. NO USES "Entiendo, eso es difícil". Usá variaciones reales y genuinas. Después volvé suavemente al objetivo del paso.
+6. PROHIBIDO: No hables de pago, envío, precios, ni datos de envío si el OBJETIVO DEL PASO no lo menciona. Limitá tu respuesta EXCLUSIVAMENTE al tema del objetivo.
+7. MENORES DE EDAD: Si el mensaje menciona menores, VERIFICÁ EL HISTORIAL. Si ya se aclaró que la persona es mayor de 18, NO repitas la restricción. Confirmá que puede tomarla y seguí adelante.
+8. ANTI-REPETICIÓN: NUNCA repitas textualmente un mensaje que ya está en el historial. Si necesitás pedir los mismos datos, usá una frase DIFERENTE.
+9. Devolvé SOLO este JSON (sin markdown, sin backticks):
 { "response": "tu respuesta corta", "goalMet": true/false, "extractedData": "dato extraído o null" }
 `;
 
