@@ -74,29 +74,78 @@ const PriceEditor = () => {
                         <button onClick={fetchPrices} className="mt-2 text-emerald-600 underline">Reintentar</button>
                     </div>
                 ) : (
-                    Object.keys(prices).map(product => (
-                        <div key={product} className="pb-4 border-b border-slate-100 last:border-0">
-                            <h3 className="text-emerald-600 font-semibold mb-3">{product}</h3>
-                            <div className="grid grid-cols-2 gap-4">
-                                {Object.keys(prices[product]).map(plan => (
-                                    <div key={plan}>
-                                        <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wide">
-                                            Plan {plan} días
-                                        </label>
-                                        <div className="relative">
-                                            <span className="absolute left-3 top-2 text-slate-400">$</span>
-                                            <input
-                                                type="text"
-                                                className="w-full pl-7 pr-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
-                                                value={prices[product][plan]}
-                                                onChange={(e) => handleChange(product, plan, e.target.value)}
-                                            />
-                                        </div>
+                    <>
+                        {/* Render Products (nested objects) */}
+                        {Object.entries(prices)
+                            .filter(([_, value]) => typeof value === 'object' && value !== null)
+                            .map(([product, plans]) => (
+                                <div key={product} className="pb-4 border-b border-slate-100 last:border-0">
+                                    <h3 className="text-emerald-600 font-semibold mb-3">{product}</h3>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {Object.keys(plans).map(plan => (
+                                            <div key={plan}>
+                                                <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wide">
+                                                    Plan {plan} días
+                                                </label>
+                                                <div className="relative">
+                                                    <span className="absolute left-3 top-2 text-slate-400">$</span>
+                                                    <input
+                                                        type="text"
+                                                        className="w-full pl-7 pr-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                                                        value={plans[plan]}
+                                                        onChange={(e) => handleChange(product, plan, e.target.value)}
+                                                    />
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
-                                ))}
+                                </div>
+                            ))}
+
+                        {/* Render Global Config (Strings) */}
+                        <div className="pt-6 mt-2 border-t border-slate-200">
+                            <h3 className="text-slate-800 font-bold mb-4 flex items-center gap-2">
+                                <span className="text-emerald-500">⚙️</span> Configuración Adicional
+                            </h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                {/* Adicional MAX */}
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wide">
+                                        Servicio Contra Reembolso MAX
+                                    </label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-2 text-slate-400">$</span>
+                                        <input
+                                            type="text"
+                                            className="w-full pl-7 pr-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                                            value={prices.adicionalMAX || ''}
+                                            onChange={(e) => setPrices(prev => ({ ...prev, adicionalMAX: e.target.value }))}
+                                            placeholder="6.000"
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 mt-1">Se cobra en planes de 60 días. (Gratis en 120)</p>
+                                </div>
+
+                                {/* Costo Logístico */}
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wide">
+                                        Costo Logístico (Multa)
+                                    </label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-2 text-slate-400">$</span>
+                                        <input
+                                            type="text"
+                                            className="w-full pl-7 pr-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                                            value={prices.costoLogistico || ''}
+                                            onChange={(e) => setPrices(prev => ({ ...prev, costoLogistico: e.target.value }))}
+                                            placeholder="18.000"
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 mt-1">Costo por rechazo o no retiro.</p>
+                                </div>
                             </div>
                         </div>
-                    ))
+                    </>
                 )}
             </div>
 

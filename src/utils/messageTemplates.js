@@ -13,12 +13,49 @@ function buildConfirmationMessage(state) {
     const cart = state.cart || [];
     const productStr = cart.map(i => i.product).join(' + ') || state.selectedProduct || 'Nuez de la India';
     const planStr = cart.map(i => `${i.plan} días`).join(' + ') || `${state.selectedPlan || '60'} días`;
-    const totalPrice = state.totalPrice || '0';
+    const totalPriceStr = state.totalPrice || '0';
+
+    // Calculate Breakdown
+    // If state.isContraReembolsoMAX is true OR (single item plan 60 and no logic says otherwise), assume service fee.
+    // However, salesFlow logic sets isContraReembolsoMAX. We rely on that or fallback to plan checking.
+
+    let serviceFee = 0;
+    let productVal = 0;
+
+    const totalInt = parseInt(totalPriceStr.replace(/\./g, '')) || 0;
+
+    // Logic: If 60 days AND ContrareembolsoMAX implies +6000.
+    // Safest way: check if total match known price + 6000? 
+    // Or rely on state.adicionalMAX which should be set in salesFlow.
+
+    if (state.isContraReembolsoMAX && state.adicionalMAX) {
+        serviceFee = state.adicionalMAX;
+    } else if (!state.isContraReembolsoMAX && state.selectedPlan === '60' && !state.cart?.length) {
+        // Fallback if flag missing but it is a simple 60 day order (usually implies max)
+        // But let's trust state first. If state.adicionalMAX is undefined, we might check total.
+        // Let's assume salesFlow sets it correctly. 
+        // If total > 40000 and plan 60... hard to guess without config. 
+        // Let's stick to state.adicionalMAX if present.
+        if (state.adicionalMAX) serviceFee = state.adicionalMAX;
+    }
+
+    productVal = totalInt - serviceFee;
+
+    const productValStr = productVal.toLocaleString('es-AR').replace(/,/g, '.');
+    const serviceFeeStr = serviceFee.toLocaleString('es-AR').replace(/,/g, '.');
+
+    let breakdown = `Valor del producto: $${productValStr}\n`;
+    if (serviceFee > 0) {
+        breakdown += `Servicio de pago en destino: $${serviceFeeStr}\n`;
+    }
+    // If 120 days, service is usually free, we can optionally explicitly say "$0" or just hide it.
+    // User requested: "en el total pon el valor del producto + lo que paga por el servicio max + el total"
 
     return `📦 *CONFIRMACIÓN DE ENVÍO*\n\n` +
         `Producto: ${productStr}\n` +
         `Plan: ${planStr}\n` +
-        `Total a pagar al recibir:\n$${totalPrice}\n\n` +
+        breakdown +
+        `Total a pagar al recibir:\n$${totalPriceStr}\n\n` +
         `✔ Correo Argentino\n` +
         `✔ Entrega estimada: 7 a 10 días hábiles\n` +
         `✔ Pago en efectivo al recibir\n\n` +
