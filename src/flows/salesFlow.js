@@ -833,11 +833,10 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 return { matched: true };
             }
 
-            // 2. Fallback to Single Item logic (legacy but compatible)
             let planSelected = false;
             let selectedPlanId = null;
-            if (normalizedText.includes('60')) selectedPlanId = '60';
-            else if (normalizedText.includes('120')) selectedPlanId = '120';
+            if (/\b60\b/.test(normalizedText)) selectedPlanId = '60';
+            else if (/\b120\b/.test(normalizedText)) selectedPlanId = '120';
 
             if (selectedPlanId) {
                 // If we have a selectedProduct from previous step, use it
@@ -1067,8 +1066,10 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 || /\b(voy a|dejam[eo])\s+(pasar|pensar|ver)\b/i.test(normalizedText);
 
             const isDataQuestion = text.includes('?')
-                || /\b(pregunte|quiero|puedo|no quiero|no acepto|no acepte|como|donde|por que|para que)\b/i.test(normalizedText)
+                || /\b(pregunte|no quiero|no acepto|no acepte|como|donde|por que|para que)\b/i.test(normalizedText)
                 || isHesitation;
+            // NOTE: 'quiero' was removed from isDataQuestion — it caused a loop where
+            // 'quiero [non-product]' bypassed address parsing AND never advanced the flow.
 
             if (isDataQuestion && !looksLikeAddress) {
                 // This is a question or objection, NOT address data
@@ -1097,7 +1098,6 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             }
 
 
-            console.log("Analyzing address data with AI...");
             console.log("Analyzing address data with AI...");
             const data = await aiService.parseAddress(text);
 
@@ -1248,6 +1248,20 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
         }
 
         case 'waiting_final_confirmation': {
+            // Helper — build orderData object from state (avoids 3 duplicate blocks)
+            const _buildOrderData = (extra = {}) => {
+                const o = currentState.pendingOrder || {};
+                const cart = o.cart || [];
+                return {
+                    cliente: userId,
+                    nombre: o.nombre, calle: o.calle, ciudad: o.ciudad, cp: o.cp,
+                    producto: cart.map(i => i.product).join(' + '),
+                    plan: cart.map(i => `${i.plan} días`).join(' + '),
+                    precio: currentState.totalPrice || '0',
+                    ...extra
+                };
+            };
+
             // Issue 3: Detect post-dated delivery requests ("a partir del 15 de marzo")
             const dateMatch = text.match(/(?:a partir del?|desde el?|para el?|despu[eé]s del?)\s*(?:d[ií]a\s*)?(\d{1,2})\s*(?:de\s*)?(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
             if (dateMatch) {
@@ -1259,22 +1273,10 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
                 // Save Order with postdatado
                 if (currentState.pendingOrder) {
-                    const o = currentState.pendingOrder;
-                    const cart = o.cart || [];
-                    const prodStr = cart.map(i => i.product).join(' + ');
-                    const planStr = cart.map(i => `${i.plan} días`).join(' + ');
-                    const finalPrice = currentState.totalPrice || "0";
-
-                    const orderData = {
-                        cliente: userId,
-                        nombre: o.nombre, calle: o.calle, ciudad: o.ciudad, cp: o.cp,
-                        producto: prodStr, plan: planStr, precio: finalPrice,
-                        postdatado: postdatado
-                    };
-
+                    const orderData = _buildOrderData({ postdatado });
                     if (dependencies.saveOrderToLocal) dependencies.saveOrderToLocal(orderData);
                     appendOrderToSheet(orderData).catch(e => console.error('[SHEETS] Async log failed:', e.message));
-                    console.log(`✅ [PEDIDO CONFIRMADO - POSTDATADO ${postdatado}] ${userId} — Total: $${finalPrice}`);
+                    console.log(`✅ [PEDIDO CONFIRMADO - POSTDATADO ${postdatado}] ${userId} — Total: $${currentState.totalPrice || '0'}`);
                 }
 
                 // Notify admin about postdatado
@@ -1291,23 +1293,10 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
                 // Save Order
                 if (currentState.pendingOrder) {
-                    const o = currentState.pendingOrder;
-                    const cart = o.cart || [];
-                    const prodStr = cart.map(i => i.product).join(' + ');
-                    const planStr = cart.map(i => `${i.plan} días`).join(' + ');
-                    const finalPrice = currentState.totalPrice || "0";
-
-                    const orderData = {
-                        cliente: userId,
-                        nombre: o.nombre, calle: o.calle, ciudad: o.ciudad, cp: o.cp,
-                        producto: prodStr,
-                        plan: planStr,
-                        precio: finalPrice
-                    };
-
+                    const orderData = _buildOrderData();
                     if (dependencies.saveOrderToLocal) dependencies.saveOrderToLocal(orderData);
                     appendOrderToSheet(orderData).catch(e => console.error('🔴 [SHEETS] Async log failed:', e.message));
-                    console.log(`✅ [PEDIDO CONFIRMADO] ${userId} — Total: $${finalPrice}`);
+                    console.log(`✅ [PEDIDO CONFIRMADO] ${userId} — Total: $${currentState.totalPrice || '0'}`);
                 }
 
                 _setStep(currentState, 'completed');
@@ -1323,18 +1312,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 await sendMessageWithDelay(userId, msg);
 
                 if (currentState.pendingOrder) {
-                    const o = currentState.pendingOrder;
-                    const cart = o.cart || [];
-                    const prodStr = cart.map(i => i.product).join(' + ');
-                    const planStr = cart.map(i => `${i.plan} días`).join(' + ');
-                    const finalPrice = currentState.totalPrice || "0";
-
-                    const orderData = {
-                        cliente: userId,
-                        nombre: o.nombre, calle: o.calle, ciudad: o.ciudad, cp: o.cp,
-                        producto: prodStr, plan: planStr, precio: finalPrice,
-                        createdAt: new Date().toISOString(), status: 'Pendiente (revisar respuesta)'
-                    };
+                    const orderData = _buildOrderData({ createdAt: new Date().toISOString(), status: 'Pendiente (revisar respuesta)' });
                     if (dependencies.saveOrderToLocal) dependencies.saveOrderToLocal(orderData);
                     appendOrderToSheet(orderData).catch(e => console.error('[SHEETS] Async log failed:', e.message));
                 }

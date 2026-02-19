@@ -1,4 +1,4 @@
-const OpenAI = require('openai');
+﻿const OpenAI = require('openai');
 const fs = require('fs');
 const path = require('path');
 
@@ -17,7 +17,17 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 min cache
 // the user's message. Its job is to answer briefly and steer back to the current step.
 const PRICES_PATH = path.join(__dirname, '../../data/prices.json');
 
-function _getSystemInstructions() {
+// Cache for system instructions — re-read prices from disk at most every 60s
+let _instrCache = null;
+let _instrCacheTime = 0;
+const INSTR_CACHE_MS = 60 * 1000;
+
+// Steps that require longer AI responses (complex objection, consultation, etc)
+const COMPLEX_STEPS = new Set(['waiting_preference_consultation', 'waiting_data', 'waiting_ok', 'safety_check']);
+
+function _getSystemInstructions(forceRefresh = false) {
+    const now = Date.now();
+    if (_instrCache && !forceRefresh && (now - _instrCacheTime) < INSTR_CACHE_MS) return _instrCache;
     let prices = {
         'Cápsulas': { '60': '46.900', '120': '66.900' },
         'Semillas': { '60': '36.900', '120': '49.900' },
@@ -32,7 +42,7 @@ function _getSystemInstructions() {
         }
     } catch (e) { console.error("Error reading prices for AI:", e); }
 
-    return `
+    const instructions = `
 ROL:
 Sos 'Herbalis', especialista en asesoramiento nutricional y ventas de Nuez de la India.
 Atendés el WhatsApp de la empresa líder hace 13 AÑOS en el mercado, con más de 15.000 clientes satisfechos.
@@ -145,6 +155,9 @@ REGLA ANTI-INVENCIÓN (CRÍTICO — LA MÁS IMPORTANTE):
 21. CANCELACIONES: Si el usuario quiere CANCELAR el pedido: Respondé "Qué pena... 😔 ¿Por qué querés cancelarlo?". extractedData="CANCEL_ORDER". PROHIBIDO mandar a hablar con asesores.
 22. PROHIBIDO decir "hablá con un asesor" o "contactá a soporte" para ventas o cambios. Vos sos quien resuelve.
 `;
+    _instrCache = instructions;
+    _instrCacheTime = Date.now();
+    return instructions;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -310,9 +323,10 @@ class AIService {
 
         if (context.summary) {
             summaryContext = `RESUMEN PREVIO:\n"${context.summary}"\n\n`;
-            if (conversationHistory.length > 5) {
-                conversationHistory = conversationHistory.slice(-5);
-            }
+        }
+        // Always cap history to keep prompt lean (regardless of summary)
+        if (conversationHistory.length > 10) {
+            conversationHistory = conversationHistory.slice(-10);
         }
 
         let knowledgeContext = "";
@@ -382,7 +396,6 @@ ETAPA ACTUAL: "${context.step || 'general'}"
 OBJETIVO DEL PASO: "${context.goal || 'Ayudar al cliente'}"
 
 HISTORIAL RECIENTE:
-HISTORIAL RECENTE:
 ${conversationHistory.map(m => `${m.role}: ${m.content}`).join('\n')}
 
 MENSAJE DEL USUARIO: "${userText}"
@@ -410,7 +423,7 @@ INSTRUCCIONES:
                         { role: "user", content: userPrompt }
                     ],
                     temperature: 0.7,
-                    max_tokens: 300
+                    max_tokens: COMPLEX_STEPS.has(context.step || '') ? 450 : 250
                 }),
                 null // No cache for chat — every conversation is unique
             );
