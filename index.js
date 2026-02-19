@@ -132,13 +132,16 @@ const client = new Client({
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',   // CRÍTICO: evita crash por /dev/shm pequeño en Docker/Railway
-            '--disable-gpu',             // No hay GPU en servidor
-            '--no-zygote',               // Necesario con single-process
-            '--single-process',          // Estabilidad en containers
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--no-zygote',
+            '--single-process',
             '--disable-extensions',
             '--disable-background-networking',
             '--disable-default-apps',
+            '--disable-software-rasterizer', // Avoids rendering issues in headless
+            '--disable-features=IsolateOrigins,site-per-process', // Critical for preventing frame detachment
+            '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
         ]
     }
 });
