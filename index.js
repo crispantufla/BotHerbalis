@@ -161,9 +161,10 @@ const client = new Client({
             '--disable-gpu',
             '--no-zygote',
             '--single-process',
+            '--disable-features=IsolateOrigins,site-per-process', // Specific fix for "Frame detached" error
             '--no-first-run'
         ],
-        timeout: 60000
+        timeout: 120000 // 2 minutes timeout for slow startups
     }
 });
 
