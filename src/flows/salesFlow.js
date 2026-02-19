@@ -1008,16 +1008,24 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             }
 
             // GUARD: Detect messages that are clearly NOT address data
-            // (questions, objections, very short non-data text)
+            // (questions, objections, very short non-data text, hesitation)
             const looksLikeAddress = text.length > 8 && (/\d/.test(text) || /\b(calle|av|avenida|barrio|mz|lote|piso|dpto|depto|departamento|casa|block|manzana)\b/i.test(text) || text.split(/[,\n]/).length >= 2);
-            const isDataQuestion = text.includes('?') || /\b(pregunte|quiero|puedo|no quiero|no acepto|no acepte|como|donde|por que|para que)\b/i.test(normalizedText);
+
+            // Regex for hesitation/delay ("lo voy a pensar", "mañana te aviso", "te confirmo mas tarde")
+            // Also handles typo "pasar" in context of "voy a pasar un poco mas" (pensar)
+            const isHesitation = /\b(pensar|pienso|despues|luego|mañana|te confirmo|te aviso|ver|veo|rato|lueguito|mas tarde|en un rato|aguanti|aguanta|espera|bancame)\b/i.test(normalizedText)
+                || /\b(voy a|dejam[eo])\s+(pasar|pensar|ver)\b/i.test(normalizedText);
+
+            const isDataQuestion = text.includes('?')
+                || /\b(pregunte|quiero|puedo|no quiero|no acepto|no acepte|como|donde|por que|para que)\b/i.test(normalizedText)
+                || isHesitation;
 
             if (isDataQuestion && !looksLikeAddress) {
                 // This is a question or objection, NOT address data
                 console.log(`[AI-FALLBACK] waiting_data: Detected question/objection from ${userId}: "${text}"`);
                 const aiData = await aiService.chat(text, {
                     step: 'waiting_data',
-                    goal: 'El usuario tiene una duda o no quiere dar datos todavía. Respondé brevemente su duda y luego pedile los datos de envío. IMPORTANTE: NO repitas la misma frase que ya le dijiste antes. Variá la forma de pedir los datos. Si el usuario mencionó un tema ya resuelto (ej: edad de una persona), confirmá lo que ya se habló y seguí adelante.',
+                    goal: 'El usuario está dudando, tiene una pregunta o quiere postergar la compra ("lo voy a pensar"). ESTRATEGIA: 1) Si dice que lo va a pensar, validá su decisión y decile algo como "Dale, tomate tu tiempo! Cualquier duda estoy acá". NO insistas en pedir datos ya. 2) Si es una duda, responé. 3) Si es una negativa, aceptala amablemente.',
                     history: currentState.history,
                     summary: currentState.summary,
                     knowledge: knowledge,
@@ -1032,7 +1040,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     console.log(`[ANTI-DUP] Skipping duplicate AI response for ${userId}`);
                     matched = true;
                 } else {
-                    await _pauseAndAlert(userId, currentState, dependencies, text, `Cliente no quiere dar datos. Dice: "${text}"`);
+                    await _pauseAndAlert(userId, currentState, dependencies, text, `Cliente duda o objeta. Dice: "${text}"`);
                     matched = true;
                 }
                 break;
