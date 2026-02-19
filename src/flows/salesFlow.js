@@ -1134,6 +1134,42 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
             if (missing.length === 0 || (addr.calle && addr.ciudad && missing.length <= 1)) {
 
+                // ── SAFETY: Never send undefined/null to client ──
+                // Re-check that all critical fields have actual values before proceeding
+                const criticalMissing = [];
+                if (!addr.nombre) criticalMissing.push('Nombre completo');
+                if (!addr.calle) criticalMissing.push('Calle y número');
+                if (!addr.ciudad) criticalMissing.push('Ciudad');
+                if (!addr.cp) criticalMissing.push('Código postal');
+
+                if (criticalMissing.length > 0) {
+                    // Track per-field re-ask count to detect repeated requests for the same data
+                    if (!currentState.fieldReaskCount) currentState.fieldReaskCount = {};
+                    let shouldEscalate = false;
+                    for (const field of criticalMissing) {
+                        currentState.fieldReaskCount[field] = (currentState.fieldReaskCount[field] || 0) + 1;
+                        if (currentState.fieldReaskCount[field] >= 2) {
+                            shouldEscalate = true;
+                        }
+                    }
+
+                    if (shouldEscalate) {
+                        // Admin escalation: we already asked for this data and still don't have it
+                        console.log(`[ESCALATE] Field re-asked 2+ times for ${userId}: ${criticalMissing.join(', ')}`);
+                        await _pauseAndAlert(userId, currentState, dependencies, text,
+                            `⚠️ No se pudo obtener dato del cliente después de 2 intentos. Faltan: ${criticalMissing.join(', ')}. Intervención manual requerida.`);
+                        matched = true;
+                        break;
+                    }
+
+                    // Ask for the missing data instead of showing undefined
+                    const askMsg = `Me falta un dato para completar el envío: *${criticalMissing.join(', ')}*. ¿Me lo pasás? 🙏`;
+                    await sendMessageWithDelay(userId, askMsg);
+                    currentState.history.push({ role: 'bot', content: askMsg });
+                    matched = true;
+                    break;
+                }
+
                 // ── ADDRESS VALIDATION ──
                 const validation = await validateAddress(addr);
 
@@ -1170,8 +1206,9 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 const maxLabel = adicional > 0 ? ` + $${adicional.toLocaleString('es-AR')}` : '';
 
                 // ── SHOW VALIDATED ADDRESS TO USER ──
+                // All fields guaranteed non-null at this point
                 let addressSummary = `📋 *Datos de envío:*\n`;
-                addressSummary += `👤 ${addr.nombre || '?'}\n`;
+                addressSummary += `👤 ${addr.nombre}\n`;
                 addressSummary += `📍 ${addr.calle}, ${addr.ciudad}\n`;
                 if (addr.provincia) addressSummary += `🏛️ ${addr.provincia}\n`;
                 addressSummary += `📮 CP: ${addr.cp}`;
@@ -1188,6 +1225,9 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
                 await sendMessageWithDelay(userId, addressSummary);
                 currentState.history.push({ role: 'bot', content: addressSummary });
+
+                // Reset field re-ask counts on success
+                currentState.fieldReaskCount = {};
 
                 // Set step to waiting_admin_ok
                 _setStep(currentState, 'waiting_admin_ok');

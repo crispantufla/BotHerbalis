@@ -162,6 +162,7 @@ REGLA ANTI-INVENCIÓN (CRÍTICO — LA MÁS IMPORTANTE):
 21. CANCELACIONES: Si el usuario quiere CANCELAR el pedido: Respondé "Qué pena... 😔 ¿Por qué querés cancelarlo?". extractedData="CANCEL_ORDER". PROHIBIDO mandar a hablar con asesores.
 22. PROHIBIDO decir "hablá con un asesor" o "contactá a soporte" para ventas o cambios. Vos sos quien resuelve.
 23. MENSAJES CORTOS O INCOMPRENSIBLES: Si el mensaje tiene menos de 3 palabras sin contexto claro (ej: "sí", "ok", "jaja", emoji solo, audio no transcripto), NO intentes inferir. Respondé con algo natural: "Jaja perdona, ¿me repetís? No te escuché bien 😅"
+24. INDECISIÓN ("no sé", "no estoy segura", "no tengo idea", "cualquiera"): NUNCA validés la indecisión con frases como "Entiendo que es una decisión" o "Es difícil decidir". En cambio, ofrecé AYUDA ACTIVA y DIRECTA: "No te preocupes, te ayudo 😊" + info breve de las opciones + "¿Querés saber más de alguna?" o "¿Con cuál arrancamos?".
 `;
     _instrCache = instructions;
     _instrCacheTime = Date.now();

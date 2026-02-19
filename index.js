@@ -705,6 +705,40 @@ async function _processDebounced(userId) {
 // ─────────────────────────────────────────────────────────────
 // RESILIENT STARTUP — Prevents crash loops from killing the process
 // ─────────────────────────────────────────────────────────────
+
+/**
+ * Soft-clean: remove only problematic Chrome files, preserve WhatsApp session.
+ * This prevents needing a new QR scan after each deploy.
+ */
+function _softCleanSession(dir) {
+    if (!fs.existsSync(dir)) return;
+
+    const REMOVE_NAMES = new Set([
+        'SingletonLock', 'SingletonCookie', 'SingletonSocket',
+        'Service Worker', 'GPUCache', 'GrShaderCache',
+        'ShaderCache', 'Code Cache', 'blob_storage'
+    ]);
+
+    function walk(currentDir) {
+        try {
+            const entries = fs.readdirSync(currentDir, { withFileTypes: true });
+            for (const entry of entries) {
+                const fullPath = path.join(currentDir, entry.name);
+                if (REMOVE_NAMES.has(entry.name)) {
+                    console.log(`[SOFT-CLEAN] Removing: ${fullPath}`);
+                    fs.rmSync(fullPath, { recursive: true, force: true });
+                } else if (entry.isDirectory() && entry.name !== 'Local Storage' && entry.name !== 'IndexedDB') {
+                    walk(fullPath); // Recurse but skip session-critical dirs
+                }
+            }
+        } catch (e) {
+            console.error(`[SOFT-CLEAN] Error in ${currentDir}:`, e.message);
+        }
+    }
+
+    walk(dir);
+}
+
 const MAX_INIT_RETRIES = 3;
 
 async function safeInitialize(attempt = 1) {
@@ -716,14 +750,27 @@ async function safeInitialize(attempt = 1) {
         console.error(`[INIT] ❌ Initialize failed (attempt ${attempt}): ${err.message}`);
 
         if (attempt < MAX_INIT_RETRIES) {
-            // Clean corrupted session before retrying
             const authDir = path.join(DATA_DIR, '.wwebjs_auth');
-            console.log(`[INIT] Cleaning session data at ${authDir} before retry...`);
-            try {
-                fs.rmSync(authDir, { recursive: true, force: true });
-                console.log('[INIT] Session cleaned successfully.');
-            } catch (cleanErr) {
-                console.error('[INIT] Failed to clean session:', cleanErr.message);
+
+            // SOFT CLEAN first: only remove problematic files, preserve session
+            // Full wipe only on LAST retry (forces new QR but at least works)
+            if (attempt < MAX_INIT_RETRIES - 1) {
+                console.log(`[INIT] Soft-cleaning session at ${authDir} (preserving login)...`);
+                try {
+                    _softCleanSession(authDir);
+                    console.log('[INIT] Soft clean done. Session preserved.');
+                } catch (cleanErr) {
+                    console.error('[INIT] Soft clean failed:', cleanErr.message);
+                }
+            } else {
+                // Last retry: full wipe as last resort
+                console.log(`[INIT] FULL session wipe at ${authDir} (last resort — will need new QR)...`);
+                try {
+                    fs.rmSync(authDir, { recursive: true, force: true });
+                    console.log('[INIT] Session wiped. Will need new QR scan.');
+                } catch (cleanErr) {
+                    console.error('[INIT] Failed to clean session:', cleanErr.message);
+                }
             }
 
             const delay = 5000 * attempt;
