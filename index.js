@@ -697,5 +697,49 @@ async function _processDebounced(userId) {
     }
 }
 
+// ─────────────────────────────────────────────────────────────
+// RESILIENT STARTUP — Prevents crash loops from killing the process
+// ─────────────────────────────────────────────────────────────
+const MAX_INIT_RETRIES = 3;
 
-client.initialize();
+async function safeInitialize(attempt = 1) {
+    try {
+        console.log(`[INIT] Starting WhatsApp client (attempt ${attempt}/${MAX_INIT_RETRIES})...`);
+        await client.initialize();
+    } catch (err) {
+        console.error(`[INIT] ❌ Initialize failed (attempt ${attempt}): ${err.message}`);
+
+        if (attempt < MAX_INIT_RETRIES) {
+            // Clean corrupted session before retrying
+            const authDir = path.join(DATA_DIR, '.wwebjs_auth');
+            console.log(`[INIT] Cleaning session data at ${authDir} before retry...`);
+            try {
+                fs.rmSync(authDir, { recursive: true, force: true });
+                console.log('[INIT] Session cleaned successfully.');
+            } catch (cleanErr) {
+                console.error('[INIT] Failed to clean session:', cleanErr.message);
+            }
+
+            const delay = 5000 * attempt;
+            console.log(`[INIT] Retrying in ${delay / 1000}s...`);
+            await new Promise(r => setTimeout(r, delay));
+            return safeInitialize(attempt + 1);
+        } else {
+            console.error(`[INIT] ❌ All ${MAX_INIT_RETRIES} attempts failed. Server is running but WhatsApp is offline.`);
+            console.error('[INIT] The /health endpoint is still available. Set RESET_SESSION=true and redeploy to force a clean start.');
+        }
+    }
+}
+
+// Global safety net — prevent unhandled errors from killing the server
+process.on('uncaughtException', (err) => {
+    console.error('[FATAL] Uncaught Exception:', err.message);
+    console.error(err.stack);
+    // Don't exit — keep the server alive for healthcheck/dashboard
+});
+
+process.on('unhandledRejection', (reason) => {
+    console.error('[FATAL] Unhandled Rejection:', reason);
+});
+
+safeInitialize();
