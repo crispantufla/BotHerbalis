@@ -542,9 +542,15 @@ client.on('message', async msg => {
             return;
         }
 
+        // 2. Logging & Ad Handling
+        // Some ads arrive with empty body. If so, treat as greeting.
+        if (!msgText && (msg.type === 'chat' || msg.type === 'unknown')) {
+            console.log(`[AD-HANDLE] Empty message from ${userId}. Treating as ad click/greeting.`);
+            msgText = "Hola! (Vengo de un anuncio)";
+        }
+
         if (!msgText) return;
 
-        // 2. Logging
         logAndEmit(userId, 'user', msgText, userState[userId]?.step || 'new');
 
         // 3. Paused Check
