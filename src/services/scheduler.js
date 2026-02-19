@@ -194,14 +194,14 @@ function startScheduler(sharedState, dependencies) {
 
     // Run immediately on start, then on interval
     setTimeout(() => {
-        checkStaleUsers(sharedState, dependencies);
+        // checkStaleUsers(sharedState, dependencies); // DISABLED by user request
         checkColdLeads(sharedState, dependencies);
         autoApproveOrders(sharedState, dependencies);
         cleanupOldUsers(sharedState, dependencies);
     }, 5000);
 
     setInterval(() => {
-        checkStaleUsers(sharedState, dependencies);
+        // checkStaleUsers(sharedState, dependencies); // DISABLED by user request
         checkColdLeads(sharedState, dependencies);
         autoApproveOrders(sharedState, dependencies);
         cleanupOldUsers(sharedState, dependencies);
