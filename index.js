@@ -126,29 +126,49 @@ loadKnowledge();
 
 // --- WHATSAPP CLIENT ---
 // ─────────────────────────────────────────────────────────────
-// CRITICAL: Clean up stale Chrome locks from previous crashes mid-session
+// CRITICAL: Clean up stale Chrome locks and corrupted sessions
 // ─────────────────────────────────────────────────────────────
+const fs = require('fs');
 
-function removeStaleLocks(dir) {
+function cleanAuth(dir) {
     if (!fs.existsSync(dir)) return;
+
+    // Manual RESET via Env Var
+    if (process.env.RESET_SESSION === 'true') {
+        console.log(`[RESET] Deleting session directory: ${dir}`);
+        fs.rmSync(dir, { recursive: true, force: true });
+        return;
+    }
+
+    // Standard Cleanup
     try {
         const files = fs.readdirSync(dir, { withFileTypes: true });
         for (const file of files) {
             const fullPath = path.join(dir, file.name);
+
+            if (file.name === 'session' && file.isDirectory()) {
+                // Clean Service Workers (often cause of "Frame Detached")
+                const swDir = path.join(fullPath, 'Default', 'Service Worker');
+                if (fs.existsSync(swDir)) {
+                    console.log(`[CLEANUP] Removing Service Worker cache: ${swDir}`);
+                    fs.rmSync(swDir, { recursive: true, force: true });
+                }
+            }
+
             if (file.isDirectory()) {
-                removeStaleLocks(fullPath);
+                cleanAuth(fullPath); // Recursive check for locks
             } else if (file.name === 'SingletonLock') {
                 console.log(`[CLEANUP] Removing stale lock file: ${fullPath}`);
                 fs.unlinkSync(fullPath);
             }
         }
     } catch (error) {
-        console.error(`[CLEANUP] Error removing locks in ${dir}:`, error);
+        console.error(`[CLEANUP] Error cleaning ${dir}:`, error);
     }
 }
 
-// Clean locks before starting client
-removeStaleLocks(path.join(DATA_DIR, '.wwebjs_auth'));
+// Clean locks/session before starting client
+cleanAuth(path.join(DATA_DIR, '.wwebjs_auth'));
 
 const client = new Client({
     authStrategy: new LocalAuth({ dataPath: path.join(DATA_DIR, '.wwebjs_auth') }),
@@ -158,6 +178,7 @@ const client = new Client({
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage', // Fix for Docker memory limit
+            '--disable-accelerated-2d-canvas', // Rendering fix
             '--disable-gpu',
             '--no-zygote',
             '--single-process',
