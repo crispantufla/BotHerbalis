@@ -1,9 +1,19 @@
 import React, { useState } from 'react';
 import { Icons } from './Icons';
 
-const SystemStatusPanel = ({ status, qrData, activeConversations = 0, adminNumbers = [], onAddPhone, onRemovePhone }) => {
+const SystemStatusPanel = ({ status, qrData, activeConversations = 0, adminNumbers = [], onAddPhone, onRemovePhone, onRegenerateQR }) => {
     const [newPhone, setNewPhone] = useState('');
     const [addingPhone, setAddingPhone] = useState(false);
+    const [regenerating, setRegenerating] = useState(false);
+
+    const handleRegenerateQR = async () => {
+        setRegenerating(true);
+        try {
+            await onRegenerateQR();
+        } finally {
+            setTimeout(() => setRegenerating(false), 5000);
+        }
+    };
 
     const handleAdd = async () => {
         if (!newPhone.trim()) return;
@@ -31,6 +41,28 @@ const SystemStatusPanel = ({ status, qrData, activeConversations = 0, adminNumbe
                         <span className={`text-xs font-mono px-2 py-0.5 rounded border ${status === 'ready' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`}>
                             {status === 'ready' ? 'CONECTADO' : status === 'scan_qr' ? 'ESPERANDO QR' : 'ERROR'}
                         </span>
+                    </div>
+
+                    {/* Regenerate QR Button */}
+                    <div className="pb-3 border-b border-slate-100">
+                        <button
+                            onClick={handleRegenerateQR}
+                            disabled={regenerating || status === 'scan_qr'}
+                            className="w-full flex items-center justify-center gap-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg px-3 py-2 text-sm font-medium hover:bg-blue-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {regenerating ? (
+                                <>
+                                    <div className="w-4 h-4 border-2 border-blue-700 border-t-transparent rounded-full animate-spin"></div>
+                                    Desconectando...
+                                </>
+                            ) : status === 'scan_qr' ? (
+                                '⏳ Esperando escaneo...'
+                            ) : (
+                                <>
+                                    📱 Regenerar QR
+                                </>
+                            )}
+                        </button>
                     </div>
 
                     <div className="flex justify-between items-center pb-3 border-b border-slate-100">

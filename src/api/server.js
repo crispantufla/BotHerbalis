@@ -65,6 +65,21 @@ function startServer(client, sharedState) {
     // Always serve /media from public/ for audio files, images, etc.
     app.use('/media', express.static(path.join(__dirname, '../../public/media')));
 
+    // --- HEALTHCHECK (no auth required) ---
+    app.get('/health', (req, res) => {
+        const memUsage = process.memoryUsage();
+        res.json({
+            status: 'ok',
+            whatsapp: sharedState.isConnected ? 'connected' : 'disconnected',
+            uptime: Math.floor(process.uptime()),
+            memory: {
+                rss: Math.round(memUsage.rss / 1024 / 1024) + 'MB',
+                heap: Math.round(memUsage.heapUsed / 1024 / 1024) + 'MB'
+            },
+            timestamp: new Date().toISOString()
+        });
+    });
+
     // --- MOUNT ROUTES ---
     // All API routes are mounted under /api to preserve existing contract
     app.use('/api', chatRoutes(client, sharedState));

@@ -481,21 +481,61 @@ client.on('ready', () => {
     }
 });
 
+// --- AUTO-RECONNECTION with exponential backoff ---
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
+const BASE_RECONNECT_DELAY = 3000; // 3s → 6s → 12s → 24s → 48s
+
 client.on('disconnected', (reason) => {
-    console.log('[WA] Cliente desconectado:', reason);
+    console.log(`[WA] Cliente desconectado: ${reason}`);
     sharedState.isConnected = false;
     sharedState.qrCodeData = null;
     if (sharedState.io) sharedState.io.emit('status_change', { status: 'disconnected' });
-    if (sharedState.manualDisconnect) {
-        console.log('[WA] Desconexion manual - esperando nuevo QR');
-        sharedState.manualDisconnect = false;
+
+    // Auth failure = session invalidated, don't retry blindly
+    if (reason === 'LOGOUT' || reason === 'CONFLICT') {
+        console.log('[WA] Sesión cerrada desde el teléfono. Se necesita nuevo QR.');
+        reconnectAttempts = 0;
         setTimeout(() => {
             client.initialize().catch(err => console.error('[WA] Re-init failed:', err.message));
         }, 3000);
-    } else {
-        console.log('[WA] Desconexion accidental - reconectando...');
-        client.initialize().catch(err => console.error('[WA] Re-init failed:', err.message));
+        return;
     }
+
+    if (sharedState.manualDisconnect) {
+        console.log('[WA] Desconexion manual - esperando nuevo QR');
+        sharedState.manualDisconnect = false;
+        reconnectAttempts = 0;
+        setTimeout(() => {
+            client.initialize().catch(err => console.error('[WA] Re-init failed:', err.message));
+        }, 3000);
+        return;
+    }
+
+    // Exponential backoff for accidental disconnections
+    if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+        console.error(`[WA] ❌ Max reconnection attempts (${MAX_RECONNECT_ATTEMPTS}) reached. Waiting for manual restart.`);
+        notifyAdmin('❌ Bot desconectado', 'system', `El bot se desconectó y no pudo reconectar después de ${MAX_RECONNECT_ATTEMPTS} intentos. Razón: ${reason}. Requiere reinicio manual.`);
+        return;
+    }
+
+    const delay = BASE_RECONNECT_DELAY * Math.pow(2, reconnectAttempts);
+    reconnectAttempts++;
+    console.log(`[WA] Desconexion accidental - reintento ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} en ${delay / 1000}s...`);
+
+    setTimeout(() => {
+        client.initialize().catch(err => {
+            console.error(`[WA] Re-init attempt ${reconnectAttempts} failed:`, err.message);
+        });
+    }, delay);
+});
+
+// Reset reconnect counter on successful connection
+client.on('ready', () => {
+    if (reconnectAttempts > 0) {
+        console.log(`[WA] ✅ Reconectado exitosamente después de ${reconnectAttempts} intento(s)`);
+    }
+    reconnectAttempts = 0;
 });
 
 client.on('message', async msg => {

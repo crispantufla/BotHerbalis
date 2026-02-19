@@ -74,6 +74,17 @@ const CorporateDashboardView = ({ alerts, config, handleQuickAction, status, qrD
         }
     };
 
+    const handleRegenerateQR = async () => {
+        const ok = await confirm('¿Desconectar WhatsApp y generar un nuevo código QR?');
+        if (!ok) return;
+        try {
+            await api.post('/api/logout');
+            toast.success('Desconectado. Esperá el nuevo QR...');
+        } catch (e) {
+            toast.error('Error al desconectar');
+        }
+    };
+
     const adminNumbers = config?.alertNumbers || (config?.alertNumber ? [config.alertNumber] : []);
 
     return (
@@ -124,6 +135,7 @@ const CorporateDashboardView = ({ alerts, config, handleQuickAction, status, qrD
                     adminNumbers={adminNumbers}
                     onAddPhone={handleAddPhone}
                     onRemovePhone={handleRemovePhone}
+                    onRegenerateQR={handleRegenerateQR}
                 />
 
             </div>
