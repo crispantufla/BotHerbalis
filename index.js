@@ -128,7 +128,7 @@ loadKnowledge();
 // ─────────────────────────────────────────────────────────────
 // CRITICAL: Clean up stale Chrome locks and corrupted sessions
 // ─────────────────────────────────────────────────────────────
-const fs = require('fs');
+
 
 function cleanAuth(dir) {
     if (!fs.existsSync(dir)) return;
