@@ -153,7 +153,7 @@ removeStaleLocks(path.join(DATA_DIR, '.wwebjs_auth'));
 const client = new Client({
     authStrategy: new LocalAuth({ dataPath: path.join(DATA_DIR, '.wwebjs_auth') }),
     puppeteer: {
-        headless: true, // Revert to classic headless for max compatibility
+        headless: true,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -161,12 +161,19 @@ const client = new Client({
             '--disable-gpu',
             '--no-zygote',
             '--single-process',
-            '--disable-features=IsolateOrigins,site-per-process',
+            '--disable-extensions',
+            '--disable-default-apps',
+            '--disable-accelerated-2d-canvas',
             '--no-first-run',
-            '--no-default-browser-check'
+            '--mute-audio', // No audio needed
+            '--disable-dbus', // Avoid DBus connection attempts
+            '--disable-software-rasterizer', // Avoid rendering issues
+            '--disable-features=IsolateOrigins,site-per-process,AudioServiceOutOfProcess', // Disable process isolation & audio service
+            '--disable-gl-drawing-for-tests',
+            '--window-size=1280,720' // Set explicit window size to avoid 0x0 issues
         ],
         timeout: 60000,
-        dumpio: true // LOG EVERYTHING from Chrome to stderr (Debug crash)
+        dumpio: true
     }
 });
 
