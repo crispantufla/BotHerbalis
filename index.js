@@ -157,23 +157,13 @@ const client = new Client({
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
+            '--disable-dev-shm-usage', // Fix for Docker memory limit
             '--disable-gpu',
             '--no-zygote',
             '--single-process',
-            '--disable-extensions',
-            '--disable-default-apps',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--mute-audio', // No audio needed
-            '--disable-dbus', // Avoid DBus connection attempts
-            '--disable-software-rasterizer', // Avoid rendering issues
-            '--disable-features=IsolateOrigins,site-per-process,AudioServiceOutOfProcess', // Disable process isolation & audio service
-            '--disable-gl-drawing-for-tests',
-            '--window-size=1280,720' // Set explicit window size to avoid 0x0 issues
+            '--no-first-run'
         ],
-        timeout: 60000,
-        dumpio: true
+        timeout: 60000
     }
 });
 
