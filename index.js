@@ -174,6 +174,11 @@ const client = new Client({
     authStrategy: new LocalAuth({ dataPath: path.join(DATA_DIR, '.wwebjs_auth') }),
     puppeteer: {
         headless: true,
+        // Use system Chrome when PUPPETEER_EXECUTABLE_PATH is set (Docker/Railway)
+        // Falls back to bundled Chromium for local development
+        ...(process.env.PUPPETEER_EXECUTABLE_PATH && {
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH
+        }),
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -704,7 +709,8 @@ const MAX_INIT_RETRIES = 3;
 
 async function safeInitialize(attempt = 1) {
     try {
-        console.log(`[INIT] Starting WhatsApp client (attempt ${attempt}/${MAX_INIT_RETRIES})...`);
+        const chromePath = process.env.PUPPETEER_EXECUTABLE_PATH || 'bundled Chromium';
+        console.log(`[INIT] Starting WhatsApp client (attempt ${attempt}/${MAX_INIT_RETRIES}) using ${chromePath}...`);
         await client.initialize();
     } catch (err) {
         console.error(`[INIT] ❌ Initialize failed (attempt ${attempt}): ${err.message}`);
