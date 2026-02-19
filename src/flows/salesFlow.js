@@ -501,7 +501,12 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
     switch (logicStage) {
         case 'greeting':
-            // Send Welcome Image (if configured in knowledge via dashboard)
+            // 1. Send Text FIRST
+            const greetMsg = _formatMessage(knowledge.flow.greeting.response);
+            await sendMessageWithDelay(userId, greetMsg);
+            currentState.history.push({ role: 'bot', content: greetMsg });
+
+            // 2. Send Image SECOND (if configured)
             try {
                 const greetingNode = knowledge.flow.greeting;
                 if (greetingNode && greetingNode.image && greetingNode.imageEnabled) {
@@ -534,10 +539,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 console.error('[GREETING] Failed to send image:', e.message);
             }
 
-            const greetMsg = _formatMessage(knowledge.flow.greeting.response);
-            await sendMessageWithDelay(userId, greetMsg);
             _setStep(currentState, knowledge.flow.greeting.nextStep);
-            currentState.history.push({ role: 'bot', content: greetMsg });
             saveState();
             matched = true;
             break;
