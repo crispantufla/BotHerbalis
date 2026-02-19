@@ -133,15 +133,11 @@ const client = new Client({
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
-            '--disable-gpu',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
             '--no-zygote',
-            '--single-process',
-            '--disable-extensions',
-            '--disable-background-networking',
-            '--disable-default-apps',
-            '--disable-software-rasterizer', // Avoids rendering issues in headless
-            '--disable-features=IsolateOrigins,site-per-process', // Critical for preventing frame detachment
-            '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+            '--single-process', // <- Important for container stability
+            '--disable-gpu'
         ]
     }
 });
