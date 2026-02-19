@@ -128,16 +128,17 @@ loadKnowledge();
 const client = new Client({
     authStrategy: new LocalAuth({ dataPath: path.join(DATA_DIR, '.wwebjs_auth') }),
     puppeteer: {
-        headless: true,
+        headless: 'shell', // New headless mode, faster and more stable for containers
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
+            '--disable-gpu',
             '--no-zygote',
-            '--single-process', // <- Important for container stability
-            '--disable-gpu'
+            '--single-process',
+            '--disable-features=IsolateOrigins,site-per-process', // Critical for preventing frame detachment
+            '--no-first-run',
+            '--no-default-browser-check'
         ]
     }
 });
