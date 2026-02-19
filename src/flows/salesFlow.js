@@ -1043,15 +1043,29 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             const data = await aiService.parseAddress(text);
 
             if (data && !data._error) {
-                if (data.nombre) currentState.partialAddress.nombre = data.nombre;
-                if (data.calle) currentState.partialAddress.calle = data.calle;
-                if (data.ciudad) currentState.partialAddress.ciudad = data.ciudad;
-                if (data.cp) currentState.partialAddress.cp = data.cp;
+                let madeProgress = false;
+                if (data.nombre && !currentState.partialAddress.nombre) { currentState.partialAddress.nombre = data.nombre; madeProgress = true; }
+                if (data.calle && !currentState.partialAddress.calle) { currentState.partialAddress.calle = data.calle; madeProgress = true; }
+                if (data.ciudad && !currentState.partialAddress.ciudad) { currentState.partialAddress.ciudad = data.ciudad; madeProgress = true; }
+                if (data.cp && !currentState.partialAddress.cp) { currentState.partialAddress.cp = data.cp; madeProgress = true; }
+
+                // If user corrected CP (e.g. provided 4 digits after being asked)
+                if (data.cp && currentState.partialAddress.cp !== data.cp) {
+                    currentState.partialAddress.cp = data.cp;
+                    madeProgress = true;
+                }
+
+                if (madeProgress) {
+                    currentState.addressAttempts = 0; // Reset attempts if we got new valid data
+                    console.log(`[ADDRESS] valid data extracted, attempts reset.`);
+                } else {
+                    currentState.addressAttempts = (currentState.addressAttempts || 0) + 1;
+                }
+            } else {
+                currentState.addressAttempts = (currentState.addressAttempts || 0) + 1;
             }
 
             const addr = currentState.partialAddress;
-            currentState.addressAttempts = (currentState.addressAttempts || 0) + 1;
-
             const missing = [];
             if (!addr.nombre) missing.push('Nombre completo');
             if (!addr.calle) missing.push('Calle y número');
@@ -1121,15 +1135,19 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
                 await notifyAdmin(`Pedido CASI completo`, userId, `Datos: ${addr.nombre}, ${addr.calle}\nCiudad: ${addr.ciudad} | CP: ${addr.cp}\nProvincia: ${addr.provincia || '?'}${validationNotes}\nItems: ${cartSummary}\nSubtotal: $${subtotal}${maxLabel}\nTotal: $${currentState.totalPrice}`);
                 matched = true;
-            } else if (currentState.addressAttempts >= 3) {
-                // Too many attempts — pause and alert admin
+            } else if (currentState.addressAttempts >= 5) {
+                // Too many attempts — pause and alert admin (Increased limit from 3 to 5)
                 console.log(`[PAUSE] waiting_data: Too many address attempts for ${userId}`);
                 await _pauseAndAlert(userId, currentState, dependencies, text, `Cliente no logra dar dirección completa. Faltan: ${missing.join(', ')}`);
                 matched = true;
             } else {
                 let msg;
-                if (missing.length >= 3) {
+                if (missing.length === 4) {
+                    // All missing
                     msg = `Para prepararte el envío necesito que me pases: Nombre completo, Calle y número, Ciudad y Código postal.`;
+                } else if (currentState.addressAttempts > 2) {
+                    // Getting frustrated? shorter
+                    msg = `Me falta: *${missing.join(', ')}*. ¿Me lo pasás? 🙏`;
                 } else {
                     msg = `Gracias! Ya tengo algunos datos. Solo me falta: *${missing.join(', ')}*. ¿Me los pasás?`;
                 }

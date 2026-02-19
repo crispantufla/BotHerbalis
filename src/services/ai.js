@@ -509,25 +509,30 @@ INSTRUCCIONES:
      */
     async parseAddress(text) {
         const prompt = `
-        Analizá el siguiente texto y extraé una dirección postal de Argentina.
-        El texto puede estar desordenado o sin etiquetas (ej: "juan perez av libertador 1234 caba 1425").
+        Analizá el siguiente texto y extraé datos de dirección postal de Argentina.
+        El texto puede estar incompleto, ser solo un código postal, una provincia, o una dirección desordenada.
         
         TEXTO DEL USUARIO: "${text}"
 
-        DETALLES DE EXTRACCIÓN:
-        - nombre: Si hay un nombre de persona al inicio, extraelo.
-        - calle: La calle y la altura (ej: "Benegas 77", "Av. Santa Fe 1234").
-        - ciudad: La localidad o ciudad (ej: "Rosario", "CABA").
-        - cp: El código postal numérico (ej: "2000", "1414").
+        DETALLES DE EXTRACCIÓN (Si no está, devolver null):
+        - nombre: Nombre de persona (ej: "Laura Aguirre").
+        - calle: Calle y altura (ej: "Av. Santa Fe 1234", "Barrio 140 viv casa 16").
+        - ciudad: Localidad o ciudad (ej: "Valle Viejo", "El Bañado").
+        - provincia: Provincia (ej: "Catamarca", "Córdoba").
+        - cp: Código postal numérico (ej: "4707", "5000").
+        
+        REGLAS:
+        1. Tu prioridad es extraer CUALQUIER dato útil, aunque falten otros.
+        2. Si el usuario solo manda el CP (ej: "4707"), extraelo en "cp" y el resto null.
+        3. Si manda "Provincia Catamarca", extrae provincia="Catamarca".
         
         Devolver JSON PURO:
         {
-          "nombre": "nombre detectado o null",
-          "calle": "calle y altura o null",
-          "ciudad": "ciudad/localidad o null",
-          "cp": "código postal o null",
-          "direccion_valida": boolean (true si hay al menos calle y altura),
-          "comentario": "razón si es invalida o falta algo"
+          "nombre": "string o null",
+          "calle": "string o null",
+          "ciudad": "string o null",
+          "provincia": "string o null",
+          "cp": "string o null"
         }
         `;
         try {
@@ -535,7 +540,7 @@ INSTRUCCIONES:
                 () => this.client.chat.completions.create({
                     model: this.model,
                     messages: [
-                        { role: "system", content: "Sos un parser de direcciones postales argentinas. Respondé SOLO con JSON puro." },
+                        { role: "system", content: "Sos un parser de datos de envío. Tu salida es SIEMPRE JSON compatible." },
                         { role: "user", content: prompt }
                     ],
                     temperature: 0,
