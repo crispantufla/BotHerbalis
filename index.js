@@ -129,7 +129,17 @@ const client = new Client({
     authStrategy: new LocalAuth({ dataPath: path.join(DATA_DIR, '.wwebjs_auth') }),
     puppeteer: {
         headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',   // CRÍTICO: evita crash por /dev/shm pequeño en Docker/Railway
+            '--disable-gpu',             // No hay GPU en servidor
+            '--no-zygote',               // Necesario con single-process
+            '--single-process',          // Estabilidad en containers
+            '--disable-extensions',
+            '--disable-background-networking',
+            '--disable-default-apps',
+        ]
     }
 });
 
