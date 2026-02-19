@@ -10,12 +10,19 @@ const PriceEditor = () => {
         fetchPrices();
     }, []);
 
+
+
     const fetchPrices = async () => {
         setLoading(true);
         try {
             const res = await fetch(`${API_URL}/api/prices`);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
+
+            // Ensure Config Defaults
+            if (!data.adicionalMAX) data.adicionalMAX = '6.000';
+            if (!data.costoLogistico) data.costoLogistico = '18.000';
+
             setPrices(data || {});
         } catch (e) {
             console.error(e);
