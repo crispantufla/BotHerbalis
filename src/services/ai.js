@@ -713,6 +713,27 @@ INSTRUCCIONES:
     }
 
     /**
+     * Generate Audio — Uses OpenAI TTS
+     */
+    async generateAudio(text) {
+        try {
+            const mp3 = await this._callQueued(
+                () => this.client.audio.speech.create({
+                    model: "tts-1",
+                    voice: "nova",
+                    input: text,
+                }),
+                null
+            );
+            const buffer = Buffer.from(await mp3.arrayBuffer());
+            return buffer.toString('base64');
+        } catch (e) {
+            console.error("🔴 [AI] TTS Error:", e.message);
+            return null;
+        }
+    }
+
+    /**
      * Get queue/cache stats for monitoring
      */
     getStats() {

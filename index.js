@@ -1,5 +1,5 @@
 ﻿require('dotenv').config();
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const { exec } = require('child_process'); // For sound
 const { logMessage } = require('./logger'); // Import Logger
@@ -17,6 +17,24 @@ const { buildConfirmationMessage } = require('./src/utils/messageTemplates');
 
 // Paths — use DATA_DIR env var for Railway volume persistence, fallback to project root
 const DATA_DIR = process.env.DATA_DIR || __dirname;
+
+console.log(`=========================================`);
+console.log(`[BOOT] DATA_DIR is set to: ${DATA_DIR}`);
+console.log(`[BOOT] Ensuring DATA_DIR exists...`);
+if (!fs.existsSync(DATA_DIR)) {
+    console.log(`[BOOT] Creating DATA_DIR at ${DATA_DIR}`);
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+console.log(`[BOOT] Checking existing files in DATA_DIR:`);
+try {
+    const files = fs.readdirSync(DATA_DIR);
+    console.log(files.length > 0 ? files.join(', ') : '(Empty directory)');
+} catch (e) {
+    console.log(`[BOOT] Could not read DATA_DIR:`, e.message);
+}
+console.log(`=========================================`);
+
 const STATE_FILE = path.join(DATA_DIR, 'persistence.json');
 const ORDERS_FILE = path.join(DATA_DIR, 'orders.json');
 // Knowledge files: save to DATA_DIR (persists on Railway), load from DATA_DIR first then source code
@@ -140,7 +158,7 @@ function cleanAuth(dir) {
     // Manual RESET via Env Var
     if (process.env.RESET_SESSION === 'true') {
         console.log(`[RESET] Deleting session directory: ${dir}`);
-        fs.rmSync(dir, { recursive: true, force: true });
+        try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { }
         return;
     }
 
@@ -172,10 +190,14 @@ function cleanAuth(dir) {
 }
 
 // Clean locks/session before starting client
-cleanAuth(path.join(DATA_DIR, '.wwebjs_auth'));
+const authPath = path.join(DATA_DIR, '.wwebjs_auth');
+cleanAuth(authPath);
 
 const client = new Client({
-    authStrategy: new LocalAuth({ dataPath: path.join(DATA_DIR, '.wwebjs_auth') }),
+    authStrategy: new LocalAuth({
+        clientId: 'session',
+        dataPath: authPath
+    }),
     puppeteer: {
         headless: true,
         // Use system Chrome when PUPPETEER_EXECUTABLE_PATH is set (Docker/Railway)
@@ -192,8 +214,25 @@ const client = new Client({
             '--no-zygote',
             '--single-process',
             '--disable-features=IsolateOrigins,site-per-process', // Specific fix for "Frame detached" error
-            '--no-first-run'
+            '--no-first-run',
+            '--disable-web-security',
+            '--disable-features=NetworkService',
+            '--no-experiments',
+            '--ignore-certificate-errors',
+            '--disable-extensions',
+            '--disable-background-networking',
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-client-side-phishing-detection',
+            '--disable-default-apps',
+            '--disable-hang-monitor',
+            '--disable-prompt-on-repost',
+            '--disable-sync',
+            '--disk-cache-dir=/dev/null',
+            '--disable-gpu-shader-disk-cache'
         ],
+        // Let puppeteer store its data inside the wwebjs auth folder directly
+        userDataDir: path.join(authPath, 'session'),
         timeout: 120000 // 2 minutes timeout for slow startups
     }
 });
@@ -651,6 +690,33 @@ client.on('message', async msg => {
 
         logAndEmit(userId, 'user', msgText, userState[userId]?.step || 'new');
 
+        // SPECIAL CASE: Audio Request
+        if (msgText.toLowerCase() === 'marta mandame un audio') {
+            console.log(`[AUDIO REQUEST] Generating audio greeting for ${userId}...`);
+            // Show "recording audio..." indicator
+            try {
+                const chat = await msg.getChat();
+                await chat.sendStateRecording();
+            } catch (e) { }
+
+            try {
+                const audioText = "¡Hola! Acá Marta del equipo de Herbalis. Contame, ¿en qué te puedo ayudar hoy?";
+                const base64Audio = await aiService.generateAudio(audioText);
+                if (base64Audio) {
+                    const media = new MessageMedia('audio/mp3', base64Audio, 'audio.mp3');
+                    await client.sendMessage(userId, media, { sendAudioAsVoice: true });
+                    logAndEmit(userId, 'bot', `AUDIO ENVIADO: "${audioText}"`, userState[userId]?.step);
+                } else {
+                    await client.sendMessage(userId, "Uh, perdoná, se me complicó mandar el audio ahora. ¡Pero decime por acá!");
+                }
+            } catch (e) {
+                console.error("[AUDIO REQUEST] Error:", e.message);
+                await client.sendMessage(userId, "Uy, tuve un problemita con el audio, ¡perdoná! ¿En qué te ayudo?");
+            }
+            // Clear recording state is handled automatically after sending message in whatsapp-web.js
+            return;
+        }
+
         // 3. Paused Check
         if (pausedUsers.has(userId)) {
             console.log(`[PAUSED] Ignoring message from ${userId} `);
@@ -717,7 +783,9 @@ function _softCleanSession(dir) {
     const REMOVE_NAMES = new Set([
         'SingletonLock', 'SingletonCookie', 'SingletonSocket',
         'Service Worker', 'GPUCache', 'GrShaderCache',
-        'ShaderCache', 'Code Cache', 'blob_storage'
+        'ShaderCache', 'Code Cache', 'blob_storage',
+        'Cache', 'Session Storage', 'Crashpad',
+        'Network Persistent State', 'TransportSecurity'
     ]);
 
     function walk(currentDir) {
