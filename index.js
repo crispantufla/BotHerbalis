@@ -162,31 +162,10 @@ function cleanAuth(dir) {
         return;
     }
 
-    // Standard Cleanup
-    try {
-        const files = fs.readdirSync(dir, { withFileTypes: true });
-        for (const file of files) {
-            const fullPath = path.join(dir, file.name);
-
-            if (file.name === 'session' && file.isDirectory()) {
-                // Clean Service Workers (often cause of "Frame Detached")
-                const swDir = path.join(fullPath, 'Default', 'Service Worker');
-                if (fs.existsSync(swDir)) {
-                    console.log(`[CLEANUP] Removing Service Worker cache: ${swDir}`);
-                    fs.rmSync(swDir, { recursive: true, force: true });
-                }
-            }
-
-            if (file.isDirectory()) {
-                cleanAuth(fullPath); // Recursive check for locks
-            } else if (file.name === 'SingletonLock') {
-                console.log(`[CLEANUP] Removing stale lock file: ${fullPath}`);
-                fs.unlinkSync(fullPath);
-            }
-        }
-    } catch (error) {
-        console.error(`[CLEANUP] Error cleaning ${dir}:`, error);
-    }
+    // DISABLING AGGRESSIVE CLEANUP.
+    // Puppeteer and LocalAuth need their internal files. Deleting them manually
+    // has proven to cause "Session closed" and "Navigating frame detached" errors.
+    console.log(`[BOOT] Session directory exists at ${dir}. Skipping manual cleanup.`);
 }
 
 // Clean locks/session before starting client
@@ -771,41 +750,6 @@ async function _processDebounced(userId) {
 // RESILIENT STARTUP — Prevents crash loops from killing the process
 // ─────────────────────────────────────────────────────────────
 
-/**
- * Soft-clean: remove only problematic Chrome files, preserve WhatsApp session.
- * This prevents needing a new QR scan after each deploy.
- */
-function _softCleanSession(dir) {
-    if (!fs.existsSync(dir)) return;
-
-    const REMOVE_NAMES = new Set([
-        'SingletonLock', 'SingletonCookie', 'SingletonSocket',
-        'Service Worker', 'GPUCache', 'GrShaderCache',
-        'ShaderCache', 'Code Cache', 'blob_storage',
-        'Cache', 'Session Storage', 'Crashpad',
-        'Network Persistent State', 'TransportSecurity'
-    ]);
-
-    function walk(currentDir) {
-        try {
-            const entries = fs.readdirSync(currentDir, { withFileTypes: true });
-            for (const entry of entries) {
-                const fullPath = path.join(currentDir, entry.name);
-                if (REMOVE_NAMES.has(entry.name)) {
-                    console.log(`[SOFT-CLEAN] Removing: ${fullPath}`);
-                    fs.rmSync(fullPath, { recursive: true, force: true });
-                } else if (entry.isDirectory() && entry.name !== 'Local Storage' && entry.name !== 'IndexedDB') {
-                    walk(fullPath); // Recurse but skip session-critical dirs
-                }
-            }
-        } catch (e) {
-            console.error(`[SOFT-CLEAN] Error in ${currentDir}:`, e.message);
-        }
-    }
-
-    walk(dir);
-}
-
 const MAX_INIT_RETRIES = 3;
 
 async function safeInitialize(attempt = 1) {
@@ -819,17 +763,10 @@ async function safeInitialize(attempt = 1) {
         if (attempt < MAX_INIT_RETRIES) {
             const authDir = path.join(DATA_DIR, '.wwebjs_auth');
 
-            // SOFT CLEAN first: only remove problematic files, preserve session
+            // Instead of soft-cleaning, we just wait and retry.
+            // If it's a Chrome lock issue, sometimes it resolves itself.
             // Full wipe only on LAST retry (forces new QR but at least works)
-            if (attempt < MAX_INIT_RETRIES - 1) {
-                console.log(`[INIT] Soft-cleaning session at ${authDir} (preserving login)...`);
-                try {
-                    _softCleanSession(authDir);
-                    console.log('[INIT] Soft clean done. Session preserved.');
-                } catch (cleanErr) {
-                    console.error('[INIT] Soft clean failed:', cleanErr.message);
-                }
-            } else {
+            if (attempt === MAX_INIT_RETRIES - 1) {
                 // Last retry: full wipe as last resort
                 console.log(`[INIT] FULL session wipe at ${authDir} (last resort — will need new QR)...`);
                 try {
