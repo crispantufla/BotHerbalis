@@ -21,7 +21,7 @@
                 "costo",
                 "gotas"
             ],
-            "response": "¡Hola! 👋 Te cuento, somos *Herbalis*, especialistas en descenso de peso natural hace *13 años*. Ya ayudamos a más de *15.000 personas* a lograr su objetivo.\n\nLos tratamientos rondan entre $37.000 y $69.000 (según duración), pero para recomendarte el ideal para vos:\n¿Qué buscás bajar? ¿Hasta 10 kg, entre 10 y 20 kg o más?",
+            "response": "¡Hola! 👋 Te cuento, somos *Herbalis*, especialistas en descenso de peso natural hace *13 años*. Ya ayudamos a más de *15.000 personas* a lograr su objetivo.\n\nNuestros tratamientos rondan entre $37.000 y $69.000 (depende de los días que elijas).\n\nPara asesorarte bien sobre qué producto te va a ser más rápido:\n👉 ¿Cuántos kilos buscás bajar en total?",
             "nextStep": "waiting_weight"
         },
         "recommendation": {
@@ -40,7 +40,7 @@
                 "practica",
                 "1"
             ],
-            "response": "Dale, buenísimo 👍 Cápsulas es lo más práctico que hay.\n\n💊 Se toman así:\n• 1 cápsula por día\n• 30 min antes de cenar\n\nMirá, tenés dos opciones para tu objetivo:\n\n🏆 *OPCIÓN RECOMENDADA (120 días)*: Hacés el tratamiento completo y te asegurás el resultado.\n💲 *${{PRICE_CAPSULAS_120}}*\n*Beneficio: Envío Gratis + Pagás al recibir SIN recargo.*\n\n🔸 *OPCIÓN INICIO (60 días)*:\n💲 *${{PRICE_CAPSULAS_60}}* (+ ${{ADICIONAL_MAX}} de recargo administrativo por cobro en domicilio).\n\n👉 ¿Querés asegurar resultado con el de 120 o preferís probar con 60?",
+            "response": "Dale, buenísimo 👍 Cápsulas es lo más efectivo y práctico que hay.\n\n💊 Se toman así:\n• 1 al día\n• 30 min antes de la comida principal\n\nMirá, para asegurar tu objetivo tenés dos opciones:\n\n🏆 *OPCIÓN RECOMENDADA (120 días)*: Hacés el tratamiento completo de una y te asegurás el resultado.\n💲 *${{PRICE_CAPSULAS_120}}*\n*Beneficio: Envío Gratis + Pagás al recibir SIN recargo.*\n\n🔸 *OPCIÓN INICIO (60 días)*:\n💲 *${{PRICE_CAPSULAS_60}}* (+ ${{ADICIONAL_MAX}} de recargo administrativo por pago en domicilio).\n\n👉 ¿Te reservo el de 120 para asegurar el resultado o preferís arrancar con 60?",
             "nextStep": "waiting_plan_choice"
         },
         "preference_semillas": {
@@ -93,7 +93,7 @@
                 "bueno",
                 "ok"
             ],
-            "response": "¡Excelente decisión! 🎉\n\nChe, voy a *separar tu stock* ahora mismo así sale en el próximo despacho.\n\nPara confirmarlo, pasame por favor:\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(Fijate que la dirección sea exacta, sin esquinas ni \"aprox\" 🙏)",
+            "response": "¡Excelente decisión! 🎉\n\nChe, voy a *separar tu stock* ahora mismo así me aseguro que salga en el próximo despacho directo a tu casa.\n\nPasame por favor tus datos para armar la etiqueta:\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(Fijate que la dirección sea exacta 🙏)",
             "nextStep": "waiting_data"
         },
         "data_request": {
@@ -107,7 +107,7 @@
                 "de una",
                 "esta bien"
             ],
-            "response": "¡Genial! Tomamos los datos para separar tu pedido 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(Fijate que la dirección sea exacta, sin esquinas ni \"aprox\" 🙏)",
+            "response": "¡Genial! Pasame tus datos para armar la etiqueta de envío 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(Fijate que la dirección sea exacta 🙏)",
             "nextStep": "waiting_data"
         },
         "confirmation": {
@@ -295,9 +295,15 @@
             "keywords": [
                 "peligrosa",
                 "mala",
-                "me dijeron"
+                "me dijeron",
+                "hace mal",
+                "dañina",
+                "toxica",
+                "veneno",
+                "murio",
+                "muerte"
             ],
-            "response": "En redes circula información mezclada con productos distintos.\n\nTrabajamos hace más de 13 años con este producto en distintos países."
+            "response": "En redes circula mucha información falsa para vender otros productos químicos. Nuestro producto es 100% natural, está certificado y trabajamos hace más de 13 años en el rubro sin un solo problema serio. El cuerpo se adapta súper bien."
         },
         {
             "keywords": [
@@ -339,7 +345,7 @@
                 "engaño",
                 "chanta"
             ],
-            "response": "Entiendo la duda.\n\nPor eso trabajamos con pago al recibir."
+            "response": "Es normal desconfiar hoy en día por internet. Justamente por eso nosotros usamos pago Contra Reembolso: el cartero llega a tu casa, te da el paquete en la mano y recién ahí le pagás. Riesgo cero para vos 😊"
         },
         {
             "keywords": [
@@ -349,7 +355,7 @@
                 "otro producto",
                 "marca"
             ],
-            "response": "Los productos de farmacia generalmente son químicos. La Nuez de la India es 100% natural, no tiene efecto rebote y las únicas contraindicaciones son embarazo y lactancia.\n\nAdemás, te enviamos a domicilio gratis y pagás al recibir 😊"
+            "response": "Las cosas de farmacia suelen tener químicos y efecto rebote. Nosotras trabajamos lo natural. Por eso tenemos gente que nos compra hace 13 años: porque funciona y el cuerpo no se acostumbra mal.\n\nAdemás tenés envío gratis a tu casa 😊"
         },
         {
             "keywords": [

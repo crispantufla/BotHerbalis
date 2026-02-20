@@ -184,7 +184,19 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
             } catch (e) { console.error('Failed to load script or prices:', e); }
         };
         fetchScriptAndPrices();
-    }, []);
+
+        if (socket) {
+            const handleScriptChange = async (data) => {
+                try {
+                    console.log("[SOCKET] script_changed, reloading UI quick replies to:", data.active);
+                    const scriptRes = await api.get('/api/script');
+                    if (scriptRes.data?.flow) setScriptFlow(scriptRes.data.flow);
+                } catch (e) { console.error('Failed to reload script on change:', e); }
+            };
+            socket.on('script_changed', handleScriptChange);
+            return () => socket.off('script_changed', handleScriptChange);
+        }
+    }, [socket]);
 
     // Format Message Helper
     const formatScriptMessage = (text) => {
@@ -816,10 +828,10 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
                                 <div className="flex justify-between items-center">
                                     <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Estado</span>
                                     <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${activeOrder.status === 'Confirmado' ? 'bg-blue-50 text-blue-600 border-blue-200' :
-                                            activeOrder.status === 'Enviado' ? 'bg-indigo-50 text-indigo-600 border-indigo-200' :
-                                                activeOrder.status === 'Entregado' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
-                                                    activeOrder.status === 'Cancelado' ? 'bg-rose-50 text-rose-600 border-rose-200' :
-                                                        'bg-amber-50 text-amber-600 border-amber-200'
+                                        activeOrder.status === 'Enviado' ? 'bg-indigo-50 text-indigo-600 border-indigo-200' :
+                                            activeOrder.status === 'Entregado' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
+                                                activeOrder.status === 'Cancelado' ? 'bg-rose-50 text-rose-600 border-rose-200' :
+                                                    'bg-amber-50 text-amber-600 border-amber-200'
                                         }`}>
                                         {activeOrder.status || 'Pendiente'}
                                     </span>

@@ -12,6 +12,7 @@ const SettingsView = ({ status }) => {
     const [config, setConfig] = useState({ alertNumber: '' });
     const [saving, setSaving] = useState(false);
     const [activeScript, setActiveScript] = useState('v1');
+    const [scriptStats, setScriptStats] = useState({});
     const [switchingScript, setSwitchingScript] = useState(false);
 
     // Initial Load
@@ -24,6 +25,7 @@ const SettingsView = ({ status }) => {
             try {
                 const scriptRes = await api.get('/api/script/active');
                 if (scriptRes.data.active) setActiveScript(scriptRes.data.active);
+                if (scriptRes.data.stats) setScriptStats(scriptRes.data.stats);
             } catch (e) { console.error("Error loading script info:", e); }
         };
         fetchData();
@@ -293,8 +295,15 @@ const SettingsView = ({ status }) => {
                         >
                             <div className={`w-3 h-3 rounded-full mb-2 ${activeScript === 'v3' ? 'bg-blue-500 animate-pulse' : 'bg-slate-300'}`}></div>
                             <h4 className={`font-bold text-sm ${activeScript === 'v3' ? 'text-blue-700' : 'text-slate-600'}`}>Guión V3 (Estándar)</h4>
-                            <p className="text-xs text-slate-500 mt-1">Profesional y directo. Ideal para empezar.</p>
-                            {activeScript === 'v3' && <span className="mt-2 text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded">ACTIVO</span>}
+                            <p className="text-xs text-slate-500 mt-1 mb-2">Profesional y directo. Ideal para empezar.</p>
+                            <div className="flex flex-col items-center gap-1 w-full">
+                                {scriptStats.v3 && (
+                                    <span className="text-[11px] font-mono text-blue-600 bg-blue-100/50 px-2 py-1 rounded w-full">
+                                        Éxito: {scriptStats.v3.started > 0 ? Math.round((scriptStats.v3.completed / scriptStats.v3.started) * 100) : 0}% ({scriptStats.v3.completed}/{scriptStats.v3.started})
+                                    </span>
+                                )}
+                                {activeScript === 'v3' && <span className="mt-1 text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded">ACTIVO</span>}
+                            </div>
                         </div>
 
                         {/* V4: Psychology */}
@@ -304,8 +313,15 @@ const SettingsView = ({ status }) => {
                         >
                             <div className={`w-3 h-3 rounded-full mb-2 ${activeScript === 'v4' ? 'bg-violet-500 animate-pulse' : 'bg-slate-300'}`}></div>
                             <h4 className={`font-bold text-sm ${activeScript === 'v4' ? 'text-violet-700' : 'text-slate-600'}`}>Guión V4 (Psicología)</h4>
-                            <p className="text-xs text-slate-500 mt-1">Autoridad + Escasez. Maximiza conversión.</p>
-                            {activeScript === 'v4' && <span className="mt-2 text-[10px] font-bold bg-violet-100 text-violet-700 px-2 py-0.5 rounded">ACTIVO</span>}
+                            <p className="text-xs text-slate-500 mt-1 mb-2">Autoridad + Escasez. Maximiza conversión.</p>
+                            <div className="flex flex-col items-center gap-1 w-full">
+                                {scriptStats.v4 && (
+                                    <span className="text-[11px] font-mono text-violet-600 bg-violet-100/50 px-2 py-1 rounded w-full">
+                                        Éxito: {scriptStats.v4.started > 0 ? Math.round((scriptStats.v4.completed / scriptStats.v4.started) * 100) : 0}% ({scriptStats.v4.completed}/{scriptStats.v4.started})
+                                    </span>
+                                )}
+                                {activeScript === 'v4' && <span className="mt-1 text-[10px] font-bold bg-violet-100 text-violet-700 px-2 py-0.5 rounded">ACTIVO</span>}
+                            </div>
                         </div>
                     </div>
                 </div>

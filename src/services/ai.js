@@ -420,10 +420,10 @@ MENSAJE DEL USUARIO: "${userText}"
 INSTRUCCIONES:
 1. Fijate si el usuario CUMPLIÓ el objetivo del paso (ej: dio un número, eligió un plan).
 2. Si lo cumplió: goalMet = true.
-3. Si NO lo cumplió: respondé BREVEMENTE (1-2 oraciones) su duda y volvé a preguntarle lo del objetivo.
+3. PREGUNTAS DEL USUARIO (CRÍTICO): Si el usuario hace una pregunta, RESPONDELA SIEMPRE de forma clara. Nunca lo ignores. Luego de responder, y en un tono relajado y muy poco insistente (ej: "te tomo los datos o te ayudo con algo más?"), volvé a intentar encausar el objetivo del paso. Si el usuario NO preguntó nada y tampoco cumplió el objetivo, volvé a preguntarle lo del objetivo pero de forma breve y amigable.
 4. Excepción a la Regla 3 (POSTERGACIÓN): Si el usuario dice que "no puede hablar ahora", "está trabajando", "después te aviso" o similar: SOLO confirmá con amabilidad (ej: "Dale, tranqui. Avisame cuando puedas!"). NO le vuelvas a preguntar el objetivo. Dejalo en paz por ahora.
 5. Si el usuario dice algo EMOCIONAL o PERSONAL (hijos, salud, bullying, autoestima): mostrá EMPATÍA primero. NO USES "Entiendo, eso es difícil". Usá variaciones reales y genuinas. Después volvé suavemente al objetivo del paso.
-6. PROHIBIDO: No hables de pago, envío, precios, ni datos de envío si el OBJETIVO DEL PASO no lo menciona. Limitá tu respuesta EXCLUSIVAMENTE al tema del objetivo.
+6. PROHIBIDO: No hables de pago, envío, precios, ni datos de envío si el OBJETIVO DEL PASO no lo menciona, a menos que el usuario lo haya preguntado explícitamente. Limitá tu respuesta al tema del objetivo.
 7. MENORES DE EDAD: Si el mensaje menciona menores, VERIFICÁ EL HISTORIAL. Si ya se aclaró que la persona es mayor de 18, NO repitas la restricción. Confirmá que puede tomarla y seguí adelante.
 8. ANTI-REPETICIÓN: NUNCA repitas textualmente un mensaje que ya está en el historial. Si necesitás pedir los mismos datos, usá una frase DIFERENTE.
 9. Devolvé SOLO este JSON (sin markdown, sin backticks):
@@ -557,14 +557,15 @@ INSTRUCCIONES:
         DETALLES DE EXTRACCIÓN (Si no está, devolver null):
         - nombre: Nombre de persona (ej: "Laura Aguirre").
         - calle: Calle y altura (ej: "Av. Santa Fe 1234", "Barrio 140 viv casa 16").
-        - ciudad: Localidad o ciudad (ej: "Valle Viejo", "El Bañado").
-        - provincia: Provincia (ej: "Catamarca", "Córdoba").
+        - ciudad: Localidad o ciudad (ej: "Valle Viejo", "El Bañado", "Gualeguay").
+        - provincia: Provincia de Argentina (ej: "Catamarca", "Córdoba", "Entre Ríos").
         - cp: Código postal numérico (ej: "4707", "5000").
         
-        REGLAS:
+        REGLAS Y CONTEXTO GEOGRÁFICO:
         1. Tu prioridad es extraer CUALQUIER dato útil, aunque falten otros.
-        2. Si el usuario solo manda el CP (ej: "4707"), extraelo en "cp" y el resto null.
-        3. Si manda "Provincia Catamarca", extrae provincia="Catamarca".
+        2. "Gualeguay" y "Gualeguaychú" pertenecen a la provincia de Entre Ríos, NO a Santa Fe.
+        3. Barrios como "Barrio 60 viviendas" o "mz F casa 4" van en "calle".
+        4. Si el texto dice claramente de qué provincia es, respetalo aunque no coincida con el código postal.
         
         Devolver JSON PURO:
         {
@@ -580,7 +581,7 @@ INSTRUCCIONES:
                 () => this.client.chat.completions.create({
                     model: this.model,
                     messages: [
-                        { role: "system", content: "Sos un parser de datos de envío. Tu salida es SIEMPRE JSON compatible." },
+                        { role: "system", content: "Sos un parser de datos de envío experto en geografía argentina. Tu salida es SIEMPRE JSON compatible puro." },
                         { role: "user", content: prompt }
                     ],
                     temperature: 0,
@@ -621,6 +622,40 @@ INSTRUCCIONES:
             return result.text || null;
         } catch (e) {
             console.error("🔴 [AI] Transcribe Error:", e.message);
+            return null;
+        }
+    }
+
+    /**
+     * Analyze Image — Uses OpenAI Vision to extract text or describe an image
+     */
+    async analyzeImage(mediaData, mimeType, prompt) {
+        try {
+            const result = await this._callQueued(
+                () => this.client.chat.completions.create({
+                    model: "gpt-4o-mini", // Vision is supported in gpt-4o-mini
+                    messages: [
+                        {
+                            role: "user",
+                            content: [
+                                { type: "text", text: prompt },
+                                {
+                                    type: "image_url",
+                                    image_url: {
+                                        url: `data:${mimeType};base64,${mediaData}`,
+                                        detail: "low"
+                                    }
+                                }
+                            ]
+                        }
+                    ],
+                    max_tokens: 300
+                }),
+                null
+            );
+            return result.choices[0].message.content.trim();
+        } catch (e) {
+            console.error("🔴 [AI] Vision Error:", e.message);
             return null;
         }
     }

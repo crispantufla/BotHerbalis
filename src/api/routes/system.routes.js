@@ -167,6 +167,7 @@ module.exports = (client, sharedState) => {
         res.json({
             active: config.activeScript || 'v3',
             available: sharedState.availableScripts || ['v3'],
+            stats: config.scriptStats || {},
             labels: {
                 'v3': 'Guión Profesional + CRM MAX'
             }

@@ -38,7 +38,7 @@ let schedulerStarted = false; // Guard against duplicate scheduler on reconnect
 // Variables for API / Dashboard State
 let qrCodeData = null;
 let sessionAlerts = [];
-let config = { alertNumbers: [], activeScript: 'v3' };
+let config = { alertNumbers: [], activeScript: 'v3', scriptStats: { v3: { started: 0, completed: 0 }, v4: { started: 0, completed: 0 } } };
 let isConnected = false;
 
 // --- PERSISTENCE HELPERS ---
@@ -266,26 +266,19 @@ function saveOrderToLocal(order) {
 
 // Helper: Send with Delay (async/await — messages arrive in order)
 const sendMessageWithDelay = async (chatId, content, startTime = Date.now()) => {
-    // Night mode: longer delays to seem human
-    let minDelay, maxDelay;
-    if (isDeepNight()) {
-        minDelay = 90000; maxDelay = 180000; // 1.5-3 min at deep night
-    } else if (!isBusinessHours()) {
-        minDelay = 45000; maxDelay = 90000;  // 45-90s outside hours
-    } else {
-        minDelay = 10000; maxDelay = 25000;  // 10-25s during hours
-    }
+    // Standard fast delay to ensure responsiveness regardless of time
+    const minDelay = 4000;
+    const maxDelay = 8000;
 
     const targetTotalDelay = Math.floor(Math.random() * (maxDelay - minDelay + 1) + minDelay);
 
     // Calculate how much time has already passed (e.g. AI thinking or 429 retries)
     const elapsedSinceStart = Date.now() - startTime;
 
-    // Remaining time to wait. If AI took 80s (429), remaining is 0.
+    // Remaining time to wait. If AI took 8s, remaining is 0.
     const remainingDelay = Math.max(0, targetTotalDelay - elapsedSinceStart);
 
-    const modeLabel = isDeepNight() ? 'NOCHE' : (!isBusinessHours() ? 'FUERA-HORARIO' : 'NORMAL');
-    console.log(`[DELAY-${modeLabel}] AI took ${elapsedSinceStart / 1000}s. Waiting ${remainingDelay / 1000}s more (Target: ${targetTotalDelay / 1000}s)`);
+    console.log(`[DELAY] AI took ${elapsedSinceStart / 1000}s. Waiting ${remainingDelay / 1000}s more (Target: ${targetTotalDelay / 1000}s)`);
 
     // Log and emit immediately (for dashboard)
     logAndEmit(chatId, 'bot', content, userState[chatId]?.step);
@@ -631,7 +624,7 @@ client.on('message', async msg => {
                     logAndEmit(userId, 'user', `MEDIA_AUDIO:${audioUrl}|TRANSCRIPTION:${transcription}`, userState[userId]?.step || 'new');
                     const startTime = Date.now();
                     await processSalesFlow(userId, transcription, userState, knowledge, {
-                        client, notifyAdmin, saveState, sendMessageWithDelay: (id, text) => sendMessageWithDelay(id, text, startTime), logAndEmit, saveOrderToLocal, sharedState
+                        client, notifyAdmin, saveState, sendMessageWithDelay: (id, text) => sendMessageWithDelay(id, text, startTime), logAndEmit, saveOrderToLocal, sharedState, config
                     });
                 } else {
                     logAndEmit(userId, 'user', `MEDIA_AUDIO:${audioUrl}`, userState[userId]?.step || 'new');
@@ -699,7 +692,7 @@ async function _processDebounced(userId) {
         await processSalesFlow(userId, combinedText, userState, knowledge, {
             client, notifyAdmin, saveState,
             sendMessageWithDelay: (id, text) => sendMessageWithDelay(id, text, startTime),
-            logAndEmit, saveOrderToLocal, sharedState
+            logAndEmit, saveOrderToLocal, sharedState, config
         });
     } catch (err) {
         console.error(`🔴[DEBOUNCE HANDLER ERROR] ${err.message}`);
