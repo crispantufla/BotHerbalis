@@ -93,7 +93,7 @@
                 "bueno",
                 "ok"
             ],
-            "response": "¡Excelente decisión! 🎉\n\nChe, voy a *separar tu stock* ahora mismo así me aseguro que salga en el próximo despacho directo a tu casa.\n\nPasame por favor tus datos para armar la etiqueta:\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(Fijate que la dirección sea exacta 🙏)",
+            "response": "¡Excelente decisión! 🎉\n\nChe, voy a *separar tu stock* ahora mismo así me aseguro que salga en el próximo despacho directo a tu casa.\n\nPara empezar a armar la etiqueta, ¿Me pasás tu *Nombre y Apellido* y la *Calle y Número* de tu casa? 👇",
             "nextStep": "waiting_data"
         },
         "data_request": {

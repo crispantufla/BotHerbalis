@@ -95,7 +95,7 @@
                 "bueno",
                 "ok"
             ],
-            "response": "Perfecto 👍\n\nTomamos los datos para el envío 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(La dirección debe ser exacta, sin esquinas ni \"aprox\")",
+            "response": "Perfecto 👍\n\nPara armar la etiqueta del envío por favor pasame:\n* Nombre y Apellido\n* Dirección (Calle y Número)",
             "nextStep": "waiting_data"
         },
         "data_request": {
@@ -109,7 +109,7 @@
                 "de una",
                 "esta bien"
             ],
-            "response": "Tomamos los datos para el envío 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(La dirección debe ser exacta, sin esquinas ni \"aprox\")",
+            "response": "Para armar la etiqueta del envío por favor pasame:\n* Nombre y Apellido\n* Dirección (Calle y Número)",
             "nextStep": "waiting_data"
         },
         "confirmation": {

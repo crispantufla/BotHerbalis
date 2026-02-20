@@ -1121,7 +1121,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 console.log(`[AI-FALLBACK] waiting_data: Detected question/objection from ${userId}: "${text}"`);
                 const aiData = await aiService.chat(text, {
                     step: 'waiting_data',
-                    goal: 'El usuario está dudando, tiene una pregunta (ej. sobre precio o envío) o quiere postergar la compra. RESPUESTAS CORTAS Y DIRECTAS. ESTRATEGIA: 1) Si pregunta precio o duda, respondéle amable y con empatía (tono Argentino como si chatearas con un amigo). Tras responder, preguntá de forma sutil y MUY breve como "¿Te lo envío entonces?" o "¿Seguimos con tu pedido?". NUNCA preguntes "¿Listo para que me pases tus datos?". 2) Si dice que lo va a pensar, decile "Dale, tomate tu tiempo!". 3) Si es una negativa, aceptala amablemente. ¡Importante! Variá siempre tus palabras, no repitas la misma frase ni seas pesado.',
+                    goal: 'El usuario está dudando, tiene una pregunta (ej. sobre precio o envío) o quiere postergar la compra. RESPUESTAS CORTAS, AMABLES Y SÚPER EMPÁTICAS. ESTRATEGIA: 1) Si pregunta o duda, respondéle amablemente como un humano real que quiere ayudar (tono Argentino cálido). 2) Si dice que lo va a pensar, decile "¡Obvio, tomate tu tiempo! 😊 Cualquier cosa me avisás". 3) Tras responder una duda, preguntá de forma sutil y breve como "Dicho esto, ¿te anoto para enviártelo?" o "¿Querés que arranquemos a armar tu paquete?". NUNCA preguntes "Pasame tus datos completos".',
                     history: currentState.history,
                     summary: currentState.summary,
                     knowledge: knowledge,
@@ -1200,10 +1200,24 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
             const addr = currentState.partialAddress;
             const missing = [];
-            if (!addr.nombre) missing.push('Nombre completo');
-            if (!addr.calle) missing.push('Calle y número');
-            if (!addr.ciudad) missing.push('Ciudad');
-            if (!addr.cp) missing.push('Código postal');
+
+            // Progressive Collection Logic: Don't ask for everything at once.
+            // Tier 1: Name and Street
+            const missingTier1 = [];
+            if (!addr.nombre) missingTier1.push('Nombre y Apellido');
+            if (!addr.calle) missingTier1.push('Dirección (Calle y Número)');
+
+            // Tier 2: City and CP (Only ask if Tier 1 is somewhat complete)
+            const missingTier2 = [];
+            if (!addr.ciudad) missingTier2.push('Localidad/Ciudad');
+            if (!addr.cp) missingTier2.push('Código postal');
+
+            // Determine what to ask for next based on progress
+            if (missingTier1.length > 0) {
+                missing.push(...missingTier1);
+            } else if (missingTier2.length > 0) {
+                missing.push(...missingTier2);
+            }
 
             if (missing.length === 0 || (addr.calle && addr.ciudad && missing.length <= 1)) {
 
@@ -1235,8 +1249,8 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                         break;
                     }
 
-                    // Ask for the missing data instead of showing undefined
-                    const askMsg = `Me falta un dato para completar el envío: *${criticalMissing.join(', ')}*. ¿Me lo pasás? 🙏`;
+                    // Ask for the missing data progressively
+                    const askMsg = `¡Perfecto! Ya tengo la primera parte anotada ✍️\n\nPara terminar la etiqueta me faltaría: *${criticalMissing.join(' y ')}* 🙏`;
                     currentState.history.push({ role: 'bot', content: askMsg, timestamp: Date.now() });
                     await sendMessageWithDelay(userId, askMsg);
                     matched = true;
@@ -1315,13 +1329,13 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 matched = true;
             } else {
                 let msg;
-                if (missing.length === 4) {
-                    // All missing - Randomized intro
+                if ((missingTier1.length === 2 && missingTier2.length === 2) || (missingTier1.length > 0 && !madeProgress)) {
+                    // Start of collection or no progress made on Tier 1
                     const intros = [
-                        `Para prepararte el envío necesito que me pases: Nombre completo, Calle y número, Ciudad y Código postal 😉`,
-                        `¡Dale! Pasame tus datos así te lo voy armando: Nombre y Apellido, Dirección, Ciudad y CP 👇`,
-                        `Confirmame tus datos para el envío por favor: Nombre completo, Calle, Ciudad y Código Postal 📦`,
-                        `Necesito unos datos para enviártelo: Nombre y apellido, tu dirección exacta, Ciudad y Código postal 🙌`
+                        `¿Me pasás tu *Nombre y Apellido* y tú *Dirección* para armar la etiqueta? 😉`,
+                        `¡Dale! Pasame tu *Nombre completo* y la *Calle y Número* de tu casa 👇`,
+                        `Necesito un par de datitos para el envío: *Nombre* y *Dirección* literal (calle y número) 📦`,
+                        `Para prepararte paquete necesito: *Nombre y apellido* y a qué *Dirección* enviarlo 🙌`
                     ];
                     msg = intros[Math.floor(Math.random() * intros.length)];
 
