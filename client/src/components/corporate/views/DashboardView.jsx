@@ -79,7 +79,7 @@ const CorporateDashboardView = ({ alerts, config, handleQuickAction, status, qrD
         if (!ok) return;
         try {
             await api.post('/api/logout');
-            toast.success('Desconectado. Esperá el nuevo QR...');
+            toast.success('Desconectado. Generando nuevo QR...');
         } catch (e) {
             toast.error('Error al desconectar');
         }

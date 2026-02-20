@@ -125,15 +125,26 @@ module.exports = (client, sharedState) => {
         }
     });
 
-    // POST /logout
+    // POST /logout — Disconnect or generate new QR
     router.post('/logout', authMiddleware, async (req, res) => {
         try {
-            console.log('[WHATSAPP] Manual logout requested...');
-            sharedState.manualDisconnect = true;
-            sharedState.isConnected = false;
-            sharedState.qrCodeData = null;
-            if (client && client.info) await client.logout();
-            if (io) io.emit('status_change', { status: 'disconnected' });
+            if (client && client.info && sharedState.isConnected) {
+                // Active session: disconnect first, then reconnect event will trigger QR
+                console.log('[WHATSAPP] Manual logout requested...');
+                sharedState.manualDisconnect = true;
+                sharedState.isConnected = false;
+                sharedState.qrCodeData = null;
+                await client.logout();
+                if (io) io.emit('status_change', { status: 'disconnected' });
+            } else {
+                // No active session: directly initialize to generate QR
+                console.log('[WHATSAPP] No active session — triggering initialize for QR...');
+                sharedState.qrCodeData = null;
+                if (io) io.emit('status_change', { status: 'disconnected' });
+                client.initialize().catch(err => {
+                    console.error('[WHATSAPP] Initialize failed:', err.message);
+                });
+            }
             res.json({ success: true });
         } catch (e) {
             sharedState.manualDisconnect = false;

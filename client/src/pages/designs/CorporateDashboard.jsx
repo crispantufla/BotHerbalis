@@ -48,8 +48,16 @@ const CorporateDashboard = () => {
     useEffect(() => {
         if (socket) {
             socket.on('qr', (data) => { setStatus('scan_qr'); setQrData(data); });
-            socket.on('ready', () => setStatus('ready'));
-            socket.on('status_change', ({ status }) => setStatus(status));
+            socket.on('ready', () => { setStatus('ready'); setQrData(null); });
+            socket.on('status_change', ({ status: newStatus }) => {
+                if (newStatus === 'disconnected') {
+                    // Immediately show QR loading spinner so user gets instant feedback
+                    setStatus('scan_qr');
+                    setQrData(null);
+                } else {
+                    setStatus(newStatus);
+                }
+            });
             socket.on('new_alert', (newAlert) => setAlerts(prev => [newAlert, ...prev]));
             socket.on('alerts_updated', (updated) => setAlerts(updated)); // Listen for updates
         }
