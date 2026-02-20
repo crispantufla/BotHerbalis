@@ -267,17 +267,25 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
     // Init User State if needed
     if (!userState[userId]) {
+        // Auto A/B Testing: Split new users 50/50 between v3 and v4 (if dependencies provide effectiveScript, use as default but prefer specific split initially if desired, or let index pass it)
+        const autoScript = Math.random() < 0.5 ? 'v3' : 'v4';
+        console.log(`[A/B TEST] New user ${userId} assigned to script: ${autoScript}`);
+
         userState[userId] = {
             step: 'greeting',
             lastMessage: null,
             addressAttempts: 0,
             partialAddress: {},
             cart: [], // NEW: Support for multiple items
+            assignedScript: autoScript, // Lock this user to their variant
             history: [],
             stepEnteredAt: Date.now(),
-            lastActivityAt: Date.now()
+            lastActivityAt: Date.now(),
+            lastInteraction: Date.now() // For abandoned cart
         };
         saveState();
+    } else {
+        userState[userId].lastInteraction = Date.now();
     }
     const currentState = userState[userId];
 

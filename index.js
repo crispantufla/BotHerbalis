@@ -689,10 +689,14 @@ async function _processDebounced(userId) {
     console.log(`[DEBOUNCE] Processing ${pending.messages.length} message(s) from ${userId}: "${combinedText}"`);
 
     try {
+        // Enforce the A/B test assigned script, fallback to global activeScript
+        const effectiveScript = userState[userId]?.assignedScript || config.activeScript;
+
         await processSalesFlow(userId, combinedText, userState, knowledge, {
             client, notifyAdmin, saveState,
             sendMessageWithDelay: (id, text) => sendMessageWithDelay(id, text, startTime),
-            logAndEmit, saveOrderToLocal, sharedState, config
+            logAndEmit, saveOrderToLocal, sharedState, config,
+            effectiveScript // Pass down to the flow
         });
     } catch (err) {
         console.error(`🔴[DEBOUNCE HANDLER ERROR] ${err.message}`);

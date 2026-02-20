@@ -21,6 +21,8 @@ const RE_ENGAGEABLE_STEPS = new Set([
 
 const STALE_THRESHOLD_MS = 30 * 60 * 1000;         // 30 minutes
 const COLD_LEAD_THRESHOLD_MS = 24 * 60 * 60 * 1000; // 24 hours
+const ABANDONED_CART_MIN_MS = 24 * 60 * 60 * 1000;  // 24 hours
+const ABANDONED_CART_MAX_MS = 48 * 60 * 60 * 1000;  // 48 hours
 const AUTO_APPROVE_THRESHOLD_MS = 15 * 60 * 1000;   // 15 minutes
 const CHECK_INTERVAL_MS = 10 * 60 * 1000;           // every 10 min
 const CLEANUP_THRESHOLD_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -193,6 +195,41 @@ function checkColdLeads(sharedState, dependencies) {
 }
 
 /**
+ * checkAbandonedCarts 
+ * Specific retargeting for users stuck in the 24-48h window.
+ */
+function checkAbandonedCarts(sharedState, dependencies) {
+    const { userState, pausedUsers } = sharedState;
+    const { sendMessageWithDelay, saveState } = dependencies;
+    const now = Date.now();
+
+    for (const [userId, state] of Object.entries(userState)) {
+        // Only target users actively in the funnel
+        if (!RE_ENGAGEABLE_STEPS.has(state.step)) continue;
+        if (!isBusinessHours()) continue;
+        if (pausedUsers && pausedUsers.has(userId)) continue;
+        if (state.cartRecovered) continue; // Only try to recover once
+
+        // Use lastInteraction (NEW), fallback to lastActivityAt
+        const lastActivity = state.lastInteraction || state.lastActivityAt;
+        if (!lastActivity) continue;
+
+        const elapsed = now - lastActivity;
+        if (elapsed > ABANDONED_CART_MIN_MS && elapsed < ABANDONED_CART_MAX_MS) {
+            console.log(`[SCHEDULER] Abandoned cart detected: ${userId} inactive for >24h on "${state.step}"`);
+
+            const msg = 'Hola, ¿te quedó alguna duda con los planes? Avisame que te guardo la promo con envío gratis.';
+            sendMessageWithDelay(userId, msg);
+
+            state.history = state.history || [];
+            state.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+            state.cartRecovered = true;
+            saveState();
+        }
+    }
+}
+
+/**
  * cleanupOldUsers — Memory leak prevention
  * Removes users inactive for >7 days from userState
  */
@@ -228,6 +265,7 @@ function startScheduler(sharedState, dependencies) {
     setTimeout(() => {
         // checkStaleUsers(sharedState, dependencies); // DISABLED by user request
         checkColdLeads(sharedState, dependencies);
+        checkAbandonedCarts(sharedState, dependencies);
         autoApproveOrders(sharedState, dependencies);
         cleanupOldUsers(sharedState, dependencies);
     }, 5000);
@@ -235,10 +273,11 @@ function startScheduler(sharedState, dependencies) {
     setInterval(() => {
         // checkStaleUsers(sharedState, dependencies); // DISABLED by user request
         checkColdLeads(sharedState, dependencies);
+        checkAbandonedCarts(sharedState, dependencies);
         autoApproveOrders(sharedState, dependencies);
         cleanupOldUsers(sharedState, dependencies);
     }, CHECK_INTERVAL_MS);
 }
 
-module.exports = { startScheduler, checkStaleUsers, checkColdLeads, autoApproveOrders };
+module.exports = { startScheduler, checkStaleUsers, checkColdLeads, checkAbandonedCarts, autoApproveOrders };
 
