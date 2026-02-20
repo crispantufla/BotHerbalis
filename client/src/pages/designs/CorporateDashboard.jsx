@@ -14,6 +14,33 @@ import SettingsView from '../../components/corporate/views/SettingsView';
 import ScriptView from '../../components/corporate/views/ScriptView';
 import GalleryView from '../../components/corporate/views/GalleryView';
 
+// Notification Sound (Web Audio API for reliability)
+const playNotificationSound = () => {
+    try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, ctx.currentTime); // A5
+        osc.frequency.exponentialRampToValueAtTime(1760, ctx.currentTime + 0.1); // A6
+
+        gainNode.gain.setValueAtTime(0, ctx.currentTime);
+        gainNode.gain.linearRampToValueAtTime(0.1, ctx.currentTime + 0.05);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+
+        osc.connect(gainNode);
+        gainNode.connect(ctx.destination);
+
+        osc.start();
+        osc.stop(ctx.currentTime + 0.2);
+    } catch (e) {
+        console.error('Audio playback failed', e);
+    }
+};
+
 // Icons (Simple SVGs for Corporate Look)
 const Icons = {
     Wifi: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" /></svg>,
@@ -37,6 +64,7 @@ const CorporateDashboard = () => {
     const [activeTab, setActiveTab] = useState('dashboard');
     const [qrData, setQrData] = useState(null);
     const [config, setConfig] = useState({ alertNumbers: [] });
+    const [targetChatId, setTargetChatId] = useState(null);
 
     const fetchConfig = useCallback(async () => {
         try {
@@ -58,8 +86,20 @@ const CorporateDashboard = () => {
                     setStatus(newStatus);
                 }
             });
-            socket.on('new_alert', (newAlert) => setAlerts(prev => [newAlert, ...prev]));
+
+            socket.on('new_alert', (newAlert) => {
+                setAlerts(prev => [newAlert, ...prev]);
+                playNotificationSound();
+            });
+
             socket.on('alerts_updated', (updated) => setAlerts(updated)); // Listen for updates
+
+            // Listen for new messages to play sound globally
+            socket.on('new_log', (data) => {
+                if (data && data.sender === 'user') {
+                    playNotificationSound();
+                }
+            });
         }
 
         const loadData = async () => {
@@ -82,9 +122,8 @@ const CorporateDashboard = () => {
 
     const handleQuickAction = async (chatId, action) => {
         if (action === 'chat') {
+            setTargetChatId(chatId);
             setActiveTab('comms');
-            // setTimeout to allow tab switch, then emit event or use context to select chat
-            // For now, just switching tab is the first step. Enhanced implementation requires context.
             return;
         }
 
@@ -106,9 +145,9 @@ const CorporateDashboard = () => {
             case 'dashboard':
                 return <DashboardView alerts={alerts} config={config} handleQuickAction={handleQuickAction} status={status} qrData={qrData} />;
             case 'comms':
-                return <CommsView />;
+                return <CommsView initialChatId={targetChatId} onChatSelected={() => setTargetChatId(null)} />;
             case 'logistics':
-                return <SalesView />;
+                return <SalesView onGoToChat={(chatId) => handleQuickAction(chatId, 'chat')} />;
             case 'script':
                 return <ScriptView />;
             case 'gallery':

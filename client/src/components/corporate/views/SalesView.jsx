@@ -3,7 +3,7 @@ import api from '../../../config/axios';
 import { useToast } from '../../ui/Toast';
 
 
-const SalesView = () => {
+const SalesView = ({ onGoToChat }) => {
     const { toast, confirm } = useToast();
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -199,12 +199,25 @@ const SalesView = () => {
                                             )}
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            <button
-                                                onClick={() => openEdit(order)}
-                                                className="text-blue-600 hover:text-blue-800 transition font-medium text-xs bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded border border-blue-200"
-                                            >
-                                                Editar
-                                            </button>
+                                            <div className="flex justify-end gap-2">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (onGoToChat) onGoToChat(order.cliente);
+                                                    }}
+                                                    className="text-emerald-600 hover:text-emerald-800 transition font-medium text-xs bg-emerald-50 hover:bg-emerald-100 px-3 py-1 rounded border border-emerald-200 flex items-center gap-1"
+                                                    title="Ir al Chat"
+                                                >
+                                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
+                                                    Chat
+                                                </button>
+                                                <button
+                                                    onClick={() => openEdit(order)}
+                                                    className="text-blue-600 hover:text-blue-800 transition font-medium text-xs bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded border border-blue-200"
+                                                >
+                                                    Editar
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))

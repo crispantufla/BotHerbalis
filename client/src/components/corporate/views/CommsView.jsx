@@ -16,7 +16,7 @@ const Icons = {
     Clip: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
 };
 
-const CommsView = () => {
+const CommsView = ({ initialChatId, onChatSelected }) => {
     const { socket } = useSocket();
     const { toast } = useToast();
     const [chats, setChats] = useState([]);
@@ -31,6 +31,9 @@ const CommsView = () => {
     const [summaryText, setSummaryText] = useState(null);
     const [attachment, setAttachment] = useState(null); // { file, preview, base64, mimetype }
     const [sendingMedia, setSendingMedia] = useState(false);
+    const [prices, setPrices] = useState(null);
+    const [activeOrder, setActiveOrder] = useState(null);
+    const [loadingOrder, setLoadingOrder] = useState(false);
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
 
@@ -38,6 +41,20 @@ const CommsView = () => {
     const filteredChats = searchTerm
         ? chats.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()))
         : chats;
+
+    // Handle initial chat selection from parent navigation
+    useEffect(() => {
+        if (initialChatId && chats.length > 0) {
+            const chatToSelect = chats.find(c => c.id === initialChatId);
+            if (chatToSelect) {
+                setSelectedChat(chatToSelect);
+            } else {
+                // If not in the current list, we create a temporary object so it can fetch history
+                setSelectedChat({ id: initialChatId, name: initialChatId });
+            }
+            if (onChatSelected) onChatSelected();
+        }
+    }, [initialChatId, chats, onChatSelected]);
 
     // Load Chats
     useEffect(() => {
@@ -156,20 +173,43 @@ const CommsView = () => {
 
     // Load Script Flow
     useEffect(() => {
-        const fetchScript = async () => {
+        const fetchScriptAndPrices = async () => {
             try {
-                const res = await api.get('/api/script');
-                if (res.data?.flow) setScriptFlow(res.data.flow);
-            } catch (e) { console.error('Failed to load script:', e); }
+                const [scriptRes, pricesRes] = await Promise.all([
+                    api.get('/api/script'),
+                    api.get('/api/prices')
+                ]);
+                if (scriptRes.data?.flow) setScriptFlow(scriptRes.data.flow);
+                if (pricesRes.data) setPrices(pricesRes.data);
+            } catch (e) { console.error('Failed to load script or prices:', e); }
         };
-        fetchScript();
+        fetchScriptAndPrices();
     }, []);
 
-    // Load Messages
+    // Format Message Helper
+    const formatScriptMessage = (text) => {
+        if (!text || !prices) return text;
+
+        let formatted = text;
+        formatted = formatted.replace(/{{PRICE_CAPSULAS_60}}/g, prices['Cápsulas']?.['60'] || '46.900');
+        formatted = formatted.replace(/{{PRICE_CAPSULAS_120}}/g, prices['Cápsulas']?.['120'] || '66.900');
+        formatted = formatted.replace(/{{PRICE_SEMILLAS_60}}/g, prices['Semillas']?.['60'] || '36.900');
+        formatted = formatted.replace(/{{PRICE_SEMILLAS_120}}/g, prices['Semillas']?.['120'] || '49.900');
+        formatted = formatted.replace(/{{PRICE_GOTAS_60}}/g, prices['Gotas']?.['60'] || '48.900');
+        formatted = formatted.replace(/{{PRICE_GOTAS_120}}/g, prices['Gotas']?.['120'] || '68.900');
+        formatted = formatted.replace(/{{ADICIONAL_MAX}}/g, prices.adicionalMAX || '6.000');
+        formatted = formatted.replace(/{{COSTO_LOGISTICO}}/g, prices.costoLogistico || '18.000');
+
+        return formatted;
+    };
+
+    // Load Messages and Active Order
     useEffect(() => {
         if (!selectedChat) return;
         setMessages([]);
         setSummaryText(null);
+        setActiveOrder(null);
+
         const fetchMessages = async () => {
             setLoading(true);
             try {
@@ -181,7 +221,26 @@ const CommsView = () => {
             }
             setLoading(false);
         };
+
+        const fetchOrderInfo = async () => {
+            setLoadingOrder(true);
+            try {
+                const res = await api.get('/api/orders');
+                const orders = res.data || [];
+                orders.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+                const chatOrder = orders.find(o => o.cliente === selectedChat.id);
+                if (chatOrder) {
+                    setActiveOrder(chatOrder);
+                }
+            } catch (e) {
+                console.error("Failed to load order info", e);
+            }
+            setLoadingOrder(false);
+        };
+
         fetchMessages();
+        fetchOrderInfo();
     }, [selectedChat]);
 
     // Scroll to bottom
@@ -221,32 +280,14 @@ const CommsView = () => {
     };
 
     // Send script step
-    const handleSendScriptStep = async (stepKey) => {
+    const handleSendScriptStep = (stepKey) => {
         if (!selectedChat) return;
         const step = scriptFlow[stepKey];
         if (!step?.response) return;
 
-        const text = step.response;
-        // Optimistic add
-        const newMessage = {
-            id: `temp-script-${Date.now()}`,
-            fromMe: true,
-            body: text,
-            type: 'chat',
-            timestamp: Date.now(),
-            pending: true
-        };
-        setMessages(prev => [...prev, newMessage]);
-
-        try {
-            await api.post('/api/send', {
-                chatId: selectedChat.id,
-                message: text
-            });
-            toast.success(`Paso "${stepKey}" enviado`);
-        } catch (e) {
-            toast.error('Error enviando paso del guión');
-        }
+        const text = formatScriptMessage(step.response);
+        setInput(text);
+        toast.info(`Paso "${stepKey}" cargado. Editá si es necesario y enviá.`);
     };
 
     // Toggle Bot Action
@@ -753,6 +794,77 @@ const CommsView = () => {
                     </div>
                 )}
             </div>
+
+            {/* 3. ORDER SUMMARY SIDEBAR */}
+            {selectedChat && (
+                <div className={`w-72 border-l border-slate-200 bg-white flex flex-col transition-all duration-300 ${activeOrder || loadingOrder ? 'translate-x-0' : 'hidden'}`}>
+                    <div className="h-16 border-b border-slate-200 flex items-center px-5 bg-slate-50">
+                        <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                            <Icons.Script /> Info del Cliente
+                        </h3>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
+                        {loadingOrder ? (
+                            <div className="flex flex-col items-center justify-center h-40 text-slate-400 gap-3">
+                                <div className="w-5 h-5 border-2 border-slate-300 border-t-transparent rounded-full animate-spin"></div>
+                                <span className="text-xs">Buscando pedido...</span>
+                            </div>
+                        ) : activeOrder ? (
+                            <div className="space-y-5">
+                                {/* Status Badge */}
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Estado</span>
+                                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${activeOrder.status === 'Confirmado' ? 'bg-blue-50 text-blue-600 border-blue-200' :
+                                            activeOrder.status === 'Enviado' ? 'bg-indigo-50 text-indigo-600 border-indigo-200' :
+                                                activeOrder.status === 'Entregado' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
+                                                    activeOrder.status === 'Cancelado' ? 'bg-rose-50 text-rose-600 border-rose-200' :
+                                                        'bg-amber-50 text-amber-600 border-amber-200'
+                                        }`}>
+                                        {activeOrder.status || 'Pendiente'}
+                                    </span>
+                                </div>
+
+                                {/* Product Info */}
+                                <div className="p-3 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100/50">
+                                    <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-1">Producto</p>
+                                    <p className="font-bold text-slate-800 text-sm">{activeOrder.producto}</p>
+                                    {activeOrder.plan && (
+                                        <p className="text-xs text-slate-500 mt-0.5">Plan {activeOrder.plan}</p>
+                                    )}
+                                </div>
+
+                                {/* Delivery Info */}
+                                <div className="space-y-2.5">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-1.5">Envío a</p>
+                                    <div>
+                                        <p className="text-sm font-semibold text-slate-700">{activeOrder.nombre}</p>
+                                        <p className="text-xs text-slate-500 mt-1">{activeOrder.calle}</p>
+                                        <p className="text-xs text-slate-500">{activeOrder.ciudad} {activeOrder.cp ? `(CP ${activeOrder.cp})` : ''}</p>
+                                        {activeOrder.provincia && <p className="text-xs text-slate-500">{activeOrder.provincia}</p>}
+                                    </div>
+                                    {activeOrder.tracking && (
+                                        <div className="mt-3 p-2.5 bg-slate-50 rounded-lg border border-slate-200">
+                                            <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Tracking Correo</p>
+                                            <p className="font-mono text-xs font-bold text-blue-600 break-all">{activeOrder.tracking}</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Total */}
+                                <div className="pt-4 border-t border-slate-100 flex justify-between items-end">
+                                    <span className="text-xs font-bold text-slate-400 uppercase">Total</span>
+                                    <span className="text-lg font-black text-emerald-600">${activeOrder.precio}</span>
+                                </div>
+
+                                <div className="pt-2 text-[10px] text-center text-slate-400 font-mono">
+                                    Creado: {new Date(activeOrder.createdAt).toLocaleDateString()}
+                                </div>
+                            </div>
+                        ) : null}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
