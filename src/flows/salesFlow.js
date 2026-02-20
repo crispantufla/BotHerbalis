@@ -437,6 +437,31 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
         return { matched: true };
     }
 
+    // NEW: Contextual "Como se toman" interceptor
+    // Avoids explaining all 3 products if the user already selected one
+    const COMO_SE_TOMAN_REGEX = /\b(como se toman|como lo tomo|como se toma|como se usa)\b/i;
+    if (COMO_SE_TOMAN_REGEX.test(normalizedText) && currentState.selectedProduct) {
+        let msg = "";
+        if (currentState.selectedProduct.includes("Cápsulas")) {
+            msg = "💊 **CÁPSULAS:**\nUna al día, media hora antes de tu comida principal (almuerzo o cena, la que sea más abundante o donde tengas más ansiedad), con un vaso de agua.";
+        } else if (currentState.selectedProduct.includes("Gotas")) {
+            msg = "💧 **GOTAS:**\n**Semana 1:** 10 gotas al día, media hora antes de la comida principal con un vaso de agua.\n**Semana 2 en adelante:** Podés tomarlas antes del almuerzo o cena, ajustando según cómo vayas perdiendo peso y ansiedad.";
+        } else {
+            msg = "🌿 **SEMILLAS:**\nPara la primera semana, partís una nuez en 8 pedacitos. Las demás van a ser en 4.\nCada noche hervís un pedacito 5 minutos. Cuando se enfría, te tomás el agua junto con el pedacito antes de dormir. (No tiene gusto a nada)";
+        }
+
+        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        await sendMessageWithDelay(userId, msg);
+
+        // Redirect logic
+        const redirect = _getStepRedirect(currentState.step, currentState);
+        if (redirect) {
+            currentState.history.push({ role: 'bot', content: redirect, timestamp: Date.now() });
+            await sendMessageWithDelay(userId, redirect);
+        }
+        return { matched: true };
+    }
+
     // NEW: Global Photo Request Handler
     // Matches: "foto", "fotos", "imagen", "imagenes", "ver producto", "tenes fotos"
     const PHOTOS_REGEX = /\b(foto|fotos|imagen|imagenes|ver\s*producto|ver\s*fotos)\b/i;
@@ -889,7 +914,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
                 const planAI = await aiService.chat(text, {
                     step: 'waiting_plan_choice',
-                    goal: `El usuario debe elegir Plan 60 o Plan 120 días. ESTRATEGIA DE VENTA (IMPORTANTE): El Plan 60 días tiene un recargo de "Contra Reembolso MAX" ($6.000 extra). El Plan 120 días NO tiene este recargo. USÁ ESTO A TU FAVOR: Si el usuario duda o elige 60, decile: "${selectedUpsell}". Si elige 120, felicitalo por la elección inteligente. Si cambia producto, confirma cambio y precios.`,
+                    goal: `El usuario debe elegir Plan 60 o Plan 120 días. CRÍTICO: goalMet=true SOLO si el usuario escribe explícitamente "60" o "120". Si pregunta algo distinto (ej: "cómo las consigo", "para mi hija"), goalMet=false, respondé su duda adaptando los pronombres si compra para otra persona (ej: "para ella") y volvé a preguntar: "¿Avanzamos con 60 o 120 días?". ESTRATEGIA (Si duda entre planes): El Plan 60 días tiene un recargo Contra Reembolso ($6.000 extra). El de 120 NO tiene recargo. Decile: "${selectedUpsell}".`,
                     history: currentState.history,
                     summary: currentState.summary,
                     knowledge: knowledge,
@@ -905,25 +930,37 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 }
 
                 if (planAI.goalMet && planAI.extractedData && !planAI.extractedData.startsWith('CHANGE_PRODUCT:')) {
-                    // AI detected a plan choice
-                    const plan = planAI.extractedData.includes('120') ? '120' : '60';
-                    const product = currentState.selectedProduct || "Nuez de la India";
-                    // SAVE STATE for placeholders
-                    currentState.selectedPlan = plan;
-                    currentState.selectedProduct = product;
+                    const extractedStr = String(planAI.extractedData);
+                    // Ultra strict validation to prevent bypassing the plan choice
+                    if (extractedStr.includes('120') || extractedStr.includes('60')) {
+                        // AI detected a valid plan choice
+                        const plan = extractedStr.includes('120') ? '120' : '60';
+                        const product = currentState.selectedProduct || "Nuez de la India";
 
-                    currentState.cart = [{
-                        product: product,
-                        plan: plan,
-                        price: _getPrice(product, plan)
-                    }];
+                        currentState.selectedPlan = plan;
+                        currentState.selectedProduct = product;
 
-                    const closingNode = knowledge.flow.closing;
-                    _setStep(currentState, closingNode.nextStep);
-                    currentState.history.push({ role: 'bot', content: closingNode.response, timestamp: Date.now() });
-                    saveState();
-                    await sendMessageWithDelay(userId, closingNode.response);
-                    matched = true;
+                        currentState.cart = [{
+                            product: product,
+                            plan: plan,
+                            price: _getPrice(product, plan)
+                        }];
+
+                        const closingNode = knowledge.flow.closing;
+                        _setStep(currentState, closingNode.nextStep);
+                        currentState.history.push({ role: 'bot', content: closingNode.response, timestamp: Date.now() });
+                        saveState();
+                        await sendMessageWithDelay(userId, closingNode.response);
+                        matched = true;
+                    } else {
+                        // AI incorrectly marked goalMet=true without getting a plan number
+                        console.warn(`[AI-SAFEGUARD] waiting_plan_choice: AI returned goalMet=true but no 60/120 in extractedData (${extractedStr}). Downgrading to false.`);
+                        if (planAI.response) {
+                            currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });
+                            await sendMessageWithDelay(userId, planAI.response);
+                            matched = true;
+                        }
+                    }
                 } else if (planAI.response) {
                     currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });
                     await sendMessageWithDelay(userId, planAI.response);
