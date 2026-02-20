@@ -5,7 +5,8 @@ const path = require('path');
 // --- CONFIGURATION ---
 const MODEL = "gpt-4o-mini";
 const MAX_RETRIES = 5;
-const MAX_HISTORY_LENGTH = 15;
+const MAX_TOKENS = 600; // Increased output token limit slightly just in case
+const MAX_HISTORY_LENGTH = 50;
 
 // --- RATE LIMIT CONFIGURATION ---
 const MAX_CONCURRENT = 3;
@@ -331,16 +332,16 @@ class AIService {
      * Main Chat Function
      */
     async chat(userText, context) {
-        // Build dynamic history (last 20 messages for context)
-        const conversationHistory = (context.history || []).slice(-20);
+        // Build dynamic history (last 50 messages for context)
+        let conversationHistory = (context.history || []).slice(-50);
         let summaryContext = "";
 
         if (context.summary) {
             summaryContext = `RESUMEN PREVIO:\n"${context.summary}"\n\n`;
         }
         // Always cap history to keep prompt lean (regardless of summary)
-        if (conversationHistory.length > 10) {
-            conversationHistory = conversationHistory.slice(-10);
+        if (conversationHistory.length > 50) {
+            conversationHistory = conversationHistory.slice(-50);
         }
 
         let knowledgeContext = "";
@@ -456,14 +457,28 @@ INSTRUCCIONES:
      * Check if history needs summarization
      */
     async checkAndSummarize(history) {
-        if (history.length > MAX_HISTORY_LENGTH) {
-            console.log(`[AI] Summarizing history (${history.length} messages)...`);
+        if (!history || history.length <= 50) return null;
+
+        const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+        const now = Date.now();
+
+        // Find how many messages are within the last 3 days
+        const recentMessages = history.filter(msg => {
+            if (!msg.timestamp) return false;
+            return (now - msg.timestamp) <= THREE_DAYS_MS;
+        });
+
+        const messagesToKeepCount = Math.max(50, recentMessages.length);
+
+        // Only summarize if history exceeds the target bounds
+        if (history.length > messagesToKeepCount) {
+            console.log(`[AI] Summarizing history (${history.length} messages down to ${messagesToKeepCount})...`);
             const summary = await this._callQueuedSummarize(history);
             if (summary) {
                 console.log(`[AI] Summary created: "${summary.substring(0, 50)}..."`);
                 return {
                     summary: summary,
-                    prunedHistory: history.slice(-5)
+                    prunedHistory: history.slice(-messagesToKeepCount)
                 };
             }
         }
