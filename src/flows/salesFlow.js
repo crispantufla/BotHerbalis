@@ -651,11 +651,12 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 // Use AI to give a consultative answer based on specific rules
                 const aiRecommendation = await aiService.chat(text, {
                     step: 'waiting_preference_consultation',
-                    goal: `El usuario está indeciso entre productos. REGLAS DE RECOMENDACIÓN (CRÍTICO):
-                    1) Si duda entre GOTAS o cualquier otra cosa: Las GOTAS son ideales para MAYORES DE 70 AÑOS o para bajar MENOS DE 10 KG (son más suaves). Si no cumple eso, recomendar la otra opción.
-                    2) Si duda entre CÁPSULAS o cualquier otra cosa: Las CÁPSULAS son SIEMPRE la opción recomendada por EFICIENCIA (aíslan los componentes activos).
+                    goal: `El usuario está indeciso entre productos o pide recomendaciones. REGLAS DE RECOMENDACIÓN (CRÍTICO):
+                    1) Si duda entre GOTAS o cualquier otra cosa: Las GOTAS son ideales para MAYORES DE 70 AÑOS o para bajar MENOS DE 10 KG. Si no cumple eso, recomendar CÁPSULAS.
+                    2) Si dice "antes tomaba semillas" o similar, felicitalo pero RECOMENDÁ CÁPSULAS para un efecto más rápido ahora.
+                    3) Si pide "lo más efectivo", "lo mejor", "lo más rápido": RECOMENDÁ CÁPSULAS SIEMPRE.
                     
-                    Respondé ayudando a decidir con estas reglas y luego PREGUNTÁ: "¿Con cuál te gustaría avanzar?"`,
+                    Respondé ayudando a decidir con estas reglas y luego PREGUNTÁ: "¿Te gustaría avanzar con las cápsulas?"`,
                     history: currentState.history,
                     summary: currentState.summary,
                     knowledge: knowledge,
@@ -705,7 +706,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 console.log(`[AI-FALLBACK] waiting_preference: No keyword match for ${userId}`);
                 const aiPref = await aiService.chat(text, {
                     step: 'waiting_preference',
-                    goal: 'Determinar si quiere cápsulas/gotas (opción práctica), semillas (opción natural) o AMBAS. REGLAS: Si pregunta recomendaciones: Gotas para >70 años o <10kg. Cápsulas por mayor eficiencia. Si elige, confirmá.',
+                    goal: 'Determinar si quiere cápsulas/gotas (opción práctica), semillas (opción natural) o AMBAS. REGLAS CRÍTICAS: Si habla en PASADO ("yo tomaba", "antes usé"), NO está eligiendo ahora; sugerile las CÁPSULAS. Si pide "lo más efectivo/rápido", sugerile CÁPSULAS. Si ya eligió claramente un producto para AHORA, confirmá.',
                     history: currentState.history,
                     summary: currentState.summary,
                     knowledge: knowledge,
@@ -1066,7 +1067,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 || /\b(voy a|dejam[eo])\s+(pasar|pensar|ver)\b/i.test(normalizedText);
 
             const isDataQuestion = text.includes('?')
-                || /\b(pregunte|no quiero|no acepto|no acepte|como|donde|por que|para que)\b/i.test(normalizedText)
+                || /\b(pregunte|no quiero|no acepto|no acepte|como|donde|por que|para que|cuanto|cuánto|precio|costo|sale|cuesta|valor)\b/i.test(normalizedText)
                 || isHesitation;
             // NOTE: 'quiero' was removed from isDataQuestion — it caused a loop where
             // 'quiero [non-product]' bypassed address parsing AND never advanced the flow.
@@ -1076,7 +1077,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 console.log(`[AI-FALLBACK] waiting_data: Detected question/objection from ${userId}: "${text}"`);
                 const aiData = await aiService.chat(text, {
                     step: 'waiting_data',
-                    goal: 'El usuario está dudando, tiene una pregunta o quiere postergar la compra ("lo voy a pensar"). ESTRATEGIA: 1) Si dice que lo va a pensar, validá su decisión y decile algo como "Dale, tomate tu tiempo! Cualquier duda estoy acá". NO insistas en pedir datos ya. 2) Si es una duda, responé con tono natural y amable (Argentino), sin ser robot. 3) Si es una negativa, aceptala amablemente.',
+                    goal: 'El usuario está dudando, tiene una pregunta (ej. sobre precio o envío) o quiere postergar la compra. RESPUESTAS CORTAS Y DIRECTAS. ESTRATEGIA: 1) Si pregunta precio o duda, respondéle amable y con empatía (tono Argentino como si chatearas con un amigo). Tras responder, preguntá de forma sutil y MUY breve como "¿Te lo envío entonces?" o "¿Seguimos con tu pedido?". NUNCA preguntes "¿Listo para que me pases tus datos?". 2) Si dice que lo va a pensar, decile "Dale, tomate tu tiempo!". 3) Si es una negativa, aceptala amablemente. ¡Importante! Variá siempre tus palabras, no repitas la misma frase ni seas pesado.',
                     history: currentState.history,
                     summary: currentState.summary,
                     knowledge: knowledge,
@@ -1085,6 +1086,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 if (aiData.response && !_isDuplicate(aiData.response, currentState.history)) {
                     await sendMessageWithDelay(userId, aiData.response);
                     currentState.history.push({ role: 'bot', content: aiData.response });
+                    saveState();
                     matched = true;
                 } else if (aiData.response) {
                     // AI generated a duplicate — skip silently, don't spam
@@ -1245,17 +1247,17 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 if (missing.length === 4) {
                     // All missing - Randomized intro
                     const intros = [
-                        `Para prepararte el envío necesito que me pases: Nombre completo, Calle y número, Ciudad y Código postal.`,
-                        `¡Genial! Pasame tus datos así te lo armo: Nombre, Dirección, Ciudad y CP.`,
-                        `Confirmame tus datos de envío: Nombre completo, Calle, Ciudad y Código Postal, por favor.`
+                        `Para prepararte el envío necesito que me pases: Nombre completo, Calle y número, Ciudad y Código postal 😉`,
+                        `¡Dale! Pasame tus datos así te lo voy armando: Nombre y Apellido, Dirección, Ciudad y CP 👇`,
+                        `Confirmame tus datos para el envío por favor: Nombre completo, Calle, Ciudad y Código Postal 📦`,
+                        `Necesito unos datos para enviártelo: Nombre y apellido, tu dirección exacta, Ciudad y Código postal 🙌`
                     ];
                     msg = intros[Math.floor(Math.random() * intros.length)];
 
                     // Check for repetition
-                    if (currentState.lastAddressMsg === msg) {
-                        // If same as last, pick the next one (cyclic)
-                        const idx = (intros.indexOf(currentState.lastAddressMsg) + 1) % intros.length;
-                        msg = intros[idx];
+                    if (currentState.lastAddressMsg === msg || (intros.indexOf(currentState.lastAddressMsg) !== -1)) {
+                        const currentIdx = Math.max(0, intros.indexOf(currentState.lastAddressMsg));
+                        msg = intros[(currentIdx + 1) % intros.length];
                     }
 
                 } else if (madeProgress) {
@@ -1267,9 +1269,24 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     ];
                     msg = acks[Math.floor(Math.random() * acks.length)];
 
+                    if (currentState.lastAddressMsg === msg || (acks.indexOf(currentState.lastAddressMsg) !== -1)) {
+                        const currentIdx = Math.max(0, acks.indexOf(currentState.lastAddressMsg));
+                        msg = acks[(currentIdx + 1) % acks.length];
+                    }
+
                 } else if (currentState.addressAttempts > 2) {
                     // Getting frustrated? shorter
-                    msg = `Me falta: *${missing.join(', ')}*. ¿Me lo pasás? 🙏`;
+                    const frustrated = [
+                        `Me falta: *${missing.join(', ')}*. ¿Me lo pasás? 🙏`,
+                        `Aún necesito: *${missing.join(', ')}* para avanzar con tu envío.`,
+                        `Solo me falta que me pases: *${missing.join(', ')}* 😅`
+                    ];
+                    msg = frustrated[Math.floor(Math.random() * frustrated.length)];
+
+                    if (currentState.lastAddressMsg === msg || (frustrated.indexOf(currentState.lastAddressMsg) !== -1)) {
+                        const currentIdx = Math.max(0, frustrated.indexOf(currentState.lastAddressMsg));
+                        msg = frustrated[(currentIdx + 1) % frustrated.length];
+                    }
                 } else {
                     const shorts = [
                         `Gracias! Ya tengo algunos datos. Solo me falta: *${missing.join(', ')}*. ¿Me los pasás?`,
@@ -1277,11 +1294,17 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                         `Solo me estaría faltando: *${missing.join(', ')}*.`
                     ];
                     msg = shorts[Math.floor(Math.random() * shorts.length)];
+
+                    if (currentState.lastAddressMsg === msg || (shorts.indexOf(currentState.lastAddressMsg) !== -1)) {
+                        const currentIdx = Math.max(0, shorts.indexOf(currentState.lastAddressMsg));
+                        msg = shorts[(currentIdx + 1) % shorts.length];
+                    }
                 }
 
                 await sendMessageWithDelay(userId, msg);
                 currentState.lastAddressMsg = msg; // Track last msg to avoid repeat
                 currentState.history.push({ role: 'bot', content: msg });
+                saveState();
                 matched = true;
             }
             break;
