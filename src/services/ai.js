@@ -713,9 +713,61 @@ INSTRUCCIONES:
     }
 
     /**
-     * Generate Audio — Uses OpenAI TTS
+     * Generate Audio — Uses ElevenLabs TTS
      */
     async generateAudio(text) {
+        const apiKey = process.env.ELEVENLABS_API_KEY;
+        // Default voice: "Bella" (female proxy). The user should ideally pick an Argentine voice ID.
+        const voiceId = process.env.ELEVENLABS_VOICE_ID || "EXAVITQu4vr4xnSDxMaL";
+
+        if (!apiKey) {
+            console.warn("⚠️ [AI] ELEVENLABS_API_KEY is not set. Falling back to OpenAI TTS.");
+            return this._generateAudioOpenAI(text);
+        }
+
+        try {
+            console.log(`[AI] Generating TTS using ElevenLabs (Voice: ${voiceId})...`);
+
+            const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`;
+            const options = {
+                method: 'POST',
+                headers: {
+                    'xi-api-key': apiKey,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    text: text,
+                    model_id: "eleven_multilingual_v2", // Multilingual v2 is much better for Spanish/Argentine accents
+                    // Optional voice settings to make it sound more natural and less expressive/robotic
+                    voice_settings: {
+                        stability: 0.5,
+                        similarity_boost: 0.75
+                    }
+                })
+            };
+
+            const response = await fetch(url, options);
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`ElevenLabs API error: ${response.status} - ${errorText}`);
+            }
+
+            const arrayBuffer = await response.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+            return buffer.toString('base64');
+
+        } catch (e) {
+            console.error("🔴 [AI] ElevenLabs TTS Error:", e.message);
+            console.warn("⚠️ Falling back to OpenAI TTS...");
+            return this._generateAudioOpenAI(text);
+        }
+    }
+
+    /**
+     * Fallback to OpenAI TTS if ElevenLabs fails or is not configured
+     */
+    async _generateAudioOpenAI(text) {
         try {
             const mp3 = await this._callQueued(
                 () => this.client.audio.speech.create({
@@ -728,7 +780,7 @@ INSTRUCCIONES:
             const buffer = Buffer.from(await mp3.arrayBuffer());
             return buffer.toString('base64');
         } catch (e) {
-            console.error("🔴 [AI] TTS Error:", e.message);
+            console.error("🔴 [AI] OpenAI TTS Error:", e.message);
             return null;
         }
     }
