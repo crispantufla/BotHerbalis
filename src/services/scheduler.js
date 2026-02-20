@@ -25,10 +25,36 @@ const AUTO_APPROVE_THRESHOLD_MS = 15 * 60 * 1000;   // 15 minutes
 const CHECK_INTERVAL_MS = 10 * 60 * 1000;           // every 10 min
 const CLEANUP_THRESHOLD_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
-const FOLLOW_UP_MESSAGES = [
+const CONTEXTUAL_FOLLOW_UPS = {
+    'waiting_weight': [
+        '¡Hola! 😊 Quedó pendiente saber cuántos kilos te gustaría bajar para recomendarte lo mejor. ¿Estás por ahí?',
+        '¡Hola! Vi que consultaste. Seguimos acá para ayudarte. ¿Cuántos kilos buscás bajar más o menos?'
+    ],
+    'waiting_preference': [
+        '¡Hola! 😊 ¿Pudiste pensar con cuál preferís arrancar, cápsulas o semillas? Acordate que el envío es gratis.',
+        'Hola 👋 Vi que estabas viendo las opciones. Cualquier duda que tengas sobre cuál es mejor para vos, decime y te ayudo.'
+    ],
+    'waiting_price_confirmation': [
+        '¡Hola! 😊 Quedaste a un pasito de ver los precios. ¿Querés que te los pase así los vas mirando?',
+        'Hola 👋 Si querés te paso los precios sin compromiso para que los tengas. ¿Te los mando?'
+    ],
+    'waiting_plan_choice': [
+        '¡Hola! 😊 ¿Pudiste revisar los tratamientos? Avisame si querés arrancar con el de 60 o el de 120 días.',
+        'Hola 👋 Te escribo cortito por si te quedó alguna duda con los planes. ¿Con cuál te gustaría avanzar?'
+    ],
+    'waiting_ok': [
+        '¡Hola! 😊 Tengo anotado tu producto pero me faltó tu confirmación para armar el pedido. ¿Avanzamos?',
+        'Hola 👋 ¿Todo bien? Avisame si confirmamos tu pedido de Herbalis así ya te lo preparamos 📦'
+    ],
+    'waiting_data': [
+        '¡Hola! 😊 Solo me faltaban tus datitos de envío (nombre, dirección, ciudad, CP) para prepararte el paquete. ¿Me los pasás?',
+        'Hola 👋 Vi que nos faltó completar los datos para el envío gratis. Cuando tengas un segundito pasamelos así ya te lo despacho 📦'
+    ]
+};
+
+const GENERIC_FOLLOW_UPS = [
     '¡Hola! 😊 Quedó algo pendiente de tu consulta. ¿Querés que te ayude a terminar?',
-    '¡Hola! Vi que quedaste a medio camino. ¿Te puedo ayudar con algo? 😊',
-    'Hola 👋 Pasaron unas horas desde tu última consulta. Si te interesa seguir, acá estamos.'
+    '¡Hola! Vi que quedaste a medio camino. ¿Te puedo ayudar con algo? 😊'
 ];
 
 /**
@@ -148,8 +174,14 @@ function checkColdLeads(sharedState, dependencies) {
             const hours = Math.round(elapsed / 3600000);
             console.log(`[SCHEDULER] Cold lead detected: ${userId} inactive for ${hours}h on "${state.step}"`);
 
-            // Pick a random follow-up
-            const msg = FOLLOW_UP_MESSAGES[Math.floor(Math.random() * FOLLOW_UP_MESSAGES.length)];
+            // Select contextual message
+            let msg = '';
+            const stepMessages = CONTEXTUAL_FOLLOW_UPS[state.step];
+            if (stepMessages && stepMessages.length > 0) {
+                msg = stepMessages[Math.floor(Math.random() * stepMessages.length)];
+            } else {
+                msg = GENERIC_FOLLOW_UPS[Math.floor(Math.random() * GENERIC_FOLLOW_UPS.length)];
+            }
 
             sendMessageWithDelay(userId, msg);
             state.history = state.history || [];

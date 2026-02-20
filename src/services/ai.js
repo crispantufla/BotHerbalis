@@ -144,6 +144,7 @@ REGLAS ESTRICTAS:
 11. NO discutas con el cliente.
 12. CONTEXTO DE PREGUNTAS ("y las gotas?"): Si el usuario pregunta "y las gotas?" o "y las semillas?" después de que hablaste de CÓMO SE TOMAN, respondé con CÓMO SE TOMAN las gotas/semillas. Si hablaste de PRECIOS, respondé con PRECIOS. Mantené el tema de la conversación.
 13. PRECISIÓN DE RESPUESTA: Si preguntan CÓMO SE TOMA UN PRODUCTO, respondé SOLO SOBRE ESE PRODUCTO. No expliques los 3.
+14. EXTRACCIÓN DE PERFIL (CRÍTICO): Si el usuario menciona una edad, peso inicial, objetivo de peso, patología médica (ej: diabetes, tiroides, gastritis, hipertensión) o cualquier dato relevante sobre su salud/estatus, DEBÉS extraerlo en el campo \`extractedData\` usando el prefijo \`PROFILE: \` seguido del dato. Ejemplo: \`PROFILE: 45 años, hipotiroidismo, busca bajar 15kg\`. Esto es vital para no olvidar su condición médica.
 
 REGLAS DE EMPATÍA Y CONTENCIÓN:
 14. Si el usuario comparte algo EMOCIONAL o PERSONAL (burlas, salud, autoestima), NO uses frases cliché como "Entiendo, eso es difícil". Usá variaciones como:
@@ -329,8 +330,9 @@ class AIService {
     /**
      * Main Chat Function
      */
-    async chat(userText, context = {}) {
-        let conversationHistory = context.history || [];
+    async chat(userText, context) {
+        // Build dynamic history (last 20 messages for context)
+        const conversationHistory = (context.history || []).slice(-20);
         let summaryContext = "";
 
         if (context.summary) {
@@ -395,6 +397,9 @@ class AIService {
                 const a = s.partialAddress;
                 stateContext += `- Datos parciales: ${a.nombre || '?'}, ${a.calle || '?'}, ${a.ciudad || '?'}, CP ${a.cp || '?'}\n`;
             }
+        }
+        if (context.userState && context.userState.profile) {
+            stateContext += `- PERFIL MÉDICO/PERSONAL: ${context.userState.profile}\n`;
         }
         if (stateContext) {
             stateContext = `\nESTADO DEL CLIENTE:\n${stateContext}`;

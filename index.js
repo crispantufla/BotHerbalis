@@ -72,19 +72,23 @@ function saveKnowledge() {
     }
 }
 
+let _saveStateTimeout = null;
 function saveState() {
-    try {
-        const stateToSave = {
-            userState,
-            chatResets,
-            lastAlertUser,
-            pausedUsers: Array.from(pausedUsers),
-            config
-        };
-        atomicWriteFile(STATE_FILE, JSON.stringify(stateToSave, null, 2));
-    } catch (e) {
-        console.error('ðŸ”´ Error saving state:', e.message);
-    }
+    if (_saveStateTimeout) clearTimeout(_saveStateTimeout);
+    _saveStateTimeout = setTimeout(() => {
+        try {
+            const stateToSave = {
+                userState,
+                chatResets,
+                lastAlertUser,
+                pausedUsers: Array.from(pausedUsers),
+                config
+            };
+            atomicWriteFile(STATE_FILE, JSON.stringify(stateToSave, null, 2));
+        } catch (e) {
+            console.error('🔴 Error saving state:', e.message);
+        }
+    }, 3000); // 3-second debounce to batch multiple concurrent updates
 }
 
 function loadState() {
@@ -502,7 +506,7 @@ client.on('disconnected', (reason) => {
         console.log('[WA] Sesión cerrada desde el teléfono. Se necesita nuevo QR.');
         reconnectAttempts = 0;
         setTimeout(() => {
-            client.initialize().catch(err => console.error('[WA] Re-init failed:', err.message));
+            safeInitialize().catch(err => console.error('[WA] Re-init failed:', err.message));
         }, 3000);
         return;
     }
@@ -512,7 +516,7 @@ client.on('disconnected', (reason) => {
         sharedState.manualDisconnect = false;
         reconnectAttempts = 0;
         setTimeout(() => {
-            client.initialize().catch(err => console.error('[WA] Re-init failed:', err.message));
+            safeInitialize().catch(err => console.error('[WA] Re-init failed:', err.message));
         }, 3000);
         return;
     }

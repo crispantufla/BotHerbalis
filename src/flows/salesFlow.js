@@ -303,6 +303,24 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
         return { matched: true };
     }
 
+    // Helper: Save extracted data locally if needed
+    function _handleExtractedData(userId, extractedData, currentState) {
+        if (!extractedData || extractedData === 'null') return;
+        console.log(`[DATA EXTRACTION] User ${userId}: ${extractedData}`);
+
+        if (extractedData.startsWith('PROFILE:')) {
+            const profileData = extractedData.replace('PROFILE:', '').trim();
+            currentState.profile = currentState.profile ? `${currentState.profile} | ${profileData}` : profileData;
+            console.log(`[PROFILE SAVED] ${currentState.profile}`);
+        } else if (extractedData === 'CHANGE_ORDER') { //Logic
+            currentState.cart = [];
+            currentState.pendingOrder = null;
+            currentState.partialAddress = {};
+            currentState.selectedProduct = null;
+            currentState.selectedPlan = null;
+        }
+    }
+
     // Only allow change if not in greeting (useless) and not complete
     // EXCEPTION: waiting_data handles changes locally to preserve data (weightGoal)
     if (CHANGE_REGEX.test(normalizedText) && currentState.step !== 'greeting' && currentState.step !== 'waiting_data' && !isNegative) {
@@ -596,7 +614,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     // USER REFUSED or FAILED TWICE -> SKIP TO PRODUCTS
                     console.log(`[LOGIC] User ${userId} refused/failed weight question. Skipping to preference.`);
 
-                    const skipMsg = "¡Entiendo, no hay problema! 👌 Pasemos directo a ver qué opción es mejor para vos.\n\nTenemos:\n1️⃣ Cápsulas (Súper práctico)\n2️⃣ Semillas/Infusión (Más natural)\n3️⃣ Gotas (Prácticas y discretas)\n\n¿Cuál te gustaría probar?";
+                    const skipMsg = "¡Entiendo, no hay problema! 👌 Pasemos directo a ver qué opción es mejor para vos.\n\nTenemos:\n1️⃣ Cápsulas (Lo más efectivo y práctico)\n2️⃣ Semillas/Infusión (Más natural)\n3️⃣ Gotas (Para >70 años o poquitos kilos)\n\n¿Cuál te gustaría probar?";
                     await sendMessageWithDelay(userId, skipMsg);
 
                     _setStep(currentState, 'waiting_preference'); // Manually set next step
@@ -652,7 +670,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 const aiRecommendation = await aiService.chat(text, {
                     step: 'waiting_preference_consultation',
                     goal: `El usuario está indeciso entre productos o pide recomendaciones. REGLAS DE RECOMENDACIÓN (CRÍTICO):
-                    1) Si duda entre GOTAS o cualquier otra cosa: Las GOTAS son ideales para MAYORES DE 70 AÑOS o para bajar MENOS DE 10 KG. Si no cumple eso, recomendar CÁPSULAS.
+                    1) Si duda o insiste entre GOTAS y CÁPSULAS: Decile "las gotas las recomendamos para cuando son menos de 10kg y tienen más de 70 años, por lo suaves que son. Para vos te recomiendo las cápsulas que son más efectivas". ¡Ofrecé SIEMPRE las cápsulas como la mejor opción!
                     2) Si dice "antes tomaba semillas" o similar, felicitalo pero RECOMENDÁ CÁPSULAS para un efecto más rápido ahora.
                     3) Si pide "lo más efectivo", "lo mejor", "lo más rápido": RECOMENDÁ CÁPSULAS SIEMPRE.
                     
@@ -706,7 +724,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 console.log(`[AI-FALLBACK] waiting_preference: No keyword match for ${userId}`);
                 const aiPref = await aiService.chat(text, {
                     step: 'waiting_preference',
-                    goal: 'Determinar si quiere cápsulas/gotas (opción práctica), semillas (opción natural) o AMBAS. REGLAS CRÍTICAS: Si habla en PASADO ("yo tomaba", "antes usé"), NO está eligiendo ahora; sugerile las CÁPSULAS. Si pide "lo más efectivo/rápido", sugerile CÁPSULAS. Si ya eligió claramente un producto para AHORA, confirmá.',
+                    goal: 'Determinar si quiere cápsulas/gotas (opción práctica), semillas (opción natural) o AMBAS. REGLAS CRÍTICAS: Si insiste con gotas pero duda, decile: "las recomendamos para cuando son menos de 10kg y tienen más de 70 años, por lo suaves que son. Llevate las cápsulas". Si habla en PASADO ("yo tomaba", "antes usé"), NO está eligiendo ahora; sugerile las CÁPSULAS. Si pide "lo más efectivo/rápido", sugerile CÁPSULAS. Si ya eligió claramente un producto para AHORA, confirmá.',
                     history: currentState.history,
                     summary: currentState.summary,
                     knowledge: knowledge,
