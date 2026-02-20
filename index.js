@@ -571,7 +571,19 @@ client.on('message', async msg => {
         const cleanAdmin = adminNumber ? adminNumber.replace(/\D/g, '') : '';
         const alertNumbers = (config.alertNumbers || []).map(n => n.replace(/\D/g, ''));
         const isAdmin = msg.fromMe || (cleanAdmin && userId.startsWith(cleanAdmin)) || alertNumbers.some(n => userId.startsWith(n));
-        const msgText = (msg.body || '').trim();
+        let msgText = (msg.body || '').trim();
+
+        // Check for WhatsApp placeholders early
+        const WA_PLACEHOLDERS = [
+            "esperando el mensaje",
+            "waiting for this message",
+            "este mensaje estaba esperando",
+            "this message was waiting"
+        ];
+        if (WA_PLACEHOLDERS.some(p => msgText.toLowerCase().includes(p))) {
+            console.log(`[WA-PLACEHOLDER] Detected waiting message from ${userId}. Treating as greeting.`);
+            msgText = "Hola"; // Treat as implicit greeting
+        }
 
         // --- ADMIN COMMANDS ---
         if (isAdmin) {

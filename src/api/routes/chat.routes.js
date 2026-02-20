@@ -154,11 +154,42 @@ module.exports = (client, sharedState) => {
         }
     });
 
+    // Helper to ensure userState exists and record admin message
+    const _recordAdminMessage = (chatId, text) => {
+        if (!userState[chatId]) {
+            // Initialize userState as if they had just been greeted
+            const autoScript = Math.random() < 0.5 ? 'v3' : 'v4';
+            console.log(`[DASHBOARD] Initializing new state for ${chatId} (Script: ${autoScript})`);
+            userState[chatId] = {
+                step: 'waiting_weight', // Skip the greeting since admin just sent a message
+                lastMessage: null,
+                addressAttempts: 0,
+                partialAddress: {},
+                cart: [],
+                assignedScript: autoScript,
+                history: [],
+                stepEnteredAt: Date.now(),
+                lastActivityAt: Date.now(),
+                lastInteraction: Date.now()
+            };
+        }
+
+        // Add admin message to history so the AI has context
+        userState[chatId].history.push({ role: 'bot', content: text, timestamp: Date.now() });
+        userState[chatId].lastActivityAt = Date.now();
+        userState[chatId].staleAlerted = false;
+
+        if (sharedState.saveState) sharedState.saveState();
+    };
+
     // POST /send
     router.post('/send', authMiddleware, async (req, res) => {
         try {
             const { chatId, message } = req.body;
             const sentMsg = await client.sendMessage(chatId, message);
+
+            _recordAdminMessage(chatId, message);
+
             if (sharedState.logAndEmit) sharedState.logAndEmit(chatId, 'admin', message, 'dashboard_reply', sentMsg.id._serialized);
             res.json({ success: true, messageId: sentMsg.id._serialized });
         } catch (e) {
@@ -175,8 +206,12 @@ module.exports = (client, sharedState) => {
             }
             const media = new MessageMedia(mimetype, base64, filename || 'image.jpg');
             const sentMsg = await client.sendMessage(chatId, media, { caption: caption || '' });
+
+            const logText = `📷 Imagen enviada${caption ? ': ' + caption : ''}`;
+            _recordAdminMessage(chatId, logText);
+
             if (sharedState.logAndEmit) {
-                sharedState.logAndEmit(chatId, 'admin', `📷 Imagen enviada${caption ? ': ' + caption : ''}`, 'dashboard_media', sentMsg.id._serialized);
+                sharedState.logAndEmit(chatId, 'admin', logText, 'dashboard_media', sentMsg.id._serialized);
             }
             res.json({ success: true, messageId: sentMsg.id._serialized });
         } catch (e) {
