@@ -231,8 +231,6 @@ const client = new Client({
             '--disk-cache-dir=/dev/null',
             '--disable-gpu-shader-disk-cache'
         ],
-        // Let puppeteer store its data inside the wwebjs auth folder directly
-        userDataDir: path.join(authPath, 'session'),
         timeout: 120000 // 2 minutes timeout for slow startups
     }
 });
