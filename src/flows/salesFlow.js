@@ -267,9 +267,17 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
     // Init User State if needed
     if (!userState[userId]) {
-        // Auto A/B Testing: Split new users 50/50 between v3 and v4 (if dependencies provide effectiveScript, use as default but prefer specific split initially if desired, or let index pass it)
-        const autoScript = Math.random() < 0.5 ? 'v3' : 'v4';
-        console.log(`[A/B TEST] New user ${userId} assigned to script: ${autoScript}`);
+        // Auto A/B Testing or Forced Script Logic
+        let initialScript = 'v3'; // Default fallback
+        if (dependencies.config && dependencies.config.activeScript === 'rotacion') {
+            initialScript = Math.random() < 0.5 ? 'v3' : 'v4';
+            console.log(`[A/B TEST] New user ${userId} randomly assigned to rotation script: ${initialScript}`);
+        } else if (dependencies.config && dependencies.config.activeScript) {
+            initialScript = dependencies.config.activeScript;
+            console.log(`[A/B TEST] New user ${userId} assigned to fixed active script: ${initialScript}`);
+        } else {
+            console.log(`[A/B TEST] New user ${userId} assigned to fallback script: ${initialScript}`);
+        }
 
         userState[userId] = {
             step: 'greeting',
@@ -277,7 +285,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             addressAttempts: 0,
             partialAddress: {},
             cart: [], // NEW: Support for multiple items
-            assignedScript: autoScript, // Lock this user to their variant
+            assignedScript: initialScript, // Lock this user to their variant
             history: [],
             stepEnteredAt: Date.now(),
             lastActivityAt: Date.now(),
@@ -326,6 +334,10 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             currentState.partialAddress = {};
             currentState.selectedProduct = null;
             currentState.selectedPlan = null;
+        } else if (extractedData.startsWith('POSTDATADO:')) {
+            const fecha = extractedData.replace('POSTDATADO:', '').trim();
+            currentState.postdatado = fecha;
+            console.log(`[POSTDATADO SAVED] Fecha: ${fecha}`);
         }
     }
 
@@ -931,8 +943,24 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
                 if (planAI.goalMet && planAI.extractedData && !planAI.extractedData.startsWith('CHANGE_PRODUCT:')) {
                     const extractedStr = String(planAI.extractedData);
+                    _handleExtractedData(userId, extractedStr, currentState);
+
+                    // If user postdates during plan selection and we already had a product
+                    if (extractedStr.startsWith('POSTDATADO:') && currentState.selectedProduct) {
+                        const closingNode = knowledge.flow.closing;
+                        _setStep(currentState, closingNode.nextStep);
+                        if (planAI.response) {
+                            currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });
+                            await sendMessageWithDelay(userId, planAI.response);
+                        } else {
+                            currentState.history.push({ role: 'bot', content: closingNode.response, timestamp: Date.now() });
+                            await sendMessageWithDelay(userId, closingNode.response);
+                        }
+                        saveState();
+                        matched = true;
+                    }
                     // Ultra strict validation to prevent bypassing the plan choice
-                    if (extractedStr.includes('120') || extractedStr.includes('60')) {
+                    else if (extractedStr.includes('120') || extractedStr.includes('60')) {
                         // AI detected a valid plan choice
                         const plan = extractedStr.includes('120') ? '120' : '60';
                         const product = currentState.selectedProduct || "Nuez de la India";
@@ -946,11 +974,19 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                             price: _getPrice(product, plan)
                         }];
 
+                        if (planAI.response) {
+                            currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });
+                            await sendMessageWithDelay(userId, planAI.response);
+                        }
+
                         const closingNode = knowledge.flow.closing;
+                        if (!planAI.response || !planAI.response.toLowerCase().includes('datos')) {
+                            currentState.history.push({ role: 'bot', content: closingNode.response, timestamp: Date.now() });
+                            await sendMessageWithDelay(userId, closingNode.response);
+                        }
+
                         _setStep(currentState, closingNode.nextStep);
-                        currentState.history.push({ role: 'bot', content: closingNode.response, timestamp: Date.now() });
                         saveState();
-                        await sendMessageWithDelay(userId, closingNode.response);
                         matched = true;
                     } else {
                         // AI incorrectly marked goalMet=true without getting a plan number
@@ -962,6 +998,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                         }
                     }
                 } else if (planAI.response) {
+                    _handleExtractedData(userId, planAI.extractedData, currentState);
                     currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });
                     await sendMessageWithDelay(userId, planAI.response);
                     matched = true;
@@ -1411,11 +1448,15 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             };
 
             // Issue 3: Detect post-dated delivery requests ("a partir del 15 de marzo")
-            const dateMatch = text.match(/(?:a partir del?|desde el?|para el?|despu[eé]s del?)\s*(?:d[ií]a\s*)?(\d{1,2})\s*(?:de\s*)?(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
-            if (dateMatch) {
-                const postdatado = `${dateMatch[1]} de ${dateMatch[2]}`;
-                currentState.postdatado = postdatado;
+            if (!currentState.postdatado) {
+                const dateMatch = text.match(/(?:a partir del?|desde el?|para el?|despu[eé]s del?)\s*(?:d[ií]a\s*)?(\d{1,2})\s*(?:de\s*)?(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
+                if (dateMatch) {
+                    currentState.postdatado = `${dateMatch[1]} de ${dateMatch[2]}`;
+                }
+            }
 
+            if (currentState.postdatado) {
+                const postdatado = currentState.postdatado;
                 const msg = `¡Perfecto! Tu pedido ya fue ingresado 🚀\n\nLo vamos a despachar para que te llegue a partir del ${postdatado}.\nTe avisamos con el número de seguimiento.\n\n¡Gracias por confiar en Herbalis!`;
                 await sendMessageWithDelay(userId, msg);
 

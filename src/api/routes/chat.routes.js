@@ -61,7 +61,8 @@ module.exports = (client, sharedState) => {
                 lastMessage: c.lastMessage ? c.lastMessage.body : '',
                 timestamp: c.timestamp,
                 isPaused: pausedUsers.has(c.id._serialized),
-                step: userState[c.id._serialized]?.step || 'new'
+                step: userState[c.id._serialized]?.step || 'new',
+                assignedScript: userState[c.id._serialized]?.assignedScript || null
             }));
             res.json(relevantChats);
         } catch (e) {

@@ -135,7 +135,8 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
                                             timestamp: timestamp,
                                         },
                                         unreadCount: selectedChat?.id === data.chatId ? 0 : (c.unreadCount || 0) + 1,
-                                        time: new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                        time: new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                                        assignedScript: data.assignedScript || c.assignedScript // update script assignment from socket
                                     }
                                     : c
                             );
@@ -563,8 +564,15 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex justify-between items-baseline mb-0.5">
-                                        <h3 className={`font-semibold text-sm truncate ${selectedChat?.id === chat.id ? 'text-blue-700' : 'text-slate-700'}`}>{chat.name}</h3>
-                                        <span className="text-[10px] text-slate-400 font-medium font-mono">{chat.time}</span>
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                            <h3 className={`font-semibold text-sm truncate ${selectedChat?.id === chat.id ? 'text-blue-700' : 'text-slate-700'}`}>{chat.name}</h3>
+                                            {chat.assignedScript && (
+                                                <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-[9px] font-bold text-slate-500 border border-slate-200 uppercase whitespace-nowrap">
+                                                    {chat.assignedScript}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <span className="text-[10px] text-slate-400 font-medium font-mono ml-2 flex-shrink-0">{chat.time}</span>
                                     </div>
                                     <p className="text-xs text-slate-500 truncate font-medium">{chat.lastMessage?.body || (typeof chat.lastMessage === 'string' ? chat.lastMessage : '') || 'Sin mensajes'}</p>
                                 </div>
@@ -592,7 +600,14 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
                                     {selectedChat.name.substring(0, 2)}
                                 </div>
                                 <div>
-                                    <h2 className="font-bold text-slate-800 text-sm">{selectedChat.name}</h2>
+                                    <div className="flex items-center gap-2">
+                                        <h2 className="font-bold text-slate-800 text-sm">{selectedChat.name}</h2>
+                                        {selectedChat.assignedScript && (
+                                            <span className="px-2 py-0.5 rounded bg-slate-100 text-[10px] font-bold text-slate-600 border border-slate-200 uppercase">
+                                                Guion: {selectedChat.assignedScript}
+                                            </span>
+                                        )}
+                                    </div>
                                     {selectedChat.isPaused ? (
                                         <p className="text-xs text-amber-600 font-bold flex items-center gap-1">
                                             <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span> BOT PAUSADO

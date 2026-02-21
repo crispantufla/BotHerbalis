@@ -173,7 +173,30 @@ function cleanAuth(dir) {
     // DISABLING AGGRESSIVE CLEANUP.
     // Puppeteer and LocalAuth need their internal files. Deleting them manually
     // has proven to cause "Session closed" and "Navigating frame detached" errors.
-    console.log(`[BOOT] Session directory exists at ${dir}. Skipping manual cleanup.`);
+    console.log(`[BOOT] Session directory exists at ${dir}. Skipping full manual cleanup.`);
+
+    // FIX FOR RAILWAY/DOCKER RENGAGEMENT: Clean ONLY the Chrome lock files
+    // If the container was killed unexpectedly, Chrome leaves a SingletonLock file behind
+    // which prevents the next instance from starting.
+    try {
+        const sessionPath = path.join(dir, 'session');
+        if (fs.existsSync(sessionPath)) {
+            const locks = ['SingletonLock', 'SingletonCookie', 'SingletonSocket'];
+            let clearedLocks = 0;
+            locks.forEach(lock => {
+                const lockPath = path.join(sessionPath, lock);
+                if (fs.existsSync(lockPath)) {
+                    fs.unlinkSync(lockPath);
+                    clearedLocks++;
+                }
+            });
+            if (clearedLocks > 0) {
+                console.log(`[BOOT] Cleared ${clearedLocks} stale Chrome lock(s) to prevent 'profile in use' crash.`);
+            }
+        }
+    } catch (e) {
+        console.error(`[BOOT] Failed to clean Chrome locks: ${e.message}`);
+    }
 }
 
 // Clean locks/session before starting client
@@ -259,7 +282,8 @@ function logAndEmit(chatId, sender, text, step, messageId = null) {
             sender,
             text,
             step,
-            messageId
+            messageId,
+            assignedScript: userState[chatId]?.assignedScript || null
         });
     }
 }
@@ -757,7 +781,8 @@ async function _processDebounced(userId) {
 
     try {
         // Enforce the A/B test assigned script, fallback to global activeScript
-        const effectiveScript = userState[userId]?.assignedScript || config.activeScript || 'v3';
+        const globalScript = config.activeScript === 'rotacion' ? 'v3' : (config.activeScript || 'v3');
+        const effectiveScript = userState[userId]?.assignedScript || globalScript;
         const effectiveKnowledge = sharedState.multiKnowledge[effectiveScript] || sharedState.knowledge;
 
         await processSalesFlow(userId, combinedText, userState, effectiveKnowledge, {

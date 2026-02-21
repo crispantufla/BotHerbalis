@@ -101,7 +101,8 @@ const SettingsView = ({ status }) => {
                 'v1': 'Original',
                 'v2': 'V2 — Empático',
                 'v3': 'V3 — Profesional',
-                'v4': 'V4 — Psicología (Agresivo)'
+                'v4': 'V4 — Psicología (Agresivo)',
+                'rotacion': 'Rotación 50/50'
             };
             toast.success(`Guión cambiado a ${labels[script] || script}`);
         } catch (e) {
@@ -287,7 +288,7 @@ const SettingsView = ({ status }) => {
                     </h3>
                     <p className="text-sm text-slate-500 mb-4">Guión activo para todas las conversaciones.</p>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {/* V3: Standard */}
                         <div
                             onClick={() => handleSwitchScript('v3')}
@@ -321,6 +322,19 @@ const SettingsView = ({ status }) => {
                                     </span>
                                 )}
                                 {activeScript === 'v4' && <span className="mt-1 text-[10px] font-bold bg-violet-100 text-violet-700 px-2 py-0.5 rounded">ACTIVO</span>}
+                            </div>
+                        </div>
+
+                        {/* Rotation A/B */}
+                        <div
+                            onClick={() => handleSwitchScript('rotacion')}
+                            className={`p-4 rounded-lg border-2 cursor-pointer transition-all flex flex-col items-center text-center ${activeScript === 'rotacion' ? 'bg-orange-50 border-orange-500 shadow-md transform scale-105' : 'bg-white border-slate-200 hover:border-orange-300 opacity-80'}`}
+                        >
+                            <div className={`w-3 h-3 rounded-full mb-2 ${activeScript === 'rotacion' ? 'bg-orange-500 animate-pulse' : 'bg-slate-300'}`}></div>
+                            <h4 className={`font-bold text-sm ${activeScript === 'rotacion' ? 'text-orange-700' : 'text-slate-600'}`}>Rotación (A/B)</h4>
+                            <p className="text-xs text-slate-500 mt-1 mb-2">Divide prospectos nuevos 50/50 entre V3 y V4.</p>
+                            <div className="flex flex-col items-center gap-1 w-full mt-auto">
+                                {activeScript === 'rotacion' && <span className="mt-1 text-[10px] font-bold bg-orange-100 text-orange-700 px-2 py-0.5 rounded">ACTIVO</span>}
                             </div>
                         </div>
                     </div>

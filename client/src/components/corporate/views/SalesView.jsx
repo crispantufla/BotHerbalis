@@ -29,7 +29,7 @@ const SalesView = ({ onGoToChat }) => {
     const handleExportCSV = () => {
         if (orders.length === 0) return;
 
-        const headers = ['Fecha', 'Cliente', 'Nombre', 'Producto', 'Plan', 'Precio', 'Estado', 'Tracking', 'Ciudad', 'Calle', 'CP'];
+        const headers = ['Fecha', 'Cliente', 'Nombre', 'Producto', 'Plan', 'Precio', 'Postdatado', 'Estado', 'Tracking', 'Ciudad', 'Calle', 'CP'];
         const rows = orders.map(o => [
             o.createdAt ? new Date(o.createdAt).toLocaleDateString() : '',
             o.cliente || '',
@@ -37,6 +37,7 @@ const SalesView = ({ onGoToChat }) => {
             o.producto || '',
             o.plan || '',
             o.precio || '',
+            o.postdatado || '',
             o.status || '',
             o.tracking || '',
             o.ciudad || '',
@@ -148,6 +149,7 @@ const SalesView = ({ onGoToChat }) => {
                                 <th className="px-6 py-4">Cliente</th>
                                 <th className="px-6 py-4">Producto / Plan</th>
                                 <th className="px-6 py-4 text-right">Monto</th>
+                                <th className="px-6 py-4 text-center">Postdatado</th>
                                 <th className="px-6 py-4 text-center">Estado</th>
                                 <th className="px-6 py-4 text-center">Tracking</th>
                                 <th className="px-6 py-4 text-right">Acciones</th>
@@ -155,14 +157,14 @@ const SalesView = ({ onGoToChat }) => {
                         </thead>
                         <tbody className="text-sm text-slate-600 divide-y divide-slate-100">
                             {loading ? (
-                                <tr><td colSpan="7" className="text-center py-10">
+                                <tr><td colSpan="8" className="text-center py-10">
                                     <div className="flex items-center justify-center gap-3 text-slate-400">
                                         <div className="w-5 h-5 border-2 border-slate-300 border-t-transparent rounded-full animate-spin"></div>
                                         Cargando pedidos...
                                     </div>
                                 </td></tr>
                             ) : orders.length === 0 ? (
-                                <tr><td colSpan="7" className="text-center py-10 opacity-50">No se encontró base de datos de pedidos.</td></tr>
+                                <tr><td colSpan="8" className="text-center py-10 opacity-50">No se encontró base de datos de pedidos.</td></tr>
                             ) : (
                                 orders.map(order => (
                                     <tr key={order.id} className="hover:bg-slate-50 transition-colors group">
@@ -183,6 +185,15 @@ const SalesView = ({ onGoToChat }) => {
                                         </td>
                                         <td className="px-6 py-4 text-right font-mono text-slate-800 font-bold">
                                             ${order.precio}
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            {order.postdatado ? (
+                                                <span className="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded shadow-sm border border-amber-200">
+                                                    {order.postdatado}
+                                                </span>
+                                            ) : (
+                                                <span className="text-slate-300">—</span>
+                                            )}
                                         </td>
                                         <td className="px-6 py-4 text-center">
                                             <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide border ${statusStyles[order.status] || statusStyles['Pendiente']}`}>

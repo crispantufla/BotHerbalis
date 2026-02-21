@@ -60,7 +60,7 @@ describe('Multi-Product Logic', () => {
         // Expect closing message
 
         expect(mockSendMessage).toHaveBeenCalledWith(
-            userId, expect.stringMatching(/Tomamos los datos/i)
+            userId, expect.stringMatching(/etiqueta/i)
         );
     });
 
@@ -88,7 +88,7 @@ describe('Multi-Product Logic', () => {
         // Expect closing message
 
         expect(mockSendMessage).toHaveBeenCalledWith(
-            userId, expect.stringMatching(/Tomamos los datos/i)
+            userId, expect.stringMatching(/etiqueta/i)
         );
     });
 });
