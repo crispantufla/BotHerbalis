@@ -45,7 +45,9 @@ const KNOWLEDGE_FILES = {
 };
 
 // --- STATE MANAGEMENT ---
-let knowledge = { flow: {}, faq: [] };
+let multiKnowledge = { 'v3': { flow: {}, faq: [] }, 'v4': { flow: {}, faq: [] } };
+// Fallback reference for legacy code if any still defaults to picking 'knowledge'
+let knowledge = multiKnowledge['v3'];
 const userState = {};
 const chatResets = {}; // Tracks timestamp of last history clear per user
 let lastAlertUser = null;
@@ -60,31 +62,37 @@ let config = { alertNumbers: [], activeScript: 'v3', scriptStats: { v3: { starte
 let isConnected = false;
 
 // --- PERSISTENCE HELPERS ---
-function loadKnowledge(scriptName) {
+function loadKnowledge(scriptName = null) {
     try {
-        const name = scriptName || config.activeScript || 'v3';
-        const paths = KNOWLEDGE_FILES[name] || KNOWLEDGE_FILES['v3'];
-        // Try persistent save path first, then source code path
-        let filePath = fs.existsSync(paths.save) ? paths.save : paths.source;
-        if (fs.existsSync(filePath)) {
-            const raw = fs.readFileSync(filePath);
-            const parsed = JSON.parse(raw);
-            // IMPORTANT: Mutate the existing object instead of replacing the reference
-            // This keeps sharedState.knowledge in sync
-            Object.keys(knowledge).forEach(k => delete knowledge[k]);
-            Object.assign(knowledge, parsed);
-            config.activeScript = name;
-            console.log(`✅ Knowledge loaded: ${name} from ${path.basename(filePath)}`);
+        // Always try to load all available scripts into multiKnowledge
+        Object.keys(KNOWLEDGE_FILES).forEach(name => {
+            const paths = KNOWLEDGE_FILES[name];
+            let filePath = fs.existsSync(paths.save) ? paths.save : paths.source;
+            if (fs.existsSync(filePath)) {
+                const raw = fs.readFileSync(filePath);
+                const parsed = JSON.parse(raw);
+                multiKnowledge[name] = parsed;
+                console.log(`✅ Knowledge loaded for ${name} from ${path.basename(filePath)}`);
+            }
+        });
+
+        // Set default global knowledge to active script
+        if (scriptName && KNOWLEDGE_FILES[scriptName]) {
+            config.activeScript = scriptName;
         }
+        knowledge = multiKnowledge[config.activeScript || 'v3'];
     } catch (e) {
         console.error('🔴 Error loading knowledge:', e.message);
     }
 }
 
-function saveKnowledge() {
+function saveKnowledge(scriptName = null) {
     try {
-        const paths = KNOWLEDGE_FILES[config.activeScript] || KNOWLEDGE_FILES['v3'];
-        atomicWriteFile(paths.save, JSON.stringify(knowledge, null, 2));
+        const nameToSave = scriptName || config.activeScript || 'v3';
+        const paths = KNOWLEDGE_FILES[nameToSave];
+        if (paths && multiKnowledge[nameToSave]) {
+            atomicWriteFile(paths.save, JSON.stringify(multiKnowledge[nameToSave], null, 2));
+        }
     } catch (e) {
         console.error('🔴 Error saving knowledge:', e.message);
     }
@@ -222,7 +230,8 @@ const sharedState = {
     pausedUsers,
     sessionAlerts,
     config,
-    knowledge,
+    get knowledge() { return multiKnowledge[config.activeScript || 'v3']; }, // Dynamic getter for legacy
+    multiKnowledge, // Expose for specific lookups
     isConnected,
     qrCodeData,
     saveState,
@@ -669,13 +678,16 @@ client.on('message', async msg => {
         }
 
         // 2. Logging & Ad Handling
-        // Some ads arrive with empty body. If so, treat as greeting.
-        if (!msgText && (msg.type === 'chat' || msg.type === 'unknown')) {
-            console.log(`[AD-HANDLE] Empty message from ${userId}. Treating as ad click/greeting.`);
-            msgText = "Hola! (Vengo de un anuncio)";
+        // Some ads arrive with empty body or as system notifications.
+        // Also if a user taps a wa.me link sometimes it registers as an empty chat creation.
+        if (!msgText || msgText.trim() === '') {
+            if (msg.type === 'chat' || msg.type === 'e2e_notification' || msg.type === 'unknown' || msg.type === 'template_button_reply') {
+                console.log(`[AD-HANDLE] Empty/System message (${msg.type}) from ${userId}. Treating as ad click/greeting.`);
+                msgText = "Hola! (Vengo de un anuncio)";
+            } else {
+                return; // Ignore other truly empty unsupported types
+            }
         }
-
-        if (!msgText) return;
 
         logAndEmit(userId, 'user', msgText, userState[userId]?.step || 'new');
 
@@ -745,9 +757,10 @@ async function _processDebounced(userId) {
 
     try {
         // Enforce the A/B test assigned script, fallback to global activeScript
-        const effectiveScript = userState[userId]?.assignedScript || config.activeScript;
+        const effectiveScript = userState[userId]?.assignedScript || config.activeScript || 'v3';
+        const effectiveKnowledge = sharedState.multiKnowledge[effectiveScript] || sharedState.knowledge;
 
-        await processSalesFlow(userId, combinedText, userState, knowledge, {
+        await processSalesFlow(userId, combinedText, userState, effectiveKnowledge, {
             client, notifyAdmin, saveState,
             sendMessageWithDelay: (id, text) => sendMessageWithDelay(id, text, startTime),
             logAndEmit, saveOrderToLocal, sharedState, config,

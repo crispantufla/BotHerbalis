@@ -187,7 +187,8 @@ module.exports = (client, sharedState) => {
 
             config.activeScript = script;
             if (sharedState.loadKnowledge) {
-                sharedState.loadKnowledge(script);
+                // Ensure all knowledge configurations are loaded
+                sharedState.loadKnowledge();
             }
 
             if (io) io.emit('script_changed', { active: script });
