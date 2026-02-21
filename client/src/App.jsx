@@ -26,15 +26,15 @@ function App() {
                                 {/* Public Route */}
                                 <Route path="/login" element={<Login />} />
 
-                                {/* Protected Route - Corporate Enterprise V1 */}
-                                <Route path="/" element={
+                                {/* Protected Route - Corporate Enterprise V1 (Legacy) */}
+                                <Route path="/v1/*" element={
                                     <ProtectedRoute>
                                         <CorporateDashboard />
                                     </ProtectedRoute>
                                 } />
 
-                                {/* Protected Route - Corporate Enterprise V2 */}
-                                <Route path="/v2/*" element={
+                                {/* Protected Route - Corporate Enterprise V2 (Main Dashboard) */}
+                                <Route path="/*" element={
                                     <ProtectedRoute>
                                         <CorporateDashboardV2 />
                                     </ProtectedRoute>
