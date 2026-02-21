@@ -918,15 +918,15 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 console.log(`[AI-FALLBACK] waiting_plan_choice: No plan number detected for ${userId}`);
 
                 const upsellOptions = [
-                    'Ojo que el de 60 tiene un recargo de $6.000 por la gestión del pago contra reembolso. En cambio el de 120 es precio final y te ahorrás esa plata. ¿Seguro querés el de 60 o pasamos al de 120?',
-                    'Acordate que el plan de 120 es precio final. El de 60, al ser contra reembolso, tiene un recargo administrativo de $6.000. ¿Preferís aprovechar el de 120 sin recargo o seguimos con el de 60?',
-                    'Te aviso por las dudas: el de 60 tiene un extra de $6.000 por el servicio de cobro. Si llevás el de 120, ese costo no corre. ¿Qué decís? ¿Vamos con el de 60 igual o querés el de 120?'
+                    'Acordate que el servicio de pago a domicilio tiene un valor de $6.000, pero ¡con el plan de 120 días te regalamos ese servicio y te queda a precio final! ¿Querés aprovechar este beneficio o seguimos con el de 60?',
+                    'Te aviso por las dudas: el servicio de cobrarte en la puerta de tu casa sale $6.000. Pero si llevás el plan de 120 días ese servicio está 100% bonificado. ¿Qué decís? ¿Vamos con el de 60 igual o aprovechás el de 120?',
+                    'Ojo que el de 60 lleva el costo de $6.000 por el servicio logístico de cobro en domicilio. ¡En cambio el de 120 te regala ese servicio! ¿Seguro querés el de 60 o pasamos al de 120 y ahorrás esa plata?'
                 ];
                 const selectedUpsell = upsellOptions[Math.floor(Math.random() * upsellOptions.length)];
 
                 const planAI = await aiService.chat(text, {
                     step: 'waiting_plan_choice',
-                    goal: `El usuario debe elegir Plan 60 o Plan 120 días. CRÍTICO: goalMet=true SOLO si el usuario escribe explícitamente "60" o "120". Si pregunta algo distinto (ej: "cómo las consigo", "para mi hija"), goalMet=false, respondé su duda adaptando los pronombres si compra para otra persona (ej: "para ella") y volvé a preguntar: "¿Avanzamos con 60 o 120 días?". ESTRATEGIA (Si duda entre planes): El Plan 60 días tiene un recargo Contra Reembolso ($6.000 extra). El de 120 NO tiene recargo. Decile: "${selectedUpsell}".`,
+                    goal: `El usuario debe elegir Plan 60 o Plan 120 días. CRÍTICO: goalMet=true SOLO si el usuario escribe explícitamente "60" o "120". Si pregunta algo distinto (ej: "cómo las consigo", "para mi hija"), goalMet=false, respondé su duda adaptando los pronombres si compra para otra persona (ej: "para ella") y volvé a preguntar: "¿Avanzamos con 60 o 120 días?". ESTRATEGIA (Si duda entre planes): El costo por pago a domicilio es de $6.000, pero el plan de 120 BONIFICA/REGALA ese servicio. Decile: "${selectedUpsell}".`,
                     history: currentState.history,
                     summary: currentState.summary,
                     knowledge: knowledge,
@@ -1036,8 +1036,9 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             }
             // SCRIPT FIRST: Clear affirmative confirmation
             else if (_isAffirmative(normalizedText)) {
-                const msg = _formatMessage(knowledge.flow.data_request.response);
-                _setStep(currentState, knowledge.flow.data_request.nextStep);
+                // Point to closing since data_request is redundant/removed
+                const msg = _formatMessage(knowledge.flow.closing.response);
+                _setStep(currentState, knowledge.flow.closing.nextStep);
                 currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
                 saveState();
                 await sendMessageWithDelay(userId, msg);
@@ -1147,11 +1148,12 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             const isHesitation = /\b(pensar|pienso|despues|luego|mañana|te confirmo|te aviso|ver|veo|rato|lueguito|mas tarde|en un rato|aguanti|aguanta|espera|bancame)\b/i.test(normalizedText)
                 || /\b(voy a|dejam[eo])\s+(pasar|pensar|ver)\b/i.test(normalizedText);
 
-            const isDataQuestion = text.includes('?')
+            // Ignore short confirmations like "si", "ok", "dale", "bueno" even if they somehow have a question mark by accident
+            const isShortConfirmation = /^(si|sisi|ok|dale|bueno|joya|de una|perfecto)[\s\?\!]*$/i.test(normalizedText);
+
+            const isDataQuestion = !isShortConfirmation && (text.includes('?')
                 || /\b(pregunte|no quiero|no acepto|no acepte|como|donde|por que|para que|cuanto|cuánto|precio|costo|sale|cuesta|valor)\b/i.test(normalizedText)
-                || isHesitation;
-            // NOTE: 'quiero' was removed from isDataQuestion — it caused a loop where
-            // 'quiero [non-product]' bypassed address parsing AND never advanced the flow.
+                || isHesitation);
 
             if (isDataQuestion && !looksLikeAddress) {
                 // This is a question or objection, NOT address data

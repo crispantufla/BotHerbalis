@@ -4,6 +4,14 @@ const { getLocalHistory } = require('../../utils/chatHistory');
 const { aiService } = require('../../services/ai');
 const { MessageMedia } = require('whatsapp-web.js');
 
+const withTimeout = (promise, ms, rejectMessage) => {
+    let timeoutId;
+    const timeout = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(rejectMessage)), ms);
+    });
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
+};
+
 module.exports = (client, sharedState) => {
     const router = express.Router();
     const { userState, pausedUsers } = sharedState;
@@ -18,8 +26,8 @@ module.exports = (client, sharedState) => {
 
             let waMessages = [];
             try {
-                const chat = await client.getChatById(chatId);
-                waMessages = await chat.fetchMessages({ limit: 50 });
+                const chat = await withTimeout(client.getChatById(chatId), 5000, "Timeout getting chat for summary");
+                waMessages = await withTimeout(chat.fetchMessages({ limit: 50 }), 10000, "Timeout fetching messages for summary");
             } catch (e) {
                 console.warn(`[SUMMARIZE] WA Fetch failed for ${chatId}`);
             }
@@ -53,7 +61,7 @@ module.exports = (client, sharedState) => {
     // GET /chats
     router.get('/chats', authMiddleware, async (req, res) => {
         try {
-            const chats = await client.getChats();
+            const chats = await withTimeout(client.getChats(), 10000, "Timeout retrieving chats");
             const relevantChats = chats.filter(c => !c.isGroup).map(c => ({
                 id: c.id._serialized,
                 name: c.name || c.id.user,
@@ -90,8 +98,8 @@ module.exports = (client, sharedState) => {
             let messages = [];
 
             try {
-                const chat = await client.getChatById(chatId);
-                const waMessages = await chat.fetchMessages({ limit: 100 });
+                const chat = await withTimeout(client.getChatById(chatId), 5000, "Timeout getting chat history");
+                const waMessages = await withTimeout(chat.fetchMessages({ limit: 100 }), 10000, "Timeout fetching history messages");
                 messages = waMessages
                     .filter(m => m.timestamp >= resetAt) // Filter WA messages after reset
                     .map(m => {

@@ -40,7 +40,7 @@
                 "practica",
                 "1"
             ],
-            "response": "Genial 👍 Cápsulas es la mejor opción para vos.\n\n💊 Se toman:\n• 1 cápsula por día\n• 30 min antes del almuerzo o la cena\n\nTenés dos opciones:\n\n🔹 60 días → ${{PRICE_CAPSULAS_60}}\n🔹 120 días → ${{PRICE_CAPSULAS_120}}\n\n📦📦 Envío gratis a todo el país.\n\nImportante 👇\nEl plan de 120 días permite pagar 100% al recibir SIN costo adicional.\nEl plan de 60 días con pago al recibir tiene un adicional de $6.000 (Modalidad MAX).\n\n👉 ¿Avanzamos con 60 o 120 días?",
+            "response": "Genial 👍 Cápsulas es la mejor opción para vos.\n\n💊 Se toman:\n• 1 cápsula por día\n• 30 min antes del almuerzo o la cena\n\nTenés dos opciones:\n\n🔹 60 días → ${{PRICE_CAPSULAS_60}}\n🔹 120 días → ${{PRICE_CAPSULAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl servicio de pago a domicilio tiene un costo de $6.000.\nPero con el plan de 120 días, ¡te REGALAMOS ese servicio!\n\n👉 ¿Avanzamos con 60 o 120 días?",
             "nextStep": "waiting_plan_choice"
         },
         "preference_semillas": {
@@ -55,7 +55,7 @@
                 "tradicional",
                 "2"
             ],
-            "response": "Genial 🌿 La semilla en estado natural es la opción más elegida.\n\nSe consume en forma de infusión cada noche.\n\n🔹 60 días → ${{PRICE_SEMILLAS_60}}\n🔹 120 días → ${{PRICE_SEMILLAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl plan de 120 días permite pago al recibir sin costo adicional.\nEl plan de 60 días con pago al recibir tiene un adicional de $6.000.\n\n👉 ¿Avanzamos con 60 o 120 días?",
+            "response": "Genial 🌿 La semilla en estado natural es la opción más elegida.\n\nSe consume en forma de infusión cada noche.\n\n🔹 60 días → ${{PRICE_SEMILLAS_60}}\n🔹 120 días → ${{PRICE_SEMILLAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl servicio de pago a domicilio tiene un costo de $6.000.\nPero con el plan de 120 días, ¡te REGALAMOS ese servicio!\n\n👉 ¿Avanzamos con 60 o 120 días?",
             "nextStep": "waiting_plan_choice"
         },
         "preference_gotas": {
@@ -66,22 +66,22 @@
                 "gotero",
                 "3"
             ],
-            "response": "Genial 🌿 Las gotas son prácticas y discretas.\n\n🔹 60 días → ${{PRICE_GOTAS_60}}\n🔹 120 días → ${{PRICE_GOTAS_120}}\n\n� Envío gratis a todo el país.\n\nImportante 👇\nEl plan de 120 días permite pago al recibir sin costo adicional.\nEl plan de 60 días con pago al recibir tiene un adicional de $6.000.\n\n👉 ¿Avanzamos con 60 o 120 días?",
+            "response": "Genial 🌿 Las gotas son prácticas y discretas.\n\n🔹 60 días → ${{PRICE_GOTAS_60}}\n🔹 120 días → ${{PRICE_GOTAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl servicio de pago a domicilio tiene un costo de $6.000.\nPero con el plan de 120 días, ¡te REGALAMOS ese servicio!\n\n👉 ¿Avanzamos con 60 o 120 días?",
             "nextStep": "waiting_plan_choice"
         },
         "price_capsulas": {
             "step": "waiting_price_confirmation",
-            "response": "💊 CÁPSULAS:\n\n🔹 Plan 60 días → ${{PRICE_CAPSULAS_60}}\n🔹 Plan 120 días → ${{PRICE_CAPSULAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl plan de 120 días permite pagar 100% al recibir SIN costo adicional.\nEl plan de 60 días con pago al recibir tiene un adicional de $6.000 (Modalidad MAX).\n\n👉 ¿Avanzamos con 60 o 120 días?",
+            "response": "💊 CÁPSULAS:\n\n🔹 Plan 60 días → ${{PRICE_CAPSULAS_60}}\n🔹 Plan 120 días → ${{PRICE_CAPSULAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl servicio de pago a domicilio tiene un costo de $6.000.\nPero con el plan de 120 días, ¡te REGALAMOS ese servicio!\n\n👉 ¿Avanzamos con 60 o 120 días?",
             "nextStep": "waiting_plan_choice"
         },
         "price_semillas": {
             "step": "waiting_price_confirmation",
-            "response": "🌱 SEMILLAS:\n\n🔹 Plan 60 días → ${{PRICE_SEMILLAS_60}}\n🔹 Plan 120 días → ${{PRICE_SEMILLAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl plan de 120 días permite pago al recibir sin costo adicional.\nEl plan de 60 días con pago al recibir tiene un adicional de $6.000.\n\n👉 ¿Avanzamos con 60 o 120 días?",
+            "response": "🌱 SEMILLAS:\n\n🔹 Plan 60 días → ${{PRICE_SEMILLAS_60}}\n🔹 Plan 120 días → ${{PRICE_SEMILLAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl servicio de pago a domicilio tiene un costo de $6.000.\nPero con el plan de 120 días, ¡te REGALAMOS ese servicio!\n\n👉 ¿Avanzamos con 60 o 120 días?",
             "nextStep": "waiting_plan_choice"
         },
         "price_gotas": {
             "step": "waiting_price_confirmation",
-            "response": "💧 GOTAS:\n\n🔹 Plan 60 días → ${{PRICE_GOTAS_60}}\n🔹 Plan 120 días → ${{PRICE_GOTAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl plan de 120 días permite pago al recibir sin costo adicional.\nEl plan de 60 días con pago al recibir tiene un adicional de $6.000.\n\n👉 ¿Avanzamos con 60 o 120 días?",
+            "response": "💧 GOTAS:\n\n🔹 Plan 60 días → ${{PRICE_GOTAS_60}}\n🔹 Plan 120 días → ${{PRICE_GOTAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl servicio de pago a domicilio tiene un costo de $6.000.\nPero con el plan de 120 días, ¡te REGALAMOS ese servicio!\n\n👉 ¿Avanzamos con 60 o 120 días?",
             "nextStep": "waiting_plan_choice"
         },
         "closing": {
@@ -95,21 +95,7 @@
                 "bueno",
                 "ok"
             ],
-            "response": "Perfecto 👍\n\nPara armar la etiqueta del envío por favor pasame:\n* Nombre y Apellido\n* Dirección (Calle y Número)",
-            "nextStep": "waiting_data"
-        },
-        "data_request": {
-            "step": "waiting_ok",
-            "match": [
-                "si",
-                "dale",
-                "bueno",
-                "sisi",
-                "joya",
-                "de una",
-                "esta bien"
-            ],
-            "response": "Para armar la etiqueta del envío por favor pasame:\n* Nombre y Apellido\n* Dirección (Calle y Número)",
+            "response": "¡Excelente! 🎉 Tomamos los datos para armar la etiqueta de envío 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(La dirección debe ser exacta, sin esquinas ni \"aprox\")",
             "nextStep": "waiting_data"
         },
         "confirmation": {
@@ -199,7 +185,7 @@
                 "pagar",
                 "como se paga"
             ],
-            "response": "Se paga al recibir el producto.\n\nEl plan de 120 días no tiene costo adicional.\nEl plan de 60 días tiene modalidad Contra Reembolso MAX con adicional de $6.000."
+            "response": "Se paga al recibir el producto.\n\nEl servicio de pago a domicilio tiene un valor de $6.000.\nPero te cuento un secreto: ¡con el plan de 120 días te REGALAMOS ese servicio!"
         },
         {
             "keywords": [
@@ -411,7 +397,7 @@
             "enabled": true,
             "adicional": 6000,
             "appliesTo": "60",
-            "description": "Modalidad Contra Reembolso MAX — adicional de $6.000 en planes de 60 días"
+            "description": "Modalidad de pago a domicilio — servicio de $6.000, bonificado en planes de 120 días"
         },
         "costoLogisticoRechazo": 18000,
         "closeIfNotAccepted": "Trabajamos bajo estas modalidades.\n\nSi en algún momento te resulta cómodo avanzar, acá estamos 😊"

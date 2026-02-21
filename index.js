@@ -749,19 +749,25 @@ client.on('message', async msg => {
         }
 
         // 4. Debounce: accumulate rapid-fire messages
+        let currentDelay = DEBOUNCE_MS;
+        if (userState[userId] && userState[userId].step === 'waiting_data') {
+            currentDelay = 60000; // 1 minuto de tolerancia si está ingresando dirección
+            console.log(`[DEBOUNCE] Aumentando delay a 60s para ${userId} (ingresando datos de envío)...`);
+        }
+
         if (pendingMessages.has(userId)) {
             const pending = pendingMessages.get(userId);
             pending.messages.push(msgText);
             clearTimeout(pending.timer);
-            pending.timer = setTimeout(() => _processDebounced(userId), DEBOUNCE_MS);
+            pending.timer = setTimeout(() => _processDebounced(userId), currentDelay);
             console.log(`[DEBOUNCE] Queued message #${pending.messages.length} from ${userId}: "${msgText}"`);
         } else {
             pendingMessages.set(userId, {
                 messages: [msgText],
-                timer: setTimeout(() => _processDebounced(userId), DEBOUNCE_MS),
+                timer: setTimeout(() => _processDebounced(userId), currentDelay),
                 startTime: Date.now()
             });
-            console.log(`[DEBOUNCE] New message from ${userId}: "${msgText}". Waiting ${DEBOUNCE_MS}ms...`);
+            console.log(`[DEBOUNCE] New message from ${userId}: "${msgText}". Waiting ${currentDelay}ms...`);
         }
     } catch (err) {
         console.error(`🔴[MESSAGE HANDLER ERROR] ${err.message} `);

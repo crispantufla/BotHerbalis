@@ -39,9 +39,23 @@ module.exports = (client, sharedState) => {
     // POST /script
     router.post('/script', authMiddleware, (req, res) => {
         try {
-            Object.assign(knowledge, req.body);
-            saveKnowledge();
-            res.json({ success: true, message: "Script updated successfully" });
+            const { version } = req.body;
+            const targetVersion = version || config.activeScript || 'v3';
+
+            if (sharedState.multiKnowledge && sharedState.multiKnowledge[targetVersion]) {
+                // Update specific version in memory
+                Object.assign(sharedState.multiKnowledge[targetVersion], req.body);
+                // Also update legacy reference if it's the active one (though knowledge is a getter in sharedState now, its local copy here might be stale)
+                // Actually knowledge is extracted from sharedState at the top of the function module.exports
+                // Let's just use saveKnowledge(targetVersion) which index.js handles
+                saveKnowledge(targetVersion);
+                res.json({ success: true, message: `Script ${targetVersion} updated successfully` });
+            } else {
+                // Fallback for unexpected states
+                Object.assign(knowledge, req.body);
+                saveKnowledge();
+                res.json({ success: true, message: "Script updated successfully (fallback)" });
+            }
         } catch (e) {
             res.status(500).json({ error: e.message });
         }

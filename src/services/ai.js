@@ -381,6 +381,7 @@ class AIService {
                 knowledgeContext += `- Envío gratis por Correo Argentino, pago en efectivo al recibir\n`;
             } else if (step === 'waiting_data') {
                 knowledgeContext += `- Necesitamos: nombre completo, calle y número, ciudad, código postal\n`;
+                knowledgeContext += `- PROHIBIDO PEDIR NÚMERO DE TELÉFONO. Ya estamos hablando por WhatsApp, ¡ya tenemos su número! Nunca pidas este dato.\n`;
                 knowledgeContext += `- (NO menciones precios ni productos, ya están decididos)\n`;
             }
 
@@ -581,7 +582,9 @@ INSTRUCCIONES:
         1. Tu prioridad es extraer CUALQUIER dato útil, aunque falten otros.
         2. "Gualeguay" y "Gualeguaychú" pertenecen a la provincia de Entre Ríos, NO a Santa Fe.
         3. Barrios como "Barrio 60 viviendas" o "mz F casa 4" van en "calle".
-        4. Si el texto dice claramente de qué provincia es, respetalo aunque no coincida con el código postal.
+        4. Si el texto comienza con palabras que parecen un nombre de persona (ej: "Horacio giosue benegas 77"), separa el nombre de persona en "nombre" y la calle en "calle".
+        5. Si el usuario envía SOLO SU NOMBRE (ej: "Juan", "Pedro Pablo"), extraelo como "nombre", y devuelve los demás como null.
+        6. Si el texto dice claramente de qué provincia es, respetalo aunque no coincida con el código postal.
         
         Devolver JSON PURO:
         {

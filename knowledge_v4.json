@@ -40,7 +40,7 @@
                 "practica",
                 "1"
             ],
-            "response": "Dale, buenísimo 👍 Cápsulas es lo más efectivo y práctico que hay.\n\n💊 Se toman así:\n• 1 al día\n• 30 min antes de la comida principal\n\nMirá, para asegurar tu objetivo tenés dos opciones:\n\n🏆 *OPCIÓN RECOMENDADA (120 días)*: Hacés el tratamiento completo de una y te asegurás el resultado.\n💲 *${{PRICE_CAPSULAS_120}}*\n*Beneficio: Envío Gratis + Pagás al recibir SIN recargo.*\n\n🔸 *OPCIÓN INICIO (60 días)*:\n💲 *${{PRICE_CAPSULAS_60}}* (+ ${{ADICIONAL_MAX}} de recargo administrativo por pago en domicilio).\n\n👉 ¿Te reservo el de 120 para asegurar el resultado o preferís arrancar con 60?",
+            "response": "Dale, buenísimo 👍 Cápsulas es lo más efectivo y práctico que hay.\n\n💊 Se toman así:\n• 1 al día\n• 30 min antes de la comida principal\n\nMirá, para asegurar tu objetivo tenés dos opciones:\n\n🏆 *OPCIÓN RECOMENDADA (120 días)*: Hacés el tratamiento completo de una y te asegurás el resultado.\n💲 *${{PRICE_CAPSULAS_120}}*\n*Beneficio: Envío Gratis + Pago a domicilio cien por ciento BONIFICADO (de regalo).* \n\n🔸 *OPCIÓN INICIO (60 días)*:\n💲 *${{PRICE_CAPSULAS_60}}* (+ ${{ADICIONAL_MAX}} costo por pago a domicilio).\n\n👉 ¿Te reservo el de 120 para asegurar el resultado o preferís arrancar con 60?",
             "nextStep": "waiting_plan_choice"
         },
         "preference_semillas": {
@@ -54,7 +54,7 @@
                 "natural",
                 "tradicional"
             ],
-            "response": "Dale, buenísimo 🌿 La semilla natural es la clásica, súper potente.\n\nSe prepara como una infusión a la noche, re fácil.\n\nMirá, tenés dos opciones:\n\n🏆 *OPCIÓN RECOMENDADA (120 días)*: Tratamiento completo.\n💲 *${{PRICE_SEMILLAS_120}}*\n*Beneficio: Envío Gratis + Pagás al recibir SIN recargo.*\n\n🔸 *OPCIÓN INICIO (60 días)*:\n💲 *${{PRICE_SEMILLAS_60}}* (+ ${{ADICIONAL_MAX}} de recargo administrativo).\n\n💡 *Tip: Si llevás 3 unidades (para amigas/os), tenés 30% DE DESCUENTO.*\n\n👉 ¿Le metemos con 120 o arrancamos con 60?",
+            "response": "Dale, buenísimo 🌿 La semilla natural es la clásica, súper potente.\n\nSe prepara como una infusión a la noche, re fácil.\n\nMirá, tenés dos opciones:\n\n🏆 *OPCIÓN RECOMENDADA (120 días)*: Tratamiento completo.\n💲 *${{PRICE_SEMILLAS_120}}*\n*Beneficio: Envío Gratis + Pago a domicilio cien por ciento BONIFICADO (de regalo).*\n\n🔸 *OPCIÓN INICIO (60 días)*:\n💲 *${{PRICE_SEMILLAS_60}}* (+ ${{ADICIONAL_MAX}} costo por pago a domicilio).\n\n💡 *Tip: Si llevás 3 unidades (para amigas/os), tenés 30% DE DESCUENTO.*\n\n👉 ¿Le metemos con 120 o arrancamos con 60?",
             "nextStep": "waiting_plan_choice"
         },
         "preference_gotas": {
@@ -64,22 +64,22 @@
                 "liquido",
                 "gotero"
             ],
-            "response": "Dale, buenísimo 🌿 Las gotas son discretas y se absorben rápido.\n\nMirá, tenés dos opciones:\n\n🏆 *OPCIÓN RECOMENDADA (120 días)*\n💲 *${{PRICE_GOTAS_120}}*\n*Beneficio: Envío Gratis + Pagás al recibir SIN recargo.*\n\n🔸 *OPCIÓN INICIO (60 días)*:\n💲 *${{PRICE_GOTAS_60}}* (+ ${{ADICIONAL_MAX}} de recargo administrativo).\n\n👉 ¿Le metemos con 120 o arrancamos con 60?",
+            "response": "Dale, buenísimo 🌿 Las gotas son discretas y se absorben rápido.\n\nMirá, tenés dos opciones:\n\n🏆 *OPCIÓN RECOMENDADA (120 días)*\n💲 *${{PRICE_GOTAS_120}}*\n*Beneficio: Envío Gratis + Pago a domicilio cien por ciento BONIFICADO (de regalo).*\n\n🔸 *OPCIÓN INICIO (60 días)*:\n💲 *${{PRICE_GOTAS_60}}* (+ ${{ADICIONAL_MAX}} costo por pago a domicilio).\n\n👉 ¿Le metemos con 120 o arrancamos con 60?",
             "nextStep": "waiting_plan_choice"
         },
         "price_capsulas": {
             "step": "waiting_price_confirmation",
-            "response": "💊 CÁPSULAS:\n\n🏆 *Plan 120 días* → *${{PRICE_CAPSULAS_120}}* (Envío Gratis + Sin Recargo)\n🔸 *Plan 60 días* → *${{PRICE_CAPSULAS_60}}* (+ ${{ADICIONAL_MAX}} recargo)\n\n👉 ¿Con cuál avanzamos?",
+            "response": "💊 CÁPSULAS:\n\n🏆 *Plan 120 días* → *${{PRICE_CAPSULAS_120}}* (Envío Gratis + Pago a domicilio DE REGALO)\n🔸 *Plan 60 días* → *${{PRICE_CAPSULAS_60}}* (+ ${{ADICIONAL_MAX}} costo por pago a domicilio)\n\n👉 ¿Con cuál avanzamos?",
             "nextStep": "waiting_plan_choice"
         },
         "price_semillas": {
             "step": "waiting_price_confirmation",
-            "response": "🌱 SEMILLAS:\n\n🏆 *Plan 120 días* → *${{PRICE_SEMILLAS_120}}* (Envío Gratis + Sin Recargo)\n🔸 *Plan 60 días* → *${{PRICE_SEMILLAS_60}}* (+ ${{ADICIONAL_MAX}} recargo)\n\n👉 ¿Con cuál avanzamos?",
+            "response": "🌱 SEMILLAS:\n\n🏆 *Plan 120 días* → *${{PRICE_SEMILLAS_120}}* (Envío Gratis + Pago a domicilio DE REGALO)\n🔸 *Plan 60 días* → *${{PRICE_SEMILLAS_60}}* (+ ${{ADICIONAL_MAX}} costo por pago a domicilio)\n\n👉 ¿Con cuál avanzamos?",
             "nextStep": "waiting_plan_choice"
         },
         "price_gotas": {
             "step": "waiting_price_confirmation",
-            "response": "💧 GOTAS:\n\n🏆 *Plan 120 días* → *${{PRICE_GOTAS_120}}* (Envío Gratis + Sin Recargo)\n🔸 *Plan 60 días* → *${{PRICE_GOTAS_60}}* (+ ${{ADICIONAL_MAX}} recargo)\n\n👉 ¿Con cuál avanzamos?",
+            "response": "💧 GOTAS:\n\n🏆 *Plan 120 días* → *${{PRICE_GOTAS_120}}* (Envío Gratis + Pago a domicilio DE REGALO)\n🔸 *Plan 60 días* → *${{PRICE_GOTAS_60}}* (+ ${{ADICIONAL_MAX}} costo por pago a domicilio)\n\n👉 ¿Con cuál avanzamos?",
             "nextStep": "waiting_plan_choice"
         },
         "closing": {
@@ -93,21 +93,7 @@
                 "bueno",
                 "ok"
             ],
-            "response": "¡Excelente decisión! 🎉\n\nChe, voy a *separar tu stock* ahora mismo así me aseguro que salga en el próximo despacho directo a tu casa.\n\nPara empezar a armar la etiqueta, ¿Me pasás tu *Nombre y Apellido* y la *Calle y Número* de tu casa? 👇",
-            "nextStep": "waiting_data"
-        },
-        "data_request": {
-            "step": "waiting_ok",
-            "match": [
-                "si",
-                "dale",
-                "bueno",
-                "sisi",
-                "joya",
-                "de una",
-                "esta bien"
-            ],
-            "response": "¡Genial! Pasame tus datos para armar la etiqueta de envío 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(Fijate que la dirección sea exacta 🙏)",
+            "response": "¡Excelente decisión! 🎉\n\nChe, voy a *separar tu stock* ahora mismo así me aseguro que salga en el próximo despacho directo a tu casa.\n\nPasame tus datos para armar la etiqueta de envío 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(Fijate que la dirección sea exacta 🙏)",
             "nextStep": "waiting_data"
         },
         "confirmation": {

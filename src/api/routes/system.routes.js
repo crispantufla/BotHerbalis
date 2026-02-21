@@ -90,25 +90,55 @@ module.exports = (client, sharedState) => {
             let totalOrders = 0;
             let todayOrders = 0;
             let completedToday = 0;
-            const today = new Date().toISOString().split('T')[0];
+
+            // Generate comparison date in YYYY-MM-DD format
+            const now = new Date();
+            const todayStr = now.toISOString().split('T')[0];
 
             if (fs.existsSync(ORDERS_FILE)) {
-                const orders = JSON.parse(fs.readFileSync(ORDERS_FILE));
+                let orders = [];
+                try {
+                    orders = JSON.parse(fs.readFileSync(ORDERS_FILE));
+                } catch (e) {
+                    console.error("❌ Stats: orders.json is malformed");
+                    orders = [];
+                }
+
                 totalOrders = orders.length;
                 orders.forEach(o => {
-                    const orderDate = o.createdAt ? new Date(o.createdAt).toISOString().split('T')[0] : '';
-                    if (orderDate === today) {
-                        todayOrders++;
-                        const price = parseFloat(String(o.precio || '0').replace(/[^0-9.]/g, ''));
-                        if (!isNaN(price)) todayRevenue += price;
-                        if (o.status !== 'Cancelado') completedToday++;
+                    if (!o || !o.createdAt) return;
+
+                    try {
+                        let orderDateStr = '';
+                        // Handle localized format "DD/MM/YYYY, HH:MM:SS"
+                        if (o.createdAt.includes('/')) {
+                            const [datePart] = o.createdAt.split(',');
+                            const [day, month, year] = datePart.split('/').map(s => s.trim());
+                            // Standardize to YYYY-MM-DD
+                            orderDateStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                        } else {
+                            // Try native parsing for ISO strings
+                            const d = new Date(o.createdAt);
+                            if (!isNaN(d.getTime())) {
+                                orderDateStr = d.toISOString().split('T')[0];
+                            }
+                        }
+
+                        if (orderDateStr === todayStr) {
+                            todayOrders++;
+                            const price = parseFloat(String(o.precio || '0').replace(/[^0-9.]/g, ''));
+                            if (!isNaN(price)) todayRevenue += price;
+                            if (o.status !== 'Cancelado') completedToday++;
+                        }
+                    } catch (err) {
+                        console.error("❌ Stats: Error parsing order date", o.createdAt);
                     }
                 });
             }
 
-            const activeSessions = Object.keys(userState).length;
-            const activeConversations = Object.values(userState).filter(
-                s => s.step && s.step !== 'completed' && s.step !== 'greeting'
+            const activeSessions = Object.keys(userState || {}).length;
+            const activeConversations = Object.values(userState || {}).filter(
+                s => s && s.step && s.step !== 'completed' && s.step !== 'greeting'
             ).length;
 
             res.json({
@@ -118,9 +148,10 @@ module.exports = (client, sharedState) => {
                 activeSessions,
                 activeConversations,
                 conversionRate: activeSessions > 0 ? Math.round((completedToday / activeSessions) * 100) : 0,
-                pausedUsers: pausedUsers.size
+                pausedUsers: (pausedUsers ? pausedUsers.size : 0)
             });
         } catch (e) {
+            console.error("🔴 [STATS ERROR]", e);
             res.status(500).json({ error: e.message });
         }
     });
