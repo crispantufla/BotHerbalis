@@ -1,0 +1,398 @@
+﻿{
+    "meta": {
+        "name": "Gui├│n V4 ÔÇö Psicolog├¡a de Ventas (Agresivo)",
+        "description": "Gui├│n optimizado con autoridad, anclaje de precios y escasez.",
+        "version": "4.0"
+    },
+    "flow": {
+        "greeting": {
+            "step": "greeting",
+            "keywords": [
+                "hola",
+                "precio",
+                "info",
+                "buenas",
+                "herbalis",
+                "nuez",
+                "kilos",
+                "bajar",
+                "cuanto",
+                "vale",
+                "costo",
+                "gotas"
+            ],
+            "response": "┬íHola! ­ƒæï Te cuento, somos *Herbalis*, especialistas en descenso de peso natural hace *13 a├▒os*. Ya ayudamos a m├ís de *15.000 personas* a lograr su objetivo.\n\nLos tratamientos rondan entre $37.000 y $69.000 (seg├║n duraci├│n), pero para recomendarte el ideal para vos:\n┬┐Qu├® busc├ís bajar? ┬┐Hasta 10 kg, entre 10 y 20 kg o m├ís?",
+            "nextStep": "waiting_weight"
+        },
+        "recommendation": {
+            "step": "waiting_weight",
+            "response": "Genial ­ƒæî\n\nQuedate tranqui que ese objetivo es re posible.\n\n┬┐Te queda m├ís c├│modo algo s├║per pr├íctico (c├ípsulas o gotas)\no prefer├¡s lo m├ís natural y tradicional (semillas)?",
+            "nextStep": "waiting_preference"
+        },
+        "preference_capsulas": {
+            "step": "waiting_preference",
+            "match": [
+                "capsula",
+                "capsulas",
+                "pastilla",
+                "pastillas",
+                "practico",
+                "practica",
+                "1"
+            ],
+            "response": "Dale, buen├¡simo ­ƒæì C├ípsulas es lo m├ís pr├íctico que hay.\n\n­ƒÆè Se toman as├¡:\nÔÇó 1 c├ípsula por d├¡a\nÔÇó 30 min antes de cenar\n\nMir├í, ten├®s dos opciones para tu objetivo:\n\n­ƒÅå *OPCI├ôN RECOMENDADA (120 d├¡as)*: Hac├®s el tratamiento completo y te asegur├ís el resultado.\n­ƒÆ▓ *${{PRICE_CAPSULAS_120}}*\n*Beneficio: Env├¡o Gratis + Pag├ís al recibir SIN recargo.*\n\n­ƒö© *OPCI├ôN INICIO (60 d├¡as)*:\n­ƒÆ▓ *${{PRICE_CAPSULAS_60}}* (+ ${{ADICIONAL_MAX}} de recargo administrativo por cobro en domicilio).\n\n­ƒæë ┬┐Quer├®s asegurar resultado con el de 120 o prefer├¡s probar con 60?",
+            "nextStep": "waiting_plan_choice"
+        },
+        "preference_semillas": {
+            "step": "waiting_preference",
+            "match": [
+                "infusion",
+                "t├®",
+                "yuyos",
+                "semillas",
+                "semilla",
+                "natural",
+                "tradicional"
+            ],
+            "response": "Dale, buen├¡simo ­ƒî┐ La semilla natural es la cl├ísica, s├║per potente.\n\nSe prepara como una infusi├│n a la noche, re f├ícil.\n\nMir├í, ten├®s dos opciones:\n\n­ƒÅå *OPCI├ôN RECOMENDADA (120 d├¡as)*: Tratamiento completo.\n­ƒÆ▓ *${{PRICE_SEMILLAS_120}}*\n*Beneficio: Env├¡o Gratis + Pag├ís al recibir SIN recargo.*\n\n­ƒö© *OPCI├ôN INICIO (60 d├¡as)*:\n­ƒÆ▓ *${{PRICE_SEMILLAS_60}}* (+ ${{ADICIONAL_MAX}} de recargo administrativo).\n\n­ƒÆí *Tip: Si llev├ís 3 unidades (para amigas/os), ten├®s 30% DE DESCUENTO.*\n\n­ƒæë ┬┐Le metemos con 120 o arrancamos con 60?",
+            "nextStep": "waiting_plan_choice"
+        },
+        "preference_gotas": {
+            "step": "waiting_preference",
+            "match": [
+                "gotas",
+                "liquido",
+                "gotero"
+            ],
+            "response": "Dale, buen├¡simo ­ƒî┐ Las gotas son discretas y se absorben r├ípido.\n\nMir├í, ten├®s dos opciones:\n\n­ƒÅå *OPCI├ôN RECOMENDADA (120 d├¡as)*\n­ƒÆ▓ *${{PRICE_GOTAS_120}}*\n*Beneficio: Env├¡o Gratis + Pag├ís al recibir SIN recargo.*\n\n­ƒö© *OPCI├ôN INICIO (60 d├¡as)*:\n­ƒÆ▓ *${{PRICE_GOTAS_60}}* (+ ${{ADICIONAL_MAX}} de recargo administrativo).\n\n­ƒæë ┬┐Le metemos con 120 o arrancamos con 60?",
+            "nextStep": "waiting_plan_choice"
+        },
+        "price_capsulas": {
+            "step": "waiting_price_confirmation",
+            "response": "­ƒÆè C├üPSULAS:\n\n­ƒÅå *Plan 120 d├¡as* ÔåÆ *${{PRICE_CAPSULAS_120}}* (Env├¡o Gratis + Sin Recargo)\n­ƒö© *Plan 60 d├¡as* ÔåÆ *${{PRICE_CAPSULAS_60}}* (+ ${{ADICIONAL_MAX}} recargo)\n\n­ƒæë ┬┐Con cu├íl avanzamos?",
+            "nextStep": "waiting_plan_choice"
+        },
+        "price_semillas": {
+            "step": "waiting_price_confirmation",
+            "response": "­ƒî▒ SEMILLAS:\n\n­ƒÅå *Plan 120 d├¡as* ÔåÆ *${{PRICE_SEMILLAS_120}}* (Env├¡o Gratis + Sin Recargo)\n­ƒö© *Plan 60 d├¡as* ÔåÆ *${{PRICE_SEMILLAS_60}}* (+ ${{ADICIONAL_MAX}} recargo)\n\n­ƒæë ┬┐Con cu├íl avanzamos?",
+            "nextStep": "waiting_plan_choice"
+        },
+        "price_gotas": {
+            "step": "waiting_price_confirmation",
+            "response": "­ƒÆº GOTAS:\n\n­ƒÅå *Plan 120 d├¡as* ÔåÆ *${{PRICE_GOTAS_120}}* (Env├¡o Gratis + Sin Recargo)\n­ƒö© *Plan 60 d├¡as* ÔåÆ *${{PRICE_GOTAS_60}}* (+ ${{ADICIONAL_MAX}} recargo)\n\n­ƒæë ┬┐Con cu├íl avanzamos?",
+            "nextStep": "waiting_plan_choice"
+        },
+        "closing": {
+            "step": "waiting_plan_choice",
+            "match": [
+                "si",
+                "sisi",
+                "precio",
+                "precios",
+                "dale",
+                "bueno",
+                "ok"
+            ],
+            "response": "┬íExcelente decisi├│n! ­ƒÄë\n\nChe, voy a *separar tu stock* ahora mismo as├¡ sale en el pr├│ximo despacho.\n\nPara confirmarlo, pasame por favor:\nNombre completo:\nCalle:\nN├║mero:\nLocalidad:\nC├│digo postal:\n\n(Fijate que la direcci├│n sea exacta, sin esquinas ni \"aprox\" ­ƒÖÅ)",
+            "nextStep": "waiting_data"
+        },
+        "data_request": {
+            "step": "waiting_ok",
+            "match": [
+                "si",
+                "dale",
+                "bueno",
+                "sisi",
+                "joya",
+                "de una",
+                "esta bien"
+            ],
+            "response": "┬íGenial! Tomamos los datos para separar tu pedido ­ƒæç\n\nNombre completo:\nCalle:\nN├║mero:\nLocalidad:\nC├│digo postal:\n\n(Fijate que la direcci├│n sea exacta, sin esquinas ni \"aprox\" ­ƒÖÅ)",
+            "nextStep": "waiting_data"
+        },
+        "confirmation": {
+            "step": "waiting_data",
+            "response": "­ƒôª CONFIRMACI├ôN DE ENV├ìO\n\nProducto: {{PRODUCT}}\nPlan: {{PLAN}} d├¡as\nTotal a pagar al recibir: {{TOTAL}}\n\nÔ£ö Correo Argentino\nÔ£ö Entrega estimada: 7 a 10 d├¡as h├íbiles\nÔ£ö Pago en efectivo al recibir\n\nImportante:\nSi el cartero no encuentra a nadie,\nel correo puede solicitar retiro en sucursal.\nPlazo: 72 hs.\n\nEl rechazo o no retiro genera un costo log├¡stico de ${{COSTO_LOGISTICO}}.\n\n­ƒæë Confirmame con un \"S├ì\" o un \"DALE\" para despachar YA mismo.",
+            "nextStep": "completed"
+        }
+    },
+    "faq": [
+        {
+            "keywords": [
+                "envio",
+                "costo de envio",
+                "cuanto el envio",
+                "gastos de envio"
+            ],
+            "response": "El env├¡o es gratuito."
+        },
+        {
+            "keywords": [
+                "que medio",
+                "que correo",
+                "por donde",
+                "empresa de envio"
+            ],
+            "response": "Realizamos los env├¡os exclusivamente por Correo Argentino ­ƒôª."
+        },
+        {
+            "keywords": [
+                "demora",
+                "tarda",
+                "tiempo",
+                "llega",
+                "cuanto demora"
+            ],
+            "response": "La entrega es de 7 a 10 d├¡as h├íbiles o a partir de la fecha que nos indiques."
+        },
+        {
+            "keywords": [
+                "programar",
+                "agendar",
+                "fecha"
+            ],
+            "response": "S├¡.\n\nPodemos enviarlo dentro de 7 a 10 d├¡as o programarlo para una fecha posterior que te quede c├│moda."
+        },
+        {
+            "keywords": [
+                "avisa",
+                "cartero",
+                "llaman",
+                "visita"
+            ],
+            "response": "No tenemos control sobre el momento exacto de la visita del cartero.\n\nSi no te encuentra, puede dejar aviso para retirar en sucursal."
+        },
+        {
+            "keywords": [
+                "sucursal",
+                "no quiero retirar",
+                "no puedo retirar"
+            ],
+            "response": "El env├¡o va a domicilio.\n\nSolo en algunos casos el correo solicita retiro. El plazo es de 72 hs."
+        },
+        {
+            "keywords": [
+                "que pasa si no retiro",
+                "rechazo",
+                "no retiro"
+            ],
+            "response": "El rechazo o no retiro genera un costo log├¡stico de $18.000."
+        },
+        {
+            "keywords": [
+                "tarjeta",
+                "cuotas",
+                "mercadopago",
+                "mp",
+                "cbu",
+                "alias",
+                "transferencia"
+            ],
+            "response": "Por el momento trabajamos ├║nicamente con pago al recibir.\n\n┬┐Prefer├¡s 60 o 120 d├¡as?"
+        },
+        {
+            "keywords": [
+                "pago",
+                "pagar",
+                "como se paga"
+            ],
+            "response": "Se paga al recibir el producto.\n\nEl plan de 120 d├¡as no tiene costo adicional.\nEl plan de 60 d├¡as tiene modalidad Contra Reembolso MAX con adicional de $6.000."
+        },
+        {
+            "keywords": [
+                "no tengo",
+                "no me alcanza",
+                "cobro",
+                "quincena",
+                "fin de mes"
+            ],
+            "response": "Podemos programar la entrega para despu├®s de la fecha que cobr├ís.\n\n┬┐Desde qu├® d├¡a te queda c├│modo recibirlo?"
+        },
+        {
+            "keywords": [
+                "muy caro",
+                "es mucho",
+                "mucha plata",
+                "sale un monton"
+            ],
+            "response": "Entiendo ­ƒÿè\n\nEs un tratamiento completo para 60 o 120 d├¡as con env├¡o incluido.\n\n┬┐Prefer├¡s 60 o 120 d├¡as?"
+        },
+        {
+            "keywords": [
+                "lo pienso",
+                "despues veo",
+                "mas tarde"
+            ],
+            "response": "Perfecto ­ƒÿè\n\n┬┐Hay algo puntual que te genere duda?"
+        },
+        {
+            "keywords": [
+                "cuantos kilos",
+                "cuanto bajo",
+                "cuanto se pierde",
+                "en un mes",
+                "en 60 dias"
+            ],
+            "response": "Cada cuerpo tiene su ritmo.\n\nQuienes tienen m├ís kilos para bajar suelen notar cambios m├ís visibles al inicio, y quienes necesitan bajar menos ven descensos m├ís progresivos.\n\nLo importante es que el descenso sea natural y sostenido."
+        },
+        {
+            "keywords": [
+                "cuanto cuesta",
+                "cuanto sale",
+                "que precio"
+            ],
+            "response": "Los tratamientos est├ín entre $37.000 y $69.000,\nseg├║n duraci├│n y formato.\n\n┬┐Busc├ís bajar hasta 10 kg, entre 10 y 20 kg o m├ís de 20 kg?",
+            "triggerStep": "waiting_weight"
+        },
+        {
+            "keywords": [
+                "que hace",
+                "para que sirve",
+                "de que se trata"
+            ],
+            "response": "Ayuda al cuerpo a eliminar excesos de forma natural, favoreciendo un descenso progresivo de peso.\n\n┬┐Quer├®s que te recomiende la mejor opci├│n para tu objetivo?"
+        },
+        {
+            "keywords": [
+                "como funciona",
+                "como actua"
+            ],
+            "response": "Acompa├▒a el proceso natural del cuerpo, ayudando a eliminar excesos de manera progresiva.\n\n┬┐Busc├ís algo pr├íctico o m├ís natural?"
+        },
+        {
+            "keywords": [
+                "dieta",
+                "comer",
+                "comida"
+            ],
+            "response": "No necesit├ís dietas estrictas.\n\nSi adem├ís cuid├ís un poco la alimentaci├│n o sum├ís movimiento, los resultados suelen verse m├ís r├ípido."
+        },
+        {
+            "keywords": [
+                "rebote"
+            ],
+            "response": "No.\n\nEl rebote suele aparecer con m├®todos agresivos. La Nuez es natural y el descenso es progresivo."
+        },
+        {
+            "keywords": [
+                "diabetes",
+                "hipotiroidismo",
+                "tiroides",
+                "presion",
+                "hipertension"
+            ],
+            "response": "Muchas personas con esas condiciones lo consumen sin inconvenientes.\n\nEs natural y no interfiere con tratamientos habituales.\nLa ├║nica contraindicaci├│n es embarazo o lactancia."
+        },
+        {
+            "keywords": [
+                "contraindicaciones",
+                "embarazo",
+                "lactancia"
+            ],
+            "response": "Solo no se recomienda durante embarazo o lactancia."
+        },
+        {
+            "keywords": [
+                "peligrosa",
+                "mala",
+                "me dijeron"
+            ],
+            "response": "En redes circula informaci├│n mezclada con productos distintos.\n\nTrabajamos hace m├ís de 13 a├▒os con este producto en distintos pa├¡ses."
+        },
+        {
+            "keywords": [
+                "medico",
+                "doctor"
+            ],
+            "response": "Perfecto ­ƒÿè\n\nEs un producto natural y no tiene contraindicaciones m├ís all├í de embarazo o lactancia.\n\nCuando decidas avanzar, lo dejamos programado."
+        },
+        {
+            "keywords": [
+                "como se toman",
+                "como tomo",
+                "como se usa"
+            ],
+            "response": "Las c├ípsulas: 1 c├ípsula por d├¡a, 30 minutos antes del almuerzo o la cena.\n\nLas semillas: se prepara en infusi├│n cada noche antes de acostarte. Es natural y no tiene gusto."
+        },
+        {
+            "keywords": [
+                "30 dias",
+                "un mes",
+                "menos tiempo"
+            ],
+            "response": "Trabajamos con planes completos de 60 o 120 d├¡as."
+        },
+        {
+            "keywords": [
+                "de donde son",
+                "quienes son",
+                "empresa"
+            ],
+            "response": "Somos Herbalis.\n\nTrabajamos hace m├ís de 13 a├▒os con este producto y enviamos a todo el pa├¡s."
+        },
+        {
+            "keywords": [
+                "estafa",
+                "trucho",
+                "mentira",
+                "robo",
+                "enga├▒o",
+                "chanta"
+            ],
+            "response": "Entiendo la duda.\n\nPor eso trabajamos con pago al recibir."
+        },
+        {
+            "keywords": [
+                "farmacia",
+                "suplemento",
+                "pastillas de farmacia",
+                "otro producto",
+                "marca"
+            ],
+            "response": "Los productos de farmacia generalmente son qu├¡micos. La Nuez de la India es 100% natural, no tiene efecto rebote y las ├║nicas contraindicaciones son embarazo y lactancia.\n\nAdem├ís, te enviamos a domicilio gratis y pag├ís al recibir ­ƒÿè"
+        },
+        {
+            "keywords": [
+                "funciona",
+                "sirve",
+                "verdad",
+                "posta"
+            ],
+            "response": "Trabajamos hace m├ís de 13 a├▒os con este producto. Es natural y el descenso es progresivo.\n\nPag├ís al recibir, as├¡ no arriesg├ís nada ­ƒÿè"
+        },
+        {
+            "keywords": [
+                "whatsapp",
+                "este numero",
+                "numero de herbalis"
+            ],
+            "response": "S├¡, este es el WhatsApp oficial de Herbalis ­ƒÿè\n\n┬┐En qu├® te puedo ayudar?"
+        },
+        {
+            "keywords": [
+                "gusto",
+                "sabor",
+                "feo",
+                "rico"
+            ],
+            "response": "Las c├ípsulas no tienen gusto, se tragan con agua.\nLas semillas se preparan en infusi├│n y son suaves, sin sabor fuerte.\nLas gotas tienen sabor neutro."
+        }
+    ],
+    "rules": {
+        "alwaysEndWithQuestion": true,
+        "maxFollowUps": 1,
+        "noNegotiatePrice": true,
+        "noDiscounts": true,
+        "noCreditCard": true,
+        "noArgue": true,
+        "keepResponsesShort": true,
+        "contraReembolsoMAX": {
+            "enabled": true,
+            "adicional": 6000,
+            "appliesTo": "60",
+            "description": "Modalidad Contra Reembolso MAX ÔÇö adicional de $6.000 en planes de 60 d├¡as"
+        },
+        "costoLogisticoRechazo": 18000,
+        "closeIfNotAccepted": "Trabajamos bajo estas modalidades.\n\nSi en alg├║n momento te resulta c├│modo avanzar, ac├í estamos ­ƒÿè"
+    }
+}

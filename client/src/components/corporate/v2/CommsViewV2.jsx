@@ -13,7 +13,8 @@ const IconsV2 = {
     Script: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
     ChevronDown: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>,
     Send: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>,
-    Clip: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+    Clip: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>,
+    Cart: ({ className = "w-5 h-5" }) => <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-1.35 2.7a1 1 0 00.9 1.5h11.45m-9 4a1 1 0 11-2 0 1 1 0 012 0zm10 0a1 1 0 11-2 0 1 1 0 012 0z" /></svg>
 };
 
 const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
@@ -26,6 +27,7 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(false);
     const [showScriptPanel, setShowScriptPanel] = useState(false);
+    const [showOrdersPanel, setShowOrdersPanel] = useState(false);
     const [scriptFlow, setScriptFlow] = useState({});
     const [summarizing, setSummarizing] = useState(false);
     const [summaryText, setSummaryText] = useState(null);
@@ -279,8 +281,11 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
                                 {chat.isPaused && <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full border-2 border-white/50"></span>}
                             </div>
                             <div className="flex-1 min-w-0">
-                                <div className="flex justify-between items-center mb-1">
-                                    <h3 className={`font-extrabold text-sm truncate ${selectedChat?.id === chat.id ? 'text-white' : 'text-slate-800'}`}>{chat.name}</h3>
+                                <div className="flex justify-between items-start mb-1 gap-2">
+                                    <h3 className={`font-extrabold text-sm truncate flex flex-wrap items-center gap-1 ${selectedChat?.id === chat.id ? 'text-white' : 'text-slate-800'}`}>
+                                        <span className="truncate max-w-[120px]">{chat.name}</span>
+                                        {chat.hasBought && <span title="Cliente Recurrente" className="inline-flex items-center text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-md font-extrabold shadow-sm"><IconsV2.Cart className="w-2.5 h-2.5 mr-0.5" /> Cliente</span>}
+                                    </h3>
                                     <span className={`text-[10px] font-bold font-mono ${selectedChat?.id === chat.id ? 'text-indigo-100' : 'text-slate-400'}`}>{chat.time}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -323,7 +328,13 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2 sm:gap-3">
+                                {selectedChat.hasBought && (
+                                    <button onClick={() => setShowOrdersPanel(!showOrdersPanel)} className="p-3 rounded-xl bg-emerald-100/80 text-emerald-700 hover:bg-emerald-200 hover:shadow-md transition-all flex items-center gap-2" title="Registro de Compras">
+                                        <IconsV2.Cart className="w-5 h-5" />
+                                        <span className="text-xs font-bold hidden xl:inline">Pedidos</span>
+                                    </button>
+                                )}
                                 <button onClick={handleSummarize} disabled={summarizing} className="p-3 rounded-xl bg-violet-100/80 text-violet-700 hover:bg-violet-200 hover:shadow-md transition-all" title="Resumen de IA">
                                     <IconsV2.AI />
                                 </button>
@@ -335,7 +346,7 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
                                 </button>
                                 <button onClick={() => setShowScriptPanel(!showScriptPanel)} className="flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-slate-800 to-slate-700 text-white font-bold text-sm hover:shadow-lg transition-all active:scale-95">
                                     <IconsV2.Script />
-                                    <span>Script</span>
+                                    <span>Guión</span>
                                 </button>
                             </div>
                         </div>
@@ -349,6 +360,28 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
                                         <button key={key} onClick={() => handleSendScriptStep(key)} className="px-4 py-2 bg-white/10 hover:bg-indigo-500 border border-white/20 rounded-xl text-xs font-medium text-white transition-all shadow-sm backdrop-blur-md">
                                             {key.replace(/_/g, ' ')}
                                         </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Orders Panel */}
+                        {showOrdersPanel && selectedChat.hasBought && (
+                            <div className="border-b border-white border-opacity-50 bg-emerald-800/90 backdrop-blur-xl p-6 z-20 animate-fade-in shadow-xl">
+                                <div className="flex justify-between items-center mb-4">
+                                    <p className="text-[10px] font-bold text-emerald-300 uppercase tracking-widest">Historial de Compras ({selectedChat.pastOrders?.length || 0})</p>
+                                    <button onClick={() => setShowOrdersPanel(false)} className="text-emerald-200 hover:text-white bg-white/10 p-1.5 rounded-lg">✕</button>
+                                </div>
+                                <div className="flex flex-col gap-3 max-h-60 overflow-y-auto custom-scrollbar">
+                                    {selectedChat.pastOrders?.map((order, i) => (
+                                        <div key={i} className="bg-white/10 border border-white/20 p-4 rounded-xl flex justify-between items-center">
+                                            <div>
+                                                <p className="text-emerald-300 font-bold text-xs tracking-wide uppercase mb-1">{order.createdAt || 'Fecha desconocida'} • {order.status}</p>
+                                                <p className="text-white font-extrabold text-sm">{order.producto} ({order.plan} días)</p>
+                                                <p className="text-emerald-100 font-medium text-xs mt-1">Dir: {order.calle}, {order.ciudad} • CP: {order.cp}</p>
+                                                <p className="text-white font-bold text-sm mt-2">{order.precio}</p>
+                                            </div>
+                                        </div>
                                     ))}
                                 </div>
                             </div>

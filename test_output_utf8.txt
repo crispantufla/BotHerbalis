@@ -1,0 +1,2550 @@
+﻿  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    [ADDRESS] valid data extracted, attempts reset.
+
+      at log (src/flows/salesFlow.js:1232:29)
+
+  console.log
+    [AI-FALLBACK] waiting_data: Detected question/objection from user_V3_CompradorPostdatado_1: "dale yo te aviso"
+
+      at log (src/flows/salesFlow.js:1160:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_UsuarioconDudas_2
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V3_UsuarioconDudas_2 failed to complete. Ended at: waiting_data
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_plan_choice -> waiting_data -> waiting_data -> waiting_data
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [GLOBAL] User user_V3_CambiodeProductoalaMitad_3 requested change.
+
+      at log (src/flows/salesFlow.js:347:17)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_CambiodeProductoalaMitad_3
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_CambiodeProductoalaMitad_3
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_CambiodeProductoalaMitad_3
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.error
+    ­ƒÜ¿ LOOP DETECTED in V3 [Scenario: Cambio de Producto a la Mitad] for user_V3_CambiodeProductoalaMitad_3 at step waiting_preference
+
+    [0m [90m 143 |[39m                     [36mif[39m (sameStepCount [33m>[39m [35m4[39m) {
+     [90m 144 |[39m                         loopCount[33m++[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 145 |[39m                         console[33m.[39merror([32m`­ƒÜ¿ LOOP DETECTED in ${versionLabel} [Scenario: ${scenario.name}] for ${userId} at step ${currentStep}`[39m)[33m;[39m
+     [90m     |[39m                                 [31m[1m^[22m[39m
+     [90m 146 |[39m                         [36mbreak[39m[33m;[39m
+     [90m 147 |[39m                     }
+     [90m 148 |[39m                 }[0m
+
+      at error (tests/simulation_100.test.js:145:33)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V3_CambiodeProductoalaMitad_3 failed to complete. Ended at: waiting_preference
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_plan_choice -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_preference
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [LOGIC] User user_V3_NegativaAmable_4 refused/failed weight question. Skipping to preference.
+
+      at log (src/flows/salesFlow.js:641:29)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_NegativaAmable_4
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    [ADDRESS] valid data extracted, attempts reset.
+
+      at log (src/flows/salesFlow.js:1232:29)
+
+  console.log
+    [AI-FALLBACK] waiting_data: Detected question/objection from user_V3_CompradorPostdatado_6: "dale yo te aviso"
+
+      at log (src/flows/salesFlow.js:1160:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_UsuarioconDudas_7
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V3_UsuarioconDudas_7 failed to complete. Ended at: waiting_data
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_plan_choice -> waiting_data -> waiting_data -> waiting_data
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [GLOBAL] User user_V3_CambiodeProductoalaMitad_8 requested change.
+
+      at log (src/flows/salesFlow.js:347:17)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_CambiodeProductoalaMitad_8
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_CambiodeProductoalaMitad_8
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_CambiodeProductoalaMitad_8
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.error
+    ­ƒÜ¿ LOOP DETECTED in V3 [Scenario: Cambio de Producto a la Mitad] for user_V3_CambiodeProductoalaMitad_8 at step waiting_preference
+
+    [0m [90m 143 |[39m                     [36mif[39m (sameStepCount [33m>[39m [35m4[39m) {
+     [90m 144 |[39m                         loopCount[33m++[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 145 |[39m                         console[33m.[39merror([32m`­ƒÜ¿ LOOP DETECTED in ${versionLabel} [Scenario: ${scenario.name}] for ${userId} at step ${currentStep}`[39m)[33m;[39m
+     [90m     |[39m                                 [31m[1m^[22m[39m
+     [90m 146 |[39m                         [36mbreak[39m[33m;[39m
+     [90m 147 |[39m                     }
+     [90m 148 |[39m                 }[0m
+
+      at error (tests/simulation_100.test.js:145:33)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V3_CambiodeProductoalaMitad_8 failed to complete. Ended at: waiting_preference
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_plan_choice -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_preference
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [LOGIC] User user_V3_NegativaAmable_9 refused/failed weight question. Skipping to preference.
+
+      at log (src/flows/salesFlow.js:641:29)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_NegativaAmable_9
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    [ADDRESS] valid data extracted, attempts reset.
+
+      at log (src/flows/salesFlow.js:1232:29)
+
+  console.log
+    [AI-FALLBACK] waiting_data: Detected question/objection from user_V3_CompradorPostdatado_11: "dale yo te aviso"
+
+      at log (src/flows/salesFlow.js:1160:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_UsuarioconDudas_12
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V3_UsuarioconDudas_12 failed to complete. Ended at: waiting_data
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_plan_choice -> waiting_data -> waiting_data -> waiting_data
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [GLOBAL] User user_V3_CambiodeProductoalaMitad_13 requested change.
+
+      at log (src/flows/salesFlow.js:347:17)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_CambiodeProductoalaMitad_13
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_CambiodeProductoalaMitad_13
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_CambiodeProductoalaMitad_13
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.error
+    ­ƒÜ¿ LOOP DETECTED in V3 [Scenario: Cambio de Producto a la Mitad] for user_V3_CambiodeProductoalaMitad_13 at step waiting_preference
+
+    [0m [90m 143 |[39m                     [36mif[39m (sameStepCount [33m>[39m [35m4[39m) {
+     [90m 144 |[39m                         loopCount[33m++[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 145 |[39m                         console[33m.[39merror([32m`­ƒÜ¿ LOOP DETECTED in ${versionLabel} [Scenario: ${scenario.name}] for ${userId} at step ${currentStep}`[39m)[33m;[39m
+     [90m     |[39m                                 [31m[1m^[22m[39m
+     [90m 146 |[39m                         [36mbreak[39m[33m;[39m
+     [90m 147 |[39m                     }
+     [90m 148 |[39m                 }[0m
+
+      at error (tests/simulation_100.test.js:145:33)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V3_CambiodeProductoalaMitad_13 failed to complete. Ended at: waiting_preference
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_plan_choice -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_preference
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [LOGIC] User user_V3_NegativaAmable_14 refused/failed weight question. Skipping to preference.
+
+      at log (src/flows/salesFlow.js:641:29)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_NegativaAmable_14
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    [ADDRESS] valid data extracted, attempts reset.
+
+      at log (src/flows/salesFlow.js:1232:29)
+
+  console.log
+    [AI-FALLBACK] waiting_data: Detected question/objection from user_V3_CompradorPostdatado_16: "dale yo te aviso"
+
+      at log (src/flows/salesFlow.js:1160:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_UsuarioconDudas_17
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V3_UsuarioconDudas_17 failed to complete. Ended at: waiting_data
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_plan_choice -> waiting_data -> waiting_data -> waiting_data
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [GLOBAL] User user_V3_CambiodeProductoalaMitad_18 requested change.
+
+      at log (src/flows/salesFlow.js:347:17)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_CambiodeProductoalaMitad_18
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_CambiodeProductoalaMitad_18
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_CambiodeProductoalaMitad_18
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.error
+    ­ƒÜ¿ LOOP DETECTED in V3 [Scenario: Cambio de Producto a la Mitad] for user_V3_CambiodeProductoalaMitad_18 at step waiting_preference
+
+    [0m [90m 143 |[39m                     [36mif[39m (sameStepCount [33m>[39m [35m4[39m) {
+     [90m 144 |[39m                         loopCount[33m++[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 145 |[39m                         console[33m.[39merror([32m`­ƒÜ¿ LOOP DETECTED in ${versionLabel} [Scenario: ${scenario.name}] for ${userId} at step ${currentStep}`[39m)[33m;[39m
+     [90m     |[39m                                 [31m[1m^[22m[39m
+     [90m 146 |[39m                         [36mbreak[39m[33m;[39m
+     [90m 147 |[39m                     }
+     [90m 148 |[39m                 }[0m
+
+      at error (tests/simulation_100.test.js:145:33)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V3_CambiodeProductoalaMitad_18 failed to complete. Ended at: waiting_preference
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_plan_choice -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_preference
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [LOGIC] User user_V3_NegativaAmable_19 refused/failed weight question. Skipping to preference.
+
+      at log (src/flows/salesFlow.js:641:29)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_NegativaAmable_19
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    [ADDRESS] valid data extracted, attempts reset.
+
+      at log (src/flows/salesFlow.js:1232:29)
+
+  console.log
+    [AI-FALLBACK] waiting_data: Detected question/objection from user_V3_CompradorPostdatado_21: "dale yo te aviso"
+
+      at log (src/flows/salesFlow.js:1160:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_UsuarioconDudas_22
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V3_UsuarioconDudas_22 failed to complete. Ended at: waiting_data
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_plan_choice -> waiting_data -> waiting_data -> waiting_data
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [GLOBAL] User user_V3_CambiodeProductoalaMitad_23 requested change.
+
+      at log (src/flows/salesFlow.js:347:17)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_CambiodeProductoalaMitad_23
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_CambiodeProductoalaMitad_23
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_CambiodeProductoalaMitad_23
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.error
+    ­ƒÜ¿ LOOP DETECTED in V3 [Scenario: Cambio de Producto a la Mitad] for user_V3_CambiodeProductoalaMitad_23 at step waiting_preference
+
+    [0m [90m 143 |[39m                     [36mif[39m (sameStepCount [33m>[39m [35m4[39m) {
+     [90m 144 |[39m                         loopCount[33m++[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 145 |[39m                         console[33m.[39merror([32m`­ƒÜ¿ LOOP DETECTED in ${versionLabel} [Scenario: ${scenario.name}] for ${userId} at step ${currentStep}`[39m)[33m;[39m
+     [90m     |[39m                                 [31m[1m^[22m[39m
+     [90m 146 |[39m                         [36mbreak[39m[33m;[39m
+     [90m 147 |[39m                     }
+     [90m 148 |[39m                 }[0m
+
+      at error (tests/simulation_100.test.js:145:33)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V3_CambiodeProductoalaMitad_23 failed to complete. Ended at: waiting_preference
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_plan_choice -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_preference
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [LOGIC] User user_V3_NegativaAmable_24 refused/failed weight question. Skipping to preference.
+
+      at log (src/flows/salesFlow.js:641:29)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_NegativaAmable_24
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    [ADDRESS] valid data extracted, attempts reset.
+
+      at log (src/flows/salesFlow.js:1232:29)
+
+  console.log
+    [AI-FALLBACK] waiting_data: Detected question/objection from user_V3_CompradorPostdatado_26: "dale yo te aviso"
+
+      at log (src/flows/salesFlow.js:1160:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_UsuarioconDudas_27
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V3_UsuarioconDudas_27 failed to complete. Ended at: waiting_data
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_plan_choice -> waiting_data -> waiting_data -> waiting_data
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [GLOBAL] User user_V3_CambiodeProductoalaMitad_28 requested change.
+
+      at log (src/flows/salesFlow.js:347:17)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_CambiodeProductoalaMitad_28
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_CambiodeProductoalaMitad_28
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_CambiodeProductoalaMitad_28
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.error
+    ­ƒÜ¿ LOOP DETECTED in V3 [Scenario: Cambio de Producto a la Mitad] for user_V3_CambiodeProductoalaMitad_28 at step waiting_preference
+
+    [0m [90m 143 |[39m                     [36mif[39m (sameStepCount [33m>[39m [35m4[39m) {
+     [90m 144 |[39m                         loopCount[33m++[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 145 |[39m                         console[33m.[39merror([32m`­ƒÜ¿ LOOP DETECTED in ${versionLabel} [Scenario: ${scenario.name}] for ${userId} at step ${currentStep}`[39m)[33m;[39m
+     [90m     |[39m                                 [31m[1m^[22m[39m
+     [90m 146 |[39m                         [36mbreak[39m[33m;[39m
+     [90m 147 |[39m                     }
+     [90m 148 |[39m                 }[0m
+
+      at error (tests/simulation_100.test.js:145:33)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V3_CambiodeProductoalaMitad_28 failed to complete. Ended at: waiting_preference
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_plan_choice -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_preference
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [LOGIC] User user_V3_NegativaAmable_29 refused/failed weight question. Skipping to preference.
+
+      at log (src/flows/salesFlow.js:641:29)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_NegativaAmable_29
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    [ADDRESS] valid data extracted, attempts reset.
+
+      at log (src/flows/salesFlow.js:1232:29)
+
+  console.log
+    [AI-FALLBACK] waiting_data: Detected question/objection from user_V3_CompradorPostdatado_31: "dale yo te aviso"
+
+      at log (src/flows/salesFlow.js:1160:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_UsuarioconDudas_32
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V3_UsuarioconDudas_32 failed to complete. Ended at: waiting_data
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_plan_choice -> waiting_data -> waiting_data -> waiting_data
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [GLOBAL] User user_V3_CambiodeProductoalaMitad_33 requested change.
+
+      at log (src/flows/salesFlow.js:347:17)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_CambiodeProductoalaMitad_33
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_CambiodeProductoalaMitad_33
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_CambiodeProductoalaMitad_33
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.error
+    ­ƒÜ¿ LOOP DETECTED in V3 [Scenario: Cambio de Producto a la Mitad] for user_V3_CambiodeProductoalaMitad_33 at step waiting_preference
+
+    [0m [90m 143 |[39m                     [36mif[39m (sameStepCount [33m>[39m [35m4[39m) {
+     [90m 144 |[39m                         loopCount[33m++[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 145 |[39m                         console[33m.[39merror([32m`­ƒÜ¿ LOOP DETECTED in ${versionLabel} [Scenario: ${scenario.name}] for ${userId} at step ${currentStep}`[39m)[33m;[39m
+     [90m     |[39m                                 [31m[1m^[22m[39m
+     [90m 146 |[39m                         [36mbreak[39m[33m;[39m
+     [90m 147 |[39m                     }
+     [90m 148 |[39m                 }[0m
+
+      at error (tests/simulation_100.test.js:145:33)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V3_CambiodeProductoalaMitad_33 failed to complete. Ended at: waiting_preference
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_plan_choice -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_preference
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [LOGIC] User user_V3_NegativaAmable_34 refused/failed weight question. Skipping to preference.
+
+      at log (src/flows/salesFlow.js:641:29)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_NegativaAmable_34
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    [ADDRESS] valid data extracted, attempts reset.
+
+      at log (src/flows/salesFlow.js:1232:29)
+
+  console.log
+    [AI-FALLBACK] waiting_data: Detected question/objection from user_V3_CompradorPostdatado_36: "dale yo te aviso"
+
+      at log (src/flows/salesFlow.js:1160:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_UsuarioconDudas_37
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V3_UsuarioconDudas_37 failed to complete. Ended at: waiting_data
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_plan_choice -> waiting_data -> waiting_data -> waiting_data
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [GLOBAL] User user_V3_CambiodeProductoalaMitad_38 requested change.
+
+      at log (src/flows/salesFlow.js:347:17)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_CambiodeProductoalaMitad_38
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_CambiodeProductoalaMitad_38
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_CambiodeProductoalaMitad_38
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.error
+    ­ƒÜ¿ LOOP DETECTED in V3 [Scenario: Cambio de Producto a la Mitad] for user_V3_CambiodeProductoalaMitad_38 at step waiting_preference
+
+    [0m [90m 143 |[39m                     [36mif[39m (sameStepCount [33m>[39m [35m4[39m) {
+     [90m 144 |[39m                         loopCount[33m++[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 145 |[39m                         console[33m.[39merror([32m`­ƒÜ¿ LOOP DETECTED in ${versionLabel} [Scenario: ${scenario.name}] for ${userId} at step ${currentStep}`[39m)[33m;[39m
+     [90m     |[39m                                 [31m[1m^[22m[39m
+     [90m 146 |[39m                         [36mbreak[39m[33m;[39m
+     [90m 147 |[39m                     }
+     [90m 148 |[39m                 }[0m
+
+      at error (tests/simulation_100.test.js:145:33)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V3_CambiodeProductoalaMitad_38 failed to complete. Ended at: waiting_preference
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_plan_choice -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_preference
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [LOGIC] User user_V3_NegativaAmable_39 refused/failed weight question. Skipping to preference.
+
+      at log (src/flows/salesFlow.js:641:29)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_NegativaAmable_39
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    [ADDRESS] valid data extracted, attempts reset.
+
+      at log (src/flows/salesFlow.js:1232:29)
+
+  console.log
+    [AI-FALLBACK] waiting_data: Detected question/objection from user_V3_CompradorPostdatado_41: "dale yo te aviso"
+
+      at log (src/flows/salesFlow.js:1160:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_UsuarioconDudas_42
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V3_UsuarioconDudas_42 failed to complete. Ended at: waiting_data
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_plan_choice -> waiting_data -> waiting_data -> waiting_data
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [GLOBAL] User user_V3_CambiodeProductoalaMitad_43 requested change.
+
+      at log (src/flows/salesFlow.js:347:17)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_CambiodeProductoalaMitad_43
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_CambiodeProductoalaMitad_43
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_CambiodeProductoalaMitad_43
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.error
+    ­ƒÜ¿ LOOP DETECTED in V3 [Scenario: Cambio de Producto a la Mitad] for user_V3_CambiodeProductoalaMitad_43 at step waiting_preference
+
+    [0m [90m 143 |[39m                     [36mif[39m (sameStepCount [33m>[39m [35m4[39m) {
+     [90m 144 |[39m                         loopCount[33m++[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 145 |[39m                         console[33m.[39merror([32m`­ƒÜ¿ LOOP DETECTED in ${versionLabel} [Scenario: ${scenario.name}] for ${userId} at step ${currentStep}`[39m)[33m;[39m
+     [90m     |[39m                                 [31m[1m^[22m[39m
+     [90m 146 |[39m                         [36mbreak[39m[33m;[39m
+     [90m 147 |[39m                     }
+     [90m 148 |[39m                 }[0m
+
+      at error (tests/simulation_100.test.js:145:33)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V3_CambiodeProductoalaMitad_43 failed to complete. Ended at: waiting_preference
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_plan_choice -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_preference
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [LOGIC] User user_V3_NegativaAmable_44 refused/failed weight question. Skipping to preference.
+
+      at log (src/flows/salesFlow.js:641:29)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_NegativaAmable_44
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    [ADDRESS] valid data extracted, attempts reset.
+
+      at log (src/flows/salesFlow.js:1232:29)
+
+  console.log
+    [AI-FALLBACK] waiting_data: Detected question/objection from user_V3_CompradorPostdatado_46: "dale yo te aviso"
+
+      at log (src/flows/salesFlow.js:1160:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_UsuarioconDudas_47
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V3_UsuarioconDudas_47 failed to complete. Ended at: waiting_data
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_plan_choice -> waiting_data -> waiting_data -> waiting_data
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [GLOBAL] User user_V3_CambiodeProductoalaMitad_48 requested change.
+
+      at log (src/flows/salesFlow.js:347:17)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_CambiodeProductoalaMitad_48
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_CambiodeProductoalaMitad_48
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_CambiodeProductoalaMitad_48
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.error
+    ­ƒÜ¿ LOOP DETECTED in V3 [Scenario: Cambio de Producto a la Mitad] for user_V3_CambiodeProductoalaMitad_48 at step waiting_preference
+
+    [0m [90m 143 |[39m                     [36mif[39m (sameStepCount [33m>[39m [35m4[39m) {
+     [90m 144 |[39m                         loopCount[33m++[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 145 |[39m                         console[33m.[39merror([32m`­ƒÜ¿ LOOP DETECTED in ${versionLabel} [Scenario: ${scenario.name}] for ${userId} at step ${currentStep}`[39m)[33m;[39m
+     [90m     |[39m                                 [31m[1m^[22m[39m
+     [90m 146 |[39m                         [36mbreak[39m[33m;[39m
+     [90m 147 |[39m                     }
+     [90m 148 |[39m                 }[0m
+
+      at error (tests/simulation_100.test.js:145:33)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V3_CambiodeProductoalaMitad_48 failed to complete. Ended at: waiting_preference
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_plan_choice -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_preference
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [LOGIC] User user_V3_NegativaAmable_49 refused/failed weight question. Skipping to preference.
+
+      at log (src/flows/salesFlow.js:641:29)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V3_NegativaAmable_49
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    [ADDRESS] valid data extracted, attempts reset.
+
+      at log (src/flows/salesFlow.js:1232:29)
+
+  console.log
+    [AI-FALLBACK] waiting_data: Detected question/objection from user_V4_CompradorPostdatado_1: "dale yo te aviso"
+
+      at log (src/flows/salesFlow.js:1160:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_UsuarioconDudas_2
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V4_UsuarioconDudas_2 failed to complete. Ended at: waiting_data
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_plan_choice -> waiting_data -> waiting_data -> waiting_data
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [GLOBAL] User user_V4_CambiodeProductoalaMitad_3 requested change.
+
+      at log (src/flows/salesFlow.js:347:17)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_CambiodeProductoalaMitad_3
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_CambiodeProductoalaMitad_3
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_CambiodeProductoalaMitad_3
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.error
+    ­ƒÜ¿ LOOP DETECTED in V4 [Scenario: Cambio de Producto a la Mitad] for user_V4_CambiodeProductoalaMitad_3 at step waiting_preference
+
+    [0m [90m 143 |[39m                     [36mif[39m (sameStepCount [33m>[39m [35m4[39m) {
+     [90m 144 |[39m                         loopCount[33m++[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 145 |[39m                         console[33m.[39merror([32m`­ƒÜ¿ LOOP DETECTED in ${versionLabel} [Scenario: ${scenario.name}] for ${userId} at step ${currentStep}`[39m)[33m;[39m
+     [90m     |[39m                                 [31m[1m^[22m[39m
+     [90m 146 |[39m                         [36mbreak[39m[33m;[39m
+     [90m 147 |[39m                     }
+     [90m 148 |[39m                 }[0m
+
+      at error (tests/simulation_100.test.js:145:33)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V4_CambiodeProductoalaMitad_3 failed to complete. Ended at: waiting_preference
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_plan_choice -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_preference
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [LOGIC] User user_V4_NegativaAmable_4 refused/failed weight question. Skipping to preference.
+
+      at log (src/flows/salesFlow.js:641:29)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_NegativaAmable_4
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    [ADDRESS] valid data extracted, attempts reset.
+
+      at log (src/flows/salesFlow.js:1232:29)
+
+  console.log
+    [AI-FALLBACK] waiting_data: Detected question/objection from user_V4_CompradorPostdatado_6: "dale yo te aviso"
+
+      at log (src/flows/salesFlow.js:1160:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_UsuarioconDudas_7
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V4_UsuarioconDudas_7 failed to complete. Ended at: waiting_data
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_plan_choice -> waiting_data -> waiting_data -> waiting_data
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [GLOBAL] User user_V4_CambiodeProductoalaMitad_8 requested change.
+
+      at log (src/flows/salesFlow.js:347:17)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_CambiodeProductoalaMitad_8
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_CambiodeProductoalaMitad_8
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_CambiodeProductoalaMitad_8
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.error
+    ­ƒÜ¿ LOOP DETECTED in V4 [Scenario: Cambio de Producto a la Mitad] for user_V4_CambiodeProductoalaMitad_8 at step waiting_preference
+
+    [0m [90m 143 |[39m                     [36mif[39m (sameStepCount [33m>[39m [35m4[39m) {
+     [90m 144 |[39m                         loopCount[33m++[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 145 |[39m                         console[33m.[39merror([32m`­ƒÜ¿ LOOP DETECTED in ${versionLabel} [Scenario: ${scenario.name}] for ${userId} at step ${currentStep}`[39m)[33m;[39m
+     [90m     |[39m                                 [31m[1m^[22m[39m
+     [90m 146 |[39m                         [36mbreak[39m[33m;[39m
+     [90m 147 |[39m                     }
+     [90m 148 |[39m                 }[0m
+
+      at error (tests/simulation_100.test.js:145:33)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V4_CambiodeProductoalaMitad_8 failed to complete. Ended at: waiting_preference
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_plan_choice -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_preference
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [LOGIC] User user_V4_NegativaAmable_9 refused/failed weight question. Skipping to preference.
+
+      at log (src/flows/salesFlow.js:641:29)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_NegativaAmable_9
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    [ADDRESS] valid data extracted, attempts reset.
+
+      at log (src/flows/salesFlow.js:1232:29)
+
+  console.log
+    [AI-FALLBACK] waiting_data: Detected question/objection from user_V4_CompradorPostdatado_11: "dale yo te aviso"
+
+      at log (src/flows/salesFlow.js:1160:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_UsuarioconDudas_12
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V4_UsuarioconDudas_12 failed to complete. Ended at: waiting_data
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_plan_choice -> waiting_data -> waiting_data -> waiting_data
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [GLOBAL] User user_V4_CambiodeProductoalaMitad_13 requested change.
+
+      at log (src/flows/salesFlow.js:347:17)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_CambiodeProductoalaMitad_13
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_CambiodeProductoalaMitad_13
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_CambiodeProductoalaMitad_13
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.error
+    ­ƒÜ¿ LOOP DETECTED in V4 [Scenario: Cambio de Producto a la Mitad] for user_V4_CambiodeProductoalaMitad_13 at step waiting_preference
+
+    [0m [90m 143 |[39m                     [36mif[39m (sameStepCount [33m>[39m [35m4[39m) {
+     [90m 144 |[39m                         loopCount[33m++[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 145 |[39m                         console[33m.[39merror([32m`­ƒÜ¿ LOOP DETECTED in ${versionLabel} [Scenario: ${scenario.name}] for ${userId} at step ${currentStep}`[39m)[33m;[39m
+     [90m     |[39m                                 [31m[1m^[22m[39m
+     [90m 146 |[39m                         [36mbreak[39m[33m;[39m
+     [90m 147 |[39m                     }
+     [90m 148 |[39m                 }[0m
+
+      at error (tests/simulation_100.test.js:145:33)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V4_CambiodeProductoalaMitad_13 failed to complete. Ended at: waiting_preference
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_plan_choice -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_preference
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [LOGIC] User user_V4_NegativaAmable_14 refused/failed weight question. Skipping to preference.
+
+      at log (src/flows/salesFlow.js:641:29)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_NegativaAmable_14
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    [ADDRESS] valid data extracted, attempts reset.
+
+      at log (src/flows/salesFlow.js:1232:29)
+
+  console.log
+    [AI-FALLBACK] waiting_data: Detected question/objection from user_V4_CompradorPostdatado_16: "dale yo te aviso"
+
+      at log (src/flows/salesFlow.js:1160:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_UsuarioconDudas_17
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V4_UsuarioconDudas_17 failed to complete. Ended at: waiting_data
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_plan_choice -> waiting_data -> waiting_data -> waiting_data
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [GLOBAL] User user_V4_CambiodeProductoalaMitad_18 requested change.
+
+      at log (src/flows/salesFlow.js:347:17)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_CambiodeProductoalaMitad_18
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_CambiodeProductoalaMitad_18
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_CambiodeProductoalaMitad_18
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.error
+    ­ƒÜ¿ LOOP DETECTED in V4 [Scenario: Cambio de Producto a la Mitad] for user_V4_CambiodeProductoalaMitad_18 at step waiting_preference
+
+    [0m [90m 143 |[39m                     [36mif[39m (sameStepCount [33m>[39m [35m4[39m) {
+     [90m 144 |[39m                         loopCount[33m++[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 145 |[39m                         console[33m.[39merror([32m`­ƒÜ¿ LOOP DETECTED in ${versionLabel} [Scenario: ${scenario.name}] for ${userId} at step ${currentStep}`[39m)[33m;[39m
+     [90m     |[39m                                 [31m[1m^[22m[39m
+     [90m 146 |[39m                         [36mbreak[39m[33m;[39m
+     [90m 147 |[39m                     }
+     [90m 148 |[39m                 }[0m
+
+      at error (tests/simulation_100.test.js:145:33)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V4_CambiodeProductoalaMitad_18 failed to complete. Ended at: waiting_preference
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_plan_choice -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_preference
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [LOGIC] User user_V4_NegativaAmable_19 refused/failed weight question. Skipping to preference.
+
+      at log (src/flows/salesFlow.js:641:29)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_NegativaAmable_19
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    [ADDRESS] valid data extracted, attempts reset.
+
+      at log (src/flows/salesFlow.js:1232:29)
+
+  console.log
+    [AI-FALLBACK] waiting_data: Detected question/objection from user_V4_CompradorPostdatado_21: "dale yo te aviso"
+
+      at log (src/flows/salesFlow.js:1160:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_UsuarioconDudas_22
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V4_UsuarioconDudas_22 failed to complete. Ended at: waiting_data
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_plan_choice -> waiting_data -> waiting_data -> waiting_data
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [GLOBAL] User user_V4_CambiodeProductoalaMitad_23 requested change.
+
+      at log (src/flows/salesFlow.js:347:17)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_CambiodeProductoalaMitad_23
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_CambiodeProductoalaMitad_23
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_CambiodeProductoalaMitad_23
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.error
+    ­ƒÜ¿ LOOP DETECTED in V4 [Scenario: Cambio de Producto a la Mitad] for user_V4_CambiodeProductoalaMitad_23 at step waiting_preference
+
+    [0m [90m 143 |[39m                     [36mif[39m (sameStepCount [33m>[39m [35m4[39m) {
+     [90m 144 |[39m                         loopCount[33m++[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 145 |[39m                         console[33m.[39merror([32m`­ƒÜ¿ LOOP DETECTED in ${versionLabel} [Scenario: ${scenario.name}] for ${userId} at step ${currentStep}`[39m)[33m;[39m
+     [90m     |[39m                                 [31m[1m^[22m[39m
+     [90m 146 |[39m                         [36mbreak[39m[33m;[39m
+     [90m 147 |[39m                     }
+     [90m 148 |[39m                 }[0m
+
+      at error (tests/simulation_100.test.js:145:33)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V4_CambiodeProductoalaMitad_23 failed to complete. Ended at: waiting_preference
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_plan_choice -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_preference
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [LOGIC] User user_V4_NegativaAmable_24 refused/failed weight question. Skipping to preference.
+
+      at log (src/flows/salesFlow.js:641:29)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_NegativaAmable_24
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    [ADDRESS] valid data extracted, attempts reset.
+
+      at log (src/flows/salesFlow.js:1232:29)
+
+  console.log
+    [AI-FALLBACK] waiting_data: Detected question/objection from user_V4_CompradorPostdatado_26: "dale yo te aviso"
+
+      at log (src/flows/salesFlow.js:1160:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_UsuarioconDudas_27
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V4_UsuarioconDudas_27 failed to complete. Ended at: waiting_data
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_plan_choice -> waiting_data -> waiting_data -> waiting_data
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [GLOBAL] User user_V4_CambiodeProductoalaMitad_28 requested change.
+
+      at log (src/flows/salesFlow.js:347:17)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_CambiodeProductoalaMitad_28
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_CambiodeProductoalaMitad_28
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_CambiodeProductoalaMitad_28
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.error
+    ­ƒÜ¿ LOOP DETECTED in V4 [Scenario: Cambio de Producto a la Mitad] for user_V4_CambiodeProductoalaMitad_28 at step waiting_preference
+
+    [0m [90m 143 |[39m                     [36mif[39m (sameStepCount [33m>[39m [35m4[39m) {
+     [90m 144 |[39m                         loopCount[33m++[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 145 |[39m                         console[33m.[39merror([32m`­ƒÜ¿ LOOP DETECTED in ${versionLabel} [Scenario: ${scenario.name}] for ${userId} at step ${currentStep}`[39m)[33m;[39m
+     [90m     |[39m                                 [31m[1m^[22m[39m
+     [90m 146 |[39m                         [36mbreak[39m[33m;[39m
+     [90m 147 |[39m                     }
+     [90m 148 |[39m                 }[0m
+
+      at error (tests/simulation_100.test.js:145:33)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V4_CambiodeProductoalaMitad_28 failed to complete. Ended at: waiting_preference
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_plan_choice -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_preference
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [LOGIC] User user_V4_NegativaAmable_29 refused/failed weight question. Skipping to preference.
+
+      at log (src/flows/salesFlow.js:641:29)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_NegativaAmable_29
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    [ADDRESS] valid data extracted, attempts reset.
+
+      at log (src/flows/salesFlow.js:1232:29)
+
+  console.log
+    [AI-FALLBACK] waiting_data: Detected question/objection from user_V4_CompradorPostdatado_31: "dale yo te aviso"
+
+      at log (src/flows/salesFlow.js:1160:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_UsuarioconDudas_32
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V4_UsuarioconDudas_32 failed to complete. Ended at: waiting_data
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_plan_choice -> waiting_data -> waiting_data -> waiting_data
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [GLOBAL] User user_V4_CambiodeProductoalaMitad_33 requested change.
+
+      at log (src/flows/salesFlow.js:347:17)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_CambiodeProductoalaMitad_33
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_CambiodeProductoalaMitad_33
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_CambiodeProductoalaMitad_33
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.error
+    ­ƒÜ¿ LOOP DETECTED in V4 [Scenario: Cambio de Producto a la Mitad] for user_V4_CambiodeProductoalaMitad_33 at step waiting_preference
+
+    [0m [90m 143 |[39m                     [36mif[39m (sameStepCount [33m>[39m [35m4[39m) {
+     [90m 144 |[39m                         loopCount[33m++[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 145 |[39m                         console[33m.[39merror([32m`­ƒÜ¿ LOOP DETECTED in ${versionLabel} [Scenario: ${scenario.name}] for ${userId} at step ${currentStep}`[39m)[33m;[39m
+     [90m     |[39m                                 [31m[1m^[22m[39m
+     [90m 146 |[39m                         [36mbreak[39m[33m;[39m
+     [90m 147 |[39m                     }
+     [90m 148 |[39m                 }[0m
+
+      at error (tests/simulation_100.test.js:145:33)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V4_CambiodeProductoalaMitad_33 failed to complete. Ended at: waiting_preference
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_plan_choice -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_preference
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [LOGIC] User user_V4_NegativaAmable_34 refused/failed weight question. Skipping to preference.
+
+      at log (src/flows/salesFlow.js:641:29)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_NegativaAmable_34
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    [ADDRESS] valid data extracted, attempts reset.
+
+      at log (src/flows/salesFlow.js:1232:29)
+
+  console.log
+    [AI-FALLBACK] waiting_data: Detected question/objection from user_V4_CompradorPostdatado_36: "dale yo te aviso"
+
+      at log (src/flows/salesFlow.js:1160:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_UsuarioconDudas_37
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V4_UsuarioconDudas_37 failed to complete. Ended at: waiting_data
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_plan_choice -> waiting_data -> waiting_data -> waiting_data
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [GLOBAL] User user_V4_CambiodeProductoalaMitad_38 requested change.
+
+      at log (src/flows/salesFlow.js:347:17)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_CambiodeProductoalaMitad_38
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_CambiodeProductoalaMitad_38
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_CambiodeProductoalaMitad_38
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.error
+    ­ƒÜ¿ LOOP DETECTED in V4 [Scenario: Cambio de Producto a la Mitad] for user_V4_CambiodeProductoalaMitad_38 at step waiting_preference
+
+    [0m [90m 143 |[39m                     [36mif[39m (sameStepCount [33m>[39m [35m4[39m) {
+     [90m 144 |[39m                         loopCount[33m++[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 145 |[39m                         console[33m.[39merror([32m`­ƒÜ¿ LOOP DETECTED in ${versionLabel} [Scenario: ${scenario.name}] for ${userId} at step ${currentStep}`[39m)[33m;[39m
+     [90m     |[39m                                 [31m[1m^[22m[39m
+     [90m 146 |[39m                         [36mbreak[39m[33m;[39m
+     [90m 147 |[39m                     }
+     [90m 148 |[39m                 }[0m
+
+      at error (tests/simulation_100.test.js:145:33)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V4_CambiodeProductoalaMitad_38 failed to complete. Ended at: waiting_preference
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_plan_choice -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_preference
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [LOGIC] User user_V4_NegativaAmable_39 refused/failed weight question. Skipping to preference.
+
+      at log (src/flows/salesFlow.js:641:29)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_NegativaAmable_39
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    [ADDRESS] valid data extracted, attempts reset.
+
+      at log (src/flows/salesFlow.js:1232:29)
+
+  console.log
+    [AI-FALLBACK] waiting_data: Detected question/objection from user_V4_CompradorPostdatado_41: "dale yo te aviso"
+
+      at log (src/flows/salesFlow.js:1160:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_UsuarioconDudas_42
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V4_UsuarioconDudas_42 failed to complete. Ended at: waiting_data
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_plan_choice -> waiting_data -> waiting_data -> waiting_data
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [GLOBAL] User user_V4_CambiodeProductoalaMitad_43 requested change.
+
+      at log (src/flows/salesFlow.js:347:17)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_CambiodeProductoalaMitad_43
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_CambiodeProductoalaMitad_43
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_CambiodeProductoalaMitad_43
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.error
+    ­ƒÜ¿ LOOP DETECTED in V4 [Scenario: Cambio de Producto a la Mitad] for user_V4_CambiodeProductoalaMitad_43 at step waiting_preference
+
+    [0m [90m 143 |[39m                     [36mif[39m (sameStepCount [33m>[39m [35m4[39m) {
+     [90m 144 |[39m                         loopCount[33m++[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 145 |[39m                         console[33m.[39merror([32m`­ƒÜ¿ LOOP DETECTED in ${versionLabel} [Scenario: ${scenario.name}] for ${userId} at step ${currentStep}`[39m)[33m;[39m
+     [90m     |[39m                                 [31m[1m^[22m[39m
+     [90m 146 |[39m                         [36mbreak[39m[33m;[39m
+     [90m 147 |[39m                     }
+     [90m 148 |[39m                 }[0m
+
+      at error (tests/simulation_100.test.js:145:33)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V4_CambiodeProductoalaMitad_43 failed to complete. Ended at: waiting_preference
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_plan_choice -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_preference
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [LOGIC] User user_V4_NegativaAmable_44 refused/failed weight question. Skipping to preference.
+
+      at log (src/flows/salesFlow.js:641:29)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_NegativaAmable_44
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    [ADDRESS] valid data extracted, attempts reset.
+
+      at log (src/flows/salesFlow.js:1232:29)
+
+  console.log
+    [AI-FALLBACK] waiting_data: Detected question/objection from user_V4_CompradorPostdatado_46: "dale yo te aviso"
+
+      at log (src/flows/salesFlow.js:1160:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_UsuarioconDudas_47
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.log
+    Analyzing address data with AI...
+
+      at log (src/flows/salesFlow.js:1213:21)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V4_UsuarioconDudas_47 failed to complete. Ended at: waiting_data
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_plan_choice -> waiting_data -> waiting_data -> waiting_data
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [GLOBAL] User user_V4_CambiodeProductoalaMitad_48 requested change.
+
+      at log (src/flows/salesFlow.js:347:17)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_CambiodeProductoalaMitad_48
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_CambiodeProductoalaMitad_48
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_CambiodeProductoalaMitad_48
+
+      at log (src/flows/salesFlow.js:750:25)
+
+  console.error
+    ­ƒÜ¿ LOOP DETECTED in V4 [Scenario: Cambio de Producto a la Mitad] for user_V4_CambiodeProductoalaMitad_48 at step waiting_preference
+
+    [0m [90m 143 |[39m                     [36mif[39m (sameStepCount [33m>[39m [35m4[39m) {
+     [90m 144 |[39m                         loopCount[33m++[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 145 |[39m                         console[33m.[39merror([32m`­ƒÜ¿ LOOP DETECTED in ${versionLabel} [Scenario: ${scenario.name}] for ${userId} at step ${currentStep}`[39m)[33m;[39m
+     [90m     |[39m                                 [31m[1m^[22m[39m
+     [90m 146 |[39m                         [36mbreak[39m[33m;[39m
+     [90m 147 |[39m                     }
+     [90m 148 |[39m                 }[0m
+
+      at error (tests/simulation_100.test.js:145:33)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.warn
+    ÔÜá´©Å Conversation user_V4_CambiodeProductoalaMitad_48 failed to complete. Ended at: waiting_preference
+
+    [0m [90m 154 |[39m                     actualSuccesses[33m++[39m[33m;[39m
+     [90m 155 |[39m                 } [36melse[39m {
+    [31m[1m>[22m[39m[90m 156 |[39m                     console[33m.[39mwarn([32m`ÔÜá´©Å Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`[39m)[33m;[39m
+     [90m     |[39m                             [31m[1m^[22m[39m
+     [90m 157 |[39m                     console[33m.[39mlog([32m`Path taken: ${trackSteps.join(' -> ')}`[39m)[33m;[39m
+     [90m 158 |[39m                 }
+     [90m 159 |[39m             }[0m
+
+      at warn (tests/simulation_100.test.js:156:29)
+      at Generator.call (tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep (tests/simulation_100.test.js:2:1)
+
+  console.log
+    Path taken: waiting_weight -> waiting_preference -> waiting_plan_choice -> waiting_preference -> waiting_preference -> waiting_preference -> waiting_preference
+
+      at log (tests/simulation_100.test.js:157:29)
+
+  console.log
+    [LOGIC] User user_V4_NegativaAmable_49 refused/failed weight question. Skipping to preference.
+
+      at log (src/flows/salesFlow.js:641:29)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_V4_NegativaAmable_49
+
+      at log (src/flows/salesFlow.js:750:25)
+
+node.exe : FAIL tests/simulation_100.test.js (6.082 
+s)
+En línea: 1 Carácter: 1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program 
+Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (FAIL te 
+   sts/simu...st.js (6.082 s):String) [], RemoteExc  
+  eption
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  100 Conversations Simulation (V3 & V4)
+    ├ù Simulate 50 mixed conversations with V3 (992 
+ms)
+    ├ù Simulate 50 mixed conversations with V4 (754 
+ms)
+
+  ÔùÅ 100 Conversations Simulation (V3 & V4) ÔÇ║ 
+Simulate 50 mixed conversations with V3
+
+    expect(received).toBe(expected) // Object.is 
+equality
+
+    Expected: 0
+    Received: 10
+
+    [0m [90m 160 |[39m         }
+     [90m 161 |[39m
+    [31m[1m>[22m[39m[90m 162 |[39m         expe
+ct(loopCount)[33m.[39mtoBe([35m0[39m)[33m;[39m 
+[90m// NO loops allowed in any scenario[39m
+     [90m     |[39m                           
+[31m[1m^[22m[39m
+     [90m 163 |[39m         expect(actualSuccesses)
+[33m.[39mtoBe(expectedSuccesses)[33m;[39m 
+[90m// All 'shouldComplete' scenarios must 
+complete[39m
+     [90m 164 |[39m     }[33m;[39m
+     [90m 165 |[39m[0m
+
+      at toBe (tests/simulation_100.test.js:162:27)
+      at Generator.call 
+(tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] 
+(tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep 
+(tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep 
+(tests/simulation_100.test.js:2:1)
+
+  ÔùÅ 100 Conversations Simulation (V3 & V4) ÔÇ║ 
+Simulate 50 mixed conversations with V4
+
+    expect(received).toBe(expected) // Object.is 
+equality
+
+    Expected: 0
+    Received: 10
+
+    [0m [90m 160 |[39m         }
+     [90m 161 |[39m
+    [31m[1m>[22m[39m[90m 162 |[39m         expe
+ct(loopCount)[33m.[39mtoBe([35m0[39m)[33m;[39m 
+[90m// NO loops allowed in any scenario[39m
+     [90m     |[39m                           
+[31m[1m^[22m[39m
+     [90m 163 |[39m         expect(actualSuccesses)
+[33m.[39mtoBe(expectedSuccesses)[33m;[39m 
+[90m// All 'shouldComplete' scenarios must 
+complete[39m
+     [90m 164 |[39m     }[33m;[39m
+     [90m 165 |[39m[0m
+
+      at toBe (tests/simulation_100.test.js:162:27)
+      at Generator.call 
+(tests/simulation_100.test.js:2:1)
+      at Generator._invoke [as next] 
+(tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep 
+(tests/simulation_100.test.js:2:1)
+      at asyncGeneratorStep 
+(tests/simulation_100.test.js:2:1)
+
+Test Suites: 1 failed, 1 total
+Tests:       2 failed, 2 total
+Snapshots:   0 total
+Time:        6.353 s, estimated 9 s
+Ran all test suites matching 
+tests/simulation_100.test.js.

@@ -37,8 +37,7 @@
                 "pastilla",
                 "pastillas",
                 "practico",
-                "practica",
-                "1"
+                "practica"
             ],
             "response": "Genial 👍 Cápsulas es la mejor opción para vos.\n\n💊 Se toman:\n• 1 cápsula por día\n• 30 min antes del almuerzo o la cena\n\nTenés dos opciones:\n\n🔹 60 días → ${{PRICE_CAPSULAS_60}}\n🔹 120 días → ${{PRICE_CAPSULAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl servicio de pago a domicilio tiene un costo de $6.000.\nPero con el plan de 120 días, ¡te REGALAMOS ese servicio!\n\n👉 ¿Avanzamos con 60 o 120 días?",
             "nextStep": "waiting_plan_choice"
@@ -52,8 +51,7 @@
                 "semillas",
                 "semilla",
                 "natural",
-                "tradicional",
-                "2"
+                "tradicional"
             ],
             "response": "Genial 🌿 La semilla en estado natural es la opción más elegida.\n\nSe consume en forma de infusión cada noche.\n\n🔹 60 días → ${{PRICE_SEMILLAS_60}}\n🔹 120 días → ${{PRICE_SEMILLAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl servicio de pago a domicilio tiene un costo de $6.000.\nPero con el plan de 120 días, ¡te REGALAMOS ese servicio!\n\n👉 ¿Avanzamos con 60 o 120 días?",
             "nextStep": "waiting_plan_choice"
@@ -63,8 +61,7 @@
             "match": [
                 "gotas",
                 "liquido",
-                "gotero",
-                "3"
+                "gotero"
             ],
             "response": "Genial 🌿 Las gotas son prácticas y discretas.\n\n🔹 60 días → ${{PRICE_GOTAS_60}}\n🔹 120 días → ${{PRICE_GOTAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl servicio de pago a domicilio tiene un costo de $6.000.\nPero con el plan de 120 días, ¡te REGALAMOS ese servicio!\n\n👉 ¿Avanzamos con 60 o 120 días?",
             "nextStep": "waiting_plan_choice"
@@ -185,7 +182,7 @@
                 "pagar",
                 "como se paga"
             ],
-            "response": "Se paga al recibir el producto.\n\nEl servicio de pago a domicilio tiene un valor de $6.000.\nPero te cuento un secreto: ¡con el plan de 120 días te REGALAMOS ese servicio!"
+            "response": "Se paga en efectivo al recibir el producto. el cartero no esta aceptando otro metodo."
         },
         {
             "keywords": [

@@ -92,27 +92,27 @@ const AlertsPanelV2 = ({ alerts, onCommand, onQuickAction }) => {
                             <div key={alert.id} className="group overflow-hidden rounded-3xl border border-white/80 bg-white/60 backdrop-blur-xl shadow-lg hover:shadow-xl transition-all duration-300">
                                 {/* Header del Alerta */}
                                 <div className="p-6 cursor-pointer hover:bg-white/40 transition-colors" onClick={() => toggleExpand(alert.id)}>
-                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                    <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-4">
                                         <div className="flex items-start gap-4">
-                                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-100 to-pink-50 flex items-center justify-center text-rose-500 text-xl shadow-inner border border-rose-100">
+                                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-100 to-pink-50 flex items-center justify-center text-rose-500 text-xl shadow-inner border border-rose-100 shrink-0">
                                                 🚨
                                             </div>
-                                            <div>
-                                                <div className="flex items-center gap-3 mb-1.5">
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-3 mb-1.5 flex-wrap">
                                                     <span className="px-3 py-1 rounded-full text-[10px] font-extrabold bg-rose-500 text-white uppercase tracking-widest shadow-sm shadow-rose-500/20">
                                                         Urgente
                                                     </span>
-                                                    <span className="text-xs font-semibold text-slate-400 bg-slate-100 px-2 py-1 rounded-full">
+                                                    <span className="text-xs font-semibold text-slate-400 bg-slate-100 px-2 py-1 rounded-full whitespace-nowrap">
                                                         {getTimeDiff(alert.timestamp)}
                                                     </span>
                                                 </div>
-                                                <h4 className="font-bold text-slate-800 text-base leading-snug">{alert.reason}</h4>
-                                                <p className="text-sm font-medium text-slate-500 mt-1">{alert.userPhone}</p>
+                                                <h4 className="font-bold text-slate-800 text-base leading-snug truncate">{alert.reason}</h4>
+                                                <p className="text-sm font-medium text-slate-500 mt-1 truncate">{alert.userPhone}</p>
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center gap-2 mt-2 sm:mt-0">
-                                            <button onClick={(e) => { e.stopPropagation(); onQuickAction(alert.userPhone, 'chat'); }} className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-colors" title="Ver Chat">
+                                        <div className="flex flex-wrap items-center gap-2 mt-2 sm:mt-0 w-full lg:w-auto">
+                                            <button onClick={(e) => { e.stopPropagation(); onQuickAction(alert.userPhone, 'chat'); }} className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-colors flex-1 sm:flex-none flex justify-center items-center" title="Ver Chat">
                                                 <IconsV2.Message />
                                             </button>
                                             <button onClick={(e) => { e.stopPropagation(); onQuickAction(alert.userPhone, 'confirmar'); }} className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-xl text-xs font-bold hover:bg-emerald-600 transition-colors shadow-md shadow-emerald-500/20">

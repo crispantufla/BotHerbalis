@@ -37,8 +37,7 @@
                 "pastilla",
                 "pastillas",
                 "practico",
-                "practica",
-                "1"
+                "practica"
             ],
             "response": "Dale, buenísimo 👍 Cápsulas es lo más efectivo y práctico que hay.\n\n💊 Se toman así:\n• 1 al día\n• 30 min antes de la comida principal\n\nMirá, para asegurar tu objetivo tenés dos opciones:\n\n🏆 *OPCIÓN RECOMENDADA (120 días)*: Hacés el tratamiento completo de una y te asegurás el resultado.\n💲 *${{PRICE_CAPSULAS_120}}*\n*Beneficio: Envío Gratis + Pago a domicilio cien por ciento BONIFICADO (de regalo).* \n\n🔸 *OPCIÓN INICIO (60 días)*:\n💲 *${{PRICE_CAPSULAS_60}}* (+ ${{ADICIONAL_MAX}} costo por pago a domicilio).\n\n👉 ¿Te reservo el de 120 para asegurar el resultado o preferís arrancar con 60?",
             "nextStep": "waiting_plan_choice"
@@ -182,7 +181,7 @@
                 "pagar",
                 "como se paga"
             ],
-            "response": "Se paga al recibir el producto.\n\nEl plan de 120 días no tiene costo adicional.\nEl plan de 60 días tiene modalidad Contra Reembolso MAX con adicional de $6.000."
+            "response": "Se paga en efectivo al recibir el producto. el cartero no esta aceptando otro metodo."
         },
         {
             "keywords": [

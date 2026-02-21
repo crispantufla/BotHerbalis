@@ -62,16 +62,39 @@ module.exports = (client, sharedState) => {
     router.get('/chats', authMiddleware, async (req, res) => {
         try {
             const chats = await withTimeout(client.getChats(), 10000, "Timeout retrieving chats");
-            const relevantChats = chats.filter(c => !c.isGroup).map(c => ({
-                id: c.id._serialized,
-                name: c.name || c.id.user,
-                unreadCount: c.unreadCount,
-                lastMessage: c.lastMessage ? c.lastMessage.body : '',
-                timestamp: c.timestamp,
-                isPaused: pausedUsers.has(c.id._serialized),
-                step: userState[c.id._serialized]?.step || 'new',
-                assignedScript: userState[c.id._serialized]?.assignedScript || null
-            }));
+
+            // Read orders to cross-reference past purchases
+            let orders = [];
+            try {
+                const fs = require('fs');
+                const path = require('path');
+                const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../../..');
+                const ORDERS_FILE = path.join(DATA_DIR, 'orders.json');
+                if (fs.existsSync(ORDERS_FILE)) {
+                    orders = JSON.parse(fs.readFileSync(ORDERS_FILE, 'utf8'));
+                }
+            } catch (err) {
+                console.error("Error reading orders.json in /chats:", err.message);
+            }
+
+            const relevantChats = chats.filter(c => !c.isGroup).map(c => {
+                const phoneNumeric = c.id.user; // e.g., '123456789' extracted from '123456789@c.us'
+                // Find all past orders matching this phone
+                const userOrders = orders.filter(o => o.cliente && o.cliente.includes(phoneNumeric) && o.status !== 'Cancelado');
+
+                return {
+                    id: c.id._serialized,
+                    name: c.name || c.id.user,
+                    unreadCount: c.unreadCount,
+                    lastMessage: c.lastMessage ? { body: c.lastMessage.hasMedia ? 'Media' : c.lastMessage.body, timestamp: c.lastMessage.timestamp * 1000 } : null,
+                    timestamp: c.timestamp,
+                    isPaused: pausedUsers.has(c.id._serialized),
+                    step: userState[c.id._serialized]?.step || 'new',
+                    assignedScript: userState[c.id._serialized]?.assignedScript || null,
+                    pastOrders: userOrders.length > 0 ? userOrders : null,
+                    hasBought: userOrders.length > 0
+                };
+            });
             res.json(relevantChats);
         } catch (e) {
             res.status(500).json({ error: e.message });

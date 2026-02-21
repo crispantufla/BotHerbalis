@@ -19,7 +19,7 @@ const StatsPanelV2 = ({ stats, loadingStats, alertsCount = 0 }) => {
 
     if (loadingStats) {
         return (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                 <KpiSkeleton /><KpiSkeleton /><KpiSkeleton /><KpiSkeleton />
             </div>
         );
@@ -45,7 +45,7 @@ const StatsPanelV2 = ({ stats, loadingStats, alertsCount = 0 }) => {
     );
 
     return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             <StatCard
                 title="Ventas Hoy"
                 value={`$${stats?.todayRevenue?.toLocaleString('es-AR') || '0'}`}

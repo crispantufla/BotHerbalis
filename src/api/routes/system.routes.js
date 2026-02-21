@@ -211,9 +211,9 @@ module.exports = (client, sharedState) => {
             const { script } = req.body;
             if (!script) return res.status(400).json({ error: 'Falta el campo "script"' });
 
-            const available = sharedState.availableScripts || ['v3'];
-            if (!available.includes(script)) {
-                return res.status(400).json({ error: `Script "${script}" no existe. Disponibles: ${available.join(', ')}` });
+            const available = sharedState.availableScripts || ['v3', 'v4'];
+            if (!available.includes(script) && script !== 'rotacion') {
+                return res.status(400).json({ error: `Script "${script}" no existe. Disponibles: ${available.join(', ')} y rotacion` });
             }
 
             config.activeScript = script;

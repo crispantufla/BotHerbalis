@@ -35,7 +35,22 @@ const CorporateDashboardV2 = () => {
     const [qrData, setQrData] = useState(null);
     const [config, setConfig] = useState({ alertNumbers: [] });
     const [targetChatId, setTargetChatId] = useState(null);
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(false); // Nuevo estado
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [isMobile, setIsMobile] = useState(false);
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+    // Detección de Mobile
+    useEffect(() => {
+        const checkMobile = () => {
+            setIsMobile(window.innerWidth < 1024);
+            if (window.innerWidth < 1024) {
+                setSidebarCollapsed(true);
+            }
+        };
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
 
     const fetchConfig = useCallback(async () => {
         try {
@@ -130,34 +145,57 @@ const CorporateDashboardV2 = () => {
     };
 
     return (
-        <div className="flex h-screen bg-slate-50 font-sans text-slate-800 overflow-hidden selection:bg-indigo-100 selection:text-indigo-900">
+        <div className="flex flex-col lg:flex-row h-screen bg-slate-50 font-sans text-slate-800 overflow-hidden selection:bg-indigo-100 selection:text-indigo-900 relative">
+
+            {/* Overlay para fondo oscurecido en Mobile al abrir el menú */}
+            {isMobile && mobileMenuOpen && (
+                <div
+                    className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-30 transition-opacity"
+                    onClick={() => setMobileMenuOpen(false)}
+                />
+            )}
+
             {/* 1. GLASSMORPHISM SIDEBAR V2 */}
-            <aside className={`relative z-20 flex flex-col backdrop-blur-2xl bg-white/70 border-r border-slate-200/60 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)] transition-all duration-300 ease-in-out ${sidebarCollapsed ? 'w-20' : 'w-72'}`}>
+            <aside className={`
+                fixed lg:relative z-40 lg:z-20 flex flex-col h-full bg-white/95 lg:bg-white/70 backdrop-blur-3xl border-r border-slate-200/60 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)] 
+                transition-transform duration-300 ease-in-out lg:translate-x-0
+                ${isMobile ? 'w-72 left-0 top-0 bottom-0' : (sidebarCollapsed ? 'w-20' : 'w-72')}
+                ${isMobile && !mobileMenuOpen ? '-translate-x-full' : 'translate-x-0'}
+            `}>
 
                 {/* Logo & Toggle */}
                 <div className="h-20 flex items-center justify-between px-6 border-b border-slate-200/50">
-                    {!sidebarCollapsed && (
-                        <div className="flex items-center gap-3 animate-fade-in">
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 shadow-lg shadow-indigo-500/30 flex items-center justify-center">
-                                <span className="text-white font-bold text-lg">H</span>
+                    {(!sidebarCollapsed || isMobile) && (
+                        <div className="flex items-center gap-3 animate-fade-in w-full justify-between lg:justify-start">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 shadow-lg shadow-indigo-500/30 flex items-center justify-center">
+                                    <span className="text-white font-bold text-lg">H</span>
+                                </div>
+                                <div>
+                                    <h1 className="font-bold text-slate-800 leading-tight">Herbalis</h1>
+                                    <p className="text-[10px] font-semibold tracking-widest text-indigo-500 uppercase">Workspace</p>
+                                </div>
                             </div>
-                            <div>
-                                <h1 className="font-bold text-slate-800 leading-tight">Herbalis</h1>
-                                <p className="text-[10px] font-semibold tracking-widest text-indigo-500 uppercase">Workspace</p>
-                            </div>
+                            {isMobile && (
+                                <button onClick={() => setMobileMenuOpen(false)} className="text-slate-400 hover:text-slate-600 p-2">
+                                    <IconsV2.X />
+                                </button>
+                            )}
                         </div>
                     )}
-                    {sidebarCollapsed && (
+                    {sidebarCollapsed && !isMobile && (
                         <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 shadow-lg shadow-indigo-500/30 flex items-center justify-center mx-auto animate-fade-in">
                             <span className="text-white font-bold text-lg">H</span>
                         </div>
                     )}
-                    <button
-                        onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                        className={`p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-slate-100 transition-colors ${sidebarCollapsed ? 'hidden' : 'block'}`}
-                    >
-                        <IconsV2.Menu />
-                    </button>
+                    {!isMobile && (
+                        <button
+                            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                            className={`p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-slate-100 transition-colors ${sidebarCollapsed ? 'hidden' : 'block'}`}
+                        >
+                            <IconsV2.Menu />
+                        </button>
+                    )}
                 </div>
 
                 <div className="flex-1 py-6 px-4 space-y-1 overflow-y-auto hide-scrollbar">
@@ -168,7 +206,7 @@ const CorporateDashboardV2 = () => {
                     <NavItem tab="gallery" icon={IconsV2.Photo} label="Galería de Medios" />
 
                     <div className="pt-6 mt-6 border-t border-slate-200/50">
-                        {!sidebarCollapsed && <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4 px-4">Administración</p>}
+                        {(!sidebarCollapsed || isMobile) && <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4 px-4">Administración</p>}
                         <NavItem tab="settings" icon={IconsV2.Cog} label="Configuración" />
                     </div>
                 </div>
@@ -177,44 +215,47 @@ const CorporateDashboardV2 = () => {
                 <div className="p-4 border-t border-slate-200/50 bg-white/40">
                     <button
                         onClick={logout}
-                        className={`w-full flex items-center ${sidebarCollapsed ? 'justify-center p-2' : 'px-4 py-3'} rounded-xl bg-gradient-to-r hover:from-rose-50 hover:to-orange-50 text-rose-600 transition-all duration-300 border border-transparent hover:border-rose-200 group`}
-                        title={sidebarCollapsed ? "Cerrar Sesión" : ""}
+                        className={`w-full flex items-center ${(sidebarCollapsed && !isMobile) ? 'justify-center p-2' : 'px-4 py-3'} rounded-xl bg-gradient-to-r hover:from-rose-50 hover:to-orange-50 text-rose-600 transition-all duration-300 border border-transparent hover:border-rose-200 group`}
+                        title={(sidebarCollapsed && !isMobile) ? "Cerrar Sesión" : ""}
                     >
-                        <div className={`${sidebarCollapsed ? '' : 'mr-3'} group-hover:scale-110 transition-transform`}>
+                        <div className={`${(sidebarCollapsed && !isMobile) ? '' : 'mr-3'} group-hover:scale-110 transition-transform`}>
                             <IconsV2.Logout />
                         </div>
-                        {!sidebarCollapsed && <span className="font-medium text-sm">Cerrar Sesión</span>}
+                        {(!sidebarCollapsed || isMobile) && <span className="font-medium text-sm">Cerrar Sesión</span>}
                     </button>
                 </div>
             </aside>
 
             {/* 2. MAIN CONTENT AREA V2 */}
-            <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-gradient-to-br from-slate-50 to-blue-50/30">
+            <div className={`flex-1 flex flex-col overflow-hidden bg-gradient-to-br from-slate-50 to-blue-50/30 w-full relative transition-all duration-300 ${!isMobile && !sidebarCollapsed ? '' : ''}`}>
                 {/* Header Superior V2 */}
-                <header className="flex-shrink-0 h-20 bg-white/60 backdrop-blur-md border-b border-white flex justify-between items-center px-8 z-20 shadow-sm shadow-slate-200/20">
-                    <div className="flex items-center gap-4">
-                        {sidebarCollapsed && (
+                <header className="flex-shrink-0 h-16 lg:h-20 bg-white/60 backdrop-blur-md border-b border-white flex justify-between items-center px-4 lg:px-8 z-10 shadow-sm shadow-slate-200/20">
+                    <div className="flex items-center gap-3 w-full lg:w-auto">
+                        <button
+                            onClick={() => isMobile ? setMobileMenuOpen(true) : setSidebarCollapsed(false)}
+                            className={`p-2 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-white shadow-sm transition-colors border border-slate-200/50 block lg:hidden`}
+                        >
+                            <IconsV2.Menu />
+                        </button>
+                        {!isMobile && sidebarCollapsed && (
                             <button
                                 onClick={() => setSidebarCollapsed(false)}
-                                className="p-2 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-white shadow-sm transition-colors border border-slate-200/50 mr-2"
+                                className={`p-2 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-white shadow-sm transition-colors border border-slate-200/50 block`}
                             >
                                 <IconsV2.Menu />
                             </button>
                         )}
+
                         <div className="flex items-center gap-2">
-                            <div className={`w-2.5 h-2.5 rounded-full ${status === 'ready' ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-rose-500 animate-pulse'}`}></div>
-                            <span className={`text-sm font-semibold tracking-wide ${status === 'ready' ? 'text-emerald-700' : 'text-rose-600'}`}>
-                                {status === 'ready' ? 'SISTEMA ONLINE' : 'SISTEMA OFFLINE'}
+                            <div className={`w-2 h-2 lg:w-2.5 lg:h-2.5 rounded-full ${status === 'ready' ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-rose-500 animate-pulse'}`}></div>
+                            <span className={`text-xs lg:text-sm font-semibold tracking-wide ${status === 'ready' ? 'text-emerald-700' : 'text-rose-600'} whitespace-nowrap`}>
+                                {status === 'ready' ? 'ONLINE' : 'OFFLINE'}
                             </span>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-6">
-                        <Link to="/" className="text-xs font-semibold text-slate-500 hover:text-indigo-600 px-3 py-1.5 rounded-full hover:bg-indigo-50 transition-colors">
-                            Volver a V1
-                        </Link>
-
-                        <div className="flex items-center gap-3 pl-6 border-l border-slate-200">
+                    <div className="flex items-center gap-2 lg:gap-6">
+                        <div className="flex items-center gap-3 pl-6">
                             <div className="text-right hidden md:block">
                                 <p className="text-sm font-bold text-slate-800">Administrador</p>
                                 <p className="text-xs text-slate-500 font-medium">Root Access</p>
@@ -227,12 +268,12 @@ const CorporateDashboardV2 = () => {
                 </header>
 
                 {/* Área de Contenido Principal */}
-                <main className="flex-1 relative flex flex-col min-h-0 overflow-hidden">
+                <main className="flex-1 relative flex flex-col min-h-0 overflow-hidden" onClick={() => { if (isMobile && mobileMenuOpen) setMobileMenuOpen(false); }}>
                     {/* Elementos decorativos de fondo (Blur Orbs) */}
-                    <div className="absolute top-[-10%] right-[-5%] w-[40%] h-[40%] rounded-full bg-purple-300/20 blur-[100px] pointer-events-none"></div>
-                    <div className="absolute bottom-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-blue-300/20 blur-[120px] pointer-events-none"></div>
+                    <div className="absolute top-[-10%] right-[-5%] w-[60%] lg:w-[40%] h-[60%] lg:h-[40%] rounded-full bg-purple-300/20 blur-[80px] lg:blur-[100px] pointer-events-none hidden sm:block"></div>
+                    <div className="absolute bottom-[-10%] left-[-10%] w-[70%] lg:w-[50%] h-[70%] lg:h-[50%] rounded-full bg-blue-300/20 blur-[100px] lg:blur-[120px] pointer-events-none hidden sm:block"></div>
 
-                    <div className="flex-1 p-6 xl:p-8 relative z-10 w-full flex flex-col min-h-0 overflow-hidden">
+                    <div className="flex-1 p-3 sm:p-6 lg:p-8 relative z-0 w-full flex flex-col min-h-0 overflow-hidden overflow-y-auto">
                         {renderContent()}
                     </div>
                 </main>
