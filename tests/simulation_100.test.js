@@ -37,7 +37,7 @@ jest.mock('../src/services/ai', () => ({
 }));
 
 jest.mock('../safeWrite', () => ({ atomicWriteFile: jest.fn() }), { virtual: true });
-jest.mock('../sheets_sync', () => ({ appendOrderToSheet: jest.fn() }), { virtual: true });
+jest.mock('../sheets_sync', () => ({ appendOrderToSheet: jest.fn().mockResolvedValue(true) }), { virtual: true });
 jest.mock('google-spreadsheet', () => ({}), { virtual: true });
 jest.mock('@google/generative-ai', () => ({}), { virtual: true });
 
