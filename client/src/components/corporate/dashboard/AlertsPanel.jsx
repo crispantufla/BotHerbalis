@@ -28,11 +28,7 @@ const AlertsPanel = ({ alerts, onCommand, onQuickAction }) => {
         return `${Math.floor(hrs / 24)}d`;
     };
 
-    const quickSuggestions = [
-        { label: '✅ Confirmar', cmd: 'confirmar' },
-        { label: '📦 Cambiar producto', cmd: 'confirma el cambio de producto' },
-        { label: '💬 Contactar', cmd: 'decile que me comunico por privado' },
-    ];
+    const quickSuggestions = [];
 
     return (
         <div className="lg:col-span-2 space-y-4">
@@ -127,18 +123,14 @@ const AlertsPanel = ({ alerts, onCommand, onQuickAction }) => {
                                                 <Icons.Message />
                                             </button>
 
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); onQuickAction(alert.userPhone, 'confirmar'); }}
-                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg text-xs font-bold hover:from-emerald-600 hover:to-teal-600 transition-all shadow-sm shadow-emerald-500/20 active:scale-95"
-                                            >
-                                                <Icons.Check /> Aprobar
-                                            </button>
-
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); onQuickAction(alert.userPhone, 'yo me encargo'); }}
-                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-slate-700 to-slate-800 text-white rounded-lg text-xs font-bold hover:from-slate-800 hover:to-slate-900 transition-all shadow-sm active:scale-95"
-                                            >
-                                                🎯 Intervenir
+                                            {/* Legacy Approve/Intercede Buttons */}
+                                            {hasOrder && (alert.reason.toLowerCase().includes('inesperada') || alert.reason.toLowerCase().includes('aprobaci')) && (
+                                                <button onClick={(e) => { e.stopPropagation(); onQuickAction(alert.userPhone, 'confirmar'); }} className="px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg text-xs font-bold hover:from-emerald-600 hover:to-teal-600 transition-all shadow-sm shadow-emerald-500/20 active:scale-95 flex items-center justify-center">
+                                                    APROBAR
+                                                </button>
+                                            )}
+                                            <button onClick={(e) => { e.stopPropagation(); toggleExpand(alert.id); }} className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-lg text-xs font-bold hover:from-amber-600 hover:to-orange-600 transition-all shadow-sm shadow-amber-500/20 active:scale-95 flex items-center justify-center">
+                                                INTERCEDER
                                             </button>
 
                                             <button
@@ -198,19 +190,7 @@ const AlertsPanel = ({ alerts, onCommand, onQuickAction }) => {
                                             </div>
                                         )}
 
-                                        {/* Quick suggestion chips */}
-                                        <div className="px-5 pb-2 flex flex-wrap gap-1.5">
-                                            {quickSuggestions.map((s, i) => (
-                                                <button
-                                                    key={i}
-                                                    onClick={() => handleSend(alert, s.cmd)}
-                                                    disabled={isSending}
-                                                    className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-600 hover:text-slate-800 transition-all active:scale-95 disabled:opacity-40"
-                                                >
-                                                    {s.label}
-                                                </button>
-                                            ))}
-                                        </div>
+                                        {/* Removed quick suggestion chips */}
 
                                         {/* Admin Input */}
                                         <div className="px-5 pb-4">

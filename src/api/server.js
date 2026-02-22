@@ -106,8 +106,11 @@ function startServer(client, sharedState) {
 
     // --- SOCKET SYNC ---
     io.on('connection', (socket) => {
-        if (client && client.info) {
+        if (sharedState.isConnected && client && client.info) {
             socket.emit('ready', { info: client.info });
+        } else if (!sharedState.isConnected && sharedState.qrCodeData) {
+            // Send the last generated QR code immediately
+            socket.emit('qr', sharedState.qrCodeData);
         }
     });
 

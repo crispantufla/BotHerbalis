@@ -1267,23 +1267,31 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 matched = true;
                 break;
             }
-            // PRIORITY 0: Detect product change ("mejor semillas", "quiero capsulas", "cambio a gotas")
+            // PRIORITY 0: Detect product or plan change ("mejor semillas", "quiero capsulas", "mejor de 60 dias")
             const productChangeMatch = normalizedText.match(/\b(mejor|quiero|prefiero|cambio|cambia|dame|paso a|en vez)\b.*\b(capsula|capsulas|pastilla|pastillas|semilla|semillas|gota|gotas|natural|infusion)\b/i)
                 || normalizedText.match(/\b(capsula|capsulas|pastilla|pastillas|semilla|semillas|gota|gotas)\b.*\b(mejor|quiero|prefiero|cambio|en vez)\b/i);
 
-            if (productChangeMatch) {
+            const planChangeMatch = normalizedText.match(/\b(mejor|quiero|prefiero|cambio|cambia|dame|paso a|en vez)\b.*\b(60|120|sesenta|ciento veinte)\b/i)
+                || normalizedText.match(/\b(60|120|sesenta|ciento veinte)\b.*\b(mejor|quiero|prefiero|cambio|en vez)\b/i);
+
+            if (productChangeMatch || planChangeMatch) {
                 // Detect which product they want
-                let newProduct = null;
+                let newProduct = currentState.selectedProduct;
                 if (/capsula|pastilla/i.test(normalizedText)) newProduct = "Cápsulas de nuez de la india";
                 else if (/semilla|natural|infusion/i.test(normalizedText)) newProduct = "Semillas de nuez de la india";
                 else if (/gota/i.test(normalizedText)) newProduct = "Gotas de nuez de la india";
 
-                if (newProduct && newProduct !== currentState.selectedProduct) {
-                    console.log(`[BACKTRACK] User ${userId} changed product from "${currentState.selectedProduct}" to "${newProduct}" during waiting_data`);
+                // Detect which plan they want
+                let newPlan = currentState.selectedPlan;
+                if (/\b(120|ciento veinte)\b/i.test(normalizedText)) newPlan = "120";
+                else if (/\b(60|sesenta)\b/i.test(normalizedText)) newPlan = "60";
+
+                if (newProduct !== currentState.selectedProduct || newPlan !== currentState.selectedPlan) {
+                    console.log(`[BACKTRACK] User ${userId} changed product from "${currentState.selectedProduct} - ${currentState.selectedPlan}" to "${newProduct} - ${newPlan}" during waiting_data`);
                     const oldGoal = currentState.weightGoal; // Preserve if exists
-                    const oldPlan = currentState.selectedPlan; // Preserve if exists
 
                     currentState.selectedProduct = newProduct;
+                    currentState.selectedPlan = newPlan;
                     currentState.pendingOrder = null;
                     if (oldGoal) currentState.weightGoal = oldGoal; // Restore
 
@@ -1294,22 +1302,23 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                         if (!currentState.postdatado) currentState.postdatado = text;
                     }
 
-                    if (oldPlan) {
+                    if (newPlan) {
                         // User already selected a plan! Just swap the item and update price without resetting.
-                        const priceStr = _getPrice(newProduct, oldPlan);
+                        const priceStr = _getPrice(newProduct, newPlan);
                         let basePrice = parseInt(priceStr.replace(/\./g, ''));
-                        currentState.cart = [{ item: newProduct, plan: oldPlan, price: priceStr }];
+                        currentState.cart = [{ product: newProduct, plan: newPlan, price: priceStr }];
 
                         // Re-evaluate MAX and Delivery fees
                         let finalAdicional = 0;
                         if (currentState.isContraReembolsoMAX) {
-                            finalAdicional = oldPlan === 60 ? _getAdicionalMAX() : 0;
+                            finalAdicional = newPlan === "60" ? _getAdicionalMAX() : 0;
                         }
                         currentState.adicionalMAX = finalAdicional;
                         const finalPrice = basePrice + finalAdicional;
                         currentState.totalPrice = finalPrice.toLocaleString('es-AR').replace(/,/g, '.');
 
-                        const changeMsg = `¡Dale, sin problema! 😊 Cambiamos a ${newProduct.split(' de ')[0].toLowerCase()} por ${oldPlan} días, tienen un valor $${currentState.totalPrice}.`;
+                        const planText = newPlan === "120" ? "120 días" : "60 días";
+                        const changeMsg = `¡Dale, sin problema! 😊 Cambiamos a ${newProduct.split(' de ')[0].toLowerCase()} por ${planText}, tienen un valor de $${currentState.totalPrice}.`;
                         currentState.history.push({ role: 'bot', content: changeMsg, timestamp: Date.now() });
                         await sendMessageWithDelay(userId, changeMsg);
 
@@ -1390,26 +1399,39 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 console.log(`[AI-FALLBACK] waiting_data: Detected question/objection from ${userId}: "${text}"`);
                 const aiData = await aiService.chat(text, {
                     step: 'waiting_data',
-                    goal: 'El usuario está dudando, tiene una pregunta (ej. sobre precio o envío) o quiere postergar la compra. RESPUESTAS CORTAS, AMABLES Y SÚPER EMPÁTICAS. ESTRATEGIA: 1) Si pregunta o duda, respondéle amablemente como un humano real que quiere ayudar (tono Argentino cálido). 2) Si dice que lo va a pensar, decile "¡Obvio, tomate tu tiempo! 😊 Cualquier cosa me avisás". 3) Tras responder una duda, preguntá de forma sutil y breve como "Dicho esto, ¿te anoto para enviártelo?" o "¿Querés que arranquemos a armar tu paquete?". NUNCA preguntes "Pasame tus datos completos".',
+                    goal: 'El usuario está dudando, tiene una pregunta (ej. sobre precio o envío) o quiere postergar la compra. RESPUESTAS CORTAS, AMABLES Y SÚPER EMPÁTICAS. ESTRATEGIA: 1) Si pregunta o duda, respondéle amablemente como un humano real que quiere ayudar (tono Argentino cálido). 2) Si dice que lo va a pensar, decile "¡Obvio, tomate tu tiempo! 😊 Cualquier cosa me avisás". 3) Si indica que cobra o puede pagar recién en una fecha futura (ej. "el 28" o "el 1 de marzo"), decile explícitamente que "Ningún problema, si querés ya te lo dejo reservado y pactado para enviártelo el [FECHA QUE DIJO]", y NADA MÁS. 4) En cualquier otro caso, tras responder la duda, preguntá sutil y brevemente: "¿Te parece que lo dejemos anotado?" o similar. NUNCA pidas los datos completos como un robot.',
                     history: currentState.history,
                     summary: currentState.summary,
                     knowledge: knowledge,
                     userState: currentState
                 });
+
                 if (aiData.response && !_isDuplicate(aiData.response, currentState.history)) {
                     currentState.history.push({ role: 'bot', content: aiData.response, timestamp: Date.now() });
                     saveState();
                     await sendMessageWithDelay(userId, aiData.response);
+
+                    // NEW: Update postdatado state if AI handled a future date effectively
+                    if (/\b(reservado|pactado|anotado|programado)\b/i.test(aiData.response) && /\b(para el|el \d+|en esa fecha)\b/.test(aiData.response)) {
+                        const postdatadoMatch = text.match(/\b(lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo|semana|mes|cobro|mañana|despues|después|principio|el \d+ de [a-z]+|el \d+)\b/i);
+                        if (postdatadoMatch) {
+                            currentState.postdatado = text;
+                            saveState();
+                        }
+                    }
+
                     matched = true;
+                    return; // EXIT COMPLETELY to avoid triggering address progressively collection again
                 } else if (aiData.response) {
                     // AI generated a duplicate — skip silently, don't spam
                     console.log(`[ANTI-DUP] Skipping duplicate AI response for ${userId}`);
                     matched = true;
+                    return; // Exit
                 } else {
                     await _pauseAndAlert(userId, currentState, dependencies, text, `Cliente duda o objeta. Dice: "${text}"`);
                     matched = true;
+                    return; // Exit
                 }
-                break;
             }
 
 
@@ -1662,22 +1684,31 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
         }
 
         case 'waiting_final_confirmation': {
-            // PRIORITY 0: Detect product change ("mejor semillas", "quiero capsulas", "cambio a gotas") BEFORE confirming
+            // PRIORITY 0: Detect product change OR plan change BEFORE confirming
             const productChangeMatch = normalizedText.match(/\b(mejor|quiero|prefiero|cambio|cambia|dame|paso a|en vez)\b.*\b(capsula|capsulas|pastilla|pastillas|semilla|semillas|gota|gotas|natural|infusion)\b/i)
                 || normalizedText.match(/\b(capsula|capsulas|pastilla|pastillas|semilla|semillas|gota|gotas)\b.*\b(mejor|quiero|prefiero|cambio|en vez)\b/i);
 
-            if (productChangeMatch && currentState.selectedPlan) {
+            const planChangeMatch = normalizedText.match(/\b(mejor|quiero|prefiero|cambio|cambia|dame|paso a|en vez)\b.*\b(60|120|sesenta|ciento veinte)\b/i)
+                || normalizedText.match(/\b(60|120|sesenta|ciento veinte)\b.*\b(mejor|quiero|prefiero|cambio|en vez)\b/i);
+
+            if ((productChangeMatch || planChangeMatch) && currentState.selectedPlan) {
                 // Detect which product they want
-                let newProduct = null;
+                let newProduct = currentState.selectedProduct;
                 if (/capsula|pastilla/i.test(normalizedText)) newProduct = "Cápsulas de nuez de la india";
                 else if (/semilla|natural|infusion/i.test(normalizedText)) newProduct = "Semillas de nuez de la india";
                 else if (/gota/i.test(normalizedText)) newProduct = "Gotas de nuez de la india";
 
-                if (newProduct && newProduct !== currentState.selectedProduct) {
-                    console.log(`[LATE-BACKTRACK] User ${userId} changed product from "${currentState.selectedProduct}" to "${newProduct}" during final confirmation`);
+                // Detect which plan they want
+                let newPlan = currentState.selectedPlan;
+                if (/\b(120|ciento veinte)\b/i.test(normalizedText)) newPlan = "120";
+                else if (/\b(60|sesenta)\b/i.test(normalizedText)) newPlan = "60";
+
+                if (newProduct !== currentState.selectedProduct || newPlan !== currentState.selectedPlan) {
+                    console.log(`[LATE-BACKTRACK] User ${userId} changed product from "${currentState.selectedProduct} - ${currentState.selectedPlan}" to "${newProduct} - ${newPlan}" during final confirmation`);
 
                     currentState.selectedProduct = newProduct;
-                    const oldPlan = currentState.selectedPlan;
+                    currentState.selectedPlan = newPlan;
+                    const oldPlan = newPlan; // use the updated plan
 
                     // Recalculate cart and price
                     const priceStr = _getPrice(newProduct, oldPlan);
@@ -1694,12 +1725,13 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     currentState.totalPrice = finalPrice.toLocaleString('es-AR').replace(/,/g, '.');
 
                     // Acknowledge change
-                    const changeMsg = `¡Dale, sin problema! 😊 Cambiamos el pedido a ${newProduct.split(' de ')[0].toLowerCase()}.`;
+                    const planText = newPlan === "120" ? "120 días" : "60 días";
+                    const changeMsg = `¡Dale, sin problema! 😊 Cambiamos el pedido a ${newProduct.split(' de ')[0].toLowerCase()} por ${planText}.`;
                     currentState.history.push({ role: 'bot', content: changeMsg, timestamp: Date.now() });
                     await sendMessageWithDelay(userId, changeMsg);
 
-                    // Re-send confirmation summary
-                    const summaryMsg = buildConfirmationMessage(currentState);
+                    // Re-send short confirmation summary instead of full template
+                    const summaryMsg = `Tendría un valor de $${currentState.totalPrice}.\n\n👉 Confirmame que podrás recibir o retirar el pedido sin inconvenientes.`;
                     currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
                     await sendMessageWithDelay(userId, summaryMsg);
 
@@ -1761,20 +1793,20 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 saveState();
                 matched = true;
             } else if (_isAffirmative(normalizedText) || /\b(si|dale|ok|listo|confirmo|correcto|acepto|bueno|joya|de una)\b/i.test(normalizedText)) {
-                // FINAL SUCCESS
-                const msg = "¡Excelente! Tu pedido ya fue ingresado 🚀\n\nTe vamos a avisar cuando lo despachemos con el número de seguimiento.\n\n¡Muchas gracias por confiar en Herbalis!";
+                // FINAL SUCCESS (PENDING ADMIN APPROVAL)
+                const msg = "¡Perfecto! Recibimos tu confirmación.\n\nAguardame un instante que verificamos los datos y te confirmamos el ingreso ⏳";
                 await sendMessageWithDelay(userId, msg);
 
-                // Save Order
+                // Save Order Local & Sheets
                 if (currentState.pendingOrder) {
                     const orderData = _buildOrderData();
                     if (dependencies.saveOrderToLocal) dependencies.saveOrderToLocal(orderData);
                     appendOrderToSheet(orderData).catch(e => console.error('🔴 [SHEETS] Async log failed:', e.message));
-                    console.log(`✅ [PEDIDO CONFIRMADO] ${userId} — Total: $${currentState.totalPrice || '0'}`);
+                    console.log(`✅ [PEDIDO CARGADO - PENDIENTE APROBACIÓN] ${userId} — Total: $${currentState.totalPrice || '0'}`);
 
-                    // Notify Admin Now
+                    // Notify Admin Now so they can click "APROBAR"
                     const o = currentState.pendingOrder;
-                    await notifyAdmin(`✅ Nuevo Pedido Confirmado`, userId, `Datos: ${o.nombre}, ${o.calle}\nCiudad: ${o.ciudad} | CP: ${o.cp}\nProvincia: ${o.provincia || '?'}\nItems: ${orderData.producto}\nTotal: $${currentState.totalPrice || '0'}`);
+                    await notifyAdmin(`⌛ Pedido Requiere Aprobación`, userId, `Datos: ${o.nombre}, ${o.calle}\nCiudad: ${o.ciudad} | CP: ${o.cp}\nProvincia: ${o.provincia || '?'}\nItems: ${orderData.producto}\nTotal: $${currentState.totalPrice || '0'}`);
 
                     // --- METRICS TRACKING ---
                     if (dependencies.config && dependencies.config.scriptStats && dependencies.config.activeScript) {
@@ -1785,7 +1817,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     }
                 }
 
-                _setStep(currentState, 'completed');
+                _setStep(currentState, 'waiting_admin_validation');
                 currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
                 saveState();
                 matched = true;

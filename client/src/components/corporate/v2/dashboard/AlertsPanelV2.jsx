@@ -34,11 +34,7 @@ const AlertsPanelV2 = ({ alerts, onCommand, onQuickAction }) => {
         return `${Math.floor(hrs / 24)}d`;
     };
 
-    const quickSuggestions = [
-        { label: '✅ Confirmar', cmd: 'confirmar' },
-        { label: '📦 Modificar', cmd: 'confirma el cambio de producto' },
-        { label: '💬 Derivar', cmd: 'decile que me comunico por privado' },
-    ];
+    const quickSuggestions = [];
 
     return (
         <div className="lg:col-span-2 space-y-6">
@@ -117,12 +113,15 @@ const AlertsPanelV2 = ({ alerts, onCommand, onQuickAction }) => {
                                                 <IconsV2.Message />
                                             </button>
 
-                                            {/* Conditionally reveal Aprobar if there's an order to confirm */}
-                                            {hasOrder && alert.reason.toLowerCase().includes('inesperada') && (
-                                                <button onClick={(e) => { e.stopPropagation(); onQuickAction(alert.userPhone, 'confirmar'); }} className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-xl text-xs font-bold hover:bg-emerald-600 transition-colors shadow-md shadow-emerald-500/20 flex-1 sm:flex-none justify-center">
-                                                    <IconsV2.Check /> Aprobar
+                                            {/* Legacy Approve/Intercede Buttons */}
+                                            {hasOrder && (alert.reason.toLowerCase().includes('inesperada') || alert.reason.toLowerCase().includes('aprobaci')) && (
+                                                <button onClick={(e) => { e.stopPropagation(); onQuickAction(alert.userPhone, 'confirmar'); }} className="px-4 py-2 bg-emerald-500 text-white rounded-xl text-xs font-bold hover:bg-emerald-600 transition-colors shadow-md shadow-emerald-500/20 flex-1 sm:flex-none flex items-center justify-center">
+                                                    APROBAR
                                                 </button>
                                             )}
+                                            <button onClick={(e) => { e.stopPropagation(); toggleExpand(alert.id); }} className="px-4 py-2 bg-amber-500 text-white rounded-xl text-xs font-bold hover:bg-amber-600 transition-colors shadow-md shadow-amber-500/20 flex-1 sm:flex-none flex items-center justify-center">
+                                                INTERCEDER
+                                            </button>
 
                                             <button onClick={(e) => { e.stopPropagation(); onQuickAction(alert.userPhone, 'descartar'); }} className="p-2.5 text-slate-400 hover:bg-rose-50 hover:text-rose-500 rounded-xl transition-colors">
                                                 ✕
@@ -157,13 +156,7 @@ const AlertsPanelV2 = ({ alerts, onCommand, onQuickAction }) => {
                                             </div>
                                         )}
 
-                                        <div className="flex flex-wrap gap-2 mb-4">
-                                            {quickSuggestions.filter(s => s.label !== '💬 Derivar').map((s, i) => (
-                                                <button key={i} onClick={() => handleSend(alert, s.cmd)} disabled={isSending} className="px-4 py-2 rounded-xl bg-white border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 text-xs font-bold text-slate-600 hover:text-indigo-700 transition-all shadow-sm">
-                                                    {s.label}
-                                                </button>
-                                            ))}
-                                        </div>
+                                        {/* Removed quick suggestions div */}
 
                                         {/* Summary text if available (from fallback text passed via details) */}
                                         {alert.details && (
