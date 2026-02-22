@@ -14,7 +14,8 @@ const IconsV2 = {
     ChevronDown: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>,
     Send: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>,
     Clip: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>,
-    Cart: ({ className = "w-5 h-5" }) => <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-1.35 2.7a1 1 0 00.9 1.5h11.45m-9 4a1 1 0 11-2 0 1 1 0 012 0zm10 0a1 1 0 11-2 0 1 1 0 012 0z" /></svg>
+    Cart: ({ className = "w-5 h-5" }) => <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-1.35 2.7a1 1 0 00.9 1.5h11.45m-9 4a1 1 0 11-2 0 1 1 0 012 0zm10 0a1 1 0 11-2 0 1 1 0 012 0z" /></svg>,
+    ArrowLeft: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
 };
 
 const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
@@ -257,7 +258,7 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
             <div className="absolute top-0 right-1/4 w-64 h-64 bg-indigo-400/10 blur-[80px] rounded-full pointer-events-none"></div>
 
             {/* SIDEBAR: Contacts */}
-            <div className="w-80 md:w-96 border-r border-white/50 flex flex-col bg-white/40 backdrop-blur-md z-10">
+            <div className={`w-full md:w-96 border-r border-white/50 flex-col bg-white/40 backdrop-blur-md z-10 ${selectedChat ? 'hidden md:flex' : 'flex'}`}>
                 {/* Search Header */}
                 <div className="p-5 border-b border-white/50 bg-white/30 backdrop-blur-sm">
                     <div className="relative group">
@@ -303,50 +304,53 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
             </div>
 
             {/* CHAT AREA */}
-            <div className="flex-1 flex flex-col bg-slate-50/30 backdrop-blur-md relative z-10">
+            <div className={`flex-1 flex-col bg-slate-50/30 backdrop-blur-md relative z-10 ${!selectedChat ? 'hidden md:flex' : 'flex'}`}>
                 {selectedChat ? (
                     <>
                         {/* Header */}
-                        <div className="flex-shrink-0 h-20 border-b border-white/50 flex items-center justify-between px-8 bg-white/50 backdrop-blur-md shadow-[0_2px_10px_rgba(0,0,0,0.02)] z-20">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center font-bold text-lg shadow-md shadow-indigo-500/20">
+                        <div className="flex-shrink-0 min-h-[5rem] border-b border-white/50 flex items-center justify-between px-3 sm:px-8 bg-white/50 backdrop-blur-md shadow-[0_2px_10px_rgba(0,0,0,0.02)] z-20 overflow-x-auto custom-scrollbar no-scrollbar">
+                            <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+                                <button onClick={() => setSelectedChat(null)} className="md:hidden p-2 -ml-1 text-slate-500 hover:bg-slate-200 rounded-full transition-colors flex-shrink-0">
+                                    <IconsV2.ArrowLeft />
+                                </button>
+                                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center font-bold text-base sm:text-lg shadow-md shadow-indigo-500/20 flex-shrink-0">
                                     {selectedChat.name.substring(0, 2).toUpperCase()}
                                 </div>
-                                <div>
-                                    <div className="flex items-center gap-3">
-                                        <h2 className="font-extrabold text-slate-800 text-lg tracking-tight">{selectedChat.name}</h2>
+                                <div className="min-w-0 pr-2">
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3 flex-wrap">
+                                        <h2 className="font-extrabold text-slate-800 text-[15px] sm:text-lg tracking-tight truncate max-w-[140px] sm:max-w-xs">{selectedChat.name}</h2>
                                         {selectedChat.assignedScript && (
-                                            <span className="px-3 py-1 rounded-full bg-indigo-100 text-[10px] font-bold text-indigo-700 uppercase tracking-widest border border-indigo-200">
+                                            <span className="self-start sm:self-auto mt-1 sm:mt-0 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full bg-indigo-100 text-[9px] sm:text-[10px] font-bold text-indigo-700 uppercase tracking-widest border border-indigo-200">
                                                 Flow: {selectedChat.assignedScript}
                                             </span>
                                         )}
                                     </div>
-                                    <p className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 mt-0.5 ${selectedChat.isPaused ? 'text-amber-500' : 'text-emerald-500'}`}>
-                                        <span className={`w-2 h-2 rounded-full ${selectedChat.isPaused ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]'}`}></span>
+                                    <p className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 mt-0.5 ${selectedChat.isPaused ? 'text-amber-500' : 'text-emerald-500'}`}>
+                                        <span className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${selectedChat.isPaused ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]'}`}></span>
                                         {selectedChat.isPaused ? 'Auto-Bot Pausado' : 'Auto-Bot Activo'}
                                     </p>
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-2 sm:gap-3">
+                            <div className="flex items-center gap-1 sm:gap-3 overflow-x-auto custom-scrollbar no-scrollbar scroll-smooth pl-2">
                                 {selectedChat.hasBought && (
-                                    <button onClick={() => setShowOrdersPanel(!showOrdersPanel)} className="p-3 rounded-xl bg-emerald-100/80 text-emerald-700 hover:bg-emerald-200 hover:shadow-md transition-all flex items-center gap-2" title="Registro de Compras">
+                                    <button onClick={() => setShowOrdersPanel(!showOrdersPanel)} className="p-2 sm:p-3 flex-shrink-0 rounded-xl bg-emerald-100/80 text-emerald-700 hover:bg-emerald-200 hover:shadow-md transition-all flex items-center gap-2" title="Registro de Compras">
                                         <IconsV2.Cart className="w-5 h-5" />
                                         <span className="text-xs font-bold hidden xl:inline">Pedidos</span>
                                     </button>
                                 )}
-                                <button onClick={handleSummarize} disabled={summarizing} className="p-3 rounded-xl bg-violet-100/80 text-violet-700 hover:bg-violet-200 hover:shadow-md transition-all" title="Resumen de IA">
+                                <button onClick={handleSummarize} disabled={summarizing} className="p-2 sm:p-3 flex-shrink-0 rounded-xl bg-violet-100/80 text-violet-700 hover:bg-violet-200 hover:shadow-md transition-all" title="Resumen de IA">
                                     <IconsV2.AI />
                                 </button>
-                                <button onClick={handleClearChat} className="p-3 rounded-xl bg-rose-100/80 text-rose-600 hover:bg-rose-200 hover:shadow-md transition-all" title="Reiniciar Memoria e Historial">
+                                <button onClick={handleClearChat} className="p-2 sm:p-3 flex-shrink-0 rounded-xl bg-rose-100/80 text-rose-600 hover:bg-rose-200 hover:shadow-md transition-all" title="Reiniciar Memoria e Historial">
                                     <IconsV2.Trash />
                                 </button>
-                                <button onClick={handleToggleBot} className={`p-3 rounded-xl text-white shadow-md transition-all ${selectedChat.isPaused ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:scale-105' : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:scale-105'}`} title={selectedChat.isPaused ? 'Reactivar Bot' : 'Pausar Bot'}>
+                                <button onClick={handleToggleBot} className={`p-2 sm:p-3 flex-shrink-0 rounded-xl text-white shadow-md transition-all ${selectedChat.isPaused ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:scale-105' : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:scale-105'}`} title={selectedChat.isPaused ? 'Reactivar Bot' : 'Pausar Bot'}>
                                     {selectedChat.isPaused ? <IconsV2.Play /> : <IconsV2.Pause />}
                                 </button>
-                                <button onClick={() => setShowScriptPanel(!showScriptPanel)} className="flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-slate-800 to-slate-700 text-white font-bold text-sm hover:shadow-lg transition-all active:scale-95">
+                                <button onClick={() => setShowScriptPanel(!showScriptPanel)} className="flex items-center gap-2 px-3 sm:px-5 py-2 sm:py-3 flex-shrink-0 rounded-xl bg-gradient-to-r from-slate-800 to-slate-700 text-white font-bold text-sm hover:shadow-lg transition-all active:scale-95">
                                     <IconsV2.Script />
-                                    <span>Guión</span>
+                                    <span className="hidden sm:inline">Guión</span>
                                 </button>
                             </div>
                         </div>
@@ -421,31 +425,31 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
                         </div>
 
                         {/* Input Area */}
-                        <div className="flex-shrink-0 p-6 bg-white/50 backdrop-blur-md border-t border-white/60 z-20">
+                        <div className="flex-shrink-0 p-2 sm:p-6 bg-white/50 backdrop-blur-md border-t border-white/60 z-20 mb-safe-bottom">
                             {attachment && (
-                                <div className="mb-4 p-4 bg-white/80 rounded-2xl border border-indigo-100 shadow-sm flex items-center gap-4">
-                                    <img src={attachment.preview} alt="Preview" className="w-16 h-16 object-cover rounded-xl" />
-                                    <div className="flex-1">
-                                        <p className="font-bold text-slate-800 text-sm">{attachment.file.name}</p>
+                                <div className="mb-2 p-3 sm:p-4 bg-white/80 rounded-2xl border border-indigo-100 shadow-sm flex items-center gap-4">
+                                    <img src={attachment.preview} alt="Preview" className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-xl" />
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-bold text-slate-800 text-sm truncate">{attachment.file.name}</p>
                                         <p className="text-xs text-slate-500">{(attachment.file.size / 1024).toFixed(0)} KB</p>
                                     </div>
-                                    <button onClick={() => setAttachment(null)} className="p-2 bg-slate-100 hover:bg-rose-100 hover:text-rose-600 rounded-xl transition-colors">✕</button>
+                                    <button type="button" onClick={() => setAttachment(null)} className="p-2 sm:p-2 bg-slate-100 hover:bg-rose-100 hover:text-rose-600 rounded-xl transition-colors shrink-0">✕</button>
                                 </div>
                             )}
-                            <form onSubmit={attachment ? (e) => { e.preventDefault(); handleSendMedia(); } : handleSend} className="flex gap-4">
+                            <form onSubmit={attachment ? (e) => { e.preventDefault(); handleSendMedia(); } : handleSend} className="flex gap-1.5 sm:gap-4 items-center w-full">
                                 <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
-                                <button type="button" onClick={() => fileInputRef.current?.click()} className="w-14 h-14 flex items-center justify-center rounded-2xl bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 transition-all shadow-sm">
+                                <button type="button" onClick={() => fileInputRef.current?.click()} className="w-11 h-11 sm:w-14 sm:h-14 flex items-center justify-center shrink-0 rounded-xl sm:rounded-2xl bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 transition-all shadow-sm">
                                     <IconsV2.Clip />
                                 </button>
                                 <input
                                     type="text"
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
-                                    placeholder="Escribe un mensaje para el cliente..."
-                                    className="flex-1 bg-white border border-slate-200 rounded-2xl px-6 py-4 text-slate-800 font-medium focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all shadow-inner placeholder:text-slate-400"
+                                    placeholder="Mensaje..."
+                                    className="w-full min-w-0 flex-1 bg-white border border-slate-200 rounded-xl sm:rounded-2xl px-3 sm:px-6 py-2.5 sm:py-4 text-slate-800 font-medium focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all shadow-inner placeholder:text-slate-400 text-[15px] sm:text-base"
                                 />
-                                <button type="submit" disabled={(!input.trim() && !attachment) || sendingMedia} className="w-14 h-14 flex items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100">
-                                    {sendingMedia ? <div className="w-6 h-6 border-2 border-white/50 border-t-white rounded-full animate-spin"></div> : <IconsV2.Send />}
+                                <button type="submit" disabled={(!input.trim() && !attachment) || sendingMedia} className="w-11 h-11 sm:w-14 sm:h-14 flex items-center justify-center shrink-0 rounded-xl sm:rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100">
+                                    {sendingMedia ? <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-white/50 border-t-white rounded-full animate-spin"></div> : <IconsV2.Send />}
                                 </button>
                             </form>
                         </div>

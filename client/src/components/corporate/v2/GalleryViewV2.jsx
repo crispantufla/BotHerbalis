@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../../config/axios';
+import { API_URL } from '../../../config/api';
 import { useToast } from '../../ui/Toast';
 
 const IconsV2 = {
@@ -172,12 +173,12 @@ const GalleryViewV2 = () => {
                                         {/* Subtle loading placeholder */}
                                         <div className="absolute inset-0 bg-gradient-to-br from-slate-100 to-slate-200 animate-pulse -z-10"></div>
 
-                                        <img src={img.url} alt={img.originalName} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" loading="lazy" />
+                                        <img src={`${API_URL}${img.url}`} alt={img.originalName} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" loading="lazy" />
 
                                         {/* Glass Overlay Actions */}
                                         <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-4">
                                             <button
-                                                onClick={() => window.open(img.url, '_blank')}
+                                                onClick={() => window.open(`${API_URL}${img.url}`, '_blank')}
                                                 className="w-12 h-12 rounded-full bg-white/20 hover:bg-white text-white hover:text-indigo-600 backdrop-blur-md flex items-center justify-center shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-all duration-300"
                                                 title="Visualización Completa"
                                             >

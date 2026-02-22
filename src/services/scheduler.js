@@ -126,8 +126,10 @@ function autoApproveOrders(sharedState, dependencies) {
                 const prodStr = cart.map(i => i.product).join(' + ');
                 const planStr = cart.map(i => `${i.plan} días`).join(' + ');
 
+                // Clean userId for Sheets (get only the phone number)
+                const phone = userId.split('@')[0];
                 const orderData = {
-                    cliente: userId,
+                    cliente: phone,
                     nombre: o.nombre, calle: o.calle, ciudad: o.ciudad, cp: o.cp,
                     producto: prodStr, plan: planStr,
                     precio: state.totalPrice || '0',

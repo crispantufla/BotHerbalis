@@ -129,17 +129,17 @@ const CorporateDashboardV2 = () => {
         const isActive = activeTab === tab;
         return (
             <button
-                onClick={() => setActiveTab(tab)}
-                className={`w-full flex items-center ${sidebarCollapsed ? 'justify-center px-0' : 'px-4'} py-3 mb-2 rounded-xl transition-all duration-300 group
+                onClick={() => { setActiveTab(tab); if (isMobile) setMobileMenuOpen(false); }}
+                className={`w-full flex items-center ${(sidebarCollapsed && !isMobile) ? 'justify-center px-0' : 'px-4'} py-3 mb-2 rounded-xl transition-all duration-300 group
                 ${isActive
                         ? 'bg-gradient-to-r from-blue-500/10 to-indigo-500/10 text-indigo-700 shadow-sm border border-indigo-200/50'
                         : 'text-slate-600 hover:bg-white hover:shadow-sm border border-transparent'}`}
-                title={sidebarCollapsed ? label : ''}
+                title={(sidebarCollapsed && !isMobile) ? label : ''}
             >
-                <div className={`${sidebarCollapsed ? '' : 'mr-4'} transition-transform duration-300 group-hover:scale-110`}>
+                <div className={`${(sidebarCollapsed && !isMobile) ? '' : 'mr-4'} transition-transform duration-300 group-hover:scale-110`}>
                     <Icon active={isActive} />
                 </div>
-                {!sidebarCollapsed && <span className={`font-medium ${isActive ? 'text-indigo-700 font-semibold' : ''}`}>{label}</span>}
+                {(!sidebarCollapsed || isMobile) && <span className={`font-medium ${isActive ? 'text-indigo-700 font-semibold' : ''}`}>{label}</span>}
             </button>
         );
     };
@@ -214,7 +214,7 @@ const CorporateDashboardV2 = () => {
                 {/* User Profile & Logout (Bottom) */}
                 <div className="p-4 border-t border-slate-200/50 bg-white/40">
                     <button
-                        onClick={logout}
+                        onClick={() => { logout(); if (isMobile) setMobileMenuOpen(false); }}
                         className={`w-full flex items-center ${(sidebarCollapsed && !isMobile) ? 'justify-center p-2' : 'px-4 py-3'} rounded-xl bg-gradient-to-r hover:from-rose-50 hover:to-orange-50 text-rose-600 transition-all duration-300 border border-transparent hover:border-rose-200 group`}
                         title={(sidebarCollapsed && !isMobile) ? "Cerrar Sesión" : ""}
                     >

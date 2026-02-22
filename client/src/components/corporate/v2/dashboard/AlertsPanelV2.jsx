@@ -83,7 +83,8 @@ const AlertsPanelV2 = ({ alerts, onCommand, onQuickAction }) => {
                     {alerts.map((alert, index) => {
                         const od = alert.orderData || {};
                         const addr = od.address || {};
-                        const hasOrder = od.product || od.price;
+                        const hasOrder = !!(od.product || od.price);
+                        const cleanPhone = alert.userPhone ? alert.userPhone.split('@')[0] : 'Desconocido';
                         const inputValue = adminInputs[alert.id] || '';
                         const isSending = sendingCommand[alert.id] || false;
                         const isExpanded = expandedCards[alert.id] !== false;
@@ -107,7 +108,7 @@ const AlertsPanelV2 = ({ alerts, onCommand, onQuickAction }) => {
                                                     </span>
                                                 </div>
                                                 <h4 className="font-bold text-slate-800 text-base leading-snug truncate">{alert.reason}</h4>
-                                                <p className="text-sm font-medium text-slate-500 mt-1 truncate">{alert.userPhone}</p>
+                                                <p className="text-sm font-medium text-slate-500 mt-1 truncate">{alert.userPhone ? alert.userPhone.split('@')[0] : 'Desconocido'}</p>
                                             </div>
                                         </div>
 
@@ -115,9 +116,14 @@ const AlertsPanelV2 = ({ alerts, onCommand, onQuickAction }) => {
                                             <button onClick={(e) => { e.stopPropagation(); onQuickAction(alert.userPhone, 'chat'); }} className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-colors flex-1 sm:flex-none flex justify-center items-center" title="Ver Chat">
                                                 <IconsV2.Message />
                                             </button>
-                                            <button onClick={(e) => { e.stopPropagation(); onQuickAction(alert.userPhone, 'confirmar'); }} className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-xl text-xs font-bold hover:bg-emerald-600 transition-colors shadow-md shadow-emerald-500/20">
-                                                <IconsV2.Check /> Aprobar
-                                            </button>
+
+                                            {/* Conditionally reveal Aprobar if there's an order to confirm */}
+                                            {hasOrder && alert.reason.toLowerCase().includes('inesperada') && (
+                                                <button onClick={(e) => { e.stopPropagation(); onQuickAction(alert.userPhone, 'confirmar'); }} className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-xl text-xs font-bold hover:bg-emerald-600 transition-colors shadow-md shadow-emerald-500/20 flex-1 sm:flex-none justify-center">
+                                                    <IconsV2.Check /> Aprobar
+                                                </button>
+                                            )}
+
                                             <button onClick={(e) => { e.stopPropagation(); onQuickAction(alert.userPhone, 'descartar'); }} className="p-2.5 text-slate-400 hover:bg-rose-50 hover:text-rose-500 rounded-xl transition-colors">
                                                 ✕
                                             </button>
@@ -152,39 +158,50 @@ const AlertsPanelV2 = ({ alerts, onCommand, onQuickAction }) => {
                                         )}
 
                                         <div className="flex flex-wrap gap-2 mb-4">
-                                            {quickSuggestions.map((s, i) => (
+                                            {quickSuggestions.filter(s => s.label !== '💬 Derivar').map((s, i) => (
                                                 <button key={i} onClick={() => handleSend(alert, s.cmd)} disabled={isSending} className="px-4 py-2 rounded-xl bg-white border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 text-xs font-bold text-slate-600 hover:text-indigo-700 transition-all shadow-sm">
                                                     {s.label}
                                                 </button>
                                             ))}
                                         </div>
 
-                                        <div className="flex gap-3">
+                                        {/* Summary text if available (from fallback text passed via details) */}
+                                        {alert.details && (
+                                            <div className="mb-4 bg-amber-50 rounded-2xl p-4 border border-amber-100 shadow-sm">
+                                                <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-1">Detalles de la alerta</p>
+                                                <p className="text-sm font-medium text-amber-900 leading-relaxed italic truncate max-w-full">
+                                                    "{alert.details}"
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        <form onSubmit={(e) => { e.preventDefault(); handleSend(alert, inputValue); }} className="relative flex gap-3">
                                             <input
                                                 type="text"
                                                 value={inputValue}
                                                 onChange={(e) => setAdminInputs(prev => ({ ...prev, [alert.id]: e.target.value }))}
-                                                onKeyDown={(e) => e.key === 'Enter' && handleSend(alert, inputValue)}
                                                 placeholder="Instrucción en lenguaje natural para la IA..."
                                                 className="flex-1 bg-white border border-slate-200 rounded-xl px-5 py-3 text-sm focus:ring-2 focus:ring-indigo-500/50 outline-none font-medium placeholder:text-slate-400 shadow-inner"
                                             />
                                             <button
-                                                onClick={() => handleSend(alert, inputValue)}
+                                                type="submit"
                                                 disabled={isSending || !inputValue.trim()}
                                                 className="bg-indigo-600 text-white px-6 py-3 rounded-xl hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2 text-sm font-bold shadow-lg shadow-indigo-600/20 transition-all"
                                             >
                                                 {isSending ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <IconsV2.Send />}
                                                 Enviar a IA
                                             </button>
-                                        </div>
+                                        </form>
                                     </div>
-                                )}
+                                )
+                                }
                             </div>
                         );
                     })}
                 </div>
-            )}
-        </div>
+            )
+            }
+        </div >
     );
 };
 

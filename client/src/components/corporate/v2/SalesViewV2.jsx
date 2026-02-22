@@ -21,6 +21,9 @@ const SalesViewV2 = ({ onGoToChat }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('Todos');
 
+    // Viewing / Details State
+    const [viewingOrder, setViewingOrder] = useState(null);
+
     // Editing State
     const [editingOrder, setEditingOrder] = useState(null);
     const [editStatus, setEditStatus] = useState('');
@@ -95,7 +98,7 @@ const SalesViewV2 = ({ onGoToChat }) => {
             return;
         }
 
-        const toastId = toast.info('Buscando chat...', { autoClose: false });
+        const toastId = toast.info('Buscando chat...');
         try {
             const res = await api.get('/api/chats');
             const chats = res.data;
@@ -142,6 +145,31 @@ const SalesViewV2 = ({ onGoToChat }) => {
 
         return matchesSearch && matchesStatus;
     });
+
+    // Timezone & Date Formatter
+    const formatDateBA = (dateStr) => {
+        if (!dateStr) return '—';
+        try {
+            // Handle DB legacy strings like "22/02/2026, 17:30" or ISO
+            let d = new Date(dateStr);
+            if (isNaN(d.getTime()) && dateStr.includes('/')) {
+                // Try strictly parsing DD/MM/YYYY
+                const parts = dateStr.split(/[^\d]/);
+                if (parts.length >= 3) {
+                    d = new Date(parts[2], parts[1] - 1, parts[0], parts[3] || 0, parts[4] || 0, parts[5] || 0);
+                }
+            }
+            if (isNaN(d.getTime())) return 'Invalid Date';
+
+            return d.toLocaleString('es-AR', {
+                timeZone: 'America/Argentina/Buenos_Aires',
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit'
+            });
+        } catch (e) {
+            return dateStr;
+        }
+    };
 
     return (
         <div className="h-full flex flex-col animate-fade-in relative z-10 w-full space-y-6">
@@ -205,14 +233,14 @@ const SalesViewV2 = ({ onGoToChat }) => {
                     <table className="w-full text-left border-collapse whitespace-nowrap">
                         <thead className="bg-white/40 border-b border-white/60 sticky top-0 z-20 backdrop-blur-md">
                             <tr className="text-xs uppercase tracking-widest text-slate-500 font-extrabold">
-                                <th className="px-8 py-5">Fecha</th>
-                                <th className="px-8 py-5">Cliente</th>
-                                <th className="px-8 py-5">Producto / Plan</th>
-                                <th className="px-8 py-5 text-right">Monto</th>
-                                <th className="px-8 py-5 text-center">Postdatado</th>
-                                <th className="px-8 py-5 text-center">Estado</th>
-                                <th className="px-8 py-5">Tracking</th>
-                                <th className="px-8 py-5 text-right">Acciones</th>
+                                <th className="px-4 sm:px-8 py-5 hidden md:table-cell">Fecha</th>
+                                <th className="px-4 sm:px-8 py-5">Cliente</th>
+                                <th className="px-4 sm:px-8 py-5">Prod / Plan</th>
+                                <th className="px-4 sm:px-8 py-5 text-right hidden sm:table-cell">Monto</th>
+                                <th className="px-4 sm:px-8 py-5 text-center hidden xl:table-cell">Postdatado</th>
+                                <th className="px-4 sm:px-8 py-5 text-center">Estado</th>
+                                <th className="px-4 sm:px-8 py-5 hidden md:table-cell">Tracking</th>
+                                <th className="px-4 sm:px-8 py-5 text-right w-10">Acciones</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200/50">
@@ -234,44 +262,46 @@ const SalesViewV2 = ({ onGoToChat }) => {
                             ) : (
                                 filteredOrders.map(order => (
                                     <tr key={order.id} className="hover:bg-white/50 transition-colors group">
-                                        <td className="px-8 py-5 font-mono text-xs font-bold text-slate-500">
-                                            {new Date(order.createdAt).toLocaleDateString()}
+                                        <td className="px-4 sm:px-8 py-5 font-mono text-xs font-bold text-slate-500 hidden md:table-cell">
+                                            {formatDateBA(order.createdAt)}
                                         </td>
-                                        <td className="px-8 py-5">
-                                            <p className="font-extrabold text-slate-800">{order.nombre || 'Desconocido'}</p>
-                                            <p className="text-xs text-slate-400 font-mono mt-0.5">{order.cliente}</p>
+                                        <td className="px-4 sm:px-8 py-5 max-w-[120px] sm:max-w-xs truncate">
+                                            <button onClick={() => setViewingOrder(order)} className="text-left group/click focus:outline-none">
+                                                <p className="font-extrabold text-slate-800 group-hover/click:text-indigo-600 transition-colors border-b border-dashed border-transparent group-hover/click:border-indigo-400 truncate">
+                                                    {order.nombre || 'Desconocido'}
+                                                </p>
+                                                <p className="text-xs text-slate-400 font-mono mt-0.5 truncate">
+                                                    {order.cliente ? order.cliente.split('@')[0] : '—'}
+                                                </p>
+                                            </button>
                                         </td>
-                                        <td className="px-8 py-5">
-                                            <div className="flex items-center gap-2">
-                                                <span className="px-3 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-100 shadow-sm">
-                                                    {order.producto}
-                                                </span>
-                                                {order.plan && <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-md">{order.plan}</span>}
-                                            </div>
+                                        <td className="px-4 sm:px-8 py-5 max-w-[100px] sm:max-w-xs truncate">
+                                            <p className="font-bold text-indigo-700 truncate">{order.producto}</p>
+                                            {order.plan && <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-400 bg-indigo-50 px-2 py-0.5 rounded-md mt-1 inline-block">Plan {order.plan} d.</span>}
                                         </td>
-                                        <td className="px-8 py-5 text-right font-mono font-extrabold text-slate-800 text-base">
+                                        <td className="px-4 sm:px-8 py-5 text-right font-mono font-extrabold text-slate-800 text-base hidden sm:table-cell">
                                             ${order.precio}
                                         </td>
-                                        <td className="px-8 py-5 text-center">
+                                        <td className="px-4 sm:px-8 py-5 text-center hidden xl:table-cell">
                                             {order.postdatado ? (
                                                 <span className="px-3 py-1 bg-amber-100/50 text-amber-700 text-[10px] font-extrabold tracking-widest uppercase rounded-full border border-amber-200 shadow-sm">
                                                     {order.postdatado}
                                                 </span>
                                             ) : <span className="text-slate-300">—</span>}
                                         </td>
-                                        <td className="px-8 py-5 text-center">
+                                        <td className="px-4 sm:px-8 py-5 text-center">
                                             <span className={`px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-widest border ${statusStyles[order.status] || statusStyles['Pendiente']}`}>
                                                 {order.status || 'Pendiente'}
                                             </span>
                                         </td>
-                                        <td className="px-8 py-5">
+                                        <td className="px-4 sm:px-8 py-5 hidden md:table-cell">
                                             {order.tracking ? (
                                                 <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50/80 px-3 py-1.5 rounded-lg border border-blue-200/50 shadow-sm cursor-copy hover:bg-blue-100 transition-colors" title="Copiar tracking" onClick={() => { navigator.clipboard.writeText(order.tracking); toast.success('Tracking copiado'); }}>
                                                     {order.tracking}
                                                 </span>
                                             ) : <span className="text-xs text-slate-300">—</span>}
                                         </td>
-                                        <td className="px-8 py-5 text-right">
+                                        <td className="px-4 sm:px-8 py-5 text-right">
                                             <div className="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <button onClick={(e) => { e.stopPropagation(); handleGoToChat(order.cliente); }} className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white transition-all flex items-center justify-center shadow-sm" title="Ir al Chat">
                                                     <IconsV2.Chat />
@@ -361,6 +391,89 @@ const SalesViewV2 = ({ onGoToChat }) => {
                             <button onClick={handleDeleteOrder} className="w-full py-4 bg-transparent border-2 border-rose-100 text-rose-500 rounded-xl text-xs font-extrabold uppercase tracking-widest hover:bg-rose-50 hover:border-rose-200 transition-all flex items-center justify-center gap-2 mt-4">
                                 <IconsV2.Trash />
                                 Eliminar Registro
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* V2 DETAILS MODAL */}
+            {viewingOrder && (
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-50 flex items-center justify-center animate-fade-in p-4" onClick={() => setViewingOrder(null)}>
+                    <div className="bg-white/90 backdrop-blur-2xl rounded-[2rem] shadow-2xl w-full max-w-lg p-8 border border-white relative overflow-hidden" onClick={e => e.stopPropagation()}>
+
+                        <div className="absolute top-0 -left-10 w-40 h-40 bg-purple-500/10 blur-[50px] rounded-full pointer-events-none"></div>
+
+                        <div className="flex justify-between items-start mb-6 relative z-10">
+                            <div>
+                                <h3 className="text-2xl font-extrabold text-slate-800 tracking-tight mb-1">{viewingOrder.nombre || 'Sin nombre'}</h3>
+                                <p className="text-sm font-bold text-indigo-500 font-mono tracking-widest">{viewingOrder.cliente ? viewingOrder.cliente.split('@')[0] : '—'}</p>
+                            </div>
+                            <button onClick={() => setViewingOrder(null)} className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition-colors flex items-center justify-center -mr-2">✕</button>
+                        </div>
+
+                        <div className="space-y-4 relative z-10 text-sm">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-white rounded-xl p-4 border border-slate-200/60 shadow-sm">
+                                    <span className="block text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Fecha / Hora (-3 BA)</span>
+                                    <p className="font-mono font-bold text-slate-700">{formatDateBA(viewingOrder.createdAt)}</p>
+                                </div>
+                                <div className="bg-white rounded-xl p-4 border border-slate-200/60 shadow-sm">
+                                    <span className="block text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Estado de Envío</span>
+                                    <span className={`inline-block px-2.5 py-1 rounded-md text-[10px] font-extrabold uppercase tracking-widest border ${statusStyles[viewingOrder.status] || statusStyles['Pendiente']}`}>
+                                        {viewingOrder.status || 'Pendiente'}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="bg-gradient-to-br from-indigo-50/50 to-purple-50/50 rounded-xl p-4 border border-indigo-100/50 shadow-sm">
+                                <span className="block text-[10px] uppercase font-bold text-indigo-400 tracking-widest mb-3">Resumen de Compra</span>
+                                <div className="space-y-2">
+                                    <div className="flex justify-between items-center bg-white/60 p-2.5 rounded-lg border border-white">
+                                        <span className="font-bold text-slate-600 text-xs">{viewingOrder.producto}</span>
+                                        <span className="font-mono font-extrabold text-slate-800">${viewingOrder.precio}</span>
+                                    </div>
+                                    <div className="flex justify-between text-xs px-2 text-slate-500">
+                                        <span>Plan elegido:</span>
+                                        <span className="font-bold">{viewingOrder.plan || '—'}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-white rounded-xl p-4 border border-slate-200/60 shadow-sm space-y-3">
+                                <span className="block text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-2 border-b border-slate-100 pb-2">Datos de Destino</span>
+                                <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs">
+                                    <div>
+                                        <span className="block text-slate-400 mb-0.5">Domicilio</span>
+                                        <p className="font-bold text-slate-700">{viewingOrder.calle || '—'}</p>
+                                    </div>
+                                    <div>
+                                        <span className="block text-slate-400 mb-0.5">Ciudad</span>
+                                        <p className="font-bold text-slate-700">{viewingOrder.ciudad || '—'}</p>
+                                    </div>
+                                    <div>
+                                        <span className="block text-slate-400 mb-0.5">Código Postal</span>
+                                        <p className="font-bold text-slate-700 font-mono">{viewingOrder.cp || '—'}</p>
+                                    </div>
+                                    <div>
+                                        <span className="block text-slate-400 mb-0.5">Tracking</span>
+                                        {viewingOrder.tracking ? (
+                                            <p className="font-bold font-mono text-blue-600 bg-blue-50 px-2 py-0.5 rounded inline-block">{viewingOrder.tracking}</p>
+                                        ) : <p className="font-bold text-slate-700">—</p>}
+                                    </div>
+                                </div>
+                                {viewingOrder.postdatado && (
+                                    <div className="mt-2 pt-2 border-t border-slate-100">
+                                        <span className="block text-amber-500 font-bold text-xs uppercase tracking-widest mb-1">Envío Postdatado</span>
+                                        <p className="text-xs font-bold text-slate-700">{viewingOrder.postdatado}</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="mt-6">
+                            <button onClick={() => setViewingOrder(null)} className="w-full py-4 bg-slate-800 text-white rounded-xl text-sm font-bold hover:bg-slate-700 transition-colors shadow-lg shadow-slate-800/20">
+                                Cerrar Detalles
                             </button>
                         </div>
                     </div>

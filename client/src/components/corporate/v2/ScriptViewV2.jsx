@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../../config/axios';
+import { API_URL } from '../../../config/api';
 import ScriptMapView from '../views/ScriptMapView'; // We'll keep using the original map view as it's a complex generic component, maybe style it later if needed. Wait, we can wrap it or build a V2. For now, let's keep it.
 import { useToast } from '../../ui/Toast';
 
@@ -259,7 +260,7 @@ const ScriptViewV2 = () => {
                                                                     <div className="flex gap-6 items-center">
                                                                         <div className="relative group/img">
                                                                             <img
-                                                                                src={step.image.startsWith('http') || step.image.startsWith('/') ? step.image : `data:${step.imageMimetype || 'image/jpeg'};base64,${step.image}`}
+                                                                                src={step.image.startsWith('http') ? step.image : step.image.startsWith('/media/') ? `${API_URL}${step.image}` : `data:${step.imageMimetype || 'image/jpeg'};base64,${step.image}`}
                                                                                 alt="Step cover"
                                                                                 className="rounded-xl border border-slate-300 shadow-md max-h-32 object-cover"
                                                                             />
@@ -399,7 +400,7 @@ const ScriptViewV2 = () => {
                                             }}
                                             className="cursor-pointer group relative aspect-square rounded-2xl overflow-hidden border-2 border-white shadow-md hover:border-indigo-400 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 bg-white"
                                         >
-                                            <img src={img.url} alt={img.originalName} className="w-full h-full object-cover" />
+                                            <img src={`${API_URL}${img.url}`} alt={img.originalName} className="w-full h-full object-cover" />
                                             <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-4">
                                                 <div className="transform translate-y-4 group-hover:translate-y-0 transition-transform">
                                                     {img.category && <span className="inline-block px-2 py-0.5 rounded-md bg-indigo-500/80 backdrop-blur-sm text-white text-[9px] font-bold uppercase tracking-wider mb-1">{img.category}</span>}

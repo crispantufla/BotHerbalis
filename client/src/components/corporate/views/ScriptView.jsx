@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../../config/axios';
+import { API_URL } from '../../../config/api';
 import ScriptMapView from './ScriptMapView';
 
 import { useToast } from '../../ui/Toast';
@@ -204,7 +205,7 @@ const Script = () => {
                                                                 {step.image ? (
                                                                     <div className="relative inline-block">
                                                                         <img
-                                                                            src={`data:${step.imageMimetype || 'image/jpeg'};base64,${step.image}`}
+                                                                            src={step.image && step.image.startsWith('/media/') ? `${API_URL}${step.image}` : `data:${step.imageMimetype || 'image/jpeg'};base64,${step.image}`}
                                                                             alt="Step image"
                                                                             className="rounded-lg border border-gray-200 shadow-sm max-h-40 object-cover"
                                                                         />
@@ -332,7 +333,7 @@ const Script = () => {
                                             }}
                                             className="cursor-pointer group relative aspect-square rounded-lg overflow-hidden border border-gray-200 hover:border-blue-500 hover:ring-2 hover:ring-blue-500/20 transition-all"
                                         >
-                                            <img src={img.url} alt={img.originalName} className="w-full h-full object-cover" />
+                                            <img src={`${API_URL}${img.url}`} alt={img.originalName} className="w-full h-full object-cover" />
                                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
                                             <div className="absolute bottom-0 left-0 right-0 p-1 bg-black/50 text-white text-[10px] truncate px-2">
                                                 {img.category && <span className="font-bold mr-1 uppercase text-blue-200">{img.category}</span>}

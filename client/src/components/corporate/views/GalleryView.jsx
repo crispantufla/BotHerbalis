@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../../config/axios';
+import { API_URL } from '../../../config/api';
 import { useToast } from '../../ui/Toast';
 
 const GalleryView = () => {
@@ -155,10 +156,10 @@ const GalleryView = () => {
                         {filteredImages.map(img => (
                             <div key={img.id} className="group relative bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition">
                                 <div className="aspect-square bg-slate-100 relative overflow-hidden">
-                                    <img src={img.url} alt={img.originalName} className="w-full h-full object-cover transition transform group-hover:scale-105" />
+                                    <img src={`${API_URL}${img.url}`} alt={img.originalName} className="w-full h-full object-cover transition transform group-hover:scale-105" />
                                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                                         <button
-                                            onClick={() => window.open(img.url, '_blank')}
+                                            onClick={() => window.open(`${API_URL}${img.url}`, '_blank')}
                                             className="p-2 bg-white/20 hover:bg-white/40 rounded-full text-white backdrop-blur-sm transition"
                                             title="Ver completa"
                                         >

@@ -5,6 +5,7 @@ const { atomicWriteFile } = require('../../safeWrite');
 const { appendOrderToSheet } = require('../../sheets_sync');
 const path = require('path');
 const fs = require('fs');
+const { buildConfirmationMessage } = require('../utils/messageTemplates');
 
 // Check DATA_DIR first (Railway volume), then source code data/ dir as fallback
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../..');
@@ -267,32 +268,26 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
     // Init User State if needed
     if (!userState[userId]) {
-        // Auto A/B Testing or Forced Script Logic
-        let initialScript = 'v3'; // Default fallback
-        if (dependencies.config && dependencies.config.activeScript === 'rotacion') {
-            initialScript = Math.random() < 0.5 ? 'v3' : 'v4';
-            console.log(`[A/B TEST] New user ${userId} randomly assigned to rotation script: ${initialScript}`);
-        } else if (dependencies.config && dependencies.config.activeScript) {
-            initialScript = dependencies.config.activeScript;
-            console.log(`[A/B TEST] New user ${userId} assigned to fixed active script: ${initialScript}`);
-        } else {
-            console.log(`[A/B TEST] New user ${userId} assigned to fallback script: ${initialScript}`);
-        }
+        const autoScript = dependencies.config?.activeScript === 'rotacion'
+            ? (Math.random() < 0.5 ? 'v3' : 'v4')
+            : (dependencies.config?.activeScript || 'v3');
+        console.log(`[SALES-FLOW] Assigning script ${autoScript} to NEW user ${userId} `);
 
         userState[userId] = {
             step: 'greeting',
-            lastMessage: null,
             addressAttempts: 0,
             partialAddress: {},
-            cart: [], // NEW: Support for multiple items
-            assignedScript: initialScript, // Lock this user to their variant
+            cart: [],
+            assignedScript: autoScript,
             history: [],
+            summary: null,
             stepEnteredAt: Date.now(),
             lastActivityAt: Date.now(),
-            lastInteraction: Date.now() // For abandoned cart
+            lastInteraction: Date.now()
         };
-        saveState();
-    } else {
+    }
+    saveState();
+    if (userState[userId]) { // Check if userState[userId] exists after potential creation
         userState[userId].lastInteraction = Date.now();
     }
     const currentState = userState[userId];
@@ -537,8 +532,8 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
     for (const faq of knowledge.faq) {
         if (faq.keywords.some(k => new RegExp(`\\b${k}\\b`, 'i').test(normalizedText))) {
-            currentState.history.push({ role: 'bot', content: _formatMessage(faq.response), timestamp: Date.now() });
-            await sendMessageWithDelay(userId, _formatMessage(faq.response));
+            currentState.history.push({ role: 'bot', content: _formatMessage(faq.response, currentState), timestamp: Date.now() });
+            await sendMessageWithDelay(userId, _formatMessage(faq.response, currentState));
 
             if (faq.triggerStep) {
                 _setStep(currentState, faq.triggerStep);
@@ -574,7 +569,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             }
 
             // 1. Send Text FIRST
-            const greetMsg = _formatMessage(knowledge.flow.greeting.response);
+            const greetMsg = _formatMessage(knowledge.flow.greeting.response, currentState);
             currentState.history.push({ role: 'bot', content: greetMsg, timestamp: Date.now() });
             await sendMessageWithDelay(userId, greetMsg);
 
@@ -617,6 +612,12 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             break;
 
         case 'waiting_weight': {
+            // Pre-catch product mention via simple regex to prevent looping if they don't say weight
+            const tLow = text.toLowerCase();
+            if (tLow.includes('cápsula') || tLow.includes('capsula')) currentState.suggestedProduct = "Cápsulas de nuez de la india";
+            else if (tLow.includes('gota')) currentState.suggestedProduct = "Gotas de nuez de la india";
+            else if (tLow.includes('semilla')) currentState.suggestedProduct = "Semillas de nuez de la india";
+
             // SCRIPT FIRST: Check if user gave a number
             const hasNumber = /\d+/.test(text.trim());
 
@@ -625,13 +626,42 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             const isRefusal = /\b(no (quiero|voy|puedo)|prefiero no|pasame|decime|precio|que tenes|mostrame)\b/i.test(normalizedText);
 
             if (hasNumber) {
-                // Direct script response — NO AI
-                const recNode = knowledge.flow.recommendation;
-                _setStep(currentState, recNode.nextStep);
-                currentState.history.push({ role: 'bot', content: _formatMessage(recNode.response), timestamp: Date.now() });
-                saveState();
-                await sendMessageWithDelay(userId, _formatMessage(recNode.response));
-                matched = true;
+                const wMatch = text.match(/\d+/);
+                if (wMatch) currentState.weightGoal = parseInt(wMatch[0], 10);
+
+                if (currentState.suggestedProduct) {
+                    console.log(`[LOGIC] User ${userId} already suggested ${currentState.suggestedProduct}, skipping preference question.`);
+                    currentState.selectedProduct = currentState.suggestedProduct;
+
+                    let priceNode;
+                    if (currentState.selectedProduct.includes('Cápsulas')) priceNode = knowledge.flow.preference_capsulas;
+                    else if (currentState.selectedProduct.includes('Gotas')) priceNode = knowledge.flow.preference_gotas;
+                    else priceNode = knowledge.flow.preference_semillas;
+
+                    // Direct jump to pricing
+                    const msg = _formatMessage(priceNode.response, currentState);
+                    _setStep(currentState, priceNode.nextStep);
+                    currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+                    saveState();
+                    await sendMessageWithDelay(userId, msg);
+
+                    if (currentState.weightGoal && currentState.weightGoal > 10) {
+                        const upsell = "Personalmente yo te recomendaría el de 120 días debido al peso que esperas perder 👌";
+                        currentState.history.push({ role: 'bot', content: upsell, timestamp: Date.now() });
+                        saveState();
+                        await sendMessageWithDelay(userId, upsell);
+                    }
+
+                    matched = true;
+                } else {
+                    // Direct script response — NO AI (Normal flow, ask preference)
+                    const recNode = knowledge.flow.recommendation;
+                    _setStep(currentState, recNode.nextStep);
+                    currentState.history.push({ role: 'bot', content: _formatMessage(recNode.response, currentState), timestamp: Date.now() });
+                    saveState();
+                    await sendMessageWithDelay(userId, _formatMessage(recNode.response, currentState));
+                    matched = true;
+                }
             } else {
                 // Increment refusal counter
                 currentState.weightRefusals = (currentState.weightRefusals || 0) + 1;
@@ -652,7 +682,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     console.log(`[AI-FALLBACK] waiting_weight: No number detected for ${userId}`);
                     const aiWeight = await aiService.chat(text, {
                         step: 'waiting_weight',
-                        goal: 'El usuario debe decir cuántos kilos quiere bajar. Si dice qué PRODUCTO quiere directamente (cápsulas, semillas, gotas), respondé goalMet=true y extractedData con el producto. Si pregunta otra cosa, respondé brevemente y volvé a preguntar cuántos kilos quiere bajar.',
+                        goal: 'Explicar brevemente el producto seleccionado y preguntar sutilmente cuánto peso buscan bajar para continuar. REGLA: Si la persona pregunta "cápsulas o gotas", o pide recomendación general, decirle EXACTAMENTE: "Las cápsulas son la opción más efectiva y práctica, ideales para un tratamiento rápido. ¿Cuántos kilos querés bajar?" No ofrezcas otros productos a menos que pregunten específicamente.',
                         history: currentState.history,
                         summary: currentState.summary,
                         knowledge: knowledge,
@@ -661,14 +691,45 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
                     if (aiWeight.goalMet) {
                         // AI detected a weight goal we missed with regex
-                        const recNode = knowledge.flow.recommendation;
-                        _setStep(currentState, recNode.nextStep);
-                        currentState.history.push({ role: 'bot', content: _formatMessage(recNode.response), timestamp: Date.now() });
-                        saveState();
-                        await sendMessageWithDelay(userId, _formatMessage(recNode.response));
-                        matched = true;
+                        if (aiWeight.extractedData) {
+                            const extNum = aiWeight.extractedData.match(/\d+/);
+                            if (extNum) currentState.weightGoal = parseInt(extNum[0], 10);
+                        }
+
+                        if (currentState.suggestedProduct) {
+                            console.log(`[LOGIC] AI goalMet weight, user already suggested ${currentState.suggestedProduct}, skipping preference.`);
+                            currentState.selectedProduct = currentState.suggestedProduct;
+
+                            let priceNode;
+                            if (currentState.selectedProduct.includes('Cápsulas')) priceNode = knowledge.flow.preference_capsulas;
+                            else if (currentState.selectedProduct.includes('Gotas')) priceNode = knowledge.flow.preference_gotas;
+                            else priceNode = knowledge.flow.preference_semillas;
+
+                            const msg = _formatMessage(priceNode.response, currentState);
+                            _setStep(currentState, priceNode.nextStep);
+                            currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+                            saveState();
+                            await sendMessageWithDelay(userId, msg);
+
+                            if (currentState.weightGoal && currentState.weightGoal > 10) {
+                                const upsell = "Personalmente yo te recomendaría el de 120 días debido al peso que esperas perder 👌";
+                                currentState.history.push({ role: 'bot', content: upsell, timestamp: Date.now() });
+                                saveState();
+                                await sendMessageWithDelay(userId, upsell);
+                            }
+
+                            matched = true;
+                        } else {
+                            const recNode = knowledge.flow.recommendation;
+                            _setStep(currentState, recNode.nextStep);
+                            currentState.history.push({ role: 'bot', content: _formatMessage(recNode.response, currentState), timestamp: Date.now() });
+                            saveState();
+                            await sendMessageWithDelay(userId, _formatMessage(recNode.response, currentState));
+                            matched = true;
+                        }
                     } else if (aiWeight.response) {
                         currentState.history.push({ role: 'bot', content: aiWeight.response, timestamp: Date.now() });
+                        saveState(); // Added saveState here
                         await sendMessageWithDelay(userId, aiWeight.response);
                         matched = true;
                     }
@@ -678,18 +739,28 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
         }
 
         case 'waiting_preference': {
+            // SCRIPT FIRST: Check if the user is asking for a deferred "postdatado" date early
+            const earlyPostdatadoMatch = text.match(/\b(lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo|semana|mes|cobro|mañana|despues|después|principio|el \d+ de [a-z]+|el \d+)\b/i);
+            if (earlyPostdatadoMatch && /\b(recibir|llega|enviar|mandar|cobro|pago|puedo)\b/i.test(normalizedText)) {
+                console.log(`[EARLY POSTDATADO] Captured in waiting_preference: ${text}`);
+                if (!currentState.postdatado) currentState.postdatado = text; // Save it to output later
+                saveState();
+            }
+
             // SCRIPT FIRST: Check keywords for capsulas or semillas
             const isMatch = (keywords, text) => keywords.some(k => new RegExp(`\\b${k}\\b`, 'i').test(text));
 
-            // DETECT INDECISION / COMPARISON (e.g. "estoy entre gotas y semillas", "cual es mejor")
             const mentionsCapsulas = isMatch(knowledge.flow.preference_capsulas.match, normalizedText);
             const mentionsSemillas = isMatch(knowledge.flow.preference_semillas.match, normalizedText);
-            const mentionsGotas = knowledge.flow.preference_gotas && isMatch(knowledge.flow.preference_gotas.match, normalizedText);
+            const mentionsGotas = knowledge.flow.preference_gotas ? isMatch(knowledge.flow.preference_gotas.match, normalizedText) : false;
 
-            const multipleMentions = [mentionsCapsulas, mentionsSemillas, mentionsGotas].filter(Boolean).length >= 2;
-            const asksRecommendation = /\b(cual|recomendame|aconsejas|diferencia|mejor|efectiva|como|info|duda|pregunta|saber)\b/i.test(normalizedText);
+            const totalMatches = (mentionsCapsulas ? 1 : 0) + (mentionsSemillas ? 1 : 0) + (mentionsGotas ? 1 : 0);
 
-            if (multipleMentions || asksRecommendation) {
+            // If user mentions more than one product (e.g., "capsulas o semillas", "qué diferencia hay")
+            // Or if they ask for a recommendation
+            const isComparison = totalMatches > 1 || /\b(cual|recomend|mejor|diferencia|que me recomiendas|que me conviene|cual me das|asesorame)\b/i.test(normalizedText);
+
+            if (isComparison) {
                 console.log(`[INDICISION] User ${userId} compares products or asks for recommendation.`);
 
                 // Use AI to give a consultative answer based on specific rules
@@ -699,6 +770,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     1) Si duda o insiste entre GOTAS y CÁPSULAS: Decile "las gotas las recomendamos para cuando son menos de 10kg y tienen más de 70 años, por lo suaves que son. Para vos te recomiendo las cápsulas que son más efectivas". ¡Ofrecé SIEMPRE las cápsulas como la mejor opción!
                     2) Si dice "antes tomaba semillas" o similar, felicitalo pero RECOMENDÁ CÁPSULAS para un efecto más rápido ahora.
                     3) Si pide "lo más efectivo", "lo mejor", "lo más rápido": RECOMENDÁ CÁPSULAS SIEMPRE.
+                    4) Si el usuario pregunta si puede recibir el pedido o pagarlo un día concreto (ej: "¿puedo recibir el 10 de marzo?"), EMPEZÁ TU RESPUESTA DICIENDO EXACTAMENTE QUE SÍ, QUE NO HAY PROBLEMA Y QUEDA ANOTADO PARA ESA FECHA, y luego pasá a la recomendación del producto.
                     
                     Respondé ayudando a decidir con estas reglas y luego PREGUNTÁ: "¿Te gustaría avanzar con las cápsulas?"`,
                     history: currentState.history,
@@ -721,43 +793,97 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             if (mentionsCapsulas) {
                 // Direct script — cápsulas
                 currentState.selectedProduct = "Cápsulas de nuez de la india";
-                const msg = _formatMessage(knowledge.flow.preference_capsulas.response);
+                const msg = _formatMessage(knowledge.flow.preference_capsulas.response, currentState);
                 _setStep(currentState, knowledge.flow.preference_capsulas.nextStep);
                 currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
                 saveState();
                 await sendMessageWithDelay(userId, msg);
+
+                if (currentState.weightGoal && currentState.weightGoal > 10) {
+                    const upsell = "Personalmente yo te recomendaría el de 120 días debido al peso que esperas perder 👌";
+                    currentState.history.push({ role: 'bot', content: upsell, timestamp: Date.now() });
+                    saveState();
+                    await sendMessageWithDelay(userId, upsell);
+                }
+
                 matched = true;
             } else if (mentionsSemillas) {
                 // Direct script — semillas
                 currentState.selectedProduct = "Semillas de nuez de la india";
-                const msg = _formatMessage(knowledge.flow.preference_semillas.response);
+                const msg = _formatMessage(knowledge.flow.preference_semillas.response, currentState);
                 _setStep(currentState, knowledge.flow.preference_semillas.nextStep);
                 currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
                 saveState();
                 await sendMessageWithDelay(userId, msg);
+
+                if (currentState.weightGoal && currentState.weightGoal > 10) {
+                    const upsell = "Personalmente yo te recomendaría el de 120 días debido al peso que esperas perder 👌";
+                    currentState.history.push({ role: 'bot', content: upsell, timestamp: Date.now() });
+                    saveState();
+                    await sendMessageWithDelay(userId, upsell);
+                }
+
                 matched = true;
             } else if (knowledge.flow.preference_gotas && mentionsGotas) {
                 // Direct script — gotas
                 currentState.selectedProduct = "Gotas de nuez de la india";
-                const msg = _formatMessage(knowledge.flow.preference_gotas.response);
+                const msg = _formatMessage(knowledge.flow.preference_gotas.response, currentState);
                 _setStep(currentState, knowledge.flow.preference_gotas.nextStep);
                 currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
                 saveState();
                 await sendMessageWithDelay(userId, msg);
+
+                if (currentState.weightGoal && currentState.weightGoal > 10) {
+                    const upsell = "Personalmente yo te recomendaría el de 120 días debido al peso que esperas perder 👌";
+                    currentState.history.push({ role: 'bot', content: upsell, timestamp: Date.now() });
+                    saveState();
+                    await sendMessageWithDelay(userId, upsell);
+                }
+
                 matched = true;
             } else {
                 // AI FALLBACK
                 console.log(`[AI-FALLBACK] waiting_preference: No keyword match for ${userId}`);
                 const aiPref = await aiService.chat(text, {
                     step: 'waiting_preference',
-                    goal: 'Determinar si quiere cápsulas/gotas (opción práctica), semillas (opción natural) o AMBAS. REGLAS CRÍTICAS: Si insiste con gotas pero duda, decile: "las recomendamos para cuando son menos de 10kg y tienen más de 70 años, por lo suaves que son. Llevate las cápsulas". Si habla en PASADO ("yo tomaba", "antes usé"), NO está eligiendo ahora; sugerile las CÁPSULAS. Si pide "lo más efectivo/rápido", sugerile CÁPSULAS. Si ya eligió claramente un producto para AHORA, confirmá.',
+                    goal: 'Determinar si quiere cápsulas/gotas (opción práctica), semillas (opción natural) o AMBAS. REGLAS CRÍTICAS: Si insiste con gotas pero duda, decile: "las recomendamos para cuando son menos de 10kg y tienen más de 70 años, por lo suaves que son. Llevate las cápsulas". Si habla en PASADO ("yo tomaba", "antes usé"), NO está eligiendo ahora; sugerile las CÁPSULAS. Si pide "lo más efectivo/rápido", sugerile CÁPSULAS. Si el usuario pregunta si puede recibir el pedido o pagarlo un día concreto (ej: "¿puedo recibir el 10 de marzo?"), DALE EL OK Y CONFIRMÁ EL PRODUCTO. Si ya eligió claramente un producto para AHORA, confirmá.',
                     history: currentState.history,
                     summary: currentState.summary,
                     knowledge: knowledge,
                     userState: currentState
                 });
 
-                if (aiPref.response) {
+                if (aiPref.goalMet && aiPref.extractedData) {
+                    const ext = aiPref.extractedData.toLowerCase();
+                    let priceNode;
+                    if (ext.includes('cápsula') || ext.includes('capsula')) {
+                        currentState.selectedProduct = 'Cápsulas de nuez de la india';
+                        priceNode = knowledge.flow.price_capsulas;
+                    } else if (ext.includes('gota')) {
+                        currentState.selectedProduct = 'Gotas de nuez de la india';
+                        priceNode = knowledge.flow.price_gotas;
+                    } else if (ext.includes('semilla')) {
+                        currentState.selectedProduct = 'Semillas de nuez de la india';
+                        priceNode = knowledge.flow.price_semillas;
+                    }
+
+                    if (priceNode) {
+                        const msg = _formatMessage(priceNode.response, currentState);
+                        _setStep(currentState, priceNode.nextStep);
+                        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+                        saveState();
+                        await sendMessageWithDelay(userId, msg);
+
+                        if (currentState.weightGoal && currentState.weightGoal > 10) {
+                            const upsell = "Personalmente yo te recomendaría el de 120 días debido al peso que esperas perder 👌";
+                            currentState.history.push({ role: 'bot', content: upsell, timestamp: Date.now() });
+                            saveState();
+                            await sendMessageWithDelay(userId, upsell);
+                        }
+
+                        matched = true;
+                    }
+                } else if (aiPref.response) {
                     currentState.history.push({ role: 'bot', content: aiPref.response, timestamp: Date.now() });
                     saveState();
                     await sendMessageWithDelay(userId, aiPref.response);
@@ -774,13 +900,13 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             if (wantsPrices || _isAffirmative(normalizedText)) {
                 let msg = "";
                 if (currentState.selectedProduct && currentState.selectedProduct.includes("Cápsulas")) {
-                    msg = _formatMessage(knowledge.flow.price_capsulas.response);
+                    msg = _formatMessage(knowledge.flow.price_capsulas.response, currentState);
                     _setStep(currentState, knowledge.flow.price_capsulas.nextStep);
                 } else if (currentState.selectedProduct && currentState.selectedProduct.includes("Gotas")) {
-                    msg = _formatMessage(knowledge.flow.price_gotas.response);
+                    msg = _formatMessage(knowledge.flow.price_gotas.response, currentState);
                     _setStep(currentState, knowledge.flow.price_gotas.nextStep);
                 } else {
-                    msg = _formatMessage(knowledge.flow.price_semillas.response);
+                    msg = _formatMessage(knowledge.flow.price_semillas.response, currentState);
                     _setStep(currentState, knowledge.flow.price_semillas.nextStep);
                 }
                 currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
@@ -914,96 +1040,140 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 await sendMessageWithDelay(userId, closingNode.response);
                 matched = true;
             } else {
-                // AI FALLBACK — only if regex didn't match
-                console.log(`[AI-FALLBACK] waiting_plan_choice: No plan number detected for ${userId}`);
+                // Check for affirmations after an upsell BEFORE consulting AI
+                // Match common combinations like "ok dale", "si dale", "perfecto gracias"
+                const isAffirmative = /^(si|sisi|ok|dale|bueno|joya|de una|perfecto|genial)[\s\?\!\.]*$/i.test(normalizedText)
+                    || /^(si|ok|dale|perfecto|bueno|hacelo)\s+(si|ok|dale|perfecto|bueno|hacelo)[\s\?\!\.]*$/i.test(normalizedText)
+                    || /\b(si|ok|dale|perfecto|bueno|hacelo)\b/i.test(normalizedText);
 
-                const upsellOptions = [
-                    'Acordate que el servicio de pago a domicilio tiene un valor de $6.000, pero ¡con el plan de 120 días te regalamos ese servicio y te queda a precio final! ¿Querés aprovechar este beneficio o seguimos con el de 60?',
-                    'Te aviso por las dudas: el servicio de cobrarte en la puerta de tu casa sale $6.000. Pero si llevás el plan de 120 días ese servicio está 100% bonificado. ¿Qué decís? ¿Vamos con el de 60 igual o aprovechás el de 120?',
-                    'Ojo que el de 60 lleva el costo de $6.000 por el servicio logístico de cobro en domicilio. ¡En cambio el de 120 te regala ese servicio! ¿Seguro querés el de 60 o pasamos al de 120 y ahorrás esa plata?'
-                ];
-                const selectedUpsell = upsellOptions[Math.floor(Math.random() * upsellOptions.length)];
-
-                const planAI = await aiService.chat(text, {
-                    step: 'waiting_plan_choice',
-                    goal: `El usuario debe elegir Plan 60 o Plan 120 días. CRÍTICO: goalMet=true SOLO si el usuario escribe explícitamente "60" o "120". Si pregunta algo distinto (ej: "cómo las consigo", "para mi hija"), goalMet=false, respondé su duda adaptando los pronombres si compra para otra persona (ej: "para ella") y volvé a preguntar: "¿Avanzamos con 60 o 120 días?". ESTRATEGIA (Si duda entre planes): El costo por pago a domicilio es de $6.000, pero el plan de 120 BONIFICA/REGALA ese servicio. Decile: "${selectedUpsell}".`,
-                    history: currentState.history,
-                    summary: currentState.summary,
-                    knowledge: knowledge,
-                    userState: currentState
-                });
-
-                if (planAI.extractedData && typeof planAI.extractedData === 'string' && planAI.extractedData.startsWith('CHANGE_PRODUCT:')) {
-                    const newProd = planAI.extractedData.split(':')[1].trim();
-                    console.log(`[FLOW-UPDATE] User changed product to: ${newProd}`);
-                    currentState.selectedProduct = newProd;
-                    saveState();
-                    // Fallthrough to send AI response
+                let recentBotMessages = "";
+                // Look at the last TWO bot messages, just in case the upsell was sent in an isolated bubble
+                let botMsgCount = 0;
+                for (let i = currentState.history.length - 1; i >= 0; i--) {
+                    if (currentState.history[i].role === 'bot') {
+                        recentBotMessages += currentState.history[i].content.toLowerCase() + " ";
+                        botMsgCount++;
+                        if (botMsgCount >= 2) break;
+                    }
                 }
 
-                if (planAI.goalMet && planAI.extractedData && !planAI.extractedData.startsWith('CHANGE_PRODUCT:')) {
-                    const extractedStr = String(planAI.extractedData);
-                    _handleExtractedData(userId, extractedStr, currentState);
+                // If user said "yes" and the bot recently recommended/mentioned the 120 plan exclusively
+                if (isAffirmative && (recentBotMessages.includes('recomendaría el de 120') || recentBotMessages.includes('recomendaría el plan de 120') || (recentBotMessages.includes('120') && !recentBotMessages.includes('60')))) {
+                    console.log(`[FLOW-INTERCEPT] User said OK to 120-day plan upsell: ${userId}`);
 
-                    // If user postdates during plan selection and we already had a product
-                    if (extractedStr.startsWith('POSTDATADO:') && currentState.selectedProduct) {
-                        const closingNode = knowledge.flow.closing;
-                        _setStep(currentState, closingNode.nextStep);
-                        if (planAI.response) {
-                            currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });
-                            await sendMessageWithDelay(userId, planAI.response);
-                        } else {
-                            currentState.history.push({ role: 'bot', content: closingNode.response, timestamp: Date.now() });
-                            await sendMessageWithDelay(userId, closingNode.response);
-                        }
+                    const product = currentState.selectedProduct || "Nuez de la India";
+                    const plan = '120';
+
+                    currentState.selectedPlan = plan;
+                    currentState.selectedProduct = product;
+                    currentState.isContraReembolsoMAX = false;
+                    currentState.adicionalMAX = 0;
+
+                    currentState.cart = [{
+                        product: product,
+                        plan: plan,
+                        price: _getPrice(product, plan)
+                    }];
+
+                    const closingNode = knowledge.flow.closing;
+                    _setStep(currentState, closingNode.nextStep);
+
+                    const combinedResponse = `¡Genial! 😊 Entonces confirmamos el plan de 120 días.\n\n${closingNode.response}`;
+
+                    currentState.history.push({ role: 'bot', content: combinedResponse, timestamp: Date.now() });
+                    saveState();
+                    await sendMessageWithDelay(userId, combinedResponse);
+                    matched = true;
+                } else {
+                    // AI FALLBACK — only if regex didn't match and it wasn't an intercepted affirmation
+                    console.log(`[AI-FALLBACK] waiting_plan_choice: No plan number detected for ${userId}`);
+
+                    const upsellOptions = [
+                        'Acordate que el servicio de pago a domicilio tiene un valor de $6.000, pero ¡con el plan de 120 días te regalamos ese servicio y te queda a precio final! ¿Querés aprovechar este beneficio o seguimos con el de 60?',
+                        'Te aviso por las dudas: el servicio de cobrarte en la puerta de tu casa sale $6.000. Pero si llevás el plan de 120 días ese servicio está 100% bonificado. ¿Qué decís? ¿Vamos con el de 60 igual o aprovechás el de 120?',
+                        'Ojo que el de 60 lleva el costo de $6.000 por el servicio logístico de cobro en domicilio. ¡En cambio el de 120 te regala ese servicio! ¿Seguro querés el de 60 o pasamos al de 120 y ahorrás esa plata?'
+                    ];
+                    const selectedUpsell = upsellOptions[Math.floor(Math.random() * upsellOptions.length)];
+
+                    const planAI = await aiService.chat(text, {
+                        step: 'waiting_plan_choice',
+                        goal: `El usuario debe elegir Plan 60 o Plan 120 días. CRÍTICO: goalMet=true SOLO si el usuario escribe explícitamente "60" o "120". Si pregunta algo distinto (ej: "cómo las consigo", "para mi hija"), goalMet=false, respondé su duda adaptando los pronombres si compra para otra persona (ej: "para ella") y volvé a preguntar: "¿Avanzamos con 60 o 120 días?". ESTRATEGIA (Si duda entre planes): El costo por pago a domicilio es de $6.000, pero el plan de 120 BONIFICA/REGALA ese servicio. Decile: "${selectedUpsell}".`,
+                        history: currentState.history,
+                        summary: currentState.summary,
+                        knowledge: knowledge,
+                        userState: currentState
+                    });
+
+                    if (planAI.extractedData && typeof planAI.extractedData === 'string' && planAI.extractedData.startsWith('CHANGE_PRODUCT:')) {
+                        const newProd = planAI.extractedData.split(':')[1].trim();
+                        console.log(`[FLOW-UPDATE] User changed product to: ${newProd}`);
+                        currentState.selectedProduct = newProd;
                         saveState();
-                        matched = true;
+                        // Fallthrough to send AI response
                     }
-                    // Ultra strict validation to prevent bypassing the plan choice
-                    else if (extractedStr.includes('120') || extractedStr.includes('60')) {
-                        // AI detected a valid plan choice
-                        const plan = extractedStr.includes('120') ? '120' : '60';
-                        const product = currentState.selectedProduct || "Nuez de la India";
 
-                        currentState.selectedPlan = plan;
-                        currentState.selectedProduct = product;
+                    if (planAI.goalMet && planAI.extractedData && !planAI.extractedData.startsWith('CHANGE_PRODUCT:')) {
+                        const extractedStr = String(planAI.extractedData);
+                        _handleExtractedData(userId, extractedStr, currentState);
 
-                        currentState.cart = [{
-                            product: product,
-                            plan: plan,
-                            price: _getPrice(product, plan)
-                        }];
-
-                        if (planAI.response) {
-                            currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });
-                            await sendMessageWithDelay(userId, planAI.response);
-                        }
-
-                        const closingNode = knowledge.flow.closing;
-                        if (!planAI.response || !planAI.response.toLowerCase().includes('datos')) {
-                            currentState.history.push({ role: 'bot', content: closingNode.response, timestamp: Date.now() });
-                            await sendMessageWithDelay(userId, closingNode.response);
-                        }
-
-                        _setStep(currentState, closingNode.nextStep);
-                        saveState();
-                        matched = true;
-                    } else {
-                        // AI incorrectly marked goalMet=true without getting a plan number
-                        console.warn(`[AI-SAFEGUARD] waiting_plan_choice: AI returned goalMet=true but no 60/120 in extractedData (${extractedStr}). Downgrading to false.`);
-                        if (planAI.response) {
-                            currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });
-                            await sendMessageWithDelay(userId, planAI.response);
+                        // If user postdates during plan selection and we already had a product
+                        if (extractedStr.startsWith('POSTDATADO:') && currentState.selectedProduct) {
+                            const closingNode = knowledge.flow.closing;
+                            _setStep(currentState, closingNode.nextStep);
+                            if (planAI.response) {
+                                currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });
+                                await sendMessageWithDelay(userId, planAI.response);
+                            } else {
+                                currentState.history.push({ role: 'bot', content: closingNode.response, timestamp: Date.now() });
+                                await sendMessageWithDelay(userId, closingNode.response);
+                            }
+                            saveState();
                             matched = true;
                         }
+                        // Ultra strict validation to prevent bypassing the plan choice
+                        else if (extractedStr.includes('120') || extractedStr.includes('60')) {
+                            // AI detected a valid plan choice
+                            const plan = extractedStr.includes('120') ? '120' : '60';
+                            const product = currentState.selectedProduct || "Nuez de la India";
+
+                            currentState.selectedPlan = plan;
+                            currentState.selectedProduct = product;
+
+                            currentState.cart = [{
+                                product: product,
+                                plan: plan,
+                                price: _getPrice(product, plan)
+                            }];
+
+                            if (planAI.response) {
+                                currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });
+                                await sendMessageWithDelay(userId, planAI.response);
+                            }
+
+                            const closingNode = knowledge.flow.closing;
+                            currentState.history.push({ role: 'bot', content: closingNode.response, timestamp: Date.now() });
+                            await sendMessageWithDelay(userId, closingNode.response);
+
+                            _setStep(currentState, closingNode.nextStep);
+                            saveState();
+                            matched = true;
+                        } else {
+                            // AI incorrectly marked goalMet=true without getting a plan number
+                            console.warn(`[AI-SAFEGUARD] waiting_plan_choice: AI returned goalMet=true but no 60/120 in extractedData (${extractedStr}). Downgrading to false.`);
+                            if (planAI.response) {
+                                currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });
+                                await sendMessageWithDelay(userId, planAI.response);
+                                matched = true;
+                            }
+                        }
+                    } else if (planAI.response) {
+                        _handleExtractedData(userId, planAI.extractedData, currentState);
+                        currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });
+                        await sendMessageWithDelay(userId, planAI.response);
+                        matched = true;
                     }
-                } else if (planAI.response) {
-                    _handleExtractedData(userId, planAI.extractedData, currentState);
-                    currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });
-                    await sendMessageWithDelay(userId, planAI.response);
-                    matched = true;
                 }
-            }
+            } // <--- The actual missing closing brace for the outer interceptor else block
             break;
         }
 
@@ -1037,7 +1207,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             // SCRIPT FIRST: Clear affirmative confirmation
             else if (_isAffirmative(normalizedText)) {
                 // Point to closing since data_request is redundant/removed
-                const msg = _formatMessage(knowledge.flow.closing.response);
+                const msg = _formatMessage(knowledge.flow.closing.response, currentState);
                 _setStep(currentState, knowledge.flow.closing.nextStep);
                 currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
                 saveState();
@@ -1089,7 +1259,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 else if (currentState.selectedProduct.includes('Gotas')) priceNode = knowledge.flow.preference_gotas;
                 else priceNode = knowledge.flow.preference_semillas;
 
-                const msg = _formatMessage(priceNode.response);
+                const msg = _formatMessage(priceNode.response, currentState);
                 _setStep(currentState, 'waiting_plan_choice');
                 currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
                 saveState();
@@ -1111,31 +1281,91 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 if (newProduct && newProduct !== currentState.selectedProduct) {
                     console.log(`[BACKTRACK] User ${userId} changed product from "${currentState.selectedProduct}" to "${newProduct}" during waiting_data`);
                     const oldGoal = currentState.weightGoal; // Preserve if exists
+                    const oldPlan = currentState.selectedPlan; // Preserve if exists
+
                     currentState.selectedProduct = newProduct;
-                    currentState.cart = [];
                     currentState.pendingOrder = null;
-                    currentState.addressAttempts = 0;
                     if (oldGoal) currentState.weightGoal = oldGoal; // Restore
 
+                    // Extract 'postdatado' dates identically to waiting_preference
+                    const postdatadoMatch = normalizedText.match(/\b(lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo|semana|mes|cobro|mañana|despues|después|principio|el \d+ de [a-z]+|el \d+)\b/i);
+                    if (postdatadoMatch && /\b(recibir|llega|enviar|mandar|cobro|pago|puedo|entregar)\b/i.test(normalizedText)) {
+                        console.log(`[LATE POSTDATADO] Captured in waiting_data swap: ${text}`);
+                        if (!currentState.postdatado) currentState.postdatado = text;
+                    }
 
-                    // Show new product prices and ask for plan
-                    let priceNode;
-                    if (newProduct.includes('Cápsulas')) priceNode = knowledge.flow.preference_capsulas;
-                    else if (newProduct.includes('Gotas')) priceNode = knowledge.flow.preference_gotas;
-                    else priceNode = knowledge.flow.preference_semillas;
+                    if (oldPlan) {
+                        // User already selected a plan! Just swap the item and update price without resetting.
+                        const priceStr = _getPrice(newProduct, oldPlan);
+                        let basePrice = parseInt(priceStr.replace(/\./g, ''));
+                        currentState.cart = [{ item: newProduct, plan: oldPlan, price: priceStr }];
 
-                    const changeMsg = `¡Dale, sin problema! 😊 Cambiamos a ${newProduct.split(' de ')[0].toLowerCase()}.`;
-                    currentState.history.push({ role: 'bot', content: changeMsg, timestamp: Date.now() });
-                    await sendMessageWithDelay(userId, changeMsg);
+                        // Re-evaluate MAX and Delivery fees
+                        let finalAdicional = 0;
+                        if (currentState.isContraReembolsoMAX) {
+                            finalAdicional = oldPlan === 60 ? _getAdicionalMAX() : 0;
+                        }
+                        currentState.adicionalMAX = finalAdicional;
+                        const finalPrice = basePrice + finalAdicional;
+                        currentState.totalPrice = finalPrice.toLocaleString('es-AR').replace(/,/g, '.');
 
-                    const priceMsg = _formatMessage(priceNode.response);
-                    currentState.history.push({ role: 'bot', content: priceMsg, timestamp: Date.now() });
-                    await sendMessageWithDelay(userId, priceMsg);
+                        const changeMsg = `¡Dale, sin problema! 😊 Cambiamos a ${newProduct.split(' de ')[0].toLowerCase()} por ${oldPlan} días, tienen un valor $${currentState.totalPrice}.`;
+                        currentState.history.push({ role: 'bot', content: changeMsg, timestamp: Date.now() });
+                        await sendMessageWithDelay(userId, changeMsg);
 
-                    _setStep(currentState, 'waiting_plan_choice');
+                        let prefix = currentState.postdatado ? `Anotado para enviarlo en esa fecha 📅.` : ``;
+                        if (prefix) {
+                            currentState.history.push({ role: 'bot', content: prefix, timestamp: Date.now() });
+                            await sendMessageWithDelay(userId, prefix);
+                        }
+
+                        saveState();
+                        // DO NOT return here! If the user sent address data ("marta pastor, benegas 77") 
+                        // in the same burst of messages (debounced by index.js), we must let execution
+                        // fall through to AI Address Parsing below, so the data is not lost.
+                    } else {
+                        // They hadn't selected a plan yet (rare during waiting_data, but fallback just in case)
+                        currentState.cart = [];
+                        currentState.addressAttempts = 0;
+
+                        let priceNode;
+                        if (newProduct.includes('Cápsulas')) priceNode = knowledge.flow.preference_capsulas;
+                        else if (newProduct.includes('Gotas')) priceNode = knowledge.flow.preference_gotas;
+                        else priceNode = knowledge.flow.preference_semillas;
+
+                        const changeMsg = `¡Dale, sin problema! 😊 Cambiamos a ${newProduct.split(' de ')[0].toLowerCase()}.`;
+                        currentState.history.push({ role: 'bot', content: changeMsg, timestamp: Date.now() });
+                        await sendMessageWithDelay(userId, changeMsg);
+
+                        const priceMsg = _formatMessage(priceNode.response, currentState);
+                        currentState.history.push({ role: 'bot', content: priceMsg, timestamp: Date.now() });
+                        await sendMessageWithDelay(userId, priceMsg);
+
+                        // Check if we also need to append the Upsell message natively
+                        if (currentState.weightGoal && currentState.weightGoal > 10) {
+                            const upsell = "Personalmente yo te recomendaría el de 120 días debido al peso que esperas perder 👌";
+                            currentState.history.push({ role: 'bot', content: upsell, timestamp: Date.now() });
+                            await sendMessageWithDelay(userId, upsell);
+                        }
+
+                        _setStep(currentState, 'waiting_plan_choice');
+                        saveState();
+                        matched = true;
+                        return; // MUST return to prevent continuing into address processing
+                    }
+                } else if (newProduct === currentState.selectedProduct) {
+                    console.log(`[REDUNDANT] User ${userId} re-selected ${newProduct} in waiting_data`);
+                    let prefixIterated = `Ok, ${newProduct.split(' de ')[0].toLowerCase()} entonces 😊. `;
+
+                    const postdatadoMatch = normalizedText.match(/\b(lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo|semana|mes|cobro|mañana|despues|después|principio)\b/i);
+                    if (postdatadoMatch) {
+                        prefixIterated += `Anotado para enviarlo en esa fecha 📅. `;
+                    }
+
+                    currentState.history.push({ role: 'bot', content: prefixIterated, timestamp: Date.now() });
                     saveState();
-                    matched = true;
-                    break;
+                    await sendMessageWithDelay(userId, prefixIterated);
+                    // DO NOT return here, allow fall-through to address parser.
                 }
             }
 
@@ -1213,7 +1443,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             console.log("Analyzing address data with AI...");
             const data = await aiService.parseAddress(textToAnalyze);
 
-            let madeProgress = false; // Moved to outer scope
+
 
             if (data && !data._error) {
                 if (data.nombre && !currentState.partialAddress.nombre) { currentState.partialAddress.nombre = data.nombre; madeProgress = true; }
@@ -1336,7 +1566,6 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 let addressSummary = `📋 *Datos de envío:*\n`;
                 addressSummary += `👤 ${addr.nombre}\n`;
                 addressSummary += `📍 ${addr.calle}, ${addr.ciudad}\n`;
-                if (addr.provincia) addressSummary += `🏛️ ${addr.provincia}\n`;
                 addressSummary += `📮 CP: ${addr.cp}`;
 
                 // If Google Maps validated, show formatted address
@@ -1344,22 +1573,20 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     addressSummary += `\n\n✅ Dirección verificada: ${validation.mapsFormatted}`;
                 }
 
-                // Warnings for admin (not shown to user)
-                const validationNotes = validation.warnings.length > 0
-                    ? `\n⚠️ Validación: ${validation.warnings.join(', ')}`
-                    : (validation.mapsValid ? '\n✅ Dirección verificada por Google Maps' : '');
-
                 currentState.history.push({ role: 'bot', content: addressSummary, timestamp: Date.now() });
                 await sendMessageWithDelay(userId, addressSummary);
+
+                // Send 2nd part: The Order Confirmation Block
+                const summaryMsg = buildConfirmationMessage(currentState);
+                currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
+                await sendMessageWithDelay(userId, summaryMsg);
 
                 // Reset field re-ask counts on success
                 currentState.fieldReaskCount = {};
 
-                // Set step to waiting_admin_ok
-                _setStep(currentState, 'waiting_admin_ok');
+                // Skip waiting_admin_ok and go straight to waiting_final_confirmation
+                _setStep(currentState, 'waiting_final_confirmation');
                 saveState();
-
-                await notifyAdmin(`Pedido CASI completo`, userId, `Datos: ${addr.nombre}, ${addr.calle}\nCiudad: ${addr.ciudad} | CP: ${addr.cp}\nProvincia: ${addr.provincia || '?'}${validationNotes}\nItems: ${cartSummary}\nSubtotal: $${subtotal}${maxLabel}\nTotal: $${currentState.totalPrice}`);
                 matched = true;
             } else if (currentState.addressAttempts >= 5) {
                 // Too many attempts — pause and alert admin (Increased limit from 3 to 5)
@@ -1435,12 +1662,60 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
         }
 
         case 'waiting_final_confirmation': {
+            // PRIORITY 0: Detect product change ("mejor semillas", "quiero capsulas", "cambio a gotas") BEFORE confirming
+            const productChangeMatch = normalizedText.match(/\b(mejor|quiero|prefiero|cambio|cambia|dame|paso a|en vez)\b.*\b(capsula|capsulas|pastilla|pastillas|semilla|semillas|gota|gotas|natural|infusion)\b/i)
+                || normalizedText.match(/\b(capsula|capsulas|pastilla|pastillas|semilla|semillas|gota|gotas)\b.*\b(mejor|quiero|prefiero|cambio|en vez)\b/i);
+
+            if (productChangeMatch && currentState.selectedPlan) {
+                // Detect which product they want
+                let newProduct = null;
+                if (/capsula|pastilla/i.test(normalizedText)) newProduct = "Cápsulas de nuez de la india";
+                else if (/semilla|natural|infusion/i.test(normalizedText)) newProduct = "Semillas de nuez de la india";
+                else if (/gota/i.test(normalizedText)) newProduct = "Gotas de nuez de la india";
+
+                if (newProduct && newProduct !== currentState.selectedProduct) {
+                    console.log(`[LATE-BACKTRACK] User ${userId} changed product from "${currentState.selectedProduct}" to "${newProduct}" during final confirmation`);
+
+                    currentState.selectedProduct = newProduct;
+                    const oldPlan = currentState.selectedPlan;
+
+                    // Recalculate cart and price
+                    const priceStr = _getPrice(newProduct, oldPlan);
+                    let basePrice = parseInt(priceStr.replace(/\./g, ''));
+                    currentState.cart = [{ product: newProduct, plan: oldPlan, price: priceStr }];
+
+                    // Re-evaluate MAX and Delivery fees
+                    let finalAdicional = 0;
+                    if (currentState.isContraReembolsoMAX) {
+                        finalAdicional = oldPlan === '60' ? _getAdicionalMAX() : 0;
+                    }
+                    currentState.adicionalMAX = finalAdicional;
+                    const finalPrice = basePrice + finalAdicional;
+                    currentState.totalPrice = finalPrice.toLocaleString('es-AR').replace(/,/g, '.');
+
+                    // Acknowledge change
+                    const changeMsg = `¡Dale, sin problema! 😊 Cambiamos el pedido a ${newProduct.split(' de ')[0].toLowerCase()}.`;
+                    currentState.history.push({ role: 'bot', content: changeMsg, timestamp: Date.now() });
+                    await sendMessageWithDelay(userId, changeMsg);
+
+                    // Re-send confirmation summary
+                    const summaryMsg = buildConfirmationMessage(currentState);
+                    currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
+                    await sendMessageWithDelay(userId, summaryMsg);
+
+                    saveState();
+                    matched = true;
+                    return; // Stay in 'waiting_final_confirmation'
+                }
+            }
+
             // Helper — build orderData object from state (avoids 3 duplicate blocks)
             const _buildOrderData = (extra = {}) => {
                 const o = currentState.pendingOrder || {};
                 const cart = o.cart || [];
+                const phone = userId.split('@')[0];
                 return {
-                    cliente: userId,
+                    cliente: phone,
                     nombre: o.nombre, calle: o.calle, ciudad: o.ciudad, cp: o.cp,
                     producto: cart.map(i => i.product).join(' + '),
                     plan: cart.map(i => `${i.plan} días`).join(' + '),
@@ -1496,6 +1771,10 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     if (dependencies.saveOrderToLocal) dependencies.saveOrderToLocal(orderData);
                     appendOrderToSheet(orderData).catch(e => console.error('🔴 [SHEETS] Async log failed:', e.message));
                     console.log(`✅ [PEDIDO CONFIRMADO] ${userId} — Total: $${currentState.totalPrice || '0'}`);
+
+                    // Notify Admin Now
+                    const o = currentState.pendingOrder;
+                    await notifyAdmin(`✅ Nuevo Pedido Confirmado`, userId, `Datos: ${o.nombre}, ${o.calle}\nCiudad: ${o.ciudad} | CP: ${o.cp}\nProvincia: ${o.provincia || '?'}\nItems: ${orderData.producto}\nTotal: $${currentState.totalPrice || '0'}`);
 
                     // --- METRICS TRACKING ---
                     if (dependencies.config && dependencies.config.scriptStats && dependencies.config.activeScript) {
