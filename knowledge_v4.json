@@ -39,7 +39,7 @@
                 "practico",
                 "practica"
             ],
-            "response": "Dale, buenísimo 👍 Cápsulas es lo más efectivo y práctico que hay.\n\n💊 Se toman así:\n• 1 al día\n• 30 min antes de la comida principal\n\nMirá, para asegurar tu objetivo tenés dos opciones:\n\n🏆 *OPCIÓN RECOMENDADA (120 días)*: Hacés el tratamiento completo de una y te asegurás el resultado.\n💲 *${{PRICE_CAPSULAS_120}}*\n*Beneficio: Envío Gratis + Pago a domicilio cien por ciento BONIFICADO (de regalo).* \n\n🔸 *OPCIÓN INICIO (60 días)*:\n💲 *${{PRICE_CAPSULAS_60}}* (+ ${{ADICIONAL_MAX}} costo por pago a domicilio).\n\n👉 ¿Te reservo el de 120 para asegurar el resultado o preferís arrancar con 60?",
+            "response": "Dale, buenísimo 👍 Excelente elección.\n\nLas cápsulas concentran el principio activo, logrando un efecto quemagrasas parejo durante todo el día sin que tengas que preparar nada. Es lo más efectivo y práctico que hay.\n\n💊 Se toman así:\n• 1 al día\n• 30 min antes de la comida principal\n\nPara que logres tu objetivo, armamos dos opciones para vos:\n\n🏆 *OPCIÓN RECOMENDADA (120 días)*: Hacés el tratamiento completo de una y te asegurás el resultado.\n💲 *${{PRICE_CAPSULAS_120}}*\n*Beneficio: Envío Gratis + Pago a domicilio cien por ciento BONIFICADO (de regalo).* \n\n🔸 *OPCIÓN INICIO (60 días)*:\n💲 *${{PRICE_CAPSULAS_60}}* (+ ${{ADICIONAL_MAX}} costo por pago a domicilio).\n\n👉 ¿Te reservo el de 120 para asegurar el resultado o preferís arrancar con 60?",
             "nextStep": "waiting_plan_choice"
         },
         "preference_semillas": {
@@ -92,7 +92,7 @@
                 "bueno",
                 "ok"
             ],
-            "response": "¡Excelente decisión! 🎉\n\nChe, voy a *separar tu stock* ahora mismo así me aseguro que salga en el próximo despacho directo a tu casa.\n\nPasame tus datos para armar la etiqueta de envío 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(Fijate que la dirección sea exacta 🙏)",
+            "response": "¡Excelente decisión! 🎉\n\nMe acaba de figurar que tengo cupo para meter tu paquete en el camión de las encomiendas que sale temprano mañana 🚚, así te llega lo más rápido posible.\n\nPasame estos datos exactos para armar la etiqueta de envío ya mismo 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(Fijate que la dirección sea exacta 🙏)",
             "nextStep": "waiting_data"
         },
         "confirmation": {
@@ -200,7 +200,7 @@
                 "mucha plata",
                 "sale un monton"
             ],
-            "response": "Entiendo 😊\n\nEs un tratamiento completo para 60 o 120 días con envío incluido.\n\n¿Preferís 60 o 120 días?"
+            "response": "Te súper entiendo. La plata hoy cuesta ganarla.\n\nMuchos clientes míos que no llegaban al tratamiento completo decidieron empezar con el plan de 60 días o probar con Semillas, que rinde excelente y es una base más económica para arrancar.\n\n¿Te gustaría que probemos con esa opción para empezar a ver cambios sin gastar de más?"
         },
         {
             "keywords": [
@@ -315,14 +315,6 @@
         },
         {
             "keywords": [
-                "de donde son",
-                "quienes son",
-                "empresa"
-            ],
-            "response": "Somos Herbalis.\n\nTrabajamos hace más de 13 años con este producto y enviamos a todo el país."
-        },
-        {
-            "keywords": [
                 "estafa",
                 "trucho",
                 "mentira",
@@ -367,6 +359,21 @@
                 "rico"
             ],
             "response": "Las cápsulas no tienen gusto, se tragan con agua.\nLas semillas se preparan en infusión y son suaves, sin sabor fuerte.\nLas gotas tienen sabor neutro."
+        },
+        {
+            "keywords": [
+                "donde estan",
+                "tienen local",
+                "puedo ir",
+                "punto de venta",
+                "direccion",
+                "donde compro",
+                "local fisico",
+                "de donde son",
+                "de donde envian",
+                "de que parte"
+            ],
+            "response": "No tenemos local de venta al público. Trabajamos 100% online y los envíos son por Correo Argentino a todo el país 📦"
         }
     ],
     "rules": {

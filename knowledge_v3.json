@@ -316,14 +316,6 @@
         },
         {
             "keywords": [
-                "de donde son",
-                "quienes son",
-                "empresa"
-            ],
-            "response": "Somos Herbalis.\n\nTrabajamos hace más de 13 años con este producto y enviamos a todo el país."
-        },
-        {
-            "keywords": [
                 "estafa",
                 "trucho",
                 "mentira",
@@ -377,7 +369,10 @@
                 "punto de venta",
                 "direccion",
                 "donde compro",
-                "local fisico"
+                "local fisico",
+                "de donde son",
+                "de donde envian",
+                "de que parte"
             ],
             "response": "No tenemos local de venta al público. Trabajamos 100% online y los envíos son por Correo Argentino a todo el país 📦"
         }
