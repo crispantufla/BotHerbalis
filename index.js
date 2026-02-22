@@ -455,6 +455,41 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false) {
             }
             return `✅ Confirmación enviada a ${actualTarget}. Esperando respuesta del cliente.`;
         }
+
+        // Feature: "Aprobar" an unexpected response in final confirmation
+        // If the order was already saved as 'Pendiente (revisar respuesta)', change it to 'Confirmado' and clear the alert.
+        let ordersData = [];
+        try {
+            const fs = require('fs');
+            ordersData = JSON.parse(fs.readFileSync('./orders.json', 'utf-8'));
+        } catch (e) { }
+
+        const cleanPhone = actualTarget.split('@')[0];
+        const pendingOrderIndex = ordersData.findIndex(o =>
+            o.cliente === cleanPhone || o.cliente === actualTarget
+        );
+
+        if (pendingOrderIndex !== -1 && ordersData[pendingOrderIndex].status.includes('Pendiente')) {
+            ordersData[pendingOrderIndex].status = 'Confirmado';
+            try {
+                const fs = require('fs');
+                // Atomic write implementation inline
+                const tempFile = `./orders.json.tmp.${Date.now()}`;
+                fs.writeFileSync(tempFile, JSON.stringify(ordersData, null, 2));
+                fs.renameSync(tempFile, './orders.json');
+
+                // Clear alerts
+                const index = sessionAlerts.findIndex(a => a.userPhone === actualTarget);
+                if (index !== -1) {
+                    sessionAlerts.splice(index, 1);
+                    if (sharedState.io) sharedState.io.emit('alerts_updated', sessionAlerts);
+                }
+                return `✅ Estado del pedido cambiado a Confirmado.`;
+            } catch (e) {
+                console.error('[ADMIN] Error saving order status:', e);
+            }
+        }
+
         return "⚠️ No hay pedido pendiente de aprobación.";
     }
 

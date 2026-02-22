@@ -39,7 +39,7 @@
                 "practico",
                 "practica"
             ],
-            "response": "Genial 👍 Cápsulas es la mejor opción para vos.\n\n💊 Se toman:\n• 1 cápsula por día\n• 30 min antes del almuerzo o la cena\n\nTenés dos opciones:\n\n🔹 60 días → ${{PRICE_CAPSULAS_60}}\n🔹 120 días → ${{PRICE_CAPSULAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl servicio de pago a domicilio tiene un costo de $6.000.\nPero con el plan de 120 días, ¡te REGALAMOS ese servicio!\n\n👉 ¿Avanzamos con 60 o 120 días?",
+            "response": "Genial 👍 Cápsulas es la mejor opción para vos.\n\n💊 Se toman:\n• 1 cápsula por día\n• 30 min antes del almuerzo o la cena\n\nTenés dos opciones:\n\n🔹 60 días → ${{PRICE_CAPSULAS_60}}\n🔹 120 días → ${{PRICE_CAPSULAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl servicio de pago a domicilio tiene un costo de $6.000.\nPero con el plan de 120 días, ¡te REGALAMOS ese servicio!\n👉 ¿Avanzamos con 60 o 120 días?",
             "nextStep": "waiting_plan_choice"
         },
         "preference_semillas": {
@@ -53,7 +53,7 @@
                 "natural",
                 "tradicional"
             ],
-            "response": "Genial 🌿 La semilla en estado natural es la opción más elegida.\n\nSe consume en forma de infusión cada noche.\n\n🔹 60 días → ${{PRICE_SEMILLAS_60}}\n🔹 120 días → ${{PRICE_SEMILLAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl servicio de pago a domicilio tiene un costo de $6.000.\nPero con el plan de 120 días, ¡te REGALAMOS ese servicio!\n\n👉 ¿Avanzamos con 60 o 120 días?",
+            "response": "Genial 🌿 La semilla en estado natural es la opción más elegida.\n\nSe consume en forma de infusión cada noche.\n\n🔹 60 días → ${{PRICE_SEMILLAS_60}}\n🔹 120 días → ${{PRICE_SEMILLAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl servicio de pago a domicilio tiene un costo de $6.000.\nPero con el plan de 120 días, ¡te REGALAMOS ese servicio!\n👉 ¿Avanzamos con 60 o 120 días?",
             "nextStep": "waiting_plan_choice"
         },
         "preference_gotas": {
@@ -63,22 +63,22 @@
                 "liquido",
                 "gotero"
             ],
-            "response": "Genial 🌿 Las gotas son prácticas y discretas.\n\n🔹 60 días → ${{PRICE_GOTAS_60}}\n🔹 120 días → ${{PRICE_GOTAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl servicio de pago a domicilio tiene un costo de $6.000.\nPero con el plan de 120 días, ¡te REGALAMOS ese servicio!\n\n👉 ¿Avanzamos con 60 o 120 días?",
+            "response": "Genial 🌿 Las gotas son prácticas y discretas.\n\n🔹 60 días → ${{PRICE_GOTAS_60}}\n🔹 120 días → ${{PRICE_GOTAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl servicio de pago a domicilio tiene un costo de $6.000.\nPero con el plan de 120 días, ¡te REGALAMOS ese servicio!\n👉 ¿Avanzamos con 60 o 120 días?",
             "nextStep": "waiting_plan_choice"
         },
         "price_capsulas": {
             "step": "waiting_price_confirmation",
-            "response": "💊 CÁPSULAS:\n\n🔹 Plan 60 días → ${{PRICE_CAPSULAS_60}}\n🔹 Plan 120 días → ${{PRICE_CAPSULAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl servicio de pago a domicilio tiene un costo de $6.000.\nPero con el plan de 120 días, ¡te REGALAMOS ese servicio!\n\n👉 ¿Avanzamos con 60 o 120 días?",
+            "response": "💊 CÁPSULAS:\n\n🔹 Plan 60 días → ${{PRICE_CAPSULAS_60}}\n🔹 Plan 120 días → ${{PRICE_CAPSULAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl servicio de pago a domicilio tiene un costo de $6.000.\nPero con el plan de 120 días, ¡te REGALAMOS ese servicio!\n👉 ¿Avanzamos con 60 o 120 días?",
             "nextStep": "waiting_plan_choice"
         },
         "price_semillas": {
             "step": "waiting_price_confirmation",
-            "response": "🌱 SEMILLAS:\n\n🔹 Plan 60 días → ${{PRICE_SEMILLAS_60}}\n🔹 Plan 120 días → ${{PRICE_SEMILLAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl servicio de pago a domicilio tiene un costo de $6.000.\nPero con el plan de 120 días, ¡te REGALAMOS ese servicio!\n\n👉 ¿Avanzamos con 60 o 120 días?",
+            "response": "🌱 SEMILLAS:\n\n🔹 Plan 60 días → ${{PRICE_SEMILLAS_60}}\n🔹 Plan 120 días → ${{PRICE_SEMILLAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl servicio de pago a domicilio tiene un costo de $6.000.\nPero con el plan de 120 días, ¡te REGALAMOS ese servicio!\n👉 ¿Avanzamos con 60 o 120 días?",
             "nextStep": "waiting_plan_choice"
         },
         "price_gotas": {
             "step": "waiting_price_confirmation",
-            "response": "💧 GOTAS:\n\n🔹 Plan 60 días → ${{PRICE_GOTAS_60}}\n🔹 Plan 120 días → ${{PRICE_GOTAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl servicio de pago a domicilio tiene un costo de $6.000.\nPero con el plan de 120 días, ¡te REGALAMOS ese servicio!\n\n👉 ¿Avanzamos con 60 o 120 días?",
+            "response": "💧 GOTAS:\n\n🔹 Plan 60 días → ${{PRICE_GOTAS_60}}\n🔹 Plan 120 días → ${{PRICE_GOTAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl servicio de pago a domicilio tiene un costo de $6.000.\nPero con el plan de 120 días, ¡te REGALAMOS ese servicio!\n👉 ¿Avanzamos con 60 o 120 días?",
             "nextStep": "waiting_plan_choice"
         },
         "closing": {

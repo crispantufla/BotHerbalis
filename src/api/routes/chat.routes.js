@@ -27,7 +27,8 @@ module.exports = (client, sharedState) => {
             let waMessages = [];
             try {
                 const chat = await withTimeout(client.getChatById(chatId), 5000, "Timeout getting chat for summary");
-                waMessages = await withTimeout(chat.fetchMessages({ limit: 50 }), 10000, "Timeout fetching messages for summary");
+                const rawMessages = await withTimeout(chat.fetchMessages({ limit: 50 }), 10000, "Timeout fetching messages for summary");
+                waMessages = rawMessages.filter(m => m.timestamp >= resetAt);
             } catch (e) {
                 console.warn(`[SUMMARIZE] WA Fetch failed for ${chatId}`);
             }
@@ -49,6 +50,10 @@ module.exports = (client, sharedState) => {
                 role: m.fromMe !== undefined ? (m.fromMe ? 'assistant' : 'user') : (m.role || 'user'),
                 content: m.body || m.content
             }));
+
+            if (formattedHistory.length === 0) {
+                return res.json({ summary: "No hay datos aún" });
+            }
 
             const summary = await aiService.generateManualSummary(formattedHistory);
             res.json({ summary });
@@ -200,6 +205,7 @@ module.exports = (client, sharedState) => {
                 cart: [],
                 assignedScript: autoScript,
                 history: [],
+                summary: null,
                 stepEnteredAt: Date.now(),
                 lastActivityAt: Date.now(),
                 lastInteraction: Date.now()

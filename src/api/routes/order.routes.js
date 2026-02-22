@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { authMiddleware } = require('../../middleware/auth');
 const { atomicWriteFile } = require('../../../safeWrite');
-const { getOrdersFromSheet, updateOrderInSheet } = require('../../../sheets_sync');
+const { getOrdersFromSheet, updateOrderInSheet, deleteOrderInSheet } = require('../../../sheets_sync');
 
 module.exports = (client, sharedState) => {
     const router = express.Router();
@@ -64,7 +64,7 @@ module.exports = (client, sharedState) => {
     });
 
     // DELETE /orders/:id (Delete order) - Authenticated
-    router.delete('/orders/:id', authMiddleware, (req, res) => {
+    router.delete('/orders/:id', authMiddleware, async (req, res) => {
         const { id } = req.params;
 
         if (!fs.existsSync(ORDERS_FILE)) return res.status(404).json({ error: "No orders found" });
@@ -73,11 +73,16 @@ module.exports = (client, sharedState) => {
         const index = orders.findIndex(o => o.id === id);
         if (index === -1) return res.status(404).json({ error: "Order not found" });
 
+        // Actually delete from Google Sheets too
+        try {
+            await deleteOrderInSheet(id);
+        } catch (e) {
+            console.error('🔴 [ROUTES] Error deleting from Sheets:', e);
+            // We can choose to proceed with local deletion or fail
+        }
+
         const deleted = orders.splice(index, 1)[0];
         atomicWriteFile(ORDERS_FILE, JSON.stringify(orders, null, 2));
-
-        // Note: DELETE operation is currently only locally deleting as destroying rows 
-        // in sheets can break formats. User can soft-delete or manually purge sheets.
 
         if (io) io.emit('order_delete', { id });
         res.json({ success: true, deleted });

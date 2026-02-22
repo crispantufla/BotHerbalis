@@ -170,7 +170,30 @@ async function updateOrderInSheet(rowNumber, updates) {
     } catch (e) {
         console.error('🔴 [SHEETS] Error updating order:', e.message);
         throw e;
+
     }
 }
 
-module.exports = { appendOrderToSheet, getOrdersFromSheet, updateOrderInSheet };
+async function deleteOrderInSheet(rowNumber) {
+    try {
+        const doc = await getSheetsDoc();
+        const sheet = doc.sheetsByIndex[0];
+        const rows = await sheet.getRows();
+
+        const row = rows.find(r => r.rowNumber.toString() === rowNumber.toString());
+
+        if (!row) {
+            console.error(`🔴 [SHEETS] Row ${rowNumber} not found for deletion.`);
+            return false;
+        }
+
+        await row.delete();
+        console.log(`✅ [SHEETS] Order at row ${rowNumber} deleted.`);
+        return true;
+    } catch (e) {
+        console.error('🔴 [SHEETS] Error deleting order:', e.message);
+        return false;
+    }
+}
+
+module.exports = { appendOrderToSheet, getOrdersFromSheet, updateOrderInSheet, deleteOrderInSheet };
