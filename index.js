@@ -179,20 +179,29 @@ function cleanAuth(dir) {
     // If the container was killed unexpectedly, Chrome leaves a SingletonLock file behind
     // which prevents the next instance from starting.
     try {
-        const sessionPath = path.join(dir, 'session');
-        if (fs.existsSync(sessionPath)) {
-            const locks = ['SingletonLock', 'SingletonCookie', 'SingletonSocket'];
-            let clearedLocks = 0;
-            locks.forEach(lock => {
-                const lockPath = path.join(sessionPath, lock);
-                if (fs.existsSync(lockPath)) {
-                    fs.unlinkSync(lockPath);
-                    clearedLocks++;
-                }
-            });
-            if (clearedLocks > 0) {
-                console.log(`[BOOT] Cleared ${clearedLocks} stale Chrome lock(s) to prevent 'profile in use' crash.`);
+        // LocalAuth appends 'session-' to the clientId. Since clientId is 'session', the folder is 'session-session'.
+        const sessionPath = path.join(dir, 'session-session');
+        const defaultPath = path.join(sessionPath, 'Default');
+
+        // Locks can be in session-session or session-session/Default depending on Puppeteer version
+        const pathsToClean = [sessionPath, defaultPath];
+
+        let clearedLocks = 0;
+        pathsToClean.forEach(targetPath => {
+            if (fs.existsSync(targetPath)) {
+                const locks = ['SingletonLock', 'SingletonCookie', 'SingletonSocket'];
+                locks.forEach(lock => {
+                    const lockPath = path.join(targetPath, lock);
+                    if (fs.existsSync(lockPath)) {
+                        fs.unlinkSync(lockPath);
+                        clearedLocks++;
+                    }
+                });
             }
+        });
+
+        if (clearedLocks > 0) {
+            console.log(`[BOOT] Cleared ${clearedLocks} stale Chrome lock(s) at ${sessionPath} to prevent 'profile in use' crash.`);
         }
     } catch (e) {
         console.error(`[BOOT] Failed to clean Chrome locks: ${e.message}`);
@@ -208,6 +217,8 @@ const client = new Client({
         clientId: 'session',
         dataPath: authPath
     }),
+    deviceName: 'Herbalis CRM',
+    browserName: 'Panel Empresarial',
     puppeteer: {
         headless: true,
         // Use system Chrome when PUPPETEER_EXECUTABLE_PATH is set (Docker/Railway)
@@ -368,6 +379,21 @@ sharedState.handleAdminCommand = handleAdminCommand; // Expose to server
 // Expose Pairing Code generation to API
 sharedState.requestPairingCode = async (phoneNumber) => {
     if (!client) throw new Error("Client not initialized");
+    if (!client.pupPage) throw new Error("WhatsApp Web window not loaded yet");
+
+    // Hotfix for whatsapp-web.js v1.34.6:
+    // If we reach here, we must lazily inject the onCodeReceivedEvent function to window
+    // otherwise client.requestPairingCode crashes.
+    try {
+        await client.pupPage.exposeFunction('onCodeReceivedEvent', (code) => {
+            console.log(`[WA-PAIRING-CODE] Event code received length ${code?.length}:`, code);
+            return code;
+        });
+    } catch (e) {
+        // exposeFunction throws an error if the function is already exposed by the page.
+        // We can safely ignore it.
+    }
+
     return await client.requestPairingCode(phoneNumber);
 };
 
