@@ -97,7 +97,7 @@
         },
         "confirmation": {
             "step": "waiting_data",
-            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT}}\nPlan: {{PLAN}} días\nTotal a pagar al recibir: {{TOTAL}}\n\n✔ Correo Argentino\n✔ Entrega estimada: 7 a 10 días hábiles\n✔ Pago en efectivo al recibir\n\nImportante:\nSi el cartero no encuentra a nadie,\nel correo puede solicitar retiro en sucursal.\nPlazo: 72 hs.\n\nEl rechazo o no retiro genera un costo logístico de ${{COSTO_LOGISTICO}}.\n\n👉 Confirmame con un \"SÍ\" o un \"DALE\" para despachar YA mismo.",
+            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT}}\nPlan: {{PLAN}} días\nTotal a pagar al recibir: {{TOTAL}}\n\n✔ Correo Argentino\n✔ Entrega estimada: 7 a 10 días hábiles\n✔ Pago exclusivo en EFECTIVO al recibir\n\n👉 Importante: El cartero no avisa cuando pasa, y si por cualquier motivo (a veces andan apurados) asienta que no te encontró o no le dejaste el efectivo, el paquete volverá a sucursal y tenés 72hs para retirarlo allí de forma gratuita.\n\nEl rechazo o no retiro genera un costo logístico de ${{COSTO_LOGISTICO}}.\n\n👉 Confirmame con un \"SÍ\" o un \"DALE\" para despachar YA mismo.",
             "nextStep": "completed"
         }
     },
@@ -181,7 +181,7 @@
                 "pagar",
                 "como se paga"
             ],
-            "response": "Se paga en efectivo al recibir el producto. el cartero no esta aceptando otro metodo."
+            "response": "Tené en cuenta que el pago al recibir es SÍ O SÍ en EFECTIVO al cartero. Ellos no disponen de posnet ni aceptan transferencias en la calle."
         },
         {
             "keywords": [
@@ -201,6 +201,16 @@
                 "sale un monton"
             ],
             "response": "Te súper entiendo. La plata hoy cuesta ganarla.\n\nMuchos clientes míos que no llegaban al tratamiento completo decidieron empezar con el plan de 60 días o probar con Semillas, que rinde excelente y es una base más económica para arrancar.\n\n¿Te gustaría que probemos con esa opción para empezar a ver cambios sin gastar de más?"
+        },
+        {
+            "keywords": [
+                "cual me conviene",
+                "cual es mejor",
+                "diferencia",
+                "que recomendas",
+                "estoy dudando"
+            ],
+            "response": "Hagamos algo: Si elegís las cápsulas o gotas por lo prácticas que son sin preparar nada, de cortesía oficial te mando unas semillas de regalo para que pruebes los dos mundos.\n\n¿Te reservo el de 60 o 120 días?"
         },
         {
             "keywords": [
@@ -288,7 +298,7 @@
                 "murio",
                 "muerte"
             ],
-            "response": "En redes circula mucha información falsa para vender otros productos químicos. Nuestro producto es 100% natural, está certificado y trabajamos hace más de 13 años en el rubro sin un solo problema serio. El cuerpo se adapta súper bien."
+            "response": "La nuez de la India y sus derivados son el producto natural líder en pérdida de peso con los que trabajamos hace 13 años con más de 70 mil clientes.\n\nSi te dijeron eso o no sentís la seguridad para avanzar, podemos cancelar tu pedido sin problema. Nuestra prioridad es tu tranquilidad.\n\n¿Avanzamos o preferís dejarlo acá?"
         },
         {
             "keywords": [

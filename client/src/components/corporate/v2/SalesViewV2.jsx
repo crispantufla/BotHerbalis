@@ -262,25 +262,43 @@ const SalesViewV2 = ({ onGoToChat }) => {
                             ) : (
                                 filteredOrders.map(order => (
                                     <tr key={order.id} className="hover:bg-white/50 transition-colors group">
-                                        <td className="px-4 sm:px-8 py-5 font-mono text-xs font-bold text-slate-500 hidden md:table-cell">
-                                            {formatDateBA(order.createdAt)}
+                                        <td className="px-4 py-5 hidden md:table-cell w-32">
+                                            {(() => {
+                                                const dt = formatDateBA(order.createdAt);
+                                                if (typeof dt === 'string' && dt.includes(',')) {
+                                                    const [datePart, timePart] = dt.split(',');
+                                                    return (
+                                                        <div className="flex flex-col whitespace-nowrap">
+                                                            <span className="font-sans text-[13px] font-extrabold text-slate-700">{datePart.trim()}</span>
+                                                            <span className="font-mono text-[10px] font-bold text-indigo-400 tracking-wider mt-0.5">{timePart.trim()}</span>
+                                                        </div>
+                                                    );
+                                                }
+                                                return <span className="font-sans text-[13px] font-extrabold text-slate-700">{dt}</span>;
+                                            })()}
                                         </td>
-                                        <td className="px-4 sm:px-8 py-5 max-w-[120px] sm:max-w-xs truncate">
-                                            <button onClick={() => setViewingOrder(order)} className="text-left group/click focus:outline-none">
-                                                <p className="font-extrabold text-slate-800 group-hover/click:text-indigo-600 transition-colors border-b border-dashed border-transparent group-hover/click:border-indigo-400 truncate">
-                                                    {order.nombre || 'Desconocido'}
-                                                </p>
-                                                <p className="text-xs text-slate-400 font-mono mt-0.5 truncate">
-                                                    {order.cliente ? order.cliente.split('@')[0] : '—'}
-                                                </p>
+                                        <td className="px-4 sm:px-8 py-5 max-w-[150px] sm:max-w-xs truncate">
+                                            <button onClick={() => setViewingOrder(order)} className="text-left group/click focus:outline-none flex items-center gap-3 w-full">
+                                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center text-indigo-600 font-extrabold text-[13px] shrink-0 border border-indigo-100/80 shadow-sm hidden sm:flex">
+                                                    {order.nombre ? order.nombre.substring(0, 2).toUpperCase() : '??'}
+                                                </div>
+                                                <div className="flex flex-col truncate">
+                                                    <p className="font-extrabold text-[14px] text-slate-800 group-hover/click:text-indigo-600 transition-colors truncate">
+                                                        {order.nombre || 'Desconocido'}
+                                                    </p>
+                                                    <p className="text-[11px] text-slate-500 font-mono mt-0.5 truncate flex items-center gap-1.5 opacity-90 transition-opacity">
+                                                        <svg className="w-3.5 h-3.5 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                                                        {order.cliente ? '+' + order.cliente.split('@')[0].replace(/\D/g, '') : '—'}
+                                                    </p>
+                                                </div>
                                             </button>
                                         </td>
-                                        <td className="px-4 sm:px-8 py-5 max-w-[100px] sm:max-w-xs truncate">
-                                            <p className="font-bold text-indigo-700 truncate">{order.producto}</p>
-                                            {order.plan && <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-400 bg-indigo-50 px-2 py-0.5 rounded-md mt-1 inline-block">Plan {order.plan} d.</span>}
+                                        <td className="px-4 sm:px-8 py-5 max-w-[120px] sm:max-w-xs truncate">
+                                            <p className="font-extrabold text-[13px] text-slate-700 truncate">{order.producto}</p>
+                                            {order.plan && <span className="text-[9px] font-extrabold uppercase tracking-widest text-indigo-600 bg-indigo-50/80 px-2 py-0.5 rounded-md mt-1 inline-block border border-indigo-100/50">Plan {order.plan} DÍAS</span>}
                                         </td>
-                                        <td className="px-4 sm:px-8 py-5 text-right font-mono font-extrabold text-slate-800 text-base hidden sm:table-cell">
-                                            ${order.precio}
+                                        <td className="px-4 sm:px-8 py-5 text-right hidden sm:table-cell">
+                                            <span className="font-mono font-extrabold text-slate-800 text-[15px] bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100/80 shadow-sm">${order.precio}</span>
                                         </td>
                                         <td className="px-4 sm:px-8 py-5 text-center hidden xl:table-cell">
                                             {order.postdatado ? (
@@ -302,7 +320,7 @@ const SalesViewV2 = ({ onGoToChat }) => {
                                             ) : <span className="text-xs text-slate-300">—</span>}
                                         </td>
                                         <td className="px-4 sm:px-8 py-5 text-right">
-                                            <div className="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <div className="flex justify-end gap-3 transition-opacity">
                                                 <button onClick={(e) => { e.stopPropagation(); handleGoToChat(order.cliente); }} className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white transition-all flex items-center justify-center shadow-sm" title="Ir al Chat">
                                                     <IconsV2.Chat />
                                                 </button>

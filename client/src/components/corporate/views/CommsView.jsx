@@ -27,6 +27,7 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
     const [loading, setLoading] = useState(false);
     const [showScriptPanel, setShowScriptPanel] = useState(false);
     const [scriptFlow, setScriptFlow] = useState({});
+    const [availableScripts, setAvailableScripts] = useState({ v3: {}, v4: {} });
     const [summarizing, setSummarizing] = useState(false);
     const [summaryText, setSummaryText] = useState(null);
     const [attachment, setAttachment] = useState(null); // { file, preview, base64, mimetype }
@@ -176,28 +177,34 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
     useEffect(() => {
         const fetchScriptAndPrices = async () => {
             try {
-                const [scriptRes, pricesRes] = await Promise.all([
-                    api.get('/api/script'),
+                const [scriptV3, scriptV4, pricesRes] = await Promise.all([
+                    api.get('/api/script/v3'),
+                    api.get('/api/script/v4'),
                     api.get('/api/prices')
                 ]);
-                if (scriptRes.data?.flow) setScriptFlow(scriptRes.data.flow);
+
+                const scripts = {
+                    v3: scriptV3.data?.flow || {},
+                    v4: scriptV4.data?.flow || {}
+                };
+                setAvailableScripts(scripts);
+                setScriptFlow(scripts.v3); // Fallback
+
                 if (pricesRes.data) setPrices(pricesRes.data);
             } catch (e) { console.error('Failed to load script or prices:', e); }
         };
         fetchScriptAndPrices();
+    }, []);
 
-        if (socket) {
-            const handleScriptChange = async (data) => {
-                try {
-                    console.log("[SOCKET] script_changed, reloading UI quick replies to:", data.active);
-                    const scriptRes = await api.get('/api/script');
-                    if (scriptRes.data?.flow) setScriptFlow(scriptRes.data.flow);
-                } catch (e) { console.error('Failed to reload script on change:', e); }
-            };
-            socket.on('script_changed', handleScriptChange);
-            return () => socket.off('script_changed', handleScriptChange);
+    // Swap flow map based on selectedChat's script
+    useEffect(() => {
+        if (!selectedChat) return;
+        const targetVersion = selectedChat.assignedScript || 'v3';
+        if (availableScripts[targetVersion]) {
+            setScriptFlow(availableScripts[targetVersion]);
         }
-    }, [socket]);
+    }, [selectedChat, availableScripts]);
+
 
     // Format Message Helper
     const formatScriptMessage = (text) => {

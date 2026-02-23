@@ -561,11 +561,12 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
     switch (logicStage) {
         case 'greeting':
             // --- METRICS TRACKING ---
-            if (dependencies.config && dependencies.config.scriptStats && dependencies.config.activeScript) {
-                if (!dependencies.config.scriptStats[dependencies.config.activeScript]) {
-                    dependencies.config.scriptStats[dependencies.config.activeScript] = { started: 0, completed: 0 };
+            const trackScript = dependencies.effectiveScript || dependencies.config?.activeScript || 'v3';
+            if (dependencies.config && dependencies.config.scriptStats && trackScript !== 'rotacion') {
+                if (!dependencies.config.scriptStats[trackScript]) {
+                    dependencies.config.scriptStats[trackScript] = { started: 0, completed: 0 };
                 }
-                dependencies.config.scriptStats[dependencies.config.activeScript].started++;
+                dependencies.config.scriptStats[trackScript].started++;
             }
 
             // 1. Send Text FIRST
@@ -858,13 +859,13 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     let priceNode;
                     if (ext.includes('cápsula') || ext.includes('capsula')) {
                         currentState.selectedProduct = 'Cápsulas de nuez de la india';
-                        priceNode = knowledge.flow.price_capsulas;
+                        priceNode = knowledge.flow.price_capsulas || knowledge.flow.preference_capsulas;
                     } else if (ext.includes('gota')) {
                         currentState.selectedProduct = 'Gotas de nuez de la india';
-                        priceNode = knowledge.flow.price_gotas;
+                        priceNode = knowledge.flow.price_gotas || knowledge.flow.preference_gotas;
                     } else if (ext.includes('semilla')) {
                         currentState.selectedProduct = 'Semillas de nuez de la india';
-                        priceNode = knowledge.flow.price_semillas;
+                        priceNode = knowledge.flow.price_semillas || knowledge.flow.preference_semillas;
                     }
 
                     if (priceNode) {
@@ -1469,7 +1470,26 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
             if (data && !data._error) {
                 if (data.nombre && !currentState.partialAddress.nombre) { currentState.partialAddress.nombre = data.nombre; madeProgress = true; }
-                if (data.calle && !currentState.partialAddress.calle) { currentState.partialAddress.calle = data.calle; madeProgress = true; }
+
+                if (data.calle && !currentState.partialAddress.calle) {
+                    const hasNumber = /\d+/.test(textToAnalyze);
+                    const hasSN = /\b(s\/n|sn|sin numero|sin número)\b/i.test(textToAnalyze);
+
+                    if (!hasNumber && !hasSN) {
+                        console.log(`[STRICT-ADDRESS] Missing number/SN in address for ${userId}. Discarding calle.`);
+                        currentState.addressAttempts = 0; // Reset attempts so it doesn't fail out.
+                        const rejectMsg = "El correo no nos permite cargar direcciones sin la altura de la calle ni esquinas (ej: entre calles). ¿Me confirmás el número exacto o aclaramos 'S/N' (sin número)? 🙏";
+                        currentState.history.push({ role: 'bot', content: rejectMsg, timestamp: Date.now() });
+                        await sendMessageWithDelay(userId, rejectMsg);
+                        saveState();
+                        matched = true;
+                        break;
+                    } else {
+                        currentState.partialAddress.calle = data.calle;
+                        madeProgress = true;
+                    }
+                }
+
                 if (data.ciudad && !currentState.partialAddress.ciudad) { currentState.partialAddress.ciudad = data.ciudad; madeProgress = true; }
                 if (data.cp && !currentState.partialAddress.cp) { currentState.partialAddress.cp = data.cp; madeProgress = true; }
 
@@ -1777,11 +1797,12 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     console.log(`✅ [PEDIDO CONFIRMADO - POSTDATADO ${postdatado}] ${userId} — Total: $${currentState.totalPrice || '0'}`);
 
                     // --- METRICS TRACKING ---
-                    if (dependencies.config && dependencies.config.scriptStats && dependencies.config.activeScript) {
-                        if (!dependencies.config.scriptStats[dependencies.config.activeScript]) {
-                            dependencies.config.scriptStats[dependencies.config.activeScript] = { started: 0, completed: 0 };
+                    const trackScript = dependencies.effectiveScript || dependencies.config?.activeScript || 'v3';
+                    if (dependencies.config && dependencies.config.scriptStats && trackScript !== 'rotacion') {
+                        if (!dependencies.config.scriptStats[trackScript]) {
+                            dependencies.config.scriptStats[trackScript] = { started: 0, completed: 0 };
                         }
-                        dependencies.config.scriptStats[dependencies.config.activeScript].completed++;
+                        dependencies.config.scriptStats[trackScript].completed++;
                     }
                 }
 
@@ -1825,8 +1846,8 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 // Not affirmative — alert admin without pausing, still process the order
                 await notifyAdmin('⚠️ Respuesta inesperada en confirmación final', userId, `Cliente respondió: "${text}". El pedido se procesó igual.`);
 
-                // Still save the order — the sale is done at this point
-                const msg = "¡Tu pedido ya fue ingresado! 🚀\n\nTe vamos a avisar cuando lo despachemos con el número de seguimiento.\n\n¡Gracias por confiar en Herbalis!";
+                // Still save the order — the sale is done at this point, but requires admin manual review
+                const msg = "Voy a revisar los datos, ya te confirmo el pedido ⏳";
                 await sendMessageWithDelay(userId, msg);
 
                 if (currentState.pendingOrder) {
@@ -1835,15 +1856,16 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     appendOrderToSheet(orderData).catch(e => console.error('[SHEETS] Async log failed:', e.message));
 
                     // --- METRICS TRACKING ---
-                    if (dependencies.config && dependencies.config.scriptStats && dependencies.config.activeScript) {
-                        if (!dependencies.config.scriptStats[dependencies.config.activeScript]) {
-                            dependencies.config.scriptStats[dependencies.config.activeScript] = { started: 0, completed: 0 };
+                    const trackScript = dependencies.effectiveScript || dependencies.config?.activeScript || 'v3';
+                    if (dependencies.config && dependencies.config.scriptStats && trackScript !== 'rotacion') {
+                        if (!dependencies.config.scriptStats[trackScript]) {
+                            dependencies.config.scriptStats[trackScript] = { started: 0, completed: 0 };
                         }
-                        dependencies.config.scriptStats[dependencies.config.activeScript].completed++;
+                        dependencies.config.scriptStats[trackScript].completed++;
                     }
                 }
 
-                _setStep(currentState, 'completed');
+                _setStep(currentState, 'waiting_admin_validation');
                 currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
                 saveState();
                 matched = true;
@@ -1851,7 +1873,8 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             break;
         }
 
-        case 'waiting_admin_ok': {
+        case 'waiting_admin_ok':
+        case 'waiting_admin_validation': {
             const msg = `Estamos revisando tu pedido, te confirmo en breve 😊`;
             currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
             await sendMessageWithDelay(userId, msg);

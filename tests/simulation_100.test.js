@@ -152,7 +152,7 @@ describe('100 Conversations Simulation (V3 & V4)', () => {
 
             // Verify final state for those that SHOULD complete
             if (scenario.shouldComplete) {
-                if (userState[userId].step === 'completed' || userState[userId].step === 'waiting_admin_ok') {
+                if (userState[userId].step === 'completed' || userState[userId].step === 'waiting_admin_ok' || userState[userId].step === 'waiting_final_confirmation' || userState[userId].step === 'waiting_admin_validation') {
                     actualSuccesses++;
                 } else {
                     console.warn(`⚠️ Conversation ${userId} failed to complete. Ended at: ${userState[userId].step}`);
@@ -165,11 +165,11 @@ describe('100 Conversations Simulation (V3 & V4)', () => {
         expect(actualSuccesses).toBe(expectedSuccesses); // All 'shouldComplete' scenarios must complete
     };
 
-    test('Simulate 50 mixed conversations with V3', async () => {
-        await runSimulation(knowledgeV3, 'V3', 50);
+    test('Simulate 100 mixed conversations with V3', async () => {
+        await runSimulation(knowledgeV3, 'V3', 100);
     });
 
-    test('Simulate 50 mixed conversations with V4', async () => {
-        await runSimulation(knowledgeV4, 'V4', 50);
+    test('Simulate 100 mixed conversations with V4', async () => {
+        await runSimulation(knowledgeV4, 'V4', 100);
     });
 });

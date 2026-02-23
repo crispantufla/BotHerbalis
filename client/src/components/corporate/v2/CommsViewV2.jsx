@@ -113,16 +113,39 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
         return () => { if (socket) { socket.off('new_log'); socket.off('bot_status_change'); } };
     }, [socket, selectedChat]);
 
+    const [availableScripts, setAvailableScripts] = useState({ v3: {}, v4: {} });
+
     useEffect(() => {
         const fetchScriptAndPrices = async () => {
             try {
-                const [scriptRes, pricesRes] = await Promise.all([api.get('/api/script'), api.get('/api/prices')]);
-                if (scriptRes.data?.flow) setScriptFlow(scriptRes.data.flow);
+                const [scriptV3, scriptV4, pricesRes] = await Promise.all([
+                    api.get('/api/script/v3'),
+                    api.get('/api/script/v4'),
+                    api.get('/api/prices')
+                ]);
+
+                const scripts = {
+                    v3: scriptV3.data?.flow || {},
+                    v4: scriptV4.data?.flow || {}
+                };
+                setAvailableScripts(scripts);
+                // Fallback initial flow
+                setScriptFlow(scripts.v3);
+
                 if (pricesRes.data) setPrices(pricesRes.data);
-            } catch (e) { }
+            } catch (e) { console.error('Error fetching scripts:', e); }
         };
         fetchScriptAndPrices();
     }, []);
+
+    useEffect(() => {
+        if (!selectedChat) return;
+        // Dynamically switch script flow based on user's assigned script
+        const targetVersion = selectedChat.assignedScript || 'v3';
+        if (availableScripts[targetVersion]) {
+            setScriptFlow(availableScripts[targetVersion]);
+        }
+    }, [selectedChat, availableScripts]);
 
     useEffect(() => {
         if (!selectedChat) return;
@@ -137,7 +160,7 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
             setLoading(false);
         };
         fetchMessages();
-    }, [selectedChat]);
+    }, [selectedChat?.id]);
 
     const scrollToBottom = () => {
         if (scrollContainerRef.current) {
