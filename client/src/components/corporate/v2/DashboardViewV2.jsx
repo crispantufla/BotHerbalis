@@ -12,6 +12,11 @@ const DashboardViewV2 = ({ alerts = [], config, handleQuickAction, status, qrDat
     const [stats, setStats] = useState(null);
     const [loadingStats, setLoadingStats] = useState(true);
 
+    // Pairing code states
+    const [pairingPhone, setPairingPhone] = useState('');
+    const [pairingCode, setPairingCode] = useState('');
+    const [loadingPairing, setLoadingPairing] = useState(false);
+
     useEffect(() => {
         const fetchStats = async () => {
             try {
@@ -59,6 +64,28 @@ const DashboardViewV2 = ({ alerts = [], config, handleQuickAction, status, qrDat
         } catch (e) { toast.error('Error enviando comando'); }
     };
 
+    const handleRequestPairingCode = async () => {
+        const cleaned = pairingPhone.replace(/\D/g, '');
+        if (!cleaned || cleaned.length < 8) {
+            toast.warning('Ingresa un número válido con código de país (ej: 5493411234567)');
+            return;
+        }
+        setLoadingPairing(true);
+        try {
+            const res = await api.post('/api/pairing-code', { phoneNumber: cleaned });
+            if (res.data?.code) {
+                setPairingCode(res.data.code);
+                toast.success('Código de vinculación generado');
+            } else {
+                toast.error('No se pudo generar el código');
+            }
+        } catch (e) {
+            toast.error(e.response?.data?.error || 'Error solicitando código');
+        } finally {
+            setLoadingPairing(false);
+        }
+    };
+
     const handleRegenerateQR = async () => {
         const ok = await confirm('¿Desconectar WhatsApp y generar un nuevo código QR?');
         if (!ok) return;
@@ -87,10 +114,49 @@ const DashboardViewV2 = ({ alerts = [], config, handleQuickAction, status, qrDat
                         <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
                     </div>
                     <h3 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-800 to-slate-600 mb-3">Vincular Dispositivo</h3>
-                    <p className="text-slate-500 mb-8 font-medium">Abrí WhatsApp → Dispositivos vinculados → Vincular un dispositivo</p>
-                    <div className="inline-block p-4 bg-white rounded-2xl border border-slate-100 shadow-inner">
-                        <QRCodeSVG value={qrData} size={256} level="M" />
-                    </div>
+                    <p className="text-slate-500 mb-4 font-medium">Abrí WhatsApp → Dispositivos vinculados</p>
+
+                    {pairingCode ? (
+                        <div className="mb-8">
+                            <p className="text-sm font-bold text-indigo-600 mb-2 uppercase tracking-wide">Código de Vinculación</p>
+                            <div className="bg-slate-100 rounded-xl p-6 text-4xl font-mono font-black tracking-[0.2em] text-slate-800 border-2 border-indigo-200">
+                                {pairingCode}
+                            </div>
+                            <p className="text-xs text-slate-500 mt-4">Ingresa este código en tu celular principal de WhatsApp cuando te llegue la notificación.</p>
+                            <button
+                                onClick={() => setPairingCode('')}
+                                className="mt-4 text-indigo-600 text-sm font-semibold hover:underline"
+                            >
+                                ← Volver al código QR
+                            </button>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="inline-block p-4 bg-white rounded-2xl border border-slate-100 shadow-inner mb-6">
+                                <QRCodeSVG value={qrData} size={256} level="M" />
+                            </div>
+
+                            <div className="border-t border-slate-200 pt-6 mt-2">
+                                <p className="text-sm font-medium text-slate-600 mb-3">¿No podés escanear el QR?</p>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        placeholder="Ej: 5493415555555"
+                                        value={pairingPhone}
+                                        onChange={(e) => setPairingPhone(e.target.value)}
+                                        className="flex-1 rounded-xl border border-slate-300 px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder-slate-400"
+                                    />
+                                    <button
+                                        onClick={handleRequestPairingCode}
+                                        disabled={loadingPairing || !pairingPhone}
+                                        className="bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white px-4 py-2 rounded-xl font-medium transition-colors"
+                                    >
+                                        {loadingPairing ? '...' : 'Generar Código'}
+                                    </button>
+                                </div>
+                            </div>
+                        </>
+                    )}
                 </div>
             )}
 

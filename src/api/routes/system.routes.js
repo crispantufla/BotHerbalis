@@ -193,6 +193,25 @@ module.exports = (client, sharedState) => {
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
+    // POST /pairing-code - Request WhatsApp Pairing Code instead of QR
+    router.post('/pairing-code', authMiddleware, async (req, res) => {
+        try {
+            const { phoneNumber } = req.body;
+            if (!phoneNumber) return res.status(400).json({ error: 'Falta el campo "phoneNumber"' });
+
+            if (!sharedState.requestPairingCode) {
+                return res.status(501).json({ error: 'El backend no soporta Pairing Code aún.' });
+            }
+
+            console.log(`[PAIRING] Solicitando código para el número: ${phoneNumber}`);
+            const code = await sharedState.requestPairingCode(phoneNumber);
+            res.json({ success: true, code });
+        } catch (e) {
+            console.error("Error solicitando Pairing Code:", e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     // GET /script/active — show current script and available options
     router.get('/script/active', authMiddleware, (req, res) => {
         res.json({

@@ -365,6 +365,11 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false) {
 }
 sharedState.handleAdminCommand = handleAdminCommand; // Expose to server
 
+// Expose Pairing Code generation to API
+sharedState.requestPairingCode = async (phoneNumber) => {
+    if (!client) throw new Error("Client not initialized");
+    return await client.requestPairingCode(phoneNumber);
+};
 
 if (!process.env.OPENAI_API_KEY) {
     console.error("âŒ CRITICAL: OPENAI_API_KEY is missing in .env!");
