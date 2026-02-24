@@ -85,18 +85,18 @@ const GalleryViewV2 = () => {
         <div className="h-full flex flex-col animate-fade-in relative z-10 w-full space-y-6">
 
             {/* Header V2 & Upload Action */}
-            <div className="bg-white/40 backdrop-blur-xl rounded-[2rem] border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-8 relative overflow-hidden">
+            <div className="bg-white/40 backdrop-blur-xl rounded-[2rem] border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-5 lg:p-6 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-fuchsia-400/10 blur-[60px] rounded-full pointer-events-none"></div>
 
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative z-10">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10">
                     <div>
                         <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-700 to-purple-600 tracking-tight">
                             Recursos y Galería
                         </h1>
-                        <p className="text-slate-500 mt-2 font-medium">Bóveda de imágenes utilizadas por el Bot de IA y el Guión de Ventas.</p>
+                        <p className="text-slate-500 mt-1 font-medium text-sm">Bóveda de imágenes utilizadas por el Bot de IA y el Guión de Ventas.</p>
                     </div>
 
-                    <label className={`px-8 py-4 bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-2xl text-sm font-extrabold tracking-widest uppercase shadow-lg shadow-indigo-500/30 transition-all flex items-center gap-3 cursor-pointer group ${uploading ? 'opacity-70 pointer-events-none' : 'hover:shadow-indigo-500/50 hover:-translate-y-1'}`}>
+                    <label className={`px-8 py-3 bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-2xl text-sm font-extrabold tracking-widest uppercase shadow-lg shadow-indigo-500/30 transition-all flex items-center gap-3 cursor-pointer group ${uploading ? 'opacity-70 pointer-events-none' : 'hover:shadow-indigo-500/50 hover:-translate-y-1'}`}>
                         {uploading ? (
                             <>
                                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />

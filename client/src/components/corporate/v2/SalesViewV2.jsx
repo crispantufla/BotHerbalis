@@ -211,8 +211,8 @@ Teléfono: ${phoneDisplay}`;
         <div className="h-full flex flex-col animate-fade-in relative z-10 w-full space-y-6">
 
             {/* V2 Header & Advanced Filters */}
-            <div className="bg-white/40 backdrop-blur-xl rounded-[2rem] border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-8">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
+            <div className="bg-white/40 backdrop-blur-xl rounded-[2rem] border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-5 lg:p-6">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-5">
                     <div>
                         <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-700 to-purple-600 tracking-tight">
                             Logística y Pedidos

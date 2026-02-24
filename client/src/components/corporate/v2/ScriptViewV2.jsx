@@ -104,8 +104,8 @@ const ScriptViewV2 = () => {
         <div className="h-full flex flex-col animate-fade-in relative z-10 w-full space-y-6">
 
             {/* Header V2 */}
-            <div className="bg-white/40 backdrop-blur-xl rounded-[2rem] border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-8">
-                <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-8">
+            <div className="bg-white/40 backdrop-blur-xl rounded-[2rem] border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-5 lg:p-6">
+                <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
                     <div className="flex-1">
                         <div className="flex items-center gap-3">
                             <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-700 to-purple-600 tracking-tight">
@@ -115,10 +115,10 @@ const ScriptViewV2 = () => {
                                 Versionador {viewingVersion.toUpperCase()}
                             </span>
                         </div>
-                        <p className="text-slate-500 mt-2 font-medium">Revisa, edita y activa diferentes estrategias de venta para tu bot.</p>
+                        <p className="text-slate-500 mt-1 font-medium text-sm">Revisa, edita y activa diferentes estrategias de venta para tu bot.</p>
 
                         {/* Version Selector Buttons */}
-                        <div className="flex flex-wrap gap-2 mt-6">
+                        <div className="flex flex-wrap gap-2 mt-4">
                             {availableScripts.map(v => (
                                 <button
                                     key={v}
