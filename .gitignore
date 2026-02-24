@@ -13,3 +13,5 @@ client/dist/
 client/.env
 .DS_Store
 Thumbs.db
+
+/src/generated/prisma

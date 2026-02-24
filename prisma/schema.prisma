@@ -1,0 +1,49 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Para desarrollo local podemos usar SQLite para probar, pero luego Postgres.
+// Dado que la app ya usa Railway y pide Postgres, usaremos postgresql.
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  phone       String   @id
+  name        String?
+  createdAt   DateTime @default(now())
+  profileData String?  // Extracted by AI (e.g., weight goals, allergies)
+  
+  orders      Order[]
+  chats       ChatLog[]
+}
+
+model Order {
+  id          String   @id @default(uuid())
+  userPhone   String
+  user        User     @relation(fields: [userPhone], references: [phone])
+  
+  status      String   @default("Pendiente") // Pendiente, Confirmado, Enviado...
+  products    String   // List of products bought
+  totalPrice  Float
+  tracking    String?
+  postdated   String?
+  
+  createdAt   DateTime @default(now())
+}
+
+model ChatLog {
+  id          String   @id @default(uuid())
+  userPhone   String
+  user        User     @relation(fields: [userPhone], references: [phone])
+  
+  role        String   // "user" or "bot" or "system"
+  content     String
+  
+  timestamp   DateTime @default(now())
+}
+
+model BotConfig {
+  key         String   @id // e.g. "activeScript", "alertNumbers"
+  value       String   // JSON stringified value
+}

@@ -68,24 +68,34 @@ module.exports = (client, sharedState) => {
         try {
             const chats = await withTimeout(client.getChats(), 10000, "Timeout retrieving chats");
 
-            // Read orders to cross-reference past purchases
+            // Read orders from Database to cross-reference past purchases
             let orders = [];
             try {
-                const fs = require('fs');
-                const path = require('path');
-                const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../../..');
-                const ORDERS_FILE = path.join(DATA_DIR, 'orders.json');
-                if (fs.existsSync(ORDERS_FILE)) {
-                    orders = JSON.parse(fs.readFileSync(ORDERS_FILE, 'utf8'));
-                }
+                const { prisma } = require('../../../db');
+                orders = await prisma.order.findMany({
+                    where: { status: { not: 'Cancelado' } }
+                });
             } catch (err) {
-                console.error("Error reading orders.json in /chats:", err.message);
+                console.error("🔴 Error fetching DB orders in /chats:", err.message);
             }
 
             const relevantChats = chats.filter(c => !c.isGroup).map(c => {
                 const phoneNumeric = c.id.user; // e.g., '123456789' extracted from '123456789@c.us'
+
                 // Find all past orders matching this phone
-                const userOrders = orders.filter(o => o.cliente && o.cliente.includes(phoneNumeric) && o.status !== 'Cancelado');
+                const userOrders = orders.filter(o => o.userPhone && (o.userPhone === phoneNumeric || phoneNumeric.includes(o.userPhone)));
+
+                // Map DB order to legacy format for frontend
+                const legacyUserOrders = userOrders.map(o => ({
+                    id: o.id,
+                    cliente: o.userPhone,
+                    status: o.status,
+                    producto: o.products,
+                    precio: o.totalPrice.toString(),
+                    tracking: o.tracking || '',
+                    postdatado: o.postdated || '',
+                    createdAt: o.createdAt.toISOString()
+                }));
 
                 return {
                     id: c.id._serialized,
@@ -96,8 +106,14 @@ module.exports = (client, sharedState) => {
                     isPaused: pausedUsers.has(c.id._serialized),
                     step: userState[c.id._serialized]?.step || 'new',
                     assignedScript: userState[c.id._serialized]?.assignedScript || null,
-                    pastOrders: userOrders.length > 0 ? userOrders : null,
-                    hasBought: userOrders.length > 0
+                    // Sales context for script placeholder resolution
+                    selectedProduct: userState[c.id._serialized]?.selectedProduct || null,
+                    selectedPlan: userState[c.id._serialized]?.selectedPlan || null,
+                    cart: userState[c.id._serialized]?.cart || null,
+                    totalPrice: userState[c.id._serialized]?.totalPrice || null,
+                    partialAddress: userState[c.id._serialized]?.partialAddress || null,
+                    pastOrders: legacyUserOrders.length > 0 ? legacyUserOrders : null,
+                    hasBought: legacyUserOrders.length > 0
                 };
             });
             res.json(relevantChats);

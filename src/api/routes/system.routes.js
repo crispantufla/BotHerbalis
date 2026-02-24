@@ -84,7 +84,7 @@ module.exports = (client, sharedState) => {
     });
 
     // GET /stats
-    router.get('/stats', authMiddleware, (req, res) => {
+    router.get('/stats', authMiddleware, async (req, res) => {
         try {
             let todayRevenue = 0;
             let totalOrders = 0;
@@ -95,46 +95,31 @@ module.exports = (client, sharedState) => {
             const now = new Date();
             const todayStr = now.toISOString().split('T')[0];
 
-            if (fs.existsSync(ORDERS_FILE)) {
-                let orders = [];
-                try {
-                    orders = JSON.parse(fs.readFileSync(ORDERS_FILE));
-                } catch (e) {
-                    console.error("❌ Stats: orders.json is malformed");
-                    orders = [];
-                }
+            const { prisma } = require('../../../db');
 
-                totalOrders = orders.length;
-                orders.forEach(o => {
-                    if (!o || !o.createdAt) return;
+            const startOfDay = new Date();
+            startOfDay.setHours(0, 0, 0, 0);
 
-                    try {
-                        let orderDateStr = '';
-                        // Handle localized format "DD/MM/YYYY, HH:MM:SS"
-                        if (o.createdAt.includes('/')) {
-                            const [datePart] = o.createdAt.split(',');
-                            const [day, month, year] = datePart.split('/').map(s => s.trim());
-                            // Standardize to YYYY-MM-DD
-                            orderDateStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-                        } else {
-                            // Try native parsing for ISO strings
-                            const d = new Date(o.createdAt);
-                            if (!isNaN(d.getTime())) {
-                                orderDateStr = d.toISOString().split('T')[0];
-                            }
-                        }
-
-                        if (orderDateStr === todayStr) {
-                            todayOrders++;
-                            const price = parseFloat(String(o.precio || '0').replace(/[^0-9.]/g, ''));
-                            if (!isNaN(price)) todayRevenue += price;
-                            if (o.status !== 'Cancelado') completedToday++;
-                        }
-                    } catch (err) {
-                        console.error("❌ Stats: Error parsing order date", o.createdAt);
+            // Fetch database aggregations in parallel for performance
+            const [totalCount, todayStats, completedStats] = await Promise.all([
+                prisma.order.count(),
+                prisma.order.aggregate({
+                    _count: true,
+                    _sum: { totalPrice: true },
+                    where: { createdAt: { gte: startOfDay } }
+                }),
+                prisma.order.count({
+                    where: {
+                        createdAt: { gte: startOfDay },
+                        status: { not: 'Cancelado' }
                     }
-                });
-            }
+                })
+            ]);
+
+            totalOrders = totalCount;
+            todayOrders = todayStats._count;
+            todayRevenue = todayStats._sum.totalPrice || 0;
+            completedToday = completedStats;
 
             const activeSessions = Object.keys(userState || {}).length;
             const activeConversations = Object.values(userState || {}).filter(

@@ -15,6 +15,9 @@ const { startScheduler } = require('./src/services/scheduler'); // P3: Stale/Re-
 const { isBusinessHours, isDeepNight, getArgentinaHour } = require('./src/services/timeUtils');
 const { buildConfirmationMessage } = require('./src/utils/messageTemplates');
 
+// --- PRISMA DATABASE SETUP ---
+const { prisma } = require('./db');
+
 // Paths — use DATA_DIR env var for Railway volume persistence, fallback to project root
 const DATA_DIR = process.env.DATA_DIR || __dirname;
 
@@ -101,52 +104,82 @@ function saveKnowledge(scriptName = null) {
 let _saveStateTimeout = null;
 function saveState() {
     if (_saveStateTimeout) clearTimeout(_saveStateTimeout);
-    _saveStateTimeout = setTimeout(() => {
+    _saveStateTimeout = setTimeout(async () => {
         try {
-            const stateToSave = {
-                userState,
-                chatResets,
-                lastAlertUser,
-                pausedUsers: Array.from(pausedUsers),
-                config
-            };
+            // Backup locally just in case (optional, but harmless)
+            const stateToSave = { userState, chatResets, lastAlertUser, pausedUsers: Array.from(pausedUsers), config };
             atomicWriteFile(STATE_FILE, JSON.stringify(stateToSave, null, 2));
+
+            // MIGRATION: Persist all users to Postgres concurrently
+            const userPromises = Object.entries(userState).map(([phone, data]) => {
+                const cleanPhone = phone.replace('@c.us', '');
+                return prisma.user.upsert({
+                    where: { phone: cleanPhone },
+                    update: { profileData: JSON.stringify(data) },
+                    create: { phone: cleanPhone, profileData: JSON.stringify(data) }
+                });
+            });
+
+            // MIGRATION: Persist dynamic config (activeScript, alertNumbers)
+            const configPromises = Object.entries(config).map(([key, value]) => {
+                return prisma.botConfig.upsert({
+                    where: { key },
+                    update: { value: JSON.stringify(value) },
+                    create: { key, value: JSON.stringify(value) }
+                });
+            });
+
+            await Promise.all([...userPromises, ...configPromises]);
         } catch (e) {
-            console.error('🔴 Error saving state:', e.message);
+            console.error('🔴 Error saving state to DB:', e.message);
         }
-    }, 3000); // 3-second debounce to batch multiple concurrent updates
+    }, 5000); // 5-second debounce to batch multiple concurrent DB updates
 }
 
-function loadState() {
+async function loadState() {
     try {
-        if (fs.existsSync(STATE_FILE)) {
-            const raw = fs.readFileSync(STATE_FILE);
-            const data = JSON.parse(raw);
-            Object.assign(userState, data.userState || {});
-            Object.assign(chatResets, data.chatResets || {});
-
-            lastAlertUser = data.lastAlertUser || null;
-            pausedUsers = new Set(data.pausedUsers || []);
-
-            // IMPORTANT: Mutate config instead of replacing reference to keep sharedState sync
-            if (data.config) {
-                // Clear existing keys? Optional, but safer to just assign
-                // Actually, let's just merge. If we want to replace, we should clear.
-                // For this simple config, merging is likely fine, but activeScript MUST be updated.
-                Object.assign(config, data.config);
+        console.log('🔄 Loading state from PostgreSQL...');
+        let dbUsers = [];
+        let dbConfig = [];
+        try {
+            dbUsers = await prisma.user.findMany();
+            dbConfig = await prisma.botConfig.findMany();
+        } catch (dbErr) {
+            console.warn('⚠️ DB Connection failed, falling back to local persistence.json', dbErr.message);
+            if (fs.existsSync(STATE_FILE)) {
+                const raw = fs.readFileSync(STATE_FILE);
+                const data = JSON.parse(raw);
+                Object.assign(userState, data.userState || {});
+                Object.assign(config, data.config || {});
             }
-
-            // Migrate from old single alertNumber to array
-            if (config.alertNumber && !config.alertNumbers) {
-                config.alertNumbers = [config.alertNumber];
-                delete config.alertNumber;
-            }
-            if (!config.alertNumbers) config.alertNumbers = [];
-
-            console.log('âœ… State loaded from persistence.json');
+            return;
         }
+
+        // Hydrate config from DB
+        dbConfig.forEach(c => {
+            try { config[c.key] = JSON.parse(c.value); } catch (e) { }
+        });
+
+        // Hydrate users from DB into Memory
+        dbUsers.forEach(u => {
+            if (u.profileData) {
+                try {
+                    const parsed = JSON.parse(u.profileData);
+                    userState[u.phone + '@c.us'] = parsed;
+                } catch (e) { }
+            }
+        });
+
+        // Migrate from old single alertNumber to array
+        if (config.alertNumber && !config.alertNumbers) {
+            config.alertNumbers = [config.alertNumber];
+            delete config.alertNumber;
+        }
+        if (!config.alertNumbers) config.alertNumbers = [];
+
+        console.log(`✅ State loaded from DB (${dbUsers.length} users, config sync)`);
     } catch (e) {
-        console.error('ðŸ”´ Error loading state:', e.message);
+        console.error('🔴 Error loading state:', e.message);
     }
 }
 
@@ -303,24 +336,39 @@ sharedState.logAndEmit = logAndEmit; // Expose to server
 // Helper: Save Order Locally (for Dashboard) — Uses write queue to prevent concurrent corruption
 let _orderWriteQueue = Promise.resolve();
 function saveOrderToLocal(order) {
-    _orderWriteQueue = _orderWriteQueue.then(() => {
-        let orders = [];
-        if (fs.existsSync(ORDERS_FILE)) {
-            try {
-                orders = JSON.parse(fs.readFileSync(ORDERS_FILE));
-            } catch (e) { orders = []; }
+    _orderWriteQueue = _orderWriteQueue.then(async () => {
+        const cleanPhone = (order.cliente || '').replace('@c.us', '').replace(/\D/g, '');
+        let priceNum = 0;
+        if (order.precio) {
+            priceNum = parseFloat(order.precio.toString().replace(/[^\d.-]/g, ''));
         }
-        const newOrder = {
+
+        const newOrderData = {
             id: Date.now().toString(),
-            createdAt: new Date().toISOString(),
+            userPhone: cleanPhone || 'desconocido',
             status: 'Pendiente',
-            tracking: '',
-            ...order
+            products: order.producto || 'Desconocido',
+            totalPrice: isNaN(priceNum) ? 0 : priceNum,
+            tracking: null,
+            postdated: order.postdatado || null,
         };
-        orders.push(newOrder);
-        atomicWriteFile(ORDERS_FILE, JSON.stringify(orders, null, 2));
-        if (sharedState.io) sharedState.io.emit('new_order', newOrder);
-        return newOrder;
+
+        try {
+            await prisma.order.create({ data: newOrderData });
+
+            // Map to legacy format for Dashboard Socket.io
+            const legacyFormatOrder = {
+                ...order,
+                id: newOrderData.id,
+                createdAt: new Date().toISOString(),
+                status: 'Pendiente',
+                tracking: ''
+            };
+            if (sharedState.io) sharedState.io.emit('new_order', legacyFormatOrder);
+            return legacyFormatOrder;
+        } catch (e) {
+            console.error('[ORDER] DB Write error:', e.message);
+        }
     }).catch(e => console.error('[ORDER] Write queue error:', e.message));
 }
 
@@ -329,39 +377,44 @@ function cancelLatestOrder(userId) {
     return new Promise((resolve) => {
         _orderWriteQueue = _orderWriteQueue.then(async () => {
             try {
-                let orders = [];
-                if (fs.existsSync(ORDERS_FILE)) {
-                    orders = JSON.parse(fs.readFileSync(ORDERS_FILE));
-                }
                 const phone = userId.split('@')[0].replace(/\D/g, '');
 
-                let foundOrderIdx = -1;
-                for (let i = orders.length - 1; i >= 0; i--) {
-                    const cl = (orders[i].cliente || '').replace(/\D/g, '');
-                    if (cl === phone || cl.includes(phone) || phone.includes(cl)) {
-                        foundOrderIdx = i;
-                        break;
-                    }
-                }
+                // Find the newest order for this user
+                const targetOrder = await prisma.order.findFirst({
+                    where: { userPhone: phone },
+                    orderBy: { createdAt: 'desc' }
+                });
 
-                if (foundOrderIdx === -1) {
+                if (!targetOrder) {
                     return resolve({ success: false, reason: "NOT_FOUND" });
                 }
 
-                const targetOrder = orders[foundOrderIdx];
                 if (targetOrder.status !== 'Pendiente' && targetOrder.status !== 'Confirmado') {
                     return resolve({ success: false, reason: "INVALID_STATUS", currentStatus: targetOrder.status });
                 }
 
-                targetOrder.status = 'Cancelado';
-                atomicWriteFile(ORDERS_FILE, JSON.stringify(orders, null, 2));
-                if (sharedState.io) sharedState.io.emit('order_update', targetOrder);
+                const updatedOrder = await prisma.order.update({
+                    where: { id: targetOrder.id },
+                    data: { status: 'Cancelado' }
+                });
+
+                // Map to legacy format for Dashboard and Sheets
+                const legacyFormatUpdate = {
+                    id: updatedOrder.id,
+                    status: 'Cancelado',
+                    cliente: userId,
+                    producto: updatedOrder.products,
+                    precio: updatedOrder.totalPrice.toString(),
+                    createdAt: updatedOrder.createdAt.toISOString()
+                };
+
+                if (sharedState.io) sharedState.io.emit('order_update', legacyFormatUpdate);
 
                 try {
                     await updateOrderInSheet(targetOrder.id, { status: 'Cancelado' });
                 } catch (e) { console.error('[CANCEL] Sheet Error:', e.message); }
 
-                resolve({ success: true, order: targetOrder });
+                resolve({ success: true, order: legacyFormatUpdate });
             } catch (err) {
                 console.error('[CANCEL] Error canceling:', err.message);
                 resolve({ success: false, reason: "ERROR" });

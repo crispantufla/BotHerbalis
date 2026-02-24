@@ -43,15 +43,29 @@ jest.mock('../src/services/addressValidator', () => ({
 }));
 // safeWrite.js is in root dir
 jest.mock('../safeWrite.js', () => ({ atomicWriteFile: jest.fn() }));
-jest.mock('../sheets_sync.js', () => ({ appendOrderToSheet: jest.fn() }));
+jest.mock('../sheets_sync.js', () => ({ appendOrderToSheet: jest.fn().mockResolvedValue(true) }));
 
-// Mock dependencies object
+jest.mock('../db', () => ({
+    prisma: {
+        order: { create: jest.fn().mockResolvedValue({ id: 'mock-order' }) },
+        user: { upsert: jest.fn().mockResolvedValue({}) },
+        chatLog: { create: jest.fn().mockResolvedValue({}) }
+    }
+}));
+
+// Mock dependencies
+const mockClient = { sendMessage: jest.fn() };
+const mockNotifyAdmin = jest.fn();
+const mockSaveState = jest.fn();
+const mockSendMessageWithDelay = jest.fn();
+const mockLogAndEmit = jest.fn();
+
 const mockDependencies = {
-    client: { sendMessage: jest.fn() },
-    notifyAdmin: jest.fn(),
-    saveState: jest.fn(),
-    sendMessageWithDelay: jest.fn(),
-    logAndEmit: jest.fn()
+    client: mockClient,
+    notifyAdmin: mockNotifyAdmin,
+    saveState: mockSaveState,
+    sendMessageWithDelay: mockSendMessageWithDelay,
+    logAndEmit: mockLogAndEmit
 };
 
 // Load knowledge
@@ -122,6 +136,7 @@ describe('Strategic Improvements', () => {
             selectedPlan: '60', // REQUIRED to pass the guard in waiting_data
             weightGoal: 'Quiero bajar 20kg', // Custom field we want to preserve
             history: [],
+            partialAddress: {},
             addressAttempts: 0
         };
 

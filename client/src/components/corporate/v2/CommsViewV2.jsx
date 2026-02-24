@@ -172,17 +172,34 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
 
     useLayoutEffect(scrollToBottom, [messages]);
 
-    const formatScriptMessage = (text) => {
-        if (!text || !prices) return text;
-        let p = prices;
-        return text.replace(/{{PRICE_CAPSULAS_60}}/g, p['Cápsulas']?.['60'] || '46.900')
-            .replace(/{{PRICE_CAPSULAS_120}}/g, p['Cápsulas']?.['120'] || '66.900')
-            .replace(/{{PRICE_SEMILLAS_60}}/g, p['Semillas']?.['60'] || '36.900')
-            .replace(/{{PRICE_SEMILLAS_120}}/g, p['Semillas']?.['120'] || '49.900')
-            .replace(/{{PRICE_GOTAS_60}}/g, p['Gotas']?.['60'] || '48.900')
-            .replace(/{{PRICE_GOTAS_120}}/g, p['Gotas']?.['120'] || '68.900')
-            .replace(/{{ADICIONAL_MAX}}/g, p.adicionalMAX || '6.000')
-            .replace(/{{COSTO_LOGISTICO}}/g, p.costoLogistico || '18.000');
+    const formatScriptMessage = (text, chat = null) => {
+        if (!text) return text;
+        let result = text;
+        if (prices) {
+            let p = prices;
+            result = result.replace(/{{PRICE_CAPSULAS_60}}/g, p['Cápsulas']?.['60'] || '46.900')
+                .replace(/{{PRICE_CAPSULAS_120}}/g, p['Cápsulas']?.['120'] || '66.900')
+                .replace(/{{PRICE_SEMILLAS_60}}/g, p['Semillas']?.['60'] || '36.900')
+                .replace(/{{PRICE_SEMILLAS_120}}/g, p['Semillas']?.['120'] || '49.900')
+                .replace(/{{PRICE_GOTAS_60}}/g, p['Gotas']?.['60'] || '48.900')
+                .replace(/{{PRICE_GOTAS_120}}/g, p['Gotas']?.['120'] || '68.900')
+                .replace(/{{ADICIONAL_MAX}}/g, p.adicionalMAX || '6.000')
+                .replace(/{{COSTO_LOGISTICO}}/g, p.costoLogistico || '18.000');
+        }
+        // Resolve order-specific placeholders from the user's sales state
+        const ctx = chat || selectedChat;
+        if (ctx) {
+            const product = ctx.selectedProduct || ctx.cart?.[0]?.product || 'Producto';
+            const plan = ctx.selectedPlan || ctx.cart?.[0]?.plan || '60';
+            let total = ctx.totalPrice || '';
+            if (!total && ctx.cart?.length > 0) {
+                total = ctx.cart.reduce((s, i) => s + parseInt((i.price || '0').toString().replace(/\D/g, '')), 0).toLocaleString('es-AR');
+            }
+            result = result.replace(/{{PRODUCT}}/g, product)
+                .replace(/{{PLAN}}/g, plan)
+                .replace(/{{TOTAL}}/g, total ? `$${total}` : '$0');
+        }
+        return result;
     };
 
     const handleSend = async (e) => {
@@ -197,7 +214,37 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
 
     const handleSendScriptStep = (stepKey) => {
         const step = scriptFlow[stepKey];
-        if (step?.response) setInput(formatScriptMessage(step.response));
+        if (step?.response) setInput(formatScriptMessage(step.response, selectedChat));
+    };
+
+    // Manual order completion — admin clicks the final step button
+    const handleManualCompletion = async () => {
+        if (!selectedChat) return;
+        const confirmMsg = '¡Excelente! Tu pedido ya fue ingresado 🚀\n\nTe vamos a avisar cuando lo despachemos con el número de seguimiento.\n\n¡Muchas gracias por confiar en Herbalis!';
+        setInput(confirmMsg);
+
+        // Also create the order in the backend
+        try {
+            await api.post('/api/orders/manual-complete', { chatId: selectedChat.id });
+            toast.success('Pedido ingresado en Ventas ✅');
+        } catch (e) {
+            toast.error('Error al registrar pedido: ' + (e.response?.data?.error || e.message));
+        }
+    };
+
+    // Delete Message Action
+    const handleDeleteMessage = async (msgId) => {
+        if (!selectedChat || !msgId) return;
+        if (!window.confirm('¿Eliminar este mensaje para todos?')) return;
+        try {
+            setMessages(prev => prev.filter(m => m.id !== msgId));
+            await api.delete('/api/messages', {
+                data: { chatId: selectedChat.id, messageId: msgId }
+            });
+            toast.success('Mensaje eliminado');
+        } catch (e) {
+            toast.error('Error eliminando mensaje');
+        }
     };
 
     const handleToggleBot = async () => {
@@ -537,6 +584,17 @@ Teléfono: ${phoneDisplay}`;
                                         <span className={`text-[10px] block text-right mt-2 font-mono font-bold ${msg.fromMe ? 'text-indigo-200' : 'text-slate-400'}`}>
                                             {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </span>
+
+                                        {/* Delete Button (Only for own messages) */}
+                                        {msg.fromMe && (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); handleDeleteMessage(msg.id); }}
+                                                className="absolute -left-9 top-1/2 -translate-y-1/2 p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-full opacity-0 group-hover:opacity-100 transition-all"
+                                                title="Eliminar mensaje para todos"
+                                            >
+                                                <IconsV2.Trash />
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             ))}
@@ -639,7 +697,7 @@ Teléfono: ${phoneDisplay}`;
                                                 onClick={() => {
                                                     // Magic: Auto pause Bot if human takes over
                                                     if (!selectedChat.isPaused) handleToggleBot();
-                                                    setInput(formatScriptMessage(step.response));
+                                                    setInput(formatScriptMessage(step.response, selectedChat));
                                                 }}
                                                 className="w-full text-left p-3.5 rounded-2xl border border-white/60 bg-white/40 hover:bg-white hover:border-indigo-300 transition-all shadow-sm hover:shadow-md group cursor-pointer relative overflow-hidden"
                                             >
@@ -649,7 +707,7 @@ Teléfono: ${phoneDisplay}`;
                                                     <span className="opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 transition-all duration-300">Insertar +</span>
                                                 </div>
                                                 <p className="text-[11.5px] text-slate-700 font-medium line-clamp-3 leading-relaxed relative z-10">
-                                                    {formatScriptMessage(step.response)}
+                                                    {formatScriptMessage(step.response, selectedChat)}
                                                 </p>
                                             </button>
                                         );
@@ -658,6 +716,25 @@ Teléfono: ${phoneDisplay}`;
                             ) : (
                                 <p className="text-xs text-slate-400 italic text-center mt-6 bg-white/40 p-4 rounded-xl border border-white/50">No hay módulos de guión en este flow.</p>
                             )}
+                        </div>
+
+                        {/* Manual Completion Button */}
+                        <div className="px-1 pb-6">
+                            <button
+                                onClick={() => {
+                                    if (!selectedChat.isPaused) handleToggleBot();
+                                    handleManualCompletion();
+                                }}
+                                className="w-full text-left p-4 rounded-2xl border-2 border-dashed border-emerald-300 bg-emerald-50/60 hover:bg-emerald-100 hover:border-emerald-400 transition-all shadow-sm hover:shadow-md group cursor-pointer relative overflow-hidden"
+                            >
+                                <div className="flex items-center justify-between mb-2 text-[10px] font-black text-emerald-600 uppercase tracking-widest relative z-10">
+                                    <span>🚀 Pedido Ingresado</span>
+                                    <span className="opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 transition-all duration-300">Confirmar Venta</span>
+                                </div>
+                                <p className="text-[11.5px] text-emerald-700 font-medium leading-relaxed relative z-10 line-clamp-2">
+                                    Envía la confirmación final y registra el pedido en Ventas automáticamente.
+                                </p>
+                            </button>
                         </div>
 
                     </div>

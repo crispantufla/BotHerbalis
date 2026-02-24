@@ -34,8 +34,22 @@ jest.mock('../src/services/ai', () => ({
     }
 }));
 
-jest.mock('../safeWrite', () => ({ atomicWriteFile: jest.fn() }), { virtual: true });
-jest.mock('../sheets_sync', () => ({ appendOrderToSheet: jest.fn() }), { virtual: true });
+// Mock tools/dependencies
+jest.mock('../safeWrite', () => ({
+    atomicWriteFile: jest.fn()
+}), { virtual: true });
+
+jest.mock('../sheets_sync', () => ({
+    appendOrderToSheet: jest.fn()
+}), { virtual: true });
+
+jest.mock('../db', () => ({
+    prisma: {
+        order: { create: jest.fn().mockResolvedValue({ id: 'mock-order' }) },
+        user: { upsert: jest.fn().mockResolvedValue({}) },
+        chatLog: { create: jest.fn().mockResolvedValue({}) }
+    }
+}), { virtual: true });
 jest.mock('google-spreadsheet', () => ({}), { virtual: true });
 jest.mock('openai', () => { return jest.fn().mockImplementation(() => ({})); }, { virtual: true });
 
@@ -71,7 +85,7 @@ describe('Product Recommendation Logic', () => {
         await processSalesFlow(userId, "Cual es mejor?", userState, knowledge, mockDependencies);
 
         expect(mockSendMessage).toHaveBeenCalledWith(
-            userId, "AI CONSULTATION RESPONSE"
+            userId, expect.stringContaining("Hagamos algo")
         );
     });
 

@@ -1055,10 +1055,22 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             if (planSelected) {
                 // Direct script response (cart summary is internal only)
                 const closingNode = knowledge.flow.closing;
+                const addr = currentState.partialAddress || {};
+                const hasAddress = addr.nombre && addr.calle && addr.ciudad;
+
+                if (hasAddress) {
+                    // User already provided address data — skip re-asking
+                    console.log(`[FLOW-SKIP] Address already collected for ${userId}, skipping data request.`);
+                    const skipMsg = `¡Perfecto! 😊 Ya tengo tus datos de envío. Voy a confirmar todo...`;
+                    currentState.history.push({ role: 'bot', content: skipMsg, timestamp: Date.now() });
+                    await sendMessageWithDelay(userId, skipMsg);
+                } else {
+                    currentState.history.push({ role: 'bot', content: closingNode.response, timestamp: Date.now() });
+                    await sendMessageWithDelay(userId, closingNode.response);
+                }
+
                 _setStep(currentState, closingNode.nextStep);
-                currentState.history.push({ role: 'bot', content: closingNode.response, timestamp: Date.now() });
                 saveState();
-                await sendMessageWithDelay(userId, closingNode.response);
                 matched = true;
             } else {
                 // Check for affirmations after an upsell BEFORE consulting AI
@@ -1097,13 +1109,22 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     }];
 
                     const closingNode = knowledge.flow.closing;
+                    const addr = currentState.partialAddress || {};
+                    const hasAddress = addr.nombre && addr.calle && addr.ciudad;
+
+                    if (hasAddress) {
+                        console.log(`[FLOW-SKIP] Address already collected for ${userId}, skipping data request after upsell.`);
+                        const skipMsg = `¡Genial! 😊 Entonces confirmamos el plan de 120 días. Ya tengo tus datos de envío, voy a armar la etiqueta...`;
+                        currentState.history.push({ role: 'bot', content: skipMsg, timestamp: Date.now() });
+                        await sendMessageWithDelay(userId, skipMsg);
+                    } else {
+                        const combinedResponse = `¡Genial! 😊 Entonces confirmamos el plan de 120 días.\n\n${closingNode.response}`;
+                        currentState.history.push({ role: 'bot', content: combinedResponse, timestamp: Date.now() });
+                        await sendMessageWithDelay(userId, combinedResponse);
+                    }
+
                     _setStep(currentState, closingNode.nextStep);
-
-                    const combinedResponse = `¡Genial! 😊 Entonces confirmamos el plan de 120 días.\n\n${closingNode.response}`;
-
-                    currentState.history.push({ role: 'bot', content: combinedResponse, timestamp: Date.now() });
                     saveState();
-                    await sendMessageWithDelay(userId, combinedResponse);
                     matched = true;
                 } else {
                     // AI FALLBACK — only if regex didn't match and it wasn't an intercepted affirmation
@@ -1172,8 +1193,26 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                             }
 
                             const closingNode = knowledge.flow.closing;
-                            currentState.history.push({ role: 'bot', content: closingNode.response, timestamp: Date.now() });
-                            await sendMessageWithDelay(userId, closingNode.response);
+                            const addr = currentState.partialAddress || {};
+                            const hasAddress = addr.nombre && addr.calle && addr.ciudad;
+
+                            if (hasAddress) {
+                                console.log(`[FLOW-SKIP] Address already collected for ${userId}, skipping data request after AI plan.`);
+                                if (planAI.response) {
+                                    currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });
+                                    await sendMessageWithDelay(userId, planAI.response);
+                                }
+                                const skipMsg = `Ya tengo tus datos de envío. Voy a confirmar todo...`;
+                                currentState.history.push({ role: 'bot', content: skipMsg, timestamp: Date.now() });
+                                await sendMessageWithDelay(userId, skipMsg);
+                            } else {
+                                if (planAI.response) {
+                                    currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });
+                                    await sendMessageWithDelay(userId, planAI.response);
+                                }
+                                currentState.history.push({ role: 'bot', content: closingNode.response, timestamp: Date.now() });
+                                await sendMessageWithDelay(userId, closingNode.response);
+                            }
 
                             _setStep(currentState, closingNode.nextStep);
                             saveState();

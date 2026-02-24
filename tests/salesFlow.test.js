@@ -16,6 +16,15 @@ jest.mock('../safeWrite', () => ({
     atomicWriteFile: jest.fn()
 }));
 
+// Mock Database
+jest.mock('../db', () => ({
+    prisma: {
+        order: { create: jest.fn().mockResolvedValue({ id: 'mock-order' }) },
+        user: { upsert: jest.fn().mockResolvedValue({}) },
+        chatLog: { create: jest.fn().mockResolvedValue({}) }
+    }
+}));
+
 // Mock AI Service with better stubs
 jest.mock('../src/services/ai', () => ({
     aiService: {
@@ -123,8 +132,8 @@ describe('Sales Flow Logic', () => {
         await processSalesFlow('user1', 'algo totalmente random', userState, knowledge, deps);
 
         // Should have migrated to waiting_final_confirmation and then processed
-        // (non-affirmative at waiting_final_confirmation still completes the order)
-        expect(userState['user1'].step).toBe('completed');
+        // (non-affirmative at waiting_final_confirmation now delegates to admin)
+        expect(userState['user1'].step).toBe('waiting_admin_validation');
         // Should have notified admin about unexpected response
         expect(mockNotifyAdmin).toHaveBeenCalled();
     });

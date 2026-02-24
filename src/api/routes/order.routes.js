@@ -2,64 +2,98 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const { authMiddleware } = require('../../middleware/auth');
-const { atomicWriteFile } = require('../../../safeWrite');
 const { getOrdersFromSheet, updateOrderInSheet, deleteOrderInSheet } = require('../../../sheets_sync');
 
 module.exports = (client, sharedState) => {
     const router = express.Router();
     const { io } = sharedState;
 
-    const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../../..');
-    const ORDERS_FILE = path.join(DATA_DIR, 'orders.json');
-
-    // GET /orders (List orders from Sheets)
+    // GET /orders (List orders from PostgreSQL with Pagination)
     router.get('/orders', authMiddleware, async (req, res) => {
         try {
-            // Priority 1: Fetch from Google Sheets
-            const sheetsOrders = await getOrdersFromSheet();
-            if (sheetsOrders && sheetsOrders.length > 0) {
-                // Background cache to local JSON (optional but good for resilience)
-                atomicWriteFile(ORDERS_FILE, JSON.stringify(sheetsOrders, null, 2));
-                return res.json(sheetsOrders);
-            }
-        } catch (error) {
-            console.error('🔴 [ROUTES] Error fetching from Sheets, falling back to local JSON.', error);
-        }
+            const page = parseInt(req.query.page) || 1;
+            const limit = parseInt(req.query.limit) || 100;
+            const skip = (page - 1) * limit;
 
-        // Priority 2: Fallback to local JSON
-        if (fs.existsSync(ORDERS_FILE)) {
-            res.json(JSON.parse(fs.readFileSync(ORDERS_FILE)));
-        } else {
-            res.json([]);
+            const { prisma } = require('../../../db');
+
+            // Get total count for metadata
+            const total = await prisma.order.count();
+
+            const orders = await prisma.order.findMany({
+                orderBy: { createdAt: 'desc' },
+                skip,
+                take: limit
+            });
+
+            // Map to legacy format expected by dashboard to avoid breaking frontend fields
+            const legacyOrders = orders.map(o => ({
+                id: o.id,
+                cliente: o.userPhone,
+                status: o.status,
+                producto: o.products,
+                precio: o.totalPrice.toString(),
+                tracking: o.tracking || '',
+                postdatado: o.postdated || '',
+                createdAt: o.createdAt.toISOString()
+            }));
+
+            res.json({
+                data: legacyOrders,
+                pagination: {
+                    total,
+                    page,
+                    limit,
+                    totalPages: Math.ceil(total / limit)
+                }
+            });
+        } catch (error) {
+            console.error('🔴 [ROUTES] Error fetching orders from DB:', error);
+            res.status(500).json({ error: "Failed to fetch orders" });
         }
     });
 
-    // POST /orders/:id/status (Update status to Sheets) - Authenticated
+    // POST /orders/:id/status (Update status) - Authenticated
     router.post('/orders/:id/status', authMiddleware, async (req, res) => {
         const { id } = req.params;
         const { status, tracking } = req.body;
 
         try {
-            // Update in Google Sheets
-            const updatedOrderNode = await updateOrderInSheet(id, { status, tracking });
+            const { prisma } = require('../../../db');
 
-            // Sync Local JSON caching
-            if (fs.existsSync(ORDERS_FILE)) {
-                let orders = JSON.parse(fs.readFileSync(ORDERS_FILE));
-                const index = orders.findIndex(o => o.id === id);
-                if (index !== -1) {
-                    if (status) orders[index].status = status;
-                    if (tracking !== undefined) orders[index].tracking = tracking;
-                    atomicWriteFile(ORDERS_FILE, JSON.stringify(orders, null, 2));
-                }
-            }
+            // 1. Update DB
+            const dataToUpdate = {};
+            if (status) dataToUpdate.status = status;
+            if (tracking !== undefined) dataToUpdate.tracking = tracking;
 
-            if (io && updatedOrderNode) io.emit('order_update', updatedOrderNode);
-            res.json({ success: true, order: updatedOrderNode });
+            const updatedOrder = await prisma.order.update({
+                where: { id },
+                data: dataToUpdate
+            });
+
+            // Format for dashboard and Sheets
+            const legacyOrder = {
+                id: updatedOrder.id,
+                cliente: updatedOrder.userPhone,
+                status: updatedOrder.status,
+                producto: updatedOrder.products,
+                precio: updatedOrder.totalPrice.toString(),
+                tracking: updatedOrder.tracking || '',
+                postdatado: updatedOrder.postdated || '',
+                createdAt: updatedOrder.createdAt.toISOString()
+            };
+
+            // 2. Update Google Sheets (Async fallback)
+            updateOrderInSheet(id, { status, tracking }).catch(e =>
+                console.error('🔴 [ROUTES] Error updating Sheets:', e.message)
+            );
+
+            if (io) io.emit('order_update', legacyOrder);
+            res.json({ success: true, order: legacyOrder });
 
         } catch (error) {
-            console.error('🔴 [ROUTES] Error updating Sheets:', error);
-            res.status(500).json({ error: "Failed to update order in Google Sheets" });
+            console.error('🔴 [ROUTES] Error updating DB:', error);
+            res.status(500).json({ error: "Failed to update order info" });
         }
     });
 
@@ -67,25 +101,24 @@ module.exports = (client, sharedState) => {
     router.delete('/orders/:id', authMiddleware, async (req, res) => {
         const { id } = req.params;
 
-        if (!fs.existsSync(ORDERS_FILE)) return res.status(404).json({ error: "No orders found" });
-
-        let orders = JSON.parse(fs.readFileSync(ORDERS_FILE));
-        const index = orders.findIndex(o => o.id === id);
-        if (index === -1) return res.status(404).json({ error: "Order not found" });
-
-        // Actually delete from Google Sheets too
         try {
-            await deleteOrderInSheet(id);
-        } catch (e) {
-            console.error('🔴 [ROUTES] Error deleting from Sheets:', e);
-            // We can choose to proceed with local deletion or fail
+            const { prisma } = require('../../../index');
+
+            // 1. Delete from DB
+            await prisma.order.delete({ where: { id } });
+
+            // 2. Delete from Google Sheets (Async fallback)
+            deleteOrderInSheet(id).catch(e =>
+                console.error('🔴 [ROUTES] Error deleting from Sheets:', e.message)
+            );
+
+            if (io) io.emit('order_delete', { id });
+            res.json({ success: true, deleted: { id } });
+
+        } catch (error) {
+            console.error('🔴 [ROUTES] Error deleting from DB:', error);
+            res.status(500).json({ error: "Failed to delete order" });
         }
-
-        const deleted = orders.splice(index, 1)[0];
-        atomicWriteFile(ORDERS_FILE, JSON.stringify(orders, null, 2));
-
-        if (io) io.emit('order_delete', { id });
-        res.json({ success: true, deleted });
     });
 
     // GET /orders/tracking/:code (Rastrear envío en Correo Argentino) - Authenticated
@@ -100,6 +133,88 @@ module.exports = (client, sharedState) => {
         } catch (e) {
             console.error('🔴 [ROUTES] Error consultando tracking:', e);
             res.status(500).json({ error: "Error interno rastreando el código." });
+        }
+    });
+
+    // POST /orders/manual-complete — Admin manually completes a sale from the script panel
+    router.post('/orders/manual-complete', authMiddleware, async (req, res) => {
+        const { chatId } = req.body;
+        if (!chatId) return res.status(400).json({ error: 'chatId es requerido' });
+
+        try {
+            const { userState } = sharedState;
+            const state = userState?.[chatId];
+
+            if (!state) return res.status(404).json({ error: 'No hay estado de conversación para este chat' });
+
+            const cart = state.cart || [];
+            const addr = state.partialAddress || {};
+            const product = cart.map(i => `${i.product} (${i.plan} días)`).join(', ') || state.selectedProduct || 'Producto';
+            const plan = state.selectedPlan || cart[0]?.plan || '60';
+            const subtotal = cart.reduce((sum, i) => sum + parseInt((i.price || '0').toString().replace(/\D/g, '')), 0);
+            const adicional = state.adicionalMAX || 0;
+            const total = subtotal + adicional;
+
+            const phoneNumeric = chatId.split('@')[0];
+
+            const { prisma } = require('../../../db');
+
+            // Upsert user
+            await prisma.user.upsert({
+                where: { phone: phoneNumeric },
+                update: { name: addr.nombre || null },
+                create: { phone: phoneNumeric, name: addr.nombre || null }
+            });
+
+            const order = await prisma.order.create({
+                data: {
+                    userPhone: phoneNumeric,
+                    status: 'Confirmado',
+                    products: product,
+                    totalPrice: total,
+                    postdated: state.postdatado || null
+                }
+            });
+
+            // Also write to Google Sheets as backup
+            try {
+                const { addOrderToSheet } = require('../../../sheets_sync');
+                if (addOrderToSheet) {
+                    await addOrderToSheet({
+                        id: order.id,
+                        cliente: phoneNumeric,
+                        nombre: addr.nombre || '',
+                        producto: product,
+                        plan: plan,
+                        precio: total.toLocaleString('es-AR'),
+                        calle: addr.calle || '',
+                        ciudad: addr.ciudad || '',
+                        cp: addr.cp || '',
+                        provincia: addr.provincia || '',
+                        status: 'Confirmado',
+                        postdatado: state.postdatado || '',
+                        createdAt: new Date().toISOString()
+                    });
+                }
+            } catch (sheetErr) {
+                console.warn('⚠️ [MANUAL-COMPLETE] Sheets backup failed:', sheetErr.message);
+            }
+
+            // Set user state to completed
+            if (state) {
+                state.step = 'completed';
+            }
+
+            // Emit socket event for real-time dashboard update
+            if (io) {
+                io.emit('order_update', { action: 'created', order });
+            }
+
+            console.log(`✅ [MANUAL-COMPLETE] Order created for ${phoneNumeric}: ${product} — $${total}`);
+            res.json({ success: true, orderId: order.id });
+        } catch (e) {
+            console.error('🔴 [MANUAL-COMPLETE] Error:', e);
+            res.status(500).json({ error: e.message });
         }
     });
 

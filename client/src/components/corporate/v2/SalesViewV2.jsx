@@ -18,6 +18,9 @@ const SalesViewV2 = ({ onGoToChat }) => {
     const { toast, confirm } = useToast();
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalOrders, setTotalOrders] = useState(0);
 
     // Advanced Filters V2
     const [searchTerm, setSearchTerm] = useState('');
@@ -36,11 +39,18 @@ const SalesViewV2 = ({ onGoToChat }) => {
     const [isTracking, setIsTracking] = useState(false);
     const [trackingData, setTrackingData] = useState(null);
 
-    const fetchOrders = async () => {
+    const fetchOrders = async (pageNum = page) => {
         setLoading(true);
         try {
-            const res = await api.get('/api/orders');
-            setOrders(res.data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+            const res = await api.get(`/api/orders?page=${pageNum}&limit=50`);
+            if (res.data.data) {
+                setOrders(res.data.data);
+                setTotalPages(res.data.pagination.totalPages);
+                setTotalOrders(res.data.pagination.total);
+                setPage(res.data.pagination.page);
+            } else {
+                setOrders(res.data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+            }
         } catch (e) {
             toast.error("Error cargando pedidos");
         } finally {
@@ -222,7 +232,7 @@ Teléfono: ${phoneDisplay}`;
                     </div>
 
                     <div className="flex gap-4">
-                        <button onClick={fetchOrders} className="p-3 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 transition-all shadow-sm active:scale-95 group">
+                        <button onClick={() => fetchOrders(page)} className="p-3 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 transition-all shadow-sm active:scale-95 group">
                             <span className="group-hover:rotate-180 transition-transform duration-500 block"><IconsV2.Refresh /></span>
                         </button>
                         <button onClick={handleExportCSV} disabled={orders.length === 0} className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-105 transition-all flex items-center gap-2 disabled:opacity-50 disabled:scale-100">
@@ -414,10 +424,28 @@ Teléfono: ${phoneDisplay}`;
 
                 </div>
 
-                {/* Footer */}
-                <div className="px-8 py-5 border-t border-white/60 flex justify-between items-center bg-white/30 backdrop-blur-md">
-                    <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Mostrando {filteredOrders.length} registros</span>
-                    <span className="text-xs font-bold text-indigo-500 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">{orders.length} Totales en BD</span>
+                {/* V2 Pagination Controls */}
+                <div className="px-8 py-5 border-t border-white/60 flex flex-col sm:flex-row justify-between items-center bg-white/30 backdrop-blur-md gap-4">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                        Página <span className="text-indigo-600">{page}</span> de {totalPages}
+                    </span>
+                    <div className="flex gap-2">
+                        <button
+                            disabled={page <= 1}
+                            onClick={() => fetchOrders(page - 1)}
+                            className="px-4 py-2 bg-white/80 rounded-xl border border-white shadow-sm text-xs font-extrabold text-slate-600 disabled:opacity-50 hover:bg-white hover:text-indigo-600 transition-all active:-translate-y-0.5"
+                        >
+                            Anterior
+                        </button>
+                        <button
+                            disabled={page >= totalPages}
+                            onClick={() => fetchOrders(page + 1)}
+                            className="px-4 py-2 bg-white/80 rounded-xl border border-white shadow-sm text-xs font-extrabold text-slate-600 disabled:opacity-50 hover:bg-white hover:text-indigo-600 transition-all active:-translate-y-0.5"
+                        >
+                            Siguiente
+                        </button>
+                    </div>
+                    <span className="text-xs font-bold text-indigo-500 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">{totalOrders} Totales en BD</span>
                 </div>
             </div>
 
