@@ -252,6 +252,42 @@ function _isNegative(normalizedText) {
 }
 
 /**
+ * _maybeUpsell
+ * Sends the 120-day upsell message if the user has a weight goal > 10kg.
+ * Extracted to avoid 6 copies of the same logic.
+ */
+async function _maybeUpsell(currentState, sendMessageWithDelay, userId, saveStateFn) {
+    if (currentState.weightGoal && currentState.weightGoal > 10) {
+        const upsell = "Personalmente yo te recomendaría el de 120 días debido al peso que esperas perder 👌";
+        currentState.history.push({ role: 'bot', content: upsell, timestamp: Date.now() });
+        if (saveStateFn) saveStateFn(userId);
+        await sendMessageWithDelay(userId, upsell);
+    }
+}
+
+/**
+ * _hasCompleteAddress
+ * Checks if the user state has enough address data to skip re-asking.
+ */
+function _hasCompleteAddress(state) {
+    const addr = state.partialAddress || {};
+    return !!(addr.nombre && addr.calle && addr.ciudad);
+}
+
+/**
+ * _detectPostdatado
+ * Checks if text contains a postdating request (future delivery date).
+ * Returns the matched text or null.
+ */
+function _detectPostdatado(normalizedText, originalText) {
+    const dateMatch = normalizedText.match(/\b(lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo|semana|mes|cobro|mañana|despues|después|principio|el \d+ de [a-z]+|el \d+)\b/i);
+    if (dateMatch && /\b(recibir|llega|enviar|mandar|cobro|pago|puedo|entregar)\b/i.test(normalizedText)) {
+        return originalText;
+    }
+    return null;
+}
+
+/**
  * processSalesFlow
  * Handles the main state machine for the sales bot.
  * 
@@ -286,7 +322,8 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             lastInteraction: Date.now()
         };
     }
-    saveState();
+    saveState(userId);
+
     if (userState[userId]) { // Check if userState[userId] exists after potential creation
         userState[userId].lastInteraction = Date.now();
     }
@@ -326,7 +363,8 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
         await notifyAdmin('🚨 Rechazo Médico Automático', userId, `Motivo: el cliente mencionó embarazo/lactancia o edad avanzada.\nMensaje original: "${text}"`);
         _setStep(currentState, 'rejected_medical');
-        saveState();
+        saveState(userId);
+
         return { matched: true };
     }
 
@@ -368,7 +406,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
         await sendMessageWithDelay(userId, msg);
 
         _setStep(currentState, 'waiting_preference');
-        saveState();
+        saveState(userId);
         return { matched: true };
     }
 
@@ -378,7 +416,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
         if (summaryResult) {
             currentState.summary = summaryResult.summary;
             currentState.history = summaryResult.prunedHistory;
-            saveState();
+            saveState(userId);
         }
     }
 
@@ -548,12 +586,13 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
     for (const faq of knowledge.faq) {
         if (faq.keywords.some(k => new RegExp(`\\b${k}\\b`, 'i').test(normalizedText))) {
-            currentState.history.push({ role: 'bot', content: _formatMessage(faq.response, currentState), timestamp: Date.now() });
-            await sendMessageWithDelay(userId, _formatMessage(faq.response, currentState));
+            const faqMsg = _formatMessage(faq.response, currentState);
+            currentState.history.push({ role: 'bot', content: faqMsg, timestamp: Date.now() });
+            await sendMessageWithDelay(userId, faqMsg);
 
             if (faq.triggerStep) {
                 _setStep(currentState, faq.triggerStep);
-                saveState();
+                saveState(userId);
             }
 
             // REDIRECT: Steer back to the current step's pending question
@@ -624,7 +663,8 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             }
 
             _setStep(currentState, knowledge.flow.greeting.nextStep);
-            saveState();
+            saveState(userId);
+
             matched = true;
             break;
 
@@ -659,24 +699,20 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     const msg = _formatMessage(priceNode.response, currentState);
                     _setStep(currentState, priceNode.nextStep);
                     currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
-                    saveState();
+                    saveState(userId);
                     await sendMessageWithDelay(userId, msg);
 
-                    if (currentState.weightGoal && currentState.weightGoal > 10) {
-                        const upsell = "Personalmente yo te recomendaría el de 120 días debido al peso que esperas perder 👌";
-                        currentState.history.push({ role: 'bot', content: upsell, timestamp: Date.now() });
-                        saveState();
-                        await sendMessageWithDelay(userId, upsell);
-                    }
+                    await _maybeUpsell(currentState, sendMessageWithDelay, userId, saveState);
 
                     matched = true;
                 } else {
                     // Direct script response — NO AI (Normal flow, ask preference)
                     const recNode = knowledge.flow.recommendation;
+                    const recMsg = _formatMessage(recNode.response, currentState);
                     _setStep(currentState, recNode.nextStep);
-                    currentState.history.push({ role: 'bot', content: _formatMessage(recNode.response, currentState), timestamp: Date.now() });
-                    saveState();
-                    await sendMessageWithDelay(userId, _formatMessage(recNode.response, currentState));
+                    currentState.history.push({ role: 'bot', content: recMsg, timestamp: Date.now() });
+                    saveState(userId);
+                    await sendMessageWithDelay(userId, recMsg);
                     matched = true;
                 }
             } else {
@@ -690,9 +726,9 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     const skipMsg = "¡Entiendo, no hay problema! 👌 Pasemos directo a ver qué opción es mejor para vos.\n\nTenemos:\n1️⃣ Cápsulas (Lo más efectivo y práctico)\n2️⃣ Semillas/Infusión (Más natural)\n3️⃣ Gotas (Para >70 años o poquitos kilos)\n\n¿Cuál te gustaría probar?";
                     await sendMessageWithDelay(userId, skipMsg);
 
-                    _setStep(currentState, 'waiting_preference'); // Manually set next step
+                    _setStep(currentState, 'waiting_preference');
                     currentState.history.push({ role: 'bot', content: skipMsg, timestamp: Date.now() });
-                    saveState();
+                    saveState(userId);
                     matched = true;
                 } else {
                     // AI FALLBACK: Try to steer back to script (1st attempt)
@@ -725,28 +761,24 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                             const msg = _formatMessage(priceNode.response, currentState);
                             _setStep(currentState, priceNode.nextStep);
                             currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
-                            saveState();
+                            saveState(userId);
                             await sendMessageWithDelay(userId, msg);
 
-                            if (currentState.weightGoal && currentState.weightGoal > 10) {
-                                const upsell = "Personalmente yo te recomendaría el de 120 días debido al peso que esperas perder 👌";
-                                currentState.history.push({ role: 'bot', content: upsell, timestamp: Date.now() });
-                                saveState();
-                                await sendMessageWithDelay(userId, upsell);
-                            }
+                            await _maybeUpsell(currentState, sendMessageWithDelay, userId, saveState);
 
                             matched = true;
                         } else {
                             const recNode = knowledge.flow.recommendation;
                             _setStep(currentState, recNode.nextStep);
                             currentState.history.push({ role: 'bot', content: _formatMessage(recNode.response, currentState), timestamp: Date.now() });
-                            saveState();
+                            saveState(userId);
                             await sendMessageWithDelay(userId, _formatMessage(recNode.response, currentState));
                             matched = true;
                         }
                     } else if (aiWeight.response) {
                         currentState.history.push({ role: 'bot', content: aiWeight.response, timestamp: Date.now() });
-                        saveState(); // Added saveState here
+                        saveState(userId);
+
                         await sendMessageWithDelay(userId, aiWeight.response);
                         matched = true;
                     }
@@ -761,7 +793,8 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             if (earlyPostdatadoMatch && /\b(recibir|llega|enviar|mandar|cobro|pago|puedo)\b/i.test(normalizedText)) {
                 console.log(`[EARLY POSTDATADO] Captured in waiting_preference: ${text}`);
                 if (!currentState.postdatado) currentState.postdatado = text; // Save it to output later
-                saveState();
+                saveState(userId);
+
             }
 
             // SCRIPT FIRST: Check keywords for capsulas or semillas
@@ -801,7 +834,8 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     await sendMessageWithDelay(userId, aiRecommendation.response);
                     // MARK CONSULTATIVE SALE
                     currentState.consultativeSale = true;
-                    saveState();
+                    saveState(userId);
+
                     matched = true;
                     break;
                 }
@@ -813,15 +847,10 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 const msg = _formatMessage(knowledge.flow.preference_capsulas.response, currentState);
                 _setStep(currentState, knowledge.flow.preference_capsulas.nextStep);
                 currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
-                saveState();
+                saveState(userId);
                 await sendMessageWithDelay(userId, msg);
 
-                if (currentState.weightGoal && currentState.weightGoal > 10) {
-                    const upsell = "Personalmente yo te recomendaría el de 120 días debido al peso que esperas perder 👌";
-                    currentState.history.push({ role: 'bot', content: upsell, timestamp: Date.now() });
-                    saveState();
-                    await sendMessageWithDelay(userId, upsell);
-                }
+                await _maybeUpsell(currentState, sendMessageWithDelay, userId, saveState);
 
                 matched = true;
             } else if (mentionsSemillas) {
@@ -830,15 +859,10 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 const msg = _formatMessage(knowledge.flow.preference_semillas.response, currentState);
                 _setStep(currentState, knowledge.flow.preference_semillas.nextStep);
                 currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
-                saveState();
+                saveState(userId);
                 await sendMessageWithDelay(userId, msg);
 
-                if (currentState.weightGoal && currentState.weightGoal > 10) {
-                    const upsell = "Personalmente yo te recomendaría el de 120 días debido al peso que esperas perder 👌";
-                    currentState.history.push({ role: 'bot', content: upsell, timestamp: Date.now() });
-                    saveState();
-                    await sendMessageWithDelay(userId, upsell);
-                }
+                await _maybeUpsell(currentState, sendMessageWithDelay, userId, saveState);
 
                 matched = true;
             } else if (knowledge.flow.preference_gotas && mentionsGotas) {
@@ -847,15 +871,10 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 const msg = _formatMessage(knowledge.flow.preference_gotas.response, currentState);
                 _setStep(currentState, knowledge.flow.preference_gotas.nextStep);
                 currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
-                saveState();
+                saveState(userId);
                 await sendMessageWithDelay(userId, msg);
 
-                if (currentState.weightGoal && currentState.weightGoal > 10) {
-                    const upsell = "Personalmente yo te recomendaría el de 120 días debido al peso que esperas perder 👌";
-                    currentState.history.push({ role: 'bot', content: upsell, timestamp: Date.now() });
-                    saveState();
-                    await sendMessageWithDelay(userId, upsell);
-                }
+                await _maybeUpsell(currentState, sendMessageWithDelay, userId, saveState);
 
                 matched = true;
             } else {
@@ -888,15 +907,10 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                         const msg = _formatMessage(priceNode.response, currentState);
                         _setStep(currentState, priceNode.nextStep);
                         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
-                        saveState();
+                        saveState(userId);
                         await sendMessageWithDelay(userId, msg);
 
-                        if (currentState.weightGoal && currentState.weightGoal > 10) {
-                            const upsell = "Personalmente yo te recomendaría el de 120 días debido al peso que esperas perder 👌";
-                            currentState.history.push({ role: 'bot', content: upsell, timestamp: Date.now() });
-                            saveState();
-                            await sendMessageWithDelay(userId, upsell);
-                        }
+                        await _maybeUpsell(currentState, sendMessageWithDelay, userId, saveState);
 
                         matched = true;
                     }
@@ -906,7 +920,8 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 // BUT the AI provided a text response anyway (e.g. answering a doubt or extracting non-product data).
                 if (!matched && aiPref.response) {
                     currentState.history.push({ role: 'bot', content: aiPref.response, timestamp: Date.now() });
-                    saveState();
+                    saveState(userId);
+
                     await sendMessageWithDelay(userId, aiPref.response);
                     matched = true;
                 }
@@ -931,7 +946,8 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     _setStep(currentState, knowledge.flow.price_semillas.nextStep);
                 }
                 currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
-                saveState();
+                saveState(userId);
+
                 await sendMessageWithDelay(userId, msg);
                 matched = true;
             } else {
@@ -1019,7 +1035,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 const closingNode = knowledge.flow.closing;
                 _setStep(currentState, closingNode.nextStep);
                 currentState.history.push({ role: 'bot', content: closingNode.response, timestamp: Date.now() });
-                saveState();
+                saveState(userId);
                 await sendMessageWithDelay(userId, closingNode.response);
                 matched = true;
                 return { matched: true };
@@ -1070,7 +1086,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 }
 
                 _setStep(currentState, closingNode.nextStep);
-                saveState();
+                saveState(userId);
                 matched = true;
             } else {
                 // Check for affirmations after an upsell BEFORE consulting AI
@@ -1124,7 +1140,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     }
 
                     _setStep(currentState, closingNode.nextStep);
-                    saveState();
+                    saveState(userId);
                     matched = true;
                 } else {
                     // AI FALLBACK — only if regex didn't match and it wasn't an intercepted affirmation
@@ -1150,7 +1166,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                         const newProd = planAI.extractedData.split(':')[1].trim();
                         console.log(`[FLOW-UPDATE] User changed product to: ${newProd}`);
                         currentState.selectedProduct = newProd;
-                        saveState();
+                        saveState(userId);
                         // Fallthrough to send AI response
                     }
 
@@ -1169,7 +1185,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                                 currentState.history.push({ role: 'bot', content: closingNode.response, timestamp: Date.now() });
                                 await sendMessageWithDelay(userId, closingNode.response);
                             }
-                            saveState();
+                            saveState(userId);
                             matched = true;
                         }
                         // Ultra strict validation to prevent bypassing the plan choice
@@ -1215,7 +1231,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                             }
 
                             _setStep(currentState, closingNode.nextStep);
-                            saveState();
+                            saveState(userId);
                             matched = true;
                         } else {
                             // AI incorrectly marked goalMet=true without getting a plan number
@@ -1270,7 +1286,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 const msg = _formatMessage(knowledge.flow.closing.response, currentState);
                 _setStep(currentState, knowledge.flow.closing.nextStep);
                 currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
-                saveState();
+                saveState(userId);
                 await sendMessageWithDelay(userId, msg);
                 matched = true;
             } else if (_isNegative(normalizedText)) {
@@ -1306,7 +1322,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 const skipMsg = "Antes de los datos de envío, necesito saber qué producto te interesa 😊\n\nTenemos:\n1️⃣ Cápsulas\n2️⃣ Semillas/Infusión\n3️⃣ Gotas\n\n¿Cuál preferís?";
                 _setStep(currentState, 'waiting_preference');
                 currentState.history.push({ role: 'bot', content: skipMsg, timestamp: Date.now() });
-                saveState();
+                saveState(userId);
                 await sendMessageWithDelay(userId, skipMsg);
                 matched = true;
                 break;
@@ -1322,7 +1338,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 const msg = _formatMessage(priceNode.response, currentState);
                 _setStep(currentState, 'waiting_plan_choice');
                 currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
-                saveState();
+                saveState(userId);
                 await sendMessageWithDelay(userId, msg);
                 matched = true;
                 break;
@@ -1388,7 +1404,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                             await sendMessageWithDelay(userId, prefix);
                         }
 
-                        saveState();
+                        saveState(userId);
                         // DO NOT return here! If the user sent address data ("marta pastor, benegas 77") 
                         // in the same burst of messages (debounced by index.js), we must let execution
                         // fall through to AI Address Parsing below, so the data is not lost.
@@ -1418,7 +1434,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                         }
 
                         _setStep(currentState, 'waiting_plan_choice');
-                        saveState();
+                        saveState(userId);
                         matched = true;
                         return; // MUST return to prevent continuing into address processing
                     }
@@ -1432,7 +1448,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     }
 
                     currentState.history.push({ role: 'bot', content: prefixIterated, timestamp: Date.now() });
-                    saveState();
+                    saveState(userId);
                     await sendMessageWithDelay(userId, prefixIterated);
                     // DO NOT return here, allow fall-through to address parser.
                 }
@@ -1468,7 +1484,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
                 if (aiData.response && !_isDuplicate(aiData.response, currentState.history)) {
                     currentState.history.push({ role: 'bot', content: aiData.response, timestamp: Date.now() });
-                    saveState();
+                    saveState(userId);
                     await sendMessageWithDelay(userId, aiData.response);
 
                     // NEW: Update postdatado state if AI handled a future date effectively
@@ -1476,7 +1492,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                         const postdatadoMatch = text.match(/\b(lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo|semana|mes|cobro|mañana|despues|después|principio|el \d+ de [a-z]+|el \d+)\b/i);
                         if (postdatadoMatch) {
                             currentState.postdatado = text;
-                            saveState();
+                            saveState(userId);
                         }
                     }
 
@@ -1546,7 +1562,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     if (data.ciudad && !currentState.partialAddress.ciudad) currentState.partialAddress.ciudad = data.ciudad;
                     if (data.cp && !currentState.partialAddress.cp) currentState.partialAddress.cp = data.cp;
 
-                    saveState();
+                    saveState(userId);
                     matched = true;
                     break;
                 }
@@ -1563,7 +1579,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                         const rejectMsg = "El correo no nos permite cargar direcciones sin la altura de la calle ni esquinas (ej: entre calles). ¿Me confirmás el número exacto o aclaramos 'S/N' (sin número)? 🙏";
                         currentState.history.push({ role: 'bot', content: rejectMsg, timestamp: Date.now() });
                         await sendMessageWithDelay(userId, rejectMsg);
-                        saveState();
+                        saveState(userId);
                         matched = true;
                         break;
                     } else {
@@ -1710,7 +1726,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
                 // Skip waiting_admin_ok and go straight to waiting_final_confirmation
                 _setStep(currentState, 'waiting_final_confirmation');
-                saveState();
+                saveState(userId);
                 matched = true;
             } else if (currentState.addressAttempts >= 5) {
                 // Too many attempts — pause and alert admin (Increased limit from 3 to 5)
@@ -1779,7 +1795,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 await sendMessageWithDelay(userId, msg);
                 currentState.lastAddressMsg = msg; // Track last msg to avoid repeat
                 currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
-                saveState();
+                saveState(userId);
                 matched = true;
             }
             break;
@@ -1837,7 +1853,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
                     await sendMessageWithDelay(userId, summaryMsg);
 
-                    saveState();
+                    saveState(userId);
                     matched = true;
                     return; // Stay in 'waiting_final_confirmation'
                 }
@@ -1893,7 +1909,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
                 _setStep(currentState, 'completed');
                 currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
-                saveState();
+                saveState(userId);
                 matched = true;
             } else if (_isAffirmative(normalizedText) || /\b(si|dale|ok|listo|confirmo|correcto|acepto|bueno|joya|de una)\b/i.test(normalizedText)) {
                 // FINAL SUCCESS (PENDING ADMIN APPROVAL)
@@ -1922,7 +1938,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
                 _setStep(currentState, 'waiting_admin_validation');
                 currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
-                saveState();
+                saveState(userId);
                 matched = true;
             } else {
                 // Not affirmative — alert admin without pausing, still process the order
@@ -1949,7 +1965,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
                 _setStep(currentState, 'waiting_admin_validation');
                 currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
-                saveState();
+                saveState(userId);
                 matched = true;
             }
             break;
@@ -1996,7 +2012,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 currentState.pendingOrder = null;
                 currentState.partialAddress = {};
                 currentState.addressAttempts = 0;
-                saveState();
+                saveState(userId);
 
                 if (postSaleAI.response) {
                     currentState.history.push({ role: 'bot', content: postSaleAI.response, timestamp: Date.now() });
@@ -2039,7 +2055,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 const newDate = postSaleAI.extractedData.replace('POSTDATE:', '').trim();
                 console.log(`[POST-SALE] Customer ${userId} wants to post-date delivery to: ${newDate}`);
                 currentState.postdatado = newDate;
-                saveState();
+                saveState(userId);
 
                 if (dependencies.notifyAdmin) {
                     await dependencies.notifyAdmin('📅 Cliente post-venta posdató envío', userId, `Nueva fecha solicitada: ${newDate}\nMensaje original: "${text}"`);
@@ -2078,7 +2094,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             if (migratedStep) {
                 console.log(`[STALE-STEP] Migrating ${currentState.step} → ${migratedStep}`);
                 _setStep(currentState, migratedStep);
-                saveState();
+                saveState(userId);
                 // Re-process with the correct step (recursive, but only once)
                 return processSalesFlow(userId, text, userState, knowledge, dependencies);
             } else {
@@ -2089,7 +2105,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 currentState.pendingOrder = null;
                 currentState.partialAddress = {};
                 currentState.addressAttempts = 0;
-                saveState();
+                saveState(userId);
                 // Process as new greeting
                 return processSalesFlow(userId, text, userState, knowledge, dependencies);
             }
@@ -2104,7 +2120,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
         if (lastHistory.role === 'bot' && lastHistory.content.includes('por precaución no recomendamos el uso durante el embarazo/lactancia/edad avanzada')) {
             console.log(`[AI MEDICAL REJECT] Intercepted AI rejection for user ${userId}. Halting flow.`);
             _setStep(currentState, 'rejected_medical');
-            saveState();
+            saveState(userId);
             await notifyAdmin('🚨 Rechazo Médico Automático (Vía IA)', userId, `Motivo: la IA detectó embarazo/lactancia o edad avanzada.\nÚltimo mensaje usuario: "${text}"`);
         }
     }
@@ -2133,7 +2149,7 @@ async function _pauseAndAlert(userId, currentState, dependencies, userMessage, r
     // Pause the user (pausedUsers is a Set)
     if (sharedState && sharedState.pausedUsers) {
         sharedState.pausedUsers.add(userId);
-        saveState();
+        saveState(userId);
     }
 
     // NIGHT MODE: Send polite night message
