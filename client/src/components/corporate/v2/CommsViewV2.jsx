@@ -308,12 +308,13 @@ Teléfono: ${phoneDisplay}`;
     };
 
     return (
-        <div className="h-full flex overflow-hidden rounded-[2rem] bg-white/40 backdrop-blur-xl border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] animate-fade-in relative z-10">
-            {/* Background elements inside chat container */}
-            <div className="absolute top-0 right-1/4 w-64 h-64 bg-indigo-400/10 blur-[80px] rounded-full pointer-events-none"></div>
+        <div className="h-full flex flex-col md:flex-row animate-fade-in relative overflow-hidden bg-slate-50/50 rounded-[2rem] border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+            {/* Ambient Background Glow */}
+            <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-400/10 blur-[100px] rounded-full pointer-events-none"></div>
+            <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-400/10 blur-[100px] rounded-full pointer-events-none"></div>
 
             {/* SIDEBAR: Contacts */}
-            <div className={`w-full md:w-72 lg:w-[280px] flex-shrink-0 border-r border-white/50 flex-col bg-white/40 backdrop-blur-md z-10 ${selectedChat ? 'hidden md:flex' : 'flex'}`}>
+            <div className={`w-full md:w-72 lg:w-[300px] flex-shrink-0 border-r border-white/50 flex-col bg-white/40 backdrop-blur-md z-10 ${selectedChat ? 'hidden md:flex' : 'flex'}`}>
                 {/* Search Header */}
                 <div className="p-5 border-b border-white/50 bg-white/30 backdrop-blur-sm">
                     <div className="relative group">
@@ -355,8 +356,8 @@ Teléfono: ${phoneDisplay}`;
                 </div>
             </div>
 
-            {/* CHAT AREA */}
-            <div className={`flex-1 flex-col bg-slate-50/30 backdrop-blur-md relative z-10 ${!selectedChat ? 'hidden md:flex' : 'flex'}`}>
+            {/* MAIN CHAT AREA */}
+            <div className={`flex-1 flex-col min-w-0 bg-transparent relative z-0 ${selectedChat ? 'flex' : 'hidden md:flex'}`}>
                 {selectedChat ? (
                     <>
                         {/* Header */}
@@ -405,9 +406,9 @@ Teléfono: ${phoneDisplay}`;
 
                         {/* Orders Panel */}
                         {showOrdersPanel && selectedChat.hasBought && (
-                            <div className="border-b border-white/60 bg-white/60 backdrop-blur-xl p-5 sm:p-6 z-10 animate-fade-in shadow-sm relative overflow-hidden flex-shrink-0">
-                                <div className="absolute -top-10 -right-10 w-32 h-32 bg-indigo-400/20 blur-[40px] rounded-full pointer-events-none"></div>
-                                <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-purple-400/20 blur-[40px] rounded-full pointer-events-none"></div>
+                            <div className="border-b border-white/60 bg-white/60 backdrop-blur-xl p-4 sm:p-5 z-10 animate-fade-in shadow-sm relative overflow-hidden shrink-0">
+                                <div className="absolute -top-10 -right-10 w-24 h-24 bg-indigo-400/20 blur-[40px] rounded-full pointer-events-none"></div>
+                                <div className="absolute -bottom-10 -left-10 w-24 h-24 bg-purple-400/20 blur-[40px] rounded-full pointer-events-none"></div>
 
                                 <div className="flex justify-between items-center mb-5 relative z-10">
                                     <div className="flex items-center gap-2">
@@ -581,7 +582,7 @@ Teléfono: ${phoneDisplay}`;
 
             {/* RIGHT PANEL - AI & Scripts Context Drawer (V3 Ported to V2) */}
             {selectedChat && showScriptPanel && (
-                <div className="w-full md:w-[380px] lg:w-[450px] shrink-0 border-l border-white/50 bg-slate-50/40 backdrop-blur-xl flex flex-col z-30 overflow-y-auto relative animate-fade-in shadow-[-10px_0_30px_rgba(0,0,0,0.05)] h-full">
+                <div className="w-full md:w-[350px] shrink-0 border-l border-white/50 bg-slate-50/40 backdrop-blur-xl flex flex-col z-30 overflow-y-auto relative animate-fade-in shadow-[-10px_0_30px_rgba(0,0,0,0.05)] h-full">
 
                     <div className="p-5 border-b border-white/50 flex justify-between items-center bg-white/50 shadow-sm z-10 sticky top-0 backdrop-blur-md">
                         <h3 className="font-extrabold text-slate-800 text-[15px] flex items-center gap-2">
