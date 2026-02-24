@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import api from '../../../config/axios';
 import { useSocket } from '../../../context/SocketContext';
 import { API_URL } from '../../../config/api';
@@ -34,6 +34,8 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
     const [summaryText, setSummaryText] = useState(null);
     const [attachment, setAttachment] = useState(null);
     const [sendingMedia, setSendingMedia] = useState(false);
+    const [isTracking, setIsTracking] = useState(false);
+    const [trackingData, setTrackingData] = useState(null);
     const [prices, setPrices] = useState(null);
     const messagesEndRef = useRef(null);
     const scrollContainerRef = useRef(null);
@@ -168,7 +170,7 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
         }
     };
 
-    useEffect(scrollToBottom, [messages]);
+    useLayoutEffect(scrollToBottom, [messages]);
 
     const formatScriptMessage = (text) => {
         if (!text || !prices) return text;
@@ -225,8 +227,22 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
         try {
             const res = await api.get(`/api/summarize/${selectedChat.id}`);
             setSummaryText(res.data.summary || res.data.message);
-        } catch (e) { toast.error('Error generando resumen'); }
+        } catch (e) { toast.error('Error generating resumen'); }
         setSummarizing(false);
+    };
+
+    const handleTrackOrder = async (trackingCode) => {
+        if (!trackingCode) return;
+        setIsTracking(true);
+        setTrackingData(null);
+        try {
+            const res = await api.get(`/api/orders/tracking/${trackingCode}`);
+            setTrackingData(res.data);
+        } catch (e) {
+            toast.error("Error al consultar seguimiento.");
+        } finally {
+            setIsTracking(false);
+        }
     };
 
     const handleFileSelect = (e) => {
@@ -240,6 +256,22 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
         };
         reader.readAsDataURL(file);
         e.target.value = '';
+    };
+
+    const handleCopySale = (order) => {
+        const rawPhone = selectedChat?.id?.split('@')[0] || '';
+        const phoneDisplay = rawPhone.length > 13 ? `Oculto por Anuncio Meta (${rawPhone})` : rawPhone || 'Desconocido';
+
+        const textToCopy = `Nombre: ${selectedChat?.name || 'Cliente'}
+Dirección: ${order.calle}, ${order.ciudad} (CP: ${order.cp})
+Producto: ${order.producto}
+Plan: ${order.plan} Días
+A pagar: ${order.precio}
+Teléfono: ${phoneDisplay}`;
+
+        navigator.clipboard.writeText(textToCopy)
+            .then(() => toast.success('Venta copiada al portapapeles'))
+            .catch(() => toast.error('Error al copiar venta'));
     };
 
     const handleSendMedia = async () => {
@@ -299,14 +331,11 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
                 {/* Contact List */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
                     {filteredChats.map(chat => (
-                        <div key={chat.id} onClick={() => setSelectedChat(chat)} className={`p-4 mb-2 rounded-2xl flex gap-4 cursor-pointer transition-all duration-300 ${selectedChat?.id === chat.id ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/30 transform scale-[1.02]' : 'hover:bg-white/80'}`}>
-                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-sm shadow-inner relative flex-shrink-0 ${selectedChat?.id === chat.id ? 'bg-white/20 text-white' : 'bg-gradient-to-br from-indigo-50 to-blue-50 text-indigo-700'}`}>
-                                {chat.name.substring(0, 2).toUpperCase()}
-                                {chat.isPaused && <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full border-2 border-white/50"></span>}
-                            </div>
+                        <div key={chat.id} onClick={() => setSelectedChat(chat)} className={`p-4 mb-2 rounded-2xl flex cursor-pointer transition-all duration-300 ${selectedChat?.id === chat.id ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/30 transform scale-[1.02]' : 'hover:bg-white/80'}`}>
                             <div className="flex-1 min-w-0">
                                 <div className="flex justify-between items-start mb-1 gap-2">
-                                    <h3 className={`font-extrabold text-sm truncate flex flex-wrap items-center gap-1 ${selectedChat?.id === chat.id ? 'text-white' : 'text-slate-800'}`}>
+                                    <h3 className={`font-extrabold text-sm truncate flex flex-wrap items-center gap-1.5 ${selectedChat?.id === chat.id ? 'text-white' : 'text-slate-800'}`}>
+                                        {chat.isPaused && <span className="w-2 h-2 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)] animate-pulse" title="Bot Pausado"></span>}
                                         <span className="truncate max-w-[120px]">{chat.name}</span>
                                         {chat.hasBought && <span title="Cliente Recurrente" className="inline-flex items-center text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-md font-extrabold shadow-sm"><IconsV2.Cart className="w-2.5 h-2.5 mr-0.5" /> Cliente</span>}
                                     </h3>
@@ -357,9 +386,8 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
 
                             <div className="flex items-center gap-1 sm:gap-3 overflow-x-auto custom-scrollbar no-scrollbar scroll-smooth pl-2 py-2">
                                 {selectedChat.hasBought && (
-                                    <button onClick={() => setShowOrdersPanel(!showOrdersPanel)} className="p-2 sm:p-3 flex-shrink-0 rounded-xl bg-emerald-100/80 text-emerald-700 hover:bg-emerald-200 hover:shadow-md transition-all flex items-center gap-2" title="Registro de Compras">
+                                    <button onClick={() => setShowOrdersPanel(!showOrdersPanel)} className="p-2 sm:p-3 flex-shrink-0 rounded-xl bg-emerald-100/80 text-emerald-700 hover:bg-emerald-200 hover:shadow-md transition-all" title="Registro de Compras">
                                         <IconsV2.Cart className="w-5 h-5" />
-                                        <span className="text-xs font-bold hidden xl:inline">Pedidos</span>
                                     </button>
                                 )}
 
@@ -369,37 +397,128 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
                                 <button onClick={handleToggleBot} className={`p-2 sm:p-3 flex-shrink-0 rounded-xl text-white shadow-md transition-all ${selectedChat.isPaused ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:scale-105' : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:scale-105'}`} title={selectedChat.isPaused ? 'Reactivar Bot' : 'Pausar Bot'}>
                                     {selectedChat.isPaused ? <IconsV2.Play /> : <IconsV2.Pause />}
                                 </button>
-                                <button onClick={() => setShowScriptPanel(!showScriptPanel)} className="flex items-center gap-2 px-3 sm:px-5 py-2 sm:py-3 flex-shrink-0 rounded-xl bg-gradient-to-r from-slate-800 to-slate-700 text-white font-bold text-sm hover:shadow-lg transition-all active:scale-95">
+                                <button onClick={() => setShowScriptPanel(!showScriptPanel)} className="p-2 sm:p-3 flex-shrink-0 rounded-xl bg-gradient-to-r from-slate-800 to-slate-700 text-white hover:shadow-lg transition-all active:scale-95" title="Guión">
                                     <IconsV2.Script />
-                                    <span className="hidden sm:inline">Guión</span>
                                 </button>
                             </div>
                         </div>
 
-                        {/* Orders Panel (Kept inside Chat if opened via Header) */}
+                        {/* Orders Panel */}
                         {showOrdersPanel && selectedChat.hasBought && (
-                            <div className="border-b border-white border-opacity-50 bg-emerald-800/90 backdrop-blur-xl p-6 z-20 animate-fade-in shadow-xl">
-                                <div className="flex justify-between items-center mb-4">
-                                    <p className="text-[10px] font-bold text-emerald-300 uppercase tracking-widest">Historial de Compras ({selectedChat.pastOrders?.length || 0})</p>
-                                    <button onClick={() => setShowOrdersPanel(false)} className="text-emerald-200 hover:text-white bg-white/10 p-1.5 rounded-lg">✕</button>
+                            <div className="border-b border-white/60 bg-white/60 backdrop-blur-xl p-5 sm:p-6 z-10 animate-fade-in shadow-sm relative overflow-hidden flex-shrink-0">
+                                <div className="absolute -top-10 -right-10 w-32 h-32 bg-emerald-400/20 blur-[40px] rounded-full pointer-events-none"></div>
+                                <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-indigo-400/20 blur-[40px] rounded-full pointer-events-none"></div>
+
+                                <div className="flex justify-between items-center mb-5 relative z-10">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-8 h-8 rounded-xl bg-emerald-100/80 text-emerald-600 flex items-center justify-center shadow-sm">
+                                            <IconsV2.Cart className="w-4 h-4" />
+                                        </div>
+                                        <h3 className="font-extrabold text-slate-800 tracking-tight text-sm">Registro de Pedidos</h3>
+                                        <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-full">{selectedChat.pastOrders?.length || 0}</span>
+                                    </div>
+                                    <button onClick={() => setShowOrdersPanel(false)} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-rose-500 bg-white/50 hover:bg-rose-50 rounded-xl transition-all border border-transparent shadow-sm hover:border-rose-100">✕</button>
                                 </div>
-                                <div className="flex flex-col gap-3 max-h-60 overflow-y-auto custom-scrollbar">
+
+                                <div className="flex flex-col gap-5 max-h-[60vh] overflow-y-auto custom-scrollbar relative z-10 pr-1 pb-4">
                                     {selectedChat.pastOrders?.map((order, i) => (
-                                        <div key={i} className="bg-white/10 border border-white/20 p-4 rounded-xl flex justify-between items-center">
-                                            <div>
-                                                <p className="text-emerald-300 font-bold text-xs tracking-wide uppercase mb-1">{order.createdAt || 'Fecha desconocida'} • {order.status}</p>
-                                                <p className="text-white font-extrabold text-sm">{order.producto} ({order.plan} días)</p>
-                                                <p className="text-emerald-100 font-medium text-xs mt-1">Dir: {order.calle}, {order.ciudad} • CP: {order.cp}</p>
-                                                <p className="text-white font-bold text-sm mt-2">{order.precio}</p>
+                                        <div key={i} className="bg-white border border-slate-200 p-5 rounded-2xl flex flex-col shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+
+                                            {/* Header de Tarjeta */}
+                                            <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="px-3 py-1 bg-indigo-50 text-indigo-700 text-[10px] font-black uppercase tracking-widest rounded-lg border border-indigo-100">{order.status || 'Completado'}</span>
+                                                    <span className="text-[11px] font-bold text-slate-400 font-mono">{order.createdAt || 'Fecha desconocida'}</span>
+                                                </div>
+                                                <button onClick={() => handleCopySale(order)} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-indigo-600 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors shadow-sm">
+                                                    <IconsV2.Script className="w-3 h-3" /> Copiar Venta
+                                                </button>
                                             </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                {/* Columna 1: Destino y Logística */}
+                                                <div>
+                                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Destino de Entrega</h4>
+                                                    <div className="space-y-3">
+                                                        <div className="grid grid-cols-2 gap-2 text-[12px]">
+                                                            <div>
+                                                                <span className="text-slate-500 font-medium">Ubicación:</span>
+                                                                <p className="font-bold text-slate-800">{order.ciudad}</p>
+                                                            </div>
+                                                            <div>
+                                                                <span className="text-slate-500 font-medium">C. Postal:</span>
+                                                                <p className="font-bold text-slate-800">{order.cp || '-'}</p>
+                                                            </div>
+                                                            <div className="col-span-2">
+                                                                <span className="text-slate-500 font-medium">Domicilio:</span>
+                                                                <p className="font-bold text-slate-800">{order.calle || '-'}</p>
+                                                            </div>
+                                                        </div>
+
+                                                        {order.tracking && (
+                                                            <div className="pt-3 mt-3 border-t border-slate-100 flex flex-col gap-2">
+                                                                <div className="flex items-center justify-between">
+                                                                    <div>
+                                                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">Tracking TCA</span>
+                                                                        <span className="font-mono text-xs font-bold text-slate-700">{order.tracking}</span>
+                                                                    </div>
+                                                                    <button onClick={() => handleTrackOrder(order.tracking)} disabled={isTracking} className="bg-blue-50 hover:bg-blue-100 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors border border-blue-200 flex items-center gap-1.5 disabled:opacity-50">
+                                                                        {isTracking ? 'Consultando...' : '🔍 Rastrear'}
+                                                                    </button>
+                                                                </div>
+
+                                                                {/* Historial Tracking */}
+                                                                {trackingData && (
+                                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2 max-h-40 overflow-y-auto custom-scrollbar mt-2 shadow-inner">
+                                                                        {trackingData.success ? (
+                                                                            trackingData.events && trackingData.events.length > 0 ? (
+                                                                                <div className="space-y-2">
+                                                                                    {trackingData.events.map((ev, i) => (
+                                                                                        <div key={i} className="bg-white p-2 rounded flex flex-col shadow-sm text-[10px] border border-slate-100">
+                                                                                            <span className="font-bold text-slate-700">{ev.fecha} - <span className="text-blue-500">{ev.planta}</span></span>
+                                                                                            <span className="text-slate-500 line-clamp-2">{ev.historia}</span>
+                                                                                        </div>
+                                                                                    ))}
+                                                                                </div>
+                                                                            ) : <p className="text-xs text-slate-500 italic">Aún no hay movimientos</p>
+                                                                        ) : <p className="text-xs text-rose-500 font-bold">Tracking Inválido</p>}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Columna 2: Mercadería */}
+                                                <div className="md:border-l md:border-slate-100 md:pl-6">
+                                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Mercadería Adquirida</h4>
+                                                    <div className="space-y-3">
+                                                        <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                                                            <p className="text-slate-800 font-extrabold text-sm mb-1">{order.producto}</p>
+                                                            <p className="text-indigo-600 font-bold text-[11px]">Tratamiento de {order.plan} días</p>
+                                                        </div>
+
+                                                        <div className="flex justify-between items-end pt-2">
+                                                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">A Pagar</span>
+                                                            <span className="text-emerald-600 font-black text-xl">${order.precio?.replace(/\D/g, '') || '0'}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
                                         </div>
                                     ))}
+                                    {(!selectedChat.pastOrders || selectedChat.pastOrders.length === 0) && (
+                                        <div className="text-center p-8 bg-slate-50 rounded-2xl border border-slate-100 border-dashed">
+                                            <p className="text-slate-400 font-medium text-sm">No hay registros de compras anteriores.</p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}
 
                         {/* Messages Area */}
-                        <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto p-8 space-y-6 custom-scrollbar scroll-smooth">
+                        <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 pt-8 pb-2 space-y-6 custom-scrollbar">
                             {loading ? (
                                 <div className="w-full h-full flex items-center justify-center">
                                     <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
@@ -418,7 +537,7 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
                         </div>
 
                         {/* Input Area */}
-                        <div className="flex-shrink-0 p-2 sm:p-6 bg-white/50 backdrop-blur-md border-t border-white/60 z-20 mb-safe-bottom">
+                        <div className="flex-shrink-0 p-3 sm:px-6 sm:py-4 bg-white/50 backdrop-blur-md border-t border-white/60 z-20 mb-safe-bottom">
                             {attachment && (
                                 <div className="mb-2 p-3 sm:p-4 bg-white/80 rounded-2xl border border-indigo-100 shadow-sm flex items-center gap-4">
                                     <img src={attachment.preview} alt="Preview" className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-xl" />

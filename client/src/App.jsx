@@ -3,7 +3,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { SocketProvider } from './context/SocketContext';
 import { ToastProvider } from './components/ui/Toast';
 import CorporateDashboardV2 from './pages/designs/v2/CorporateDashboardV2';
-import CorporateDashboardV3 from './pages/designs/v3/CorporateDashboardV3';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 
@@ -33,12 +32,6 @@ function App() {
                                     </ProtectedRoute>
                                 } />
 
-                                {/* Protected Route - Corporate Enterprise V3 (Next-Gen Redesign) */}
-                                <Route path="/v3/*" element={
-                                    <ProtectedRoute>
-                                        <CorporateDashboardV3 />
-                                    </ProtectedRoute>
-                                } />
 
                                 {/* Catch all - Redirect to Home */}
                                 <Route path="*" element={<Navigate to="/" replace />} />
