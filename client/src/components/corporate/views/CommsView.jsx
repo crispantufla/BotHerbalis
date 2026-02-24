@@ -627,90 +627,30 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
                                 </div>
                             </div>
 
-                            {/* Actions Toolbar */}
+                            {/* Actions Toolbar Modernized (V3 to V2 Import) */}
                             <div className="flex items-center gap-2">
-                                {/* AI Summarize Button */}
-                                <button
-                                    onClick={handleSummarize}
-                                    disabled={summarizing || messages.length === 0}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition bg-violet-100 text-violet-700 hover:bg-violet-200 disabled:opacity-50"
-                                    title="Generar resumen IA de esta conversación"
-                                >
-                                    {summarizing ? (
-                                        <div className="w-4 h-4 border-2 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
-                                    ) : (
-                                        <Icons.AI />
-                                    )}
-                                    {summarizing ? 'RESUMIENDO...' : 'RESUMIR IA'}
-                                </button>
-
                                 <button
                                     onClick={handleToggleBot}
-                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition ${selectedChat.isPaused ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'}`}
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all shadow-sm ${selectedChat.isPaused
+                                        ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200'
+                                        : 'bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200'
+                                        }`}
                                 >
-                                    {selectedChat.isPaused ? <><Icons.Play /> REACTIVAR BOT</> : <><Icons.Pause /> PAUSAR BOT</>}
-                                </button>
-                                <button
-                                    onClick={handleClearChat}
-                                    title="Borrar historial y reiniciar flow"
-                                    className="p-2 hover:bg-rose-100 rounded text-slate-400 hover:text-rose-600 transition"
-                                >
-                                    <Icons.Trash />
+                                    {selectedChat.isPaused ? <><Icons.Play /> REACTIVAR IA</> : <><Icons.Pause /> PAUSAR IA</>}
                                 </button>
 
-                                {/* Script Panel Toggle */}
+                                <span className="w-px h-6 bg-slate-200 mx-1"></span>
+
                                 <button
                                     onClick={() => setShowScriptPanel(!showScriptPanel)}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition ${showScriptPanel ? 'bg-teal-600 text-white' : 'bg-teal-100 text-teal-700 hover:bg-teal-200'}`}
-                                    title="Mostrar pasos del guión para envío rápido"
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all border ${showScriptPanel ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                                    title="Abrir Asistente IA (Resumen y Guiones)"
                                 >
-                                    <Icons.Script />
-                                    GUIÓN
-                                    <span className={`transition-transform ${showScriptPanel ? 'rotate-180' : ''}`}><Icons.ChevronDown /></span>
+                                    <Icons.AI />
+                                    ASISTENTE IA
                                 </button>
                             </div>
                         </div>
-
-                        {/* AI Summary Banner */}
-                        {summaryText && (
-                            <div className="mx-6 mt-3 p-4 bg-violet-50 border border-violet-200 rounded-lg animate-fade-in relative">
-                                <button
-                                    onClick={() => setSummaryText(null)}
-                                    className="absolute top-2 right-2 text-violet-400 hover:text-violet-600 text-xs"
-                                >✕</button>
-                                <div className="flex items-start gap-2">
-                                    <span className="text-violet-600 mt-0.5"><Icons.AI /></span>
-                                    <div>
-                                        <p className="text-xs font-bold text-violet-700 uppercase tracking-wide mb-1">Resumen IA</p>
-                                        <p className="text-sm text-violet-800 whitespace-pre-wrap leading-relaxed">{summaryText}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Script Steps Panel */}
-                        {showScriptPanel && Object.keys(scriptFlow).length > 0 && (
-                            <div className="border-b border-slate-200 bg-teal-50/50 animate-fade-in">
-                                <div className="px-4 py-3">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <p className="text-[10px] font-bold text-teal-700 uppercase tracking-wider">📋 Pasos del Guión — Click para enviar</p>
-                                        <span className="text-[10px] text-teal-500 font-mono">{Object.keys(scriptFlow).length} pasos</span>
-                                    </div>
-                                    <div className="flex flex-wrap gap-1.5">
-                                        {Object.entries(scriptFlow).map(([key, step]) => (
-                                            <button
-                                                key={key}
-                                                onClick={() => handleSendScriptStep(key)}
-                                                className="px-2.5 py-1.5 bg-white border border-teal-200 rounded text-[11px] font-medium text-teal-800 hover:bg-teal-100 hover:border-teal-300 transition truncate max-w-[180px] shadow-sm"
-                                                title={step.response?.substring(0, 100) + '...'}
-                                            >
-                                                {key.replace(/_/g, ' ')}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
 
                         {/* Messages */}
                         <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
@@ -896,6 +836,83 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
                                 </div>
                             </div>
                         ) : null}
+                    </div>
+                </div>
+            )}
+
+            {/* 4. RIGHT PANEL - AI & Scripts Context Drawer (Imported from V3) */}
+            {selectedChat && showScriptPanel && (
+                <div className="w-[320px] shrink-0 border-l border-slate-200 bg-slate-50 flex flex-col z-30 overflow-y-auto animate-fade-in relative shadow-[-4px_0_24px_-12px_rgba(0,0,0,0.05)]">
+
+                    <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-white shadow-sm z-10">
+                        <h3 className="font-extrabold text-slate-800 text-sm flex items-center gap-2">
+                            <Icons.AI /> Asistente IA
+                        </h3>
+                        <button onClick={() => setShowScriptPanel(false)} className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors">
+                            <span className="text-xl leading-none">&times;</span>
+                        </button>
+                    </div>
+
+                    <div className="p-5 flex-1 flex flex-col gap-6 custom-scrollbar">
+
+                        {/* Summary Block */}
+                        <div>
+                            <div className="flex justify-between items-center mb-3">
+                                <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Contexto IA</h4>
+                                <button onClick={handleSummarize} disabled={summarizing || messages.length === 0} className="text-[10px] font-bold text-indigo-700 bg-indigo-100 px-2 py-1 rounded hover:bg-indigo-200 transition-colors disabled:opacity-50">
+                                    {summarizing ? 'Generando...' : 'Resumir Chat'}
+                                </button>
+                            </div>
+                            <div className="bg-white border border-slate-200 rounded-xl p-4 text-xs font-medium text-slate-600 shadow-sm min-h-[100px] relative">
+                                {summaryText ? (
+                                    <div className="whitespace-pre-wrap leading-relaxed">
+                                        {summaryText}
+                                        <button onClick={() => setSummaryText(null)} className="absolute top-2 right-2 text-slate-300 hover:text-slate-500 bg-white rounded-full p-0.5"><Icons.Trash /></button>
+                                    </div>
+                                ) : (
+                                    <span className="text-slate-400 italic flex items-center h-full justify-center text-center">Haz clic en resumir para analizar la intención de compra del cliente.</span>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Script Injection */}
+                        <div className="flex-1">
+                            <div className="flex items-center justify-between mb-3">
+                                <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Guión Sugerido</h4>
+                                <span className="bg-slate-200 text-slate-600 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase">{selectedChat.assignedScript || 'V3'}</span>
+                            </div>
+
+                            {Object.keys(scriptFlow).length > 0 ? (
+                                <div className="space-y-2">
+                                    {Object.keys(scriptFlow).map((stepKey) => {
+                                        const step = scriptFlow[stepKey];
+                                        if (!step?.response) return null;
+                                        return (
+                                            <button
+                                                key={stepKey}
+                                                onClick={() => {
+                                                    // Pausar bot automáticamente al inyectar humano
+                                                    if (!selectedChat.isPaused) handleToggleBot();
+                                                    setInput(formatScriptMessage(step.response));
+                                                }}
+                                                className="w-full text-left p-3 rounded-lg border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 transition-colors group cursor-pointer bg-white shadow-sm"
+                                            >
+                                                <div className="flex items-center justify-between mb-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest group-hover:text-indigo-600">
+                                                    <span>{stepKey.replace(/_/g, ' ')}</span>
+                                                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">Insertar +</span>
+                                                </div>
+                                                <p className="text-[11px] text-slate-600 font-medium line-clamp-3 leading-relaxed">
+                                                    {formatScriptMessage(step.response)}
+                                                </p>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <p className="text-xs text-slate-400 italic text-center mt-4">No hay pasos de guión configurados.</p>
+                            )}
+                        </div>
+
                     </div>
                 </div>
             )}

@@ -26,6 +26,8 @@ const SalesViewV3 = ({ onGoToChat }) => {
     const [editingOrder, setEditingOrder] = useState(null);
     const [editStatus, setEditStatus] = useState('');
     const [editTracking, setEditTracking] = useState('');
+    const [trackingData, setTrackingData] = useState(null);
+    const [isTracking, setIsTracking] = useState(false);
 
     const fetchOrders = async () => {
         setLoading(true);
@@ -96,6 +98,20 @@ const SalesViewV3 = ({ onGoToChat }) => {
     };
 
     const statusOptions = ['Pendiente', 'Confirmado', 'Enviado', 'Entregado', 'Cancelado'];
+
+    const handleTrackOrder = async (trackingCode) => {
+        if (!trackingCode) return;
+        setIsTracking(true);
+        setTrackingData(null);
+        try {
+            const res = await api.get(`/api/orders/tracking/${trackingCode}`);
+            setTrackingData(res.data);
+        } catch (e) {
+            toast.error("Error al consultar seguimiento.");
+        } finally {
+            setIsTracking(false);
+        }
+    };
 
     // Status visual map for V3
     const getStatusStyle = (status) => {
@@ -219,7 +235,7 @@ const SalesViewV3 = ({ onGoToChat }) => {
             {/* VIEW/EDIT MODAL OVERLAY */}
             {(viewingOrder || editingOrder) && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => { setViewingOrder(null); setEditingOrder(null); }}></div>
+                    <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => { setViewingOrder(null); setEditingOrder(null); setTrackingData(null); }}></div>
 
                     <div className="bg-white rounded-[2.5rem] w-full max-w-2xl max-h-[90vh] overflow-y-auto relative z-10 shadow-2xl animate-scale-up border border-slate-100">
                         {/* Header Image Gradient */}
@@ -288,8 +304,44 @@ const SalesViewV3 = ({ onGoToChat }) => {
                                         <h4 className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-4 border-b pb-2">Bitácora Interna</h4>
                                         <div className="grid grid-cols-1 gap-4">
                                             <p className="text-sm"><b>Status Operativo:</b> <span className={`px-2 py-0.5 rounded ml-1 text-xs font-bold ${getStatusStyle(viewingOrder.status || 'Pendiente')}`}>{viewingOrder.status || 'Pendiente'}</span></p>
-                                            <p className="text-sm"><b>Tracking:</b> {viewingOrder.tracking ? <span className="font-mono bg-slate-100 px-2 py-1 rounded text-slate-800 tracking-wide">{viewingOrder.tracking}</span> : 'A la espera de carga.'}</p>
-                                            {viewingOrder.postdatado && <p className="text-sm text-amber-600 bg-amber-50 p-3 rounded-xl border border-amber-100"><b>Aviso Postdatado:</b> Entregar a partir de {viewingOrder.postdatado}</p>}
+
+                                            <div className="text-sm flex flex-col items-start gap-2">
+                                                <div>
+                                                    <b>Tracking:</b> {viewingOrder.tracking ? <span className="font-mono bg-slate-100 px-2 py-1 rounded text-slate-800 tracking-wide">{viewingOrder.tracking}</span> : 'A la espera de carga.'}
+                                                    {viewingOrder.tracking && (
+                                                        <button
+                                                            onClick={() => handleTrackOrder(viewingOrder.tracking)}
+                                                            disabled={isTracking}
+                                                            className="ml-3 text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1 rounded-lg font-bold transition flex-inline items-center gap-1"
+                                                        >
+                                                            {isTracking ? 'Consultando...' : '🔍 Rastrear en Vivo'}
+                                                        </button>
+                                                    )}
+                                                </div>
+
+                                                {trackingData && (
+                                                    <div className="mt-2 text-xs bg-slate-100 p-3 rounded-xl border border-slate-200 w-full">
+                                                        {trackingData.success ? (
+                                                            trackingData.events && trackingData.events.length > 0 ? (
+                                                                <div className="space-y-3">
+                                                                    {trackingData.events.map((ev, i) => (
+                                                                        <div key={i} className="flex flex-col bg-white p-2 rounded-lg shadow-sm border border-slate-100">
+                                                                            <span className="font-bold text-slate-800 border-b pb-1 mb-1">{ev.fecha} - <span className="text-blue-600">{ev.planta}</span></span>
+                                                                            <span className="text-slate-600 font-medium">{ev.historia}</span>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            ) : (
+                                                                <p className="text-slate-600 italic font-medium">{trackingData.message || "Sin movimientos aún en el Correo."}</p>
+                                                            )
+                                                        ) : (
+                                                            <p className="text-rose-600 font-bold">{trackingData.error || "Código de seguimiento incorrecto o no encontrado."}</p>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {viewingOrder.postdatado && <p className="text-sm text-amber-600 bg-amber-50 p-3 rounded-xl border border-amber-100 mt-2"><b>Aviso Postdatado:</b> Entregar a partir de {viewingOrder.postdatado}</p>}
                                         </div>
                                     </div>
 

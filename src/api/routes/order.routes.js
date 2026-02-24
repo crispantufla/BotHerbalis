@@ -88,5 +88,20 @@ module.exports = (client, sharedState) => {
         res.json({ success: true, deleted });
     });
 
+    // GET /orders/tracking/:code (Rastrear envío en Correo Argentino) - Authenticated
+    router.get('/orders/tracking/:code', authMiddleware, async (req, res) => {
+        const { code } = req.params;
+        if (!code || code.length < 8) return res.status(400).json({ error: "Código inválido" });
+
+        try {
+            const { getTrackingNacional } = require('../../../bot/correoTracker');
+            const result = await getTrackingNacional(code);
+            res.json(result);
+        } catch (e) {
+            console.error('🔴 [ROUTES] Error consultando tracking:', e);
+            res.status(500).json({ error: "Error interno rastreando el código." });
+        }
+    });
+
     return router;
 };

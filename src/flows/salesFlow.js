@@ -314,6 +314,22 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
         return { matched: true };
     }
 
+    // ─────────────────────────────────────────────────
+    // GLOBAL MEDICAL REJECT (Lactancia / Embarazo / +80)
+    // ─────────────────────────────────────────────────
+    const MEDICAL_REJECT_REGEX = /\b(embarazada|embarazo|lactancia|lactar|amamantar|amamantando|dando la teta|dando el pecho|8[0-9]\s*a[ñn]os|9[0-9]\s*a[ñn]os)\b/i;
+    if (MEDICAL_REJECT_REGEX.test(normalizedText) && !isNegative) {
+        console.log(`[MEDICAL REJECT] User ${userId} mentioned contraindicated condition.`);
+        const msg = "Lamentablemente, por precaución, no recomendamos el uso de la Nuez de la India durante el embarazo, la lactancia o en personas mayores de 80 años. Priorizamos tu salud por encima de todo. 🌿😊\n\nSi igual es para otra persona abonando en tu domicilio, avisame y seguimos. De lo contrario, damos por finalizada la consulta. ¡Cuidate mucho!";
+        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        await sendMessageWithDelay(userId, msg);
+
+        await notifyAdmin('🚨 Rechazo Médico Automático', userId, `Motivo: el cliente mencionó embarazo/lactancia o edad avanzada.\nMensaje original: "${text}"`);
+        _setStep(currentState, 'rejected_medical');
+        saveState();
+        return { matched: true };
+    }
+
     // Helper: Save extracted data locally if needed
     function _handleExtractedData(userId, extractedData, currentState) {
         if (!extractedData || extractedData === 'null') return;
@@ -1965,7 +1981,20 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
     }
 
     // ─────────────────────────────────────────────────
-    // 3. SAFETY NET: If nothing matched → Pause + Alert Admin
+    // 3. POST-PROCESSING MEDICAL REJECT CHECK
+    // ─────────────────────────────────────────────────
+    if (currentState.history && currentState.history.length > 0) {
+        const lastHistory = currentState.history[currentState.history.length - 1];
+        if (lastHistory.role === 'bot' && lastHistory.content.includes('por precaución no recomendamos el uso durante el embarazo/lactancia/edad avanzada')) {
+            console.log(`[AI MEDICAL REJECT] Intercepted AI rejection for user ${userId}. Halting flow.`);
+            _setStep(currentState, 'rejected_medical');
+            saveState();
+            await notifyAdmin('🚨 Rechazo Médico Automático (Vía IA)', userId, `Motivo: la IA detectó embarazo/lactancia o edad avanzada.\nÚltimo mensaje usuario: "${text}"`);
+        }
+    }
+
+    // ─────────────────────────────────────────────────
+    // 4. SAFETY NET: If nothing matched → Pause + Alert Admin
     // ─────────────────────────────────────────────────
     if (!matched) {
         console.log(`[PAUSE] No match for user ${userId} at step "${currentState.step}". Pausing and alerting admin.`);
