@@ -97,15 +97,12 @@ module.exports = (client, sharedState) => {
         const { id } = req.params;
 
         try {
-            const { prisma } = require('../../../index');
+            const { prisma } = require('../../../db');
 
             // 1. Delete from DB
             await prisma.order.delete({ where: { id } });
 
-            // 2. Delete from Google Sheets (Async fallback)
-            deleteOrderInSheet(id).catch(e =>
-                console.error('🔴 [ROUTES] Error deleting from Sheets:', e.message)
-            );
+            // (Google Sheets fallback removed via DB migration)
 
             if (io) io.emit('order_delete', { id });
             res.json({ success: true, deleted: { id } });
