@@ -331,7 +331,7 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
                 {selectedChat ? (
                     <>
                         {/* Header */}
-                        <div className="flex-shrink-0 min-h-[5rem] border-b border-white/50 flex items-center justify-between px-3 sm:px-8 bg-white/50 backdrop-blur-md shadow-[0_2px_10px_rgba(0,0,0,0.02)] z-20 overflow-x-auto custom-scrollbar no-scrollbar">
+                        <div className="flex-shrink-0 min-h-[5rem] border-b border-white/50 flex items-center justify-between px-3 sm:px-8 bg-white/50 backdrop-blur-md shadow-[0_2px_10px_rgba(0,0,0,0.02)] z-20 overflow-x-auto custom-scrollbar no-scrollbar py-2">
                             <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
                                 <button onClick={() => setSelectedChat(null)} className="md:hidden p-2 -ml-1 text-slate-500 hover:bg-slate-200 rounded-full transition-colors flex-shrink-0">
                                     <IconsV2.ArrowLeft />
@@ -355,7 +355,7 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-1 sm:gap-3 overflow-x-auto custom-scrollbar no-scrollbar scroll-smooth pl-2">
+                            <div className="flex items-center gap-1 sm:gap-3 overflow-x-auto custom-scrollbar no-scrollbar scroll-smooth pl-2 py-2">
                                 {selectedChat.hasBought && (
                                     <button onClick={() => setShowOrdersPanel(!showOrdersPanel)} className="p-2 sm:p-3 flex-shrink-0 rounded-xl bg-emerald-100/80 text-emerald-700 hover:bg-emerald-200 hover:shadow-md transition-all flex items-center gap-2" title="Registro de Compras">
                                         <IconsV2.Cart className="w-5 h-5" />
