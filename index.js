@@ -4,7 +4,7 @@ const qrcode = require('qrcode-terminal');
 const { exec } = require('child_process'); // For sound
 const { logMessage } = require('./logger'); // Import Logger
 const { analyzeDailyLogs } = require('./analyze_day'); // Import Analyzer
-const { appendOrderToSheet } = require('./sheets_sync');
+const { appendOrderToSheet, updateOrderInSheet } = require('./sheets_sync');
 const fs = require('fs');
 const path = require('path');
 const { atomicWriteFile } = require('./safeWrite');
@@ -324,6 +324,52 @@ function saveOrderToLocal(order) {
     }).catch(e => console.error('[ORDER] Write queue error:', e.message));
 }
 
+// Helper: Cancel Latest User Order
+function cancelLatestOrder(userId) {
+    return new Promise((resolve) => {
+        _orderWriteQueue = _orderWriteQueue.then(async () => {
+            try {
+                let orders = [];
+                if (fs.existsSync(ORDERS_FILE)) {
+                    orders = JSON.parse(fs.readFileSync(ORDERS_FILE));
+                }
+                const phone = userId.split('@')[0].replace(/\D/g, '');
+
+                let foundOrderIdx = -1;
+                for (let i = orders.length - 1; i >= 0; i--) {
+                    const cl = (orders[i].cliente || '').replace(/\D/g, '');
+                    if (cl === phone || cl.includes(phone) || phone.includes(cl)) {
+                        foundOrderIdx = i;
+                        break;
+                    }
+                }
+
+                if (foundOrderIdx === -1) {
+                    return resolve({ success: false, reason: "NOT_FOUND" });
+                }
+
+                const targetOrder = orders[foundOrderIdx];
+                if (targetOrder.status !== 'Pendiente' && targetOrder.status !== 'Confirmado') {
+                    return resolve({ success: false, reason: "INVALID_STATUS", currentStatus: targetOrder.status });
+                }
+
+                targetOrder.status = 'Cancelado';
+                atomicWriteFile(ORDERS_FILE, JSON.stringify(orders, null, 2));
+                if (sharedState.io) sharedState.io.emit('order_update', targetOrder);
+
+                try {
+                    await updateOrderInSheet(targetOrder.id, { status: 'Cancelado' });
+                } catch (e) { console.error('[CANCEL] Sheet Error:', e.message); }
+
+                resolve({ success: true, order: targetOrder });
+            } catch (err) {
+                console.error('[CANCEL] Error canceling:', err.message);
+                resolve({ success: false, reason: "ERROR" });
+            }
+        });
+    });
+}
+
 // Helper: Send with Delay (async/await — messages arrive in order)
 const sendMessageWithDelay = async (chatId, content, startTime = Date.now()) => {
     // Standard fast delay to ensure responsiveness regardless of time
@@ -592,7 +638,7 @@ client.on('message', async msg => {
                     logAndEmit(userId, 'user', `MEDIA_AUDIO:${audioUrl}|TRANSCRIPTION:${transcription}`, userState[userId]?.step || 'new');
                     const startTime = Date.now();
                     await processSalesFlow(userId, transcription, userState, knowledge, {
-                        client, notifyAdmin, saveState, sendMessageWithDelay: (id, text) => sendMessageWithDelay(id, text, startTime), logAndEmit, saveOrderToLocal, sharedState, config
+                        client, notifyAdmin, saveState, sendMessageWithDelay: (id, text) => sendMessageWithDelay(id, text, startTime), logAndEmit, saveOrderToLocal, cancelLatestOrder, sharedState, config
                     });
                 } else {
                     logAndEmit(userId, 'user', `MEDIA_AUDIO:${audioUrl}`, userState[userId]?.step || 'new');
@@ -701,7 +747,7 @@ async function _processDebounced(userId) {
         await processSalesFlow(userId, combinedText, userState, effectiveKnowledge, {
             client, notifyAdmin, saveState,
             sendMessageWithDelay: (id, text) => sendMessageWithDelay(id, text, startTime),
-            logAndEmit, saveOrderToLocal, sharedState, config,
+            logAndEmit, saveOrderToLocal, cancelLatestOrder, sharedState, config,
             effectiveScript // Pass down to the flow
         });
     } catch (err) {

@@ -164,7 +164,7 @@ const CorporateDashboardV2 = () => {
             `}>
 
                 {/* Logo & Toggle */}
-                <div className="h-20 flex items-center justify-between px-6 border-b border-slate-200/50">
+                <div className="h-14 flex items-center justify-between px-6 border-b border-slate-200/50">
                     {(!sidebarCollapsed || isMobile) && (
                         <div className="flex items-center gap-3 animate-fade-in w-full justify-between lg:justify-start">
                             <div className="flex items-center gap-3">
@@ -229,7 +229,7 @@ const CorporateDashboardV2 = () => {
             {/* 2. MAIN CONTENT AREA V2 */}
             <div className={`flex-1 flex flex-col overflow-hidden bg-gradient-to-br from-slate-50 to-blue-50/30 w-full relative transition-all duration-300 ${!isMobile && !sidebarCollapsed ? '' : ''}`}>
                 {/* Header Superior V2 */}
-                <header className="flex-shrink-0 h-16 lg:h-20 bg-white/60 backdrop-blur-md border-b border-white flex justify-between items-center px-4 lg:px-8 z-10 shadow-sm shadow-slate-200/20">
+                <header className="flex-shrink-0 h-14 bg-white/60 backdrop-blur-md border-b border-white flex justify-between items-center px-4 lg:px-8 z-10 shadow-sm shadow-slate-200/20">
                     <div className="flex items-center gap-3 w-full lg:w-auto">
                         <button
                             onClick={() => isMobile ? setMobileMenuOpen(true) : setSidebarCollapsed(false)}

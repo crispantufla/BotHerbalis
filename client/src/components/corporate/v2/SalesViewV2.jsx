@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import api from '../../../config/axios';
 import { useToast } from '../../ui/Toast';
 
@@ -421,8 +422,8 @@ Teléfono: ${phoneDisplay}`;
             </div>
 
             {/* V2 GLASSMORPHISM EDIT MODAL */}
-            {editingOrder && (
-                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-50 flex items-center justify-center animate-fade-in p-4">
+            {editingOrder && createPortal(
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[100] flex items-center justify-center animate-fade-in p-4">
                     <div className="bg-white/90 backdrop-blur-2xl rounded-[2rem] shadow-2xl w-full max-w-md p-8 border border-white relative overflow-hidden">
 
                         <div className="absolute top-0 right-0 w-40 h-40 bg-indigo-500/10 blur-[50px] rounded-full pointer-events-none"></div>
@@ -489,13 +490,14 @@ Teléfono: ${phoneDisplay}`;
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* V2 DETAILS MODAL (TICKET STYLE COMPACTADO) */}
-            {viewingOrder && (
-                <div className="fixed inset-0 bg-white/95 sm:bg-slate-900/60 backdrop-blur-none sm:backdrop-blur-md z-50 flex items-center justify-center animate-fade-in p-0 sm:p-4" onClick={() => setViewingOrder(null)}>
-                    <div className="bg-slate-50/95 sm:bg-white/70 backdrop-blur-none sm:backdrop-blur-2xl rounded-none sm:rounded-3xl shadow-none sm:shadow-[0_16px_40px_rgb(0,0,0,0.15)] w-full h-full sm:h-auto max-w-2xl overflow-hidden flex flex-col sm:max-h-[90vh] relative border-0 sm:border border-white" onClick={e => e.stopPropagation()}>
+            {viewingOrder && createPortal(
+                <div className="fixed inset-0 bg-white/95 sm:bg-slate-900/60 backdrop-blur-none sm:backdrop-blur-md z-[100] flex items-center justify-center animate-fade-in p-0 sm:p-4" onClick={() => setViewingOrder(null)}>
+                    <div className="bg-slate-50/95 sm:bg-white/70 backdrop-blur-none sm:backdrop-blur-2xl rounded-none sm:rounded-3xl shadow-none sm:shadow-[0_16px_40px_rgb(0,0,0,0.15)] w-full h-full sm:h-auto max-w-4xl overflow-hidden flex flex-col sm:max-h-[90vh] relative border-0 sm:border border-white" onClick={e => e.stopPropagation()}>
 
                         {/* Compact Header Glassmorphism */}
                         <div className="bg-white/40 p-4 sm:p-5 flex justify-between items-center relative overflow-hidden shrink-0 border-b border-white/50">
@@ -628,7 +630,8 @@ Teléfono: ${phoneDisplay}`;
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

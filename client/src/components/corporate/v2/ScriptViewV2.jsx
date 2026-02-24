@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import api from '../../../config/axios';
 import { API_URL } from '../../../config/api';
 import ScriptMapView from '../views/ScriptMapView'; // We'll keep using the original map view as it's a complex generic component, maybe style it later if needed. Wait, we can wrap it or build a V2. For now, let's keep it.
@@ -192,7 +193,7 @@ const ScriptViewV2 = () => {
                             )}
 
                             {activeTab === 'flow' && (
-                                <div className="space-y-6 max-w-4xl mx-auto">
+                                <div className="space-y-6 max-w-5xl 2xl:max-w-7xl mx-auto">
                                     {Object.entries(script.flow || {}).map(([key, step]) => (
                                         <div key={key} className="bg-white/80 backdrop-blur-md p-6 rounded-3xl border border-white shadow-sm hover:shadow-md hover:border-indigo-200 transition-all duration-300">
                                             <div className="flex justify-between items-center cursor-pointer group" onClick={() => setExpandedCard(expandedCard === key ? null : key)}>
@@ -321,7 +322,7 @@ const ScriptViewV2 = () => {
                             )}
 
                             {activeTab === 'faq' && (
-                                <div className="space-y-6 max-w-4xl mx-auto">
+                                <div className="space-y-6 max-w-5xl 2xl:max-w-7xl mx-auto">
                                     <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-4">
                                         <div className="relative w-full sm:w-96 group">
                                             <input
@@ -385,9 +386,9 @@ const ScriptViewV2 = () => {
             </div>
 
             {/* GALLERY MODAL V2 */}
-            {showGallery && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
-                    <div className="bg-white/95 backdrop-blur-2xl rounded-[2rem] shadow-2xl w-full max-w-5xl max-h-[85vh] flex flex-col border border-white relative overflow-hidden">
+            {showGallery && createPortal(
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-fade-in">
+                    <div className="bg-white/95 backdrop-blur-2xl rounded-[2rem] shadow-2xl w-full max-w-6xl 2xl:max-w-7xl max-h-[85vh] flex flex-col border border-white relative overflow-hidden">
                         <div className="p-8 border-b border-white flex justify-between items-center bg-white/40 sticky top-0 z-10 backdrop-blur-md">
                             <div>
                                 <h3 className="text-2xl font-extrabold text-slate-800 tracking-tight">Galería de Medios</h3>
@@ -432,7 +433,8 @@ const ScriptViewV2 = () => {
                             )}
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );
