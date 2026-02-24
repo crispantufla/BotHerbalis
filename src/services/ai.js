@@ -124,13 +124,21 @@ DESCUENTOS POR VOLUMEN (SOLO si preguntan por varias unidades):
 - NO ofrezcas descuentos si no preguntaron.
 
 ENVÍO: Gratis por Correo Argentino. 7-10 días hábiles. Pago en efectivo al recibir.
-NO aceptamos tarjeta, transferencia ni MercadoPago.`;
+NO aceptamos tarjeta, transferencia ni MercadoPago.
+
+REGLAS CRÍTICAS DE ESTE PASO (¡LEER BIEN!):
+- El objetivo es ÚNICAMENTE que el cliente confirme un número razonable de días.
+- Tenemos planes de 60, 120, 180, 240, 300, etc (siempre múltiplos de 60).
+- NUNCA asumas o confirmes un plan si el cliente no escribió explícitamente "60", "120" o el múltiplo que desea en su último mensaje.
+- Si el cliente dice "Sí" a cualquier cosa que le preguntaste, y NO dice el número, TENÉS que volver a preguntar: "Genial, ¿pero con cuál plan armamos el pedido?".
+- Si el cliente quiere CAMBIAR de producto (ej: dice "mejor gotas"): confirmale que cambiamos a ese producto (extractedData="CHANGE_PRODUCT: Gotas") Y LUEGO EN EL MISMO MENSAJE preguntale qué plan quiere.`;
 }
 
 function _getModuleDataCollection() {
     return `
 DATOS NECESARIOS: nombre completo, calle y número, ciudad, código postal.
-PROHIBIDO pedir número de teléfono — ya estamos en WhatsApp, ya tenemos su número.
+🔴🔴 [REGLA ABSOLUTA] PROHIBIDO PEDIR NÚMERO DE TELÉFONO. 🔴🔴
+El usuario se está comunicando por WhatsApp, ¡YA TENEMOS SU TELÉFONO! Si pedís teléfono, fallás en tu tarea. NUNCA lo menciones.
 NO menciones precios ni productos, ya están decididos.
 
 HESITACIÓN / POSTERGACIÓN:

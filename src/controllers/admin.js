@@ -201,13 +201,20 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false, shar
         return "⚠️ No hay pedido pendiente de aprobación.";
     }
 
-    // 5. AI Instruction (Default Fallback)
     const actualTarget = targetChatId || sharedState.lastAlertUser;
     if (actualTarget) {
         try {
-            const history = (sharedState.userState[actualTarget]?.history || [])
+            const state = sharedState.userState[actualTarget] || {};
+            const history = (state.history || [])
                 .map(m => `${m.role.toUpperCase()}: ${m.content} `).join('\n');
-            const suggestion = await aiService.generateSuggestion(commandText, history);
+            const cartStr = state.cart && state.cart.length > 0
+                ? state.cart.map(i => `${i.product} (${i.plan} días)`).join(' + ')
+                : `${state.selectedProduct || 'Producto desconocido'} (${state.selectedPlan || '?'} días)`;
+            const totalStr = state.totalPrice ? `$${state.totalPrice}` : 'Desconocido';
+
+            const contextStr = `HISTORIAL DEL CHAT:\n${history}\n\nDATOS DEL PEDIDO ACTUAL (USALOS SI DEBÉS CONFIRMAR O ARMAR RESUMEN):\n- Productos: ${cartStr}\n- Total a pagar al recibir: ${totalStr}`;
+
+            const suggestion = await aiService.generateSuggestion(commandText, contextStr);
 
             if (suggestion) {
                 await client.sendMessage(actualTarget, suggestion);

@@ -669,14 +669,37 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             break;
 
         case 'waiting_weight': {
-            // Pre-catch product mention via simple regex to prevent looping if they don't say weight
-            const tLow = text.toLowerCase();
-            if (tLow.includes('cápsula') || tLow.includes('capsula')) currentState.suggestedProduct = "Cápsulas de nuez de la india";
-            else if (tLow.includes('gota')) currentState.suggestedProduct = "Gotas de nuez de la india";
-            else if (tLow.includes('semilla')) currentState.suggestedProduct = "Semillas de nuez de la india";
-
             // SCRIPT FIRST: Check if user gave a number
             const hasNumber = /\d+/.test(text.trim());
+
+            // Check if user explicitly typed a product name OR if the bot *just* recommended capsules
+            const tLow = text.toLowerCase();
+            let implicitProduct = null;
+
+            if (tLow.includes('cápsula') || tLow.includes('capsula')) implicitProduct = "Cápsulas de nuez de la india";
+            else if (tLow.includes('gota')) implicitProduct = "Gotas de nuez de la india";
+            else if (tLow.includes('semilla')) implicitProduct = "Semillas de nuez de la india";
+
+            let recentBotMessages = "";
+            let botMsgCount = 0;
+            for (let i = currentState.history.length - 1; i >= 0; i--) {
+                if (currentState.history[i].role === 'bot') {
+                    recentBotMessages += currentState.history[i].content.toLowerCase() + " ";
+                    botMsgCount++;
+                    if (botMsgCount >= 2) break;
+                }
+            }
+
+            // If they answered a number or affirmative, and the bot just asked "Las cápsulas son la opción más efectiva... ¿Cuántos kilos querés bajar?"
+            // or anything heavily implying capsules have been locked in.
+            const isAffirmative = /^(si|sisi|ok|dale|bueno|joya|de una|perfecto|genial)[\s\?\!\.]*$/i.test(normalizedText);
+            if (!implicitProduct && (hasNumber || isAffirmative) && (recentBotMessages.includes('cápsula') || recentBotMessages.includes('capsula'))) {
+                implicitProduct = "Cápsulas de nuez de la india";
+            }
+
+            if (implicitProduct) {
+                currentState.suggestedProduct = implicitProduct;
+            }
 
             // CHECK REFUSAL or SKIP
             // If user says "no quiero decir", "prefiero no", "decime precios", etc.
@@ -1043,17 +1066,32 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
             let planSelected = false;
             let selectedPlanId = null;
-            if (/\b60\b/.test(normalizedText)) selectedPlanId = '60';
-            else if (/\b120\b/.test(normalizedText)) selectedPlanId = '120';
+
+            // Match multiples of 60 (from 60 up to 600)
+            const planMatch = normalizedText.match(/\b(60|120|180|240|300|360|420|480|540|600)\b/);
+            if (planMatch) {
+                selectedPlanId = planMatch[1];
+            }
 
             if (selectedPlanId) {
                 // If we have a selectedProduct from previous step, use it
                 const product = currentState.selectedProduct || "Nuez de la India"; // Default
-                const basePrice = _getPrice(product, selectedPlanId);
+
+                // For direct script matching, calculate price if plan > 120
+                const factor = parseInt(selectedPlanId) / 60;
+                const base120 = parseInt(_getPrice(product, '120').replace(/\./g, ''));
+                const base60 = parseInt(_getPrice(product, '60').replace(/\./g, ''));
+
+                let calculatedPrice = 0;
+                const pairs = Math.floor(factor / 2);
+                const remainder = factor % 2;
+
+                calculatedPrice = (pairs * base120) + (remainder * base60);
+
                 currentState.cart = [{
                     product: product,
                     plan: selectedPlanId,
-                    price: basePrice
+                    price: calculatedPrice.toLocaleString('es-AR').replace(/,/g, '.')
                 }];
                 currentState.selectedPlan = selectedPlanId;
                 currentState.selectedProduct = product;
@@ -1080,12 +1118,22 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     const skipMsg = `¡Perfecto! 😊 Ya tengo tus datos de envío. Voy a confirmar todo...`;
                     currentState.history.push({ role: 'bot', content: skipMsg, timestamp: Date.now() });
                     await sendMessageWithDelay(userId, skipMsg);
+
+                    // Construct summary and jump to final confirmation natively
+                    const subtotal = currentState.cart.reduce((sum, i) => sum + parseInt(i.price.replace('.', '')), 0);
+                    const adicional = currentState.adicionalMAX || 0;
+                    currentState.totalPrice = (subtotal + adicional).toLocaleString('es-AR').replace(/,/g, '.');
+                    const summaryMsg = buildConfirmationMessage(currentState);
+
+                    currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
+                    await sendMessageWithDelay(userId, summaryMsg);
+                    _setStep(currentState, 'waiting_final_confirmation');
                 } else {
                     currentState.history.push({ role: 'bot', content: closingNode.response, timestamp: Date.now() });
                     await sendMessageWithDelay(userId, closingNode.response);
+                    _setStep(currentState, closingNode.nextStep);
                 }
 
-                _setStep(currentState, closingNode.nextStep);
                 saveState(userId);
                 matched = true;
             } else {
@@ -1133,13 +1181,23 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                         const skipMsg = `¡Genial! 😊 Entonces confirmamos el plan de 120 días. Ya tengo tus datos de envío, voy a armar la etiqueta...`;
                         currentState.history.push({ role: 'bot', content: skipMsg, timestamp: Date.now() });
                         await sendMessageWithDelay(userId, skipMsg);
+
+                        // Construct summary and jump to final confirmation natively
+                        const subtotal = currentState.cart.reduce((sum, i) => sum + parseInt(i.price.replace('.', '')), 0);
+                        const adicional = currentState.adicionalMAX || 0;
+                        currentState.totalPrice = (subtotal + adicional).toLocaleString('es-AR').replace(/,/g, '.');
+                        const summaryMsg = buildConfirmationMessage(currentState);
+
+                        currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
+                        await sendMessageWithDelay(userId, summaryMsg);
+                        _setStep(currentState, 'waiting_final_confirmation');
                     } else {
                         const combinedResponse = `¡Genial! 😊 Entonces confirmamos el plan de 120 días.\n\n${closingNode.response}`;
                         currentState.history.push({ role: 'bot', content: combinedResponse, timestamp: Date.now() });
                         await sendMessageWithDelay(userId, combinedResponse);
+                        _setStep(currentState, closingNode.nextStep);
                     }
 
-                    _setStep(currentState, closingNode.nextStep);
                     saveState(userId);
                     matched = true;
                 } else {
@@ -1189,18 +1247,31 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                             matched = true;
                         }
                         // Ultra strict validation to prevent bypassing the plan choice
-                        else if (extractedStr.includes('120') || extractedStr.includes('60')) {
+                        else if (/\b(60|120|180|240|300|360|420|480|540|600)\b/.test(extractedStr)) {
                             // AI detected a valid plan choice
-                            const plan = extractedStr.includes('120') ? '120' : '60';
+                            const planMatchAI = extractedStr.match(/\b(60|120|180|240|300|360|420|480|540|600)\b/);
+                            const plan = planMatchAI ? planMatchAI[1] : '60';
                             const product = currentState.selectedProduct || "Nuez de la India";
 
                             currentState.selectedPlan = plan;
                             currentState.selectedProduct = product;
 
+                            // Calculate units based on 60 days per unit
+                            const factor = parseInt(plan) / 60;
+                            // Pricing logic matches factor (1=60d, 2=120d). If factor > 2, treat pairs as 120 plans
+                            const base120 = parseInt(_getPrice(product, '120').replace(/\./g, ''));
+                            const base60 = parseInt(_getPrice(product, '60').replace(/\./g, ''));
+
+                            let calculatedPrice = 0;
+                            const pairs = Math.floor(factor / 2);
+                            const remainder = factor % 2;
+
+                            calculatedPrice = (pairs * base120) + (remainder * base60);
+
                             currentState.cart = [{
                                 product: product,
                                 plan: plan,
-                                price: _getPrice(product, plan)
+                                price: calculatedPrice.toLocaleString('es-AR').replace(/,/g, '.')
                             }];
 
                             if (planAI.response) {
@@ -1221,6 +1292,16 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                                 const skipMsg = `Ya tengo tus datos de envío. Voy a confirmar todo...`;
                                 currentState.history.push({ role: 'bot', content: skipMsg, timestamp: Date.now() });
                                 await sendMessageWithDelay(userId, skipMsg);
+
+                                // Construct summary and jump to final confirmation natively
+                                const subtotal = currentState.cart.reduce((sum, i) => sum + parseInt(i.price.replace('.', '')), 0);
+                                const adicional = currentState.adicionalMAX || 0;
+                                currentState.totalPrice = (subtotal + adicional).toLocaleString('es-AR').replace(/,/g, '.');
+                                const summaryMsg = buildConfirmationMessage(currentState);
+
+                                currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
+                                await sendMessageWithDelay(userId, summaryMsg);
+                                _setStep(currentState, 'waiting_final_confirmation');
                             } else {
                                 if (planAI.response) {
                                     currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });
@@ -1228,14 +1309,14 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                                 }
                                 currentState.history.push({ role: 'bot', content: closingNode.response, timestamp: Date.now() });
                                 await sendMessageWithDelay(userId, closingNode.response);
+                                _setStep(currentState, closingNode.nextStep);
                             }
 
-                            _setStep(currentState, closingNode.nextStep);
                             saveState(userId);
                             matched = true;
                         } else {
-                            // AI incorrectly marked goalMet=true without getting a plan number
-                            console.warn(`[AI-SAFEGUARD] waiting_plan_choice: AI returned goalMet=true but no 60/120 in extractedData (${extractedStr}). Downgrading to false.`);
+                            // AI incorrectly marked goalMet=true without getting a valid plan number
+                            console.warn(`[AI-SAFEGUARD] waiting_plan_choice: AI returned goalMet=true but no 60/120/180/240 etc in extractedData (${extractedStr}). Downgrading to false.`);
                             if (planAI.response) {
                                 currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });
                                 await sendMessageWithDelay(userId, planAI.response);
@@ -1859,35 +1940,59 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 }
             }
 
-            // Helper — build orderData object from state (avoids 3 duplicate blocks)
+            // Helper — build orderData object from state (avoids duplicate blocks)
+            // Fixes "Desconocido" in Dashboard when skip happens
             const _buildOrderData = (extra = {}) => {
-                const o = currentState.pendingOrder || {};
-                const cart = o.cart || [];
+                // If the user skipped waiting_data, pendingOrder never gets explicitly built.
+                // We construct a fallback using partialAddress and the current cart.
+                const addr = currentState.partialAddress || {};
+                const cart = currentState.cart || [];
+                const o = currentState.pendingOrder || {
+                    nombre: addr.nombre,
+                    calle: addr.calle,
+                    ciudad: addr.ciudad,
+                    cp: addr.cp,
+                    provincia: addr.provincia
+                };
+
                 const phone = userId.split('@')[0];
                 return {
                     cliente: phone,
-                    nombre: o.nombre, calle: o.calle, ciudad: o.ciudad, cp: o.cp,
-                    producto: cart.map(i => i.product).join(' + '),
-                    plan: cart.map(i => `${i.plan} días`).join(' + '),
+                    nombre: o.nombre, calle: o.calle, ciudad: o.ciudad, cp: o.cp, provincia: o.provincia,
+                    producto: cart.map(i => i.product).join(' + ') || currentState.selectedProduct,
+                    plan: cart.map(i => `${i.plan} días`).join(' + ') || `${currentState.selectedPlan} días`,
                     precio: currentState.totalPrice || '0',
                     ...extra
                 };
             };
 
             // Issue 3: Detect post-dated delivery requests ("a partir del 15 de marzo")
+            let hasNewPostdate = false;
             if (!currentState.postdatado) {
-                const dateMatch = text.match(/(?:a partir del?|desde el?|para el?|despu[eé]s del?)\s*(?:d[ií]a\s*)?(\d{1,2})\s*(?:de\s*)?(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
+                const dateMatch = _detectPostdatado(text, text) || text.match(/(?:a partir del?|desde el?|para el?|despu[eé]s del?)\s*(?:d[ií]a\s*)?(\d{1,2})\s*(?:de\s*)?(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
                 if (dateMatch) {
-                    currentState.postdatado = `${dateMatch[1]} de ${dateMatch[2]}`;
+                    currentState.postdatado = typeof dateMatch === 'string' ? dateMatch : `${dateMatch[1]} de ${dateMatch[2]}`;
+                    hasNewPostdate = true;
                 }
             }
 
-            if (currentState.postdatado) {
+            if (currentState.postdatado && hasNewPostdate) {
+                // We JUST detected a postdate. We should confirm it explicitly.
+                const postdatado = currentState.postdatado;
+                const msg = `¡Perfecto! Anotamos tu envío para: ${postdatado}.\n\nEntonces, con esta modificación de fecha, ¿me confirmás que dejamos todo listo?`;
+                await sendMessageWithDelay(userId, msg);
+
+                // Track we made a change so next time they say "Yes" it just goes through
+                currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+                saveState(userId);
+                matched = true;
+            } else if (currentState.postdatado && _isAffirmative(normalizedText)) {
+                // FINAL SUCCESS AFTER POSTDATE
                 const postdatado = currentState.postdatado;
                 const msg = `¡Perfecto! Tu pedido ya fue ingresado 🚀\n\nLo vamos a despachar para que te llegue a partir del ${postdatado}.\nTe avisamos con el número de seguimiento.\n\n¡Gracias por confiar en Herbalis!`;
                 await sendMessageWithDelay(userId, msg);
 
-                // Save Order with postdatado
+                // Save Order Local & Sheets
                 if (currentState.pendingOrder) {
                     const orderData = _buildOrderData({ postdatado });
                     if (dependencies.saveOrderToLocal) dependencies.saveOrderToLocal(orderData);
@@ -1895,17 +2000,16 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     console.log(`✅ [PEDIDO CONFIRMADO - POSTDATADO ${postdatado}] ${userId} — Total: $${currentState.totalPrice || '0'}`);
 
                     // --- METRICS TRACKING ---
-                    const trackScript = dependencies.effectiveScript || dependencies.config?.activeScript || 'v3';
-                    if (dependencies.config && dependencies.config.scriptStats && trackScript !== 'rotacion') {
-                        if (!dependencies.config.scriptStats[trackScript]) {
-                            dependencies.config.scriptStats[trackScript] = { started: 0, completed: 0 };
+                    if (dependencies.config && dependencies.config.scriptStats && dependencies.config.activeScript) {
+                        if (!dependencies.config.scriptStats[dependencies.config.activeScript]) {
+                            dependencies.config.scriptStats[dependencies.config.activeScript] = { started: 0, completed: 0 };
                         }
-                        dependencies.config.scriptStats[trackScript].completed++;
+                        dependencies.config.scriptStats[dependencies.config.activeScript].completed++;
                     }
                 }
 
-                // Notify admin about postdatado
-                await notifyAdmin('📅 Pedido POSTDATADO confirmado', userId, `Fecha: a partir del ${postdatado}\nTotal: $${currentState.totalPrice || '?'}`);
+                // Notify admin about postdatado (auto-confirmed)
+                await notifyAdmin('📅 Pedido POSTDATADO confirmado', userId, `Fecha: ${postdatado}\nTotal: $${currentState.totalPrice || '?'}`);
 
                 _setStep(currentState, 'completed');
                 currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
@@ -1924,7 +2028,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     console.log(`✅ [PEDIDO CARGADO - PENDIENTE APROBACIÓN] ${userId} — Total: $${currentState.totalPrice || '0'}`);
 
                     // Notify Admin Now so they can click "APROBAR"
-                    const o = currentState.pendingOrder;
+                    const o = currentState.pendingOrder || currentState.partialAddress || {};
                     await notifyAdmin(`⌛ Pedido Requiere Aprobación`, userId, `Datos: ${o.nombre}, ${o.calle}\nCiudad: ${o.ciudad} | CP: ${o.cp}\nProvincia: ${o.provincia || '?'}\nItems: ${orderData.producto}\nTotal: $${currentState.totalPrice || '0'}`);
 
                     // --- METRICS TRACKING ---
