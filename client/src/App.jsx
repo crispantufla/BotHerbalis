@@ -2,7 +2,6 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { SocketProvider } from './context/SocketContext';
 import { ToastProvider } from './components/ui/Toast';
-import CorporateDashboard from './pages/designs/CorporateDashboard';
 import CorporateDashboardV2 from './pages/designs/v2/CorporateDashboardV2';
 import CorporateDashboardV3 from './pages/designs/v3/CorporateDashboardV3';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -26,13 +25,6 @@ function App() {
                             <Routes>
                                 {/* Public Route */}
                                 <Route path="/login" element={<Login />} />
-
-                                {/* Protected Route - Corporate Enterprise V1 (Legacy) */}
-                                <Route path="/v1/*" element={
-                                    <ProtectedRoute>
-                                        <CorporateDashboard />
-                                    </ProtectedRoute>
-                                } />
 
                                 {/* Protected Route - Corporate Enterprise V2 (Main Dashboard) */}
                                 <Route path="/*" element={

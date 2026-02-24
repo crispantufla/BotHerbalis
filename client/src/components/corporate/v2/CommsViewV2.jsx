@@ -378,21 +378,7 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
                             </div>
                         </div>
 
-                        {/* Script Panel */}
-                        {showScriptPanel && (
-                            <div className="border-b border-white border-opacity-50 bg-slate-800/90 backdrop-blur-xl p-6 z-20 animate-fade-in shadow-xl">
-                                <p className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest mb-4">Módulos del Guión (Click para cargar)</p>
-                                <div className="flex flex-wrap gap-2">
-                                    {Object.entries(scriptFlow).map(([key, step]) => (
-                                        <button key={key} onClick={() => handleSendScriptStep(key)} className="px-4 py-2 bg-white/10 hover:bg-indigo-500 border border-white/20 rounded-xl text-xs font-medium text-white transition-all shadow-sm backdrop-blur-md">
-                                            {key.replace(/_/g, ' ')}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Orders Panel */}
+                        {/* Orders Panel (Kept inside Chat if opened via Header) */}
                         {showOrdersPanel && selectedChat.hasBought && (
                             <div className="border-b border-white border-opacity-50 bg-emerald-800/90 backdrop-blur-xl p-6 z-20 animate-fade-in shadow-xl">
                                 <div className="flex justify-between items-center mb-4">
@@ -410,20 +396,6 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
                                             </div>
                                         </div>
                                     ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* AI Summary */}
-                        {summaryText && (
-                            <div className="absolute top-24 left-1/2 -translate-x-1/2 w-3/4 max-w-2xl bg-white/90 backdrop-blur-2xl border border-violet-200/50 p-6 rounded-3xl shadow-2xl z-30 animate-fade-in">
-                                <button onClick={() => setSummaryText(null)} className="absolute top-4 right-4 p-2 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-500 transition-colors">✕</button>
-                                <div className="flex gap-4">
-                                    <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl flex items-center justify-center text-white shadow-lg"><IconsV2.AI /></div>
-                                    <div>
-                                        <h3 className="font-extrabold text-violet-900 mb-2">Análisis de IA</h3>
-                                        <p className="text-sm font-medium text-slate-700 leading-relaxed max-h-48 overflow-y-auto custom-scrollbar pr-2">{summaryText}</p>
-                                    </div>
                                 </div>
                             </div>
                         )}
@@ -489,6 +461,84 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
                     </div>
                 )}
             </div>
+
+            {/* RIGHT PANEL - AI & Scripts Context Drawer (V3 Ported to V2) */}
+            {selectedChat && showScriptPanel && (
+                <div className="w-[320px] shrink-0 border-l border-white/50 bg-slate-50/40 backdrop-blur-xl flex flex-col z-30 overflow-y-auto relative animate-fade-in shadow-[-10px_0_30px_rgba(0,0,0,0.05)] h-full">
+
+                    <div className="p-5 border-b border-white/50 flex justify-between items-center bg-white/50 shadow-sm z-10 sticky top-0 backdrop-blur-md">
+                        <h3 className="font-extrabold text-slate-800 text-[15px] flex items-center gap-2">
+                            <IconsV2.AI /> Asistente IA
+                        </h3>
+                        <button onClick={() => setShowScriptPanel(false)} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-white/60 rounded-xl transition-all">
+                            ✕
+                        </button>
+                    </div>
+
+                    <div className="p-5 flex-1 flex flex-col gap-6 custom-scrollbar overflow-y-auto">
+
+                        {/* Summary Block */}
+                        <div className="bg-white/60 rounded-2xl p-4 shadow-sm border border-white/60 relative group">
+                            <div className="flex justify-between items-center mb-3">
+                                <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Contexto IA</h4>
+                                <button onClick={handleSummarize} disabled={summarizing || messages.length === 0} className="text-[10px] font-bold text-indigo-700 bg-indigo-100/80 px-2.5 py-1 rounded-lg hover:bg-indigo-200 transition-colors disabled:opacity-50">
+                                    {summarizing ? 'Generando...' : 'Resumir Chat'}
+                                </button>
+                            </div>
+                            <div className="min-h-[80px]">
+                                {summaryText ? (
+                                    <div className="text-xs font-medium text-slate-700 whitespace-pre-wrap leading-relaxed">
+                                        {summaryText}
+                                        <button onClick={() => setSummaryText(null)} className="absolute top-2 right-2 text-slate-400 hover:text-rose-500 bg-white/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"><IconsV2.Trash /></button>
+                                    </div>
+                                ) : (
+                                    <span className="text-slate-400 italic text-xs flex items-center h-full justify-center text-center">Analiza la intención de compra y sentimientos del cliente.</span>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Script Injection Area */}
+                        <div className="flex-1 pb-6">
+                            <div className="flex items-center justify-between mb-3 px-1">
+                                <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Guión Sugerido</h4>
+                                <span className="bg-white/80 shadow-sm border border-white text-indigo-600 text-[9px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">{selectedChat.assignedScript || 'V3'}</span>
+                            </div>
+
+                            {Object.keys(scriptFlow).length > 0 ? (
+                                <div className="space-y-2.5">
+                                    {Object.keys(scriptFlow).map((stepKey) => {
+                                        const step = scriptFlow[stepKey];
+                                        if (!step?.response) return null;
+                                        return (
+                                            <button
+                                                key={stepKey}
+                                                onClick={() => {
+                                                    // Magic: Auto pause Bot if human takes over
+                                                    if (!selectedChat.isPaused) handleToggleBot();
+                                                    setInput(formatScriptMessage(step.response));
+                                                }}
+                                                className="w-full text-left p-3.5 rounded-2xl border border-white/60 bg-white/40 hover:bg-white hover:border-indigo-300 transition-all shadow-sm hover:shadow-md group cursor-pointer relative overflow-hidden"
+                                            >
+                                                <div className="absolute top-0 right-0 w-12 h-12 bg-indigo-50 rounded-bl-full -mr-6 -mt-6 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                                <div className="flex items-center justify-between mb-2 text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-indigo-600 relative z-10 transition-colors">
+                                                    <span>{stepKey.replace(/_/g, ' ')}</span>
+                                                    <span className="opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 transition-all duration-300">Insertar +</span>
+                                                </div>
+                                                <p className="text-[11.5px] text-slate-700 font-medium line-clamp-3 leading-relaxed relative z-10">
+                                                    {formatScriptMessage(step.response)}
+                                                </p>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <p className="text-xs text-slate-400 italic text-center mt-6 bg-white/40 p-4 rounded-xl border border-white/50">No hay módulos de guión en este flow.</p>
+                            )}
+                        </div>
+
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

@@ -884,7 +884,11 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
                         matched = true;
                     }
-                } else if (aiPref.response) {
+                }
+
+                // CRITICAL FIX: If no valid price node was found and matched is still false, 
+                // BUT the AI provided a text response anyway (e.g. answering a doubt or extracting non-product data).
+                if (!matched && aiPref.response) {
                     currentState.history.push({ role: 'bot', content: aiPref.response, timestamp: Date.now() });
                     saveState();
                     await sendMessageWithDelay(userId, aiPref.response);
