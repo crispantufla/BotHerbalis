@@ -124,7 +124,7 @@ const GalleryViewV2 = () => {
                             placeholder="Buscar por nombre de archivo o hashtag..."
                             value={filter}
                             onChange={(e) => setFilter(e.target.value)}
-                            className="w-full bg-white/70 border border-white rounded-xl pl-12 pr-4 py-3.5 text-sm font-bold text-slate-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 focus:bg-white transition-all shadow-inner placeholder:text-slate-400 placeholder:font-medium"
+                            className="w-full bg-white/70 border border-white rounded-xl pl-12 pr-4 py-3.5 text-sm font-bold text-slate-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 focus:bg-white transition-all shadow-inner placeholder:text-slate-400 placeholder:font-medium hover:shadow-md hover:border-indigo-100"
                         />
                         <span className="absolute left-4 top-3.5 text-slate-400 group-focus-within:text-indigo-500 transition-colors"><IconsV2.Search /></span>
                     </div>
@@ -133,7 +133,7 @@ const GalleryViewV2 = () => {
                         <select
                             value={selectedCategory}
                             onChange={(e) => setSelectedCategory(e.target.value)}
-                            className="appearance-none bg-white/70 border border-white rounded-xl pl-12 pr-10 py-3.5 text-sm font-extrabold text-slate-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 focus:bg-white transition-all shadow-inner cursor-pointer min-w-[200px] uppercase tracking-wider"
+                            className="appearance-none bg-white/70 border border-white rounded-xl pl-12 pr-10 py-3.5 text-sm font-extrabold text-slate-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 focus:bg-white transition-all shadow-inner hover:shadow-md hover:border-indigo-100 cursor-pointer min-w-[200px] uppercase tracking-wider"
                         >
                             {categories.map(c => (
                                 <option key={c} value={c} className="font-bold text-slate-700">
@@ -157,11 +157,11 @@ const GalleryViewV2 = () => {
                         </div>
                     ) : filteredImages.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-full min-h-[400px] bg-white/40 backdrop-blur-xl rounded-[2rem] border border-white/60 border-dashed m-1">
-                            <div className="w-20 h-20 bg-white shadow-sm border border-slate-200 rounded-full flex items-center justify-center mb-6 text-slate-300">
-                                <IconsV2.Upload />
+                            <div className="w-20 h-20 bg-gradient-to-br from-indigo-50 to-purple-50 shadow-sm border border-indigo-100/50 rounded-full flex items-center justify-center mb-6 text-indigo-400">
+                                <IconsV2.Image />
                             </div>
-                            <p className="text-xl font-extrabold text-slate-700 mb-2">Bóveda Vacía</p>
-                            <p className="text-sm font-medium text-slate-400">No hay imágenes que coincidan con los filtros actuales.</p>
+                            <p className="text-slate-600 font-extrabold text-lg mb-1 tracking-tight">Galería Vacía</p>
+                            <p className="text-sm font-medium text-slate-500">Utilizá el botón de carga superior para añadir imágenes.</p>
                         </div>
                     ) : (
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">

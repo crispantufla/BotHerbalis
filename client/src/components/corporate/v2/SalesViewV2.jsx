@@ -224,7 +224,7 @@ Teléfono: ${phoneDisplay}`;
                         <button onClick={fetchOrders} className="p-3 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 transition-all shadow-sm active:scale-95 group">
                             <span className="group-hover:rotate-180 transition-transform duration-500 block"><IconsV2.Refresh /></span>
                         </button>
-                        <button onClick={handleExportCSV} disabled={orders.length === 0} className="px-6 py-3 bg-gradient-to-r from-slate-800 to-slate-700 text-white rounded-xl text-sm font-bold shadow-lg shadow-slate-800/20 hover:shadow-slate-800/40 hover:scale-105 transition-all flex items-center gap-2 disabled:opacity-50 disabled:scale-100">
+                        <button onClick={handleExportCSV} disabled={orders.length === 0} className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-105 transition-all flex items-center gap-2 disabled:opacity-50 disabled:scale-100">
                             <IconsV2.Download />
                             <span>Exportar CSV</span>
                         </button>
@@ -339,7 +339,7 @@ Teléfono: ${phoneDisplay}`;
                                                 <button onClick={(e) => { e.stopPropagation(); handleGoToChat(order.cliente); }} className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white transition-all flex items-center justify-center shadow-sm" title="Ir al Chat">
                                                     <IconsV2.Chat />
                                                 </button>
-                                                <button onClick={() => openEdit(order)} className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-500 hover:text-white transition-all flex items-center justify-center shadow-sm" title="Editar Pedido">
+                                                <button onClick={() => openEdit(order)} className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-500 hover:text-white transition-all flex items-center justify-center shadow-sm" title="Editar Pedido">
                                                     <IconsV2.Edit />
                                                 </button>
                                             </div>
@@ -402,7 +402,7 @@ Teléfono: ${phoneDisplay}`;
                                         <button onClick={(e) => { e.stopPropagation(); handleGoToChat(order.cliente); }} className="w-12 bg-emerald-50 border border-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center shadow-sm active:bg-emerald-100 transition-colors">
                                             <IconsV2.Chat className="w-4 h-4" />
                                         </button>
-                                        <button onClick={() => openEdit(order)} className="w-12 bg-blue-50 border border-blue-100 text-blue-600 rounded-xl flex items-center justify-center shadow-sm active:bg-blue-100 transition-colors">
+                                        <button onClick={() => openEdit(order)} className="w-12 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center shadow-sm active:bg-indigo-100 transition-colors">
                                             <IconsV2.Edit className="w-4 h-4" />
                                         </button>
                                     </div>
@@ -623,7 +623,7 @@ Teléfono: ${phoneDisplay}`;
                             <button onClick={() => handleCopySaleDetails(viewingOrder)} className="flex items-center gap-1.5 px-4 py-2 sm:px-5 sm:py-2.5 bg-white/70 text-indigo-700 hover:bg-white hover:text-indigo-600 border border-white shadow-sm font-extrabold text-[11px] uppercase tracking-wider rounded-xl transition-all hover:-translate-y-0.5">
                                 <IconsV2.Script className="w-3.5 h-3.5" /> Copiar Venta
                             </button>
-                            <button onClick={() => setViewingOrder(null)} className="px-6 py-2 sm:px-8 sm:py-2.5 bg-slate-800/90 text-white rounded-xl text-[11px] uppercase tracking-wider font-extrabold hover:bg-slate-900 transition-all shadow-md shadow-slate-800/20 hover:-translate-y-0.5 backdrop-blur-sm">
+                            <button onClick={() => setViewingOrder(null)} className="px-6 py-2 sm:px-8 sm:py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl text-[11px] uppercase tracking-wider font-extrabold hover:opacity-90 transition-all shadow-md shadow-indigo-500/30 hover:-translate-y-0.5 backdrop-blur-sm">
                                 Entendido
                             </button>
                         </div>

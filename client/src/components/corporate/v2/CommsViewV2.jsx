@@ -377,8 +377,8 @@ Teléfono: ${phoneDisplay}`;
                                             </span>
                                         )}
                                     </div>
-                                    <p className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 mt-0.5 ${selectedChat.isPaused ? 'text-amber-500' : 'text-emerald-500'}`}>
-                                        <span className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${selectedChat.isPaused ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]'}`}></span>
+                                    <p className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 mt-0.5 ${selectedChat.isPaused ? 'text-rose-500' : 'text-emerald-500'}`}>
+                                        <span className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${selectedChat.isPaused ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]'}`}></span>
                                         {selectedChat.isPaused ? 'Auto-Bot Pausado' : 'Auto-Bot Activo'}
                                     </p>
                                 </div>
@@ -386,7 +386,7 @@ Teléfono: ${phoneDisplay}`;
 
                             <div className="flex items-center gap-1 sm:gap-3 overflow-x-auto custom-scrollbar no-scrollbar scroll-smooth pl-2 py-2">
                                 {selectedChat.hasBought && (
-                                    <button onClick={() => setShowOrdersPanel(!showOrdersPanel)} className="p-2 sm:p-3 flex-shrink-0 rounded-xl bg-emerald-100/80 text-emerald-700 hover:bg-emerald-200 hover:shadow-md transition-all" title="Registro de Compras">
+                                    <button onClick={() => setShowOrdersPanel(!showOrdersPanel)} className="p-2 sm:p-3 flex-shrink-0 rounded-xl bg-indigo-100/80 text-indigo-700 hover:bg-indigo-200 hover:shadow-md transition-all" title="Registro de Compras">
                                         <IconsV2.Cart className="w-5 h-5" />
                                     </button>
                                 )}
@@ -397,7 +397,7 @@ Teléfono: ${phoneDisplay}`;
                                 <button onClick={handleToggleBot} className={`p-2 sm:p-3 flex-shrink-0 rounded-xl text-white shadow-md transition-all ${selectedChat.isPaused ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:scale-105' : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:scale-105'}`} title={selectedChat.isPaused ? 'Reactivar Bot' : 'Pausar Bot'}>
                                     {selectedChat.isPaused ? <IconsV2.Play /> : <IconsV2.Pause />}
                                 </button>
-                                <button onClick={() => setShowScriptPanel(!showScriptPanel)} className="p-2 sm:p-3 flex-shrink-0 rounded-xl bg-gradient-to-r from-slate-800 to-slate-700 text-white hover:shadow-lg transition-all active:scale-95" title="Guión">
+                                <button onClick={() => setShowScriptPanel(!showScriptPanel)} className="p-2 sm:p-3 flex-shrink-0 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500/30 hover:shadow-lg hover:shadow-indigo-500/40 transition-all active:scale-95" title="Guión">
                                     <IconsV2.Script />
                                 </button>
                             </div>
@@ -406,12 +406,12 @@ Teléfono: ${phoneDisplay}`;
                         {/* Orders Panel */}
                         {showOrdersPanel && selectedChat.hasBought && (
                             <div className="border-b border-white/60 bg-white/60 backdrop-blur-xl p-5 sm:p-6 z-10 animate-fade-in shadow-sm relative overflow-hidden flex-shrink-0">
-                                <div className="absolute -top-10 -right-10 w-32 h-32 bg-emerald-400/20 blur-[40px] rounded-full pointer-events-none"></div>
-                                <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-indigo-400/20 blur-[40px] rounded-full pointer-events-none"></div>
+                                <div className="absolute -top-10 -right-10 w-32 h-32 bg-indigo-400/20 blur-[40px] rounded-full pointer-events-none"></div>
+                                <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-purple-400/20 blur-[40px] rounded-full pointer-events-none"></div>
 
                                 <div className="flex justify-between items-center mb-5 relative z-10">
                                     <div className="flex items-center gap-2">
-                                        <div className="w-8 h-8 rounded-xl bg-emerald-100/80 text-emerald-600 flex items-center justify-center shadow-sm">
+                                        <div className="w-8 h-8 rounded-xl bg-indigo-100/80 text-indigo-600 flex items-center justify-center shadow-sm">
                                             <IconsV2.Cart className="w-4 h-4" />
                                         </div>
                                         <h3 className="font-extrabold text-slate-800 tracking-tight text-sm">Registro de Pedidos</h3>
@@ -430,7 +430,7 @@ Teléfono: ${phoneDisplay}`;
                                                     <span className="px-3 py-1 bg-indigo-50 text-indigo-700 text-[10px] font-black uppercase tracking-widest rounded-lg border border-indigo-100">{order.status || 'Completado'}</span>
                                                     <span className="text-[11px] font-bold text-slate-400 font-mono">{order.createdAt || 'Fecha desconocida'}</span>
                                                 </div>
-                                                <button onClick={() => handleCopySale(order)} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-indigo-600 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors shadow-sm">
+                                                <button onClick={() => handleCopySale(order)} className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors shadow-md shadow-indigo-500/30">
                                                     <IconsV2.Script className="w-3 h-3" /> Copiar Venta
                                                 </button>
                                             </div>
