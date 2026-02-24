@@ -362,43 +362,49 @@ Teléfono: ${phoneDisplay}`;
                     <>
                         {/* Header */}
                         <div className="flex-shrink-0 min-h-[5rem] border-b border-white/50 flex items-center justify-between px-3 sm:px-8 bg-white/50 backdrop-blur-md shadow-[0_2px_10px_rgba(0,0,0,0.02)] z-20 overflow-x-auto custom-scrollbar no-scrollbar py-2">
-                            <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
-                                <button onClick={() => setSelectedChat(null)} className="md:hidden p-2 -ml-1 text-slate-500 hover:bg-slate-200 rounded-full transition-colors flex-shrink-0">
-                                    <IconsV2.ArrowLeft />
+                            <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0 w-full sm:w-auto mb-2 sm:mb-0">
+                                {/* Back Button (Mobile Only) */}
+                                <button
+                                    onClick={() => setSelectedChat(null)}
+                                    className="md:hidden p-2 -ml-2 bg-white/60 border border-slate-200 rounded-xl text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 shadow-sm transition-all"
+                                    title="Volver a Contactos"
+                                >
+                                    <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" /></svg>
                                 </button>
+
                                 <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center font-bold text-base sm:text-lg shadow-md shadow-indigo-500/20 flex-shrink-0">
                                     {selectedChat.name.substring(0, 2).toUpperCase()}
                                 </div>
                                 <div className="min-w-0 pr-2">
-                                    <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3 flex-wrap">
-                                        <h2 className="font-extrabold text-slate-800 text-[15px] sm:text-lg tracking-tight truncate max-w-[140px] sm:max-w-xs">{selectedChat.name}</h2>
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2 flex-wrap">
+                                        <h2 className="font-extrabold text-slate-800 text-[14px] sm:text-lg tracking-tight truncate max-w-[130px] sm:max-w-xs">{selectedChat.name}</h2>
                                         {selectedChat.assignedScript && (
-                                            <span className="self-start sm:self-auto mt-1 sm:mt-0 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full bg-indigo-100 text-[9px] sm:text-[10px] font-bold text-indigo-700 uppercase tracking-widest border border-indigo-200">
+                                            <span className="self-start sm:self-auto mt-0.5 sm:mt-0 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full bg-indigo-100 text-[9px] sm:text-[10px] font-bold text-indigo-700 uppercase tracking-widest border border-indigo-200">
                                                 Flow: {selectedChat.assignedScript}
                                             </span>
                                         )}
                                     </div>
-                                    <p className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 mt-0.5 ${selectedChat.isPaused ? 'text-rose-500' : 'text-emerald-500'}`}>
+                                    <p className={`text-[9px] sm:text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 mt-0.5 ${selectedChat.isPaused ? 'text-rose-500' : 'text-emerald-500'}`}>
                                         <span className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${selectedChat.isPaused ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]'}`}></span>
                                         {selectedChat.isPaused ? 'Auto-Bot Pausado' : 'Auto-Bot Activo'}
                                     </p>
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-1 sm:gap-3 overflow-x-auto custom-scrollbar no-scrollbar scroll-smooth pl-2 py-2">
+                            <div className="flex items-center justify-start sm:justify-end gap-1 sm:gap-3 overflow-x-auto custom-scrollbar no-scrollbar scroll-smooth w-full sm:w-auto pb-1 sm:pb-0">
                                 {selectedChat.hasBought && (
-                                    <button onClick={() => setShowOrdersPanel(!showOrdersPanel)} className="p-2 sm:p-3 flex-shrink-0 rounded-xl bg-indigo-100/80 text-indigo-700 hover:bg-indigo-200 hover:shadow-md transition-all" title="Registro de Compras">
-                                        <IconsV2.Cart className="w-5 h-5" />
+                                    <button onClick={() => setShowOrdersPanel(!showOrdersPanel)} className="p-2.5 sm:p-3 flex-shrink-0 rounded-xl bg-indigo-100/80 text-indigo-700 hover:bg-indigo-200 hover:shadow-md transition-all" title="Registro de Compras">
+                                        <IconsV2.Cart className="w-4 h-4 sm:w-5 sm:h-5" />
                                     </button>
                                 )}
 
-                                <button onClick={handleClearChat} className="p-2 sm:p-3 flex-shrink-0 rounded-xl bg-rose-100/80 text-rose-600 hover:bg-rose-200 hover:shadow-md transition-all" title="Reiniciar Memoria e Historial">
+                                <button onClick={handleClearChat} className="p-2.5 sm:p-3 flex-shrink-0 rounded-xl bg-rose-100/80 text-rose-600 hover:bg-rose-200 hover:shadow-md transition-all" title="Reiniciar Memoria e Historial">
                                     <IconsV2.Trash />
                                 </button>
-                                <button onClick={handleToggleBot} className={`p-2 sm:p-3 flex-shrink-0 rounded-xl text-white shadow-md transition-all ${selectedChat.isPaused ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:scale-105' : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:scale-105'}`} title={selectedChat.isPaused ? 'Reactivar Bot' : 'Pausar Bot'}>
+                                <button onClick={handleToggleBot} className={`p-2.5 sm:p-3 flex-shrink-0 rounded-xl text-white shadow-md transition-all ${selectedChat.isPaused ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:scale-105' : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:scale-105'}`} title={selectedChat.isPaused ? 'Reactivar Bot' : 'Pausar Bot'}>
                                     {selectedChat.isPaused ? <IconsV2.Play /> : <IconsV2.Pause />}
                                 </button>
-                                <button onClick={() => setShowScriptPanel(!showScriptPanel)} className="p-2 sm:p-3 flex-shrink-0 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500/30 hover:shadow-lg hover:shadow-indigo-500/40 transition-all active:scale-95" title="Guión">
+                                <button onClick={() => setShowScriptPanel(!showScriptPanel)} className="p-2.5 sm:p-3 flex-shrink-0 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500/30 hover:shadow-lg hover:shadow-indigo-500/40 transition-all active:scale-95" title="Guión">
                                     <IconsV2.Script />
                                 </button>
                             </div>
@@ -582,7 +588,7 @@ Teléfono: ${phoneDisplay}`;
 
             {/* RIGHT PANEL - AI & Scripts Context Drawer (V3 Ported to V2) */}
             {selectedChat && showScriptPanel && (
-                <div className="w-full md:w-[350px] shrink-0 border-l border-white/50 bg-slate-50/40 backdrop-blur-xl flex flex-col z-30 overflow-y-auto relative animate-fade-in shadow-[-10px_0_30px_rgba(0,0,0,0.05)] h-full">
+                <div className="w-full md:w-[350px] shrink-0 border-l border-white/50 bg-slate-50/40 backdrop-blur-xl flex flex-col z-30 md:relative absolute right-0 top-0 bottom-0 overflow-y-auto animate-fade-in shadow-[-10px_0_30px_rgba(0,0,0,0.05)] h-full">
 
                     <div className="p-5 border-b border-white/50 flex justify-between items-center bg-white/50 shadow-sm z-10 sticky top-0 backdrop-blur-md">
                         <h3 className="font-extrabold text-slate-800 text-[15px] flex items-center gap-2">

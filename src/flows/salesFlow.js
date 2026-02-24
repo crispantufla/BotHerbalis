@@ -1489,6 +1489,29 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
 
             if (data && !data._error) {
+                // DETECT POSTDATED SHIPMENTS
+                if (data.postdatado) {
+                    console.log(`[ADDRESS] Postdated request detected: ${data.postdatado}`);
+                    const postponedAcks = [
+                        `¡No hay problema! 😊 Entiendo perfecto. Podemos dejarlo anotado de forma posdatada para esa fecha. ¿Te gustaría que ya mismo tomemos todos los datos así te congela la promo de envío gratis para cuando lo necesites?`,
+                        `¡Dale, ningún problema! Podemos dejar el paquete listo y posdatado para enviarlo cuando te quede mejor a vos. ¿A partir de qué fecha te conviene recibirlo exactamente? Así lo anoto en la etiqueta. 📦`,
+                        `Super entendible 🙌. Lo que hacemos en estos casos es agendar el envío de forma \"posdatada\" para la fecha que indiques, así reservas la promo de hoy. ¿Te parece bien si armamos la etiqueta ahora y lo despachamos en la fecha que vos me digas?`
+                    ];
+                    const ackMsg = postponedAcks[Math.floor(Math.random() * postponedAcks.length)];
+                    currentState.history.push({ role: 'bot', content: ackMsg, timestamp: Date.now() });
+                    await sendMessageWithDelay(userId, ackMsg);
+
+                    // We also save any partial direction data they might have sent just in case
+                    if (data.nombre && !currentState.partialAddress.nombre) currentState.partialAddress.nombre = data.nombre;
+                    if (data.calle && !currentState.partialAddress.calle) currentState.partialAddress.calle = data.calle;
+                    if (data.ciudad && !currentState.partialAddress.ciudad) currentState.partialAddress.ciudad = data.ciudad;
+                    if (data.cp && !currentState.partialAddress.cp) currentState.partialAddress.cp = data.cp;
+
+                    saveState();
+                    matched = true;
+                    break;
+                }
+
                 if (data.nombre && !currentState.partialAddress.nombre) { currentState.partialAddress.nombre = data.nombre; madeProgress = true; }
 
                 if (data.calle && !currentState.partialAddress.calle) {
