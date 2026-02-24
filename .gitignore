@@ -15,3 +15,26 @@ client/.env
 Thumbs.db
 
 /src/generated/prisma
+
+# Debug / Test outputs
+*.diff
+*.patch
+*_out.txt
+*_out.log
+test_failures*.txt
+test_output*.txt
+test_output*.log
+debug_log.txt
+correo_dump.html
+
+# Temporary scripts
+fix.js
+fix.py
+fix_history.js
+test-connect.js
+test-beep.js
+orig_salesFlow.js
+*.backup.json
+
+# Sheets (removed)
+sheets_sync.js

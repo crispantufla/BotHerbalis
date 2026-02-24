@@ -2,7 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const { authMiddleware } = require('../../middleware/auth');
-const { appendOrderToSheet } = require('../../../sheets_sync');
+
 
 module.exports = (client, sharedState) => {
     const router = express.Router();
@@ -168,15 +168,7 @@ module.exports = (client, sharedState) => {
         }
     });
 
-    // POST /sheets/test
-    router.post('/sheets/test', authMiddleware, async (req, res) => {
-        try {
-            const testData = { cliente: 'DASHBOARD_TEST', nombre: 'Prueba desde Panel', calle: 'Test', ciudad: 'Dashboard', cp: '0000', producto: 'Test', plan: 'Test', precio: '0' };
-            const success = await appendOrderToSheet(testData);
-            if (success) res.json({ success: true });
-            else res.status(500).json({ success: false });
-        } catch (e) { res.status(500).json({ error: e.message }); }
-    });
+
 
     // POST /pairing-code - Request WhatsApp Pairing Code instead of QR
     router.post('/pairing-code', authMiddleware, async (req, res) => {

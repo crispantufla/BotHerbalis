@@ -6,7 +6,7 @@
  * P0 #1: Auto-approve orders after 15 min without admin review
  */
 
-const { appendOrderToSheet } = require('../../sheets_sync');
+
 const { isBusinessHours } = require('./timeUtils');
 const { buildConfirmationMessage } = require('../utils/messageTemplates');
 
@@ -138,7 +138,7 @@ function autoApproveOrders(sharedState, dependencies) {
                 };
 
                 if (saveOrderToLocal) saveOrderToLocal(orderData);
-                appendOrderToSheet(orderData).catch(e => console.error('[SHEETS] Auto-approve log failed:', e.message));
+
             }
 
             // Move to waiting_final_confirmation

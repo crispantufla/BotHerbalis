@@ -2,7 +2,6 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const { authMiddleware } = require('../../middleware/auth');
-const { getOrdersFromSheet, updateOrderInSheet, deleteOrderInSheet } = require('../../../sheets_sync');
 
 module.exports = (client, sharedState) => {
     const router = express.Router();
@@ -83,10 +82,6 @@ module.exports = (client, sharedState) => {
                 createdAt: updatedOrder.createdAt.toISOString()
             };
 
-            // 2. Update Google Sheets (Async fallback)
-            updateOrderInSheet(id, { status, tracking }).catch(e =>
-                console.error('🔴 [ROUTES] Error updating Sheets:', e.message)
-            );
 
             if (io) io.emit('order_update', legacyOrder);
             res.json({ success: true, order: legacyOrder });
@@ -176,29 +171,7 @@ module.exports = (client, sharedState) => {
                 }
             });
 
-            // Also write to Google Sheets as backup
-            try {
-                const { addOrderToSheet } = require('../../../sheets_sync');
-                if (addOrderToSheet) {
-                    await addOrderToSheet({
-                        id: order.id,
-                        cliente: phoneNumeric,
-                        nombre: addr.nombre || '',
-                        producto: product,
-                        plan: plan,
-                        precio: total.toLocaleString('es-AR'),
-                        calle: addr.calle || '',
-                        ciudad: addr.ciudad || '',
-                        cp: addr.cp || '',
-                        provincia: addr.provincia || '',
-                        status: 'Confirmado',
-                        postdatado: state.postdatado || '',
-                        createdAt: new Date().toISOString()
-                    });
-                }
-            } catch (sheetErr) {
-                console.warn('⚠️ [MANUAL-COMPLETE] Sheets backup failed:', sheetErr.message);
-            }
+
 
             // Set user state to completed
             if (state) {

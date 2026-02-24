@@ -4,7 +4,7 @@ const qrcode = require('qrcode-terminal');
 const { exec } = require('child_process'); // For sound
 const { logMessage } = require('./logger'); // Import Logger
 const { analyzeDailyLogs } = require('./analyze_day'); // Import Analyzer
-const { appendOrderToSheet, updateOrderInSheet } = require('./sheets_sync');
+// Google Sheets removed — PostgreSQL is now the sole source of truth
 const fs = require('fs');
 const path = require('path');
 const { atomicWriteFile } = require('./safeWrite');
@@ -102,7 +102,7 @@ function saveKnowledge(scriptName = null) {
 }
 
 let _saveStateTimeout = null;
-function saveState() {
+function saveState(changedUserId = null) {
     if (_saveStateTimeout) clearTimeout(_saveStateTimeout);
     _saveStateTimeout = setTimeout(async () => {
         try {
@@ -110,8 +110,12 @@ function saveState() {
             const stateToSave = { userState, chatResets, lastAlertUser, pausedUsers: Array.from(pausedUsers), config };
             atomicWriteFile(STATE_FILE, JSON.stringify(stateToSave, null, 2));
 
-            // MIGRATION: Persist all users to Postgres concurrently
-            const userPromises = Object.entries(userState).map(([phone, data]) => {
+            // Persist only the changed user to DB (avoid N+1 flood)
+            const usersToSave = changedUserId
+                ? [[changedUserId, userState[changedUserId]]].filter(([, v]) => v)
+                : Object.entries(userState);
+
+            const userPromises = usersToSave.map(([phone, data]) => {
                 const cleanPhone = phone.replace('@c.us', '');
                 return prisma.user.upsert({
                     where: { phone: cleanPhone },
@@ -120,7 +124,7 @@ function saveState() {
                 });
             });
 
-            // MIGRATION: Persist dynamic config (activeScript, alertNumbers)
+            // Persist dynamic config
             const configPromises = Object.entries(config).map(([key, value]) => {
                 return prisma.botConfig.upsert({
                     where: { key },
@@ -410,9 +414,6 @@ function cancelLatestOrder(userId) {
 
                 if (sharedState.io) sharedState.io.emit('order_update', legacyFormatUpdate);
 
-                try {
-                    await updateOrderInSheet(targetOrder.id, { status: 'Cancelado' });
-                } catch (e) { console.error('[CANCEL] Sheet Error:', e.message); }
 
                 resolve({ success: true, order: legacyFormatUpdate });
             } catch (err) {
@@ -757,8 +758,8 @@ client.on('message', async msg => {
         // 4. Debounce: accumulate rapid-fire messages
         let currentDelay = DEBOUNCE_MS;
         if (userState[userId] && userState[userId].step === 'waiting_data') {
-            currentDelay = 60000; // 1 minuto de tolerancia si está ingresando dirección
-            console.log(`[DEBOUNCE] Aumentando delay a 60s para ${userId} (ingresando datos de envío)...`);
+            currentDelay = 15000; // 15 seconds tolerance for address entry
+            console.log(`[DEBOUNCE] Aumentando delay a 15s para ${userId} (ingresando datos de envío)...`);
         }
 
         if (pendingMessages.has(userId)) {
@@ -860,5 +861,19 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason) => {
     console.error('[FATAL] Unhandled Rejection:', reason);
 });
+
+// Graceful Shutdown
+const _shutdown = async (signal) => {
+    console.log(`[SHUTDOWN] Received ${signal}. Cleaning up...`);
+    try {
+        await prisma.$disconnect();
+        const { pool } = require('./db');
+        await pool.end();
+        console.log('[SHUTDOWN] DB connections closed.');
+    } catch (e) { console.error('[SHUTDOWN] Error:', e.message); }
+    process.exit(0);
+};
+process.on('SIGTERM', () => _shutdown('SIGTERM'));
+process.on('SIGINT', () => _shutdown('SIGINT'));
 
 safeInitialize();

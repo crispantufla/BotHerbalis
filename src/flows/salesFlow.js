@@ -2,7 +2,7 @@ const { aiService } = require('../services/ai');
 const { MessageMedia } = require('whatsapp-web.js');
 const { validateAddress } = require('../services/addressValidator');
 const { atomicWriteFile } = require('../../safeWrite');
-const { appendOrderToSheet } = require('../../sheets_sync');
+// Google Sheets removed — DB is sole source of truth
 const path = require('path');
 const fs = require('fs');
 const { buildConfirmationMessage } = require('../utils/messageTemplates');
@@ -1875,7 +1875,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 if (currentState.pendingOrder) {
                     const orderData = _buildOrderData({ postdatado });
                     if (dependencies.saveOrderToLocal) dependencies.saveOrderToLocal(orderData);
-                    appendOrderToSheet(orderData).catch(e => console.error('[SHEETS] Async log failed:', e.message));
+
                     console.log(`✅ [PEDIDO CONFIRMADO - POSTDATADO ${postdatado}] ${userId} — Total: $${currentState.totalPrice || '0'}`);
 
                     // --- METRICS TRACKING ---
@@ -1904,7 +1904,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 if (currentState.pendingOrder) {
                     const orderData = _buildOrderData();
                     if (dependencies.saveOrderToLocal) dependencies.saveOrderToLocal(orderData);
-                    appendOrderToSheet(orderData).catch(e => console.error('🔴 [SHEETS] Async log failed:', e.message));
+
                     console.log(`✅ [PEDIDO CARGADO - PENDIENTE APROBACIÓN] ${userId} — Total: $${currentState.totalPrice || '0'}`);
 
                     // Notify Admin Now so they can click "APROBAR"
@@ -1935,7 +1935,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 if (currentState.pendingOrder) {
                     const orderData = _buildOrderData({ createdAt: new Date().toISOString(), status: 'Pendiente (revisar respuesta)' });
                     if (dependencies.saveOrderToLocal) dependencies.saveOrderToLocal(orderData);
-                    appendOrderToSheet(orderData).catch(e => console.error('[SHEETS] Async log failed:', e.message));
+
 
                     // --- METRICS TRACKING ---
                     const trackScript = dependencies.effectiveScript || dependencies.config?.activeScript || 'v3';
