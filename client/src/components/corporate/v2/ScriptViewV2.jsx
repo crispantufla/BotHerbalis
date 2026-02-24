@@ -22,6 +22,7 @@ const ScriptViewV2 = () => {
     const [loading, setLoading] = useState(true);
     const [showGallery, setShowGallery] = useState(null);
     const [galleryImages, setGalleryImages] = useState([]);
+    const [faqSearchTerm, setFaqSearchTerm] = useState('');
 
     // Multi-script support
     const [viewingVersion, setViewingVersion] = useState('v3');
@@ -321,42 +322,60 @@ const ScriptViewV2 = () => {
 
                             {activeTab === 'faq' && (
                                 <div className="space-y-6 max-w-4xl mx-auto">
-                                    <div className="flex justify-end mb-4">
-                                        <button onClick={addFAQ} className="px-6 py-3 bg-white border border-indigo-200 text-indigo-600 rounded-xl text-xs font-extrabold uppercase tracking-widest hover:bg-indigo-50 shadow-sm transition-all flex items-center gap-2">
+                                    <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-4">
+                                        <div className="relative w-full sm:w-96 group">
+                                            <input
+                                                type="text"
+                                                placeholder="Buscar por palabra clave o respuesta..."
+                                                value={faqSearchTerm}
+                                                onChange={(e) => setFaqSearchTerm(e.target.value)}
+                                                className="w-full bg-white/70 border border-white rounded-xl pl-11 pr-4 py-3.5 text-sm font-bold text-slate-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 focus:bg-white transition-all shadow-inner placeholder:text-slate-400 placeholder:font-medium hover:shadow-md hover:border-indigo-100"
+                                            />
+                                            <span className="absolute left-4 top-3.5 text-slate-400 group-focus-within:text-indigo-500 transition-colors">
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                                            </span>
+                                        </div>
+                                        <button onClick={addFAQ} className="w-full sm:w-auto px-6 py-3 bg-white border border-indigo-200 text-indigo-600 rounded-xl text-xs font-extrabold uppercase tracking-widest hover:bg-indigo-50 shadow-sm transition-all flex items-center justify-center gap-2">
                                             <span className="text-lg leading-none mb-0.5">+</span> Nueva Respuesta
                                         </button>
                                     </div>
                                     <div className="grid gap-6">
-                                        {script.faq.map((item, idx) => (
-                                            <div key={idx} className="bg-white/80 backdrop-blur-md p-6 rounded-3xl border border-white shadow-sm hover:shadow-md transition-all duration-300 relative group">
-                                                <button onClick={() => deleteFAQ(idx)} className="absolute top-4 right-4 w-8 h-8 bg-rose-50 text-rose-400 hover:bg-rose-500 hover:text-white rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all" title="Eliminar FAQ">
-                                                    <IconsV2.Trash />
-                                                </button>
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-2">
-                                                    <div>
-                                                        <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-2 ml-1">Palabras Clave (Tokens)</label>
-                                                        <input
-                                                            type="text"
-                                                            className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono text-slate-600 focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all shadow-inner"
-                                                            value={item.keywords.join(', ')}
-                                                            placeholder="ej: envios, correo, andreani"
-                                                            onChange={(e) => handleFAQChange(idx, 'keywords', e.target.value.split(',').map(s => s.trim()))}
-                                                        />
-                                                        <p className="text-[10px] font-medium text-slate-400 mt-2 ml-2">Separadas por comas. El bot usará esto como triggers.</p>
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-2 ml-1">Respuesta Estática</label>
-                                                        <textarea
-                                                            className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all shadow-inner"
-                                                            rows={3}
-                                                            placeholder="Respuesta literal que mandará el bot..."
-                                                            value={item.response}
-                                                            onChange={(e) => handleFAQChange(idx, 'response', e.target.value)}
-                                                        />
+                                        {script.faq.map((item, originalIndex) => ({ item, originalIndex }))
+                                            .filter(({ item }) => {
+                                                if (!faqSearchTerm) return true;
+                                                const term = faqSearchTerm.toLowerCase();
+                                                return item.keywords.some(k => k.toLowerCase().includes(term)) || (item.response && item.response.toLowerCase().includes(term));
+                                            })
+                                            .map(({ item, originalIndex }) => (
+                                                <div key={originalIndex} className="bg-white/80 backdrop-blur-md p-6 rounded-3xl border border-white shadow-sm hover:shadow-md transition-all duration-300 relative group">
+                                                    <button onClick={() => deleteFAQ(originalIndex)} className="absolute top-4 right-4 w-8 h-8 bg-rose-50 text-rose-400 hover:bg-rose-500 hover:text-white rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all" title="Eliminar FAQ">
+                                                        <IconsV2.Trash />
+                                                    </button>
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-2">
+                                                        <div>
+                                                            <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-2 ml-1">Palabras Clave (Tokens)</label>
+                                                            <input
+                                                                type="text"
+                                                                className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono text-slate-600 focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all shadow-inner"
+                                                                value={item.keywords.join(', ')}
+                                                                placeholder="ej: envios, correo, andreani"
+                                                                onChange={(e) => handleFAQChange(originalIndex, 'keywords', e.target.value.split(',').map(s => s.trim()))}
+                                                            />
+                                                            <p className="text-[10px] font-medium text-slate-400 mt-2 ml-2">Separadas por comas. El bot usará esto como triggers.</p>
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-2 ml-1">Respuesta Estática</label>
+                                                            <textarea
+                                                                className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all shadow-inner"
+                                                                rows={3}
+                                                                placeholder="Respuesta literal que mandará el bot..."
+                                                                value={item.response}
+                                                                onChange={(e) => handleFAQChange(originalIndex, 'response', e.target.value)}
+                                                            />
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        ))}
+                                            ))}
                                     </div>
                                 </div>
                             )}

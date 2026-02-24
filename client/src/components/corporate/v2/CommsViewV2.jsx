@@ -313,7 +313,7 @@ Teléfono: ${phoneDisplay}`;
             <div className="absolute top-0 right-1/4 w-64 h-64 bg-indigo-400/10 blur-[80px] rounded-full pointer-events-none"></div>
 
             {/* SIDEBAR: Contacts */}
-            <div className={`w-full md:w-96 border-r border-white/50 flex-col bg-white/40 backdrop-blur-md z-10 ${selectedChat ? 'hidden md:flex' : 'flex'}`}>
+            <div className={`w-full md:w-72 lg:w-[280px] flex-shrink-0 border-r border-white/50 flex-col bg-white/40 backdrop-blur-md z-10 ${selectedChat ? 'hidden md:flex' : 'flex'}`}>
                 {/* Search Header */}
                 <div className="p-5 border-b border-white/50 bg-white/30 backdrop-blur-sm">
                     <div className="relative group">
@@ -581,7 +581,7 @@ Teléfono: ${phoneDisplay}`;
 
             {/* RIGHT PANEL - AI & Scripts Context Drawer (V3 Ported to V2) */}
             {selectedChat && showScriptPanel && (
-                <div className="w-[320px] shrink-0 border-l border-white/50 bg-slate-50/40 backdrop-blur-xl flex flex-col z-30 overflow-y-auto relative animate-fade-in shadow-[-10px_0_30px_rgba(0,0,0,0.05)] h-full">
+                <div className="w-full md:w-[380px] lg:w-[450px] shrink-0 border-l border-white/50 bg-slate-50/40 backdrop-blur-xl flex flex-col z-30 overflow-y-auto relative animate-fade-in shadow-[-10px_0_30px_rgba(0,0,0,0.05)] h-full">
 
                     <div className="p-5 border-b border-white/50 flex justify-between items-center bg-white/50 shadow-sm z-10 sticky top-0 backdrop-blur-md">
                         <h3 className="font-extrabold text-slate-800 text-[15px] flex items-center gap-2">
