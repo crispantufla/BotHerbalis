@@ -362,9 +362,7 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
                                         <span className="text-xs font-bold hidden xl:inline">Pedidos</span>
                                     </button>
                                 )}
-                                <button onClick={handleSummarize} disabled={summarizing} className="p-2 sm:p-3 flex-shrink-0 rounded-xl bg-violet-100/80 text-violet-700 hover:bg-violet-200 hover:shadow-md transition-all" title="Resumen de IA">
-                                    <IconsV2.AI />
-                                </button>
+
                                 <button onClick={handleClearChat} className="p-2 sm:p-3 flex-shrink-0 rounded-xl bg-rose-100/80 text-rose-600 hover:bg-rose-200 hover:shadow-md transition-all" title="Reiniciar Memoria e Historial">
                                     <IconsV2.Trash />
                                 </button>
