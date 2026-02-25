@@ -284,6 +284,7 @@ Teléfono: ${phoneDisplay}`;
                                 <th className="px-4 sm:px-8 py-5 hidden md:table-cell">Fecha</th>
                                 <th className="px-4 sm:px-8 py-5 w-full">Cliente</th>
                                 <th className="px-4 sm:px-8 py-5 whitespace-nowrap">Teléfono</th>
+                                <th className="px-4 sm:px-8 py-5 text-center">Vendedor</th>
                                 <th className="px-4 sm:px-8 py-5 text-center">Estado</th>
                                 <th className="px-4 sm:px-8 py-5 text-right w-10">Acciones</th>
                             </tr>
@@ -339,6 +340,15 @@ Teléfono: ${phoneDisplay}`;
                                                 <svg className="w-4 h-4 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                                                 {order.cliente ? '+' + order.cliente.split('@')[0].replace(/\D/g, '') : '—'}
                                             </p>
+                                        </td>
+                                        <td className="px-4 sm:px-8 py-5 text-center">
+                                            {order.seller ? (
+                                                <span className="px-2 py-1 bg-blue-50 text-blue-600 rounded-md text-[10px] font-bold border border-blue-100 shadow-sm">
+                                                    +{order.seller.replace(/\D/g, '')}
+                                                </span>
+                                            ) : (
+                                                <span className="text-[10px] text-slate-400 font-medium">—</span>
+                                            )}
                                         </td>
                                         <td className="px-4 sm:px-8 py-5 text-center">
                                             <span className={`px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-widest border ${statusStyles[order.status] || statusStyles['Pendiente']}`}>
@@ -399,9 +409,15 @@ Teléfono: ${phoneDisplay}`;
                                                 const dt = formatDateBA(order.createdAt);
                                                 if (typeof dt === 'string' && dt.includes(',')) {
                                                     const [datePart] = dt.split(',');
-                                                    return <span className="font-extrabold text-[10px] text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">{datePart.trim()}</span>;
+                                                    return <div className="flex flex-col items-end gap-1">
+                                                        <span className="font-extrabold text-[10px] text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">{datePart.trim()}</span>
+                                                        {order.seller && <span className="font-bold text-[9px] text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">+{order.seller.replace(/\D/g, '')}</span>}
+                                                    </div>;
                                                 }
-                                                return <span className="font-extrabold text-[10px] text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">{dt}</span>;
+                                                return <div className="flex flex-col items-end gap-1">
+                                                    <span className="font-extrabold text-[10px] text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">{dt}</span>
+                                                    {order.seller && <span className="font-bold text-[9px] text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">+{order.seller.replace(/\D/g, '')}</span>}
+                                                </div>;
                                             })()}
                                         </div>
                                     </div>

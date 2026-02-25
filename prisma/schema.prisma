@@ -28,6 +28,7 @@ model Order {
   totalPrice  Float
   tracking    String?
   postdated   String?
+  seller      String?  // Phone number of the WhatsApp session that created the order
   
   nombre      String?
   calle       String?

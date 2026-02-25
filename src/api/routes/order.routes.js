@@ -39,6 +39,7 @@ module.exports = (client, sharedState) => {
                 ciudad: o.ciudad || '',
                 provincia: o.provincia || '',
                 cp: o.cp || '',
+                seller: o.seller || '',
                 createdAt: o.createdAt.toISOString()
             }));
 
@@ -89,6 +90,7 @@ module.exports = (client, sharedState) => {
                 ciudad: updatedOrder.ciudad || '',
                 provincia: updatedOrder.provincia || '',
                 cp: updatedOrder.cp || '',
+                seller: updatedOrder.seller || '',
                 createdAt: updatedOrder.createdAt.toISOString()
             };
 

@@ -360,6 +360,7 @@ function saveOrderToLocal(order) {
             ciudad: order.ciudad || null,
             provincia: order.provincia || null,
             cp: order.cp || null,
+            seller: client?.info?.wid?.user || null
         };
 
         try {

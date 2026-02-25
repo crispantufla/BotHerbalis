@@ -162,6 +162,7 @@ const SalesView = ({ onGoToChat }) => {
                                 <th className="px-6 py-4">Producto / Plan</th>
                                 <th className="px-6 py-4 text-right">Monto</th>
                                 <th className="px-6 py-4 text-center">Postdatado</th>
+                                <th className="px-6 py-4 text-center">Vendedor</th>
                                 <th className="px-6 py-4 text-center">Estado</th>
                                 <th className="px-6 py-4 text-center">Tracking</th>
                                 <th className="px-6 py-4 text-right">Acciones</th>
@@ -202,6 +203,15 @@ const SalesView = ({ onGoToChat }) => {
                                             {order.postdatado ? (
                                                 <span className="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded shadow-sm border border-amber-200">
                                                     {order.postdatado}
+                                                </span>
+                                            ) : (
+                                                <span className="text-slate-300">—</span>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            {order.seller ? (
+                                                <span className="px-2 py-1 bg-blue-50 text-blue-600 text-[10px] font-bold rounded border border-blue-200">
+                                                    +{order.seller.replace(/\D/g, '')}
                                                 </span>
                                             ) : (
                                                 <span className="text-slate-300">—</span>
