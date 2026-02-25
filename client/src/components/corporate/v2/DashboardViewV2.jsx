@@ -124,8 +124,8 @@ const DashboardViewV2 = ({ alerts = [], config, handleQuickAction, status, qrDat
                 <button
                     onClick={handleToggleGlobalPause}
                     className={`flex items-center justify-center gap-4 px-6 rounded-[1.25rem] font-bold transition-all shadow-sm w-72 h-full ${isGlobalPause
-                            ? 'bg-amber-100/90 text-amber-800 hover:bg-amber-200 border-2 border-amber-200 shadow-amber-500/20'
-                            : 'bg-white border-2 border-slate-100/80 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 hover:border-indigo-100 hover:shadow-indigo-500/10'
+                        ? 'bg-amber-100/90 text-amber-800 hover:bg-amber-200 border-2 border-amber-200 shadow-amber-500/20'
+                        : 'bg-white border-2 border-slate-100/80 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 hover:border-indigo-100 hover:shadow-indigo-500/10'
                         }`}
                 >
                     {isGlobalPause ? (
