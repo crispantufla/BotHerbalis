@@ -222,23 +222,26 @@ function cleanAuth(dir) {
 
         // Locks can be in session-session or session-session/Default depending on Puppeteer version
         const pathsToClean = [sessionPath, defaultPath];
+        const locks = ['SingletonLock', 'SingletonCookie', 'SingletonSocket'];
 
         let clearedLocks = 0;
         pathsToClean.forEach(targetPath => {
-            if (fs.existsSync(targetPath)) {
-                const locks = ['SingletonLock', 'SingletonCookie', 'SingletonSocket'];
-                locks.forEach(lock => {
-                    const lockPath = path.join(targetPath, lock);
-                    if (fs.existsSync(lockPath)) {
-                        fs.unlinkSync(lockPath);
-                        clearedLocks++;
-                    }
-                });
-            }
+            locks.forEach(lock => {
+                const lockPath = path.join(targetPath, lock);
+                // CRITICAL: Use unlinkSync directly instead of existsSync.
+                // On Linux, SingletonLock is a SYMLINK pointing to {hostname}-{pid}.
+                // When the old container dies, the symlink target no longer exists (dangling symlink).
+                // fs.existsSync() follows symlinks → broken symlink returns false → lock never deleted!
+                // fs.unlinkSync() works on the symlink itself, regardless of target.
+                try {
+                    fs.unlinkSync(lockPath);
+                    clearedLocks++;
+                } catch (e) { /* File doesn't exist — that's fine */ }
+            });
         });
 
         if (clearedLocks > 0) {
-            console.log(`[BOOT] Cleared ${clearedLocks} stale Chrome lock(s) at ${sessionPath} to prevent 'profile in use' crash.`);
+            console.log(`[BOOT] ✅ Cleared ${clearedLocks} stale Chrome lock(s) to prevent 'profile in use' crash.`);
         }
     } catch (e) {
         console.error(`[BOOT] Failed to clean Chrome locks: ${e.message}`);
@@ -876,19 +879,10 @@ async function safeInitialize(attempt = 1) {
         if (attempt < MAX_INIT_RETRIES) {
             const authDir = path.join(DATA_DIR, '.wwebjs_auth');
 
-            // Instead of soft-cleaning, we just wait and retry.
-            // If it's a Chrome lock issue, sometimes it resolves itself.
-            // Full wipe only on LAST retry (forces new QR but at least works)
-            if (attempt === MAX_INIT_RETRIES - 1) {
-                // Last retry: full wipe as last resort
-                console.log(`[INIT] FULL session wipe at ${authDir} (last resort — will need new QR)...`);
-                try {
-                    fs.rmSync(authDir, { recursive: true, force: true });
-                    console.log('[INIT] Session wiped. Will need new QR scan.');
-                } catch (cleanErr) {
-                    console.error('[INIT] Failed to clean session:', cleanErr.message);
-                }
-            }
+            // Clean Chrome lock files between retries (preserves WhatsApp session!)
+            // The lock is a broken symlink on Linux — cleanAuth handles this correctly now.
+            console.log(`[INIT] Cleaning Chrome locks before retry...`);
+            cleanAuth(authDir);
 
             const delay = 5000 * attempt;
             console.log(`[INIT] Retrying in ${delay / 1000}s...`);
@@ -916,11 +910,24 @@ process.on('unhandledRejection', (reason) => {
 const _shutdown = async (signal) => {
     console.log(`[SHUTDOWN] Received ${signal}. Cleaning up...`);
     try {
+        // CRITICAL: Destroy WhatsApp client FIRST so Chrome cleans up its lock files.
+        // Without this, Chrome leaves a SingletonLock symlink in the persistent volume
+        // which prevents the next container from starting Chrome.
+        if (client) {
+            console.log('[SHUTDOWN] Destroying WhatsApp client (cleaning Chrome locks)...');
+            await Promise.race([
+                client.destroy(),
+                new Promise(r => setTimeout(r, 5000)) // 5s timeout — don't hang forever
+            ]);
+            console.log('[SHUTDOWN] WhatsApp client destroyed.');
+        }
+    } catch (e) { console.error('[SHUTDOWN] Error destroying client:', e.message); }
+    try {
         await prisma.$disconnect();
         const { pool } = require('./db');
         await pool.end();
         console.log('[SHUTDOWN] DB connections closed.');
-    } catch (e) { console.error('[SHUTDOWN] Error:', e.message); }
+    } catch (e) { console.error('[SHUTDOWN] Error closing DB:', e.message); }
     process.exit(0);
 };
 process.on('SIGTERM', () => _shutdown('SIGTERM'));
