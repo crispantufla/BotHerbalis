@@ -3,14 +3,7 @@ import api from '../../../config/axios';
 import { API_URL } from '../../../config/api';
 import { useToast } from '../../ui/Toast';
 
-const IconsV2 = {
-    Upload: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>,
-    Search: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
-    Filter: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>,
-    Trash: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
-    Maximize: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5-5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>,
-    Image: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-};
+import { Upload, Search, Filter, Trash2 as Trash, Maximize, Image as ImageIcon } from 'lucide-react';
 
 const GalleryViewV2 = () => {
     const { toast, confirm } = useToast();
@@ -105,7 +98,7 @@ const GalleryViewV2 = () => {
                             </>
                         ) : (
                             <>
-                                <span className="group-hover:scale-110 transition-transform block"><IconsV2.Upload /></span>
+                                <span className="group-hover:scale-110 transition-transform block"><Upload className="w-5 h-5" /></span>
                                 <span>Cargar Nueva Imagen</span>
                             </>
                         )}
@@ -127,7 +120,7 @@ const GalleryViewV2 = () => {
                             onChange={(e) => setFilter(e.target.value)}
                             className="w-full bg-white/70 border border-white rounded-xl pl-12 pr-4 py-3.5 text-sm font-bold text-slate-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 focus:bg-white transition-all shadow-inner placeholder:text-slate-400 placeholder:font-medium hover:shadow-md hover:border-indigo-100"
                         />
-                        <span className="absolute left-4 top-3.5 text-slate-400 group-focus-within:text-indigo-500 transition-colors"><IconsV2.Search /></span>
+                        <span className="absolute left-4 top-3.5 text-slate-400 group-focus-within:text-indigo-500 transition-colors"><Search className="w-5 h-5" /></span>
                     </div>
 
                     <div className="relative">
@@ -142,7 +135,7 @@ const GalleryViewV2 = () => {
                                 </option>
                             ))}
                         </select>
-                        <span className="absolute left-4 top-3.5 text-slate-400"><IconsV2.Filter /></span>
+                        <span className="absolute left-4 top-3.5 text-slate-400"><Filter className="w-5 h-5" /></span>
                         <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none text-slate-400">
                             <span className="text-[10px]">▼</span>
                         </div>
@@ -159,7 +152,7 @@ const GalleryViewV2 = () => {
                     ) : filteredImages.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-full min-h-[400px] bg-white/40 backdrop-blur-xl rounded-[2rem] border border-white/60 border-dashed m-1">
                             <div className="w-20 h-20 bg-gradient-to-br from-indigo-50 to-purple-50 shadow-sm border border-indigo-100/50 rounded-full flex items-center justify-center mb-6 text-indigo-400">
-                                <IconsV2.Image />
+                                <ImageIcon className="w-6 h-6" />
                             </div>
                             <p className="text-slate-600 font-extrabold text-lg mb-1 tracking-tight">Galería Vacía</p>
                             <p className="text-sm font-medium text-slate-500">Utilizá el botón de carga superior para añadir imágenes.</p>
@@ -183,14 +176,14 @@ const GalleryViewV2 = () => {
                                                 className="w-12 h-12 rounded-full bg-white/20 hover:bg-white text-white hover:text-indigo-600 backdrop-blur-md flex items-center justify-center shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-all duration-300"
                                                 title="Visualización Completa"
                                             >
-                                                <IconsV2.Maximize />
+                                                <Maximize className="w-4 h-4" />
                                             </button>
                                             <button
                                                 onClick={() => handleDelete(img)}
                                                 className="w-12 h-12 rounded-full bg-rose-500/80 hover:bg-rose-600 text-white backdrop-blur-md flex items-center justify-center shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-all duration-300 delay-75"
                                                 title="Eliminar Recurso"
                                             >
-                                                <IconsV2.Trash />
+                                                <Trash className="w-4 h-4" />
                                             </button>
                                         </div>
                                     </div>

@@ -84,6 +84,9 @@ module.exports = (client, sharedState) => {
 
     // GET /chats
     router.get('/chats', authMiddleware, async (req, res) => {
+        if (!sharedState.isConnected) {
+            return res.json([]); // Return empty list if WA is still initializing
+        }
         try {
             const chats = await withTimeout(client.getChats(), 10000, "Timeout retrieving chats");
 

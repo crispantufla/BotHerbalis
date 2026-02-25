@@ -1,3 +1,4 @@
+const logger = require('./logger');
 const fs = require('fs');
 const path = require('path');
 
@@ -37,7 +38,7 @@ function getLocalHistory(chatId, sinceTimestamp = 0) {
                 }
             });
         } catch (e) {
-            console.error(`Error reading log file ${file}:`, e.message);
+            logger.error(`Error reading log file ${file}:`, e.message);
         }
     });
 

@@ -5,12 +5,7 @@ import { useSocket } from '../../../context/SocketContext';
 import PriceEditor from '../../PriceEditor'; // Assuming reusing the original PriceEditor, it's ok since it's an internal component, but ideally it should also be V2. Let's wrap it in a glass container.
 import { useToast } from '../../ui/Toast';
 
-const IconsV2 = {
-    Settings: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
-    Download: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" /></svg>,
-    Script: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
-    Power: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-};
+import { Settings, Download, FileText, Power } from 'lucide-react';
 
 const SettingsViewV2 = ({ status }) => {
     const { socket } = useSocket();
@@ -133,7 +128,7 @@ const SettingsViewV2 = ({ status }) => {
                             <div className="absolute -bottom-20 -right-20 w-80 h-80 bg-purple-400/10 blur-[80px] rounded-full pointer-events-none"></div>
                             <div className="flex items-center gap-4 mb-8 relative z-10">
                                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-fuchsia-600 text-white flex items-center justify-center shadow-lg shadow-purple-500/20">
-                                    <IconsV2.Script />
+                                    <FileText className="w-6 h-6" />
                                 </div>
                                 <div>
                                     <h3 className="font-extrabold text-slate-800 text-lg">Modelos de Venta (A/B)</h3>
@@ -192,7 +187,7 @@ const SettingsViewV2 = ({ status }) => {
 
                             <div className="pl-6 relative z-10">
                                 <h3 className="font-extrabold text-rose-700 text-lg mb-2 flex items-center gap-2">
-                                    <IconsV2.Power /> Interrupción Fuerte
+                                    <Power className="w-6 h-6" /> Interrupción Fuerte
                                 </h3>
                                 <p className="text-sm font-medium text-slate-600 leading-relaxed max-w-sm mb-6">
                                     Cerrar la sesión desconecta inmediatamente el dispositivo vinculado de WhatsApp. Ningún mensaje será respondido luego de esta acción.
@@ -208,7 +203,7 @@ const SettingsViewV2 = ({ status }) => {
                             <div className="absolute top-0 right-0 w-32 h-32 bg-blue-400/10 blur-[50px] rounded-full pointer-events-none"></div>
                             <div className="flex items-center gap-4 mb-6 relative z-10">
                                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/20">
-                                    <IconsV2.Settings />
+                                    <Settings className="w-6 h-6" />
                                 </div>
                                 <div>
                                     <h3 className="font-extrabold text-slate-800 text-lg">Herramientas</h3>
@@ -217,7 +212,7 @@ const SettingsViewV2 = ({ status }) => {
                             </div>
 
                             <button onClick={handleTestReport} className="w-full bg-white border border-slate-200 text-slate-700 px-6 py-4 rounded-xl text-sm font-extrabold hover:border-indigo-300 hover:text-indigo-600 transition-all shadow-sm flex items-center justify-center gap-3 group relative z-10 hover:shadow-md">
-                                <span className="text-indigo-400 group-hover:text-indigo-600 transition-colors"><IconsV2.Download /></span>
+                                <span className="text-indigo-400 group-hover:text-indigo-600 transition-colors"><Download className="w-5 h-5" /></span>
                                 Generar & Descargar Reporte PDF
                             </button>
                         </div>

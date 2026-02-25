@@ -1,3 +1,4 @@
+const logger = require('../utils/logger');
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -17,7 +18,7 @@ function startServer(client, sharedState) {
 
     // Validate sharedState
     if (!userState || !sessionAlerts) {
-        console.error("❌ [SERVER] Critical: Shared State missing!");
+        logger.error("❌ [SERVER] Critical: Shared State missing!");
     }
 
     const app = express();
@@ -55,11 +56,11 @@ function startServer(client, sharedState) {
     const clientDistPath = path.join(__dirname, '../../client/dist');
     if (require('fs').existsSync(clientDistPath)) {
         app.use(express.static(clientDistPath));
-        console.log(`✅ Serving static files from: ${clientDistPath}`);
+        logger.info(`✅ Serving static files from: ${clientDistPath}`);
     } else {
         // Fallback for local development if dist doesn't exist yet
         app.use(express.static(path.join(__dirname, '../../public')));
-        console.log(`ℹ️ Client build not found. Serving public folder only.`);
+        logger.info(`ℹ️ Client build not found. Serving public folder only.`);
     }
 
     // Always serve /media from public/ for audio files, images, etc.
@@ -116,7 +117,7 @@ function startServer(client, sharedState) {
 
     const PORT = process.env.PORT || 3000;
     server.listen(PORT, () => {
-        console.log(`✅ Server running on http://localhost:${PORT}`);
+        logger.info(`✅ Server running on http://localhost:${PORT}`);
     });
 
     return { io, app };

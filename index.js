@@ -1,4 +1,26 @@
-﻿require('dotenv').config();
+const logger = require('./src/utils/logger');
+require('dotenv').config();
+
+// --- PUPPETEER STEALTH INJECTION ---
+// whatsapp-web.js doesn't natively accept custom puppeteer modules easily anymore.
+// We intercept the require cache so when it calls `require('puppeteer')`, it gets our stealth version.
+const puppeteerExtra = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+puppeteerExtra.use(StealthPlugin());
+
+try {
+    const puppeteerPath = require.resolve('puppeteer');
+    require.cache[puppeteerPath] = {
+        id: puppeteerPath,
+        filename: puppeteerPath,
+        loaded: true,
+        exports: puppeteerExtra
+    };
+    logger.info('[BOOT] Injection: Puppeteer Stealth Plugin is active.');
+} catch (e) {
+    logger.error('[BOOT] Failed to inject Puppeteer Stealth Plugin:', e.message);
+}
+
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const { exec } = require('child_process'); // For sound
@@ -22,22 +44,22 @@ const { prisma } = require('./db');
 const defaultDataFolder = path.join(__dirname, 'data');
 const DATA_DIR = process.env.DATA_DIR || (process.env.NODE_ENV === 'production' ? defaultDataFolder : __dirname);
 
-console.log(`=========================================`);
-console.log(`[BOOT] DATA_DIR is set to: ${DATA_DIR}`);
-console.log(`[BOOT] Ensuring DATA_DIR exists...`);
+logger.info(`=========================================`);
+logger.info(`[BOOT] DATA_DIR is set to: ${DATA_DIR}`);
+logger.info(`[BOOT] Ensuring DATA_DIR exists...`);
 if (!fs.existsSync(DATA_DIR)) {
-    console.log(`[BOOT] Creating DATA_DIR at ${DATA_DIR}`);
+    logger.info(`[BOOT] Creating DATA_DIR at ${DATA_DIR}`);
     fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-console.log(`[BOOT] Checking existing files in DATA_DIR:`);
+logger.info(`[BOOT] Checking existing files in DATA_DIR:`);
 try {
     const files = fs.readdirSync(DATA_DIR);
-    console.log(files.length > 0 ? files.join(', ') : '(Empty directory)');
+    logger.info(files.length > 0 ? files.join(', ') : '(Empty directory)');
 } catch (e) {
-    console.log(`[BOOT] Could not read DATA_DIR:`, e.message);
+    logger.info(`[BOOT] Could not read DATA_DIR:`, e.message);
 }
-console.log(`=========================================`);
+logger.info(`=========================================`);
 
 const STATE_FILE = path.join(DATA_DIR, 'persistence.json');
 const ORDERS_FILE = path.join(DATA_DIR, 'orders.json');
@@ -52,7 +74,30 @@ const KNOWLEDGE_FILES = {
 let multiKnowledge = { 'v3': { flow: {}, faq: [] }, 'v4': { flow: {}, faq: [] } };
 // Fallback reference for legacy code if any still defaults to picking 'knowledge'
 let knowledge = multiKnowledge['v3'];
-const userState = {};
+const { userCache } = require('./src/utils/cache');
+const userState = new Proxy({}, {
+    get: (target, prop) => {
+        if (prop === 'constructor' || typeof prop === 'symbol' || prop === 'then' || prop === 'toJSON') return Reflect.get(target, prop);
+        return userCache.get(prop);
+    },
+    set: (target, prop, value) => {
+        if (typeof prop === 'symbol') { target[prop] = value; return true; }
+        return userCache.set(prop, value);
+    },
+    deleteProperty: (target, prop) => {
+        return userCache.del(prop) > 0;
+    },
+    has: (target, prop) => {
+        return userCache.has(prop);
+    },
+    ownKeys: (target) => {
+        return userCache.keys();
+    },
+    getOwnPropertyDescriptor: (target, prop) => {
+        if (userCache.has(prop)) return { enumerable: true, configurable: true, value: userCache.get(prop) };
+        return undefined;
+    }
+});
 const chatResets = {}; // Tracks timestamp of last history clear per user
 let lastAlertUser = null;
 let pausedUsers = new Set();
@@ -76,7 +121,7 @@ function loadKnowledge(scriptName = null) {
                 const raw = fs.readFileSync(filePath);
                 const parsed = JSON.parse(raw);
                 multiKnowledge[name] = parsed;
-                console.log(`✅ Knowledge loaded for ${name} from ${path.basename(filePath)}`);
+                logger.info(`✅ Knowledge loaded for ${name} from ${path.basename(filePath)}`);
             }
         });
 
@@ -86,7 +131,7 @@ function loadKnowledge(scriptName = null) {
         }
         knowledge = multiKnowledge[config.activeScript || 'v3'];
     } catch (e) {
-        console.error('🔴 Error loading knowledge:', e.message);
+        logger.error('🔴 Error loading knowledge:', e.message);
     }
 }
 
@@ -98,7 +143,7 @@ function saveKnowledge(scriptName = null) {
             atomicWriteFile(paths.save, JSON.stringify(multiKnowledge[nameToSave], null, 2));
         }
     } catch (e) {
-        console.error('🔴 Error saving knowledge:', e.message);
+        logger.error('🔴 Error saving knowledge:', e.message);
     }
 }
 
@@ -136,21 +181,21 @@ function saveState(changedUserId = null) {
 
             await Promise.all([...userPromises, ...configPromises]);
         } catch (e) {
-            console.error('🔴 Error saving state to DB:', e.message);
+            logger.error('🔴 Error saving state to DB:', e.message);
         }
     }, 5000); // 5-second debounce to batch multiple concurrent DB updates
 }
 
 async function loadState() {
     try {
-        console.log('🔄 Loading state from PostgreSQL...');
+        logger.info('🔄 Loading state from PostgreSQL...');
         let dbUsers = [];
         let dbConfig = [];
         try {
             dbUsers = await prisma.user.findMany();
             dbConfig = await prisma.botConfig.findMany();
         } catch (dbErr) {
-            console.warn('⚠️ DB Connection failed, falling back to local persistence.json', dbErr.message);
+            logger.warn('⚠️ DB Connection failed, falling back to local persistence.json', dbErr.message);
             if (fs.existsSync(STATE_FILE)) {
                 const raw = fs.readFileSync(STATE_FILE);
                 const data = JSON.parse(raw);
@@ -182,9 +227,9 @@ async function loadState() {
         }
         if (!config.alertNumbers) config.alertNumbers = [];
 
-        console.log(`✅ State loaded from DB (${dbUsers.length} users, config sync)`);
+        logger.info(`✅ State loaded from DB (${dbUsers.length} users, config sync)`);
     } catch (e) {
-        console.error('🔴 Error loading state:', e.message);
+        logger.error('🔴 Error loading state:', e.message);
     }
 }
 
@@ -203,7 +248,7 @@ function cleanAuth(dir) {
 
     // Manual RESET via Env Var
     if (process.env.RESET_SESSION === 'true') {
-        console.log(`[RESET] Deleting session directory: ${dir}`);
+        logger.info(`[RESET] Deleting session directory: ${dir}`);
         try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { }
         return;
     }
@@ -211,7 +256,7 @@ function cleanAuth(dir) {
     // DISABLING AGGRESSIVE CLEANUP.
     // Puppeteer and LocalAuth need their internal files. Deleting them manually
     // has proven to cause "Session closed" and "Navigating frame detached" errors.
-    console.log(`[BOOT] Session directory exists at ${dir}. Skipping full manual cleanup.`);
+    logger.info(`[BOOT] Session directory exists at ${dir}. Skipping full manual cleanup.`);
 
     // FIX FOR RAILWAY/DOCKER RENGAGEMENT: Clean ONLY the Chrome lock files
     // If the container was killed unexpectedly, Chrome leaves a SingletonLock file behind
@@ -242,10 +287,10 @@ function cleanAuth(dir) {
         });
 
         if (clearedLocks > 0) {
-            console.log(`[BOOT] ✅ Cleared ${clearedLocks} stale Chrome lock(s) to prevent 'profile in use' crash.`);
+            logger.info(`[BOOT] ✅ Cleared ${clearedLocks} stale Chrome lock(s) to prevent 'profile in use' crash.`);
         }
     } catch (e) {
-        console.error(`[BOOT] Failed to clean Chrome locks: ${e.message}`);
+        logger.error(`[BOOT] Failed to clean Chrome locks: ${e.message}`);
     }
 }
 
@@ -381,9 +426,9 @@ function saveOrderToLocal(order) {
             if (sharedState.io) sharedState.io.emit('new_order', legacyFormatOrder);
             return legacyFormatOrder;
         } catch (e) {
-            console.error('[ORDER] DB Write error:', e.message);
+            logger.error('[ORDER] DB Write error:', e.message);
         }
-    }).catch(e => console.error('[ORDER] Write queue error:', e.message));
+    }).catch(e => logger.error('[ORDER] Write queue error:', e.message));
 }
 
 // Helper: Cancel Latest User Order
@@ -427,7 +472,7 @@ function cancelLatestOrder(userId) {
 
                 resolve({ success: true, order: legacyFormatUpdate });
             } catch (err) {
-                console.error('[CANCEL] Error canceling:', err.message);
+                logger.error('[CANCEL] Error canceling:', err.message);
                 resolve({ success: false, reason: "ERROR" });
             }
         });
@@ -448,7 +493,7 @@ const sendMessageWithDelay = async (chatId, content, startTime = Date.now()) => 
     // Remaining time to wait. If AI took 8s, remaining is 0.
     const remainingDelay = Math.max(0, targetTotalDelay - elapsedSinceStart);
 
-    console.log(`[DELAY] AI took ${elapsedSinceStart / 1000}s. Waiting ${remainingDelay / 1000}s more (Target: ${targetTotalDelay / 1000}s)`);
+    logger.info(`[DELAY] AI took ${elapsedSinceStart / 1000}s. Waiting ${remainingDelay / 1000}s more (Target: ${targetTotalDelay / 1000}s)`);
 
     // Log and emit immediately (for dashboard)
     logAndEmit(chatId, 'bot', content, userState[chatId]?.step);
@@ -467,9 +512,9 @@ const sendMessageWithDelay = async (chatId, content, startTime = Date.now()) => 
     // Send the actual message
     try {
         await client.sendMessage(chatId, content);
-        console.log(`[SENT] Message sent to ${chatId}`);
+        logger.info(`[SENT] Message sent to ${chatId}`);
     } catch (e) {
-        console.error(`[ERROR] Failed to send message: ${e}`);
+        logger.error(`[ERROR] Failed to send message: ${e}`);
     }
 };
 
@@ -498,7 +543,7 @@ sharedState.requestPairingCode = async (phoneNumber) => {
     // otherwise client.requestPairingCode crashes.
     try {
         await client.pupPage.exposeFunction('onCodeReceivedEvent', (code) => {
-            console.log(`[WA-PAIRING-CODE] Event code received length ${code?.length}:`, code);
+            logger.info(`[WA-PAIRING-CODE] Event code received length ${code?.length}:`, code);
             return code;
         });
     } catch (e) {
@@ -509,21 +554,21 @@ sharedState.requestPairingCode = async (phoneNumber) => {
     const MAX_PAIRING_RETRIES = 5;
     for (let attempt = 1; attempt <= MAX_PAIRING_RETRIES; attempt++) {
         try {
-            console.log(`[PAIRING] Intentando generar código (intento ${attempt}/${MAX_PAIRING_RETRIES})...`);
+            logger.info(`[PAIRING] Intentando generar código (intento ${attempt}/${MAX_PAIRING_RETRIES})...`);
             // Adding a small delay to ensure React state on WA Web is ready
             await new Promise(r => setTimeout(r, 2000));
             return await client.requestPairingCode(phoneNumber);
         } catch (e) {
-            console.warn(`[PAIRING] Puppeteer Error (Intento ${attempt}): ${e.message}`);
+            logger.warn(`[PAIRING] Puppeteer Error (Intento ${attempt}): ${e.message}`);
 
             // if whatsapp-web.js throws 't' or 'CompanionHelloError', it means Rate Limit (429)
             if (e.message === 't' || e.message.includes('CompanionHelloError') || e.message.includes('rate-overlimit')) {
-                console.error(`[PAIRING] ❌ Número bloqueado temporalmente por WhatsApp (Rate Limit).`);
+                logger.error(`[PAIRING] ❌ Número bloqueado temporalmente por WhatsApp (Rate Limit).`);
                 throw new Error("WhatsApp ha bloqueado temporalmente tu número por pedir demasiados códigos de vinculación seguidos (Error 429 - Rate Limit). Debes vincular escaneando el código QR, o esperar un par de horas antes de volver a intentar con código.");
             }
 
             if (attempt === MAX_PAIRING_RETRIES) {
-                console.error(`[PAIRING] ❌ Fallo definitivo tras ${MAX_PAIRING_RETRIES} intentos.`);
+                logger.error(`[PAIRING] ❌ Fallo definitivo tras ${MAX_PAIRING_RETRIES} intentos.`);
                 throw new Error("Error interno de WhatsApp Web. La página no terminó de cargar. Por favor, haz clic en 'Reconectar Bot' o reinicia el servidor.");
             }
         }
@@ -531,33 +576,33 @@ sharedState.requestPairingCode = async (phoneNumber) => {
 };
 
 if (!process.env.OPENAI_API_KEY) {
-    console.error("âŒ CRITICAL: OPENAI_API_KEY is missing in .env!");
+    logger.error("âŒ CRITICAL: OPENAI_API_KEY is missing in .env!");
 } else {
     // Basic mask check log
-    console.log(`âœ… OPENAI_API_KEY initialized.`);
+    logger.info(`âœ… OPENAI_API_KEY initialized.`);
 }
 
 if (!process.env.API_KEY) {
-    console.warn("âš ï¸ SECURITY WARNING: API_KEY not set in .env. Using default insecure key.");
+    logger.warn("âš ï¸ SECURITY WARNING: API_KEY not set in .env. Using default insecure key.");
 } else {
-    console.log(`ðŸ”’ Security: API_KEY configured.`);
+    logger.info(`ðŸ”’ Security: API_KEY configured.`);
 }
 
 // --- CLIENT EVENTS ---
 
 client.on('qr', (qr) => {
-    console.log('ESCANEA ESTE CÓDIGO QR:');
+    logger.info('ESCANEA ESTE CÓDIGO QR:');
     qrcode.generate(qr, { small: true });
     sharedState.qrCodeData = qr;
     if (sharedState.io) sharedState.io.emit('qr', qr);
 });
 
 client.on('ready', () => {
-    console.log('¡Cliente WhatsApp Listo!');
+    logger.info('¡Cliente WhatsApp Listo!');
     sharedState.isConnected = true;
     sharedState.qrCodeData = null;
     sharedState.connectedAt = Math.floor(Date.now() / 1000);
-    console.log(`[READY] connectedAt = ${sharedState.connectedAt}. Ignoring older messages.`);
+    logger.info(`[READY] connectedAt = ${sharedState.connectedAt}. Ignoring older messages.`);
     if (sharedState.io) sharedState.io.emit('ready', { info: client.info });
 
     // P3: Start scheduler for stale user alerts, re-engagement, and auto-approve
@@ -578,45 +623,45 @@ const MAX_RECONNECT_ATTEMPTS = 5;
 const BASE_RECONNECT_DELAY = 3000; // 3s → 6s → 12s → 24s → 48s
 
 client.on('disconnected', (reason) => {
-    console.log(`[WA] Cliente desconectado: ${reason}`);
+    logger.info(`[WA] Cliente desconectado: ${reason}`);
     sharedState.isConnected = false;
     sharedState.qrCodeData = null;
     if (sharedState.io) sharedState.io.emit('status_change', { status: 'disconnected' });
 
     // Auth failure = session invalidated, don't retry blindly
     if (reason === 'LOGOUT' || reason === 'CONFLICT') {
-        console.log('[WA] Sesión cerrada desde el teléfono. Se necesita nuevo QR.');
+        logger.info('[WA] Sesión cerrada desde el teléfono. Se necesita nuevo QR.');
         reconnectAttempts = 0;
         setTimeout(() => {
-            safeInitialize().catch(err => console.error('[WA] Re-init failed:', err.message));
+            safeInitialize().catch(err => logger.error('[WA] Re-init failed:', err.message));
         }, 3000);
         return;
     }
 
     if (sharedState.manualDisconnect) {
-        console.log('[WA] Desconexion manual - esperando nuevo QR');
+        logger.info('[WA] Desconexion manual - esperando nuevo QR');
         sharedState.manualDisconnect = false;
         reconnectAttempts = 0;
         setTimeout(() => {
-            safeInitialize().catch(err => console.error('[WA] Re-init failed:', err.message));
+            safeInitialize().catch(err => logger.error('[WA] Re-init failed:', err.message));
         }, 3000);
         return;
     }
 
     // Exponential backoff for accidental disconnections
     if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-        console.error(`[WA] ❌ Max reconnection attempts (${MAX_RECONNECT_ATTEMPTS}) reached. Waiting for manual restart.`);
+        logger.error(`[WA] ❌ Max reconnection attempts (${MAX_RECONNECT_ATTEMPTS}) reached. Waiting for manual restart.`);
         notifyAdmin('❌ Bot desconectado', 'system', `El bot se desconectó y no pudo reconectar después de ${MAX_RECONNECT_ATTEMPTS} intentos. Razón: ${reason}. Requiere reinicio manual.`);
         return;
     }
 
     const delay = BASE_RECONNECT_DELAY * Math.pow(2, reconnectAttempts);
     reconnectAttempts++;
-    console.log(`[WA] Desconexion accidental - reintento ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} en ${delay / 1000}s...`);
+    logger.info(`[WA] Desconexion accidental - reintento ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} en ${delay / 1000}s...`);
 
     setTimeout(() => {
         client.initialize().catch(err => {
-            console.error(`[WA] Re-init attempt ${reconnectAttempts} failed:`, err.message);
+            logger.error(`[WA] Re-init attempt ${reconnectAttempts} failed:`, err.message);
         });
     }, delay);
 });
@@ -624,7 +669,7 @@ client.on('disconnected', (reason) => {
 // Reset reconnect counter on successful connection
 client.on('ready', () => {
     if (reconnectAttempts > 0) {
-        console.log(`[WA] ✅ Reconectado exitosamente después de ${reconnectAttempts} intento(s)`);
+        logger.info(`[WA] ✅ Reconectado exitosamente después de ${reconnectAttempts} intento(s)`);
     }
     reconnectAttempts = 0;
 });
@@ -647,10 +692,10 @@ client.on('message', async msg => {
                 const contact = await msg.getContact();
                 if (contact && contact.number) {
                     userId = `${contact.number}@c.us`;
-                    console.log(`[LID-RESOLVE] Resolved ${msg.from} to real phone ${userId}`);
+                    logger.info(`[LID-RESOLVE] Resolved ${msg.from} to real phone ${userId}`);
                 }
             } catch (e) {
-                console.error(`[LID-RESOLVE] Error resolving @lid ${msg.from}:`, e.message);
+                logger.error(`[LID-RESOLVE] Error resolving @lid ${msg.from}:`, e.message);
             }
         }
 
@@ -668,7 +713,7 @@ client.on('message', async msg => {
             "this message was waiting"
         ];
         if (WA_PLACEHOLDERS.some(p => msgText.toLowerCase().includes(p))) {
-            console.log(`[WA-PLACEHOLDER] Detected waiting message from ${userId}. Treating as greeting.`);
+            logger.info(`[WA-PLACEHOLDER] Detected waiting message from ${userId}. Treating as greeting.`);
             msgText = "Hola"; // Treat as implicit greeting
         }
 
@@ -680,7 +725,7 @@ client.on('message', async msg => {
                 if (media) {
                     const transcription = await aiService.transcribeAudio(media.data, media.mimetype);
                     if (transcription) {
-                        console.log(`[ADMIN AUDIO] Transcribed: "${transcription}"`);
+                        logger.info(`[ADMIN AUDIO] Transcribed: "${transcription}"`);
                         const result = await handleAdminCommand(lastAlertUser, transcription, false);
                         if (result) await client.sendMessage(msg.from, result);
                     }
@@ -688,7 +733,7 @@ client.on('message', async msg => {
                 return;
             }
             if (!msgText) return;
-            console.log(`[ADMIN] ${userId}: ${msgText} `);
+            logger.info(`[ADMIN] ${userId}: ${msgText} `);
 
             // 1. !saltear
             if (msgText.toLowerCase().startsWith('!saltear ')) {
@@ -735,7 +780,7 @@ client.on('message', async msg => {
                 // Transcribe with Whisper
                 const transcription = await aiService.transcribeAudio(media.data, media.mimetype);
                 if (transcription) {
-                    console.log(`[AUDIO] Transcribed: "${transcription}"`);
+                    logger.info(`[AUDIO] Transcribed: "${transcription}"`);
                     logAndEmit(userId, 'user', `MEDIA_AUDIO:${audioUrl}|TRANSCRIPTION:${transcription}`, userState[userId]?.step || 'new');
                     const startTime = Date.now();
                     await processSalesFlow(userId, transcription, userState, knowledge, {
@@ -760,7 +805,7 @@ client.on('message', async msg => {
         // Also if a user taps a wa.me link sometimes it registers as an empty chat creation.
         if (!msgText || msgText.trim() === '') {
             if (msg.type === 'chat' || msg.type === 'e2e_notification' || msg.type === 'unknown' || msg.type === 'template_button_reply') {
-                console.log(`[AD-HANDLE] Empty/System message (${msg.type}) from ${userId}. Treating as ad click/greeting.`);
+                logger.info(`[AD-HANDLE] Empty/System message (${msg.type}) from ${userId}. Treating as ad click/greeting.`);
                 msgText = "Hola! (Vengo de un anuncio)";
             } else {
                 return; // Ignore other truly empty unsupported types
@@ -771,7 +816,7 @@ client.on('message', async msg => {
 
         // SPECIAL CASE: Audio Request
         if (msgText.toLowerCase() === 'marta mandame un audio') {
-            console.log(`[AUDIO REQUEST] Generating audio greeting for ${userId}...`);
+            logger.info(`[AUDIO REQUEST] Generating audio greeting for ${userId}...`);
             // Show "recording audio..." indicator
             try {
                 const chat = await msg.getChat();
@@ -789,7 +834,7 @@ client.on('message', async msg => {
                     await client.sendMessage(userId, "Uh, perdoná, se me complicó mandar el audio ahora. ¡Pero decime por acá!");
                 }
             } catch (e) {
-                console.error("[AUDIO REQUEST] Error:", e.message);
+                logger.error("[AUDIO REQUEST] Error:", e.message);
                 await client.sendMessage(userId, "Uy, tuve un problemita con el audio, ¡perdoná! ¿En qué te ayudo?");
             }
             // Clear recording state is handled automatically after sending message in whatsapp-web.js
@@ -798,12 +843,12 @@ client.on('message', async msg => {
 
         // 3. Paused Check
         if (config.globalPause && !isAdmin) {
-            console.log(`[PAUSED GLOBAL] Ignoring message from ${userId}`);
+            logger.info(`[PAUSED GLOBAL] Ignoring message from ${userId}`);
             return;
         }
 
         if (pausedUsers.has(userId)) {
-            console.log(`[PAUSED] Ignoring message from ${userId} `);
+            logger.info(`[PAUSED] Ignoring message from ${userId} `);
             return;
         }
 
@@ -811,7 +856,7 @@ client.on('message', async msg => {
         let currentDelay = DEBOUNCE_MS;
         if (userState[userId] && userState[userId].step === 'waiting_data') {
             currentDelay = 15000; // 15 seconds tolerance for address entry
-            console.log(`[DEBOUNCE] Aumentando delay a 15s para ${userId} (ingresando datos de envío)...`);
+            logger.info(`[DEBOUNCE] Aumentando delay a 15s para ${userId} (ingresando datos de envío)...`);
         }
 
         if (pendingMessages.has(userId)) {
@@ -819,17 +864,17 @@ client.on('message', async msg => {
             pending.messages.push(msgText);
             clearTimeout(pending.timer);
             pending.timer = setTimeout(() => _processDebounced(userId), currentDelay);
-            console.log(`[DEBOUNCE] Queued message #${pending.messages.length} from ${userId}: "${msgText}"`);
+            logger.info(`[DEBOUNCE] Queued message #${pending.messages.length} from ${userId}: "${msgText}"`);
         } else {
             pendingMessages.set(userId, {
                 messages: [msgText],
                 timer: setTimeout(() => _processDebounced(userId), currentDelay),
                 startTime: Date.now()
             });
-            console.log(`[DEBOUNCE] New message from ${userId}: "${msgText}". Waiting ${currentDelay}ms...`);
+            logger.info(`[DEBOUNCE] New message from ${userId}: "${msgText}". Waiting ${currentDelay}ms...`);
         }
     } catch (err) {
-        console.error(`🔴[MESSAGE HANDLER ERROR] ${err.message} `);
+        logger.error(`🔴[MESSAGE HANDLER ERROR] ${err.message} `);
     }
 });
 
@@ -842,7 +887,7 @@ async function _processDebounced(userId) {
     const startTime = pending.startTime;
     pendingMessages.delete(userId);
 
-    console.log(`[DEBOUNCE] Processing ${pending.messages.length} message(s) from ${userId}: "${combinedText}"`);
+    logger.info(`[DEBOUNCE] Processing ${pending.messages.length} message(s) from ${userId}: "${combinedText}"`);
 
     try {
         // Enforce the A/B test assigned script, fallback to global activeScript
@@ -864,7 +909,7 @@ async function _processDebounced(userId) {
             effectiveScript // Pass down to the flow
         });
     } catch (err) {
-        console.error(`🔴[DEBOUNCE HANDLER ERROR] ${err.message}`);
+        logger.error(`🔴[DEBOUNCE HANDLER ERROR] ${err.message}`);
     }
 }
 
@@ -877,63 +922,63 @@ const MAX_INIT_RETRIES = 3;
 async function safeInitialize(attempt = 1) {
     try {
         const chromePath = process.env.PUPPETEER_EXECUTABLE_PATH || 'bundled Chromium';
-        console.log(`[INIT] Starting WhatsApp client (attempt ${attempt}/${MAX_INIT_RETRIES}) using ${chromePath}...`);
+        logger.info(`[INIT] Starting WhatsApp client (attempt ${attempt}/${MAX_INIT_RETRIES}) using ${chromePath}...`);
         await client.initialize();
     } catch (err) {
-        console.error(`[INIT] ❌ Initialize failed (attempt ${attempt}): ${err.message}`);
+        logger.error(`[INIT] ❌ Initialize failed (attempt ${attempt}): ${err.message}`);
 
         if (attempt < MAX_INIT_RETRIES) {
             const authDir = path.join(DATA_DIR, '.wwebjs_auth');
 
             // Clean Chrome lock files between retries (preserves WhatsApp session!)
             // The lock is a broken symlink on Linux — cleanAuth handles this correctly now.
-            console.log(`[INIT] Cleaning Chrome locks before retry...`);
+            logger.info(`[INIT] Cleaning Chrome locks before retry...`);
             cleanAuth(authDir);
 
             const delay = 5000 * attempt;
-            console.log(`[INIT] Retrying in ${delay / 1000}s...`);
+            logger.info(`[INIT] Retrying in ${delay / 1000}s...`);
             await new Promise(r => setTimeout(r, delay));
             return safeInitialize(attempt + 1);
         } else {
-            console.error(`[INIT] ❌ All ${MAX_INIT_RETRIES} attempts failed. Server is running but WhatsApp is offline.`);
-            console.error('[INIT] The /health endpoint is still available. Set RESET_SESSION=true and redeploy to force a clean start.');
+            logger.error(`[INIT] ❌ All ${MAX_INIT_RETRIES} attempts failed. Server is running but WhatsApp is offline.`);
+            logger.error('[INIT] The /health endpoint is still available. Set RESET_SESSION=true and redeploy to force a clean start.');
         }
     }
 }
 
 // Global safety net — prevent unhandled errors from killing the server
 process.on('uncaughtException', (err) => {
-    console.error('[FATAL] Uncaught Exception:', err.message);
-    console.error(err.stack);
+    logger.error('[FATAL] Uncaught Exception:', err.message);
+    logger.error(err.stack);
     // Don't exit — keep the server alive for healthcheck/dashboard
 });
 
 process.on('unhandledRejection', (reason) => {
-    console.error('[FATAL] Unhandled Rejection:', reason);
+    logger.error('[FATAL] Unhandled Rejection:', reason);
 });
 
 // Graceful Shutdown
 const _shutdown = async (signal) => {
-    console.log(`[SHUTDOWN] Received ${signal}. Cleaning up...`);
+    logger.info(`[SHUTDOWN] Received ${signal}. Cleaning up...`);
     try {
         // CRITICAL: Destroy WhatsApp client FIRST so Chrome cleans up its lock files.
         // Without this, Chrome leaves a SingletonLock symlink in the persistent volume
         // which prevents the next container from starting Chrome.
         if (client) {
-            console.log('[SHUTDOWN] Destroying WhatsApp client (cleaning Chrome locks)...');
+            logger.info('[SHUTDOWN] Destroying WhatsApp client (cleaning Chrome locks)...');
             await Promise.race([
                 client.destroy(),
                 new Promise(r => setTimeout(r, 5000)) // 5s timeout — don't hang forever
             ]);
-            console.log('[SHUTDOWN] WhatsApp client destroyed.');
+            logger.info('[SHUTDOWN] WhatsApp client destroyed.');
         }
-    } catch (e) { console.error('[SHUTDOWN] Error destroying client:', e.message); }
+    } catch (e) { logger.error('[SHUTDOWN] Error destroying client:', e.message); }
     try {
         await prisma.$disconnect();
         const { pool } = require('./db');
         await pool.end();
-        console.log('[SHUTDOWN] DB connections closed.');
-    } catch (e) { console.error('[SHUTDOWN] Error closing DB:', e.message); }
+        logger.info('[SHUTDOWN] DB connections closed.');
+    } catch (e) { logger.error('[SHUTDOWN] Error closing DB:', e.message); }
     process.exit(0);
 };
 process.on('SIGTERM', () => _shutdown('SIGTERM'));

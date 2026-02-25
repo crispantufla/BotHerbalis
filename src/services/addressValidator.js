@@ -1,3 +1,4 @@
+const logger = require('../utils/logger');
 const path = require('path');
 const fs = require('fs');
 
@@ -99,11 +100,11 @@ async function validateWithGoogleMaps(address) {
         } else if (data.status === 'ZERO_RESULTS') {
             return { valid: false, formatted: null, location: null, error: 'No se encontró la dirección en Google Maps' };
         } else {
-            console.error(`[MAPS] Geocoding error: ${data.status} — ${data.error_message || ''}`);
+            logger.error(`[MAPS] Geocoding error: ${data.status} — ${data.error_message || ''}`);
             return { valid: null, formatted: null, location: null, error: `Error de geocoding: ${data.status}` };
         }
     } catch (e) {
-        console.error(`[MAPS] Fetch error: ${e.message}`);
+        logger.error(`[MAPS] Fetch error: ${e.message}`);
         return { valid: null, formatted: null, location: null, error: e.message };
     }
 }

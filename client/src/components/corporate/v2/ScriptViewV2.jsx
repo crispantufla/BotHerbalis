@@ -5,15 +5,7 @@ import { API_URL } from '../../../config/api';
 import ScriptMapView from '../views/ScriptMapView'; // We'll keep using the original map view as it's a complex generic component, maybe style it later if needed. Wait, we can wrap it or build a V2. For now, let's keep it.
 import { useToast } from '../../ui/Toast';
 
-const IconsV2 = {
-    Refresh: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
-    Save: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>,
-    Image: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
-    Close: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>,
-    Check: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>,
-    Play: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
-    Trash: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-};
+import { RefreshCw as Refresh, Save, Image as ImageIcon, X as Close, Check, Play, Trash2 as Trash } from 'lucide-react';
 
 const ScriptViewV2 = () => {
     const { toast } = useToast();
@@ -144,15 +136,15 @@ const ScriptViewV2 = () => {
                                 onClick={() => switchActiveScript(viewingVersion)}
                                 className="px-6 py-3 bg-white border border-indigo-200 text-indigo-600 rounded-xl text-sm font-bold shadow-sm hover:bg-indigo-50 hover:shadow-md transition-all flex items-center gap-2 group"
                             >
-                                <IconsV2.Play />
+                                <Play className="w-4 h-4" />
                                 <span>Activar en el Bot</span>
                             </button>
                         )}
                         <button onClick={() => fetchScript(viewingVersion)} className="p-3 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 transition-all shadow-sm active:scale-95 group" title="Recargar">
-                            <span className="group-hover:rotate-180 transition-transform duration-500 block"><IconsV2.Refresh /></span>
+                            <span className="group-hover:rotate-180 transition-transform duration-500 block"><Refresh className="w-5 h-5" /></span>
                         </button>
                         <button onClick={saveScript} className="px-8 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-105 transition-all flex items-center gap-2">
-                            <IconsV2.Save />
+                            <Save className="w-5 h-5" />
                             <span>Guardar Cambios</span>
                         </button>
                     </div>
@@ -275,7 +267,7 @@ const ScriptViewV2 = () => {
                                                                                 className="absolute -top-3 -right-3 w-8 h-8 bg-rose-500 text-white rounded-xl shadow-lg flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-all transform scale-75 group-hover/img:scale-100"
                                                                                 title="Eliminar imagen adjunta"
                                                                             >
-                                                                                <IconsV2.Close />
+                                                                                <Close className="w-4 h-4" />
                                                                             </button>
                                                                         </div>
                                                                         <div className="flex-1">
@@ -289,7 +281,7 @@ const ScriptViewV2 = () => {
                                                                             onClick={() => { setShowGallery(key); fetchGallery(); }}
                                                                             className="py-4 bg-white border border-indigo-200 text-indigo-600 rounded-xl text-xs font-bold hover:bg-indigo-50 transition-colors shadow-sm flex items-center justify-center gap-2"
                                                                         >
-                                                                            <IconsV2.Image />
+                                                                            <ImageIcon className="w-4 h-4" />
                                                                             Abrir Galería
                                                                         </button>
                                                                         <label className="flex flex-col items-center justify-center py-4 border-2 border-dashed border-indigo-200 rounded-xl cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 transition-all group bg-white">
@@ -350,7 +342,7 @@ const ScriptViewV2 = () => {
                                             .map(({ item, originalIndex }) => (
                                                 <div key={originalIndex} className="bg-white/80 backdrop-blur-md p-6 rounded-3xl border border-white shadow-sm hover:shadow-md transition-all duration-300 relative group">
                                                     <button onClick={() => deleteFAQ(originalIndex)} className="absolute top-4 right-4 w-8 h-8 bg-rose-50 text-rose-400 hover:bg-rose-500 hover:text-white rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all" title="Eliminar FAQ">
-                                                        <IconsV2.Trash />
+                                                        <Trash className="w-5 h-5" />
                                                     </button>
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-2">
                                                         <div>
@@ -395,14 +387,14 @@ const ScriptViewV2 = () => {
                                 <p className="text-xs font-bold text-indigo-500 uppercase tracking-widest mt-1">Selecciona una imagen para el paso</p>
                             </div>
                             <button onClick={() => setShowGallery(null)} className="w-12 h-12 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition-colors flex items-center justify-center">
-                                <IconsV2.Close />
+                                <Close className="w-4 h-4" />
                             </button>
                         </div>
                         <div className="p-8 overflow-y-auto custom-scrollbar flex-1 bg-slate-50/50">
                             {galleryImages.length === 0 ? (
                                 <div className="text-center py-20">
                                     <div className="w-20 h-20 bg-white shadow-sm border border-slate-200 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
-                                        <IconsV2.Image />
+                                        <ImageIcon className="w-4 h-4" />
                                     </div>
                                     <p className="text-slate-500 font-bold text-lg mb-1">Galería Vacía</p>
                                     <p className="text-sm text-slate-400">Dirigite a la pestaña principal de Galería para subir archivos.</p>

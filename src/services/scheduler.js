@@ -1,3 +1,4 @@
+const logger = require('../utils/logger');
 /**
  * scheduler.js — Periodic checks for stale users, cold leads, and auto-approval
  * 
@@ -79,13 +80,13 @@ function checkStaleUsers(sharedState, dependencies) {
         const elapsed = now - state.stepEnteredAt;
         if (elapsed > STALE_THRESHOLD_MS) {
             const minutes = Math.round(elapsed / 60000);
-            console.log(`[SCHEDULER] Stale user detected: ${userId} on step "${state.step}" for ${minutes} min`);
+            logger.info(`[SCHEDULER] Stale user detected: ${userId} on step "${state.step}" for ${minutes} min`);
 
             notifyAdmin(
                 `⏰ Cliente estancado ${minutes} min`,
                 userId,
                 `Paso: ${state.step}\nÚltima actividad: hace ${minutes} min\nProducto: ${state.selectedProduct || '?'}`
-            ).catch(e => console.error('[SCHEDULER] notifyAdmin error:', e.message));
+            ).catch(e => logger.error('[SCHEDULER] notifyAdmin error:', e.message));
 
             state.staleAlerted = true;
             dependencies.saveState();
@@ -110,7 +111,7 @@ function autoApproveOrders(sharedState, dependencies) {
         const elapsed = now - state.stepEnteredAt;
         if (elapsed > AUTO_APPROVE_THRESHOLD_MS) {
             const minutes = Math.round(elapsed / 60000);
-            console.log(`[AUTO-APPROVE] Order for ${userId} auto-approved after ${minutes} min without admin review`);
+            logger.info(`[AUTO-APPROVE] Order for ${userId} auto-approved after ${minutes} min without admin review`);
 
             // Build confirmation message using shared builder
             const confirmMsg = buildConfirmationMessage(state);
@@ -151,7 +152,7 @@ function autoApproveOrders(sharedState, dependencies) {
                 '⚡ Pedido AUTO-APROBADO (15 min sin revisión)',
                 userId,
                 `El pedido fue aprobado automáticamente.\nProducto: ${state.cart ? state.cart.map(i => i.product).join(' + ') : '?'}\nTotal: $${state.totalPrice || '?'}\n⚠️ Revisar en panel de ventas.`
-            ).catch(e => console.error('[SCHEDULER] Auto-approve notify error:', e.message));
+            ).catch(e => logger.error('[SCHEDULER] Auto-approve notify error:', e.message));
         }
     }
 }
@@ -176,7 +177,7 @@ function checkColdLeads(sharedState, dependencies) {
         const elapsed = now - state.lastActivityAt;
         if (elapsed > COLD_LEAD_THRESHOLD_MS) {
             const hours = Math.round(elapsed / 3600000);
-            console.log(`[SCHEDULER] Cold lead detected: ${userId} inactive for ${hours}h on "${state.step}"`);
+            logger.info(`[SCHEDULER] Cold lead detected: ${userId} inactive for ${hours}h on "${state.step}"`);
 
             // Select contextual message
             let msg = '';
@@ -218,7 +219,7 @@ function checkAbandonedCarts(sharedState, dependencies) {
 
         const elapsed = now - lastActivity;
         if (elapsed > ABANDONED_CART_MIN_MS && elapsed < ABANDONED_CART_MAX_MS) {
-            console.log(`[SCHEDULER] Abandoned cart detected: ${userId} inactive for >24h on "${state.step}"`);
+            logger.info(`[SCHEDULER] Abandoned cart detected: ${userId} inactive for >24h on "${state.step}"`);
 
             const msg = 'Hola, ¿te quedó alguna duda con los planes? Avisame que te guardo la promo con envío gratis.';
             sendMessageWithDelay(userId, msg);
@@ -252,7 +253,7 @@ function cleanupOldUsers(sharedState, dependencies) {
     }
 
     if (cleaned > 0) {
-        console.log(`[SCHEDULER] Cleaned up ${cleaned} inactive user(s) (>30 days)`);
+        logger.info(`[SCHEDULER] Cleaned up ${cleaned} inactive user(s) (>30 days)`);
         saveState();
     }
 }
@@ -261,7 +262,7 @@ function cleanupOldUsers(sharedState, dependencies) {
  * startScheduler — Starts periodic checks
  */
 function startScheduler(sharedState, dependencies) {
-    console.log(`[SCHEDULER] Started — checking every ${CHECK_INTERVAL_MS / 60000} min`);
+    logger.info(`[SCHEDULER] Started — checking every ${CHECK_INTERVAL_MS / 60000} min`);
 
     // Run immediately on start, then on interval
     setTimeout(() => {

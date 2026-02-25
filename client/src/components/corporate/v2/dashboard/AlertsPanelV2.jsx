@@ -1,13 +1,6 @@
 import React, { useState } from 'react';
 
-const IconsV2 = {
-    Alert: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
-    Message: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>,
-    Check: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>,
-    Send: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>,
-    Package: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>,
-    MapPin: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-};
+import { AlertCircle as Alert, MessageCircle as Message, Check, Send, Package, MapPin } from 'lucide-react';
 
 const AlertsPanelV2 = ({ alerts, onCommand, onQuickAction }) => {
     const [adminInputs, setAdminInputs] = useState({});
@@ -43,7 +36,7 @@ const AlertsPanelV2 = ({ alerts, onCommand, onQuickAction }) => {
                 <div className="flex items-center gap-4">
                     <div className="relative">
                         <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-400 via-pink-500 to-rose-600 flex items-center justify-center shadow-lg shadow-rose-500/30 text-white">
-                            <IconsV2.Alert />
+                            <Alert className="w-5 h-5" />
                         </div>
                         {alerts.length > 0 && (
                             <span className="absolute -top-2 -right-2 w-6 h-6 bg-rose-600 text-white text-xs font-bold rounded-full flex items-center justify-center ring-4 ring-white shadow-lg animate-bounce">
@@ -110,7 +103,7 @@ const AlertsPanelV2 = ({ alerts, onCommand, onQuickAction }) => {
 
                                         <div className="flex flex-wrap items-center gap-2 mt-2 sm:mt-0 w-full lg:w-auto">
                                             <button onClick={(e) => { e.stopPropagation(); onQuickAction(alert.userPhone, 'chat'); }} className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-colors flex-1 sm:flex-none flex justify-center items-center" title="Ver Chat">
-                                                <IconsV2.Message />
+                                                <Message className="w-4 h-4" />
                                             </button>
 
                                             {/* Legacy Approve/Intercede Buttons */}
@@ -137,7 +130,7 @@ const AlertsPanelV2 = ({ alerts, onCommand, onQuickAction }) => {
                                             <div className="mb-6 bg-white/80 rounded-2xl p-5 border border-slate-100 shadow-sm">
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                                     <div className="flex gap-4 items-center">
-                                                        <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center"><IconsV2.Package /></div>
+                                                        <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center"><Package className="w-5 h-5" /></div>
                                                         <div>
                                                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pedido</p>
                                                             <p className="font-bold text-slate-800">{od.product}</p>
@@ -145,7 +138,7 @@ const AlertsPanelV2 = ({ alerts, onCommand, onQuickAction }) => {
                                                         </div>
                                                     </div>
                                                     <div className="flex gap-4 items-center">
-                                                        <div className="w-10 h-10 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center"><IconsV2.MapPin /></div>
+                                                        <div className="w-10 h-10 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center"><MapPin className="w-5 h-5" /></div>
                                                         <div>
                                                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Envío</p>
                                                             <p className="font-bold text-slate-800">{addr.nombre}</p>
@@ -181,7 +174,7 @@ const AlertsPanelV2 = ({ alerts, onCommand, onQuickAction }) => {
                                                 disabled={isSending || !inputValue.trim()}
                                                 className="bg-indigo-600 text-white px-6 py-3 rounded-xl hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2 text-sm font-bold shadow-lg shadow-indigo-600/20 transition-all"
                                             >
-                                                {isSending ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <IconsV2.Send />}
+                                                {isSending ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Send className="w-4 h-4" />}
                                                 Enviar a IA
                                             </button>
                                         </form>

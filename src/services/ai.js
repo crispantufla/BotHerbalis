@@ -1,3 +1,4 @@
+const logger = require('../utils/logger');
 ﻿const OpenAI = require('openai');
 const fs = require('fs');
 const path = require('path');
@@ -44,7 +45,7 @@ function _getPrices() {
             const data = JSON.parse(fs.readFileSync(PRICES_PATH, 'utf8'));
             prices = { ...prices, ...data };
         }
-    } catch (e) { console.error("Error reading prices for AI:", e); }
+    } catch (e) { logger.error("Error reading prices for AI:", e); }
     _pricesCache = prices;
     _pricesCacheTime = now;
     return prices;
@@ -364,10 +365,10 @@ class AIService {
     constructor() {
         const apiKey = process.env.OPENAI_API_KEY || "";
         if (!apiKey) {
-            console.error("❌ CRITICAL: OPENAI_API_KEY is missing!");
+            logger.error("❌ CRITICAL: OPENAI_API_KEY is missing!");
         }
 
-        console.log(`📡 [AI] Initializing OpenAI (model: ${MODEL})`);
+        logger.info(`📡 [AI] Initializing OpenAI (model: ${MODEL})`);
 
         this.client = new OpenAI({ apiKey });
         this.model = MODEL;
@@ -401,7 +402,7 @@ class AIService {
                     if (status === 429) {
                         this.stats.retries++;
                         const waitTime = Math.pow(2, attempt + 1) * 1000 + Math.floor(Math.random() * 1000);
-                        console.warn(`⚠️ [AI] Rate Limit (429). Attempt ${attempt + 1}/${MAX_RETRIES}. Backing off ${waitTime / 1000}s...`);
+                        logger.warn(`⚠️ [AI] Rate Limit (429). Attempt ${attempt + 1}/${MAX_RETRIES}. Backing off ${waitTime / 1000}s...`);
                         await new Promise(r => setTimeout(r, waitTime));
                     } else {
                         this.stats.errors++;
@@ -542,7 +543,7 @@ INSTRUCCIONES:
             const text = result.choices[0].message.content;
             return this._parseJSON(text);
         } catch (e) {
-            console.error("🔴 [AI] Chat Error:", e.message);
+            logger.error("🔴 [AI] Chat Error:", e.message);
             return { response: "Estoy teniendo un pequeño problema técnico, ¿me repetís?", goalMet: false };
         }
     }
@@ -566,10 +567,10 @@ INSTRUCCIONES:
 
         // Only summarize if history exceeds the target bounds
         if (history.length > messagesToKeepCount) {
-            console.log(`[AI] Summarizing history (${history.length} messages down to ${messagesToKeepCount})...`);
+            logger.info(`[AI] Summarizing history (${history.length} messages down to ${messagesToKeepCount})...`);
             const summary = await this._callQueuedSummarize(history);
             if (summary) {
-                console.log(`[AI] Summary created: "${summary.substring(0, 50)}..."`);
+                logger.info(`[AI] Summary created: "${summary.substring(0, 50)}..."`);
                 return {
                     summary: summary,
                     prunedHistory: history.slice(-messagesToKeepCount)
@@ -624,7 +625,7 @@ INSTRUCCIONES:
             );
             return result.choices[0].message.content.trim();
         } catch (e) {
-            console.error("🔴 [AI] Summary Error:", e.message);
+            logger.error("🔴 [AI] Summary Error:", e.message);
             return null;
         }
     }
@@ -648,7 +649,7 @@ INSTRUCCIONES:
             );
             return result.choices[0].message.content;
         } catch (e) {
-            console.error("🔴 [AI] Report Error:", e.message);
+            logger.error("🔴 [AI] Report Error:", e.message);
             throw e;
         }
     }
@@ -736,7 +737,7 @@ INSTRUCCIONES:
 
             return result.text || null;
         } catch (e) {
-            console.error("🔴 [AI] Transcribe Error:", e.message);
+            logger.error("🔴 [AI] Transcribe Error:", e.message);
             return null;
         }
     }
@@ -770,7 +771,7 @@ INSTRUCCIONES:
             );
             return result.choices[0].message.content.trim();
         } catch (e) {
-            console.error("🔴 [AI] Vision Error:", e.message);
+            logger.error("🔴 [AI] Vision Error:", e.message);
             return null;
         }
     }

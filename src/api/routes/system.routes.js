@@ -1,8 +1,10 @@
+const logger = require('../../utils/logger');
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const { authMiddleware } = require('../../middleware/auth');
-
+const validate = require('../../middleware/validate');
+const { pricesSchema, scriptSwitchSchema, pairingCodeSchema } = require('../../schemas/system.schema');
 
 module.exports = (client, sharedState) => {
     const router = express.Router();
@@ -89,7 +91,7 @@ module.exports = (client, sharedState) => {
         if (index !== -1) {
             sessionAlerts.splice(index, 1);
             if (io) io.emit('alerts_updated', sessionAlerts);
-            console.log(`[ALERTS] Dismissed alert for ${userPhone}`);
+            logger.info(`[ALERTS] Dismissed alert for ${userPhone}`);
         }
         res.json({ success: true, remaining: sessionAlerts.length });
     });
@@ -148,7 +150,7 @@ module.exports = (client, sharedState) => {
                 globalPause: !!config.globalPause
             });
         } catch (e) {
-            console.error("🔴 [STATS ERROR]", e);
+            logger.error("🔴 [STATS ERROR]", e);
             res.status(500).json({ error: e.message });
         }
     });
@@ -161,10 +163,10 @@ module.exports = (client, sharedState) => {
 
             if (io) io.emit('global_pause_changed', { globalPause: config.globalPause });
 
-            console.log(`[SYSTEM] Global Pause toggled to: ${config.globalPause}`);
+            logger.info(`[SYSTEM] Global Pause toggled to: ${config.globalPause}`);
             res.json({ success: true, globalPause: config.globalPause });
         } catch (e) {
-            console.error("Error toggling global pause:", e);
+            logger.error("Error toggling global pause:", e);
             res.status(500).json({ error: e.message });
         }
     });
@@ -174,7 +176,7 @@ module.exports = (client, sharedState) => {
         try {
             if (client && client.info && sharedState.isConnected) {
                 // Active session: disconnect first, then reconnect event will trigger QR
-                console.log('[WHATSAPP] Manual logout requested...');
+                logger.info('[WHATSAPP] Manual logout requested...');
                 sharedState.manualDisconnect = true;
                 sharedState.isConnected = false;
                 sharedState.qrCodeData = null;
@@ -182,11 +184,11 @@ module.exports = (client, sharedState) => {
                 if (io) io.emit('status_change', { status: 'disconnected' });
             } else {
                 // No active session: directly initialize to generate QR
-                console.log('[WHATSAPP] No active session — triggering initialize for QR...');
+                logger.info('[WHATSAPP] No active session — triggering initialize for QR...');
                 sharedState.qrCodeData = null;
                 if (io) io.emit('status_change', { status: 'disconnected' });
                 client.initialize().catch(err => {
-                    console.error('[WHATSAPP] Initialize failed:', err.message);
+                    logger.error('[WHATSAPP] Initialize failed:', err.message);
                 });
             }
             res.json({ success: true });
@@ -199,7 +201,7 @@ module.exports = (client, sharedState) => {
 
 
     // POST /pairing-code - Request WhatsApp Pairing Code instead of QR
-    router.post('/pairing-code', authMiddleware, async (req, res) => {
+    router.post('/pairing-code', authMiddleware, validate(pairingCodeSchema), async (req, res) => {
         try {
             const { phoneNumber } = req.body;
             if (!phoneNumber) return res.status(400).json({ error: 'Falta el campo "phoneNumber"' });
@@ -208,11 +210,11 @@ module.exports = (client, sharedState) => {
                 return res.status(501).json({ error: 'El backend no soporta Pairing Code aún.' });
             }
 
-            console.log(`[PAIRING] Solicitando código para el número: ${phoneNumber}`);
+            logger.info(`[PAIRING] Solicitando código para el número: ${phoneNumber}`);
             const code = await sharedState.requestPairingCode(phoneNumber);
             res.json({ success: true, code });
         } catch (e) {
-            console.error("Error solicitando Pairing Code:", e);
+            logger.error("Error solicitando Pairing Code:", e);
             res.status(500).json({ error: e.message });
         }
     });
@@ -230,7 +232,7 @@ module.exports = (client, sharedState) => {
     });
 
     // POST /script/switch — switch to a different script
-    router.post('/script/switch', authMiddleware, (req, res) => {
+    router.post('/script/switch', authMiddleware, validate(scriptSwitchSchema), (req, res) => {
         try {
             const { script } = req.body;
             if (!script) return res.status(400).json({ error: 'Falta el campo "script"' });
@@ -248,10 +250,10 @@ module.exports = (client, sharedState) => {
 
             if (io) io.emit('script_changed', { active: script });
 
-            console.log(`📋 [SCRIPT] Switched to: ${script}`);
+            logger.info(`📋 [SCRIPT] Switched to: ${script}`);
             res.json({ success: true, active: script });
         } catch (e) {
-            console.error("Error switching script:", e);
+            logger.error("Error switching script:", e);
             res.status(500).json({ error: e.message });
         }
     });
@@ -311,7 +313,7 @@ module.exports = (client, sharedState) => {
     });
 
     // POST /prices
-    router.post('/prices', authMiddleware, (req, res) => {
+    router.post('/prices', authMiddleware, validate(pricesSchema), (req, res) => {
         try {
             const newPrices = req.body;
             if (!newPrices || typeof newPrices !== 'object') {

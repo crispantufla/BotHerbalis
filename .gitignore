@@ -28,11 +28,12 @@ debug_log.txt
 correo_dump.html
 
 # Temporary scripts
-fix.js
+fix*.js
+test_*.js
+test-*.js
+simulate_*.js
+replace_*.js
 fix.py
-fix_history.js
-test-connect.js
-test-beep.js
 orig_salesFlow.js
 *.backup.json
 

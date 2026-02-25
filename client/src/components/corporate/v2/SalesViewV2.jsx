@@ -3,16 +3,7 @@ import { createPortal } from 'react-dom';
 import api from '../../../config/axios';
 import { useToast } from '../../ui/Toast';
 
-const IconsV2 = {
-    Refresh: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
-    Download: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
-    Search: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
-    Filter: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>,
-    Chat: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>,
-    Edit: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>,
-    Trash: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
-    Script: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-};
+import { RefreshCw as Refresh, Download, Search, Filter, MessageCircle as Chat, Edit2 as Edit, Trash2 as Trash, FileText as Script } from 'lucide-react';
 
 const SalesViewV2 = ({ onGoToChat }) => {
     const { toast, confirm } = useToast();
@@ -233,10 +224,10 @@ Teléfono: ${phoneDisplay}`;
 
                     <div className="flex gap-4">
                         <button onClick={() => fetchOrders(page)} className="p-3 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 transition-all shadow-sm active:scale-95 group">
-                            <span className="group-hover:rotate-180 transition-transform duration-500 block"><IconsV2.Refresh /></span>
+                            <span className="group-hover:rotate-180 transition-transform duration-500 block"><Refresh className="w-5 h-5" /></span>
                         </button>
                         <button onClick={handleExportCSV} disabled={orders.length === 0} className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-105 transition-all flex items-center gap-2 disabled:opacity-50 disabled:scale-100">
-                            <IconsV2.Download />
+                            <Download className="w-5 h-5" />
                             <span>Exportar CSV</span>
                         </button>
                     </div>
@@ -252,11 +243,11 @@ Teléfono: ${phoneDisplay}`;
                             placeholder="Buscar por cliente, teléfono o tracking..."
                             className="w-full bg-white/80 border border-white rounded-xl pl-12 pr-4 py-3.5 text-sm font-medium focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all text-slate-700 shadow-inner placeholder:text-slate-400"
                         />
-                        <span className="absolute left-4 top-3.5 text-slate-400 group-focus-within:text-indigo-500 transition-colors"><IconsV2.Search /></span>
+                        <span className="absolute left-4 top-3.5 text-slate-400 group-focus-within:text-indigo-500 transition-colors"><Search className="w-5 h-5" /></span>
                     </div>
 
                     <div className="flex items-center gap-2 bg-white/60 p-2 rounded-xl border border-white/80 shadow-inner overflow-x-auto custom-scrollbar">
-                        <div className="pl-3 pr-2 text-slate-400"><IconsV2.Filter /></div>
+                        <div className="pl-3 pr-2 text-slate-400"><Filter className="w-5 h-5" /></div>
                         {['Todos', ...statusOptions].map(status => (
                             <button
                                 key={status}
@@ -300,7 +291,7 @@ Teléfono: ${phoneDisplay}`;
                             ) : filteredOrders.length === 0 ? (
                                 <tr><td colSpan="5" className="text-center py-20">
                                     <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-dashed border-slate-300">
-                                        <IconsV2.Search />
+                                        <Search className="w-5 h-5" />
                                     </div>
                                     <p className="text-slate-500 font-bold text-lg">No se encontraron pedidos</p>
                                     <p className="text-slate-400 text-sm mt-1">Intentá ajustar los filtros de búsqueda.</p>
@@ -358,10 +349,10 @@ Teléfono: ${phoneDisplay}`;
                                         <td className="px-4 sm:px-8 py-5 text-right">
                                             <div className="flex justify-end gap-3 transition-opacity">
                                                 <button onClick={(e) => { e.stopPropagation(); handleGoToChat(order.cliente); }} className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white transition-all flex items-center justify-center shadow-sm" title="Ir al Chat">
-                                                    <IconsV2.Chat />
+                                                    <Chat className="w-4 h-4" />
                                                 </button>
                                                 <button onClick={() => openEdit(order)} className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-500 hover:text-white transition-all flex items-center justify-center shadow-sm" title="Editar Pedido">
-                                                    <IconsV2.Edit />
+                                                    <Edit className="w-4 h-4" />
                                                 </button>
                                             </div>
                                         </td>
@@ -381,7 +372,7 @@ Teléfono: ${phoneDisplay}`;
                         ) : filteredOrders.length === 0 ? (
                             <div className="text-center py-10">
                                 <div className="w-16 h-16 bg-white/60 rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm border border-white">
-                                    <IconsV2.Search />
+                                    <Search className="w-5 h-5" />
                                 </div>
                                 <p className="text-slate-500 font-bold text-[15px]">No se encontraron pedidos</p>
                             </div>
@@ -424,13 +415,13 @@ Teléfono: ${phoneDisplay}`;
 
                                     <div className="flex gap-2">
                                         <button onClick={() => { setViewingOrder(order); setTrackingData(null); }} className="flex-1 bg-white border border-slate-200 text-indigo-600 rounded-xl py-2.5 text-[11px] font-extrabold uppercase tracking-widest flex items-center justify-center gap-1.5 shadow-sm active:bg-indigo-50 transition-colors">
-                                            <IconsV2.Script className="w-3.5 h-3.5" /> Detalles
+                                            <Script className="w-3.5 h-3.5" /> Detalles
                                         </button>
                                         <button onClick={(e) => { e.stopPropagation(); handleGoToChat(order.cliente); }} className="w-12 bg-emerald-50 border border-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center shadow-sm active:bg-emerald-100 transition-colors">
-                                            <IconsV2.Chat className="w-4 h-4" />
+                                            <Chat className="w-4 h-4" />
                                         </button>
                                         <button onClick={() => openEdit(order)} className="w-12 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center shadow-sm active:bg-indigo-100 transition-colors">
-                                            <IconsV2.Edit className="w-4 h-4" />
+                                            <Edit className="w-4 h-4" />
                                         </button>
                                     </div>
                                 </div>
@@ -501,7 +492,7 @@ Teléfono: ${phoneDisplay}`;
                                         {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
                                     </select>
                                     <div className="absolute inset-y-0 right-0 flex items-center px-5 pointer-events-none text-slate-400">
-                                        <IconsV2.Filter />
+                                        <Filter className="w-5 h-5" />
                                     </div>
                                 </div>
                             </div>
@@ -529,7 +520,7 @@ Teléfono: ${phoneDisplay}`;
                             </div>
 
                             <button onClick={handleDeleteOrder} className="w-full py-4 bg-transparent border-2 border-rose-100 text-rose-500 rounded-xl text-xs font-extrabold uppercase tracking-widest hover:bg-rose-50 hover:border-rose-200 transition-all flex items-center justify-center gap-2 mt-4">
-                                <IconsV2.Trash />
+                                <Trash className="w-4 h-4" />
                                 Eliminar Registro
                             </button>
                         </div>
@@ -547,7 +538,7 @@ Teléfono: ${phoneDisplay}`;
                         <div className="bg-gradient-to-r from-slate-50 to-white p-6 sm:p-8 flex justify-between items-center relative border-b border-slate-100 shrink-0">
                             <div className="flex items-center gap-4 relative z-10">
                                 <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-inner border border-indigo-100/50">
-                                    <IconsV2.Script />
+                                    <Script className="w-4 h-4" />
                                 </div>
                                 <div>
                                     <h3 className="text-2xl font-black text-slate-800 tracking-tight">Detalles de Venta</h3>
@@ -658,7 +649,7 @@ Teléfono: ${phoneDisplay}`;
                                                     </span>
                                                 </div>
                                                 <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-500">
-                                                    <IconsV2.Refresh />
+                                                    <Refresh className="w-5 h-5" />
                                                 </div>
                                             </div>
 
@@ -700,7 +691,7 @@ Teléfono: ${phoneDisplay}`;
                         {/* Footer Options */}
                         <div className="bg-slate-50 p-6 flex justify-end gap-3 shrink-0 border-t border-slate-200">
                             <button onClick={() => handleCopySaleDetails(viewingOrder)} className="flex items-center gap-2 px-6 py-3 bg-white text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 shadow-sm font-extrabold text-xs uppercase tracking-widest rounded-xl transition-all">
-                                <IconsV2.Script className="w-4 h-4" /> Copiar Info
+                                <Script className="w-4 h-4" /> Copiar Info
                             </button>
                             <button onClick={() => setViewingOrder(null)} className="px-8 py-3 bg-slate-800 text-white rounded-xl text-xs uppercase tracking-widest font-extrabold hover:bg-black transition-all shadow-lg shadow-slate-800/20 active:scale-95">
                                 Cerrar

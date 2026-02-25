@@ -4,19 +4,7 @@ import { useSocket } from '../../../context/SocketContext';
 import { API_URL } from '../../../config/api';
 import { useToast } from '../../ui/Toast';
 
-const IconsV2 = {
-    Search: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
-    AI: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>,
-    Play: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
-    Pause: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
-    Trash: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
-    Script: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
-    ChevronDown: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>,
-    Send: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>,
-    Clip: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>,
-    Cart: ({ className = "w-5 h-5" }) => <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-1.35 2.7a1 1 0 00.9 1.5h11.45m-9 4a1 1 0 11-2 0 1 1 0 012 0zm10 0a1 1 0 11-2 0 1 1 0 012 0z" /></svg>,
-    ArrowLeft: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-};
+import { Search, Bot, Play, Pause, Trash2 as Trash, FileText as ScriptIcon, ChevronDown, Send, Paperclip, ShoppingCart, ArrowLeft } from 'lucide-react';
 
 const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
     const { socket } = useSocket();
@@ -357,7 +345,7 @@ Teléfono: ${phoneDisplay}`;
             return (
                 <div className="space-y-3 min-w-[200px]">
                     <div className="flex items-center gap-3 bg-black/10 rounded-2xl p-3 border border-white/10">
-                        <div className="w-10 h-10 rounded-full bg-emerald-500/90 text-white flex items-center justify-center shadow-lg"><IconsV2.Play /></div>
+                        <div className="w-10 h-10 rounded-full bg-emerald-500/90 text-white flex items-center justify-center shadow-lg"><Play className="w-5 h-5" /></div>
                         <div className="flex-1 h-2 bg-black/10 rounded-full overflow-hidden text-emerald-500 font-mono text-[8px] leading-none text-center">Audio Player</div>
                     </div>
                     {transcription && <div className="bg-white/40 p-3 rounded-xl text-xs italic text-slate-800 font-medium">📝 "{transcription}"</div>}
@@ -385,7 +373,7 @@ Teléfono: ${phoneDisplay}`;
                             placeholder="Buscar chats..."
                             className="w-full bg-white/60 border border-white rounded-2xl pl-12 pr-4 py-3 text-sm focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-300 transition-all text-slate-700 shadow-inner font-medium placeholder:text-slate-400"
                         />
-                        <span className="absolute left-4 top-3 text-slate-400 group-focus-within:text-indigo-500 transition-colors"><IconsV2.Search /></span>
+                        <span className="absolute left-4 top-3 text-slate-400 group-focus-within:text-indigo-500 transition-colors"><Search className="w-5 h-5" /></span>
                     </div>
                 </div>
 
@@ -398,7 +386,7 @@ Teléfono: ${phoneDisplay}`;
                                     <h3 className={`font-extrabold text-sm truncate flex flex-wrap items-center gap-1.5 ${selectedChat?.id === chat.id ? 'text-white' : 'text-slate-800'}`}>
                                         {chat.isPaused && <span className="w-2 h-2 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)] animate-pulse" title="Bot Pausado"></span>}
                                         <span className="truncate max-w-[170px]">{chat.name}</span>
-                                        {chat.hasBought && <span title="Cliente Recurrente" className="inline-flex items-center text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-md font-extrabold shadow-sm"><IconsV2.Cart className="w-2.5 h-2.5 mr-0.5" /> Cliente</span>}
+                                        {chat.hasBought && <span title="Cliente Recurrente" className="inline-flex items-center text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-md font-extrabold shadow-sm"><ShoppingCart className="w-2.5 h-2.5 mr-0.5" /> Cliente</span>}
                                     </h3>
                                     <span className={`text-[10px] font-bold font-mono ${selectedChat?.id === chat.id ? 'text-indigo-100' : 'text-slate-400'}`}>{chat.time}</span>
                                 </div>
@@ -454,18 +442,18 @@ Teléfono: ${phoneDisplay}`;
                             <div className="flex items-center justify-start sm:justify-end gap-1 sm:gap-3 overflow-x-visible w-full sm:w-auto pb-1 sm:pb-0">
                                 {selectedChat.hasBought && (
                                     <button onClick={() => setShowOrdersPanel(!showOrdersPanel)} className="p-2.5 sm:p-3 flex-shrink-0 rounded-xl bg-indigo-100/80 text-indigo-700 hover:bg-indigo-200 hover:shadow-md transition-all" title="Registro de Compras">
-                                        <IconsV2.Cart className="w-4 h-4 sm:w-5 sm:h-5" />
+                                        <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" />
                                     </button>
                                 )}
 
                                 <button onClick={handleClearChat} className="p-2.5 sm:p-3 flex-shrink-0 rounded-xl bg-rose-100/80 text-rose-600 hover:bg-rose-200 hover:shadow-md transition-all" title="Reiniciar Memoria e Historial">
-                                    <IconsV2.Trash />
+                                    <Trash className="w-5 h-5" />
                                 </button>
                                 <button onClick={handleToggleBot} className={`p-2.5 sm:p-3 flex-shrink-0 rounded-xl text-white shadow-md transition-all hover:brightness-110 hover:-translate-y-0.5 ${globalPause || selectedChat.isPaused ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 'bg-gradient-to-r from-amber-500 to-orange-500'}`} title={globalPause ? 'Bot Pausado Globalmente' : (selectedChat.isPaused ? 'Reactivar Auto-Bot' : 'Pausar Auto-Bot')}>
-                                    {globalPause || selectedChat.isPaused ? <IconsV2.Play /> : <IconsV2.Pause />}
+                                    {globalPause || selectedChat.isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
                                 </button>
                                 <button onClick={() => setShowScriptPanel(!showScriptPanel)} className="p-2.5 sm:p-3 flex-shrink-0 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500/30 hover:shadow-lg hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all active:scale-95" title="Guión">
-                                    <IconsV2.Script />
+                                    <ScriptIcon className="w-5 h-5" />
                                 </button>
                             </div>
                         </div>
@@ -479,7 +467,7 @@ Teléfono: ${phoneDisplay}`;
                                 <div className="flex justify-between items-center mb-5 relative z-10">
                                     <div className="flex items-center gap-2">
                                         <div className="w-8 h-8 rounded-xl bg-indigo-100/80 text-indigo-600 flex items-center justify-center shadow-sm">
-                                            <IconsV2.Cart className="w-4 h-4" />
+                                            <ShoppingCart className="w-4 h-4" />
                                         </div>
                                         <h3 className="font-extrabold text-slate-800 tracking-tight text-sm">Registro de Pedidos</h3>
                                         <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-full">{selectedChat.pastOrders?.length || 0}</span>
@@ -498,7 +486,7 @@ Teléfono: ${phoneDisplay}`;
                                                     <span className="text-[11px] font-bold text-slate-400 font-mono">{order.createdAt || 'Fecha desconocida'}</span>
                                                 </div>
                                                 <button onClick={() => handleCopySale(order)} className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors shadow-md shadow-indigo-500/30">
-                                                    <IconsV2.Script className="w-3 h-3" /> Copiar Venta
+                                                    <ScriptIcon className="w-3 h-3" /> Copiar Venta
                                                 </button>
                                             </div>
 
@@ -605,7 +593,7 @@ Teléfono: ${phoneDisplay}`;
                                                 className="absolute -left-9 top-1/2 -translate-y-1/2 p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-full opacity-0 group-hover:opacity-100 transition-all"
                                                 title="Eliminar mensaje para todos"
                                             >
-                                                <IconsV2.Trash />
+                                                <Trash className="w-5 h-5" />
                                             </button>
                                         )}
                                     </div>
@@ -629,7 +617,7 @@ Teléfono: ${phoneDisplay}`;
                             <form onSubmit={attachment ? (e) => { e.preventDefault(); handleSendMedia(); } : handleSend} className="flex gap-1.5 sm:gap-4 items-center w-full">
                                 <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
                                 <button type="button" onClick={() => fileInputRef.current?.click()} className="w-11 h-11 sm:w-14 sm:h-14 flex items-center justify-center shrink-0 rounded-xl sm:rounded-2xl bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 transition-all shadow-sm">
-                                    <IconsV2.Clip />
+                                    <Paperclip className="w-6 h-6" />
                                 </button>
                                 <input
                                     type="text"
@@ -639,7 +627,7 @@ Teléfono: ${phoneDisplay}`;
                                     className="w-full min-w-0 flex-1 bg-white border border-slate-200 rounded-xl sm:rounded-2xl px-3 sm:px-6 py-2.5 sm:py-4 text-slate-800 font-medium focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all shadow-inner placeholder:text-slate-400 text-[15px] sm:text-base"
                                 />
                                 <button type="submit" disabled={(!input.trim() && !attachment) || sendingMedia} className="w-11 h-11 sm:w-14 sm:h-14 flex items-center justify-center shrink-0 rounded-xl sm:rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100">
-                                    {sendingMedia ? <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-white/50 border-t-white rounded-full animate-spin"></div> : <IconsV2.Send />}
+                                    {sendingMedia ? <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-white/50 border-t-white rounded-full animate-spin"></div> : <Send className="w-5 h-5" />}
                                 </button>
                             </form>
                         </div>
@@ -663,7 +651,7 @@ Teléfono: ${phoneDisplay}`;
 
                     <div className="p-5 border-b border-white/50 flex justify-between items-center bg-white/50 shadow-sm z-10 sticky top-0 backdrop-blur-md">
                         <h3 className="font-extrabold text-slate-800 text-[15px] flex items-center gap-2">
-                            <IconsV2.AI /> Asistente IA
+                            <Bot className="w-5 h-5" /> Asistente IA
                         </h3>
                         <button onClick={() => setShowScriptPanel(false)} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-white/60 rounded-xl transition-all">
                             ✕
@@ -684,7 +672,7 @@ Teléfono: ${phoneDisplay}`;
                                 {summaryText ? (
                                     <div className="text-xs font-medium text-slate-700 whitespace-pre-wrap leading-relaxed">
                                         {summaryText}
-                                        <button onClick={() => setSummaryText(null)} className="absolute top-2 right-2 text-slate-400 hover:text-rose-500 bg-white/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"><IconsV2.Trash /></button>
+                                        <button onClick={() => setSummaryText(null)} className="absolute top-2 right-2 text-slate-400 hover:text-rose-500 bg-white/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"><Trash className="w-5 h-5" /></button>
                                     </div>
                                 ) : (
                                     <span className="text-slate-400 italic text-xs flex items-center h-full justify-center text-center">Analiza la intención de compra y sentimientos del cliente.</span>
