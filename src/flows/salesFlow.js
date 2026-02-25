@@ -1719,7 +1719,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             const data = await (dependencies.mockAiService || aiService).parseAddress(textToAnalyze);
 
             if (data && !data._error) {
-                // DETECT POSTDATED SHIPMENTS — VALIDATE against actual user text
+                let madeProgress = false;
                 // The AI sometimes halluccinates postdatado from address data, so we cross-check
                 const postdateKeywords = /\b(lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo|semana|mes|cobro|mañana|despues|después|principio|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\b/i;
                 const userActuallyAskedPostdate = postdateKeywords.test(normalizedText) && /\b(recibir|llega|enviar|mandar|cobro|pago|puedo|entregar|envio|después|despues|más adelante|otro momento|no puedo ahora)\b/i.test(normalizedText);
