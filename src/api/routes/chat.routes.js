@@ -116,7 +116,7 @@ module.exports = (client, sharedState) => {
                     timestamp: c.timestamp,
                     isPaused: pausedUsers.has(c.id._serialized),
                     step: userState[c.id._serialized]?.step || 'new',
-                    assignedScript: userState[c.id._serialized]?.assignedScript || null,
+                    assignedScript: userState[c.id._serialized]?.assignedScript || (sharedState.config?.activeScript === 'rotacion' ? 'v3' : sharedState.config?.activeScript || 'v3'),
                     // Sales context for script placeholder resolution
                     selectedProduct: userState[c.id._serialized]?.selectedProduct || null,
                     selectedPlan: userState[c.id._serialized]?.selectedPlan || null,

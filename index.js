@@ -331,7 +331,7 @@ function logAndEmit(chatId, sender, text, step, messageId = null) {
             text,
             step,
             messageId,
-            assignedScript: userState[chatId]?.assignedScript || null
+            assignedScript: userState[chatId]?.assignedScript || (config?.activeScript === 'rotacion' ? 'v3' : config?.activeScript || 'v3')
         });
     }
 }

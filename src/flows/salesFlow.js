@@ -1328,11 +1328,6 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                                 price: calculatedPrice.toLocaleString('es-AR').replace(/,/g, '.')
                             }];
 
-                            if (planAI.response) {
-                                currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });
-                                await sendMessageWithDelay(userId, planAI.response);
-                            }
-
                             const closingNode = knowledge.flow.closing;
                             const addr = currentState.partialAddress || {};
                             const hasAddress = addr.nombre && addr.calle && addr.ciudad;

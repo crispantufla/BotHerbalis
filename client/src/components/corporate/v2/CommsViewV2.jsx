@@ -220,13 +220,11 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
     // Manual order completion — admin clicks the final step button
     const handleManualCompletion = async () => {
         if (!selectedChat) return;
-        const confirmMsg = '¡Excelente! Tu pedido ya fue ingresado 🚀\n\nTe vamos a avisar cuando lo despachemos con el número de seguimiento.\n\n¡Muchas gracias por confiar en Herbalis!';
-        setInput(confirmMsg);
 
-        // Also create the order in the backend
         try {
             await api.post('/api/orders/manual-complete', { chatId: selectedChat.id });
-            toast.success('Pedido ingresado en Ventas ✅');
+            toast.success('Pedido ingresado y confirmación enviada ✅');
+            setInput(''); // Clear input if it had anything
         } catch (e) {
             toast.error('Error al registrar pedido: ' + (e.response?.data?.error || e.message));
         }

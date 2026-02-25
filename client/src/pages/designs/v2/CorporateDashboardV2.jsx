@@ -107,10 +107,16 @@ const CorporateDashboardV2 = () => {
         }
 
         try {
-            await api.post('/api/admin-command', { chatId, command: action });
+            if (action === 'confirmar') {
+                await api.post('/api/orders/manual-complete', { chatId });
+            } else {
+                await api.post('/api/admin-command', { chatId, command: action });
+            }
             setAlerts(prev => prev.filter(a => a.userPhone !== chatId));
             toast.success(`Acción ejecutada: ${action}`);
-        } catch (e) { toast.error('Error ejecutando acción'); }
+        } catch (e) {
+            toast.error('Error ejecutando acción: ' + (e.response?.data?.error || e.message));
+        }
     };
 
     const renderContent = () => {

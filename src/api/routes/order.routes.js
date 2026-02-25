@@ -231,9 +231,27 @@ module.exports = (client, sharedState) => {
 
 
 
-            // Set user state to completed
-            if (state) {
-                state.step = 'completed';
+            // Set user state to completed and send confirmation
+            const msg = "¡Excelente! Tu pedido ya fue ingresado 🚀\n\nTe vamos a avisar cuando lo despachemos con el número de seguimiento.\n\n¡Muchas gracias por confiar en Herbalis!";
+
+            try {
+                const targetPhone = `${phoneNumeric}@c.us`;
+                console.log(`[MANUAL-COMPLETE] Enviando WhatsApp de confirmación a ${targetPhone}...`);
+                await client.sendMessage(targetPhone, msg);
+
+                if (state) {
+                    state.step = 'completed';
+                    state.history = state.history || [];
+                    state.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+                    if (sharedState.saveState) {
+                        try { sharedState.saveState(chatId); } catch (e) { sharedState.saveState(); }
+                    }
+                }
+                if (sharedState.logAndEmit) {
+                    sharedState.logAndEmit(chatId, 'bot', msg, 'completed');
+                }
+            } catch (e) {
+                console.error(`🔴 [MANUAL-COMPLETE] Error enviando WhatsApp:`, e.message);
             }
 
             const legacyOrder = {
