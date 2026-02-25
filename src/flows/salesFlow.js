@@ -334,12 +334,27 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     // Count how many messages the USER sent before this one
                     const previousUserMessages = messages.filter(m => !m.fromMe).length;
 
-                    if (previousUserMessages >= 5) {
-                        console.log(`[SPAM FILTER] User ${userId} has ${previousUserMessages} previous messages before bot init. Auto-pausing.`);
+                    // Also check WHEN the last message in that history was sent. 
+                    // If it's been more than 24 hours since the last interaction, treat them as a "returning customer" and DO NOT pause them.
+                    let isRecentConversation = false;
+                    if (messages.length > 0) {
+                        // Get the message right before the current one
+                        const lastMsg = messages[messages.length > 1 ? messages.length - 2 : 0];
+                        if (lastMsg && lastMsg.timestamp) {
+                            const hoursSinceLastMsg = (Date.now() / 1000 - lastMsg.timestamp) / 3600;
+                            // If they talked to us within the last 24 hours, it's an ongoing conversation.
+                            if (hoursSinceLastMsg <= 24) {
+                                isRecentConversation = true;
+                            }
+                        }
+                    }
+
+                    if (previousUserMessages >= 5 && isRecentConversation) {
+                        console.log(`[SPAM FILTER] User ${userId} has ${previousUserMessages} previous messages before bot init and conversation is recent. Auto-pausing.`);
                         if (dependencies.sharedState && dependencies.sharedState.pausedUsers) {
                             dependencies.sharedState.pausedUsers.add(userId);
                             try {
-                                dependencies.notifyAdmin('😴 Conversación Antigua', userId, 'Se detectó que este cliente ya tenía un historial largo de chat previo al encendido del bot. El bot se silenció automáticamente para no entrometerse.');
+                                dependencies.notifyAdmin('😴 Conversación Existente', userId, 'Se detectó que este cliente estaba respondiendo a un hilo de chat reciente activo. El bot se silenció automáticamente para no entrometerse.');
                             } catch (e) { }
                         }
                         return { matched: true, paused: true };
