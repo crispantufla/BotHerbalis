@@ -355,6 +355,11 @@ function saveOrderToLocal(order) {
             totalPrice: isNaN(priceNum) ? 0 : priceNum,
             tracking: null,
             postdated: order.postdatado || null,
+            nombre: order.nombre || null,
+            calle: order.calle || null,
+            ciudad: order.ciudad || null,
+            provincia: order.provincia || null,
+            cp: order.cp || null,
         };
 
         try {
@@ -606,7 +611,21 @@ client.on('message', async msg => {
         const chat = await msg.getChat();
         if (chat.isGroup) return;
 
-        const userId = msg.from;
+        let userId = msg.from;
+
+        // Automatically resolve Meta @lid identifiers to real phone numbers
+        if (userId.includes('@lid')) {
+            try {
+                const contact = await msg.getContact();
+                if (contact && contact.number) {
+                    userId = `${contact.number}@c.us`;
+                    console.log(`[LID-RESOLVE] Resolved ${msg.from} to real phone ${userId}`);
+                }
+            } catch (e) {
+                console.error(`[LID-RESOLVE] Error resolving @lid ${msg.from}:`, e.message);
+            }
+        }
+
         const adminNumber = process.env.ADMIN_NUMBER;
         const cleanAdmin = adminNumber ? adminNumber.replace(/\D/g, '') : '';
         const alertNumbers = (config.alertNumbers || []).map(n => n.replace(/\D/g, ''));

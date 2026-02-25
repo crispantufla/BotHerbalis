@@ -34,6 +34,11 @@ module.exports = (client, sharedState) => {
                 precio: o.totalPrice.toString(),
                 tracking: o.tracking || '',
                 postdatado: o.postdated || '',
+                nombre: o.nombre || '',
+                calle: o.calle || '',
+                ciudad: o.ciudad || '',
+                provincia: o.provincia || '',
+                cp: o.cp || '',
                 createdAt: o.createdAt.toISOString()
             }));
 
@@ -79,6 +84,11 @@ module.exports = (client, sharedState) => {
                 precio: updatedOrder.totalPrice.toString(),
                 tracking: updatedOrder.tracking || '',
                 postdatado: updatedOrder.postdated || '',
+                nombre: updatedOrder.nombre || '',
+                calle: updatedOrder.calle || '',
+                ciudad: updatedOrder.ciudad || '',
+                provincia: updatedOrder.provincia || '',
+                cp: updatedOrder.cp || '',
                 createdAt: updatedOrder.createdAt.toISOString()
             };
 
@@ -164,7 +174,12 @@ module.exports = (client, sharedState) => {
                     status: 'Confirmado',
                     products: product,
                     totalPrice: total,
-                    postdated: state.postdatado || null
+                    postdated: state.postdatado || null,
+                    nombre: addr.nombre || null,
+                    calle: addr.calle || null,
+                    ciudad: addr.ciudad || null,
+                    provincia: addr.provincia || null,
+                    cp: addr.cp || null,
                 }
             });
 
@@ -175,9 +190,25 @@ module.exports = (client, sharedState) => {
                 state.step = 'completed';
             }
 
+            const legacyOrder = {
+                id: order.id,
+                cliente: order.userPhone,
+                status: order.status,
+                producto: order.products,
+                precio: order.totalPrice.toString(),
+                tracking: order.tracking || '',
+                postdatado: order.postdated || '',
+                nombre: order.nombre || '',
+                calle: order.calle || '',
+                ciudad: order.ciudad || '',
+                provincia: order.provincia || '',
+                cp: order.cp || '',
+                createdAt: order.createdAt.toISOString()
+            };
+
             // Emit socket event for real-time dashboard update
             if (io) {
-                io.emit('order_update', { action: 'created', order });
+                io.emit('order_update', { action: 'created', order: legacyOrder });
             }
 
             console.log(`✅ [MANUAL-COMPLETE] Order created for ${phoneNumeric}: ${product} — $${total}`);

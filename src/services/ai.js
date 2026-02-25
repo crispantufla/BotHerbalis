@@ -164,7 +164,7 @@ PAGO Y ENVÍO:
 - Si "llega" + "pago/abona/plata/cobran": ES PREGUNTA DE PAGO, no de entrega.
 - Correo Argentino NO abre sábados/domingos. NO controlamos día/hora exacta.
 - Si pide día específico: "No podemos garantizar porque depende del correo."
-- Podemos POSTDATAR (despachar más adelante) si pide.
+- REGLA ESTRICTA: NUNCA ofrezcas postergar el envío o postdatar a menos que el cliente indique explícitamente problemas de dinero, o pida recibirlo/pagarlo en otra fecha.
 
 INDECISIÓN:
 - Dudan sobre PRODUCTO: "No te preocupes, te ayudo 😊" + breve info opciones + "¿Querés saber más de alguna?"
@@ -203,8 +203,10 @@ EMBARAZO/LACTANCIA/+80 AÑOS: RECHAZAR VENTA. "Priorizamos tu salud 🌿😊 Si 
 function _getExtractionRules() {
     return `
 EXTRACCIÓN DE DATOS (CRÍTICO — siempre verificar antes de responder):
+- Si el cliente elige o confirma un producto (ej: "sí, quiero esas", "cápsulas", "gotas"): extractedData="PRODUCTO: Cápsulas" (o Gotas, o Semillas). ¡Este paso es VITAL para que el sistema avance!
 - Si mencionan edad/peso/patología (diabetes, tiroides, gastritis, hipertensión): extractedData="PROFILE: [dato]". Ejemplo: "PROFILE: 45 años, hipotiroidismo, bajar 15kg"
 - Si piden postergar envío a fecha futura: extractedData="POSTDATADO: [fecha]"
+- REGLA DE POSTERGACIÓN: NUNCA ofrezcas postergar el envío por tu cuenta. Solo hacelo si el cliente lo insinúa.
 - Si quieren CAMBIAR pedido: preguntá qué quieren y extractedData="CHANGE_ORDER"
 - Si quieren CANCELAR: "Qué pena... 😔 ¿Por qué?" extractedData="CANCEL_ORDER"
 - Si EMBARAZADA/LACTANDO/+80: rechazar venta, extractedData="REJECT_MEDICAL"

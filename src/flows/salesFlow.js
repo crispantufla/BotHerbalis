@@ -355,13 +355,13 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
     // GLOBAL MEDICAL REJECT (Lactancia / Embarazo / +80)
     // ─────────────────────────────────────────────────
     const MEDICAL_REJECT_REGEX = /\b(embarazada|embarazo|lactancia|lactar|amamantar|amamantando|dando la teta|dando el pecho|8[0-9]\s*a[ñn]os|9[0-9]\s*a[ñn]os)\b/i;
-    if (MEDICAL_REJECT_REGEX.test(normalizedText) && !isNegative) {
-        console.log(`[MEDICAL REJECT] User ${userId} mentioned contraindicated condition.`);
-        const msg = "Lamentablemente, por precaución, no recomendamos el uso de la Nuez de la India durante el embarazo, la lactancia o en personas mayores de 80 años. Priorizamos tu salud por encima de todo. 🌿😊\n\nSi igual es para otra persona abonando en tu domicilio, avisame y seguimos. De lo contrario, damos por finalizada la consulta. ¡Cuidate mucho!";
+    if ((MEDICAL_REJECT_REGEX.test(normalizedText) && !isNegative) || currentState.step === 'rejected_medical') {
+        console.log(`[MEDICAL REJECT] User ${userId} mentioned contraindicated condition or is already rejected.`);
+        const msg = "Lamentablemente, por estricta precaución, no recomendamos ni permitimos el uso de la Nuez de la India durante el embarazo, la lactancia o en personas mayores de 80 años. Priorizamos tu salud por encima de todo. 🌿😊\n\nPor este motivo, damos por finalizada la consulta y no podremos avanzar con el envío. ¡Cuidate mucho!";
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         await sendMessageWithDelay(userId, msg);
 
-        await notifyAdmin('🚨 Rechazo Médico Automático', userId, `Motivo: el cliente mencionó embarazo/lactancia o edad avanzada.\nMensaje original: "${text}"`);
+        // Save state but explicitly DO NOT notify admin anymore 
         _setStep(currentState, 'rejected_medical');
         saveState(userId);
 
@@ -586,18 +586,47 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
     for (const faq of knowledge.faq) {
         if (faq.keywords.some(k => new RegExp(`\\b${k}\\b`, 'i').test(normalizedText))) {
-            const faqMsg = _formatMessage(faq.response, currentState);
+
+            // --- BUGFIX: Prevent FAQ from hijacking plan choices ---
+            if (currentState.step === 'waiting_plan_choice' && /\b(60|120|180|240|300|360|420|480|540|600)\b/.test(normalizedText)) {
+                // If they ask a question but ALSO provide a valid plan number, let the flow handle it!
+                console.log(`[FLOW-PRESERVE] Bypassing FAQ to allow plan selection to process: ${normalizedText}`);
+                continue;
+            }
+
+            let faqMsg = _formatMessage(faq.response, currentState);
+            let targetStep = faq.triggerStep;
+
+            // --- BUGFIX: Dynamic Price FAQ based on profile progress ---
+            const isPriceFaq = faq.keywords.includes('cuanto sale') || faq.keywords.includes('que precio') || faq.keywords.includes('cuanto cuesta');
+            if (isPriceFaq) {
+                // If we already know the weight, or we are deep in the funnel, don't ask for weight again.
+                const hasPassedWeight = currentState.weightGoal ||
+                    ['waiting_preference', 'waiting_price_confirmation', 'waiting_plan_choice', 'waiting_data', 'waiting_final_confirmation'].includes(currentState.step);
+
+                if (hasPassedWeight) {
+                    faqMsg = "Los tratamientos están entre $37.000 y $69.000,\nsegún duración y formato.\n\n¿Te tomo los datos de envío?";
+                    // Usually we don't want to violently rip them out of their current step (like 'waiting_plan_choice')
+                    // just because they asked a price FAQ. So we can omit setting targetStep to 'waiting_data' 
+                    // and just let them stay where they are, while displaying the requested message.
+                    targetStep = null;
+                }
+            }
+
             currentState.history.push({ role: 'bot', content: faqMsg, timestamp: Date.now() });
             await sendMessageWithDelay(userId, faqMsg);
 
-            if (faq.triggerStep) {
-                _setStep(currentState, faq.triggerStep);
+            if (targetStep) {
+                _setStep(currentState, targetStep);
                 saveState(userId);
             }
 
             // REDIRECT: Steer back to the current step's pending question
             const redirect = _getStepRedirect(currentState.step, currentState);
-            if (redirect && !faq.triggerStep) {
+            // If the FAQ itself already ends in a question, don't append another question right after.
+            const endsWithQuestion = faqMsg.trim().endsWith('?');
+
+            if (redirect && !targetStep && !endsWithQuestion) {
                 currentState.history.push({ role: 'bot', content: redirect, timestamp: Date.now() });
                 await sendMessageWithDelay(userId, redirect);
             }
@@ -1620,22 +1649,26 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             }
 
             console.log("Analyzing address data with AI...");
-            const data = await aiService.parseAddress(textToAnalyze);
-
-
+            const data = await (dependencies.mockAiService || aiService).parseAddress(textToAnalyze);
 
             if (data && !data._error) {
                 // DETECT POSTDATED SHIPMENTS
                 if (data.postdatado) {
                     console.log(`[ADDRESS] Postdated request detected: ${data.postdatado}`);
-                    const postponedAcks = [
-                        `¡No hay problema! 😊 Entiendo perfecto. Podemos dejarlo anotado de forma posdatada para esa fecha. ¿Te gustaría que ya mismo tomemos todos los datos así te congela la promo de envío gratis para cuando lo necesites?`,
-                        `¡Dale, ningún problema! Podemos dejar el paquete listo y posdatado para enviarlo cuando te quede mejor a vos. ¿A partir de qué fecha te conviene recibirlo exactamente? Así lo anoto en la etiqueta. 📦`,
-                        `Super entendible 🙌. Lo que hacemos en estos casos es agendar el envío de forma \"posdatada\" para la fecha que indiques, así reservas la promo de hoy. ¿Te parece bien si armamos la etiqueta ahora y lo despachamos en la fecha que vos me digas?`
-                    ];
-                    const ackMsg = postponedAcks[Math.floor(Math.random() * postponedAcks.length)];
-                    currentState.history.push({ role: 'bot', content: ackMsg, timestamp: Date.now() });
-                    await sendMessageWithDelay(userId, ackMsg);
+
+                    // Only send the prolonged ack if we haven't already acknowledged it recently to avoid spam
+                    if (!currentState.postdatado) {
+                        const postponedAcks = [
+                            `¡No hay problema! 😊 Entiendo perfecto. Podemos dejarlo anotado de forma posdatada para esa fecha. ¿Te gustaría que ya mismo tomemos todos los datos así te congela la promo de envío gratis para cuando lo necesites?`,
+                            `¡Dale, ningún problema! Podemos dejar el paquete listo y posdatado para enviarlo cuando te quede mejor a vos. ¿A partir de qué fecha te conviene recibirlo exactamente? Así lo anoto en la etiqueta. 📦`,
+                            `Super entendible 🙌. Lo que hacemos en estos casos es agendar el envío de forma "posdatada" para la fecha que indiques, así reservas la promo de hoy. ¿Te parece bien si armamos la etiqueta ahora y lo despachamos en la fecha que vos me digas?`
+                        ];
+                        const ackMsg = postponedAcks[Math.floor(Math.random() * postponedAcks.length)];
+                        currentState.history.push({ role: 'bot', content: ackMsg, timestamp: Date.now() });
+                        await sendMessageWithDelay(userId, ackMsg);
+                    }
+
+                    currentState.postdatado = data.postdatado; // Save to state
 
                     // We also save any partial direction data they might have sent just in case
                     if (data.nombre && !currentState.partialAddress.nombre) currentState.partialAddress.nombre = data.nombre;
@@ -1643,9 +1676,9 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     if (data.ciudad && !currentState.partialAddress.ciudad) currentState.partialAddress.ciudad = data.ciudad;
                     if (data.cp && !currentState.partialAddress.cp) currentState.partialAddress.cp = data.cp;
 
-                    saveState(userId);
-                    matched = true;
-                    break;
+                    // Do NOT break here. Let execution fall through so the address data can be validated
+                    // and the system can progress if the address is complete.
+                    madeProgress = true;
                 }
 
                 if (data.nombre && !currentState.partialAddress.nombre) { currentState.partialAddress.nombre = data.nombre; madeProgress = true; }
@@ -2225,7 +2258,6 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             console.log(`[AI MEDICAL REJECT] Intercepted AI rejection for user ${userId}. Halting flow.`);
             _setStep(currentState, 'rejected_medical');
             saveState(userId);
-            await notifyAdmin('🚨 Rechazo Médico Automático (Vía IA)', userId, `Motivo: la IA detectó embarazo/lactancia o edad avanzada.\nÚltimo mensaje usuario: "${text}"`);
         }
     }
 

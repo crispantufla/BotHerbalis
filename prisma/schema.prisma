@@ -29,6 +29,12 @@ model Order {
   tracking    String?
   postdated   String?
   
+  nombre      String?
+  calle       String?
+  ciudad      String?
+  provincia   String?
+  cp          String?
+  
   createdAt   DateTime @default(now())
 }
 

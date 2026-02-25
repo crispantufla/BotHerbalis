@@ -5,6 +5,16 @@ Al cambiar de cuenta de Google, puedes pedirle a la IA: *"Lee el archivo AI_SESS
 
 ---
 
+## 🛑 [25 Feb 2026] Análisis Rápido: Postdate ignorado y doble mensaje ("cobro el día 15")
+**Problema:**
+1. Al entrar al paso `waiting_data` y mandar un postdatado como "además cobro el 15...", el interceptor global de FAQ respondía sobre agendar la fecha, pero inmediatamente después _volvía_ a mandar el mensaje nativo pidiendo "Pasame los datos para el envío", duplicando el pedido y rompiendo la naturalidad (Doble Respuesta).
+2. Si el cliente daba la fecha y la dirección exacta en el mismo mensaje, la IA detectaba que se postdataba y lanzaba la confirmación, pero ejecutaba un comando `break;` que interrumpía el bloque, ignorando por competo procesar la dirección y obligando al cliente a mandar su calle otra vez.
+
+**Solución:**
+1. En el iterador de FAQ de `src/flows/salesFlow.js`, se implementó una verificación cruzada `endsWithQuestion`: Si la respuesta del FAQ ya termina en signo de pregunta (`?`), bloquea proactivamente la inyección del "Step Redirect" nativo del paso. Esto suprime la doble pregunta instatánea.
+2. En la lógica de `aiService.parseAddress`, al encontrar postdatado, se removió el comando destructivo `break;` y se reemplazó por un esquema fall-through. Ahora envía la confirmación de la reserva y continúa hacia abajo evaluando y guardando los campos `data.nombre`, `data.calle`, etc. extrayendo todo a la primera.
+
+---
 ## 🛑 [22 Feb 2026] Análisis Rápido: Salto de mensaje "Prices" y Ajuste de Tono (V2)
 **Problema:** Aunque la IA detectaba que el cliente elegía Cápsulas (ej. "Cápsulas o gotas" -> IA recomienda Cápsulas y pregunta si avanzar), cuando el usuario decía "Sí", el bot enviaba el mensaje general de "preference" en lugar del mensaje detallado de PRECIOS de las cápsulas y avanzaba al plan. Además, el cierre de la recomendación de la IA ("¿Te gustaría avanzar con las cápsulas?") sonaba muy robótico.
 **Solución:** 
