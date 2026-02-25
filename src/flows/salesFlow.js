@@ -23,6 +23,41 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             geoRejected: false,
             stepEnteredAt: Date.now()
         };
+
+        // --- NEW PRE-BOT HISTORY CHECK ---
+        try {
+            if (dependencies.client) {
+                const chat = await dependencies.client.getChatById(userId);
+                if (chat) {
+                    const messages = await chat.fetchMessages({ limit: 10 });
+                    const previousUserMessages = messages.filter(m => !m.fromMe).length;
+
+                    let isRecentConversation = false;
+                    if (messages.length > 0) {
+                        const lastMsg = messages[messages.length > 1 ? messages.length - 2 : 0];
+                        if (lastMsg && lastMsg.timestamp) {
+                            const hoursSinceLastMsg = (Date.now() / 1000 - lastMsg.timestamp) / 3600;
+                            if (hoursSinceLastMsg <= 24) {
+                                isRecentConversation = true;
+                            }
+                        }
+                    }
+
+                    if (previousUserMessages >= 5 && isRecentConversation) {
+                        console.log(`[SPAM FILTER] User ${userId} has ${previousUserMessages} previous messages before bot init and conversation is recent. Auto-pausing.`);
+                        if (dependencies.sharedState && dependencies.sharedState.pausedUsers) {
+                            dependencies.sharedState.pausedUsers.add(userId);
+                            try {
+                                dependencies.notifyAdmin('😴 Conversación Existente', userId, 'Se detectó que este cliente estaba respondiendo a un hilo de chat reciente activo. El bot se silenció automáticamente para no entrometerse.');
+                            } catch (e) { }
+                        }
+                        return { matched: true, paused: true };
+                    }
+                }
+            }
+        } catch (err) {
+            console.error(`[SPAM FILTER] Failed to fetch chat history for ${userId}:`, err.message);
+        }
     }
     saveState(userId);
 
