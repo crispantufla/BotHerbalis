@@ -214,20 +214,48 @@ module.exports = (client, sharedState) => {
                 create: { phone: phoneNumeric, name: addr.nombre || null }
             });
 
-            const order = await prisma.order.create({
-                data: {
-                    userPhone: phoneNumeric,
-                    status: 'Confirmado',
-                    products: product,
-                    totalPrice: total,
-                    postdated: state.postdatado || null,
-                    nombre: addr.nombre || null,
-                    calle: addr.calle || null,
-                    ciudad: addr.ciudad || null,
-                    provincia: addr.provincia || null,
-                    cp: addr.cp || null,
-                }
+            const seller = client?.info?.wid?.user || null;
+
+            // Check if there's already a Pendiente order for this user — update it instead of creating a duplicate
+            const existingOrder = await prisma.order.findFirst({
+                where: { userPhone: phoneNumeric, status: 'Pendiente' },
+                orderBy: { createdAt: 'desc' }
             });
+
+            let order;
+            if (existingOrder) {
+                console.log(`[MANUAL-COMPLETE] Found existing Pendiente order ${existingOrder.id}, updating to Confirmado...`);
+                order = await prisma.order.update({
+                    where: { id: existingOrder.id },
+                    data: {
+                        status: 'Confirmado',
+                        seller: seller,
+                        // Update address fields in case they were collected after the initial order
+                        nombre: addr.nombre || existingOrder.nombre,
+                        calle: addr.calle || existingOrder.calle,
+                        ciudad: addr.ciudad || existingOrder.ciudad,
+                        provincia: addr.provincia || existingOrder.provincia,
+                        cp: addr.cp || existingOrder.cp,
+                    }
+                });
+            } else {
+                console.log(`[MANUAL-COMPLETE] No existing order found, creating new Confirmado order...`);
+                order = await prisma.order.create({
+                    data: {
+                        userPhone: phoneNumeric,
+                        status: 'Confirmado',
+                        products: product,
+                        totalPrice: total,
+                        postdated: state.postdatado || null,
+                        nombre: addr.nombre || null,
+                        calle: addr.calle || null,
+                        ciudad: addr.ciudad || null,
+                        provincia: addr.provincia || null,
+                        cp: addr.cp || null,
+                        seller: seller,
+                    }
+                });
+            }
 
 
 
