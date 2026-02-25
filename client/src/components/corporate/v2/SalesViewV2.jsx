@@ -595,7 +595,7 @@ Teléfono: ${phoneDisplay}`;
                                     </div>
                                     <div className="mt-2 pt-2 border-t border-white flex items-center justify-between">
                                         <span className="text-emerald-600 font-extrabold text-[10px] uppercase tracking-wider">A Pagar</span>
-                                        <span className="font-black text-emerald-600 text-lg tracking-tighter leading-none">${viewingOrder.precio?.replace(/\D/g, '') || '0'}</span>
+                                        <span className="font-black text-emerald-600 text-lg tracking-tighter leading-none">${new Intl.NumberFormat('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(parseFloat(viewingOrder.precio || 0))}</span>
                                     </div>
                                 </div>
 

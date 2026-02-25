@@ -309,11 +309,12 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
         const rawPhone = selectedChat?.id?.split('@')[0] || '';
         const phoneDisplay = rawPhone.length > 13 ? `Oculto por Anuncio Meta (${rawPhone})` : rawPhone || 'Desconocido';
 
-        const textToCopy = `Nombre: ${selectedChat?.name || 'Cliente'}
+        const priceFormatted = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(parseFloat(order.precio || 0));
+        const textToCopy = `Nombre: ${selectedChat?.name || order.nombre || 'Cliente'}
 Dirección: ${order.calle}, ${order.ciudad} (CP: ${order.cp})
 Producto: ${order.producto}
-Plan: ${order.plan} Días
-A pagar: ${order.precio}
+Plan: ${order.plan || '120'} Días
+A pagar: $${priceFormatted}
 Teléfono: ${phoneDisplay}`;
 
         navigator.clipboard.writeText(textToCopy)

@@ -485,7 +485,9 @@ sharedState.handleAdminCommand = handleAdminCommand; // Expose to server
 // Expose Pairing Code generation to API
 sharedState.requestPairingCode = async (phoneNumber) => {
     if (!client) throw new Error("Client not initialized");
-    if (!client.pupPage) throw new Error("WhatsApp Web window not loaded yet");
+    if (!client.pupPage || client.pupPage.isClosed()) {
+        throw new Error("La ventana de WhatsApp Web no está activa o se cerró. Reinicia el servidor o el bot desde el panel.");
+    }
 
     // Hotfix for whatsapp-web.js v1.34.6:
     // If we reach here, we must lazily inject the onCodeReceivedEvent function to window
@@ -500,7 +502,28 @@ sharedState.requestPairingCode = async (phoneNumber) => {
         // We can safely ignore it.
     }
 
-    return await client.requestPairingCode(phoneNumber);
+    const MAX_PAIRING_RETRIES = 5;
+    for (let attempt = 1; attempt <= MAX_PAIRING_RETRIES; attempt++) {
+        try {
+            console.log(`[PAIRING] Intentando generar código (intento ${attempt}/${MAX_PAIRING_RETRIES})...`);
+            // Adding a small delay to ensure React state on WA Web is ready
+            await new Promise(r => setTimeout(r, 2000));
+            return await client.requestPairingCode(phoneNumber);
+        } catch (e) {
+            console.warn(`[PAIRING] Puppeteer Error (Intento ${attempt}): ${e.message}`);
+
+            // if whatsapp-web.js throws 't' or 'CompanionHelloError', it means Rate Limit (429)
+            if (e.message === 't' || e.message.includes('CompanionHelloError') || e.message.includes('rate-overlimit')) {
+                console.error(`[PAIRING] ❌ Número bloqueado temporalmente por WhatsApp (Rate Limit).`);
+                throw new Error("WhatsApp ha bloqueado temporalmente tu número por pedir demasiados códigos de vinculación seguidos (Error 429 - Rate Limit). Debes vincular escaneando el código QR, o esperar un par de horas antes de volver a intentar con código.");
+            }
+
+            if (attempt === MAX_PAIRING_RETRIES) {
+                console.error(`[PAIRING] ❌ Fallo definitivo tras ${MAX_PAIRING_RETRIES} intentos.`);
+                throw new Error("Error interno de WhatsApp Web. La página no terminó de cargar. Por favor, haz clic en 'Reconectar Bot' o reinicia el servidor.");
+            }
+        }
+    }
 };
 
 if (!process.env.OPENAI_API_KEY) {
@@ -816,6 +839,13 @@ async function _processDebounced(userId) {
         // Enforce the A/B test assigned script, fallback to global activeScript
         const globalScript = config.activeScript === 'rotacion' ? 'v3' : (config.activeScript || 'v3');
         const effectiveScript = userState[userId]?.assignedScript || globalScript;
+
+        // Self-heal: Ensure assignedScript is populated for the dashboard UI
+        if (userState[userId] && !userState[userId].assignedScript) {
+            userState[userId].assignedScript = effectiveScript;
+            saveState(userId);
+        }
+
         const effectiveKnowledge = sharedState.multiKnowledge[effectiveScript] || sharedState.knowledge;
 
         await processSalesFlow(userId, combinedText, userState, effectiveKnowledge, {

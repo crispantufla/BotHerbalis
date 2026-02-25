@@ -321,6 +321,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             lastActivityAt: Date.now(),
             lastInteraction: Date.now()
         };
+        console.log(`[DEBUG-FLOW] INITIALIZED USER ${userId} with state:`, userState[userId]);
     }
     saveState(userId);
 
@@ -709,25 +710,17 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             else if (tLow.includes('gota')) implicitProduct = "Gotas de nuez de la india";
             else if (tLow.includes('semilla')) implicitProduct = "Semillas de nuez de la india";
 
-            let recentBotMessages = "";
-            let botMsgCount = 0;
-            for (let i = currentState.history.length - 1; i >= 0; i--) {
-                if (currentState.history[i].role === 'bot') {
-                    recentBotMessages += currentState.history[i].content.toLowerCase() + " ";
-                    botMsgCount++;
-                    if (botMsgCount >= 2) break;
+            // If not explicit, check if the bot just recommended capsules in the previous AI fallback
+            if (!implicitProduct && currentState.history && currentState.history.length > 0) {
+                const lastBotMsg = [...currentState.history].reverse().find(m => m.role === 'bot');
+                if (lastBotMsg && lastBotMsg.content.toLowerCase().includes('cápsulas son la opción más efectiva')) {
+                    implicitProduct = "Cápsulas de nuez de la india";
                 }
-            }
-
-            // If they answered a number or affirmative, and the bot just asked "Las cápsulas son la opción más efectiva... ¿Cuántos kilos querés bajar?"
-            // or anything heavily implying capsules have been locked in.
-            const isAffirmative = /^(si|sisi|ok|dale|bueno|joya|de una|perfecto|genial)[\s\?\!\.]*$/i.test(normalizedText);
-            if (!implicitProduct && (hasNumber || isAffirmative) && (recentBotMessages.includes('cápsula') || recentBotMessages.includes('capsula'))) {
-                implicitProduct = "Cápsulas de nuez de la india";
             }
 
             if (implicitProduct) {
                 currentState.suggestedProduct = implicitProduct;
+                console.log(`[LOGIC] Implicitly detected product: ${implicitProduct}`);
             }
 
             // CHECK REFUSAL or SKIP
@@ -868,20 +861,45 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 // Use AI to give a consultative answer based on specific rules
                 const aiRecommendation = await aiService.chat(text, {
                     step: 'waiting_preference_consultation',
-                    goal: `El usuario está indeciso entre productos o pide recomendaciones. REGLAS DE RECOMENDACIÓN (CRÍTICO):
-                    1) Si duda o insiste entre GOTAS y CÁPSULAS: Decile "las gotas las recomendamos para cuando son menos de 10kg y tienen más de 70 años, por lo suaves que son. Para vos te recomiendo las cápsulas que son más efectivas". ¡Ofrecé SIEMPRE las cápsulas como la mejor opción!
-                    2) Si dice "antes tomaba semillas" o similar, felicitalo pero RECOMENDÁ CÁPSULAS para un efecto más rápido ahora.
-                    3) Si pide "lo más efectivo", "lo mejor", "lo más rápido": RECOMENDÁ CÁPSULAS SIEMPRE.
-                    4) Si el usuario pregunta si puede recibir el pedido o pagarlo un día concreto (ej: "¿puedo recibir el 10 de marzo?"), EMPEZÁ TU RESPUESTA DICIENDO EXACTAMENTE QUE SÍ, QUE NO HAY PROBLEMA Y QUEDA ANOTADO PARA ESA FECHA, y luego pasá a la recomendación del producto.
-                    
-                    Respondé ayudando a decidir con estas reglas y luego PREGUNTÁ: "¿Te gustaría avanzar con las cápsulas?"`,
+                    goal: `El usuario está indeciso entre productos, pide recomendaciones, O está aceptando una recomendación previa ("dale", "bueno"). REGLAS DE RECOMENDACIÓN (CRÍTICO):
+                    1) Si el usuario YA ESTÁ ACEPTANDO tu recomendación previa (ej: "dale", "bueno", "capsulas"), ¡tu objetivo está cumplido! Respondé con goalMet=true y extractedData="Cápsulas de nuez de la india".
+                    2) Si pide "lo más efectivo", "lo mejor", "lo más rápido": El objetivo está cumplido automáticamente, respondé goalMet=true y extractedData="Cápsulas de nuez de la india".
+                    3) Si duda o insiste entre GOTAS y CÁPSULAS: Ofrcé SIEMPRE las cápsulas como la mejor opción.
+                    4) Si todavía requiere que lo asesores, respondé ayudando a decidir con estas reglas y luego PREGUNTÁ: "¿Te gustaría avanzar con las cápsulas?".
+                    SOLO marcá goalMet=true si el cliente ya eligió o si explícitamente pidió "lo mejor/más rápido" (asumiendo cápsulas).`,
                     history: currentState.history,
                     summary: currentState.summary,
                     knowledge: knowledge,
                     userState: currentState
                 });
 
-                if (aiRecommendation.response) {
+                if (aiRecommendation.goalMet && aiRecommendation.extractedData) {
+                    const ext = aiRecommendation.extractedData.toLowerCase();
+                    let priceNode;
+                    if (ext.includes('cápsula') || ext.includes('capsula')) {
+                        currentState.selectedProduct = 'Cápsulas de nuez de la india';
+                        priceNode = knowledge.flow.preference_capsulas;
+                    } else if (ext.includes('gota')) {
+                        currentState.selectedProduct = 'Gotas de nuez de la india';
+                        priceNode = knowledge.flow.preference_gotas;
+                    } else if (ext.includes('semilla')) {
+                        currentState.selectedProduct = 'Semillas de nuez de la india';
+                        priceNode = knowledge.flow.preference_semillas;
+                    }
+
+                    if (priceNode) {
+                        const msg = _formatMessage(priceNode.response, currentState);
+                        _setStep(currentState, priceNode.nextStep);
+                        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+                        saveState(userId);
+                        await sendMessageWithDelay(userId, msg);
+
+                        await _maybeUpsell(currentState, sendMessageWithDelay, userId, saveState);
+
+                        matched = true;
+                        break;
+                    }
+                } else if (aiRecommendation.response) {
                     currentState.history.push({ role: 'bot', content: aiRecommendation.response, timestamp: Date.now() });
                     await sendMessageWithDelay(userId, aiRecommendation.response);
                     // MARK CONSULTATIVE SALE
@@ -934,7 +952,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 console.log(`[AI-FALLBACK] waiting_preference: No keyword match for ${userId}`);
                 const aiPref = await aiService.chat(text, {
                     step: 'waiting_preference',
-                    goal: 'Determinar si quiere cápsulas/gotas (opción práctica), semillas (opción natural) o AMBAS. REGLAS CRÍTICAS: Si insiste con gotas pero duda, decile: "las recomendamos para cuando son menos de 10kg y tienen más de 70 años, por lo suaves que son. Llevate las cápsulas". Si habla en PASADO ("yo tomaba", "antes usé"), NO está eligiendo ahora; sugerile las CÁPSULAS. Si pide "lo más efectivo/rápido", sugerile CÁPSULAS. Si el usuario pregunta si puede recibir el pedido o pagarlo un día concreto (ej: "¿puedo recibir el 10 de marzo?"), DALE EL OK Y CONFIRMÁ EL PRODUCTO. Si ya eligió claramente un producto para AHORA, confirmá.',
+                    goal: 'Determinar si quiere cápsulas/gotas (opción práctica), semillas (opción natural) o AMBAS. REGLAS CRÍTICAS: 1) Si insiste con gotas pero duda, decile: "las recomendamos para cuando son menos de 10kg y tienen más de 70 años, por lo suaves que son. Llevate las cápsulas". 2) Si habla en PASADO ("yo tomaba", "antes usé"), NO está eligiendo ahora; sugerile las CÁPSULAS. 3) Si pide "lo más efectivo/rápido", sugerile CÁPSULAS. 4) Si el usuario pregunta si puede recibir el pedido o pagarlo un día concreto (ej: "¿puedo recibir el 10 de marzo?"), DALE EL OK Y CONFIRMÁ EL PRODUCTO. \n\n🔴 REGLA ABSOLUTA DE CONFIRMACIÓN: Si el usuario ya aceptó tu sugerencia o eligió un producto explícita O implícitamente (ej: "dale", "si", "bueno", "quiero esas"), NO DEBES GENERAR RESPUESTA. Debes marcar goalMet=true y extractedData="PRODUCTO: Cápsulas de nuez de la india" inmediatamente.',
                     history: currentState.history,
                     summary: currentState.summary,
                     knowledge: knowledge,
@@ -1168,9 +1186,9 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             } else {
                 // Check for affirmations after an upsell BEFORE consulting AI
                 // Match common combinations like "ok dale", "si dale", "perfecto gracias"
-                const isAffirmative = /^(si|sisi|ok|dale|bueno|joya|de una|perfecto|genial)[\s\?\!\.]*$/i.test(normalizedText)
-                    || /^(si|ok|dale|perfecto|bueno|hacelo)\s+(si|ok|dale|perfecto|bueno|hacelo)[\s\?\!\.]*$/i.test(normalizedText)
-                    || /\b(si|ok|dale|perfecto|bueno|hacelo)\b/i.test(normalizedText);
+                const isAffirmative = /^(si|sisi|ok|oka|dale|bueno|joya|de una|perfecto|genial)[\s\?\!\.]*$/i.test(normalizedText)
+                    || /^(si|ok|oka|dale|perfecto|bueno|hacelo)\s+(si|ok|oka|dale|perfecto|bueno|hacelo)[\s\?\!\.]*$/i.test(normalizedText)
+                    || /\b(si|ok|oka|dale|perfecto|bueno|hacelo)\b/i.test(normalizedText);
 
                 let recentBotMessages = "";
                 // Look at the last TWO bot messages, just in case the upsell was sent in an isolated bubble
@@ -1183,9 +1201,16 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     }
                 }
 
-                // If user said "yes" and the bot recently recommended/mentioned the 120 plan exclusively
-                if (isAffirmative && (recentBotMessages.includes('recomendaría el de 120') || recentBotMessages.includes('recomendaría el plan de 120') || (recentBotMessages.includes('120') && !recentBotMessages.includes('60')))) {
-                    console.log(`[FLOW-INTERCEPT] User said OK to 120-day plan upsell: ${userId}`);
+                // If user said "yes/ok" and the bot recently recommended/mentioned the 120 plan exclusively or strongly suggested it
+                const aiRecommended120 = recentBotMessages.includes('recomendaría el de 120')
+                    || recentBotMessages.includes('recomendaría el plan de 120')
+                    || recentBotMessages.includes('te recomendaría el de 120')
+                    || recentBotMessages.includes('mejor opción para vos es el de 120')
+                    || (recentBotMessages.includes('120') && !recentBotMessages.includes('60'))
+                    || (recentBotMessages.includes('120') && recentBotMessages.includes('recomen'));
+
+                if (isAffirmative && aiRecommended120) {
+                    console.log(`[FLOW-INTERCEPT] User said OK to 120-day plan upsell/AI recommendation: ${userId}`);
 
                     const product = currentState.selectedProduct || "Nuez de la India";
                     const plan = '120';
@@ -1242,7 +1267,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
                     const planAI = await aiService.chat(text, {
                         step: 'waiting_plan_choice',
-                        goal: `El usuario debe elegir Plan 60 o Plan 120 días. CRÍTICO: goalMet=true SOLO si el usuario escribe explícitamente "60" o "120". Si pregunta algo distinto (ej: "cómo las consigo", "para mi hija"), goalMet=false, respondé su duda adaptando los pronombres si compra para otra persona (ej: "para ella") y volvé a preguntar: "¿Avanzamos con 60 o 120 días?". ESTRATEGIA (Si duda entre planes): El costo por pago a domicilio es de $6.000, pero el plan de 120 BONIFICA/REGALA ese servicio. Decile: "${selectedUpsell}".`,
+                        goal: `El usuario debe elegir Plan 60 o Plan 120 días. CRÍTICO: goalMet=true SOLO si el usuario escribe explícitamente "60" o "120", o si acepta tu sugerencia del plan de 120 diciendo "sí", "ok", "dale", "ese" (en cuyo caso MÁGICAMENTE extraes "120" en extractedData). Si pregunta algo distinto (ej: "cómo las consigo"), goalMet=false, respondé su duda y volvé a preguntar: "¿Avanzamos con 60 o 120 días?". ESTRATEGIA: El pago a domicilio cuesta $6.000, pero el plan de 120 LO REGALA. Decile: "${selectedUpsell}".`,
                         history: currentState.history,
                         summary: currentState.summary,
                         knowledge: knowledge,
@@ -2073,6 +2098,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     }
                 }
 
+                console.log(`[DEBUG-FLOW] User ${userId} entering waiting_admin_validation via AFFIRMATIVE match. Text: "${text}"`);
                 _setStep(currentState, 'waiting_admin_validation');
                 currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
                 saveState(userId);
@@ -2100,6 +2126,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     }
                 }
 
+                console.log(`[DEBUG-FLOW] User ${userId} entering waiting_admin_validation via NOT AFFIRMATIVE match. Text: "${text}"`);
                 _setStep(currentState, 'waiting_admin_validation');
                 currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
                 saveState(userId);

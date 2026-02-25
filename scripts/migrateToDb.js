@@ -95,6 +95,17 @@ async function main() {
         }
 
         try {
+            let parsedDate = o.createdAt ? new Date(o.createdAt) : new Date();
+            if (isNaN(parsedDate.getTime()) && typeof o.createdAt === 'string') {
+                const parts = o.createdAt.split(/[^\d]/);
+                if (parts.length >= 3) {
+                    parsedDate = new Date(parts[2], parts[1] - 1, parts[0], parts[3] || 0, parts[4] || 0, parts[5] || 0);
+                }
+            }
+            if (isNaN(parsedDate.getTime())) {
+                parsedDate = new Date();
+            }
+
             await prisma.order.create({
                 data: {
                     id: o.id || undefined,
@@ -104,7 +115,7 @@ async function main() {
                     totalPrice: isNaN(priceNum) ? 0 : priceNum,
                     tracking: o.tracking || null,
                     postdated: o.postdatado || null,
-                    createdAt: o.createdAt ? new Date(o.createdAt) : new Date(),
+                    createdAt: parsedDate,
                 }
             });
         } catch (e) {

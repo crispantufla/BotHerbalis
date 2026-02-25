@@ -16,10 +16,21 @@ module.exports = (client, sharedState) => {
     const router = express.Router();
     const { userState, pausedUsers } = sharedState;
 
+    const resolveChatId = async (id) => {
+        if (!id || !id.includes('@lid')) return id;
+        try {
+            const contact = await client.getContactById(id);
+            if (contact && contact.number) return `${contact.number}@c.us`;
+        } catch (e) {
+            console.error(`[LID-RESOLVE] API Error for ${id}:`, e.message);
+        }
+        return id;
+    };
+
     // GET /summarize/:chatId
     router.get('/summarize/:chatId', authMiddleware, async (req, res) => {
         try {
-            const chatId = req.params.chatId;
+            const chatId = await resolveChatId(req.params.chatId);
             const resetAt = sharedState.chatResets[chatId] || 0;
             // Reusing history logic (simplified for summary - we need text)
             const localMessages = getLocalHistory(chatId, resetAt);
@@ -125,7 +136,7 @@ module.exports = (client, sharedState) => {
     // POST /chats/:id/read
     router.post('/chats/:id/read', authMiddleware, async (req, res) => {
         try {
-            const chatId = req.params.id;
+            const chatId = await resolveChatId(req.params.id);
             const chat = await client.getChatById(chatId);
             await chat.sendSeen();
             res.json({ success: true });
@@ -137,7 +148,7 @@ module.exports = (client, sharedState) => {
     // GET /history/:id
     router.get('/history/:id', authMiddleware, async (req, res) => {
         try {
-            const chatId = req.params.id;
+            const chatId = await resolveChatId(req.params.id);
             const resetAt = sharedState.chatResets[chatId] || 0;
             let messages = [];
 
@@ -239,7 +250,8 @@ module.exports = (client, sharedState) => {
     // POST /send
     router.post('/send', authMiddleware, async (req, res) => {
         try {
-            const { chatId, message } = req.body;
+            let { chatId, message } = req.body;
+            chatId = await resolveChatId(chatId);
             const sentMsg = await client.sendMessage(chatId, message);
 
             _recordAdminMessage(chatId, message);
@@ -254,7 +266,8 @@ module.exports = (client, sharedState) => {
     // POST /send-media (send image from dashboard)
     router.post('/send-media', authMiddleware, async (req, res) => {
         try {
-            const { chatId, base64, mimetype, filename, caption } = req.body;
+            let { chatId, base64, mimetype, filename, caption } = req.body;
+            chatId = await resolveChatId(chatId);
             if (!chatId || !base64 || !mimetype) {
                 return res.status(400).json({ error: 'Missing chatId, base64, or mimetype' });
             }
@@ -277,17 +290,47 @@ module.exports = (client, sharedState) => {
     // POST /reset-chat
     router.post('/reset-chat', authMiddleware, async (req, res) => {
         try {
-            const { chatId } = req.body;
+            let { chatId } = req.body;
+            chatId = await resolveChatId(chatId);
+
             delete userState[chatId];
             sharedState.chatResets[chatId] = Math.floor(Date.now() / 1000); // 1. Record reset timestamp
             pausedUsers.delete(chatId);
             sharedState.saveState();
 
+            // Clear the saved state from the PostgreSQL database too
+            const { prisma } = require('../../../db');
+            const phoneStr = chatId.replace('@c.us', '');
+            try {
+                await prisma.user.update({
+                    where: { phone: phoneStr },
+                    data: { profileData: null }
+                });
+            } catch (dbErr) {
+                console.warn(`[RESET] Could not clear DB state for ${phoneStr}:`, dbErr.message);
+            }
+
             const chat = await client.getChatById(chatId);
             await chat.clearMessages();
 
-            if (sharedState.io) sharedState.io.emit('bot_status_change', { chatId, paused: false });
-            res.json({ success: true, message: "Chat reset successfully" });
+            if (sharedState.logAndEmit) sharedState.logAndEmit(chatId, 'system', 'Memoria de chat reiniciada', 'new');
+            res.json({ success: true });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // POST /toggle-bot
+    router.post('/toggle-bot', authMiddleware, async (req, res) => {
+        try {
+            let { chatId, paused } = req.body;
+            chatId = await resolveChatId(chatId);
+
+            if (paused) pausedUsers.add(chatId);
+            else pausedUsers.delete(chatId);
+
+            if (sharedState.io) sharedState.io.emit('bot_status_change', { chatId, paused });
+            res.json({ success: true });
         } catch (e) {
             res.status(500).json({ error: e.message });
         }
@@ -296,7 +339,9 @@ module.exports = (client, sharedState) => {
     // DELETE /messages (Delete for everyone)
     router.delete('/messages', authMiddleware, async (req, res) => {
         try {
-            const { chatId, messageId } = req.body;
+            let { chatId, messageId } = req.body;
+            chatId = await resolveChatId(chatId);
+
             if (!chatId || !messageId) return res.status(400).json({ error: 'Missing parameters' });
 
             const chat = await client.getChatById(chatId);

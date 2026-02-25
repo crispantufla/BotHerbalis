@@ -7,6 +7,17 @@ module.exports = (client, sharedState) => {
     const router = express.Router();
     const { io } = sharedState;
 
+    const resolveChatId = async (id) => {
+        if (!id || !id.includes('@lid')) return id;
+        try {
+            const contact = await client.getContactById(id);
+            if (contact && contact.number) return `${contact.number}@c.us`;
+        } catch (e) {
+            console.error(`[LID-RESOLVE] API Error for ${id}:`, e.message);
+        }
+        return id;
+    };
+
     // GET /orders (List orders from PostgreSQL with Pagination)
     router.get('/orders', authMiddleware, async (req, res) => {
         try {
@@ -22,7 +33,8 @@ module.exports = (client, sharedState) => {
             const orders = await prisma.order.findMany({
                 orderBy: { createdAt: 'desc' },
                 skip,
-                take: limit
+                take: limit,
+                include: { user: true }
             });
 
             // Map to legacy format expected by dashboard to avoid breaking frontend fields
@@ -34,7 +46,7 @@ module.exports = (client, sharedState) => {
                 precio: o.totalPrice.toString(),
                 tracking: o.tracking || '',
                 postdatado: o.postdated || '',
-                nombre: o.nombre || '',
+                nombre: o.nombre || o.user?.name || '',
                 calle: o.calle || '',
                 ciudad: o.ciudad || '',
                 provincia: o.provincia || '',
@@ -75,6 +87,36 @@ module.exports = (client, sharedState) => {
                 where: { id },
                 data: dataToUpdate
             });
+
+            // Trigger confirmation message if marked as confirmed
+            if (status && status.toLowerCase() === 'confirmado') {
+                console.log(`[ORDER-STATUS] El dashboard marcó la orden ${id} como Confirmado.`);
+
+                // Extraemos solo los números por si vino mezclado o con @lid
+                const rawPhone = updatedOrder.userPhone.replace(/\D/g, '');
+                const targetPhone = `${rawPhone}@c.us`;
+
+                const msg = "¡Excelente! Tu pedido ya fue ingresado 🚀\n\nTe vamos a avisar cuando lo despachemos con el número de seguimiento.\n\n¡Muchas gracias por confiar en Herbalis!";
+
+                try {
+                    console.log(`[ORDER-STATUS] Intentando enviar WhatsApp a ${targetPhone}...`);
+                    await client.sendMessage(targetPhone, msg);
+                    console.log(`[ORDER-STATUS] ✅ WhatsApp enviado exitosamente a ${targetPhone}`);
+
+                    if (sharedState.userState && sharedState.userState[targetPhone]) {
+                        sharedState.userState[targetPhone].step = 'completed';
+                        sharedState.userState[targetPhone].history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+                        if (sharedState.saveState) {
+                            try { sharedState.saveState(targetPhone); } catch (e) { sharedState.saveState(); }
+                        }
+                    }
+                    if (sharedState.logAndEmit) {
+                        sharedState.logAndEmit(targetPhone, 'bot', msg, 'completed');
+                    }
+                } catch (e) {
+                    console.error(`🔴 [ORDER-STATUS] FALLO AL ENVIAR WHATSAPP a ${targetPhone}. Motivo: ${e.message}`);
+                }
+            }
 
             // Format for dashboard and Sheets
             const legacyOrder = {
@@ -142,10 +184,12 @@ module.exports = (client, sharedState) => {
 
     // POST /orders/manual-complete — Admin manually completes a sale from the script panel
     router.post('/orders/manual-complete', authMiddleware, async (req, res) => {
-        const { chatId } = req.body;
+        let { chatId } = req.body;
         if (!chatId) return res.status(400).json({ error: 'chatId es requerido' });
 
         try {
+            chatId = await resolveChatId(chatId);
+
             const { userState } = sharedState;
             const state = userState?.[chatId];
 
