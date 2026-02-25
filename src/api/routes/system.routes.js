@@ -83,6 +83,18 @@ module.exports = (client, sharedState) => {
         res.json(sessionAlerts);
     });
 
+    // DELETE /alerts/:userPhone — Dismiss a specific alert permanently
+    router.delete('/alerts/:userPhone', authMiddleware, (req, res) => {
+        const { userPhone } = req.params;
+        const index = sessionAlerts.findIndex(a => a.userPhone === userPhone || a.userPhone === `${userPhone}@c.us`);
+        if (index !== -1) {
+            sessionAlerts.splice(index, 1);
+            if (io) io.emit('alerts_updated', sessionAlerts);
+            console.log(`[ALERTS] Dismissed alert for ${userPhone}`);
+        }
+        res.json({ success: true, remaining: sessionAlerts.length });
+    });
+
     // GET /stats
     router.get('/stats', authMiddleware, async (req, res) => {
         try {
