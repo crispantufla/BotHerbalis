@@ -13,6 +13,7 @@ RUN apt-get update \
 # Set Environment Variables
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
   PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable \
+  DATA_DIR=/app/data \
   PORT=3000
 
 WORKDIR /app

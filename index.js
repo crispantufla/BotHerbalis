@@ -18,8 +18,9 @@ const { buildConfirmationMessage } = require('./src/utils/messageTemplates');
 // --- PRISMA DATABASE SETUP ---
 const { prisma } = require('./db');
 
-// Paths — use DATA_DIR env var for Railway volume persistence, fallback to project root
-const DATA_DIR = process.env.DATA_DIR || __dirname;
+// Paths — use DATA_DIR env var for Railway volume persistence, fallback to /app/data or project root
+const defaultDataFolder = path.join(__dirname, 'data');
+const DATA_DIR = process.env.DATA_DIR || (process.env.NODE_ENV === 'production' ? defaultDataFolder : __dirname);
 
 console.log(`=========================================`);
 console.log(`[BOOT] DATA_DIR is set to: ${DATA_DIR}`);
