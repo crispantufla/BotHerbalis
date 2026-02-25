@@ -377,22 +377,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
     currentState.lastActivityAt = Date.now();
     currentState.staleAlerted = false; // Reset on new activity
 
-    // ─────────────────────────────────────────────────
-    // NEW FILTER: Auto-Pause for Uninterested / Random Chats
-    // ─────────────────────────────────────────────────
-    const historyCount = currentState.history.filter(m => m.role === 'user').length;
-    const isEarlyStep = ['greeting', 'waiting_weight', 'rejected_medical', 'rejected_geo'].includes(currentState.step);
 
-    if (isEarlyStep && historyCount > 5) {
-        console.log(`[SPAM FILTER] User ${userId} sent > 5 messages in step ${currentState.step}. Pausing bot.`);
-        if (dependencies.sharedState && dependencies.sharedState.pausedUsers) {
-            dependencies.sharedState.pausedUsers.add(userId);
-            try {
-                dependencies.notifyAdmin('😴 Chat Inactivo / Random', userId, 'El usuario envió más de 5 mensajes en la fase inicial sin demostrar interés de avance. El bot se silenció automáticamente.');
-            } catch (e) { }
-        }
-        return { matched: true, paused: true };
-    }
 
     // ─────────────────────────────────────────────────
     // GLOBAL INTENTS (Priority 0 — Cancel/Change)
