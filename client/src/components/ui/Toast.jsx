@@ -28,12 +28,6 @@ const ICON_COLORS = {
     info: 'text-indigo-600 drop-shadow-[0_0_8px_rgba(99,102,241,0.3)] bg-indigo-100/50 p-1.5 rounded-xl border border-indigo-200/50',
 };
 
-const PROGRESS_STYLES = {
-    success: 'bg-gradient-to-r from-emerald-400 to-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]',
-    error: 'bg-gradient-to-r from-rose-400 to-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.5)]',
-    warning: 'bg-gradient-to-r from-amber-400 to-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]',
-    info: 'bg-gradient-to-r from-indigo-500 to-purple-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]',
-};
 
 export const ToastProvider = ({ children }) => {
     const [toasts, setToasts] = useState([]);
@@ -126,30 +120,11 @@ export const ToastProvider = ({ children }) => {
                                 >
                                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
-                                {/* Progress bar */}
-                                {t.duration > 0 && (
-                                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-slate-100/50">
-                                        <div
-                                            className={`h-full ${PROGRESS_STYLES[t.type]}`}
-                                            style={{
-                                                animation: `shrink ${t.duration}ms linear forwards`,
-                                            }}
-                                        />
-                                    </div>
-                                )}
                             </div>
                         )}
                     </div>
                 ))}
             </div>
-
-            {/* Progress bar animation */}
-            <style>{`
-                @keyframes shrink {
-                    from { width: 100%; }
-                    to { width: 0%; }
-                }
-            `}</style>
         </ToastContext.Provider>
     );
 };

@@ -37,6 +37,7 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
     const [isTracking, setIsTracking] = useState(false);
     const [trackingData, setTrackingData] = useState(null);
     const [prices, setPrices] = useState(null);
+    const [globalPause, setGlobalPause] = useState(false);
     const messagesEndRef = useRef(null);
     const scrollContainerRef = useRef(null);
     const fileInputRef = useRef(null);
@@ -60,7 +61,14 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
                 setChats(res.data);
             } catch (e) { setChats([]); }
         };
+        const fetchStatsForPause = async () => {
+            try {
+                const res = await api.get('/api/stats');
+                setGlobalPause(!!res.data.globalPause);
+            } catch (e) { console.error('Error fetching global stats', e); }
+        };
         fetchChats();
+        fetchStatsForPause();
 
         if (socket) {
             socket.on('new_log', (data) => {
@@ -111,8 +119,14 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
                     setSelectedChat(prev => ({ ...prev, isPaused: data.paused }));
                 }
             });
+
+            socket.on('global_pause_changed', (data) => {
+                if (data && typeof data.globalPause !== 'undefined') {
+                    setGlobalPause(data.globalPause);
+                }
+            });
         }
-        return () => { if (socket) { socket.off('new_log'); socket.off('bot_status_change'); } };
+        return () => { if (socket) { socket.off('new_log'); socket.off('bot_status_change'); socket.off('global_pause_changed'); } };
     }, [socket, selectedChat]);
 
     const [availableScripts, setAvailableScripts] = useState({ v3: {}, v4: {} });
@@ -383,7 +397,7 @@ Teléfono: ${phoneDisplay}`;
                                 <div className="flex justify-between items-start mb-1 gap-2">
                                     <h3 className={`font-extrabold text-sm truncate flex flex-wrap items-center gap-1.5 ${selectedChat?.id === chat.id ? 'text-white' : 'text-slate-800'}`}>
                                         {chat.isPaused && <span className="w-2 h-2 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)] animate-pulse" title="Bot Pausado"></span>}
-                                        <span className="truncate max-w-[120px]">{chat.name}</span>
+                                        <span className="truncate max-w-[170px]">{chat.name}</span>
                                         {chat.hasBought && <span title="Cliente Recurrente" className="inline-flex items-center text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-md font-extrabold shadow-sm"><IconsV2.Cart className="w-2.5 h-2.5 mr-0.5" /> Cliente</span>}
                                     </h3>
                                     <span className={`text-[10px] font-bold font-mono ${selectedChat?.id === chat.id ? 'text-indigo-100' : 'text-slate-400'}`}>{chat.time}</span>
@@ -437,7 +451,7 @@ Teléfono: ${phoneDisplay}`;
                                 </div>
                             </div>
 
-                            <div className="flex items-center justify-start sm:justify-end gap-1 sm:gap-3 overflow-x-auto custom-scrollbar no-scrollbar scroll-smooth w-full sm:w-auto pb-1 sm:pb-0">
+                            <div className="flex items-center justify-start sm:justify-end gap-1 sm:gap-3 overflow-x-visible w-full sm:w-auto pb-1 sm:pb-0">
                                 {selectedChat.hasBought && (
                                     <button onClick={() => setShowOrdersPanel(!showOrdersPanel)} className="p-2.5 sm:p-3 flex-shrink-0 rounded-xl bg-indigo-100/80 text-indigo-700 hover:bg-indigo-200 hover:shadow-md transition-all" title="Registro de Compras">
                                         <IconsV2.Cart className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -447,10 +461,10 @@ Teléfono: ${phoneDisplay}`;
                                 <button onClick={handleClearChat} className="p-2.5 sm:p-3 flex-shrink-0 rounded-xl bg-rose-100/80 text-rose-600 hover:bg-rose-200 hover:shadow-md transition-all" title="Reiniciar Memoria e Historial">
                                     <IconsV2.Trash />
                                 </button>
-                                <button onClick={handleToggleBot} className={`p-2.5 sm:p-3 flex-shrink-0 rounded-xl text-white shadow-md transition-all ${selectedChat.isPaused ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:scale-105' : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:scale-105'}`} title={selectedChat.isPaused ? 'Reactivar Bot' : 'Pausar Bot'}>
-                                    {selectedChat.isPaused ? <IconsV2.Play /> : <IconsV2.Pause />}
+                                <button onClick={handleToggleBot} className={`p-2.5 sm:p-3 flex-shrink-0 rounded-xl text-white shadow-md transition-all hover:brightness-110 hover:-translate-y-0.5 ${globalPause || selectedChat.isPaused ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 'bg-gradient-to-r from-amber-500 to-orange-500'}`} title={globalPause ? 'Bot Pausado Globalmente' : (selectedChat.isPaused ? 'Reactivar Auto-Bot' : 'Pausar Auto-Bot')}>
+                                    {globalPause || selectedChat.isPaused ? <IconsV2.Play /> : <IconsV2.Pause />}
                                 </button>
-                                <button onClick={() => setShowScriptPanel(!showScriptPanel)} className="p-2.5 sm:p-3 flex-shrink-0 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500/30 hover:shadow-lg hover:shadow-indigo-500/40 transition-all active:scale-95" title="Guión">
+                                <button onClick={() => setShowScriptPanel(!showScriptPanel)} className="p-2.5 sm:p-3 flex-shrink-0 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500/30 hover:shadow-lg hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all active:scale-95" title="Guión">
                                     <IconsV2.Script />
                                 </button>
                             </div>
@@ -601,7 +615,7 @@ Teléfono: ${phoneDisplay}`;
                         </div>
 
                         {/* Input Area */}
-                        <div className="flex-shrink-0 p-3 sm:px-6 sm:py-4 bg-white/50 backdrop-blur-md border-t border-white/60 z-20 mb-safe-bottom">
+                        <div className="flex-shrink-0 p-3 sm:px-6 sm:py-4 pb-[max(1rem,env(safe-area-inset-bottom))] lg:pb-4 bg-white/50 backdrop-blur-md border-t border-white/60 z-20">
                             {attachment && (
                                 <div className="mb-2 p-3 sm:p-4 bg-white/80 rounded-2xl border border-indigo-100 shadow-sm flex items-center gap-4">
                                     <img src={attachment.preview} alt="Preview" className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-xl" />

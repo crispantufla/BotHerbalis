@@ -144,10 +144,27 @@ module.exports = (client, sharedState) => {
                 activeSessions,
                 activeConversations,
                 conversionRate: activeSessions > 0 ? Math.round((completedToday / activeSessions) * 100) : 0,
-                pausedUsers: (pausedUsers ? pausedUsers.size : 0)
+                pausedUsers: (pausedUsers ? pausedUsers.size : 0),
+                globalPause: !!config.globalPause
             });
         } catch (e) {
             console.error("🔴 [STATS ERROR]", e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // POST /global-pause - Toggle bot global pause state
+    router.post('/global-pause', authMiddleware, (req, res) => {
+        try {
+            config.globalPause = !config.globalPause;
+            if (sharedState.saveState) sharedState.saveState();
+
+            if (io) io.emit('global_pause_changed', { globalPause: config.globalPause });
+
+            console.log(`[SYSTEM] Global Pause toggled to: ${config.globalPause}`);
+            res.json({ success: true, globalPause: config.globalPause });
+        } catch (e) {
+            console.error("Error toggling global pause:", e);
             res.status(500).json({ error: e.message });
         }
     });

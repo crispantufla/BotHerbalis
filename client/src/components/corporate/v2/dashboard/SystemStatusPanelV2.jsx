@@ -66,21 +66,6 @@ const SystemStatusPanelV2 = ({ status, activeConversations = 0, adminNumbers = [
                         </button>
                     </div>
 
-                    <div className="flex justify-between items-center pb-4 border-b border-slate-200/50">
-                        <div className="flex items-center gap-4">
-                            <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]"></div>
-                            <span className="text-sm font-bold text-slate-700">Google Sheets</span>
-                        </div>
-                        <span className="text-[10px] font-extrabold font-mono px-3 py-1 rounded-full bg-emerald-100/50 text-emerald-700 border border-emerald-200">OK</span>
-                    </div>
-
-                    <div className="flex justify-between items-center pb-4 border-b border-slate-200/50">
-                        <div className="flex items-center gap-4">
-                            <div className="w-3 h-3 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.3)]"></div>
-                            <span className="text-sm font-bold text-slate-700">Conversaciones</span>
-                        </div>
-                        <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full">{activeConversations} en curso</span>
-                    </div>
                 </div>
 
                 {/* Admin Phone Numbers */}

@@ -538,139 +538,172 @@ Teléfono: ${phoneDisplay}`;
                 document.body
             )}
 
-            {/* V2 DETAILS MODAL (TICKET STYLE COMPACTADO) */}
+            {/* V2 PREMIUM TICKET MODAL */}
             {viewingOrder && createPortal(
-                <div className="fixed inset-0 bg-white/95 sm:bg-slate-900/60 backdrop-blur-none sm:backdrop-blur-md z-[100] flex items-center justify-center animate-fade-in p-0 sm:p-4" onClick={() => setViewingOrder(null)}>
-                    <div className="bg-slate-50/95 sm:bg-white/70 backdrop-blur-none sm:backdrop-blur-2xl rounded-none sm:rounded-3xl shadow-none sm:shadow-[0_16px_40px_rgb(0,0,0,0.15)] w-full h-full sm:h-auto max-w-4xl overflow-hidden flex flex-col sm:max-h-[90vh] relative border-0 sm:border border-white" onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[100] flex items-center justify-center animate-fade-in p-0 sm:p-4 sm:p-6" onClick={() => setViewingOrder(null)}>
+                    <div className="bg-white rounded-none sm:rounded-[2rem] shadow-2xl w-full h-full sm:h-auto max-w-3xl overflow-hidden flex flex-col sm:max-h-[90vh] relative border border-slate-100" onClick={e => e.stopPropagation()}>
 
-                        {/* Compact Header Glassmorphism */}
-                        <div className="bg-white/40 p-4 sm:p-5 flex justify-between items-center relative overflow-hidden shrink-0 border-b border-white/50">
-                            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 blur-[50px] rounded-full pointer-events-none"></div>
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-white/70 text-indigo-600 flex items-center justify-center shadow-sm">
+                        {/* Header */}
+                        <div className="bg-gradient-to-r from-slate-50 to-white p-6 sm:p-8 flex justify-between items-center relative border-b border-slate-100 shrink-0">
+                            <div className="flex items-center gap-4 relative z-10">
+                                <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-inner border border-indigo-100/50">
                                     <IconsV2.Script />
                                 </div>
                                 <div>
-                                    <h3 className="text-xl font-black text-slate-800 tracking-tight leading-none">Detalles del Ticket</h3>
-                                    <p className="text-indigo-600 font-bold text-[10px] uppercase tracking-widest mt-0.5">{viewingOrder.id ? `#${viewingOrder.id.substring(0, 8)}` : 'REGISTRO DE VENTA'}</p>
+                                    <h3 className="text-2xl font-black text-slate-800 tracking-tight">Detalles de Venta</h3>
+                                    <p className="text-slate-500 font-bold text-xs uppercase tracking-widest mt-1">
+                                        Ref: {viewingOrder.id ? viewingOrder.id.substring(0, 8) : 'N/A'}
+                                    </p>
                                 </div>
                             </div>
-                            <button onClick={() => setViewingOrder(null)} className="w-8 h-8 rounded-full bg-white text-slate-400 hover:text-rose-500 shadow-sm transition-all flex items-center justify-center border border-slate-100 hover:border-rose-100">✕</button>
+                            <button onClick={() => setViewingOrder(null)} className="w-10 h-10 rounded-full bg-slate-50 text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all flex items-center justify-center border border-slate-200">✕</button>
                         </div>
 
-                        {/* Ticket Body scrollable - Compact Grid */}
-                        <div className="p-3 sm:p-4 overflow-y-auto custom-scrollbar flex-1 relative bg-slate-50/20">
-                            <div className="absolute -left-10 top-1/4 w-40 h-40 bg-purple-400/10 blur-[50px] rounded-full pointer-events-none"></div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                                {/* Card 1: Titular */}
-                                <div className="bg-white/60 backdrop-blur-md rounded-2xl p-4 border border-white shadow-sm flex flex-col justify-between relative overflow-hidden">
-                                    <div className="absolute right-0 bottom-0 w-16 h-16 bg-emerald-400/10 blur-[20px] rounded-full pointer-events-none"></div>
-                                    <span className="text-[10px] font-black uppercase text-indigo-400 tracking-widest mb-2 flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-indigo-400"></div> Titular</span>
-                                    <p className="font-extrabold text-slate-800 text-sm leading-tight">{viewingOrder.nombre || 'Sin nombre'}</p>
-                                    <p className="font-mono text-slate-500 text-[11px] font-bold mt-0.5">{viewingOrder.cliente ? viewingOrder.cliente.split('@')[0] : '—'}</p>
-                                    <div className="mt-2 pt-2 border-t border-white text-[11px]">
-                                        <span className="text-slate-400 font-bold">Creación:</span> <span className="text-slate-700 font-extrabold">{formatDateBA(viewingOrder.createdAt)}</span>
+                        {/* Content */}
+                        <div className="p-6 sm:p-8 overflow-y-auto custom-scrollbar flex-1 bg-white relative">
+                            {/* Top info grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                                {/* Client Info */}
+                                <div>
+                                    <span className="text-[10px] font-black uppercase text-indigo-500 tracking-widest mb-3 flex items-center gap-2">
+                                        <div className="w-4 h-[2px] bg-indigo-500 rounded-full"></div> Cliente
+                                    </span>
+                                    <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100">
+                                        <p className="font-black text-slate-800 text-lg leading-tight mb-1">{viewingOrder.nombre || 'Sin nombre'}</p>
+                                        <p className="font-mono text-slate-500 text-sm font-medium">{viewingOrder.cliente ? viewingOrder.cliente.split('@')[0] : '—'}</p>
+                                        <div className="mt-4 pt-4 border-t border-slate-200/60 flex justify-between items-center">
+                                            <span className="text-slate-400 font-bold text-xs">Fecha:</span>
+                                            <span className="text-slate-700 font-bold text-sm">{formatDateBA(viewingOrder.createdAt)}</span>
+                                        </div>
                                     </div>
                                 </div>
 
-                                {/* Card 2: Destino */}
-                                <div className="bg-white/60 backdrop-blur-md rounded-2xl p-4 border border-white shadow-sm flex flex-col justify-between">
-                                    <span className="text-[10px] font-black uppercase text-indigo-400 tracking-widest mb-2 flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-indigo-400"></div> Destino de Entrega</span>
-                                    <p className="font-extrabold text-slate-800 text-sm leading-tight flex-1">{viewingOrder.calle || 'Sin domicilio'}, <br />{viewingOrder.ciudad || 'Sin ciudad'}</p>
-                                    <div className="mt-2 pt-2 border-t border-white flex items-center justify-between text-[11px]">
-                                        <div><span className="text-slate-400 font-bold">C.P.:</span> <span className="text-slate-700 font-extrabold">{viewingOrder.cp || '—'}</span></div>
-                                        {viewingOrder.postdatado && <span className="text-amber-500 font-bold bg-amber-50 px-1.5 py-0.5 rounded shadow-sm">Postdatado: {viewingOrder.postdatado}</span>}
+                                {/* Delivery Info */}
+                                <div>
+                                    <div className="flex justify-between items-center mb-3">
+                                        <span className="text-[10px] font-black uppercase text-indigo-500 tracking-widest flex items-center gap-2">
+                                            <div className="w-4 h-[2px] bg-indigo-500 rounded-full"></div> Envío
+                                        </span>
+                                        {/* Premium Postdatado Badge */}
+                                        {viewingOrder.postdatado && String(viewingOrder.postdatado).trim() !== '' && String(viewingOrder.postdatado).toLowerCase() !== 'no' && String(viewingOrder.postdatado).toLowerCase() !== 'false' ? (
+                                            <span className="text-[10px] font-black bg-amber-100 text-amber-600 px-3 py-1 rounded-full border border-amber-200 uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+                                                <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div>
+                                                POSTDATADO: {viewingOrder.postdatado}
+                                            </span>
+                                        ) : (
+                                            <span className="text-[10px] font-bold bg-slate-100 text-slate-400 px-3 py-1 rounded-full border border-slate-200 uppercase tracking-widest">
+                                                Inmediato
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100 h-[calc(100%-28px)] flex flex-col justify-center">
+                                        <p className="font-bold text-slate-700 text-base leading-relaxed">{viewingOrder.calle || 'Sin domicilio'}</p>
+                                        <p className="font-medium text-slate-600 text-sm mt-1">{viewingOrder.ciudad || 'Sin ciudad'} <span className="text-slate-400 ml-1">(CP: {viewingOrder.cp || '—'})</span></p>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                {/* Card 3: Mercaderia */}
-                                <div className="bg-white/60 backdrop-blur-md rounded-2xl p-4 border border-white shadow-sm flex flex-col justify-between">
-                                    <span className="text-[10px] font-black uppercase text-indigo-400 tracking-widest mb-2 flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-indigo-400"></div> Mercadería</span>
-                                    <div>
-                                        <p className="font-extrabold text-slate-800 text-sm leading-tight">{viewingOrder.producto}</p>
-                                        {viewingOrder.plan && <p className="text-slate-500 font-bold text-[11px] mt-0.5">Plan {viewingOrder.plan} Días</p>}
+                            {/* Order Summary & Status */}
+                            <div className="bg-slate-50 rounded-3xl p-6 border border-slate-100 mb-8">
+                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                                    <div className="flex-1 w-full">
+                                        <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1 block">Producto</span>
+                                        <p className="font-black text-slate-800 text-xl">{viewingOrder.producto}</p>
+                                        {viewingOrder.plan && <span className="inline-block mt-2 px-3 py-1 bg-white border border-slate-200 text-slate-600 text-xs font-bold rounded-lg shadow-sm">Plan {viewingOrder.plan} Días</span>}
                                     </div>
-                                    <div className="mt-2 pt-2 border-t border-white flex items-center justify-between">
-                                        <span className="text-emerald-600 font-extrabold text-[10px] uppercase tracking-wider">A Pagar</span>
-                                        <span className="font-black text-emerald-600 text-lg tracking-tighter leading-none">${new Intl.NumberFormat('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(parseFloat(viewingOrder.precio || 0))}</span>
+
+                                    <div className="w-full md:w-px h-px md:h-16 bg-slate-200"></div>
+
+                                    <div className="flex-1 w-full flex flex-col items-start md:items-center">
+                                        <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 block">Estado Actual</span>
+                                        <span className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest border shadow-sm ${statusStyles[viewingOrder.status] || statusStyles['Pendiente']}`}>
+                                            {viewingOrder.status || 'Pendiente'}
+                                        </span>
+                                    </div>
+
+                                    <div className="w-full md:w-px h-px md:h-16 bg-slate-200"></div>
+
+                                    <div className="flex-1 w-full flex flex-col items-start md:items-end">
+                                        <span className="text-[10px] font-black uppercase text-emerald-600 tracking-widest mb-1 block">Total a Pagar</span>
+                                        <span className="font-black text-emerald-500 text-4xl tracking-tighter leading-none">${new Intl.NumberFormat('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(parseFloat(viewingOrder.precio || 0))}</span>
                                     </div>
                                 </div>
+                            </div>
 
-                                {/* Card 4: Bitacora */}
-                                <div className="bg-white/60 backdrop-blur-md rounded-2xl p-4 border border-white shadow-sm flex flex-col">
-                                    <span className="text-[10px] font-black uppercase text-indigo-400 tracking-widest mb-2 flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-indigo-400"></div> Bitácora</span>
+                            {/* Tracking Section */}
+                            <div>
+                                <div className="flex justify-between items-center mb-4">
+                                    <span className="text-[10px] font-black uppercase text-indigo-500 tracking-widest flex items-center gap-2">
+                                        <div className="w-4 h-[2px] bg-indigo-500 rounded-full"></div> Logística
+                                    </span>
+                                    {viewingOrder.tracking && (
+                                        <button onClick={() => handleTrackOrder(viewingOrder.tracking)} disabled={isTracking} className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white font-bold text-xs rounded-xl transition-all shadow-sm border border-blue-100 disabled:opacity-50">
+                                            {isTracking ? 'Consultando...' : '🔍 Rastrear Envío'}
+                                        </button>
+                                    )}
+                                </div>
 
-                                    <div className="flex justify-between items-center mb-2">
-                                        <div className="flex flex-col gap-0.5">
-                                            <span className="text-slate-400 font-bold text-[10px] uppercase">Status</span>
-                                            <span className={`inline-block px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border shadow-sm ${statusStyles[viewingOrder.status] || statusStyles['Pendiente']}`}>
-                                                {viewingOrder.status || 'Pendiente'}
-                                            </span>
-                                        </div>
-                                        {viewingOrder.tracking && (
-                                            <div className="flex flex-col items-end gap-0.5">
-                                                <span className="text-slate-400 font-bold text-[10px] uppercase">Tracking TCA</span>
-                                                <span className="font-bold font-mono text-slate-700 bg-white/80 px-2 py-0.5 rounded shadow-sm border border-slate-100 text-[10px]">{viewingOrder.tracking}</span>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Tracking Controls */}
-                                    {viewingOrder.tracking ? (
-                                        <div className="mt-auto pt-1">
-                                            <button onClick={() => handleTrackOrder(viewingOrder.tracking)} disabled={isTracking} className="w-full justify-center flex items-center gap-1.5 px-3 py-1.5 bg-blue-50/80 text-blue-600 hover:bg-blue-100 font-bold text-[11px] rounded-lg transition-all shadow-sm border border-blue-200/50 disabled:opacity-50">
-                                                {isTracking ? 'Consultando...' : '🔍 Rastrear en Vivo'}
-                                            </button>
-                                            {/* Tracking Events Expansion Compact - MOVED BELOW */}
+                                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                                    {!viewingOrder.tracking ? (
+                                        <div className="text-center py-6">
+                                            <p className="text-slate-400 font-medium text-sm">Aún no hay número de seguimiento asignado.</p>
                                         </div>
                                     ) : (
-                                        <span className="text-slate-400 font-extrabold text-[10px] text-center mt-auto block pt-2 border-t border-white">—</span>
+                                        <div>
+                                            <div className="flex items-center justify-between mb-6 pb-6 border-b border-slate-100">
+                                                <div>
+                                                    <span className="text-xs font-bold text-slate-500 block mb-1">Código de Tracking</span>
+                                                    <span className="font-mono text-slate-800 font-bold text-lg bg-slate-50 px-3 py-1 rounded-lg border border-slate-200 tracking-wider">
+                                                        {viewingOrder.tracking}
+                                                    </span>
+                                                </div>
+                                                <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-500">
+                                                    <IconsV2.Refresh />
+                                                </div>
+                                            </div>
+
+                                            {/* Tracking Data */}
+                                            {trackingData && (
+                                                <div className="animate-fade-in">
+                                                    {trackingData.success ? (
+                                                        trackingData.events && trackingData.events.length > 0 ? (
+                                                            <div className="space-y-4">
+                                                                {trackingData.events.map((ev, i) => (
+                                                                    <div key={i} className="flex gap-4 items-start relative pb-6 border-l-2 border-indigo-100 last:border-0 last:pb-0 ml-2">
+                                                                        <div className="absolute -left-[5px] top-1 w-2 h-2 rounded-full bg-indigo-400 ring-4 ring-white"></div>
+                                                                        <div className="pl-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 w-full">
+                                                                            <div className="min-w-[120px]">
+                                                                                <span className="font-bold text-slate-800 text-xs block">{ev.fecha}</span>
+                                                                                <span className="text-blue-500 font-black uppercase text-[9px] tracking-widest mt-0.5 block">{ev.planta}</span>
+                                                                            </div>
+                                                                            <p className="text-slate-600 font-medium text-sm flex-1">{ev.historia}</p>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        ) : (
+                                                            <p className="text-slate-500 text-sm text-center py-4">El operador no reporta movimientos recientes.</p>
+                                                        )
+                                                    ) : (
+                                                        <div className="bg-rose-50 text-rose-600 font-bold text-sm p-4 rounded-xl text-center border border-rose-100">
+                                                            {trackingData.error || "Tracking sin información disponible."}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
                                     )}
                                 </div>
                             </div>
-
-                            {/* Card 5: Tracking Events Expansion (Full Width) */}
-                            {trackingData && (
-                                <div className="mt-3 bg-white/60 backdrop-blur-md rounded-2xl p-4 border border-white shadow-sm flex flex-col w-full animate-fade-in">
-                                    <span className="text-[10px] font-black uppercase text-indigo-400 tracking-widest mb-3 flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></div> Historial Integral del Paquete</span>
-
-                                    <div className="bg-white/50 border border-white/80 rounded-xl p-3 shadow-[inset_0_2px_10px_rgb(0,0,0,0.02)] max-h-48 overflow-y-auto custom-scrollbar">
-                                        {trackingData.success ? (
-                                            trackingData.events && trackingData.events.length > 0 ? (
-                                                <div className="space-y-2">
-                                                    {trackingData.events.map((ev, i) => (
-                                                        <div key={i} className="flex flex-col sm:flex-row sm:items-center bg-white/80 p-3 rounded-lg shadow-sm border border-white/50 text-[11px] backdrop-blur-sm gap-2 sm:gap-4 transition-all hover:bg-white hover:shadow-md">
-                                                            <div className="flex flex-col justify-center min-w-[130px]">
-                                                                <span className="font-extrabold text-slate-800 border-b border-slate-100 pb-0.5 mb-1 sm:border-0 sm:pb-0 sm:mb-0">{ev.fecha}</span>
-                                                                <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded font-black uppercase tracking-widest text-[9px] w-fit sm:mt-0.5">{ev.planta}</span>
-                                                            </div>
-                                                            <div className="hidden sm:block w-px h-8 bg-slate-200"></div>
-                                                            <span className="text-slate-600 font-medium leading-relaxed flex-1">{ev.historia}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <p className="text-slate-500 italic text-[11px] font-medium text-center py-3">El operador logístico aún no reportó movimientos.</p>
-                                            )
-                                        ) : (
-                                            <p className="text-rose-600 font-bold text-[11px] bg-rose-50 p-2.5 rounded-lg text-center border border-rose-100">{trackingData.error || "Tracking incorrecto o inactivo."}</p>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-
                         </div>
 
-                        {/* Footer Buttons Compact Glassmorphism */}
-                        <div className="bg-white/50 border-t border-white/50 p-3 sm:p-4 flex justify-end gap-2.5 shrink-0 backdrop-blur-md">
-                            <button onClick={() => handleCopySaleDetails(viewingOrder)} className="flex items-center gap-1.5 px-4 py-2 sm:px-5 sm:py-2.5 bg-white/70 text-indigo-700 hover:bg-white hover:text-indigo-600 border border-white shadow-sm font-extrabold text-[11px] uppercase tracking-wider rounded-xl transition-all hover:-translate-y-0.5">
-                                <IconsV2.Script className="w-3.5 h-3.5" /> Copiar Venta
+                        {/* Footer Options */}
+                        <div className="bg-slate-50 p-6 flex justify-end gap-3 shrink-0 border-t border-slate-200">
+                            <button onClick={() => handleCopySaleDetails(viewingOrder)} className="flex items-center gap-2 px-6 py-3 bg-white text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 shadow-sm font-extrabold text-xs uppercase tracking-widest rounded-xl transition-all">
+                                <IconsV2.Script className="w-4 h-4" /> Copiar Info
                             </button>
-                            <button onClick={() => setViewingOrder(null)} className="px-6 py-2 sm:px-8 sm:py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl text-[11px] uppercase tracking-wider font-extrabold hover:opacity-90 transition-all shadow-md shadow-indigo-500/30 hover:-translate-y-0.5 backdrop-blur-sm">
-                                Entendido
+                            <button onClick={() => setViewingOrder(null)} className="px-8 py-3 bg-slate-800 text-white rounded-xl text-xs uppercase tracking-widest font-extrabold hover:bg-black transition-all shadow-lg shadow-slate-800/20 active:scale-95">
+                                Cerrar
                             </button>
                         </div>
                     </div>

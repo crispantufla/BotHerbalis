@@ -221,6 +221,12 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false, shar
                 await client.sendMessage(actualTarget, suggestion);
                 if (sharedState.logAndEmit) sharedState.logAndEmit(actualTarget, 'admin', suggestion, 'admin_instruction');
 
+                // UNPAUSE the user so the bot resumes the flow from here dynamically
+                if (sharedState.pausedUsers.has(actualTarget)) {
+                    sharedState.pausedUsers.delete(actualTarget);
+                    console.log(`[ADMIN] User ${actualTarget} unpaused after admin intervention.`);
+                }
+
                 // Clear Alert on Action
                 const index = sharedState.sessionAlerts.findIndex(a => a.userPhone === actualTarget);
                 if (index !== -1) {

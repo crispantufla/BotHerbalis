@@ -97,14 +97,53 @@ const DashboardViewV2 = ({ alerts = [], config, handleQuickAction, status, qrDat
 
     const adminNumbers = config?.alertNumbers || (config?.alertNumber ? [config.alertNumber] : []);
 
+    const isGlobalPause = !!stats?.globalPause;
+
+    const handleToggleGlobalPause = async () => {
+        try {
+            const res = await api.post('/api/global-pause');
+            setStats(prev => ({ ...prev, globalPause: res.data.globalPause }));
+            toast.success(`Bot ${res.data.globalPause ? 'pausado' : 'reactivado'} globalmente`);
+        } catch (e) {
+            toast.error('Error cambiando el estado global del bot');
+        }
+    };
+
     return (
         <div className="space-y-8 animate-fade-in relative z-10 w-full">
             {/* Header de la vista */}
-            <div className="mb-8">
-                <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-700 to-purple-600">
-                    Dashboard Overview
-                </h1>
-                <p className="text-slate-500 mt-1 font-medium">Resumen del sistema y métricas en tiempo real</p>
+            <div className="mb-8 flex justify-between items-stretch gap-6 h-[5.5rem]">
+                <div className="flex flex-col justify-center">
+                    <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-700 to-purple-600 leading-none mb-2">
+                        Dashboard Overview
+                    </h1>
+                    <p className="text-slate-500 font-medium m-0 leading-none">Resumen del sistema y métricas en tiempo real</p>
+                </div>
+
+                {/* Global Pause Button */}
+                <button
+                    onClick={handleToggleGlobalPause}
+                    className={`flex items-center justify-center gap-4 px-6 rounded-[1.25rem] font-bold transition-all shadow-sm w-72 h-full ${isGlobalPause
+                            ? 'bg-amber-100/90 text-amber-800 hover:bg-amber-200 border-2 border-amber-200 shadow-amber-500/20'
+                            : 'bg-white border-2 border-slate-100/80 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 hover:border-indigo-100 hover:shadow-indigo-500/10'
+                        }`}
+                >
+                    {isGlobalPause ? (
+                        <>
+                            <div className="w-12 h-12 flex items-center justify-center rounded-2xl bg-amber-500 text-white shadow-md shadow-amber-500/40 flex-shrink-0">
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            </div>
+                            <span className="text-left leading-tight text-[15px] tracking-wide font-extrabold">Reactivar Bot<br />Global</span>
+                        </>
+                    ) : (
+                        <>
+                            <div className="w-12 h-12 flex items-center justify-center rounded-2xl bg-amber-50 text-amber-500 shadow-inner border border-amber-100 flex-shrink-0">
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            </div>
+                            <span className="text-left leading-tight text-[15px] tracking-wide font-extrabold">Pausar Bot<br />Global</span>
+                        </>
+                    )}
+                </button>
             </div>
 
             {/* QR CODE OVERLAY - Glassmorphism style */}

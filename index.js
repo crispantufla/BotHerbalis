@@ -796,6 +796,11 @@ client.on('message', async msg => {
         }
 
         // 3. Paused Check
+        if (config.globalPause && !isAdmin) {
+            console.log(`[PAUSED GLOBAL] Ignoring message from ${userId}`);
+            return;
+        }
+
         if (pausedUsers.has(userId)) {
             console.log(`[PAUSED] Ignoring message from ${userId} `);
             return;
@@ -931,6 +936,20 @@ const _shutdown = async (signal) => {
     process.exit(0);
 };
 process.on('SIGTERM', () => _shutdown('SIGTERM'));
+
+// En Windows, presionar Ctrl+C no emite el evento SIGINT de forma natural.
+// Necesitamos usar readline para capturarlo y forzar el evento adecuado.
+if (process.platform === "win32") {
+    var rl = require("readline").createInterface({
+        input: process.stdin,
+        output: process.stdout
+    });
+
+    rl.on("SIGINT", function () {
+        process.emit("SIGINT");
+    });
+}
+
 process.on('SIGINT', () => _shutdown('SIGINT'));
 
 safeInitialize();
