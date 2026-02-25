@@ -303,7 +303,15 @@ module.exports = (client, sharedState) => {
                 io.emit('order_update', { action: 'created', order: legacyOrder });
             }
 
-            console.log(`✅ [MANUAL-COMPLETE] Order created for ${phoneNumeric}: ${product} — $${total}`);
+            // Clear the alert from sessionAlerts so it doesn't reappear on reload
+            const alertIndex = sharedState.sessionAlerts.findIndex(a => a.userPhone === phoneNumeric || a.userPhone === chatId);
+            if (alertIndex !== -1) {
+                sharedState.sessionAlerts.splice(alertIndex, 1);
+                if (io) io.emit('alerts_updated', sharedState.sessionAlerts);
+                console.log(`[MANUAL-COMPLETE] Alert cleared for ${phoneNumeric}`);
+            }
+
+            console.log(`✅ [MANUAL-COMPLETE] Order confirmed for ${phoneNumeric}: ${product} — $${total}`);
             res.json({ success: true, orderId: order.id });
         } catch (e) {
             console.error('🔴 [MANUAL-COMPLETE] Error:', e);
