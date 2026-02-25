@@ -590,7 +590,7 @@ Teléfono: ${phoneDisplay}`;
                                         {msg.fromMe && (
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); handleDeleteMessage(msg.id); }}
-                                                className="absolute -left-9 top-1/2 -translate-y-1/2 p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-full opacity-0 group-hover:opacity-100 transition-all"
+                                                className="absolute -left-9 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all"
                                                 title="Eliminar mensaje para todos"
                                             >
                                                 <Trash className="w-5 h-5" />

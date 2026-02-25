@@ -1314,7 +1314,15 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
                     const planAI = await aiService.chat(text, {
                         step: 'waiting_plan_choice',
-                        goal: `El usuario debe elegir Plan 60 o Plan 120 días. CRÍTICO: goalMet=true SOLO si el usuario escribe explícitamente "60" o "120", o si acepta tu sugerencia del plan de 120 diciendo "sí", "ok", "dale", "ese" (en cuyo caso MÁGICAMENTE extraes "120" en extractedData). Si pregunta algo distinto (ej: "cómo las consigo"), goalMet=false, respondé su duda y volvé a preguntar: "¿Avanzamos con 60 o 120 días?". ESTRATEGIA: El pago a domicilio cuesta $6.000, pero el plan de 120 LO REGALA. Decile: "${selectedUpsell}".`,
+                        goal: `El usuario debe elegir Plan 60 o Plan 120 días. CRÍTICO: goalMet=true SOLO si el usuario escribe explícitamente "60" o "120", o si acepta tu sugerencia del plan de 120 diciendo "sí", "ok", "dale", "ese" (en cuyo caso MÁGICAMENTE extraes "120" en extractedData). Si pregunta algo distinto (ej: "cómo las consigo"), goalMet=false, respondé su duda y volvé a preguntar: "¿Avanzamos con 60 o 120 días?". ESTRATEGIA: El pago a domicilio cuesta $6.000, pero el plan de 120 LO REGALA. Decile: "${selectedUpsell}".
+                        
+                        🔴 REGLA CRÍTICA SI MENCIONA OTRO FORMATO (gotas, semillas, cápsulas):
+                        Si el usuario menciona otro producto/formato (ej: "o gotas", "y las semillas?", "cuánto las gotas?"), NO asumas que quiere CAMBIAR.
+                        Está COMPARANDO opciones. Debés:
+                        1) Mostrarle los precios del formato que preguntó (60 y 120 días) usando el knowledge.
+                        2) Recordarle los precios del formato que ya tenía seleccionado (${currentState.selectedProduct || 'Cápsulas'}).
+                        3) Preguntarle: "¿Con cuál avanzamos entonces?"
+                        NO uses CHANGE_PRODUCT. NO cambies el producto automáticamente. goalMet=false hasta que elija explícitamente.`,
                         history: currentState.history,
                         summary: currentState.summary,
                         knowledge: knowledge,
