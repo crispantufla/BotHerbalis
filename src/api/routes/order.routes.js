@@ -8,12 +8,20 @@ module.exports = (client, sharedState) => {
     const { io } = sharedState;
 
     const resolveChatId = async (id) => {
-        if (!id || !id.includes('@lid')) return id;
-        try {
-            const contact = await client.getContactById(id);
-            if (contact && contact.number) return `${contact.number}@c.us`;
-        } catch (e) {
-            console.error(`[LID-RESOLVE] API Error for ${id}:`, e.message);
+        if (!id) return id;
+        // Handle @lid format
+        if (id.includes('@lid')) {
+            try {
+                const contact = await client.getContactById(id);
+                if (contact && contact.number) return `${contact.number}@c.us`;
+            } catch (e) {
+                console.error(`[LID-RESOLVE] API Error for ${id}:`, e.message);
+            }
+            return id;
+        }
+        // Normalize bare phone numbers to @c.us format
+        if (!id.includes('@')) {
+            return `${id.replace(/\D/g, '')}@c.us`;
         }
         return id;
     };
@@ -189,11 +197,15 @@ module.exports = (client, sharedState) => {
 
         try {
             chatId = await resolveChatId(chatId);
+            console.log(`[MANUAL-COMPLETE] Resolved chatId: ${chatId}`);
 
             const { userState } = sharedState;
             const state = userState?.[chatId];
 
-            if (!state) return res.status(404).json({ error: 'No hay estado de conversación para este chat' });
+            if (!state) {
+                console.log(`[MANUAL-COMPLETE] No state found for ${chatId}. Available keys sample:`, Object.keys(userState || {}).slice(0, 5));
+                return res.status(404).json({ error: 'No hay estado de conversación para este chat' });
+            }
 
             const cart = state.cart || [];
             const addr = state.partialAddress || {};
