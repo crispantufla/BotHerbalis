@@ -94,6 +94,8 @@ const CorporateDashboardV2 = () => {
         return () => window.removeEventListener('config-updated', handleConfigUpdate);
     }, [socket, fetchConfig]);
 
+    const [processingAction, setProcessingAction] = useState(null); // Prevent double-click
+
     const handleQuickAction = async (chatId, action) => {
         if (action === 'chat') {
             setTargetChatId(chatId);
@@ -108,6 +110,11 @@ const CorporateDashboardV2 = () => {
             return;
         }
 
+        // Prevent double-click
+        const actionKey = `${chatId}_${action}`;
+        if (processingAction === actionKey) return;
+        setProcessingAction(actionKey);
+
         try {
             if (action === 'confirmar') {
                 await api.post('/api/orders/manual-complete', { chatId });
@@ -118,6 +125,8 @@ const CorporateDashboardV2 = () => {
             toast.success(`Acción ejecutada: ${action}`);
         } catch (e) {
             toast.error('Error ejecutando acción: ' + (e.response?.data?.error || e.message));
+        } finally {
+            setProcessingAction(null);
         }
     };
 

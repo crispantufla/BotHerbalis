@@ -369,6 +369,31 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
         return { matched: true };
     }
 
+    // ─────────────────────────────────────────────────
+    // GLOBAL GEOGRAPHIC RESTRICTION — Only sell within Argentina
+    // ─────────────────────────────────────────────────
+    const GEO_REGEX = /\b(espana|españa|mexico|méxico|chile|colombia|peru|perú|uruguay|bolivia|paraguay|ecuador|venezuela|brasil|panama|panamá|costa rica|eeuu|estados unidos|usa|europa|fuera del pais|fuera de argentina|otro pais|no estoy en argentina|vivo en el exterior|desde afuera|no soy de argentina)\b/i;
+
+    if (GEO_REGEX.test(normalizedText) && !currentState.geoRejected) {
+        console.log(`[GEO REJECT] User ${userId} is outside Argentina: "${text}"`);
+        currentState.geoRejected = true;
+        const msg = "Lamentablemente solo hacemos envíos dentro de Argentina 😔 Si en algún momento necesitás para alguien de acá, ¡con gusto te ayudamos!";
+        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        await sendMessageWithDelay(userId, msg);
+        _setStep(currentState, 'rejected_geo');
+        saveState(userId);
+        return { matched: true };
+    }
+
+    // If already geo-rejected, block further sales attempts
+    if (currentState.geoRejected || currentState.step === 'rejected_geo') {
+        console.log(`[GEO REJECT] User ${userId} already geo-rejected, blocking.`);
+        const msg = "Como te comenté, lamentablemente solo realizamos envíos dentro de Argentina 😔";
+        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        await sendMessageWithDelay(userId, msg);
+        return { matched: true };
+    }
+
     // Helper: Save extracted data locally if needed
     function _handleExtractedData(userId, extractedData, currentState) {
         if (!extractedData || extractedData === 'null') return;
@@ -645,6 +670,27 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
 
     switch (logicStage) {
         case 'greeting':
+            // --- CHECK: Manual greeting already sent by admin ---
+            // If the chat history already contains the greeting message (sent manually),
+            // skip directly to waiting_weight and process the user's response as a weight answer.
+            const existingHistory = currentState.history || [];
+            const hasManualGreeting = existingHistory.some(m =>
+                m.role === 'bot' &&
+                (m.content.includes('Buscás bajar hasta 10 kg') ||
+                    m.content.includes('Cuántos kilos buscás bajar') ||
+                    m.content.includes('cuántos kilos buscás bajar'))
+            );
+
+            if (hasManualGreeting) {
+                console.log(`[GREETING] Manual greeting detected for ${userId}, skipping to waiting_weight.`);
+                _setStep(currentState, 'waiting_weight');
+                saveState(userId);
+                // Pop the user message we just pushed (line ~334) to avoid double-push in recursive call
+                currentState.history.pop();
+                // Re-process this message as waiting_weight (fall through won't work in switch)
+                return await processSalesFlow(userId, text, userState, knowledge, dependencies);
+            }
+
             // --- METRICS TRACKING ---
             const trackScript = dependencies.effectiveScript || dependencies.config?.activeScript || 'v3';
             if (dependencies.config && dependencies.config.scriptStats && trackScript !== 'rotacion') {

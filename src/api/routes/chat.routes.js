@@ -17,12 +17,20 @@ module.exports = (client, sharedState) => {
     const { userState, pausedUsers } = sharedState;
 
     const resolveChatId = async (id) => {
-        if (!id || !id.includes('@lid')) return id;
-        try {
-            const contact = await client.getContactById(id);
-            if (contact && contact.number) return `${contact.number}@c.us`;
-        } catch (e) {
-            console.error(`[LID-RESOLVE] API Error for ${id}:`, e.message);
+        if (!id) return id;
+        // Handle @lid format
+        if (id.includes('@lid')) {
+            try {
+                const contact = await client.getContactById(id);
+                if (contact && contact.number) return `${contact.number}@c.us`;
+            } catch (e) {
+                console.error(`[LID-RESOLVE] API Error for ${id}:`, e.message);
+            }
+            return id;
+        }
+        // Normalize bare phone numbers to @c.us format
+        if (!id.includes('@')) {
+            return `${id.replace(/\D/g, '')}@c.us`;
         }
         return id;
     };

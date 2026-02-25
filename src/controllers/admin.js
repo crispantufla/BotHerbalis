@@ -1,7 +1,7 @@
 const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const { aiService } = require('../services/ai'); // Assuming aiService is here based on index.js usage
+const { aiService } = require('../services/ai');
 
 /**
  * Módulo de Controladores de Administrador
@@ -56,18 +56,20 @@ async function notifyAdmin(reason, userPhone, details = null, sharedState, clien
     }
 }
 
-// Helper: Realiza el build del mensaje de confirmación
-function buildConfirmationMessage(clientState) {
+// Helper: Build the WhatsApp confirmation sent to client after admin approves
+// Uses the shared buildConfirmationMessage from messageTemplates.js
+// This wrapper adds address formatting on top
+function buildAdminApprovalMessage(clientState) {
     if (!clientState.pendingOrder) return "Pedido confirmado.";
 
     const { nombre, calle, ciudad, provincia, cp } = clientState.pendingOrder;
     const prod = clientState.selectedProduct || 'Producto desconocido';
-    const plan = clientState.selectedPlan ? `${clientState.selectedPlan} días` : '';
+    const plan = clientState.selectedPlan ? `${clientState.selectedPlan} días` : (clientState.cart?.[0]?.plan ? `${clientState.cart[0].plan} días` : '');
     const details = [prod, plan].filter(Boolean).join(' - ');
-    const priceText = clientState.price ? `Total a pagar: $${clientState.price}` : '';
+    const priceText = clientState.totalPrice ? `Total a pagar: $${clientState.totalPrice}` : '';
 
     let addrObj = clientState.partialAddress || clientState.pendingOrder || {};
-    const deliveryNotes = addrObj.postdatado ? `\n\n📌 *Nota de entrega:* ${addrObj.postdatado}` : '';
+    const deliveryNotes = addrObj.postdatado || clientState.postdatado ? `\n\n📌 *Nota de entrega:* ${addrObj.postdatado || clientState.postdatado}` : '';
 
     return `✅ *¡Genial! Pedido en preparación.*
     
@@ -77,10 +79,10 @@ Recibió este mensaje porque su pedido fue aprobado.
 ${details}
 
 *Envío a:*
-${nombre}
-${calle}
-${ciudad} ${provincia ? ', ' + provincia : ''}
-CP: ${cp}
+${nombre || 'Sin nombre'}
+${calle || ''}
+${ciudad || ''}${provincia ? ', ' + provincia : ''}
+CP: ${cp || '?'}
 ${priceText}${deliveryNotes}
 
 En las próximas 24/48hs hábiles te enviaremos el código de seguimiento. ¡Gracias por confiar en Herbalis! 🌱`;
@@ -134,7 +136,7 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false, shar
         const clientState = sharedState.userState[actualTarget];
 
         if (clientState && clientState.step === 'waiting_admin_ok' && clientState.pendingOrder) {
-            const summary = buildConfirmationMessage(clientState);
+            const summary = buildAdminApprovalMessage(clientState);
             await client.sendMessage(actualTarget, summary);
             if (sharedState.logAndEmit) sharedState.logAndEmit(actualTarget, 'bot', summary, 'waiting_final_confirmation');
             clientState.step = 'waiting_final_confirmation';
@@ -151,39 +153,38 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false, shar
             return `✅ Confirmación enviada a ${actualTarget}. Esperando respuesta del cliente.`;
         }
 
-        // Feature: "Aprobar" an unexpected response in final confirmation
-        let ordersData = [];
-        const dataDir = process.env.DATA_DIR || path.resolve(__dirname, '../../');
-        const ordersFile = path.join(dataDir, 'orders.json');
-
-        try {
-            ordersData = JSON.parse(fs.readFileSync(ordersFile, 'utf-8'));
-        } catch (e) { }
-
+        // Approve via Prisma DB (not legacy JSON)
         const cleanPhone = actualTarget.split('@')[0];
-        const pendingOrderIndex = ordersData.findIndex(o =>
-            o.cliente === cleanPhone || o.cliente === actualTarget
-        );
+        try {
+            const { prisma } = require('../../db');
+            const existingOrder = await prisma.order.findFirst({
+                where: { userPhone: cleanPhone, status: 'Pendiente' },
+                orderBy: { createdAt: 'desc' }
+            });
 
-        if (pendingOrderIndex !== -1 && ordersData[pendingOrderIndex].status.includes('Pendiente')) {
-            ordersData[pendingOrderIndex].status = 'Confirmado';
-            try {
-                // Atomic write implementation inline
-                const tempFile = path.join(dataDir, `orders.json.tmp.${Date.now()}`);
-                fs.writeFileSync(tempFile, JSON.stringify(ordersData, null, 2));
-                fs.renameSync(tempFile, ordersFile);
+            if (existingOrder) {
+                await prisma.order.update({
+                    where: { id: existingOrder.id },
+                    data: { status: 'Confirmado' }
+                });
 
                 // Send the FINAL SUCCESS message to the user now that it's approved
                 const msg = "¡Excelente! Tu pedido ya fue ingresado 🚀\n\nTe vamos a avisar cuando lo despachemos con el número de seguimiento.\n\n¡Muchas gracias por confiar en Herbalis!";
                 await client.sendMessage(actualTarget, msg);
 
                 if (sharedState.userState[actualTarget]) {
-                    sharedState.userState[actualTarget].step = 'completed'; // Move to post-sale mode
+                    sharedState.userState[actualTarget].step = 'completed';
+                    sharedState.userState[actualTarget].history = sharedState.userState[actualTarget].history || [];
                     sharedState.userState[actualTarget].history.push({ role: 'bot', content: msg, timestamp: Date.now() });
                     if (sharedState.saveState) sharedState.saveState();
                 }
 
                 if (sharedState.logAndEmit) sharedState.logAndEmit(actualTarget, 'bot', msg, 'completed');
+
+                // Emit order update to dashboard
+                if (sharedState.io) {
+                    sharedState.io.emit('order_update', { action: 'updated', order: { id: existingOrder.id, status: 'Confirmado' } });
+                }
 
                 // Clear alerts
                 const index = sharedState.sessionAlerts.findIndex(a => a.userPhone === actualTarget);
@@ -193,9 +194,9 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false, shar
                 }
 
                 return `✅ Estado del pedido cambiado a Confirmado. Cliente notificado con éxito.`;
-            } catch (e) {
-                console.error('[ADMIN] Error saving order status:', e);
             }
+        } catch (e) {
+            console.error('[ADMIN] Error confirming order in DB:', e);
         }
 
         return "⚠️ No hay pedido pendiente de aprobación.";
@@ -241,5 +242,5 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false, shar
 module.exports = {
     notifyAdmin,
     handleAdminCommand,
-    buildConfirmationMessage
+    buildAdminApprovalMessage
 };
