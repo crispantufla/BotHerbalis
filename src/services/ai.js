@@ -657,19 +657,19 @@ INSTRUCCIONES:
         TEXTO DEL USUARIO: "${text}"
 
         DETALLES DE EXTRACCIÓN (Si no está, devolver null):
-        - nombre: Nombre de persona (ej: "Laura Aguirre").
+        - nombre: Nombre COMPLETO de persona, SIEMPRE incluir apellido si lo dice (ej: "Laura Aguirre", "Marta Pastor"). NUNCA omitas el apellido.
         - calle: Calle y altura (ej: "Av. Santa Fe 1234", "Barrio 140 viv casa 16").
         - ciudad: Localidad o ciudad (ej: "Valle Viejo", "El Bañado", "Gualeguay").
         - provincia: Provincia de Argentina (ej: "Catamarca", "Córdoba", "Entre Ríos").
         - cp: Código postal numérico (ej: "4707", "5000").
-        - postdatado: Si el cliente pide enviar o recibir el pedido en una fecha futura (ej: "mandamelo el 10", "cobro a principio de mes", "para la semana que viene"). Guardar la fecha/referencia literal o null.
+        - postdatado: SOLO si el cliente EXPLÍCITAMENTE pide enviar o recibir el pedido en una fecha futura (ej: "mandamelo el 10", "cobro a principio de mes"). Si el texto es solo datos de dirección/nombre, SIEMPRE devolver null. NO inventar ni adivinar fechas.
         
         REGLAS Y CONTEXTO GEOGRÁFICO:
         1. Tu prioridad es extraer CUALQUIER dato útil, aunque falten otros.
         2. "Gualeguay" y "Gualeguaychú" pertenecen a la provincia de Entre Ríos, NO a Santa Fe.
         3. Barrios como "Barrio 60 viviendas" o "mz F casa 4" van en "calle".
         4. CRÍTICO: Separa correctamente el NOMBRE DE PERSONA del NOMBRE DE LA CALLE. 
-           Si te dicen "marta pastor bengas 77", "marta pastor" es el nombre y "bengas 77" es la calle. No pongas apellidos como parte de la calle ni calles como parte del apellido. EXTRAE SIEMPRE el nombre de la persona, incluso si coincide con el tuyo ("Marta").
+           Si te dicen "marta pastor bengas 77", "marta pastor" es el nombre y "bengas 77" es la calle. No pongas apellidos como parte de la calle ni calles como parte del apellido. EXTRAE SIEMPRE el nombre Y apellido completo de la persona.
         5. Si el usuario envía SOLO SU NOMBRE (ej: "Juan", "Pedro Pablo"), extraelo como "nombre", y devuelve los demás como null.
         6. Si el texto dice claramente de qué provincia es, respetalo aunque no coincida con el código postal.
         7. Las Avenidas o calles a veces están abreviadas (ej: "av belgrano 45D").

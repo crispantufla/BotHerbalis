@@ -1672,9 +1672,13 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             const data = await (dependencies.mockAiService || aiService).parseAddress(textToAnalyze);
 
             if (data && !data._error) {
-                // DETECT POSTDATED SHIPMENTS
-                if (data.postdatado) {
-                    console.log(`[ADDRESS] Postdated request detected: ${data.postdatado}`);
+                // DETECT POSTDATED SHIPMENTS — VALIDATE against actual user text
+                // The AI sometimes halluccinates postdatado from address data, so we cross-check
+                const postdateKeywords = /\b(lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo|semana|mes|cobro|mañana|despues|después|principio|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\b/i;
+                const userActuallyAskedPostdate = postdateKeywords.test(normalizedText) && /\b(recibir|llega|enviar|mandar|cobro|pago|puedo|entregar|envio|después|despues|más adelante|otro momento|no puedo ahora)\b/i.test(normalizedText);
+
+                if (data.postdatado && userActuallyAskedPostdate) {
+                    console.log(`[ADDRESS] Postdated request VALIDATED: ${data.postdatado}`);
 
                     // Only send the prolonged ack if we haven't already acknowledged it recently to avoid spam
                     if (!currentState.postdatado) {
@@ -1699,6 +1703,10 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     // Do NOT break here. Let execution fall through so the address data can be validated
                     // and the system can progress if the address is complete.
                     madeProgress = true;
+                } else if (data.postdatado) {
+                    // AI hallucinated a postdate from address data — IGNORE it
+                    console.log(`[ADDRESS] AI hallucinated postdatado "${data.postdatado}" but user text doesn't confirm it. Ignoring.`);
+                    data.postdatado = null;
                 }
 
                 if (data.nombre && !currentState.partialAddress.nombre) { currentState.partialAddress.nombre = data.nombre; madeProgress = true; }
@@ -1836,11 +1844,10 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 const maxLabel = adicional > 0 ? ` + $${adicional.toLocaleString('es-AR')}` : '';
 
                 // ── SHOW VALIDATED ADDRESS TO USER ──
-                // All fields guaranteed non-null at this point
                 let addressSummary = `📋 *Datos de envío:*\n`;
-                addressSummary += `👤 ${addr.nombre}\n`;
-                addressSummary += `📍 ${addr.calle}, ${addr.ciudad}\n`;
-                addressSummary += `📮 CP: ${addr.cp}`;
+                addressSummary += `👤 ${addr.nombre || 'Sin nombre'}\n`;
+                addressSummary += `📍 ${addr.calle || ''}${addr.ciudad ? ', ' + addr.ciudad : ''}${addr.provincia ? ' (' + addr.provincia + ')' : ''}\n`;
+                addressSummary += `📮 CP: ${addr.cp || 'Sin CP'}`;
 
                 // If Google Maps validated, show formatted address
                 if (validation.mapsFormatted) {
@@ -2040,17 +2047,21 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 saveState(userId);
                 matched = true;
             } else if (currentState.postdatado && _isAffirmative(normalizedText)) {
-                // FINAL SUCCESS AFTER POSTDATE
+                // POSTDATED ORDER — ALSO GOES THROUGH ADMIN APPROVAL (same as normal)
                 const postdatado = currentState.postdatado;
-                const msg = `¡Perfecto! Tu pedido ya fue ingresado 🚀\n\nLo vamos a despachar para que te llegue a partir del ${postdatado}.\nTe avisamos con el número de seguimiento.\n\n¡Gracias por confiar en Herbalis!`;
+                const msg = "¡Perfecto! Recibimos tu confirmación.\n\nAguardame un instante que verificamos los datos y te confirmamos el ingreso ⏳";
                 await sendMessageWithDelay(userId, msg);
 
-                // Save Order Local & Sheets
+                // Save Order Local
                 if (currentState.pendingOrder) {
                     const orderData = _buildOrderData({ postdatado });
                     if (dependencies.saveOrderToLocal) dependencies.saveOrderToLocal(orderData);
 
-                    console.log(`✅ [PEDIDO CONFIRMADO - POSTDATADO ${postdatado}] ${userId} — Total: $${currentState.totalPrice || '0'}`);
+                    console.log(`✅ [PEDIDO CARGADO - POSTDATADO ${postdatado} - PENDIENTE APROBACIÓN] ${userId} — Total: $${currentState.totalPrice || '0'}`);
+
+                    // Notify Admin to approve
+                    const o = currentState.pendingOrder || currentState.partialAddress || {};
+                    await notifyAdmin(`⌛ Pedido POSTDATADO Requiere Aprobación`, userId, `Fecha envío: ${postdatado}\nDatos: ${o.nombre}, ${o.calle}\nCiudad: ${o.ciudad} | CP: ${o.cp}\nTotal: $${currentState.totalPrice || '0'}`);
 
                     // --- METRICS TRACKING ---
                     if (dependencies.config && dependencies.config.scriptStats && dependencies.config.activeScript) {
@@ -2061,10 +2072,8 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                     }
                 }
 
-                // Notify admin about postdatado (auto-confirmed)
-                await notifyAdmin('📅 Pedido POSTDATADO confirmado', userId, `Fecha: ${postdatado}\nTotal: $${currentState.totalPrice || '?'}`);
-
-                _setStep(currentState, 'completed');
+                console.log(`[DEBUG-FLOW] User ${userId} entering waiting_admin_validation via POSTDATED AFFIRMATIVE. Text: "${text}"`);
+                _setStep(currentState, 'waiting_admin_validation');
                 currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
                 saveState(userId);
                 matched = true;

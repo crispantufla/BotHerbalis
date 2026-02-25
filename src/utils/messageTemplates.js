@@ -12,7 +12,9 @@
 function buildConfirmationMessage(state) {
     const cart = state.cart || [];
     const productStr = cart.map(i => i.product).join(' + ') || state.selectedProduct || 'Nuez de la India';
-    const planStr = cart.map(i => `${i.plan} días`).join(' + ') || `${state.selectedPlan || '60'} días`;
+    const planStr = cart.length > 0
+        ? cart.map(i => `${i.plan} días`).join(' + ')
+        : `${state.selectedPlan || '60'} días`;
     const totalPriceStr = state.totalPrice || '0';
 
     // Calculate Breakdown
