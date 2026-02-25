@@ -322,6 +322,33 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
             lastInteraction: Date.now()
         };
         console.log(`[DEBUG-FLOW] INITIALIZED USER ${userId} with state:`, userState[userId]);
+
+        // --- NEW PRE-BOT HISTORY CHECK ---
+        // If a new user texts us but they ALREADY have a long chat history with us (e.g. they talked about other stuff in the past),
+        // we automatically pause the bot so it doesn't interrupt ongoing human conversations.
+        try {
+            if (client) {
+                const chat = await client.getChatById(userId);
+                if (chat) {
+                    const messages = await chat.fetchMessages({ limit: 10 });
+                    // Count how many messages the USER sent before this one
+                    const previousUserMessages = messages.filter(m => !m.fromMe).length;
+
+                    if (previousUserMessages >= 5) {
+                        console.log(`[SPAM FILTER] User ${userId} has ${previousUserMessages} previous messages before bot init. Auto-pausing.`);
+                        if (dependencies.sharedState && dependencies.sharedState.pausedUsers) {
+                            dependencies.sharedState.pausedUsers.add(userId);
+                            try {
+                                dependencies.notifyAdmin('😴 Conversación Antigua', userId, 'Se detectó que este cliente ya tenía un historial largo de chat previo al encendido del bot. El bot se silenció automáticamente para no entrometerse.');
+                            } catch (e) { }
+                        }
+                        return { matched: true, paused: true };
+                    }
+                }
+            }
+        } catch (err) {
+            console.error(`[SPAM FILTER] Failed to fetch chat history for ${userId}:`, err.message);
+        }
     }
     saveState(userId);
 
