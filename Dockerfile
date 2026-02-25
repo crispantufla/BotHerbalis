@@ -29,6 +29,9 @@ RUN cd client && npm ci --production=false
 # Copy source code
 COPY . .
 
+# Generate Prisma Client
+RUN npx prisma generate
+
 # Copy prices.json to /app/config/ so it survives Railway volume mount at /app/data/
 RUN mkdir -p /app/config && cp /app/data/prices.json /app/config/prices.json 2>/dev/null || true
 
