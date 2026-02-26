@@ -62,7 +62,7 @@ describe('Sales Flow Logic', () => {
         // Expect delivery message
         expect(mockSendMessage).toHaveBeenCalledWith(
             userId,
-            expect.stringMatching(/Tené en cuenta que enviamos por Correo Argentino/i)
+            expect.stringMatching(/Mirá, te comento que enviamos por Correo Argentino/i)
         );
         // Expect redirect message
         // The redirect depends on step. waiting_weight -> 'cuántos kilos querés bajar'

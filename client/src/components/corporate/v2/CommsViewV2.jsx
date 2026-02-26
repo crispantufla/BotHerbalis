@@ -91,7 +91,7 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
                                 ...c,
                                 lastMessage: { body: data.text || '', timestamp },
                                 unreadCount: selectedChat?.id === data.chatId ? 0 : (c.unreadCount || 0) + 1,
-                                time: new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                                time: new Date(timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' }),
                                 assignedScript: data.assignedScript || c.assignedScript
                             } : c);
                         }
@@ -218,7 +218,7 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
                 const d = new Date(msg.timestamp);
                 if (!isNaN(d.getTime())) {
                     // Formato: [10:56, 26/2/2026]
-                    dateStr = `[${d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}, ${d.toLocaleDateString('es-AR')}] `;
+                    dateStr = `[${d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' })}, ${d.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })}] `;
                 }
             } catch (e) { }
 
@@ -636,7 +636,7 @@ Teléfono: ${phoneDisplay}`;
                                     <div className={`max-w-[75%] p-4 text-sm leading-relaxed shadow-sm relative group ${msg.fromMe ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-3xl rounded-tr-sm shadow-indigo-500/20' : 'bg-white text-slate-800 rounded-3xl rounded-tl-sm border border-white/60'}`}>
                                         {renderMessageBody(msg)}
                                         <span className={`text-[10px] block text-right mt-2 font-mono font-bold ${msg.fromMe ? 'text-indigo-200' : 'text-slate-400'}`}>
-                                            {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            {new Date(msg.timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' })}
                                         </span>
 
                                         {/* Delete Button (Only for own messages) */}

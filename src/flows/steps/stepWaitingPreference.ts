@@ -1,7 +1,15 @@
+import { UserState, FlowStep } from '../../types/state';
 const { _formatMessage } = require('../utils/messages');
 const { _setStep, _maybeUpsell } = require('../utils/flowHelpers');
 
-async function handleWaitingPreference(userId, text, normalizedText, currentState, knowledge, dependencies) {
+export async function handleWaitingPreference(
+    userId: string,
+    text: string,
+    normalizedText: string,
+    currentState: UserState,
+    knowledge: any,
+    dependencies: any
+): Promise<{ matched: boolean }> {
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
 
     // SCRIPT FIRST: Check if the user is asking for a deferred "postdatado" date early
@@ -13,7 +21,7 @@ async function handleWaitingPreference(userId, text, normalizedText, currentStat
     }
 
     // SCRIPT FIRST: Check keywords for capsulas or semillas
-    const isMatch = (keywords, text) => keywords.some(k => new RegExp(`\\b${k}\\b`, 'i').test(text));
+    const isMatch = (keywords: string[], text: string) => keywords.some((k: string) => new RegExp(`\\b${k}\\b`, 'i').test(text));
 
     const mentionsCapsulas = isMatch(knowledge.flow.preference_capsulas.match, normalizedText);
     const mentionsSemillas = isMatch(knowledge.flow.preference_semillas.match, normalizedText);
@@ -45,7 +53,7 @@ async function handleWaitingPreference(userId, text, normalizedText, currentStat
         console.log(`[INDICISION] User ${userId} compares products or asks for recommendation.`);
 
         const aiRecommendation = await aiService.chat(text, {
-            step: 'waiting_preference_consultation',
+            step: FlowStep.WAITING_PREF_CONSULT,
             goal: `El usuario está indeciso entre productos, pide recomendaciones, O está aceptando una recomendación previa ("dale", "bueno"). REGLAS DE RECOMENDACIÓN (CRÍTICO):
             1) Si el usuario YA ESTÁ ACEPTANDO tu recomendación previa (ej: "dale", "bueno", "capsulas"), ¡tu objetivo está cumplido! Respondé con goalMet=true y extractedData="Cápsulas de nuez de la india".
             2) Si pide "lo más efectivo", "lo mejor", "lo más rápido" o "cualquiera": El objetivo está cumplido automáticamente, respondé goalMet=true y extractedData="Cápsulas de nuez de la india".
@@ -122,7 +130,7 @@ async function handleWaitingPreference(userId, text, normalizedText, currentStat
     } else {
         console.log(`[AI-FALLBACK] waiting_preference: No keyword match for ${userId}`);
         const aiPref = await aiService.chat(text, {
-            step: 'waiting_preference',
+            step: FlowStep.WAITING_PREFERENCE,
             goal: 'Determinar si quiere cápsulas/gotas (opción práctica), semillas (opción natural) o AMBAS. REGLAS CRÍTICAS DE HUMANIZACIÓN: 1) MÁXIMO 35 PALABRAS. 2) Usa muletillas simpáticas al arrancar ("Dale perfecto", "Entiendo bárbaro", "Tranqui te explico"). 3) Si duda o pregunta entre GOTAS y CÁPSULAS: Decile EXACTAMENTE que recomendás más las cápsulas, las cuales suelen ser más efectivas, y que las gotas se recomiendan para cuando son pocos kilos o gente muy mayor ya que son más suaves. Luego preguntale con cuál prefiere avanzar. 4) Si habla en PASADO ("yo tomaba", "antes usé"), decile tipo "Ah mirá que bueno que ya las conoces! Entonces vayamos con las CÁPSULAS". 5) Si pide información o precios de "las 3", "todas", o "los 3", brindá un resumen BREVE de Cápsulas, Semillas y Gotas con sus precios correspondientes de 60 días (usando el knowledge) y luego preguntá cuál prefiere. 6) Si el usuario pregunta si puede recibir el pedido o pagarlo un día concreto, DALE EL OK Y CONFIRMÁ EL PRODUCTO. \n\n🔴 REGLA ABSOLUTA DE CONFIRMACIÓN: Si el usuario ya aceptó tu sugerencia o eligió explícita O implícitamente (ej: "dale", "si", "bueno"), NO DEBES GENERAR RESPUESTA. Debes marcar goalMet=true y extractedData="PRODUCTO: Cápsulas de nuez de la india" inmediatamente.',
             history: currentState.history,
             summary: currentState.summary,
@@ -165,5 +173,3 @@ async function handleWaitingPreference(userId, text, normalizedText, currentStat
     }
     return { matched: false };
 }
-
-module.exports = { handleWaitingPreference };

@@ -1,3 +1,43 @@
+import { UserState } from './src/types/state';
+
+// --- SHARED STATE INTERFACE ---
+interface ScriptStats {
+    started: number;
+    completed: number;
+}
+
+interface BotConfig {
+    alertNumbers: string[];
+    activeScript: string;
+    scriptStats: { [script: string]: ScriptStats };
+    alertNumber?: string;
+    globalPause?: boolean;
+    [key: string]: any;
+}
+
+interface SharedState {
+    userState: any;
+    chatResets: Record<string, number>;
+    pausedUsers: Set<string>;
+    sessionAlerts: any[];
+    config: BotConfig;
+    knowledge: any;
+    multiKnowledge: Record<string, any>;
+    isConnected: boolean;
+    qrCodeData: string | null;
+    connectedAt?: number;
+    manualDisconnect?: boolean;
+    saveState: (changedUserId?: string | null) => void;
+    saveKnowledge: (scriptName?: string | null) => void;
+    loadKnowledge: (scriptName?: string | null) => void;
+    reloadKnowledge: (scriptName?: string | null) => void;
+    availableScripts: string[];
+    handleAdminCommand: ((targetChatId: string | null, commandText: string, isApi?: boolean) => Promise<any>) | null;
+    logAndEmit: ((chatId: string, sender: string, text: string, step?: string, messageId?: string | null) => void) | null;
+    io: any;
+    requestPairingCode?: (phoneNumber: string) => Promise<string | undefined>;
+}
+
 const logger = require('./src/utils/logger');
 require('dotenv').config();
 
@@ -10,6 +50,7 @@ puppeteerExtra.use(StealthPlugin());
 
 try {
     const puppeteerPath = require.resolve('puppeteer');
+    // @ts-ignore - puppeteer-extra doesn't expose the full Node Module shape, safe to ignore
     require.cache[puppeteerPath] = {
         id: puppeteerPath,
         filename: puppeteerPath,
@@ -17,7 +58,7 @@ try {
         exports: puppeteerExtra
     };
     logger.info('[BOOT] Injection: Puppeteer Stealth Plugin is active.');
-} catch (e) {
+} catch (e: any) {
     logger.error('[BOOT] Failed to inject Puppeteer Stealth Plugin:', e.message);
 }
 
@@ -56,7 +97,7 @@ logger.info(`[BOOT] Checking existing files in DATA_DIR:`);
 try {
     const files = fs.readdirSync(DATA_DIR);
     logger.info(files.length > 0 ? files.join(', ') : '(Empty directory)');
-} catch (e) {
+} catch (e: any) {
     logger.info(`[BOOT] Could not read DATA_DIR:`, e.message);
 }
 logger.info(`=========================================`);
@@ -65,13 +106,13 @@ const STATE_FILE = path.join(DATA_DIR, 'persistence.json');
 const ORDERS_FILE = path.join(DATA_DIR, 'orders.json');
 // Knowledge files: save to DATA_DIR (persists on Railway), load from DATA_DIR first then source code
 const KNOWLEDGE_SAVE_DIR = DATA_DIR; // Where edits are saved (persistent volume on Railway)
-const KNOWLEDGE_FILES = {
+const KNOWLEDGE_FILES: Record<string, { save: string; source: string }> = {
     'v3': { save: path.join(KNOWLEDGE_SAVE_DIR, 'knowledge_v3.json'), source: path.join(__dirname, 'knowledge_v3.json') },
     'v4': { save: path.join(KNOWLEDGE_SAVE_DIR, 'knowledge_v4.json'), source: path.join(__dirname, 'knowledge_v4.json') }
 };
 
 // --- STATE MANAGEMENT ---
-let multiKnowledge = { 'v3': { flow: {}, faq: [] }, 'v4': { flow: {}, faq: [] } };
+let multiKnowledge: Record<string, any> = { 'v3': { flow: {}, faq: [] }, 'v4': { flow: {}, faq: [] } };
 // Fallback reference for legacy code if any still defaults to picking 'knowledge'
 let knowledge = multiKnowledge['v3'];
 const { userCache } = require('./src/utils/cache');
@@ -80,8 +121,8 @@ const userState = new Proxy({}, {
         if (prop === 'constructor' || typeof prop === 'symbol' || prop === 'then' || prop === 'toJSON') return Reflect.get(target, prop);
         return userCache.get(prop);
     },
-    set: (target, prop, value) => {
-        if (typeof prop === 'symbol') { target[prop] = value; return true; }
+    set: (target: any, prop: string | symbol, value: any) => {
+        if (typeof prop === 'symbol') { (target as any)[prop] = value; return true; }
         return userCache.set(prop, value);
     },
     deleteProperty: (target, prop) => {
@@ -98,16 +139,16 @@ const userState = new Proxy({}, {
         return undefined;
     }
 });
-const chatResets = {}; // Tracks timestamp of last history clear per user
-let lastAlertUser = null;
-let pausedUsers = new Set();
-const pendingMessages = new Map(); // Debounce: userId -> { messages: [], timer }
+const chatResets: Record<string, number> = {}; // Tracks timestamp of last history clear per user
+let lastAlertUser: string | null = null;
+let pausedUsers = new Set<string>();
+const pendingMessages = new Map<string, { messages: string[]; timer: ReturnType<typeof setTimeout>; startTime: number }>(); // Debounce: userId -> { messages: [], timer }
 const DEBOUNCE_MS = 3000; // Wait 3s for more messages before processing
 let schedulerStarted = false; // Guard against duplicate scheduler on reconnect
 // Variables for API / Dashboard State
-let qrCodeData = null;
-let sessionAlerts = [];
-let config = { alertNumbers: [], activeScript: 'v3', scriptStats: { v3: { started: 0, completed: 0 }, v4: { started: 0, completed: 0 } } };
+let qrCodeData: string | null = null;
+let sessionAlerts: any[] = [];
+let config: BotConfig = { alertNumbers: [], activeScript: 'v3', scriptStats: { v3: { started: 0, completed: 0 }, v4: { started: 0, completed: 0 } } };
 let isConnected = false;
 
 // --- PERSISTENCE HELPERS ---
@@ -130,7 +171,7 @@ function loadKnowledge(scriptName = null) {
             config.activeScript = scriptName;
         }
         knowledge = multiKnowledge[config.activeScript || 'v3'];
-    } catch (e) {
+    } catch (e: any) {
         logger.error('🔴 Error loading knowledge:', e.message);
     }
 }
@@ -142,13 +183,13 @@ function saveKnowledge(scriptName = null) {
         if (paths && multiKnowledge[nameToSave]) {
             atomicWriteFile(paths.save, JSON.stringify(multiKnowledge[nameToSave], null, 2));
         }
-    } catch (e) {
+    } catch (e: any) {
         logger.error('🔴 Error saving knowledge:', e.message);
     }
 }
 
-let _saveStateTimeout = null;
-function saveState(changedUserId = null) {
+let _saveStateTimeout: ReturnType<typeof setTimeout> | null = null;
+function saveState(changedUserId: string | null = null): void {
     if (_saveStateTimeout) clearTimeout(_saveStateTimeout);
     _saveStateTimeout = setTimeout(async () => {
         try {
@@ -180,7 +221,7 @@ function saveState(changedUserId = null) {
             });
 
             await Promise.all([...userPromises, ...configPromises]);
-        } catch (e) {
+        } catch (e: any) {
             logger.error('🔴 Error saving state to DB:', e.message);
         }
     }, 5000); // 5-second debounce to batch multiple concurrent DB updates
@@ -194,7 +235,7 @@ async function loadState() {
         try {
             dbUsers = await prisma.user.findMany();
             dbConfig = await prisma.botConfig.findMany();
-        } catch (dbErr) {
+        } catch (dbErr: any) {
             logger.warn('⚠️ DB Connection failed, falling back to local persistence.json', dbErr.message);
             if (fs.existsSync(STATE_FILE)) {
                 const raw = fs.readFileSync(STATE_FILE);
@@ -206,12 +247,12 @@ async function loadState() {
         }
 
         // Hydrate config from DB
-        dbConfig.forEach(c => {
-            try { config[c.key] = JSON.parse(c.value); } catch (e) { }
+        dbConfig.forEach((c: any) => {
+            try { config[c.key] = JSON.parse(c.value); } catch (e: any) { }
         });
 
         // Hydrate users from DB into Memory
-        dbUsers.forEach(u => {
+        dbUsers.forEach((u: any) => {
             if (u.profileData) {
                 try {
                     const parsed = JSON.parse(u.profileData);
@@ -228,7 +269,7 @@ async function loadState() {
         if (!config.alertNumbers) config.alertNumbers = [];
 
         logger.info(`✅ State loaded from DB (${dbUsers.length} users, config sync)`);
-    } catch (e) {
+    } catch (e: any) {
         logger.error('🔴 Error loading state:', e.message);
     }
 }
@@ -243,7 +284,7 @@ loadKnowledge();
 // ─────────────────────────────────────────────────────────────
 
 
-function cleanAuth(dir) {
+function cleanAuth(dir: string): void {
     if (!fs.existsSync(dir)) return;
 
     // Manual RESET via Env Var
@@ -289,7 +330,7 @@ function cleanAuth(dir) {
         if (clearedLocks > 0) {
             logger.info(`[BOOT] ✅ Cleared ${clearedLocks} stale Chrome lock(s) to prevent 'profile in use' crash.`);
         }
-    } catch (e) {
+    } catch (e: any) {
         logger.error(`[BOOT] Failed to clean Chrome locks: ${e.message}`);
     }
 }
@@ -360,17 +401,17 @@ const sharedState = {
     reloadKnowledge: loadKnowledge, // Expose this function for the API
     availableScripts: Object.keys(KNOWLEDGE_FILES),
     // Methods will be attached later
-    handleAdminCommand: null,
-    logAndEmit: null,
-    io: null // Populated by startServer
-};
+    handleAdminCommand: null as any,
+    logAndEmit: null as any,
+    io: null as any // Populated by startServer
+} as SharedState;
 
 // --- INITIALIZE SERVER ---
 // Pass client and sharedState so Server can handle API routes
 startServer(client, sharedState);
 
 // Helper: Log and Emit to Dashboard (Now uses sharedState.io)
-function logAndEmit(chatId, sender, text, step, messageId = null) {
+function logAndEmit(chatId: string, sender: string, text: string, step?: string, messageId: string | null = null): void {
     logMessage(chatId, sender, text, step);
     if (sharedState.io) {
         sharedState.io.emit('new_log', {
@@ -388,7 +429,7 @@ sharedState.logAndEmit = logAndEmit; // Expose to server
 
 // Helper: Save Order Locally (for Dashboard) — Uses write queue to prevent concurrent corruption
 let _orderWriteQueue = Promise.resolve();
-function saveOrderToLocal(order) {
+function saveOrderToLocal(order: Record<string, any>): void {
     _orderWriteQueue = _orderWriteQueue.then(async () => {
         const cleanPhone = (order.cliente || '').replace('@c.us', '').replace(/\D/g, '');
         let priceNum = 0;
@@ -432,7 +473,7 @@ function saveOrderToLocal(order) {
 }
 
 // Helper: Cancel Latest User Order
-function cancelLatestOrder(userId) {
+function cancelLatestOrder(userId: string): Promise<{ success: boolean; order?: any; reason?: string; currentStatus?: string }> {
     return new Promise((resolve) => {
         _orderWriteQueue = _orderWriteQueue.then(async () => {
             try {
@@ -471,7 +512,7 @@ function cancelLatestOrder(userId) {
 
 
                 resolve({ success: true, order: legacyFormatUpdate });
-            } catch (err) {
+            } catch (err: any) {
                 logger.error('[CANCEL] Error canceling:', err.message);
                 resolve({ success: false, reason: "ERROR" });
             }
@@ -480,7 +521,7 @@ function cancelLatestOrder(userId) {
 }
 
 // Helper: Send with Delay (async/await — messages arrive in order)
-const sendMessageWithDelay = async (chatId, content, startTime = Date.now()) => {
+const sendMessageWithDelay = async (chatId: string, content: string, startTime: number = Date.now()): Promise<void> => {
     // Standard fast delay to ensure responsiveness regardless of time
     const minDelay = 4000;
     const maxDelay = 8000;
@@ -519,20 +560,20 @@ const sendMessageWithDelay = async (chatId, content, startTime = Date.now()) => 
 };
 
 // Helper: Notify Admin
-async function notifyAdmin(reason, userPhone, details = null) {
+async function notifyAdmin(reason: string, userPhone: string, details: string | null = null): Promise<any> {
     const { notifyAdmin: notifyAdminCtrl } = require('./src/controllers/admin');
     return await notifyAdminCtrl(reason, userPhone, details, sharedState, client, config);
 }
 
 // Helper: Handle Admin Command (Exposed to API)
-async function handleAdminCommand(targetChatId, commandText, isApi = false) {
+async function handleAdminCommand(targetChatId: string | null, commandText: string, isApi: boolean = false): Promise<any> {
     const { handleAdminCommand: handleAdminCommandCtrl } = require('./src/controllers/admin');
     return await handleAdminCommandCtrl(targetChatId, commandText, isApi, sharedState, client);
 }
 sharedState.handleAdminCommand = handleAdminCommand; // Expose to server
 
 // Expose Pairing Code generation to API
-sharedState.requestPairingCode = async (phoneNumber) => {
+sharedState.requestPairingCode = async (phoneNumber: string) => {
     if (!client) throw new Error("Client not initialized");
     if (!client.pupPage || client.pupPage.isClosed()) {
         throw new Error("La ventana de WhatsApp Web no está activa o se cerró. Reinicia el servidor o el bot desde el panel.");
@@ -542,11 +583,11 @@ sharedState.requestPairingCode = async (phoneNumber) => {
     // If we reach here, we must lazily inject the onCodeReceivedEvent function to window
     // otherwise client.requestPairingCode crashes.
     try {
-        await client.pupPage.exposeFunction('onCodeReceivedEvent', (code) => {
+        await client.pupPage.exposeFunction('onCodeReceivedEvent', (code: any) => {
             logger.info(`[WA-PAIRING-CODE] Event code received length ${code?.length}:`, code);
             return code;
         });
-    } catch (e) {
+    } catch (e: any) {
         // exposeFunction throws an error if the function is already exposed by the page.
         // We can safely ignore it.
     }
@@ -558,7 +599,7 @@ sharedState.requestPairingCode = async (phoneNumber) => {
             // Adding a small delay to ensure React state on WA Web is ready
             await new Promise(r => setTimeout(r, 2000));
             return await client.requestPairingCode(phoneNumber);
-        } catch (e) {
+        } catch (e: any) {
             logger.warn(`[PAIRING] Puppeteer Error (Intento ${attempt}): ${e.message}`);
 
             // if whatsapp-web.js throws 't' or 'CompanionHelloError', it means Rate Limit (429)
@@ -590,7 +631,7 @@ if (!process.env.API_KEY) {
 
 // --- CLIENT EVENTS ---
 
-client.on('qr', (qr) => {
+client.on('qr', (qr: string) => {
     logger.info('ESCANEA ESTE CÓDIGO QR:');
     qrcode.generate(qr, { small: true });
     sharedState.qrCodeData = qr;
@@ -622,7 +663,7 @@ let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;
 const BASE_RECONNECT_DELAY = 3000; // 3s → 6s → 12s → 24s → 48s
 
-client.on('disconnected', (reason) => {
+client.on('disconnected', (reason: string) => {
     logger.info(`[WA] Cliente desconectado: ${reason}`);
     sharedState.isConnected = false;
     sharedState.qrCodeData = null;
@@ -660,7 +701,7 @@ client.on('disconnected', (reason) => {
     logger.info(`[WA] Desconexion accidental - reintento ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} en ${delay / 1000}s...`);
 
     setTimeout(() => {
-        client.initialize().catch(err => {
+        client.initialize().catch((err: any) => {
             logger.error(`[WA] Re-init attempt ${reconnectAttempts} failed:`, err.message);
         });
     }, delay);
@@ -674,7 +715,7 @@ client.on('ready', () => {
     reconnectAttempts = 0;
 });
 
-client.on('message', async msg => {
+client.on('message', async (msg: any) => {
     try {
         if (msg.from === 'status@broadcast') return;
 
@@ -694,7 +735,7 @@ client.on('message', async msg => {
                     userId = `${contact.number}@c.us`;
                     logger.info(`[LID-RESOLVE] Resolved ${msg.from} to real phone ${userId}`);
                 }
-            } catch (e) {
+            } catch (e: any) {
                 logger.error(`[LID-RESOLVE] Error resolving @lid ${msg.from}:`, e.message);
             }
         }
@@ -784,7 +825,7 @@ client.on('message', async msg => {
                     logAndEmit(userId, 'user', `MEDIA_AUDIO:${audioUrl}|TRANSCRIPTION:${transcription}`, userState[userId]?.step || 'new');
                     const startTime = Date.now();
                     await processSalesFlow(userId, transcription, userState, knowledge, {
-                        client, notifyAdmin, saveState, aiService, sendMessageWithDelay: (id, text) => sendMessageWithDelay(id, text, startTime), logAndEmit, saveOrderToLocal, cancelLatestOrder, sharedState, config
+                        client, notifyAdmin, saveState, aiService, sendMessageWithDelay: (id: string, text: string) => sendMessageWithDelay(id, text, startTime), logAndEmit, saveOrderToLocal, cancelLatestOrder, sharedState, config
                     });
                 } else {
                     logAndEmit(userId, 'user', `MEDIA_AUDIO:${audioUrl}`, userState[userId]?.step || 'new');
@@ -833,7 +874,7 @@ client.on('message', async msg => {
                 } else {
                     await client.sendMessage(userId, "Uh, perdoná, se me complicó mandar el audio ahora. ¡Pero decime por acá!");
                 }
-            } catch (e) {
+            } catch (e: any) {
                 logger.error("[AUDIO REQUEST] Error:", e.message);
                 await client.sendMessage(userId, "Uy, tuve un problemita con el audio, ¡perdoná! ¿En qué te ayudo?");
             }
@@ -860,7 +901,7 @@ client.on('message', async msg => {
         }
 
         if (pendingMessages.has(userId)) {
-            const pending = pendingMessages.get(userId);
+            const pending = pendingMessages.get(userId)!;
             pending.messages.push(msgText);
             clearTimeout(pending.timer);
             pending.timer = setTimeout(() => _processDebounced(userId), currentDelay);
@@ -873,13 +914,13 @@ client.on('message', async msg => {
             });
             logger.info(`[DEBOUNCE] New message from ${userId}: "${msgText}". Waiting ${currentDelay}ms...`);
         }
-    } catch (err) {
+    } catch (err: any) {
         logger.error(`🔴[MESSAGE HANDLER ERROR] ${err.message} `);
     }
 });
 
 // Debounce processor: fires after DEBOUNCE_MS of silence from a user
-async function _processDebounced(userId) {
+async function _processDebounced(userId: string): Promise<void> {
     const pending = pendingMessages.get(userId);
     if (!pending) return;
 
@@ -904,11 +945,11 @@ async function _processDebounced(userId) {
 
         await processSalesFlow(userId, combinedText, userState, effectiveKnowledge, {
             client, notifyAdmin, saveState, aiService,
-            sendMessageWithDelay: (id, text) => sendMessageWithDelay(id, text, startTime),
+            sendMessageWithDelay: (id: string, text: string) => sendMessageWithDelay(id, text, startTime),
             logAndEmit, saveOrderToLocal, cancelLatestOrder, sharedState, config,
             effectiveScript // Pass down to the flow
         });
-    } catch (err) {
+    } catch (err: any) {
         logger.error(`🔴[DEBOUNCE HANDLER ERROR] ${err.message}`);
     }
 }
@@ -919,7 +960,7 @@ async function _processDebounced(userId) {
 
 const MAX_INIT_RETRIES = 3;
 
-async function safeInitialize(attempt = 1) {
+async function safeInitialize(attempt: number = 1): Promise<void> {
     try {
         const chromePath = process.env.PUPPETEER_EXECUTABLE_PATH || 'bundled Chromium';
         logger.info(`[INIT] Starting WhatsApp client (attempt ${attempt}/${MAX_INIT_RETRIES}) using ${chromePath}...`);
@@ -958,7 +999,7 @@ process.on('unhandledRejection', (reason) => {
 });
 
 // Graceful Shutdown
-const _shutdown = async (signal) => {
+const _shutdown = async (signal: string): Promise<void> => {
     logger.info(`[SHUTDOWN] Received ${signal}. Cleaning up...`);
     try {
         // CRITICAL: Destroy WhatsApp client FIRST so Chrome cleans up its lock files.

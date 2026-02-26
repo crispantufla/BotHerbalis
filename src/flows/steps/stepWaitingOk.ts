@@ -1,8 +1,16 @@
+import { UserState, FlowStep } from '../../types/state';
 const { _formatMessage } = require('../utils/messages');
 const { _setStep, _pauseAndAlert } = require('../utils/flowHelpers');
 const { _isAffirmative, _isNegative } = require('../utils/validation');
 
-async function handleWaitingOk(userId, text, normalizedText, currentState, knowledge, dependencies) {
+export async function handleWaitingOk(
+    userId: string,
+    text: string,
+    normalizedText: string,
+    currentState: UserState,
+    knowledge: any,
+    dependencies: any
+): Promise<{ matched: boolean }> {
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
 
     const isQuestion = text.includes('?') || /\b(puedo|puede|como|donde|cuando|que pasa)\b/.test(normalizedText) && !/\b(si|dale|ok|listo|bueno|claro|vamos|joya)\b/.test(normalizedText);
@@ -16,7 +24,7 @@ async function handleWaitingOk(userId, text, normalizedText, currentState, knowl
     else if (isQuestion) {
         console.log(`[AI-FALLBACK] waiting_ok: Detected QUESTION from ${userId}`);
         const aiOk = await aiService.chat(text, {
-            step: 'waiting_ok',
+            step: FlowStep.WAITING_OK,
             goal: 'El usuario tiene una duda sobre el envío. Respondé brevemente y volvé a preguntar: ¿Te resulta posible retirar en sucursal si fuera necesario? SÍ o NO.',
             history: currentState.history,
             summary: currentState.summary,
@@ -43,7 +51,7 @@ async function handleWaitingOk(userId, text, normalizedText, currentState, knowl
     } else {
         console.log(`[AI-FALLBACK] waiting_ok: No match for ${userId}`);
         const aiOk = await aiService.chat(text, {
-            step: 'waiting_ok',
+            step: FlowStep.WAITING_OK,
             goal: 'El usuario debe confirmar que puede retirar en sucursal si es necesario. Respondé brevemente cualquier duda y volvé a preguntar SÍ o NO.',
             history: currentState.history,
             summary: currentState.summary,
@@ -59,5 +67,3 @@ async function handleWaitingOk(userId, text, normalizedText, currentState, knowl
     }
     return { matched: false };
 }
-
-module.exports = { handleWaitingOk };

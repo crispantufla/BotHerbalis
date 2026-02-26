@@ -136,7 +136,7 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
                                             timestamp: timestamp,
                                         },
                                         unreadCount: selectedChat?.id === data.chatId ? 0 : (c.unreadCount || 0) + 1,
-                                        time: new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                                        time: new Date(timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' }),
                                         assignedScript: data.assignedScript || c.assignedScript // update script assignment from socket
                                     }
                                     : c
@@ -282,7 +282,7 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
             try {
                 const d = new Date(msg.timestamp);
                 if (!isNaN(d.getTime())) {
-                    dateStr = `[${d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}, ${d.toLocaleDateString('es-AR')}] `;
+                    dateStr = `[${d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' })}, ${d.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })}] `;
                 }
             } catch (e) { }
 
@@ -728,7 +728,7 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
                                                 {(() => {
                                                     try {
                                                         const d = new Date(msg.timestamp);
-                                                        return isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                                        return isNaN(d.getTime()) ? '' : d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' });
                                                     } catch (e) { return ''; }
                                                 })()}
                                             </span>

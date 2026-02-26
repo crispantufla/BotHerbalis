@@ -1,6 +1,6 @@
 const { _getPrices } = require('./pricing');
 
-function _formatMessage(text, state) {
+function _formatMessage(text: string, state: any): string {
     if (!text) return "";
     const prices = _getPrices();
 
@@ -44,7 +44,7 @@ function _formatMessage(text, state) {
  * Checks if the proposed message is identical or near-identical to the last bot message.
  * Prevents the bot from sending the same text twice in a row.
  */
-function _isDuplicate(proposedMsg, history) {
+function _isDuplicate(proposedMsg: string, history: any[]): boolean {
     if (!history || history.length === 0) return false;
     // Find last bot message
     for (let i = history.length - 1; i >= 0; i--) {
@@ -66,8 +66,8 @@ function _isDuplicate(proposedMsg, history) {
  * Returns a brief message to steer the user back to the current step's pending question.
  * This is used after FAQ answers and AI fallbacks to keep the conversation on track.
  */
-function _getStepRedirect(step, state) {
-    const redirects = {
+function _getStepRedirect(step: string, state: any): string | null {
+    const redirects: Record<string, string> = {
         'waiting_weight': '👉 Entonces, ¿cuántos kilos querés bajar aproximadamente?',
         'waiting_preference': '👉 Dicho esto... ¿preferís cápsulas (opción 1) o semillas (opción 2)?',
         'waiting_price_confirmation': '👉 ¿Querés que te pase los precios?',
@@ -83,7 +83,7 @@ function _getStepRedirect(step, state) {
  * _getAdminSuggestions
  * Returns contextual quick-reply suggestions for the admin based on the step and user message.
  */
-function _getAdminSuggestions(step, userMessage) {
+function _getAdminSuggestions(step: string, userMessage: string): string[] {
     const base = ['"ok" para confirmar pedido', '"me encargo" + tu instrucción'];
     const normalized = (userMessage || '').toLowerCase();
 
@@ -122,3 +122,4 @@ module.exports = {
     _getStepRedirect,
     _getAdminSuggestions
 };
+export { };

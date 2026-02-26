@@ -1,8 +1,16 @@
+import { UserState, FlowStep } from '../../types/state';
 const { _setStep, _detectPostdatado } = require('../utils/flowHelpers');
 const { _getPrice, _getAdicionalMAX } = require('../utils/pricing');
 const { _isAffirmative } = require('../utils/validation');
 
-async function handleWaitingFinalConfirmation(userId, text, normalizedText, currentState, knowledge, dependencies) {
+export async function handleWaitingFinalConfirmation(
+    userId: string,
+    text: string,
+    normalizedText: string,
+    currentState: UserState,
+    knowledge: any,
+    dependencies: any
+): Promise<{ matched: boolean }> {
     const { sendMessageWithDelay, saveState, notifyAdmin } = dependencies;
 
     const productChangeMatch = normalizedText.match(/\b(mejor|quiero|prefiero|cambio|cambia|dame|paso a|en vez)\b.*\b(capsula|capsulas|pastilla|pastillas|semilla|semillas|gota|gotas|natural|infusion)\b/i)
@@ -12,12 +20,12 @@ async function handleWaitingFinalConfirmation(userId, text, normalizedText, curr
         || normalizedText.match(/\b(60|120|sesenta|ciento veinte)\b.*\b(mejor|quiero|prefiero|cambio|en vez)\b/i);
 
     if ((productChangeMatch || planChangeMatch) && currentState.selectedPlan) {
-        let newProduct = currentState.selectedProduct;
+        let newProduct = currentState.selectedProduct || "Nuez de la India";
         if (/capsula|pastilla/i.test(normalizedText)) newProduct = "Cápsulas de nuez de la india";
         else if (/semilla|natural|infusion/i.test(normalizedText)) newProduct = "Semillas de nuez de la india";
         else if (/gota/i.test(normalizedText)) newProduct = "Gotas de nuez de la india";
 
-        let newPlan = currentState.selectedPlan;
+        let newPlan = currentState.selectedPlan || "60";
         if (/\b(120|ciento veinte)\b/i.test(normalizedText)) newPlan = "120";
         else if (/\b(60|sesenta)\b/i.test(normalizedText)) newPlan = "60";
 
@@ -62,8 +70,8 @@ async function handleWaitingFinalConfirmation(userId, text, normalizedText, curr
         const phone = userId.split('@')[0];
         return {
             cliente: phone, nombre: o.nombre, calle: o.calle, ciudad: o.ciudad, cp: o.cp, provincia: o.provincia,
-            producto: cart.map(i => i.product).join(' + ') || currentState.selectedProduct,
-            plan: cart.map(i => `${i.plan} días`).join(' + ') || `${currentState.selectedPlan} días`,
+            producto: cart.map(i => i.product).join(' + ') || currentState.selectedProduct || '',
+            plan: cart.map(i => `${i.plan} días`).join(' + ') || `${currentState.selectedPlan || '60'} días`,
             precio: currentState.totalPrice || '0', ...extra
         };
     };
@@ -102,7 +110,7 @@ async function handleWaitingFinalConfirmation(userId, text, normalizedText, curr
             }
         }
 
-        _setStep(currentState, 'waiting_admin_validation');
+        _setStep(currentState, FlowStep.WAITING_ADMIN_VALIDATION);
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);
         return { matched: true };
@@ -123,7 +131,7 @@ async function handleWaitingFinalConfirmation(userId, text, normalizedText, curr
             }
         }
 
-        _setStep(currentState, 'waiting_admin_validation');
+        _setStep(currentState, FlowStep.WAITING_ADMIN_VALIDATION);
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);
         return { matched: true };
@@ -155,7 +163,7 @@ async function handleWaitingFinalConfirmation(userId, text, normalizedText, curr
                 }
             }
 
-            _setStep(currentState, 'waiting_admin_validation');
+            _setStep(currentState, FlowStep.WAITING_ADMIN_VALIDATION);
             currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
             saveState(userId);
             return { matched: true };
@@ -182,11 +190,9 @@ async function handleWaitingFinalConfirmation(userId, text, normalizedText, curr
             }
         }
 
-        _setStep(currentState, 'waiting_admin_validation');
+        _setStep(currentState, FlowStep.WAITING_ADMIN_VALIDATION);
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);
         return { matched: true };
     }
 }
-
-module.exports = { handleWaitingFinalConfirmation };

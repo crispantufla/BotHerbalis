@@ -11,7 +11,7 @@ const PRICES_PATHS = [
     '/app/config/prices.json',                                // Docker safe copy (survives volume mount)
 ];
 
-function _findPricesFile() {
+function _findPricesFile(): string | null {
     for (const p of PRICES_PATHS) {
         if (fs.existsSync(p)) return p;
     }
@@ -19,7 +19,7 @@ function _findPricesFile() {
 }
 
 // Read adicional MAX and costo logístico from centralized prices
-function _getAdicionalMAX() {
+function _getAdicionalMAX(): number {
     try {
         const pricesFile = _findPricesFile();
         const prices = JSON.parse(fs.readFileSync(pricesFile, 'utf8'));
@@ -27,7 +27,7 @@ function _getAdicionalMAX() {
     } catch (e) { return 6000; }
 }
 
-function _getCostoLogistico() {
+function _getCostoLogistico(): string {
     try {
         const pricesFile = _findPricesFile();
         const prices = JSON.parse(fs.readFileSync(pricesFile, 'utf8'));
@@ -35,7 +35,7 @@ function _getCostoLogistico() {
     } catch (e) { return '18.000'; }
 }
 
-function _getPrices() {
+function _getPrices(): Record<string, any> {
     try {
         const pricesFile = _findPricesFile();
         if (!pricesFile) throw new Error('prices.json not found in any location');
@@ -52,14 +52,14 @@ function _getPrices() {
     }
 }
 
-function _getPrice(product, plan) {
+function _getPrice(product: string | null | undefined, plan: string): string {
     const prices = _getPrices();
     if (product && product.includes('Cápsulas')) return prices['Cápsulas'][plan] || prices['Cápsulas']['60'];
     if (product && product.includes('Gotas')) return prices['Gotas'][plan] || prices['Gotas']['60'];
     return prices['Semillas'][plan] || prices['Semillas']['60'];
 }
 
-module.exports = {
+export {
     _findPricesFile,
     _getAdicionalMAX,
     _getCostoLogistico,

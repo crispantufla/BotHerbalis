@@ -117,9 +117,8 @@ const CorporateDashboardV2 = () => {
         }
 
         if (action === 'descartar') {
-            setAlerts(prev => prev.filter(a => a.userPhone !== chatId));
-            // Also remove from backend so it doesn't reappear on reload
-            try { await api.delete(`/api/system/alerts/${chatId}`); } catch (e) { /* silent */ }
+            setAlerts(prev => prev.filter(a => a.userPhone !== chatId && a.userPhone !== `${chatId}@c.us`));
+            try { await api.delete(`/api/alerts/${chatId}`); } catch (e) { /* silent */ }
             return;
         }
 

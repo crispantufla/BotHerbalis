@@ -1,8 +1,32 @@
 const logger = require('../utils/logger');
-const OpenAI = require('openai');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+import OpenAI from 'openai';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+import { UserState } from '../types/state';
+
+// Interfaces locales
+export interface APIContext {
+    history?: any[];
+    summary?: string;
+    knowledge?: any;
+    step?: string;
+    goal?: string;
+    userState?: UserState;
+}
+
+export interface AIParsedResponse {
+    response?: string;
+    goalMet?: boolean;
+    extractedData?: string | null;
+    _error?: boolean;
+    nombre?: string | null;
+    calle?: string | null;
+    ciudad?: string | null;
+    provincia?: string | null;
+    cp?: string | null;
+    postdatado?: string | null;
+}
 
 // --- CONFIGURATION ---
 const MODEL = "gpt-4o-mini";
@@ -26,14 +50,14 @@ const COMPLEX_STEPS = new Set(['waiting_preference_consultation', 'waiting_data'
 // ═══════════════════════════════════════════════════════
 
 // Cache for prices — re-read from disk at most every 60s
-let _pricesCache = null;
+let _pricesCache: Record<string, any> | null = null;
 let _pricesCacheTime = 0;
 const PRICES_CACHE_MS = 60 * 1000;
 
-function _getPrices() {
+function _getPrices(): Record<string, any> {
     const now = Date.now();
     if (_pricesCache && (now - _pricesCacheTime) < PRICES_CACHE_MS) return _pricesCache;
-    let prices = {
+    let prices: Record<string, any> = {
         'Cápsulas': { '60': '46.900', '120': '66.900' },
         'Semillas': { '60': '36.900', '120': '49.900' },
         'Gotas': { '60': '48.900', '120': '68.900' },
@@ -45,14 +69,14 @@ function _getPrices() {
             const data = JSON.parse(fs.readFileSync(PRICES_PATH, 'utf8'));
             prices = { ...prices, ...data };
         }
-    } catch (e) { logger.error("Error reading prices for AI:", e); }
+    } catch (e: any) { logger.error("Error reading prices for AI:", e.message); }
     _pricesCache = prices;
     _pricesCacheTime = now;
     return prices;
 }
 
 // ── CORE PROMPT (always sent, top of system message = max attention) ──
-function _getCorePrompt() {
+function _getCorePrompt(): string {
     return `IDENTIDAD: Sos Marta, asesora de Herbalis (Nuez de la India), Rosario, Santa Fe. Empresa líder hace 13 AÑOS, +15.000 clientes. "Hacemos envíos a todo el país". NUNCA admitas ser bot/IA. Si preguntan: "Jaja no, soy Marta! Te estoy escribiendo yo 😊".
 Si preguntan tu nombre: "Soy Marta 😊".
 
@@ -87,7 +111,7 @@ REGLAS UNIVERSALES:
 
 // ── STEP MODULES (only one is sent per call, positioned in the middle) ──
 
-function _getModuleEarlyFunnel(prices) {
+function _getModuleEarlyFunnel(prices: Record<string, any>): string {
     return `
 PRODUCTOS Y PRECIOS:
 - Cápsulas: $${prices['Cápsulas']['60']} (60d) / $${prices['Cápsulas']['120']} (120d). ESTRELLA, más efectivo, rápido y potente.
@@ -115,7 +139,7 @@ REGLAS DE ESTE PASO:
 - Precios: Si piden "precio" genérico: "$37.000 a $69.000". Si insisten/piden todos: dar detalle completo.`;
 }
 
-function _getModulePlanChoice(prices) {
+function _getModulePlanChoice(prices: Record<string, any>): string {
     return `
 PRECIOS EXACTOS:
 - Cápsulas: $${prices['Cápsulas']['60']} (60d) / $${prices['Cápsulas']['120']} (120d)
@@ -142,7 +166,7 @@ REGLAS CRÍTICAS DE ESTE PASO (¡LEER BIEN!):
 - Si el cliente quiere CAMBIAR de producto (ej: dice "mejor gotas"): confirmale que cambiamos a ese producto (extractedData="CHANGE_PRODUCT: Gotas") Y LUEGO EN EL MISMO MENSAJE preguntale qué plan quiere.`;
 }
 
-function _getModuleDataCollection() {
+function _getModuleDataCollection(): string {
     return `
 DATOS NECESARIOS: nombre completo, calle y número, ciudad, código postal.
 🔴🔴 [REGLA ABSOLUTA] PROHIBIDO PEDIR NÚMERO DE TELÉFONO. 🔴🔴
@@ -159,7 +183,7 @@ HESITACIÓN / POSTERGACIÓN:
 - RETIRO TERCEROS: Si preguntan si OTRA PERSONA puede recibir o ir a retirar al correo: "Sí, puede recibirlo o retirarlo en sucursal cualquier persona mayor de edad con tu DNI (o fotocopia) y una nota de autorización tuya."`;
 }
 
-function _getModuleObjection(prices) {
+function _getModuleObjection(prices: Record<string, any>): string {
     return `
 OBJECIONES COMUNES:
 - "Es caro": "Pensalo así: es menos que una gaseosa por día. Y es una inversión que funciona de verdad."
@@ -186,7 +210,7 @@ INDECISIÓN:
 - Dudan sobre COMPRAR AHORA: Ofrecé programar envío para congelar precio. Comportate como vendedor con alternativas.`;
 }
 
-function _getModuleConsumption() {
+function _getModuleConsumption(): string {
     return `
 INSTRUCCIONES DE CONSUMO (responder SOLO el producto preguntado):
 ⚠️ Si no sabés qué producto eligió: preguntá primero "¿Con cuál arrancás?"
@@ -195,7 +219,7 @@ INSTRUCCIONES DE CONSUMO (responder SOLO el producto preguntado):
 - GOTAS: Semana 1: 10 gotas antes de la comida principal con agua. Semana 2+: antes del almuerzo o cena, ajustando según progreso.`;
 }
 
-function _getModulePostSale() {
+function _getModulePostSale(): string {
     return `
 Este cliente YA COMPRÓ. Sos un asistente post-venta amable.
 REGLAS:
@@ -208,7 +232,7 @@ REGLAS:
 7. NUNCA inventes info. NUNCA pidas datos de envío/dirección.`;
 }
 
-function _getModuleSafety() {
+function _getModuleSafety(): string {
     return `
 Verificar si hay contraindicación o riesgo.
 MENORES — REGLA CRÍTICA DE IDENTIFICACIÓN:
@@ -220,7 +244,7 @@ EMBARAZO/LACTANCIA/+80 AÑOS/CÁNCER: RECHAZAR VENTA. "Priorizamos tu salud 🌿
 }
 
 // ── EXTRACTION RULES (always sent, at END = high attention zone) ──
-function _getExtractionRules() {
+function _getExtractionRules(): string {
     return `
 EXTRACCIÓN DE DATOS (CRÍTICO — siempre verificar antes de responder):
 - Si el cliente elige o confirma un producto (ej: "sí, quiero esas", "cápsulas", "gotas"): extractedData="PRODUCTO: Cápsulas" (o Gotas, o Semillas). ¡Este paso es VITAL para que el sistema avance!
@@ -236,7 +260,7 @@ FORMATO (JSON puro, sin markdown, sin backticks):
 }
 
 // ── PROMPT BUILDER — Selects the right module for each step ──
-function _buildSystemPrompt(step) {
+function _buildSystemPrompt(step: string): string {
     const prices = _getPrices();
     let module;
 
@@ -288,7 +312,13 @@ function _buildSystemPrompt(step) {
 // GLOBAL REQUEST QUEUE — Prevents rate limit floods
 // ═══════════════════════════════════════════════════════
 class RequestQueue {
-    constructor(maxConcurrent, minDelayMs) {
+    maxConcurrent: number;
+    minDelayMs: number;
+    running: number;
+    queue: { fn: () => Promise<any>, resolve: (v: any) => void, reject: (err: any) => void }[];
+    lastRequestTime: number;
+
+    constructor(maxConcurrent: number, minDelayMs: number) {
         this.maxConcurrent = maxConcurrent;
         this.minDelayMs = minDelayMs;
         this.running = 0;
@@ -296,18 +326,23 @@ class RequestQueue {
         this.lastRequestTime = 0;
     }
 
-    enqueue(fn) {
+    enqueue<T>(fn: () => Promise<T>): Promise<T> {
         return new Promise((resolve, reject) => {
-            this.queue.push({ fn, resolve, reject });
+            this.queue.push({ fn, resolve: resolve as (v: any) => void, reject });
             this._process();
         });
     }
 
-    async _process() {
+    async _process(): Promise<void> {
         if (this.running >= this.maxConcurrent || this.queue.length === 0) return;
 
         this.running++;
-        const { fn, resolve, reject } = this.queue.shift();
+        const nextItem = this.queue.shift();
+        if (!nextItem) {
+            this.running--;
+            return;
+        }
+        const { fn, resolve, reject } = nextItem;
 
         try {
             // Enforce minimum delay between requests
@@ -336,12 +371,15 @@ class RequestQueue {
 // SIMPLE RESPONSE CACHE — Avoids duplicate API calls
 // ═══════════════════════════════════════════════════════
 class ResponseCache {
-    constructor(ttlMs) {
+    ttl: number;
+    cache: Map<string, { value: any, time: number }>;
+
+    constructor(ttlMs: number) {
         this.ttl = ttlMs;
         this.cache = new Map();
     }
 
-    _hash(str) {
+    _hash(str: string) {
         let hash = 0;
         for (let i = 0; i < str.length; i++) {
             hash = ((hash << 5) - hash) + str.charCodeAt(i);
@@ -350,7 +388,7 @@ class ResponseCache {
         return hash.toString(36);
     }
 
-    get(prompt) {
+    get(prompt: string): any {
         const key = this._hash(prompt);
         const entry = this.cache.get(key);
         if (entry && Date.now() - entry.time < this.ttl) {
@@ -360,7 +398,7 @@ class ResponseCache {
         return null;
     }
 
-    set(prompt, value) {
+    set(prompt: string, value: any): void {
         const key = this._hash(prompt);
         this.cache.set(key, { value, time: Date.now() });
         if (this.cache.size > 200) {
@@ -378,6 +416,12 @@ class ResponseCache {
 // AI SERVICE — OpenAI GPT-4o-mini
 // ═══════════════════════════════════════════════════════
 class AIService {
+    client: OpenAI;
+    model: string;
+    queue: RequestQueue;
+    cache: ResponseCache;
+    stats: { calls: number, cached: number, retries: number, errors: number };
+
     constructor() {
         const apiKey = process.env.OPENAI_API_KEY || "";
         if (!apiKey) {
@@ -397,7 +441,7 @@ class AIService {
     /**
      * Core API call with retry + rate limit handling
      */
-    async _callQueued(apiCallFn, cacheKey = null) {
+    async _callQueued<T>(apiCallFn: () => Promise<T>, cacheKey: string | null = null): Promise<T> {
         // Check cache first
         if (cacheKey) {
             const cached = this.cache.get(cacheKey);
@@ -413,7 +457,7 @@ class AIService {
             for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
                 try {
                     return await apiCallFn();
-                } catch (e) {
+                } catch (e: any) {
                     const status = e.status || e.statusCode;
                     if (status === 429) {
                         this.stats.retries++;
@@ -441,7 +485,7 @@ class AIService {
     /**
      * Main Chat Function
      */
-    async chat(userText, context) {
+    async chat(userText: string, context: APIContext): Promise<AIParsedResponse> {
         // Build dynamic history (last 50 messages for context)
         let conversationHistory = (context.history || []).slice(-50);
         let summaryContext = "";
@@ -462,7 +506,7 @@ class AIService {
 
             knowledgeContext = `INFORMACIÓN RELEVANTE PARA ESTE PASO:\n`;
 
-            const pathInfo = faq.find(q => q.keywords.includes('diabetes'))?.response || "";
+            const pathInfo = faq.find((q: any) => q.keywords.includes('diabetes'))?.response || "";
             if (pathInfo) knowledgeContext += `- SOBRE PATOLOGÍAS: "${pathInfo}"\n`;
 
             if (['waiting_weight', 'waiting_preference'].includes(step)) {
@@ -484,7 +528,7 @@ class AIService {
                 try {
                     const pd = JSON.parse(fs.readFileSync(PRICES_PATH, 'utf8'));
                     if (pd.adicionalMAX) adMax = pd.adicionalMAX;
-                } catch (e) { }
+                } catch (e: any) { }
 
                 knowledgeContext += `- Plan 120 días sin adicional. Plan 60 días con Contra Reembolso MAX (+$${adMax}).\n`;
                 knowledgeContext += `- Envío gratis por Correo Argentino, pago en efectivo al recibir\n`;
@@ -509,9 +553,6 @@ class AIService {
                 const a = s.partialAddress;
                 stateContext += `- Datos parciales: ${a.nombre || '?'}, ${a.calle || '?'}, ${a.ciudad || '?'}, CP ${a.cp || '?'}\n`;
             }
-        }
-        if (context.userState && context.userState.profile) {
-            stateContext += `- PERFIL MÉDICO/PERSONAL: ${context.userState.profile}\n`;
         }
         if (stateContext) {
             stateContext = `\nESTADO DEL CLIENTE:\n${stateContext}`;
@@ -556,9 +597,9 @@ INSTRUCCIONES:
                 }),
                 null // No cache for chat — every conversation is unique
             );
-            const text = result.choices[0].message.content;
+            const text = result.choices[0].message?.content || "";
             return this._parseJSON(text);
-        } catch (e) {
+        } catch (e: any) {
             logger.error("🔴 [AI] Chat Error:", e.message);
             return { response: "Estoy teniendo un pequeño problema técnico, ¿me repetís?", goalMet: false };
         }
@@ -567,7 +608,7 @@ INSTRUCCIONES:
     /**
      * Check if history needs summarization
      */
-    async checkAndSummarize(history) {
+    async checkAndSummarize(history: any[]): Promise<{ summary: string; prunedHistory: any[] } | null> {
         if (!history || history.length <= 50) return null;
 
         const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
@@ -599,14 +640,14 @@ INSTRUCCIONES:
     /**
      * Manual Summary Trigger (for API)
      */
-    async generateManualSummary(history) {
+    async generateManualSummary(history: any[]): Promise<string | null> {
         return await this._callQueuedSummarize(history);
     }
 
     /**
      * Summarize history through the queue
      */
-    async _callQueuedSummarize(history) {
+    async _callQueuedSummarize(history: any[]): Promise<string | null> {
         const conversationText = history.map(msg =>
             `${msg.role === 'user' ? 'Cliente' : 'Vendedor'}: ${msg.content}`
         ).join('\n');
@@ -639,8 +680,8 @@ INSTRUCCIONES:
                 }),
                 cacheKey
             );
-            return result.choices[0].message.content.trim();
-        } catch (e) {
+            return result.choices[0].message?.content || "";
+        } catch (e: any) {
             logger.error("🔴 [AI] Summary Error:", e.message);
             return null;
         }
@@ -649,7 +690,7 @@ INSTRUCCIONES:
     /**
      * Generate Report (for analyze_day.js)
      */
-    async generateReport(prompt) {
+    async generateReport(prompt: string): Promise<string> {
         try {
             const result = await this._callQueued(
                 () => this.client.chat.completions.create({
@@ -663,8 +704,8 @@ INSTRUCCIONES:
                 }),
                 null
             );
-            return result.choices[0].message.content;
-        } catch (e) {
+            return result.choices[0].message?.content || "";
+        } catch (e: any) {
             logger.error("🔴 [AI] Report Error:", e.message);
             throw e;
         }
@@ -673,7 +714,7 @@ INSTRUCCIONES:
     /**
      * Parse Address from Text
      */
-    async parseAddress(text) {
+    async parseAddress(text: string): Promise<AIParsedResponse> {
         const prompt = `
         Analizá el siguiente texto y extraé datos de dirección postal de Argentina.
         El texto puede estar incompleto, ser solo un código postal, una provincia, o una dirección desordenada.
@@ -721,8 +762,8 @@ INSTRUCCIONES:
                 }),
                 `addr_${text.substring(0, 100)}`
             );
-            return this._parseJSON(result.choices[0].message.content);
-        } catch (e) {
+            return this._parseJSON(result.choices[0].message?.content || "");
+        } catch (e: any) {
             return { _error: true };
         }
     }
@@ -730,7 +771,7 @@ INSTRUCCIONES:
     /**
      * Transcribe Audio — Uses OpenAI Whisper API
      */
-    async transcribeAudio(mediaData, mimeType) {
+    async transcribeAudio(mediaData: string, mimeType: string): Promise<string | null> {
         try {
             // Convert base64 to buffer and write temp file (Whisper needs a file)
             const buffer = Buffer.from(mediaData, 'base64');
@@ -752,7 +793,7 @@ INSTRUCCIONES:
             try { fs.unlinkSync(tmpPath); } catch (e) { /* ignore */ }
 
             return result.text || null;
-        } catch (e) {
+        } catch (e: any) {
             logger.error("🔴 [AI] Transcribe Error:", e.message);
             return null;
         }
@@ -761,7 +802,7 @@ INSTRUCCIONES:
     /**
      * Analyze Image — Uses OpenAI Vision to extract text or describe an image
      */
-    async analyzeImage(mediaData, mimeType, prompt) {
+    async analyzeImage(mediaData: string, mimeType: string, prompt: string): Promise<string | null> {
         try {
             const result = await this._callQueued(
                 () => this.client.chat.completions.create({
@@ -785,8 +826,8 @@ INSTRUCCIONES:
                 }),
                 null
             );
-            return result.choices[0].message.content.trim();
-        } catch (e) {
+            return result.choices[0].message?.content?.trim() || null;
+        } catch (e: any) {
             logger.error("🔴 [AI] Vision Error:", e.message);
             return null;
         }
@@ -795,7 +836,7 @@ INSTRUCCIONES:
     /**
      * Helper for Admin Suggestions ("Yo me encargo")
      */
-    async generateSuggestion(instruction, conversationContext) {
+    async generateSuggestion(instruction: string, conversationContext: string): Promise<string> {
         const prompt = `
         SITUACION: El ADMINISTRADOR del negocio te da una instrucción DIRECTA para enviarle al cliente.
         La instrucción del admin tiene AUTORIDAD TOTAL — ANULÁ cualquier regla tuya que la contradiga.
@@ -823,8 +864,8 @@ INSTRUCCIONES:
                 }),
                 null
             );
-            return result.choices[0].message.content;
-        } catch (e) {
+            return result.choices[0].message?.content || instruction;
+        } catch (e: any) {
             return instruction; // Fallback to raw instruction
         }
     }
@@ -841,20 +882,20 @@ INSTRUCCIONES:
         };
     }
 
-    _parseJSON(text) {
+    _parseJSON(text: string): AIParsedResponse {
         try {
             const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
             const parsed = JSON.parse(jsonStr);
             if (typeof parsed.response !== 'string') {
                 parsed.response = String(parsed.response || "");
             }
-            return parsed;
-        } catch (e) {
-            return { response: text.replace(/```/g, ''), goalMet: false };
+            return parsed as AIParsedResponse;
+        } catch (e: any) {
+            return { response: typeof text === 'string' ? text.replace(/```/g, '') : "", goalMet: false };
         }
     }
 }
 
 // Singleton Instance
 const aiService = new AIService();
-module.exports = { aiService };
+export { aiService };

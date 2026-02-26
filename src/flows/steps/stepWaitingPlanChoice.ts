@@ -1,8 +1,9 @@
+import { UserState, FlowStep } from '../../types/state';
 const { _getPrice, _getAdicionalMAX } = require('../utils/pricing');
 const { _setStep } = require('../utils/flowHelpers');
 const { buildConfirmationMessage } = require('../../utils/messageTemplates');
 
-function _handleExtractedData(userId, extractedData, currentState) {
+function _handleExtractedData(userId: string, extractedData: string, currentState: UserState) {
     if (!extractedData || extractedData === 'null') return;
     console.log(`[DATA EXTRACTION] User ${userId}: ${extractedData}`);
 
@@ -23,7 +24,14 @@ function _handleExtractedData(userId, extractedData, currentState) {
     }
 }
 
-async function handleWaitingPlanChoice(userId, text, normalizedText, currentState, knowledge, dependencies) {
+async function handleWaitingPlanChoice(
+    userId: string,
+    text: string,
+    normalizedText: string,
+    currentState: UserState,
+    knowledge: any,
+    dependencies: any
+): Promise<{ matched: boolean }> {
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
 
     const products = [
@@ -130,14 +138,14 @@ async function handleWaitingPlanChoice(userId, text, normalizedText, currentStat
             currentState.history.push({ role: 'bot', content: skipMsg2, timestamp: Date.now() });
             await sendMessageWithDelay(userId, skipMsg2);
 
-            const subtotal = currentState.cart.reduce((sum, i) => sum + parseInt(i.price.replace('.', '')), 0);
+            const subtotal = currentState.cart.reduce((sum, i) => sum + parseInt(i.price.toString().replace(/\./g, '')), 0);
             const adicional = currentState.adicionalMAX || 0;
             currentState.totalPrice = (subtotal + adicional).toLocaleString('es-AR').replace(/,/g, '.');
             const summaryMsg = buildConfirmationMessage(currentState);
 
             currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
             await sendMessageWithDelay(userId, summaryMsg);
-            _setStep(currentState, 'waiting_final_confirmation');
+            _setStep(currentState, FlowStep.WAITING_FINAL_CONFIRMATION);
         } else {
             currentState.history.push({ role: 'bot', content: closingNode.response, timestamp: Date.now() });
             await sendMessageWithDelay(userId, closingNode.response);
@@ -200,14 +208,14 @@ async function handleWaitingPlanChoice(userId, text, normalizedText, currentStat
                 currentState.history.push({ role: 'bot', content: skipMsg2, timestamp: Date.now() });
                 await sendMessageWithDelay(userId, skipMsg2);
 
-                const subtotal = currentState.cart.reduce((sum, i) => sum + parseInt(i.price.replace('.', '')), 0);
+                const subtotal = currentState.cart.reduce((sum, i) => sum + parseInt(i.price.toString().replace(/\./g, '')), 0);
                 const adicional = currentState.adicionalMAX || 0;
                 currentState.totalPrice = (subtotal + adicional).toLocaleString('es-AR').replace(/,/g, '.');
                 const summaryMsg = buildConfirmationMessage(currentState);
 
                 currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
                 await sendMessageWithDelay(userId, summaryMsg);
-                _setStep(currentState, 'waiting_final_confirmation');
+                _setStep(currentState, FlowStep.WAITING_FINAL_CONFIRMATION);
             } else {
                 const combinedResponse = `¡Genial! 😊 Entonces confirmamos el plan de 120 días.\n\n${closingNode.response}`;
                 currentState.history.push({ role: 'bot', content: combinedResponse, timestamp: Date.now() });
@@ -229,15 +237,9 @@ async function handleWaitingPlanChoice(userId, text, normalizedText, currentStat
 
             const planAI = await aiService.chat(text, {
                 step: 'waiting_plan_choice',
-                goal: `El usuario debe elegir Plan 60 o Plan 120 días. CRÍTICO (REGLAS DE HUMANIZACIÓN DE ORO): 1) MÁXIMO 30 PALABRAS. 2) goalMet=true SOLO si el usuario escribe explícitamente "60" o "120", o si acepta tu sugerencia diciendo "sí", "ok", "dale", "ese" (en cuyo caso MÁGICAMENTE extraes "120" en extractedData). 3) Si pregunta algo distinto (ej: "cómo las consigo"), goalMet=false, usa una muletilla amigable ("Te cuento", "Mirá"), respondé su duda brevemente y volvé a preguntar: "¿Avanzamos con 60 o 120 días?". ESTRATEGIA: El pago a domicilio cuesta $6.000, pero el plan de 120 LO REGALA. Decile: "${selectedUpsell}".
-                
-                🔴 REGLA CRÍTICA SI MENCIONA OTRO FORMATO (gotas, semillas, cápsulas):
-                Si el usuario menciona otro producto/formato (ej: "o gotas", "y las semillas?", "cuánto las gotas?"), NO asumas que quiere CAMBIAR.
-                Está COMPARANDO opciones. Debés:
-                1) Mostrarle los precios del formato que preguntó (60 y 120 días) usando el knowledge.
-                2) Recordarle los precios del formato que ya tenía seleccionado (${currentState.selectedProduct || 'Cápsulas'}).
-                3) Preguntarle amablemente: "¿Con cuál avanzamos entonces?"
-                NO uses CHANGE_PRODUCT. NO cambies el producto automáticamente. goalMet=false hasta que elija explícitamente.`,
+                goal: `El usuario debe elegir Plan 60 o Plan 120 días. CRÍTICO (REGLAS DE ORO): 1) MÁXIMO 30 PALABRAS. 2) goalMet=true SOLO si elige "60" o "120". 3) Si pregunta algo distinto (ej: "cómo se paga", "cuánto llega"), goalMet=false. Respondé su duda breve y amablemente y recordale: "¿Avanzamos con 60 o 120 días?". ESTRATEGIA INICIAL: El pago a domicilio cuesta $6.000, pero el plan de 120 LO REGALA. Decile: "${selectedUpsell}". 
+                🔴 REGLA PREGUNTAS DE PAGO: Si pregunta cuándo/cómo se paga, decile: "El pago es al cartero cuando recibís el producto (solo efectivo)". Y reitera la pregunta de los planes.
+                🔴 REGLA PRODUCTOS ALTERNOS: Si menciona gotas/semillas (ej: "o gotas"), NO asumas que cambia. Mostrá precios (knowledge) y preguntá: "¿Avanzamos con ese?". NO uses CHANGE_PRODUCT. goalMet=false hasta que elija.`,
                 history: currentState.history,
                 summary: currentState.summary,
                 knowledge: knowledge,
@@ -306,14 +308,14 @@ async function handleWaitingPlanChoice(userId, text, normalizedText, currentStat
                         currentState.history.push({ role: 'bot', content: skipMsg, timestamp: Date.now() });
                         await sendMessageWithDelay(userId, skipMsg);
 
-                        const subtotal = currentState.cart.reduce((sum, i) => sum + parseInt(i.price.replace('.', '')), 0);
+                        const subtotal = currentState.cart.reduce((sum, i) => sum + parseInt(i.price.toString().replace(/\./g, '')), 0);
                         const adicional = currentState.adicionalMAX || 0;
                         currentState.totalPrice = (subtotal + adicional).toLocaleString('es-AR').replace(/,/g, '.');
                         const summaryMsg = buildConfirmationMessage(currentState);
 
                         currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
                         await sendMessageWithDelay(userId, summaryMsg);
-                        _setStep(currentState, 'waiting_final_confirmation');
+                        _setStep(currentState, FlowStep.WAITING_FINAL_CONFIRMATION);
                     } else {
                         if (planAI.response) {
                             currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });

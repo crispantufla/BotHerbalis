@@ -8,18 +8,18 @@ const path = require('path');
  * @param {number} sinceTimestamp - Optional Unix timestamp to filter history.
  * @returns {Array} List of message objects.
  */
-function getLocalHistory(chatId, sinceTimestamp = 0) {
+function getLocalHistory(chatId: string, sinceTimestamp: number = 0): any[] {
     const logsDir = path.join(__dirname, '../../logs');
     if (!fs.existsSync(logsDir)) return [];
 
-    const files = fs.readdirSync(logsDir).filter(f => f.endsWith('.jsonl'));
-    let localMessages = [];
+    const files = fs.readdirSync(logsDir).filter((f: string) => f.endsWith('.jsonl'));
+    let localMessages: any[] = [];
 
-    files.forEach(file => {
+    files.forEach((file: string) => {
         try {
             const content = fs.readFileSync(path.join(logsDir, file), 'utf8');
-            const lines = content.split('\n').filter(l => l.trim());
-            lines.forEach(line => {
+            const lines = content.split('\n').filter((l: string) => l.trim());
+            lines.forEach((line: string) => {
                 try {
                     const log = JSON.parse(line);
                     const logTimestamp = Math.floor(new Date(log.timestamp).getTime() / 1000);
@@ -37,7 +37,7 @@ function getLocalHistory(chatId, sinceTimestamp = 0) {
                     // Ignore malformed lines
                 }
             });
-        } catch (e) {
+        } catch (e: any) {
             logger.error(`Error reading log file ${file}:`, e.message);
         }
     });
@@ -45,4 +45,4 @@ function getLocalHistory(chatId, sinceTimestamp = 0) {
     return localMessages;
 }
 
-module.exports = { getLocalHistory };
+export { getLocalHistory };

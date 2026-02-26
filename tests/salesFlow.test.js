@@ -48,7 +48,8 @@ const deps = {
     saveState: mockSaveState,
     sendMessageWithDelay: mockSendMessage,
     logAndEmit: mockLogAndEmit,
-    sharedState
+    sharedState,
+    aiService
 };
 
 const knowledge = {
@@ -132,9 +133,8 @@ describe('Sales Flow Logic', () => {
         await processSalesFlow('user1', 'algo totalmente random', userState, knowledge, deps);
 
         // Should have migrated to waiting_final_confirmation and then processed
-        // (non-affirmative at waiting_final_confirmation now delegates to admin)
-        expect(userState['user1'].step).toBe('waiting_admin_validation');
-        // Should have notified admin about unexpected response
-        expect(mockNotifyAdmin).toHaveBeenCalled();
+        // (non-affirmative at waiting_final_confirmation delegates to AI now, not admin)
+        expect(userState['user1'].step).toBe('waiting_final_confirmation');
+        expect(deps.aiService.chat).toHaveBeenCalled();
     });
 });

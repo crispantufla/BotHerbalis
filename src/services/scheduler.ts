@@ -8,8 +8,26 @@ const logger = require('../utils/logger');
  */
 
 
-const { isBusinessHours } = require('./timeUtils');
-const { buildConfirmationMessage } = require('../utils/messageTemplates');
+const timeUtils = require('./timeUtils');
+const isBusinessHours = timeUtils.isBusinessHours;
+
+const messageTemplates = require('../utils/messageTemplates');
+const buildConfirmationMessage = messageTemplates.buildConfirmationMessage;
+import { UserState } from '../types/state';
+
+interface SchedulerSharedState {
+    userState: Record<string, UserState>;
+    pausedUsers: Set<string>;
+    [key: string]: any;
+}
+
+interface SchedulerDependencies {
+    notifyAdmin: (title: string, userId: string, msg: string) => Promise<void>;
+    sendMessageWithDelay: (userId: string, msg: string) => Promise<void>;
+    saveState: (userId?: string) => void;
+    saveOrderToLocal?: (order: any) => void;
+    [key: string]: any;
+}
 
 const RE_ENGAGEABLE_STEPS = new Set([
     'waiting_weight',
@@ -20,15 +38,15 @@ const RE_ENGAGEABLE_STEPS = new Set([
     'waiting_data'
 ]);
 
-const STALE_THRESHOLD_MS = 30 * 60 * 1000;         // 30 minutes
-const COLD_LEAD_THRESHOLD_MS = 24 * 60 * 60 * 1000; // 24 hours
+const STALE_THRESHOLD_MS = 20 * 60 * 1000;         // 20 minutes
+const COLD_LEAD_THRESHOLD_MS = 20 * 60 * 1000;      // 20 minutes
 const ABANDONED_CART_MIN_MS = 24 * 60 * 60 * 1000;  // 24 hours
 const ABANDONED_CART_MAX_MS = 48 * 60 * 60 * 1000;  // 48 hours
 const AUTO_APPROVE_THRESHOLD_MS = 15 * 60 * 1000;   // 15 minutes
-const CHECK_INTERVAL_MS = 10 * 60 * 1000;           // every 10 min
+const CHECK_INTERVAL_MS = 5 * 60 * 1000;            // every 5 min
 const CLEANUP_THRESHOLD_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
-const CONTEXTUAL_FOLLOW_UPS = {
+const CONTEXTUAL_FOLLOW_UPS: Record<string, string[]> = {
     'waiting_weight': [
         '¡Hola! 😊 Quedó pendiente saber cuántos kilos te gustaría bajar para recomendarte lo mejor. ¿Estás por ahí?',
         '¡Hola! Vi que consultaste. Seguimos acá para ayudarte. ¿Cuántos kilos buscás bajar más o menos?'
@@ -64,7 +82,7 @@ const GENERIC_FOLLOW_UPS = [
  * checkStaleUsers — P3 #3
  * Alerts admin if a user has been stuck on the same step for >30 min
  */
-function checkStaleUsers(sharedState, dependencies) {
+function checkStaleUsers(sharedState: SchedulerSharedState, dependencies: SchedulerDependencies): void {
     const { userState, pausedUsers } = sharedState;
     const { notifyAdmin } = dependencies;
     const now = Date.now();
@@ -99,7 +117,7 @@ function checkStaleUsers(sharedState, dependencies) {
  * Auto-approves orders stuck in waiting_admin_ok for >15 min.
  * Marks the order as "Auto-aprobado (sin revisión manual)" for later dashboard review.
  */
-function autoApproveOrders(sharedState, dependencies) {
+function autoApproveOrders(sharedState: SchedulerSharedState, dependencies: SchedulerDependencies): void {
     const { userState } = sharedState;
     const { sendMessageWithDelay, notifyAdmin, saveState, saveOrderToLocal } = dependencies;
     const now = Date.now();
@@ -118,7 +136,7 @@ function autoApproveOrders(sharedState, dependencies) {
 
             sendMessageWithDelay(userId, confirmMsg);
             state.history = state.history || [];
-            state.history.push({ role: 'bot', content: confirmMsg });
+            state.history.push({ role: 'bot', content: confirmMsg, timestamp: Date.now() });
 
             // Save order with auto-approved status
             if (state.pendingOrder) {
@@ -161,7 +179,7 @@ function autoApproveOrders(sharedState, dependencies) {
  * checkColdLeads — P3 #5
  * Sends a follow-up message to users inactive for 24h+ on re-engageable steps
  */
-function checkColdLeads(sharedState, dependencies) {
+function checkColdLeads(sharedState: SchedulerSharedState, dependencies: SchedulerDependencies): void {
     const { userState, pausedUsers } = sharedState;
     const { sendMessageWithDelay, saveState } = dependencies;
     const now = Date.now();
@@ -190,7 +208,7 @@ function checkColdLeads(sharedState, dependencies) {
 
             sendMessageWithDelay(userId, msg);
             state.history = state.history || [];
-            state.history.push({ role: 'bot', content: msg });
+            state.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
             state.reengagementSent = true;
             saveState();
         }
@@ -201,7 +219,7 @@ function checkColdLeads(sharedState, dependencies) {
  * checkAbandonedCarts 
  * Specific retargeting for users stuck in the 24-48h window.
  */
-function checkAbandonedCarts(sharedState, dependencies) {
+function checkAbandonedCarts(sharedState: SchedulerSharedState, dependencies: SchedulerDependencies): void {
     const { userState, pausedUsers } = sharedState;
     const { sendMessageWithDelay, saveState } = dependencies;
     const now = Date.now();
@@ -236,7 +254,7 @@ function checkAbandonedCarts(sharedState, dependencies) {
  * cleanupOldUsers — Memory leak prevention
  * Removes users inactive for >7 days from userState
  */
-function cleanupOldUsers(sharedState, dependencies) {
+function cleanupOldUsers(sharedState: SchedulerSharedState, dependencies: SchedulerDependencies): void {
     const { userState } = sharedState;
     const { saveState } = dependencies;
     const now = Date.now();
@@ -261,14 +279,14 @@ function cleanupOldUsers(sharedState, dependencies) {
 /**
  * startScheduler — Starts periodic checks
  */
-function startScheduler(sharedState, dependencies) {
+function startScheduler(sharedState: SchedulerSharedState, dependencies: SchedulerDependencies): void {
     logger.info(`[SCHEDULER] Started — checking every ${CHECK_INTERVAL_MS / 60000} min`);
 
     // Run immediately on start, then on interval
     setTimeout(() => {
         // checkStaleUsers(sharedState, dependencies); // DISABLED by user request
         checkColdLeads(sharedState, dependencies);
-        checkAbandonedCarts(sharedState, dependencies);
+        // checkAbandonedCarts(sharedState, dependencies); // DISABLED due to dual-send overlap with coldLeads
         autoApproveOrders(sharedState, dependencies);
         cleanupOldUsers(sharedState, dependencies);
     }, 5000);
@@ -276,11 +294,11 @@ function startScheduler(sharedState, dependencies) {
     setInterval(() => {
         // checkStaleUsers(sharedState, dependencies); // DISABLED by user request
         checkColdLeads(sharedState, dependencies);
-        checkAbandonedCarts(sharedState, dependencies);
+        // checkAbandonedCarts(sharedState, dependencies); // DISABLED due to dual-send overlap with coldLeads
         autoApproveOrders(sharedState, dependencies);
         cleanupOldUsers(sharedState, dependencies);
     }, CHECK_INTERVAL_MS);
 }
 
-module.exports = { startScheduler, checkStaleUsers, checkColdLeads, checkAbandonedCarts, autoApproveOrders };
+export { startScheduler, checkStaleUsers, checkColdLeads, checkAbandonedCarts, autoApproveOrders };
 

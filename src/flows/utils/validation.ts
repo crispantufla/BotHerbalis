@@ -6,7 +6,7 @@
  * Matches: "si", "dale", "ok", "listo", "si quiero", "bueno dale"
  * Does NOT match: "si pero primero...", "bueno no sé", "si fuera más barato"
  */
-function _isAffirmative(normalizedText) {
+function _isAffirmative(normalizedText: string): boolean {
     const trimmed = normalizedText.trim();
     const words = trimmed.split(/\s+/);
 
@@ -28,7 +28,7 @@ function _isAffirmative(normalizedText) {
     return false;
 }
 
-function _isNegative(normalizedText) {
+function _isNegative(normalizedText: string): boolean {
     const trimmed = normalizedText.trim();
     const words = trimmed.split(/\s+/);
 
@@ -44,7 +44,7 @@ function _isNegative(normalizedText) {
     return false;
 }
 
-module.exports = {
+export {
     _isAffirmative,
     _isNegative
 };

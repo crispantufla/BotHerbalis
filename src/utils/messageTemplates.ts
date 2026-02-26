@@ -9,11 +9,11 @@
  * @param {Object} state - The user's state object
  * @returns {string} The formatted confirmation message
  */
-function buildConfirmationMessage(state) {
+function buildConfirmationMessage(state: any): string {
     const cart = state.cart || [];
-    const productStr = cart.map(i => i.product).join(' + ') || state.selectedProduct || 'Nuez de la India';
+    const productStr = cart.map((i: any) => i.product).join(' + ') || state.selectedProduct || 'Nuez de la India';
     const planStr = cart.length > 0
-        ? cart.map(i => `${i.plan} días`).join(' + ')
+        ? cart.map((i: any) => `${i.plan} días`).join(' + ')
         : `${state.selectedPlan || '60'} días`;
     const totalPriceStr = state.totalPrice || '0';
 
@@ -69,4 +69,4 @@ function buildConfirmationMessage(state) {
         `👉 Confirmame que podrás recibir o retirar el pedido sin inconvenientes.`;
 }
 
-module.exports = { buildConfirmationMessage };
+export { buildConfirmationMessage };

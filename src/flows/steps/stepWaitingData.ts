@@ -1,17 +1,25 @@
+import { UserState, FlowStep } from '../../types/state';
 const { validateAddress } = require('../../services/addressValidator');
 const { buildConfirmationMessage } = require('../../utils/messageTemplates');
 const { _setStep, _pauseAndAlert } = require('../utils/flowHelpers');
 const { _getPrice, _getAdicionalMAX } = require('../utils/pricing');
 const { _isDuplicate } = require('../utils/messages');
 
-async function handleWaitingData(userId, text, normalizedText, currentState, knowledge, dependencies) {
+export async function handleWaitingData(
+    userId: string,
+    text: string,
+    normalizedText: string,
+    currentState: UserState,
+    knowledge: any,
+    dependencies: any
+): Promise<{ matched: boolean }> {
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
 
     // GUARD: Ensure product + plan are selected before collecting data
     if (!currentState.selectedProduct) {
         console.log(`[GUARD] waiting_data: No product selected for ${userId}, redirecting to preference`);
         const skipMsg = "Antes de los datos de envío, necesito saber qué producto te interesa 😊\n\nTenemos:\n1️⃣ Cápsulas\n2️⃣ Semillas/Infusión\n3️⃣ Gotas\n\n¿Cuál preferís?";
-        _setStep(currentState, 'waiting_preference');
+        _setStep(currentState, FlowStep.WAITING_PREFERENCE);
         currentState.history.push({ role: 'bot', content: skipMsg, timestamp: Date.now() });
         saveState(userId);
         await sendMessageWithDelay(userId, skipMsg);
@@ -27,7 +35,7 @@ async function handleWaitingData(userId, text, normalizedText, currentState, kno
 
         const { _formatMessage } = require('../utils/messages');
         const msg = _formatMessage(priceNode.response, currentState);
-        _setStep(currentState, 'waiting_plan_choice');
+        _setStep(currentState, FlowStep.WAITING_PLAN_CHOICE);
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
@@ -107,13 +115,13 @@ async function handleWaitingData(userId, text, normalizedText, currentState, kno
                 currentState.history.push({ role: 'bot', content: priceMsg, timestamp: Date.now() });
                 await sendMessageWithDelay(userId, priceMsg);
 
-                if (currentState.weightGoal && currentState.weightGoal > 10) {
+                if (currentState.weightGoal && Number(currentState.weightGoal) > 10) {
                     const upsell = "Personalmente yo te recomendaría el de 120 días debido al peso que esperas perder 👌";
                     currentState.history.push({ role: 'bot', content: upsell, timestamp: Date.now() });
                     await sendMessageWithDelay(userId, upsell);
                 }
 
-                _setStep(currentState, 'waiting_plan_choice');
+                _setStep(currentState, FlowStep.WAITING_PLAN_CHOICE);
                 saveState(userId);
                 return { matched: true };
             }
@@ -129,21 +137,24 @@ async function handleWaitingData(userId, text, normalizedText, currentState, kno
         }
     }
 
-    const looksLikeAddress = text.length > 8 && (/\d/.test(text) || /\b(calle|av|avenida|barrio|mz|lote|piso|dpto|depto|departamento|casa|block|manzana)\b/i.test(text) || text.split(/[,\n]/).length >= 2);
+    const explicitQuestionKeywords = /\b(cuanto|cuánto|precio|costo|sale|cuesta|valor|paga|pagan|abona|tarjeta|transferencia|tarda|llega|envio|envío)\b/i.test(normalizedText) || text.includes('?');
+
+    const looksLikeAddress = text.length > 8 && (!explicitQuestionKeywords) && (/\d/.test(text) || /\b(calle|av|avenida|barrio|mz|lote|piso|dpto|depto|departamento|casa|block|manzana)\b/i.test(text) || text.split(/[,\n]/).length >= 2);
+
     const isHesitation = /\b(pensar|pienso|despues|luego|mañana|te confirmo|te aviso|ver|veo|rato|lueguito|mas tarde|en un rato|aguanti|aguanta|espera|bancame)\b/i.test(normalizedText)
         || /\b(voy a|dejam[eo])\s+(pasar|pensar|ver)\b/i.test(normalizedText);
 
     const isShortConfirmation = /^(si|sisi|ok|dale|bueno|joya|de una|perfecto)[\s\?\!]*$/i.test(normalizedText);
 
-    const isDataQuestion = !isShortConfirmation && (text.includes('?')
-        || /\b(pregunte|no quiero|no acepto|no acepte|como|donde|por que|para que|cuanto|cuánto|precio|costo|sale|cuesta|valor)\b/i.test(normalizedText)
+    const isDataQuestion = !isShortConfirmation && (explicitQuestionKeywords
+        || /\b(pregunte|no quiero|no acepto|no acepte|como|donde|por que|para que)\b/i.test(normalizedText)
         || isHesitation);
 
     if (isDataQuestion && !looksLikeAddress) {
         console.log(`[AI-FALLBACK] waiting_data: Detected question/objection from ${userId}: "${text}"`);
         const aiData = await aiService.chat(text, {
-            step: 'waiting_data',
-            goal: 'El usuario está dudando, tiene una pregunta o quiere postergar la compra. RESPUESTAS CORTAS, AMABLES Y EMPÁTICAS. Si va a pensar, decile "¡Obvio, tomate tu tiempo!". Si dice que cobra en una fecha, decile que se lo reservás para enviar en esa fecha. Luego preguntá sutil y brevemente: "¿Te parece que lo dejemos anotado?". NUNCA pidas los datos completos como un robot.',
+            step: FlowStep.WAITING_DATA,
+            goal: 'El usuario tiene una duda en plena toma de datos (ej: pregunta el precio de los planes, cómo se paga, cuándo llega, si le entregan en el trabajo). DEBES RESPONDER SU PREGUNTA DIRECTAMENTE de forma amable y concisa usando el Knowledge. Si pregunta si puede recibir en su TRABAJO: "Si estás en horario laboral del cartero no hay problema. Si no te encuentra, vas a tener que ir a buscarlo a la sucursal.". Si pregunta formas de pago: "El pago a domicilio es al cartero en efectivo, por transferencia es previo al envío.". Si pregunta tiempos: "Tarda de 7 a 10 días hábiles.". Nunca lo obligues a dar los datos, respondé su duda y cerrá sutilmente con: "¿Te parece que lo dejemos anotado?" o "¿Te tomo los datos para el paquete?".',
             history: currentState.history,
             summary: currentState.summary,
             knowledge: knowledge,
@@ -193,9 +204,8 @@ async function handleWaitingData(userId, text, normalizedText, currentState, kno
     }
 
     const data = await (dependencies.mockAiService || aiService).parseAddress(textToAnalyze);
-
+    let madeProgress = false;
     if (data && !data._error) {
-        let madeProgress = false;
         const postdateKeywords = /\b(lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo|semana|mes|cobro|mañana|despues|después|principio|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\b/i;
         const userActuallyAskedPostdate = postdateKeywords.test(normalizedText) && /\b(recibir|llega|enviar|mandar|cobro|pago|puedo|entregar|envio|después|despues|más adelante|otro momento|no puedo ahora)\b/i.test(normalizedText);
 
@@ -319,7 +329,7 @@ async function handleWaitingData(userId, text, normalizedText, currentState, kno
 
         currentState.pendingOrder = { ...addr, cart: currentState.cart };
 
-        const subtotal = currentState.cart.reduce((sum, i) => sum + parseInt(i.price.replace('.', '')), 0);
+        const subtotal = currentState.cart.reduce((sum, i) => sum + parseInt(i.price.toString().replace(/\./g, '')), 0);
         const adicional = currentState.adicionalMAX || 0;
         const total = subtotal + adicional;
         currentState.totalPrice = total.toLocaleString('es-AR').replace(/,/g, '.');
@@ -341,7 +351,7 @@ async function handleWaitingData(userId, text, normalizedText, currentState, kno
         await sendMessageWithDelay(userId, summaryMsg);
 
         currentState.fieldReaskCount = {};
-        _setStep(currentState, 'waiting_final_confirmation');
+        _setStep(currentState, FlowStep.WAITING_FINAL_CONFIRMATION);
         saveState(userId);
         return { matched: true };
     } else if (currentState.addressAttempts >= 5) {
@@ -357,8 +367,9 @@ async function handleWaitingData(userId, text, normalizedText, currentState, kno
                 `Para prepararte paquete necesito: *Nombre y apellido* y a qué *Dirección* enviarlo 🙌`
             ];
             msg = intros[Math.floor(Math.random() * intros.length)];
-            if (currentState.lastAddressMsg === msg || (intros.indexOf(currentState.lastAddressMsg) !== -1)) {
-                const currentIdx = Math.max(0, intros.indexOf(currentState.lastAddressMsg));
+            const lastMsg = currentState.lastAddressMsg || "";
+            if (lastMsg === msg || (intros.indexOf(lastMsg) !== -1)) {
+                const currentIdx = Math.max(0, intros.indexOf(lastMsg));
                 msg = intros[(currentIdx + 1) % intros.length];
             }
         } else if (madeProgress) {
@@ -368,8 +379,9 @@ async function handleWaitingData(userId, text, normalizedText, currentState, kno
                 `¡Dale! Ya casi estamos. Me faltaría: *${missing.join(', ')}*.`
             ];
             msg = acks[Math.floor(Math.random() * acks.length)];
-            if (currentState.lastAddressMsg === msg || (acks.indexOf(currentState.lastAddressMsg) !== -1)) {
-                const currentIdx = Math.max(0, acks.indexOf(currentState.lastAddressMsg));
+            const lastMsg = currentState.lastAddressMsg || "";
+            if (lastMsg === msg || (acks.indexOf(lastMsg) !== -1)) {
+                const currentIdx = Math.max(0, acks.indexOf(lastMsg));
                 msg = acks[(currentIdx + 1) % acks.length];
             }
         } else if (currentState.addressAttempts > 2) {
@@ -379,8 +391,9 @@ async function handleWaitingData(userId, text, normalizedText, currentState, kno
                 `Solo me falta que me pases: *${missing.join(', ')}* 😅`
             ];
             msg = frustrated[Math.floor(Math.random() * frustrated.length)];
-            if (currentState.lastAddressMsg === msg || (frustrated.indexOf(currentState.lastAddressMsg) !== -1)) {
-                const currentIdx = Math.max(0, frustrated.indexOf(currentState.lastAddressMsg));
+            const lastMsg = currentState.lastAddressMsg || "";
+            if (lastMsg === msg || (frustrated.indexOf(lastMsg) !== -1)) {
+                const currentIdx = Math.max(0, frustrated.indexOf(lastMsg));
                 msg = frustrated[(currentIdx + 1) % frustrated.length];
             }
         } else {
@@ -390,8 +403,9 @@ async function handleWaitingData(userId, text, normalizedText, currentState, kno
                 `Solo me estaría faltando: *${missing.join(', ')}*.`
             ];
             msg = shorts[Math.floor(Math.random() * shorts.length)];
-            if (currentState.lastAddressMsg === msg || (shorts.indexOf(currentState.lastAddressMsg) !== -1)) {
-                const currentIdx = Math.max(0, shorts.indexOf(currentState.lastAddressMsg));
+            const lastMsg = currentState.lastAddressMsg || "";
+            if (lastMsg === msg || (shorts.indexOf(lastMsg) !== -1)) {
+                const currentIdx = Math.max(0, shorts.indexOf(lastMsg));
                 msg = shorts[(currentIdx + 1) % shorts.length];
             }
         }

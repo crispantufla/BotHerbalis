@@ -71,6 +71,7 @@ describe('Chat Routes', () => {
         };
 
         sharedStateMock = {
+            isConnected: true,
             userState: {},
             pausedUsers: new Set(),
         };
