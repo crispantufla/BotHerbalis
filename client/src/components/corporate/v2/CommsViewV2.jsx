@@ -204,10 +204,63 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
         return result;
     };
 
+    const handleDownloadHistory = () => {
+        if (!selectedChat || messages.length === 0) {
+            toast.warning('No hay mensajes para descargar');
+            return;
+        }
+
+        let txtContent = `Analiza esta conversacion:\n\n`;
+
+        messages.forEach(msg => {
+            let dateStr = '';
+            try {
+                const d = new Date(msg.timestamp);
+                if (!isNaN(d.getTime())) {
+                    // Formato: [10:56, 26/2/2026]
+                    dateStr = `[${d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}, ${d.toLocaleDateString('es-AR')}] `;
+                }
+            } catch (e) { }
+
+            const sender = msg.fromMe ? 'Herbalis' : (selectedChat.name || selectedChat.id).split('@')[0];
+            let body = msg.body || '';
+
+            // Clean up media placeholders if any
+            if (body.startsWith('MEDIA_IMAGE:')) body = '[Imagen adjunta]';
+            if (body.startsWith('MEDIA_AUDIO:')) {
+                const parts = body.split('|');
+                const trans = parts[1] ? parts[1].replace('TRANSCRIPTION:', '').trim() : '';
+                body = trans ? `[Audio transcrito]: ${trans}` : `[Audio adjunto]`;
+            }
+            if (body.startsWith('🎤 Audio:')) body = `[Audio transcrito]: ${body.replace(/^🎤\s*Audio:\s*/, '').replace(/^"|"$/g, '').trim()}`;
+
+            txtContent += `${dateStr}${sender}: ${body}\n`;
+        });
+
+        const blob = new Blob([txtContent], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const safePhone = selectedChat.id.split('@')[0].replace(/\D/g, '');
+        a.download = `chat_${safePhone}_${new Date().toISOString().split('T')[0]}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast.success('Historial descargado para análisis');
+    };
+
     const handleSend = async (e) => {
         e.preventDefault();
         if (!input.trim() || !selectedChat) return;
         const text = input;
+
+        if (text.trim().toLowerCase() === '/descargar') {
+            handleDownloadHistory();
+            setInput('');
+            return;
+        }
+
         setInput('');
         setMessages(prev => [...prev, { id: `temp-${Date.now()}`, fromMe: true, body: text, type: 'chat', timestamp: Date.now(), pending: true }]);
         try { await api.post('/api/send', { chatId: selectedChat.id, message: text }); }
