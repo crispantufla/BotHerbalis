@@ -115,7 +115,7 @@ module.exports = (client, sharedState) => {
                     cliente: o.userPhone,
                     status: o.status,
                     producto: o.products,
-                    precio: o.totalPrice.toString(),
+                    precio: Math.round(o.totalPrice).toLocaleString('es-AR'),
                     tracking: o.tracking || '',
                     postdatado: o.postdated || '',
                     createdAt: o.createdAt.toISOString()
