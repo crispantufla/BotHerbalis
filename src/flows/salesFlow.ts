@@ -1,8 +1,29 @@
+import { UserState, FlowStep } from '../types/state';
 const { processGlobals } = require('./globals');
 const { processStep } = require('./steps');
 const { _pauseAndAlert, _setStep } = require('./utils/flowHelpers');
 
-async function processSalesFlow(userId, text, userState, knowledge, dependencies) {
+interface SalesFlowDependencies {
+    saveState: (userId?: string) => void;
+    client?: any;
+    sharedState?: any;
+    notifyAdmin?: (reason: string, userPhone: string, details?: string | null) => Promise<any>;
+    aiService?: any;
+    sendMessageWithDelay?: (chatId: string, content: string, startTime?: number) => Promise<void>;
+    logAndEmit?: (chatId: string, sender: string, text: string, step?: string) => void;
+    saveOrderToLocal?: (order: any) => void;
+    cancelLatestOrder?: (userId: string) => Promise<any>;
+    config?: any;
+    effectiveScript?: string;
+}
+
+export async function processSalesFlow(
+    userId: string,
+    text: string,
+    userState: Record<string, any>,
+    knowledge: any,
+    dependencies: SalesFlowDependencies
+): Promise<{ matched: boolean; paused?: boolean } | void> {
     const { saveState } = dependencies;
 
     // Remove accents and lowercase
@@ -30,7 +51,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                 const chat = await dependencies.client.getChatById(userId);
                 if (chat) {
                     const messages = await chat.fetchMessages({ limit: 10 });
-                    const previousUserMessages = messages.filter(m => !m.fromMe).length;
+                    const previousUserMessages = messages.filter((m: any) => !m.fromMe).length;
 
                     let isRecentConversation = false;
                     if (messages.length > 0) {
@@ -48,14 +69,14 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
                         if (dependencies.sharedState && dependencies.sharedState.pausedUsers) {
                             dependencies.sharedState.pausedUsers.add(userId);
                             try {
-                                dependencies.notifyAdmin('😴 Conversación Existente', userId, 'Se detectó que este cliente estaba respondiendo a un hilo de chat reciente activo. El bot se silenció automáticamente para no entrometerse.');
+                                if (dependencies.notifyAdmin) dependencies.notifyAdmin('😴 Conversación Existente', userId, 'Se detectó que este cliente estaba respondiendo a un hilo de chat reciente activo. El bot se silenció automáticamente para no entrometerse.');
                             } catch (e) { }
                         }
                         return { matched: true, paused: true };
                     }
                 }
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error(`[SPAM FILTER] Failed to fetch chat history for ${userId}:`, err.message);
         }
     }
@@ -95,10 +116,8 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
         const lastHistory = currentState.history[currentState.history.length - 1];
         if (lastHistory.role === 'bot' && (lastHistory.content.includes('por precaución no recomendamos el consumo') || lastHistory.content.includes('por precaución no recomendamos el uso durante'))) {
             console.log(`[AI MEDICAL REJECT] Intercepted AI rejection for user ${userId}. Halting flow.`);
-            _setStep(currentState, 'rejected_medical');
+            _setStep(currentState, FlowStep.REJECTED_MEDICAL);
             saveState(userId);
         }
     }
 }
-
-module.exports = { processSalesFlow };

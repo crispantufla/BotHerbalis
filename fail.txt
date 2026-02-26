@@ -1,0 +1,55 @@
+  console.log
+    [dotenv@17.3.1] injecting env (14) from .env -- tip: 🛡️ auth for agents: https://vestauth.com
+
+      at _log (node_modules/dotenv/lib/main.js:139:11)
+
+  console.log
+    [INDICISION] User user_test_imp compares products or asks for recommendation.
+
+      at log (src/flows/steps/stepWaitingPreference.js:45:17)
+
+  console.log
+    [BACKTRACK] User user_test_imp changed product from "Semillas - 60" to "Cápsulas de nuez de la india - 60" during waiting_data
+
+      at log (src/flows/steps/stepWaitingData.js:54:21)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_test_imp
+
+      at log (src/flows/steps/stepWaitingPreference.js:123:17)
+
+  console.log
+    [AI-FALLBACK] waiting_preference: No keyword match for user_test_imp
+
+      at log (src/flows/steps/stepWaitingPreference.js:123:17)
+
+FAIL tests/improvements.test.js
+  Strategic Improvements
+    √ 1. Consultative Tagging: Should mark sales as consultative (19 ms)
+    √ 2. Data Persistence: Should preserve weightGoal when changing product (28 ms)
+    × 3. Smart Address Accumulation: Should acknowledge partial progress (1 ms)
+    √ 4. Postponement Handling: Should NOT force closing question if user is busy (3 ms)
+    √ 5. Full Price List: Should show all prices if explicitly asked (2 ms)
+
+  ● Strategic Improvements › 3. Smart Address Accumulation: Should acknowledge partial progress
+
+    ReferenceError: madeProgress is not defined
+
+    [0m [90m 353 |[39m     } [36melse[39m {
+     [90m 354 |[39m         [36mlet[39m msg[33m;[39m
+    [31m[1m>[22m[39m[90m 355 |[39m         [36mif[39m ((missingTier1[33m.[39mlength [33m===[39m [35m2[39m [33m&&[39m missingTier2[33m.[39mlength [33m===[39m [35m2[39m) [33m||[39m (missingTier1[33m.[39mlength [33m>[39m [35m0[39m [33m&&[39m [33m![39mmadeProgress)) {
+     [90m     |[39m                                                                                                      [31m[1m^[22m[39m
+     [90m 356 |[39m             [36mconst[39m intros [33m=[39m [
+     [90m 357 |[39m                 [32m`¿Me pasás tu *Nombre y Apellido* y tú *Dirección* para armar la etiqueta? 😉`[39m[33m,[39m
+     [90m 358 |[39m                 [32m`¡Dale! Pasame tu *Nombre completo* y la *Calle y Número* de tu casa 👇`[39m[33m,[39m[0m
+
+      at madeProgress (src/flows/steps/stepWaitingData.js:355:102)
+      at processStep (src/flows/steps/index.js:36:22)
+      at processSalesFlow (src/flows/salesFlow.js:80:24)
+      at Object.<anonymous> (tests/improvements.test.js:169:9)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 4 passed, 5 total
+Snapshots:   0 total
+Time:        2.26 s, estimated 3 s
+Ran all test suites matching tests/improvements.test.js.

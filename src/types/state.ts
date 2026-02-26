@@ -1,4 +1,5 @@
 export enum FlowStep {
+    GREETING = "greeting",
     GENERAL = "general",
     WAITING_WEIGHT = "waiting_weight",
     WAITING_PREFERENCE = "waiting_preference",
@@ -12,7 +13,9 @@ export enum FlowStep {
     WAITING_ADMIN_VALIDATION = "waiting_admin_validation",
     POST_SALE = "post_sale",
     SAFETY_CHECK = "safety_check",
-    CLOSING = "closing"
+    CLOSING = "closing",
+    COMPLETED = "completed",
+    REJECTED_MEDICAL = "rejected_medical"
 }
 
 export interface Address {
