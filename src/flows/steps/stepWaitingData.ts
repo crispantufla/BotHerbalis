@@ -139,7 +139,11 @@ export async function handleWaitingData(
 
     const explicitQuestionKeywords = /\b(cuanto|cuánto|precio|costo|sale|cuesta|valor|paga|pagan|abona|tarjeta|transferencia|tarda|llega|envio|envío)\b/i.test(normalizedText) || text.includes('?');
 
-    const looksLikeAddress = text.length > 8 && (!explicitQuestionKeywords) && (/\d/.test(text) || /\b(calle|av|avenida|barrio|mz|lote|piso|dpto|depto|departamento|casa|block|manzana)\b/i.test(text) || text.split(/[,\n]/).length >= 2);
+    // Detect if the numbers in the text are plan references (60/120) not address numbers
+    const onlyPlanNumbers = /\b(60|120)\b/.test(text) && !/\b(calle|av|avenida|barrio|mz|lote|piso|dpto|depto|departamento|casa|block|manzana)\b/i.test(text);
+    const mentionsPlanOrPrice = /\b(de 60|de 120|el de 60|el de 120|plan|dias|días)\b/i.test(normalizedText);
+
+    const looksLikeAddress = text.length > 8 && (!explicitQuestionKeywords) && !mentionsPlanOrPrice && (/\d/.test(text) || /\b(calle|av|avenida|barrio|mz|lote|piso|dpto|depto|departamento|casa|block|manzana)\b/i.test(text) || text.split(/[,\n]/).length >= 2);
 
     const isHesitation = /\b(pensar|pienso|despues|luego|mañana|te confirmo|te aviso|ver|veo|rato|lueguito|mas tarde|en un rato|aguanti|aguanta|espera|bancame)\b/i.test(normalizedText)
         || /\b(voy a|dejam[eo])\s+(pasar|pensar|ver)\b/i.test(normalizedText);

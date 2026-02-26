@@ -87,8 +87,12 @@ async function handleWaitingPlanChoice(
     let planSelected = false;
     let selectedPlanId = null;
 
+    // GUARD: Detect price/payment questions BEFORE interpreting numbers as plan selection
+    // e.g. "el de 120 cuánto sale", "precio del de 60", "cuánto cuesta el de 120"
+    const isPriceQuestion = /\b(cuanto|cuánto|precio|costo|sale|cuesta|valor|paga|cobr)/i.test(normalizedText);
+
     const planMatch = normalizedText.match(/\b(60|120|180|240|300|360|420|480|540|600)\b/);
-    if (planMatch) {
+    if (planMatch && !isPriceQuestion) {
         selectedPlanId = planMatch[1];
     }
 
