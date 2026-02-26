@@ -64,6 +64,7 @@ const CorporateDashboard = () => {
     const [activeTab, setActiveTab] = useState('dashboard');
     const [qrData, setQrData] = useState(null);
     const [config, setConfig] = useState({ alertNumbers: [] });
+    const [connectedPhone, setConnectedPhone] = useState(null);
     const [targetChatId, setTargetChatId] = useState(null);
 
     const fetchConfig = useCallback(async () => {
@@ -110,6 +111,7 @@ const CorporateDashboard = () => {
                 ]);
                 setAlerts(alertRes.data);
                 if (statusRes.data.config) setConfig(statusRes.data.config);
+                if (statusRes.data.info?.wid?.user) setConnectedPhone(statusRes.data.info.wid.user);
             } catch (e) { }
         }
         loadData();
@@ -122,14 +124,17 @@ const CorporateDashboard = () => {
 
     const handleQuickAction = async (chatId, action, sellerPhone) => {
         if (action === 'chat') {
+            const toastId = toast.info('Buscando chat...');
             try {
                 const statusRes = await api.get('/api/status');
-                const connectedPhone = statusRes.data?.info?.wid?.user;
+                const connectedPhoneInfo = statusRes.data?.info?.wid?.user;
+                const connectedPhone = connectedPhoneInfo || config.alertNumber; // Fallback
 
                 if (sellerPhone && connectedPhone) {
                     const cleanedSeller = sellerPhone.replace(/\D/g, '');
                     const cleanedConnected = connectedPhone.replace(/\D/g, '');
                     if (cleanedSeller !== cleanedConnected) {
+                        toast.dismiss(toastId);
                         toast.warning(`Esta venta se hizo desde otro \u00fanumero (+${cleanedSeller}).`);
                         return;
                     }
@@ -138,6 +143,7 @@ const CorporateDashboard = () => {
                 // ignore
             }
 
+            toast.dismiss(toastId);
             setTargetChatId(chatId);
             setActiveTab('comms');
             return;
@@ -244,6 +250,14 @@ const CorporateDashboard = () => {
                         <span className={`px-2 py-0.5 rounded-full text-xs font-bold border ${status === 'ready' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`}>
                             {status === 'ready' ? 'SISTEMA ONLINE' : 'SISTEMA OFFLINE'}
                         </span>
+                        {status === 'ready' && connectedPhone && (
+                            <>
+                                <span className="mx-2">/</span>
+                                <span className="px-2 py-0.5 rounded-full text-xs font-bold border bg-slate-100 text-slate-600 border-slate-200">
+                                    +{connectedPhone}
+                                </span>
+                            </>
+                        )}
                     </div>
 
                     <div className="flex items-center gap-4">

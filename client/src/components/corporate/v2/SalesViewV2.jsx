@@ -124,7 +124,9 @@ const SalesViewV2 = ({ onGoToChat }) => {
         try {
             // Check connected number
             const statusRes = await api.get('/api/status');
-            const connectedPhone = statusRes.data?.info?.wid?.user;
+            const connectedPhoneInfo = statusRes.data?.info?.wid?.user;
+            // Best effort fallback
+            const connectedPhone = connectedPhoneInfo || (statusRes.data?.config?.alertNumber) || (statusRes.data?.config?.alertNumbers?.[0]);
 
             if (sellerPhone && connectedPhone) {
                 const cleanedSeller = sellerPhone.replace(/\D/g, '');

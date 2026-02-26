@@ -23,6 +23,7 @@ const CorporateDashboardV2 = () => {
     const [activeTab, setActiveTab] = useState('dashboard');
     const [qrData, setQrData] = useState(null);
     const [config, setConfig] = useState({ alertNumbers: [] });
+    const [connectedPhone, setConnectedPhone] = useState(null);
     const [targetChatId, setTargetChatId] = useState(null);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
@@ -45,13 +46,14 @@ const CorporateDashboardV2 = () => {
         try {
             const res = await api.get('/api/status');
             if (res.data.config) setConfig(res.data.config);
+            if (res.data.info?.wid?.user) setConnectedPhone(res.data.info.wid.user);
         } catch (e) { }
     }, []);
 
     useEffect(() => {
         if (socket) {
             socket.on('qr', (data) => { setStatus('scan_qr'); setQrData(data); });
-            socket.on('ready', () => { setStatus('ready'); setQrData(null); });
+            socket.on('ready', () => { setStatus('ready'); setQrData(null); fetchConfig(); });
             socket.on('status_change', ({ status: newStatus }) => {
                 if (newStatus === 'disconnected') {
                     setStatus('scan_qr');
@@ -74,6 +76,7 @@ const CorporateDashboardV2 = () => {
                 ]);
                 setAlerts(alertRes.data);
                 if (statusRes.data.config) setConfig(statusRes.data.config);
+                if (statusRes.data.info?.wid?.user) setConnectedPhone(statusRes.data.info.wid.user);
             } catch (e) { }
         }
         loadData();
@@ -87,15 +90,18 @@ const CorporateDashboardV2 = () => {
 
     const handleQuickAction = async (chatId, action, sellerPhone) => {
         if (action === 'chat') {
+            const toastId = toast.info('Buscando chat...');
             try {
                 const statusRes = await api.get('/api/status');
-                const connectedPhone = statusRes.data?.info?.wid?.user;
+                const connectedPhoneInfo = statusRes.data?.info?.wid?.user;
+                const connectedPhone = connectedPhoneInfo || config.alertNumber; // Fallback
 
                 if (sellerPhone && connectedPhone) {
                     const cleanedSeller = sellerPhone.replace(/\D/g, '');
                     const cleanedConnected = connectedPhone.replace(/\D/g, '');
                     // Only block if we have both values perfectly and they differ
                     if (cleanedSeller !== cleanedConnected) {
+                        toast.dismiss(toastId);
                         toast.warning(`Esta venta se hizo desde otro \u00fanumero (+${cleanedSeller}).`);
                         return; // Prevent redirecting
                     }
@@ -104,6 +110,7 @@ const CorporateDashboardV2 = () => {
                 // non-fatal, proceed
             }
 
+            toast.dismiss(toastId);
             setTargetChatId(chatId);
             setActiveTab('comms');
             return;
@@ -274,6 +281,11 @@ const CorporateDashboardV2 = () => {
                             <span className={`text-xs lg:text-sm font-semibold tracking-wide ${status === 'ready' ? 'text-emerald-700' : 'text-rose-600'} whitespace-nowrap`}>
                                 {status === 'ready' ? 'ONLINE' : 'OFFLINE'}
                             </span>
+                            {status === 'ready' && connectedPhone && (
+                                <span className="text-xs font-semibold text-slate-500 tracking-wider bg-slate-100 px-2 py-0.5 rounded border border-slate-200 ml-1">
+                                    +{connectedPhone}
+                                </span>
+                            )}
                         </div>
                     </div>
 

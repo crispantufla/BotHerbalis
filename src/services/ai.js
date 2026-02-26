@@ -175,6 +175,7 @@ PAGO Y ENVÍO:
 - Envío GRATIS por Correo Argentino. 7-10 días hábiles.
 - Si "llega" + "pago/abona/plata/cobran": ES PREGUNTA DE PAGO, no de entrega.
 - Correo Argentino NO abre sábados/domingos. NO controlamos día/hora exacta.
+- CONDICIÓN SÁBADO: Si el cliente dice "mejor si es sábado", "entreguen el sábado" o similar durante la confirmación: NO confirmes el pedido (goalMet=false). Respondé EXACTAMENTE: "Los carteros normalmente no trabajan los sabados, en caso de no poder entregartelo en persona podrias ir a buscarlo a la sucursal no?" y esperá su afirmación.
 - Si pide día específico: "No podemos garantizar porque depende del correo."
 - RETIRO TERCEROS: Si preguntan si OTRA PERSONA puede recibir o ir a retirar al correo: "Sí, puede recibirlo o retirarlo en sucursal cualquier persona mayor de edad con tu DNI (o fotocopia) y una nota de autorización tuya."
 
