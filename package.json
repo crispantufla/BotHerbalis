@@ -2,13 +2,13 @@
   "name": "bot-whatsapp",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "index.ts",
   "scripts": {
-    "dev:server": "node index.js",
-    "dev:ts": "tsx watch index.js",
+    "dev:server": "tsx index.ts",
+    "dev:ts": "tsx watch index.ts",
     "dev:client": "npm run dev --prefix client",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "start": "npx prisma migrate deploy && node index.js",
+    "start": "npx prisma migrate deploy && tsx index.ts",
     "kill": "taskkill /F /IM node.exe",
     "test": "jest"
   },
