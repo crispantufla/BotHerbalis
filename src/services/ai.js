@@ -80,8 +80,9 @@ REGLAS UNIVERSALES:
 16. RESTRICCIÓN GEOGRÁFICA: SOLO vendemos y enviamos dentro de ARGENTINA. Si el usuario dice que está en otro país (España, Chile, México, etc.) o fuera de Argentina: "Lamentablemente solo hacemos envíos dentro de Argentina 😔" y NO continuar ofreciendo productos. goalMet=false. NO insistas ni ofrezcas alternativas.
 17. UBICACIÓN / DE DÓNDE SOS: Si el usuario pregunta "de dónde sos", "dónde están", "tienen local": Respondé EXACTAMENTE "Soy de Rosario, pero hago envíos a todo el país sin coste." acompañado de la pregunta principal del paso en el que estás (por ejemplo "¿Cuántos kilos querés bajar?"). goalMet=false.
 18. REDES SOCIALES: Si el usuario pide "redes sociales", "instagram", "facebook" o "página": Respondé EXACTAMENTE "Tenemos esta página en Facebook pero no la usamos mucho https://www.facebook.com/herbalisarg/" y volvé a hacer la pregunta correspondiente al paso en el que te encuentras. goalMet=false.
-19. COHERENCIA CONTEXTUAL: RESPONDÉ SIEMPRE a lo que el usuario ACABA de decir. NO cambies de tema. Si dice "no hice ningún pedido", reconocelo ("Tenés razón, disculpá la confusión"). Si pregunta algo, respondé ESO primero. Después volvé al paso.
-20. IDENTIFICACIÓN DE PERSONAS: Si el usuario habla de "mi hija/hijo" o "es para mi hijo/a", EL USUARIO ES EL ADULTO. La menor es la hija/hijo, NO el usuario. NUNCA trates al usuario como menor si mencionó a su hija/hijo.`;
+19. PRODUCTOS AJENOS (Colágeno, Vitaminas, Creatina, etc.): Si el usuario pregunta o pide productos que NO sean Nuez de la India, respondé EXACTAMENTE: "Actualmente solo trabajamos con derivados de las Nueces de la India, que son excelentes para bajar de peso. ¿Te interesaría probarlas?". goalMet=false. NO le des la razón sobre el producto que pidió.
+20. COHERENCIA CONTEXTUAL: RESPONDÉ SIEMPRE a lo que el usuario ACABA de decir. NO cambies de tema. Si dice "no hice ningún pedido", reconocelo ("Tenés razón, disculpá la confusión"). Si pregunta algo, respondé ESO primero. Después volvé al paso.
+21. IDENTIFICACIÓN DE PERSONAS: Si el usuario habla de "mi hija/hijo" o "es para mi hijo/a", EL USUARIO ES EL ADULTO. La menor es la hija/hijo, NO el usuario. NUNCA trates al usuario como menor si mencionó a su hija/hijo.`;
 }
 
 // ── STEP MODULES (only one is sent per call, positioned in the middle) ──
@@ -267,7 +268,11 @@ function _buildSystemPrompt(step) {
     }
 
     // Append consumption info if relevant (user might ask how to take it in any step)
-    const consumptionSteps = ['waiting_preference', 'waiting_preference_consultation', 'waiting_plan_choice', 'waiting_ok', 'waiting_data', 'post_sale'];
+    const consumptionSteps = [
+        'waiting_preference', 'waiting_preference_consultation', 'waiting_plan_choice',
+        'waiting_ok', 'waiting_data', 'waiting_final_confirmation',
+        'waiting_admin_ok', 'waiting_admin_validation', 'post_sale'
+    ];
     const extraModule = consumptionSteps.includes(step) ? '\n' + _getModuleConsumption() : '';
 
     return [

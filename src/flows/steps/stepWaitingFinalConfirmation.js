@@ -128,6 +128,44 @@ async function handleWaitingFinalConfirmation(userId, text, normalizedText, curr
         saveState(userId);
         return { matched: true };
     } else {
+        console.log(`[AI-FALLBACK] waiting_final_confirmation: Delegando consulta a IA para ${userId}`);
+        const aiResponse = await dependencies.aiService.chat(text, {
+            step: 'waiting_final_confirmation',
+            goal: 'El pedido ya está armado. Solo responde a dudas concretas o preguntas sobre el producto (como consumirlo o los envíos) o cualquier otra duda que tenga. Si el usuario te hace una pregunta SI O SI DEBES RESPONDERLE resolviendole su duda con el contexto que tienes y LUEGO EN EL MISMO MENSAJE preguntar nuevamente si confirmas el envío. SI el usuario simplemente está confirmando de otra manera ("dale", "ok", "listo", "dale avanza"), retorna goalMet=true.',
+            history: currentState.history,
+            summary: currentState.summary,
+            knowledge: knowledge,
+            userState: currentState
+        });
+
+        if (aiResponse.goalMet) {
+            const msg = "¡Perfecto! Recibimos tu confirmación.\n\nAguardame un instante que verificamos los datos y te confirmamos el ingreso ⏳";
+            await sendMessageWithDelay(userId, msg);
+
+            if (currentState.pendingOrder) {
+                const orderData = _buildOrderData();
+                if (dependencies.saveOrderToLocal) dependencies.saveOrderToLocal(orderData);
+
+                const o = currentState.pendingOrder || currentState.partialAddress || {};
+                if (notifyAdmin) await notifyAdmin(`⌛ Pedido Requiere Aprobación`, userId, `Datos: ${o.nombre}, ${o.calle}\nCiudad: ${o.ciudad} | CP: ${o.cp}\nProvincia: ${o.provincia || '?'}\nItems: ${orderData.producto}\nTotal: $${currentState.totalPrice || '0'}`);
+
+                if (dependencies.config && dependencies.config.scriptStats && dependencies.config.activeScript) {
+                    if (!dependencies.config.scriptStats[dependencies.config.activeScript]) dependencies.config.scriptStats[dependencies.config.activeScript] = { started: 0, completed: 0 };
+                    dependencies.config.scriptStats[dependencies.config.activeScript].completed++;
+                }
+            }
+
+            _setStep(currentState, 'waiting_admin_validation');
+            currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+            saveState(userId);
+            return { matched: true };
+        } else if (aiResponse.response) {
+            currentState.history.push({ role: 'bot', content: aiResponse.response, timestamp: Date.now() });
+            saveState(userId);
+            await sendMessageWithDelay(userId, aiResponse.response);
+            return { matched: true };
+        }
+
         if (notifyAdmin) await notifyAdmin('⚠️ Respuesta inesperada en confirmación final', userId, `Cliente respondió: "${text}". El pedido se procesó igual.`);
 
         const msg = "Voy a revisar los datos, ya te confirmo el pedido ⏳";
