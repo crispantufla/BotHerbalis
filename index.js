@@ -855,8 +855,8 @@ client.on('message', async msg => {
         // 4. Debounce: accumulate rapid-fire messages
         let currentDelay = DEBOUNCE_MS;
         if (userState[userId] && userState[userId].step === 'waiting_data') {
-            currentDelay = 15000; // 15 seconds tolerance for address entry
-            logger.info(`[DEBOUNCE] Aumentando delay a 15s para ${userId} (ingresando datos de envío)...`);
+            currentDelay = 25000; // 25 seconds tolerance for address entry
+            logger.info(`[DEBOUNCE] Aumentando delay a 25s para ${userId} (ingresando datos de envío)...`);
         }
 
         if (pendingMessages.has(userId)) {
