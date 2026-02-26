@@ -1,4 +1,4 @@
-import { UserState } from './src/types/state';
+
 
 // --- SHARED STATE INTERFACE ---
 interface ScriptStats {
@@ -466,10 +466,10 @@ function saveOrderToLocal(order: Record<string, any>): void {
             };
             if (sharedState.io) sharedState.io.emit('new_order', legacyFormatOrder);
             return legacyFormatOrder;
-        } catch (e) {
+        } catch (e: any) {
             logger.error('[ORDER] DB Write error:', e.message);
         }
-    }).catch(e => logger.error('[ORDER] Write queue error:', e.message));
+    }).catch((e: any) => logger.error('[ORDER] Write queue error:', e.message));
 }
 
 // Helper: Cancel Latest User Order
@@ -965,7 +965,7 @@ async function safeInitialize(attempt: number = 1): Promise<void> {
         const chromePath = process.env.PUPPETEER_EXECUTABLE_PATH || 'bundled Chromium';
         logger.info(`[INIT] Starting WhatsApp client (attempt ${attempt}/${MAX_INIT_RETRIES}) using ${chromePath}...`);
         await client.initialize();
-    } catch (err) {
+    } catch (err: any) {
         logger.error(`[INIT] ❌ Initialize failed (attempt ${attempt}): ${err.message}`);
 
         if (attempt < MAX_INIT_RETRIES) {
@@ -1013,13 +1013,13 @@ const _shutdown = async (signal: string): Promise<void> => {
             ]);
             logger.info('[SHUTDOWN] WhatsApp client destroyed.');
         }
-    } catch (e) { logger.error('[SHUTDOWN] Error destroying client:', e.message); }
+    } catch (e: any) { logger.error('[SHUTDOWN] Error destroying client:', e.message); }
     try {
         await prisma.$disconnect();
         const { pool } = require('./db');
         await pool.end();
         logger.info('[SHUTDOWN] DB connections closed.');
-    } catch (e) { logger.error('[SHUTDOWN] Error closing DB:', e.message); }
+    } catch (e: any) { logger.error('[SHUTDOWN] Error closing DB:', e.message); }
     process.exit(0);
 };
 process.on('SIGTERM', () => _shutdown('SIGTERM'));

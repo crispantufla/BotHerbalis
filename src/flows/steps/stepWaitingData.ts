@@ -417,5 +417,3 @@ export async function handleWaitingData(
         return { matched: true };
     }
 }
-
-module.exports = { handleWaitingData };
