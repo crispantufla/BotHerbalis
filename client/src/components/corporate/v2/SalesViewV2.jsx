@@ -63,10 +63,10 @@ const SalesViewV2 = ({ onGoToChat }) => {
                 setViewingOrder(updated);
                 setOrders(prev => prev.map(o => o.id === updated.id ? updated : o));
                 setIsDetailEditing(false);
-                toast({ title: '✅ Orden actualizada', type: 'success' });
+                toast.success('Orden actualizada');
             }
         } catch (err) {
-            toast({ title: '❌ Error al guardar', description: err.message, type: 'error' });
+            toast.error('Error al guardar: ' + err.message);
         } finally {
             setSavingDetails(false);
         }
