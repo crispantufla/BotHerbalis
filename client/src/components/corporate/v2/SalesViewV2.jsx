@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import api from '../../../config/axios';
 import { useToast } from '../../ui/Toast';
 
-import { RefreshCw as Refresh, Download, Search, Filter, MessageCircle as Chat, Edit2 as Edit, Trash2 as Trash, FileText as Script } from 'lucide-react';
+import { RefreshCw as Refresh, Download, Search, Filter, MessageCircle as Chat, Edit2 as Edit, Trash2 as Trash, FileText as Script, Save, X as XIcon } from 'lucide-react';
 
 const SalesViewV2 = ({ onGoToChat }) => {
     const { toast, confirm } = useToast();
@@ -19,6 +19,9 @@ const SalesViewV2 = ({ onGoToChat }) => {
 
     // Viewing / Details State
     const [viewingOrder, setViewingOrder] = useState(null);
+    const [isDetailEditing, setIsDetailEditing] = useState(false);
+    const [detailEditData, setDetailEditData] = useState({});
+    const [savingDetails, setSavingDetails] = useState(false);
 
     // Editing State
     const [editingOrder, setEditingOrder] = useState(null);
@@ -29,6 +32,49 @@ const SalesViewV2 = ({ onGoToChat }) => {
     // Tracking State
     const [isTracking, setIsTracking] = useState(false);
     const [trackingData, setTrackingData] = useState(null);
+
+    const startDetailEdit = (order) => {
+        setDetailEditData({
+            nombre: order.nombre || '',
+            calle: order.calle || '',
+            ciudad: order.ciudad || '',
+            cp: order.cp || '',
+            provincia: order.provincia || '',
+            producto: order.producto || '',
+            precio: order.precio || '0',
+            tracking: order.tracking || '',
+            postdatado: order.postdatado || ''
+        });
+        setIsDetailEditing(true);
+    };
+
+    const cancelDetailEdit = () => {
+        setIsDetailEditing(false);
+        setDetailEditData({});
+    };
+
+    const handleSaveOrderDetails = async () => {
+        if (!viewingOrder) return;
+        setSavingDetails(true);
+        try {
+            const res = await api.put(`/api/orders/${viewingOrder.id}`, detailEditData);
+            if (res.data.success) {
+                const updated = res.data.order;
+                setViewingOrder(updated);
+                setOrders(prev => prev.map(o => o.id === updated.id ? updated : o));
+                setIsDetailEditing(false);
+                toast({ title: '✅ Orden actualizada', type: 'success' });
+            }
+        } catch (err) {
+            toast({ title: '❌ Error al guardar', description: err.message, type: 'error' });
+        } finally {
+            setSavingDetails(false);
+        }
+    };
+
+    const handleDetailField = (field, value) => {
+        setDetailEditData(prev => ({ ...prev, [field]: value }));
+    };
 
     const fetchOrders = async (pageNum = page) => {
         setLoading(true);
@@ -553,7 +599,7 @@ Teléfono: ${phoneDisplay}`;
 
             {/* V2 PREMIUM TICKET MODAL */}
             {viewingOrder && createPortal(
-                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[100] flex items-center justify-center animate-fade-in p-0 sm:p-4 sm:p-6" onClick={() => setViewingOrder(null)}>
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[100] flex items-center justify-center animate-fade-in p-0 sm:p-4 sm:p-6" onClick={() => { setViewingOrder(null); cancelDetailEdit(); }}>
                     <div className="bg-white rounded-none sm:rounded-[2rem] shadow-2xl w-full h-full sm:h-auto max-w-3xl overflow-hidden flex flex-col sm:max-h-[90vh] relative border border-slate-100" onClick={e => e.stopPropagation()}>
 
                         {/* Header */}
@@ -569,7 +615,18 @@ Teléfono: ${phoneDisplay}`;
                                     </p>
                                 </div>
                             </div>
-                            <button onClick={() => setViewingOrder(null)} className="w-10 h-10 rounded-full bg-slate-50 text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all flex items-center justify-center border border-slate-200">✕</button>
+                            <div className="flex items-center gap-2">
+                                {!isDetailEditing ? (
+                                    <button onClick={() => startDetailEdit(viewingOrder)} className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-100 transition-all flex items-center justify-center border border-indigo-200" title="Editar">
+                                        <Edit className="w-4 h-4" />
+                                    </button>
+                                ) : (
+                                    <button onClick={cancelDetailEdit} className="w-10 h-10 rounded-full bg-rose-50 text-rose-500 hover:text-rose-700 hover:bg-rose-100 transition-all flex items-center justify-center border border-rose-200" title="Cancelar edición">
+                                        <XIcon className="w-4 h-4" />
+                                    </button>
+                                )}
+                                <button onClick={() => { setViewingOrder(null); cancelDetailEdit(); }} className="w-10 h-10 rounded-full bg-slate-50 text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all flex items-center justify-center border border-slate-200">✕</button>
+                            </div>
                         </div>
 
                         {/* Content */}
@@ -581,8 +638,12 @@ Teléfono: ${phoneDisplay}`;
                                     <span className="text-[10px] font-black uppercase text-indigo-500 tracking-widest mb-3 flex items-center gap-2">
                                         <div className="w-4 h-[2px] bg-indigo-500 rounded-full"></div> Cliente
                                     </span>
-                                    <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100">
-                                        <p className="font-black text-slate-800 text-lg leading-tight mb-1">{viewingOrder.nombre || 'Sin nombre'}</p>
+                                    <div className={`bg-slate-50 rounded-2xl p-5 border ${isDetailEditing ? 'border-indigo-200' : 'border-slate-100'}`}>
+                                        {isDetailEditing ? (
+                                            <input type="text" value={detailEditData.nombre || ''} onChange={e => handleDetailField('nombre', e.target.value)} className="w-full font-black text-slate-800 text-lg leading-tight mb-1 bg-white rounded-lg px-3 py-2 border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none" placeholder="Nombre completo" />
+                                        ) : (
+                                            <p className="font-black text-slate-800 text-lg leading-tight mb-1">{viewingOrder.nombre || 'Sin nombre'}</p>
+                                        )}
                                         <p className="font-mono text-slate-500 text-sm font-medium">{viewingOrder.cliente ? viewingOrder.cliente.split('@')[0] : '—'}</p>
                                         <div className="mt-4 pt-4 border-t border-slate-200/60 flex justify-between items-center">
                                             <span className="text-slate-400 font-bold text-xs">Fecha:</span>
@@ -609,9 +670,22 @@ Teléfono: ${phoneDisplay}`;
                                             </span>
                                         )}
                                     </div>
-                                    <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100 h-[calc(100%-28px)] flex flex-col justify-center">
-                                        <p className="font-bold text-slate-700 text-base leading-relaxed">{viewingOrder.calle || 'Sin domicilio'}</p>
-                                        <p className="font-medium text-slate-600 text-sm mt-1">{viewingOrder.ciudad || 'Sin ciudad'} <span className="text-slate-400 ml-1">(CP: {viewingOrder.cp || '—'})</span></p>
+                                    <div className={`bg-slate-50 rounded-2xl p-5 border ${isDetailEditing ? 'border-indigo-200' : 'border-slate-100'} h-[calc(100%-28px)] flex flex-col justify-center`}>
+                                        {isDetailEditing ? (
+                                            <>
+                                                <input type="text" value={detailEditData.calle || ''} onChange={e => handleDetailField('calle', e.target.value)} className="w-full font-bold text-slate-700 text-base bg-white rounded-lg px-3 py-2 border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none mb-2" placeholder="Calle y número" />
+                                                <div className="flex gap-2">
+                                                    <input type="text" value={detailEditData.ciudad || ''} onChange={e => handleDetailField('ciudad', e.target.value)} className="flex-1 font-medium text-slate-600 text-sm bg-white rounded-lg px-3 py-2 border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none" placeholder="Ciudad" />
+                                                    <input type="text" value={detailEditData.cp || ''} onChange={e => handleDetailField('cp', e.target.value)} className="w-24 font-medium text-slate-600 text-sm bg-white rounded-lg px-3 py-2 border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none" placeholder="CP" />
+                                                </div>
+                                                <input type="text" value={detailEditData.provincia || ''} onChange={e => handleDetailField('provincia', e.target.value)} className="w-full font-medium text-slate-600 text-sm bg-white rounded-lg px-3 py-2 border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none mt-2" placeholder="Provincia" />
+                                            </>
+                                        ) : (
+                                            <>
+                                                <p className="font-bold text-slate-700 text-base leading-relaxed">{viewingOrder.calle || 'Sin domicilio'}</p>
+                                                <p className="font-medium text-slate-600 text-sm mt-1">{viewingOrder.ciudad || 'Sin ciudad'} <span className="text-slate-400 ml-1">(CP: {viewingOrder.cp || '—'})</span></p>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -621,7 +695,11 @@ Teléfono: ${phoneDisplay}`;
                                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                                     <div className="flex-1 w-full">
                                         <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1 block">Producto</span>
-                                        <p className="font-black text-slate-800 text-xl">{viewingOrder.producto}</p>
+                                        {isDetailEditing ? (
+                                            <input type="text" value={detailEditData.producto || ''} onChange={e => handleDetailField('producto', e.target.value)} className="w-full font-black text-slate-800 text-xl bg-white rounded-lg px-3 py-2 border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none" />
+                                        ) : (
+                                            <p className="font-black text-slate-800 text-xl">{viewingOrder.producto}</p>
+                                        )}
                                         {viewingOrder.plan && <span className="inline-block mt-2 px-3 py-1 bg-white border border-slate-200 text-slate-600 text-xs font-bold rounded-lg shadow-sm">Plan {viewingOrder.plan} Días</span>}
                                     </div>
 
@@ -638,7 +716,14 @@ Teléfono: ${phoneDisplay}`;
 
                                     <div className="flex-1 w-full flex flex-col items-start md:items-end">
                                         <span className="text-[10px] font-black uppercase text-emerald-600 tracking-widest mb-1 block">Total a Pagar</span>
-                                        <span className="font-black text-emerald-500 text-4xl tracking-tighter leading-none">${viewingOrder.precio || '0'}</span>
+                                        {isDetailEditing ? (
+                                            <div className="flex items-center gap-1">
+                                                <span className="font-black text-emerald-500 text-2xl">$</span>
+                                                <input type="text" value={detailEditData.precio || ''} onChange={e => handleDetailField('precio', e.target.value)} className="w-32 font-black text-emerald-500 text-2xl bg-white rounded-lg px-3 py-2 border border-slate-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 outline-none text-right" />
+                                            </div>
+                                        ) : (
+                                            <span className="font-black text-emerald-500 text-4xl tracking-tighter leading-none">${viewingOrder.precio || '0'}</span>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -712,12 +797,25 @@ Teléfono: ${phoneDisplay}`;
 
                         {/* Footer Options */}
                         <div className="bg-slate-50 p-6 flex justify-end gap-3 shrink-0 border-t border-slate-200">
-                            <button onClick={() => handleCopySaleDetails(viewingOrder)} className="flex items-center gap-2 px-6 py-3 bg-white text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 shadow-sm font-extrabold text-xs uppercase tracking-widest rounded-xl transition-all">
-                                <Script className="w-4 h-4" /> Copiar Info
-                            </button>
-                            <button onClick={() => setViewingOrder(null)} className="px-8 py-3 bg-slate-800 text-white rounded-xl text-xs uppercase tracking-widest font-extrabold hover:bg-black transition-all shadow-lg shadow-slate-800/20 active:scale-95">
-                                Cerrar
-                            </button>
+                            {isDetailEditing ? (
+                                <>
+                                    <button onClick={cancelDetailEdit} className="flex items-center gap-2 px-6 py-3 bg-white text-slate-500 hover:text-slate-700 hover:bg-slate-100 border border-slate-200 shadow-sm font-extrabold text-xs uppercase tracking-widest rounded-xl transition-all">
+                                        <XIcon className="w-4 h-4" /> Cancelar
+                                    </button>
+                                    <button onClick={handleSaveOrderDetails} disabled={savingDetails} className="flex items-center gap-2 px-8 py-3 bg-indigo-600 text-white rounded-xl text-xs uppercase tracking-widest font-extrabold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 active:scale-95 disabled:opacity-50">
+                                        <Save className="w-4 h-4" /> {savingDetails ? 'Guardando...' : 'Guardar'}
+                                    </button>
+                                </>
+                            ) : (
+                                <>
+                                    <button onClick={() => handleCopySaleDetails(viewingOrder)} className="flex items-center gap-2 px-6 py-3 bg-white text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 shadow-sm font-extrabold text-xs uppercase tracking-widest rounded-xl transition-all">
+                                        <Script className="w-4 h-4" /> Copiar Info
+                                    </button>
+                                    <button onClick={() => { setViewingOrder(null); cancelDetailEdit(); }} className="px-8 py-3 bg-slate-800 text-white rounded-xl text-xs uppercase tracking-widest font-extrabold hover:bg-black transition-all shadow-lg shadow-slate-800/20 active:scale-95">
+                                        Cerrar
+                                    </button>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>,
