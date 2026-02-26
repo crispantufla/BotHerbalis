@@ -784,7 +784,7 @@ client.on('message', async msg => {
                     logAndEmit(userId, 'user', `MEDIA_AUDIO:${audioUrl}|TRANSCRIPTION:${transcription}`, userState[userId]?.step || 'new');
                     const startTime = Date.now();
                     await processSalesFlow(userId, transcription, userState, knowledge, {
-                        client, notifyAdmin, saveState, sendMessageWithDelay: (id, text) => sendMessageWithDelay(id, text, startTime), logAndEmit, saveOrderToLocal, cancelLatestOrder, sharedState, config
+                        client, notifyAdmin, saveState, aiService, sendMessageWithDelay: (id, text) => sendMessageWithDelay(id, text, startTime), logAndEmit, saveOrderToLocal, cancelLatestOrder, sharedState, config
                     });
                 } else {
                     logAndEmit(userId, 'user', `MEDIA_AUDIO:${audioUrl}`, userState[userId]?.step || 'new');
@@ -903,7 +903,7 @@ async function _processDebounced(userId) {
         const effectiveKnowledge = sharedState.multiKnowledge[effectiveScript] || sharedState.knowledge;
 
         await processSalesFlow(userId, combinedText, userState, effectiveKnowledge, {
-            client, notifyAdmin, saveState,
+            client, notifyAdmin, saveState, aiService,
             sendMessageWithDelay: (id, text) => sendMessageWithDelay(id, text, startTime),
             logAndEmit, saveOrderToLocal, cancelLatestOrder, sharedState, config,
             effectiveScript // Pass down to the flow

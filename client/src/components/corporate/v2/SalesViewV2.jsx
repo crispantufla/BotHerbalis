@@ -114,7 +114,7 @@ const SalesViewV2 = ({ onGoToChat }) => {
         } catch (e) { toast.error('Error eliminando pedido'); }
     };
 
-    const handleGoToChat = async (clienteStr) => {
+    const handleGoToChat = async (clienteStr, sellerPhone) => {
         if (!clienteStr) {
             toast.warning('El pedido no tiene un teléfono asociado.');
             return;
@@ -122,6 +122,20 @@ const SalesViewV2 = ({ onGoToChat }) => {
 
         const toastId = toast.info('Buscando chat...');
         try {
+            // Check connected number
+            const statusRes = await api.get('/api/status');
+            const connectedPhone = statusRes.data?.info?.wid?.user;
+
+            if (sellerPhone && connectedPhone) {
+                const cleanedSeller = sellerPhone.replace(/\D/g, '');
+                const cleanedConnected = connectedPhone.replace(/\D/g, '');
+                if (cleanedSeller !== cleanedConnected) {
+                    toast.dismiss(toastId);
+                    toast.warning('Esta venta se hizo desde otro \u00fanumero.');
+                    return;
+                }
+            }
+
             const res = await api.get('/api/chats');
             const chats = res.data;
             const cleaned = clienteStr.replace(/\D/g, ''); // phone numbers only mode
@@ -138,7 +152,7 @@ const SalesViewV2 = ({ onGoToChat }) => {
                 toast.dismiss(toastId);
             } else {
                 toast.dismiss(toastId);
-                toast.warning('No se ha encontrado un chat activo en WhatsApp para este cliente. Asegurate de que el bot esté conectado y el cliente haya escrito.');
+                toast.warning('Esa venta se hizo con otro numero.');
             }
         } catch (e) {
             toast.dismiss(toastId);
@@ -348,7 +362,7 @@ Teléfono: ${phoneDisplay}`;
                                         </td>
                                         <td className="px-4 sm:px-8 py-5 text-right">
                                             <div className="flex justify-end gap-3 transition-opacity">
-                                                <button onClick={(e) => { e.stopPropagation(); handleGoToChat(order.cliente); }} className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white transition-all flex items-center justify-center shadow-sm" title="Ir al Chat">
+                                                <button onClick={(e) => { e.stopPropagation(); handleGoToChat(order.cliente, order.seller); }} className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white transition-all flex items-center justify-center shadow-sm" title="Ir al Chat">
                                                     <Chat className="w-4 h-4" />
                                                 </button>
                                                 <button onClick={() => openEdit(order)} className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-500 hover:text-white transition-all flex items-center justify-center shadow-sm" title="Editar Pedido">
@@ -417,7 +431,7 @@ Teléfono: ${phoneDisplay}`;
                                         <button onClick={() => { setViewingOrder(order); setTrackingData(null); }} className="flex-1 bg-white border border-slate-200 text-indigo-600 rounded-xl py-2.5 text-[11px] font-extrabold uppercase tracking-widest flex items-center justify-center gap-1.5 shadow-sm active:bg-indigo-50 transition-colors">
                                             <Script className="w-3.5 h-3.5" /> Detalles
                                         </button>
-                                        <button onClick={(e) => { e.stopPropagation(); handleGoToChat(order.cliente); }} className="w-12 bg-emerald-50 border border-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center shadow-sm active:bg-emerald-100 transition-colors">
+                                        <button onClick={(e) => { e.stopPropagation(); handleGoToChat(order.cliente, order.seller); }} className="w-12 bg-emerald-50 border border-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center shadow-sm active:bg-emerald-100 transition-colors">
                                             <Chat className="w-4 h-4" />
                                         </button>
                                         <button onClick={() => openEdit(order)} className="w-12 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center shadow-sm active:bg-indigo-100 transition-colors">

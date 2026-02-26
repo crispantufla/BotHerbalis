@@ -65,7 +65,8 @@ const mockDependencies = {
     notifyAdmin: mockNotifyAdmin,
     saveState: mockSaveState,
     sendMessageWithDelay: mockSendMessageWithDelay,
-    logAndEmit: mockLogAndEmit
+    logAndEmit: mockLogAndEmit,
+    aiService: require('../src/services/ai').aiService
 };
 
 // Load knowledge

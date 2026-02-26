@@ -236,7 +236,7 @@ const SalesView = ({ onGoToChat }) => {
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        if (onGoToChat) onGoToChat(order.cliente);
+                                                        if (onGoToChat) onGoToChat(order.cliente, order.seller);
                                                     }}
                                                     className="text-emerald-600 hover:text-emerald-800 transition font-medium text-xs bg-emerald-50 hover:bg-emerald-100 px-3 py-1 rounded border border-emerald-200 flex items-center gap-1"
                                                     title="Ir al Chat"

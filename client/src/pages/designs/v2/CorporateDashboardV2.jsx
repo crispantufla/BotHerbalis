@@ -85,8 +85,25 @@ const CorporateDashboardV2 = () => {
 
     const [processingAction, setProcessingAction] = useState(null); // Prevent double-click
 
-    const handleQuickAction = async (chatId, action) => {
+    const handleQuickAction = async (chatId, action, sellerPhone) => {
         if (action === 'chat') {
+            try {
+                const statusRes = await api.get('/api/status');
+                const connectedPhone = statusRes.data?.info?.wid?.user;
+
+                if (sellerPhone && connectedPhone) {
+                    const cleanedSeller = sellerPhone.replace(/\D/g, '');
+                    const cleanedConnected = connectedPhone.replace(/\D/g, '');
+                    // Only block if we have both values perfectly and they differ
+                    if (cleanedSeller !== cleanedConnected) {
+                        toast.warning(`Esta venta se hizo desde otro \u00fanumero (+${cleanedSeller}).`);
+                        return; // Prevent redirecting
+                    }
+                }
+            } catch (e) {
+                // non-fatal, proceed
+            }
+
             setTargetChatId(chatId);
             setActiveTab('comms');
             return;

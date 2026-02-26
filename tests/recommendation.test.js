@@ -13,7 +13,8 @@ const mockDependencies = {
     saveState: mockSaveState,
     sendMessageWithDelay: mockSendMessage,
     logAndEmit: jest.fn(),
-    sharedState: { io: { emit: jest.fn() }, pausedUsers: new Set() }
+    sharedState: { io: { emit: jest.fn() }, pausedUsers: new Set() },
+    aiService: require('../src/services/ai').aiService
 };
 
 // LOAD KNOWLEDGE

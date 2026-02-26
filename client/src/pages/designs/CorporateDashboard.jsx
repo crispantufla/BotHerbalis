@@ -120,8 +120,24 @@ const CorporateDashboard = () => {
         return () => window.removeEventListener('config-updated', handleConfigUpdate);
     }, [socket, fetchConfig]);
 
-    const handleQuickAction = async (chatId, action) => {
+    const handleQuickAction = async (chatId, action, sellerPhone) => {
         if (action === 'chat') {
+            try {
+                const statusRes = await api.get('/api/status');
+                const connectedPhone = statusRes.data?.info?.wid?.user;
+
+                if (sellerPhone && connectedPhone) {
+                    const cleanedSeller = sellerPhone.replace(/\D/g, '');
+                    const cleanedConnected = connectedPhone.replace(/\D/g, '');
+                    if (cleanedSeller !== cleanedConnected) {
+                        toast.warning(`Esta venta se hizo desde otro \u00fanumero (+${cleanedSeller}).`);
+                        return;
+                    }
+                }
+            } catch (e) {
+                // ignore
+            }
+
             setTargetChatId(chatId);
             setActiveTab('comms');
             return;
@@ -147,7 +163,7 @@ const CorporateDashboard = () => {
             case 'comms':
                 return <CommsView initialChatId={targetChatId} onChatSelected={() => setTargetChatId(null)} />;
             case 'logistics':
-                return <SalesView onGoToChat={(chatId) => handleQuickAction(chatId, 'chat')} />;
+                return <SalesView onGoToChat={(chatId, sellerPhone) => handleQuickAction(chatId, 'chat', sellerPhone)} />;
             case 'script':
                 return <ScriptView />;
             case 'gallery':

@@ -53,6 +53,7 @@ export const ToastProvider = ({ children }) => {
         error: (msg, dur) => addToast(msg, 'error', dur),
         warning: (msg, dur) => addToast(msg, 'warning', dur),
         info: (msg, dur) => addToast(msg, 'info', dur),
+        dismiss: (id) => removeToast(id),
     };
 
     /**

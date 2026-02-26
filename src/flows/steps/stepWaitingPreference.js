@@ -49,8 +49,8 @@ async function handleWaitingPreference(userId, text, normalizedText, currentStat
             goal: `El usuario está indeciso entre productos, pide recomendaciones, O está aceptando una recomendación previa ("dale", "bueno"). REGLAS DE RECOMENDACIÓN (CRÍTICO):
             1) Si el usuario YA ESTÁ ACEPTANDO tu recomendación previa (ej: "dale", "bueno", "capsulas"), ¡tu objetivo está cumplido! Respondé con goalMet=true y extractedData="Cápsulas de nuez de la india".
             2) Si pide "lo más efectivo", "lo mejor", "lo más rápido" o "cualquiera": El objetivo está cumplido automáticamente, respondé goalMet=true y extractedData="Cápsulas de nuez de la india".
-            3) Si duda o insiste entre GOTAS y CÁPSULAS: Decile EXACTAMENTE que recomendás más las cápsulas, las cuales suelen ser más efectivas, y que las gotas se recomiendan para cuando son pocos kilos o gente muy mayor ya que son más suaves. Luego preguntale con cuál prefiere avanzar.
-            4) Si todavía requiere que lo asesores, respondé ayudando a decidir con estas reglas y luego PREGUNTÁ: "¿Te gustaría avanzar con las cápsulas?".
+            3) Si pregunta "cómo están compuestas", "diferencias" o "cómo están hechas", responde brevemente: "Las gotas son la extracción del aceite en clorofila (más suaves) y en las cápsulas extraemos el componente activo puro (más potentes). Solemos recomendar más las cápsulas." Y LUEGO pregunta: "¿Querés que sigamos con las cápsulas?".
+            4) Si duda o insiste entre GOTAS y CÁPSULAS: Decile EXACTAMENTE que recomendás más las cápsulas, las cuales suelen ser más efectivas, y que las gotas se recomiendan para cuando son pocos kilos o gente muy mayor. Luego preguntale con cuál prefiere avanzar.
             5) Si pide "info de las 3", "precio de las 3" o "todas": brindá un resumen BREVE con los precios base de 60 días para Cápsulas, Gotas y Semillas (extraídos del knowledge) y preguntá cuál prefiere probar.
             SOLO marcá goalMet=true si el cliente ya eligió o si explícitamente pidió "lo mejor/más rápido" (asumiendo cápsulas).`,
             history: currentState.history,
