@@ -4,8 +4,18 @@ Este documento mantiene un registro de los problemas resueltos, características
 Al cambiar de cuenta de Google, puedes pedirle a la IA: *"Lee el archivo AI_SESSION_NOTES.md para tener todo el contexto de lo que estábamos haciendo"*.
 
 ---
+## 🛑 [26 Feb 2026] Análisis Rápido: Error 404 al Borrar Mensajes, Postdatado en Planes y Colores UI
+**Problemas Detectados:**
+1. **Error 404 al Eliminar Mensajes:** Desde el Dashboard (CommsViewV2), al intentar borrar un mensaje enviado, la API devolvía 404. Esto ocurría porque el backend (`chat.routes.js`) solo buscaba el `messageId` en los últimos 50 mensajes del chat, haciendo invisibles los mensajes un poco más antiguos.
+2. **Postdatado en Selección de Plan:** Durante la etapa de elegir plan (`_getModulePlanChoice`), si el usuario decía que no tenía plata o cobraba en unos días, la IA no sabía cómo continuar para asegurar la venta postergada sin perder el hilo del plan.
+3. **Colores Confusos en Logística:** Los estados "En sistema" y "Confirmado" en la tabla de pedidos tenían colores muy parecidos (azules/índigos), dificultando su diferenciación visual rápida.
 
-## 🛑 [25 Feb 2026] Análisis Rápido: Postdate ignorado y doble mensaje ("cobro el día 15")
+**Soluciones Implementadas:**
+1. **Fix Mensajes 404:** Se aumentó el límite de búsqueda a `fetchMessages({ limit: 200 })` en la ruta `DELETE /messages` de `chat.routes.js` y se añadió un log de advertencia para facilitar futuros rastreos.
+2. **Postdatado Mejorado:** Se instruyó a la IA en `ai.ts` (`_getModulePlanChoice`) para que, ante falta de dinero, ofrezca programar el envío y congelar el precio, obligando a combinar esto con la pregunta del plan (ej: "¿Para qué fecha lo agendamos, y con qué plan preferís que lo armemos?").
+3. **UI/UX Diferenciación Visual:** En `SalesView.jsx` y `SalesViewV2.jsx`, se asignó color fucsia (`fuchsia-100`/`fuchsia-700`) al estado "En sistema" y celeste (`sky-100`/`sky-700`) a "Confirmado".
+
+---
 **Problema:**
 1. Al entrar al paso `waiting_data` y mandar un postdatado como "además cobro el 15...", el interceptor global de FAQ respondía sobre agendar la fecha, pero inmediatamente después _volvía_ a mandar el mensaje nativo pidiendo "Pasame los datos para el envío", duplicando el pedido y rompiendo la naturalidad (Doble Respuesta).
 2. Si el cliente daba la fecha y la dirección exacta en el mismo mensaje, la IA detectaba que se postdataba y lanzaba la confirmación, pero ejecutaba un comando `break;` que interrumpía el bloque, ignorando por competo procesar la dirección y obligando al cliente a mandar su calle otra vez.

@@ -163,7 +163,8 @@ REGLAS CRÍTICAS DE ESTE PASO (¡LEER BIEN!):
 - Tenemos planes de 60, 120, 180, 240, 300, etc (siempre múltiplos de 60).
 - NUNCA asumas o confirmes un plan si el cliente no escribió explícitamente "60", "120" o el múltiplo que desea en su último mensaje.
 - Si el cliente dice "Sí" a cualquier cosa que le preguntaste, y NO dice el número, TENÉS que volver a preguntar: "Genial, ¿pero con cuál plan armamos el pedido?".
-- Si el cliente quiere CAMBIAR de producto (ej: dice "mejor gotas"): confirmale que cambiamos a ese producto (extractedData="CHANGE_PRODUCT: Gotas") Y LUEGO EN EL MISMO MENSAJE preguntale qué plan quiere.`;
+- Si el cliente quiere CAMBIAR de producto (ej: dice "mejor gotas"): confirmale que cambiamos a ese producto (extractedData="CHANGE_PRODUCT: Gotas") Y LUEGO EN EL MISMO MENSAJE preguntale qué plan quiere.
+- POSTERGACIÓN (Falta de dinero / Cobro en X días): Si el cliente dice que no tiene plata ahora o necesita esperar a cobrar, OFRECELE PROGRAMAR el envío. CONGELAMOS el precio y paga cuando recibe. DEBES COMBINAR esta oferta con la pregunta del plan. EJEMPLO: "¡No hay problema! Podemos dejar el pedido programado, congelar el precio y pagás recién cuando te llega. ¿Para qué fecha lo agendaríamos, y con qué plan (60 o 120 días) preferís que lo armemos?".`;
 }
 
 function _getModuleDataCollection(): string {

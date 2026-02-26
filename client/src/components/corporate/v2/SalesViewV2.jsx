@@ -233,8 +233,8 @@ Teléfono: ${phoneDisplay}`;
     const statusOptions = ['Pendiente', 'Confirmado', 'En sistema', 'Enviado', 'Entregado', 'Cancelado'];
     const statusStyles = {
         'Pendiente': 'bg-amber-100/80 text-amber-700 border-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.2)]',
-        'Confirmado': 'bg-blue-100/80 text-blue-700 border-blue-300 shadow-[0_0_10px_rgba(59,130,246,0.2)]',
-        'En sistema': 'bg-indigo-100/80 text-indigo-700 border-indigo-300 shadow-[0_0_10px_rgba(99,102,241,0.2)]',
+        'Confirmado': 'bg-sky-100/80 text-sky-700 border-sky-300 shadow-[0_0_10px_rgba(14,165,233,0.2)]',
+        'En sistema': 'bg-fuchsia-100/80 text-fuchsia-700 border-fuchsia-300 shadow-[0_0_10px_rgba(217,70,239,0.2)]',
         'Enviado': 'bg-purple-100/80 text-purple-700 border-purple-300 shadow-[0_0_10px_rgba(168,85,247,0.2)]',
         'Entregado': 'bg-emerald-100/80 text-emerald-700 border-emerald-300 shadow-[0_0_10px_rgba(16,185,129,0.2)]',
         'Cancelado': 'bg-rose-100/80 text-rose-700 border-rose-300 shadow-[0_0_10px_rgba(244,63,94,0.2)]'

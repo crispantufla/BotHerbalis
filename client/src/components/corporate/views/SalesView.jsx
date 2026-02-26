@@ -167,8 +167,8 @@ const SalesView = ({ onGoToChat }) => {
 
     const statusStyles = {
         'Pendiente': 'bg-amber-50 text-amber-600 border-amber-200',
-        'Confirmado': 'bg-blue-50 text-blue-600 border-blue-200',
-        'En sistema': 'bg-purple-50 text-purple-600 border-purple-200',
+        'Confirmado': 'bg-sky-50 text-sky-600 border-sky-200',
+        'En sistema': 'bg-fuchsia-50 text-fuchsia-600 border-fuchsia-200',
         'Enviado': 'bg-indigo-50 text-indigo-600 border-indigo-200',
         'Entregado': 'bg-emerald-50 text-emerald-600 border-emerald-200',
         'Cancelado': 'bg-rose-50 text-rose-600 border-rose-200'

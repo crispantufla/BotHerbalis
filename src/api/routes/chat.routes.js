@@ -358,13 +358,14 @@ module.exports = (client, sharedState) => {
             if (!chatId || !messageId) return res.status(400).json({ error: 'Missing parameters' });
 
             const chat = await client.getChatById(chatId);
-            const messages = await chat.fetchMessages({ limit: 50 }); // Search in last 50
+            const messages = await chat.fetchMessages({ limit: 200 }); // Increased from 50 to 200 to find older messages
             const msgToDel = messages.find(m => m.id._serialized === messageId);
 
             if (msgToDel) {
                 await msgToDel.delete(true); // true = delete for everyone
                 res.json({ success: true });
             } else {
+                console.warn(`[DELETE-MSG] 404 Not Found in last 200 msgs. Requested messageId: ${messageId}`);
                 res.status(404).json({ error: 'Message not found in recent history' });
             }
         } catch (e) {
