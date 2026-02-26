@@ -434,7 +434,8 @@ function saveOrderToLocal(order: Record<string, any>): void {
         const cleanPhone = (order.cliente || '').replace('@c.us', '').replace(/\D/g, '');
         let priceNum = 0;
         if (order.precio) {
-            priceNum = parseFloat(order.precio.toString().replace(/[^\d.-]/g, ''));
+            // Remove dots (thousands separator in es-AR format) before parsing
+            priceNum = parseInt(order.precio.toString().replace(/\./g, '').replace(/[^\d]/g, ''), 10);
         }
 
         const newOrderData = {
