@@ -131,7 +131,8 @@ const SalesViewV2 = ({ onGoToChat }) => {
             if (sellerPhone && connectedPhone) {
                 const cleanedSeller = sellerPhone.replace(/\D/g, '');
                 const cleanedConnected = connectedPhone.replace(/\D/g, '');
-                if (cleanedSeller !== cleanedConnected) {
+                // Allow matches if one ends with the other (e.g. 549341... vs 341...)
+                if (!cleanedSeller.endsWith(cleanedConnected) && !cleanedConnected.endsWith(cleanedSeller)) {
                     toast.dismiss(toastId);
                     toast.warning('Esta venta se hizo desde otro \u00fanumero.');
                     return;
@@ -142,19 +143,23 @@ const SalesViewV2 = ({ onGoToChat }) => {
             const chats = res.data;
             const cleaned = clienteStr.replace(/\D/g, ''); // phone numbers only mode
 
-            const chatExists = chats.find(c =>
-                c.id === clienteStr ||
-                c.id === `${clienteStr}@c.us` ||
-                c.id.includes(cleaned) ||
-                (c.name && c.name.includes(clienteStr))
-            );
+            const chatExists = chats.find(c => {
+                const cCleaned = String(c.id).replace(/\D/g, '');
+                return c.id === clienteStr ||
+                    c.id === `${clienteStr}@c.us` ||
+                    c.id.includes(cleaned) ||
+                    cCleaned.endsWith(cleaned) ||
+                    cleaned.endsWith(cCleaned) ||
+                    (c.name && c.name.includes(clienteStr));
+            });
 
             if (chatExists) {
                 if (onGoToChat) onGoToChat(chatExists.id);
                 toast.dismiss(toastId);
             } else {
+                // If it doesn't exist in recent chats, but we know it belongs to us, we can force-go to the ID
+                if (onGoToChat) onGoToChat(`${cleaned}@c.us`);
                 toast.dismiss(toastId);
-                toast.warning('Esa venta se hizo con otro numero.');
             }
         } catch (e) {
             toast.dismiss(toastId);

@@ -133,10 +133,11 @@ const CorporateDashboard = () => {
                 if (sellerPhone && connectedPhone) {
                     const cleanedSeller = sellerPhone.replace(/\D/g, '');
                     const cleanedConnected = connectedPhone.replace(/\D/g, '');
-                    if (cleanedSeller !== cleanedConnected) {
+                    // Only block if we have both values perfectly and they differ
+                    if (!cleanedSeller.endsWith(cleanedConnected) && !cleanedConnected.endsWith(cleanedSeller)) {
                         toast.dismiss(toastId);
                         toast.warning(`Esta venta se hizo desde otro \u00fanumero (+${cleanedSeller}).`);
-                        return;
+                        return; // Prevent redirecting
                     }
                 }
             } catch (e) {
