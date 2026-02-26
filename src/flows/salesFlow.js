@@ -93,7 +93,7 @@ async function processSalesFlow(userId, text, userState, knowledge, dependencies
     // 5. Post-Processing Medical Reject Check
     if (currentState.history && currentState.history.length > 0) {
         const lastHistory = currentState.history[currentState.history.length - 1];
-        if (lastHistory.role === 'bot' && lastHistory.content.includes('por precaución no recomendamos el uso durante el embarazo/lactancia/edad avanzada')) {
+        if (lastHistory.role === 'bot' && (lastHistory.content.includes('por precaución no recomendamos el consumo') || lastHistory.content.includes('por precaución no recomendamos el uso durante'))) {
             console.log(`[AI MEDICAL REJECT] Intercepted AI rejection for user ${userId}. Halting flow.`);
             _setStep(currentState, 'rejected_medical');
             saveState(userId);

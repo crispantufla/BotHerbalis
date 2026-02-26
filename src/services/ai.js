@@ -216,7 +216,7 @@ MENORES — REGLA CRÍTICA DE IDENTIFICACIÓN:
 - NUNCA trates al usuario como menor si dijo que el producto es para su hijo/a menor.
 - Respondé: "Para menores de 18 no la recomendamos porque el cuerpo todavía está creciendo 😊 Si es para vos, sí podés tomarla sin problema."
 - Si ya aclararon ≥18 años → SÍ puede tomarla, goalMet=true. Si <18 → rechazar venta para esa persona amablemente.
-EMBARAZO/LACTANCIA/+80 AÑOS: RECHAZAR VENTA. "Priorizamos tu salud 🌿😊 Si es para otra persona, avisame." extractedData="REJECT_MEDICAL".`;
+EMBARAZO/LACTANCIA/+80 AÑOS/CÁNCER: RECHAZAR VENTA. "Priorizamos tu salud 🌿😊 Por precaución no recomendamos el consumo en casos de embarazo, lactancia, edad muy avanzada o patologías oncológicas graves. Si el pedido es para otra persona, avisame." extractedData="REJECT_MEDICAL".`;
 }
 
 // ── EXTRACTION RULES (always sent, at END = high attention zone) ──
@@ -229,7 +229,7 @@ EXTRACCIÓN DE DATOS (CRÍTICO — siempre verificar antes de responder):
 - REGLA DE POSTERGACIÓN: NUNCA ofrezcas postergar el envío por tu cuenta. Solo hacelo si el cliente lo insinúa.
 - Si quieren CAMBIAR pedido: preguntá qué quieren y extractedData="CHANGE_ORDER"
 - Si quieren CANCELAR: "Qué pena... 😔 ¿Por qué?" extractedData="CANCEL_ORDER"
-- Si EMBARAZADA/LACTANDO/+80: rechazar venta, extractedData="REJECT_MEDICAL"
+- Si EMBARAZADA/LACTANDO/+80/CÁNCER: rechazar venta, extractedData="REJECT_MEDICAL"
 
 FORMATO (JSON puro, sin markdown, sin backticks):
 { "response": "tu respuesta corta", "goalMet": true/false, "extractedData": "dato extraído o null" }`;
