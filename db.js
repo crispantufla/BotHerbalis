@@ -1,22 +1,21 @@
+const { Pool } = require('pg');
+const { PrismaPg } = require('@prisma/adapter-pg');
 const { PrismaClient } = require('@prisma/client');
 
-let connectionString = process.env.DATABASE_URL;
+const connectionString = process.env.DATABASE_URL;
 
-if (connectionString) {
-    // Ensure connection limit is set for Railway free tier
-    if (!connectionString.includes('connection_limit')) {
-        const separator = connectionString.includes('?') ? '&' : '?';
-        connectionString += `${separator}connection_limit=5&pool_timeout=5`;
-    }
-    // Prisma automatically picks up process.env.DATABASE_URL
-    process.env.DATABASE_URL = connectionString;
-}
+const pool = new Pool({
+    connectionString,
+    max: 5,                      // Max 5 connections (Railway free tier friendly)
+    idleTimeoutMillis: 30000,    // Close idle connections after 30s
+    connectionTimeoutMillis: 5000 // Fail fast if DB is unreachable
+});
 
-const prisma = new PrismaClient();
+pool.on('error', (err) => {
+    console.error('🔴 [DB] Unexpected pool error:', err.message);
+});
 
-// Polyfill pool to prevent errors in scripts that call pool.end()
-const pool = {
-    end: async () => { }
-};
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 
 module.exports = { prisma, pool };
