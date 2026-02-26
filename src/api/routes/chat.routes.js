@@ -55,10 +55,12 @@ module.exports = (client, sharedState) => {
             // Combine and format for AI
             const history = [...(localMessages || [])];
             waMessages.forEach(m => {
-                if (!history.some(h => Math.abs(h.timestamp - m.timestamp) < 2 && h.body === m.body)) {
+                const tsMs = m.timestamp * 1000; // Convert WA seconds to ms
+                if (!history.some(h => Math.abs(h.timestamp - tsMs) < 2000 && h.body === m.body)) {
                     history.push({
                         role: m.fromMe ? 'assistant' : 'user', // mapping for AI
-                        content: m.body
+                        content: m.body,
+                        timestamp: tsMs
                     });
                 }
             });
@@ -177,7 +179,7 @@ module.exports = (client, sharedState) => {
                         return {
                             fromMe: m.fromMe,
                             body: body,
-                            timestamp: m.timestamp,
+                            timestamp: m.timestamp * 1000, // WhatsApp returns seconds, frontend expects ms
                             type: m.type,
                             id: m.id._serialized
                         };
@@ -198,7 +200,7 @@ module.exports = (client, sharedState) => {
                         const isAudioLog = (m.type === 'audio' || m.type === 'ptt') && lm.body?.startsWith('🎤');
                         const isImageLog = (m.type === 'image' || m.type === 'sticker') && lm.body?.startsWith('📷');
                         // 60s tolerance because downloading media + OpenAI transcription can take time
-                        return sameRole && timeDiff <= 60 && (isMediaLog || isAudioLog || isImageLog);
+                        return sameRole && timeDiff <= 60000 && (isMediaLog || isAudioLog || isImageLog);
                     });
                     if (match) return { ...m, body: match.body };
                 }
@@ -216,7 +218,7 @@ module.exports = (client, sharedState) => {
                     const mediaMatch = lm.body?.startsWith('MEDIA_') && m.hasMedia;
                     const audioMatch = lm.body?.startsWith('🎤') && (m.type === 'audio' || m.type === 'ptt');
                     const imageMatch = lm.body?.startsWith('📷') && (m.type === 'image' || m.type === 'sticker');
-                    return sameRole && timeDiff <= 60 && (bodyMatch || mediaMatch || audioMatch || imageMatch);
+                    return sameRole && timeDiff <= 60000 && (bodyMatch || mediaMatch || audioMatch || imageMatch);
                 });
                 if (!isDuplicate) combined.push(lm);
             });

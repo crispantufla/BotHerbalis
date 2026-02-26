@@ -22,13 +22,14 @@ function getLocalHistory(chatId: string, sinceTimestamp: number = 0): any[] {
             lines.forEach((line: string) => {
                 try {
                     const log = JSON.parse(line);
-                    const logTimestamp = Math.floor(new Date(log.timestamp).getTime() / 1000);
+                    const logTimestampMs = new Date(log.timestamp).getTime();
 
-                    if (log.userId === chatId && logTimestamp >= sinceTimestamp) {
+                    // sinceTimestamp is in seconds (from WA), convert to ms for comparison
+                    if (log.userId === chatId && logTimestampMs >= sinceTimestamp * 1000) {
                         localMessages.push({
                             fromMe: log.role === 'bot' || log.role === 'admin' || log.role === 'system',
                             body: log.content,
-                            timestamp: Math.floor(new Date(log.timestamp).getTime() / 1000),
+                            timestamp: new Date(log.timestamp).getTime(), // ms for frontend consistency
                             type: 'chat',
                             isLocal: true
                         });
