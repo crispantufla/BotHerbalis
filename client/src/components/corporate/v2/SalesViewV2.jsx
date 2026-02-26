@@ -638,7 +638,7 @@ Teléfono: ${phoneDisplay}`;
 
                                     <div className="flex-1 w-full flex flex-col items-start md:items-end">
                                         <span className="text-[10px] font-black uppercase text-emerald-600 tracking-widest mb-1 block">Total a Pagar</span>
-                                        <span className="font-black text-emerald-500 text-4xl tracking-tighter leading-none">${new Intl.NumberFormat('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(parseFloat(viewingOrder.precio || 0))}</span>
+                                        <span className="font-black text-emerald-500 text-4xl tracking-tighter leading-none">${viewingOrder.precio || '0'}</span>
                                     </div>
                                 </div>
                             </div>

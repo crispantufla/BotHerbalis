@@ -362,7 +362,7 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
         const rawPhone = selectedChat?.id?.split('@')[0] || '';
         const phoneDisplay = rawPhone.length > 13 ? `Oculto por Anuncio Meta (${rawPhone})` : rawPhone || 'Desconocido';
 
-        const priceFormatted = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(parseFloat(order.precio || 0));
+        const priceFormatted = order.precio || '0';
         const textToCopy = `Nombre: ${selectedChat?.name || order.nombre || 'Cliente'}
 Dirección: ${order.calle}, ${order.ciudad} (CP: ${order.cp})
 Producto: ${order.producto}
@@ -608,7 +608,7 @@ Teléfono: ${phoneDisplay}`;
 
                                                         <div className="flex justify-between items-end pt-2">
                                                             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">A Pagar</span>
-                                                            <span className="text-emerald-600 font-black text-xl">${order.precio?.replace(/\D/g, '') || '0'}</span>
+                                                            <span className="text-emerald-600 font-black text-xl">${order.precio || '0'}</span>
                                                         </div>
                                                     </div>
                                                 </div>
