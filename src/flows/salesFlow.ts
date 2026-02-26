@@ -64,6 +64,25 @@ export async function processSalesFlow(
                         }
                     }
 
+                    // --- POST-SALE DETECTION: auto-pause if outgoing post-sale messages exist ---
+                    const outgoingMessages = messages.filter((m: any) => m.fromMe && m.body);
+                    const hasPostSaleMessage = outgoingMessages.some((m: any) => {
+                        const body = (m.body || '').trim();
+                        // 1. Branch pickup notification
+                        if (body.includes('MENSAJE DE HERBALIS') || body.includes('MENSAJDE DE HERBALIS')) return true;
+                        // 2. Tracking code (starts with CO + 9 digits, e.g. CO767708617)
+                        if (/^CO\d{9}$/i.test(body)) return true;
+                        return false;
+                    });
+
+                    if (hasPostSaleMessage) {
+                        console.log(`[POST-SALE] User ${userId} has post-sale messages in history. Auto-pausing (post-sale management).`);
+                        if (dependencies.sharedState && dependencies.sharedState.pausedUsers) {
+                            dependencies.sharedState.pausedUsers.add(userId);
+                        }
+                        return { matched: true, paused: true };
+                    }
+
                     if (previousUserMessages >= 5 && isRecentConversation) {
                         console.log(`[SPAM FILTER] User ${userId} has ${previousUserMessages} previous messages before bot init and conversation is recent. Auto-pausing.`);
                         if (dependencies.sharedState && dependencies.sharedState.pausedUsers) {
