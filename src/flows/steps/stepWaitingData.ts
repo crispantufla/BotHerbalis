@@ -241,6 +241,19 @@ export async function handleWaitingData(
             const hasNumber = /\d+/.test(textToAnalyze);
             const hasSN = /\b(s\/n|sn|sin numero|sin número)\b/i.test(textToAnalyze);
 
+            // Detect intersections/corners: "X y calle Y", "X y Y", "X entre Y", "X esq Y"
+            const isIntersection = /\b(y\s+calle|y\s+pasaje|y\s+av\b|y\s+avenida|entre\s+calle|entre\s+.+\s+y\s+|esq\b|esquina)\b/i.test(textToAnalyze)
+                || /\bcalle\s+\d+\b/i.test(textToAnalyze) && /\by\b/i.test(textToAnalyze); // "calle 1406" + "y" = intersection
+
+            if (isIntersection) {
+                currentState.addressAttempts = 0;
+                const rejectMsg = "⚠️ El correo no nos permite cargar esquinas ni intersecciones (ej: \"calle X y calle Y\").\n\nNecesitamos **una sola calle con número de puerta** (ej: Av. San Martín 1234).\n\n¿Me pasás la dirección con el número exacto? 🙏";
+                currentState.history.push({ role: 'bot', content: rejectMsg, timestamp: Date.now() });
+                await sendMessageWithDelay(userId, rejectMsg);
+                saveState(userId);
+                return { matched: true };
+            }
+
             if (!hasNumber && !hasSN) {
                 currentState.addressAttempts = 0;
                 const rejectMsg = "El correo no nos permite cargar direcciones sin la altura de la calle ni esquinas (ej: entre calles). ¿Me confirmás el número exacto o aclaramos 'S/N' (sin número)? 🙏";
