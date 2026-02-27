@@ -164,13 +164,13 @@ const CorporateDashboardV2 = () => {
                 className={`w-full flex items-center ${(sidebarCollapsed && !isMobile) ? 'justify-center px-0' : 'px-4'} py-3 mb-2 rounded-xl transition-all duration-300 group
                 ${isActive
                         ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md shadow-indigo-500/30 border border-transparent'
-                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-indigo-600 dark:hover:text-indigo-400 hover:shadow-sm border border-transparent'}`}
+                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-indigo-600 dark:hover:text-white hover:shadow-sm border border-transparent'}`}
                 title={(sidebarCollapsed && !isMobile) ? label : ''}
             >
                 <div className={`${(sidebarCollapsed && !isMobile) ? '' : 'mr-4'} transition-transform duration-300 group-hover:scale-110`}>
-                    <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400'}`} strokeWidth={isActive ? 2.5 : 2} />
+                    <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 dark:text-slate-500 dark:group-hover:text-white transition-colors duration-300'}`} strokeWidth={isActive ? 2.5 : 2} />
                 </div>
-                {(!sidebarCollapsed || isMobile) && <span className={`font-medium ${isActive ? 'text-white font-bold tracking-wide' : ''}`}>{label}</span>}
+                {(!sidebarCollapsed || isMobile) && <span className={`font-medium ${isActive ? 'text-white font-bold tracking-wide' : 'dark:group-hover:text-white transition-colors duration-300'}`}>{label}</span>}
             </button>
         );
     };

@@ -527,7 +527,7 @@ Teléfono: ${phoneDisplay}`;
             {/* V2 GLASSMORPHISM EDIT MODAL */}
             {editingOrder && createPortal(
                 <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[100] flex items-center justify-center animate-fade-in p-4">
-                    <div className="bg-white/9 dark:bg-slate-800/90 backdrop-blur-2xl rounded-[2rem] shadow-2xl w-full max-w-md p-8 border border-white relative overflow-hidden">
+                    <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-2xl rounded-[2rem] shadow-2xl w-full max-w-md p-8 border border-white dark:border-slate-700 relative overflow-hidden">
 
                         <div className="absolute top-0 right-0 w-40 h-40 bg-indigo-500/10 blur-[50px] rounded-full pointer-events-none"></div>
 
@@ -536,16 +536,16 @@ Teléfono: ${phoneDisplay}`;
                                 <h3 className="text-2xl font-extrabold text-slate-800 tracking-tight">Editar Estado</h3>
                                 <p className="text-xs font-bold text-indigo-600 uppercase tracking-widest mt-1">Order #{editingOrder.id?.substring(0, 6) || 'N/A'}</p>
                             </div>
-                            <button onClick={() => setEditingOrder(null)} className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition-colors flex items-center justify-center">✕</button>
+                            <button onClick={() => setEditingOrder(null)} className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 hover:text-slate-800 dark:hover:text-white transition-colors flex items-center justify-center">✕</button>
                         </div>
 
                         <div className="space-y-6 relative z-10">
-                            <div className="bg-gradient-to-br from-slate-50 to-blue-50/50 rounded-2xl p-5 border border-slate-200/60 shadow-inner">
-                                <p className="text-lg font-extrabold text-slate-800 mb-1">{editingOrder.nombre || 'Sin nombre'}</p>
-                                <p className="text-sm font-mono text-slate-500 mb-3">{editingOrder.cliente}</p>
+                            <div className="bg-gradient-to-br from-slate-50 to-blue-50/50 dark:from-slate-700/50 dark:to-slate-700/30 rounded-2xl p-5 border border-slate-200/60 dark:border-slate-600/50 shadow-inner">
+                                <p className="text-lg font-extrabold text-slate-800 dark:text-slate-100 mb-1">{editingOrder.nombre || 'Sin nombre'}</p>
+                                <p className="text-sm font-mono text-slate-500 dark:text-slate-400 mb-3">{editingOrder.cliente}</p>
                                 <div className="flex items-center gap-2">
-                                    <span className="px-2.5 py-1 rounded-lg bg-indigo-100 text-indigo-700 text-xs font-bold">{editingOrder.producto}</span>
-                                    <span className="text-sm font-extrabold text-slate-800 ml-auto">${editingOrder.precio}</span>
+                                    <span className="px-2.5 py-1 rounded-lg bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 text-xs font-bold">{editingOrder.producto}</span>
+                                    <span className="text-sm font-extrabold text-slate-800 dark:text-slate-100 ml-auto">${editingOrder.precio}</span>
                                 </div>
                             </div>
 
@@ -555,7 +555,7 @@ Teléfono: ${phoneDisplay}`;
                                     <select
                                         value={editStatus}
                                         onChange={(e) => setEditStatus(e.target.value)}
-                                        className="w-full appearance-none bg-white border border-slate-200 rounded-xl px-5 py-4 text-sm font-bold text-slate-700 focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all shadow-sm cursor-pointer"
+                                        className="w-full appearance-none bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-5 py-4 text-sm font-bold text-slate-700 dark:text-slate-200 focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all shadow-sm cursor-pointer"
                                     >
                                         {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
                                     </select>
@@ -572,14 +572,14 @@ Teléfono: ${phoneDisplay}`;
                                     value={editTracking}
                                     onChange={(e) => setEditTracking(e.target.value)}
                                     placeholder="Ej: CP123456789AR"
-                                    className="w-full bg-white border border-slate-200 rounded-xl px-5 py-4 text-sm font-mono font-bold text-slate-700 focus:ring-4 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition-all shadow-sm placeholder:text-slate-300 placeholder:font-sans placeholder:font-normal"
+                                    className="w-full bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-5 py-4 text-sm font-mono font-bold text-slate-700 dark:text-slate-200 focus:ring-4 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition-all shadow-sm placeholder:text-slate-300 dark:placeholder:text-slate-500"
                                 />
                             </div>
                         </div>
 
                         <div className="mt-8 space-y-3 relative z-10">
                             <div className="flex gap-3">
-                                <button onClick={() => setEditingOrder(null)} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-200 transition-colors shadow-sm">
+                                <button onClick={() => setEditingOrder(null)} className="flex-1 py-4 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors shadow-sm">
                                     Cancelar
                                 </button>
                                 <button onClick={handleSaveEdit} disabled={savingOrder} className="flex-1 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-[1.02] transition-all disabled:opacity-50 disabled:scale-100">
@@ -600,16 +600,16 @@ Teléfono: ${phoneDisplay}`;
             {/* V2 PREMIUM TICKET MODAL */}
             {viewingOrder && createPortal(
                 <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[100] flex items-center justify-center animate-fade-in p-0 sm:p-4 sm:p-6" onClick={() => { setViewingOrder(null); cancelDetailEdit(); }}>
-                    <div className="bg-white rounded-none sm:rounded-[2rem] shadow-2xl w-full h-full sm:h-auto max-w-3xl overflow-hidden flex flex-col sm:max-h-[90vh] relative border border-slate-100" onClick={e => e.stopPropagation()}>
+                    <div className="bg-white dark:bg-slate-900 rounded-none sm:rounded-[2rem] shadow-2xl w-full h-full sm:h-auto max-w-3xl overflow-hidden flex flex-col sm:max-h-[90vh] relative border border-slate-100 dark:border-slate-700" onClick={e => e.stopPropagation()}>
 
                         {/* Header */}
-                        <div className="bg-gradient-to-r from-slate-50 to-white p-6 sm:p-8 flex justify-between items-center relative border-b border-slate-100 shrink-0">
+                        <div className="bg-gradient-to-r from-slate-50 to-white dark:from-slate-800 dark:to-slate-900 p-6 sm:p-8 flex justify-between items-center relative border-b border-slate-100 dark:border-slate-700 shrink-0">
                             <div className="flex items-center gap-4 relative z-10">
                                 <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-inner border border-indigo-100/50">
                                     <Script className="w-4 h-4" />
                                 </div>
                                 <div>
-                                    <h3 className="text-2xl font-black text-slate-800 tracking-tight">Detalles de Venta</h3>
+                                    <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight">Detalles de Venta</h3>
                                     <p className="text-slate-500 font-bold text-xs uppercase tracking-widest mt-1">
                                         Ref: {viewingOrder.id ? viewingOrder.id.substring(0, 8) : 'N/A'}
                                     </p>
@@ -625,12 +625,12 @@ Teléfono: ${phoneDisplay}`;
                                         <XIcon className="w-4 h-4" />
                                     </button>
                                 )}
-                                <button onClick={() => { setViewingOrder(null); cancelDetailEdit(); }} className="w-10 h-10 rounded-full bg-slate-50 text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all flex items-center justify-center border border-slate-200">✕</button>
+                                <button onClick={() => { setViewingOrder(null); cancelDetailEdit(); }} className="w-10 h-10 rounded-full bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all flex items-center justify-center border border-slate-200 dark:border-slate-700">✕</button>
                             </div>
                         </div>
 
                         {/* Content */}
-                        <div className="p-6 sm:p-8 overflow-y-auto custom-scrollbar flex-1 bg-white relative">
+                        <div className="p-6 sm:p-8 overflow-y-auto custom-scrollbar flex-1 bg-white dark:bg-slate-900 relative">
                             {/* Top info grid */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
                                 {/* Client Info */}
@@ -638,16 +638,16 @@ Teléfono: ${phoneDisplay}`;
                                     <span className="text-[10px] font-black uppercase text-indigo-500 tracking-widest mb-3 flex items-center gap-2">
                                         <div className="w-4 h-[2px] bg-indigo-500 rounded-full"></div> Cliente
                                     </span>
-                                    <div className={`bg-slate-50 rounded-2xl p-5 border ${isDetailEditing ? 'border-indigo-200' : 'border-slate-100'}`}>
+                                    <div className={`bg-slate-50 dark:bg-slate-800 rounded-2xl p-5 border ${isDetailEditing ? 'border-indigo-200 dark:border-indigo-500/50' : 'border-slate-100 dark:border-slate-700'}`}>
                                         {isDetailEditing ? (
-                                            <input type="text" value={detailEditData.nombre || ''} onChange={e => handleDetailField('nombre', e.target.value)} className="w-full font-black text-slate-800 text-lg leading-tight mb-1 bg-white rounded-lg px-3 py-2 border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none" placeholder="Nombre completo" />
+                                            <input type="text" value={detailEditData.nombre || ''} onChange={e => handleDetailField('nombre', e.target.value)} className="w-full font-black text-slate-800 dark:text-slate-100 text-lg leading-tight mb-1 bg-white dark:bg-slate-700 rounded-lg px-3 py-2 border border-slate-200 dark:border-slate-600 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900/50 outline-none" placeholder="Nombre completo" />
                                         ) : (
-                                            <p className="font-black text-slate-800 text-lg leading-tight mb-1">{viewingOrder.nombre || 'Sin nombre'}</p>
+                                            <p className="font-black text-slate-800 dark:text-slate-100 text-lg leading-tight mb-1">{viewingOrder.nombre || 'Sin nombre'}</p>
                                         )}
-                                        <p className="font-mono text-slate-500 text-sm font-medium">{viewingOrder.cliente ? viewingOrder.cliente.split('@')[0] : '—'}</p>
-                                        <div className="mt-4 pt-4 border-t border-slate-200/60 flex justify-between items-center">
-                                            <span className="text-slate-400 font-bold text-xs">Fecha:</span>
-                                            <span className="text-slate-700 font-bold text-sm">{formatDateBA(viewingOrder.createdAt)}</span>
+                                        <p className="font-mono text-slate-500 dark:text-slate-400 text-sm font-medium">{viewingOrder.cliente ? viewingOrder.cliente.split('@')[0] : '—'}</p>
+                                        <div className="mt-4 pt-4 border-t border-slate-200/60 dark:border-slate-700/60 flex justify-between items-center">
+                                            <span className="text-slate-400 dark:text-slate-500 font-bold text-xs">Fecha:</span>
+                                            <span className="text-slate-700 dark:text-slate-300 font-bold text-sm">{formatDateBA(viewingOrder.createdAt)}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -665,45 +665,46 @@ Teléfono: ${phoneDisplay}`;
                                                 POSTDATADO: {viewingOrder.postdatado}
                                             </span>
                                         ) : (
-                                            <span className="text-[10px] font-bold bg-slate-100 text-slate-400 px-3 py-1 rounded-full border border-slate-200 uppercase tracking-widest">
+                                            <span className="text-[10px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-300 px-3 py-1 rounded-full border border-slate-200 dark:border-slate-600 uppercase tracking-widest">
                                                 Inmediato
                                             </span>
                                         )}
                                     </div>
-                                    <div className={`bg-slate-50 rounded-2xl p-5 border ${isDetailEditing ? 'border-indigo-200' : 'border-slate-100'} h-[calc(100%-28px)] flex flex-col justify-center`}>
+                                    <div className={`bg-slate-50 dark:bg-slate-800 rounded-2xl p-5 border ${isDetailEditing ? 'border-indigo-200 dark:border-indigo-500/50' : 'border-slate-100 dark:border-slate-700'} h-[calc(100%-28px)] flex flex-col justify-center`}>
                                         {isDetailEditing ? (
                                             <>
-                                                <input type="text" value={detailEditData.calle || ''} onChange={e => handleDetailField('calle', e.target.value)} className="w-full font-bold text-slate-700 text-base bg-white rounded-lg px-3 py-2 border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none mb-2" placeholder="Calle y número" />
+                                                <input type="text" value={detailEditData.calle || ''} onChange={e => handleDetailField('calle', e.target.value)} className="w-full font-bold text-slate-700 dark:text-slate-200 text-base bg-white dark:bg-slate-700 rounded-lg px-3 py-2 border border-slate-200 dark:border-slate-600 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none mb-2" placeholder="Calle y número" />
                                                 <div className="flex gap-2">
-                                                    <input type="text" value={detailEditData.ciudad || ''} onChange={e => handleDetailField('ciudad', e.target.value)} className="flex-1 font-medium text-slate-600 text-sm bg-white rounded-lg px-3 py-2 border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none" placeholder="Ciudad" />
-                                                    <input type="text" value={detailEditData.cp || ''} onChange={e => handleDetailField('cp', e.target.value)} className="w-24 font-medium text-slate-600 text-sm bg-white rounded-lg px-3 py-2 border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none" placeholder="CP" />
+                                                    <input type="text" value={detailEditData.ciudad || ''} onChange={e => handleDetailField('ciudad', e.target.value)} className="flex-1 font-medium text-slate-600 dark:text-slate-300 text-sm bg-white dark:bg-slate-700 rounded-lg px-3 py-2 border border-slate-200 dark:border-slate-600 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none" placeholder="Ciudad" />
+                                                    <input type="text" value={detailEditData.cp || ''} onChange={e => handleDetailField('cp', e.target.value)} className="w-24 font-medium text-slate-600 dark:text-slate-300 text-sm bg-white dark:bg-slate-700 rounded-lg px-3 py-2 border border-slate-200 dark:border-slate-600 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none" placeholder="CP" />
                                                 </div>
-                                                <input type="text" value={detailEditData.provincia || ''} onChange={e => handleDetailField('provincia', e.target.value)} className="w-full font-medium text-slate-600 text-sm bg-white rounded-lg px-3 py-2 border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none mt-2" placeholder="Provincia" />
+                                                <input type="text" value={detailEditData.provincia || ''} onChange={e => handleDetailField('provincia', e.target.value)} className="w-full font-medium text-slate-600 dark:text-slate-300 text-sm bg-white dark:bg-slate-700 rounded-lg px-3 py-2 border border-slate-200 dark:border-slate-600 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none mt-2" placeholder="Provincia" />
                                             </>
                                         ) : (
                                             <>
-                                                <p className="font-bold text-slate-700 text-base leading-relaxed">{viewingOrder.calle || 'Sin domicilio'}</p>
-                                                <p className="font-medium text-slate-600 text-sm mt-1">{viewingOrder.ciudad || 'Sin ciudad'} <span className="text-slate-400 ml-1">(CP: {viewingOrder.cp || '—'})</span></p>
+                                                <p className="font-bold text-slate-700 dark:text-slate-200 text-base leading-relaxed">{viewingOrder.calle || 'Sin domicilio'}</p>
+                                                <p className="font-medium text-slate-600 dark:text-slate-400 text-sm mt-1">{viewingOrder.ciudad || 'Sin ciudad'} <span className="text-slate-400 dark:text-slate-500 ml-1">(CP: {viewingOrder.cp || '—'})</span></p>
                                             </>
                                         )}
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Order Summary & Status */}
-                            <div className="bg-slate-50 rounded-3xl p-6 border border-slate-100 mb-8">
-                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                                    <div className="flex-1 w-full">
-                                        <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1 block">Producto</span>
+                            {/* Order Summary Ribbon */}
+                            <div className="bg-slate-50 dark:bg-slate-800 rounded-3xl p-6 border border-slate-100 dark:border-slate-700 mb-8">
+                                <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                                    <div className="text-center md:text-left flex-1">
                                         {isDetailEditing ? (
-                                            <input type="text" value={detailEditData.producto || ''} onChange={e => handleDetailField('producto', e.target.value)} className="w-full font-black text-slate-800 text-xl bg-white rounded-lg px-3 py-2 border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none" />
+                                            <input type="text" value={detailEditData.producto || ''} onChange={e => handleDetailField('producto', e.target.value)} className="font-black text-slate-800 dark:text-slate-100 text-xl bg-white dark:bg-slate-700 rounded-xl px-3 py-2 border border-slate-200 dark:border-slate-600 w-full focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900/50 outline-none" placeholder="Producto" />
                                         ) : (
-                                            <p className="font-black text-slate-800 text-xl">{viewingOrder.producto}</p>
+                                            <p className="font-black text-slate-800 dark:text-slate-100 text-xl">{viewingOrder.producto || 'Sin producto'}</p>
                                         )}
-                                        {viewingOrder.plan && <span className="inline-block mt-2 px-3 py-1 bg-white border border-slate-200 text-slate-600 text-xs font-bold rounded-lg shadow-sm">Plan {viewingOrder.plan} Días</span>}
+                                        <span className="inline-block mt-2 px-3 py-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-lg shadow-sm">
+                                            ID: {viewingOrder.id ? viewingOrder.id.substring(8, 16) : 'N/A'}
+                                        </span>
                                     </div>
 
-                                    <div className="w-full md:w-px h-px md:h-16 bg-slate-200"></div>
+                                    <div className="w-full md:w-px h-px md:h-16 bg-slate-200 dark:bg-slate-700"></div>
 
                                     <div className="flex-1 w-full flex flex-col items-start md:items-center">
                                         <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 block">Estado Actual</span>
@@ -712,18 +713,19 @@ Teléfono: ${phoneDisplay}`;
                                         </span>
                                     </div>
 
-                                    <div className="w-full md:w-px h-px md:h-16 bg-slate-200"></div>
+                                    <div className="w-full md:w-px h-px md:h-16 bg-slate-200 dark:bg-slate-700"></div>
 
-                                    <div className="flex-1 w-full flex flex-col items-start md:items-end">
-                                        <span className="text-[10px] font-black uppercase text-emerald-600 tracking-widest mb-1 block">Total a Pagar</span>
-                                        {isDetailEditing ? (
-                                            <div className="flex items-center gap-1">
-                                                <span className="font-black text-emerald-500 text-2xl">$</span>
-                                                <input type="text" value={detailEditData.precio || ''} onChange={e => handleDetailField('precio', e.target.value)} className="w-32 font-black text-emerald-500 text-2xl bg-white rounded-lg px-3 py-2 border border-slate-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 outline-none text-right" />
-                                            </div>
-                                        ) : (
-                                            <span className="font-black text-emerald-500 text-4xl tracking-tighter leading-none">${viewingOrder.precio || '0'}</span>
-                                        )}
+                                    <div className="text-center md:text-right">
+                                        <p className="text-slate-400 dark:text-slate-500 font-bold text-xs tracking-widest uppercase mb-1">Total a Cobrar</p>
+                                        <div className="flex items-start justify-center md:justify-end">
+                                            <span className="text-emerald-500 font-bold mt-1 mr-1 text-lg">$</span>
+                                            {isDetailEditing ? (
+                                                <input type="text" value={detailEditData.precio || ''} onChange={e => handleDetailField('precio', e.target.value)} className="font-black text-emerald-500 dark:text-emerald-400 text-4xl w-full bg-white dark:bg-slate-700 rounded-xl px-3 py-2 border border-slate-200 dark:border-slate-600 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 dark:focus:ring-emerald-900/50 outline-none" placeholder="0" />
+                                            ) : (
+                                                <h4 className="font-black text-emerald-500 dark:text-emerald-400 text-4xl tabular-nums tracking-tighter">{viewingOrder.precio}</h4>
+                                            )}
+                                        </div>
+                                        <p className="text-slate-400 dark:text-slate-500 font-bold text-xs">Pago en efectivo al repartidor</p>
                                     </div>
                                 </div>
                             </div>
@@ -741,17 +743,17 @@ Teléfono: ${phoneDisplay}`;
                                     )}
                                 </div>
 
-                                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm">
                                     {!viewingOrder.tracking ? (
                                         <div className="text-center py-6">
-                                            <p className="text-slate-400 font-medium text-sm">Aún no hay número de seguimiento asignado.</p>
+                                            <p className="text-slate-400 dark:text-slate-500 font-medium text-sm">Aún no hay número de seguimiento asignado.</p>
                                         </div>
                                     ) : (
                                         <div>
-                                            <div className="flex items-center justify-between mb-6 pb-6 border-b border-slate-100">
+                                            <div className="flex items-center justify-between mb-6 pb-6 border-b border-slate-100 dark:border-slate-700">
                                                 <div>
                                                     <span className="text-xs font-bold text-slate-500 block mb-1">Código de Tracking</span>
-                                                    <span className="font-mono text-slate-800 font-bold text-lg bg-slate-50 px-3 py-1 rounded-lg border border-slate-200 tracking-wider">
+                                                    <span className="font-mono text-slate-800 dark:text-slate-200 font-bold text-lg bg-slate-50 dark:bg-slate-700 px-3 py-1 rounded-lg border border-slate-200 dark:border-slate-600 tracking-wider">
                                                         {viewingOrder.tracking}
                                                     </span>
                                                 </div>
@@ -767,26 +769,52 @@ Teléfono: ${phoneDisplay}`;
                                                         trackingData.events && trackingData.events.length > 0 ? (
                                                             <div className="space-y-4">
                                                                 {trackingData.events.map((ev, i) => (
-                                                                    <div key={i} className="flex gap-4 items-start relative pb-6 border-l-2 border-indigo-100 last:border-0 last:pb-0 ml-2">
-                                                                        <div className="absolute -left-[5px] top-1 w-2 h-2 rounded-full bg-indigo-400 ring-4 ring-white"></div>
+                                                                    <div key={i} className="flex gap-4 items-start relative pb-6 border-l-2 border-indigo-100 dark:border-indigo-900/50 last:border-0 last:pb-0 ml-2">
+                                                                        <div className="absolute -left-[5px] top-1 w-2 h-2 rounded-full bg-indigo-400 ring-4 ring-white dark:ring-slate-800"></div>
                                                                         <div className="pl-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 w-full">
                                                                             <div className="min-w-[120px]">
-                                                                                <span className="font-bold text-slate-800 text-xs block">{ev.fecha}</span>
+                                                                                <span className="font-bold text-slate-800 dark:text-slate-200 text-xs block">{ev.fecha}</span>
                                                                                 <span className="text-blue-500 font-black uppercase text-[9px] tracking-widest mt-0.5 block">{ev.planta}</span>
                                                                             </div>
-                                                                            <p className="text-slate-600 font-medium text-sm flex-1">{ev.historia}</p>
+                                                                            <p className="text-slate-600 dark:text-slate-300 font-medium text-sm flex-1">{ev.historia}</p>
                                                                         </div>
                                                                     </div>
                                                                 ))}
                                                             </div>
                                                         ) : (
-                                                            <p className="text-slate-500 text-sm text-center py-4">El operador no reporta movimientos recientes.</p>
+                                                            <p className="text-slate-500 dark:text-slate-400 text-sm text-center py-4">El operador no reporta movimientos recientes.</p>
                                                         )
                                                     ) : (
-                                                        <div className="bg-rose-50 text-rose-600 font-bold text-sm p-4 rounded-xl text-center border border-rose-100">
+                                                        <div className="bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 font-bold text-sm p-4 rounded-xl text-center border border-rose-100 dark:border-rose-800/50">
                                                             {trackingData.error || "Tracking sin información disponible."}
                                                         </div>
                                                     )}
+                                                </div>
+                                            )}
+                                            {viewingOrder.logs && viewingOrder.logs.length > 0 && (
+                                                <div className="mt-8 pt-8 border-t border-slate-100 dark:border-slate-700">
+                                                    <span className="text-[10px] font-black uppercase text-indigo-500 tracking-widest mb-4 flex items-center gap-2">
+                                                        <div className="w-4 h-[2px] bg-indigo-500 rounded-full"></div> Historial de Estados
+                                                    </span>
+                                                    <div className="space-y-4">
+                                                        {[...viewingOrder.logs].reverse().map((log, idx) => (
+                                                            <div key={idx} className="flex gap-4 items-start relative pb-6 border-l-2 border-indigo-100 dark:border-indigo-900/50 last:border-0 last:pb-0 ml-2">
+                                                                <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-white dark:bg-slate-800 border-4 border-indigo-500 z-10"></div>
+                                                                <div className="pl-6 flex-1 pt-[-2px]">
+                                                                    <div className="flex justify-between items-center mb-1">
+                                                                        <span className="font-bold text-slate-800 dark:text-slate-200 text-xs block">{log.status}</span>
+                                                                        <span className="text-slate-400 dark:text-slate-500 text-[10px] font-bold">{formatDateBA(log.timestamp)}</span>
+                                                                    </div>
+                                                                    <p className="text-slate-600 dark:text-slate-300 font-medium text-sm flex-1">{log.message}</p>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {viewingOrder.status === 'Cancelado' && (
+                                                <div className="bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 font-bold text-sm p-4 rounded-xl text-center border border-rose-100 dark:border-rose-800/50 mt-6">
+                                                    Este pedido fue marcado como Cancelado.
                                                 </div>
                                             )}
                                         </div>

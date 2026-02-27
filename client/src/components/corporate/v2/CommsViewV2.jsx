@@ -468,7 +468,7 @@ Teléfono: ${phoneDisplay}`;
                                     <span className={`text-[10px] font-bold font-mono ${selectedChat?.id === chat.id ? 'text-indigo-100' : 'text-slate-500 dark:text-slate-400'}`}>{chat.time}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <p className={`text-xs truncate font-medium flex-1 ${selectedChat?.id === chat.id ? 'text-indigo-100' : 'text-slate-500'}`}>{chat.lastMessage?.body || 'Sin mensajes'}</p>
+                                    <p className={`text-xs truncate font-medium flex-1 ${selectedChat?.id === chat.id ? 'text-indigo-100' : 'text-slate-500 dark:text-slate-300'}`}>{chat.lastMessage?.body || 'Sin mensajes'}</p>
                                     {chat.unread > 0 && selectedChat?.id !== chat.id && (
                                         <span className="w-5 h-5 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-md">
                                             {chat.unread}
@@ -727,7 +727,7 @@ Teléfono: ${phoneDisplay}`;
                 <div className="w-full md:w-[350px] shrink-0 border-l border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex flex-col z-30 md:relative absolute right-0 top-0 bottom-0 overflow-y-auto animate-fade-in shadow-[-10px_0_30px_rgba(0,0,0,0.05)] h-full">
 
                     <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-800 shadow-sm z-10 sticky top-0">
-                        <h3 className="font-extrabold text-slate-800 text-[15px] flex items-center gap-2">
+                        <h3 className="font-extrabold text-slate-800 dark:text-slate-100 text-[15px] flex items-center gap-2">
                             <Bot className="w-5 h-5" /> Asistente IA
                         </h3>
                         <button onClick={() => setShowScriptPanel(false)} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-white/6 dark:bg-slate-800/60 rounded-xl transition-all">
@@ -740,14 +740,14 @@ Teléfono: ${phoneDisplay}`;
                         {/* Summary Block */}
                         <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm border border-slate-200 dark:border-slate-700 relative group">
                             <div className="flex justify-between items-center mb-3">
-                                <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Contexto IA</h4>
+                                <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-300">Contexto IA</h4>
                                 <button onClick={handleSummarize} disabled={summarizing || messages.length === 0} className="text-[10px] font-bold text-indigo-700 bg-indigo-100/80 px-2.5 py-1 rounded-lg hover:bg-indigo-200 transition-colors disabled:opacity-50">
                                     {summarizing ? 'Generando...' : 'Resumir Chat'}
                                 </button>
                             </div>
                             <div className="min-h-[80px]">
                                 {summaryText ? (
-                                    <div className="text-xs font-medium text-slate-700 whitespace-pre-wrap leading-relaxed">
+                                    <div className="text-xs font-medium text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
                                         {summaryText}
                                         <button onClick={() => setSummaryText(null)} className="absolute top-2 right-2 text-slate-400 hover:text-rose-500 bg-slate-100 dark:bg-slate-700 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"><Trash className="w-5 h-5" /></button>
                                     </div>
@@ -760,7 +760,7 @@ Teléfono: ${phoneDisplay}`;
                         {/* Script Injection Area */}
                         <div className="flex-1 pb-6">
                             <div className="flex items-center justify-between mb-3 px-1">
-                                <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Guión Sugerido</h4>
+                                <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-300">Guión Sugerido</h4>
                                 <span className="bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 text-indigo-600 dark:text-indigo-400 text-[9px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">{selectedChat.assignedScript || 'V3'}</span>
                             </div>
 
@@ -780,11 +780,11 @@ Teléfono: ${phoneDisplay}`;
                                                 className="w-full text-left p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-indigo-300 transition-all shadow-sm hover:shadow-md group cursor-pointer relative overflow-hidden"
                                             >
                                                 <div className="absolute top-0 right-0 w-12 h-12 bg-indigo-50 dark:bg-indigo-900/30 rounded-bl-full -mr-6 -mt-6 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                                                <div className="flex items-center justify-between mb-2 text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-indigo-600 relative z-10 transition-colors">
+                                                <div className="flex items-center justify-between mb-2 text-[10px] font-black text-slate-400 dark:text-slate-300 uppercase tracking-widest group-hover:text-indigo-600 dark:group-hover:text-indigo-400 relative z-10 transition-colors">
                                                     <span>{stepKey.replace(/_/g, ' ')}</span>
                                                     <span className="opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 transition-all duration-300">Insertar +</span>
                                                 </div>
-                                                <p className="text-[11.5px] text-slate-700 font-medium line-clamp-3 leading-relaxed relative z-10">
+                                                <p className="text-[11.5px] text-slate-700 dark:text-slate-200 font-medium line-clamp-3 leading-relaxed relative z-10">
                                                     {formatScriptMessage(step.response, selectedChat)}
                                                 </p>
                                             </button>

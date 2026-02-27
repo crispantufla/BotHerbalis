@@ -140,7 +140,7 @@ const SettingsViewV2 = ({ status }) => {
             <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-indigo-50/50 via-transparent to-purple-50/50 pointer-events-none z-0"></div>
 
             {/* Header V2 */}
-            <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-200 dark:border-slate-700 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-8 mb-8 relative z-10">
+            <div className="bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-8 mb-8 relative z-10">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                     <div>
                         <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-700 to-purple-600 dark:from-indigo-400 dark:to-purple-400 tracking-tight">
@@ -162,7 +162,7 @@ const SettingsViewV2 = ({ status }) => {
                     {/* Left Column: Editor & Tools */}
                     <div className="space-y-8">
                         {/* Wrapper for original PriceEditor to adapt it to Glassmorphism */}
-                        <div className="bg-white dark:bg-slate-800 p-8 rounded-[2rem] border border-slate-200 dark:border-slate-700 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
+                        <div className="bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl p-8 rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
                             <div className="absolute -top-32 -left-32 w-64 h-64 bg-indigo-400/10 blur-[60px] rounded-full pointer-events-none"></div>
                             <div className="relative z-10">
                                 <PriceEditor />
@@ -173,7 +173,7 @@ const SettingsViewV2 = ({ status }) => {
                     {/* Right Column: Scripts & Danger */}
                     <div className="space-y-8">
                         {/* Script Switcher V2 */}
-                        <div className="bg-white dark:bg-slate-800 p-8 rounded-[2rem] border border-slate-200 dark:border-slate-700 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
+                        <div className="bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl p-8 rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
                             <div className="absolute -bottom-20 -right-20 w-80 h-80 bg-purple-400/10 blur-[80px] rounded-full pointer-events-none"></div>
                             <div className="flex items-center gap-4 mb-8 relative z-10">
                                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-fuchsia-600 text-white flex items-center justify-center shadow-lg shadow-purple-500/20">
@@ -195,8 +195,8 @@ const SettingsViewV2 = ({ status }) => {
                                         key={script.id}
                                         onClick={() => handleSwitchScript(script.id)}
                                         className={`p-5 rounded-2xl border-2 cursor-pointer transition-all duration-300 flex flex-col items-start relative overflow-hidden ${activeScript === script.id
-                                            ? `bg-white dark:bg-slate-800 border-${script.color}-500 shadow-lg shadow-${script.color}-500/20 transform scale-105 z-10`
-                                            : `bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 hover:border-${script.color}-300 hover:bg-white dark:hover:bg-slate-800`
+                                            ? `bg-white/10 dark:bg-slate-800/80 border-${script.color}-500 shadow-lg shadow-${script.color}-500/20 transform scale-105 z-10`
+                                            : `bg-white/5 dark:bg-slate-800/40 border-slate-200/50 dark:border-slate-700/50 hover:border-${script.color}-300 hover:bg-white/10 dark:hover:bg-slate-800/60`
                                             } ${script.id === 'rotacion' ? 'sm:col-span-2 sm:flex-row sm:items-center sm:justify-between' : ''}`}
                                     >
                                         <div className="flex items-start gap-4 flex-1">
@@ -216,7 +216,7 @@ const SettingsViewV2 = ({ status }) => {
 
                                         {/* Stats Display */}
                                         {script.stats && (
-                                            <div className="mt-4 w-full bg-slate-50 dark:bg-slate-700/30 border border-slate-100 dark:border-slate-700 p-2.5 rounded-xl flex items-center justify-between">
+                                            <div className="mt-4 w-full bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50 p-2.5 rounded-xl flex items-center justify-between">
                                                 <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Conversión</span>
                                                 <span className={`text-xs font-mono font-extrabold ${activeScript === script.id ? `text-${script.color}-600 dark:text-${script.color}-400` : 'text-slate-700 dark:text-slate-300'}`}>
                                                     {script.stats.started > 0 ? Math.round((script.stats.completed / script.stats.started) * 100) : 0}%
@@ -230,7 +230,7 @@ const SettingsViewV2 = ({ status }) => {
                         </div>
 
                         {/* Danger Zone */}
-                        <div className="bg-white dark:bg-slate-800 p-8 rounded-[2rem] border border-rose-100 dark:border-rose-900/50 shadow-[0_8px_30px_rgba(244,63,94,0.04)] relative overflow-hidden group">
+                        <div className="bg-rose-50/50 dark:bg-slate-800/40 backdrop-blur-xl p-8 rounded-[2rem] border border-rose-200/50 dark:border-rose-900/50 shadow-[0_8px_30px_rgba(244,63,94,0.04)] relative overflow-hidden group">
                             <div className="absolute -left-20 top-1/2 -translate-y-1/2 w-40 h-40 bg-rose-500/10 blur-[40px] rounded-full group-hover:bg-rose-500/20 transition-colors pointer-events-none"></div>
                             <div className="absolute left-0 top-0 bottom-0 w-2 bg-gradient-to-b from-rose-400 to-rose-600 rounded-l-[2rem]"></div>
 
@@ -249,7 +249,7 @@ const SettingsViewV2 = ({ status }) => {
                         </div>
 
                         {/* Herramientas */}
-                        <div className="bg-white dark:bg-slate-800 p-8 rounded-[2rem] border border-slate-200 dark:border-slate-700 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
+                        <div className="bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl p-8 rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
                             <div className="absolute top-0 right-0 w-32 h-32 bg-blue-400/10 blur-[50px] rounded-full pointer-events-none"></div>
                             <div className="flex items-center gap-4 mb-6 relative z-10">
                                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/20">
@@ -261,7 +261,7 @@ const SettingsViewV2 = ({ status }) => {
                                 </div>
                             </div>
 
-                            <button onClick={handleTestReport} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 px-6 py-4 rounded-xl text-sm font-extrabold hover:border-indigo-300 dark:hover:border-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-sm flex items-center justify-center gap-3 group relative z-10 hover:shadow-md">
+                            <button onClick={handleTestReport} className="w-full bg-white/50 dark:bg-slate-800/80 border border-slate-200/50 dark:border-slate-700 text-slate-700 dark:text-slate-200 px-6 py-4 rounded-xl text-sm font-extrabold hover:border-indigo-300 dark:hover:border-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-sm flex items-center justify-center gap-3 group relative z-10 hover:shadow-md">
                                 <span className="text-indigo-400 group-hover:text-indigo-600 transition-colors"><Download className="w-5 h-5" /></span>
                                 Generar & Descargar Reporte PDF
                             </button>
@@ -270,7 +270,7 @@ const SettingsViewV2 = ({ status }) => {
 
                     {/* FULL WIDTH: Memory Management Panel */}
                     <div className="xl:col-span-2">
-                        <div className={`bg-white dark:bg-slate-800 p-8 rounded-[2rem] border border-slate-200 dark:border-slate-700 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden ${memStats ? getMemoryLabel().glow : ''}`}>
+                        <div className={`bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl p-8 rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden ${memStats ? getMemoryLabel().glow : ''}`}>
                             <div className="absolute -top-20 -right-20 w-80 h-80 bg-indigo-400/10 blur-[80px] rounded-full pointer-events-none"></div>
                             <div className="absolute left-0 top-0 bottom-0 w-2 bg-gradient-to-b from-indigo-400 to-purple-600 rounded-l-[2rem]"></div>
 

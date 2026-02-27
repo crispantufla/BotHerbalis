@@ -69,7 +69,7 @@ const PriceEditor = () => {
     if (loading) return <div>Cargando precios...</div>;
 
     return (
-        <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 h-full transition-colors duration-300">
+        <div className="bg-transparent p-6 h-full transition-colors duration-300">
             <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-6 flex items-center gap-2">
                 <span className="text-emerald-500">💰</span> Editor de Precios
             </h2>
