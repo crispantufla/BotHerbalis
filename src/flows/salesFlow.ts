@@ -101,22 +101,28 @@ export async function processSalesFlow(
                         // If there are ANY previous outgoing messages (bot or human),
                         // this person was already spoken to. Auto-pause UNLESS they show purchase intent.
                         const hasPriorOutgoing = outgoingMessages.length > 0;
+                        // Also flag if there are 5+ total messages (heavy history, likely not a fresh lead)
+                        const hasHeavyHistory = messages.length > 5;
+                        const shouldPauseByHistory = hasPriorOutgoing || hasHeavyHistory;
 
-                        if (hasPriorOutgoing) {
+                        if (shouldPauseByHistory) {
                             const showsPurchaseIntent = PURCHASE_INTENT_KEYWORDS.test(normalizedText);
 
                             if (showsPurchaseIntent) {
-                                console.log(`[SMART-DETECT] User ${userId} has prior conversation but shows purchase intent ("${text.substring(0, 50)}"). Allowing sales flow.`);
+                                console.log(`[SMART-DETECT] User ${userId} has prior history (outgoing: ${outgoingMessages.length}, total: ${messages.length}) but shows purchase intent ("${text.substring(0, 50)}"). Allowing sales flow.`);
                                 // Let them through to the greeting flow normally
                             } else {
-                                console.log(`[SMART-DETECT] User ${userId} has prior conversation and NO purchase intent. Auto-pausing.`);
+                                const reason = hasPriorOutgoing
+                                    ? `Ya tenía ${outgoingMessages.length} mensaje(s) enviados previos`
+                                    : `Tiene ${messages.length} mensajes totales en el historial (+5)`;
+                                console.log(`[SMART-DETECT] User ${userId}: ${reason} and NO purchase intent. Auto-pausing.`);
                                 if (dependencies.sharedState && dependencies.sharedState.pausedUsers) {
                                     dependencies.sharedState.pausedUsers.add(userId);
                                     try {
                                         if (dependencies.notifyAdmin) dependencies.notifyAdmin(
                                             '😴 Cliente con historial previo',
                                             userId,
-                                            `Este contacto ya tenía mensajes previos en WhatsApp y volvió a escribir: "${text.substring(0, 100)}"\nEl bot se silenció automáticamente. Si es un prospecto nuevo, despausalo desde el panel.`
+                                            `${reason}. Volvió a escribir: "${text.substring(0, 100)}"\nEl bot se silenció automáticamente. Si es un prospecto nuevo, despausalo desde el panel.`
                                         );
                                     } catch (e) { }
                                 }
