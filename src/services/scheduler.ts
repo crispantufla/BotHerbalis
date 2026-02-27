@@ -8,8 +8,8 @@ const logger = require('../utils/logger');
  */
 
 
-const timeUtils = require('./timeUtils');
-const isBusinessHours = timeUtils.isBusinessHours;
+import { isBusinessHours } from './timeUtils';
+import { differenceInMinutes, differenceInHours, differenceInDays } from 'date-fns';
 
 const messageTemplates = require('../utils/messageTemplates');
 const buildConfirmationMessage = messageTemplates.buildConfirmationMessage;
@@ -38,13 +38,13 @@ const RE_ENGAGEABLE_STEPS = new Set([
     'waiting_data'
 ]);
 
-const STALE_THRESHOLD_MS = 20 * 60 * 1000;         // 20 minutes
-const COLD_LEAD_THRESHOLD_MS = 20 * 60 * 1000;      // 20 minutes
-const ABANDONED_CART_MIN_MS = 24 * 60 * 60 * 1000;  // 24 hours
-const ABANDONED_CART_MAX_MS = 48 * 60 * 60 * 1000;  // 48 hours
-const AUTO_APPROVE_THRESHOLD_MS = 15 * 60 * 1000;   // 15 minutes
-const CHECK_INTERVAL_MS = 5 * 60 * 1000;            // every 5 min
-const CLEANUP_THRESHOLD_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const STALE_THRESHOLD_MINS = 20;
+const COLD_LEAD_THRESHOLD_HOURS = 24;
+const ABANDONED_CART_MIN_HOURS = 24;
+const ABANDONED_CART_MAX_HOURS = 48;
+const AUTO_APPROVE_THRESHOLD_MINS = 15;
+const CHECK_INTERVAL_MS = 5 * 60 * 1000;            // Mantener MS para setInterval
+const CLEANUP_THRESHOLD_DAYS = 30;
 
 const CONTEXTUAL_FOLLOW_UPS: Record<string, string[]> = {
     'waiting_weight': [
@@ -95,9 +95,8 @@ function checkStaleUsers(sharedState: SchedulerSharedState, dependencies: Schedu
         if (state.staleAlerted) continue;
         if (!state.stepEnteredAt) continue;
 
-        const elapsed = now - state.stepEnteredAt;
-        if (elapsed > STALE_THRESHOLD_MS) {
-            const minutes = Math.round(elapsed / 60000);
+        const minutes = differenceInMinutes(now, state.stepEnteredAt);
+        if (minutes > STALE_THRESHOLD_MINS) {
             logger.info(`[SCHEDULER] Stale user detected: ${userId} on step "${state.step}" for ${minutes} min`);
 
             notifyAdmin(
@@ -126,9 +125,8 @@ function autoApproveOrders(sharedState: SchedulerSharedState, dependencies: Sche
         if (state.step !== 'waiting_admin_ok') continue;
         if (!state.stepEnteredAt) continue;
 
-        const elapsed = now - state.stepEnteredAt;
-        if (elapsed > AUTO_APPROVE_THRESHOLD_MS) {
-            const minutes = Math.round(elapsed / 60000);
+        const minutes = differenceInMinutes(now, state.stepEnteredAt);
+        if (minutes > AUTO_APPROVE_THRESHOLD_MINS) {
             logger.info(`[AUTO-APPROVE] Order for ${userId} auto-approved after ${minutes} min without admin review`);
 
             // Build confirmation message using shared builder
@@ -192,9 +190,8 @@ function checkColdLeads(sharedState: SchedulerSharedState, dependencies: Schedul
         if (state.reengagementSent) continue;
         if (!state.lastActivityAt) continue;
 
-        const elapsed = now - state.lastActivityAt;
-        if (elapsed > COLD_LEAD_THRESHOLD_MS) {
-            const hours = Math.round(elapsed / 3600000);
+        const hours = differenceInHours(now, state.lastActivityAt);
+        if (hours >= COLD_LEAD_THRESHOLD_HOURS) {
             logger.info(`[SCHEDULER] Cold lead detected: ${userId} inactive for ${hours}h on "${state.step}"`);
 
             // Select contextual message
@@ -235,9 +232,9 @@ function checkAbandonedCarts(sharedState: SchedulerSharedState, dependencies: Sc
         const lastActivity = state.lastInteraction || state.lastActivityAt;
         if (!lastActivity) continue;
 
-        const elapsed = now - lastActivity;
-        if (elapsed > ABANDONED_CART_MIN_MS && elapsed < ABANDONED_CART_MAX_MS) {
-            logger.info(`[SCHEDULER] Abandoned cart detected: ${userId} inactive for >24h on "${state.step}"`);
+        const hours = differenceInHours(now, lastActivity);
+        if (hours > ABANDONED_CART_MIN_HOURS && hours < ABANDONED_CART_MAX_HOURS) {
+            logger.info(`[SCHEDULER] Abandoned cart detected: ${userId} inactive for ${hours}h on "${state.step}"`);
 
             const msg = 'Hola, ¿te quedó alguna duda con los planes? Avisame que te guardo la promo con envío gratis.';
             sendMessageWithDelay(userId, msg);
@@ -262,7 +259,7 @@ function cleanupOldUsers(sharedState: SchedulerSharedState, dependencies: Schedu
 
     for (const [userId, state] of Object.entries(userState)) {
         const lastActivity = state.lastActivityAt || state.stepEnteredAt || 0;
-        if (lastActivity && (now - lastActivity) > CLEANUP_THRESHOLD_MS) {
+        if (lastActivity && differenceInDays(now, lastActivity) > CLEANUP_THRESHOLD_DAYS) {
             // Keep completed orders for reference, only delete truly abandoned
             if (state.step === 'completed') continue;
             delete userState[userId];

@@ -15,6 +15,8 @@ Al cambiar de cuenta de Google, puedes pedirle a la IA: *"Lee el archivo AI_SESS
 2. **Postdatado Mejorado:** Se instruyó a la IA en `ai.ts` (`_getModulePlanChoice`) para que, ante falta de dinero, ofrezca programar el envío y congelar el precio, obligando a combinar esto con la pregunta del plan (ej: "¿Para qué fecha lo agendamos, y con qué plan preferís que lo armemos?").
 3. **UI/UX Diferenciación Visual:** En `SalesView.jsx` y `SalesViewV2.jsx`, se asignó color fucsia (`fuchsia-100`/`fuchsia-700`) al estado "En sistema" y celeste (`sky-100`/`sky-700`) a "Confirmado".
 
+**🔍 Nota de Análisis Posterior (Postdatado global):** Se verificó y confirmó que ofrecer y capturar fechas diferidas o falta de dinero de manera temprana (durante la elección del plan en `_getModulePlanChoice`) NO entra en conflicto con las lógicas parcheadas ayer en la etapa final de dirección (`waiting_data`). La variable `currentState.postdatado` es de alcance global y su método de abstracción, `_handleExtractedData`, la guarda independientemente del paso (ya sea interceptada por la IA o por un regex), permitiendo al bot guardar el conocimiento a futuro sin interrumpir las validaciones estrictas de dirección o cambio de producto posteriores.
+
 ---
 **Problema:**
 1. Al entrar al paso `waiting_data` y mandar un postdatado como "además cobro el 15...", el interceptor global de FAQ respondía sobre agendar la fecha, pero inmediatamente después _volvía_ a mandar el mensaje nativo pidiendo "Pasame los datos para el envío", duplicando el pedido y rompiendo la naturalidad (Doble Respuesta).

@@ -1,9 +1,29 @@
 const logger = require('../utils/logger');
+import { z } from 'zod';
+import { zodResponseFormat } from 'openai/helpers/zod';
+import { differenceInDays } from 'date-fns';
+import NodeCache from 'node-cache';
 import OpenAI from 'openai';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { UserState } from '../types/state';
+
+// --- ZOD SCHEMAS FOR STRUCTURED OUTPUTS ---
+const ChatResponseSchema = z.object({
+    response: z.string().describe("Your short 1-2 sentence response to the user"),
+    goalMet: z.boolean().describe("Whether the user fulfilled the objective of the current step"),
+    extractedData: z.string().nullable().describe("Extracted data, or null if nothing to extract")
+});
+
+const AddressResponseSchema = z.object({
+    nombre: z.string().nullable().describe("Nombre y apellido"),
+    calle: z.string().nullable().describe("Calle, altura, barrio"),
+    ciudad: z.string().nullable().describe("Ciudad o localidad"),
+    provincia: z.string().nullable().describe("Provincia argentina"),
+    cp: z.string().nullable().describe("Código postal numérico"),
+    postdatado: z.string().nullable().describe("Fecha futura de postdatado si la pidió")
+});
 
 // Interfaces locales
 export interface APIContext {
@@ -36,7 +56,7 @@ const MAX_HISTORY_LENGTH = 50;
 // --- RATE LIMIT CONFIGURATION ---
 const MAX_CONCURRENT = 3;
 const MIN_DELAY_MS = 200;
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 min cache
+const CACHE_TTL_SECONDS = 45 * 60; // 45 min cache for node-cache
 
 // --- PRICES PATH ---
 const PRICES_PATH = path.join(__dirname, '../../data/prices.json');
@@ -309,109 +329,7 @@ function _buildSystemPrompt(step: string): string {
     ].join('\n\n');
 }
 
-// ═══════════════════════════════════════════════════════
-// GLOBAL REQUEST QUEUE — Prevents rate limit floods
-// ═══════════════════════════════════════════════════════
-class RequestQueue {
-    maxConcurrent: number;
-    minDelayMs: number;
-    running: number;
-    queue: { fn: () => Promise<any>, resolve: (v: any) => void, reject: (err: any) => void }[];
-    lastRequestTime: number;
 
-    constructor(maxConcurrent: number, minDelayMs: number) {
-        this.maxConcurrent = maxConcurrent;
-        this.minDelayMs = minDelayMs;
-        this.running = 0;
-        this.queue = [];
-        this.lastRequestTime = 0;
-    }
-
-    enqueue<T>(fn: () => Promise<T>): Promise<T> {
-        return new Promise((resolve, reject) => {
-            this.queue.push({ fn, resolve: resolve as (v: any) => void, reject });
-            this._process();
-        });
-    }
-
-    async _process(): Promise<void> {
-        if (this.running >= this.maxConcurrent || this.queue.length === 0) return;
-
-        this.running++;
-        const nextItem = this.queue.shift();
-        if (!nextItem) {
-            this.running--;
-            return;
-        }
-        const { fn, resolve, reject } = nextItem;
-
-        try {
-            // Enforce minimum delay between requests
-            const now = Date.now();
-            const elapsed = now - this.lastRequestTime;
-            if (elapsed < this.minDelayMs) {
-                await new Promise(r => setTimeout(r, this.minDelayMs - elapsed));
-            }
-            this.lastRequestTime = Date.now();
-
-            const result = await fn();
-            resolve(result);
-        } catch (e) {
-            reject(e);
-        } finally {
-            this.running--;
-            this._process();
-        }
-    }
-
-    get pending() { return this.queue.length; }
-    get active() { return this.running; }
-}
-
-// ═══════════════════════════════════════════════════════
-// SIMPLE RESPONSE CACHE — Avoids duplicate API calls
-// ═══════════════════════════════════════════════════════
-class ResponseCache {
-    ttl: number;
-    cache: Map<string, { value: any, time: number }>;
-
-    constructor(ttlMs: number) {
-        this.ttl = ttlMs;
-        this.cache = new Map();
-    }
-
-    _hash(str: string) {
-        let hash = 0;
-        for (let i = 0; i < str.length; i++) {
-            hash = ((hash << 5) - hash) + str.charCodeAt(i);
-            hash |= 0;
-        }
-        return hash.toString(36);
-    }
-
-    get(prompt: string): any {
-        const key = this._hash(prompt);
-        const entry = this.cache.get(key);
-        if (entry && Date.now() - entry.time < this.ttl) {
-            return entry.value;
-        }
-        if (entry) this.cache.delete(key);
-        return null;
-    }
-
-    set(prompt: string, value: any): void {
-        const key = this._hash(prompt);
-        this.cache.set(key, { value, time: Date.now() });
-        if (this.cache.size > 200) {
-            const now = Date.now();
-            for (const [k, v] of this.cache) {
-                if (now - v.time > this.ttl) this.cache.delete(k);
-            }
-        }
-    }
-
-    get size() { return this.cache.size; }
-}
 
 // ═══════════════════════════════════════════════════════
 // AI SERVICE — OpenAI GPT-4o-mini
@@ -419,8 +337,7 @@ class ResponseCache {
 class AIService {
     client: OpenAI;
     model: string;
-    queue: RequestQueue;
-    cache: ResponseCache;
+    cache: NodeCache;
     stats: { calls: number, cached: number, retries: number, errors: number };
 
     constructor() {
@@ -433,51 +350,73 @@ class AIService {
 
         this.client = new OpenAI({ apiKey });
         this.model = MODEL;
-
-        this.queue = new RequestQueue(MAX_CONCURRENT, MIN_DELAY_MS);
-        this.cache = new ResponseCache(CACHE_TTL_MS);
+        this.cache = new NodeCache({ stdTTL: CACHE_TTL_SECONDS, checkperiod: 120, maxKeys: 1000 });
         this.stats = { calls: 0, cached: 0, retries: 0, errors: 0 };
+    }
+
+    /**
+     * Hash string utility for Keys
+     */
+    _hashKey(str: string): string {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            hash = ((hash << 5) - hash) + str.charCodeAt(i);
+            hash |= 0;
+        }
+        // Prefab with standard length for collision awareness
+        return 'ai_' + hash.toString(36) + '_' + str.length;
     }
 
     /**
      * Core API call with retry + rate limit handling
      */
-    async _callQueued<T>(apiCallFn: () => Promise<T>, cacheKey: string | null = null): Promise<T> {
+    async _callQueued<T>(apiCallFn: () => Promise<T>, rawCacheKey: string | null = null, customTTL: number | undefined = undefined): Promise<T> {
         // Check cache first
-        if (cacheKey) {
-            const cached = this.cache.get(cacheKey);
-            if (cached) {
+        let cacheKey = null;
+        if (rawCacheKey) {
+            cacheKey = this._hashKey(rawCacheKey);
+            const cached: T | undefined = this.cache.get(cacheKey);
+            if (cached !== undefined) {
                 this.stats.cached++;
                 return cached;
             }
         }
-
         this.stats.calls++;
 
-        const result = await this.queue.enqueue(async () => {
-            for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-                try {
-                    return await apiCallFn();
-                } catch (e: any) {
-                    const status = e.status || e.statusCode;
-                    if (status === 429) {
-                        this.stats.retries++;
-                        const waitTime = Math.pow(2, attempt + 1) * 1000 + Math.floor(Math.random() * 1000);
-                        logger.warn(`⚠️ [AI] Rate Limit (429). Attempt ${attempt + 1}/${MAX_RETRIES}. Backing off ${waitTime / 1000}s...`);
-                        await new Promise(r => setTimeout(r, waitTime));
-                    } else {
-                        this.stats.errors++;
-                        throw e;
-                    }
+        let result: T | undefined;
+        let success = false;
+
+        for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+            try {
+                result = await apiCallFn();
+                success = true;
+                break;
+            } catch (e: any) {
+                const status = e.status || e.statusCode;
+                if (status === 429) {
+                    this.stats.retries++;
+                    const waitTime = Math.pow(2, attempt + 1) * 1000 + Math.floor(Math.random() * 1000);
+                    logger.warn(`⚠️ [AI] Rate Limit (429). Attempt ${attempt + 1}/${MAX_RETRIES}. Backing off ${waitTime / 1000}s...`);
+                    await new Promise(r => setTimeout(r, waitTime));
+                } else {
+                    this.stats.errors++;
+                    throw e; // Non-rate limit errors bubble up to BullMQ worker explicitly
                 }
             }
+        }
+
+        if (!success || result === undefined) {
             this.stats.errors++;
-            throw new Error("AI Service Unavailable (Max Retries Exceeded)");
-        });
+            throw new Error("AI Service Unavailable (Max Retries Exceeded or Unhandled Error)");
+        }
 
         // Cache the result
         if (cacheKey && result) {
-            this.cache.set(cacheKey, result);
+            if (customTTL) {
+                this.cache.set(cacheKey, result, customTTL);
+            } else {
+                this.cache.set(cacheKey, result);
+            }
         }
 
         return result;
@@ -580,26 +519,28 @@ INSTRUCCIONES:
 6. PROHIBIDO: No hables de pago, envío, precios, ni datos de envío si el OBJETIVO DEL PASO no lo menciona, a menos que el usuario lo haya preguntado explícitamente. Limitá tu respuesta al tema del objetivo.
 7. MENORES DE EDAD: Si el mensaje menciona menores, VERIFICÁ EL HISTORIAL. Si ya se aclaró que la persona es mayor de 18, NO repitas la restricción. Confirmá que puede tomarla y seguí adelante.
 8. ANTI-REPETICIÓN: NUNCA repitas textualmente un mensaje que ya está en el historial. Si necesitás pedir los mismos datos, usá una frase DIFERENTE.
-9. Devolvé SOLO este JSON (sin markdown, sin backticks):
-{ "response": "tu respuesta corta", "goalMet": true/false, "extractedData": "dato extraído o null" }
 `;
 
         try {
             const systemPrompt = _buildSystemPrompt(context.step || 'general');
-            const result = await this._callQueued(
+            const result: any = await this._callQueued(
                 () => this.client.chat.completions.create({
                     model: this.model,
                     messages: [
                         { role: "system", content: systemPrompt },
                         { role: "user", content: userPrompt }
                     ],
+                    response_format: zodResponseFormat(ChatResponseSchema, "chat_response"),
                     temperature: 0.7,
                     max_tokens: COMPLEX_STEPS.has(context.step || '') ? 450 : 250
                 }),
-                null // No cache for chat — every conversation is unique
+                `chat_${systemPrompt.length}_${userPrompt.substring(0, 150)}` // Caché activo para FAQs y etapas repetitivas
             );
-            const text = result.choices[0].message?.content || "";
-            return this._parseJSON(text);
+
+            // OpenAI Structured Outputs guarantees this structure natively due to zodResponseFormat
+            // The content string is 100% guaranteed to be a valid JSON matching the schema
+            const content = result.choices[0].message?.content || "";
+            return this._parseJSON(content);
         } catch (e: any) {
             logger.error("🔴 [AI] Chat Error:", e.message);
             return { response: "Estoy teniendo un pequeño problema técnico, ¿me repetís?", goalMet: false };
@@ -612,13 +553,12 @@ INSTRUCCIONES:
     async checkAndSummarize(history: any[]): Promise<{ summary: string; prunedHistory: any[] } | null> {
         if (!history || history.length <= 50) return null;
 
-        const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
         const now = Date.now();
 
         // Find how many messages are within the last 3 days
         const recentMessages = history.filter(msg => {
             if (!msg.timestamp) return false;
-            return (now - msg.timestamp) <= THREE_DAYS_MS;
+            return differenceInDays(now, msg.timestamp) <= 3;
         });
 
         const messagesToKeepCount = Math.max(50, recentMessages.length);
@@ -692,6 +632,7 @@ INSTRUCCIONES:
      * Generate Report (for analyze_day.js)
      */
     async generateReport(prompt: string): Promise<string> {
+        const cacheKey = `report_${prompt.substring(0, 100)}`;
         try {
             const result = await this._callQueued(
                 () => this.client.chat.completions.create({
@@ -703,7 +644,8 @@ INSTRUCCIONES:
                     temperature: 0.3,
                     max_tokens: 1500
                 }),
-                null
+                cacheKey, // Clave de caché
+                60 * 60 // 1 hora de caché TTL para reportes diarios
             );
             return result.choices[0].message?.content || "";
         } catch (e: any) {
@@ -728,7 +670,10 @@ INSTRUCCIONES:
         - ciudad: Localidad o ciudad (ej: "Valle Viejo", "El Bañado", "Gualeguay").
         - provincia: Provincia de Argentina (ej: "Catamarca", "Córdoba", "Entre Ríos").
         - cp: Código postal numérico (ej: "4707", "5000").
-        - postdatado: SOLO si el cliente EXPLÍCITAMENTE pide enviar o recibir el pedido en una fecha futura (ej: "mandamelo el 10", "cobro a principio de mes"). Si el texto es solo datos de dirección/nombre, SIEMPRE devolver null. NO inventar ni adivinar fechas.
+        
+        FECHA ACTUAL DE LA CONSULTA: ${new Date().toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+        - postdatado: SOLO si el cliente EXPLÍCITAMENTE pide enviar o recibir el pedido en una fecha futura (ej: "mandamelo el 10", "cobro a principio de mes", "el viernes que viene"). 
+          CRÍTICO: Usá la "Fecha Actual" provista arriba para calcular el día exacto y retorná la fecha en formato "dd/MM" (ej: "10/05", "15/12"). Si es "a principio de mes", asume el día 05 del mes siguiente. Si el texto es solo datos de dirección/nombre, SIEMPRE devolver null. NO inventes si no lo pidieron.
         
         REGLAS Y CONTEXTO GEOGRÁFICO:
         1. Tu prioridad es extraer CUALQUIER dato útil, aunque falten otros.
@@ -739,31 +684,25 @@ INSTRUCCIONES:
         5. Si el usuario envía SOLO SU NOMBRE (ej: "Juan", "Pedro Pablo"), extraelo como "nombre", y devuelve los demás como null.
         6. Si el texto dice claramente de qué provincia es, respetalo aunque no coincida con el código postal.
         7. Las Avenidas o calles a veces están abreviadas (ej: "av belgrano 45D").
-        
-        Devolver JSON PURO:
-        {
-          "nombre": "string o null",
-          "calle": "string o null",
-          "ciudad": "string o null",
-          "provincia": "string o null",
-          "cp": "string o null",
-          "postdatado": "string o null"
-        }
         `;
         try {
-            const result = await this._callQueued(
+            const result: any = await this._callQueued(
                 () => this.client.chat.completions.create({
                     model: this.model,
                     messages: [
-                        { role: "system", content: "Sos un parser de datos de envío experto en geografía argentina. Tu salida es SIEMPRE JSON compatible puro." },
+                        { role: "system", content: "Sos un parser de datos de envío experto en geografía argentina." },
                         { role: "user", content: prompt }
                     ],
+                    response_format: zodResponseFormat(AddressResponseSchema, "address_response"),
                     temperature: 0,
                     max_tokens: 200
                 }),
-                `addr_${text.substring(0, 100)}`
+                `addr_${text.substring(0, 50)}`, // Clave de caché para deduplicar textos crudos como "1", "2" o direcciones comunes
+                5 * 60 // 5 MINUTOS DE TTL para extracciones
             );
-            return this._parseJSON(result.choices[0].message?.content || "");
+
+            const content = result.choices[0].message?.content || "";
+            return this._parseJSON(content);
         } catch (e: any) {
             return { _error: true };
         }
@@ -877,9 +816,7 @@ INSTRUCCIONES:
     getStats() {
         return {
             ...this.stats,
-            queuePending: this.queue.pending,
-            queueActive: this.queue.active,
-            cacheSize: this.cache.size
+            cacheSize: this.cache.keys().length
         };
     }
 

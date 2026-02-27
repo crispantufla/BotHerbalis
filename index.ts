@@ -77,6 +77,7 @@ const { startServer } = require('./src/api/server'); // Centralized Server
 const { startScheduler } = require('./src/services/scheduler'); // P3: Stale/Re-engagement checks
 const { isBusinessHours, isDeepNight, getArgentinaHour } = require('./src/services/timeUtils');
 const { buildConfirmationMessage } = require('./src/utils/messageTemplates');
+const { botQueue, initWorker } = require('./src/services/queueService');
 
 // --- PRISMA DATABASE SETUP ---
 const { prisma } = require('./db');
@@ -958,12 +959,17 @@ async function _processDebounced(userId: string): Promise<void> {
 
         const effectiveKnowledge = sharedState.multiKnowledge[effectiveScript] || sharedState.knowledge;
 
-        await processSalesFlow(userId, combinedText, userState, effectiveKnowledge, {
-            client, notifyAdmin, saveState, aiService,
-            sendMessageWithDelay: (id: string, text: string) => sendMessageWithDelay(id, text, startTime),
-            logAndEmit, saveOrderToLocal, cancelLatestOrder, sharedState, config,
-            effectiveScript // Pass down to the flow
+        // Inyectar el payload en Redis a través de BullMQ en vez de bloquear el proceso de Node.js
+        await botQueue.add('process-message', {
+            userId,
+            combinedText,
+            effectiveScript,
+            startTime
+        }, {
+            removeOnComplete: true,
+            removeOnFail: 100 // Mantener info de los últimos 100 crashes 
         });
+
     } catch (err: any) {
         logger.error(`🔴[DEBOUNCE HANDLER ERROR] ${err.message}`);
     }
@@ -1053,5 +1059,12 @@ if (process.platform === "win32") {
 }
 
 process.on('SIGINT', () => _shutdown('SIGINT'));
+
+// Inicializar el Worker de background que consumirá Redis
+initWorker({
+    processSalesFlow, userState, sharedState, client, notifyAdmin,
+    saveState, aiService, sendMessageWithDelay, logAndEmit,
+    saveOrderToLocal, cancelLatestOrder, config
+});
 
 safeInitialize();
