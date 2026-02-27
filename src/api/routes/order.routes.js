@@ -34,11 +34,13 @@ module.exports = (client, sharedState) => {
             const skip = (page - 1) * limit;
 
             const { prisma } = require('../../../db');
+            const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
 
             // Get total count for metadata
-            const total = await prisma.order.count();
+            const total = await prisma.order.count({ where: { instanceId: INSTANCE_ID } });
 
             const orders = await prisma.order.findMany({
+                where: { instanceId: INSTANCE_ID },
                 orderBy: { createdAt: 'desc' },
                 skip,
                 take: limit,
@@ -271,19 +273,20 @@ module.exports = (client, sharedState) => {
             const phoneNumeric = chatId.split('@')[0];
 
             const { prisma } = require('../../../db');
+            const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
 
             // Upsert user
             await prisma.user.upsert({
-                where: { phone: phoneNumeric },
+                where: { phone_instanceId: { phone: phoneNumeric, instanceId: INSTANCE_ID } },
                 update: { name: addr.nombre || null },
-                create: { phone: phoneNumeric, name: addr.nombre || null }
+                create: { phone: phoneNumeric, instanceId: INSTANCE_ID, name: addr.nombre || null }
             });
 
             const seller = client?.info?.wid?.user || null;
 
             // Check if there's already a Pendiente order for this user — update it instead of creating a duplicate
             const existingOrder = await prisma.order.findFirst({
-                where: { userPhone: phoneNumeric, status: 'Pendiente' },
+                where: { userPhone: phoneNumeric, status: 'Pendiente', instanceId: INSTANCE_ID },
                 orderBy: { createdAt: 'desc' }
             });
 
@@ -307,6 +310,7 @@ module.exports = (client, sharedState) => {
                 console.log(`[MANUAL-COMPLETE] No existing order found, creating new Confirmado order...`);
                 order = await prisma.order.create({
                     data: {
+                        instanceId: INSTANCE_ID,
                         userPhone: phoneNumeric,
                         status: 'Confirmado',
                         products: product,

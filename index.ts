@@ -84,9 +84,12 @@ const { prisma } = require('./db');
 
 // Paths — use DATA_DIR env var for Railway volume persistence, fallback to /app/data or project root
 const defaultDataFolder = path.join(__dirname, 'data');
-const DATA_DIR = process.env.DATA_DIR || (process.env.NODE_ENV === 'production' ? defaultDataFolder : __dirname);
+const ROOT_DATA_DIR = process.env.DATA_DIR || (process.env.NODE_ENV === 'production' ? defaultDataFolder : __dirname);
+const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
+const DATA_DIR = path.join(ROOT_DATA_DIR, INSTANCE_ID);
 
 logger.info(`=========================================`);
+logger.info(`[BOOT] INSTANCE_ID is set to: ${INSTANCE_ID}`);
 logger.info(`[BOOT] DATA_DIR is set to: ${DATA_DIR}`);
 logger.info(`[BOOT] Ensuring DATA_DIR exists...`);
 if (!fs.existsSync(DATA_DIR)) {
@@ -103,13 +106,13 @@ try {
 }
 logger.info(`=========================================`);
 
-const STATE_FILE = path.join(DATA_DIR, 'persistence.json');
-const ORDERS_FILE = path.join(DATA_DIR, 'orders.json');
+const STATE_FILE = path.join(DATA_DIR, `persistence_${INSTANCE_ID}.json`);
+const ORDERS_FILE = path.join(DATA_DIR, `orders_${INSTANCE_ID}.json`);
 // Knowledge files: save to DATA_DIR (persists on Railway), load from DATA_DIR first then source code
 const KNOWLEDGE_SAVE_DIR = DATA_DIR; // Where edits are saved (persistent volume on Railway)
 const KNOWLEDGE_FILES: Record<string, { save: string; source: string }> = {
-    'v3': { save: path.join(KNOWLEDGE_SAVE_DIR, 'knowledge_v3.json'), source: path.join(__dirname, 'knowledge_v3.json') },
-    'v4': { save: path.join(KNOWLEDGE_SAVE_DIR, 'knowledge_v4.json'), source: path.join(__dirname, 'knowledge_v4.json') }
+    'v3': { save: path.join(KNOWLEDGE_SAVE_DIR, `knowledge_v3_${INSTANCE_ID}.json`), source: path.join(__dirname, 'knowledge_v3.json') },
+    'v4': { save: path.join(KNOWLEDGE_SAVE_DIR, `knowledge_v4_${INSTANCE_ID}.json`), source: path.join(__dirname, 'knowledge_v4.json') }
 };
 
 // --- STATE MANAGEMENT ---
@@ -206,18 +209,18 @@ function saveState(changedUserId: string | null = null): void {
             const userPromises = usersToSave.map(([phone, data]) => {
                 const cleanPhone = phone.replace('@c.us', '');
                 return prisma.user.upsert({
-                    where: { phone: cleanPhone },
+                    where: { phone_instanceId: { phone: cleanPhone, instanceId: INSTANCE_ID } },
                     update: { profileData: JSON.stringify(data) },
-                    create: { phone: cleanPhone, profileData: JSON.stringify(data) }
+                    create: { phone: cleanPhone, instanceId: INSTANCE_ID, profileData: JSON.stringify(data) }
                 });
             });
 
             // Persist dynamic config
             const configPromises = Object.entries(config).map(([key, value]) => {
                 return prisma.botConfig.upsert({
-                    where: { key },
+                    where: { instanceId_key: { instanceId: INSTANCE_ID, key } },
                     update: { value: JSON.stringify(value) },
-                    create: { key, value: JSON.stringify(value) }
+                    create: { instanceId: INSTANCE_ID, key, value: JSON.stringify(value) }
                 });
             });
 
@@ -234,8 +237,8 @@ async function loadState() {
         let dbUsers = [];
         let dbConfig = [];
         try {
-            dbUsers = await prisma.user.findMany();
-            dbConfig = await prisma.botConfig.findMany();
+            dbUsers = await prisma.user.findMany({ where: { instanceId: INSTANCE_ID } });
+            dbConfig = await prisma.botConfig.findMany({ where: { instanceId: INSTANCE_ID } });
         } catch (dbErr: any) {
             logger.warn('⚠️ DB Connection failed, falling back to local persistence.json', dbErr.message);
             if (fs.existsSync(STATE_FILE)) {
@@ -452,7 +455,8 @@ function saveOrderToLocal(order: Record<string, any>): void {
             ciudad: order.ciudad || null,
             provincia: order.provincia || null,
             cp: order.cp || null,
-            seller: client?.info?.wid?.user || null
+            seller: client?.info?.wid?.user || null,
+            instanceId: INSTANCE_ID
         };
 
         try {
@@ -483,7 +487,7 @@ function cancelLatestOrder(userId: string): Promise<{ success: boolean; order?: 
 
                 // Find the newest order for this user
                 const targetOrder = await prisma.order.findFirst({
-                    where: { userPhone: phone },
+                    where: { userPhone: phone, instanceId: INSTANCE_ID },
                     orderBy: { createdAt: 'desc' }
                 });
 

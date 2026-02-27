@@ -18,7 +18,7 @@ interface SalesFlowDependencies {
 }
 
 // Keywords that signal clear purchase intent — if present, don't auto-pause
-const PURCHASE_INTENT_KEYWORDS = /\b(comprar|quiero comprar|quiero pedir|me interesa|precio|precios|cuanto sale|cuánto sale|cuanto cuesta|cuánto cuesta|quiero encargar|necesito comprar|hagan envios|hacen envíos|hacen envios|quisiera pedir|quisiera comprar|quiero adquirir|quiero ordenar|tienen capsulas|tienen semillas|tienen gotas|nuez de la india)\b/i;
+const PURCHASE_INTENT_KEYWORDS = /\b(comprar|quiero comprar|quiero pedir|me interesa|precio|precios|cuanto sale|cuánto sale|cuanto cuesta|cuánto cuesta|quiero encargar|necesito comprar|hagan envios|hacen envíos|hacen envios|quisiera pedir|quisiera comprar|quiero adquirir|quiero ordenar|tienen capsulas|tienen semillas|tienen gotas|nuez de la india|la direccion|la dirección|mi direccion|mi dirección|te paso mis datos|mis datos|los datos|te paso la direccion|te paso la dirección)\b/i;
 
 export async function processSalesFlow(
     userId: string,
@@ -52,9 +52,10 @@ export async function processSalesFlow(
         // If this phone has an existing order, they're a past customer — route to post-sale
         try {
             const { prisma } = require('../../db');
+            const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
             const cleanPhone = userId.split('@')[0].replace(/\D/g, '');
             const existingOrder = await prisma.order.findFirst({
-                where: { userPhone: cleanPhone },
+                where: { userPhone: cleanPhone, instanceId: INSTANCE_ID },
                 orderBy: { createdAt: 'desc' }
             });
 
@@ -101,9 +102,7 @@ export async function processSalesFlow(
                         // If there are ANY previous outgoing messages (bot or human),
                         // this person was already spoken to. Auto-pause UNLESS they show purchase intent.
                         const hasPriorOutgoing = outgoingMessages.length > 0;
-                        // Also flag if there are 5+ total messages (heavy history, likely not a fresh lead)
-                        const hasHeavyHistory = messages.length > 5;
-                        const shouldPauseByHistory = hasPriorOutgoing || hasHeavyHistory;
+                        const shouldPauseByHistory = hasPriorOutgoing;
 
                         if (shouldPauseByHistory) {
                             const showsPurchaseIntent = PURCHASE_INTENT_KEYWORDS.test(normalizedText);
@@ -112,10 +111,9 @@ export async function processSalesFlow(
                                 console.log(`[SMART-DETECT] User ${userId} has prior history (outgoing: ${outgoingMessages.length}, total: ${messages.length}) but shows purchase intent ("${text.substring(0, 50)}"). Allowing sales flow.`);
                                 // Let them through to the greeting flow normally
                             } else {
-                                const reason = hasPriorOutgoing
-                                    ? `Ya tenía ${outgoingMessages.length} mensaje(s) enviados previos`
-                                    : `Tiene ${messages.length} mensajes totales en el historial (+5)`;
+                                const reason = `Ya tenía ${outgoingMessages.length} mensaje(s) enviados previos`;
                                 console.log(`[SMART-DETECT] User ${userId}: ${reason} and NO purchase intent. Auto-pausing.`);
+
                                 if (dependencies.sharedState && dependencies.sharedState.pausedUsers) {
                                     dependencies.sharedState.pausedUsers.add(userId);
                                     try {

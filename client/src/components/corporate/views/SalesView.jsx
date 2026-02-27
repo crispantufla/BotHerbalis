@@ -179,13 +179,13 @@ const SalesView = ({ onGoToChat }) => {
             {/* Header */}
             <div className="flex justify-between items-center mb-6">
                 <div>
-                    <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Logística y Pedidos</h2>
-                    <p className="text-sm text-slate-500">Seguimiento en tiempo real de ventas y envíos.</p>
+                    <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 tracking-tight">Logística y Pedidos</h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Seguimiento en tiempo real de ventas y envíos.</p>
                 </div>
                 <div className="flex gap-3">
                     <button
                         onClick={() => fetchOrders(page)}
-                        className="px-4 py-2 bg-white border border-slate-300 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-50 transition shadow-sm flex items-center gap-2"
+                        className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-sm flex items-center gap-2"
                     >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                         Actualizar Datos
@@ -193,7 +193,7 @@ const SalesView = ({ onGoToChat }) => {
                     <button
                         onClick={handleExportCSV}
                         disabled={orders.length === 0}
-                        className="px-4 py-2 bg-slate-900 text-white rounded-md text-sm font-medium shadow-sm hover:bg-slate-800 transition flex items-center gap-2 disabled:opacity-50"
+                        className="px-4 py-2 bg-slate-900 border border-slate-900 dark:bg-slate-700 dark:border-slate-600 text-white rounded-md text-sm font-medium shadow-sm hover:bg-slate-800 dark:hover:bg-slate-600 transition flex items-center gap-2 disabled:opacity-50"
                     >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                         Exportar CSV
@@ -202,11 +202,11 @@ const SalesView = ({ onGoToChat }) => {
             </div>
 
             {/* Table Container */}
-            <div className="flex-1 bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+            <div className="flex-1 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col">
                 <div className="overflow-x-auto custom-scrollbar flex-1">
                     <table className="w-full text-left border-collapse">
-                        <thead className="bg-slate-50 border-b border-slate-200">
-                            <tr className="text-xs uppercase tracking-wider text-slate-500 font-bold">
+                        <thead className="bg-slate-50 dark:bg-slate-700 border-b border-slate-200 dark:border-slate-600">
+                            <tr className="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 font-bold">
                                 <th className="px-6 py-4">Fecha</th>
                                 <th className="px-6 py-4">Cliente</th>
                                 <th className="px-6 py-4">Producto / Plan</th>
@@ -218,53 +218,53 @@ const SalesView = ({ onGoToChat }) => {
                                 <th className="px-6 py-4 text-right">Acciones</th>
                             </tr>
                         </thead>
-                        <tbody className="text-sm text-slate-600 divide-y divide-slate-100">
+                        <tbody className="text-sm text-slate-600 dark:text-slate-300 divide-y divide-slate-100 dark:divide-slate-700 border-b border-slate-200 dark:border-slate-700">
                             {loading ? (
                                 <tr><td colSpan="8" className="text-center py-10">
-                                    <div className="flex items-center justify-center gap-3 text-slate-400">
-                                        <div className="w-5 h-5 border-2 border-slate-300 border-t-transparent rounded-full animate-spin"></div>
+                                    <div className="flex items-center justify-center gap-3 text-slate-400 dark:text-slate-500">
+                                        <div className="w-5 h-5 border-2 border-slate-300 dark:border-slate-600 border-t-transparent dark:border-t-transparent rounded-full animate-spin"></div>
                                         Cargando pedidos...
                                     </div>
                                 </td></tr>
                             ) : orders.length === 0 ? (
-                                <tr><td colSpan="8" className="text-center py-10 opacity-50">No se encontró base de datos de pedidos.</td></tr>
+                                <tr><td colSpan="8" className="text-center py-10 opacity-50 text-slate-500 dark:text-slate-400">No se encontró base de datos de pedidos.</td></tr>
                             ) : (
                                 orders.map(order => (
-                                    <tr key={order.id} className="hover:bg-slate-50 transition-colors group">
+                                    <tr key={order.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group">
                                         <td className="px-6 py-4 font-mono text-xs opacity-70">
                                             {new Date(order.createdAt).toLocaleDateString()}
                                         </td>
-                                        <td className="px-6 py-4 font-medium text-slate-800">
+                                        <td className="px-6 py-4 font-medium text-slate-800 dark:text-slate-200">
                                             {order.nombre || 'Desconocido'}
-                                            <div className="text-xs text-slate-400 font-normal">{order.cliente}</div>
+                                            <div className="text-xs text-slate-400 dark:text-slate-500 font-normal">{order.cliente}</div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <span className="px-2 py-1 rounded bg-slate-100 text-slate-600 text-xs font-semibold border border-slate-200">
+                                            <span className="px-2 py-1 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold border border-slate-200 dark:border-slate-600">
                                                 {order.producto}
                                             </span>
                                             {order.plan && (
-                                                <span className="ml-2 text-xs text-slate-400">{order.plan}</span>
+                                                <span className="ml-2 text-xs text-slate-400 dark:text-slate-500">{order.plan}</span>
                                             )}
                                         </td>
-                                        <td className="px-6 py-4 text-right font-mono text-slate-800 font-bold">
+                                        <td className="px-6 py-4 text-right font-mono text-slate-800 dark:text-slate-200 font-bold">
                                             ${order.precio}
                                         </td>
                                         <td className="px-6 py-4 text-center">
                                             {order.postdatado ? (
-                                                <span className="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded shadow-sm border border-amber-200">
+                                                <span className="px-2 py-1 bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 text-xs font-bold rounded shadow-sm border border-amber-200 dark:border-amber-800/50">
                                                     {order.postdatado}
                                                 </span>
                                             ) : (
-                                                <span className="text-slate-300">—</span>
+                                                <span className="text-slate-300 dark:text-slate-600">—</span>
                                             )}
                                         </td>
                                         <td className="px-6 py-4 text-center">
                                             {order.seller ? (
-                                                <span className="px-2 py-1 bg-blue-50 text-blue-600 text-[10px] font-bold rounded border border-blue-200">
+                                                <span className="px-2 py-1 bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 text-[10px] font-bold rounded border border-blue-200 dark:border-blue-800/50">
                                                     +{order.seller.replace(/\D/g, '')}
                                                 </span>
                                             ) : (
-                                                <span className="text-slate-300">—</span>
+                                                <span className="text-slate-300 dark:text-slate-600">—</span>
                                             )}
                                         </td>
                                         <td className="px-6 py-4 text-center">
@@ -274,11 +274,11 @@ const SalesView = ({ onGoToChat }) => {
                                         </td>
                                         <td className="px-6 py-4 text-center">
                                             {order.tracking ? (
-                                                <span className="font-mono text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-200">
+                                                <span className="font-mono text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/40 px-2 py-1 rounded border border-blue-200 dark:border-blue-800/50">
                                                     {order.tracking}
                                                 </span>
                                             ) : (
-                                                <span className="text-xs text-slate-300">—</span>
+                                                <span className="text-xs text-slate-300 dark:text-slate-600">—</span>
                                             )}
                                         </td>
                                         <td className="px-6 py-4 text-right">
@@ -288,7 +288,7 @@ const SalesView = ({ onGoToChat }) => {
                                                         e.stopPropagation();
                                                         handleGoToChat(order.cliente, order.seller);
                                                     }}
-                                                    className="text-emerald-600 hover:text-emerald-800 transition font-medium text-xs bg-emerald-50 hover:bg-emerald-100 px-3 py-1 rounded border border-emerald-200 flex items-center gap-1"
+                                                    className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 transition font-medium text-xs bg-emerald-50 dark:bg-emerald-900/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 px-3 py-1 rounded border border-emerald-200 dark:border-emerald-800/50 flex items-center gap-1"
                                                     title="Ir al Chat"
                                                 >
                                                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
@@ -296,7 +296,7 @@ const SalesView = ({ onGoToChat }) => {
                                                 </button>
                                                 <button
                                                     onClick={() => openEdit(order)}
-                                                    className="text-blue-600 hover:text-blue-800 transition font-medium text-xs bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded border border-blue-200"
+                                                    className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition font-medium text-xs bg-blue-50 dark:bg-blue-900/40 hover:bg-blue-100 dark:hover:bg-blue-900/60 px-3 py-1 rounded border border-blue-200 dark:border-blue-800/50"
                                                 >
                                                     Editar
                                                 </button>
@@ -310,52 +310,52 @@ const SalesView = ({ onGoToChat }) => {
                 </div>
 
                 {/* Footer / Pagination Controls */}
-                <div className="px-6 py-4 border-t border-slate-200 flex justify-between items-center bg-slate-50/50">
-                    <span className="text-xs text-slate-500 font-medium">Página {page} de {totalPages}</span>
+                <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800 flex justify-between items-center rounded-b-lg">
+                    <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Página {page} de {totalPages}</span>
                     <div className="flex gap-2">
                         <button
                             disabled={page <= 1}
                             onClick={() => fetchOrders(page - 1)}
-                            className="px-4 py-2 bg-white rounded border border-slate-300 text-xs font-bold text-slate-600 disabled:opacity-50 hover:bg-slate-50 transition-colors"
+                            className="px-4 py-2 bg-white dark:bg-slate-700 rounded border border-slate-300 dark:border-slate-600 text-xs font-bold text-slate-600 dark:text-slate-300 disabled:opacity-50 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
                         >
                             Ant.
                         </button>
                         <button
                             disabled={page >= totalPages}
                             onClick={() => fetchOrders(page + 1)}
-                            className="px-4 py-2 bg-white rounded border border-slate-300 text-xs font-bold text-slate-600 disabled:opacity-50 hover:bg-slate-50 transition-colors"
+                            className="px-4 py-2 bg-white dark:bg-slate-700 rounded border border-slate-300 dark:border-slate-600 text-xs font-bold text-slate-600 dark:text-slate-300 disabled:opacity-50 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
                         >
                             Sig.
                         </button>
                     </div>
-                    <span className="text-xs text-slate-500 font-medium">Total: {totalOrders}</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Total: {totalOrders}</span>
                 </div>
             </div>
 
             {/* EDIT ORDER MODAL */}
             {editingOrder && (
-                <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center animate-fade-in">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 border border-slate-200">
+                <div className="fixed inset-0 bg-black/30 dark:bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center animate-fade-in px-4">
+                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-md p-6 border border-slate-200 dark:border-slate-700">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-lg font-bold text-slate-800">Editar Pedido</h3>
-                            <button onClick={() => setEditingOrder(null)} className="text-slate-400 hover:text-slate-600 transition text-xl">✕</button>
+                            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Editar Pedido</h3>
+                            <button onClick={() => setEditingOrder(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition text-xl">✕</button>
                         </div>
 
                         <div className="space-y-4">
                             {/* Order Info */}
-                            <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-                                <p className="text-sm font-bold text-slate-700">{editingOrder.nombre || 'Sin nombre'}</p>
-                                <p className="text-xs text-slate-500">{editingOrder.cliente}</p>
-                                <p className="text-xs text-slate-400 mt-1">{editingOrder.producto} — ${editingOrder.precio}</p>
+                            <div className="bg-slate-50 dark:bg-slate-900/50 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{editingOrder.nombre || 'Sin nombre'}</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">{editingOrder.cliente}</p>
+                                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{editingOrder.producto} — ${editingOrder.precio}</p>
                             </div>
 
                             {/* Status */}
                             <div>
-                                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5">Estado</label>
+                                <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wide mb-1.5">Estado</label>
                                 <select
                                     value={editStatus}
                                     onChange={(e) => setEditStatus(e.target.value)}
-                                    className="w-full border border-slate-200 rounded-lg p-2.5 text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none transition"
+                                    className="w-full border border-slate-200 dark:border-slate-600 rounded-lg p-2.5 text-sm bg-white dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition"
                                 >
                                     {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
                                 </select>
@@ -363,13 +363,13 @@ const SalesView = ({ onGoToChat }) => {
 
                             {/* Tracking */}
                             <div>
-                                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5">Código de Seguimiento</label>
+                                <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wide mb-1.5">Código de Seguimiento</label>
                                 <input
                                     type="text"
                                     value={editTracking}
                                     onChange={(e) => setEditTracking(e.target.value)}
                                     placeholder="Ej: CP123456789AR"
-                                    className="w-full border border-slate-200 rounded-lg p-2.5 text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none transition"
+                                    className="w-full border border-slate-200 dark:border-slate-600 rounded-lg p-2.5 text-sm font-mono focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-700 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 outline-none transition"
                                 />
                             </div>
                         </div>
@@ -377,7 +377,7 @@ const SalesView = ({ onGoToChat }) => {
                         {/* Delete button */}
                         <button
                             onClick={handleDeleteOrder}
-                            className="w-full mt-6 py-2 bg-white border border-rose-200 text-rose-500 rounded-lg text-xs font-medium hover:bg-rose-50 hover:text-rose-600 transition flex items-center justify-center gap-2"
+                            className="w-full mt-6 py-2 bg-white dark:bg-slate-800 border border-rose-200 dark:border-rose-800 text-rose-500 dark:text-rose-400 rounded-lg text-xs font-medium hover:bg-rose-50 dark:hover:bg-rose-900/30 hover:text-rose-600 dark:hover:text-rose-300 transition flex items-center justify-center gap-2"
                         >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                             Eliminar Pedido
@@ -386,14 +386,14 @@ const SalesView = ({ onGoToChat }) => {
                         <div className="flex gap-3 mt-3">
                             <button
                                 onClick={() => setEditingOrder(null)}
-                                className="flex-1 py-2.5 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-200 transition"
+                                className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-sm font-medium hover:bg-slate-200 dark:hover:bg-slate-600 transition"
                             >
                                 Cancelar
                             </button>
                             <button
                                 onClick={handleSaveEdit}
                                 disabled={savingOrder}
-                                className="flex-1 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition disabled:opacity-50"
+                                className="flex-1 py-2.5 bg-blue-600 dark:bg-blue-500 text-white rounded-lg text-sm font-bold hover:bg-blue-700 dark:hover:bg-blue-600 transition disabled:opacity-50"
                             >
                                 {savingOrder ? 'Guardando...' : 'Guardar Cambios'}
                             </button>

@@ -96,8 +96,9 @@ module.exports = (client, sharedState) => {
             let orders = [];
             try {
                 const { prisma } = require('../../../db');
+                const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
                 orders = await prisma.order.findMany({
-                    where: { status: { not: 'Cancelado' } }
+                    where: { status: { not: 'Cancelado' }, instanceId: INSTANCE_ID }
                 });
             } catch (err) {
                 console.error("🔴 Error fetching DB orders in /chats:", err.message);
@@ -313,10 +314,11 @@ module.exports = (client, sharedState) => {
 
             // Clear the saved state from the PostgreSQL database too
             const { prisma } = require('../../../db');
+            const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
             const phoneStr = chatId.replace('@c.us', '');
             try {
                 await prisma.user.update({
-                    where: { phone: phoneStr },
+                    where: { phone_instanceId: { phone: phoneStr, instanceId: INSTANCE_ID } },
                     data: { profileData: null }
                 });
             } catch (dbErr) {

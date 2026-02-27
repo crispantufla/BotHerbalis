@@ -109,22 +109,24 @@ module.exports = (client, sharedState) => {
             const todayStr = now.toISOString().split('T')[0];
 
             const { prisma } = require('../../../db');
+            const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
 
             const startOfDay = new Date();
             startOfDay.setHours(0, 0, 0, 0);
 
             // Fetch database aggregations in parallel for performance
             const [totalCount, todayStats, completedStats] = await Promise.all([
-                prisma.order.count(),
+                prisma.order.count({ where: { instanceId: INSTANCE_ID } }),
                 prisma.order.aggregate({
                     _count: true,
                     _sum: { totalPrice: true },
-                    where: { createdAt: { gte: startOfDay } }
+                    where: { createdAt: { gte: startOfDay }, instanceId: INSTANCE_ID }
                 }),
                 prisma.order.count({
                     where: {
                         createdAt: { gte: startOfDay },
-                        status: { not: 'Cancelado' }
+                        status: { not: 'Cancelado' },
+                        instanceId: INSTANCE_ID
                     }
                 })
             ]);
@@ -341,9 +343,10 @@ module.exports = (client, sharedState) => {
         try {
             const { prisma } = require('../../../db');
             const memUsage = process.memoryUsage();
+            const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
 
             // Count total users in DB
-            const totalUsers = await prisma.user.count();
+            const totalUsers = await prisma.user.count({ where: { instanceId: INSTANCE_ID } });
 
             // Count users with active (non-completed) conversations in RAM
             const allKeys = Object.keys(userState || {});
@@ -381,15 +384,16 @@ module.exports = (client, sharedState) => {
     router.post('/reset-memory', authMiddleware, async (req, res) => {
         try {
             const { prisma } = require('../../../db');
+            const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
 
             // 1. Purge DB user states (safe: preserves users with orders/chatlogs)
             // Delete users WITHOUT any orders (safe to remove entirely)
             const deleted = await prisma.user.deleteMany({
-                where: { orders: { none: {} } }
+                where: { orders: { none: {} }, instanceId: INSTANCE_ID }
             });
             // For users WITH orders, just clear their profile data
             const cleaned = await prisma.user.updateMany({
-                where: { orders: { some: {} }, profileData: { not: null } },
+                where: { orders: { some: {} }, profileData: { not: null }, instanceId: INSTANCE_ID },
                 data: { profileData: null }
             });
 

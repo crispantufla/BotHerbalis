@@ -15,9 +15,9 @@ export const ThemeProvider = ({ children }) => {
     useEffect(() => {
         const root = document.documentElement;
         if (isDark) {
-            root.classList.add('dark-mode');
+            root.classList.add('dark', 'dark-mode');
         } else {
-            root.classList.remove('dark-mode');
+            root.classList.remove('dark', 'dark-mode');
         }
         localStorage.setItem('herbalis-theme', isDark ? 'dark' : 'light');
     }, [isDark]);

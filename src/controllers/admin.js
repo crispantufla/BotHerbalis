@@ -157,8 +157,9 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false, shar
         const cleanPhone = actualTarget.split('@')[0];
         try {
             const { prisma } = require('../../db');
+            const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
             const existingOrder = await prisma.order.findFirst({
-                where: { userPhone: cleanPhone, status: 'Pendiente' },
+                where: { userPhone: cleanPhone, status: 'Pendiente', instanceId: INSTANCE_ID },
                 orderBy: { createdAt: 'desc' }
             });
 

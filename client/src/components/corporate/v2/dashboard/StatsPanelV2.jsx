@@ -5,10 +5,10 @@ import { DollarSign as Dollar, Users, AlertCircle as Alert, Activity } from 'luc
 
 const StatsPanelV2 = ({ stats, loadingStats, alertsCount = 0 }) => {
     const KpiSkeleton = () => (
-        <div className="bg-white/40 backdrop-blur-md p-4 lg:p-5 rounded-3xl border border-white/60 shadow-lg animate-pulse">
-            <div className="h-4 bg-slate-200/50 rounded w-28 mb-3"></div>
-            <div className="h-7 bg-slate-200/50 rounded w-24 mb-2"></div>
-            <div className="h-3 bg-slate-200/50 rounded w-20"></div>
+        <div className="bg-white/40 dark:bg-slate-800/40 backdrop-blur-md p-4 lg:p-5 rounded-3xl border border-white/60 dark:border-slate-700/60 shadow-lg animate-pulse">
+            <div className="h-4 bg-slate-200/50 dark:bg-slate-700/50 rounded w-28 mb-3"></div>
+            <div className="h-7 bg-slate-200/50 dark:bg-slate-700/50 rounded w-24 mb-2"></div>
+            <div className="h-3 bg-slate-200/50 dark:bg-slate-700/50 rounded w-20"></div>
         </div>
     );
 
@@ -21,20 +21,20 @@ const StatsPanelV2 = ({ stats, loadingStats, alertsCount = 0 }) => {
     }
 
     const StatCard = ({ title, value, subtext, icon: Icon, colorClass, gradientClass }) => (
-        <div className="relative overflow-hidden bg-white/60 backdrop-blur-xl p-4 lg:p-5 rounded-[1.25rem] border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 group hover:-translate-y-1">
+        <div className="relative overflow-hidden bg-white/60 dark:bg-slate-800/60 backdrop-blur-xl p-4 lg:p-5 rounded-[1.25rem] border border-white/80 dark:border-slate-700/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 group hover:-translate-y-1">
             {/* Soft background glow */}
             <div className={`absolute -right-6 -top-6 w-24 h-24 rounded-full blur-2xl opacity-20 ${gradientClass} group-hover:opacity-40 transition-opacity duration-500`}></div>
 
             <div className="flex items-start justify-between mb-2 relative z-10">
-                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{title}</p>
+                <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">{title}</p>
                 <div className={`w-8 h-8 rounded-xl ${gradientClass} flex items-center justify-center text-white shadow-lg shadow-${colorClass}-500/30 transform group-hover:scale-110 transition-transform duration-300`}>
                     <Icon className="w-4 h-4" />
                 </div>
             </div>
 
             <div className="relative z-10">
-                <h3 className="text-2xl font-extrabold text-slate-800 tracking-tight">{value}</h3>
-                <p className="text-[13px] text-slate-500 mt-1 font-medium leading-tight">{subtext}</p>
+                <h3 className="text-2xl font-extrabold text-slate-800 dark:text-white tracking-tight">{value}</h3>
+                <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-1 font-medium leading-tight">{subtext}</p>
             </div>
         </div>
     );
@@ -60,7 +60,7 @@ const StatsPanelV2 = ({ stats, loadingStats, alertsCount = 0 }) => {
             <StatCard
                 title="Alertas"
                 value={alertsCount}
-                subtext={alertsCount > 0 ? <span className="text-rose-500 font-bold tracking-wide">Requiere atención</span> : 'Todo en orden'}
+                subtext={alertsCount > 0 ? <span className="text-rose-500 dark:text-rose-400 font-bold tracking-wide">Requiere atención</span> : 'Todo en orden'}
                 icon={Alert}
                 colorClass="rose"
                 gradientClass="bg-gradient-to-br from-rose-400 to-pink-500"

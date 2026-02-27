@@ -176,7 +176,7 @@ const CorporateDashboardV2 = () => {
     };
 
     return (
-        <div className="flex flex-col lg:flex-row h-[100dvh] bg-slate-50 font-sans text-slate-800 overflow-hidden selection:bg-indigo-100 selection:text-indigo-900 relative">
+        <div className="flex flex-col lg:flex-row h-[100dvh] bg-slate-50 dark:bg-slate-900 font-sans text-slate-800 dark:text-slate-100 overflow-hidden selection:bg-indigo-100 dark:selection:bg-indigo-900/50 selection:text-indigo-900 dark:selection:text-indigo-100 relative transition-colors duration-300">
 
             {/* Overlay para fondo oscurecido en Mobile al abrir el menú */}
             {isMobile && mobileMenuOpen && (
@@ -188,14 +188,14 @@ const CorporateDashboardV2 = () => {
 
             {/* 1. GLASSMORPHISM SIDEBAR V2 */}
             <aside className={`
-                fixed lg:relative z-40 lg:z-20 flex flex-col h-full bg-white/95 lg:bg-white/70 backdrop-blur-3xl border-r border-slate-200/60 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)] 
+                fixed lg:relative z-40 lg:z-20 flex flex-col h-full bg-white/95 dark:bg-slate-900/95 lg:bg-white/70 dark:lg:bg-slate-900/70 backdrop-blur-3xl border-r border-slate-200/60 dark:border-slate-700/60 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)] dark:shadow-[4px_0_24px_-12px_rgba(0,0,0,0.5)] 
                 transition-transform duration-300 ease-in-out lg:translate-x-0
                 ${isMobile ? 'w-72 left-0 top-0 bottom-0' : (sidebarCollapsed ? 'w-20' : 'w-72')}
                 ${isMobile && !mobileMenuOpen ? '-translate-x-full' : 'translate-x-0'}
             `}>
 
                 {/* Logo & Toggle */}
-                <div className="h-14 flex items-center justify-between px-6 border-b border-slate-200/50">
+                <div className="h-14 flex items-center justify-between px-6 border-b border-slate-200/50 dark:border-slate-700/50">
                     {(!sidebarCollapsed || isMobile) && (
                         <div className="flex items-center gap-3 animate-fade-in w-full justify-between lg:justify-start">
                             <div className="flex items-center gap-3">
@@ -203,12 +203,12 @@ const CorporateDashboardV2 = () => {
                                     <span className="text-white font-bold text-lg">H</span>
                                 </div>
                                 <div>
-                                    <h1 className="font-bold text-slate-800 leading-tight">Herbalis</h1>
-                                    <p className="text-[10px] font-semibold tracking-widest text-indigo-500 uppercase">Workspace</p>
+                                    <h1 className="font-bold text-slate-800 dark:text-slate-100 leading-tight">Herbalis</h1>
+                                    <p className="text-[10px] font-semibold tracking-widest text-indigo-500 dark:text-indigo-400 uppercase">Workspace</p>
                                 </div>
                             </div>
                             {isMobile && (
-                                <button onClick={() => setMobileMenuOpen(false)} className="text-slate-400 hover:text-slate-600 p-2">
+                                <button onClick={() => setMobileMenuOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-2">
                                     <X className="w-5 h-5" />
                                 </button>
                             )}
@@ -236,18 +236,18 @@ const CorporateDashboardV2 = () => {
                     <NavItem tab="script" icon={FileText} label="Guión & Prompts" />
                     <NavItem tab="gallery" icon={ImageIcon} label="Galería de Medios" />
 
-                    <div className="pt-6 mt-6 border-t border-slate-200/50">
-                        {(!sidebarCollapsed || isMobile) && <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4 px-4">Administración</p>}
+                    <div className="pt-6 mt-6 border-t border-slate-200/50 dark:border-slate-700/50">
+                        {(!sidebarCollapsed || isMobile) && <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-4 px-4">Administración</p>}
                         <NavItem tab="settings" icon={Settings} label="Configuración" />
                     </div>
                 </div>
 
                 {/* User Profile & Logout (Bottom) */}
-                <div className="p-4 border-t border-slate-200/50 bg-white/40">
+                <div className="p-4 border-t border-slate-200/50 dark:border-slate-700/50 bg-white/40 dark:bg-slate-800/40">
                     {/* Theme Toggle */}
                     <button
                         onClick={toggleTheme}
-                        className={`w-full flex items-center ${(sidebarCollapsed && !isMobile) ? 'justify-center p-2' : 'px-4 py-3'} mb-2 rounded-xl transition-all duration-300 border border-transparent hover:border-indigo-200 group
+                        className={`w-full flex items-center ${(sidebarCollapsed && !isMobile) ? 'justify-center p-2' : 'px-4 py-3'} mb-2 rounded-xl transition-all duration-300 border border-transparent hover:border-indigo-200 dark:hover:border-indigo-800/50 group
                             ${isDark
                                 ? 'bg-gradient-to-r from-indigo-500/10 to-purple-500/10 text-amber-400 hover:from-indigo-500/20 hover:to-purple-500/20'
                                 : 'text-slate-500 hover:bg-slate-100 hover:text-indigo-600'
@@ -273,9 +273,9 @@ const CorporateDashboardV2 = () => {
             </aside>
 
             {/* 2. MAIN CONTENT AREA V2 */}
-            <div className={`flex-1 flex flex-col overflow-hidden bg-gradient-to-br from-slate-50 to-blue-50/30 w-full relative transition-all duration-300 ${!isMobile && !sidebarCollapsed ? '' : ''}`}>
+            <div className={`flex-1 flex flex-col overflow-hidden bg-gradient-to-br from-slate-50 dark:from-slate-900 to-blue-50/30 dark:to-indigo-900/10 w-full relative transition-all duration-300 ${!isMobile && !sidebarCollapsed ? '' : ''}`}>
                 {/* Header Superior V2 */}
-                <header className="flex-shrink-0 h-14 bg-white/60 backdrop-blur-md border-b border-white flex justify-between items-center px-4 lg:px-8 z-10 shadow-sm shadow-slate-200/20">
+                <header className="flex-shrink-0 h-14 bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border-b border-white dark:border-slate-800 flex justify-between items-center px-4 lg:px-8 z-10 shadow-sm shadow-slate-200/20 dark:shadow-black/20">
                     <div className="flex items-center gap-3 w-full lg:w-auto">
                         <button
                             onClick={() => isMobile ? setMobileMenuOpen(true) : setSidebarCollapsed(false)}
@@ -294,11 +294,11 @@ const CorporateDashboardV2 = () => {
 
                         <div className="flex items-center gap-2">
                             <div className={`w-2 h-2 lg:w-2.5 lg:h-2.5 rounded-full ${status === 'ready' ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-rose-500 animate-pulse'}`}></div>
-                            <span className={`text-xs lg:text-sm font-semibold tracking-wide ${status === 'ready' ? 'text-emerald-700' : 'text-rose-600'} whitespace-nowrap`}>
+                            <span className={`text-xs lg:text-sm font-semibold tracking-wide ${status === 'ready' ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'} whitespace-nowrap`}>
                                 {status === 'ready' ? 'ONLINE' : 'OFFLINE'}
                             </span>
                             {status === 'ready' && connectedPhone && (
-                                <span className="text-xs font-semibold text-slate-500 tracking-wider bg-slate-100 px-2 py-0.5 rounded border border-slate-200 ml-1">
+                                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 tracking-wider bg-slate-100 dark:bg-slate-800/80 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 ml-1">
                                     +{connectedPhone}
                                 </span>
                             )}
@@ -308,8 +308,8 @@ const CorporateDashboardV2 = () => {
                     <div className="flex items-center gap-2 lg:gap-6">
                         <div className="flex items-center gap-3 pl-6">
                             <div className="text-right hidden md:block">
-                                <p className="text-sm font-bold text-slate-800">Administrador</p>
-                                <p className="text-xs text-slate-500 font-medium">Root Access</p>
+                                <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Administrador</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Root Access</p>
                             </div>
                             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shadow-md shadow-indigo-500/30 border border-white/20">
                                 <span className="text-white font-bold text-sm tracking-widest">AD</span>
@@ -321,10 +321,10 @@ const CorporateDashboardV2 = () => {
                 {/* Área de Contenido Principal */}
                 <main className="flex-1 relative flex flex-col min-h-0 overflow-hidden" onClick={() => { if (isMobile && mobileMenuOpen) setMobileMenuOpen(false); }}>
                     {/* Elementos decorativos de fondo (Blur Orbs) */}
-                    <div className="absolute top-[-10%] right-[-5%] w-[60%] lg:w-[40%] h-[60%] lg:h-[40%] rounded-full bg-purple-300/20 blur-[80px] lg:blur-[100px] pointer-events-none hidden sm:block"></div>
-                    <div className="absolute bottom-[-10%] left-[-10%] w-[70%] lg:w-[50%] h-[70%] lg:h-[50%] rounded-full bg-blue-300/20 blur-[100px] lg:blur-[120px] pointer-events-none hidden sm:block"></div>
+                    <div className="absolute top-[-10%] right-[-5%] w-[60%] lg:w-[40%] h-[60%] lg:h-[40%] rounded-full bg-purple-300/20 dark:bg-purple-900/20 blur-[80px] lg:blur-[100px] pointer-events-none hidden sm:block"></div>
+                    <div className="absolute bottom-[-10%] left-[-10%] w-[70%] lg:w-[50%] h-[70%] lg:h-[50%] rounded-full bg-blue-300/20 dark:bg-indigo-900/20 blur-[100px] lg:blur-[120px] pointer-events-none hidden sm:block"></div>
 
-                    <div className="flex-1 p-3 sm:p-6 lg:p-8 relative z-0 w-full flex flex-col min-h-0 overflow-hidden overflow-y-auto">
+                    <div className="flex-1 p-3 sm:p-6 lg:p-8 relative z-0 w-full flex flex-col min-h-0 overflow-hidden overflow-y-auto custom-scrollbar">
                         {renderContent()}
                     </div>
                 </main>

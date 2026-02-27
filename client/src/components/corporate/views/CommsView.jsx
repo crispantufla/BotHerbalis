@@ -581,28 +581,28 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
     };
 
     return (
-        <div className="h-full flex overflow-hidden rounded-lg bg-white border border-slate-200 shadow-sm animate-fade-in">
+        <div className="h-full flex overflow-hidden rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm animate-fade-in">
 
             {/* 1. SIDEBAR: Contacts */}
-            <div className="w-80 border-r border-slate-200 flex flex-col bg-slate-50">
+            <div className="w-80 border-r border-slate-200 dark:border-slate-700 flex flex-col bg-slate-50 dark:bg-slate-800/50">
                 {/* Search */}
-                <div className="p-4 border-b border-slate-200 bg-white">
+                <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                     <div className="relative">
                         <input
                             type="text"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             placeholder="Buscar contactos..."
-                            className="w-full bg-slate-100 border border-slate-200 rounded-md pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all text-slate-700"
+                            className="w-full bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-md pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all text-slate-700 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500"
                         />
-                        <span className="absolute left-3 top-2.5 text-slate-400"><Icons.Search /></span>
+                        <span className="absolute left-3 top-2.5 text-slate-400 dark:text-slate-500"><Icons.Search /></span>
                     </div>
                 </div>
 
                 {/* Contact List */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar">
                     {filteredChats.length === 0 ? (
-                        <div className="p-6 text-center text-slate-400 text-sm">
+                        <div className="p-6 text-center text-slate-400 dark:text-slate-500 text-sm">
                             {searchTerm ? 'No se encontraron resultados' : 'No hay chats todavía'}
                         </div>
                     ) : (
@@ -610,29 +610,29 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
                             <div
                                 key={chat.id}
                                 onClick={() => setSelectedChat(chat)}
-                                className={`p-4 flex gap-3 cursor-pointer transition-colors border-l-2 ${selectedChat?.id === chat.id ? 'bg-white border-blue-600 shadow-sm' : 'border-transparent hover:bg-slate-100'}`}
+                                className={`p-4 flex gap-3 cursor-pointer transition-colors border-l-2 ${selectedChat?.id === chat.id ? 'bg-white dark:bg-slate-800 border-blue-600 dark:border-blue-500 shadow-sm' : 'border-transparent hover:bg-slate-100 dark:hover:bg-slate-700/50'}`}
                             >
-                                <div className="w-10 h-10 rounded bg-slate-200 flex items-center justify-center text-slate-500 font-bold text-xs uppercase shadow-sm relative">
+                                <div className="w-10 h-10 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 font-bold text-xs uppercase shadow-sm relative">
                                     {chat.name.substring(0, 2)}
                                     {chat.isPaused && (
-                                        <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-amber-500 rounded-full border-2 border-white flex items-center justify-center">
-                                            <span className="text-[8px] text-white">||</span>
+                                        <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-amber-500 rounded-full border-2 border-white dark:border-slate-800 flex items-center justify-center">
+                                            <span className="text-[8px] text-white tooltip" title="Bot Pausado">||</span>
                                         </span>
                                     )}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex justify-between items-baseline mb-0.5">
                                         <div className="flex items-center gap-1.5 min-w-0">
-                                            <h3 className={`font-semibold text-sm truncate ${selectedChat?.id === chat.id ? 'text-blue-700' : 'text-slate-700'}`}>{chat.name}</h3>
+                                            <h3 className={`font-semibold text-sm truncate ${selectedChat?.id === chat.id ? 'text-blue-700 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'}`}>{chat.name}</h3>
                                             {chat.assignedScript && (
-                                                <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-[9px] font-bold text-slate-500 border border-slate-200 uppercase whitespace-nowrap">
+                                                <span className="px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-[9px] font-bold text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-600 uppercase whitespace-nowrap">
                                                     {chat.assignedScript}
                                                 </span>
                                             )}
                                         </div>
-                                        <span className="text-[10px] text-slate-400 font-medium font-mono ml-2 flex-shrink-0">{chat.time}</span>
+                                        <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium font-mono ml-2 flex-shrink-0">{chat.time}</span>
                                     </div>
-                                    <p className="text-xs text-slate-500 truncate font-medium">{chat.lastMessage?.body || (typeof chat.lastMessage === 'string' ? chat.lastMessage : '') || 'Sin mensajes'}</p>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate font-medium">{chat.lastMessage?.body || (typeof chat.lastMessage === 'string' ? chat.lastMessage : '') || 'Sin mensajes'}</p>
                                 </div>
                                 {chat.unread > 0 && (
                                     <div className="flex flex-col justify-center items-end">
@@ -648,30 +648,30 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
             </div>
 
             {/* 2. CHAT AREA */}
-            <div className="flex-1 flex flex-col bg-[#eef2f6] relative">
+            <div className="flex-1 flex flex-col bg-[#eef2f6] dark:bg-[#1e293b] relative">
                 {selectedChat ? (
                     <>
                         {/* Header */}
-                        <div className="h-16 border-b border-slate-200 flex items-center justify-between px-6 bg-white shadow-sm z-10">
+                        <div className="h-16 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-6 bg-white dark:bg-slate-800 shadow-sm z-10">
                             <div className="flex items-center gap-3">
-                                <div className="w-9 h-9 rounded bg-slate-800 text-white flex items-center justify-center font-bold text-sm">
+                                <div className="w-9 h-9 rounded bg-slate-800 dark:bg-slate-700 text-white flex items-center justify-center font-bold text-sm">
                                     {selectedChat.name.substring(0, 2)}
                                 </div>
                                 <div>
                                     <div className="flex items-center gap-2">
-                                        <h2 className="font-bold text-slate-800 text-sm">{selectedChat.name}</h2>
+                                        <h2 className="font-bold text-slate-800 dark:text-slate-100 text-sm">{selectedChat.name}</h2>
                                         {selectedChat.assignedScript && (
-                                            <span className="px-2 py-0.5 rounded bg-slate-100 text-[10px] font-bold text-slate-600 border border-slate-200 uppercase">
+                                            <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-[10px] font-bold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 uppercase">
                                                 Guion: {selectedChat.assignedScript}
                                             </span>
                                         )}
                                     </div>
                                     {selectedChat.isPaused ? (
-                                        <p className="text-xs text-amber-600 font-bold flex items-center gap-1">
+                                        <p className="text-xs text-amber-600 dark:text-amber-500 font-bold flex items-center gap-1">
                                             <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span> BOT PAUSADO
                                         </p>
                                     ) : (
-                                        <p className="text-xs text-emerald-600 font-bold flex items-center gap-1">
+                                        <p className="text-xs text-emerald-600 dark:text-emerald-500 font-bold flex items-center gap-1">
                                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> BOT ACTIVO
                                         </p>
                                     )}
@@ -683,18 +683,18 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
                                 <button
                                     onClick={handleToggleBot}
                                     className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all shadow-sm ${selectedChat.isPaused
-                                        ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200'
-                                        : 'bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200'
+                                        ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-800/50 border border-emerald-200 dark:border-emerald-800/50'
+                                        : 'bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-800/50 border border-orange-200 dark:border-orange-800/50'
                                         }`}
                                 >
                                     {selectedChat.isPaused ? <><Icons.Play /> REACTIVAR IA</> : <><Icons.Pause /> PAUSAR IA</>}
                                 </button>
 
-                                <span className="w-px h-6 bg-slate-200 mx-1"></span>
+                                <span className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></span>
 
                                 <button
                                     onClick={() => setShowScriptPanel(!showScriptPanel)}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all border ${showScriptPanel ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all border ${showScriptPanel ? 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-200 dark:border-indigo-800/50 text-indigo-700 dark:text-indigo-400' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
                                     title="Abrir Asistente IA (Resumen y Guiones)"
                                 >
                                     <Icons.AI />
@@ -707,13 +707,13 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
                         <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
                             {loading ? (
                                 <div className="flex items-center justify-center h-full">
-                                    <div className="flex items-center gap-3 text-slate-400">
-                                        <div className="w-5 h-5 border-2 border-slate-300 border-t-transparent rounded-full animate-spin"></div>
+                                    <div className="flex items-center gap-3 text-slate-400 dark:text-slate-500">
+                                        <div className="w-5 h-5 border-2 border-slate-300 dark:border-slate-600 border-t-transparent dark:border-t-transparent rounded-full animate-spin"></div>
                                         <span className="text-sm">Cargando mensajes...</span>
                                     </div>
                                 </div>
                             ) : messages.length === 0 ? (
-                                <div className="flex items-center justify-center h-full text-slate-400 text-sm">
+                                <div className="flex items-center justify-center h-full text-slate-400 dark:text-slate-500 text-sm">
                                     No hay mensajes en este chat
                                 </div>
                             ) : (
@@ -721,10 +721,10 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
                                     <div key={idx} className={`flex ${msg.fromMe ? 'justify-end' : 'justify-start'}`}>
                                         <div className={`max-w-[70%] p-3 text-sm leading-relaxed shadow-sm relative group ${msg.fromMe
                                             ? 'bg-blue-600 text-white rounded-l-lg rounded-br-lg'
-                                            : 'bg-white text-slate-700 rounded-r-lg rounded-bl-lg border border-slate-200'
+                                            : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-white rounded-r-lg rounded-bl-lg border border-slate-200 dark:border-slate-600'
                                             }`}>
                                             {renderMessageBody(msg)}
-                                            <span className={`text-[10px] block text-right mt-1 font-mono opacity-80 ${msg.fromMe ? 'text-blue-100' : 'text-slate-400'}`}>
+                                            <span className={`text-[10px] block text-right mt-1 font-mono opacity-80 ${msg.fromMe ? 'text-blue-100' : 'text-slate-400 dark:text-slate-400'}`}>
                                                 {(() => {
                                                     try {
                                                         const d = new Date(msg.timestamp);
@@ -737,7 +737,7 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
                                             {msg.fromMe && (
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); handleDeleteMessage(msg.id); }}
-                                                    className="absolute -left-8 top-1/2 -translate-y-1/2 p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-full opacity-0 group-hover:opacity-100 transition-all"
+                                                    className="absolute -left-8 top-1/2 -translate-y-1/2 p-1.5 text-slate-300 dark:text-slate-500 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-full opacity-0 group-hover:opacity-100 transition-all"
                                                     title="Eliminar mensaje para todos"
                                                 >
                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
@@ -751,18 +751,18 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
                         </div>
 
                         {/* Input */}
-                        <div className="p-4 bg-white border-t border-slate-200">
+                        <div className="p-4 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700">
                             {/* Attachment Preview */}
                             {attachment && (
-                                <div className="mb-3 p-3 bg-slate-50 rounded-lg border border-slate-200 flex items-center gap-3 animate-fade-in">
-                                    <img src={attachment.preview} alt="Preview" className="w-16 h-16 object-cover rounded-lg border border-slate-200 shadow-sm" />
+                                <div className="mb-3 p-3 bg-slate-50 dark:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-600 flex items-center gap-3 animate-fade-in">
+                                    <img src={attachment.preview} alt="Preview" className="w-16 h-16 object-cover rounded-lg border border-slate-200 dark:border-slate-600 shadow-sm" />
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium text-slate-700 truncate">{attachment.file.name}</p>
-                                        <p className="text-xs text-slate-400">{(attachment.file.size / 1024).toFixed(0)} KB</p>
+                                        <p className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{attachment.file.name}</p>
+                                        <p className="text-xs text-slate-400 dark:text-slate-500">{(attachment.file.size / 1024).toFixed(0)} KB</p>
                                     </div>
                                     <button
                                         onClick={() => setAttachment(null)}
-                                        className="p-1.5 hover:bg-rose-100 rounded-lg text-slate-400 hover:text-rose-600 transition"
+                                        className="p-1.5 hover:bg-rose-100 dark:hover:bg-rose-900/30 rounded-lg text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 transition"
                                     >
                                         ✕
                                     </button>
@@ -781,7 +781,7 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
                                 <button
                                     type="button"
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="p-2.5 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all"
+                                    className="p-2.5 rounded-md text-slate-400 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/40 transition-all"
                                     title="Adjuntar imagen"
                                 >
                                     <Icons.Clip />
@@ -792,7 +792,7 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
                                         value={input}
                                         onChange={(e) => setInput(e.target.value)}
                                         placeholder={attachment ? 'Agregar texto (opcional)...' : 'Escribe un mensaje...'}
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-md pl-4 pr-10 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all text-slate-700"
+                                        className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-md pl-4 pr-10 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all text-slate-700 dark:text-white placeholder-slate-400 dark:placeholder-slate-400"
                                     />
                                 </div>
                                 <button
@@ -851,38 +851,38 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
                                 </div>
 
                                 {/* Product Info */}
-                                <div className="p-3 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100/50">
-                                    <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-1">Producto</p>
-                                    <p className="font-bold text-slate-800 text-sm">{activeOrder.producto}</p>
+                                <div className="p-3 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-100/50 dark:border-blue-800/20">
+                                    <p className="text-[10px] font-bold text-blue-400 dark:text-blue-500 uppercase tracking-widest mb-1">Producto</p>
+                                    <p className="font-bold text-slate-800 dark:text-slate-100 text-sm">{activeOrder.producto}</p>
                                     {activeOrder.plan && (
-                                        <p className="text-xs text-slate-500 mt-0.5">Plan {activeOrder.plan}</p>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Plan {activeOrder.plan}</p>
                                     )}
                                 </div>
 
                                 {/* Delivery Info */}
                                 <div className="space-y-2.5">
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-1.5">Envío a</p>
+                                    <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-100 dark:border-slate-700 pb-1.5">Envío a</p>
                                     <div>
-                                        <p className="text-sm font-semibold text-slate-700">{activeOrder.nombre}</p>
-                                        <p className="text-xs text-slate-500 mt-1">{activeOrder.calle}</p>
-                                        <p className="text-xs text-slate-500">{activeOrder.ciudad} {activeOrder.cp ? `(CP ${activeOrder.cp})` : ''}</p>
-                                        {activeOrder.provincia && <p className="text-xs text-slate-500">{activeOrder.provincia}</p>}
+                                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{activeOrder.nombre}</p>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{activeOrder.calle}</p>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">{activeOrder.ciudad} {activeOrder.cp ? `(CP ${activeOrder.cp})` : ''}</p>
+                                        {activeOrder.provincia && <p className="text-xs text-slate-500 dark:text-slate-400">{activeOrder.provincia}</p>}
                                     </div>
                                     {activeOrder.tracking && (
-                                        <div className="mt-3 p-2.5 bg-slate-50 rounded-lg border border-slate-200">
-                                            <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Tracking Correo</p>
-                                            <p className="font-mono text-xs font-bold text-blue-600 break-all">{activeOrder.tracking}</p>
+                                        <div className="mt-3 p-2.5 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-600">
+                                            <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Tracking Correo</p>
+                                            <p className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400 break-all">{activeOrder.tracking}</p>
                                         </div>
                                     )}
                                 </div>
 
                                 {/* Total */}
-                                <div className="pt-4 border-t border-slate-100 flex justify-between items-end">
-                                    <span className="text-xs font-bold text-slate-400 uppercase">Total</span>
-                                    <span className="text-lg font-black text-emerald-600">${activeOrder.precio}</span>
+                                <div className="pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-between items-end">
+                                    <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase">Total</span>
+                                    <span className="text-lg font-black text-emerald-600 dark:text-emerald-500">${activeOrder.precio}</span>
                                 </div>
 
-                                <div className="pt-2 text-[10px] text-center text-slate-400 font-mono">
+                                <div className="pt-2 text-[10px] text-center text-slate-400 dark:text-slate-500 font-mono">
                                     Creado: {new Date(activeOrder.createdAt).toLocaleDateString()}
                                 </div>
                             </div>
@@ -893,13 +893,13 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
 
             {/* 4. RIGHT PANEL - AI & Scripts Context Drawer (Imported from V3) */}
             {selectedChat && showScriptPanel && (
-                <div className="w-[320px] shrink-0 border-l border-slate-200 bg-slate-50 flex flex-col z-30 overflow-y-auto animate-fade-in relative shadow-[-4px_0_24px_-12px_rgba(0,0,0,0.05)]">
+                <div className="w-[320px] shrink-0 border-l border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 flex flex-col z-30 overflow-y-auto animate-fade-in relative shadow-[-4px_0_24px_-12px_rgba(0,0,0,0.05)]">
 
-                    <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-white shadow-sm z-10">
-                        <h3 className="font-extrabold text-slate-800 text-sm flex items-center gap-2">
+                    <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-white dark:bg-slate-800 shadow-sm z-10">
+                        <h3 className="font-extrabold text-slate-800 dark:text-slate-100 text-sm flex items-center gap-2">
                             <Icons.AI /> Asistente IA
                         </h3>
-                        <button onClick={() => setShowScriptPanel(false)} className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors">
+                        <button onClick={() => setShowScriptPanel(false)} className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md transition-colors">
                             <span className="text-xl leading-none">&times;</span>
                         </button>
                     </div>
@@ -909,19 +909,19 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
                         {/* Summary Block */}
                         <div>
                             <div className="flex justify-between items-center mb-3">
-                                <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Contexto IA</h4>
-                                <button onClick={handleSummarize} disabled={summarizing || messages.length === 0} className="text-[10px] font-bold text-indigo-700 bg-indigo-100 px-2 py-1 rounded hover:bg-indigo-200 transition-colors disabled:opacity-50">
+                                <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Contexto IA</h4>
+                                <button onClick={handleSummarize} disabled={summarizing || messages.length === 0} className="text-[10px] font-bold text-indigo-700 dark:text-indigo-400 bg-indigo-100 dark:bg-indigo-900/30 px-2 py-1 rounded hover:bg-indigo-200 dark:hover:bg-indigo-900/60 transition-colors disabled:opacity-50 border border-indigo-200 dark:border-indigo-800/50">
                                     {summarizing ? 'Generando...' : 'Resumir Chat'}
                                 </button>
                             </div>
-                            <div className="bg-white border border-slate-200 rounded-xl p-4 text-xs font-medium text-slate-600 shadow-sm min-h-[100px] relative">
+                            <div className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl p-4 text-xs font-medium text-slate-600 dark:text-slate-300 shadow-sm min-h-[100px] relative">
                                 {summaryText ? (
                                     <div className="whitespace-pre-wrap leading-relaxed">
                                         {summaryText}
-                                        <button onClick={() => setSummaryText(null)} className="absolute top-2 right-2 text-slate-300 hover:text-slate-500 bg-white rounded-full p-0.5"><Icons.Trash /></button>
+                                        <button onClick={() => setSummaryText(null)} className="absolute top-2 right-2 text-slate-300 hover:text-slate-500 dark:hover:text-slate-400 bg-white dark:bg-slate-700 rounded-full p-0.5"><Icons.Trash /></button>
                                     </div>
                                 ) : (
-                                    <span className="text-slate-400 italic flex items-center h-full justify-center text-center">Haz clic en resumir para analizar la intención de compra del cliente.</span>
+                                    <span className="text-slate-400 dark:text-slate-500 italic flex items-center h-full justify-center text-center">Haz clic en resumir para analizar la intención de compra del cliente.</span>
                                 )}
                             </div>
                         </div>
@@ -929,8 +929,8 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
                         {/* Script Injection */}
                         <div className="flex-1">
                             <div className="flex items-center justify-between mb-3">
-                                <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Guión Sugerido</h4>
-                                <span className="bg-slate-200 text-slate-600 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase">{selectedChat.assignedScript || 'V3'}</span>
+                                <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Guión Sugerido</h4>
+                                <span className="bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase">{selectedChat.assignedScript || 'V3'}</span>
                             </div>
 
                             {Object.keys(scriptFlow).length > 0 ? (
@@ -946,13 +946,13 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
                                                     if (!selectedChat.isPaused) handleToggleBot();
                                                     setInput(formatScriptMessage(step.response));
                                                 }}
-                                                className="w-full text-left p-3 rounded-lg border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 transition-colors group cursor-pointer bg-white shadow-sm"
+                                                className="w-full text-left p-3 rounded-lg border border-slate-200 dark:border-slate-600 hover:border-indigo-300 dark:hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/40 transition-colors group cursor-pointer bg-white dark:bg-slate-700 shadow-sm"
                                             >
-                                                <div className="flex items-center justify-between mb-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest group-hover:text-indigo-600">
+                                                <div className="flex items-center justify-between mb-1.5 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
                                                     <span>{stepKey.replace(/_/g, ' ')}</span>
                                                     <span className="opacity-0 group-hover:opacity-100 transition-opacity">Insertar +</span>
                                                 </div>
-                                                <p className="text-[11px] text-slate-600 font-medium line-clamp-3 leading-relaxed">
+                                                <p className="text-[11px] text-slate-600 dark:text-slate-300 font-medium line-clamp-3 leading-relaxed">
                                                     {formatScriptMessage(step.response)}
                                                 </p>
                                             </button>
@@ -960,7 +960,7 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
                                     })}
                                 </div>
                             ) : (
-                                <p className="text-xs text-slate-400 italic text-center mt-4">No hay pasos de guión configurados.</p>
+                                <p className="text-xs text-slate-400 dark:text-slate-500 italic text-center mt-4">No hay pasos de guión configurados.</p>
                             )}
                         </div>
 

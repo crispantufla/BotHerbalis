@@ -16,7 +16,8 @@ redisConnection.on('ready', () => {
 });
 
 // --- QUEUE ---
-export const botQueue = new Queue('whatsapp-messages', { connection: redisConnection });
+const QUEUE_NAME = `whatsapp-messages-${process.env.INSTANCE_ID || 'default'}`;
+export const botQueue = new Queue(QUEUE_NAME, { connection: redisConnection });
 
 // --- WORKER FACTORY ---
 // We initialize the worker injecting the required dependencies from index.ts
@@ -36,7 +37,7 @@ export function initWorker(dependencies: any) {
         config
     } = dependencies;
 
-    const worker = new Worker('whatsapp-messages', async (job: Job) => {
+    const worker = new Worker(QUEUE_NAME, async (job: Job) => {
         const { userId, combinedText, effectiveScript, startTime } = job.data;
         logger.info(`[BULLMQ] 🚀 Procesando Job ${job.id} para ${userId}`);
 
