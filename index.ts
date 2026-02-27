@@ -142,8 +142,8 @@ const userState = new Proxy({}, {
 const chatResets: Record<string, number> = {}; // Tracks timestamp of last history clear per user
 let lastAlertUser: string | null = null;
 let pausedUsers = new Set<string>();
-const pendingMessages = new Map<string, { messages: string[]; timer: ReturnType<typeof setTimeout>; startTime: number }>(); // Debounce: userId -> { messages: [], timer }
-const DEBOUNCE_MS = 3000; // Wait 3s for more messages before processing
+const pendingMessages = new Map<string, { messages: { text: string; timestamp: number }[]; timer: ReturnType<typeof setTimeout>; startTime: number }>(); // Debounce: userId -> { messages: [{text, timestamp}], timer }
+const DEBOUNCE_MS = 10000; // Wait 10s for more messages before processing (makes bot look more human)
 let schedulerStarted = false; // Guard against duplicate scheduler on reconnect
 // Variables for API / Dashboard State
 let qrCodeData: string | null = null;
@@ -824,22 +824,29 @@ client.on('message', async (msg: any) => {
                 if (transcription) {
                     logger.info(`[AUDIO] Transcribed: "${transcription}"`);
                     logAndEmit(userId, 'user', `MEDIA_AUDIO:${audioUrl}|TRANSCRIPTION:${transcription}`, userState[userId]?.step || 'new');
-                    const startTime = Date.now();
-                    await processSalesFlow(userId, transcription, userState, knowledge, {
-                        client, notifyAdmin, saveState, aiService, sendMessageWithDelay: (id: string, text: string) => sendMessageWithDelay(id, text, startTime), logAndEmit, saveOrderToLocal, cancelLatestOrder, sharedState, config
-                    });
+
+                    // INSTED of immediate processing, push to universal Debounce buffer
+                    msgText = transcription;
                 } else {
                     logAndEmit(userId, 'user', `MEDIA_AUDIO:${audioUrl}`, userState[userId]?.step || 'new');
                     await client.sendMessage(userId, "Disculpá, no pude escuchar bien el audio. ¿Me lo escribís?");
+                    return; // Stop processing this particular message
                 }
+            } else {
+                return;
             }
-            return;
         }
 
         // 1b. Media Handling (Image/Sticker)
         if (msg.type === 'image' || msg.type === 'sticker') {
             logAndEmit(userId, 'user', `📷 ${msg.type === 'sticker' ? 'Sticker' : 'Imagen'} recibida${msg.body ? ': ' + msg.body : ''}`, userState[userId]?.step || 'new');
-            return;
+
+            if (msg.type === 'image' && msg.body) {
+                // If it's an image WITH a text caption, we capture the caption + context
+                msgText = `[Imagen enviada por el usuario] ${msg.body}`;
+            } else {
+                return; // Stickers or blank images are purely visual, ignore for AI flow
+            }
         }
 
         // 2. Logging & Ad Handling
@@ -854,7 +861,9 @@ client.on('message', async (msg: any) => {
             }
         }
 
-        logAndEmit(userId, 'user', msgText, userState[userId]?.step || 'new');
+        if (msg.type !== 'ptt' && msg.type !== 'audio' && msg.type !== 'image') {
+            logAndEmit(userId, 'user', msgText, userState[userId]?.step || 'new');
+        }
 
         // SPECIAL CASE: Audio Request
         if (msgText.toLowerCase() === 'marta mandame un audio') {
@@ -894,22 +903,24 @@ client.on('message', async (msg: any) => {
             return;
         }
 
-        // 4. Debounce: accumulate rapid-fire messages
+        // 4. Debounce: accumulate rapid-fire messages (Text, Transcribed Audio, Captions)
         let currentDelay = DEBOUNCE_MS;
         if (userState[userId] && userState[userId].step === 'waiting_data') {
             currentDelay = 25000; // 25 seconds tolerance for address entry
             logger.info(`[DEBOUNCE] Aumentando delay a 25s para ${userId} (ingresando datos de envío)...`);
         }
 
+        const msgObj = { text: msgText, timestamp: msg.timestamp || Math.floor(Date.now() / 1000) };
+
         if (pendingMessages.has(userId)) {
             const pending = pendingMessages.get(userId)!;
-            pending.messages.push(msgText);
+            pending.messages.push(msgObj);
             clearTimeout(pending.timer);
             pending.timer = setTimeout(() => _processDebounced(userId), currentDelay);
             logger.info(`[DEBOUNCE] Queued message #${pending.messages.length} from ${userId}: "${msgText}"`);
         } else {
             pendingMessages.set(userId, {
-                messages: [msgText],
+                messages: [msgObj],
                 timer: setTimeout(() => _processDebounced(userId), currentDelay),
                 startTime: Date.now()
             });
@@ -925,11 +936,14 @@ async function _processDebounced(userId: string): Promise<void> {
     const pending = pendingMessages.get(userId);
     if (!pending) return;
 
-    const combinedText = pending.messages.join(' ');
+    // Sort chronologically by the exact WhatsApp timestamp (fixes audio transcription delay ordering)
+    const sortedMessages = pending.messages.sort((a, b) => a.timestamp - b.timestamp);
+    const combinedText = sortedMessages.map(m => m.text).join(' ');
+
     const startTime = pending.startTime;
     pendingMessages.delete(userId);
 
-    logger.info(`[DEBOUNCE] Processing ${pending.messages.length} message(s) from ${userId}: "${combinedText}"`);
+    logger.info(`[DEBOUNCE] Processing ${sortedMessages.length} message(s) from ${userId} combined: "${combinedText}"`);
 
     try {
         // Enforce the A/B test assigned script, fallback to global activeScript
