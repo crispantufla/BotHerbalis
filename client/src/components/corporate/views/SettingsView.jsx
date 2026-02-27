@@ -15,6 +15,11 @@ const SettingsView = ({ status }) => {
     const [scriptStats, setScriptStats] = useState({});
     const [switchingScript, setSwitchingScript] = useState(false);
 
+    // Memory stats
+    const [memStats, setMemStats] = useState(null);
+    const [loadingMem, setLoadingMem] = useState(false);
+    const [resetting, setResetting] = useState(false);
+
     // Initial Load
     useEffect(() => {
         const fetchData = async () => {
@@ -29,14 +34,26 @@ const SettingsView = ({ status }) => {
             } catch (e) { console.error("Error loading script info:", e); }
         };
         fetchData();
+        fetchMemoryStats();
     }, []);
+
+    const fetchMemoryStats = async () => {
+        setLoadingMem(true);
+        try {
+            const res = await api.get('/api/memory-stats');
+            setMemStats(res.data);
+        } catch (e) { console.error("Error loading memory stats:", e); }
+        setLoadingMem(false);
+    };
 
     // Listen for script changes from other sessions
     useEffect(() => {
         if (!socket) return;
         const handler = (data) => { if (data.active) setActiveScript(data.active); };
         socket.on('script_changed', handler);
-        return () => socket.off('script_changed', handler);
+        const memHandler = () => fetchMemoryStats();
+        socket.on('memory_reset', memHandler);
+        return () => { socket.off('script_changed', handler); socket.off('memory_reset', memHandler); };
     }, [socket]);
 
     // Handlers
@@ -56,6 +73,18 @@ const SettingsView = ({ status }) => {
             await api.post('/api/logout');
             toast.success('Bot desconectado. Escaneá el QR nuevamente si querés reconectar.');
         } catch (e) { toast.error('Error al desconectar'); }
+    };
+
+    const handleResetMemory = async () => {
+        const ok = await confirm("⚠️ ¿Estás seguro?\n\nEsto borrará TODOS los estados de conversación de los clientes. El bot olvidará en qué paso estaba cada uno.\n\n✅ Las ventas y pedidos NO se borran.");
+        if (!ok) return;
+        setResetting(true);
+        try {
+            const res = await api.post('/api/reset-memory');
+            toast.success(`Memoria limpiada. ${res.data.deletedUsers} estados eliminados.`);
+            fetchMemoryStats();
+        } catch (e) { toast.error('Error al limpiar la memoria'); }
+        setResetting(false);
     };
 
     const handleTestReport = async () => {
@@ -224,6 +253,26 @@ const SettingsView = ({ status }) => {
         }
     };
 
+    // Memory gauge helpers
+    const getMemoryPercent = () => {
+        if (!memStats) return 0;
+        return Math.min(100, Math.round((memStats.totalUsersDB / memStats.thresholds.danger) * 100));
+    };
+
+    const getMemoryColor = () => {
+        if (!memStats) return 'bg-slate-200';
+        if (memStats.recommendation === 'critical') return 'bg-red-500';
+        if (memStats.recommendation === 'warning') return 'bg-amber-500';
+        return 'bg-emerald-500';
+    };
+
+    const getMemoryLabel = () => {
+        if (!memStats) return { text: 'Cargando...', color: 'text-slate-400', bg: 'bg-slate-50', border: 'border-slate-200' };
+        if (memStats.recommendation === 'critical') return { text: '🔴 LIMPIEZA RECOMENDADA', color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-200' };
+        if (memStats.recommendation === 'warning') return { text: '🟡 MEMORIA MODERADA', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' };
+        return { text: '🟢 MEMORIA SALUDABLE', color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200' };
+    };
+
     return (
         <div className="p-8 max-w-5xl mx-auto space-y-8 animate-fade-in pb-20">
 
@@ -340,7 +389,106 @@ const SettingsView = ({ status }) => {
                     </div>
                 </div>
 
-                {/* 5. Dangerous Zone */}
+                {/* 5. MEMORY MANAGEMENT PANEL */}
+                <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm relative overflow-hidden md:col-span-2">
+                    <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                            <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                            Gestión de Memoria
+                        </h3>
+                        <button onClick={fetchMemoryStats} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition">
+                            ↻ Actualizar
+                        </button>
+                    </div>
+
+                    {memStats ? (
+                        <div className="space-y-5">
+                            {/* Status Badge */}
+                            {(() => {
+                                const label = getMemoryLabel();
+                                return (
+                                    <div className={`px-4 py-2.5 rounded-lg border ${label.border} ${label.bg} flex items-center justify-between`}>
+                                        <span className={`font-bold text-sm tracking-wide ${label.color}`}>{label.text}</span>
+                                        <span className="text-xs text-slate-500">{memStats.totalUsersDB} / {memStats.thresholds.danger} usuarios</span>
+                                    </div>
+                                );
+                            })()}
+
+                            {/* Progress Bar */}
+                            <div>
+                                <div className="flex justify-between text-xs text-slate-500 mb-1.5">
+                                    <span>Ocupación de Memoria</span>
+                                    <span className="font-mono font-bold">{getMemoryPercent()}%</span>
+                                </div>
+                                <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+                                    <div
+                                        className={`h-full rounded-full transition-all duration-700 ease-out ${getMemoryColor()}`}
+                                        style={{ width: `${Math.max(2, getMemoryPercent())}%` }}
+                                    ></div>
+                                </div>
+                                <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+                                    <span>0</span>
+                                    <span className="text-amber-500 font-bold">⚠ {memStats.thresholds.warn}</span>
+                                    <span className="text-red-500 font-bold">🔴 {memStats.thresholds.danger}</span>
+                                </div>
+                            </div>
+
+                            {/* Stats Grid */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                <div className="bg-slate-50 rounded-lg p-3 text-center">
+                                    <div className="text-lg font-black text-slate-800">{memStats.totalUsersDB}</div>
+                                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">En Base de Datos</div>
+                                </div>
+                                <div className="bg-blue-50 rounded-lg p-3 text-center">
+                                    <div className="text-lg font-black text-blue-700">{memStats.ramUsers}</div>
+                                    <div className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">En RAM</div>
+                                </div>
+                                <div className="bg-emerald-50 rounded-lg p-3 text-center">
+                                    <div className="text-lg font-black text-emerald-700">{memStats.activeConversations}</div>
+                                    <div className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Activos Ahora</div>
+                                </div>
+                                <div className="bg-amber-50 rounded-lg p-3 text-center">
+                                    <div className="text-lg font-black text-amber-700">{memStats.heapUsedMB} MB</div>
+                                    <div className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Heap Usada</div>
+                                </div>
+                            </div>
+
+                            {/* Info Text */}
+                            <p className="text-xs text-slate-400 leading-relaxed">
+                                💡 <strong>¿Cuándo limpiar?</strong> Recomendamos limpiar cuando el indicador pase a 🟡 amarillo (+200 usuarios).
+                                Esto borra los estados de conversación acumulados (en qué paso del guion estaba cada cliente).
+                                <strong> Las ventas y pedidos NO se borran nunca.</strong>
+                            </p>
+
+                            {/* Reset Button */}
+                            <button
+                                onClick={handleResetMemory}
+                                disabled={resetting}
+                                className="w-full bg-indigo-50 text-indigo-700 border border-indigo-200 px-6 py-3 rounded-lg text-sm font-bold hover:bg-indigo-100 transition flex items-center justify-center gap-2 disabled:opacity-50 active:scale-[0.98]"
+                            >
+                                {resetting ? (
+                                    <>
+                                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                        Limpiando...
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                        LIMPIAR MEMORIA DE USUARIOS
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="flex items-center justify-center py-8 text-slate-400">
+                            <svg className="w-5 h-5 animate-spin mr-2" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            Cargando estadísticas...
+                        </div>
+                    )}
+                </div>
+
+                {/* 6. Dangerous Zone */}
                 <div className="bg-white p-6 rounded-lg border border-red-100 shadow-sm relative overflow-hidden md:col-span-2">
                     <div className="absolute top-0 left-0 w-1 h-full bg-red-500"></div>
                     <h3 className="font-bold text-red-700 mb-4 flex items-center gap-2">
