@@ -382,14 +382,22 @@ module.exports = (client, sharedState) => {
         try {
             const { prisma } = require('../../../db');
 
-            // 1. Purge DB user states
-            const deleted = await prisma.user.deleteMany();
+            // 1. Purge DB user states (safe: preserves users with orders/chatlogs)
+            // Delete users WITHOUT any orders (safe to remove entirely)
+            const deleted = await prisma.user.deleteMany({
+                where: { orders: { none: {} } }
+            });
+            // For users WITH orders, just clear their profile data
+            const cleaned = await prisma.user.updateMany({
+                where: { orders: { some: {} }, profileData: { not: null } },
+                data: { profileData: null }
+            });
 
             // 2. Clear RAM cache
             const { userCache } = require('../../utils/cache');
             userCache.flushAll();
 
-            logger.info(`[RESET] Memory purged. Deleted ${deleted.count} user records from DB.`);
+            logger.info(`[RESET] Memory purged. Deleted ${deleted.count} users sin pedidos, limpiado ${cleaned.count} con pedidos.`);
 
             // 3. Notify dashboard
             if (io) io.emit('memory_reset', { deletedCount: deleted.count });

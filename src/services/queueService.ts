@@ -52,13 +52,8 @@ export function initWorker(dependencies: any) {
             logger.info(`[BULLMQ] ✅ Job ${job.id} de ${userId} completado con éxito.`);
         } catch (error: any) {
             logger.error(`[BULLMQ] ❌ Job ${job.id} falló:`, error.message);
-            // Si el error es un rate limit the OpenAI o timeout, forzamos reintento
-            if (error.status === 429 || error.message.includes('Timeout') || error.message.includes('502')) {
-                throw error; // Al relanzar, BullMQ lo reintenta automáticamente según config
-            } else {
-                // Errores lógicos no merecen reintentarse infinitamente
-                throw error;
-            }
+            // Al relanzar, BullMQ reintenta automáticamente con backoff exponencial
+            throw error;
         }
     }, {
         connection: redisConnection,
