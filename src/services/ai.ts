@@ -813,6 +813,50 @@ INSTRUCCIONES:
     }
 
     /**
+     * Generates a short, highly empathetic or colloquial phrase to bridge the user's input
+     * before sending the hardcoded sales script.
+     * This makes the bot sound more human on the "happy path".
+     */
+    async generateContextualBridge(userMessage: string, context: string): Promise<string> {
+        const prompt = `
+        Actúa como Marta (vendedora/asesora argentina de 50 años). El usuario acaba de decir: "${userMessage}".
+        El contexto actual de la charla es: "${context}".
+        
+        Tu tarea: Genera SOLO UNA frase corta (máximo 8-10 palabras) de empatía REAL o reacción natural ante lo que dijo el usuario.
+        Ejemplos de tono esperado: "Uy qué garrón", "Te re entiendo firme", "Olvidate, es un tema", "Ay sí a todas nos pasa", "Mirá vos, bueno tranqui", "Excelente, me re alegro".
+        
+        REGLAS:
+        1. NO hagas ninguna pregunta.
+        2. NO ofrezcas productos ni soluciones en esta frase.
+        3. NO suenes como bot ni como coach motivacional. Suena como una señora tomando mates.
+        4. Debe ser cortísima.
+        5. Devuelve SOLO el texto, sin comillas ni formato JSON.
+        `;
+
+        try {
+            const result = await this._callQueued(
+                () => this.client.chat.completions.create({
+                    model: "gpt-4o-mini",
+                    messages: [
+                        { role: "system", content: "Sos Marta, una vendedora argentina empática. Respondés cortísimo, orgánico y natural." },
+                        { role: "user", content: prompt }
+                    ],
+                    temperature: 0.8, // Slightly more creative for natural variability
+                    max_tokens: 40
+                }),
+                `bridge_${userMessage}`,
+                60 * 60 // 1 hour cache to avoid unnecessary calls for common phrases
+            );
+
+            const bridge = result.choices[0].message?.content?.trim() || "";
+            return bridge;
+        } catch (e: any) {
+            logger.error("🔴 [AI] Contextual Bridge Error:", e.message);
+            return ""; // Soft fail: if it fails, simply return empty so the main script continues unaffected
+        }
+    }
+
+    /**
      * Get queue/cache stats for monitoring
      */
     getStats() {

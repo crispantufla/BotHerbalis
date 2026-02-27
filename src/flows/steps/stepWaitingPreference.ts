@@ -105,7 +105,19 @@ export async function handleWaitingPreference(
 
     if (mentionsCapsulas) {
         currentState.selectedProduct = "Cápsulas de nuez de la india";
-        const msg = _formatMessage(knowledge.flow.preference_capsulas.response, currentState);
+        let msg = _formatMessage(knowledge.flow.preference_capsulas.response, currentState);
+
+        // --- CONTEXTUAL BRIDGE INJECTION ---
+        try {
+            const bridge = await aiService.generateContextualBridge(text, "El cliente acaba de elegir las Cápsulas. Me dispongo a enviarle los precios y opciones de plan.");
+            if (bridge) {
+                msg = `${bridge}\n\n${msg}`;
+            }
+        } catch (e) {
+            console.error("[BRIDGE] Error generating bridge in preference step (Capsulas):", e);
+        }
+        // -----------------------------------
+
         _setStep(currentState, knowledge.flow.preference_capsulas.nextStep);
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);
@@ -114,7 +126,19 @@ export async function handleWaitingPreference(
         return { matched: true };
     } else if (mentionsSemillas) {
         currentState.selectedProduct = "Semillas de nuez de la india";
-        const msg = _formatMessage(knowledge.flow.preference_semillas.response, currentState);
+        let msg = _formatMessage(knowledge.flow.preference_semillas.response, currentState);
+
+        // --- CONTEXTUAL BRIDGE INJECTION ---
+        try {
+            const bridge = await aiService.generateContextualBridge(text, "El cliente acaba de elegir las Semillas. Me dispongo a enviarle los precios y opciones de plan.");
+            if (bridge) {
+                msg = `${bridge}\n\n${msg}`;
+            }
+        } catch (e) {
+            console.error("[BRIDGE] Error generating bridge in preference step (Semillas):", e);
+        }
+        // -----------------------------------
+
         _setStep(currentState, knowledge.flow.preference_semillas.nextStep);
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);
@@ -123,7 +147,19 @@ export async function handleWaitingPreference(
         return { matched: true };
     } else if (knowledge.flow.preference_gotas && mentionsGotas) {
         currentState.selectedProduct = "Gotas de nuez de la india";
-        const msg = _formatMessage(knowledge.flow.preference_gotas.response, currentState);
+        let msg = _formatMessage(knowledge.flow.preference_gotas.response, currentState);
+
+        // --- CONTEXTUAL BRIDGE INJECTION ---
+        try {
+            const bridge = await aiService.generateContextualBridge(text, "El cliente acaba de elegir las Gotas. Me dispongo a enviarle los precios y opciones de plan.");
+            if (bridge) {
+                msg = `${bridge}\n\n${msg}`;
+            }
+        } catch (e) {
+            console.error("[BRIDGE] Error generating bridge in preference step (Gotas):", e);
+        }
+        // -----------------------------------
+
         _setStep(currentState, knowledge.flow.preference_gotas.nextStep);
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);

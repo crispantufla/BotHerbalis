@@ -1,10 +1,14 @@
 const { _getPrices } = require('./pricing');
 
-function _formatMessage(text: string, state: any): string {
+function _formatMessage(text: string | string[], state: any): string {
     if (!text) return "";
+
+    // Si es un array de respuestas, elige una al azar para dar variabilidad
+    let textToFormat = Array.isArray(text) ? text[Math.floor(Math.random() * text.length)] : text;
+
     const prices = _getPrices();
 
-    let formatted = text;
+    let formatted = textToFormat;
     // Replace {{PRICE_PRODUCT_PLAN}}
     formatted = formatted.replace(/{{PRICE_CAPSULAS_60}}/g, prices['Cápsulas']['60']);
     formatted = formatted.replace(/{{PRICE_CAPSULAS_120}}/g, prices['Cápsulas']['120']);
