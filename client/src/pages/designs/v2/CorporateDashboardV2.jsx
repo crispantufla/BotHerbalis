@@ -4,6 +4,7 @@ import { useSocket } from '../../../context/SocketContext';
 import { useAuth } from '../../../context/AuthContext';
 import { Link } from 'react-router-dom';
 import { useToast } from '../../../components/ui/Toast';
+import { useTheme } from '../../../context/ThemeContext';
 
 import DashboardViewV2 from '../../../components/corporate/v2/DashboardViewV2';
 import CommsViewV2 from '../../../components/corporate/v2/CommsViewV2';
@@ -12,12 +13,13 @@ import SettingsViewV2 from '../../../components/corporate/v2/SettingsViewV2';
 import ScriptViewV2 from '../../../components/corporate/v2/ScriptViewV2';
 import GalleryViewV2 from '../../../components/corporate/v2/GalleryViewV2';
 
-import { Wifi, MessageCircle, Database, Settings, FileText, ImageIcon, LogOut, Menu, X } from 'lucide-react';
+import { Wifi, MessageCircle, Database, Settings, FileText, ImageIcon, LogOut, Menu, X, Moon, Sun } from 'lucide-react';
 
 const CorporateDashboardV2 = () => {
     const { socket } = useSocket();
     const { logout } = useAuth();
     const { toast } = useToast();
+    const { isDark, toggleTheme } = useTheme();
     const [status, setStatus] = useState('initializing');
     const [alerts, setAlerts] = useState([]);
     const [activeTab, setActiveTab] = useState('dashboard');
@@ -242,6 +244,21 @@ const CorporateDashboardV2 = () => {
 
                 {/* User Profile & Logout (Bottom) */}
                 <div className="p-4 border-t border-slate-200/50 bg-white/40">
+                    {/* Theme Toggle */}
+                    <button
+                        onClick={toggleTheme}
+                        className={`w-full flex items-center ${(sidebarCollapsed && !isMobile) ? 'justify-center p-2' : 'px-4 py-3'} mb-2 rounded-xl transition-all duration-300 border border-transparent hover:border-indigo-200 group
+                            ${isDark
+                                ? 'bg-gradient-to-r from-indigo-500/10 to-purple-500/10 text-amber-400 hover:from-indigo-500/20 hover:to-purple-500/20'
+                                : 'text-slate-500 hover:bg-slate-100 hover:text-indigo-600'
+                            }`}
+                        title={(sidebarCollapsed && !isMobile) ? (isDark ? 'Modo Claro' : 'Modo Oscuro') : ''}
+                    >
+                        <div className={`${(sidebarCollapsed && !isMobile) ? '' : 'mr-3'} group-hover:scale-110 transition-transform duration-300`}>
+                            {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                        </div>
+                        {(!sidebarCollapsed || isMobile) && <span className="font-medium text-sm">{isDark ? 'Modo Claro' : 'Modo Oscuro'}</span>}
+                    </button>
                     <button
                         onClick={() => { logout(); if (isMobile) setMobileMenuOpen(false); }}
                         className={`w-full flex items-center ${(sidebarCollapsed && !isMobile) ? 'justify-center p-2' : 'px-4 py-3'} rounded-xl bg-gradient-to-r hover:from-rose-50 hover:to-orange-50 text-rose-600 transition-all duration-300 border border-transparent hover:border-rose-200 group`}
