@@ -26,7 +26,7 @@
         },
         "recommendation": {
             "step": "waiting_weight",
-            "response": "Perfecto 👌\n\nEse objetivo es totalmente posible.\n\n¿Preferís algo súper práctico (cápsulas o gotas)\no más natural (semillas)?",
+            "response": "Perfecto 👌\n\nEse objetivo es totalmente posible. Pasemos directo a ver qué opción es mejor para vos.\n\nTenemos:\n1️⃣ Cápsulas (Lo más efectivo y práctico)\n2️⃣ Semillas/Infusión (Más natural)\n3️⃣ Gotas (Para >70 años o poquitos kilos)\n\n¿Cuál te gustaría probar?",
             "nextStep": "waiting_preference"
         },
         "preference_capsulas": {
