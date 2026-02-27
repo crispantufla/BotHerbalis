@@ -17,6 +17,9 @@ interface SalesFlowDependencies {
     effectiveScript?: string;
 }
 
+// Keywords that signal clear purchase intent — if present, don't auto-pause
+const PURCHASE_INTENT_KEYWORDS = /\b(comprar|quiero comprar|quiero pedir|me interesa|precio|precios|cuanto sale|cuánto sale|cuanto cuesta|cuánto cuesta|quiero encargar|necesito comprar|hagan envios|hacen envíos|hacen envios|quisiera pedir|quisiera comprar|quiero adquirir|quiero ordenar|tienen capsulas|tienen semillas|tienen gotas|nuez de la india)\b/i;
+
 export async function processSalesFlow(
     userId: string,
     text: string,
@@ -45,58 +48,86 @@ export async function processSalesFlow(
             stepEnteredAt: Date.now()
         };
 
-        // --- NEW PRE-BOT HISTORY CHECK ---
+        // --- CHECK 1: Cross-reference against Orders DB ---
+        // If this phone has an existing order, they're a past customer — route to post-sale
         try {
-            if (dependencies.client) {
-                const chat = await dependencies.client.getChatById(userId);
-                if (chat) {
-                    const messages = await chat.fetchMessages({ limit: 10 });
-                    const previousUserMessages = messages.filter((m: any) => !m.fromMe).length;
+            const { prisma } = require('../../db');
+            const cleanPhone = userId.split('@')[0].replace(/\D/g, '');
+            const existingOrder = await prisma.order.findFirst({
+                where: { userPhone: cleanPhone },
+                orderBy: { createdAt: 'desc' }
+            });
 
-                    let isRecentConversation = false;
-                    if (messages.length > 0) {
-                        const lastMsg = messages[messages.length > 1 ? messages.length - 2 : 0];
-                        if (lastMsg && lastMsg.timestamp) {
-                            const hoursSinceLastMsg = (Date.now() / 1000 - lastMsg.timestamp) / 3600;
-                            if (hoursSinceLastMsg <= 24) {
-                                isRecentConversation = true;
+            if (existingOrder) {
+                console.log(`[ORDER-CHECK] User ${userId} has existing order (status: ${existingOrder.status}). Routing to post-sale.`);
+                userState[userId].step = 'completed';
+                userState[userId].selectedProduct = existingOrder.products;
+                saveState(userId);
+                // Don't return — let the flow continue into stepCompleted handler below
+            }
+        } catch (err: any) {
+            console.error(`[ORDER-CHECK] Failed to query orders for ${userId}:`, err.message);
+        }
+
+        // --- CHECK 2: WhatsApp Chat History Detection ---
+        // Only run this if we didn't already route to post-sale via Orders
+        if (userState[userId].step !== 'completed') {
+            try {
+                if (dependencies.client) {
+                    const chat = await dependencies.client.getChatById(userId);
+                    if (chat) {
+                        const messages = await chat.fetchMessages({ limit: 10 });
+
+                        // --- POST-SALE DETECTION: auto-pause if outgoing post-sale messages exist ---
+                        const outgoingMessages = messages.filter((m: any) => m.fromMe && m.body);
+                        const hasPostSaleMessage = outgoingMessages.some((m: any) => {
+                            const body = (m.body || '').trim();
+                            // 1. Branch pickup notification
+                            if (body.includes('MENSAJE DE HERBALIS') || body.includes('MENSAJDE DE HERBALIS')) return true;
+                            // 2. Tracking code (starts with CO + 9 digits, e.g. CO767708617)
+                            if (/^CO\d{9}$/i.test(body)) return true;
+                            return false;
+                        });
+
+                        if (hasPostSaleMessage) {
+                            console.log(`[POST-SALE] User ${userId} has post-sale messages in history. Auto-pausing.`);
+                            if (dependencies.sharedState && dependencies.sharedState.pausedUsers) {
+                                dependencies.sharedState.pausedUsers.add(userId);
+                            }
+                            return { matched: true, paused: true };
+                        }
+
+                        // --- EXISTING CONVERSATION DETECTION ---
+                        // If there are ANY previous outgoing messages (bot or human),
+                        // this person was already spoken to. Auto-pause UNLESS they show purchase intent.
+                        const hasPriorOutgoing = outgoingMessages.length > 0;
+
+                        if (hasPriorOutgoing) {
+                            const showsPurchaseIntent = PURCHASE_INTENT_KEYWORDS.test(normalizedText);
+
+                            if (showsPurchaseIntent) {
+                                console.log(`[SMART-DETECT] User ${userId} has prior conversation but shows purchase intent ("${text.substring(0, 50)}"). Allowing sales flow.`);
+                                // Let them through to the greeting flow normally
+                            } else {
+                                console.log(`[SMART-DETECT] User ${userId} has prior conversation and NO purchase intent. Auto-pausing.`);
+                                if (dependencies.sharedState && dependencies.sharedState.pausedUsers) {
+                                    dependencies.sharedState.pausedUsers.add(userId);
+                                    try {
+                                        if (dependencies.notifyAdmin) dependencies.notifyAdmin(
+                                            '😴 Cliente con historial previo',
+                                            userId,
+                                            `Este contacto ya tenía mensajes previos en WhatsApp y volvió a escribir: "${text.substring(0, 100)}"\nEl bot se silenció automáticamente. Si es un prospecto nuevo, despausalo desde el panel.`
+                                        );
+                                    } catch (e) { }
+                                }
+                                return { matched: true, paused: true };
                             }
                         }
                     }
-
-                    // --- POST-SALE DETECTION: auto-pause if outgoing post-sale messages exist ---
-                    const outgoingMessages = messages.filter((m: any) => m.fromMe && m.body);
-                    const hasPostSaleMessage = outgoingMessages.some((m: any) => {
-                        const body = (m.body || '').trim();
-                        // 1. Branch pickup notification
-                        if (body.includes('MENSAJE DE HERBALIS') || body.includes('MENSAJDE DE HERBALIS')) return true;
-                        // 2. Tracking code (starts with CO + 9 digits, e.g. CO767708617)
-                        if (/^CO\d{9}$/i.test(body)) return true;
-                        return false;
-                    });
-
-                    if (hasPostSaleMessage) {
-                        console.log(`[POST-SALE] User ${userId} has post-sale messages in history. Auto-pausing (post-sale management).`);
-                        if (dependencies.sharedState && dependencies.sharedState.pausedUsers) {
-                            dependencies.sharedState.pausedUsers.add(userId);
-                        }
-                        return { matched: true, paused: true };
-                    }
-
-                    if (previousUserMessages >= 5 && isRecentConversation) {
-                        console.log(`[SPAM FILTER] User ${userId} has ${previousUserMessages} previous messages before bot init and conversation is recent. Auto-pausing.`);
-                        if (dependencies.sharedState && dependencies.sharedState.pausedUsers) {
-                            dependencies.sharedState.pausedUsers.add(userId);
-                            try {
-                                if (dependencies.notifyAdmin) dependencies.notifyAdmin('😴 Conversación Existente', userId, 'Se detectó que este cliente estaba respondiendo a un hilo de chat reciente activo. El bot se silenció automáticamente para no entrometerse.');
-                            } catch (e) { }
-                        }
-                        return { matched: true, paused: true };
-                    }
                 }
+            } catch (err: any) {
+                console.error(`[SMART-DETECT] Failed to fetch chat history for ${userId}:`, err.message);
             }
-        } catch (err: any) {
-            console.error(`[SPAM FILTER] Failed to fetch chat history for ${userId}:`, err.message);
         }
     }
     saveState(userId);
