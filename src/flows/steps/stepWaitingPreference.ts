@@ -43,10 +43,11 @@ export async function handleWaitingPreference(
             await sendMessageWithDelay(userId, hardcodedRec1);
 
             currentState.history.push({ role: 'bot', content: hardcodedRec2, timestamp: Date.now() });
+            _setStep(currentState, FlowStep.WAITING_PREFERENCE);
+            currentState.consultativeSale = true;
             saveState(userId);
             await sendMessageWithDelay(userId, hardcodedRec2);
 
-            currentState.consultativeSale = true;
             return { matched: true };
         }
 
