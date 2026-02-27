@@ -433,22 +433,22 @@ Teléfono: ${phoneDisplay}`;
     };
 
     return (
-        <div className="h-full flex flex-col md:flex-row animate-fade-in relative overflow-hidden bg-slate-50/5 dark:bg-slate-800/50 rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+        <div className="h-full flex flex-col md:flex-row animate-fade-in relative overflow-hidden bg-slate-50 dark:bg-slate-900 rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
             {/* Ambient Background Glow */}
             <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-400/10 blur-[100px] rounded-full pointer-events-none"></div>
             <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-400/10 blur-[100px] rounded-full pointer-events-none"></div>
 
             {/* SIDEBAR: Contacts */}
-            <div className={`w-full md:w-72 lg:w-[300px] flex-shrink-0 border-r border-white/5 dark:border-slate-700/50 flex-col bg-white/4 dark:bg-slate-800/40 backdrop-blur-md z-10 ${selectedChat ? 'hidden md:flex' : 'flex'}`}>
+            <div className={`w-full md:w-72 lg:w-[300px] flex-shrink-0 border-r border-slate-200 dark:border-slate-800 flex-col bg-white dark:bg-slate-800 z-10 ${selectedChat ? 'hidden md:flex' : 'flex'}`}>
                 {/* Search Header */}
-                <div className="p-5 border-b border-white/5 dark:border-slate-700/50 bg-white/3 dark:bg-slate-800/30 backdrop-blur-sm">
+                <div className="p-5 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800">
                     <div className="relative group">
                         <input
                             type="text"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             placeholder="Buscar chats..."
-                            className="w-full bg-white/6 dark:bg-slate-800/60 border border-white rounded-2xl pl-12 pr-4 py-3 text-sm focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-300 transition-all text-slate-700 shadow-inner font-medium placeholder:text-slate-400"
+                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl pl-12 pr-4 py-3 text-sm focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-300 transition-all text-slate-800 dark:text-slate-100 shadow-inner font-medium placeholder:text-slate-400"
                         />
                         <span className="absolute left-4 top-3 text-slate-400 group-focus-within:text-indigo-500 transition-colors"><Search className="w-5 h-5" /></span>
                     </div>
@@ -457,15 +457,15 @@ Teléfono: ${phoneDisplay}`;
                 {/* Contact List */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
                     {filteredChats.map(chat => (
-                        <div key={chat.id} onClick={() => setSelectedChat(chat)} className={`p-4 mb-2 rounded-2xl flex cursor-pointer transition-all duration-300 ${selectedChat?.id === chat.id ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/30 transform scale-[1.02]' : 'hover:bg-white/80 dark:bg-slate-800/80'}`}>
+                        <div key={chat.id} onClick={() => setSelectedChat(chat)} className={`p-4 mb-2 rounded-2xl flex cursor-pointer transition-all duration-300 ${selectedChat?.id === chat.id ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/30 transform scale-[1.02]' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}>
                             <div className="flex-1 min-w-0">
                                 <div className="flex justify-between items-start mb-1 gap-2">
-                                    <h3 className={`font-extrabold text-sm truncate flex flex-wrap items-center gap-1.5 ${selectedChat?.id === chat.id ? 'text-white' : 'text-slate-800'}`}>
+                                    <h3 className={`font-extrabold text-sm truncate flex flex-wrap items-center gap-1.5 ${selectedChat?.id === chat.id ? 'text-white' : 'text-slate-800 dark:text-slate-100'}`}>
                                         {chat.isPaused && <span className="w-2 h-2 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)] animate-pulse" title="Bot Pausado"></span>}
                                         <span className="truncate max-w-[170px]">{chat.name}</span>
                                         {chat.hasBought && <span title="Cliente Recurrente" className="inline-flex items-center text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-md font-extrabold shadow-sm"><ShoppingCart className="w-2.5 h-2.5 mr-0.5" /> Cliente</span>}
                                     </h3>
-                                    <span className={`text-[10px] font-bold font-mono ${selectedChat?.id === chat.id ? 'text-indigo-100' : 'text-slate-400'}`}>{chat.time}</span>
+                                    <span className={`text-[10px] font-bold font-mono ${selectedChat?.id === chat.id ? 'text-indigo-100' : 'text-slate-500 dark:text-slate-400'}`}>{chat.time}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <p className={`text-xs truncate font-medium flex-1 ${selectedChat?.id === chat.id ? 'text-indigo-100' : 'text-slate-500'}`}>{chat.lastMessage?.body || 'Sin mensajes'}</p>
@@ -486,7 +486,7 @@ Teléfono: ${phoneDisplay}`;
                 {selectedChat ? (
                     <>
                         {/* Header */}
-                        <div className="flex-shrink-0 min-h-[5rem] border-b border-white/5 dark:border-slate-700/50 flex items-center justify-between px-3 sm:px-8 bg-white/5 dark:bg-slate-800/50 backdrop-blur-md shadow-[0_2px_10px_rgba(0,0,0,0.02)] z-20 overflow-x-auto custom-scrollbar no-scrollbar py-2">
+                        <div className="flex-shrink-0 min-h-[5rem] border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 sm:px-8 bg-white dark:bg-slate-800 shadow-[0_2px_10px_rgba(0,0,0,0.02)] z-20 overflow-x-auto custom-scrollbar no-scrollbar py-2">
                             <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0 w-full sm:w-auto mb-2 sm:mb-0">
                                 {/* Back Button (Mobile Only) */}
                                 <button
@@ -502,7 +502,7 @@ Teléfono: ${phoneDisplay}`;
                                 </div>
                                 <div className="min-w-0 pr-2">
                                     <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2 flex-wrap">
-                                        <h2 className="font-extrabold text-slate-800 text-[14px] sm:text-lg tracking-tight truncate max-w-[130px] sm:max-w-xs">{selectedChat.name}</h2>
+                                        <h2 className="font-extrabold text-slate-800 dark:text-slate-100 text-[14px] sm:text-lg tracking-tight truncate max-w-[130px] sm:max-w-xs">{selectedChat.name}</h2>
                                         {selectedChat.assignedScript && (
                                             <span className="self-start sm:self-auto mt-0.5 sm:mt-0 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full bg-indigo-100 text-[9px] sm:text-[10px] font-bold text-indigo-700 uppercase tracking-widest border border-indigo-200">
                                                 Flow: {selectedChat.assignedScript}
@@ -537,7 +537,7 @@ Teléfono: ${phoneDisplay}`;
 
                         {/* Orders Panel */}
                         {showOrdersPanel && selectedChat.hasBought && (
-                            <div className="border-b border-white/6 dark:border-slate-700/60 bg-white/6 dark:bg-slate-800/60 backdrop-blur-xl p-4 sm:p-5 z-10 animate-fade-in shadow-sm relative overflow-hidden shrink-0">
+                            <div className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 sm:p-5 z-10 animate-fade-in shadow-sm relative overflow-hidden shrink-0">
                                 <div className="absolute -top-10 -right-10 w-24 h-24 bg-indigo-400/20 blur-[40px] rounded-full pointer-events-none"></div>
                                 <div className="absolute -bottom-10 -left-10 w-24 h-24 bg-purple-400/20 blur-[40px] rounded-full pointer-events-none"></div>
 
@@ -657,7 +657,7 @@ Teléfono: ${phoneDisplay}`;
                                 </div>
                             ) : messages.map((msg, idx) => (
                                 <div key={idx} className={`flex ${msg.fromMe ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`max-w-[75%] p-4 text-sm leading-relaxed shadow-sm relative group ${msg.fromMe ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-3xl rounded-tr-sm shadow-indigo-500/20' : 'bg-white text-slate-800 rounded-3xl rounded-tl-sm border border-white/60 dark:border-slate-700/60'}`}>
+                                    <div className={`max-w-[75%] p-4 text-sm leading-relaxed shadow-sm relative group ${msg.fromMe ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-3xl rounded-tr-sm shadow-indigo-500/20' : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-3xl rounded-tl-sm border border-slate-100 dark:border-slate-700'}`}>
                                         {renderMessageBody(msg)}
                                         <span className={`text-[10px] block text-right mt-2 font-mono font-bold ${msg.fromMe ? 'text-indigo-200' : 'text-slate-400'}`}>
                                             {new Date(msg.timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' })}
@@ -680,7 +680,7 @@ Teléfono: ${phoneDisplay}`;
                         </div>
 
                         {/* Input Area */}
-                        <div className="flex-shrink-0 p-3 sm:px-6 sm:py-4 pb-[max(1rem,env(safe-area-inset-bottom))] lg:pb-4 bg-white/5 dark:bg-slate-800/50 backdrop-blur-md border-t border-white/6 dark:border-slate-700/60 z-20">
+                        <div className="flex-shrink-0 p-3 sm:px-6 sm:py-4 pb-[max(1rem,env(safe-area-inset-bottom))] lg:pb-4 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-800 z-20">
                             {attachment && (
                                 <div className="mb-2 p-3 sm:p-4 bg-white/8 dark:bg-slate-800/80 rounded-2xl border border-indigo-100 shadow-sm flex items-center gap-4">
                                     <img src={attachment.preview} alt="Preview" className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-xl" />
@@ -712,11 +712,11 @@ Teléfono: ${phoneDisplay}`;
                 ) : (
                     <div className="flex-1 flex items-center justify-center p-12">
                         <div className="text-center">
-                            <div className="w-24 h-24 bg-white/6 dark:bg-slate-800/60 backdrop-blur-xl rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-white">
+                            <div className="w-24 h-24 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-slate-200 dark:border-slate-700">
                                 <span className="text-4xl">👋</span>
                             </div>
-                            <h2 className="text-2xl font-extrabold text-slate-800 mb-2">Inbox de Mensajes V2</h2>
-                            <p className="text-slate-500 font-medium">Seleccioná un chat del sidebar para iniciar a responder</p>
+                            <h2 className="text-2xl font-extrabold text-slate-800 dark:text-slate-100 mb-2">Inbox de Mensajes V2</h2>
+                            <p className="text-slate-500 dark:text-slate-400 font-medium">Seleccioná un chat del sidebar para iniciar a responder</p>
                         </div>
                     </div>
                 )}
@@ -724,9 +724,9 @@ Teléfono: ${phoneDisplay}`;
 
             {/* RIGHT PANEL - AI & Scripts Context Drawer (V3 Ported to V2) */}
             {selectedChat && showScriptPanel && (
-                <div className="w-full md:w-[350px] shrink-0 border-l border-white/5 dark:border-slate-700/50 bg-slate-50/4 dark:bg-slate-800/40 backdrop-blur-xl flex flex-col z-30 md:relative absolute right-0 top-0 bottom-0 overflow-y-auto animate-fade-in shadow-[-10px_0_30px_rgba(0,0,0,0.05)] h-full">
+                <div className="w-full md:w-[350px] shrink-0 border-l border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex flex-col z-30 md:relative absolute right-0 top-0 bottom-0 overflow-y-auto animate-fade-in shadow-[-10px_0_30px_rgba(0,0,0,0.05)] h-full">
 
-                    <div className="p-5 border-b border-white/5 dark:border-slate-700/50 flex justify-between items-center bg-white/5 dark:bg-slate-800/50 shadow-sm z-10 sticky top-0 backdrop-blur-md">
+                    <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-800 shadow-sm z-10 sticky top-0">
                         <h3 className="font-extrabold text-slate-800 text-[15px] flex items-center gap-2">
                             <Bot className="w-5 h-5" /> Asistente IA
                         </h3>
@@ -738,7 +738,7 @@ Teléfono: ${phoneDisplay}`;
                     <div className="p-5 flex-1 flex flex-col gap-6 custom-scrollbar overflow-y-auto">
 
                         {/* Summary Block */}
-                        <div className="bg-white/6 dark:bg-slate-800/60 rounded-2xl p-4 shadow-sm border border-white/6 dark:border-slate-700/60 relative group">
+                        <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm border border-slate-200 dark:border-slate-700 relative group">
                             <div className="flex justify-between items-center mb-3">
                                 <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Contexto IA</h4>
                                 <button onClick={handleSummarize} disabled={summarizing || messages.length === 0} className="text-[10px] font-bold text-indigo-700 bg-indigo-100/80 px-2.5 py-1 rounded-lg hover:bg-indigo-200 transition-colors disabled:opacity-50">
@@ -749,7 +749,7 @@ Teléfono: ${phoneDisplay}`;
                                 {summaryText ? (
                                     <div className="text-xs font-medium text-slate-700 whitespace-pre-wrap leading-relaxed">
                                         {summaryText}
-                                        <button onClick={() => setSummaryText(null)} className="absolute top-2 right-2 text-slate-400 hover:text-rose-500 bg-white/8 dark:bg-slate-800/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"><Trash className="w-5 h-5" /></button>
+                                        <button onClick={() => setSummaryText(null)} className="absolute top-2 right-2 text-slate-400 hover:text-rose-500 bg-slate-100 dark:bg-slate-700 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"><Trash className="w-5 h-5" /></button>
                                     </div>
                                 ) : (
                                     <span className="text-slate-400 italic text-xs flex items-center h-full justify-center text-center">Analiza la intención de compra y sentimientos del cliente.</span>
@@ -761,7 +761,7 @@ Teléfono: ${phoneDisplay}`;
                         <div className="flex-1 pb-6">
                             <div className="flex items-center justify-between mb-3 px-1">
                                 <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Guión Sugerido</h4>
-                                <span className="bg-white/8 dark:bg-slate-800/80 shadow-sm border border-white text-indigo-600 text-[9px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">{selectedChat.assignedScript || 'V3'}</span>
+                                <span className="bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 text-indigo-600 dark:text-indigo-400 text-[9px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">{selectedChat.assignedScript || 'V3'}</span>
                             </div>
 
                             {Object.keys(scriptFlow).length > 0 ? (
@@ -777,9 +777,9 @@ Teléfono: ${phoneDisplay}`;
                                                     if (!selectedChat.isPaused) handleToggleBot();
                                                     setInput(formatScriptMessage(step.response, selectedChat));
                                                 }}
-                                                className="w-full text-left p-3.5 rounded-2xl border border-white/6 dark:border-slate-700/60 bg-white/4 dark:bg-slate-800/40 hover:bg-white hover:border-indigo-300 transition-all shadow-sm hover:shadow-md group cursor-pointer relative overflow-hidden"
+                                                className="w-full text-left p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-indigo-300 transition-all shadow-sm hover:shadow-md group cursor-pointer relative overflow-hidden"
                                             >
-                                                <div className="absolute top-0 right-0 w-12 h-12 bg-indigo-50 rounded-bl-full -mr-6 -mt-6 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                                <div className="absolute top-0 right-0 w-12 h-12 bg-indigo-50 dark:bg-indigo-900/30 rounded-bl-full -mr-6 -mt-6 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                                                 <div className="flex items-center justify-between mb-2 text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-indigo-600 relative z-10 transition-colors">
                                                     <span>{stepKey.replace(/_/g, ' ')}</span>
                                                     <span className="opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 transition-all duration-300">Insertar +</span>
@@ -792,7 +792,7 @@ Teléfono: ${phoneDisplay}`;
                                     })}
                                 </div>
                             ) : (
-                                <p className="text-xs text-slate-400 italic text-center mt-6 bg-white/4 dark:bg-slate-800/40 p-4 rounded-xl border border-white/5 dark:border-slate-700/50">No hay módulos de guión en este flow.</p>
+                                <p className="text-xs text-slate-400 italic text-center mt-6 bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700">No hay módulos de guión en este flow.</p>
                             )}
                         </div>
 

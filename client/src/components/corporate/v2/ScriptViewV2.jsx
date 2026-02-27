@@ -97,7 +97,7 @@ const ScriptViewV2 = () => {
         <div className="h-full flex flex-col animate-fade-in relative z-10 w-full space-y-6">
 
             {/* Header V2 */}
-            <div className="bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-5 lg:p-6">
+            <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-200 dark:border-slate-700 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-5 lg:p-6">
                 <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
                     <div className="flex-1">
                         <div className="flex items-center gap-3">
@@ -140,7 +140,7 @@ const ScriptViewV2 = () => {
                                 <span>Activar en el Bot</span>
                             </button>
                         )}
-                        <button onClick={() => fetchScript(viewingVersion)} className="p-3 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 transition-all shadow-sm active:scale-95 group" title="Recargar">
+                        <button onClick={() => fetchScript(viewingVersion)} className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-sm active:scale-95 group" title="Recargar">
                             <span className="group-hover:rotate-180 transition-transform duration-500 block"><Refresh className="w-5 h-5" /></span>
                         </button>
                         <button onClick={saveScript} className="px-8 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-105 transition-all flex items-center gap-2">
@@ -152,7 +152,7 @@ const ScriptViewV2 = () => {
             </div>
 
             {/* Main Content Area */}
-            <div className="flex-1 bg-white/6 dark:bg-slate-800/60 backdrop-blur-xl rounded-[2rem] border border-white/8 dark:border-slate-700/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden flex flex-col relative text-sm">
+            <div className="flex-1 bg-slate-50 dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden flex flex-col relative text-sm">
 
                 {/* Background Glow */}
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full max-w-2xl max-h-2xl bg-indigo-400/5 blur-[120px] rounded-full pointer-events-none"></div>
@@ -189,7 +189,7 @@ const ScriptViewV2 = () => {
                                     {Object.entries(script.flow || {}).map(([key, step]) => (
                                         <div key={key} className="bg-white/8 dark:bg-slate-800/80 backdrop-blur-md p-6 rounded-3xl border border-white shadow-sm hover:shadow-md hover:border-indigo-200 transition-all duration-300">
                                             <div className="flex justify-between items-center cursor-pointer group" onClick={() => setExpandedCard(expandedCard === key ? null : key)}>
-                                                <h3 className="font-extrabold text-slate-800 capitalize text-base group-hover:text-indigo-600 transition-colors">{key.replace(/_/g, ' ')}</h3>
+                                                <h3 className="font-extrabold text-slate-800 dark:text-slate-100 capitalize text-base group-hover:text-indigo-600 transition-colors">{key.replace(/_/g, ' ')}</h3>
                                                 <div className="flex items-center gap-4">
                                                     <span className="text-[10px] bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg border border-indigo-100 font-bold uppercase tracking-widest shadow-sm">ID: {step.step || 'sin_paso'}</span>
                                                     <span className={`text-slate-300 transition-transform duration-300 ${expandedCard === key ? 'rotate-180 text-indigo-500' : ''}`}>▼</span>
@@ -199,9 +199,9 @@ const ScriptViewV2 = () => {
                                             {expandedCard === key && (
                                                 <div className="mt-6 space-y-6 animate-fade-in border-t border-slate-100/50 pt-6">
                                                     <div>
-                                                        <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-2 ml-1">Respuesta del Agente IA</label>
+                                                        <label className="block text-[10px] font-extrabold text-slate-500 dark:text-slate-300 uppercase tracking-widest mb-2 ml-1">Respuesta del Agente IA</label>
                                                         <textarea
-                                                            className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium text-slate-700 focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all leading-relaxed shadow-inner"
+                                                            className="w-full p-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-medium text-slate-700 dark:text-slate-200 focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all leading-relaxed shadow-inner"
                                                             rows={4}
                                                             value={step.response}
                                                             onChange={(e) => handleFlowChange(key, 'response', e.target.value)}
@@ -210,20 +210,20 @@ const ScriptViewV2 = () => {
 
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                         <div>
-                                                            <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-2 ml-1">Clave Siguiente Paso</label>
+                                                            <label className="block text-[10px] font-extrabold text-slate-500 dark:text-slate-300 uppercase tracking-widest mb-2 ml-1">Clave Siguiente Paso</label>
                                                             <input
                                                                 type="text"
-                                                                className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono font-bold text-slate-600 focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all shadow-inner"
+                                                                className="w-full p-3.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-mono font-bold text-slate-600 dark:text-slate-300 focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all shadow-inner"
                                                                 value={step.nextStep || ''}
                                                                 onChange={(e) => handleFlowChange(key, 'nextStep', e.target.value)}
                                                             />
                                                         </div>
                                                         {step.step && (
                                                             <div>
-                                                                <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-2 ml-1">ID Módulo (Lectura AI)</label>
+                                                                <label className="block text-[10px] font-extrabold text-slate-500 dark:text-slate-300 uppercase tracking-widest mb-2 ml-1">ID Módulo (Lectura AI)</label>
                                                                 <input
                                                                     type="text"
-                                                                    className="w-full p-3.5 bg-slate-100/5 dark:bg-slate-700/50 border border-slate-200 rounded-xl text-sm font-mono font-bold text-slate-400 shadow-inner cursor-not-allowed"
+                                                                    className="w-full p-3.5 bg-slate-100/5 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-mono font-bold text-slate-400 shadow-inner cursor-not-allowed"
                                                                     value={step.step}
                                                                     onChange={(e) => handleFlowChange(key, 'step', e.target.value)}
                                                                 />
@@ -322,7 +322,7 @@ const ScriptViewV2 = () => {
                                                 placeholder="Buscar por palabra clave o respuesta..."
                                                 value={faqSearchTerm}
                                                 onChange={(e) => setFaqSearchTerm(e.target.value)}
-                                                className="w-full bg-white/7 dark:bg-slate-800/70 border border-white rounded-xl pl-11 pr-4 py-3.5 text-sm font-bold text-slate-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 focus:bg-white transition-all shadow-inner placeholder:text-slate-400 placeholder:font-medium hover:shadow-md hover:border-indigo-100"
+                                                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-11 pr-4 py-3.5 text-sm font-bold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all shadow-inner placeholder:text-slate-400 placeholder:font-medium"
                                             />
                                             <span className="absolute left-4 top-3.5 text-slate-400 group-focus-within:text-indigo-500 transition-colors">
                                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
@@ -346,10 +346,10 @@ const ScriptViewV2 = () => {
                                                     </button>
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-2">
                                                         <div>
-                                                            <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-2 ml-1">Palabras Clave (Tokens)</label>
+                                                            <label className="block text-[10px] font-extrabold text-slate-500 dark:text-slate-300 uppercase tracking-widest mb-2 ml-1">Palabras Clave (Tokens)</label>
                                                             <input
                                                                 type="text"
-                                                                className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono text-slate-600 focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all shadow-inner"
+                                                                className="w-full p-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-mono text-slate-600 dark:text-slate-300 focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all shadow-inner"
                                                                 value={item.keywords.join(', ')}
                                                                 placeholder="ej: envios, correo, andreani"
                                                                 onChange={(e) => handleFAQChange(originalIndex, 'keywords', e.target.value.split(',').map(s => s.trim()))}
@@ -357,9 +357,9 @@ const ScriptViewV2 = () => {
                                                             <p className="text-[10px] font-medium text-slate-400 mt-2 ml-2">Separadas por comas. El bot usará esto como triggers.</p>
                                                         </div>
                                                         <div>
-                                                            <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-2 ml-1">Respuesta Estática</label>
+                                                            <label className="block text-[10px] font-extrabold text-slate-500 dark:text-slate-300 uppercase tracking-widest mb-2 ml-1">Respuesta Estática</label>
                                                             <textarea
-                                                                className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all shadow-inner"
+                                                                className="w-full p-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-200 focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all shadow-inner"
                                                                 rows={3}
                                                                 placeholder="Respuesta literal que mandará el bot..."
                                                                 value={item.response}
