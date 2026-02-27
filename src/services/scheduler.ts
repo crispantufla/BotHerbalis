@@ -1,19 +1,24 @@
 const logger = require('../utils/logger');
-/**
- * scheduler.js — Periodic checks for stale users, cold leads, and auto-approval
- * 
- * P3 #3: Alert admin when a user is stuck on a step for >30 min
- * P3 #5: Re-engage cold leads after 24h of inactivity
- * P0 #1: Auto-approve orders after 15 min without admin review
- */
+// scheduler.ts - Cron-based periodic checks for stale users, cold leads, and auto-approval
+//
+// Uses node-cron with America/Argentina/Buenos_Aires timezone so schedules
+// always run at Argentina time regardless of server location (Europe/Railway).
+//
+// CRON SCHEDULE (all times Argentina UTC-3):
+//   autoApproveOrders  -> cada 3 min de 9-23h
+//   checkColdLeads     -> 10:00 y 18:00
+//   cleanupOldUsers    -> 04:00 diario
 
-
+import cron from 'node-cron';
 import { isBusinessHours } from './timeUtils';
 import { differenceInMinutes, differenceInHours, differenceInDays } from 'date-fns';
 
 const messageTemplates = require('../utils/messageTemplates');
 const buildConfirmationMessage = messageTemplates.buildConfirmationMessage;
 import { UserState } from '../types/state';
+
+// ── Constants ──
+const TIMEZONE = 'America/Argentina/Buenos_Aires';
 
 interface SchedulerSharedState {
     userState: Record<string, UserState>;
@@ -43,7 +48,6 @@ const COLD_LEAD_THRESHOLD_HOURS = 24;
 const ABANDONED_CART_MIN_HOURS = 24;
 const ABANDONED_CART_MAX_HOURS = 48;
 const AUTO_APPROVE_THRESHOLD_MINS = 15;
-const CHECK_INTERVAL_MS = 5 * 60 * 1000;            // Mantener MS para setInterval
 const CLEANUP_THRESHOLD_DAYS = 30;
 
 const CONTEXTUAL_FOLLOW_UPS: Record<string, string[]> = {
@@ -78,9 +82,13 @@ const GENERIC_FOLLOW_UPS = [
     '¡Hola! Vi que quedaste a medio camino. ¿Te puedo ayudar con algo? 😊'
 ];
 
+// ══════════════════════════════════════════════════════════════
+// TASK FUNCTIONS (unchanged logic, now called by cron instead of setInterval)
+// ══════════════════════════════════════════════════════════════
+
 /**
  * checkStaleUsers — P3 #3
- * Alerts admin if a user has been stuck on the same step for >30 min
+ * Alerts admin if a user has been stuck on the same step for >20 min
  */
 function checkStaleUsers(sharedState: SchedulerSharedState, dependencies: SchedulerDependencies): void {
     const { userState, pausedUsers } = sharedState;
@@ -88,9 +96,8 @@ function checkStaleUsers(sharedState: SchedulerSharedState, dependencies: Schedu
     const now = Date.now();
 
     for (const [userId, state] of Object.entries(userState)) {
-        // Skip completed, greeting, paused, or already alerted users
         if (!state.step || state.step === 'completed' || state.step === 'greeting') continue;
-        if (state.step === 'waiting_admin_ok') continue; // Handled by autoApproveOrders
+        if (state.step === 'waiting_admin_ok') continue;
         if (pausedUsers && pausedUsers.has(userId)) continue;
         if (state.staleAlerted) continue;
         if (!state.stepEnteredAt) continue;
@@ -114,7 +121,6 @@ function checkStaleUsers(sharedState: SchedulerSharedState, dependencies: Schedu
 /**
  * autoApproveOrders — P0 #1
  * Auto-approves orders stuck in waiting_admin_ok for >15 min.
- * Marks the order as "Auto-aprobado (sin revisión manual)" for later dashboard review.
  */
 function autoApproveOrders(sharedState: SchedulerSharedState, dependencies: SchedulerDependencies): void {
     const { userState } = sharedState;
@@ -129,21 +135,18 @@ function autoApproveOrders(sharedState: SchedulerSharedState, dependencies: Sche
         if (minutes > AUTO_APPROVE_THRESHOLD_MINS) {
             logger.info(`[AUTO-APPROVE] Order for ${userId} auto-approved after ${minutes} min without admin review`);
 
-            // Build confirmation message using shared builder
             const confirmMsg = buildConfirmationMessage(state);
 
             sendMessageWithDelay(userId, confirmMsg);
             state.history = state.history || [];
             state.history.push({ role: 'bot', content: confirmMsg, timestamp: Date.now() });
 
-            // Save order with auto-approved status
             if (state.pendingOrder) {
                 const o = state.pendingOrder;
                 const cart = o.cart || [];
                 const prodStr = cart.map(i => i.product).join(' + ');
                 const planStr = cart.map(i => `${i.plan} días`).join(' + ');
 
-                // Clean userId for Sheets (get only the phone number)
                 const phone = userId.split('@')[0];
                 const orderData = {
                     cliente: phone,
@@ -155,15 +158,12 @@ function autoApproveOrders(sharedState: SchedulerSharedState, dependencies: Sche
                 };
 
                 if (saveOrderToLocal) saveOrderToLocal(orderData);
-
             }
 
-            // Move to waiting_final_confirmation
             state.step = 'waiting_final_confirmation';
             state.stepEnteredAt = now;
             saveState();
 
-            // Alert admin
             notifyAdmin(
                 '⚡ Pedido AUTO-APROBADO (15 min sin revisión)',
                 userId,
@@ -183,9 +183,8 @@ function checkColdLeads(sharedState: SchedulerSharedState, dependencies: Schedul
     const now = Date.now();
 
     for (const [userId, state] of Object.entries(userState)) {
-        // Only re-engage users on specific steps
         if (!RE_ENGAGEABLE_STEPS.has(state.step)) continue;
-        if (!isBusinessHours()) continue; // Don't text at night
+        if (!isBusinessHours()) continue;
         if (pausedUsers && pausedUsers.has(userId)) continue;
         if (state.reengagementSent) continue;
         if (!state.lastActivityAt) continue;
@@ -194,7 +193,6 @@ function checkColdLeads(sharedState: SchedulerSharedState, dependencies: Schedul
         if (hours >= COLD_LEAD_THRESHOLD_HOURS) {
             logger.info(`[SCHEDULER] Cold lead detected: ${userId} inactive for ${hours}h on "${state.step}"`);
 
-            // Select contextual message
             let msg = '';
             const stepMessages = CONTEXTUAL_FOLLOW_UPS[state.step];
             if (stepMessages && stepMessages.length > 0) {
@@ -222,13 +220,11 @@ function checkAbandonedCarts(sharedState: SchedulerSharedState, dependencies: Sc
     const now = Date.now();
 
     for (const [userId, state] of Object.entries(userState)) {
-        // Only target users actively in the funnel
         if (!RE_ENGAGEABLE_STEPS.has(state.step)) continue;
         if (!isBusinessHours()) continue;
         if (pausedUsers && pausedUsers.has(userId)) continue;
-        if (state.cartRecovered) continue; // Only try to recover once
+        if (state.cartRecovered) continue;
 
-        // Use lastInteraction (NEW), fallback to lastActivityAt
         const lastActivity = state.lastInteraction || state.lastActivityAt;
         if (!lastActivity) continue;
 
@@ -249,7 +245,7 @@ function checkAbandonedCarts(sharedState: SchedulerSharedState, dependencies: Sc
 
 /**
  * cleanupOldUsers — Memory leak prevention
- * Removes users inactive for >7 days from userState
+ * Removes users inactive for >30 days from userState
  */
 function cleanupOldUsers(sharedState: SchedulerSharedState, dependencies: SchedulerDependencies): void {
     const { userState } = sharedState;
@@ -260,7 +256,6 @@ function cleanupOldUsers(sharedState: SchedulerSharedState, dependencies: Schedu
     for (const [userId, state] of Object.entries(userState)) {
         const lastActivity = state.lastActivityAt || state.stepEnteredAt || 0;
         if (lastActivity && differenceInDays(now, lastActivity) > CLEANUP_THRESHOLD_DAYS) {
-            // Keep completed orders for reference, only delete truly abandoned
             if (state.step === 'completed') continue;
             delete userState[userId];
             cleaned++;
@@ -273,29 +268,38 @@ function cleanupOldUsers(sharedState: SchedulerSharedState, dependencies: Schedu
     }
 }
 
-/**
- * startScheduler — Starts periodic checks
- */
+// ══════════════════════════════════════════════════════════════
+// CRON SCHEDULER — All times in Argentina (UTC-3)
+// ══════════════════════════════════════════════════════════════
+
 function startScheduler(sharedState: SchedulerSharedState, dependencies: SchedulerDependencies): void {
-    logger.info(`[SCHEDULER] Started — checking every ${CHECK_INTERVAL_MS / 60000} min`);
+    logger.info(`[SCHEDULER] ⏰ Iniciando cron jobs (timezone: ${TIMEZONE})`);
 
-    // Run immediately on start, then on interval
+    // ── AUTO-APPROVE: cada 3 minutos de 9am a 11pm Argentina ──
+    // Los pedidos no pueden esperar mucho — necesitamos checkear frecuente en horario activo.
+    cron.schedule('*/3 9-23 * * *', () => {
+        autoApproveOrders(sharedState, dependencies);
+    }, { timezone: TIMEZONE });
+    logger.info('[SCHEDULER] ✅ autoApproveOrders → cada 3 min (9-23h ARG)');
+
+    // ── COLD LEADS: a las 10am y 6pm Argentina ──
+    // Horas óptimas para re-engagement (mañana y tarde).
+    cron.schedule('0 10,18 * * *', () => {
+        checkColdLeads(sharedState, dependencies);
+    }, { timezone: TIMEZONE });
+    logger.info('[SCHEDULER] ✅ checkColdLeads → 10:00 y 18:00 ARG');
+
+    // ── CLEANUP: a las 4am Argentina ──
+    // Limpieza de memoria nocturna. Borra usuarios inactivos >30 días.
+    cron.schedule('0 4 * * *', () => {
+        cleanupOldUsers(sharedState, dependencies);
+    }, { timezone: TIMEZONE });
+    logger.info('[SCHEDULER] ✅ cleanupOldUsers → 04:00 ARG (diario)');
+
+    // ── Run auto-approve once 10s after boot (no cold lead/cleanup needed at startup) ──
     setTimeout(() => {
-        // checkStaleUsers(sharedState, dependencies); // DISABLED by user request
-        checkColdLeads(sharedState, dependencies);
-        // checkAbandonedCarts(sharedState, dependencies); // DISABLED due to dual-send overlap with coldLeads
         autoApproveOrders(sharedState, dependencies);
-        cleanupOldUsers(sharedState, dependencies);
-    }, 5000);
-
-    setInterval(() => {
-        // checkStaleUsers(sharedState, dependencies); // DISABLED by user request
-        checkColdLeads(sharedState, dependencies);
-        // checkAbandonedCarts(sharedState, dependencies); // DISABLED due to dual-send overlap with coldLeads
-        autoApproveOrders(sharedState, dependencies);
-        cleanupOldUsers(sharedState, dependencies);
-    }, CHECK_INTERVAL_MS);
+    }, 10000);
 }
 
 export { startScheduler, checkStaleUsers, checkColdLeads, checkAbandonedCarts, autoApproveOrders };
-
