@@ -5,7 +5,7 @@ import { DollarSign as Dollar, Users, AlertCircle as Alert, Activity } from 'luc
 
 const StatsPanelV2 = ({ stats, loadingStats, alertsCount = 0 }) => {
     const KpiSkeleton = () => (
-        <div className="bg-white/40 dark:bg-slate-800/40 backdrop-blur-md p-4 lg:p-5 rounded-3xl border border-white/60 dark:border-slate-700/60 shadow-lg animate-pulse">
+        <div className="bg-white/4 dark:bg-slate-800/40 dark:bg-slate-800/40 backdrop-blur-md p-4 lg:p-5 rounded-3xl border border-white/6 dark:border-slate-700/60 dark:border-slate-700/60 shadow-lg animate-pulse">
             <div className="h-4 bg-slate-200/50 dark:bg-slate-700/50 rounded w-28 mb-3"></div>
             <div className="h-7 bg-slate-200/50 dark:bg-slate-700/50 rounded w-24 mb-2"></div>
             <div className="h-3 bg-slate-200/50 dark:bg-slate-700/50 rounded w-20"></div>
@@ -21,7 +21,7 @@ const StatsPanelV2 = ({ stats, loadingStats, alertsCount = 0 }) => {
     }
 
     const StatCard = ({ title, value, subtext, icon: Icon, colorClass, gradientClass }) => (
-        <div className="relative overflow-hidden bg-white/60 dark:bg-slate-800/60 backdrop-blur-xl p-4 lg:p-5 rounded-[1.25rem] border border-white/80 dark:border-slate-700/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 group hover:-translate-y-1">
+        <div className="relative overflow-hidden bg-white/6 dark:bg-slate-800/60 dark:bg-slate-800/60 backdrop-blur-xl p-4 lg:p-5 rounded-[1.25rem] border border-white/8 dark:border-slate-700/80 dark:border-slate-700/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 group hover:-translate-y-1">
             {/* Soft background glow */}
             <div className={`absolute -right-6 -top-6 w-24 h-24 rounded-full blur-2xl opacity-20 ${gradientClass} group-hover:opacity-40 transition-opacity duration-500`}></div>
 

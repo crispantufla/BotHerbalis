@@ -391,17 +391,17 @@ Teléfono: ${phoneDisplay}`;
     const renderMessageBody = (msg) => {
         if (msg.body && msg.body.startsWith('MEDIA_IMAGE:')) {
             const url = msg.body.split('|')[0].replace('MEDIA_IMAGE:', '');
-            return <img src={`${API_URL}${url}`} alt="Media" className="rounded-2xl max-w-full h-auto max-h-64 object-cover border border-white/20 shadow-sm" />;
+            return <img src={`${API_URL}${url}`} alt="Media" className="rounded-2xl max-w-full h-auto max-h-64 object-cover border border-white/2 dark:border-slate-700/20 shadow-sm" />;
         }
         if (msg.body && (msg.body.startsWith('MEDIA_AUDIO:') || msg.body.startsWith('🎤'))) {
             let transcription = msg.body.includes('TRANSCRIPTION:') ? msg.body.split('TRANSCRIPTION:')[1].trim() : msg.body.replace(/^🎤\s*Audio:\s*/, '').replace(/^"|"$/g, '').trim();
             return (
                 <div className="space-y-3 min-w-[200px]">
-                    <div className="flex items-center gap-3 bg-black/10 rounded-2xl p-3 border border-white/10">
+                    <div className="flex items-center gap-3 bg-black/10 rounded-2xl p-3 border border-white/1 dark:border-slate-700/10">
                         <div className="w-10 h-10 rounded-full bg-emerald-500/90 text-white flex items-center justify-center shadow-lg"><Play className="w-5 h-5" /></div>
                         <div className="flex-1 h-2 bg-black/10 rounded-full overflow-hidden text-emerald-500 font-mono text-[8px] leading-none text-center">Audio Player</div>
                     </div>
-                    {transcription && <div className="bg-white/40 p-3 rounded-xl text-xs italic text-slate-800 font-medium">📝 "{transcription}"</div>}
+                    {transcription && <div className="bg-white/4 dark:bg-slate-800/40 p-3 rounded-xl text-xs italic text-slate-800 font-medium">📝 "{transcription}"</div>}
                 </div>
             );
         }
@@ -409,22 +409,22 @@ Teléfono: ${phoneDisplay}`;
     };
 
     return (
-        <div className="h-full flex flex-col md:flex-row animate-fade-in relative overflow-hidden bg-slate-50/50 rounded-[2rem] border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+        <div className="h-full flex flex-col md:flex-row animate-fade-in relative overflow-hidden bg-slate-50/5 dark:bg-slate-800/50 rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
             {/* Ambient Background Glow */}
             <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-400/10 blur-[100px] rounded-full pointer-events-none"></div>
             <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-400/10 blur-[100px] rounded-full pointer-events-none"></div>
 
             {/* SIDEBAR: Contacts */}
-            <div className={`w-full md:w-72 lg:w-[300px] flex-shrink-0 border-r border-white/50 flex-col bg-white/40 backdrop-blur-md z-10 ${selectedChat ? 'hidden md:flex' : 'flex'}`}>
+            <div className={`w-full md:w-72 lg:w-[300px] flex-shrink-0 border-r border-white/5 dark:border-slate-700/50 flex-col bg-white/4 dark:bg-slate-800/40 backdrop-blur-md z-10 ${selectedChat ? 'hidden md:flex' : 'flex'}`}>
                 {/* Search Header */}
-                <div className="p-5 border-b border-white/50 bg-white/30 backdrop-blur-sm">
+                <div className="p-5 border-b border-white/5 dark:border-slate-700/50 bg-white/3 dark:bg-slate-800/30 backdrop-blur-sm">
                     <div className="relative group">
                         <input
                             type="text"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             placeholder="Buscar chats..."
-                            className="w-full bg-white/60 border border-white rounded-2xl pl-12 pr-4 py-3 text-sm focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-300 transition-all text-slate-700 shadow-inner font-medium placeholder:text-slate-400"
+                            className="w-full bg-white/6 dark:bg-slate-800/60 border border-white rounded-2xl pl-12 pr-4 py-3 text-sm focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-300 transition-all text-slate-700 shadow-inner font-medium placeholder:text-slate-400"
                         />
                         <span className="absolute left-4 top-3 text-slate-400 group-focus-within:text-indigo-500 transition-colors"><Search className="w-5 h-5" /></span>
                     </div>
@@ -433,7 +433,7 @@ Teléfono: ${phoneDisplay}`;
                 {/* Contact List */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
                     {filteredChats.map(chat => (
-                        <div key={chat.id} onClick={() => setSelectedChat(chat)} className={`p-4 mb-2 rounded-2xl flex cursor-pointer transition-all duration-300 ${selectedChat?.id === chat.id ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/30 transform scale-[1.02]' : 'hover:bg-white/80'}`}>
+                        <div key={chat.id} onClick={() => setSelectedChat(chat)} className={`p-4 mb-2 rounded-2xl flex cursor-pointer transition-all duration-300 ${selectedChat?.id === chat.id ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/30 transform scale-[1.02]' : 'hover:bg-white/80 dark:bg-slate-800/80'}`}>
                             <div className="flex-1 min-w-0">
                                 <div className="flex justify-between items-start mb-1 gap-2">
                                     <h3 className={`font-extrabold text-sm truncate flex flex-wrap items-center gap-1.5 ${selectedChat?.id === chat.id ? 'text-white' : 'text-slate-800'}`}>
@@ -462,12 +462,12 @@ Teléfono: ${phoneDisplay}`;
                 {selectedChat ? (
                     <>
                         {/* Header */}
-                        <div className="flex-shrink-0 min-h-[5rem] border-b border-white/50 flex items-center justify-between px-3 sm:px-8 bg-white/50 backdrop-blur-md shadow-[0_2px_10px_rgba(0,0,0,0.02)] z-20 overflow-x-auto custom-scrollbar no-scrollbar py-2">
+                        <div className="flex-shrink-0 min-h-[5rem] border-b border-white/5 dark:border-slate-700/50 flex items-center justify-between px-3 sm:px-8 bg-white/5 dark:bg-slate-800/50 backdrop-blur-md shadow-[0_2px_10px_rgba(0,0,0,0.02)] z-20 overflow-x-auto custom-scrollbar no-scrollbar py-2">
                             <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0 w-full sm:w-auto mb-2 sm:mb-0">
                                 {/* Back Button (Mobile Only) */}
                                 <button
                                     onClick={() => setSelectedChat(null)}
-                                    className="md:hidden p-2 -ml-2 bg-white/60 border border-slate-200 rounded-xl text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 shadow-sm transition-all"
+                                    className="md:hidden p-2 -ml-2 bg-white/6 dark:bg-slate-800/60 border border-slate-200 rounded-xl text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 shadow-sm transition-all"
                                     title="Volver a Contactos"
                                 >
                                     <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" /></svg>
@@ -513,7 +513,7 @@ Teléfono: ${phoneDisplay}`;
 
                         {/* Orders Panel */}
                         {showOrdersPanel && selectedChat.hasBought && (
-                            <div className="border-b border-white/60 bg-white/60 backdrop-blur-xl p-4 sm:p-5 z-10 animate-fade-in shadow-sm relative overflow-hidden shrink-0">
+                            <div className="border-b border-white/6 dark:border-slate-700/60 bg-white/6 dark:bg-slate-800/60 backdrop-blur-xl p-4 sm:p-5 z-10 animate-fade-in shadow-sm relative overflow-hidden shrink-0">
                                 <div className="absolute -top-10 -right-10 w-24 h-24 bg-indigo-400/20 blur-[40px] rounded-full pointer-events-none"></div>
                                 <div className="absolute -bottom-10 -left-10 w-24 h-24 bg-purple-400/20 blur-[40px] rounded-full pointer-events-none"></div>
 
@@ -525,7 +525,7 @@ Teléfono: ${phoneDisplay}`;
                                         <h3 className="font-extrabold text-slate-800 tracking-tight text-sm">Registro de Pedidos</h3>
                                         <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-full">{selectedChat.pastOrders?.length || 0}</span>
                                     </div>
-                                    <button onClick={() => setShowOrdersPanel(false)} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-rose-500 bg-white/50 hover:bg-rose-50 rounded-xl transition-all border border-transparent shadow-sm hover:border-rose-100">✕</button>
+                                    <button onClick={() => setShowOrdersPanel(false)} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-rose-500 bg-white/5 dark:bg-slate-800/50 hover:bg-rose-50 rounded-xl transition-all border border-transparent shadow-sm hover:border-rose-100">✕</button>
                                 </div>
 
                                 <div className="flex flex-col gap-5 max-h-[60vh] overflow-y-auto custom-scrollbar relative z-10 pr-1 pb-4">
@@ -633,7 +633,7 @@ Teléfono: ${phoneDisplay}`;
                                 </div>
                             ) : messages.map((msg, idx) => (
                                 <div key={idx} className={`flex ${msg.fromMe ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`max-w-[75%] p-4 text-sm leading-relaxed shadow-sm relative group ${msg.fromMe ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-3xl rounded-tr-sm shadow-indigo-500/20' : 'bg-white text-slate-800 rounded-3xl rounded-tl-sm border border-white/60'}`}>
+                                    <div className={`max-w-[75%] p-4 text-sm leading-relaxed shadow-sm relative group ${msg.fromMe ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-3xl rounded-tr-sm shadow-indigo-500/20' : 'bg-white text-slate-800 rounded-3xl rounded-tl-sm border border-white/60 dark:border-slate-700/60'}`}>
                                         {renderMessageBody(msg)}
                                         <span className={`text-[10px] block text-right mt-2 font-mono font-bold ${msg.fromMe ? 'text-indigo-200' : 'text-slate-400'}`}>
                                             {new Date(msg.timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' })}
@@ -656,9 +656,9 @@ Teléfono: ${phoneDisplay}`;
                         </div>
 
                         {/* Input Area */}
-                        <div className="flex-shrink-0 p-3 sm:px-6 sm:py-4 pb-[max(1rem,env(safe-area-inset-bottom))] lg:pb-4 bg-white/50 backdrop-blur-md border-t border-white/60 z-20">
+                        <div className="flex-shrink-0 p-3 sm:px-6 sm:py-4 pb-[max(1rem,env(safe-area-inset-bottom))] lg:pb-4 bg-white/5 dark:bg-slate-800/50 backdrop-blur-md border-t border-white/6 dark:border-slate-700/60 z-20">
                             {attachment && (
-                                <div className="mb-2 p-3 sm:p-4 bg-white/80 rounded-2xl border border-indigo-100 shadow-sm flex items-center gap-4">
+                                <div className="mb-2 p-3 sm:p-4 bg-white/8 dark:bg-slate-800/80 rounded-2xl border border-indigo-100 shadow-sm flex items-center gap-4">
                                     <img src={attachment.preview} alt="Preview" className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-xl" />
                                     <div className="flex-1 min-w-0">
                                         <p className="font-bold text-slate-800 text-sm truncate">{attachment.file.name}</p>
@@ -680,7 +680,7 @@ Teléfono: ${phoneDisplay}`;
                                     className="w-full min-w-0 flex-1 bg-white border border-slate-200 rounded-xl sm:rounded-2xl px-3 sm:px-6 py-2.5 sm:py-4 text-slate-800 font-medium focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all shadow-inner placeholder:text-slate-400 text-[15px] sm:text-base"
                                 />
                                 <button type="submit" disabled={(!input.trim() && !attachment) || sendingMedia} className="w-11 h-11 sm:w-14 sm:h-14 flex items-center justify-center shrink-0 rounded-xl sm:rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100">
-                                    {sendingMedia ? <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-white/50 border-t-white rounded-full animate-spin"></div> : <Send className="w-5 h-5" />}
+                                    {sendingMedia ? <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-white/5 dark:border-slate-700/50 border-t-white rounded-full animate-spin"></div> : <Send className="w-5 h-5" />}
                                 </button>
                             </form>
                         </div>
@@ -688,7 +688,7 @@ Teléfono: ${phoneDisplay}`;
                 ) : (
                     <div className="flex-1 flex items-center justify-center p-12">
                         <div className="text-center">
-                            <div className="w-24 h-24 bg-white/60 backdrop-blur-xl rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-white">
+                            <div className="w-24 h-24 bg-white/6 dark:bg-slate-800/60 backdrop-blur-xl rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-white">
                                 <span className="text-4xl">👋</span>
                             </div>
                             <h2 className="text-2xl font-extrabold text-slate-800 mb-2">Inbox de Mensajes V2</h2>
@@ -700,13 +700,13 @@ Teléfono: ${phoneDisplay}`;
 
             {/* RIGHT PANEL - AI & Scripts Context Drawer (V3 Ported to V2) */}
             {selectedChat && showScriptPanel && (
-                <div className="w-full md:w-[350px] shrink-0 border-l border-white/50 bg-slate-50/40 backdrop-blur-xl flex flex-col z-30 md:relative absolute right-0 top-0 bottom-0 overflow-y-auto animate-fade-in shadow-[-10px_0_30px_rgba(0,0,0,0.05)] h-full">
+                <div className="w-full md:w-[350px] shrink-0 border-l border-white/5 dark:border-slate-700/50 bg-slate-50/4 dark:bg-slate-800/40 backdrop-blur-xl flex flex-col z-30 md:relative absolute right-0 top-0 bottom-0 overflow-y-auto animate-fade-in shadow-[-10px_0_30px_rgba(0,0,0,0.05)] h-full">
 
-                    <div className="p-5 border-b border-white/50 flex justify-between items-center bg-white/50 shadow-sm z-10 sticky top-0 backdrop-blur-md">
+                    <div className="p-5 border-b border-white/5 dark:border-slate-700/50 flex justify-between items-center bg-white/5 dark:bg-slate-800/50 shadow-sm z-10 sticky top-0 backdrop-blur-md">
                         <h3 className="font-extrabold text-slate-800 text-[15px] flex items-center gap-2">
                             <Bot className="w-5 h-5" /> Asistente IA
                         </h3>
-                        <button onClick={() => setShowScriptPanel(false)} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-white/60 rounded-xl transition-all">
+                        <button onClick={() => setShowScriptPanel(false)} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-white/6 dark:bg-slate-800/60 rounded-xl transition-all">
                             ✕
                         </button>
                     </div>
@@ -714,7 +714,7 @@ Teléfono: ${phoneDisplay}`;
                     <div className="p-5 flex-1 flex flex-col gap-6 custom-scrollbar overflow-y-auto">
 
                         {/* Summary Block */}
-                        <div className="bg-white/60 rounded-2xl p-4 shadow-sm border border-white/60 relative group">
+                        <div className="bg-white/6 dark:bg-slate-800/60 rounded-2xl p-4 shadow-sm border border-white/6 dark:border-slate-700/60 relative group">
                             <div className="flex justify-between items-center mb-3">
                                 <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Contexto IA</h4>
                                 <button onClick={handleSummarize} disabled={summarizing || messages.length === 0} className="text-[10px] font-bold text-indigo-700 bg-indigo-100/80 px-2.5 py-1 rounded-lg hover:bg-indigo-200 transition-colors disabled:opacity-50">
@@ -725,7 +725,7 @@ Teléfono: ${phoneDisplay}`;
                                 {summaryText ? (
                                     <div className="text-xs font-medium text-slate-700 whitespace-pre-wrap leading-relaxed">
                                         {summaryText}
-                                        <button onClick={() => setSummaryText(null)} className="absolute top-2 right-2 text-slate-400 hover:text-rose-500 bg-white/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"><Trash className="w-5 h-5" /></button>
+                                        <button onClick={() => setSummaryText(null)} className="absolute top-2 right-2 text-slate-400 hover:text-rose-500 bg-white/8 dark:bg-slate-800/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"><Trash className="w-5 h-5" /></button>
                                     </div>
                                 ) : (
                                     <span className="text-slate-400 italic text-xs flex items-center h-full justify-center text-center">Analiza la intención de compra y sentimientos del cliente.</span>
@@ -737,7 +737,7 @@ Teléfono: ${phoneDisplay}`;
                         <div className="flex-1 pb-6">
                             <div className="flex items-center justify-between mb-3 px-1">
                                 <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Guión Sugerido</h4>
-                                <span className="bg-white/80 shadow-sm border border-white text-indigo-600 text-[9px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">{selectedChat.assignedScript || 'V3'}</span>
+                                <span className="bg-white/8 dark:bg-slate-800/80 shadow-sm border border-white text-indigo-600 text-[9px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">{selectedChat.assignedScript || 'V3'}</span>
                             </div>
 
                             {Object.keys(scriptFlow).length > 0 ? (
@@ -753,7 +753,7 @@ Teléfono: ${phoneDisplay}`;
                                                     if (!selectedChat.isPaused) handleToggleBot();
                                                     setInput(formatScriptMessage(step.response, selectedChat));
                                                 }}
-                                                className="w-full text-left p-3.5 rounded-2xl border border-white/60 bg-white/40 hover:bg-white hover:border-indigo-300 transition-all shadow-sm hover:shadow-md group cursor-pointer relative overflow-hidden"
+                                                className="w-full text-left p-3.5 rounded-2xl border border-white/6 dark:border-slate-700/60 bg-white/4 dark:bg-slate-800/40 hover:bg-white hover:border-indigo-300 transition-all shadow-sm hover:shadow-md group cursor-pointer relative overflow-hidden"
                                             >
                                                 <div className="absolute top-0 right-0 w-12 h-12 bg-indigo-50 rounded-bl-full -mr-6 -mt-6 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                                                 <div className="flex items-center justify-between mb-2 text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-indigo-600 relative z-10 transition-colors">
@@ -768,7 +768,7 @@ Teléfono: ${phoneDisplay}`;
                                     })}
                                 </div>
                             ) : (
-                                <p className="text-xs text-slate-400 italic text-center mt-6 bg-white/40 p-4 rounded-xl border border-white/50">No hay módulos de guión en este flow.</p>
+                                <p className="text-xs text-slate-400 italic text-center mt-6 bg-white/4 dark:bg-slate-800/40 p-4 rounded-xl border border-white/5 dark:border-slate-700/50">No hay módulos de guión en este flow.</p>
                             )}
                         </div>
 

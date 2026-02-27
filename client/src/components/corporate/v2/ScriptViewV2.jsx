@@ -97,7 +97,7 @@ const ScriptViewV2 = () => {
         <div className="h-full flex flex-col animate-fade-in relative z-10 w-full space-y-6">
 
             {/* Header V2 */}
-            <div className="bg-white/40 backdrop-blur-xl rounded-[2rem] border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-5 lg:p-6">
+            <div className="bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-5 lg:p-6">
                 <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
                     <div className="flex-1">
                         <div className="flex items-center gap-3">
@@ -152,20 +152,20 @@ const ScriptViewV2 = () => {
             </div>
 
             {/* Main Content Area */}
-            <div className="flex-1 bg-white/60 backdrop-blur-xl rounded-[2rem] border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden flex flex-col relative text-sm">
+            <div className="flex-1 bg-white/6 dark:bg-slate-800/60 backdrop-blur-xl rounded-[2rem] border border-white/8 dark:border-slate-700/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden flex flex-col relative text-sm">
 
                 {/* Background Glow */}
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full max-w-2xl max-h-2xl bg-indigo-400/5 blur-[120px] rounded-full pointer-events-none"></div>
 
                 {/* Glass Tabs */}
-                <div className="border-b border-white/60 flex overflow-x-auto bg-white/30 backdrop-blur-md sticky top-0 z-20">
-                    <button onClick={() => setActiveTab('flow')} className={`px-8 py-5 font-extrabold text-xs uppercase tracking-widest whitespace-nowrap transition-all ${activeTab === 'flow' ? 'border-b-2 border-indigo-600 text-indigo-700 bg-white/50' : 'text-slate-400 hover:text-indigo-500 hover:bg-white/20'}`}>
+                <div className="border-b border-white/6 dark:border-slate-700/60 flex overflow-x-auto bg-white/3 dark:bg-slate-800/30 backdrop-blur-md sticky top-0 z-20">
+                    <button onClick={() => setActiveTab('flow')} className={`px-8 py-5 font-extrabold text-xs uppercase tracking-widest whitespace-nowrap transition-all ${activeTab === 'flow' ? 'border-b-2 border-indigo-600 text-indigo-700 bg-white/50 dark:bg-slate-800/50' : 'text-slate-400 hover:text-indigo-500 hover:bg-white/20 dark:bg-slate-800/20'}`}>
                         Pasos del Flujo
                     </button>
-                    <button onClick={() => setActiveTab('map')} className={`px-8 py-5 font-extrabold text-xs uppercase tracking-widest whitespace-nowrap transition-all ${activeTab === 'map' ? 'border-b-2 border-indigo-600 text-indigo-700 bg-white/50' : 'text-slate-400 hover:text-indigo-500 hover:bg-white/20'}`}>
+                    <button onClick={() => setActiveTab('map')} className={`px-8 py-5 font-extrabold text-xs uppercase tracking-widest whitespace-nowrap transition-all ${activeTab === 'map' ? 'border-b-2 border-indigo-600 text-indigo-700 bg-white/50 dark:bg-slate-800/50' : 'text-slate-400 hover:text-indigo-500 hover:bg-white/20 dark:bg-slate-800/20'}`}>
                         Mapa Visual
                     </button>
-                    <button onClick={() => setActiveTab('faq')} className={`px-8 py-5 font-extrabold text-xs uppercase tracking-widest whitespace-nowrap transition-all ${activeTab === 'faq' ? 'border-b-2 border-indigo-600 text-indigo-700 bg-white/50' : 'text-slate-400 hover:text-indigo-500 hover:bg-white/20'}`}>
+                    <button onClick={() => setActiveTab('faq')} className={`px-8 py-5 font-extrabold text-xs uppercase tracking-widest whitespace-nowrap transition-all ${activeTab === 'faq' ? 'border-b-2 border-indigo-600 text-indigo-700 bg-white/50 dark:bg-slate-800/50' : 'text-slate-400 hover:text-indigo-500 hover:bg-white/20 dark:bg-slate-800/20'}`}>
                         Preguntas (FAQ)
                     </button>
                 </div>
@@ -179,7 +179,7 @@ const ScriptViewV2 = () => {
                     ) : (
                         <>
                             {activeTab === 'map' && (
-                                <div className="bg-white/50 rounded-2xl p-4 border border-white shadow-inner h-full min-h-[500px]">
+                                <div className="bg-white/5 dark:bg-slate-800/50 rounded-2xl p-4 border border-white shadow-inner h-full min-h-[500px]">
                                     <ScriptMapView script={script} onUpdate={handleUpdate} />
                                 </div>
                             )}
@@ -187,7 +187,7 @@ const ScriptViewV2 = () => {
                             {activeTab === 'flow' && (
                                 <div className="space-y-6 max-w-5xl 2xl:max-w-7xl mx-auto">
                                     {Object.entries(script.flow || {}).map(([key, step]) => (
-                                        <div key={key} className="bg-white/80 backdrop-blur-md p-6 rounded-3xl border border-white shadow-sm hover:shadow-md hover:border-indigo-200 transition-all duration-300">
+                                        <div key={key} className="bg-white/8 dark:bg-slate-800/80 backdrop-blur-md p-6 rounded-3xl border border-white shadow-sm hover:shadow-md hover:border-indigo-200 transition-all duration-300">
                                             <div className="flex justify-between items-center cursor-pointer group" onClick={() => setExpandedCard(expandedCard === key ? null : key)}>
                                                 <h3 className="font-extrabold text-slate-800 capitalize text-base group-hover:text-indigo-600 transition-colors">{key.replace(/_/g, ' ')}</h3>
                                                 <div className="flex items-center gap-4">
@@ -223,7 +223,7 @@ const ScriptViewV2 = () => {
                                                                 <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-2 ml-1">ID Módulo (Lectura AI)</label>
                                                                 <input
                                                                     type="text"
-                                                                    className="w-full p-3.5 bg-slate-100/50 border border-slate-200 rounded-xl text-sm font-mono font-bold text-slate-400 shadow-inner cursor-not-allowed"
+                                                                    className="w-full p-3.5 bg-slate-100/5 dark:bg-slate-700/50 border border-slate-200 rounded-xl text-sm font-mono font-bold text-slate-400 shadow-inner cursor-not-allowed"
                                                                     value={step.step}
                                                                     onChange={(e) => handleFlowChange(key, 'step', e.target.value)}
                                                                 />
@@ -322,7 +322,7 @@ const ScriptViewV2 = () => {
                                                 placeholder="Buscar por palabra clave o respuesta..."
                                                 value={faqSearchTerm}
                                                 onChange={(e) => setFaqSearchTerm(e.target.value)}
-                                                className="w-full bg-white/70 border border-white rounded-xl pl-11 pr-4 py-3.5 text-sm font-bold text-slate-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 focus:bg-white transition-all shadow-inner placeholder:text-slate-400 placeholder:font-medium hover:shadow-md hover:border-indigo-100"
+                                                className="w-full bg-white/7 dark:bg-slate-800/70 border border-white rounded-xl pl-11 pr-4 py-3.5 text-sm font-bold text-slate-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 focus:bg-white transition-all shadow-inner placeholder:text-slate-400 placeholder:font-medium hover:shadow-md hover:border-indigo-100"
                                             />
                                             <span className="absolute left-4 top-3.5 text-slate-400 group-focus-within:text-indigo-500 transition-colors">
                                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
@@ -340,7 +340,7 @@ const ScriptViewV2 = () => {
                                                 return item.keywords.some(k => k.toLowerCase().includes(term)) || (item.response && item.response.toLowerCase().includes(term));
                                             })
                                             .map(({ item, originalIndex }) => (
-                                                <div key={originalIndex} className="bg-white/80 backdrop-blur-md p-6 rounded-3xl border border-white shadow-sm hover:shadow-md transition-all duration-300 relative group">
+                                                <div key={originalIndex} className="bg-white/8 dark:bg-slate-800/80 backdrop-blur-md p-6 rounded-3xl border border-white shadow-sm hover:shadow-md transition-all duration-300 relative group">
                                                     <button onClick={() => deleteFAQ(originalIndex)} className="absolute top-4 right-4 w-8 h-8 bg-rose-50 text-rose-400 hover:bg-rose-500 hover:text-white rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all" title="Eliminar FAQ">
                                                         <Trash className="w-5 h-5" />
                                                     </button>
@@ -380,8 +380,8 @@ const ScriptViewV2 = () => {
             {/* GALLERY MODAL V2 */}
             {showGallery && createPortal(
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-fade-in">
-                    <div className="bg-white/95 backdrop-blur-2xl rounded-[2rem] shadow-2xl w-full max-w-6xl 2xl:max-w-7xl max-h-[85vh] flex flex-col border border-white relative overflow-hidden">
-                        <div className="p-8 border-b border-white flex justify-between items-center bg-white/40 sticky top-0 z-10 backdrop-blur-md">
+                    <div className="bg-white/9 dark:bg-slate-800/95 backdrop-blur-2xl rounded-[2rem] shadow-2xl w-full max-w-6xl 2xl:max-w-7xl max-h-[85vh] flex flex-col border border-white relative overflow-hidden">
+                        <div className="p-8 border-b border-white flex justify-between items-center bg-white/4 dark:bg-slate-800/40 sticky top-0 z-10 backdrop-blur-md">
                             <div>
                                 <h3 className="text-2xl font-extrabold text-slate-800 tracking-tight">Galería de Medios</h3>
                                 <p className="text-xs font-bold text-indigo-500 uppercase tracking-widest mt-1">Selecciona una imagen para el paso</p>
@@ -390,7 +390,7 @@ const ScriptViewV2 = () => {
                                 <Close className="w-4 h-4" />
                             </button>
                         </div>
-                        <div className="p-8 overflow-y-auto custom-scrollbar flex-1 bg-slate-50/50">
+                        <div className="p-8 overflow-y-auto custom-scrollbar flex-1 bg-slate-50/5 dark:bg-slate-800/50">
                             {galleryImages.length === 0 ? (
                                 <div className="text-center py-20">
                                     <div className="w-20 h-20 bg-white shadow-sm border border-slate-200 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">

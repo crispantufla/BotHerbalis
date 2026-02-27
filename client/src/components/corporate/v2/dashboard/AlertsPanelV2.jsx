@@ -32,7 +32,7 @@ const AlertsPanelV2 = ({ alerts, onCommand, onQuickAction }) => {
     return (
         <div className="lg:col-span-2 space-y-6">
             {/* Header V2 */}
-            <div className="flex items-center justify-between bg-white/40 dark:bg-slate-800/40 backdrop-blur-md p-5 rounded-3xl border border-white/60 dark:border-slate-700/60 shadow-sm">
+            <div className="flex items-center justify-between bg-white/4 dark:bg-slate-800/40 dark:bg-slate-800/40 backdrop-blur-md p-5 rounded-3xl border border-white/6 dark:border-slate-700/60 dark:border-slate-700/60 shadow-sm">
                 <div className="flex items-center gap-4">
                     <div className="relative">
                         <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-400 via-pink-500 to-rose-600 flex items-center justify-center shadow-lg shadow-rose-500/30 text-white">
@@ -53,7 +53,7 @@ const AlertsPanelV2 = ({ alerts, onCommand, onQuickAction }) => {
 
             {/* Empty State V2 */}
             {alerts.length === 0 ? (
-                <div className="relative overflow-hidden rounded-3xl border border-white/60 dark:border-slate-700/60 bg-white/40 dark:bg-slate-800/40 backdrop-blur-md p-12 text-center shadow-sm">
+                <div className="relative overflow-hidden rounded-3xl border border-white/6 dark:border-slate-700/60 dark:border-slate-700/60 bg-white/4 dark:bg-slate-800/40 dark:bg-slate-800/40 backdrop-blur-md p-12 text-center shadow-sm">
                     <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-400/10 blur-[80px] rounded-full pointer-events-none" />
                     <div className="absolute bottom-0 left-0 w-64 h-64 bg-teal-400/10 blur-[80px] rounded-full pointer-events-none" />
 
@@ -79,9 +79,9 @@ const AlertsPanelV2 = ({ alerts, onCommand, onQuickAction }) => {
                         const isExpanded = expandedCards[alert.id] !== false;
 
                         return (
-                            <div key={alert.id} className="group overflow-hidden rounded-3xl border border-white/80 dark:border-slate-700/80 bg-white/60 dark:bg-slate-800/60 backdrop-blur-xl shadow-lg hover:shadow-xl transition-all duration-300">
+                            <div key={alert.id} className="group overflow-hidden rounded-3xl border border-white/8 dark:border-slate-700/80 dark:border-slate-700/80 bg-white/6 dark:bg-slate-800/60 dark:bg-slate-800/60 backdrop-blur-xl shadow-lg hover:shadow-xl transition-all duration-300">
                                 {/* Header del Alerta */}
-                                <div className="p-6 cursor-pointer hover:bg-white/40 dark:hover:bg-slate-800/40 transition-colors" onClick={() => toggleExpand(alert.id)}>
+                                <div className="p-6 cursor-pointer hover:bg-white/4 dark:bg-slate-800/40 dark:hover:bg-slate-800/40 transition-colors" onClick={() => toggleExpand(alert.id)}>
                                     <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-4">
                                         <div className="flex items-start gap-4">
                                             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-100 to-pink-50 dark:from-rose-900/30 dark:to-pink-900/30 flex items-center justify-center text-rose-500 dark:text-rose-400 text-xl shadow-inner border border-rose-100 dark:border-rose-900/50 shrink-0">
@@ -125,9 +125,9 @@ const AlertsPanelV2 = ({ alerts, onCommand, onQuickAction }) => {
 
                                 {/* Contenido Expandido */}
                                 {isExpanded && (
-                                    <div className="border-t border-slate-200/50 dark:border-slate-700/50 bg-white/30 dark:bg-slate-800/30 p-6">
+                                    <div className="border-t border-slate-200/50 dark:border-slate-700/50 bg-white/3 dark:bg-slate-800/30 dark:bg-slate-800/30 p-6">
                                         {hasOrder && (
-                                            <div className="mb-6 bg-white/80 dark:bg-slate-900/50 rounded-2xl p-5 border border-slate-100 dark:border-slate-800 shadow-sm">
+                                            <div className="mb-6 bg-white/8 dark:bg-slate-800/80 dark:bg-slate-900/50 rounded-2xl p-5 border border-slate-100 dark:border-slate-800 shadow-sm">
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                                     <div className="flex gap-4 items-center">
                                                         <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center"><Package className="w-5 h-5" /></div>
@@ -174,7 +174,7 @@ const AlertsPanelV2 = ({ alerts, onCommand, onQuickAction }) => {
                                                 disabled={isSending || !inputValue.trim()}
                                                 className="bg-indigo-600 dark:bg-indigo-500 text-white px-6 py-3 rounded-xl hover:bg-indigo-700 dark:hover:bg-indigo-600 disabled:opacity-50 flex items-center gap-2 text-sm font-bold shadow-lg shadow-indigo-600/20 transition-all"
                                             >
-                                                {isSending ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Send className="w-4 h-4" />}
+                                                {isSending ? <div className="w-4 h-4 border-2 border-white/3 dark:border-slate-700/30 border-t-white rounded-full animate-spin" /> : <Send className="w-4 h-4" />}
                                                 Enviar a IA
                                             </button>
                                         </form>

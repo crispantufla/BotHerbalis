@@ -25,11 +25,11 @@ const SystemStatusPanelV2 = ({ status, activeConversations = 0, adminNumbers = [
     };
 
     return (
-        <div className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-xl rounded-3xl border border-white/80 dark:border-slate-700/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col relative overflow-hidden group">
+        <div className="bg-white/6 dark:bg-slate-800/60 dark:bg-slate-800/60 backdrop-blur-xl rounded-3xl border border-white/8 dark:border-slate-700/80 dark:border-slate-700/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col relative overflow-hidden group">
             {/* Background glow */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-400/10 dark:bg-indigo-900/20 blur-[60px] rounded-full pointer-events-none group-hover:bg-indigo-400/20 dark:group-hover:bg-indigo-900/30 transition-colors duration-500"></div>
 
-            <div className="px-6 py-5 border-b border-white/60 dark:border-slate-700/60 bg-white/40 dark:bg-slate-800/40">
+            <div className="px-6 py-5 border-b border-white/6 dark:border-slate-700/60 dark:border-slate-700/60 bg-white/4 dark:bg-slate-800/40 dark:bg-slate-800/40">
                 <h3 className="font-extrabold text-slate-800 dark:text-slate-100 text-sm uppercase tracking-widest">Sistema</h3>
             </div>
 

@@ -281,7 +281,7 @@ Teléfono: ${phoneDisplay}`;
         <div className="h-full flex flex-col animate-fade-in relative z-10 w-full space-y-6">
 
             {/* V2 Header & Advanced Filters */}
-            <div className="bg-white/40 backdrop-blur-xl rounded-[2rem] border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-5 lg:p-6">
+            <div className="bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-5 lg:p-6">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-5">
                     <div>
                         <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-700 to-purple-600 tracking-tight">
@@ -309,12 +309,12 @@ Teléfono: ${phoneDisplay}`;
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             placeholder="Buscar por cliente, teléfono o tracking..."
-                            className="w-full bg-white/80 border border-white rounded-xl pl-12 pr-4 py-3.5 text-sm font-medium focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all text-slate-700 shadow-inner placeholder:text-slate-400"
+                            className="w-full bg-white/8 dark:bg-slate-800/80 border border-white rounded-xl pl-12 pr-4 py-3.5 text-sm font-medium focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all text-slate-700 shadow-inner placeholder:text-slate-400"
                         />
                         <span className="absolute left-4 top-3.5 text-slate-400 group-focus-within:text-indigo-500 transition-colors"><Search className="w-5 h-5" /></span>
                     </div>
 
-                    <div className="flex items-center gap-2 bg-white/60 p-2 rounded-xl border border-white/80 shadow-inner overflow-x-auto custom-scrollbar">
+                    <div className="flex items-center gap-2 bg-white/6 dark:bg-slate-800/60 p-2 rounded-xl border border-white/8 dark:border-slate-700/80 shadow-inner overflow-x-auto custom-scrollbar">
                         <div className="pl-3 pr-2 text-slate-400"><Filter className="w-5 h-5" /></div>
                         {['Todos', ...statusOptions].map(status => (
                             <button
@@ -330,7 +330,7 @@ Teléfono: ${phoneDisplay}`;
             </div>
 
             {/* V2 Glassmorphism Table */}
-            <div className="flex-1 bg-white/60 backdrop-blur-xl rounded-[2rem] border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden flex flex-col relative text-sm">
+            <div className="flex-1 bg-white/6 dark:bg-slate-800/60 backdrop-blur-xl rounded-[2rem] border border-white/8 dark:border-slate-700/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden flex flex-col relative text-sm">
 
                 {/* Background Glow */}
                 <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-purple-400/10 blur-[100px] rounded-full pointer-events-none"></div>
@@ -338,7 +338,7 @@ Teléfono: ${phoneDisplay}`;
                 <div className="overflow-auto custom-scrollbar flex-1 relative z-10">
                     {/* PC & Tablet Table View */}
                     <table className="w-full text-left border-collapse whitespace-nowrap hidden md:table">
-                        <thead className="bg-white/40 border-b border-white/60 sticky top-0 z-20 backdrop-blur-md">
+                        <thead className="bg-white/4 dark:bg-slate-800/40 border-b border-white/6 dark:border-slate-700/60 sticky top-0 z-20 backdrop-blur-md">
                             <tr className="text-xs uppercase tracking-widest text-slate-500 font-extrabold">
                                 <th className="px-4 sm:px-8 py-5 hidden md:table-cell">Fecha</th>
                                 <th className="px-4 sm:px-8 py-5 w-full">Cliente</th>
@@ -366,7 +366,7 @@ Teléfono: ${phoneDisplay}`;
                                 </td></tr>
                             ) : (
                                 filteredOrders.map(order => (
-                                    <tr key={order.id} className="hover:bg-white/50 transition-colors group">
+                                    <tr key={order.id} className="hover:bg-white/5 dark:bg-slate-800/50 transition-colors group">
                                         <td className="px-4 py-5 hidden md:table-cell w-32">
                                             {(() => {
                                                 const dt = formatDateBA(order.createdAt);
@@ -439,14 +439,14 @@ Teléfono: ${phoneDisplay}`;
                             </div>
                         ) : filteredOrders.length === 0 ? (
                             <div className="text-center py-10">
-                                <div className="w-16 h-16 bg-white/60 rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm border border-white">
+                                <div className="w-16 h-16 bg-white/6 dark:bg-slate-800/60 rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm border border-white">
                                     <Search className="w-5 h-5" />
                                 </div>
                                 <p className="text-slate-500 font-bold text-[15px]">No se encontraron pedidos</p>
                             </div>
                         ) : (
                             filteredOrders.map(order => (
-                                <div key={order.id} className="bg-white/80 backdrop-blur-md border border-white rounded-[1.5rem] shadow-sm p-5 flex flex-col gap-4 relative overflow-hidden flex-shrink-0 animate-fade-in transition-all active:scale-[0.98]">
+                                <div key={order.id} className="bg-white/8 dark:bg-slate-800/80 backdrop-blur-md border border-white rounded-[1.5rem] shadow-sm p-5 flex flex-col gap-4 relative overflow-hidden flex-shrink-0 animate-fade-in transition-all active:scale-[0.98]">
                                     <div className="flex justify-between items-start gap-3 w-full">
                                         <div className="flex items-center gap-3 min-w-0 flex-1">
                                             <div className="w-11 h-11 rounded-full bg-gradient-to-br from-indigo-50 to-purple-100 flex items-center justify-center text-indigo-600 font-extrabold text-[15px] shrink-0 border border-white shadow-sm shadow-indigo-100/50">
@@ -500,7 +500,7 @@ Teléfono: ${phoneDisplay}`;
                 </div>
 
                 {/* V2 Pagination Controls */}
-                <div className="px-8 py-5 border-t border-white/60 flex flex-col sm:flex-row justify-between items-center bg-white/30 backdrop-blur-md gap-4">
+                <div className="px-8 py-5 border-t border-white/6 dark:border-slate-700/60 flex flex-col sm:flex-row justify-between items-center bg-white/3 dark:bg-slate-800/30 backdrop-blur-md gap-4">
                     <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">
                         Página <span className="text-indigo-600">{page}</span> de {totalPages}
                     </span>
@@ -508,14 +508,14 @@ Teléfono: ${phoneDisplay}`;
                         <button
                             disabled={page <= 1}
                             onClick={() => fetchOrders(page - 1)}
-                            className="px-4 py-2 bg-white/80 rounded-xl border border-white shadow-sm text-xs font-extrabold text-slate-600 disabled:opacity-50 hover:bg-white hover:text-indigo-600 transition-all active:-translate-y-0.5"
+                            className="px-4 py-2 bg-white/8 dark:bg-slate-800/80 rounded-xl border border-white shadow-sm text-xs font-extrabold text-slate-600 disabled:opacity-50 hover:bg-white hover:text-indigo-600 transition-all active:-translate-y-0.5"
                         >
                             Anterior
                         </button>
                         <button
                             disabled={page >= totalPages}
                             onClick={() => fetchOrders(page + 1)}
-                            className="px-4 py-2 bg-white/80 rounded-xl border border-white shadow-sm text-xs font-extrabold text-slate-600 disabled:opacity-50 hover:bg-white hover:text-indigo-600 transition-all active:-translate-y-0.5"
+                            className="px-4 py-2 bg-white/8 dark:bg-slate-800/80 rounded-xl border border-white shadow-sm text-xs font-extrabold text-slate-600 disabled:opacity-50 hover:bg-white hover:text-indigo-600 transition-all active:-translate-y-0.5"
                         >
                             Siguiente
                         </button>
@@ -527,7 +527,7 @@ Teléfono: ${phoneDisplay}`;
             {/* V2 GLASSMORPHISM EDIT MODAL */}
             {editingOrder && createPortal(
                 <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[100] flex items-center justify-center animate-fade-in p-4">
-                    <div className="bg-white/90 backdrop-blur-2xl rounded-[2rem] shadow-2xl w-full max-w-md p-8 border border-white relative overflow-hidden">
+                    <div className="bg-white/9 dark:bg-slate-800/90 backdrop-blur-2xl rounded-[2rem] shadow-2xl w-full max-w-md p-8 border border-white relative overflow-hidden">
 
                         <div className="absolute top-0 right-0 w-40 h-40 bg-indigo-500/10 blur-[50px] rounded-full pointer-events-none"></div>
 

@@ -140,7 +140,7 @@ const SettingsViewV2 = ({ status }) => {
             <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-indigo-50/50 via-transparent to-purple-50/50 pointer-events-none z-0"></div>
 
             {/* Header V2 */}
-            <div className="bg-white/40 backdrop-blur-xl rounded-[2rem] border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-8 mb-8 relative z-10">
+            <div className="bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-8 mb-8 relative z-10">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                     <div>
                         <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-700 to-purple-600 tracking-tight">
@@ -162,7 +162,7 @@ const SettingsViewV2 = ({ status }) => {
                     {/* Left Column: Editor & Tools */}
                     <div className="space-y-8">
                         {/* Wrapper for original PriceEditor to adapt it to Glassmorphism */}
-                        <div className="bg-white/60 backdrop-blur-xl p-8 rounded-[2rem] border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
+                        <div className="bg-white/6 dark:bg-slate-800/60 backdrop-blur-xl p-8 rounded-[2rem] border border-white/8 dark:border-slate-700/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
                             <div className="absolute -top-32 -left-32 w-64 h-64 bg-indigo-400/10 blur-[60px] rounded-full pointer-events-none"></div>
                             <div className="relative z-10">
                                 <PriceEditor />
@@ -173,7 +173,7 @@ const SettingsViewV2 = ({ status }) => {
                     {/* Right Column: Scripts & Danger */}
                     <div className="space-y-8">
                         {/* Script Switcher V2 */}
-                        <div className="bg-white/60 backdrop-blur-xl p-8 rounded-[2rem] border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
+                        <div className="bg-white/6 dark:bg-slate-800/60 backdrop-blur-xl p-8 rounded-[2rem] border border-white/8 dark:border-slate-700/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
                             <div className="absolute -bottom-20 -right-20 w-80 h-80 bg-purple-400/10 blur-[80px] rounded-full pointer-events-none"></div>
                             <div className="flex items-center gap-4 mb-8 relative z-10">
                                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-fuchsia-600 text-white flex items-center justify-center shadow-lg shadow-purple-500/20">
@@ -196,7 +196,7 @@ const SettingsViewV2 = ({ status }) => {
                                         onClick={() => handleSwitchScript(script.id)}
                                         className={`p-5 rounded-2xl border-2 cursor-pointer transition-all duration-300 flex flex-col items-start relative overflow-hidden ${activeScript === script.id
                                             ? `bg-white border-${script.color}-500 shadow-lg shadow-${script.color}-500/20 transform scale-105 z-10`
-                                            : `bg-white/50 border-white hover:border-${script.color}-200 hover:bg-white`
+                                            : `bg-white/5 dark:bg-slate-800/50 border-white hover:border-${script.color}-200 hover:bg-white dark:bg-slate-800`
                                             } ${script.id === 'rotacion' ? 'sm:col-span-2 sm:flex-row sm:items-center sm:justify-between' : ''}`}
                                     >
                                         <div className="flex items-start gap-4 flex-1">
@@ -230,7 +230,7 @@ const SettingsViewV2 = ({ status }) => {
                         </div>
 
                         {/* Danger Zone */}
-                        <div className="bg-white/60 backdrop-blur-xl p-8 rounded-[2rem] border border-rose-100 shadow-[0_8px_30px_rgba(244,63,94,0.04)] relative overflow-hidden group">
+                        <div className="bg-white/6 dark:bg-slate-800/60 backdrop-blur-xl p-8 rounded-[2rem] border border-rose-100 shadow-[0_8px_30px_rgba(244,63,94,0.04)] relative overflow-hidden group">
                             <div className="absolute -left-20 top-1/2 -translate-y-1/2 w-40 h-40 bg-rose-500/10 blur-[40px] rounded-full group-hover:bg-rose-500/20 transition-colors pointer-events-none"></div>
                             <div className="absolute left-0 top-0 bottom-0 w-2 bg-gradient-to-b from-rose-400 to-rose-600 rounded-l-[2rem]"></div>
 
@@ -249,7 +249,7 @@ const SettingsViewV2 = ({ status }) => {
                         </div>
 
                         {/* Herramientas */}
-                        <div className="bg-white/60 backdrop-blur-xl p-8 rounded-[2rem] border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
+                        <div className="bg-white/6 dark:bg-slate-800/60 backdrop-blur-xl p-8 rounded-[2rem] border border-white/8 dark:border-slate-700/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
                             <div className="absolute top-0 right-0 w-32 h-32 bg-blue-400/10 blur-[50px] rounded-full pointer-events-none"></div>
                             <div className="flex items-center gap-4 mb-6 relative z-10">
                                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/20">
@@ -270,7 +270,7 @@ const SettingsViewV2 = ({ status }) => {
 
                     {/* FULL WIDTH: Memory Management Panel */}
                     <div className="xl:col-span-2">
-                        <div className={`bg-white/60 backdrop-blur-xl p-8 rounded-[2rem] border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden ${memStats ? getMemoryLabel().glow : ''}`}>
+                        <div className={`bg-white/6 dark:bg-slate-800/60 backdrop-blur-xl p-8 rounded-[2rem] border border-white/8 dark:border-slate-700/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden ${memStats ? getMemoryLabel().glow : ''}`}>
                             <div className="absolute -top-20 -right-20 w-80 h-80 bg-indigo-400/10 blur-[80px] rounded-full pointer-events-none"></div>
                             <div className="absolute left-0 top-0 bottom-0 w-2 bg-gradient-to-b from-indigo-400 to-purple-600 rounded-l-[2rem]"></div>
 
@@ -301,7 +301,7 @@ const SettingsViewV2 = ({ status }) => {
                                         {(() => {
                                             const label = getMemoryLabel();
                                             return (
-                                                <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl ${label.color} bg-white/80 border border-white shadow-sm`}>
+                                                <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl ${label.color} bg-white/8 dark:bg-slate-800/80 border border-white shadow-sm`}>
                                                     <span className="font-extrabold text-sm tracking-wide">{label.text}</span>
                                                     <span className="text-xs text-slate-400 font-medium">{memStats.totalUsersDB} / {memStats.thresholds.danger}</span>
                                                 </div>
@@ -314,7 +314,7 @@ const SettingsViewV2 = ({ status }) => {
                                                 <span>Ocupación</span>
                                                 <span className="font-mono">{getMemoryPercent()}%</span>
                                             </div>
-                                            <div className="w-full bg-slate-100/80 rounded-full h-4 overflow-hidden backdrop-blur-sm">
+                                            <div className="w-full bg-slate-100/8 dark:bg-slate-700/80 rounded-full h-4 overflow-hidden backdrop-blur-sm">
                                                 <div
                                                     className={`h-full rounded-full transition-all duration-1000 ease-out bg-gradient-to-r ${getMemoryGradient()}`}
                                                     style={{ width: `${Math.max(3, getMemoryPercent())}%` }}
@@ -335,7 +335,7 @@ const SettingsViewV2 = ({ status }) => {
                                                 { value: memStats.activeConversations, label: 'Activos Ahora', color: 'from-emerald-500 to-teal-600' },
                                                 { value: `${memStats.heapUsedMB} MB`, label: 'Heap Usada', color: 'from-amber-500 to-orange-600' }
                                             ].map((stat, i) => (
-                                                <div key={i} className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 text-center border border-white shadow-sm">
+                                                <div key={i} className="bg-white/8 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl p-4 text-center border border-white shadow-sm">
                                                     <div className={`text-xl font-black text-transparent bg-clip-text bg-gradient-to-r ${stat.color}`}>{stat.value}</div>
                                                     <div className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest mt-1">{stat.label}</div>
                                                 </div>

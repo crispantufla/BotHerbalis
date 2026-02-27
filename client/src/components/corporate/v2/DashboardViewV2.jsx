@@ -148,7 +148,7 @@ const DashboardViewV2 = ({ alerts = [], config, handleQuickAction, status, qrDat
 
             {/* QR CODE OVERLAY - Glassmorphism style */}
             {status === 'scan_qr' && qrData && (
-                <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border border-white/40 dark:border-slate-700/40 shadow-2xl rounded-3xl p-10 text-center max-w-lg mx-auto transform transition-all hover:scale-[1.02]">
+                <div className="bg-white/8 dark:bg-slate-800/80 dark:bg-slate-800/80 backdrop-blur-xl border border-white/4 dark:border-slate-700/40 dark:border-slate-700/40 shadow-2xl rounded-3xl p-10 text-center max-w-lg mx-auto transform transition-all hover:scale-[1.02]">
                     <div className="w-16 h-16 bg-gradient-to-tr from-blue-500 to-indigo-500 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-blue-500/30">
                         <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
                     </div>
@@ -200,7 +200,7 @@ const DashboardViewV2 = ({ alerts = [], config, handleQuickAction, status, qrDat
             )}
 
             {status === 'scan_qr' && !qrData && (
-                <div className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-lg border border-white dark:border-slate-700/50 rounded-3xl p-8 text-center max-w-lg mx-auto shadow-xl">
+                <div className="bg-white/6 dark:bg-slate-800/60 dark:bg-slate-800/60 backdrop-blur-lg border border-white dark:border-slate-700/50 rounded-3xl p-8 text-center max-w-lg mx-auto shadow-xl">
                     <div className="flex flex-col items-center justify-center gap-4">
                         <div className="w-12 h-12 border-4 border-indigo-200 dark:border-indigo-900 border-t-indigo-600 dark:border-t-indigo-500 rounded-full animate-spin"></div>
                         <span className="font-bold text-indigo-800 dark:text-indigo-400 text-lg">Generando código QR seguro...</span>

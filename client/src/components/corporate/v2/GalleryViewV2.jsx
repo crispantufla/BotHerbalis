@@ -79,7 +79,7 @@ const GalleryViewV2 = () => {
         <div className="h-full flex flex-col animate-fade-in relative z-10 w-full space-y-6">
 
             {/* Header V2 & Upload Action */}
-            <div className="bg-white/40 backdrop-blur-xl rounded-[2rem] border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-5 lg:p-6 relative overflow-hidden">
+            <div className="bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-5 lg:p-6 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-fuchsia-400/10 blur-[60px] rounded-full pointer-events-none"></div>
 
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10">
@@ -93,7 +93,7 @@ const GalleryViewV2 = () => {
                     <label className={`px-8 py-3 bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-2xl text-sm font-extrabold tracking-widest uppercase shadow-lg shadow-indigo-500/30 transition-all flex items-center gap-3 cursor-pointer group ${uploading ? 'opacity-70 pointer-events-none' : 'hover:shadow-indigo-500/50 hover:-translate-y-1'}`}>
                         {uploading ? (
                             <>
-                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                <div className="w-5 h-5 border-2 border-white/3 dark:border-slate-700/30 border-t-white rounded-full animate-spin" />
                                 <span>Procesando...</span>
                             </>
                         ) : (
@@ -111,14 +111,14 @@ const GalleryViewV2 = () => {
             <div className="flex-1 flex flex-col relative">
 
                 {/* Unified Filters Bar */}
-                <div className="bg-white/60 backdrop-blur-xl rounded-2xl border border-white/80 shadow-sm p-4 mb-6 flex flex-col md:flex-row gap-4 relative z-20">
+                <div className="bg-white/6 dark:bg-slate-800/60 backdrop-blur-xl rounded-2xl border border-white/8 dark:border-slate-700/80 shadow-sm p-4 mb-6 flex flex-col md:flex-row gap-4 relative z-20">
                     <div className="flex-1 relative group">
                         <input
                             type="text"
                             placeholder="Buscar por nombre de archivo o hashtag..."
                             value={filter}
                             onChange={(e) => setFilter(e.target.value)}
-                            className="w-full bg-white/70 border border-white rounded-xl pl-12 pr-4 py-3.5 text-sm font-bold text-slate-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 focus:bg-white transition-all shadow-inner placeholder:text-slate-400 placeholder:font-medium hover:shadow-md hover:border-indigo-100"
+                            className="w-full bg-white/7 dark:bg-slate-800/70 border border-white rounded-xl pl-12 pr-4 py-3.5 text-sm font-bold text-slate-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 focus:bg-white transition-all shadow-inner placeholder:text-slate-400 placeholder:font-medium hover:shadow-md hover:border-indigo-100"
                         />
                         <span className="absolute left-4 top-3.5 text-slate-400 group-focus-within:text-indigo-500 transition-colors"><Search className="w-5 h-5" /></span>
                     </div>
@@ -127,7 +127,7 @@ const GalleryViewV2 = () => {
                         <select
                             value={selectedCategory}
                             onChange={(e) => setSelectedCategory(e.target.value)}
-                            className="appearance-none bg-white/70 border border-white rounded-xl pl-12 pr-10 py-3.5 text-sm font-extrabold text-slate-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 focus:bg-white transition-all shadow-inner hover:shadow-md hover:border-indigo-100 cursor-pointer min-w-[200px] uppercase tracking-wider"
+                            className="appearance-none bg-white/7 dark:bg-slate-800/70 border border-white rounded-xl pl-12 pr-10 py-3.5 text-sm font-extrabold text-slate-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 focus:bg-white transition-all shadow-inner hover:shadow-md hover:border-indigo-100 cursor-pointer min-w-[200px] uppercase tracking-wider"
                         >
                             {categories.map(c => (
                                 <option key={c} value={c} className="font-bold text-slate-700">
@@ -150,7 +150,7 @@ const GalleryViewV2 = () => {
                             <span className="font-bold tracking-widest text-xs uppercase text-slate-400">Escaneando Bóveda</span>
                         </div>
                     ) : filteredImages.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-full min-h-[400px] bg-white/40 backdrop-blur-xl rounded-[2rem] border border-white/60 border-dashed m-1">
+                        <div className="flex flex-col items-center justify-center h-full min-h-[400px] bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl rounded-[2rem] border border-white/6 dark:border-slate-700/60 border-dashed m-1">
                             <div className="w-20 h-20 bg-gradient-to-br from-indigo-50 to-purple-50 shadow-sm border border-indigo-100/50 rounded-full flex items-center justify-center mb-6 text-indigo-400">
                                 <ImageIcon className="w-6 h-6" />
                             </div>
@@ -160,10 +160,10 @@ const GalleryViewV2 = () => {
                     ) : (
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
                             {filteredImages.map(img => (
-                                <div key={img.id} className="group flex flex-col bg-white/60 backdrop-blur-xl rounded-2xl border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
+                                <div key={img.id} className="group flex flex-col bg-white/6 dark:bg-slate-800/60 backdrop-blur-xl rounded-2xl border border-white/8 dark:border-slate-700/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
 
                                     {/* Abstract Image Container */}
-                                    <div className="aspect-square relative overflow-hidden bg-slate-100/50">
+                                    <div className="aspect-square relative overflow-hidden bg-slate-100/5 dark:bg-slate-700/50">
                                         {/* Subtle loading placeholder */}
                                         <div className="absolute inset-0 bg-gradient-to-br from-slate-100 to-slate-200 animate-pulse -z-10"></div>
 
@@ -173,7 +173,7 @@ const GalleryViewV2 = () => {
                                         <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-4">
                                             <button
                                                 onClick={() => window.open(`${API_URL}${img.url}`, '_blank')}
-                                                className="w-12 h-12 rounded-full bg-white/20 hover:bg-white text-white hover:text-indigo-600 backdrop-blur-md flex items-center justify-center shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-all duration-300"
+                                                className="w-12 h-12 rounded-full bg-white/2 dark:bg-slate-800/20 hover:bg-white text-white hover:text-indigo-600 backdrop-blur-md flex items-center justify-center shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-all duration-300"
                                                 title="Visualización Completa"
                                             >
                                                 <Maximize className="w-4 h-4" />
