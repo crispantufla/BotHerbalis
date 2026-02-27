@@ -394,14 +394,38 @@ Teléfono: ${phoneDisplay}`;
             return <img src={`${API_URL}${url}`} alt="Media" className="rounded-2xl max-w-full h-auto max-h-64 object-cover border border-white/2 dark:border-slate-700/20 shadow-sm" />;
         }
         if (msg.body && (msg.body.startsWith('MEDIA_AUDIO:') || msg.body.startsWith('🎤'))) {
+            let audioUrl = '';
             let transcription = msg.body.includes('TRANSCRIPTION:') ? msg.body.split('TRANSCRIPTION:')[1].trim() : msg.body.replace(/^🎤\s*Audio:\s*/, '').replace(/^"|"$/g, '').trim();
+
+            if (msg.body.startsWith('MEDIA_AUDIO:')) {
+                audioUrl = msg.body.split('|')[0].replace('MEDIA_AUDIO:', '').trim();
+            }
+
             return (
-                <div className="space-y-3 min-w-[200px]">
-                    <div className="flex items-center gap-3 bg-black/10 rounded-2xl p-3 border border-white/1 dark:border-slate-700/10">
-                        <div className="w-10 h-10 rounded-full bg-emerald-500/90 text-white flex items-center justify-center shadow-lg"><Play className="w-5 h-5" /></div>
-                        <div className="flex-1 h-2 bg-black/10 rounded-full overflow-hidden text-emerald-500 font-mono text-[8px] leading-none text-center">Audio Player</div>
-                    </div>
-                    {transcription && <div className="bg-white/4 dark:bg-slate-800/40 p-3 rounded-xl text-xs italic text-slate-800 font-medium">📝 "{transcription}"</div>}
+                <div className="space-y-3 min-w-[200px] sm:min-w-[250px]">
+                    {audioUrl && audioUrl !== 'PENDING' ? (
+                        <div className="bg-black/5 dark:bg-white/5 rounded-2xl p-2 border border-white/10 dark:border-slate-700/30">
+                            <audio
+                                controls
+                                preload="metadata"
+                                className="w-full h-10 drop-shadow-sm [&::-webkit-media-controls-panel]:bg-emerald-50 [&::-webkit-media-controls-play-button]:bg-emerald-500 [&::-webkit-media-controls-play-button]:rounded-full [&::-webkit-media-controls-current-time-display]:text-emerald-700 [&::-webkit-media-controls-time-remaining-display]:text-emerald-700 pl-1"
+                                src={`${API_URL}${audioUrl}`}
+                            >
+                                Tu navegador no soporta el elemento de audio.
+                            </audio>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-3 bg-black/10 rounded-2xl p-3 border border-white/1 dark:border-slate-700/10">
+                            <div className="w-10 h-10 rounded-full bg-slate-400/90 text-white flex items-center justify-center shadow-lg"><Play className="w-5 h-5" /></div>
+                            <div className="flex-1 h-2 bg-black/10 rounded-full overflow-hidden text-slate-500 font-mono text-[8px] leading-none text-center">Audio PENDING...</div>
+                        </div>
+                    )}
+                    {transcription && transcription !== 'PENDING' && (
+                        <div className="bg-white/4 dark:bg-slate-800/40 p-3 rounded-xl text-xs flex items-start gap-2 text-slate-700 dark:text-slate-300 font-medium">
+                            <span className="text-emerald-600 mt-0.5">📝</span>
+                            <span className="italic leading-relaxed flex-1">"{transcription}"</span>
+                        </div>
+                    )}
                 </div>
             );
         }

@@ -9,7 +9,8 @@ const path = require('path');
  * @returns {Array} List of message objects.
  */
 function getLocalHistory(chatId: string, sinceTimestamp: number = 0): any[] {
-    const logsDir = path.join(__dirname, '../../logs');
+    const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../..');
+    const logsDir = path.join(DATA_DIR, 'logs');
     if (!fs.existsSync(logsDir)) return [];
 
     const files = fs.readdirSync(logsDir).filter((f: string) => f.endsWith('.jsonl'));

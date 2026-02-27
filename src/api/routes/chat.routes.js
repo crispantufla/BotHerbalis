@@ -343,6 +343,8 @@ module.exports = (client, sharedState) => {
             if (paused) pausedUsers.add(chatId);
             else pausedUsers.delete(chatId);
 
+            if (sharedState.saveState) sharedState.saveState();
+
             if (sharedState.io) sharedState.io.emit('bot_status_change', { chatId, paused });
             res.json({ success: true });
         } catch (e) {

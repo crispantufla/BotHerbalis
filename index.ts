@@ -265,6 +265,22 @@ async function loadState() {
             }
         });
 
+        // Always load transient state from persistence.json (pausedUsers, chatResets)
+        // because they are not stored in PostgreSQL currently
+        if (fs.existsSync(STATE_FILE)) {
+            try {
+                const raw = fs.readFileSync(STATE_FILE);
+                const data = JSON.parse(raw);
+                if (data.pausedUsers && Array.isArray(data.pausedUsers)) {
+                    data.pausedUsers.forEach((userId: string) => pausedUsers.add(userId));
+                }
+                if (data.chatResets) Object.assign(chatResets, data.chatResets);
+                if (data.lastAlertUser) lastAlertUser = data.lastAlertUser;
+            } catch (e: any) {
+                logger.error('🔴 Error loading transient state:', e.message);
+            }
+        }
+
         // Migrate from old single alertNumber to array
         if (config.alertNumber && !config.alertNumbers) {
             config.alertNumbers = [config.alertNumber];
