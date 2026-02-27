@@ -34,13 +34,11 @@ module.exports = (client, sharedState) => {
             const skip = (page - 1) * limit;
 
             const { prisma } = require('../../../db');
-            const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
 
             // Get total count for metadata
-            const total = await prisma.order.count({ where: { instanceId: INSTANCE_ID } });
+            const total = await prisma.order.count();
 
             const orders = await prisma.order.findMany({
-                where: { instanceId: INSTANCE_ID },
                 orderBy: { createdAt: 'desc' },
                 skip,
                 take: limit,

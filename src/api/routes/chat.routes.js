@@ -96,9 +96,8 @@ module.exports = (client, sharedState) => {
             let orders = [];
             try {
                 const { prisma } = require('../../../db');
-                const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
                 orders = await prisma.order.findMany({
-                    where: { status: { not: 'Cancelado' }, instanceId: INSTANCE_ID }
+                    where: { status: { not: 'Cancelado' } }
                 });
             } catch (err) {
                 console.error("🔴 Error fetching DB orders in /chats:", err.message);
