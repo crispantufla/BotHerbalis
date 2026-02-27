@@ -334,5 +334,80 @@ module.exports = (client, sharedState) => {
         }
     });
 
+    // --- MEMORY MANAGEMENT ---
+
+    // GET /memory-stats — Dashboard memory gauge
+    router.get('/memory-stats', authMiddleware, async (req, res) => {
+        try {
+            const { prisma } = require('../../../db');
+            const memUsage = process.memoryUsage();
+
+            // Count total users in DB
+            const totalUsers = await prisma.user.count();
+
+            // Count users with active (non-completed) conversations in RAM
+            const allKeys = Object.keys(userState || {});
+            const ramUsers = allKeys.length;
+            const activeConvos = allKeys.filter(k => {
+                const s = userState[k];
+                return s && s.step && s.step !== 'completed' && s.step !== 'greeting';
+            }).length;
+            const staleUsers = ramUsers - activeConvos;
+
+            // Thresholds for recommendations
+            const WARN_THRESHOLD = 200;
+            const DANGER_THRESHOLD = 500;
+            let recommendation = 'healthy';
+            if (totalUsers >= DANGER_THRESHOLD) recommendation = 'critical';
+            else if (totalUsers >= WARN_THRESHOLD) recommendation = 'warning';
+
+            res.json({
+                totalUsersDB: totalUsers,
+                ramUsers,
+                activeConversations: activeConvos,
+                staleUsers,
+                heapUsedMB: Math.round(memUsage.heapUsed / 1024 / 1024),
+                rssMB: Math.round(memUsage.rss / 1024 / 1024),
+                recommendation,
+                thresholds: { warn: WARN_THRESHOLD, danger: DANGER_THRESHOLD }
+            });
+        } catch (e) {
+            logger.error('[MEMORY-STATS] Error:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // POST /reset-memory — Purge all user states (keeps orders intact)
+    router.post('/reset-memory', authMiddleware, async (req, res) => {
+        try {
+            const { prisma } = require('../../../db');
+
+            // 1. Purge DB user states (safe: preserves users with orders/chatlogs)
+            // Delete users WITHOUT any orders (safe to remove entirely)
+            const deleted = await prisma.user.deleteMany({
+                where: { orders: { none: {} } }
+            });
+            // For users WITH orders, just clear their profile data
+            const cleaned = await prisma.user.updateMany({
+                where: { orders: { some: {} }, profileData: { not: null } },
+                data: { profileData: null }
+            });
+
+            // 2. Clear RAM cache
+            const { userCache } = require('../../utils/cache');
+            userCache.flushAll();
+
+            logger.info(`[RESET] Memory purged. Deleted ${deleted.count} users sin pedidos, limpiado ${cleaned.count} con pedidos.`);
+
+            // 3. Notify dashboard
+            if (io) io.emit('memory_reset', { deletedCount: deleted.count });
+
+            res.json({ success: true, deletedUsers: deleted.count });
+        } catch (e) {
+            logger.error('[RESET] Error purging memory:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     return router;
 };

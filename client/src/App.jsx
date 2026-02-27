@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { SocketProvider } from './context/SocketContext';
 import { ToastProvider } from './components/ui/Toast';
+import { ThemeProvider } from './context/ThemeContext';
 import CorporateDashboardV2 from './pages/designs/v2/CorporateDashboardV2';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
@@ -16,31 +17,33 @@ const ProtectedRoute = ({ children }) => {
 
 function App() {
     return (
-        <ToastProvider>
-            <AuthProvider>
-                <SocketProvider>
-                    <Router>
-                        <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
-                            <Routes>
-                                {/* Public Route */}
-                                <Route path="/login" element={<Login />} />
+        <ThemeProvider>
+            <ToastProvider>
+                <AuthProvider>
+                    <SocketProvider>
+                        <Router>
+                            <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
+                                <Routes>
+                                    {/* Public Route */}
+                                    <Route path="/login" element={<Login />} />
 
-                                {/* Protected Route - Corporate Enterprise V2 (Main Dashboard) */}
-                                <Route path="/*" element={
-                                    <ProtectedRoute>
-                                        <CorporateDashboardV2 />
-                                    </ProtectedRoute>
-                                } />
+                                    {/* Protected Route - Corporate Enterprise V2 (Main Dashboard) */}
+                                    <Route path="/*" element={
+                                        <ProtectedRoute>
+                                            <CorporateDashboardV2 />
+                                        </ProtectedRoute>
+                                    } />
 
 
-                                {/* Catch all - Redirect to Home */}
-                                <Route path="*" element={<Navigate to="/" replace />} />
-                            </Routes>
-                        </div>
-                    </Router>
-                </SocketProvider>
-            </AuthProvider>
-        </ToastProvider>
+                                    {/* Catch all - Redirect to Home */}
+                                    <Route path="*" element={<Navigate to="/" replace />} />
+                                </Routes>
+                            </div>
+                        </Router>
+                    </SocketProvider>
+                </AuthProvider>
+            </ToastProvider>
+        </ThemeProvider>
     );
 }
 

@@ -136,7 +136,7 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
                                             timestamp: timestamp,
                                         },
                                         unreadCount: selectedChat?.id === data.chatId ? 0 : (c.unreadCount || 0) + 1,
-                                        time: new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                                        time: new Date(timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' }),
                                         assignedScript: data.assignedScript || c.assignedScript // update script assignment from socket
                                     }
                                     : c
@@ -269,12 +269,63 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
     };
     useEffect(scrollToBottom, [messages]);
 
+    const handleDownloadHistory = () => {
+        if (!selectedChat || messages.length === 0) {
+            toast.warning('No hay mensajes para descargar');
+            return;
+        }
+
+        let txtContent = `Analiza esta conversacion:\n\n`;
+
+        messages.forEach(msg => {
+            let dateStr = '';
+            try {
+                const d = new Date(msg.timestamp);
+                if (!isNaN(d.getTime())) {
+                    dateStr = `[${d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' })}, ${d.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })}] `;
+                }
+            } catch (e) { }
+
+            const sender = msg.fromMe ? 'Herbalis' : (selectedChat.name || selectedChat.id).split('@')[0];
+            let body = msg.body || '';
+
+            if (body.startsWith('MEDIA_IMAGE:')) body = '[Imagen adjunta]';
+            if (body.startsWith('MEDIA_AUDIO:')) {
+                const parts = body.split('|');
+                const trans = parts[1] ? parts[1].replace('TRANSCRIPTION:', '').trim() : '';
+                body = trans ? `[Audio transcrito]: ${trans}` : `[Audio adjunto]`;
+            }
+            if (body.startsWith('🎤 Audio:')) body = `[Audio transcrito]: ${body.replace(/^🎤\s*Audio:\s*/, '').replace(/^"|"$/g, '').trim()}`;
+
+            txtContent += `${dateStr}${sender}: ${body}\n`;
+        });
+
+        const blob = new Blob([txtContent], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const safePhone = selectedChat.id.split('@')[0].replace(/\D/g, '');
+        a.download = `chat_${safePhone}_${new Date().toISOString().split('T')[0]}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast.success('Historial descargado para análisis');
+    };
+
     // Send
     const handleSend = async (e) => {
         e.preventDefault();
         if (!input.trim() || !selectedChat) return;
 
         const text = input;
+
+        if (text.trim().toLowerCase() === '/descargar') {
+            handleDownloadHistory();
+            setInput('');
+            return;
+        }
+
         setInput('');
 
         // Optimistic add with temporary ID and pending flag
@@ -677,7 +728,7 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
                                                 {(() => {
                                                     try {
                                                         const d = new Date(msg.timestamp);
-                                                        return isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                                        return isNaN(d.getTime()) ? '' : d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' });
                                                     } catch (e) { return ''; }
                                                 })()}
                                             </span>

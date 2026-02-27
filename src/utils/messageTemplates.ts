@@ -9,11 +9,11 @@
  * @param {Object} state - The user's state object
  * @returns {string} The formatted confirmation message
  */
-function buildConfirmationMessage(state) {
+function buildConfirmationMessage(state: any): string {
     const cart = state.cart || [];
-    const productStr = cart.map(i => i.product).join(' + ') || state.selectedProduct || 'Nuez de la India';
+    const productStr = cart.map((i: any) => i.product).join(' + ') || state.selectedProduct || 'Nuez de la India';
     const planStr = cart.length > 0
-        ? cart.map(i => `${i.plan} días`).join(' + ')
+        ? cart.map((i: any) => `${i.plan} días`).join(' + ')
         : `${state.selectedPlan || '60'} días`;
     const totalPriceStr = state.totalPrice || '0';
 
@@ -53,7 +53,7 @@ function buildConfirmationMessage(state) {
     // If 120 days, service is usually free, we can optionally explicitly say "$0" or just hide it.
     // User requested: "en el total pon el valor del producto + lo que paga por el servicio max + el total"
 
-    return `📦 *CONFIRMACIÓN DE ENVÍO*\n\n` +
+    return `📦 CONFIRMACIÓN DE ENVÍO\n\n` +
         `Producto: ${productStr}\n` +
         `Plan: ${planStr}\n` +
         breakdown +
@@ -61,12 +61,12 @@ function buildConfirmationMessage(state) {
         `✔ Correo Argentino\n` +
         `✔ Entrega estimada: 7 a 10 días hábiles\n` +
         `✔ Pago en efectivo al recibir\n\n` +
-        `*Importante:*\n` +
+        `Importante:\n` +
         `Si el cartero no encuentra a nadie,\n` +
         `el correo puede solicitar retiro en sucursal.\n` +
         `Plazo: 72 hs.\n\n` +
         `El rechazo o no retiro genera un costo logístico de $18.000.\n\n` +
-        `👉 Confirmame que podrás recibir o retirar el pedido sin inconvenientes.`;
+        `👉 El envío va a tu domicilio, pero necesito que me confirmes que en caso de que el correo lo determine, podrás retirarlo en la sucursal dentro de las 72 hs.`;
 }
 
-module.exports = { buildConfirmationMessage };
+export { buildConfirmationMessage };

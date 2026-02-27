@@ -26,6 +26,14 @@ test_output*.txt
 test_output*.log
 debug_log.txt
 correo_dump.html
+fail.txt
+*_fail.json
+*_utf8.json
+jest_out.json
+jest_all_out.json
+flow_test.out
+route_error.txt
+test_results.txt
 
 # Temporary scripts
 fix*.js
@@ -36,6 +44,7 @@ replace_*.js
 fix.py
 orig_salesFlow.js
 *.backup.json
+*.bak.js
 
 # Sheets (removed)
 sheets_sync.js

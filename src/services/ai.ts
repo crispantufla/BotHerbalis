@@ -1,8 +1,52 @@
 const logger = require('../utils/logger');
-﻿const OpenAI = require('openai');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+import { z } from 'zod';
+import { zodResponseFormat } from 'openai/helpers/zod';
+import { differenceInDays } from 'date-fns';
+import NodeCache from 'node-cache';
+import OpenAI from 'openai';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+import { UserState } from '../types/state';
+
+// --- ZOD SCHEMAS FOR STRUCTURED OUTPUTS ---
+const ChatResponseSchema = z.object({
+    response: z.string().describe("Your short 1-2 sentence response to the user"),
+    goalMet: z.boolean().describe("Whether the user fulfilled the objective of the current step"),
+    extractedData: z.string().nullable().describe("Extracted data, or null if nothing to extract")
+});
+
+const AddressResponseSchema = z.object({
+    nombre: z.string().nullable().describe("Nombre y apellido"),
+    calle: z.string().nullable().describe("Calle, altura, barrio"),
+    ciudad: z.string().nullable().describe("Ciudad o localidad"),
+    provincia: z.string().nullable().describe("Provincia argentina"),
+    cp: z.string().nullable().describe("Código postal numérico"),
+    postdatado: z.string().nullable().describe("Fecha futura de postdatado si la pidió")
+});
+
+// Interfaces locales
+export interface APIContext {
+    history?: any[];
+    summary?: string;
+    knowledge?: any;
+    step?: string;
+    goal?: string;
+    userState?: UserState;
+}
+
+export interface AIParsedResponse {
+    response?: string;
+    goalMet?: boolean;
+    extractedData?: string | null;
+    _error?: boolean;
+    nombre?: string | null;
+    calle?: string | null;
+    ciudad?: string | null;
+    provincia?: string | null;
+    cp?: string | null;
+    postdatado?: string | null;
+}
 
 // --- CONFIGURATION ---
 const MODEL = "gpt-4o-mini";
@@ -12,7 +56,7 @@ const MAX_HISTORY_LENGTH = 50;
 // --- RATE LIMIT CONFIGURATION ---
 const MAX_CONCURRENT = 3;
 const MIN_DELAY_MS = 200;
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 min cache
+const CACHE_TTL_SECONDS = 45 * 60; // 45 min cache for node-cache
 
 // --- PRICES PATH ---
 const PRICES_PATH = path.join(__dirname, '../../data/prices.json');
@@ -26,14 +70,14 @@ const COMPLEX_STEPS = new Set(['waiting_preference_consultation', 'waiting_data'
 // ═══════════════════════════════════════════════════════
 
 // Cache for prices — re-read from disk at most every 60s
-let _pricesCache = null;
+let _pricesCache: Record<string, any> | null = null;
 let _pricesCacheTime = 0;
 const PRICES_CACHE_MS = 60 * 1000;
 
-function _getPrices() {
+function _getPrices(): Record<string, any> {
     const now = Date.now();
     if (_pricesCache && (now - _pricesCacheTime) < PRICES_CACHE_MS) return _pricesCache;
-    let prices = {
+    let prices: Record<string, any> = {
         'Cápsulas': { '60': '46.900', '120': '66.900' },
         'Semillas': { '60': '36.900', '120': '49.900' },
         'Gotas': { '60': '48.900', '120': '68.900' },
@@ -45,14 +89,14 @@ function _getPrices() {
             const data = JSON.parse(fs.readFileSync(PRICES_PATH, 'utf8'));
             prices = { ...prices, ...data };
         }
-    } catch (e) { logger.error("Error reading prices for AI:", e); }
+    } catch (e: any) { logger.error("Error reading prices for AI:", e.message); }
     _pricesCache = prices;
     _pricesCacheTime = now;
     return prices;
 }
 
 // ── CORE PROMPT (always sent, top of system message = max attention) ──
-function _getCorePrompt() {
+function _getCorePrompt(): string {
     return `IDENTIDAD: Sos Marta, asesora de Herbalis (Nuez de la India), Rosario, Santa Fe. Empresa líder hace 13 AÑOS, +15.000 clientes. "Hacemos envíos a todo el país". NUNCA admitas ser bot/IA. Si preguntan: "Jaja no, soy Marta! Te estoy escribiendo yo 😊".
 Si preguntan tu nombre: "Soy Marta 😊".
 
@@ -68,7 +112,7 @@ REGLAS UNIVERSALES:
 4. ANTI-REPETICIÓN: NUNCA repitas textualmente un mensaje del historial. Variá frases de cierre siempre.
 5. ANTI-INVENCIÓN (LA MÁS IMPORTANTE): SOLO datos explícitos en este prompt. Si no sabés: "Dejame consultar y te confirmo 😊", goalMet=false. PROHIBIDO inventar números, cantidades, porcentajes, dosis, ingredientes.
 6. Si preguntan por servicios ajenos: "Solo manejamos productos Herbalis" y volvé al tema.
-7. Siempre terminá con una PREGUNTA cuando sea posible.
+7. Siempre terminá con una PREGUNTA cuando sea posible, EXCEPTO si el cliente dice "No gracias" o indica que ya no requiere asistencia (en ese caso despedite amablemente sin preguntar nada).
 8. NO negocies precio. NO ofrezcas descuentos (salvo que pregunten). NO ofrezcas tarjeta.
 9. PROHIBIDO decir "hablá con un asesor" o "contactá a soporte". Vos resolvés.
 10. Mensajes <3 palabras sin contexto: "Jaja perdona, ¿me repetís? No te escuché bien 😅".
@@ -78,13 +122,16 @@ REGLAS UNIVERSALES:
 14. NO insistas más de una vez si el cliente no responde.
 15. "CÓMO LA CONSIGO" / "DÓNDE LA COMPRO": "Se consigue únicamente por acá 😊 ¿Con cuál plan querés avanzar?"
 16. RESTRICCIÓN GEOGRÁFICA: SOLO vendemos y enviamos dentro de ARGENTINA. Si el usuario dice que está en otro país (España, Chile, México, etc.) o fuera de Argentina: "Lamentablemente solo hacemos envíos dentro de Argentina 😔" y NO continuar ofreciendo productos. goalMet=false. NO insistas ni ofrezcas alternativas.
-17. COHERENCIA CONTEXTUAL: RESPONDÉ SIEMPRE a lo que el usuario ACABA de decir. NO cambies de tema. Si dice "no hice ningún pedido", reconocelo ("Tenés razón, disculpá la confusión"). Si pregunta algo, respondé ESO primero. Después volvé al paso.
-18. IDENTIFICACIÓN DE PERSONAS: Si el usuario habla de "mi hija/hijo" o "es para mi hijo/a", EL USUARIO ES EL ADULTO. La menor es la hija/hijo, NO el usuario. NUNCA trates al usuario como menor si mencionó a su hija/hijo.`;
+17. UBICACIÓN / DE DÓNDE SOS: Si el usuario pregunta "de dónde sos", "dónde están", "tienen local": Respondé EXACTAMENTE "Soy de Rosario, pero hago envíos a todo el país sin coste." acompañado de la pregunta principal del paso en el que estás (por ejemplo "¿Cuántos kilos querés bajar?"). goalMet=false.
+18. REDES SOCIALES: Si el usuario pide "redes sociales", "instagram", "facebook" o "página": Respondé EXACTAMENTE "Tenemos esta página en Facebook pero no la usamos mucho https://www.facebook.com/herbalisarg/" y volvé a hacer la pregunta correspondiente al paso en el que te encuentras. goalMet=false.
+19. PRODUCTOS AJENOS (Colágeno, Vitaminas, Creatina, etc.): Si el usuario pregunta o pide productos que NO sean Nuez de la India, respondé EXACTAMENTE: "Actualmente solo trabajamos con derivados de las Nueces de la India, que son excelentes para bajar de peso. ¿Te interesaría probarlas?". goalMet=false. NO le des la razón sobre el producto que pidió.
+20. COHERENCIA CONTEXTUAL: RESPONDÉ SIEMPRE a lo que el usuario ACABA de decir. NO cambies de tema. Si dice "no hice ningún pedido", reconocelo ("Tenés razón, disculpá la confusión"). Si pregunta algo, respondé ESO primero. Después volvé al paso.
+21. IDENTIFICACIÓN DE PERSONAS: Si el usuario habla de "mi hija/hijo" o "es para mi hijo/a", EL USUARIO ES EL ADULTO. La menor es la hija/hijo, NO el usuario. NUNCA trates al usuario como menor si mencionó a su hija/hijo.`;
 }
 
 // ── STEP MODULES (only one is sent per call, positioned in the middle) ──
 
-function _getModuleEarlyFunnel(prices) {
+function _getModuleEarlyFunnel(prices: Record<string, any>): string {
     return `
 PRODUCTOS Y PRECIOS:
 - Cápsulas: $${prices['Cápsulas']['60']} (60d) / $${prices['Cápsulas']['120']} (120d). ESTRELLA, más efectivo, rápido y potente.
@@ -100,8 +147,9 @@ B) Mencionan "hijo/a" sin edad: PREGUNTAR "¿Cuántos años tiene?"
 C) Ya aclararon ≥18 en historial: NO volver a mencionar restricción. "Perfecto, no hay problema 😊"
 
 QUÉ ES Y CÓMO FUNCIONA (palabras simples):
-- Semilla natural procesada de forma segura. Limpia el sistema digestivo, quema grasa acumulada, baja ganas de comer de más.
-- Ayuda: baja colesterol, mejora piel/pelo, alivia estreñimiento, baja ganas de fumar.
+- Semillas: El producto en su estado 100% natural. Limpia el sistema digestivo y quema grasa.
+- Gotas: Extracción del aceite de la nuez en clorofila. Más suaves, recomendadas para pocos kilos o gente mayor.
+- Cápsulas: Extracción del componente activo puro. Más potentes y efectivas para bajar rápido.
 - Síntomas normales al principio: malestar de panza, gases. Es señal de que funciona. Se va en la primera semana tomando agua.
 
 REGLAS DE ESTE PASO:
@@ -111,7 +159,7 @@ REGLAS DE ESTE PASO:
 - Precios: Si piden "precio" genérico: "$37.000 a $69.000". Si insisten/piden todos: dar detalle completo.`;
 }
 
-function _getModulePlanChoice(prices) {
+function _getModulePlanChoice(prices: Record<string, any>): string {
     return `
 PRECIOS EXACTOS:
 - Cápsulas: $${prices['Cápsulas']['60']} (60d) / $${prices['Cápsulas']['120']} (120d)
@@ -135,23 +183,28 @@ REGLAS CRÍTICAS DE ESTE PASO (¡LEER BIEN!):
 - Tenemos planes de 60, 120, 180, 240, 300, etc (siempre múltiplos de 60).
 - NUNCA asumas o confirmes un plan si el cliente no escribió explícitamente "60", "120" o el múltiplo que desea en su último mensaje.
 - Si el cliente dice "Sí" a cualquier cosa que le preguntaste, y NO dice el número, TENÉS que volver a preguntar: "Genial, ¿pero con cuál plan armamos el pedido?".
-- Si el cliente quiere CAMBIAR de producto (ej: dice "mejor gotas"): confirmale que cambiamos a ese producto (extractedData="CHANGE_PRODUCT: Gotas") Y LUEGO EN EL MISMO MENSAJE preguntale qué plan quiere.`;
+- Si el cliente quiere CAMBIAR de producto (ej: dice "mejor gotas"): confirmale que cambiamos a ese producto (extractedData="CHANGE_PRODUCT: Gotas") Y LUEGO EN EL MISMO MENSAJE preguntale qué plan quiere.
+- POSTERGACIÓN (Falta de dinero / Cobro en X días): Si el cliente dice que no tiene plata ahora o necesita esperar a cobrar, OFRECELE PROGRAMAR el envío. CONGELAMOS el precio y paga cuando recibe. DEBES COMBINAR esta oferta con la pregunta del plan. EJEMPLO: "¡No hay problema! Podemos dejar el pedido programado, congelar el precio y pagás recién cuando te llega. ¿Para qué fecha lo agendaríamos, y con qué plan (60 o 120 días) preferís que lo armemos?".`;
 }
 
-function _getModuleDataCollection() {
+function _getModuleDataCollection(): string {
     return `
 DATOS NECESARIOS: nombre completo, calle y número, ciudad, código postal.
 🔴🔴 [REGLA ABSOLUTA] PROHIBIDO PEDIR NÚMERO DE TELÉFONO. 🔴🔴
 El usuario se está comunicando por WhatsApp, ¡YA TENEMOS SU TELÉFONO! Si pedís teléfono, fallás en tu tarea. NUNCA lo menciones.
 NO menciones precios ni productos, ya están decididos.
+REGLA ANTI-REPETICIÓN DE DATOS: Si ya pediste los datos de envío recientemente, NO vuelvas a listar todos los requisitos (nombre, calle, etc.). En su lugar, simplemente preguntá: "¿Te tomo los datos?".
 
 HESITACIÓN / POSTERGACIÓN:
 - "No puede hablar ahora" / "está trabajando": "Dale, tranqui. Avisame cuando puedas!". goalMet=false.
-- "En otro momento lo compro" / "no tengo plata" / "cobro el X" / "después veo": VENDÉ la postergación. NUNCA bajes precio. "¡No te preocupes! Si querés podemos programar el envío para más adelante, congelamos el precio, y pagás recién cuando te llega. ¿Para qué fecha te gustaría?" Si da fecha: confirmá y extraé POSTDATADO: [fecha] en extractedData.
-- NUNCA validés indecisión silenciosamente. Ofrecé alternativas como vendedor.`;
+- POSTERGACIÓN (Postdatar): Si el cliente pide recibirlo o pagarlo en una fecha específica (ej: "el otro viernes", "a fin de mes", "cobro el X"):
+  - Calculá mentalmente los días: Si faltan MENOS de 10 días para esa fecha, respondé: "Los envíos por Correo Argentino ya demoran entre 7 y 10 días hábiles, así que te estaría llegando justo para esa fecha o poco después. ¿Confirmamos el pedido para que vaya en camino?". goalMet=false.
+  - Si faltan MÁS de 10 días: Aceptá y VENDÉ la postergación. "¡No te preocupes! Podemos programar el envío para más adelante, congelamos el precio y pagás recién cuando te llega. Lo agendamos para esa fecha." y extraé POSTDATADO: [fecha] en extractedData.
+- NUNCA validés indecisión silenciosamente. Ofrecé alternativas como vendedor.
+- RETIRO TERCEROS: Si preguntan si OTRA PERSONA puede recibir o ir a retirar al correo: "Sí, puede recibirlo o retirarlo en sucursal cualquier persona mayor de edad con tu DNI (o fotocopia) y una nota de autorización tuya."`;
 }
 
-function _getModuleObjection(prices) {
+function _getModuleObjection(prices: Record<string, any>): string {
     return `
 OBJECIONES COMUNES:
 - "Es caro": "Pensalo así: es menos que una gaseosa por día. Y es una inversión que funciona de verdad."
@@ -159,7 +212,9 @@ OBJECIONES COMUNES:
 - "No funciona?": "100% natural, funciona con constancia."
 - "Me da miedo / Efectos secundarios": "Producto natural líder mundial, 70 mil clientes, casos de 40kg. Si no sentís la seguridad para avanzar, lo dejamos acá. ¿Querés seguir?"
 - "Mi marido/señora no quiere" / "tengo que consultar": "Pagás cuando llega, no antes — no hay riesgo. Si querés programamos el envío para unos días. ¿Qué te parece?" Si insiste: "Dale, avisame cuando lo charlen 😊" goalMet=false.
-- "No tengo plata ahora" / "cobro el X": NUNCA bajar precio. POSTDATAR: "Programamos el envío para cuando puedas, congelamos el precio 😊 ¿Para qué fecha?". Si da fecha: "Perfecto, lo dejamos agendado 😊" y extraé POSTDATADO: [fecha].
+- POSTERGACIÓN (Postdatar): Si el cliente pide recibirlo o pagarlo en una fecha específica o dice "no tengo plata ahora" / "cobro el X":
+  - Calculá: Si faltan MENOS de 10 días para esa fecha, respondé: "Los envíos por correo demoran entre 7 y 10 días hábiles, así que te estaría llegando justo para esa fecha o poco después. ¿Confirmamos el pedido?". goalMet=false.
+  - Si faltan MÁS de 10 días: "Programamos el envío para cuando puedas, congelamos el precio 😊 ¿Para qué fecha lo agendamos?". Si da fecha: "Perfecto, lo dejamos agendado 😊" y extraé POSTDATADO: [fecha].
 
 PAGO Y ENVÍO:
 - SOLO efectivo al recibir (Contra Reembolso). NO transferencia, NO tarjeta, NO MercadoPago.
@@ -167,15 +222,16 @@ PAGO Y ENVÍO:
 - Envío GRATIS por Correo Argentino. 7-10 días hábiles.
 - Si "llega" + "pago/abona/plata/cobran": ES PREGUNTA DE PAGO, no de entrega.
 - Correo Argentino NO abre sábados/domingos. NO controlamos día/hora exacta.
+- CONDICIÓN SÁBADO: Si el cliente dice "mejor si es sábado", "entreguen el sábado" o similar durante la confirmación: NO confirmes el pedido (goalMet=false). Respondé EXACTAMENTE: "Los carteros normalmente no trabajan los sabados, en caso de no poder entregartelo en persona podrias ir a buscarlo a la sucursal no?" y esperá su afirmación.
 - Si pide día específico: "No podemos garantizar porque depende del correo."
-- REGLA ESTRICTA: NUNCA ofrezcas postergar el envío o postdatar a menos que el cliente indique explícitamente problemas de dinero, o pida recibirlo/pagarlo en otra fecha.
+- RETIRO TERCEROS: Si preguntan si OTRA PERSONA puede recibir o ir a retirar al correo: "Sí, puede recibirlo o retirarlo en sucursal cualquier persona mayor de edad con tu DNI (o fotocopia) y una nota de autorización tuya."
 
 INDECISIÓN:
 - Dudan sobre PRODUCTO: "No te preocupes, te ayudo 😊" + breve info opciones + "¿Querés saber más de alguna?"
 - Dudan sobre COMPRAR AHORA: Ofrecé programar envío para congelar precio. Comportate como vendedor con alternativas.`;
 }
 
-function _getModuleConsumption() {
+function _getModuleConsumption(): string {
     return `
 INSTRUCCIONES DE CONSUMO (responder SOLO el producto preguntado):
 ⚠️ Si no sabés qué producto eligió: preguntá primero "¿Con cuál arrancás?"
@@ -184,7 +240,7 @@ INSTRUCCIONES DE CONSUMO (responder SOLO el producto preguntado):
 - GOTAS: Semana 1: 10 gotas antes de la comida principal con agua. Semana 2+: antes del almuerzo o cena, ajustando según progreso.`;
 }
 
-function _getModulePostSale() {
+function _getModulePostSale(): string {
     return `
 Este cliente YA COMPRÓ. Sos un asistente post-venta amable.
 REGLAS:
@@ -193,10 +249,11 @@ REGLAS:
 3. Si pide postergar ENVÍO a fecha futura: Si <10 días desde hoy: "Los envíos tardan mínimo 10 días, no hay problema". Si >10 días: aceptá, confirmá y extraé POSTDATE: [fecha].
 4. Si tiene reclamo/duda compleja: extractedData="NEED_ADMIN".
 5. Si quiere VOLVER A COMPRAR: extractedData="RE_PURCHASE" y preguntale qué quiere.
-6. NUNCA inventes info. NUNCA pidas datos de envío/dirección.`;
+6. ANTI-INSISTENCIA (CRÍTICO): NUNCA repitas "¿Te puedo ayudar con algo más?" si ya lo dijiste hace poco. Si el cliente dice "No gracias" o indica que no necesita más nada, RESPONDÉ SIMPLEMENTE "¡Perfecto! Que tengas un lindo día 😊" y NO HAGAS NINGUNA PREGUNTA MÁS.
+7. NUNCA inventes info. NUNCA pidas datos de envío/dirección.`;
 }
 
-function _getModuleSafety() {
+function _getModuleSafety(): string {
     return `
 Verificar si hay contraindicación o riesgo.
 MENORES — REGLA CRÍTICA DE IDENTIFICACIÓN:
@@ -204,11 +261,11 @@ MENORES — REGLA CRÍTICA DE IDENTIFICACIÓN:
 - NUNCA trates al usuario como menor si dijo que el producto es para su hijo/a menor.
 - Respondé: "Para menores de 18 no la recomendamos porque el cuerpo todavía está creciendo 😊 Si es para vos, sí podés tomarla sin problema."
 - Si ya aclararon ≥18 años → SÍ puede tomarla, goalMet=true. Si <18 → rechazar venta para esa persona amablemente.
-EMBARAZO/LACTANCIA/+80 AÑOS: RECHAZAR VENTA. "Priorizamos tu salud 🌿😊 Si es para otra persona, avisame." extractedData="REJECT_MEDICAL".`;
+EMBARAZO/LACTANCIA/+80 AÑOS/CÁNCER: RECHAZAR VENTA. "Priorizamos tu salud 🌿😊 Por precaución no recomendamos el consumo en casos de embarazo, lactancia, edad muy avanzada o patologías oncológicas graves. Si el pedido es para otra persona, avisame." extractedData="REJECT_MEDICAL".`;
 }
 
 // ── EXTRACTION RULES (always sent, at END = high attention zone) ──
-function _getExtractionRules() {
+function _getExtractionRules(): string {
     return `
 EXTRACCIÓN DE DATOS (CRÍTICO — siempre verificar antes de responder):
 - Si el cliente elige o confirma un producto (ej: "sí, quiero esas", "cápsulas", "gotas"): extractedData="PRODUCTO: Cápsulas" (o Gotas, o Semillas). ¡Este paso es VITAL para que el sistema avance!
@@ -217,14 +274,14 @@ EXTRACCIÓN DE DATOS (CRÍTICO — siempre verificar antes de responder):
 - REGLA DE POSTERGACIÓN: NUNCA ofrezcas postergar el envío por tu cuenta. Solo hacelo si el cliente lo insinúa.
 - Si quieren CAMBIAR pedido: preguntá qué quieren y extractedData="CHANGE_ORDER"
 - Si quieren CANCELAR: "Qué pena... 😔 ¿Por qué?" extractedData="CANCEL_ORDER"
-- Si EMBARAZADA/LACTANDO/+80: rechazar venta, extractedData="REJECT_MEDICAL"
+- Si EMBARAZADA/LACTANDO/+80/CÁNCER: rechazar venta, extractedData="REJECT_MEDICAL"
 
 FORMATO (JSON puro, sin markdown, sin backticks):
 { "response": "tu respuesta corta", "goalMet": true/false, "extractedData": "dato extraído o null" }`;
 }
 
 // ── PROMPT BUILDER — Selects the right module for each step ──
-function _buildSystemPrompt(step) {
+function _buildSystemPrompt(step: string): string {
     const prices = _getPrices();
     let module;
 
@@ -257,7 +314,11 @@ function _buildSystemPrompt(step) {
     }
 
     // Append consumption info if relevant (user might ask how to take it in any step)
-    const consumptionSteps = ['waiting_preference', 'waiting_preference_consultation', 'waiting_plan_choice', 'waiting_ok', 'waiting_data', 'post_sale'];
+    const consumptionSteps = [
+        'waiting_preference', 'waiting_preference_consultation', 'waiting_plan_choice',
+        'waiting_ok', 'waiting_data', 'waiting_final_confirmation',
+        'waiting_admin_ok', 'waiting_admin_validation', 'post_sale'
+    ];
     const extraModule = consumptionSteps.includes(step) ? '\n' + _getModuleConsumption() : '';
 
     return [
@@ -268,100 +329,17 @@ function _buildSystemPrompt(step) {
     ].join('\n\n');
 }
 
-// ═══════════════════════════════════════════════════════
-// GLOBAL REQUEST QUEUE — Prevents rate limit floods
-// ═══════════════════════════════════════════════════════
-class RequestQueue {
-    constructor(maxConcurrent, minDelayMs) {
-        this.maxConcurrent = maxConcurrent;
-        this.minDelayMs = minDelayMs;
-        this.running = 0;
-        this.queue = [];
-        this.lastRequestTime = 0;
-    }
 
-    enqueue(fn) {
-        return new Promise((resolve, reject) => {
-            this.queue.push({ fn, resolve, reject });
-            this._process();
-        });
-    }
-
-    async _process() {
-        if (this.running >= this.maxConcurrent || this.queue.length === 0) return;
-
-        this.running++;
-        const { fn, resolve, reject } = this.queue.shift();
-
-        try {
-            // Enforce minimum delay between requests
-            const now = Date.now();
-            const elapsed = now - this.lastRequestTime;
-            if (elapsed < this.minDelayMs) {
-                await new Promise(r => setTimeout(r, this.minDelayMs - elapsed));
-            }
-            this.lastRequestTime = Date.now();
-
-            const result = await fn();
-            resolve(result);
-        } catch (e) {
-            reject(e);
-        } finally {
-            this.running--;
-            this._process();
-        }
-    }
-
-    get pending() { return this.queue.length; }
-    get active() { return this.running; }
-}
-
-// ═══════════════════════════════════════════════════════
-// SIMPLE RESPONSE CACHE — Avoids duplicate API calls
-// ═══════════════════════════════════════════════════════
-class ResponseCache {
-    constructor(ttlMs) {
-        this.ttl = ttlMs;
-        this.cache = new Map();
-    }
-
-    _hash(str) {
-        let hash = 0;
-        for (let i = 0; i < str.length; i++) {
-            hash = ((hash << 5) - hash) + str.charCodeAt(i);
-            hash |= 0;
-        }
-        return hash.toString(36);
-    }
-
-    get(prompt) {
-        const key = this._hash(prompt);
-        const entry = this.cache.get(key);
-        if (entry && Date.now() - entry.time < this.ttl) {
-            return entry.value;
-        }
-        if (entry) this.cache.delete(key);
-        return null;
-    }
-
-    set(prompt, value) {
-        const key = this._hash(prompt);
-        this.cache.set(key, { value, time: Date.now() });
-        if (this.cache.size > 200) {
-            const now = Date.now();
-            for (const [k, v] of this.cache) {
-                if (now - v.time > this.ttl) this.cache.delete(k);
-            }
-        }
-    }
-
-    get size() { return this.cache.size; }
-}
 
 // ═══════════════════════════════════════════════════════
 // AI SERVICE — OpenAI GPT-4o-mini
 // ═══════════════════════════════════════════════════════
 class AIService {
+    client: OpenAI;
+    model: string;
+    cache: NodeCache;
+    stats: { calls: number, cached: number, retries: number, errors: number };
+
     constructor() {
         const apiKey = process.env.OPENAI_API_KEY || "";
         if (!apiKey) {
@@ -372,51 +350,73 @@ class AIService {
 
         this.client = new OpenAI({ apiKey });
         this.model = MODEL;
-
-        this.queue = new RequestQueue(MAX_CONCURRENT, MIN_DELAY_MS);
-        this.cache = new ResponseCache(CACHE_TTL_MS);
+        this.cache = new NodeCache({ stdTTL: CACHE_TTL_SECONDS, checkperiod: 120, maxKeys: 1000 });
         this.stats = { calls: 0, cached: 0, retries: 0, errors: 0 };
+    }
+
+    /**
+     * Hash string utility for Keys
+     */
+    _hashKey(str: string): string {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            hash = ((hash << 5) - hash) + str.charCodeAt(i);
+            hash |= 0;
+        }
+        // Prefab with standard length for collision awareness
+        return 'ai_' + hash.toString(36) + '_' + str.length;
     }
 
     /**
      * Core API call with retry + rate limit handling
      */
-    async _callQueued(apiCallFn, cacheKey = null) {
+    async _callQueued<T>(apiCallFn: () => Promise<T>, rawCacheKey: string | null = null, customTTL: number | undefined = undefined): Promise<T> {
         // Check cache first
-        if (cacheKey) {
-            const cached = this.cache.get(cacheKey);
-            if (cached) {
+        let cacheKey = null;
+        if (rawCacheKey) {
+            cacheKey = this._hashKey(rawCacheKey);
+            const cached: T | undefined = this.cache.get(cacheKey);
+            if (cached !== undefined) {
                 this.stats.cached++;
                 return cached;
             }
         }
-
         this.stats.calls++;
 
-        const result = await this.queue.enqueue(async () => {
-            for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-                try {
-                    return await apiCallFn();
-                } catch (e) {
-                    const status = e.status || e.statusCode;
-                    if (status === 429) {
-                        this.stats.retries++;
-                        const waitTime = Math.pow(2, attempt + 1) * 1000 + Math.floor(Math.random() * 1000);
-                        logger.warn(`⚠️ [AI] Rate Limit (429). Attempt ${attempt + 1}/${MAX_RETRIES}. Backing off ${waitTime / 1000}s...`);
-                        await new Promise(r => setTimeout(r, waitTime));
-                    } else {
-                        this.stats.errors++;
-                        throw e;
-                    }
+        let result: T | undefined;
+        let success = false;
+
+        for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+            try {
+                result = await apiCallFn();
+                success = true;
+                break;
+            } catch (e: any) {
+                const status = e.status || e.statusCode;
+                if (status === 429) {
+                    this.stats.retries++;
+                    const waitTime = Math.pow(2, attempt + 1) * 1000 + Math.floor(Math.random() * 1000);
+                    logger.warn(`⚠️ [AI] Rate Limit (429). Attempt ${attempt + 1}/${MAX_RETRIES}. Backing off ${waitTime / 1000}s...`);
+                    await new Promise(r => setTimeout(r, waitTime));
+                } else {
+                    this.stats.errors++;
+                    throw e; // Non-rate limit errors bubble up to BullMQ worker explicitly
                 }
             }
+        }
+
+        if (!success || result === undefined) {
             this.stats.errors++;
-            throw new Error("AI Service Unavailable (Max Retries Exceeded)");
-        });
+            throw new Error("AI Service Unavailable (Max Retries Exceeded or Unhandled Error)");
+        }
 
         // Cache the result
         if (cacheKey && result) {
-            this.cache.set(cacheKey, result);
+            if (customTTL) {
+                this.cache.set(cacheKey, result, customTTL);
+            } else {
+                this.cache.set(cacheKey, result);
+            }
         }
 
         return result;
@@ -425,7 +425,7 @@ class AIService {
     /**
      * Main Chat Function
      */
-    async chat(userText, context) {
+    async chat(userText: string, context: APIContext): Promise<AIParsedResponse> {
         // Build dynamic history (last 50 messages for context)
         let conversationHistory = (context.history || []).slice(-50);
         let summaryContext = "";
@@ -446,7 +446,7 @@ class AIService {
 
             knowledgeContext = `INFORMACIÓN RELEVANTE PARA ESTE PASO:\n`;
 
-            const pathInfo = faq.find(q => q.keywords.includes('diabetes'))?.response || "";
+            const pathInfo = faq.find((q: any) => q.keywords.includes('diabetes'))?.response || "";
             if (pathInfo) knowledgeContext += `- SOBRE PATOLOGÍAS: "${pathInfo}"\n`;
 
             if (['waiting_weight', 'waiting_preference'].includes(step)) {
@@ -468,7 +468,7 @@ class AIService {
                 try {
                     const pd = JSON.parse(fs.readFileSync(PRICES_PATH, 'utf8'));
                     if (pd.adicionalMAX) adMax = pd.adicionalMAX;
-                } catch (e) { }
+                } catch (e: any) { }
 
                 knowledgeContext += `- Plan 120 días sin adicional. Plan 60 días con Contra Reembolso MAX (+$${adMax}).\n`;
                 knowledgeContext += `- Envío gratis por Correo Argentino, pago en efectivo al recibir\n`;
@@ -494,9 +494,6 @@ class AIService {
                 stateContext += `- Datos parciales: ${a.nombre || '?'}, ${a.calle || '?'}, ${a.ciudad || '?'}, CP ${a.cp || '?'}\n`;
             }
         }
-        if (context.userState && context.userState.profile) {
-            stateContext += `- PERFIL MÉDICO/PERSONAL: ${context.userState.profile}\n`;
-        }
         if (stateContext) {
             stateContext = `\nESTADO DEL CLIENTE:\n${stateContext}`;
         }
@@ -516,33 +513,35 @@ MENSAJE DEL USUARIO: "${userText}"
 INSTRUCCIONES:
 1. Fijate si el usuario CUMPLIÓ el objetivo del paso (ej: dio un número, eligió un plan).
 2. Si lo cumplió: goalMet = true.
-3. PREGUNTAS DEL USUARIO (CRÍTICO): Si el usuario hace una pregunta, RESPONDELA SIEMPRE de forma clara. Nunca lo ignores. Luego de responder, y en un tono relajado y muy poco insistente (ej: "te tomo los datos o te ayudo con algo más?"), volvé a intentar encausar el objetivo del paso. Si el usuario NO preguntó nada y tampoco cumplió el objetivo, volvé a preguntarle lo del objetivo pero de forma breve y amigable.
+3. PREGUNTAS DEL USUARIO (CRÍTICO): Si el usuario hace una pregunta, RESPONDELA SIEMPRE de forma clara. Nunca lo ignores. Luego de responder, y en un tono relajado y muy poco insistente (ej: "te tomo los datos o te ayudo con algo más?"), volvé a intentar encausar el objetivo del paso. EXCEPCIÓN: Si el usuario dice explícitamente "No gracias" o similar, o la etapa es post-venta y no quiere nada más, NO HAGAS NINGUNA PREGUNTA ADICIONAL. Si el usuario NO preguntó nada y tampoco cumplió el objetivo, volvé a preguntarle lo del objetivo pero de forma breve y amigable.
 4. Excepción a la Regla 3 (POSTERGACIÓN): Si el usuario dice que "no puede hablar ahora" o "está trabajando", SOLO confirmá con amabilidad ("Dale, tranqui. Avisame cuando puedas!"). PERO si el usuario dice "en otro momento lo compro", "este mes no puedo", "después veo", "no tengo plata ahora": DEBES ofrecer POSTDATAR el envío para "congelar el precio" como te indica el prompt. NO apliques postergación silenciosa acá, compórtate como VENDEDOR.
 5. Si el usuario dice algo EMOCIONAL o PERSONAL (hijos, salud, bullying, autoestima): mostrá EMPATÍA primero. NO USES "Entiendo, eso es difícil". Usá variaciones reales y genuinas. Después volvé suavemente al objetivo del paso.
 6. PROHIBIDO: No hables de pago, envío, precios, ni datos de envío si el OBJETIVO DEL PASO no lo menciona, a menos que el usuario lo haya preguntado explícitamente. Limitá tu respuesta al tema del objetivo.
 7. MENORES DE EDAD: Si el mensaje menciona menores, VERIFICÁ EL HISTORIAL. Si ya se aclaró que la persona es mayor de 18, NO repitas la restricción. Confirmá que puede tomarla y seguí adelante.
 8. ANTI-REPETICIÓN: NUNCA repitas textualmente un mensaje que ya está en el historial. Si necesitás pedir los mismos datos, usá una frase DIFERENTE.
-9. Devolvé SOLO este JSON (sin markdown, sin backticks):
-{ "response": "tu respuesta corta", "goalMet": true/false, "extractedData": "dato extraído o null" }
 `;
 
         try {
             const systemPrompt = _buildSystemPrompt(context.step || 'general');
-            const result = await this._callQueued(
+            const result: any = await this._callQueued(
                 () => this.client.chat.completions.create({
                     model: this.model,
                     messages: [
                         { role: "system", content: systemPrompt },
                         { role: "user", content: userPrompt }
                     ],
+                    response_format: zodResponseFormat(ChatResponseSchema, "chat_response"),
                     temperature: 0.7,
                     max_tokens: COMPLEX_STEPS.has(context.step || '') ? 450 : 250
                 }),
-                null // No cache for chat — every conversation is unique
+                `chat_${systemPrompt.length}_${userPrompt.substring(0, 150)}` // Caché activo para FAQs y etapas repetitivas
             );
-            const text = result.choices[0].message.content;
-            return this._parseJSON(text);
-        } catch (e) {
+
+            // OpenAI Structured Outputs guarantees this structure natively due to zodResponseFormat
+            // The content string is 100% guaranteed to be a valid JSON matching the schema
+            const content = result.choices[0].message?.content || "";
+            return this._parseJSON(content);
+        } catch (e: any) {
             logger.error("🔴 [AI] Chat Error:", e.message);
             return { response: "Estoy teniendo un pequeño problema técnico, ¿me repetís?", goalMet: false };
         }
@@ -551,16 +550,15 @@ INSTRUCCIONES:
     /**
      * Check if history needs summarization
      */
-    async checkAndSummarize(history) {
+    async checkAndSummarize(history: any[]): Promise<{ summary: string; prunedHistory: any[] } | null> {
         if (!history || history.length <= 50) return null;
 
-        const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
         const now = Date.now();
 
         // Find how many messages are within the last 3 days
         const recentMessages = history.filter(msg => {
             if (!msg.timestamp) return false;
-            return (now - msg.timestamp) <= THREE_DAYS_MS;
+            return differenceInDays(now, msg.timestamp) <= 3;
         });
 
         const messagesToKeepCount = Math.max(50, recentMessages.length);
@@ -583,14 +581,14 @@ INSTRUCCIONES:
     /**
      * Manual Summary Trigger (for API)
      */
-    async generateManualSummary(history) {
+    async generateManualSummary(history: any[]): Promise<string | null> {
         return await this._callQueuedSummarize(history);
     }
 
     /**
      * Summarize history through the queue
      */
-    async _callQueuedSummarize(history) {
+    async _callQueuedSummarize(history: any[]): Promise<string | null> {
         const conversationText = history.map(msg =>
             `${msg.role === 'user' ? 'Cliente' : 'Vendedor'}: ${msg.content}`
         ).join('\n');
@@ -623,8 +621,8 @@ INSTRUCCIONES:
                 }),
                 cacheKey
             );
-            return result.choices[0].message.content.trim();
-        } catch (e) {
+            return result.choices[0].message?.content || "";
+        } catch (e: any) {
             logger.error("🔴 [AI] Summary Error:", e.message);
             return null;
         }
@@ -633,7 +631,8 @@ INSTRUCCIONES:
     /**
      * Generate Report (for analyze_day.js)
      */
-    async generateReport(prompt) {
+    async generateReport(prompt: string): Promise<string> {
+        const cacheKey = `report_${prompt.substring(0, 100)}`;
         try {
             const result = await this._callQueued(
                 () => this.client.chat.completions.create({
@@ -645,10 +644,11 @@ INSTRUCCIONES:
                     temperature: 0.3,
                     max_tokens: 1500
                 }),
-                null
+                cacheKey, // Clave de caché
+                60 * 60 // 1 hora de caché TTL para reportes diarios
             );
-            return result.choices[0].message.content;
-        } catch (e) {
+            return result.choices[0].message?.content || "";
+        } catch (e: any) {
             logger.error("🔴 [AI] Report Error:", e.message);
             throw e;
         }
@@ -657,7 +657,7 @@ INSTRUCCIONES:
     /**
      * Parse Address from Text
      */
-    async parseAddress(text) {
+    async parseAddress(text: string): Promise<AIParsedResponse> {
         const prompt = `
         Analizá el siguiente texto y extraé datos de dirección postal de Argentina.
         El texto puede estar incompleto, ser solo un código postal, una provincia, o una dirección desordenada.
@@ -670,7 +670,10 @@ INSTRUCCIONES:
         - ciudad: Localidad o ciudad (ej: "Valle Viejo", "El Bañado", "Gualeguay").
         - provincia: Provincia de Argentina (ej: "Catamarca", "Córdoba", "Entre Ríos").
         - cp: Código postal numérico (ej: "4707", "5000").
-        - postdatado: SOLO si el cliente EXPLÍCITAMENTE pide enviar o recibir el pedido en una fecha futura (ej: "mandamelo el 10", "cobro a principio de mes"). Si el texto es solo datos de dirección/nombre, SIEMPRE devolver null. NO inventar ni adivinar fechas.
+        
+        FECHA ACTUAL DE LA CONSULTA: ${new Date().toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+        - postdatado: SOLO si el cliente EXPLÍCITAMENTE pide enviar o recibir el pedido en una fecha futura (ej: "mandamelo el 10", "cobro a principio de mes", "el viernes que viene"). 
+          CRÍTICO: Usá la "Fecha Actual" provista arriba para calcular el día exacto y retorná la fecha en formato "dd/MM" (ej: "10/05", "15/12"). Si es "a principio de mes", asume el día 05 del mes siguiente. Si el texto es solo datos de dirección/nombre, SIEMPRE devolver null. NO inventes si no lo pidieron.
         
         REGLAS Y CONTEXTO GEOGRÁFICO:
         1. Tu prioridad es extraer CUALQUIER dato útil, aunque falten otros.
@@ -681,32 +684,26 @@ INSTRUCCIONES:
         5. Si el usuario envía SOLO SU NOMBRE (ej: "Juan", "Pedro Pablo"), extraelo como "nombre", y devuelve los demás como null.
         6. Si el texto dice claramente de qué provincia es, respetalo aunque no coincida con el código postal.
         7. Las Avenidas o calles a veces están abreviadas (ej: "av belgrano 45D").
-        
-        Devolver JSON PURO:
-        {
-          "nombre": "string o null",
-          "calle": "string o null",
-          "ciudad": "string o null",
-          "provincia": "string o null",
-          "cp": "string o null",
-          "postdatado": "string o null"
-        }
         `;
         try {
-            const result = await this._callQueued(
+            const result: any = await this._callQueued(
                 () => this.client.chat.completions.create({
                     model: this.model,
                     messages: [
-                        { role: "system", content: "Sos un parser de datos de envío experto en geografía argentina. Tu salida es SIEMPRE JSON compatible puro." },
+                        { role: "system", content: "Sos un parser de datos de envío experto en geografía argentina." },
                         { role: "user", content: prompt }
                     ],
+                    response_format: zodResponseFormat(AddressResponseSchema, "address_response"),
                     temperature: 0,
                     max_tokens: 200
                 }),
-                `addr_${text.substring(0, 100)}`
+                `addr_${text.substring(0, 50)}`, // Clave de caché para deduplicar textos crudos como "1", "2" o direcciones comunes
+                5 * 60 // 5 MINUTOS DE TTL para extracciones
             );
-            return this._parseJSON(result.choices[0].message.content);
-        } catch (e) {
+
+            const content = result.choices[0].message?.content || "";
+            return this._parseJSON(content);
+        } catch (e: any) {
             return { _error: true };
         }
     }
@@ -714,7 +711,7 @@ INSTRUCCIONES:
     /**
      * Transcribe Audio — Uses OpenAI Whisper API
      */
-    async transcribeAudio(mediaData, mimeType) {
+    async transcribeAudio(mediaData: string, mimeType: string): Promise<string | null> {
         try {
             // Convert base64 to buffer and write temp file (Whisper needs a file)
             const buffer = Buffer.from(mediaData, 'base64');
@@ -736,7 +733,7 @@ INSTRUCCIONES:
             try { fs.unlinkSync(tmpPath); } catch (e) { /* ignore */ }
 
             return result.text || null;
-        } catch (e) {
+        } catch (e: any) {
             logger.error("🔴 [AI] Transcribe Error:", e.message);
             return null;
         }
@@ -745,7 +742,7 @@ INSTRUCCIONES:
     /**
      * Analyze Image — Uses OpenAI Vision to extract text or describe an image
      */
-    async analyzeImage(mediaData, mimeType, prompt) {
+    async analyzeImage(mediaData: string, mimeType: string, prompt: string): Promise<string | null> {
         try {
             const result = await this._callQueued(
                 () => this.client.chat.completions.create({
@@ -769,8 +766,8 @@ INSTRUCCIONES:
                 }),
                 null
             );
-            return result.choices[0].message.content.trim();
-        } catch (e) {
+            return result.choices[0].message?.content?.trim() || null;
+        } catch (e: any) {
             logger.error("🔴 [AI] Vision Error:", e.message);
             return null;
         }
@@ -779,7 +776,7 @@ INSTRUCCIONES:
     /**
      * Helper for Admin Suggestions ("Yo me encargo")
      */
-    async generateSuggestion(instruction, conversationContext) {
+    async generateSuggestion(instruction: string, conversationContext: string): Promise<string> {
         const prompt = `
         SITUACION: El ADMINISTRADOR del negocio te da una instrucción DIRECTA para enviarle al cliente.
         La instrucción del admin tiene AUTORIDAD TOTAL — ANULÁ cualquier regla tuya que la contradiga.
@@ -807,8 +804,8 @@ INSTRUCCIONES:
                 }),
                 null
             );
-            return result.choices[0].message.content;
-        } catch (e) {
+            return result.choices[0].message?.content || instruction;
+        } catch (e: any) {
             return instruction; // Fallback to raw instruction
         }
     }
@@ -819,26 +816,24 @@ INSTRUCCIONES:
     getStats() {
         return {
             ...this.stats,
-            queuePending: this.queue.pending,
-            queueActive: this.queue.active,
-            cacheSize: this.cache.size
+            cacheSize: this.cache.keys().length
         };
     }
 
-    _parseJSON(text) {
+    _parseJSON(text: string): AIParsedResponse {
         try {
             const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
             const parsed = JSON.parse(jsonStr);
             if (typeof parsed.response !== 'string') {
                 parsed.response = String(parsed.response || "");
             }
-            return parsed;
-        } catch (e) {
-            return { response: text.replace(/```/g, ''), goalMet: false };
+            return parsed as AIParsedResponse;
+        } catch (e: any) {
+            return { response: typeof text === 'string' ? text.replace(/```/g, '') : "", goalMet: false };
         }
     }
 }
 
 // Singleton Instance
 const aiService = new AIService();
-module.exports = { aiService };
+export { aiService };

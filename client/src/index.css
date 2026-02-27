@@ -104,31 +104,266 @@ body {
 .hide-scrollbar::-webkit-scrollbar {
     display: none;
 }
+
 .hide-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(5px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(5px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
+
 .animate-fade-in {
     animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes scaleUp {
-    from { opacity: 0; transform: scale(0.95); }
-    to { opacity: 1; transform: scale(1); }
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
 }
+
 .animate-scale-up {
     animation: scaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes slideInRight {
-    from { opacity: 0; transform: translateX(20px); }
-    to { opacity: 1; transform: translateX(0); }
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
 }
+
 .animate-slide-in-right {
     animation: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   DARK MODE OVERRIDES
+   Applied when .dark-mode class is on <html>.
+   Overrides Tailwind utility classes globally so every V2 component
+   automatically gets dark styling without individual edits.
+   ══════════════════════════════════════════════════════════════ */
+
+/* -- Body & Root Backgrounds -- */
+.dark-mode body {
+    background-color: #0f172a;
+}
+
+.dark-mode .bg-slate-50,
+.dark-mode .bg-slate-100 {
+    background-color: #0f172a !important;
+}
+
+.dark-mode .from-slate-50 {
+    --tw-gradient-from: #0f172a !important;
+}
+
+.dark-mode .to-blue-50\/30 {
+    --tw-gradient-to: rgba(30, 41, 59, 0.3) !important;
+}
+
+/* -- White panels → Dark panels -- */
+.dark-mode .bg-white,
+.dark-mode .bg-white\/95,
+.dark-mode .bg-white\/70,
+.dark-mode .bg-white\/60,
+.dark-mode .bg-white\/40 {
+    background-color: rgba(30, 41, 59, 0.85) !important;
+}
+
+.dark-mode .hover\:bg-white:hover {
+    background-color: rgba(51, 65, 85, 0.6) !important;
+}
+
+/* -- Glass panels → Dark glass -- */
+.dark-mode .glass-panel {
+    background: rgba(30, 41, 59, 0.7) !important;
+    border-color: rgba(71, 85, 105, 0.4) !important;
+}
+
+/* -- Text colors -- */
+.dark-mode .text-slate-800,
+.dark-mode .text-slate-900 {
+    color: #e2e8f0 !important;
+}
+
+.dark-mode .text-slate-700 {
+    color: #cbd5e1 !important;
+}
+
+.dark-mode .text-slate-600 {
+    color: #94a3b8 !important;
+}
+
+.dark-mode .text-slate-500 {
+    color: #94a3b8 !important;
+}
+
+.dark-mode .text-slate-400 {
+    color: #94a3b8 !important;
+}
+
+/* -- Small labels & badges (uppercase tracking-wider labels) -- */
+.dark-mode .text-xs.font-semibold,
+.dark-mode .text-\[10px\],
+.dark-mode .text-xs.text-slate-500,
+.dark-mode .text-xs.font-medium {
+    color: #94a3b8 !important;
+}
+
+.dark-mode .text-xs.uppercase {
+    color: #7c8db5 !important;
+}
+
+/* -- Border colors -- */
+.dark-mode .border-slate-200,
+.dark-mode .border-slate-200\/60,
+.dark-mode .border-slate-200\/50,
+.dark-mode .border-white,
+.dark-mode .border-white\/20 {
+    border-color: rgba(71, 85, 105, 0.6) !important;
+}
+
+/* -- Card-level borders (more visible separation) -- */
+.dark-mode .rounded-2xl,
+.dark-mode .rounded-xl {
+    border-color: rgba(71, 85, 105, 0.5);
+}
+
+.dark-mode .bg-white.rounded-2xl,
+.dark-mode .bg-white.rounded-xl,
+.dark-mode .bg-white\/70.rounded-2xl {
+    border: 1px solid rgba(99, 102, 241, 0.12) !important;
+}
+
+/* -- Input / Form elements -- */
+.dark-mode input,
+.dark-mode textarea,
+.dark-mode select {
+    background-color: #1e293b !important;
+    color: #e2e8f0 !important;
+    border-color: #334155 !important;
+}
+
+.dark-mode input::placeholder,
+.dark-mode textarea::placeholder {
+    color: #64748b !important;
+}
+
+.dark-mode input:focus,
+.dark-mode textarea:focus,
+.dark-mode select:focus {
+    border-color: #6366f1 !important;
+    outline-color: #6366f1 !important;
+}
+
+/* -- Background utilities commonly used in cards -- */
+.dark-mode .bg-slate-100\/50,
+.dark-mode .bg-slate-100\/80,
+.dark-mode .bg-slate-50\/50,
+.dark-mode .bg-indigo-50,
+.dark-mode .bg-emerald-50,
+.dark-mode .bg-amber-50,
+.dark-mode .bg-rose-50,
+.dark-mode .bg-blue-50 {
+    background-color: rgba(30, 41, 59, 0.5) !important;
+}
+
+/* -- Hover states for cards -- */
+.dark-mode .hover\:bg-slate-50:hover,
+.dark-mode .hover\:bg-slate-100:hover {
+    background-color: rgba(51, 65, 85, 0.4) !important;
+}
+
+.dark-mode .hover\:from-rose-50:hover {
+    --tw-gradient-from: rgba(51, 65, 85, 0.4) !important;
+}
+
+.dark-mode .hover\:to-orange-50:hover {
+    --tw-gradient-to: rgba(51, 65, 85, 0.2) !important;
+}
+
+/* -- Shadow adjustments -- */
+.dark-mode .shadow-sm,
+.dark-mode .shadow-md {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+}
+
+.dark-mode .shadow-lg {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+}
+
+.dark-mode .shadow-slate-200\/20 {
+    --tw-shadow-color: rgba(0, 0, 0, 0.3) !important;
+}
+
+/* -- Backdrop blur (keep but darken) -- */
+.dark-mode .backdrop-blur-md,
+.dark-mode .backdrop-blur-3xl {
+    backdrop-filter: blur(16px) !important;
+}
+
+/* -- Scrollbar dark -- */
+.dark-mode .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.dark-mode .custom-scrollbar:hover::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.dark-mode .custom-scrollbar {
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+/* -- Decorative blur orbs -- */
+.dark-mode .bg-purple-300\/20 {
+    background-color: rgba(99, 102, 241, 0.08) !important;
+}
+
+.dark-mode .bg-blue-300\/20 {
+    background-color: rgba(59, 130, 246, 0.06) !important;
+}
+
+/* -- Selection color -- */
+.dark-mode .selection\:bg-indigo-100 ::selection {
+    background-color: rgba(99, 102, 241, 0.3) !important;
+    color: #e2e8f0 !important;
+}
+
+/* -- Badge/Pill backgrounds -- */
+.dark-mode .bg-slate-100 {
+    background-color: rgba(51, 65, 85, 0.5) !important;
+}
+
+/* -- Status indicator backgrounds (keep vibrant) -- */
+.dark-mode .bg-emerald-500,
+.dark-mode .bg-rose-500 {
+    /* Keep as-is for visibility */
+}
+
+/* -- Smooth transition for theme switching -- */
+.dark-mode * {
+    transition: background-color 0.3s ease, color 0.2s ease, border-color 0.3s ease;
 }

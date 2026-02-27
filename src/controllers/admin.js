@@ -99,7 +99,7 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false, shar
         try {
             // Nota: analyzeDailyLogs debería ser importado si se hace una refactorización completa.
             // Por ahora vamos a requerir la lógica si está disponible en otro lugar o manejar el error
-            const { analyzeDailyLogs } = require('../services/analytics'); // Supone existencia o falla graciosamente
+            const { analyzeDailyLogs } = require('../../analyze_day');
             const report = await analyzeDailyLogs();
             if (isApi) return report || "No hay logs para hoy.";
             if (userId) await client.sendMessage(userId, report || "No hay logs.");

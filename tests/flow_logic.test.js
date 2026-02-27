@@ -14,7 +14,8 @@ const mockDependencies = {
     saveState: mockSaveState,
     sendMessageWithDelay: mockSendMessage,
     logAndEmit: jest.fn(),
-    sharedState: { io: { emit: jest.fn() }, pausedUsers: new Set() }
+    sharedState: { io: { emit: jest.fn() }, pausedUsers: new Set() },
+    aiService: require('../src/services/ai').aiService
 };
 
 // LOAD KNOWLEDGE
@@ -61,7 +62,7 @@ describe('Sales Flow Logic', () => {
         // Expect delivery message
         expect(mockSendMessage).toHaveBeenCalledWith(
             userId,
-            expect.stringMatching(/Tené en cuenta que enviamos por Correo Argentino/i)
+            expect.stringMatching(/Mirá, te comento que enviamos por Correo Argentino/i)
         );
         // Expect redirect message
         // The redirect depends on step. waiting_weight -> 'cuántos kilos querés bajar'

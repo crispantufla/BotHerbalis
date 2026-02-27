@@ -4,6 +4,7 @@ import { useSocket } from '../../../context/SocketContext';
 import { useAuth } from '../../../context/AuthContext';
 import { Link } from 'react-router-dom';
 import { useToast } from '../../../components/ui/Toast';
+import { useTheme } from '../../../context/ThemeContext';
 
 import DashboardViewV2 from '../../../components/corporate/v2/DashboardViewV2';
 import CommsViewV2 from '../../../components/corporate/v2/CommsViewV2';
@@ -12,17 +13,19 @@ import SettingsViewV2 from '../../../components/corporate/v2/SettingsViewV2';
 import ScriptViewV2 from '../../../components/corporate/v2/ScriptViewV2';
 import GalleryViewV2 from '../../../components/corporate/v2/GalleryViewV2';
 
-import { Wifi, MessageCircle, Database, Settings, FileText, ImageIcon, LogOut, Menu, X } from 'lucide-react';
+import { Wifi, MessageCircle, Database, Settings, FileText, ImageIcon, LogOut, Menu, X, Moon, Sun } from 'lucide-react';
 
 const CorporateDashboardV2 = () => {
     const { socket } = useSocket();
     const { logout } = useAuth();
     const { toast } = useToast();
+    const { isDark, toggleTheme } = useTheme();
     const [status, setStatus] = useState('initializing');
     const [alerts, setAlerts] = useState([]);
     const [activeTab, setActiveTab] = useState('dashboard');
     const [qrData, setQrData] = useState(null);
     const [config, setConfig] = useState({ alertNumbers: [] });
+    const [connectedPhone, setConnectedPhone] = useState(null);
     const [targetChatId, setTargetChatId] = useState(null);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
@@ -45,13 +48,14 @@ const CorporateDashboardV2 = () => {
         try {
             const res = await api.get('/api/status');
             if (res.data.config) setConfig(res.data.config);
+            if (res.data.info?.wid?.user) setConnectedPhone(res.data.info.wid.user);
         } catch (e) { }
     }, []);
 
     useEffect(() => {
         if (socket) {
             socket.on('qr', (data) => { setStatus('scan_qr'); setQrData(data); });
-            socket.on('ready', () => { setStatus('ready'); setQrData(null); });
+            socket.on('ready', () => { setStatus('ready'); setQrData(null); fetchConfig(); });
             socket.on('status_change', ({ status: newStatus }) => {
                 if (newStatus === 'disconnected') {
                     setStatus('scan_qr');
@@ -74,6 +78,7 @@ const CorporateDashboardV2 = () => {
                 ]);
                 setAlerts(alertRes.data);
                 if (statusRes.data.config) setConfig(statusRes.data.config);
+                if (statusRes.data.info?.wid?.user) setConnectedPhone(statusRes.data.info.wid.user);
             } catch (e) { }
         }
         loadData();
@@ -85,17 +90,37 @@ const CorporateDashboardV2 = () => {
 
     const [processingAction, setProcessingAction] = useState(null); // Prevent double-click
 
-    const handleQuickAction = async (chatId, action) => {
+    const handleQuickAction = async (chatId, action, sellerPhone) => {
         if (action === 'chat') {
+            const toastId = toast.info('Buscando chat...');
+            try {
+                const statusRes = await api.get('/api/status');
+                const connectedPhoneInfo = statusRes.data?.info?.wid?.user;
+                const connectedPhone = connectedPhoneInfo || config.alertNumber; // Fallback
+
+                if (sellerPhone && connectedPhone) {
+                    const cleanedSeller = sellerPhone.replace(/\D/g, '');
+                    const cleanedConnected = connectedPhone.replace(/\D/g, '');
+                    // Only block if we have both values perfectly and they differ
+                    if (!cleanedSeller.endsWith(cleanedConnected) && !cleanedConnected.endsWith(cleanedSeller)) {
+                        toast.dismiss(toastId);
+                        toast.warning('Esta venta se hizo desde otro \u00fanumero.');
+                        return; // Prevent redirecting
+                    }
+                }
+            } catch (e) {
+                // non-fatal, proceed
+            }
+
+            toast.dismiss(toastId);
             setTargetChatId(chatId);
             setActiveTab('comms');
             return;
         }
 
         if (action === 'descartar') {
-            setAlerts(prev => prev.filter(a => a.userPhone !== chatId));
-            // Also remove from backend so it doesn't reappear on reload
-            try { await api.delete(`/api/system/alerts/${chatId}`); } catch (e) { /* silent */ }
+            setAlerts(prev => prev.filter(a => a.userPhone !== chatId && a.userPhone !== `${chatId}@c.us`));
+            try { await api.delete(`/api/alerts/${chatId}`); } catch (e) { /* silent */ }
             return;
         }
 
@@ -219,6 +244,21 @@ const CorporateDashboardV2 = () => {
 
                 {/* User Profile & Logout (Bottom) */}
                 <div className="p-4 border-t border-slate-200/50 bg-white/40">
+                    {/* Theme Toggle */}
+                    <button
+                        onClick={toggleTheme}
+                        className={`w-full flex items-center ${(sidebarCollapsed && !isMobile) ? 'justify-center p-2' : 'px-4 py-3'} mb-2 rounded-xl transition-all duration-300 border border-transparent hover:border-indigo-200 group
+                            ${isDark
+                                ? 'bg-gradient-to-r from-indigo-500/10 to-purple-500/10 text-amber-400 hover:from-indigo-500/20 hover:to-purple-500/20'
+                                : 'text-slate-500 hover:bg-slate-100 hover:text-indigo-600'
+                            }`}
+                        title={(sidebarCollapsed && !isMobile) ? (isDark ? 'Modo Claro' : 'Modo Oscuro') : ''}
+                    >
+                        <div className={`${(sidebarCollapsed && !isMobile) ? '' : 'mr-3'} group-hover:scale-110 transition-transform duration-300`}>
+                            {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                        </div>
+                        {(!sidebarCollapsed || isMobile) && <span className="font-medium text-sm">{isDark ? 'Modo Claro' : 'Modo Oscuro'}</span>}
+                    </button>
                     <button
                         onClick={() => { logout(); if (isMobile) setMobileMenuOpen(false); }}
                         className={`w-full flex items-center ${(sidebarCollapsed && !isMobile) ? 'justify-center p-2' : 'px-4 py-3'} rounded-xl bg-gradient-to-r hover:from-rose-50 hover:to-orange-50 text-rose-600 transition-all duration-300 border border-transparent hover:border-rose-200 group`}
@@ -257,6 +297,11 @@ const CorporateDashboardV2 = () => {
                             <span className={`text-xs lg:text-sm font-semibold tracking-wide ${status === 'ready' ? 'text-emerald-700' : 'text-rose-600'} whitespace-nowrap`}>
                                 {status === 'ready' ? 'ONLINE' : 'OFFLINE'}
                             </span>
+                            {status === 'ready' && connectedPhone && (
+                                <span className="text-xs font-semibold text-slate-500 tracking-wider bg-slate-100 px-2 py-0.5 rounded border border-slate-200 ml-1">
+                                    +{connectedPhone}
+                                </span>
+                            )}
                         </div>
                     </div>
 

@@ -114,11 +114,61 @@ const SalesView = ({ onGoToChat }) => {
         }
     };
 
-    const statusOptions = ['Pendiente', 'Confirmado', 'Enviado', 'Entregado', 'Cancelado'];
+    const handleGoToChat = async (clienteStr, sellerPhone) => {
+        if (!clienteStr) {
+            toast.warning('El pedido no tiene un teléfono asociado.');
+            return;
+        }
+
+        const toastId = toast.info('Buscando chat...');
+        try {
+            const statusRes = await api.get('/api/status');
+            const connectedPhoneInfo = statusRes.data?.info?.wid?.user;
+            const connectedPhone = connectedPhoneInfo || (statusRes.data?.config?.alertNumber) || (statusRes.data?.config?.alertNumbers?.[0]);
+
+            if (sellerPhone && connectedPhone) {
+                const cleanedSeller = sellerPhone.replace(/\D/g, '');
+                const cleanedConnected = connectedPhone.replace(/\D/g, '');
+                if (!cleanedSeller.endsWith(cleanedConnected) && !cleanedConnected.endsWith(cleanedSeller)) {
+                    toast.dismiss(toastId);
+                    toast.warning('Esta venta se hizo desde otro \u00fanumero.');
+                    return;
+                }
+            }
+
+            const res = await api.get('/api/chats');
+            const chats = res.data;
+            const cleaned = clienteStr.replace(/\D/g, '');
+
+            const chatExists = chats.find(c => {
+                const cCleaned = String(c.id).replace(/\D/g, '');
+                return c.id === clienteStr ||
+                    c.id === `${clienteStr}@c.us` ||
+                    c.id.includes(cleaned) ||
+                    cCleaned.endsWith(cleaned) ||
+                    cleaned.endsWith(cCleaned) ||
+                    (c.name && c.name.includes(clienteStr));
+            });
+
+            if (chatExists) {
+                if (onGoToChat) onGoToChat(chatExists.id);
+                toast.dismiss(toastId);
+            } else {
+                if (onGoToChat) onGoToChat(`${cleaned}@c.us`);
+                toast.dismiss(toastId);
+            }
+        } catch (e) {
+            toast.dismiss(toastId);
+            toast.error('Error de conexión al verificar chats activos.');
+        }
+    };
+
+    const statusOptions = ['Pendiente', 'Confirmado', 'En sistema', 'Enviado', 'Entregado', 'Cancelado'];
 
     const statusStyles = {
         'Pendiente': 'bg-amber-50 text-amber-600 border-amber-200',
-        'Confirmado': 'bg-blue-50 text-blue-600 border-blue-200',
+        'Confirmado': 'bg-sky-50 text-sky-600 border-sky-200',
+        'En sistema': 'bg-fuchsia-50 text-fuchsia-600 border-fuchsia-200',
         'Enviado': 'bg-indigo-50 text-indigo-600 border-indigo-200',
         'Entregado': 'bg-emerald-50 text-emerald-600 border-emerald-200',
         'Cancelado': 'bg-rose-50 text-rose-600 border-rose-200'
@@ -236,7 +286,7 @@ const SalesView = ({ onGoToChat }) => {
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        if (onGoToChat) onGoToChat(order.cliente);
+                                                        handleGoToChat(order.cliente, order.seller);
                                                     }}
                                                     className="text-emerald-600 hover:text-emerald-800 transition font-medium text-xs bg-emerald-50 hover:bg-emerald-100 px-3 py-1 rounded border border-emerald-200 flex items-center gap-1"
                                                     title="Ir al Chat"

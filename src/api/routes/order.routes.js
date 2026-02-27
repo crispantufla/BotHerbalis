@@ -51,7 +51,7 @@ module.exports = (client, sharedState) => {
                 cliente: o.userPhone,
                 status: o.status,
                 producto: o.products,
-                precio: o.totalPrice.toString(),
+                precio: Math.round(o.totalPrice).toLocaleString('es-AR'),
                 tracking: o.tracking || '',
                 postdatado: o.postdated || '',
                 nombre: o.nombre || o.user?.name || '',
@@ -75,6 +75,59 @@ module.exports = (client, sharedState) => {
         } catch (error) {
             console.error('🔴 [ROUTES] Error fetching orders from DB:', error);
             res.status(500).json({ error: "Failed to fetch orders" });
+        }
+    });
+
+    // PUT /orders/:id (Edit order details) - Authenticated
+    router.put('/orders/:id', authMiddleware, async (req, res) => {
+        const { id } = req.params;
+        const { nombre, calle, ciudad, provincia, cp, producto, precio, tracking, status, postdatado } = req.body;
+
+        try {
+            const { prisma } = require('../../../db');
+
+            const dataToUpdate = {};
+            if (nombre !== undefined) dataToUpdate.nombre = nombre;
+            if (calle !== undefined) dataToUpdate.calle = calle;
+            if (ciudad !== undefined) dataToUpdate.ciudad = ciudad;
+            if (provincia !== undefined) dataToUpdate.provincia = provincia;
+            if (cp !== undefined) dataToUpdate.cp = cp;
+            if (producto !== undefined) dataToUpdate.products = producto;
+            if (precio !== undefined) {
+                const parsed = parseInt(precio.toString().replace(/\./g, '').replace(/[^\d]/g, ''), 10);
+                dataToUpdate.totalPrice = isNaN(parsed) ? 0 : parsed;
+            }
+            if (tracking !== undefined) dataToUpdate.tracking = tracking;
+            if (status !== undefined) dataToUpdate.status = status;
+            if (postdatado !== undefined) dataToUpdate.postdated = postdatado;
+
+            const updatedOrder = await prisma.order.update({
+                where: { id },
+                data: dataToUpdate
+            });
+
+            const legacyOrder = {
+                id: updatedOrder.id,
+                cliente: updatedOrder.userPhone,
+                status: updatedOrder.status,
+                producto: updatedOrder.products,
+                precio: Math.round(updatedOrder.totalPrice).toLocaleString('es-AR'),
+                tracking: updatedOrder.tracking || '',
+                postdatado: updatedOrder.postdated || '',
+                nombre: updatedOrder.nombre || '',
+                calle: updatedOrder.calle || '',
+                ciudad: updatedOrder.ciudad || '',
+                provincia: updatedOrder.provincia || '',
+                cp: updatedOrder.cp || '',
+                seller: updatedOrder.seller || '',
+                createdAt: updatedOrder.createdAt.toISOString()
+            };
+
+            if (io) io.emit('order_update', legacyOrder);
+            res.json({ success: true, order: legacyOrder });
+        } catch (error) {
+            console.error('🔴 [ROUTES] Error updating order:', error);
+            res.status(500).json({ error: "Failed to update order" });
         }
     });
 
@@ -132,7 +185,7 @@ module.exports = (client, sharedState) => {
                 cliente: updatedOrder.userPhone,
                 status: updatedOrder.status,
                 producto: updatedOrder.products,
-                precio: updatedOrder.totalPrice.toString(),
+                precio: Math.round(updatedOrder.totalPrice).toLocaleString('es-AR'),
                 tracking: updatedOrder.tracking || '',
                 postdatado: updatedOrder.postdated || '',
                 nombre: updatedOrder.nombre || '',
@@ -299,7 +352,7 @@ module.exports = (client, sharedState) => {
                 cliente: order.userPhone,
                 status: order.status,
                 producto: order.products,
-                precio: order.totalPrice.toString(),
+                precio: Math.round(order.totalPrice).toLocaleString('es-AR'),
                 tracking: order.tracking || '',
                 postdatado: order.postdated || '',
                 nombre: order.nombre || '',

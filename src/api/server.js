@@ -39,6 +39,18 @@ function startServer(client, sharedState) {
     app.use(cors({
         origin: allowedOrigin
     }));
+
+    // Security Headers — protects against common web vulnerabilities
+    const helmet = require('helmet');
+    app.use(helmet({
+        contentSecurityPolicy: false, // Disable CSP — the SPA dashboard needs inline scripts/styles
+        crossOriginEmbedderPolicy: false // Allow loading external resources (fonts, etc)
+    }));
+
+    // Gzip Compression — reduces response size ~70% (1MB bundle → 330KB)
+    const compression = require('compression');
+    app.use(compression());
+
     app.use(express.json({ limit: '10mb' }));
 
     // Rate Limiting — Protect API from abuse (100 reqs / 15 min)
