@@ -447,6 +447,31 @@ function logAndEmit(chatId: string, sender: string, text: string, step?: string,
 }
 sharedState.logAndEmit = logAndEmit; // Expose to server
 
+// Helper: Normalize product name to standardized format based on pricing rules
+// e.g. "Cápsulas de nuez de la india" + "120 días" -> "Cápsulas (120 días)"
+function normalizeProductName(rawProduct: string, rawPlan: string, price: number): string {
+    const lower = (rawProduct || '').toLowerCase();
+    let baseType = '';
+    if (lower.includes('capsul') || lower.includes('cápsul')) baseType = 'Cápsulas';
+    else if (lower.includes('gota')) baseType = 'Gotas';
+    else if (lower.includes('semilla')) baseType = 'Semillas';
+
+    if (!baseType) return rawProduct || 'Desconocido';
+
+    // Determine duration: parse from plan string, then validate as multiple-of-60
+    const planMatch = (rawPlan || '').match(/(\d+)/);
+    let duration = planMatch ? parseInt(planMatch[1]) : 0;
+
+    // If plan not available or non-standard, infer from price
+    if (!duration || duration % 60 !== 0) {
+        if (baseType === 'Cápsulas') duration = price >= 66900 ? 120 : 60;
+        else if (baseType === 'Gotas') duration = price >= 68900 ? 120 : 60;
+        else if (baseType === 'Semillas') duration = price >= 49900 ? 120 : 60;
+    }
+
+    return `${baseType} (${duration} días)`;
+}
+
 // Helper: Save Order Locally (for Dashboard) — Uses write queue to prevent concurrent corruption
 let _orderWriteQueue = Promise.resolve();
 function saveOrderToLocal(order: Record<string, any>): void {
@@ -458,11 +483,13 @@ function saveOrderToLocal(order: Record<string, any>): void {
             priceNum = parseInt(order.precio.toString().replace(/\./g, '').replace(/[^\d]/g, ''), 10);
         }
 
+        const normalizedProduct = normalizeProductName(order.producto || '', order.plan || '', priceNum);
+
         const newOrderData = {
             id: Date.now().toString(),
             userPhone: cleanPhone || 'desconocido',
             status: 'Pendiente',
-            products: order.producto || 'Desconocido',
+            products: normalizedProduct,
             totalPrice: isNaN(priceNum) ? 0 : priceNum,
             tracking: null,
             postdated: order.postdatado || null,

@@ -12,8 +12,9 @@ import SalesViewV2 from '../../../components/corporate/v2/SalesViewV2';
 import SettingsViewV2 from '../../../components/corporate/v2/SettingsViewV2';
 import ScriptViewV2 from '../../../components/corporate/v2/ScriptViewV2';
 import GalleryViewV2 from '../../../components/corporate/v2/GalleryViewV2';
+import AdvancedAnalyticsViewV2 from '../../../components/corporate/v2/AdvancedAnalyticsViewV2';
 
-import { Wifi, MessageCircle, Database, Settings, FileText, ImageIcon, LogOut, Menu, X, Moon, Sun } from 'lucide-react';
+import { Wifi, MessageCircle, Database, Settings, FileText, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity } from 'lucide-react';
 
 const CorporateDashboardV2 = () => {
     const { socket } = useSocket();
@@ -147,6 +148,7 @@ const CorporateDashboardV2 = () => {
     const renderContent = () => {
         switch (activeTab) {
             case 'dashboard': return <DashboardViewV2 alerts={alerts} config={config} handleQuickAction={handleQuickAction} status={status} qrData={qrData} />;
+            case 'statistics': return <AdvancedAnalyticsViewV2 />;
             case 'comms': return <CommsViewV2 initialChatId={targetChatId} onChatSelected={() => setTargetChatId(null)} />;
             case 'logistics': return <SalesViewV2 onGoToChat={(chatId) => handleQuickAction(chatId, 'chat')} />;
             case 'script': return <ScriptViewV2 />;
@@ -176,7 +178,7 @@ const CorporateDashboardV2 = () => {
     };
 
     return (
-        <div className="flex flex-col lg:flex-row h-[100dvh] bg-slate-50 dark:bg-slate-900 font-sans text-slate-800 dark:text-slate-100 overflow-hidden selection:bg-indigo-100 dark:selection:bg-indigo-900/50 selection:text-indigo-900 dark:selection:text-indigo-100 relative transition-colors duration-300">
+        <div className="flex flex-col lg:flex-row min-h-screen bg-slate-50 dark:bg-slate-900 font-sans text-slate-800 dark:text-slate-100 selection:bg-indigo-100 dark:selection:bg-indigo-900/50 selection:text-indigo-900 dark:selection:text-indigo-100 relative transition-colors duration-300">
 
             {/* Overlay para fondo oscurecido en Mobile al abrir el menú */}
             {isMobile && mobileMenuOpen && (
@@ -188,7 +190,7 @@ const CorporateDashboardV2 = () => {
 
             {/* 1. GLASSMORPHISM SIDEBAR V2 */}
             <aside className={`
-                fixed lg:relative z-40 lg:z-20 flex flex-col h-full bg-white/95 dark:bg-slate-900/95 lg:bg-white/70 dark:lg:bg-slate-900/70 backdrop-blur-3xl border-r border-slate-200/60 dark:border-slate-700/60 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)] dark:shadow-[4px_0_24px_-12px_rgba(0,0,0,0.5)] 
+                fixed lg:sticky top-0 z-40 lg:z-20 flex flex-col h-screen bg-white/95 dark:bg-slate-900/95 lg:bg-white/70 dark:lg:bg-slate-900/70 backdrop-blur-3xl border-r border-slate-200/60 dark:border-slate-700/60 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)] dark:shadow-[4px_0_24px_-12px_rgba(0,0,0,0.5)] 
                 transition-transform duration-300 ease-in-out lg:translate-x-0
                 ${isMobile ? 'w-72 left-0 top-0 bottom-0' : (sidebarCollapsed ? 'w-20' : 'w-72')}
                 ${isMobile && !mobileMenuOpen ? '-translate-x-full' : 'translate-x-0'}
@@ -233,6 +235,7 @@ const CorporateDashboardV2 = () => {
                     <NavItem tab="dashboard" icon={Wifi} label="Inicio" />
                     <NavItem tab="comms" icon={MessageCircle} label="Chat & Atencion" />
                     <NavItem tab="logistics" icon={Database} label="Ventas & Logística" />
+                    <NavItem tab="statistics" icon={BarChart2} label="Estadísticas" />
                     <NavItem tab="script" icon={FileText} label="Guión & Prompts" />
                     <NavItem tab="gallery" icon={ImageIcon} label="Galería de Medios" />
 

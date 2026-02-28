@@ -10,6 +10,7 @@ const chatRoutes = require('./routes/chat.routes');
 const orderRoutes = require('./routes/order.routes');
 const adminRoutes = require('./routes/admin.routes');
 const systemRoutes = require('./routes/system.routes');
+const analyticsRoutes = require('./routes/analytics.routes');
 const authRoutes = require('./routes/auth.routes');
 const galleryRoutes = require('./routes/gallery.routes');
 
@@ -99,6 +100,7 @@ function startServer(client, sharedState) {
     app.use('/api', orderRoutes(client, sharedState));
     app.use('/api', adminRoutes(client, sharedState));
     app.use('/api', systemRoutes(client, sharedState));
+    app.use('/api', analyticsRoutes(client, sharedState));
     app.use('/api', authRoutes(client, sharedState));
     app.use('/api', galleryRoutes(client, sharedState));
 

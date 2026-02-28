@@ -156,6 +156,92 @@ module.exports = (client, sharedState) => {
         }
     });
 
+    // GET /stats/charts - Get historical data for the last 30 days
+    router.get('/stats/charts', authMiddleware, async (req, res) => {
+        try {
+            const { prisma } = require('../../../db');
+            const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
+
+            // Get date 30 days ago
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+            thirtyDaysAgo.setHours(0, 0, 0, 0);
+
+            // Fetch all orders from the last 30 days for this instance
+            const orders = await prisma.order.findMany({
+                where: {
+                    createdAt: { gte: thirtyDaysAgo },
+                    status: { not: 'Cancelado' }
+                },
+                select: {
+                    createdAt: true,
+                    totalPrice: true,
+                    products: true,
+                    status: true
+                }
+            });
+
+            // Group by day for the line/bar chart
+            const dailyData = {};
+            // Product grouping for the pie chart
+            const productData = {
+                'Cápsulas': 0,
+                'Gotas': 0,
+                'Otros': 0
+            };
+
+            // Initialize all 30 days with 0 so the chart doesn't have gaps
+            for (let i = 0; i < 30; i++) {
+                const d = new Date();
+                d.setDate(d.getDate() - i);
+                const dateStr = d.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', month: 'short', day: 'numeric' });
+                dailyData[dateStr] = { date: dateStr, orders: 0, revenue: 0, sortKey: d.getTime() };
+            }
+
+            // Populate data
+            orders.forEach(order => {
+                const dateObj = new Date(order.createdAt);
+                const dateStr = dateObj.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', month: 'short', day: 'numeric' });
+
+                if (dailyData[dateStr]) {
+                    dailyData[dateStr].orders += 1;
+                    dailyData[dateStr].revenue += (order.totalPrice || 0);
+                }
+
+                // Parse products
+                const prodStr = (order.products || '').toLowerCase();
+                if (prodStr.includes('cápsula') || prodStr.includes('capsula')) {
+                    productData['Cápsulas'] += 1;
+                } else if (prodStr.includes('gota')) {
+                    productData['Gotas'] += 1;
+                } else if (prodStr.trim() !== '') {
+                    productData['Otros'] += 1;
+                }
+            });
+
+            // Convert to array and sort chronologically
+            const chartData = Object.values(dailyData).sort((a, b) => a.sortKey - b.sortKey).map(d => ({
+                date: d.date,
+                orders: d.orders,
+                revenue: d.revenue
+            }));
+
+            // Format product data for recharts PieChart
+            const pieData = Object.keys(productData)
+                .filter(key => productData[key] > 0)
+                .map(key => ({ name: key, value: productData[key] }));
+
+            res.json({
+                chartData,
+                pieData
+            });
+
+        } catch (e) {
+            console.error("🔴 [STATS/CHARTS ERROR]", e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     // POST /global-pause - Toggle bot global pause state
     router.post('/global-pause', authMiddleware, (req, res) => {
         try {

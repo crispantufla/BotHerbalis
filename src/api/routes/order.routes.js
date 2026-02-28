@@ -262,11 +262,32 @@ module.exports = (client, sharedState) => {
 
             const cart = state.cart || [];
             const addr = state.partialAddress || {};
-            const product = cart.map(i => `${i.product} (${i.plan} días)`).join(', ') || state.selectedProduct || 'Producto';
             const plan = state.selectedPlan || cart[0]?.plan || '60';
             const subtotal = cart.reduce((sum, i) => sum + parseInt((i.price || '0').toString().replace(/\D/g, '')), 0);
             const adicional = state.adicionalMAX || 0;
             const total = subtotal + adicional;
+
+            // Normalize product name to standard format: "Cápsulas (120 días)"
+            const normalizeProductName = (rawProduct, rawPlan, price) => {
+                const lower = (rawProduct || '').toLowerCase();
+                let baseType = '';
+                if (lower.includes('capsul') || lower.includes('cápsul')) baseType = 'Cápsulas';
+                else if (lower.includes('gota')) baseType = 'Gotas';
+                else if (lower.includes('semilla')) baseType = 'Semillas';
+                if (!baseType) return rawProduct || 'Desconocido';
+                const planMatch = (rawPlan || '').match(/(\d+)/);
+                let duration = planMatch ? parseInt(planMatch[1]) : 0;
+                if (!duration || duration % 60 !== 0) {
+                    if (baseType === 'Cápsulas') duration = price >= 66900 ? 120 : 60;
+                    else if (baseType === 'Gotas') duration = price >= 68900 ? 120 : 60;
+                    else if (baseType === 'Semillas') duration = price >= 49900 ? 120 : 60;
+                }
+                return `${baseType} (${duration} días)`;
+            };
+
+            const rawProduct = cart.map(i => i.product).join(' + ') || state.selectedProduct || 'Producto';
+            const rawPlan = cart.map(i => `${i.plan} días`).join(' + ') || `${plan} días`;
+            const product = normalizeProductName(rawProduct, rawPlan, total);
 
             const phoneNumeric = chatId.split('@')[0];
 
