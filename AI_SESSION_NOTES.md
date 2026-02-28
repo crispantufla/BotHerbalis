@@ -4,6 +4,17 @@ Este documento mantiene un registro de los problemas resueltos, características
 Al cambiar de cuenta de Google, puedes pedirle a la IA: *"Lee el archivo AI_SESSION_NOTES.md para tener todo el contexto de lo que estábamos haciendo"*.
 
 ---
+## 🛑 [28 Feb 2026] Análisis Rápido: IA Ignora Preguntas Múltiples y Repetición de Ubicación
+**Problemas Detectados:**
+1. **Omisión de Preguntas:** Cuando un usuario hacía dos preguntas en un mismo mensaje (ej: "¿Cómo te llamás? ¿Puedo ir a buscarla?"), la IA solo respondía una y pasaba directo al objetivo del paso. Esto se debía a reglas "Respondé EXACTAMENTE" muy rígidas y un límite estricto de "1-2 oraciones".
+2. **Repetición Innecesaria de Ubicación:** La IA repetía que era de Rosario y no tenía local incluso cuando el usuario ya lo sabía o no lo había preguntado explícitamente en ese turno, resultando redundante.
+
+**Soluciones Implementadas:**
+1. **Reglas de Completitud:** Se actualizó `src/services/ai.ts` con una nueva regla universal: "SI EL USUARIO HACE VARIAS PREGUNTAS O PUNTOS, RESPONDELOS TODOS". Se relajó el límite de brevedad para permitir respuestas más completas cuando sea necesario.
+2. **Refinamiento de Reglas "EXACTAMENTE":** Se cambiaron las instrucciones de Ubicación (Regla 17), Redes Sociales (Regla 18) y Pagos (Regla 22) para que sean "Asegurate de incluir esta info" en lugar de obligar a una respuesta única que pise todo lo demás.
+3. **Control de Redundancia de Local:** Se especificó en la Regla 17 que SOLO mencione la ubicación si el usuario pregunta explícitamente por ella ("¿de dónde sos?", "¿tienen local?"), evitando respuestas automáticas fuera de contexto.
+
+---
 ## 🛑 [26 Feb 2026] Análisis Rápido: Error 404 al Borrar Mensajes, Postdatado en Planes y Colores UI
 **Problemas Detectados:**
 1. **Error 404 al Eliminar Mensajes:** Desde el Dashboard (CommsViewV2), al intentar borrar un mensaje enviado, la API devolvía 404. Esto ocurría porque el backend (`chat.routes.js`) solo buscaba el `messageId` en los últimos 50 mensajes del chat, haciendo invisibles los mensajes un poco más antiguos.
