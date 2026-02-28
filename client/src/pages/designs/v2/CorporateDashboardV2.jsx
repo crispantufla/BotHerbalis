@@ -178,7 +178,7 @@ const CorporateDashboardV2 = () => {
     };
 
     return (
-        <div className="flex flex-col lg:flex-row min-h-screen bg-slate-50 dark:bg-slate-900 font-sans text-slate-800 dark:text-slate-100 selection:bg-indigo-100 dark:selection:bg-indigo-900/50 selection:text-indigo-900 dark:selection:text-indigo-100 relative transition-colors duration-300">
+        <div className="flex flex-col lg:flex-row h-screen overflow-hidden bg-slate-50 dark:bg-slate-900 font-sans text-slate-800 dark:text-slate-100 selection:bg-indigo-100 dark:selection:bg-indigo-900/50 selection:text-indigo-900 dark:selection:text-indigo-100 relative transition-colors duration-300">
 
             {/* Overlay para fondo oscurecido en Mobile al abrir el menú */}
             {isMobile && mobileMenuOpen && (
