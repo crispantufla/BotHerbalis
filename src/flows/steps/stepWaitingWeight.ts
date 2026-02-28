@@ -16,7 +16,7 @@ export async function handleWaitingWeight(
     const tLow = text.toLowerCase();
     let implicitProduct = null;
 
-    if (tLow.includes('cápsula') || tLow.includes('capsula')) implicitProduct = "Cápsulas de nuez de la india";
+    if (tLow.includes('cápsula') || tLow.includes('capsula') || tLow.includes('pastilla') || tLow.includes('pastillas')) implicitProduct = "Cápsulas de nuez de la india";
     else if (tLow.includes('gota')) implicitProduct = "Gotas de nuez de la india";
     else if (tLow.includes('semilla')) implicitProduct = "Semillas de nuez de la india";
 

@@ -2,17 +2,27 @@ import { Queue, Worker, Job } from 'bullmq';
 import Redis from 'ioredis';
 const logger = require('../utils/logger');
 
-// --- REDIS CONNECTION ---
+// --- REDIS CONNECTIONS ---
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
-export const redisConnection = new Redis(REDIS_URL, {
-    maxRetriesPerRequest: null, // Required by BullMQ
-});
+
+// BullMQ requires separate Redis connections for Queues, Workers, and Events
+const connectionParams = { maxRetriesPerRequest: null };
+
+export const redisConnection = new Redis(REDIS_URL, connectionParams);
+const workerConnection = new Redis(REDIS_URL, connectionParams);
 
 redisConnection.on('error', (err) => {
-    logger.error('🔴 [REDIS] Error de conexión:', err.message);
+    logger.error('🔴 [REDIS QUEUE] Error de conexión:', err.message);
 });
 redisConnection.on('ready', () => {
-    logger.info('✅ [REDIS] Conectado exitosamente para BullMQ.');
+    logger.info('✅ [REDIS QUEUE] Conectado exitosamente.');
+});
+
+workerConnection.on('error', (err) => {
+    logger.error('🔴 [REDIS WORKER] Error de conexión:', err.message);
+});
+workerConnection.on('ready', () => {
+    logger.info('✅ [REDIS WORKER] Conectado exitosamente.');
 });
 
 // --- QUEUE ---
@@ -57,7 +67,7 @@ export function initWorker(dependencies: any) {
             throw error;
         }
     }, {
-        connection: redisConnection,
+        connection: workerConnection,
         concurrency: 3, // Máximo 3 clientes procesándose en IA de forma verdaderamente paralela en Node
         settings: {
             backoffStrategy: (attemptsMade: number, type: string, err: Error, job: Job) => {

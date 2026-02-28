@@ -193,21 +193,31 @@ function saveKnowledge(scriptName = null) {
 }
 
 let _saveStateTimeout: ReturnType<typeof setTimeout> | null = null;
+const _pendingSaveUsers = new Set<string>();
+
 function saveState(changedUserId: string | null = null): void {
+    if (changedUserId) {
+        _pendingSaveUsers.add(changedUserId);
+    }
+
     if (_saveStateTimeout) clearTimeout(_saveStateTimeout);
+
     _saveStateTimeout = setTimeout(async () => {
         try {
             // Backup locally just in case (optional, but harmless)
             const stateToSave = { userState, chatResets, lastAlertUser, pausedUsers: Array.from(pausedUsers), config };
             atomicWriteFile(STATE_FILE, JSON.stringify(stateToSave, null, 2));
 
-            // Persist only the changed user to DB (avoid N+1 flood)
-            const usersToSave = changedUserId
-                ? [[changedUserId, userState[changedUserId]]].filter(([, v]) => v)
+            // Persist only the accumulated changed users to DB
+            const usersToProcess = Array.from(_pendingSaveUsers);
+            _pendingSaveUsers.clear(); // Clear immediately so new saves start accumulating
+
+            const usersToSave = usersToProcess.length > 0
+                ? usersToProcess.map(id => [id, userState[id]]).filter(([, v]) => v)
                 : Object.entries(userState);
 
             const userPromises = usersToSave.map(([phone, data]) => {
-                const cleanPhone = phone.replace('@c.us', '');
+                const cleanPhone = (phone as string).replace('@c.us', '');
                 return prisma.user.upsert({
                     where: { phone_instanceId: { phone: cleanPhone, instanceId: INSTANCE_ID } },
                     update: { profileData: JSON.stringify(data) },
