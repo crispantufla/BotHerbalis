@@ -103,23 +103,44 @@ module.exports = (client, sharedState) => {
                 console.error("🔴 Error fetching DB orders in /chats:", err.message);
             }
 
-            const relevantChats = chats.filter(c => !c.isGroup).map(c => {
-                const phoneNumeric = c.id.user; // e.g., '123456789' extracted from '123456789@c.us'
+            const instanceFilterId = req.query.instanceId || process.env.INSTANCE_ID || 'default';
 
-                // Find all past orders matching this phone
-                const userOrders = orders.filter(o => o.userPhone && (o.userPhone === phoneNumeric || phoneNumeric.includes(o.userPhone)));
+            const relevantChats = chats.filter(c => !c.isGroup).map(c => {
+                const phoneNumeric = c.id.user.replace(/\D/g, '');
+                const last10Chat = phoneNumeric.slice(-10);
+
+                // Find all past orders matching this phone (comparing last 10 digits for robustness)
+                const userOrders = orders.filter(o => {
+                    if (!o.userPhone) return false;
+                    const cleanOrderPhone = o.userPhone.replace(/\D/g, '');
+                    const last10Order = cleanOrderPhone.slice(-10);
+
+                    // Match by phone AND instanceId for accurate "Solo este Bot" context
+                    return (last10Order === last10Chat && o.instanceId === instanceFilterId);
+                });
 
                 // Map DB order to legacy format for frontend
-                const legacyUserOrders = userOrders.map(o => ({
-                    id: o.id,
-                    cliente: o.userPhone,
-                    status: o.status,
-                    producto: o.products,
-                    precio: Math.round(o.totalPrice).toLocaleString('es-AR'),
-                    tracking: o.tracking || '',
-                    postdatado: o.postdated || '',
-                    createdAt: o.createdAt.toISOString()
-                }));
+                const legacyUserOrders = userOrders.map(o => {
+                    // Extract plan number from product string if not explicit (e.g. "Cápsulas (60 días)" -> "60")
+                    let inferredPlan = '60';
+                    const planMatch = (o.products || '').match(/(\d+)/);
+                    if (planMatch) inferredPlan = planMatch[1];
+
+                    return {
+                        id: o.id,
+                        cliente: o.userPhone,
+                        status: o.status,
+                        producto: o.products,
+                        plan: inferredPlan,
+                        precio: Math.round(o.totalPrice).toLocaleString('es-AR'),
+                        tracking: o.tracking || '',
+                        postdatado: o.postdated || '',
+                        ciudad: o.ciudad || '',
+                        calle: o.calle || '',
+                        cp: o.cp || '',
+                        createdAt: o.createdAt.toISOString()
+                    };
+                });
 
                 return {
                     id: c.id._serialized,

@@ -29,6 +29,7 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
     const messagesEndRef = useRef(null);
     const scrollContainerRef = useRef(null);
     const fileInputRef = useRef(null);
+    const [instanceId, setInstanceId] = useState(null);
 
     const filteredChats = searchTerm
         ? chats.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -43,20 +44,23 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
     }, [initialChatId, chats, onChatSelected]);
 
     useEffect(() => {
-        const fetchChats = async () => {
+        const fetchMetadata = async () => {
             try {
-                const res = await api.get('/api/chats');
-                setChats(res.data);
-            } catch (e) { setChats([]); }
+                const statusRes = await api.get('/api/status');
+                const id = statusRes.data?.instanceId || 'default';
+                setInstanceId(id);
+
+                const chatsRes = await api.get(`/api/chats?instanceId=${id}`);
+                setChats(chatsRes.data);
+
+                const statsRes = await api.get('/api/stats');
+                setGlobalPause(!!statsRes.data.globalPause);
+            } catch (e) {
+                console.error('Error fetching initial comms data', e);
+                setChats([]);
+            }
         };
-        const fetchStatsForPause = async () => {
-            try {
-                const res = await api.get('/api/stats');
-                setGlobalPause(!!res.data.globalPause);
-            } catch (e) { console.error('Error fetching global stats', e); }
-        };
-        fetchChats();
-        fetchStatsForPause();
+        fetchMetadata();
     }, []);
 
     // Use a ref to always have the latest selectedChat without re-binding sockets
