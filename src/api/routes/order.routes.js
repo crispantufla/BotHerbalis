@@ -41,27 +41,41 @@ module.exports = (client, sharedState) => {
             const orders = await prisma.order.findMany({
                 orderBy: { createdAt: 'desc' },
                 skip,
-                take: limit,
-                include: { user: true }
+                take: limit
             });
 
+            // Workaround for Prisma adapter-pg composite key bug with include: { user: true }
+            const userPhones = [...new Set(orders.map(o => o.userPhone))];
+            const instanceIds = [...new Set(orders.map(o => o.instanceId))];
+            const users = await prisma.user.findMany({
+                where: {
+                    phone: { in: userPhones },
+                    instanceId: { in: instanceIds }
+                }
+            });
+            const userMap = new Map();
+            users.forEach(u => userMap.set(`${u.phone}_${u.instanceId}`, u));
+
             // Map to legacy format expected by dashboard to avoid breaking frontend fields
-            const legacyOrders = orders.map(o => ({
-                id: o.id,
-                cliente: o.userPhone,
-                status: o.status,
-                producto: o.products,
-                precio: Math.round(o.totalPrice).toLocaleString('es-AR'),
-                tracking: o.tracking || '',
-                postdatado: o.postdated || '',
-                nombre: o.nombre || o.user?.name || '',
-                calle: o.calle || '',
-                ciudad: o.ciudad || '',
-                provincia: o.provincia || '',
-                cp: o.cp || '',
-                seller: o.seller || '',
-                createdAt: o.createdAt.toISOString()
-            }));
+            const legacyOrders = orders.map(o => {
+                const user = userMap.get(`${o.userPhone}_${o.instanceId}`);
+                return {
+                    id: o.id,
+                    cliente: o.userPhone,
+                    status: o.status,
+                    producto: o.products,
+                    precio: Math.round(o.totalPrice).toLocaleString('es-AR'),
+                    tracking: o.tracking || '',
+                    postdatado: o.postdated || '',
+                    nombre: o.nombre || user?.name || '',
+                    calle: o.calle || '',
+                    ciudad: o.ciudad || '',
+                    provincia: o.provincia || '',
+                    cp: o.cp || '',
+                    seller: o.seller || '',
+                    createdAt: o.createdAt.toISOString()
+                };
+            });
 
             res.json({
                 data: legacyOrders,

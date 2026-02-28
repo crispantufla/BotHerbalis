@@ -34,11 +34,11 @@ module.exports = (client, sharedState) => {
         try {
             const days = parseInt(req.query.days) || 30;
             const instanceFilter = req.query.instance; // e.g. "current" or "all"
-            const instanceId = req.query.instanceId; // explicit instanceId from client
+            const instanceId = req.query.instanceId || process.env.INSTANCE_ID || 'default';
             const { currentStart, previousStart, previousEnd } = getPeriods(days);
 
             const baseWhere = { status: { not: 'Cancelado' } };
-            if (instanceFilter === 'current' && instanceId) {
+            if (instanceFilter === 'current') {
                 baseWhere.instanceId = instanceId;
             }
 
@@ -90,11 +90,11 @@ module.exports = (client, sharedState) => {
         try {
             const days = parseInt(req.query.days) || 30;
             const instanceFilter = req.query.instance;
-            const instanceId = req.query.instanceId;
+            const instanceId = req.query.instanceId || process.env.INSTANCE_ID || 'default';
             const { currentStart } = getPeriods(days);
 
             const baseWhere = { status: { not: 'Cancelado' } };
-            if (instanceFilter === 'current' && instanceId) {
+            if (instanceFilter === 'current') {
                 baseWhere.instanceId = instanceId;
             }
 
@@ -173,13 +173,13 @@ module.exports = (client, sharedState) => {
         try {
             const days = parseInt(req.query.days) || 30;
             const instanceFilter = req.query.instance;
-            const instanceId = req.query.instanceId;
+            const instanceId = req.query.instanceId || process.env.INSTANCE_ID || 'default';
             const { currentStart } = getPeriods(days);
 
             const baseWhere = { status: { not: 'Cancelado' } };
             const baseUserWhere = {}; // Users table has no 'status' field
 
-            if (instanceFilter === 'current' && instanceId) {
+            if (instanceFilter === 'current') {
                 baseWhere.instanceId = instanceId;
                 baseUserWhere.instanceId = instanceId;
             }

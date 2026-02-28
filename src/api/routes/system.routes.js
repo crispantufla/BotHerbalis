@@ -117,16 +117,17 @@ module.exports = (client, sharedState) => {
 
             // Fetch database aggregations in parallel for performance
             const [totalCount, todayStats, completedStats] = await Promise.all([
-                prisma.order.count(),
+                prisma.order.count({ where: { instanceId: INSTANCE_ID } }),
                 prisma.order.aggregate({
                     _count: true,
                     _sum: { totalPrice: true },
-                    where: { createdAt: { gte: startOfDay } }
+                    where: { createdAt: { gte: startOfDay }, instanceId: INSTANCE_ID }
                 }),
                 prisma.order.count({
                     where: {
                         createdAt: { gte: startOfDay },
-                        status: { not: 'Cancelado' }
+                        status: { not: 'Cancelado' },
+                        instanceId: INSTANCE_ID
                     }
                 })
             ]);
@@ -172,7 +173,8 @@ module.exports = (client, sharedState) => {
             const orders = await prisma.order.findMany({
                 where: {
                     createdAt: { gte: thirtyDaysAgo },
-                    status: { not: 'Cancelado' }
+                    status: { not: 'Cancelado' },
+                    instanceId: INSTANCE_ID
                 },
                 select: {
                     createdAt: true,
