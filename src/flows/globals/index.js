@@ -1,6 +1,6 @@
 const { handleSystemGlobals } = require('./globalSystem');
 const { handleSafetyCheck } = require('./globalSafety');
-const { handleFaqGlobals } = require('./globalFaq');
+const { handleMediaGlobals } = require('./globalMedia');
 
 async function processGlobals(userId, text, normalizedText, currentState, knowledge, dependencies) {
     let result;
@@ -11,8 +11,12 @@ async function processGlobals(userId, text, normalizedText, currentState, knowle
     result = await handleSafetyCheck(userId, text, normalizedText, currentState, knowledge, dependencies);
     if (result && result.matched) return result;
 
-    result = await handleFaqGlobals(userId, text, normalizedText, currentState, knowledge, dependencies);
+    // Media requests (photos) — handled globally for any step
+    result = await handleMediaGlobals(userId, text, normalizedText, currentState, knowledge, dependencies);
     if (result && result.matched) return result;
+
+    // FAQ questions (payment, shipping, how-to-take, etc.) are now handled
+    // by the AI naturally within each step handler — no more global interceptors.
 
     return null; // Not matched by any global interceptor
 }

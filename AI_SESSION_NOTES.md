@@ -4,6 +4,25 @@ Este documento mantiene un registro de los problemas resueltos, características
 Al cambiar de cuenta de Google, puedes pedirle a la IA: *"Lee el archivo AI_SESSION_NOTES.md para tener todo el contexto de lo que estábamos haciendo"*.
 
 ---
+## 🏗️ [28 Feb 2026] Refactorización Arquitectónica: Eliminación de globalFaq, StepRedirect y Bridge
+**Problemas Raíz Identificados:**
+1. **Doble Respuesta:** `globalFaq.js` interceptaba mensajes ANTES de los step handlers y luego `_getStepRedirect()` re-inyectaba la pregunta del paso, generando respuestas robóticas.
+2. **Código Duplicado:** La lógica de cálculo de carrito/precio estaba repetida 7 veces en `stepWaitingPlanChoice.ts` y `stepWaitingData.ts`.
+3. **API Calls Innecesarias:** `generateContextualBridge()` añadía una llamada extra a GPT por cada mensaje en pasos clave, sumando latencia sin valor real.
+
+**Cambios Implementados:**
+1. **[ELIMINADO] `globalFaq.js`** — Las FAQs ahora las maneja la IA naturalmente desde el prompt de cada paso.
+2. **[NUEVO] `globalMedia.js`** — Solo intercepta requests de fotos (migrado de globalFaq).
+3. **[ELIMINADO] `_getStepRedirect()`** de `messages.ts` — La IA decide cuándo re-preguntar.
+4. **[NUEVO] `cartHelpers.ts`** — Centraliza `buildCartFromSelection()` y `calculateTotal()`.
+5. **[REFACTORIZADO] `stepWaitingPlanChoice.ts`** — De 355 a ~280 líneas, 5 bloques duplicados eliminados.
+6. **[REFACTORIZADO] `stepWaitingData.ts`** — Usa `cartHelpers` para cambios de producto/plan.
+7. **[SIMPLIFICADO] `stepWaitingWeight.ts` y `stepWaitingPreference.ts`** — Eliminadas 5 llamadas a `generateContextualBridge()`.
+8. **[ACTUALIZADO] `globals/index.js`** — Pipeline: System → Safety → Media (sin FAQ).
+
+**Rama:** `nueva_arquitectura` (para testing aislado en un solo bot antes de producción)
+
+---
 ## 🛑 [28 Feb 2026] Análisis Rápido: IA Ignora Preguntas Múltiples y Repetición de Ubicación
 **Problemas Detectados:**
 1. **Omisión de Preguntas:** Cuando un usuario hacía dos preguntas en un mismo mensaje (ej: "¿Cómo te llamás? ¿Puedo ir a buscarla?"), la IA solo respondía una y pasaba directo al objetivo del paso. Esto se debía a reglas "Respondé EXACTAMENTE" muy rígidas y un límite estricto de "1-2 oraciones".

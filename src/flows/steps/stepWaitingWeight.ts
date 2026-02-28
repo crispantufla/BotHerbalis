@@ -58,18 +58,7 @@ export async function handleWaitingWeight(
             return { matched: true };
         } else {
             const recNode = knowledge.flow.recommendation;
-            let recMsg = _formatMessage(recNode.response, currentState);
-
-            // --- CONTEXTUAL BRIDGE INJECTION ---
-            try {
-                const bridge = await aiService.generateContextualBridge(text, "El cliente me acaba de decir la cantidad de kilos que quiere bajar. Voy a ofrecerle las opciones de tratamiento.");
-                if (bridge) {
-                    recMsg = `${bridge}\n\n${recMsg}`;
-                }
-            } catch (e) {
-                console.error("[BRIDGE] Error generating bridge in weight step:", e);
-            }
-            // -----------------------------------
+            const recMsg = _formatMessage(recNode.response, currentState);
 
             _setStep(currentState, recNode.nextStep);
             currentState.history.push({ role: 'bot', content: recMsg, timestamp: Date.now() });
@@ -126,18 +115,7 @@ export async function handleWaitingWeight(
                     return { matched: true };
                 } else {
                     const recNode = knowledge.flow.recommendation;
-                    let recMsg = _formatMessage(recNode.response, currentState);
-
-                    // --- CONTEXTUAL BRIDGE INJECTION ---
-                    try {
-                        const bridge = await aiService.generateContextualBridge(text, "El cliente me acaba de decir la cantidad de kilos que quiere bajar, después de que le tuve que preguntar. Voy a ofrecerle las opciones de tratamiento.");
-                        if (bridge) {
-                            recMsg = `${bridge}\n\n${recMsg}`;
-                        }
-                    } catch (e) {
-                        console.error("[BRIDGE] Error generating bridge in weight step (AI fallback path):", e);
-                    }
-                    // -----------------------------------
+                    const recMsg = _formatMessage(recNode.response, currentState);
 
                     _setStep(currentState, recNode.nextStep);
                     currentState.history.push({ role: 'bot', content: recMsg, timestamp: Date.now() });

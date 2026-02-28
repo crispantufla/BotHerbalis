@@ -2,6 +2,7 @@ import { UserState, FlowStep } from '../../types/state';
 const { _getPrice, _getAdicionalMAX } = require('../utils/pricing');
 const { _setStep } = require('../utils/flowHelpers');
 const { buildConfirmationMessage } = require('../../utils/messageTemplates');
+const { buildCartFromSelection, calculateTotal } = require('../utils/cartHelpers');
 
 function _handleExtractedData(userId: string, extractedData: string, currentState: UserState) {
     if (!extractedData || extractedData === 'null') return;
@@ -98,31 +99,7 @@ async function handleWaitingPlanChoice(
 
     if (selectedPlanId) {
         const product = currentState.selectedProduct || "Nuez de la India";
-
-        const factor = parseInt(selectedPlanId) / 60;
-        const base120 = parseInt(_getPrice(product, '120').replace(/\./g, ''));
-        const base60 = parseInt(_getPrice(product, '60').replace(/\./g, ''));
-
-        let calculatedPrice = 0;
-        const pairs = Math.floor(factor / 2);
-        const remainder = factor % 2;
-
-        calculatedPrice = (pairs * base120) + (remainder * base60);
-
-        currentState.cart = [{
-            product: product,
-            plan: selectedPlanId,
-            price: calculatedPrice.toLocaleString('es-AR').replace(/,/g, '.')
-        }];
-        currentState.selectedPlan = selectedPlanId;
-        currentState.selectedProduct = product;
-        if (selectedPlanId === '60') {
-            currentState.isContraReembolsoMAX = true;
-            currentState.adicionalMAX = _getAdicionalMAX();
-        } else {
-            currentState.isContraReembolsoMAX = false;
-            currentState.adicionalMAX = 0;
-        }
+        buildCartFromSelection(product, selectedPlanId, currentState);
         planSelected = true;
     }
 
@@ -142,9 +119,7 @@ async function handleWaitingPlanChoice(
             currentState.history.push({ role: 'bot', content: skipMsg2, timestamp: Date.now() });
             await sendMessageWithDelay(userId, skipMsg2);
 
-            const subtotal = currentState.cart.reduce((sum, i) => sum + parseInt(i.price.toString().replace(/\./g, '')), 0);
-            const adicional = currentState.adicionalMAX || 0;
-            currentState.totalPrice = (subtotal + adicional).toLocaleString('es-AR').replace(/,/g, '.');
+            calculateTotal(currentState);
             const summaryMsg = buildConfirmationMessage(currentState);
 
             currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
@@ -184,18 +159,7 @@ async function handleWaitingPlanChoice(
             console.log(`[FLOW-INTERCEPT] User said OK to 120-day plan upsell/AI recommendation: ${userId}`);
 
             const product = currentState.selectedProduct || "Nuez de la India";
-            const plan = '120';
-
-            currentState.selectedPlan = plan;
-            currentState.selectedProduct = product;
-            currentState.isContraReembolsoMAX = false;
-            currentState.adicionalMAX = 0;
-
-            currentState.cart = [{
-                product: product,
-                plan: plan,
-                price: _getPrice(product, plan)
-            }];
+            buildCartFromSelection(product, '120', currentState);
 
             const closingNode = knowledge.flow.closing;
             const addr = currentState.partialAddress || {};
@@ -212,9 +176,7 @@ async function handleWaitingPlanChoice(
                 currentState.history.push({ role: 'bot', content: skipMsg2, timestamp: Date.now() });
                 await sendMessageWithDelay(userId, skipMsg2);
 
-                const subtotal = currentState.cart.reduce((sum, i) => sum + parseInt(i.price.toString().replace(/\./g, '')), 0);
-                const adicional = currentState.adicionalMAX || 0;
-                currentState.totalPrice = (subtotal + adicional).toLocaleString('es-AR').replace(/,/g, '.');
+                calculateTotal(currentState);
                 const summaryMsg = buildConfirmationMessage(currentState);
 
                 currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
@@ -279,24 +241,7 @@ async function handleWaitingPlanChoice(
                     const plan = planMatchAI ? planMatchAI[1] : '60';
                     const product = currentState.selectedProduct || "Nuez de la India";
 
-                    currentState.selectedPlan = plan;
-                    currentState.selectedProduct = product;
-
-                    const factor = parseInt(plan) / 60;
-                    const base120 = parseInt(_getPrice(product, '120').replace(/\./g, ''));
-                    const base60 = parseInt(_getPrice(product, '60').replace(/\./g, ''));
-
-                    let calculatedPrice = 0;
-                    const pairs = Math.floor(factor / 2);
-                    const remainder = factor % 2;
-
-                    calculatedPrice = (pairs * base120) + (remainder * base60);
-
-                    currentState.cart = [{
-                        product: product,
-                        plan: plan,
-                        price: calculatedPrice.toLocaleString('es-AR').replace(/,/g, '.')
-                    }];
+                    buildCartFromSelection(product, plan, currentState);
 
                     const closingNode = knowledge.flow.closing;
                     const addr = currentState.partialAddress || {};
@@ -312,9 +257,7 @@ async function handleWaitingPlanChoice(
                         currentState.history.push({ role: 'bot', content: skipMsg, timestamp: Date.now() });
                         await sendMessageWithDelay(userId, skipMsg);
 
-                        const subtotal = currentState.cart.reduce((sum, i) => sum + parseInt(i.price.toString().replace(/\./g, '')), 0);
-                        const adicional = currentState.adicionalMAX || 0;
-                        currentState.totalPrice = (subtotal + adicional).toLocaleString('es-AR').replace(/,/g, '.');
+                        calculateTotal(currentState);
                         const summaryMsg = buildConfirmationMessage(currentState);
 
                         currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });

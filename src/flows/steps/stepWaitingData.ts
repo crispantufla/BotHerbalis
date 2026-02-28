@@ -3,6 +3,7 @@ const { validateAddress } = require('../../services/addressValidator');
 const { buildConfirmationMessage } = require('../../utils/messageTemplates');
 const { _setStep, _pauseAndAlert } = require('../utils/flowHelpers');
 const { _getPrice, _getAdicionalMAX } = require('../utils/pricing');
+const { buildCartFromSelection, calculateTotal } = require('../utils/cartHelpers');
 const { _isDuplicate } = require('../utils/messages');
 
 export async function handleWaitingData(
@@ -74,18 +75,10 @@ export async function handleWaitingData(
 
             if (newPlan) {
                 const priceStr = _getPrice(newProduct, newPlan);
-                let basePrice = parseInt(priceStr.replace(/\./g, ''));
-                currentState.cart = [{ product: newProduct, plan: newPlan, price: priceStr }];
-
-                let finalAdicional = 0;
-                if (currentState.isContraReembolsoMAX) {
-                    finalAdicional = newPlan === "60" ? _getAdicionalMAX() : 0;
-                }
-                currentState.adicionalMAX = finalAdicional;
-                const finalPrice = basePrice + finalAdicional;
-                currentState.totalPrice = finalPrice.toLocaleString('es-AR').replace(/,/g, '.');
+                buildCartFromSelection(newProduct, newPlan, currentState);
 
                 const planText = newPlan === "120" ? "120 días" : "60 días";
+                calculateTotal(currentState);
                 const changeMsg = `¡Dale, sin problema! 😊 Cambiamos a ${newProduct.split(' de ')[0].toLowerCase()} por ${planText}, tienen un valor de $${currentState.totalPrice}.`;
                 currentState.history.push({ role: 'bot', content: changeMsg, timestamp: Date.now() });
                 await sendMessageWithDelay(userId, changeMsg);

@@ -65,23 +65,6 @@ function _isDuplicate(proposedMsg: string, history: any[]): boolean {
     return false;
 }
 
-/**
- * _getStepRedirect
- * Returns a brief message to steer the user back to the current step's pending question.
- * This is used after FAQ answers and AI fallbacks to keep the conversation on track.
- */
-function _getStepRedirect(step: string, state: any): string | null {
-    const redirects: Record<string, string> = {
-        'waiting_weight': '👉 Entonces, ¿cuántos kilos querés bajar aproximadamente?',
-        'waiting_preference': '👉 Dicho esto... ¿preferís cápsulas (opción 1) o semillas (opción 2)?',
-        'waiting_price_confirmation': '👉 ¿Querés que te pase los precios?',
-        'waiting_plan_choice': '👉 Entonces, ¿con qué plan te gustaría avanzar? 60 o 120 días?',
-        'waiting_ok': '👉 ¿Te resulta posible retirar en sucursal si fuera necesario? SÍ o NO',
-        'waiting_data': '👉 Pasame los datos para el envío: nombre, calle y número, ciudad y código postal.',
-        'waiting_final_confirmation': '👉 Confirmame que podrás recibir o retirar el pedido sin inconvenientes.',
-    };
-    return redirects[step] || null;
-}
 
 /**
  * _getAdminSuggestions
@@ -123,7 +106,6 @@ function _getAdminSuggestions(step: string, userMessage: string): string[] {
 module.exports = {
     _formatMessage,
     _isDuplicate,
-    _getStepRedirect,
     _getAdminSuggestions
 };
 export { };
