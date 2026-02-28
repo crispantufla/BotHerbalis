@@ -99,6 +99,8 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
                     setChats((prev) => {
                         if (!Array.isArray(prev)) return [];
                         const currentSelectedId = selectedChatRef.current?.id;
+                        const existingChat = prev.find(c => c.id === data.chatId);
+
                         if (existingChat) {
                             return prev.map((c) => c.id === data.chatId ? {
                                 ...c,
