@@ -45,14 +45,21 @@ module.exports = (client, sharedState) => {
             });
 
             // Workaround for Prisma adapter-pg composite key bug with include: { user: true }
-            const userPhones = [...new Set(orders.map(o => o.userPhone))];
-            const instanceIds = [...new Set(orders.map(o => o.instanceId))];
-            const users = await prisma.user.findMany({
-                where: {
-                    phone: { in: userPhones },
-                    instanceId: { in: instanceIds }
-                }
-            });
+            const userPhones = [...new Set(orders.map(o => o.userPhone).filter(Boolean))];
+            const instanceIds = [...new Set(orders.map(o => o.instanceId).filter(Boolean))];
+
+            let users = [];
+            if (userPhones.length > 0 && instanceIds.length > 0) {
+                users = await prisma.user.findMany({
+                    where: {
+                        OR: userPhones.map(phone => ({
+                            phone,
+                            instanceId: { in: instanceIds }
+                        }))
+                    }
+                });
+            }
+
             const userMap = new Map();
             users.forEach(u => userMap.set(`${u.phone}_${u.instanceId}`, u));
 
