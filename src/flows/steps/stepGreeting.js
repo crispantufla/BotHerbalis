@@ -29,14 +29,13 @@ async function handleGreeting(userId, text, currentState, knowledge, dependencie
         return await processSalesFlow(userId, text, fakeUserStateMap, knowledge, dependencies);
     }
 
-    // --- CHECK: Ad Interaction (User manual push) ---
-    // If the message is exactly the ad trigger, the user implies they are sending it on behalf of the customer
-    // The bot should simply acknowledge the state change without sending an explicit response yet.
+    // --- CHECK: Ad Interaction ---
+    // When a user clicks a Facebook/Instagram ad, WhatsApp sends an e2e_notification
+    // which gets converted to "Hola! (Vengo de un anuncio)" by the message handler.
+    // We treat this as a normal greeting and send the full presentation.
     if (text.trim() === 'Hola! (Vengo de un anuncio)') {
-        console.log(`[GREETING] Ad trigger detected for ${userId}. Skipping auto-greeting.`);
-        _setStep(currentState, knowledge.flow.greeting.nextStep);
-        saveState(userId);
-        return { matched: true };
+        console.log(`[GREETING] Ad trigger detected for ${userId}. Sending full greeting.`);
+        // Fall through to the normal greeting logic below (don't return early)
     }
 
     // --- METRICS TRACKING ---

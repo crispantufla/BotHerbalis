@@ -32,6 +32,7 @@ module.exports = (client, sharedState) => {
         } else {
             pausedUsers.delete(chatId);
         }
+        logger.info(`[API] admin toggle-bot: ${chatId} → ${paused ? 'PAUSED' : 'UNPAUSED'} (via admin API)`);
         saveState();
         if (io) io.emit('bot_status_change', { chatId, paused });
         res.json({ success: true, paused });

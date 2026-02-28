@@ -268,6 +268,51 @@ function cleanupOldUsers(sharedState: SchedulerSharedState, dependencies: Schedu
     }
 }
 
+/**
+ * cleanStalePausedUsers — Prevent indefinite pause accumulation
+ * Removes users from pausedUsers if they've been inactive for >7 days
+ * and are not in an active mid-funnel step. This prevents the "paused forever" bug
+ * where users who contacted weeks ago remain permanently blocked.
+ */
+function cleanStalePausedUsers(sharedState: SchedulerSharedState, dependencies: SchedulerDependencies): void {
+    const { userState, pausedUsers } = sharedState;
+    const { saveState } = dependencies;
+    const now = Date.now();
+    const STALE_PAUSE_DAYS = 7;
+    let cleaned = 0;
+
+    // Active steps that should NOT be auto-unpaused (admin may still be handling them)
+    const ACTIVE_STEPS = new Set([
+        'waiting_admin_ok', 'waiting_final_confirmation', 'waiting_data'
+    ]);
+
+    for (const userId of Array.from(pausedUsers)) {
+        const state = userState[userId];
+
+        // If no state exists at all, this user was cleaned up but pause persisted — remove it
+        if (!state) {
+            pausedUsers.delete(userId);
+            cleaned++;
+            continue;
+        }
+
+        // Don't auto-unpause users in active admin-managed steps
+        if (ACTIVE_STEPS.has(state.step)) continue;
+
+        const lastActivity = state.lastActivityAt || state.stepEnteredAt || 0;
+        if (lastActivity && differenceInDays(now, lastActivity) > STALE_PAUSE_DAYS) {
+            logger.info(`[SCHEDULER] Removing stale pause for ${userId} (inactive ${differenceInDays(now, lastActivity)} days, step: ${state.step})`);
+            pausedUsers.delete(userId);
+            cleaned++;
+        }
+    }
+
+    if (cleaned > 0) {
+        logger.info(`[SCHEDULER] ✅ Cleaned ${cleaned} stale paused user(s) (>7 days inactive)`);
+        saveState();
+    }
+}
+
 // ══════════════════════════════════════════════════════════════
 // CRON SCHEDULER — All times in Argentina (UTC-3)
 // ══════════════════════════════════════════════════════════════
@@ -296,10 +341,22 @@ function startScheduler(sharedState: SchedulerSharedState, dependencies: Schedul
     }, { timezone: TIMEZONE });
     logger.info('[SCHEDULER] ✅ cleanupOldUsers → 04:00 ARG (diario)');
 
+    // ── STALE PAUSE CLEANUP: a las 5am Argentina ──
+    // Limpia pausas viejas (>7 días inactivos) para evitar acumulación infinita.
+    cron.schedule('0 5 * * *', () => {
+        cleanStalePausedUsers(sharedState, dependencies);
+    }, { timezone: TIMEZONE });
+    logger.info('[SCHEDULER] ✅ cleanStalePausedUsers → 05:00 ARG (diario)');
+
     // ── Run auto-approve once 10s after boot (no cold lead/cleanup needed at startup) ──
     setTimeout(() => {
         autoApproveOrders(sharedState, dependencies);
     }, 10000);
+
+    // ── Run stale pause cleanup once 15s after boot ──
+    setTimeout(() => {
+        cleanStalePausedUsers(sharedState, dependencies);
+    }, 15000);
 }
 
-export { startScheduler, checkStaleUsers, checkColdLeads, checkAbandonedCarts, autoApproveOrders };
+export { startScheduler, checkStaleUsers, checkColdLeads, checkAbandonedCarts, autoApproveOrders, cleanStalePausedUsers };
