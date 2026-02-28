@@ -26,6 +26,7 @@ const AdvancedAnalyticsViewV2 = () => {
     const [loading, setLoading] = useState(true);
     const [daysAgoToFetch, setDaysAgoToFetch] = useState(30);
     const [instanceScope, setInstanceScope] = useState('current'); // 'current' or 'all'
+    const [currentInstanceId, setCurrentInstanceId] = useState(null); // actual INSTANCE_ID from server
     const [data, setData] = useState({
         overview: null,
         products: { popularity: [], duration: [] },
@@ -33,15 +34,28 @@ const AdvancedAnalyticsViewV2 = () => {
         charts: { chartData: [], pieData: [] } // From original basic stats
     });
 
+    // Fetch the current bot's INSTANCE_ID from /status on mount
+    useEffect(() => {
+        api.get('/api/status').then(res => {
+            const id = res.data?.instanceId || res.data?.info?.wid?.user || null;
+            setCurrentInstanceId(id);
+        }).catch(() => { });
+    }, []);
+
     const fetchAllData = async () => {
         try {
             setLoading(true);
 
+            // Build instanceId param for 'Solo este bot' filter
+            const instanceIdParam = instanceScope === 'current' && currentInstanceId
+                ? `&instanceId=${encodeURIComponent(currentInstanceId)}`
+                : '';
+
             // Fetch all 4 endpoints in parallel
             const [overviewRes, productsRes, demoRes, chartsRes] = await Promise.all([
-                api.get(`/api/analytics/overview?days=${daysAgoToFetch}&instance=${instanceScope}`),
-                api.get(`/api/analytics/products?days=${daysAgoToFetch}&instance=${instanceScope}`),
-                api.get(`/api/analytics/demographics?days=${daysAgoToFetch}&instance=${instanceScope}`),
+                api.get(`/api/analytics/overview?days=${daysAgoToFetch}&instance=${instanceScope}${instanceIdParam}`),
+                api.get(`/api/analytics/products?days=${daysAgoToFetch}&instance=${instanceScope}${instanceIdParam}`),
+                api.get(`/api/analytics/demographics?days=${daysAgoToFetch}&instance=${instanceScope}${instanceIdParam}`),
                 api.get('/api/stats/charts') // Kept for the daily revenue line chart
             ]);
 

@@ -39,6 +39,7 @@ module.exports = (client, sharedState) => {
             status: qrCodeData ? 'scan_qr' : (isConnected ? 'ready' : 'initializing'),
             qr: qrCodeData,
             info: isConnected && client ? client.info : null,
+            instanceId: process.env.INSTANCE_ID || 'default',
             config: config
         });
     });

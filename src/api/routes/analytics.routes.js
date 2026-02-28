@@ -34,12 +34,12 @@ module.exports = (client, sharedState) => {
         try {
             const days = parseInt(req.query.days) || 30;
             const instanceFilter = req.query.instance; // e.g. "current" or "all"
+            const instanceId = req.query.instanceId; // explicit instanceId from client
             const { currentStart, previousStart, previousEnd } = getPeriods(days);
-            const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
 
             const baseWhere = { status: { not: 'Cancelado' } };
-            if (instanceFilter === 'current') {
-                baseWhere.instanceId = INSTANCE_ID;
+            if (instanceFilter === 'current' && instanceId) {
+                baseWhere.instanceId = instanceId;
             }
 
             // Fetch current period data
@@ -90,12 +90,12 @@ module.exports = (client, sharedState) => {
         try {
             const days = parseInt(req.query.days) || 30;
             const instanceFilter = req.query.instance;
+            const instanceId = req.query.instanceId;
             const { currentStart } = getPeriods(days);
-            const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
 
             const baseWhere = { status: { not: 'Cancelado' } };
-            if (instanceFilter === 'current') {
-                baseWhere.instanceId = INSTANCE_ID;
+            if (instanceFilter === 'current' && instanceId) {
+                baseWhere.instanceId = instanceId;
             }
 
             const orders = await prisma.order.findMany({
@@ -173,15 +173,15 @@ module.exports = (client, sharedState) => {
         try {
             const days = parseInt(req.query.days) || 30;
             const instanceFilter = req.query.instance;
+            const instanceId = req.query.instanceId;
             const { currentStart } = getPeriods(days);
-            const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
 
             const baseWhere = { status: { not: 'Cancelado' } };
             const baseUserWhere = {}; // Users table has no 'status' field
 
-            if (instanceFilter === 'current') {
-                baseWhere.instanceId = INSTANCE_ID;
-                baseUserWhere.instanceId = INSTANCE_ID;
+            if (instanceFilter === 'current' && instanceId) {
+                baseWhere.instanceId = instanceId;
+                baseUserWhere.instanceId = instanceId;
             }
 
             // Top provinces
