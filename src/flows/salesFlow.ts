@@ -70,9 +70,61 @@ export async function processSalesFlow(
             console.error(`[ORDER-CHECK] Failed to query orders for ${userId}:`, err.message);
         }
 
+        // --- CHECK 1.5: Cross-Instance Duplicate Detection ---
+        // If this phone is already in an active sales flow on ANOTHER bot instance,
+        // redirect them politely instead of starting a duplicate conversation.
+        if (userState[userId].step !== 'completed') {
+            try {
+                const { prisma } = require('../../db');
+                const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
+                const cleanPhone = userId.split('@')[0].replace(/\\D/g, '');
+
+                const otherInstanceUsers = await prisma.user.findMany({
+                    where: {
+                        phone: cleanPhone,
+                        instanceId: { not: INSTANCE_ID }
+                    },
+                    select: { instanceId: true, profileData: true }
+                });
+
+                // Check if any of those other instances have an active (mid-funnel) conversation
+                const activeInOtherBot = otherInstanceUsers.some((u: any) => {
+                    try {
+                        const data = JSON.parse(u.profileData || '{}');
+                        const step = data.step || 'greeting';
+                        // Consider "active" if they're past greeting but not yet completed/rejected
+                        const activeSteps = ['waiting_weight', 'waiting_preference', 'waiting_price_confirmation', 'waiting_plan_choice', 'waiting_ok', 'waiting_data', 'waiting_final_confirmation'];
+                        return activeSteps.includes(step);
+                    } catch (e) { return false; }
+                });
+
+                if (activeInOtherBot) {
+                    console.log(`[CROSS-BOT] User ${userId} is already active in another bot instance. Sending redirect.`);
+
+                    if (dependencies.sendMessageWithDelay) {
+                        await dependencies.sendMessageWithDelay(
+                            userId,
+                            "¡Hola! Ya te está atendiendo mi compañera por el otro número 😊 Seguí la charla por ahí así no nos pisamos. ¡Cualquier cosa acá estoy!"
+                        );
+                    }
+
+                    // Auto-pause this instance to prevent further messages
+                    if (dependencies.sharedState?.pausedUsers) {
+                        dependencies.sharedState.pausedUsers.add(userId);
+                    }
+                    userState[userId].step = 'cross_bot_redirected';
+                    saveState(userId);
+                    return { matched: true, paused: true };
+                }
+            } catch (err: any) {
+                console.error(`[CROSS-BOT] Failed to check other instances for ${userId}:`, err.message);
+                // Non-blocking: if DB fails, just proceed normally
+            }
+        }
+
         // --- CHECK 2: WhatsApp Chat History Detection ---
         // Only run this if we didn't already route to post-sale via Orders
-        if (userState[userId].step !== 'completed') {
+        if (userState[userId].step !== 'completed' && userState[userId].step !== 'cross_bot_redirected') {
             try {
                 if (dependencies.client) {
                     const chat = await dependencies.client.getChatById(userId);
