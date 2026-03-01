@@ -1,0 +1,147 @@
+# 🔍 Simulación: 50 Preguntas que el Bot NO sabe responder
+
+Analicé todas las FAQ de [knowledge_v4.json](file:///d:/Bot%20Whatsapp/knowledge_v4.json), las 24 reglas del core prompt, los 7 módulos de IA, y [globalSafety.js](file:///d:/Bot%20Whatsapp/src/flows/globals/globalSafety.js). Acá están los agujeros encontrados.
+
+**Leyenda de severidad:**
+- 🔴 **CRÍTICO** — El bot probablemente crashea, ignora, o inventa algo mal
+- 🟡 **MEDIO** — El bot se las puede arreglar con la IA, pero mal o incompleto
+- 🟢 **BAJO** — La IA podría manejarlo, pero sin datos precisos
+
+---
+
+## 1. 🏥 SALUD Y COMPATIBILIDAD (Preguntas médicas)
+
+| # | Pregunta del usuario | Paso | Severidad | Qué hace el bot ahora | Fix sugerido |
+|---|-----|------|-----------|----------------------|-------------|
+| 1 | *"¿Se puede tomar con otros medicamentos?"* | `waiting_preference` | 🟡 | IA improvisa. No tiene data clara | Agregar FAQ: "Es 100% natural y no interfiere con medicamentos. La única contraindicación es embarazo/lactancia" |
+| 2 | *"Tengo gastritis, ¿la puedo tomar?"* | `waiting_weight` | 🔴 | `globalSafety` NO se activa (no matchea regex). IA no tiene info | Agregar keyword "gastritis" al FAQ de diabetes/patologías |
+| 3 | *"¿Se puede tomar si tengo colesterol alto?"* | `waiting_preference` | 🔴 | Igual que gastritis — no matchea safety ni FAQ | Agregar "colesterol" a keywords de patologías |
+| 4 | *"Tengo problemas de corazón / tengo un marcapasos"* | `waiting_plan_choice` | 🔴 | Safety NO se activa. IA puede inventar | Agregar "corazon", "marcapasos", "cardiaco", "arritmia" al safety check o FAQ |
+| 5 | *"¿Se puede tomar con alcohol?"* | `waiting_plan_choice` | 🟡 | IA no tiene data. Puede inventar | Agregar FAQ: "No tiene interacción, pero recomendamos moderación como con cualquier tratamiento" |
+| 6 | *"¿Puedo tomar mate/café mientras hago el tratamiento?"* | `waiting_ok` | 🟡 | IA no sabe. Regla 5 dice "no inventes" → puede quedar muda | FAQ: "Sí, podés tomar mate y café normal" |
+| 7 | *"¿Se puede tomar durante la menstruación?"* | `waiting_preference` | 🟡 | Sin data. IA inventa o se traba | FAQ: "Sí, no hay problema" |
+| 8 | *"¿Sirve para la tiroides?" (sin decir "hipotiroidismo")* | `waiting_weight` | 🟡 | FAQ matchea "tiroides". OK ✅ | — |
+| 9 | *"Tengo 75 años, ¿puedo tomarla?"* | `greeting` | 🔴 | Safety tiene regex para `<18` pero NO para `>70`. El prompt dice rechazar `>80` pero no hay interceptor para 70-80. Gotas sí dan para >70 pero el bot puede rechazar | Agregar lógica para >70: recomendar gotas. >80: rechazar |
+| 10 | *"Es para mi mamá que tiene 82 años"* | `waiting_weight` | 🔴 | Safety NO detecta esto. IA podría no rechazar | Agregar "82 años", "mayor de 80" al safety regex |
+
+---
+
+## 2. 📦 PRODUCTO (Composición, contenido, calidad)
+
+| # | Pregunta del usuario | Paso | Severidad | Qué hace el bot ahora | Fix sugerido |
+|---|-----|------|-----------|----------------------|-------------|
+| 11 | *"¿Cuántas cápsulas vienen en el envase?"* | `waiting_plan_choice` | 🔴 | No tiene dato. IA inventa o se traba | FAQ: "El plan de 60 días trae 60 cápsulas (1 por día). El de 120, 120 cápsulas" |
+| 12 | *"¿Qué ingredientes tiene?"* | `waiting_preference` | 🔴 | Regla 5 dice no inventar. Puede quedar muda | FAQ: "Es derivado 100% natural de la Nuez de la India. Sin químicos ni conservantes" |
+| 13 | *"¿Tiene ANMAT?" / "¿Está aprobado?"* | `waiting_ok` | 🔴 | Sin info. IA puede inventar un registro falso | FAQ: "Es un suplemento natural, no requiere receta. Trabajamos hace 13 años con +15.000 clientes" |
+| 14 | *"¿Es vegano?" / "¿Es apto celíacos?"* | `waiting_preference` | 🟡 | Sin data | FAQ: "Sí, es 100% de origen vegetal y libre de gluten" |
+| 15 | *"¿Tiene fecha de vencimiento?" / "¿Cuánto dura?"* | `waiting_ok` | 🟡 | Sin data | FAQ: "Sí, tiene amplia vida útil. Te llega siempre fresco" |
+| 16 | *"¿De dónde sale la nuez?"* / *"¿Quién lo fabrica?"* | `waiting_weight` | 🟡 | Puede inventar país de origen | FAQ: "Es de origen importado, procesado acá en Argentina bajo nuestros estándares" |
+| 17 | *"¿Puedo tomar dos cápsulas por día para bajar más rápido?"* | `waiting_plan_choice` | 🔴 | Puede decir que sí (peligroso) | FAQ: "No, la dosis es 1 por día. Más no es mejor y puede causar malestar innecesario" |
+| 18 | *"¿Viene el paquete discreto?" / "¿Se nota qué es?"* | `waiting_data` | 🟡 | Sin data | FAQ: "Sí, el paquete es discreto, sin marcas visibles del contenido" |
+| 19 | *"¿Es lo mismo que la nuez de Brasil?"* | `waiting_weight` | 🟡 | Puede confundir | FAQ: "No, son diferentes. La Nuez de la India es específica para bajar de peso" |
+| 20 | *"¿Puedo combinar cápsulas y semillas?"* | `waiting_plan_choice` | 🟡 | Sin info | FAQ: "No es necesario, cada formato tiene la dosis completa" |
+
+---
+
+## 3. 🚚 LOGÍSTICA Y ENVÍO (Tracking, problemas, zonas)
+
+| # | Pregunta del usuario | Paso | Severidad | Qué hace el bot ahora | Fix sugerido |
+|---|-----|------|-----------|----------------------|-------------|
+| 21 | *"¿Se puede rastrear el envío?"* / *"¿Me dan un tracking?"* | `waiting_ok` | 🔴 | Sin data. Respuesta depende de si realmente dan tracking | FAQ: "Sí, una vez despachado te paso el código de seguimiento para que rastrees tu paquete" |
+| 22 | *"¿Qué pasa si llega roto/dañado?"* | `waiting_ok` | 🟡 | Sin data | FAQ: "Si llega en mal estado, nos avisás y te reenviamos sin costo" |
+| 23 | *"¿Envían a Tierra del Fuego?" / "¿Llega al interior?"* | `waiting_data` | 🟡 | Dice "envíos a todo el país" pero sin confirmar zonas extremas | FAQ: "Sí, enviamos a todo el país, incluidas provincias del sur e islas" |
+| 24 | *"¿Se puede retirar en persona?"* / *"¿Tienen pick-up?"* | `waiting_preference` | 🟡 | FAQ cubre "local físico" (no tienen) pero no cubre retiro directo | FAQ: "No tenemos punto de retiro, es envío a domicilio por Correo Argentino" |
+| 25 | *"¿Puedo pagar con QR al cartero?"* | `waiting_ok` | 🟡 | FAQ cubre tarjeta/MP pero no QR específicamente | Agregar "qr" a keywords de pago |
+
+---
+
+## 4. 💸 COMERCIAL (Descuentos, recompras, facturación)
+
+| # | Pregunta del usuario | Paso | Severidad | Qué hace el bot ahora | Fix sugerido |
+|---|-----|------|-----------|----------------------|-------------|
+| 26 | *"¿Hacen factura?"* / *"¿Me dan un comprobante?"* | `waiting_ok` | 🔴 | Sin info. IA puede inventar | FAQ con la respuesta real del negocio (¿hacen factura o no?) |
+| 27 | *"Ya compré antes, ¿tengo descuento?"* | `greeting` | 🟡 | Post-sale debería activarse pero puede no detectarlo si no hay orden en DB | El sistema ya detecta órdenes previas, pero el descuento por recompra no está documentado |
+| 28 | *"¿Tienen muestras gratis?"* | `waiting_preference` | 🟡 | Sin data | FAQ: "No manejamos muestras, pero pagás al recibir, así que no arriesgás nada" |
+| 29 | *"¿Me hacen precio por 3?"* / *"Quiero para mis amigas"* | `waiting_plan_choice` | 🟡 | El prompt tiene descuentos por volumen pero SOLO si preguntan. Esto SÍ aplica ✅ | — |
+| 30 | *"¿Devuelven la plata si no funciona?"* / *"¿Hay garantía?"* | `waiting_ok` | 🔴 | Sin info. IA puede inventar una garantía falsa | FAQ con la política real del negocio |
+
+---
+
+## 5. 🤔 CONFIANZA Y PRUEBA SOCIAL
+
+| # | Pregunta del usuario | Paso | Severidad | Qué hace el bot ahora | Fix sugerido |
+|---|-----|------|-----------|----------------------|-------------|
+| 31 | *"¿Tienen testimonios?" / "¿Puedo ver resultados?"* | `waiting_preference` | 🔴 | Sin data. Puede inventar testimonios | FAQ: "Sí, te mando fotos de resultados de clientes" + enviar fotos de galería? |
+| 32 | *"¿Cómo sé que es un negocio real?"* | `waiting_ok` | 🟡 | FAQ cubre "estafa" parcialmente. Pero esto no triggerea esos keywords | Agregar "negocio real", "empresa real", "confiable" a keywords de estafa |
+| 33 | *"¿Tienen CUIT?" / "¿Están registrados?"* | `waiting_ok` | 🔴 | Sin info | FAQ: dato real del negocio |
+| 34 | *"Lo vi en TikTok/YouTube, ¿son ustedes?"* | `greeting` | 🟡 | Sin data | FAQ: "No tenemos cuenta oficial en TikTok, operamos solo por WhatsApp y Facebook" |
+
+---
+
+## 6. ⏰ TEMPORALIDAD Y RESULTADOS
+
+| # | Pregunta del usuario | Paso | Severidad | Qué hace el bot ahora | Fix sugerido |
+|---|-----|------|-----------|----------------------|-------------|
+| 35 | *"¿A partir de cuándo se ven resultados?"* | `waiting_plan_choice` | 🟡 | FAQ tiene "cuantos kilos" pero no "cuándo". IA puede inventar plazos | FAQ: "Los primeros cambios se suelen notar entre la 2da y 3ra semana. Cada cuerpo es diferente" |
+| 36 | *"¿Qué pasa si dejo de tomarlo a la mitad?"* | `waiting_ok` | 🟡 | Sin data | FAQ: "Lo ideal es completar el tratamiento. Si dejás, no pasa nada malo, pero los resultados pueden ser parciales" |
+| 37 | *"¿Qué pasa si me olvido de tomar un día?"* | `post_sale` | 🟡 | Sin data | FAQ: "No pasa nada, al otro día seguís normal" |
+| 38 | *"¿Puedo tomarlo de noche en vez de antes de la comida?"* | `waiting_plan_choice` | 🟡 | Módulo consumo dice "antes de comida principal". No cubre este edge case | FAQ: "Lo ideal es media hora antes de la comida principal, pero si te es más cómodo a la noche, también funciona" |
+| 39 | *"¿Cuánto dura el tratamiento completo?"* | `waiting_weight` | 🟡 | FAQ cubre "30 días" pero no "cuánto dura" genérico | Agregar keywords: "cuanto dura", "duracion", "tiempo de tratamiento" |
+
+---
+
+## 7. 👤 CONTEXTO PERSONAL
+
+| # | Pregunta del usuario | Paso | Severidad | Qué hace el bot ahora | Fix sugerido |
+|---|-----|------|-----------|----------------------|-------------|
+| 40 | *"¿Funciona para hombres?"* | `waiting_weight` | 🟡 | Sin data explícita | FAQ: "Sí, funciona tanto para hombres como mujeres" |
+| 41 | *"Estoy amamantando pero ya tiene 2 años"* | `waiting_preference` | 🔴 | Safety detecta "lactancia" → rechaza. Pero lactancia prolongada >2 años es edge case | Necesita intervención humana — depende de política del negocio |
+| 42 | *"Soy vegetariana, ¿puedo tomarlo?"* | `waiting_preference` | 🟡 | Sin data | FAQ: "Sí, es 100% de origen vegetal" |
+| 43 | *"Quiero bajar 3 kilos nomás"* | `waiting_weight` | 🟡 | El bot debería recomendar gotas pero puede no hacerlo | El prompt dice gotas para <10kg, debería funcionar si la IA lo procesa bien |
+| 44 | *"Es para mi perro/mascota"* | `greeting` | 🟡 | Sin data. IA puede seguir vendiendo | FAQ: "Nuestros productos son exclusivamente para consumo humano" |
+| 45 | *"Estoy operada del estómago / bypass gástrico"* | `waiting_preference` | 🔴 | Safety NO lo detecta. IA puede vender cuando debería alertar | Agregar al safety: "bypass", "operada del estomago", "manga gastrica", "bariatrica" |
+
+---
+
+## 8. 📱 INTERACCIÓN Y META-PREGUNTAS
+
+| # | Pregunta del usuario | Paso | Severidad | Qué hace el bot ahora | Fix sugerido |
+|---|-----|------|-----------|----------------------|-------------|
+| 46 | *"¿Puedo hablar con alguien por teléfono?"* | cualquiera | 🟡 | Regla 9 dice no derivar. Pero no ofrece alternativa | FAQ: "Podemos resolver todo por acá mismo 😊 Decime tu duda" |
+| 47 | *"¿Hablo con una persona o un robot?"* | cualquiera | 🟢 | Core prompt cubre esto ✅ | — |
+| 48 | *"No me llegó el anterior pedido"* | `post_sale` | 🟡 | Post-sale dice NEED_ADMIN para reclamos complejos. OK parcial | Funciona, pero la IA puede intentar resolver sola y dar info incorrecta de tracking |
+| 49 | *"Quiero cancelar mi pedido"* | `post_sale`/`waiting_ok` | 🟡 | Extraction rules tienen CANCEL_ORDER pero la respuesta puede ser rara | La IA responde con "Qué pena..." pero no hay flujo de cancelación real |
+| 50 | *Envía solo un emoji* 😂 / *Envía un sticker* | cualquiera | 🟡 | Regla 10: "<3 palabras sin contexto". Puede crashear con emojis | Agregar detección de mensajes vacíos o solo-emoji |
+
+---
+
+## 📊 Resumen por prioridad
+
+### 🔴 CRÍTICOS — 14 escenarios que NECESITAN fix urgente
+
+| Área | Escenarios | Solución |
+|------|-----------|----------|
+| **Salud** | #2 gastritis, #3 colesterol, #4 corazón, #9 >70 años, #10 >80 años, #45 bypass | Ampliar Safety regex + agregar keywords a FAQ patologías |
+| **Producto** | #11 cuántas cápsulas, #12 ingredientes, #17 doble dosis | Agregar FAQs con datos reales del producto |
+| **Comercial** | #13 ANMAT, #26 factura, #30 garantía, #31 testimonios | ⚠️ **Necesito TUS respuestas** para estas — dependen de la realidad del negocio |
+
+### 🟡 MEDIOS — 29 escenarios mejorables
+
+Mayormente resolubles con FAQs simples en [knowledge_v4.json](file:///d:/Bot%20Whatsapp/knowledge_v4.json).
+
+### 🟢 BAJOS — 2 escenarios ya cubiertos parcialmente
+
+---
+
+## ❓ Preguntas para vos (necesito respuestas reales)
+
+Antes de poder agregar las FAQs para los escenarios críticos, necesito saber la respuesta REAL del negocio:
+
+1. **¿Hacen factura?** (Escenario #26)
+2. **¿Hay garantía o política de devolución?** (Escenario #30)
+3. **¿Dan código de tracking?** (Escenario #21)
+4. **¿Tienen CUIT/están registrados como negocio?** (Escenario #33)
+5. **¿Qué pasa con bypass gástrico, ¿se les puede vender o no?** (Escenario #45)
+6. **¿Cuántas cápsulas/semillas/gotas trae cada envase?** (Escenario #11)
+7. **¿Tienen testimonios reales para compartir?** (Escenario #31)
+8. **¿El paquete viene discreto?** (Escenario #18)

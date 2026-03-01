@@ -5,6 +5,7 @@ const path = require('path');
 const { authMiddleware } = require('../../middleware/auth');
 const validate = require('../../middleware/validate');
 const { pricesSchema, scriptSwitchSchema, pairingCodeSchema } = require('../../schemas/system.schema');
+const { aiService } = require('../../../src/services/ai');
 
 module.exports = (client, sharedState) => {
     const router = express.Router();
@@ -13,7 +14,6 @@ module.exports = (client, sharedState) => {
 
     // GET /health — Real system health check
     router.get('/health', (req, res) => {
-        const { aiService } = require('../../../src/services/ai');
         const memUsage = process.memoryUsage();
         res.json({
             status: sharedState.isConnected ? 'ok' : 'degraded',

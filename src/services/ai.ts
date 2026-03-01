@@ -129,7 +129,7 @@ let _pricesCache: Record<string, any> | null = null;
 let _pricesCacheTime = 0;
 const PRICES_CACHE_MS = 60 * 1000;
 
-function _getPrices(): Record<string, any> {
+async function _getPrices(): Promise<Record<string, any>> {
     const now = Date.now();
     if (_pricesCache && (now - _pricesCacheTime) < PRICES_CACHE_MS) return _pricesCache;
     let prices: Record<string, any> = {
@@ -141,7 +141,7 @@ function _getPrices(): Record<string, any> {
     };
     try {
         if (fs.existsSync(PRICES_PATH)) {
-            const data = JSON.parse(fs.readFileSync(PRICES_PATH, 'utf8'));
+            const data = JSON.parse(await fs.promises.readFile(PRICES_PATH, 'utf8'));
             prices = { ...prices, ...data };
         }
     } catch (e: any) { logger.error("Error reading prices for AI:", e.message); }
@@ -319,8 +319,8 @@ DEBES LLAMAR A LA HERRAMIENTA 'control_dialog_flow' PARA EMITIR TU RESPUESTA AL 
 }
 
 // ── PROMPT BUILDER — Selects the right module for each step ──
-function _buildSystemPrompt(step: string, userText: string = ""): string {
-    const prices = _getPrices();
+async function _buildSystemPrompt(step: string, userText: string = ""): Promise<string> {
+    const prices = await _getPrices();
     let module;
 
     switch (step) {
@@ -560,7 +560,7 @@ INSTRUCCIONES:
 `;
 
         try {
-            const systemPrompt = _buildSystemPrompt(context.step || 'general');
+            const systemPrompt = await _buildSystemPrompt(context.step || 'general', userText);
             const result: any = await this._callQueued(
                 () => this.client.chat.completions.create({
                     model: this.model,

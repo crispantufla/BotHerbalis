@@ -1,11 +1,11 @@
 const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const { aiService } = require('../services/ai');
+const { aiService } = require('./ai');
 
 /**
- * Módulo de Controladores de Administrador
- * Extraído de index.js para mejorar la modularidad.
+ * Módulo de Servicios de Administrador
+ * Refactorizado de src/controllers/admin.js a services/adminService.js
  */
 
 // Helper: Notify Admin
@@ -57,8 +57,6 @@ async function notifyAdmin(reason, userPhone, details = null, sharedState, clien
 }
 
 // Helper: Build the WhatsApp confirmation sent to client after admin approves
-// Uses the shared buildConfirmationMessage from messageTemplates.js
-// This wrapper adds address formatting on top
 function buildAdminApprovalMessage(clientState) {
     if (!clientState.pendingOrder) return "Pedido confirmado.";
 
@@ -71,23 +69,8 @@ function buildAdminApprovalMessage(clientState) {
     let addrObj = clientState.partialAddress || clientState.pendingOrder || {};
     const deliveryNotes = addrObj.postdatado || clientState.postdatado ? `\n\n📌 *Nota de entrega:* ${addrObj.postdatado || clientState.postdatado}` : '';
 
-    return `✅ *¡Genial! Pedido en preparación.*
-    
-Recibió este mensaje porque su pedido fue aprobado.
-
-*Detalle:*
-${details}
-
-*Envío a:*
-${nombre || 'Sin nombre'}
-${calle || ''}
-${ciudad || ''}${provincia ? ', ' + provincia : ''}
-CP: ${cp || '?'}
-${priceText}${deliveryNotes}
-
-En las próximas 24/48hs hábiles te enviaremos el código de seguimiento. ¡Gracias por confiar en Herbalis! 🌱`;
+    return `✅ *¡Genial! Pedido en preparación.*\n\nRecibió este mensaje porque su pedido fue aprobado.\n\n*Detalle:*\n${details}\n\n*Envío a:*\n${nombre || 'Sin nombre'}\n${calle || ''}\n${ciudad || ''}${provincia ? ', ' + provincia : ''}\nCP: ${cp || '?'}\n${priceText}${deliveryNotes}\n\nEn las próximas 24/48hs hábiles te enviaremos el código de seguimiento. ¡Gracias por confiar en Herbalis! 🌱`;
 }
-
 
 // Helper: Handle Admin Command
 async function handleAdminCommand(targetChatId, commandText, isApi = false, sharedState, client) {
@@ -97,15 +80,13 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false, shar
     // 1. Summary
     if (lowerMsg === '!resumen' || lowerMsg === '!analisis') {
         try {
-            // Nota: analyzeDailyLogs debería ser importado si se hace una refactorización completa.
-            // Por ahora vamos a requerir la lógica si está disponible en otro lugar o manejar el error
             const { analyzeDailyLogs } = require('../../analyze_day');
             const report = await analyzeDailyLogs();
             if (isApi) return report || "No hay logs para hoy.";
             if (userId) await client.sendMessage(userId, report || "No hay logs.");
             return "Report sent to WA";
         } catch (e) {
-            return "⚠️ Función de análisis (analyzeDailyLogs) no disponible en esta extracción.";
+            return "⚠️ Función de análisis no disponible.";
         }
     }
 
@@ -153,7 +134,7 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false, shar
             return `✅ Confirmación enviada a ${actualTarget}. Esperando respuesta del cliente.`;
         }
 
-        // Approve via Prisma DB (not legacy JSON)
+        // Approve via Prisma DB
         const cleanPhone = actualTarget.split('@')[0];
         try {
             const { prisma } = require('../../db');
@@ -169,7 +150,6 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false, shar
                     data: { status: 'Confirmado' }
                 });
 
-                // Send the FINAL SUCCESS message to the user now that it's approved
                 const msg = "¡Excelente! Tu pedido ya fue ingresado 🚀\n\nTe vamos a avisar cuando lo despachemos con el número de seguimiento.\n\n¡Muchas gracias por confiar en Herbalis!";
                 await client.sendMessage(actualTarget, msg);
 
@@ -182,12 +162,10 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false, shar
 
                 if (sharedState.logAndEmit) sharedState.logAndEmit(actualTarget, 'bot', msg, 'completed');
 
-                // Emit order update to dashboard
                 if (sharedState.io) {
                     sharedState.io.emit('order_update', { action: 'updated', order: { id: existingOrder.id, status: 'Confirmado' } });
                 }
 
-                // Clear alerts
                 const index = sharedState.sessionAlerts.findIndex(a => a.userPhone === actualTarget);
                 if (index !== -1) {
                     sharedState.sessionAlerts.splice(index, 1);
@@ -222,13 +200,10 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false, shar
                 await client.sendMessage(actualTarget, suggestion);
                 if (sharedState.logAndEmit) sharedState.logAndEmit(actualTarget, 'admin', suggestion, 'admin_instruction');
 
-                // UNPAUSE the user so the bot resumes the flow from here dynamically
                 if (sharedState.pausedUsers.has(actualTarget)) {
                     sharedState.pausedUsers.delete(actualTarget);
-                    console.log(`[ADMIN] User ${actualTarget} unpaused after admin intervention.`);
                 }
 
-                // Clear Alert on Action
                 const index = sharedState.sessionAlerts.findIndex(a => a.userPhone === actualTarget);
                 if (index !== -1) {
                     sharedState.sessionAlerts.splice(index, 1);

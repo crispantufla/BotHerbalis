@@ -620,13 +620,13 @@ const sendMessageWithDelay = async (chatId: string, content: string, startTime: 
 
 // Helper: Notify Admin
 async function notifyAdmin(reason: string, userPhone: string, details: string | null = null): Promise<any> {
-    const { notifyAdmin: notifyAdminCtrl } = require('./src/controllers/admin');
+    const { notifyAdmin: notifyAdminCtrl } = require('./src/services/adminService');
     return await notifyAdminCtrl(reason, userPhone, details, sharedState, client, config);
 }
 
 // Helper: Handle Admin Command (Exposed to API)
 async function handleAdminCommand(targetChatId: string | null, commandText: string, isApi: boolean = false): Promise<any> {
-    const { handleAdminCommand: handleAdminCommandCtrl } = require('./src/controllers/admin');
+    const { handleAdminCommand: handleAdminCommandCtrl } = require('./src/services/adminService');
     return await handleAdminCommandCtrl(targetChatId, commandText, isApi, sharedState, client);
 }
 sharedState.handleAdminCommand = handleAdminCommand; // Expose to server

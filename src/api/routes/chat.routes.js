@@ -4,6 +4,8 @@ const { getLocalHistory } = require('../../utils/chatHistory');
 const { aiService } = require('../../services/ai');
 const { MessageMedia } = require('whatsapp-web.js');
 
+const globalContactCache = new Map();
+
 const withTimeout = (promise, ms, rejectMessage) => {
     let timeoutId;
     const timeout = new Promise((_, reject) => {
@@ -20,9 +22,14 @@ module.exports = (client, sharedState) => {
         if (!id) return id;
         // Handle @lid format
         if (id.includes('@lid')) {
+            if (globalContactCache.has(id)) return globalContactCache.get(id).id;
             try {
                 const contact = await client.getContactById(id);
-                if (contact && contact.number) return `${contact.number}@c.us`;
+                if (contact && contact.number) {
+                    const resolvedId = `${contact.number}@c.us`;
+                    globalContactCache.set(id, { id: resolvedId, name: contact.name || contact.pushname || `+${contact.number}` });
+                    return resolvedId;
+                }
             } catch (e) {
                 console.error(`[LID-RESOLVE] API Error for ${id}:`, e.message);
             }
@@ -111,18 +118,25 @@ module.exports = (client, sharedState) => {
                 let actualName = c.name || c.id.user;
 
                 if (actualId.includes('@lid')) {
-                    try {
-                        const contact = await withTimeout(client.getContactById(actualId), 1500, "Timeout resolving @lid");
-                        if (contact && contact.number) {
-                            actualId = `${contact.number}@c.us`;
-                            if (contact.name || contact.pushname) {
-                                actualName = contact.name || contact.pushname;
-                            } else {
-                                actualName = `+${contact.number}`;
+                    if (globalContactCache.has(actualId)) {
+                        const cached = globalContactCache.get(actualId);
+                        actualId = cached.id;
+                        actualName = cached.name;
+                    } else {
+                        try {
+                            const contact = await withTimeout(client.getContactById(actualId), 1500, "Timeout resolving @lid");
+                            if (contact && contact.number) {
+                                actualId = `${contact.number}@c.us`;
+                                if (contact.name || contact.pushname) {
+                                    actualName = contact.name || contact.pushname;
+                                } else {
+                                    actualName = `+${contact.number}`;
+                                }
+                                globalContactCache.set(c.id._serialized, { id: actualId, name: actualName });
                             }
+                        } catch (e) {
+                            console.error(`[LID-RESOLVE] Error resolving ${actualId} in /chats:`, e.message);
                         }
-                    } catch (e) {
-                        console.error(`[LID-RESOLVE] Error resolving ${actualId} in /chats:`, e.message);
                     }
                 }
                 return { chatData: c, resolvedId: actualId, resolvedName: actualName, originalId: c.id._serialized };
