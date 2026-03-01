@@ -63,6 +63,11 @@ try {
     logger.error('[BOOT] Failed to inject Puppeteer Stealth Plugin:', e.message);
 }
 
+const fs = require('fs');
+const path = require('path');
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
+const qrcode = require('qrcode-terminal');
+
 const { exec } = require('child_process'); // For sound
 // const { logMessage } = require('./logger'); // Import Logger - Replaced by new logger
 // const { analyzeDailyLogs } = require('./analyze_day'); // Import Analyzer
@@ -456,7 +461,8 @@ startServer(client, sharedState);
 
 // Helper: Log and Emit to Dashboard (Now uses sharedState.io)
 function logAndEmit(chatId: string, sender: string, text: string, step?: string, messageId: string | null = null): void {
-    logMessage(chatId, sender, text, step);
+    // Use polyfilled logger.logMessage
+    logger.logMessage(chatId, sender, text, step);
     if (sharedState.io) {
         sharedState.io.emit('new_log', {
             timestamp: new Date(),
@@ -546,7 +552,7 @@ function saveOrderToLocal(order: Record<string, any>): void {
             logger.error('[ORDER] Write error or Lock timeout:', e.message);
         } finally {
             if (lock) {
-                await lock.release().catch((e) => logger.warn('Failed to release lock:', e));
+                await lock.release().catch((e: any) => logger.warn('Failed to release lock:', e));
             }
         }
     })();
@@ -599,7 +605,7 @@ function cancelLatestOrder(userId: string): Promise<{ success: boolean; order?: 
                 resolve({ success: false, reason: "ERROR" });
             } finally {
                 if (lock) {
-                    await lock.release().catch((e) => logger.warn('Failed to release lock:', e));
+                    await lock.release().catch((e: any) => logger.warn('Failed to release lock:', e));
                 }
             }
         })();
