@@ -62,17 +62,27 @@ try {
     logger.error('[BOOT] Failed to inject Puppeteer Stealth Plugin:', e.message);
 }
 
-const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
 const { exec } = require('child_process'); // For sound
-const { logMessage } = require('./logger'); // Import Logger
-const { analyzeDailyLogs } = require('./analyze_day'); // Import Analyzer
+// const { logMessage } = require('./logger'); // Import Logger - Replaced by new logger
+// const { analyzeDailyLogs } = require('./analyze_day'); // Import Analyzer
 // Google Sheets removed — PostgreSQL is now the sole source of truth
-const fs = require('fs');
-const path = require('path');
 const { atomicWriteFile } = require('./safeWrite');
 const { processSalesFlow } = require('./src/flows/salesFlow');
 const { aiService } = require('./src/services/ai'); // Centralized AI
+import { env } from './src/config/env'; // Env config
+import { Redis } from 'ioredis';
+import Redlock from 'redlock';
+
+// --- Redis y Redlock Setup ---
+const redisClient = new Redis(env.REDIS_URL);
+const redlock = new Redlock([redisClient], {
+    driftFactor: 0.01,
+    retryCount: 10,
+    retryDelay: 200, // wait up to 2 seconds total for lock
+    retryJitter: 200
+});
+// -----------------------------
+
 const { startServer } = require('./src/api/server'); // Centralized Server
 const { startScheduler } = require('./src/services/scheduler'); // P3: Stale/Re-engagement checks
 const { isBusinessHours, isDeepNight, getArgentinaHour } = require('./src/services/timeUtils');
@@ -482,37 +492,41 @@ function normalizeProductName(rawProduct: string, rawPlan: string, price: number
     return `${baseType} (${duration} días)`;
 }
 
-// Helper: Save Order Locally (for Dashboard) — Uses write queue to prevent concurrent corruption
-let _orderWriteQueue = Promise.resolve();
+// Helper: Save Order Locally (for Dashboard) — Uses Redlock to prevent concurrent Postgres corruption
 function saveOrderToLocal(order: Record<string, any>): void {
-    _orderWriteQueue = _orderWriteQueue.then(async () => {
+    // Fire and forget wrapped in an async IIFE to avoid crashing main loop
+    (async () => {
+        let lock;
         const cleanPhone = (order.cliente || '').replace('@c.us', '').replace(/\D/g, '');
-        let priceNum = 0;
-        if (order.precio) {
-            // Remove dots (thousands separator in es-AR format) before parsing
-            priceNum = parseInt(order.precio.toString().replace(/\./g, '').replace(/[^\d]/g, ''), 10);
-        }
-
-        const normalizedProduct = normalizeProductName(order.producto || '', order.plan || '', priceNum);
-
-        const newOrderData = {
-            id: Date.now().toString(),
-            userPhone: cleanPhone || 'desconocido',
-            status: 'Pendiente',
-            products: normalizedProduct,
-            totalPrice: isNaN(priceNum) ? 0 : priceNum,
-            tracking: null,
-            postdated: order.postdatado || null,
-            nombre: order.nombre || null,
-            calle: order.calle || null,
-            ciudad: order.ciudad || null,
-            provincia: order.provincia || null,
-            cp: order.cp || null,
-            seller: client?.info?.wid?.user || null,
-            instanceId: INSTANCE_ID
-        };
-
         try {
+            // Lock by Phone so the same user cannot place 2 orders at the exact same millisecond
+            lock = await redlock.acquire([`order_lock:${cleanPhone}`], 3000);
+
+            let priceNum = 0;
+            if (order.precio) {
+                // Remove dots (thousands separator in es-AR format) before parsing
+                priceNum = parseInt(order.precio.toString().replace(/\./g, '').replace(/[^\d]/g, ''), 10);
+            }
+
+            const normalizedProduct = normalizeProductName(order.producto || '', order.plan || '', priceNum);
+
+            const newOrderData = {
+                id: Date.now().toString(),
+                userPhone: cleanPhone || 'desconocido',
+                status: 'Pendiente',
+                products: normalizedProduct,
+                totalPrice: isNaN(priceNum) ? 0 : priceNum,
+                tracking: null,
+                postdated: order.postdatado || null,
+                nombre: order.nombre || null,
+                calle: order.calle || null,
+                ciudad: order.ciudad || null,
+                provincia: order.provincia || null,
+                cp: order.cp || null,
+                seller: client?.info?.wid?.user || null,
+                instanceId: INSTANCE_ID
+            };
+
             await prisma.order.create({ data: newOrderData });
 
             // Map to legacy format for Dashboard Socket.io
@@ -524,19 +538,25 @@ function saveOrderToLocal(order: Record<string, any>): void {
                 tracking: ''
             };
             if (sharedState.io) sharedState.io.emit('new_order', legacyFormatOrder);
-            return legacyFormatOrder;
         } catch (e: any) {
-            logger.error('[ORDER] DB Write error:', e.message);
+            logger.error('[ORDER] Write error or Lock timeout:', e.message);
+        } finally {
+            if (lock) {
+                await lock.release().catch((e) => logger.warn('Failed to release lock:', e));
+            }
         }
-    }).catch((e: any) => logger.error('[ORDER] Write queue error:', e.message));
+    })();
 }
 
 // Helper: Cancel Latest User Order
 function cancelLatestOrder(userId: string): Promise<{ success: boolean; order?: any; reason?: string; currentStatus?: string }> {
     return new Promise((resolve) => {
-        _orderWriteQueue = _orderWriteQueue.then(async () => {
+        (async () => {
+            let lock;
+            const phone = userId.split('@')[0].replace(/\D/g, '');
             try {
-                const phone = userId.split('@')[0].replace(/\D/g, '');
+                // Shared lock to avoid colliding with saveOrderToLocal
+                lock = await redlock.acquire([`order_lock:${phone}`], 3000);
 
                 // Find the newest order for this user
                 const targetOrder = await prisma.order.findFirst({
@@ -569,13 +589,16 @@ function cancelLatestOrder(userId: string): Promise<{ success: boolean; order?: 
 
                 if (sharedState.io) sharedState.io.emit('order_update', legacyFormatUpdate);
 
-
                 resolve({ success: true, order: legacyFormatUpdate });
             } catch (err: any) {
                 logger.error('[CANCEL] Error canceling:', err.message);
                 resolve({ success: false, reason: "ERROR" });
+            } finally {
+                if (lock) {
+                    await lock.release().catch((e) => logger.warn('Failed to release lock:', e));
+                }
             }
-        });
+        })();
     });
 }
 

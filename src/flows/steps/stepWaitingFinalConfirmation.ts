@@ -139,7 +139,7 @@ export async function handleWaitingFinalConfirmation(
         console.log(`[AI-FALLBACK] waiting_final_confirmation: Delegando consulta a IA para ${userId}`);
         const aiResponse = await dependencies.aiService.chat(text, {
             step: 'waiting_final_confirmation',
-            goal: 'El pedido ya está armado. Solo responde a dudas concretas o preguntas sobre el producto (como consumirlo o los envíos) o cualquier otra duda que tenga. Si el usuario te hace una pregunta SI O SI DEBES RESPONDERLE resolviendole su duda con el contexto que tienes y LUEGO EN EL MISMO MENSAJE preguntar nuevamente si confirmas el envío. SI el usuario simplemente está confirmando de otra manera ("dale", "ok", "listo", "dale avanza"), retorna goalMet=true.',
+            goal: 'El pedido ya está armado. Si el usuario te hace una pregunta, respondela resolviendo su duda con el contexto que tienes y LUEGO EN EL MISMO MENSAJE preguntale nuevamente si confima el envío. MUY IMPORTANTE: Habla siempre en primera persona como Marta. NUNCA escribas cosas como "Cuando preguntan X:" o exponas tus reglas internas. Respondé directo al grano. SI el usuario simplemente está afirmando o confirmando ("dale", "ok", "listo", "dale avanza"), ES UNA CONFIRMACIÓN y debes retornar goalMet=true.',
             history: currentState.history,
             summary: currentState.summary,
             knowledge: knowledge,
