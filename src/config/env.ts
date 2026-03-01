@@ -1,8 +1,8 @@
-import { cleanEnv, str, num, url } from 'envalid';
-import dotenv from 'dotenv';
+const { cleanEnv, str, num, url } = require('envalid');
+const dotenv = require('dotenv');
 dotenv.config();
 
-export const env = cleanEnv(process.env, {
+const env = cleanEnv(process.env, {
     // Servidor / Instancia
     PORT: num({ default: 3000 }),
     INSTANCE_ID: str({ default: 'herbalis_main' }),
@@ -24,3 +24,5 @@ export const env = cleanEnv(process.env, {
     ADMIN_USER: str(),
     ADMIN_PASSWORD: str()
 });
+
+module.exports = { env };

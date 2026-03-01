@@ -38,8 +38,9 @@ interface SharedState {
     requestPairingCode?: (phoneNumber: string) => Promise<string | undefined>;
 }
 
-const logger = require('./src/utils/logger');
+// Load generic ENV natively before our strict validator kicks in
 require('dotenv').config();
+const logger = require('./src/utils/logger');
 
 // --- PUPPETEER STEALTH INJECTION ---
 // whatsapp-web.js doesn't natively accept custom puppeteer modules easily anymore.
@@ -69,9 +70,12 @@ const { exec } = require('child_process'); // For sound
 const { atomicWriteFile } = require('./safeWrite');
 const { processSalesFlow } = require('./src/flows/salesFlow');
 const { aiService } = require('./src/services/ai'); // Centralized AI
-import { env } from './src/config/env'; // Env config
-import { Redis } from 'ioredis';
-import Redlock from 'redlock';
+
+// Import Env explicitly resolving as CommonJS (since package.json is type: commonjs)
+const { env } = require('./src/config/env'); // Env config
+
+const { Redis } = require('ioredis');
+const Redlock = require('redlock').default || require('redlock');
 
 // --- Redis y Redlock Setup ---
 const redisClient = new Redis(env.REDIS_URL);
