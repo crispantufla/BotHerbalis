@@ -99,13 +99,14 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
                     setChats((prev) => {
                         if (!Array.isArray(prev)) return [];
                         const currentSelectedId = selectedChatRef.current?.id;
-                        const existingChat = prev.find(c => c.id === data.chatId);
+                        const incomingPhone = data.chatId.replace(/\D/g, '');
+                        const existingChat = prev.find(c => c.id === data.chatId || (incomingPhone && c.id.replace(/\D/g, '').endsWith(incomingPhone.slice(-10))));
 
                         if (existingChat) {
-                            return prev.map((c) => c.id === data.chatId ? {
+                            return prev.map((c) => c.id === existingChat.id ? {
                                 ...c,
                                 lastMessage: { body: data.text || '', timestamp },
-                                unreadCount: currentSelectedId === data.chatId ? 0 : (c.unreadCount || 0) + 1,
+                                unreadCount: currentSelectedId === existingChat.id ? 0 : (c.unreadCount || 0) + 1,
                                 time: new Date(timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' }),
                                 assignedScript: data.assignedScript || c.assignedScript
                             } : c);

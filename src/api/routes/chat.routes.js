@@ -105,8 +105,68 @@ module.exports = (client, sharedState) => {
 
             const instanceFilterId = req.query.instanceId || process.env.INSTANCE_ID || 'default';
 
-            const relevantChats = chats.filter(c => !c.isGroup).map(c => {
-                const phoneNumeric = c.id.user.replace(/\D/g, '');
+            // 1. Resolve @lid and Pre-process
+            const mappedPromises = chats.filter(c => !c.isGroup).map(async (c) => {
+                let actualId = c.id._serialized;
+                let actualName = c.name || c.id.user;
+
+                if (actualId.includes('@lid')) {
+                    try {
+                        const contact = await withTimeout(client.getContactById(actualId), 1500, "Timeout resolving @lid");
+                        if (contact && contact.number) {
+                            actualId = `${contact.number}@c.us`;
+                            if (contact.name || contact.pushname) {
+                                actualName = contact.name || contact.pushname;
+                            } else {
+                                actualName = `+${contact.number}`;
+                            }
+                        }
+                    } catch (e) {
+                        console.error(`[LID-RESOLVE] Error resolving ${actualId} in /chats:`, e.message);
+                    }
+                }
+                return { chatData: c, resolvedId: actualId, resolvedName: actualName, originalId: c.id._serialized };
+            });
+
+            const preProcessedChats = await Promise.all(mappedPromises);
+
+            // 2. Deduplicate matching actualId
+            const resolvedChatsMap = new Map();
+            for (const item of preProcessedChats) {
+                const { resolvedId, resolvedName, chatData, originalId } = item;
+                if (!resolvedChatsMap.has(resolvedId)) {
+                    resolvedChatsMap.set(resolvedId, item);
+                } else {
+                    const existing = resolvedChatsMap.get(resolvedId);
+
+                    // Prefer the actual @c.us chat for name since it has the WhatsApp format +54 9...
+                    const isExistingLid = existing.originalId.includes('@lid');
+                    const isNewLid = originalId.includes('@lid');
+
+                    let finalName = existing.resolvedName;
+                    if (isExistingLid && !isNewLid) finalName = resolvedName;
+                    else if (!isExistingLid && isNewLid) finalName = existing.resolvedName;
+                    // If one is purely numeric and the other has format, prefer formatted
+                    else if (finalName === existing.resolvedId.replace(/\D/g, '') && isNaN(resolvedName.replace(/\D/g, ''))) finalName = resolvedName;
+
+                    // Keep the latest timestamp and last message
+                    const newestChatData = chatData.timestamp > existing.chatData.timestamp ? chatData : existing.chatData;
+
+                    resolvedChatsMap.set(resolvedId, {
+                        chatData: newestChatData,
+                        resolvedId,
+                        resolvedName: finalName,
+                        originalId: isExistingLid && !isNewLid ? originalId : existing.originalId // keep @c.us originalId if possible
+                    });
+                }
+            }
+
+            // 3. Map to final output
+            const relevantChats = Array.from(resolvedChatsMap.values()).map(item => {
+                const { resolvedId, resolvedName, chatData } = item;
+                const c = chatData;
+
+                const phoneNumeric = resolvedId.replace(/\D/g, '');
                 const last10Chat = phoneNumeric.slice(-10);
 
                 // Find all past orders matching this phone (comparing last 10 digits for robustness)
@@ -143,8 +203,8 @@ module.exports = (client, sharedState) => {
                 });
 
                 return {
-                    id: c.id._serialized,
-                    name: c.name || c.id.user,
+                    id: resolvedId,
+                    name: resolvedName,
                     unreadCount: c.unreadCount,
                     lastMessage: c.lastMessage ? { body: c.lastMessage.hasMedia ? 'Media' : c.lastMessage.body, timestamp: c.lastMessage.timestamp * 1000 } : null,
                     timestamp: c.timestamp,

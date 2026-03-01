@@ -125,24 +125,33 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
                     // 2. Update chat list preview
                     setChats((prev) => {
                         if (!Array.isArray(prev)) return [];
-                        const existingChat = prev.find((c) => c.id === data.chatId);
+                        const incomingPhone = data.chatId.replace(/\D/g, '');
+                        const existingChat = prev.find((c) => c.id === data.chatId || (incomingPhone && c.id.replace(/\D/g, '').endsWith(incomingPhone.slice(-10))));
                         if (existingChat) {
                             return prev.map((c) =>
-                                c.id === data.chatId
+                                c.id === existingChat.id
                                     ? {
                                         ...c,
                                         lastMessage: {
                                             body: data.text || '',
                                             timestamp: timestamp,
                                         },
-                                        unreadCount: selectedChat?.id === data.chatId ? 0 : (c.unreadCount || 0) + 1,
+                                        unreadCount: selectedChat?.id === existingChat.id ? 0 : (c.unreadCount || 0) + 1,
                                         time: new Date(timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' }),
                                         assignedScript: data.assignedScript || c.assignedScript // update script assignment from socket
                                     }
                                     : c
                             );
                         } else {
-                            return prev;
+                            // Add new chat to the list if it doesn't exist (fallback for v1)
+                            return [{
+                                id: data.chatId,
+                                name: data.chatId,
+                                unreadCount: selectedChat?.id === data.chatId ? 0 : 1,
+                                lastMessage: { body: data.text || '', timestamp },
+                                time: new Date(timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' }),
+                                assignedScript: data.assignedScript
+                            }, ...prev];
                         }
                     });
                 } catch (err) {
@@ -623,7 +632,10 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
                                 <div className="flex-1 min-w-0">
                                     <div className="flex justify-between items-baseline mb-0.5">
                                         <div className="flex items-center gap-1.5 min-w-0">
-                                            <h3 className={`font-semibold text-sm truncate ${selectedChat?.id === chat.id ? 'text-blue-700 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'}`}>{chat.name}</h3>
+                                            <h3 className={`font-semibold text-sm truncate flex items-center gap-1 ${selectedChat?.id === chat.id ? 'text-blue-700 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                                                {chat.name}
+                                                {chat.hasBought && <span title="Cliente Recurrente" className="inline-flex items-center text-[8px] bg-green-100 text-green-700 px-1 py-0.5 rounded-sm font-bold ml-1">CLIENTE</span>}
+                                            </h3>
                                             {chat.assignedScript && (
                                                 <span className="px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-[9px] font-bold text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-600 uppercase whitespace-nowrap">
                                                     {chat.assignedScript}
@@ -659,7 +671,10 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
                                 </div>
                                 <div>
                                     <div className="flex items-center gap-2">
-                                        <h2 className="font-bold text-slate-800 dark:text-slate-100 text-sm">{selectedChat.name}</h2>
+                                        <h2 className="font-bold text-slate-800 dark:text-slate-100 text-sm flex items-center gap-1">
+                                            {selectedChat.name}
+                                            {selectedChat.hasBought && <span title="Cliente Recurrente" className="inline-flex items-center text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-sm font-bold shadow-sm">CLIENTE</span>}
+                                        </h2>
                                         {selectedChat.assignedScript && (
                                             <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-[10px] font-bold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 uppercase">
                                                 Guion: {selectedChat.assignedScript}
