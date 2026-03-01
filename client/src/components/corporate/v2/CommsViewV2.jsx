@@ -532,20 +532,7 @@ Teléfono: ${phoneDisplay}`;
             </div>
 
             {/* MAIN CHAT AREA */}
-            <div className={`flex-1 flex-col min-w-0 relative z-0 ${selectedChat ? 'flex' : 'hidden md:flex'} min-h-0`}>
-                {/* Fondo Chat Híbrido: WA Colors + MagicUI Retro Grid */}
-                <div className="absolute inset-0 z-[-1] bg-[#E5DDD5] dark:bg-[#0B141A] transition-colors duration-300 overflow-hidden">
-                    <div className="absolute inset-0 h-full w-full opacity-[0.15] dark:opacity-[0.03]"
-                        style={{
-                            backgroundImage: `
-                             linear-gradient(to right, #8b9bb4 1px, transparent 1px),
-                             linear-gradient(to bottom, #8b9bb4 1px, transparent 1px)
-                             `,
-                            backgroundSize: '40px 40px'
-                        }}>
-                    </div>
-                </div>
-
+            <div className={`flex-1 flex-col min-w-0 bg-transparent relative z-0 ${selectedChat ? 'flex' : 'hidden md:flex'} min-h-0`}>
                 {selectedChat ? (
                     <>
                         {/* Header */}
