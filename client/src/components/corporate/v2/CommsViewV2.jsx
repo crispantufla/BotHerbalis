@@ -500,14 +500,14 @@ Teléfono: ${phoneDisplay}`;
                             <div className="flex-1 min-w-0">
                                 <div className="flex justify-between items-start mb-1 gap-2">
                                     <div className="flex flex-col min-w-0">
-                                        <span className={`font-mono text-[10px] tracking-tight ${selectedChat?.id === chat.id ? 'text-indigo-200' : 'text-slate-400 dark:text-slate-500'}`}>
-                                            +{chat.id?.split('@')[0]}
-                                        </span>
                                         <h3 className={`font-extrabold text-sm truncate flex flex-wrap items-center gap-1.5 ${selectedChat?.id === chat.id ? 'text-white' : 'text-slate-800 dark:text-slate-100'}`}>
                                             {chat.isPaused && <span className="w-2 h-2 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)] animate-pulse" title="Bot Pausado"></span>}
                                             <span className="truncate max-w-[170px]">{chat.name}</span>
                                             {chat.hasBought && <span title="Cliente Recurrente" className="inline-flex items-center text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-md font-extrabold shadow-sm"><ShoppingCart className="w-2.5 h-2.5 mr-0.5" /> Cliente</span>}
                                         </h3>
+                                        <span className={`font-mono text-[10px] tracking-tight ${selectedChat?.id === chat.id ? 'text-indigo-200' : 'text-slate-400 dark:text-slate-500'}`}>
+                                            +{chat.id?.split('@')[0]}
+                                        </span>
                                     </div>
                                     <span className={`text-[10px] font-bold font-mono mt-0.5 ${selectedChat?.id === chat.id ? 'text-indigo-100' : 'text-slate-500 dark:text-slate-400'}`}>{chat.time}</span>
                                 </div>

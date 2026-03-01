@@ -638,9 +638,6 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
                                 <div className="flex-1 min-w-0">
                                     <div className="flex justify-between items-baseline mb-0.5">
                                         <div className="flex flex-col min-w-0">
-                                            <span className={`font-mono text-[10px] tracking-tight ${selectedChat?.id === chat.id ? 'text-blue-200' : 'text-slate-400 dark:text-slate-500'}`}>
-                                                +{chat.id?.split('@')[0]}
-                                            </span>
                                             <div className="flex items-center gap-1.5 min-w-0">
                                                 <h3 className={`font-semibold text-sm truncate flex items-center gap-1 ${selectedChat?.id === chat.id ? 'text-blue-700 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'}`}>
                                                     {chat.name}
@@ -652,8 +649,11 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
                                                     </span>
                                                 )}
                                             </div>
-                                            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium font-mono ml-2 flex-shrink-0">{chat.time}</span>
+                                            <span className={`font-mono text-[10px] tracking-tight ${selectedChat?.id === chat.id ? 'text-blue-200' : 'text-slate-400 dark:text-slate-500'}`}>
+                                                +{chat.id?.split('@')[0]}
+                                            </span>
                                         </div>
+                                        <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium font-mono ml-2 flex-shrink-0">{chat.time}</span>
                                     </div>
                                     <p className="text-xs text-slate-500 dark:text-slate-400 truncate font-medium mt-1">{chat.lastMessage?.body || (typeof chat.lastMessage === 'string' ? chat.lastMessage : '') || 'Sin mensajes'}</p>
                                 </div>
