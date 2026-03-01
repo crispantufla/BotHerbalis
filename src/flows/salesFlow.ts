@@ -18,7 +18,7 @@ interface SalesFlowDependencies {
 }
 
 // Keywords that signal clear purchase intent — if present, don't auto-pause
-const PURCHASE_INTENT_KEYWORDS = /\b(comprar|quiero comprar|quiero pedir|me interesa|precio|precios|cuanto sale|cuánto sale|cuanto cuesta|cuánto cuesta|quiero encargar|necesito comprar|hagan envios|hacen envíos|hacen envios|quisiera pedir|quisiera comprar|quiero adquirir|quiero ordenar|tienen capsulas|tienen semillas|tienen gotas|nuez de la india|la direccion|la dirección|mi direccion|mi dirección|te paso mis datos|mis datos|los datos|te paso la direccion|te paso la dirección)\b/i;
+const PURCHASE_INTENT_KEYWORDS = /\b(comprar|quiero comprar|quiero pedir|me interesa|precio|precios|cuanto sale|cuánto sale|cuanto cuesta|cuánto cuesta|quiero encargar|necesito comprar|hagan envios|hacen envíos|hacen envios|quisiera pedir|quisiera comprar|quiero adquirir|quiero ordenar|tienen capsulas|tienen semillas|tienen gotas|nuez de la india|la direccion|la dirección|mi direccion|mi dirección|te paso mis datos|mis datos|los datos|te paso la direccion|te paso la dirección|informacion|información|quiero saber|quiero mas info|bajar|adelgazar|kilos|kilo|capsulas|cápsulas|semillas|gotas|peso|perder peso|bajar de peso|10 kg|20 kg|mas de 20)\b/i;
 
 export async function processSalesFlow(
     userId: string,
@@ -149,12 +149,12 @@ export async function processSalesFlow(
                         }
 
                         // --- EXISTING CONVERSATION DETECTION ---
-                        // If there are ANY previous outgoing messages (bot or human),
-                        // this person was already spoken to. Auto-pause UNLESS they show purchase intent.
-                        const hasPriorOutgoing = outgoingMessages.length > 0;
-                        const shouldPauseByHistory = hasPriorOutgoing;
+                        // Only consider it "prior history" if there are 10+ outgoing messages.
+                        // 1-9 outgoing = likely just bot greetings/early funnel from ads.
+                        // It's normal for users to take hours to respond after clicking an ad.
+                        const hasSignificantHistory = outgoingMessages.length >= 10;
 
-                        if (shouldPauseByHistory) {
+                        if (hasSignificantHistory) {
                             const showsPurchaseIntent = PURCHASE_INTENT_KEYWORDS.test(normalizedText);
 
                             if (showsPurchaseIntent) {
@@ -168,7 +168,7 @@ export async function processSalesFlow(
                                     dependencies.sharedState.pausedUsers.add(userId);
                                     try {
                                         if (dependencies.notifyAdmin) dependencies.notifyAdmin(
-                                            '😴 Cliente con historial previo',
+                                            '😴 Cliente con historial extenso',
                                             userId,
                                             `${reason}. Volvió a escribir: "${text.substring(0, 100)}"\nEl bot se silenció automáticamente. Si es un prospecto nuevo, despausalo desde el panel.`
                                         );
@@ -176,6 +176,8 @@ export async function processSalesFlow(
                                 }
                                 return { matched: true, paused: true };
                             }
+                        } else if (outgoingMessages.length > 0) {
+                            console.log(`[SMART-DETECT] User ${userId} has ${outgoingMessages.length} prior message(s) (< 10 threshold). Treating as new/active prospect.`);
                         }
                     }
                 }
