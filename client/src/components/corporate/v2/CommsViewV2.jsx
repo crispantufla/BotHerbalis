@@ -57,7 +57,11 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
                 setInstanceId(id);
 
                 const chatsRes = await api.get(`/api/chats?instanceId=${id}`);
-                setChats(chatsRes.data);
+                const chatsWithTime = chatsRes.data.map(c => ({
+                    ...c,
+                    time: c.lastMessage?.timestamp ? new Date(c.lastMessage.timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' }) : ''
+                }));
+                setChats(chatsWithTime);
 
                 const statsRes = await api.get('/api/stats');
                 setGlobalPause(!!statsRes.data.globalPause);
