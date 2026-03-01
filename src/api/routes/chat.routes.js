@@ -124,7 +124,7 @@ module.exports = (client, sharedState) => {
                         actualName = cached.name;
                     } else {
                         try {
-                            const contact = await withTimeout(client.getContactById(actualId), 1500, "Timeout resolving @lid");
+                            const contact = await withTimeout(client.getContactById(actualId), 1500, "Timeout");
                             if (contact && contact.number) {
                                 actualId = `${contact.number}@c.us`;
                                 if (contact.name || contact.pushname) {
@@ -135,7 +135,9 @@ module.exports = (client, sharedState) => {
                                 globalContactCache.set(c.id._serialized, { id: actualId, name: actualName });
                             }
                         } catch (e) {
-                            console.error(`[LID-RESOLVE] Error resolving ${actualId} in /chats:`, e.message);
+                            // Silenciar el spam: Si Meta hace timeout, guardamos el @lid temporalmente 
+                            // para no atorar la red iterando 50 veces por segundo en futuras recargas.
+                            globalContactCache.set(c.id._serialized, { id: actualId, name: actualName });
                         }
                     }
                 }
