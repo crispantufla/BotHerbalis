@@ -532,7 +532,17 @@ Teléfono: ${phoneDisplay}`;
             </div>
 
             {/* MAIN CHAT AREA */}
-            <div className={`flex-1 flex-col min-w-0 bg-transparent relative z-0 ${selectedChat ? 'flex' : 'hidden md:flex'} min-h-0`}>
+            <div className={`flex-1 flex-col min-w-0 relative z-0 ${selectedChat ? 'flex' : 'hidden md:flex'} min-h-0`}>
+                {/* Fondo Chat Híbrido: WA Colors + UI Pattern */}
+                <div className="absolute inset-0 z-[-1] bg-[#E5DDD5] dark:bg-[#0B141A] transition-colors duration-300">
+                    <div className="absolute inset-0 dark:opacity-20 opacity-40 mix-blend-multiply dark:mix-blend-screen"
+                        style={{
+                            backgroundImage: 'radial-gradient(circle at center, #8b9bb4 1.5px, transparent 1.5px)',
+                            backgroundSize: '28px 28px'
+                        }}>
+                    </div>
+                </div>
+
                 {selectedChat ? (
                     <>
                         {/* Header */}
@@ -703,7 +713,7 @@ Teléfono: ${phoneDisplay}`;
                         )}
 
                         {/* Messages Area */}
-                        <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 pt-8 pb-2 space-y-6 custom-scrollbar">
+                        <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 pt-8 pb-2 space-y-6 custom-scrollbar relative z-10">
                             {loading ? (
                                 <div className="w-full h-full flex items-center justify-center">
                                     <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
