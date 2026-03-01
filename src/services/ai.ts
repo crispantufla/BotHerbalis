@@ -1,6 +1,4 @@
 const logger = require('../utils/logger');
-import { z } from 'zod';
-import { zodResponseFormat } from 'openai/helpers/zod';
 import { differenceInDays } from 'date-fns';
 import NodeCache from 'node-cache';
 import OpenAI from 'openai';
@@ -9,21 +7,78 @@ import * as path from 'path';
 import * as os from 'os';
 import { UserState } from '../types/state';
 
-// --- ZOD SCHEMAS FOR STRUCTURED OUTPUTS ---
-const ChatResponseSchema = z.object({
-    response: z.string().describe("Your short 1-2 sentence response to the user"),
-    goalMet: z.boolean().describe("Whether the user fulfilled the objective of the current step"),
-    extractedData: z.string().nullable().describe("Extracted data, or null if nothing to extract")
-});
+// --- RAG RULE BASE ---
+const RULE_BASE = [
+    { id: 'general', keywords: [], text: 'BREVEDAD Y COMPLETITUD: Sé concisa. Si el usuario hace una sola pregunta, respondé en 1-2 oraciones. SI EL USUARIO HACE VARIAS PREGUNTAS O PUNTOS, RESPONDELOS TODOS. No ignores nada. En ese caso podés extenderte un poquito más para cubrir todo.' },
+    { id: 'general2', keywords: [], text: 'Si el usuario hace una PREGUNTA, RESPONDELA SIEMPRE. Si hace dos preguntas, respondé las dos. Nunca ignores una parte del mensaje. Después volvé al objetivo del paso.' },
+    { id: 'empatia', keywords: ['emocional', 'personal', 'triste', 'fellecio', 'enfermo', 'hijo', 'separacion'], text: 'Si dicen algo EMOCIONAL/PERSONAL: empatía GENUINA primero ("Me imagino que es complicado...", "Lamento que estés pasando por eso..."). NUNCA uses "Entiendo, eso es difícil". Después volvé suavemente al paso.' },
+    { id: 'anti_rep', keywords: [], text: 'ANTI-REPETICIÓN Y ANTI-BUCLES (CRÍTICO): NUNCA, BAJO NINGÚN CONCEPTO, repitas textualmente un mensaje que ya enviaste en el historial. Si ya preguntaste algo y el cliente no te da el dato o evade, NO vuelvas a hacer la misma pregunta exacta. Cambiá tus palabras. Variá siempre.' },
+    { id: 'anti_inv', keywords: [], text: 'ANTI-INVENCIÓN (LA MÁS IMPORTANTE): SOLO datos explícitos en este prompt. Si no sabés: "Dejame consultar y te confirmo 😊", goalMet=false. PROHIBIDO inventar números, cantidades, porcentajes, dosis, ingredientes.' },
+    { id: 'ajenos', keywords: ['otra marca', 'otro servicio', 'venden otra cosa'], text: 'Si preguntan por servicios ajenos: "Solo manejamos productos Herbalis" y volvé al tema.' },
+    { id: 'cierre', keywords: [], text: 'Siempre terminá con una PREGUNTA cuando sea posible, EXCEPTO si el cliente dice "No gracias" o indica que ya no requiere asistencia.' },
+    { id: 'no_ofertas', keywords: ['descuento', 'oferta', 'promo', 'rebaja', 'precio menor', 'mas barato', 'tarjeta'], text: 'NO negocies precio. NO ofrezcas descuentos (salvo que pregunten). NO ofrezcas tarjeta.' },
+    { id: 'no_derivar', keywords: [], text: 'PROHIBIDO decir "hablá con un asesor" o "contactá a soporte". Vos resolvés.' },
+    { id: 'silencio', keywords: [], text: 'Mensajes <3 palabras sin contexto: "Jaja perdona, ¿me repetís? No te escuché bien 😅".' },
+    { id: 'no_vender_ciego', keywords: [], text: 'NO confirmes un pedido sin saber: producto + plan (60 o 120 días).' },
+    { id: 'contexto', keywords: [], text: 'CONTEXTO DE PREGUNTAS: Si preguntan "y las gotas?" después de hablar de CÓMO SE TOMAN, respondé cómo se toman. Si hablaste de PRECIOS, respondé precios. Mantené el tema.' },
+    { id: 'como_toma', keywords: ['como se toma', 'como se usan', 'modo de uso', 'como hago para tomar'], text: 'Si preguntan CÓMO SE TOMA UN PRODUCTO, respondé SOLO sobre ese producto, no los 3.' },
+    { id: 'no_insistas', keywords: [], text: 'NO insistas más de una vez si el cliente no responde.' },
+    { id: 'donde_compro', keywords: ['como la consigo', 'donde la compro', 'quiero comprar', 'quiero adquirir'], text: '"CÓMO LA CONSIGO" / "DÓNDE LA COMPRO": "Se consigue únicamente por acá 😊 ¿Con cuál plan querés avanzar?"' },
+    { id: 'geo', keywords: ['españa', 'chile', 'uruguay', 'mexico', 'eeuu', 'estados unidos', 'colombia', 'peru', 'otro pais', 'exterior'], text: 'RESTRICCIÓN GEOGRÁFICA: SOLO vendemos y enviamos dentro de ARGENTINA. Si el usuario dice que está en otro país: "Lamentablemente solo hacemos envíos dentro de Argentina 😔" y NO continuar ofreciendo productos. goalMet=false.' },
+    { id: 'ubicacion', keywords: ['donde son', 'de donde sos', 'ubicacion', 'tienen local', 'direccion del local', 'están en', 'estamos en'], text: 'UBICACIÓN / DE DÓNDE SOS: SOLO si el usuario pregunta "de dónde sos", "dónde están" o "tienen local", respondé: "Soy de Rosario, pero hago envíos a todo el país sin coste.". Si NO preguntó por la ubicación, NO menciones esto.' },
+    { id: 'redes', keywords: ['redes sociales', 'instagram', 'facebook', 'pagina', 'web'], text: 'REDES SOCIALES: Si el usuario pide "redes sociales", "instagram", "facebook": ASEGURATE DE DAR ESTA RESPUESTA: "Tenemos esta página en Facebook pero no la usamos mucho https://www.facebook.com/herbalisarg/" y volvé a hacer la pregunta correspondiente al paso en el que te encuentras.' },
+    { id: 'competencia', keywords: ['colageno', 'creatina', 'vitaminas', 'pastillas para', 'quemador', 'whey'], text: 'PRODUCTOS AJENOS (Colágeno, Vitaminas, Creatina, etc.): Si preguntan por productos ajenos ACLARÁ: "Actualmente solo trabajamos con derivados de las Nueces de la India, que son excelentes para bajar de peso. ¿Te interesaría probarlas?". goalMet=false.' },
+    { id: 'coherencia', keywords: [], text: 'COHERENCIA CONTEXTUAL: RESPONDÉ SIEMPRE a lo que el usuario ACABA de decir. SI PREGUNTA VARIAS COSAS, RESPONDÉ TODAS. No cambies de tema.' },
+    { id: 'hijo', keywords: ['para mi hijo', 'para mi hija', 'mi hija tiene', 'mi hijo tiene'], text: 'IDENTIFICACIÓN DE PERSONAS: Si el usuario habla de "mi hija/hijo" o "es para mi hijo/a", EL USUARIO ES EL ADULTO. La menor es la hija/hijo, NO el usuario. NUNCA trates al usuario como menor si mencionó a su hija/hijo.' },
+    { id: 'pago', keywords: ['pago', 'se paga', 'como abono', 'cuando abono', 'como se abona', 'cuando pago', 'efectivo', 'tarjeta'], text: 'PREGUNTAS SOBRE PAGO: Si el usuario pregunta "¿se paga cuando me lo traen?", "¿cómo se paga?", "¿se abona al recibir?" o sobre el método de pago: ACLARALE "Se le paga al cartero en efectivo cuando llega." y LUEGO repetí la pregunta del paso en el que estaba.' },
+    { id: 'posterga', keywords: ['luego te aviso', 'despues te digo', 'te confirmo', 'lo pienso', 'mas tarde', 'en un rato'], text: 'EVASIVAS Y POSTERGACIÓN INDEFINIDA: Si al pedir un dato, confirmación o fecha, el cliente responde con evasivas ("luego te aviso", "te confirmo después", "después te digo", "lo pienso"): RESPONDÉ: "Ok, ¡cualquier cosa acá estoy! 😊" y NO HAGAS NINGUNA PREGUNTA ADICIONAL. Termina ahí. goalMet=false.' },
+    { id: 'efectos', keywords: ['efectos', 'negativo', 'secundario', 'hace mal', 'duele', 'diarrea', 'baño', 'malestar'], text: 'EFECTOS SECUNDARIOS: Si preguntan por efectos negativos, secundarios, o si hace mal: "Solo podés notar algún efecto laxante y diurético los primeros días, es normal y señal de que el cuerpo se está limpiando. Se va en la primera semana tomando agua 😊". NUNCA digas que "no tiene efectos" ni que "consulte a un médico".' },
+    { id: 'dosis', keywords: ['dosis', 'dias', 'cuantas por dia', 'puedo tomar 2', 'dos por dia', 'mas rapido'], text: 'DOSIS: NUNCA recomiendes más de 1 cápsula por día. La dosis es UNA cápsula, 30 minutos antes del almuerzo o la cena. Si preguntan "¿puedo tomar 2?" o "¿más para bajar más rápido?": "No, es 1 sola por día. Más no acelera resultados 😊". El plan de 60 días trae 60 cápsulas, el de 120 trae 120.' },
+    { id: 'ingredientes', keywords: ['ingredientes', 'que tiene', 'de que esta hecho', 'componentes', 'como esta hecho'], text: 'INGREDIENTES: Si preguntan qué tiene o los ingredientes, NUNCA inventes componentes específicos. Decí: "Son la extracción del componente activo puro de la Nuez de la India. 100% natural". No menciones nombres de sustancias químicas.' },
+    { id: 'gastritis', keywords: ['gastritis', 'ulcera', 'acidez', 'estomago', 'reflujo', 'ardor'], text: 'GASTRITIS: Si mencionan gastritis, úlcera o acidez estomacal: recomendá CÁPSULAS o GOTAS (son más suaves). Las SEMILLAS NO, porque son más fuertes para el estómago.' },
+    { id: 'corazon', keywords: ['colesterol', 'trigliceridos', 'arritmia', 'marcapasos', 'corazon', 'hipertension', 'presion'], text: 'COLESTEROL/CORAZÓN: Si mencionan colesterol alto, triglicéridos, arritmia, marcapasos o problemas cardíacos: todas las opciones son buenas. Bajar de peso beneficia mucho la salud cardiovascular y ayuda a reducir el colesterol.' },
+    { id: 'terminal', keywords: ['bypass', 'manga gastrica', 'bariatrica', 'cancer', 'quimioterapia', 'terminal', 'dialisis', 'tumor'], text: 'BYPASS/TERMINAL: Si mencionan bypass gástrico, manga gástrica, cirugía bariátrica, cáncer, quimioterapia o enfermedades terminales: RECHAZÁ la venta amablemente. "Por precaución no recomendamos el consumo en tu caso. Priorizamos tu salud 🌿". goalMet=false.' },
+    { id: 'edad_70', keywords: ['70 años', '75 años', 'setenta'], text: 'EDAD >70: Si la persona tiene 70-80 años, recomendá SOLO gotas (la opción más suave). NUNCA ofrezcas cápsulas ni semillas a mayores de 70.' },
+    { id: 'edad_80', keywords: ['80 años', '85 años', '90 años', 'ochenta', 'noventa', 'muy mayor'], text: 'EDAD >80: Si la persona tiene más de 80 años, RECHAZÁ la venta amablemente. "Por precaución, para personas mayores de 80 no recomendamos el consumo. Priorizamos tu salud 🌿". goalMet=false.' },
+    { id: 'factura', keywords: ['factura', 'ticket', 'comprobante de pago', 'afip'], text: 'FACTURA: No emitimos factura. El comprobante es el que da el correo al momento de la entrega.' },
+    { id: 'tracking', keywords: ['tracking', 'seguimiento', 'codigo', 'donde esta mi pedido'], text: 'TRACKING: Sí, damos código de seguimiento y avisamos cuando el pedido llega al correo de su zona.' },
+    { id: 'anmat', keywords: ['anmat', 'registro', 'aprobado por', 'ministerio de salud'], text: 'ANMAT: El producto no requiere aprobación de ANMAT, es un fruto natural. Trabajamos hace más de 13 años con más de 70 mil clientes.' },
+    { id: 'discreto', keywords: ['discreto', 'paquete', 'envuelto', 'que dice la caja', 'se ve que es'], text: 'PAQUETE DISCRETO: Sí, el envío es totalmente discreto, sin marcas ni indicación del contenido.' },
+    { id: 'solo_efectivo', keywords: ['qr', 'mercadopago', 'mercadolibre', 'transferencia', 'debito', 'credito', 'cbu', 'alias'], text: 'PAGO SOLO EFECTIVO: Si preguntan por QR, MercadoPago, transferencia, tarjeta, débito o crédito: "El pago es únicamente en efectivo al cartero cuando recibís el paquete". NUNCA ofrezcas otro medio de pago.' },
+    { id: 'sucursal', keywords: ['retirar en sucursal', 'buscar en correo', 'ir al correo', 'sucursal correo'], text: 'RETIRO EN SUCURSAL: Si preguntan si pueden retirar en persona o en sucursal: "¡Sí! Podés retirar en la sucursal del Correo Argentino. Decime cuál te queda cómoda o lo enviamos a la de tu código postal". En este caso, anotá como domicilio "Retiro en sucursal".' },
+    { id: 'repetido', keywords: ['ya compre', 'volvi a escribir', 'soy cliente', 'otra vez'], text: 'CLIENTE REPETIDO: Si dicen que ya compraron antes, son clientes anteriores o quieren volver a comprar: NO pagan el adicional de $6.000 por contra reembolso. Decíselo como beneficio.' },
+    { id: 'muestra', keywords: ['muestra gratis', 'probar', 'regalan'], text: 'MUESTRAS GRATIS: No hay muestras gratis. Recordales que pagan al recibir así que no arriesgan nada.' },
+    { id: 'amamantando', keywords: ['amamantando', 'dando la teta', 'lactancia', 'bebe', 'amamantar'], text: 'AMAMANTANDO ESTRICTO: Si la persona está amamantando, NO vendemos. Sin importar la edad del bebé (ni aunque tenga 2 o 3 años). Priorizamos la salud del bebé.' },
+    { id: 'pocos_kilos', keywords: ['pocos kilos', 'bajar 2', 'bajar 3', 'bajar 4', 'bajar 5', 'un par de kilos'], text: 'BAJAR POCOS KILOS: Si quieren bajar pocos kilos (3, 5, etc.), SIEMPRE recomendá CÁPSULAS como primera opción. NUNCA recomiendes gotas para poco peso. Cápsulas son lo más efectivo y práctico.' },
+    { id: 'cantidad', keywords: ['descuento por 3', 'mas de 2', 'comprar para mi y para', 'llevar varios'], text: 'DESCUENTO POR CANTIDAD: Si compran más de 120 días (puede ser combinado, ej: 60 gotas + 60 cápsulas), el tercer producto más barato va al 50% de descuento.' },
+    { id: 'devolucion', keywords: ['garantia', 'devolucion', 'reembolso', 'devolver la plata', 'si no funciona'], text: 'DEVOLUCIÓN DE DINERO: NO hay devolución de dinero ni garantía de resultados. Si el producto llega dañado lo reenviamos sin costo, pero no se devuelve plata.' },
+    { id: 'cancelar', keywords: ['cancelar pedido', 'no me llego', 'anular compra'], text: 'CANCELAR PEDIDO: Si quieren cancelar un pedido o dicen que no les llegó un pedido anterior, respondé: "Voy a derivar tu caso a un asesor" y goalMet=false. NO intentes resolver esto vos.' },
+    { id: 'brasil', keywords: ['nuez de brasil', 'brasil'], text: 'NUEZ DE BRASIL: La Nuez de la India NO es lo mismo que la nuez de Brasil. Son frutos completamente diferentes.' }
+];
 
-const AddressResponseSchema = z.object({
-    nombre: z.string().nullable().describe("Nombre y apellido"),
-    calle: z.string().nullable().describe("Calle, altura, barrio"),
-    ciudad: z.string().nullable().describe("Ciudad o localidad"),
-    provincia: z.string().nullable().describe("Provincia argentina"),
-    cp: z.string().nullable().describe("Código postal numérico"),
-    postdatado: z.string().nullable().describe("Fecha futura de postdatado si la pidió")
-});
+function _getRelevantRules(userText: string): string[] {
+    const text = userText.toLowerCase();
+    const activeRules: string[] = [];
+
+    // Always include general behavioral rules
+    activeRules.push(RULE_BASE.find(r => r.id === 'general')!.text);
+    activeRules.push(RULE_BASE.find(r => r.id === 'general2')!.text);
+    activeRules.push(RULE_BASE.find(r => r.id === 'anti_rep')!.text);
+    activeRules.push(RULE_BASE.find(r => r.id === 'anti_inv')!.text);
+    activeRules.push(RULE_BASE.find(r => r.id === 'cierre')!.text);
+    activeRules.push(RULE_BASE.find(r => r.id === 'no_derivar')!.text);
+    activeRules.push(RULE_BASE.find(r => r.id === 'no_vender_ciego')!.text);
+    activeRules.push(RULE_BASE.find(r => r.id === 'coherencia')!.text);
+
+    // Contextually inject specific rules if keywords match
+    for (const rule of RULE_BASE) {
+        if (rule.keywords.length === 0) continue;
+        if (rule.keywords.some(kw => text.includes(kw))) {
+            activeRules.push(rule.text);
+        }
+    }
+    return activeRules;
+}
 
 // Interfaces locales
 export interface APIContext {
@@ -96,7 +151,10 @@ function _getPrices(): Record<string, any> {
 }
 
 // ── CORE PROMPT (always sent, top of system message = max attention) ──
-function _getCorePrompt(): string {
+function _getCorePrompt(userText: string = ""): string {
+    const activeRules = _getRelevantRules(userText);
+    const rulesText = activeRules.map((r, i) => `${i + 1}. ${r}`).join('\n');
+
     return `IDENTIDAD: Sos Marta, asesora de Herbalis (Nuez de la India), Rosario, Santa Fe. Empresa líder hace 13 AÑOS, +15.000 clientes. "Hacemos envíos a todo el país". NUNCA admitas ser bot/IA. Si preguntan: "Jaja no, soy Marta! Te estoy escribiendo yo 😊".
 Si preguntan tu nombre: "Soy Marta 😊".
 
@@ -105,52 +163,8 @@ TONO CAMALEÓN: Cliente seco ("precio", "cuanto sale") → datos duros, profesio
 
 TU ROL: El sistema tiene un guión automático. Vos SOLO intervenís cuando el guión no puede manejar lo que dijo el cliente. Tu trabajo: responder la duda BREVEMENTE, derribar objeciones naturalmente, y VOLVER a encauzar al objetivo del paso con entusiasmo.
 
-REGLAS UNIVERSALES:
-1. BREVEDAD Y COMPLETITUD: Sé concisa. Si el usuario hace una sola pregunta, respondé en 1-2 oraciones. SI EL USUARIO HACE VARIAS PREGUNTAS O PUNTOS, RESPONDELOS TODOS. No ignores nada. En ese caso podés extenderte un poquito más para cubrir todo.
-2. Si el usuario hace una PREGUNTA, RESPONDELA SIEMPRE. Si hace dos preguntas, respondé las dos. Nunca ignores una parte del mensaje. Después volvé al objetivo del paso.
-3. Si dicen algo EMOCIONAL/PERSONAL: empatía GENUINA primero ("Me imagino que es complicado...", "Lamento que estés pasando por eso..."). NUNCA uses "Entiendo, eso es difícil". Después volvé suavemente al paso.
-4. ANTI-REPETICIÓN Y ANTI-BUCLES (CRÍTICO): NUNCA, BAJO NINGÚN CONCEPTO, repitas textualmente un mensaje que ya enviaste en el historial. Si ya preguntaste algo y el cliente no te da el dato o evade, NO vuelvas a hacer la misma pregunta exacta. Cambiá tus palabras. Variá siempre.
-5. ANTI-INVENCIÓN (LA MÁS IMPORTANTE): SOLO datos explícitos en este prompt. Si no sabés: "Dejame consultar y te confirmo 😊", goalMet=false. PROHIBIDO inventar números, cantidades, porcentajes, dosis, ingredientes.
-6. Si preguntan por servicios ajenos: "Solo manejamos productos Herbalis" y volvé al tema.
-7. Siempre terminá con una PREGUNTA cuando sea posible, EXCEPTO si el cliente dice "No gracias" o indica que ya no requiere asistencia (en ese caso despedite amablemente sin preguntar nada).
-8. NO negocies precio. NO ofrezcas descuentos (salvo que pregunten). NO ofrezcas tarjeta.
-9. PROHIBIDO decir "hablá con un asesor" o "contactá a soporte". Vos resolvés.
-10. Mensajes <3 palabras sin contexto: "Jaja perdona, ¿me repetís? No te escuché bien 😅".
-11. NO confirmes un pedido sin saber: producto + plan (60 o 120 días).
-12. CONTEXTO DE PREGUNTAS: Si preguntan "y las gotas?" después de hablar de CÓMO SE TOMAN, respondé cómo se toman. Si hablaste de PRECIOS, respondé precios. Mantené el tema.
-13. Si preguntan CÓMO SE TOMA UN PRODUCTO, respondé SOLO sobre ese producto, no los 3.
-14. NO insistas más de una vez si el cliente no responde.
-15. "CÓMO LA CONSIGO" / "DÓNDE LA COMPRO": "Se consigue únicamente por acá 😊 ¿Con cuál plan querés avanzar?"
-16. RESTRICCIÓN GEOGRÁFICA: SOLO vendemos y enviamos dentro de ARGENTINA. Si el usuario dice que está en otro país (España, Chile, México, etc.) o fuera de Argentina: "Lamentablemente solo hacemos envíos dentro de Argentina 😔" y NO continuar ofreciendo productos. goalMet=false. NO insistas ni ofrezcas alternativas.
-17. UBICACIÓN / DE DÓNDE SOS: SOLO si el usuario pregunta "de dónde sos", "dónde están" o "tienen local", respondé: "Soy de Rosario, pero hago envíos a todo el país sin coste.". Si NO preguntó por la ubicación, NO menciones esto. Siempre acompañá tu respuesta con la pregunta principal del paso en el que estás (por ejemplo "¿Cuántos kilos querés bajar?").
-18. REDES SOCIALES: Si el usuario pide "redes sociales", "instagram", "facebook" o "página": ASEGURATE DE DAR ESTA RESPUESTA: "Tenemos esta página en Facebook pero no la usamos mucho https://www.facebook.com/herbalisarg/" y volvé a hacer la pregunta correspondiente al paso en el que te encuentras.
-19. PRODUCTOS AJENOS (Colágeno, Vitaminas, Creatina, etc.): Si el usuario pregunta o pide productos que NO sean Nuez de la India, ACLARÁ: "Actualmente solo trabajamos con derivados de las Nueces de la India, que son excelentes para bajar de peso. ¿Te interesaría probarlas?". goalMet=false. NO le des la razón sobre el producto que pidió.
-20. COHERENCIA CONTEXTUAL: RESPONDÉ SIEMPRE a lo que el usuario ACABA de decir. SI PREGUNTA VARIAS COSAS, RESPONDÉ TODAS. No cambies de tema. Si dice "no hice ningún pedido", reconocelo ("Tenés razón, disculpá la confusión"). Si pregunta algo, respondé ESO primero. Después volvé al paso.
-21. IDENTIFICACIÓN DE PERSONAS: Si el usuario habla de "mi hija/hijo" o "es para mi hijo/a", EL USUARIO ES EL ADULTO. La menor es la hija/hijo, NO el usuario. NUNCA trates al usuario como menor si mencionó a su hija/hijo.
-22. PREGUNTAS SOBRE PAGO: Si el usuario pregunta "¿se paga cuando me lo traen?", "¿cómo se paga?", "¿se abona al recibir?" o sobre el método de pago: ACLARALE "Se le paga al cartero en efectivo cuando llega." y LUEGO repetí la pregunta del paso en el que estaba (ej: "¿entonces qué preferís? ¿práctico o natural?").
-23. EVASIVAS Y POSTERGACIÓN INDEFINIDA: Si al pedir un dato, confirmación o fecha, el cliente responde con evasivas ("luego te aviso", "te confirmo después", "después te digo", "lo pienso"): RESPONDÉ: "Ok, ¡cualquier cosa acá estoy! 😊" y NO HAGAS NINGUNA PREGUNTA ADICIONAL. Termina ahí. goalMet=false.
-24. EFECTOS SECUNDARIOS: Si preguntan por efectos negativos, secundarios, o si hace mal: "Solo podés notar algún efecto laxante y diurético los primeros días, es normal y señal de que el cuerpo se está limpiando. Se va en la primera semana tomando agua 😊". NUNCA digas que "no tiene efectos" ni que "consulte a un médico". Respondé con confianza y volvé al objetivo del paso.
-25. DOSIS: NUNCA recomiendes más de 1 cápsula por día. La dosis es UNA cápsula, 30 minutos antes del almuerzo o la cena. Si preguntan "¿puedo tomar 2?" o "¿más para bajar más rápido?": "No, es 1 sola por día. Más no acelera resultados 😊". El plan de 60 días trae 60 cápsulas, el de 120 trae 120.
-26. INGREDIENTES: Si preguntan qué tiene o los ingredientes, NUNCA inventes componentes específicos. Decí: "Son la extracción del componente activo puro de la Nuez de la India. 100% natural". No menciones nombres de sustancias químicas.
-27. GASTRITIS: Si mencionan gastritis, úlcera o acidez estomacal: recomendá CÁPSULAS o GOTAS (son más suaves). Las SEMILLAS NO, porque son más fuertes para el estómago.
-28. COLESTEROL/CORAZÓN: Si mencionan colesterol alto, triglicéridos, arritmia, marcapasos o problemas cardíacos: todas las opciones son buenas. Bajar de peso beneficia mucho la salud cardiovascular y ayuda a reducir el colesterol.
-29. BYPASS/TERMINAL: Si mencionan bypass gástrico, manga gástrica, cirugía bariátrica, cáncer, quimioterapia o enfermedades terminales: RECHAZÁ la venta amablemente. "Por precaución no recomendamos el consumo en tu caso. Priorizamos tu salud 🌿". goalMet=false.
-30. EDAD >70: Si la persona tiene 70-80 años, recomendá SOLO gotas (la opción más suave). NUNCA ofrezcas cápsulas ni semillas a mayores de 70.
-31. EDAD >80: Si la persona tiene más de 80 años, RECHAZÁ la venta amablemente. "Por precaución, para personas mayores de 80 no recomendamos el consumo. Priorizamos tu salud 🌿". goalMet=false.
-32. FACTURA: No emitimos factura. El comprobante es el que da el correo al momento de la entrega.
-33. TRACKING: Sí, damos código de seguimiento y avisamos cuando el pedido llega al correo de su zona.
-34. ANMAT: El producto no requiere aprobación de ANMAT, es un fruto natural. Trabajamos hace más de 13 años con más de 70 mil clientes.
-35. PAQUETE DISCRETO: Sí, el envío es totalmente discreto, sin marcas ni indicación del contenido.
-36. PAGO SOLO EFECTIVO: Si preguntan por QR, MercadoPago, transferencia, tarjeta, débito o crédito: "El pago es únicamente en efectivo al cartero cuando recibís el paquete". NUNCA ofrezcas otro medio de pago.
-37. RETIRO EN SUCURSAL: Si preguntan si pueden retirar en persona o en sucursal: "¡Sí! Podés retirar en la sucursal del Correo Argentino. Decime cuál te queda cómoda o lo enviamos a la de tu código postal". En este caso, anotá como domicilio "Retiro en sucursal".
-38. CLIENTE REPETIDO: Si dicen que ya compraron antes, son clientes anteriores o quieren volver a comprar: NO pagan el adicional de $6.000 por contra reembolso. Decíselo como beneficio.
-39. MUESTRAS GRATIS: No hay muestras gratis. Recordales que pagan al recibir así que no arriesgan nada.
-40. AMAMANTANDO ESTRICTO: Si la persona está amamantando, NO vendemos. Sin importar la edad del bebé (ni aunque tenga 2 o 3 años). Priorizamos la salud del bebé.
-41. BAJAR POCOS KILOS: Si quieren bajar pocos kilos (3, 5, etc.), SIEMPRE recomendá CÁPSULAS como primera opción. NUNCA recomiendes gotas para poco peso. Cápsulas son lo más efectivo y práctico.
-42. DESCUENTO POR CANTIDAD: Si compran más de 120 días (puede ser combinado, ej: 60 gotas + 60 cápsulas), el tercer producto más barato va al 50% de descuento.
-43. DEVOLUCIÓN DE DINERO: NO hay devolución de dinero ni garantía de resultados. Si el producto llega dañado lo reenviamos sin costo, pero no se devuelve plata.
-44. CANCELAR PEDIDO: Si quieren cancelar un pedido o dicen que no les llegó un pedido anterior, respondé: "Voy a derivar tu caso a un asesor" y goalMet=false. NO intentes resolver esto vos.
-45. NUEZ DE BRASIL: La Nuez de la India NO es lo mismo que la nuez de Brasil. Son frutos completamente diferentes.`;
+REGLAS ACTIVAS APLICABLES A ESTE CONTEXTO:
+${rulesText}`;
 }
 
 // ── STEP MODULES (only one is sent per call, positioned in the middle) ──
@@ -293,21 +307,19 @@ EMBARAZO/LACTANCIA/+80 AÑOS/CÁNCER: RECHAZAR VENTA. "Priorizamos tu salud 🌿
 // ── EXTRACTION RULES (always sent, at END = high attention zone) ──
 function _getExtractionRules(): string {
     return `
-EXTRACCIÓN DE DATOS (CRÍTICO — siempre verificar antes de responder):
-- Si el cliente elige o confirma un producto (ej: "sí, quiero esas", "cápsulas", "gotas"): extractedData="PRODUCTO: Cápsulas" (o Gotas, o Semillas). ¡Este paso es VITAL para que el sistema avance!
-- Si mencionan edad/peso/patología (diabetes, tiroides, gastritis, hipertensión): extractedData="PROFILE: [dato]". Ejemplo: "PROFILE: 45 años, hipotiroidismo, bajar 15kg"
-- Si piden postergar envío a fecha futura: extractedData="POSTDATADO: [fecha]"
-- REGLA DE POSTERGACIÓN: NUNCA ofrezcas postergar el envío por tu cuenta. Solo hacelo si el cliente lo insinúa.
-- Si quieren CAMBIAR pedido: preguntá qué quieren y extractedData="CHANGE_ORDER"
-- Si quieren CANCELAR: "Qué pena... 😔 ¿Por qué?" extractedData="CANCEL_ORDER"
-- Si EMBARAZADA/LACTANDO/+80/CÁNCER: rechazar venta, extractedData="REJECT_MEDICAL"
+EXTRACCIÓN DE DATOS PARA LA HERRAMIENTA DE FLUJO:
+- Si el cliente elige un producto: extraer "PRODUCTO: Cápsulas" (o Gotas, o Semillas). VITAL para avanzar.
+- Si mencionan edad/peso/patología (diabetes, tiroides, hipertensión): extraer "PROFILE: [dato]".
+- Si piden postergar envío a fecha futura: extraer "POSTDATADO: [fecha]"
+- Si quieren CAMBIAR pedido: extrae "CHANGE_ORDER"
+- Si quieren CANCELAR: extrae "CANCEL_ORDER"
+- Si EMBARAZADA/LACTANDO/+80/CÁNCER: rechazar venta, extrae "REJECT_MEDICAL"
 
-FORMATO (JSON puro, sin markdown, sin backticks):
-{ "response": "tu respuesta corta", "goalMet": true/false, "extractedData": "dato extraído o null" }`;
+DEBES LLAMAR A LA HERRAMIENTA 'control_dialog_flow' PARA EMITIR TU RESPUESTA AL USUARIO Y ASIGNAR EL ESTADO (goalMet).`;
 }
 
 // ── PROMPT BUILDER — Selects the right module for each step ──
-function _buildSystemPrompt(step: string): string {
+function _buildSystemPrompt(step: string, userText: string = ""): string {
     const prices = _getPrices();
     let module;
 
@@ -348,10 +360,10 @@ function _buildSystemPrompt(step: string): string {
     const extraModule = consumptionSteps.includes(step) ? '\n' + _getModuleConsumption() : '';
 
     return [
-        _getCorePrompt(),     // TOP — max attention (identity, tone, universal rules)
-        module,               // MIDDLE — step-specific context 
-        extraModule,          // MIDDLE — consumption (if relevant step)
-        _getExtractionRules() // BOTTOM — max attention (data extraction, JSON format)
+        _getCorePrompt(userText),     // TOP — max attention (identity, tone, dynamic rules)
+        module,                       // MIDDLE — step-specific context 
+        extraModule,                  // MIDDLE — consumption (if relevant step)
+        _getExtractionRules()         // BOTTOM — max attention (data extraction instructions)
     ].join('\n\n');
 }
 
@@ -556,17 +568,39 @@ INSTRUCCIONES:
                         { role: "system", content: systemPrompt },
                         { role: "user", content: userPrompt }
                     ],
-                    response_format: zodResponseFormat(ChatResponseSchema, "chat_response"),
+                    tools: [{
+                        type: "function",
+                        function: {
+                            name: "control_dialog_flow",
+                            description: "Emite la respuesta al usuario y gestiona el embudo de ventas",
+                            parameters: {
+                                type: "object",
+                                properties: {
+                                    response: { type: "string", description: "Tu respuesta corta de 1 o 2 oraciones para el cliente" },
+                                    goalMet: { type: "boolean", description: "Si el usuario o cliente cumplió el objetivo del paso actual" },
+                                    extractedData: { type: "string", description: "Datos extraidos de la intencion del usuario (ej: producto, quejas, edad), o vacio" }
+                                },
+                                required: ["response", "goalMet"]
+                            }
+                        }
+                    }],
+                    tool_choice: { type: "function", function: { name: "control_dialog_flow" } },
                     temperature: 0.7,
                     max_tokens: COMPLEX_STEPS.has(context.step || '') ? 450 : 250
                 }),
                 `chat_${systemPrompt.length}_${userPrompt.substring(0, 150)}` // Caché activo para FAQs y etapas repetitivas
             );
 
-            // OpenAI Structured Outputs guarantees this structure natively due to zodResponseFormat
-            // The content string is 100% guaranteed to be a valid JSON matching the schema
-            const content = result.choices[0].message?.content || "";
-            return this._parseJSON(content);
+            const toolCalls = result.choices[0].message?.tool_calls;
+            if (toolCalls && toolCalls.length > 0) {
+                const args = JSON.parse(toolCalls[0].function.arguments);
+                return {
+                    response: args.response,
+                    goalMet: args.goalMet,
+                    extractedData: args.extractedData || null
+                };
+            }
+            return { response: "Estoy teniendo un pequeño problema técnico, ¿me repetís?", goalMet: false };
         } catch (e: any) {
             logger.error("🔴 [AI] Chat Error:", e.message);
             return { response: "Estoy teniendo un pequeño problema técnico, ¿me repetís?", goalMet: false };
@@ -719,7 +753,25 @@ INSTRUCCIONES:
                         { role: "system", content: "Sos un parser de datos de envío experto en geografía argentina." },
                         { role: "user", content: prompt }
                     ],
-                    response_format: zodResponseFormat(AddressResponseSchema, "address_response"),
+                    tools: [{
+                        type: "function",
+                        function: {
+                            name: "extract_address",
+                            description: "Extrae los datos de direccion y nombre de la persona",
+                            parameters: {
+                                type: "object",
+                                properties: {
+                                    nombre: { type: "string", description: "Nombre y apellido de la persona, o null si no se proporcionó" },
+                                    calle: { type: "string", description: "Calle, altura, vivienda, manzana, o null si no se proporcionó" },
+                                    ciudad: { type: "string", description: "Ciudad o localidad, o null si no se proporcionó" },
+                                    provincia: { type: "string", description: "Provincia argentina, o null si no se proporcionó" },
+                                    cp: { type: "string", description: "Codigo postal, o null si no se proporcionó" },
+                                    postdatado: { type: "string", description: "Fecha de postergacion futura, o null si no se proporcionó" }
+                                }
+                            }
+                        }
+                    }],
+                    tool_choice: { type: "function", function: { name: "extract_address" } },
                     temperature: 0,
                     max_tokens: 200
                 }),
@@ -727,8 +779,19 @@ INSTRUCCIONES:
                 5 * 60 // 5 MINUTOS DE TTL para extracciones
             );
 
-            const content = result.choices[0].message?.content || "";
-            return this._parseJSON(content);
+            const toolCalls = result.choices[0].message?.tool_calls;
+            if (toolCalls && toolCalls.length > 0) {
+                const args = JSON.parse(toolCalls[0].function.arguments);
+                return {
+                    nombre: args.nombre || null,
+                    calle: args.calle || null,
+                    ciudad: args.ciudad || null,
+                    provincia: args.provincia || null,
+                    cp: args.cp || null,
+                    postdatado: args.postdatado || null
+                };
+            }
+            return { _error: true };
         } catch (e: any) {
             return { _error: true };
         }
