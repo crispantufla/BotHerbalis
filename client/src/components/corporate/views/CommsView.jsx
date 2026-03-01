@@ -637,21 +637,33 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex justify-between items-baseline mb-0.5">
-                                        <div className="flex flex-col min-w-0">
-                                            <div className="flex items-center gap-1.5 min-w-0">
-                                                <h3 className={`font-semibold text-sm truncate flex items-center gap-1 ${selectedChat?.id === chat.id ? 'text-blue-700 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'}`}>
-                                                    {chat.name}
-                                                    {chat.hasBought && <span title="Cliente Recurrente" className="inline-flex items-center text-[8px] bg-green-100 text-green-700 px-1 py-0.5 rounded-sm font-bold ml-1">CLIENTE</span>}
+                                        <div className="flex flex-col">
+                                            <div className="flex items-center gap-2 mb-0.5">
+                                                <h3 className={`font-bold text-base tracking-tight ${selectedChat?.id === chat.id ? 'text-blue-700 dark:text-blue-400' : 'text-slate-800 dark:text-slate-100'}`}>
+                                                    +{chat.id?.split('@')[0]}
                                                 </h3>
+                                                {chat.hasBought && <span title="Cliente Recurrente" className="inline-flex items-center text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-sm font-bold shadow-sm">CLIENTE</span>}
                                                 {chat.assignedScript && (
-                                                    <span className="px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-[9px] font-bold text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-600 uppercase whitespace-nowrap">
-                                                        {chat.assignedScript}
+                                                    <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-[10px] font-bold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 uppercase">
+                                                        Guion: {chat.assignedScript}
                                                     </span>
                                                 )}
                                             </div>
-                                            <span className={`font-mono text-[10px] tracking-tight ${selectedChat?.id === chat.id ? 'text-blue-200' : 'text-slate-400 dark:text-slate-500'}`}>
-                                                +{chat.id?.split('@')[0]}
-                                            </span>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`text-xs font-medium ${selectedChat?.id === chat.id ? 'text-blue-600/80 dark:text-blue-300' : 'text-slate-500 dark:text-slate-400'}`}>
+                                                    {chat.name}
+                                                </span>
+                                                <span className="text-slate-300 dark:text-slate-600">•</span>
+                                                {chat.isPaused ? (
+                                                    <p className="text-[10px] text-amber-600 dark:text-amber-500 font-bold flex items-center gap-1">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span> BOT PAUSADO
+                                                    </p>
+                                                ) : (
+                                                    <p className="text-[10px] text-emerald-600 dark:text-emerald-500 font-bold flex items-center gap-1">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> BOT ACTIVO
+                                                    </p>
+                                                )}
+                                            </div>
                                         </div>
                                         <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium font-mono ml-2 flex-shrink-0">{chat.time}</span>
                                     </div>
