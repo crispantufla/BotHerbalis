@@ -1,6 +1,6 @@
 async function handleSafetyCheck(userId, text, normalizedText, currentState, knowledge, dependencies) {
     const { sendMessageWithDelay, aiService } = dependencies;
-    const SAFETY_REGEX = /\b(hija|hijo|niñ[oa]s?|menor(es)?|bebe|embaraz[oa]|lactanc?ia|1[0-7]\s*años?)\b/i;
+    const SAFETY_REGEX = /\b(hija|hijo|niñ[oa]s?|menor(es)?|bebe|embaraz[oa]|lactanc?ia|1[0-7]\s*años?|bypass|manga\s*gastrica|bariatric[oa]|operad[oa]\s*del\s*estomago|cancer|terminal|quimioterapia|8[0-9]\s*años?|9[0-9]\s*años?)\b/i;
     const AGE_CLARIFICATION = /\b(tiene|tengo|son|es)\s*(\d{2,})\b|\b(\d{2,})\s*(años|año)\b|\b(mayor|adulto|adulta|grande)\b/i;
 
     const ageMatch = normalizedText.match(/\b(tiene|tengo)\s*(\d{2,})\b|\b(\d{2,})\s*(anos|ano)\b/);

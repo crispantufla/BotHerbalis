@@ -280,11 +280,48 @@
         },
         {
             "keywords": [
+                "gastritis",
+                "estomago",
+                "ulcera",
+                "acidez"
+            ],
+            "response": "Con gastritis te recomendamos cápsulas o gotas, que son más suaves para el estómago. Las semillas no, porque son más fuertes para digerir 😊"
+        },
+        {
+            "keywords": [
+                "colesterol",
+                "colesterol alto",
+                "trigliceridos"
+            ],
+            "response": "Todas las opciones son buenas para vos 😊 Bajar de peso de hecho ayuda muchísimo a reducir el colesterol. ¡Es un beneficio doble!"
+        },
+        {
+            "keywords": [
+                "corazon",
+                "cardiaco",
+                "arritmia",
+                "marcapasos",
+                "problema cardiaco"
+            ],
+            "response": "No hay inconveniente 😊 Es 100% natural y bajar de peso beneficia mucho la salud cardiovascular."
+        },
+        {
+            "keywords": [
+                "bypass",
+                "manga gastrica",
+                "bariatrica",
+                "operada del estomago",
+                "cirugia bariatrica"
+            ],
+            "response": "Por precaución, en casos de cirugía bariátrica (bypass, manga gástrica) no recomendamos el consumo. Priorizamos tu salud 🌿😊"
+        },
+        {
+            "keywords": [
                 "contraindicaciones",
                 "embarazo",
                 "lactancia"
             ],
-            "response": "Solo no se recomienda durante embarazo o lactancia."
+            "response": "No se recomienda durante embarazo, lactancia, ni en personas con cirugía bariátrica (bypass/manga gástrica)."
         },
         {
             "keywords": [
@@ -315,6 +352,37 @@
                 "muerte"
             ],
             "response": "La nuez de la India y sus derivados son el producto natural líder en pérdida de peso con los que trabajamos hace 13 años con más de 70 mil clientes.\n\nSi te dijeron eso y no sentís la seguridad para avanzar, lo dejamos acá sin problema. Nuestra prioridad es tu tranquilidad.\n\n¿Avanzamos o preferís dejarlo acá?"
+        },
+        {
+            "keywords": [
+                "cuantas capsulas",
+                "cuantas vienen",
+                "cuantas trae",
+                "cuanto trae",
+                "cuantas unidades",
+                "cantidad de capsulas"
+            ],
+            "response": "Se toma 1 por día, así que el plan de 60 días trae 60 cápsulas y el de 120 trae 120 😊"
+        },
+        {
+            "keywords": [
+                "ingredientes",
+                "composicion",
+                "que tiene adentro",
+                "de que esta hecho",
+                "que contiene"
+            ],
+            "response": "Las cápsulas son la extracción del componente activo puro de la Nuez de la India. 100% natural, sin químicos ni conservantes 🌿"
+        },
+        {
+            "keywords": [
+                "puedo tomar 2",
+                "tomar dos",
+                "doble dosis",
+                "tomar mas",
+                "mas rapido"
+            ],
+            "response": "No, la dosis es 1 sola cápsula por día, 30 minutos antes de tu almuerzo o cena. Más no acelera resultados y puede causar malestar innecesario 😊"
         },
         {
             "keywords": [
@@ -400,6 +468,238 @@
                 "de que parte"
             ],
             "response": "No tenemos local de venta al público. Trabajamos 100% online y los envíos son por Correo Argentino a todo el país 📦"
+        },
+        {
+            "keywords": [
+                "factura",
+                "factura a",
+                "factura b",
+                "comprobante",
+                "ticket"
+            ],
+            "response": "No emitimos factura. El comprobante de tu compra es el que te da el correo al momento de la entrega 😊"
+        },
+        {
+            "keywords": [
+                "tracking",
+                "seguimiento",
+                "rastreo",
+                "codigo de seguimiento",
+                "numero de seguimiento",
+                "donde esta mi pedido"
+            ],
+            "response": "¡Sí! Te damos el código de seguimiento y además te avisamos cuando el pedido llega al correo de tu zona 📦😊"
+        },
+        {
+            "keywords": [
+                "discreto",
+                "paquete discreto",
+                "que dice el paquete",
+                "viene marcado",
+                "se nota"
+            ],
+            "response": "Sí, el envío es totalmente discreto. El paquete no tiene ninguna marca ni indicación del contenido 📦😊"
+        },
+        {
+            "keywords": [
+                "anmat",
+                "aprobado",
+                "regulado",
+                "habilitado",
+                "cuit"
+            ],
+            "response": "Es un producto natural a base de un fruto, no requiere aprobación de ANMAT. Trabajamos hace más de 13 años con más de 70 mil clientes 😊"
+        },
+        {
+            "keywords": [
+                "70 anos",
+                "setenta",
+                "mayor de 70",
+                "persona mayor",
+                "abuelo",
+                "abuela",
+                "tercera edad"
+            ],
+            "response": "Para personas de 70 años o más recomendamos SOLO gotas, que son la opción más suave. Es importante empezar con dosis baja 😊"
+        },
+        {
+            "keywords": [
+                "80 anos",
+                "ochenta",
+                "mayor de 80",
+                "mas de 80"
+            ],
+            "response": "Por precaución, para personas mayores de 80 años no recomendamos el consumo. Priorizamos siempre la salud 🌿😊"
+        },
+        {
+            "keywords": [
+                "nuez de brasil",
+                "nuez del brasil",
+                "es lo mismo",
+                "para de brasil",
+                "castana"
+            ],
+            "response": "No, la Nuez de la India no es lo mismo que la nuez de Brasil. Son frutos completamente diferentes 😊"
+        },
+        {
+            "keywords": [
+                "combinar",
+                "dieta",
+                "ejercicio",
+                "gimnasio",
+                "puedo hacer dieta",
+                "complementar"
+            ],
+            "response": "¡Sí! La combinación con dieta y ejercicio potencia muchísimo los resultados 💪 El tratamiento trabaja de base y lo demás lo complementa."
+        },
+        {
+            "keywords": [
+                "llego roto",
+                "llego danado",
+                "roto",
+                "danado",
+                "en mal estado",
+                "se rompio"
+            ],
+            "response": "Si el producto llega dañado, lo reenviamos y nos hacemos cargo nosotros. ¡Quedate tranquilo/a! 📦😊"
+        },
+        {
+            "keywords": [
+                "garantia",
+                "devolucion",
+                "devolver",
+                "no me gusto",
+                "quiero devolver",
+                "cambio",
+                "devuelven la plata",
+                "no funciona"
+            ],
+            "response": "No hacemos devolución de dinero. Si el producto llega dañado lo reenviamos sin costo, pero no hay garantía de resultados ni reembolso 😊"
+        },
+        {
+            "keywords": [
+                "qr",
+                "pago qr",
+                "mercadopago",
+                "transferencia",
+                "tarjeta",
+                "debito",
+                "credito"
+            ],
+            "response": "El pago es únicamente en efectivo al cartero cuando recibís el paquete 😊 No aceptamos QR, transferencia ni tarjeta."
+        },
+        {
+            "keywords": [
+                "retirar",
+                "retiro",
+                "pick up",
+                "pickup",
+                "buscar",
+                "puedo ir a buscar",
+                "sucursal",
+                "oficina correo"
+            ],
+            "response": "¡Sí! Podés retirar en la sucursal del Correo Argentino. Decime cuál sucursal te queda cómoda o lo enviamos a la de tu código postal 📦😊"
+        },
+        {
+            "keywords": [
+                "es real",
+                "negocio real",
+                "como se que",
+                "es confiable",
+                "confiar"
+            ],
+            "response": "Al pagar contra reembolso no corrés ningún riesgo: el cartero te entrega el paquete en mano y recién ahí le pagás en efectivo. Si no te convence, no pagás 😊"
+        },
+        {
+            "keywords": [
+                "ya compre",
+                "compre antes",
+                "soy cliente",
+                "cliente anterior",
+                "segunda vez",
+                "descuento"
+            ],
+            "response": "¡Bienvenido/a de nuevo! 😊 Como ya sos cliente, no pagás el adicional de $6.000 por contra reembolso."
+        },
+        {
+            "keywords": [
+                "muestra",
+                "muestra gratis",
+                "probar",
+                "prueba",
+                "probar gratis"
+            ],
+            "response": "No manejamos muestras gratis. Pero recordá que pagás al recibir, así que no arriesgás nada 😊"
+        },
+        {
+            "keywords": [
+                "cuanto dura",
+                "duracion",
+                "cuanto tiempo",
+                "tratamiento completo"
+            ],
+            "response": "La duración depende del plan que elijas: tenemos de 60 días y de 120 días 😊"
+        },
+        {
+            "keywords": [
+                "amamantando",
+                "dando de mamar",
+                "dando pecho",
+                "teta",
+                "leche materna"
+            ],
+            "response": "Si estás amamantando no podemos venderte el producto, sin importar la edad del bebé. Priorizamos tu salud y la del bebé 🌿😊"
+        },
+        {
+            "keywords": [
+                "3 kilos",
+                "5 kilos",
+                "poco peso",
+                "poquito",
+                "unos kilos"
+            ],
+            "response": "Para objetivos de pocos kilos te recomendamos cápsulas, que son lo más efectivo y práctico. Con el plan de 60 días vas a ver resultados geniales 😊"
+        },
+        {
+            "keywords": [
+                "para mi amiga",
+                "para mis amigas",
+                "precio por 3",
+                "precio por cantidad",
+                "comprar varios",
+                "mayorista"
+            ],
+            "response": "¡Sí! Si comprás más de 120 días (puede ser combinado, ej: 60 de gotas + 60 de cápsulas), el tercer producto más barato va al 50% de descuento 🎉"
+        },
+        {
+            "keywords": [
+                "cuit",
+                "registrados",
+                "monotributo",
+                "empresa"
+            ],
+            "response": "Sí, estamos registrados. Trabajamos hace más de 13 años con más de 70 mil clientes en todo el país 😊"
+        },
+        {
+            "keywords": [
+                "no me llego",
+                "no llego",
+                "no recibi",
+                "pedido anterior",
+                "pedido perdido"
+            ],
+            "response": "Lamento eso 😔 Voy a derivar tu caso a un asesor para que lo resuelva lo antes posible."
+        },
+        {
+            "keywords": [
+                "cancelar",
+                "cancelar pedido",
+                "anular",
+                "anular pedido",
+                "no quiero"
+            ],
+            "response": "Voy a derivar tu caso a un asesor para gestionar la cancelación 😊"
         }
     ],
     "rules": {
