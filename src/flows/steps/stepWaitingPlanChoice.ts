@@ -288,6 +288,7 @@ async function handleWaitingPlanChoice(
                 _handleExtractedData(userId, planAI.extractedData, currentState);
                 currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });
                 await sendMessageWithDelay(userId, planAI.response);
+                saveState(userId);
 
                 // Setup Follow Up check for delayed answers ("despues hablamos")
                 if (planAI.response.includes('después hablamos') || planAI.response.includes('cualquier cosa acá estoy')) {

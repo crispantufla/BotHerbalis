@@ -173,8 +173,8 @@ export async function handleWaitingPreference(
 
         if (aiPref.response) {
             currentState.history.push({ role: 'bot', content: aiPref.response, timestamp: Date.now() });
-            saveState(userId);
             await sendMessageWithDelay(userId, aiPref.response);
+            saveState(userId);
             return { matched: true };
         }
     }

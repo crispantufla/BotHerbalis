@@ -169,8 +169,8 @@ export async function handleWaitingFinalConfirmation(
             return { matched: true };
         } else if (aiResponse.response) {
             currentState.history.push({ role: 'bot', content: aiResponse.response, timestamp: Date.now() });
-            saveState(userId);
             await sendMessageWithDelay(userId, aiResponse.response);
+            saveState(userId);
             return { matched: true };
         }
 

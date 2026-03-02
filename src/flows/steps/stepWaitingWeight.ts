@@ -125,8 +125,8 @@ export async function handleWaitingWeight(
                 }
             } else if (aiWeight.response) {
                 currentState.history.push({ role: 'bot', content: aiWeight.response, timestamp: Date.now() });
-                saveState(userId);
                 await sendMessageWithDelay(userId, aiWeight.response);
+                saveState(userId);
                 return { matched: true };
             }
         }
