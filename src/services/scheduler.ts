@@ -355,6 +355,16 @@ function startScheduler(sharedState: SchedulerSharedState, dependencies: Schedul
     }, { timezone: TIMEZONE });
     logger.info('[SCHEDULER] ✅ cleanStalePausedUsers → 05:00 ARG (diario)');
 
+    // ── GRACEFUL RESTART: a las 8am Argentina ──
+    // Fuerza un inicio en frío eliminando por completo cualquier fuga de RAM de Chromium/Puppeteer.
+    // Railway (o PM2) volverá a levantar el contenedor y reconectará en menos de 10s.
+    cron.schedule('0 8 * * *', () => {
+        logger.info('[SCHEDULER] 🔄 Ejecutando reinicio preventivo diario (Anti-Memory Leak)...');
+        // El manejador SIGTERM de index.ts atrapará el kill() / exit() y limpiará los candados de Chrome.
+        process.exit(0);
+    }, { timezone: TIMEZONE });
+    logger.info('[SCHEDULER] ✅ Reinicio Preventivo Diario → 08:00 ARG (diario)');
+
     // ── Run auto-approve once 10s after boot (no cold lead/cleanup needed at startup) ──
     setTimeout(() => {
         autoApproveOrders(sharedState, dependencies);

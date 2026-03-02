@@ -1,0 +1,16 @@
+[LID-RESOLVE] Resolved 34716220682340@lid to real phone 5491157492823@c.us
+[MSG_TRACK] USER
+[DEBOUNCE] New message from 5491157492823@c.us: "Hola! Se puede abonar con transferencia?". Waiting 10000ms...
+[AI-FALLBACK] waiting_weight: No number detected for 5491157492823@c.us
+[BULLMQ] 🚀 Procesando Job 947 para 5491157492823@c.us
+[DEBOUNCE] Processing 1 message(s) from 5491157492823@c.us combined: "Hola! Se puede abonar con transferencia?"
+[GREETING] Manual greeting detected for 5491157492823@c.us, skipping to waiting_weight.
+[PAUSE] No match for user 5491157492823@c.us at step "waiting_weight". Pausing and alerting admin.
+⚠️ [ADMIN ALERT] 🚨 BOT PAUSADO — Necesita intervención (User: 5491157492823@c.us)
+⏸️ [BOT] User 5491157492823@c.us paused. Reason: Bot no pudo responder en paso "waiting_weight".
+[SENT] Message sent to 5491157492823@c.us
+[BULLMQ] ✅ Job 947 de 5491157492823@c.us completado con éxito.
+[MSG_TRACK] BOT
+[PAUSED] Ignoring message from 5491157492823@c.us 
+[LID-RESOLVE] Resolved 34716220682340@lid to real phone 5491157492823@c.us
+[MSG_TRACK] USER

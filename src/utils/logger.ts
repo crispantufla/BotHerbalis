@@ -25,12 +25,18 @@ const logger = pino({
                     ignore: 'pid,hostname'
                 } : { destination: 1 } // 1 = STDOUT
             },
-            // Target 2: File (JSON for ELK/Datadog or parsing)
+            // Target 2: File (Rotated Daily / Limit 10MB per file / 30 Days max via pino-roll)
             {
-                target: 'pino/file',
+                target: 'pino-roll',
                 options: {
-                    destination: path.join(logDir, 'bot-activity.log'),
-                    mkdir: true
+                    file: path.join(logDir, 'bot-activity'),
+                    size: '10m',
+                    frequency: 'daily',
+                    mkdir: true,
+                    extension: '.log',
+                    limit: {
+                        count: 30
+                    }
                 }
             }
         ]
