@@ -227,6 +227,7 @@ DESCUENTOS POR VOLUMEN (SOLO si preguntan por varias unidades):
 
 ENVÍO: Gratis por Correo Argentino. 7-10 días hábiles. Pago ÚNICAMENTE en efectivo (tanto a domicilio como en sucursal).
 NO aceptamos tarjeta, transferencia ni MercadoPago. No existe posibilidad de otro medio de pago.
+CARGO ADICIONAL: El cargo extra es el costo del servicio de "Contra Reembolso" (pagar al recibir) y SE COBRA IGUAL sea a domicilio o en sucursal del correo. Este costo está BONIFICADO (es GRATIS) para el plan de 120 días. Para el de 60 días tiene un costo (ej: $6.000). Si el cliente elige 60 días y pregunta por retirar en correo para evitar el cargo, explicá muy amablemente esto y ofrecé cambiar al de 120 días para que se lo ahorre. Si elige el de 120 días, confirmale que NO tiene ningún cargo adicional.
 
 EFECTOS: Solo efecto laxante/diurético leve los primeros días. Normal y transitorio. Se va en la primera semana tomando agua.
 
@@ -524,7 +525,8 @@ class AIService {
                     if (pd.adicionalMAX) adMax = pd.adicionalMAX;
                 } catch (e: any) { }
 
-                knowledgeContext += `- Plan 120 días sin adicional.Plan 60 días con Contra Reembolso MAX(+$${adMax}).\n`;
+                knowledgeContext += `- Plan 120 días SIN adicional. Plan 60 días con Contra Reembolso MAX (+$${adMax}).\n`;
+                knowledgeContext += `- SOBRE CARGO ADICIONAL: El cargo extra es el costo del servicio de Contra Reembolso (pagar al recibir). Se cobra IGUAL sea envío a domicilio o retiro en sucursal. Para el plan 120 días está BONIFICADO (es gratis). Si eligió 60 días y pide retirar en correo para no pagar envío, explicá esto y ofrecé pasar a 120 días para ahorrarlo.\n`;
                 knowledgeContext += `- Envío gratis por Correo Argentino, pago en efectivo al recibir\n`;
             } else if (step === 'waiting_data') {
                 knowledgeContext += `- Necesitamos: nombre completo, calle y número, ciudad, código postal\n`;
