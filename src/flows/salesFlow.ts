@@ -124,65 +124,64 @@ export async function processSalesFlow(
         // Only run this if we didn't already route to post-sale via Orders
         if (userState[userId].step !== 'completed' && userState[userId].step !== 'cross_bot_redirected') {
             try {
-                if (dependencies.client) {
-                    const chat = await dependencies.client.getChatById(userId);
-                    if (chat) {
-                        const messages = await chat.fetchMessages({ limit: 10 });
+                const { prisma } = require('../../db');
+                const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
+                const cleanPhone = userId.split('@')[0].replace(/\D/g, '');
 
-                        // --- POST-SALE DETECTION: auto-pause if outgoing post-sale messages exist ---
-                        const outgoingMessages = messages.filter((m: any) => m.fromMe && m.body);
-                        const hasPostSaleMessage = outgoingMessages.some((m: any) => {
-                            const body = (m.body || '').trim();
-                            // 1. Branch pickup notification
-                            if (body.includes('MENSAJE DE HERBALIS') || body.includes('MENSAJDE DE HERBALIS')) return true;
-                            // 2. Tracking code (starts with CO + 9 digits, e.g. CO767708617)
-                            if (/^CO\d{9}$/i.test(body)) return true;
-                            return false;
-                        });
+                // Grab the last 15 messages from DB locally (sub-millisecond compared to API)
+                const messagesConfig = await prisma.chatLog.findMany({
+                    where: { userPhone: cleanPhone, instanceId: INSTANCE_ID },
+                    orderBy: { timestamp: 'desc' },
+                    take: 15
+                });
 
-                        if (hasPostSaleMessage) {
-                            console.log(`[POST-SALE] User ${userId} has post-sale messages in history. Auto-pausing.`);
-                            if (dependencies.sharedState && dependencies.sharedState.pausedUsers) {
-                                dependencies.sharedState.pausedUsers.add(userId);
-                            }
-                            return { matched: true, paused: true };
-                        }
+                // Check for existence of any prior post-sale outgoing message
+                const outgoingMessages = messagesConfig.filter((m: any) => m.role === 'bot');
+                const hasPostSaleMessage = outgoingMessages.some((m: any) => {
+                    const body = (m.content || '').trim();
+                    if (body.includes('MENSAJE DE HERBALIS') || body.includes('MENSAJDE DE HERBALIS')) return true;
+                    if (/^CO\d{9}$/i.test(body)) return true;
+                    return false;
+                });
 
-                        // --- EXISTING CONVERSATION DETECTION ---
-                        // Only consider it "prior history" if there are 10+ outgoing messages.
-                        // 1-9 outgoing = likely just bot greetings/early funnel from ads.
-                        // It's normal for users to take hours to respond after clicking an ad.
-                        const hasSignificantHistory = outgoingMessages.length >= 10;
-
-                        if (hasSignificantHistory) {
-                            const showsPurchaseIntent = PURCHASE_INTENT_KEYWORDS.test(normalizedText);
-
-                            if (showsPurchaseIntent) {
-                                console.log(`[SMART-DETECT] User ${userId} has prior history (outgoing: ${outgoingMessages.length}, total: ${messages.length}) but shows purchase intent ("${text.substring(0, 50)}"). Allowing sales flow.`);
-                                // Let them through to the greeting flow normally
-                            } else {
-                                const reason = `Ya tenía ${outgoingMessages.length} mensaje(s) enviados previos`;
-                                console.log(`[SMART-DETECT] User ${userId}: ${reason} and NO purchase intent. Auto-pausing.`);
-
-                                if (dependencies.sharedState && dependencies.sharedState.pausedUsers) {
-                                    dependencies.sharedState.pausedUsers.add(userId);
-                                    try {
-                                        if (dependencies.notifyAdmin) dependencies.notifyAdmin(
-                                            '😴 Cliente con historial extenso',
-                                            userId,
-                                            `${reason}. Volvió a escribir: "${text.substring(0, 100)}"\nEl bot se silenció automáticamente. Si es un prospecto nuevo, despausalo desde el panel.`
-                                        );
-                                    } catch (e) { }
-                                }
-                                return { matched: true, paused: true };
-                            }
-                        } else if (outgoingMessages.length > 0) {
-                            console.log(`[SMART-DETECT] User ${userId} has ${outgoingMessages.length} prior message(s) (< 10 threshold). Treating as new/active prospect.`);
-                        }
+                if (hasPostSaleMessage) {
+                    console.log(`[POST-SALE] User ${userId} has post-sale messages in local DB. Auto-pausing.`);
+                    if (dependencies.sharedState && dependencies.sharedState.pausedUsers) {
+                        dependencies.sharedState.pausedUsers.add(userId);
                     }
+                    return { matched: true, paused: true };
+                }
+
+                // If no post-sale message exists, let's see if there's extensive prior interaction
+                // 1-9 outgoing = likely bots replying to ads. 10+ means extensive interaction history.
+                const hasSignificantHistory = outgoingMessages.length >= 10;
+
+                if (hasSignificantHistory) {
+                    const showsPurchaseIntent = PURCHASE_INTENT_KEYWORDS.test(normalizedText);
+
+                    if (showsPurchaseIntent) {
+                        console.log(`[SMART-DETECT] User ${userId} has prior history (outgoing bot: ${outgoingMessages.length}) but shows purchase intent. Allowing sales flow.`);
+                    } else {
+                        const reason = `Ya tenía ${outgoingMessages.length} mensaje(s) del bot previos en DB`;
+                        console.log(`[SMART-DETECT] User ${userId}: ${reason} and NO purchase intent. Auto-pausing.`);
+
+                        if (dependencies.sharedState && dependencies.sharedState.pausedUsers) {
+                            dependencies.sharedState.pausedUsers.add(userId);
+                            try {
+                                if (dependencies.notifyAdmin) dependencies.notifyAdmin(
+                                    '😴 Cliente con historial extenso',
+                                    userId,
+                                    `${reason}. Volvió a escribir: "${text.substring(0, 100)}"\nEl bot se silenció automáticamente.`
+                                );
+                            } catch (e) { }
+                        }
+                        return { matched: true, paused: true };
+                    }
+                } else if (outgoingMessages.length > 0) {
+                    console.log(`[SMART-DETECT] User ${userId} has ${outgoingMessages.length} prior message(s) (< 10 threshold) in DB. Treating as active prospect.`);
                 }
             } catch (err: any) {
-                console.error(`[SMART-DETECT] Failed to fetch chat history for ${userId}:`, err.message);
+                console.error(`[SMART-DETECT] Failed to fetch local chat history DB for ${userId}:`, err.message);
             }
         }
     }
