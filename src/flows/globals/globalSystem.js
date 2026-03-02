@@ -30,6 +30,23 @@ async function handleSystemGlobals(userId, text, normalizedText, currentState, d
         return { matched: true };
     }
 
+    // 2.5 ABUSIVE / ANGRY REJECT
+    const ABUSIVE_REGEX = /\b(estafador|estafadores|estafa|robo|ladron|ladrones|mierda|puta|puto|boludos|boludeo|boludear|mentirosos|mentira|chantas|chanta|garcas|garca|denunciar|defensa al consumidor)\b/i;
+    if (ABUSIVE_REGEX.test(normalizedText) && currentState.step !== 'rejected_abusive') {
+        console.log(`[ABUSIVE REJECT] User ${userId} used aggressive language.`);
+        const msg = "Lamento mucho que te sientas de esta manera. Voy a suspender la interacción automática para que un asesor humano atienda y analice tu caso a la brevedad.";
+        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        await sendMessageWithDelay(userId, msg);
+
+        _setStep(currentState, 'rejected_abusive');
+        await _pauseAndAlert(userId, currentState, dependencies, text, '🚨 Lenguaje agresivo o acusación de estafa detectado. Bot silenciado.');
+        saveState(userId);
+        return { matched: true };
+    }
+    if (currentState.step === 'rejected_abusive') {
+        return { matched: true }; // Silent block if they keep insulting
+    }
+
     // 3. GEO REJECT
     const GEO_REGEX = /\b(espana|españa|mexico|méxico|chile|colombia|peru|perú|uruguay|bolivia|paraguay|ecuador|venezuela|brasil|panama|panamá|costa rica|eeuu|estados unidos|usa|europa|fuera del pais|fuera de argentina|otro pais|no estoy en argentina|vivo en el exterior|desde afuera|no soy de argentina)\b/i;
     if (GEO_REGEX.test(normalizedText) && !currentState.geoRejected) {
