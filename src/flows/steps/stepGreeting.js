@@ -26,7 +26,8 @@ async function handleGreeting(userId, text, currentState, knowledge, dependencie
         // Let the caller (salesFlow.js) know it should yield/continue the recursive call, 
         // to avoid circular promise loops, it's safer to just set the state and let the caller re-run or we can run it here
         const fakeUserStateMap = { [userId]: currentState };
-        return await processSalesFlow(userId, text, fakeUserStateMap, knowledge, dependencies);
+        await processSalesFlow(userId, text, fakeUserStateMap, knowledge, dependencies);
+        return { matched: true };
     }
 
     // --- CHECK: Ad Interaction ---
