@@ -217,13 +217,35 @@ export async function processSalesFlow(
         await _pauseAndAlert(userId, currentState, dependencies, text, `Bot no pudo responder en paso "${currentState.step}".`);
     }
 
-    // 5. Post-Processing Medical Reject Check
+    // 5. Post-Processing Context Triggers Check
     if (currentState.history && currentState.history.length > 0) {
         const lastHistory = currentState.history[currentState.history.length - 1];
-        if (lastHistory.role === 'bot' && (lastHistory.content.includes('por precaución no recomendamos el consumo') || lastHistory.content.includes('por precaución no recomendamos el uso durante'))) {
-            console.log(`[AI MEDICAL REJECT] Intercepted AI rejection for user ${userId}. Halting flow.`);
-            _setStep(currentState, FlowStep.REJECTED_MEDICAL);
-            saveState(userId);
+        if (lastHistory.role === 'bot') {
+            const botMsg = lastHistory.content;
+
+            if (botMsg.includes('por precaución no recomendamos el consumo') || botMsg.includes('por precaución no recomendamos el uso durante')) {
+                console.log(`[AI MEDICAL REJECT] Intercepted AI rejection for user ${userId}. Halting flow.`);
+                _setStep(currentState, FlowStep.REJECTED_MEDICAL);
+                saveState(userId);
+            }
+
+            if (botMsg.includes('Por falta de respeto damos por terminada la comunicación')) {
+                console.log(`[ABUSE REJECT] Intercepted AI abuse rejection for user ${userId}. Halting flow.`);
+                await _pauseAndAlert(userId, currentState, dependencies, text, 'El cliente insultó al bot y fue bloqueado automáticamente.');
+                saveState(userId);
+            }
+
+            if (botMsg.includes('Pensalo tranquilo y cuando estés 100% segura retomamos el pedido')) {
+                console.log(`[INDECISION PAUSE] Intercepted AI indecision limit for user ${userId}. Halting flow.`);
+                await _pauseAndAlert(userId, currentState, dependencies, text, 'El cliente cruzó el umbral de indecisión/cambios. Pausa preventiva.');
+                saveState(userId);
+            }
+
+            if (botMsg.includes('Voy a derivar tu caso a un asesor')) {
+                console.log(`[CANCEL PAUSE] Intercepted cancel/complaint for user ${userId}. Halting flow.`);
+                await _pauseAndAlert(userId, currentState, dependencies, text, 'El cliente desea cancelar, reclamar o derivar el caso a un humano.');
+                saveState(userId);
+            }
         }
     }
 }

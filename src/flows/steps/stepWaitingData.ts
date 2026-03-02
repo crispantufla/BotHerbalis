@@ -202,6 +202,17 @@ export async function handleWaitingData(
 
     const data = await (dependencies.mockAiService || aiService).parseAddress(textToAnalyze);
     let madeProgress = false;
+
+    // Hard-pause conditions from AI Parsing
+    if (data && data.cp === 'UNKNOWN') {
+        await _pauseAndAlert(userId, currentState, dependencies, text, 'El cliente reportó explícitamente no saber su Código Postal.');
+        return { matched: true };
+    }
+    if (data && data.provincia === 'CONFLICT') {
+        await _pauseAndAlert(userId, currentState, dependencies, text, 'El cliente brindó datos de envíos contradictorios (ej: calle de Mendoza pero dice ser de Rosario).');
+        return { matched: true };
+    }
+
     if (data && !data._error) {
         const postdateKeywords = /\b(lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo|semana|mes|cobro|mañana|despues|después|principio|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\b/i;
         const userActuallyAskedPostdate = postdateKeywords.test(normalizedText) && /\b(recibir|llega|enviar|mandar|cobro|pago|puedo|entregar|envio|después|despues|más adelante|otro momento|no puedo ahora)\b/i.test(normalizedText);
@@ -239,20 +250,12 @@ export async function handleWaitingData(
                 || /\bcalle\s+\d+\b/i.test(textToAnalyze) && /\by\b/i.test(textToAnalyze); // "calle 1406" + "y" = intersection
 
             if (isIntersection) {
-                currentState.addressAttempts = 0;
-                const rejectMsg = "⚠️ El correo no nos permite cargar esquinas ni intersecciones (ej: \"calle X y calle Y\").\n\nNecesitamos **una sola calle con número de puerta** (ej: Av. San Martín 1234).\n\n¿Me pasás la dirección con el número exacto? 🙏";
-                currentState.history.push({ role: 'bot', content: rejectMsg, timestamp: Date.now() });
-                await sendMessageWithDelay(userId, rejectMsg);
-                saveState(userId);
+                await _pauseAndAlert(userId, currentState, dependencies, text, '⚠️ Intersección detectada: El correo no admite esquinas. Se requiere intervención de administrador para pedirle dirección exacta.');
                 return { matched: true };
             }
 
             if (!hasNumber && !hasSN) {
-                currentState.addressAttempts = 0;
-                const rejectMsg = "El correo no nos permite cargar direcciones sin la altura de la calle ni esquinas (ej: entre calles). ¿Me confirmás el número exacto o aclaramos 'S/N' (sin número)? 🙏";
-                currentState.history.push({ role: 'bot', content: rejectMsg, timestamp: Date.now() });
-                await sendMessageWithDelay(userId, rejectMsg);
-                saveState(userId);
+                await _pauseAndAlert(userId, currentState, dependencies, text, '⚠️ Dirección sin número detectada: Faltó especificar la altura de la calle o "S/N". Intervención requerida para no enviar paquete a destino impreciso.');
                 return { matched: true };
             } else {
                 currentState.partialAddress.calle = data.calle;
@@ -275,6 +278,12 @@ export async function handleWaitingData(
         }
     } else {
         currentState.addressAttempts = (currentState.addressAttempts || 0) + 1;
+    }
+
+    // "Pide ayuda al administrador al primer intento"
+    if (!madeProgress && currentState.addressAttempts >= 1) {
+        await _pauseAndAlert(userId, currentState, dependencies, text, 'La IA no pudo procesar correctamente los datos ingresados en el primer intento.');
+        return { matched: true };
     }
 
     const addr = currentState.partialAddress;
@@ -363,9 +372,6 @@ export async function handleWaitingData(
         currentState.fieldReaskCount = {};
         _setStep(currentState, FlowStep.WAITING_FINAL_CONFIRMATION);
         saveState(userId);
-        return { matched: true };
-    } else if (currentState.addressAttempts >= 5) {
-        await _pauseAndAlert(userId, currentState, dependencies, text, `Cliente no logra dar dirección completa. Faltan: ${missing.join(', ')}`);
         return { matched: true };
     } else {
         let msg;
