@@ -204,7 +204,8 @@ async function handleWaitingPlanChoice(
             const planAI = await aiService.chat(text, {
                 step: 'waiting_plan_choice',
                 goal: `El usuario debe elegir Plan 60 o Plan 120 días. CRÍTICO (REGLAS DE ORO): 1) MÁXIMO 30 PALABRAS. 2) goalMet=true SOLO si elige "60" o "120". 3) Si pregunta algo distinto (ej: "cómo se paga", "cuánto llega"), goalMet=false. Respondé su duda breve y amablemente y recordale: "¿Avanzamos con 60 o 120 días?". ESTRATEGIA INICIAL: El pago a domicilio cuesta $6.000, pero el plan de 120 LO REGALA. Decile: "${selectedUpsell}". 
-                🔴 REGLA PREGUNTAS DE PAGO: Si pregunta cuándo/cómo se paga, decile: "El pago es al cartero cuando recibís el producto (solo efectivo)". Y reitera la pregunta de los planes.
+                🔴 REGLA PREGUNTAS ENVÍO/PAGO: Si pregunta por envío o medios de pago, aclará brevemente que el envío es gratis a todo el país y se abona en efectivo al recibir (Contra Reembolso). Y reitera la pregunta de los planes.
+                🔴 REGLA EXCUSAS O RETRASOS: Si el cliente dice "lo consulto", "escribo a la tarde", "te aviso: DECÍ EXACTAMENTE: "Ok, no pasa nada, ¡después hablamos! 😊", y establecé goalMet=false. NUNCA REPITAS LOS PRECIOS.
                 🔴 REGLA PRODUCTOS ALTERNOS: Si menciona gotas/semillas (ej: "o gotas"), NO asumas que cambia. Mostrá precios (knowledge) y preguntá: "¿Avanzamos con ese?". NO uses CHANGE_PRODUCT. goalMet=false hasta que elija.`,
                 history: currentState.history,
                 summary: currentState.summary,
@@ -287,6 +288,13 @@ async function handleWaitingPlanChoice(
                 _handleExtractedData(userId, planAI.extractedData, currentState);
                 currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });
                 await sendMessageWithDelay(userId, planAI.response);
+
+                // Setup Follow Up check for delayed answers ("despues hablamos")
+                if (planAI.response.includes('después hablamos') || planAI.response.includes('cualquier cosa acá estoy')) {
+                    // Just set state as paused or track time, cron cleans up cold leads next day
+                    console.log(`[FLOW] User ${userId} delayed step. Will follow up later.`);
+                }
+
                 return { matched: true };
             }
         }

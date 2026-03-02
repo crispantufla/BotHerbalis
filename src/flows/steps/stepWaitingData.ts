@@ -353,18 +353,6 @@ export async function handleWaitingData(
         const total = subtotal + adicional;
         currentState.totalPrice = total.toLocaleString('es-AR').replace(/,/g, '.');
 
-        let addressSummary = `📋 *Datos de envío:*\n`;
-        addressSummary += `👤 ${addr.nombre || 'Sin nombre'}\n`;
-        addressSummary += `📍 ${addr.calle || ''}${addr.ciudad ? ', ' + addr.ciudad : ''}${addr.provincia ? ' (' + addr.provincia + ')' : ''}\n`;
-        addressSummary += `📮 CP: ${addr.cp || 'Sin CP'}`;
-
-        if (validation.mapsFormatted) {
-            addressSummary += `\n\n✅ Dirección verificada: ${validation.mapsFormatted}`;
-        }
-
-        currentState.history.push({ role: 'bot', content: addressSummary, timestamp: Date.now() });
-        await sendMessageWithDelay(userId, addressSummary);
-
         const summaryMsg = buildConfirmationMessage(currentState);
         currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
         await sendMessageWithDelay(userId, summaryMsg);

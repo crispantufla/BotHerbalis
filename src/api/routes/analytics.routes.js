@@ -107,7 +107,7 @@ module.exports = (client, sharedState) => {
                 capsulas: 0,
                 gotas: 0,
                 combos: 0,
-                otros: 0
+                semillas: 0
             };
 
             const duration = {
@@ -129,7 +129,7 @@ module.exports = (client, sharedState) => {
                 } else if (prodStr.includes('gota')) {
                     popularity.gotas++;
                 } else {
-                    popularity.otros++;
+                    popularity.semillas++;
                 }
 
                 // Duration

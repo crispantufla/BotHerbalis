@@ -246,6 +246,12 @@ export async function processSalesFlow(
                 await _pauseAndAlert(userId, currentState, dependencies, text, 'El cliente desea cancelar, reclamar o derivar el caso a un humano.');
                 saveState(userId);
             }
+
+            if (botMsg.includes('3413755757') || botMsg.includes('Horacio')) {
+                console.log(`[RESELLER PAUSE] Intercepted reseller intent for user ${userId}. Halting flow.`);
+                await _pauseAndAlert(userId, currentState, dependencies, text, 'El cliente está interesado en reventa/compras por mayor. Derivado a Horacio.');
+                saveState(userId);
+            }
         }
     }
 }

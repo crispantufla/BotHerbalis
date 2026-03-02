@@ -82,7 +82,7 @@ export async function handleWaitingWeight(
             console.log(`[AI-FALLBACK] waiting_weight: No number detected for ${userId}`);
             const aiWeight = await aiService.chat(text, {
                 step: FlowStep.WAITING_WEIGHT,
-                goal: 'Explicar brevemente el producto seleccionado y preguntar sutilmente cuánto peso buscan bajar para continuar. REGLAS DE ORO: 1) MÁXIMO 30 PALABRAS. 2) Usa conectores humanos y empáticos como "Te re entiendo", "Es normal", "Mira te cuento". 3) TERMINA SIEMPRE con la pregunta "¿Cuántos kilos te gustaría bajar aproximadamente?". 4) Si la persona pregunta "cápsulas o gotas", o pide recomendación general, decirle EXACTAMENTE: "Mirá, las cápsulas son la opción más efectiva y práctica, ideales para un tratamiento rápido. ¿Cuántos kilos querés bajar?".',
+                goal: 'Explicar brevemente el producto seleccionado y preguntar sutilmente cuánto peso buscan bajar para continuar. REGLAS DE ORO: 1) MÁXIMO 30 PALABRAS. 2) Usa conectores humanos y empáticos como "Te re entiendo", "Es normal", "Mira te cuento". 3) TERMINA SIEMPRE con la pregunta "¿Cuántos kilos te gustaría bajar aproximadamente?". 4) Si la persona pregunta "cápsulas o gotas", o pide recomendación general, decirle EXACTAMENTE: "Mirá, las cápsulas son la opción más efectiva y práctica, ideales para un tratamiento rápido. ¿Cuántos kilos querés bajar?". 5) Si pregunta por envío o medios de pago, aclará brevemente que el envío es gratis a todo el país y se abona en efectivo al recibir. Luego reiterá la pregunta de los kilos.',
                 history: currentState.history,
                 summary: currentState.summary,
                 knowledge: knowledge,

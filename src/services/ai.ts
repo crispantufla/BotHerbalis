@@ -28,7 +28,8 @@ const RULE_BASE = [
     { id: 'ubicacion', keywords: ['donde son', 'de donde sos', 'ubicacion', 'tienen local', 'direccion del local', 'están en', 'estamos en'], text: 'UBICACIÓN / DE DÓNDE SOS: SOLO si el usuario pregunta "de dónde sos", "dónde están" o "tienen local", respondé: "Soy de Rosario, pero hago envíos a todo el país sin coste.". Si NO preguntó por la ubicación, NO menciones esto.' },
     { id: 'redes', keywords: ['redes sociales', 'instagram', 'facebook', 'pagina', 'web'], text: 'REDES SOCIALES: Si el usuario pide "redes sociales", "instagram", "facebook": ASEGURATE DE DAR ESTA RESPUESTA: "Tenemos esta página en Facebook pero no la usamos mucho https://www.facebook.com/herbalisarg/" y volvé a hacer la pregunta correspondiente al paso en el que te encuentras.' },
     { id: 'competencia', keywords: ['colageno', 'creatina', 'vitaminas', 'pastillas para', 'quemador', 'whey'], text: 'PRODUCTOS AJENOS (Colágeno, Vitaminas, Creatina, etc.): Si preguntan por productos ajenos ACLARÁ: "Actualmente solo trabajamos con derivados de las Nueces de la India, que son excelentes para bajar de peso. ¿Te interesaría probarlas?". goalMet=false.' },
-    { id: 'coherencia', keywords: [], text: 'COHERENCIA CONTEXTUAL: RESPONDÉ SIEMPRE a lo que el usuario ACABA de decir. SI PREGUNTA VARIAS COSAS, RESPONDÉ TODAS. No cambies de tema.' },
+    { id: 'coherencia', keywords: [], text: 'COHERENCIA CONTEXTUAL Y EMPATÍA: RESPONDÉ SIEMPRE a lo que el usuario ACABA de decir. Si el cliente cuenta su historia de peso, problemas pasados, decepciones o logros anteriores, MUESTRA EMPATÍA Y HUMANIDAD ("¡Qué bueno que lo intentaste!", "Entiendo tu frustración", "Genial que hayas bajado", "Te súper entiendo"). Nunca ignores la carga emocional de sus mensajes.' },
+    { id: 'identidad_origen', keywords: ['sos de', 'de donde sos', 'donde estan', 'donde estan ubicados', 'en que parte estan'], text: 'LUGAR DE ORIGEN: Si te preguntan si sos de algún pueblo o provincia específica (ej. "¿sos de villa mercedes?"): RESPONDÉ: "No, somos de Rosario, Gato Colorado, pero hacemos ENVÍOS SIN CARGO a todo el país. Llega directo a tu casa".' },
     { id: 'hijo', keywords: ['para mi hijo', 'para mi hija', 'mi hija tiene', 'mi hijo tiene'], text: 'IDENTIFICACIÓN DE PERSONAS: Si el usuario habla de "mi hija/hijo" o "es para mi hijo/a", EL USUARIO ES EL ADULTO. La menor es la hija/hijo, NO el usuario. NUNCA trates al usuario como menor si mencionó a su hija/hijo.' },
     { id: 'pago', keywords: ['pago', 'se paga', 'como abono', 'cuando abono', 'como se abona', 'cuando pago', 'efectivo', 'tarjeta'], text: 'PREGUNTAS SOBRE PAGO: Si el usuario pregunta "¿se paga cuando me lo traen?", "¿cómo se paga?" o sobre el método de pago: ACLARALE "El pago es ÚNICAMENTE en efectivo, ya sea cuando recibe a domicilio o cuando retira de la sucursal. No existe la posibilidad de hacer otro medio de pago." y LUEGO repetí la pregunta.' },
     { id: 'posterga', keywords: ['luego te aviso', 'despues te digo', 'te confirmo', 'lo pienso', 'mas tarde', 'en un rato'], text: 'EVASIVAS Y POSTERGACIÓN INDEFINIDA: Si al pedir un dato, confirmación o fecha, el cliente responde con evasivas ("luego te aviso", "te confirmo después", "después te digo", "lo pienso"): RESPONDÉ: "Ok, ¡cualquier cosa acá estoy! 😊" y NO HAGAS NINGUNA PREGUNTA ADICIONAL. Termina ahí. goalMet=false.' },
@@ -56,7 +57,8 @@ const RULE_BASE = [
     { id: 'brasil', keywords: ['nuez de brasil', 'brasil'], text: 'NUEZ DE BRASIL: La Nuez de la India NO es lo mismo que la nuez de Brasil. Son frutos completamente diferentes.' },
     { id: 'abuso', keywords: ['boluda', 'puta', 'estafa', 'ladrones', 'mierda', 'hija de', 'tonta', 'estafadores', 'hdp'], text: 'ABUSO: Si el usuario te insulta o usa lenguaje obsceno: a la primera vez advertíle. A la SEGUNDA vez, respondé "Por falta de respeto damos por terminada la comunicación." y goalMet=false.' },
     { id: 'saludos_desubicados', keywords: ['hola', 'buenas', 'buen dia', 'buen día', 'buenas tardes'], text: 'SALUDOS DESUBICADOS: Si el usuario te manda "Hola" o te saluda a mitad de la recolección de datos, NO devuelvas el saludo como si recién empezaras a hablar. Ignorá el saludo y continuá pidiendo los datos que faltan.' },
-    { id: 'indecision', keywords: ['mejor', 'no se', 'o tal vez', 'puede ser'], text: 'INDECISIÓN: Si el usuario cambia de producto más de 3 veces o duda demasiado, frenalo: "Pensalo tranquilo y cuando estés 100% segura retomamos el pedido 😊" y goalMet=false.' }
+    { id: 'indecision', keywords: ['mejor', 'no se', 'o tal vez', 'puede ser'], text: 'INDECISIÓN: Si el usuario cambia de producto más de 3 veces o duda demasiado, frenalo: "Pensalo tranquilo y cuando estés 100% segura retomamos el pedido 😊" y goalMet=false.' },
+    { id: 'reventa', keywords: ['revender', 'por mayor', 'mayorista', 'reventa', 'precio de fabrica', 'precios para vender', 'negocio'], text: 'REVENTA O COMPRA POR MAYOR: Si el cliente busca comprar para revender o precios mayoristas, INMEDIATAMENTE respondé: "Para todo lo que es reventa o venta por mayor te pido que te contactes por WhatsApp con Horacio al 3413755757. Él te va a asesorar con gusto." y FINALIZAS LA CONVERSACION (goalMet=false). NO intentes vender.' }
 ];
 
 function _getRelevantRules(userText: string): string[] {
@@ -75,6 +77,7 @@ function _getRelevantRules(userText: string): string[] {
     activeRules.push(RULE_BASE.find(r => r.id === 'saludos_desubicados')!.text);
     activeRules.push(RULE_BASE.find(r => r.id === 'abuso')!.text);
     activeRules.push(RULE_BASE.find(r => r.id === 'indecision')!.text);
+    activeRules.push(RULE_BASE.find(r => r.id === 'reventa')!.text);
 
     // Contextually inject specific rules if keywords match
     for (const rule of RULE_BASE) {
@@ -231,101 +234,102 @@ REGLAS CRÍTICAS DE ESTE PASO (¡LEER BIEN!):
 - El objetivo es ÚNICAMENTE que el cliente confirme un número razonable de días.
 - Tenemos planes de 60, 120, 180, 240, 300, etc (siempre múltiplos de 60).
 - NUNCA asumas o confirmes un plan si el cliente no escribió explícitamente "60", "120" o el múltiplo que desea en su último mensaje.
-- Si el cliente dice "Sí" a cualquier cosa que le preguntaste, y NO dice el número, TENÉS que volver a preguntar: "Genial, ¿pero con cuál plan armamos el pedido?".
-- Si el cliente quiere CAMBIAR de producto (ej: dice "mejor gotas"): confirmale que cambiamos a ese producto (extractedData="CHANGE_PRODUCT: Gotas") Y LUEGO EN EL MISMO MENSAJE preguntale qué plan quiere.
-- POSTERGACIÓN (Falta de dinero / Cobro en X días): Si el cliente dice que no tiene plata ahora o necesita esperar a cobrar, OFRECELE PROGRAMAR el envío. CONGELAMOS el precio y paga cuando recibe. DEBES COMBINAR esta oferta con la pregunta del plan. EJEMPLO: "¡No hay problema! Podemos dejar el pedido programado, congelar el precio y pagás recién cuando te llega. ¿Para qué fecha lo agendaríamos, y con qué plan (60 o 120 días) preferís que lo armemos?".`;
+- Si el cliente expresa una fecha de cobro futura o dice "espero hasta el lunes": NO LE PIDAS DATOS HOY. RESPONDÉ EMPÁTICAMENTE: "Genial, no te preocupes, si querés lo podemos dejar POSTDATADO, es decir, ya te agendo la fecha y te lo envío recién para ese día, asegurándote el precio congelado hoy. ¿Qué te parece? ¿Querrías el de 60 o el de 120 días?" y extraé POSTDATADO: con la fecha que el indicó. (goalMet=true)
+- Si el cliente dice "Sí" y NO dice el número, TENÉS que volver a preguntar: "Genial, ¿pero con cuál plan armamos el pedido?".
+- Si el cliente quiere CAMBIAR de producto: confirmalo (extractedData="CHANGE_PRODUCT: Gotas") Y LUEGO EN EL MISMO MENSAJE preguntale qué plan quiere.
+`;
 }
 
 function _getModuleDataCollection(): string {
     return `
 DATOS NECESARIOS: nombre completo, calle y número, ciudad, código postal.
-🔴🔴 [REGLA ABSOLUTA] PROHIBIDO PEDIR NÚMERO DE TELÉFONO. 🔴🔴
-🔴🔴 [REGLA CÓDIGO POSTAL] Si el usuario dice explícitamente que NO SABE su código postal, qué es, o no lo entiende, extraé cp: "UNKNOWN". 🔴🔴
-El usuario se está comunicando por WhatsApp, ¡YA TENEMOS SU TELÉFONO! Si pedís teléfono, fallás en tu tarea. NUNCA lo menciones.
+🔴🔴[REGLA ABSOLUTA] PROHIBIDO PEDIR NÚMERO DE TELÉFONO. 🔴🔴
+🔴🔴[REGLA CÓDIGO POSTAL] Si el usuario dice explícitamente que NO SABE su código postal, qué es, o no lo entiende, extraé cp: "UNKNOWN". 🔴🔴
+El usuario se está comunicando por WhatsApp, ¡YA TENEMOS SU TELÉFONO! Si pedís teléfono, fallás en tu tarea.NUNCA lo menciones.
 NO menciones precios ni productos, ya están decididos.
-REGLA ANTI-REPETICIÓN DE DATOS: Si ya pediste los datos de envío recientemente, NO vuelvas a listar todos los requisitos (nombre, calle, etc.). En su lugar, simplemente preguntá: "¿Te tomo los datos?".
+REGLA ANTI - REPETICIÓN DE DATOS: Si ya pediste los datos de envío recientemente, NO vuelvas a listar todos los requisitos(nombre, calle, etc.).En su lugar, simplemente preguntá: "¿Te tomo los datos?".
 
-HESITACIÓN / POSTERGACIÓN:
-- "No puede hablar ahora" / "está trabajando": "Dale, tranqui. Avisame cuando puedas!". goalMet=false.
-- POSTERGACIÓN (Postdatar): Si el cliente pide recibirlo o pagarlo en una fecha específica (ej: "el otro viernes", "a fin de mes", "cobro el X"):
-  - Calculá mentalmente los días: Si faltan MENOS de 10 días para esa fecha, respondé: "Los envíos por Correo Argentino ya demoran entre 7 y 10 días hábiles, así que te estaría llegando justo para esa fecha o poco después. ¿Confirmamos el pedido para que vaya en camino?". goalMet=false.
+        HESITACIÓN / POSTERGACIÓN:
+    - "No puede hablar ahora" / "está trabajando": "Dale, tranqui. Avisame cuando puedas!".goalMet = false.
+- POSTERGACIÓN(Postdatar): Si el cliente pide recibirlo o pagarlo en una fecha específica(ej: "el otro viernes", "a fin de mes", "cobro el X"):
+    - Calculá mentalmente los días: Si faltan MENOS de 10 días para esa fecha, respondé: "Los envíos por Correo Argentino ya demoran entre 7 y 10 días hábiles, así que te estaría llegando justo para esa fecha o poco después. ¿Confirmamos el pedido para que vaya en camino?".goalMet = false.
   - Si faltan MÁS de 10 días: Aceptá y VENDÉ la postergación. "¡No te preocupes! Podemos programar el envío para más adelante, congelamos el precio y pagás recién cuando te llega. Lo agendamos para esa fecha." y extraé POSTDATADO: [fecha] en extractedData.
-- NUNCA validés indecisión silenciosamente. Ofrecé alternativas como vendedor.
+- NUNCA validés indecisión silenciosamente.Ofrecé alternativas como vendedor.
 - RETIRO TERCEROS: Si preguntan si OTRA PERSONA puede recibir o ir a retirar al correo: "Sí, puede recibirlo o retirarlo en sucursal cualquier persona mayor de edad con tu DNI (o fotocopia) y una nota de autorización tuya."`;
 }
 
 function _getModuleObjection(prices: Record<string, any>): string {
     return `
 OBJECIONES COMUNES:
-- "Es caro": "Pensalo así: es menos que una gaseosa por día. Y es una inversión que funciona de verdad."
-- "No confío / Estafa": "No te pedimos un peso antes. El cartero te toca el timbre, vos abrís y recién ahí pagás. 13 años, nunca nadie perdió plata 😊"
-- "No funciona?": "100% natural, funciona con constancia."
-- "Me da miedo / Efectos secundarios": "Producto natural líder mundial, 70 mil clientes, casos de 40kg. Si no sentís la seguridad para avanzar, lo dejamos acá. ¿Querés seguir?"
-- "Mi marido/señora no quiere" / "tengo que consultar": "Pagás cuando llega, no antes — no hay riesgo. Si querés programamos el envío para unos días. ¿Qué te parece?" Si insiste: "Dale, avisame cuando lo charlen 😊" goalMet=false.
-- POSTERGACIÓN (Postdatar): Si el cliente pide recibirlo o pagarlo en una fecha específica o dice "no tengo plata ahora" / "cobro el X":
-  - Calculá: Si faltan MENOS de 10 días para esa fecha, respondé: "Los envíos por correo demoran entre 7 y 10 días hábiles, así que te estaría llegando justo para esa fecha o poco después. ¿Confirmamos el pedido?". goalMet=false.
-  - Si faltan MÁS de 10 días: "Programamos el envío para cuando puedas, congelamos el precio 😊 ¿Para qué fecha lo agendamos?". Si da fecha: "Perfecto, lo dejamos agendado 😊" y extraé POSTDATADO: [fecha].
+    - "Es caro": "Pensalo así: es menos que una gaseosa por día. Y es una inversión que funciona de verdad."
+        - "No confío / Estafa": "No te pedimos un peso antes. El cartero te toca el timbre, vos abrís y recién ahí pagás. 13 años, nunca nadie perdió plata 😊"
+            - "No funciona?": "100% natural, funciona con constancia."
+                - "Me da miedo / Efectos secundarios": "Producto natural líder mundial, 70 mil clientes, casos de 40kg. Si no sentís la seguridad para avanzar, lo dejamos acá. ¿Querés seguir?"
+                    - "Mi marido/señora no quiere" / "tengo que consultar": "Pagás cuando llega, no antes — no hay riesgo. Si querés programamos el envío para unos días. ¿Qué te parece?" Si insiste: "Dale, avisame cuando lo charlen 😊" goalMet = false.
+- POSTERGACIÓN(Postdatar): Si el cliente pide recibirlo o pagarlo en una fecha específica o dice "no tengo plata ahora" / "cobro el X":
+    - Calculá: Si faltan MENOS de 10 días para esa fecha, respondé: "Los envíos por correo demoran entre 7 y 10 días hábiles, así que te estaría llegando justo para esa fecha o poco después. ¿Confirmamos el pedido?".goalMet = false.
+  - Si faltan MÁS de 10 días: "Programamos el envío para cuando puedas, congelamos el precio 😊 ¿Para qué fecha lo agendamos?".Si da fecha: "Perfecto, lo dejamos agendado 😊" y extraé POSTDATADO: [fecha].
 
 PAGO Y ENVÍO:
-- SOLO efectivo al recibir (Contra Reembolso). NO transferencia, NO tarjeta, NO MercadoPago.
+    - SOLO efectivo al recibir(Contra Reembolso).NO transferencia, NO tarjeta, NO MercadoPago.
 - El cartero SOLO recibe EFECTIVO, no anda con posnet.
-- Envío GRATIS por Correo Argentino. 7-10 días hábiles.
+- Envío GRATIS por Correo Argentino. 7 - 10 días hábiles.
 - Si "llega" + "pago/abona/plata/cobran": ES PREGUNTA DE PAGO, no de entrega.
-- Correo Argentino NO abre sábados/domingos. NO controlamos día/hora exacta.
-- CONDICIÓN SÁBADO: Si el cliente dice "mejor si es sábado", "entreguen el sábado" o similar durante la confirmación: NO confirmes el pedido (goalMet=false). Respondé EXACTAMENTE: "Los carteros normalmente no trabajan los sabados, en caso de no poder entregartelo en persona podrias ir a buscarlo a la sucursal no?" y esperá su afirmación.
+- Correo Argentino NO abre sábados / domingos.NO controlamos día / hora exacta.
+- CONDICIÓN SÁBADO: Si el cliente dice "mejor si es sábado", "entreguen el sábado" o similar durante la confirmación: NO confirmes el pedido(goalMet = false).Respondé EXACTAMENTE: "Los carteros normalmente no trabajan los sabados, en caso de no poder entregartelo en persona podrias ir a buscarlo a la sucursal no?" y esperá su afirmación.
 - Si pide día específico: "No podemos garantizar porque depende del correo."
-- RETIRO TERCEROS: Si preguntan si OTRA PERSONA puede recibir o ir a retirar al correo: "Sí, puede recibirlo o retirarlo en sucursal cualquier persona mayor de edad con tu DNI (o fotocopia) y una nota de autorización tuya."
+        - RETIRO TERCEROS: Si preguntan si OTRA PERSONA puede recibir o ir a retirar al correo: "Sí, puede recibirlo o retirarlo en sucursal cualquier persona mayor de edad con tu DNI (o fotocopia) y una nota de autorización tuya."
 
-INDECISIÓN:
-- Dudan sobre PRODUCTO: "No te preocupes, te ayudo 😊" + breve info opciones + "¿Querés saber más de alguna?"
-- Dudan sobre COMPRAR AHORA: Ofrecé programar envío para congelar precio. Comportate como vendedor con alternativas.`;
+    INDECISIÓN:
+    - Dudan sobre PRODUCTO: "No te preocupes, te ayudo 😊" + breve info opciones + "¿Querés saber más de alguna?"
+        - Dudan sobre COMPRAR AHORA: Ofrecé programar envío para congelar precio.Comportate como vendedor con alternativas.`;
 }
 
 function _getModuleConsumption(): string {
     return `
-INSTRUCCIONES DE CONSUMO (responder SOLO el producto preguntado):
+INSTRUCCIONES DE CONSUMO(responder SOLO el producto preguntado):
 ⚠️ Si no sabés qué producto eligió: preguntá primero "¿Con cuál arrancás?"
-- SEMILLAS: Semana 1 partís en 8, después en 4. Cada noche hervís un pedacito 5 min, tomás agua + pedacito antes de dormir. Sin gusto.
-- CÁPSULAS: Una al día, media hora antes de la comida principal con un vaso de agua. Antes del almuerzo o cena (la que más comés o más ansiedad tenés).
-- GOTAS: Semana 1: 10 gotas antes de la comida principal con agua. Semana 2+: antes del almuerzo o cena, ajustando según progreso.`;
+        - SEMILLAS: Semana 1 partís en 8, después en 4. Cada noche hervís un pedacito 5 min, tomás agua + pedacito antes de dormir.Sin gusto.
+- CÁPSULAS: Una al día, media hora antes de la comida principal con un vaso de agua.Antes del almuerzo o cena(la que más comés o más ansiedad tenés).
+- GOTAS: Semana 1: 10 gotas antes de la comida principal con agua.Semana 2 +: antes del almuerzo o cena, ajustando según progreso.`;
 }
 
 function _getModulePostSale(): string {
     return `
-Este cliente YA COMPRÓ. Sos un asistente post-venta amable.
-REGLAS:
-1. Si saluda: respondé breve.
-2. Si pregunta por envío/demora: tarda 7-10 días hábiles.
-3. Si pide postergar ENVÍO a fecha futura: Si <10 días desde hoy: "Los envíos tardan mínimo 10 días, no hay problema". Si >10 días: aceptá, confirmá y extraé POSTDATE: [fecha].
-4. Si tiene reclamo/duda compleja: extractedData="NEED_ADMIN".
-5. Si quiere VOLVER A COMPRAR: extractedData="RE_PURCHASE" y preguntale qué quiere.
-6. ANTI-INSISTENCIA (CRÍTICO): NUNCA repitas "¿Te puedo ayudar con algo más?" si ya lo dijiste hace poco. Si el cliente dice "No gracias" o indica que no necesita más nada, RESPONDÉ SIMPLEMENTE "¡Perfecto! Que tengas un lindo día 😊" y NO HAGAS NINGUNA PREGUNTA MÁS.
-7. NUNCA inventes info. NUNCA pidas datos de envío/dirección.`;
+Este cliente YA COMPRÓ.Sos un asistente post - venta amable.
+        REGLAS:
+    1. Si saluda: respondé breve.
+2. Si pregunta por envío / demora: tarda 7 - 10 días hábiles.
+3. Si pide postergar ENVÍO a fecha futura: Si < 10 días desde hoy: "Los envíos tardan mínimo 10 días, no hay problema".Si > 10 días: aceptá, confirmá y extraé POSTDATE: [fecha].
+4. Si tiene reclamo / duda compleja: extractedData = "NEED_ADMIN".
+5. Si quiere VOLVER A COMPRAR: extractedData = "RE_PURCHASE" y preguntale qué quiere.
+6. ANTI - INSISTENCIA(CRÍTICO): NUNCA repitas "¿Te puedo ayudar con algo más?" si ya lo dijiste hace poco.Si el cliente dice "No gracias" o indica que no necesita más nada, RESPONDÉ SIMPLEMENTE "¡Perfecto! Que tengas un lindo día 😊" y NO HAGAS NINGUNA PREGUNTA MÁS.
+7. NUNCA inventes info.NUNCA pidas datos de envío / dirección.`;
 }
 
 function _getModuleSafety(): string {
     return `
 Verificar si hay contraindicación o riesgo.
-MENORES — REGLA CRÍTICA DE IDENTIFICACIÓN:
-- Si el usuario menciona "mi hija/hijo" o "es para mi hija/hijo": EL USUARIO ES EL ADULTO. La menor es la hija/hijo, NO el usuario.
-- NUNCA trates al usuario como menor si dijo que el producto es para su hijo/a menor.
+        MENORES — REGLA CRÍTICA DE IDENTIFICACIÓN:
+    - Si el usuario menciona "mi hija/hijo" o "es para mi hija/hijo": EL USUARIO ES EL ADULTO.La menor es la hija / hijo, NO el usuario.
+- NUNCA trates al usuario como menor si dijo que el producto es para su hijo / a menor.
 - Respondé: "Para menores de 18 no la recomendamos porque el cuerpo todavía está creciendo 😊 Si es para vos, sí podés tomarla sin problema."
-- Si ya aclararon ≥18 años → SÍ puede tomarla, goalMet=true. Si <18 → rechazar venta para esa persona amablemente.
-EMBARAZO/LACTANCIA/+80 AÑOS/CÁNCER: RECHAZAR VENTA. "Priorizamos tu salud 🌿😊 Por precaución no recomendamos el consumo en casos de embarazo, lactancia, edad muy avanzada o patologías oncológicas graves. Si el pedido es para otra persona, avisame." extractedData="REJECT_MEDICAL".`;
+        - Si ya aclararon ≥18 años → SÍ puede tomarla, goalMet = true.Si < 18 → rechazar venta para esa persona amablemente.
+            EMBARAZO / LACTANCIA / +80 AÑOS / CÁNCER: RECHAZAR VENTA. "Priorizamos tu salud 🌿😊 Por precaución no recomendamos el consumo en casos de embarazo, lactancia, edad muy avanzada o patologías oncológicas graves. Si el pedido es para otra persona, avisame." extractedData = "REJECT_MEDICAL".`;
 }
 
 // ── EXTRACTION RULES (always sent, at END = high attention zone) ──
 function _getExtractionRules(): string {
     return `
 EXTRACCIÓN DE DATOS PARA LA HERRAMIENTA DE FLUJO:
-- Si el cliente elige un producto: extraer "PRODUCTO: Cápsulas" (o Gotas, o Semillas). VITAL para avanzar.
-- Si mencionan edad/peso/patología (diabetes, tiroides, hipertensión): extraer "PROFILE: [dato]".
+    - Si el cliente elige un producto: extraer "PRODUCTO: Cápsulas"(o Gotas, o Semillas).VITAL para avanzar.
+- Si mencionan edad / peso / patología(diabetes, tiroides, hipertensión): extraer "PROFILE: [dato]".
 - Si piden postergar envío a fecha futura: extraer "POSTDATADO: [fecha]"
-- Si quieren CAMBIAR pedido: extrae "CHANGE_ORDER"
-- Si quieren CANCELAR: extrae "CANCEL_ORDER"
-- Si EMBARAZADA/LACTANDO/+80/CÁNCER: rechazar venta, extrae "REJECT_MEDICAL"
+        - Si quieren CAMBIAR pedido: extrae "CHANGE_ORDER"
+            - Si quieren CANCELAR: extrae "CANCEL_ORDER"
+                - Si EMBARAZADA / LACTANDO / +80 / CÁNCER: rechazar venta, extrae "REJECT_MEDICAL"
 
-DEBES LLAMAR A LA HERRAMIENTA 'control_dialog_flow' PARA EMITIR TU RESPUESTA AL USUARIO Y ASIGNAR EL ESTADO (goalMet).`;
+DEBES LLAMAR A LA HERRAMIENTA 'control_dialog_flow' PARA EMITIR TU RESPUESTA AL USUARIO Y ASIGNAR EL ESTADO(goalMet).`;
 }
 
 // ── PROMPT BUILDER — Selects the right module for each step ──
@@ -394,7 +398,7 @@ class AIService {
             logger.error("❌ CRITICAL: OPENAI_API_KEY is missing!");
         }
 
-        logger.info(`📡 [AI] Initializing OpenAI (model: ${MODEL})`);
+        logger.info(`📡[AI] Initializing OpenAI(model: ${MODEL})`);
 
         this.client = new OpenAI({ apiKey });
         this.model = MODEL;
@@ -444,7 +448,8 @@ class AIService {
                 if (status === 429) {
                     this.stats.retries++;
                     const waitTime = Math.pow(2, attempt + 1) * 1000 + Math.floor(Math.random() * 1000);
-                    logger.warn(`⚠️ [AI] Rate Limit (429). Attempt ${attempt + 1}/${MAX_RETRIES}. Backing off ${waitTime / 1000}s...`);
+                    logger.warn(`⚠️[AI] Rate Limit(429).Attempt ${attempt + 1} /${MAX_RETRIES}. Backing off ${waitTime / 1000
+                        }s...`);
                     await new Promise(r => setTimeout(r, waitTime));
                 } else {
                     this.stats.errors++;
@@ -479,7 +484,7 @@ class AIService {
         let summaryContext = "";
 
         if (context.summary) {
-            summaryContext = `RESUMEN PREVIO:\n"${context.summary}"\n\n`;
+            summaryContext = `RESUMEN PREVIO: \n"${context.summary}"\n\n`;
         }
         // Always cap history to keep prompt lean (regardless of summary)
         if (conversationHistory.length > 50) {
@@ -492,24 +497,25 @@ class AIService {
             const faq = context.knowledge.faq || [];
             const step = context.step || 'general';
 
-            knowledgeContext = `INFORMACIÓN RELEVANTE PARA ESTE PASO:\n`;
+            knowledgeContext = `INFORMACIÓN RELEVANTE PARA ESTE PASO: \n`;
 
             const pathInfo = faq.find((q: any) => q.keywords.includes('diabetes'))?.response || "";
             if (pathInfo) knowledgeContext += `- SOBRE PATOLOGÍAS: "${pathInfo}"\n`;
 
             if (['waiting_weight', 'waiting_preference'].includes(step)) {
-                knowledgeContext += `- Productos principales: Cápsulas (prácticas, MAS EFECTIVAS y recomendadas) y Semillas (naturales/experiencia previa del cliente).\n`;
+                knowledgeContext += `- Productos principales: Cápsulas(prácticas, MAS EFECTIVAS y recomendadas) y Semillas(naturales / experiencia previa del cliente).\n`;
                 knowledgeContext += `- Gotas: SOLO ofrecer si tiene < 10kg para bajar o > 70 años.\n`;
-                knowledgeContext += `- Contraindicaciones: solo embarazo y lactancia. NO menores de edad.\n`;
-                knowledgeContext += `- PRECIOS: Si preguntan "precio" en general, decí "$37.000 a $69.000". PERO si preguntan "precio de todos", "lista de precios" o insisten, PASALES TODOS LOS PRECIOS detallados (Semillas: $36.900/60d, $49.900/120d; Cápsulas: $46.900/60d, $66.900/120d, etc).\n`;
+                knowledgeContext += `- Contraindicaciones: solo embarazo y lactancia.NO menores de edad.\n`;
+                knowledgeContext += `- PRECIOS: Si preguntan "precio" en general, decí "$37.000 a $69.000".PERO si preguntan "precio de todos", "lista de precios" o insisten, PASALES TODOS LOS PRECIOS detallados(Semillas: $36.900 / 60d, $49.900 / 120d; Cápsulas: $46.900 / 60d, $66.900 / 120d, etc).\n`;
+                knowledgeContext += `- ENVÍO Y PAGO: Envío gratis por Correo Argentino a todo el país.Solo aceptamos pago en efectivo al recibir(Contra Reembolso).\n`;
             } else if (step === 'waiting_price_confirmation') {
-                knowledgeContext += `- El usuario todavía NO vio precios. Tu trabajo es convencerlo de que quiera verlos.\n`;
-                knowledgeContext += `- Contraindicaciones: solo embarazo y lactancia. NO menores de edad.\n`;
-                knowledgeContext += `- (NO menciones precios específicos ni formas de pago, solo que son accesibles)\n`;
+                knowledgeContext += `- El usuario todavía NO vio precios.Tu trabajo es convencerlo de que quiera verlos.\n`;
+                knowledgeContext += `- Contraindicaciones: solo embarazo y lactancia.NO menores de edad.\n`;
+                knowledgeContext += `- (NO menciones precios específicos ni formas de pago, solo que son accesibles) \n`;
             } else if (['waiting_plan_choice', 'closing', 'waiting_ok'].includes(step)) {
                 const pCaps = f.price_capsulas?.response || "";
                 const pSem = f.price_semillas?.response || "";
-                if (pCaps || pSem) knowledgeContext += `- PRECIOS: Capsulas ($46.900/$66.900) | Semillas ($36.900/$49.900)\n`;
+                if (pCaps || pSem) knowledgeContext += `- PRECIOS: Capsulas($46.900 / $66.900) | Semillas($36.900 / $49.900) \n`;
 
                 // Get dynamic prices for context too
                 let adMax = '6.000';
@@ -518,12 +524,12 @@ class AIService {
                     if (pd.adicionalMAX) adMax = pd.adicionalMAX;
                 } catch (e: any) { }
 
-                knowledgeContext += `- Plan 120 días sin adicional. Plan 60 días con Contra Reembolso MAX (+$${adMax}).\n`;
+                knowledgeContext += `- Plan 120 días sin adicional.Plan 60 días con Contra Reembolso MAX(+$${adMax}).\n`;
                 knowledgeContext += `- Envío gratis por Correo Argentino, pago en efectivo al recibir\n`;
             } else if (step === 'waiting_data') {
                 knowledgeContext += `- Necesitamos: nombre completo, calle y número, ciudad, código postal\n`;
-                knowledgeContext += `- PROHIBIDO PEDIR NÚMERO DE TELÉFONO. Ya estamos hablando por WhatsApp, ¡ya tenemos su número! Nunca pidas este dato.\n`;
-                knowledgeContext += `- (NO menciones precios ni productos, ya están decididos)\n`;
+                knowledgeContext += `- PROHIBIDO PEDIR NÚMERO DE TELÉFONO.Ya estamos hablando por WhatsApp, ¡ya tenemos su número! Nunca pidas este dato.\n`;
+                knowledgeContext += `- (NO menciones precios ni productos, ya están decididos) \n`;
             }
 
             knowledgeContext += `(No inventes datos, usá siempre esta base)`;
@@ -533,17 +539,17 @@ class AIService {
         let stateContext = "";
         if (context.userState) {
             const s = context.userState;
-            if (s.selectedProduct) stateContext += `- Producto elegido: ${s.selectedProduct}\n`;
+            if (s.selectedProduct) stateContext += `- Producto elegido: ${s.selectedProduct} \n`;
             if (s.cart && s.cart.length > 0) {
-                stateContext += `- Carrito: ${s.cart.map(i => `${i.product} (${i.plan} días) $${i.price}`).join(', ')}\n`;
+                stateContext += `- Carrito: ${s.cart.map(i => `${i.product} (${i.plan} días) $${i.price}`).join(', ')} \n`;
             }
             if (s.partialAddress && Object.keys(s.partialAddress).length > 0) {
                 const a = s.partialAddress;
-                stateContext += `- Datos parciales: ${a.nombre || '?'}, ${a.calle || '?'}, ${a.ciudad || '?'}, CP ${a.cp || '?'}\n`;
+                stateContext += `- Datos parciales: ${a.nombre || '?'}, ${a.calle || '?'}, ${a.ciudad || '?'}, CP ${a.cp || '?'} \n`;
             }
         }
         if (stateContext) {
-            stateContext = `\nESTADO DEL CLIENTE:\n${stateContext}`;
+            stateContext = `\nESTADO DEL CLIENTE: \n${stateContext} `;
         }
 
         const userPrompt = `
@@ -559,14 +565,14 @@ ${conversationHistory.map(m => `${m.role}: ${m.content}`).join('\n')}
 MENSAJE DEL USUARIO: "${userText}"
 
 INSTRUCCIONES:
-1. Fijate si el usuario CUMPLIÓ el objetivo del paso (ej: dio un número, eligió un plan).
+1. Fijate si el usuario CUMPLIÓ el objetivo del paso(ej: dio un número, eligió un plan).
 2. Si lo cumplió: goalMet = true.
-3. PREGUNTAS DEL USUARIO (CRÍTICO): Si el usuario hace una pregunta, RESPONDELA SIEMPRE de forma clara. Nunca lo ignores. Luego de responder, y en un tono relajado y muy poco insistente (ej: "te tomo los datos o te ayudo con algo más?"), volvé a intentar encausar el objetivo del paso. EXCEPCIÓN: Si el usuario dice explícitamente "No gracias" o similar, o la etapa es post-venta y no quiere nada más, NO HAGAS NINGUNA PREGUNTA ADICIONAL. Si el usuario NO preguntó nada y tampoco cumplió el objetivo, volvé a preguntarle lo del objetivo pero de forma breve y amigable.
-4. Excepción a la Regla 3 (POSTERGACIÓN): Si el usuario dice que "no puede hablar ahora" o "está trabajando", SOLO confirmá con amabilidad ("Dale, tranqui. Avisame cuando puedas!"). PERO si el usuario dice "en otro momento lo compro", "este mes no puedo", "después veo", "no tengo plata ahora": DEBES ofrecer POSTDATAR el envío para "congelar el precio" como te indica el prompt. NO apliques postergación silenciosa acá, compórtate como VENDEDOR.
-5. Si el usuario dice algo EMOCIONAL o PERSONAL (hijos, salud, bullying, autoestima): mostrá EMPATÍA primero. NO USES "Entiendo, eso es difícil". Usá variaciones reales y genuinas. Después volvé suavemente al objetivo del paso.
-6. PROHIBIDO: No hables de pago, envío, precios, ni datos de envío si el OBJETIVO DEL PASO no lo menciona, a menos que el usuario lo haya preguntado explícitamente. Limitá tu respuesta al tema del objetivo.
-7. MENORES DE EDAD: Si el mensaje menciona menores, VERIFICÁ EL HISTORIAL. Si ya se aclaró que la persona es mayor de 18, NO repitas la restricción. Confirmá que puede tomarla y seguí adelante.
-8. ANTI-REPETICIÓN: NUNCA repitas textualmente un mensaje que ya está en el historial. Si necesitás pedir los mismos datos, usá una frase DIFERENTE.
+3. PREGUNTAS DEL USUARIO(CRÍTICO): Si el usuario hace una pregunta, RESPONDELA SIEMPRE de forma clara.Nunca lo ignores.Luego de responder, y en un tono relajado y muy poco insistente(ej: "te tomo los datos o te ayudo con algo más?"), volvé a intentar encausar el objetivo del paso.EXCEPCIÓN: Si el usuario dice explícitamente "No gracias" o similar, o la etapa es post - venta y no quiere nada más, NO HAGAS NINGUNA PREGUNTA ADICIONAL.Si el usuario NO preguntó nada y tampoco cumplió el objetivo, volvé a preguntarle lo del objetivo pero de forma breve y amigable.
+4. Excepción a la Regla 3(POSTERGACIÓN): Si el usuario dice que "no puede hablar ahora" o "está trabajando", SOLO confirmá con amabilidad("Dale, tranqui. Avisame cuando puedas!").PERO si el usuario dice "en otro momento lo compro", "este mes no puedo", "después veo", "no tengo plata ahora": DEBES ofrecer POSTDATAR el envío para "congelar el precio" como te indica el prompt.NO apliques postergación silenciosa acá, compórtate como VENDEDOR.
+5. Si el usuario dice algo EMOCIONAL o PERSONAL(hijos, salud, bullying, autoestima): mostrá EMPATÍA primero.NO USES "Entiendo, eso es difícil".Usá variaciones reales y genuinas.Después volvé suavemente al objetivo del paso.
+6. PROHIBIDO: No hables de pago, envío, precios, ni datos de envío si el OBJETIVO DEL PASO no lo menciona, a menos que el usuario lo haya preguntado explícitamente.Limitá tu respuesta al tema del objetivo.
+7. MENORES DE EDAD: Si el mensaje menciona menores, VERIFICÁ EL HISTORIAL.Si ya se aclaró que la persona es mayor de 18, NO repitas la restricción.Confirmá que puede tomarla y seguí adelante.
+8. ANTI - REPETICIÓN: NUNCA repitas textualmente un mensaje que ya está en el historial.Si necesitás pedir los mismos datos, usá una frase DIFERENTE.
 `;
 
         try {
@@ -598,7 +604,7 @@ INSTRUCCIONES:
                     temperature: 0.7,
                     max_tokens: COMPLEX_STEPS.has(context.step || '') ? 450 : 250
                 }),
-                `chat_${systemPrompt.length}_${userPrompt.substring(0, 150)}` // Caché activo para FAQs y etapas repetitivas
+                `chat_${systemPrompt.length}_${userPrompt.substring(0, 150)} ` // Caché activo para FAQs y etapas repetitivas
             );
 
             const toolCalls = result.choices[0].message?.tool_calls;
@@ -635,7 +641,7 @@ INSTRUCCIONES:
 
         // Only summarize if history exceeds the target bounds
         if (history.length > messagesToKeepCount) {
-            logger.info(`[AI] Summarizing history (${history.length} messages down to ${messagesToKeepCount})...`);
+            logger.info(`[AI] Summarizing history(${history.length} messages down to ${messagesToKeepCount})...`);
             const summary = await this._callQueuedSummarize(history);
             if (summary) {
                 logger.info(`[AI] Summary created: "${summary.substring(0, 50)}..."`);
@@ -660,23 +666,23 @@ INSTRUCCIONES:
      */
     async _callQueuedSummarize(history: any[]): Promise<string | null> {
         const conversationText = history.map(msg =>
-            `${msg.role === 'user' ? 'Cliente' : 'Vendedor'}: ${msg.content}`
+            `${msg.role === 'user' ? 'Cliente' : 'Vendedor'}: ${msg.content} `
         ).join('\n');
 
-        const cacheKey = `summary_${history.length}_${history.slice(-3).map(m => m.content).join('|')}`;
+        const cacheKey = `summary_${history.length}_${history.slice(-3).map(m => m.content).join('|')} `;
 
         const prompt = `
-        Analizá la siguiente conversación de venta de productos naturales (Nuez de la India).
-        Generá un RESUMEN CONCISO (máximo 3 oraciones) que capture:
-        1. Qué productos le interesan al cliente.
-        2. Datos personales ya proporcionados (nombre, dirección, dudas).
-        3. En qué estado quedó la negociación (¿está dudando? ¿ya compró? ¿espera envío?).
+        Analizá la siguiente conversación de venta de productos naturales(Nuez de la India).
+        Generá un RESUMEN CONCISO(máximo 3 oraciones) que capture:
+1. Qué productos le interesan al cliente.
+        2. Datos personales ya proporcionados(nombre, dirección, dudas).
+        3. En qué estado quedó la negociación(¿está dudando ? ¿ya compró ? ¿espera envío ?).
 
-        CONVERSACIÓN:
+    CONVERSACIÓN:
         ${conversationText}
 
-        RESUMEN:
-        `;
+RESUMEN:
+`;
 
         try {
             const result = await this._callQueued(
@@ -702,7 +708,7 @@ INSTRUCCIONES:
      * Generate Report (for analyze_day.js)
      */
     async generateReport(prompt: string): Promise<string> {
-        const cacheKey = `report_${prompt.substring(0, 100)}`;
+        const cacheKey = `report_${prompt.substring(0, 100)} `;
         try {
             const result = await this._callQueued(
                 () => this.client.chat.completions.create({
@@ -734,28 +740,28 @@ INSTRUCCIONES:
         
         TEXTO DEL USUARIO: "${text}"
 
-        DETALLES DE EXTRACCIÓN (Si no está, devolver null):
-        - nombre: Nombre COMPLETO de persona, SIEMPRE incluir apellido si lo dice (ej: "Laura Aguirre", "Marta Pastor"). NUNCA omitas el apellido.
-        - calle: Calle y altura (ej: "Av. Santa Fe 1234", "Barrio 140 viv casa 16").
-        - ciudad: Localidad o ciudad (ej: "Valle Viejo", "El Bañado", "Gualeguay").
-        - provincia: Provincia de Argentina (ej: "Catamarca", "Córdoba", "Entre Ríos").
-        - cp: Código postal numérico (ej: "4707", "5000").
+        DETALLES DE EXTRACCIÓN(Si no está, devolver null):
+- nombre: Nombre COMPLETO de persona, SIEMPRE incluir apellido si lo dice(ej: "Laura Aguirre", "Marta Pastor").NUNCA omitas el apellido.
+        - calle: Calle y altura(ej: "Av. Santa Fe 1234", "Barrio 140 viv casa 16").
+        - ciudad: Localidad o ciudad(ej: "Valle Viejo", "El Bañado", "Gualeguay").
+        - provincia: Provincia de Argentina(ej: "Catamarca", "Córdoba", "Entre Ríos").
+        - cp: Código postal numérico(ej: "4707", "5000").
         
         FECHA ACTUAL DE LA CONSULTA: ${new Date().toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-        - postdatado: SOLO si el cliente EXPLÍCITAMENTE pide enviar o recibir el pedido en una fecha futura (ej: "mandamelo el 10", "cobro a principio de mes", "el viernes que viene"). 
-          CRÍTICO: Usá la "Fecha Actual" provista arriba para calcular el día exacto y retorná la fecha en formato "dd/MM" (ej: "10/05", "15/12"). Si es "a principio de mes", asume el día 05 del mes siguiente. Si el texto es solo datos de dirección/nombre, SIEMPRE devolver null. NO inventes si no lo pidieron.
+- postdatado: SOLO si el cliente EXPLÍCITAMENTE pide enviar o recibir el pedido en una fecha futura(ej: "mandamelo el 10", "cobro a principio de mes", "el viernes que viene").
+    CRÍTICO: Usá la "Fecha Actual" provista arriba para calcular el día exacto y retorná la fecha en formato "dd/MM"(ej: "10/05", "15/12").Si es "a principio de mes", asume el día 05 del mes siguiente.Si el texto es solo datos de dirección / nombre, SIEMPRE devolver null.NO inventes si no lo pidieron.
         
         REGLAS Y CONTEXTO GEOGRÁFICO:
-        1. Tu prioridad es extraer CUALQUIER dato útil, aunque falten otros.
+1. Tu prioridad es extraer CUALQUIER dato útil, aunque falten otros.
         2. "Gualeguay" y "Gualeguaychú" pertenecen a la provincia de Entre Ríos, NO a Santa Fe.
         3. Barrios como "Barrio 60 viviendas" o "mz F casa 4" van en "calle".
         4. CRÍTICO: Separa correctamente el NOMBRE DE PERSONA del NOMBRE DE LA CALLE. 
-           Si te dicen "marta pastor bengas 77", "marta pastor" es el nombre y "bengas 77" es la calle. No pongas apellidos como parte de la calle ni calles como parte del apellido. EXTRAE SIEMPRE el nombre Y apellido completo de la persona.
-        5. Si el usuario envía SOLO SU NOMBRE (ej: "Juan", "Pedro Pablo"), extraelo como "nombre", y devuelve los demás como null.
+           Si te dicen "marta pastor bengas 77", "marta pastor" es el nombre y "bengas 77" es la calle.No pongas apellidos como parte de la calle ni calles como parte del apellido.EXTRAE SIEMPRE el nombre Y apellido completo de la persona.
+        5. Si el usuario envía SOLO SU NOMBRE(ej: "Juan", "Pedro Pablo"), extraelo como "nombre", y devuelve los demás como null.
         6. Si el texto dice claramente de qué provincia es, respetalo aunque no coincida con el código postal.
-        7. Las Avenidas o calles a veces están abreviadas (ej: "av belgrano 45D").
-        8. Si el usuario da una dirección sumamente vaga que un correo rechazaría (ej: "cerca del kiosco", "al lado de la plaza", "frente al tacho"), IGNORA esa calle cruzada y devuelve calle: null.
-        9. Si el usuario da datos geográficamente imposibles o contradictorios (ej: calle en Mendoza pero dice estar en Rosario, Santa Fe), devuelve provincia: "CONFLICT".
+        7. Las Avenidas o calles a veces están abreviadas(ej: "av belgrano 45D").
+        8. Si el usuario da una dirección sumamente vaga que un correo rechazaría(ej: "cerca del kiosco", "al lado de la plaza", "frente al tacho"), IGNORA esa calle cruzada y devuelve calle: null.
+        9. Si el usuario da datos geográficamente imposibles o contradictorios(ej: calle en Mendoza pero dice estar en Rosario, Santa Fe), devuelve provincia: "CONFLICT".
         `;
         try {
             const result: any = await this._callQueued(
@@ -787,7 +793,7 @@ INSTRUCCIONES:
                     temperature: 0,
                     max_tokens: 200
                 }),
-                `addr_${text.substring(0, 50)}`, // Clave de caché para deduplicar textos crudos como "1", "2" o direcciones comunes
+                `addr_${text.substring(0, 50)} `, // Clave de caché para deduplicar textos crudos como "1", "2" o direcciones comunes
                 5 * 60 // 5 MINUTOS DE TTL para extracciones
             );
 
@@ -817,7 +823,7 @@ INSTRUCCIONES:
             // Convert base64 to buffer and write temp file (Whisper needs a file)
             const buffer = Buffer.from(mediaData, 'base64');
             const ext = mimeType.includes('ogg') ? 'ogg' : mimeType.includes('mp4') ? 'mp4' : 'webm';
-            const tmpPath = path.join(os.tmpdir(), `herbalis_audio_${Date.now()}.${ext}`);
+            const tmpPath = path.join(os.tmpdir(), `herbalis_audio_${Date.now()}.${ext} `);
 
             fs.writeFileSync(tmpPath, buffer);
 
@@ -856,7 +862,7 @@ INSTRUCCIONES:
                                 {
                                     type: "image_url",
                                     image_url: {
-                                        url: `data:${mimeType};base64,${mediaData}`,
+                                        url: `data:${mimeType}; base64, ${mediaData} `,
                                         detail: "low"
                                     }
                                 }
@@ -879,10 +885,10 @@ INSTRUCCIONES:
      */
     async generateSuggestion(instruction: string, conversationContext: string): Promise<string> {
         const prompt = `
-        SITUACION: El ADMINISTRADOR del negocio te da una instrucción DIRECTA para enviarle al cliente.
+SITUACION: El ADMINISTRADOR del negocio te da una instrucción DIRECTA para enviarle al cliente.
         La instrucción del admin tiene AUTORIDAD TOTAL — ANULÁ cualquier regla tuya que la contradiga.
         Si el admin dice "confirmá el cambio", "aceptá", "dale", VOS HACÉS LO QUE DICE.
-        NO digas "no puedo cambiar el pedido" ni "no puedo hacer eso". El admin PUEDE y VOS OBEDECÉS.
+        NO digas "no puedo cambiar el pedido" ni "no puedo hacer eso".El admin PUEDE y VOS OBEDECÉS.
 
         INSTRUCCIÓN DEL ADMIN: "${instruction}"
         CONTEXTO DEL CHAT CON EL CLIENTE: "${conversationContext}"
@@ -918,16 +924,16 @@ INSTRUCCIONES:
      */
     async generateContextualBridge(userMessage: string, context: string): Promise<string> {
         const prompt = `
-        Actúa como Marta (vendedora/asesora argentina de 50 años). El usuario acaba de decir: "${userMessage}".
+        Actúa como Marta(vendedora / asesora argentina de 50 años).El usuario acaba de decir: "${userMessage}".
         El contexto actual de la charla es: "${context}".
         
-        Tu tarea: Genera SOLO UNA frase corta (máximo 8-10 palabras) de empatía REAL o reacción natural ante lo que dijo el usuario.
+        Tu tarea: Genera SOLO UNA frase corta(máximo 8 - 10 palabras) de empatía REAL o reacción natural ante lo que dijo el usuario.
         Ejemplos de tono esperado: "Uy qué garrón", "Te re entiendo firme", "Olvidate, es un tema", "Ay sí a todas nos pasa", "Mirá vos, bueno tranqui", "Excelente, me re alegro".
-        
-        REGLAS:
-        1. NO hagas ninguna pregunta.
+
+    REGLAS:
+1. NO hagas ninguna pregunta.
         2. NO ofrezcas productos ni soluciones en esta frase.
-        3. NO suenes como bot ni como coach motivacional. Suena como una señora tomando mates.
+        3. NO suenes como bot ni como coach motivacional.Suena como una señora tomando mates.
         4. Debe ser cortísima.
         5. Devuelve SOLO el texto, sin comillas ni formato JSON.
         `;
@@ -943,7 +949,7 @@ INSTRUCCIONES:
                     temperature: 0.8, // Slightly more creative for natural variability
                     max_tokens: 40
                 }),
-                `bridge_${userMessage}`,
+                `bridge_${userMessage} `,
                 60 * 60 // 1 hour cache to avoid unnecessary calls for common phrases
             );
 
@@ -967,7 +973,7 @@ INSTRUCCIONES:
 
     _parseJSON(text: string): AIParsedResponse {
         try {
-            const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
+            const jsonStr = text.replace(/```json\s*/gi, '').replace(/```/g, '').trim();
             const parsed = JSON.parse(jsonStr);
             if (typeof parsed.response !== 'string') {
                 parsed.response = String(parsed.response || "");

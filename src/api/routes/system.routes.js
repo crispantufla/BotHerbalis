@@ -190,7 +190,7 @@ module.exports = (client, sharedState) => {
             const productData = {
                 'Cápsulas': 0,
                 'Gotas': 0,
-                'Otros': 0
+                'Semillas': 0
             };
 
             // Initialize all 30 days with 0 so the chart doesn't have gaps
@@ -218,7 +218,7 @@ module.exports = (client, sharedState) => {
                 } else if (prodStr.includes('gota')) {
                     productData['Gotas'] += 1;
                 } else if (prodStr.trim() !== '') {
-                    productData['Otros'] += 1;
+                    productData['Semillas'] += 1;
                 }
             });
 

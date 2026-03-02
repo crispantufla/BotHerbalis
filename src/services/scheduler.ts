@@ -45,8 +45,8 @@ const RE_ENGAGEABLE_STEPS = new Set([
 
 const STALE_THRESHOLD_MINS = 20;
 const COLD_LEAD_THRESHOLD_HOURS = 24;
-const ABANDONED_CART_MIN_HOURS = 24;
-const ABANDONED_CART_MAX_HOURS = 48;
+const ABANDONED_CART_MIN_HOURS = 4; // Cambiado para cubrir "más tarde en el mismo día"
+const ABANDONED_CART_MAX_HOURS = 24;
 const AUTO_APPROVE_THRESHOLD_MINS = 15;
 const CLEANUP_THRESHOLD_DAYS = 30;
 
@@ -333,6 +333,13 @@ function startScheduler(sharedState: SchedulerSharedState, dependencies: Schedul
         checkColdLeads(sharedState, dependencies);
     }, { timezone: TIMEZONE });
     logger.info('[SCHEDULER] ✅ checkColdLeads → 10:00 y 18:00 ARG');
+
+    // ── ABANDONED CARTS: al inicio de cada hora, solo de 10 a 21hs Argentina ──
+    // Asegura que NUNCA se escriba de madrugada o pasadas las 22hs.
+    cron.schedule('0 10-21 * * *', () => {
+        checkAbandonedCarts(sharedState, dependencies);
+    }, { timezone: TIMEZONE });
+    logger.info('[SCHEDULER] ✅ checkAbandonedCarts → cada hora de 10 a 21 ARG');
 
     // ── CLEANUP: a las 4am Argentina ──
     // Limpieza de memoria nocturna. Borra usuarios inactivos >30 días.
