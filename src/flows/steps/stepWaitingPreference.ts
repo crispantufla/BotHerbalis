@@ -29,11 +29,11 @@ export async function handleWaitingPreference(
 
     const totalMatches = (mentionsCapsulas ? 1 : 0) + (mentionsSemillas ? 1 : 0) + (mentionsGotas ? 1 : 0);
 
-    // If user mentions more than one product (e.g., "capsulas o semillas", "qué diferencia hay")
-    // Or if they ask for a recommendation
+    // Or if they ask for a recommendation or express a physical objection (e.g., hard to swallow)
     // FIX: Only treat as comparison if they ACTUALLY mention more than one, or explicitly ask for comparison.
     // Answering "Capsulas" to "con cual preferis avanzar, capsulas o semillas?" should NOT be a comparison.
-    const isComparison = totalMatches > 1 || (totalMatches === 0 && /\b(cual|recomend|mejor|diferencia|que me recomiendas|que me conviene|cual me das|asesorame)\b/i.test(normalizedText));
+    const hasObjection = /\b(tragar|ahogar|grandes|cuestan|complicado|dificil|miedo a ahogarme)\b/i.test(normalizedText);
+    const isComparison = totalMatches > 1 || hasObjection || (totalMatches === 0 && /\b(cual|recomend|mejor|diferencia|que me recomiendas|que me conviene|cual me das|asesorame)\b/i.test(normalizedText));
 
     if (isComparison) {
         if (/^(capsulas? o gotas?|gotas? o capsulas?|capsulas o gotas porfa(?:vor)?)$/i.test(normalizedText.trim())) {
