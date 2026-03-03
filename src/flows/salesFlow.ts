@@ -1,7 +1,7 @@
 import { UserState, FlowStep } from '../types/state';
 const { processGlobals } = require('./globals');
 const { processStep } = require('./steps');
-const { _pauseAndAlert, _setStep } = require('./utils/flowHelpers');
+const { _pauseAndAlert, _setStep, _extractSilentVariables } = require('./utils/flowHelpers');
 
 interface SalesFlowDependencies {
     saveState: (userId?: string) => void;
@@ -195,6 +195,45 @@ export async function processSalesFlow(
     // Save User message
     currentState.history.push({ role: 'user', content: text, timestamp: Date.now() });
     saveState(userId);
+
+    // 1.5. Silent Variable Extraction (Age/Weight out of band)
+    // Only do this if they are in an active questioning step
+    const activeSteps = ['waiting_weight', 'waiting_preference', 'waiting_preference_consultation', 'waiting_plan_choice', 'waiting_ok', 'waiting_data'];
+    if (activeSteps.includes(currentState.step)) {
+        const extraction = _extractSilentVariables(normalizedText, currentState);
+        if (extraction.ageUpdated || extraction.weightUpdated) {
+            saveState(userId);
+            // If the user's message was merely "tengo 40 años" we don't want to confuse the AI
+            // We just ACK and repeat the state's main question if it was merely a correction
+            if (extraction.isSolelyCorrection) {
+                console.log(`[GLOBAL EXTRACTION] Intercepted sole correction for ${userId}. Age:${extraction.ageUpdated}, Weight:${extraction.weightUpdated}`);
+                let ackMsg = "¡Anotado! 😊\n\nEntonces, decime...";
+
+                // Customize the re-prompt based on the step we are stalled in
+                switch (currentState.step) {
+                    case 'waiting_plan_choice':
+                        ackMsg += " ¿preferías avanzar con el plan de 60 o el de 120 días?";
+                        break;
+                    case 'waiting_preference':
+                        ackMsg += " ¿qué opción preferías probar (Cápsulas, Semillas o Gotas)?";
+                        break;
+                    case 'waiting_ok':
+                        ackMsg += " ¿te tomo los datos para el envío?";
+                        break;
+                    default:
+                        ackMsg = "¡Anotado! 😊 Seguimos...";
+                        break;
+                }
+
+                currentState.history.push({ role: 'bot', content: ackMsg, timestamp: Date.now() });
+                if (dependencies.sendMessageWithDelay) {
+                    await dependencies.sendMessageWithDelay(userId, ackMsg);
+                }
+                saveState(userId);
+                return; // HALT further processing
+            }
+        }
+    }
 
     // 2. Execute Global Interceptors (Priority 0 and 1)
     const globalsResult = await processGlobals(userId, text, normalizedText, currentState, knowledge, dependencies);

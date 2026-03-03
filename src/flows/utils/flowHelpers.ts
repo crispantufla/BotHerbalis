@@ -106,10 +106,55 @@ async function _pauseAndAlert(userId: string, currentState: UserState, dependenc
     console.log(`⏸️ [BOT] User ${userId} paused. Reason: ${reason}${nightLabel}`);
 }
 
+/**
+ * _extractSilentVariables
+ * Preemptively catches out-of-band age or weight updates to prevent
+ * AI confusion if the user provides these at the wrong step.
+ */
+function _extractSilentVariables(normalizedText: string, currentState: any): { ageUpdated?: number, weightUpdated?: number, isSolelyCorrection: boolean } {
+    let result: { ageUpdated?: number, weightUpdated?: number, isSolelyCorrection: boolean } = { isSolelyCorrection: false };
+
+    // Catch "tengo X años", "mi edad X"
+    const ageMatch = normalizedText.match(/\b(tengo|mi edad es(?:\sde)?)\s+(\d{2})\s*(años|añitos)?\b/i);
+    if (ageMatch && ageMatch[2]) {
+        result.ageUpdated = parseInt(ageMatch[2], 10);
+        currentState.age = result.ageUpdated;
+    }
+
+    // Catch "peso X", "X kilos"
+    const weightMatch = normalizedText.match(/\b(peso|estoy pesando|kilos|kg)\s+(\d{2,3})\s*(kilos|kg|kgs)?\b/i) || normalizedText.match(/\b(\d{2,3})\s*(kilos|kg|kgs)\b/i);
+    if (weightMatch) {
+        // The number might be in group 2 or 1 depending on which regex branch matched
+        const numStr = weightMatch[2] && !isNaN(parseInt(weightMatch[2], 10)) ? weightMatch[2] : weightMatch[1];
+        if (numStr) {
+            result.weightUpdated = parseInt(numStr, 10);
+            // If we don't already have a weight goal, set it. Otherwise just update currentWeight.
+            if (!currentState.weightGoal) {
+                // If they say "peso X" we don't know the goal yet, but we can store it as info
+                currentState.currentWeight = result.weightUpdated;
+            } else {
+                // If they correct their goal out-of-band
+                currentState.weightGoal = result.weightUpdated;
+            }
+        }
+    }
+
+    // Determine if the message was ONLY this correction (short message)
+    if (result.ageUpdated || result.weightUpdated) {
+        const wordCount = normalizedText.trim().split(/\s+/).length;
+        if (wordCount <= 6) {
+            result.isSolelyCorrection = true;
+        }
+    }
+
+    return result;
+}
+
 module.exports = {
     _setStep,
     _maybeUpsell,
     _hasCompleteAddress,
     _detectPostdatado,
-    _pauseAndAlert
+    _pauseAndAlert,
+    _extractSilentVariables
 };
