@@ -606,7 +606,7 @@ INSTRUCCIONES:
                     temperature: 0.6,
                     max_tokens: 1500
                 }),
-                `chat_${systemPrompt.length}_${userPrompt.substring(0, 150)} ` // Caché activo para FAQs y etapas repetitivas
+                `chat_${systemPrompt.length}_${userPrompt}` // Caché activo para FAQs y etapas repetitivas
             );
 
             const toolCalls = result.choices[0].message?.tool_calls;

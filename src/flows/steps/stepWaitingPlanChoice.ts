@@ -280,6 +280,7 @@ RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.
                     if (planAI.response) {
                         currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });
                         await sendMessageWithDelay(userId, planAI.response);
+                        saveState(userId);
                         return { matched: true };
                     }
                 }
