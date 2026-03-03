@@ -91,7 +91,7 @@ async function handleWaitingPlanChoice(
     // GUARD: Detect any questions BEFORE interpreting numbers as plan selection blindly
     // e.g. "el de 120 cuánto sale", "quiero el de 60, como se toma?", "el de 60 pero me cuesta tragar"
     // If the user has a question AND a plan, we want the AI to handle it so it answers their question first.
-    const hasQuestion = /\b(como|cómo|cuando|cuándo|que|qué|donde|dónde|por que|por qué|cual|cuál|duda|consulta|precio|costo|sale|cuesta|valor|paga|cobr|tarjeta|efectivo|transferencia|contraindicaciones|efectos|mal|dieta|rebote|tragar|ahogar|grandes|cuestan|complicado|dificil)\b/i.test(normalizedText) || normalizedText.includes('?');
+    const hasQuestion = /\b(como|cómo|cuando|cuándo|que|qué|donde|dónde|por que|por qué|cual|cuál|duda|consulta|precio|costo|sale|cuesta|valor|paga|cobr|tarjeta|efectivo|transferencia|contraindicaciones|efectos|mal|dieta|rebote|tragar|ahogar|grandes|cuestan|complicado|dificil|seguridad|garantia|garantía|efectiva|efectivo|funciona|seguro)\b/i.test(normalizedText) || normalizedText.includes('?');
 
     // If text is super long (like a transcription), force AI to handle it so we don't look robotic
     const isVeryLongMessage = text.split(/\s+/).length > 20;
