@@ -4,7 +4,7 @@ import { useSocket } from '../../../context/SocketContext';
 import { API_URL } from '../../../config/api';
 import { useToast } from '../../ui/Toast';
 
-import { Search, Bot, Play, Pause, Trash2 as Trash, FileText as ScriptIcon, ChevronDown, Send, Paperclip, ShoppingCart, ArrowLeft } from 'lucide-react';
+import { Search, Bot, Play, Pause, Trash2 as Trash, FileText as ScriptIcon, ChevronDown, Send, Paperclip, ShoppingCart, ArrowLeft, Type } from 'lucide-react';
 
 const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
     const { socket } = useSocket();
@@ -30,6 +30,12 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
     const scrollContainerRef = useRef(null);
     const fileInputRef = useRef(null);
     const [instanceId, setInstanceId] = useState(null);
+    const [chatFontSize, setChatFontSize] = useState(() => parseInt(localStorage.getItem('herbalis_chat_font_size') || '14', 10));
+    const [showFontSlider, setShowFontSlider] = useState(false);
+
+    useEffect(() => {
+        localStorage.setItem('herbalis_chat_font_size', chatFontSize);
+    }, [chatFontSize]);
 
     const filteredChats = searchTerm
         ? chats.filter(c => {
@@ -582,6 +588,25 @@ Teléfono: ${phoneDisplay}`;
                                 <button onClick={handleToggleBot} className={`p-2.5 sm:p-3 flex-shrink-0 rounded-xl text-white shadow-md transition-all hover:brightness-110 hover:-translate-y-0.5 ${globalPause || selectedChat.isPaused ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 'bg-gradient-to-r from-amber-500 to-orange-500'}`} title={globalPause ? 'Bot Pausado Globalmente' : (selectedChat.isPaused ? 'Reactivar Auto-Bot' : 'Pausar Auto-Bot')}>
                                     {globalPause || selectedChat.isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
                                 </button>
+                                <div className="relative">
+                                    <button onClick={() => setShowFontSlider(!showFontSlider)} className="p-2.5 sm:p-3 flex-shrink-0 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-indigo-50 hover:text-indigo-600 transition-all shadow-sm" title="Tamaño de Letra">
+                                        <Type className="w-5 h-5" />
+                                    </button>
+                                    {showFontSlider && (
+                                        <div className="absolute top-[3.5rem] right-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-2xl shadow-xl w-64 z-[100] animate-fade-in flex flex-col gap-3">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Tamaño Letra</span>
+                                                <span className="text-sm font-bold text-indigo-600">{chatFontSize}px</span>
+                                            </div>
+                                            <input
+                                                type="range" min="12" max="28" step="1"
+                                                value={chatFontSize}
+                                                onChange={(e) => setChatFontSize(parseInt(e.target.value, 10))}
+                                                className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
                                 <button onClick={() => setShowScriptPanel(!showScriptPanel)} className="p-2.5 sm:p-3 flex-shrink-0 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500/30 hover:shadow-lg hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all active:scale-95" title="Guión">
                                     <ScriptIcon className="w-5 h-5" />
                                 </button>
@@ -710,7 +735,7 @@ Teléfono: ${phoneDisplay}`;
                                 </div>
                             ) : messages.map((msg, idx) => (
                                 <div key={idx} className={`flex ${msg.fromMe ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`max-w-[75%] p-4 text-sm leading-relaxed shadow-sm relative group ${msg.fromMe ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-3xl rounded-tr-sm shadow-indigo-500/20' : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-3xl rounded-tl-sm border border-slate-100 dark:border-slate-700'}`}>
+                                    <div className={`max-w-[75%] p-4 leading-relaxed shadow-sm relative group ${msg.fromMe ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-3xl rounded-tr-sm shadow-indigo-500/20' : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-3xl rounded-tl-sm border border-slate-100 dark:border-slate-700'}`} style={{ fontSize: `${chatFontSize}px` }}>
                                         {renderMessageBody(msg)}
                                         <span className={`text-[10px] block text-right mt-2 font-mono font-bold ${msg.fromMe ? 'text-indigo-200' : 'text-slate-400'}`}>
                                             {new Date(msg.timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' })}
