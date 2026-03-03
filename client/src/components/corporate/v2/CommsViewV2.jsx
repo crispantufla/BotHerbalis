@@ -589,11 +589,11 @@ Teléfono: ${phoneDisplay}`;
                                     {globalPause || selectedChat.isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
                                 </button>
                                 <div className="relative">
-                                    <button onClick={() => setShowFontSlider(!showFontSlider)} className="p-2.5 sm:p-3 flex-shrink-0 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-indigo-50 hover:text-indigo-600 transition-all shadow-sm" title="Tamaño de Letra">
+                                    <button onClick={(e) => { e.stopPropagation(); setShowFontSlider(!showFontSlider); }} className="p-2.5 sm:p-3 flex-shrink-0 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-indigo-50 hover:text-indigo-600 transition-all shadow-sm" title="Tamaño de Letra">
                                         <Type className="w-5 h-5" />
                                     </button>
                                     {showFontSlider && (
-                                        <div className="absolute top-[3.5rem] right-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-2xl shadow-xl w-64 z-[100] animate-fade-in flex flex-col gap-3">
+                                        <div className="fixed top-[4.5rem] right-4 sm:right-16 md:right-32 lg:right-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-2xl shadow-xl w-64 z-[9999] animate-fade-in flex flex-col gap-3">
                                             <div className="flex justify-between items-center">
                                                 <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Tamaño Letra</span>
                                                 <span className="text-sm font-bold text-indigo-600">{chatFontSize}px</span>
