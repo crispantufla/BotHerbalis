@@ -218,8 +218,8 @@ export async function handleWaitingData(
     }
 
     if (data && !data._error) {
-        const postdateKeywords = /\b(lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo|semana|mes|cobro|mañana|despues|después|principio|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\b/i;
-        const userActuallyAskedPostdate = postdateKeywords.test(normalizedText) && /\b(recibir|llega|enviar|mandar|cobro|pago|puedo|entregar|envio|después|despues|más adelante|otro momento|no puedo ahora)\b/i.test(normalizedText);
+        const postdateKeywords = /\b(lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo|semana|mes|cobro|depositan|sueldo|mañana|despues|después|quincena|principio|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\b/i;
+        const userActuallyAskedPostdate = postdateKeywords.test(normalizedText) && /\b(recibir|llega|enviar|mandar|cobro|depositan|sueldo|pago|puedo|entregar|envio|después|despues|más adelante|otro momento|no puedo ahora|para el)\b/i.test(normalizedText);
 
         if (data.postdatado && userActuallyAskedPostdate) {
             if (!currentState.postdatado) {

@@ -751,8 +751,8 @@ RESUMEN:
         - cp: Código postal numérico(ej: "4707", "5000").
         
         FECHA ACTUAL DE LA CONSULTA: ${new Date().toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-- postdatado: SOLO si el cliente EXPLÍCITAMENTE pide enviar o recibir el pedido en una fecha futura(ej: "mandamelo el 10", "cobro a principio de mes", "el viernes que viene").
-    CRÍTICO: Usá la "Fecha Actual" provista arriba para calcular el día exacto y retorná la fecha en formato "dd/MM"(ej: "10/05", "15/12").Si es "a principio de mes", asume el día 05 del mes siguiente.Si el texto es solo datos de dirección / nombre, SIEMPRE devolver null.NO inventes si no lo pidieron.
+- postdatado: SOLO si el cliente EXPLÍCITAMENTE pide enviar o recibir el pedido en una fecha futura (ej: "mandamelo el 10", "cobro a principio de mes", "para el jueves que me depositan el sueldo").
+CRÍTICO: Usá la "Fecha Actual" provista arriba para calcular el día exacto y retorná la fecha en formato "dd/MM" (ej: "10/05", "15/12"). Si es "a principio de mes", asume el día 05 del mes siguiente. Si el texto es solo datos de dirección/nombre, SIEMPRE devolver null. NO inventes si no lo pidieron.
         
         REGLAS Y CONTEXTO GEOGRÁFICO:
 1. Tu prioridad es extraer CUALQUIER dato útil, aunque falten otros.
