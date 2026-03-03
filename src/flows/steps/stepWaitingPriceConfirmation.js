@@ -27,7 +27,7 @@ async function handleWaitingPriceConfirmation(userId, text, normalizedText, curr
         console.log(`[AI-FALLBACK] waiting_price_confirmation: No match for ${userId}`);
         const aiPrice = await aiService.chat(text, {
             step: 'waiting_price_confirmation',
-            goal: 'El usuario debe confirmar si quiere ver los precios. Si tiene dudas, respondé brevemente y preguntale si quiere que le pases los precios.',
+            goal: 'El usuario debe confirmar si quiere ver los precios. Si tiene dudas, respondé de manera detallada, humana y empática, resolviendo sus ansiedades de forma cálida y extensa, tómate tu tiempo, y luego preguntale si quiere que le pases los precios.',
             history: currentState.history,
             summary: currentState.summary,
             knowledge: knowledge,

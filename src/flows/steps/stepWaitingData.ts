@@ -136,6 +136,9 @@ export async function handleWaitingData(
     const onlyPlanNumbers = /\b(60|120)\b/.test(text) && !/\b(calle|av|avenida|barrio|mz|lote|piso|dpto|depto|departamento|casa|block|manzana)\b/i.test(text);
     const mentionsPlanOrPrice = /\b(de 60|de 120|el de 60|el de 120|plan|dias|días)\b/i.test(normalizedText);
 
+    // If text is super long (like a personal story), force AI to handle it so we don't look robotic even if they gave an address
+    const isVeryLongMessage = text.split(/\s+/).length > 20;
+
     const looksLikeAddress = text.length > 8 && (!explicitQuestionKeywords) && !mentionsPlanOrPrice && (/\d/.test(text) || /\b(calle|av|avenida|barrio|mz|lote|piso|dpto|depto|departamento|casa|block|manzana)\b/i.test(text) || text.split(/[,\n]/).length >= 2);
 
     const isHesitation = /\b(pensar|pienso|despues|luego|mañana|te confirmo|te aviso|ver|veo|rato|lueguito|mas tarde|en un rato|aguanti|aguanta|espera|bancame)\b/i.test(normalizedText)
@@ -143,15 +146,16 @@ export async function handleWaitingData(
 
     const isShortConfirmation = /^(si|sisi|ok|dale|bueno|joya|de una|perfecto)[\s\?\!]*$/i.test(normalizedText);
 
-    const isDataQuestion = !isShortConfirmation && (explicitQuestionKeywords
+    const isDataQuestionOrEmotion = !isShortConfirmation && (explicitQuestionKeywords
         || /\b(pregunte|no quiero|no acepto|no acepte|como|donde|por que|para que)\b/i.test(normalizedText)
-        || isHesitation);
+        || isHesitation
+        || isVeryLongMessage);
 
-    if (isDataQuestion && !looksLikeAddress) {
-        console.log(`[AI-FALLBACK] waiting_data: Detected question/objection from ${userId}: "${text}"`);
+    if (isDataQuestionOrEmotion && (!looksLikeAddress || isVeryLongMessage)) {
+        console.log(`[AI-FALLBACK] waiting_data: Detected question/objection or long emotional text from ${userId}: "${text}"`);
         const aiData = await aiService.chat(text, {
             step: FlowStep.WAITING_DATA,
-            goal: 'El usuario tiene una duda en plena toma de datos (ej: pregunta el precio de los planes, cómo se paga, cuándo llega, si le entregan en el trabajo). DEBES RESPONDER SU PREGUNTA DIRECTAMENTE de forma amable y concisa usando el Knowledge. Si pregunta si puede recibir en su TRABAJO: "Si estás en horario laboral del cartero no hay problema. Si no te encuentra, vas a tener que ir a buscarlo a la sucursal.". Si pregunta formas de pago: "El pago a domicilio es al cartero en efectivo, por transferencia es previo al envío.". Si pregunta tiempos: "Tarda de 7 a 10 días hábiles.". Nunca lo obligues a dar los datos, respondé su duda y cerrá sutilmente con: "¿Te parece que lo dejemos anotado?" o "¿Te tomo los datos para el paquete?".',
+            goal: 'El usuario tiene una duda o expresa una preocupación en plena toma de datos (ej: pregunta cómo se paga, cuándo llega, si le entregan en el trabajo, o cuenta un largo problema personal). DEBES RESPONDER SU TEXTO DIRECTAMENTE de forma EXTENSA Y MUY EMPÁTICA usando el Knowledge. Si expresa miedos sobre demoras o recepción, redactá un párrafo largo brindando tranquilidad absoluta. Si pregunta si puede recibir en su TRABAJO: "Si estás en horario laboral del cartero no hay problema. Si no te encuentra, vas con el DNI a la sucursal.". Si pregunta formas de pago: "El pago a domicilio es al cartero en efectivo". Si pregunta tiempos: "Tarda de 7 a 10 días hábiles en promedio.". Nunca lo obligues a dar los datos, respondé su duda o drama con muchísima calidez, tómate tu tiempo, y cerrá sutilmente con: "¿Te parece que lo dejemos anotado?" o "¿Te tomo los datos?".',
             history: currentState.history,
             summary: currentState.summary,
             knowledge: knowledge,

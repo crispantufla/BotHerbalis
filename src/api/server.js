@@ -119,6 +119,19 @@ function startServer(client, sharedState) {
         }
     });
 
+    // --- EXPRESS 5 GLOBAL ERROR HANDLER ---
+    // Express 5 natively passes unhandled Promise rejections to the next(err) middleware
+    app.use((err, req, res, next) => {
+        logger.error(`❌ [API ERROR] ${req.method} ${req.url}:`, err.message);
+        if (err.stack) {
+            console.error(err.stack);
+        }
+        res.status(err.status || 500).json({
+            error: err.message || 'Internal Server Error',
+            details: process.env.NODE_ENV === 'development' ? err.stack : undefined
+        });
+    });
+
     // --- SOCKET SYNC ---
     io.on('connection', (socket) => {
         if (sharedState.isConnected && client && client.info) {

@@ -88,12 +88,16 @@ async function handleWaitingPlanChoice(
     let planSelected = false;
     let selectedPlanId = null;
 
-    // GUARD: Detect price/payment questions BEFORE interpreting numbers as plan selection
-    // e.g. "el de 120 cuánto sale", "precio del de 60", "cuánto cuesta el de 120"
-    const isPriceQuestion = /\b(cuanto|cuánto|precio|costo|sale|cuesta|valor|paga|cobr)/i.test(normalizedText);
+    // GUARD: Detect any questions BEFORE interpreting numbers as plan selection blindly
+    // e.g. "el de 120 cuánto sale", "quiero el de 60, como se toma?"
+    // If the user has a question AND a plan, we want the AI to handle it so it answers their question first.
+    const hasQuestion = /\b(como|cómo|cuando|cuándo|que|qué|donde|dónde|por que|por qué|cual|cuál|duda|consulta|precio|costo|sale|cuesta|valor|paga|cobr|tarjeta|efectivo|transferencia|contraindicaciones|efectos|mal|dieta|rebote)\b/i.test(normalizedText) || normalizedText.includes('?');
+
+    // If text is super long (like a transcription), force AI to handle it so we don't look robotic
+    const isVeryLongMessage = text.split(/\s+/).length > 20;
 
     const planMatch = normalizedText.match(/\b(60|120|180|240|300|360|420|480|540|600)\b/);
-    if (planMatch && !isPriceQuestion) {
+    if (planMatch && !hasQuestion && !isVeryLongMessage) {
         selectedPlanId = planMatch[1];
     }
 
@@ -194,19 +198,14 @@ async function handleWaitingPlanChoice(
         } else {
             console.log(`[AI-FALLBACK] waiting_plan_choice: No plan number detected for ${userId}`);
 
-            const upsellOptions = [
-                'Acordate que el servicio de pago a domicilio tiene un valor de $6.000, pero ¡con el plan de 120 días te regalamos ese servicio y te queda a precio final! ¿Querés aprovechar este beneficio o seguimos con el de 60?',
-                'Te aviso por las dudas: el servicio de cobrarte en la puerta de tu casa sale $6.000. Pero si llevás el plan de 120 días ese servicio está 100% bonificado. ¿Qué decís? ¿Vamos con el de 60 igual o aprovechás el de 120?',
-                'Ojo que el de 60 lleva el costo de $6.000 por el servicio logístico de cobro en domicilio. ¡En cambio el de 120 te regala ese servicio! ¿Seguro querés el de 60 o pasamos al de 120 y ahorrás esa plata?'
-            ];
-            const selectedUpsell = upsellOptions[Math.floor(Math.random() * upsellOptions.length)];
-
             const planAI = await aiService.chat(text, {
                 step: 'waiting_plan_choice',
-                goal: `El usuario debe elegir Plan 60 o Plan 120 días. CRÍTICO (REGLAS DE ORO): 1) MÁXIMO 30 PALABRAS. 2) goalMet=true SOLO si elige "60" o "120". 3) Si pregunta algo distinto (ej: "cómo se paga", "cuánto llega", "cuántas traen", "diferencia"), goalMet=false. Respondé su duda breve y amablemente y recordale: "¿Avanzamos con 60 o 120 días?". ESTRATEGIA INICIAL: El pago a domicilio cuesta $6.000, pero el plan de 120 LO REGALA. Decile: "${selectedUpsell}". 
-                🔴 REGLA PREGUNTAS ENVÍO/PAGO/CANTIDAD: Si pregunta por envío, pago, CUALQUIER DUDA O "cuántas traen", responde la duda y establece goalMet=false. Y reitera la pregunta de los planes.
-                🔴 REGLA EXCUSAS O RETRASOS: Si el cliente dice "lo consulto", "escribo a la tarde", "te aviso: DECÍ EXACTAMENTE: "Ok, no pasa nada, ¡después hablamos! 😊", y establecé goalMet=false. NUNCA REPITAS LOS PRECIOS.
-                🔴 REGLA PRODUCTOS ALTERNOS: Si menciona gotas/semillas (ej: "o gotas"), NO asumas que cambia. Mostrá precios (knowledge) y preguntá: "¿Avanzamos con ese?". NO uses CHANGE_PRODUCT. goalMet=false hasta que elija.`,
+                goal: `El usuario debe elegir un plan (60 o 120 días).
+RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.
+1) SI EL USUARIO HACE PREGUNTAS (ej: "cómo se toma", "tiene contraindicaciones", sobre su salud, o pide info de otro producto): TÓMATE TODO EL ESPACIO NECESARIO. Respóndele con párrafos muy detallados, extensos y con muchísima empatía. Explayate sobre los efectos del producto, dietas o garantías si lo piden. Y después preguntá sutilmente con cuál plan avanzar. goalMet=false.
+2) CAMBIO DE PRODUCTO: Si el usuario dice "quiero semillas" o "gotas", confirmá el cambio usando extractedData="CHANGE_PRODUCT: [Producto]" (SIN preguntarle de nuevo) y dale los precios de ese nuevo producto para que elija el plan. goalMet=false.
+3) Si el usuario confirma un plan (60/120) en su mensaje y también pregunta algo: respondé su pregunta explayándote todo lo necesario, extrae el número en extractedData y establece goalMet=true.
+4) Si pone excusas ("después te aviso", "no tengo ahora"): decile con mucha calidez "Dale, tranqui, avisame y te mantengo el precio congelado, ¿te lo dejo anotado para alguna fecha futura?", goalMet=false.`,
                 history: currentState.history,
                 summary: currentState.summary,
                 knowledge: knowledge,

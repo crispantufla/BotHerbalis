@@ -6,7 +6,7 @@ const chatRoutes = require('../routes/chat.routes');
 // Mock sheets_sync to avoid ESM issues with google-spreadsheet
 jest.mock('../../../sheets_sync', () => ({
     appendOrderToSheet: jest.fn().mockResolvedValue(true)
-}));
+}), { virtual: true });
 
 // Mock Auth Middleware to bypass key check for tests
 jest.mock('../../middleware/auth', () => ({

@@ -25,7 +25,7 @@ export async function handleWaitingOk(
         console.log(`[AI-FALLBACK] waiting_ok: Detected QUESTION from ${userId}`);
         const aiOk = await aiService.chat(text, {
             step: FlowStep.WAITING_OK,
-            goal: 'El usuario tiene una duda sobre el envío. Respondé brevemente y volvé a preguntar: ¿Te resulta posible retirar en sucursal si fuera necesario? SÍ o NO.',
+            goal: 'El usuario tiene una duda sobre el envío. Respondé de manera detallada, humana y empática, resolviendo sus ansiedades sobre el envío de forma cálida y extensa. Tómate tu tiempo en conversar antes de preguntar: ¿Te resulta posible retirar en sucursal si fuera necesario? SÍ o NO.',
             history: currentState.history,
             summary: currentState.summary,
             knowledge: knowledge,
@@ -52,7 +52,7 @@ export async function handleWaitingOk(
         console.log(`[AI-FALLBACK] waiting_ok: No match for ${userId}`);
         const aiOk = await aiService.chat(text, {
             step: FlowStep.WAITING_OK,
-            goal: 'El usuario debe confirmar que puede retirar en sucursal si es necesario. Respondé brevemente cualquier duda y volvé a preguntar SÍ o NO.',
+            goal: 'El usuario debe confirmar que puede retirar en sucursal si es necesario. Respondé de manera muy amable, calmando cualquier duda de forma detallada y preguntándole de vuelta con mucha calidez: SÍ o NO.',
             history: currentState.history,
             summary: currentState.summary,
             knowledge: knowledge,

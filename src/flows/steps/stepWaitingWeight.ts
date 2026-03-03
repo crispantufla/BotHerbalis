@@ -13,6 +13,10 @@ export async function handleWaitingWeight(
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
 
     const hasNumber = /\d+/.test(text.trim());
+    const hasQuestion = /\b(como|cómo|cuando|cuándo|que|qué|donde|dónde|por que|por qué|cual|cuál|duda|consulta|precio|costo|sale|cuesta|valor|paga|cobr|tarjeta|efectivo|transferencia|contraindicaciones|efectos|mal|dieta|rebote)\b/i.test(normalizedText) || normalizedText.includes('?');
+    // If text is super long (like a transcription), force AI to handle it so we don't look robotic
+    const isVeryLongMessage = text.split(/\s+/).length > 20;
+
     const tLow = text.toLowerCase();
     let implicitProduct = null;
 
@@ -34,7 +38,7 @@ export async function handleWaitingWeight(
 
     const isRefusal = /\b(no (quiero|voy|puedo)|prefiero no|pasame|decime|precio|que tenes|mostrame)\b/i.test(normalizedText);
 
-    if (hasNumber) {
+    if (hasNumber && !hasQuestion && !isVeryLongMessage) {
         const wMatch = text.match(/\d+/);
         if (wMatch) currentState.weightGoal = parseInt(wMatch[0], 10);
 
@@ -82,7 +86,7 @@ export async function handleWaitingWeight(
             console.log(`[AI-FALLBACK] waiting_weight: No number detected for ${userId}`);
             const aiWeight = await aiService.chat(text, {
                 step: FlowStep.WAITING_WEIGHT,
-                goal: 'Explicar brevemente el producto seleccionado y preguntar sutilmente cuánto peso buscan bajar para continuar. REGLAS DE ORO: 1) MÁXIMO 30 PALABRAS. 2) Usa conectores humanos y empáticos como "Te re entiendo", "Es normal", "Mira te cuento". 3) TERMINA SIEMPRE con la pregunta "¿Cuántos kilos te gustaría bajar aproximadamente?". 4) Si la persona pregunta "cápsulas o gotas", o pide recomendación general, decirle EXACTAMENTE: "Mirá, las cápsulas son la opción más efectiva y práctica, ideales para un tratamiento rápido. ¿Cuántos kilos querés bajar?". 5) Si pregunta por envío o medios de pago, aclará brevemente que el envío es gratis a todo el país y se abona en efectivo al recibir. Luego reiterá la pregunta de los kilos.',
+                goal: 'Explicar brevemente el producto seleccionado y preguntar sutilmente cuánto peso buscan bajar para continuar. RESPONDÉ NATURALMENTE Y COMO HUMANO. 1) Si la persona envía un mensaje largo contando una historia, un problema personal, de salud, inseguridades de peso o miedos: TÓMATE TODO TU TIEMPO, usa párrafos largos, muestra muchísima empatía conectando tu respuesta con cada una de sus palabras antes de decirle nada del producto. No te limites, sé humana, reconfortala. 2) No te limites si el usuario hace preguntas sobre dietas, rebote o cuidados, dales respuestas completísimas, tenés espacio para escribir. 3) Solo si el usuario envía un texto rápido o escueto como "hola" o un número, sé más concisa. 4) TERMINA SIEMPRE con la pregunta "¿Cuántos kilos te gustaría bajar aproximadamente?" al final de tu respuesta de validación. 5) Si preguntan "cápsulas o gotas", o piden recomendación general, decirle EXACTAMENTE: "Mirá, las cápsulas son la opción más efectiva y práctica para la mayoría. ¿Cuántos kilos querés bajar?".',
                 history: currentState.history,
                 summary: currentState.summary,
                 knowledge: knowledge,

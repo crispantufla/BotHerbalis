@@ -6,11 +6,6 @@ const mockSaveState = jest.fn();
 const mockSendMessage = jest.fn();
 const mockLogAndEmit = jest.fn();
 
-// Mock sheets_sync to avoid ESM issues
-jest.mock('../sheets_sync', () => ({
-    appendOrderToSheet: jest.fn().mockResolvedValue(true)
-}));
-
 // Mock safeWrite
 jest.mock('../safeWrite', () => ({
     atomicWriteFile: jest.fn()

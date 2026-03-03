@@ -60,10 +60,10 @@ export async function handleWaitingPreference(
             goal: `El usuario está indeciso entre productos, pide recomendaciones, O está aceptando una recomendación previa ("dale", "bueno"). REGLAS DE RECOMENDACIÓN (CRÍTICO):
             1) Si el usuario YA ESTÁ ACEPTANDO tu recomendación previa (ej: "dale", "bueno", "capsulas"), ¡tu objetivo está cumplido! Respondé con goalMet=true y extractedData="Cápsulas de nuez de la india".
             2) Si pide "lo más efectivo", "lo mejor", "lo más rápido" o "cualquiera": El objetivo está cumplido automáticamente, respondé goalMet=true y extractedData="Cápsulas de nuez de la india".
-            3) Si pregunta "cómo están compuestas", "diferencias" o "cómo están hechas", responde brevemente: "Las gotas son la extracción del aceite en clorofila (más suaves) y en las cápsulas extraemos el componente activo puro (más potentes). Solemos recomendar más las cápsulas." Y LUEGO pregunta: "¿Querés que sigamos con las cápsulas?".
-            4) Si duda o insiste entre GOTAS y CÁPSULAS: Decile EXACTAMENTE que recomendás más las cápsulas, las cuales suelen ser más efectivas, y que las gotas se recomiendan para cuando son pocos kilos o gente muy mayor. Luego preguntale con cuál prefiere avanzar.
-            5) Si pide "info de las 3", "precio de las 3" o "todas": brindá un resumen BREVE con los precios base de 60 días para Cápsulas, Gotas y Semillas (extraídos del knowledge) y preguntá cuál prefiere probar.
-            6) Si pregunta por envío o medios de pago, aclará brevemente que el envío es gratis a todo el país y se abona en efectivo al recibir. Luego preguntale con cuál producto prefiere avanzar.
+            3) EMOCIÓN Y SALUD: Si cuenta su historia de peso, problemas médicos (tiroides, operaciones) o inseguridades, REDACTA UN PÁRRAFO EXTENSO Y PROFUNDAMENTE EMPÁTICO validando sus sentimientos ANTES de recomendar nada.
+            4) Si duda o insiste entre GOTAS y CÁPSULAS: Decile con mucha calidez y detalle que recomendás más las cápsulas (suelen ser más efectivas), pero que las gotas se recomiendan para cuando son pocos kilos o gente adulta mayor. Luego preguntale con cuál prefiere avanzar.
+            5) Si pide "info de las 3", "precio de las 3" o "todas": brindá un resumen explicativo detallado con los precios base de 60 días para Cápsulas, Gotas y Semillas (extraídos del knowledge) y luego preguntá cuál prefiere probar.
+            6) Si pregunta por envío o medios de pago, aclara con amabilidad que el envío es gratis y se abona en efectivo al recibir. Luego preguntale con cuál producto prefiere avanzar.
             SOLO marcá goalMet=true si el cliente ya eligió o si explícitamente pidió "lo mejor/más rápido" (asumiendo cápsulas).`,
             history: currentState.history,
             summary: currentState.summary,
@@ -138,7 +138,16 @@ export async function handleWaitingPreference(
         console.log(`[AI-FALLBACK] waiting_preference: No keyword match for ${userId}`);
         const aiPref = await aiService.chat(text, {
             step: FlowStep.WAITING_PREFERENCE,
-            goal: 'Determinar si quiere cápsulas/gotas (opción práctica), semillas (opción natural) o AMBAS. REGLAS CRÍTICAS DE HUMANIZACIÓN: 1) MÁXIMO 35 PALABRAS. 2) Usa muletillas simpáticas al arrancar ("Dale perfecto", "Entiendo bárbaro", "Tranqui te explico"). 3) Si duda o pregunta entre GOTAS y CÁPSULAS: Decile EXACTAMENTE que recomendás más las cápsulas, las cuales suelen ser más efectivas, y que las gotas se recomiendan para cuando son pocos kilos o gente muy mayor ya que son más suaves. Luego preguntale con cuál prefiere avanzar. 4) Si habla en PASADO ("yo tomaba", "antes usé"), decile tipo "Ah mirá que bueno que ya las conoces! Entonces vayamos con las CÁPSULAS". 5) Si pide información o precios de "las 3", "todas", o "los 3", brindá un resumen BREVE de Cápsulas, Semillas y Gotas con sus precios correspondientes de 60 días (usando el knowledge) y luego preguntá cuál prefiere. 6) Si el usuario pregunta si puede recibir el pedido o pagarlo un día concreto, DALE EL OK Y CONFIRMÁ EL PRODUCTO. 7) Si pregunta por envío o medios de pago, aclará brevemente que el envío es gratis a todo el país y se abona en efectivo al recibir. Luego preguntale con cuál producto prefiere avanzar. \n\n🔴 REGLA ABSOLUTA DE CONFIRMACIÓN: Si el usuario ya aceptó tu sugerencia o eligió explícita O implícitamente (ej: "dale", "si", "bueno"), NO DEBES GENERAR RESPUESTA. Debes marcar goalMet=true y extractedData="PRODUCTO: Cápsulas de nuez de la india" inmediatamente.',
+            goal: `Determinar si quiere cápsulas/gotas (opción práctica), semillas (opción natural) o AMBAS. REGLAS CRÍTICAS DE HUMANIZACIÓN: 
+1) EMOCIÓN Y SALUD: Si hace un descargo sobre su peso, operaciones o inseguridades médicas, REDACTÁ MÚLTIPLES PÁRRAFOS demostrando altísima empatía y contención. Usa un tono explayado y compasivo antes de darle la recomendación del producto. NO SEAS ROBÓTICA NI BREVE ante temas sensibles.
+2) Usa muletillas simpáticas al conversar ("Dale perfecto", "Entiendo bárbaro", "Tranqui te explico super detallado"). 
+3) Si duda o pregunta entre GOTAS y CÁPSULAS: Explicá con detenimiento que recomendás más las cápsulas, las cuales suelen ser más potentes, y que las gotas son para cuando son poquitos kilos o gente mayor por ser suaves. Luego preguntale con cuál prefiere avanzar. 
+4) Si habla en PASADO ("yo tomaba", "antes usé"), decile tipo "Ah mirá que bueno que ya las conoces y pudiste sacarles provecho! Entonces vayamos con las CÁPSULAS directamente". 
+5) Si pide información o precios de "las 3", "todas", o "los 3", brindá una explicación extensa y amable de Cápsulas, Semillas y Gotas con sus precios correspondientes de 60 días (usando el knowledge) y luego preguntá cuál prefiere. 
+6) Si el usuario pregunta si puede recibir el pedido o pagarlo un día concreto, DALE EL OK Y CONFIRMÁ EL PRODUCTO. 
+7) Si pregunta por envío o medios de pago, aclará de forma cálida que el envío es gratis a todo el país y se abona en dinero físico al recibir. Luego preguntale con cuál producto prefiere avanzar. 
+
+🔴 REGLA ABSOLUTA DE CONFIRMACIÓN: Si el usuario ya aceptó tu sugerencia o eligió explícita O implícitamente (ej: "dale", "si", "bueno"), NO DEBES GENERAR RESPUESTA. Debes marcar goalMet=true y extractedData="PRODUCTO: Cápsulas de nuez de la india" inmediatamente.`,
             history: currentState.history,
             summary: currentState.summary,
             knowledge: knowledge,

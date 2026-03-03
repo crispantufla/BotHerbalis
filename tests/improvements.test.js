@@ -43,7 +43,7 @@ jest.mock('../src/services/addressValidator', () => ({
 }));
 // safeWrite.js is in root dir
 jest.mock('../safeWrite.js', () => ({ atomicWriteFile: jest.fn() }));
-jest.mock('../sheets_sync.js', () => ({ appendOrderToSheet: jest.fn().mockResolvedValue(true) }));
+jest.mock('../sheets_sync.js', () => ({ appendOrderToSheet: jest.fn().mockResolvedValue(true) }), { virtual: true });
 
 jest.mock('../db', () => ({
     prisma: {
