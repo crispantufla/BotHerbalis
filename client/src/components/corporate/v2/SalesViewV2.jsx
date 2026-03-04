@@ -2,16 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import api from '../../../config/axios';
 import { useToast } from '../../ui/Toast';
+import { useOrders } from '../../../hooks/useOrders';
 
 import { RefreshCw as Refresh, Download, Search, Filter, MessageCircle as Chat, Edit2 as Edit, Trash2 as Trash, FileText as Script, Save, X as XIcon } from 'lucide-react';
 
 const SalesViewV2 = ({ onGoToChat }) => {
     const { toast, confirm } = useToast();
-    const [orders, setOrders] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
-    const [totalOrders, setTotalOrders] = useState(0);
+
+    // Custom Hook Data
+    const { orders, pagination, isLoading, isFetching, updateDetails, updateStatus, deleteOrder, refetch } = useOrders(page, 50);
 
     // Advanced Filters V2
     const [searchTerm, setSearchTerm] = useState('');
@@ -57,14 +57,10 @@ const SalesViewV2 = ({ onGoToChat }) => {
         if (!viewingOrder) return;
         setSavingDetails(true);
         try {
-            const res = await api.put(`/api/orders/${viewingOrder.id}`, detailEditData);
-            if (res.data.success) {
-                const updated = res.data.order;
-                setViewingOrder(updated);
-                setOrders(prev => prev.map(o => o.id === updated.id ? updated : o));
-                setIsDetailEditing(false);
-                toast.success('Orden actualizada');
-            }
+            await updateDetails({ id: viewingOrder.id, data: detailEditData });
+            setViewingOrder((prev) => ({ ...prev, ...detailEditData }));
+            setIsDetailEditing(false);
+            toast.success('Orden actualizada');
         } catch (err) {
             toast.error('Error al guardar: ' + err.message);
         } finally {
@@ -75,27 +71,6 @@ const SalesViewV2 = ({ onGoToChat }) => {
     const handleDetailField = (field, value) => {
         setDetailEditData(prev => ({ ...prev, [field]: value }));
     };
-
-    const fetchOrders = async (pageNum = page) => {
-        setLoading(true);
-        try {
-            const res = await api.get(`/api/orders?page=${pageNum}&limit=50`);
-            if (res.data.data) {
-                setOrders(res.data.data);
-                setTotalPages(res.data.pagination.totalPages);
-                setTotalOrders(res.data.pagination.total);
-                setPage(res.data.pagination.page);
-            } else {
-                setOrders(res.data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
-            }
-        } catch (e) {
-            toast.error("Error cargando pedidos");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => { fetchOrders(); }, []);
 
     // Tracking Request
     const handleTrackOrder = async (trackingCode) => {
@@ -140,8 +115,7 @@ const SalesViewV2 = ({ onGoToChat }) => {
         if (!editingOrder) return;
         setSavingOrder(true);
         try {
-            await api.post(`/api/orders/${editingOrder.id}/status`, { status: editStatus, tracking: editTracking });
-            setOrders(prev => prev.map(o => o.id === editingOrder.id ? { ...o, status: editStatus, tracking: editTracking } : o));
+            await updateStatus({ id: editingOrder.id, status: editStatus, tracking: editTracking });
             toast.success("Pedido actualizado");
             setEditingOrder(null);
         } catch (e) { toast.error('Error al guardar'); }
@@ -153,8 +127,7 @@ const SalesViewV2 = ({ onGoToChat }) => {
         const ok = await confirm(`¿Eliminar definitivamente el pedido de ${editingOrder.nombre}?`);
         if (!ok) return;
         try {
-            await api.delete(`/api/orders/${editingOrder.id}`);
-            setOrders(prev => prev.filter(o => o.id !== editingOrder.id));
+            await deleteOrder(editingOrder.id);
             setEditingOrder(null);
             toast.success('Pedido eliminado');
         } catch (e) { toast.error('Error eliminando pedido'); }
@@ -291,8 +264,8 @@ Teléfono: ${phoneDisplay}`;
                     </div>
 
                     <div className="flex gap-4">
-                        <button onClick={() => fetchOrders(page)} className="p-3 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 transition-all shadow-sm active:scale-95 group">
-                            <span className="group-hover:rotate-180 transition-transform duration-500 block"><Refresh className="w-5 h-5" /></span>
+                        <button onClick={() => refetch()} className="p-3 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 transition-all shadow-sm active:scale-95 group">
+                            <span className={`group-hover:rotate-180 transition-transform duration-500 block ${isFetching ? 'animate-spin text-indigo-500' : ''}`}><Refresh className="w-5 h-5" /></span>
                         </button>
                         <button onClick={handleExportCSV} disabled={orders.length === 0} className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-105 transition-all flex items-center gap-2 disabled:opacity-50 disabled:scale-100">
                             <Download className="w-5 h-5" />
@@ -349,13 +322,17 @@ Teléfono: ${phoneDisplay}`;
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200/50">
-                            {loading ? (
-                                <tr><td colSpan="5" className="text-center py-20">
-                                    <div className="flex flex-col items-center justify-center gap-4 text-indigo-500">
-                                        <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin shadow-lg"></div>
-                                        <span className="font-bold tracking-widest text-xs uppercase text-slate-400">Sincronizando Base de Datos</span>
-                                    </div>
-                                </td></tr>
+                            {isLoading ? (
+                                Array.from({ length: 5 }).map((_, i) => (
+                                    <tr key={`skel-${i}`} className="animate-pulse">
+                                        <td className="px-4 py-5 hidden md:table-cell"><div className="h-4 bg-slate-200 dark:bg-slate-700/50 rounded w-16"></div></td>
+                                        <td className="px-4 py-5"><div className="flex gap-3 items-center"><div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700/50"></div><div className="h-4 bg-slate-200 dark:bg-slate-700/50 rounded w-24"></div></div></td>
+                                        <td className="px-4 py-5 text-center"><div className="h-4 bg-slate-200 dark:bg-slate-700/50 rounded w-20"></div></td>
+                                        <td className="px-4 py-5 text-center"><div className="h-4 bg-slate-200 dark:bg-slate-700/50 rounded w-16 mx-auto"></div></td>
+                                        <td className="px-4 py-5 text-center"><div className="h-6 bg-slate-200 dark:bg-slate-700/50 rounded-full w-20 mx-auto"></div></td>
+                                        <td className="px-4 py-5"><div className="flex gap-2 justify-end"><div className="w-10 h-10 rounded-xl bg-slate-200 dark:bg-slate-700/50"></div></div></td>
+                                    </tr>
+                                ))
                             ) : filteredOrders.length === 0 ? (
                                 <tr><td colSpan="5" className="text-center py-20">
                                     <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-dashed border-slate-300">
@@ -432,11 +409,10 @@ Teléfono: ${phoneDisplay}`;
 
                     {/* Mobile Cards View (sm and below) */}
                     <div className="md:hidden flex flex-col gap-4 p-4">
-                        {loading ? (
-                            <div className="flex flex-col items-center justify-center gap-4 text-indigo-500 py-10">
-                                <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin shadow-lg"></div>
-                                <span className="font-bold tracking-widest text-xs uppercase text-slate-400">Sincronizando Base de Datos</span>
-                            </div>
+                        {isLoading ? (
+                            Array.from({ length: 3 }).map((_, i) => (
+                                <div key={`skel-m-${i}`} className="p-5 rounded-[1.5rem] bg-slate-100/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 animate-pulse h-32"></div>
+                            ))
                         ) : filteredOrders.length === 0 ? (
                             <div className="text-center py-10">
                                 <div className="w-16 h-16 bg-white/6 dark:bg-slate-800/60 rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm border border-white">
@@ -502,25 +478,25 @@ Teléfono: ${phoneDisplay}`;
                 {/* V2 Pagination Controls */}
                 <div className="px-8 py-5 border-t border-white/6 dark:border-slate-700/60 flex flex-col sm:flex-row justify-between items-center bg-white/3 dark:bg-slate-800/30 backdrop-blur-md gap-4">
                     <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-                        Página <span className="text-indigo-600">{page}</span> de {totalPages}
+                        Página <span className="text-indigo-600">{page}</span> de {pagination.totalPages}
                     </span>
                     <div className="flex gap-2">
                         <button
-                            disabled={page <= 1}
-                            onClick={() => fetchOrders(page - 1)}
+                            disabled={page <= 1 || isFetching}
+                            onClick={() => setPage(p => Math.max(1, p - 1))}
                             className="px-4 py-2 bg-white/8 dark:bg-slate-800/80 rounded-xl border border-white shadow-sm text-xs font-extrabold text-slate-600 disabled:opacity-50 hover:bg-white hover:text-indigo-600 transition-all active:-translate-y-0.5"
                         >
                             Anterior
                         </button>
                         <button
-                            disabled={page >= totalPages}
-                            onClick={() => fetchOrders(page + 1)}
+                            disabled={page >= pagination.totalPages || isFetching}
+                            onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
                             className="px-4 py-2 bg-white/8 dark:bg-slate-800/80 rounded-xl border border-white shadow-sm text-xs font-extrabold text-slate-600 disabled:opacity-50 hover:bg-white hover:text-indigo-600 transition-all active:-translate-y-0.5"
                         >
                             Siguiente
                         </button>
                     </div>
-                    <span className="text-xs font-bold text-indigo-500 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">{totalOrders} Totales en BD</span>
+                    <span className="text-xs font-bold text-indigo-500 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">{pagination.total} Totales en BD</span>
                 </div>
             </div>
 

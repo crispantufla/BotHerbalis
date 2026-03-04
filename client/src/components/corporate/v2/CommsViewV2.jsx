@@ -1,20 +1,17 @@
-import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../../../config/axios';
-import { useSocket } from '../../../context/SocketContext';
-import { API_URL } from '../../../config/api';
 import { useToast } from '../../ui/Toast';
+import { useChat } from '../../../hooks/useChat';
+import ChatMessageList from './components/ChatMessageList';
+import ChatInputArea from './components/ChatInputArea';
 
 import { Search, Bot, Play, Pause, Trash2 as Trash, FileText as ScriptIcon, ChevronDown, Send, Paperclip, ShoppingCart, ArrowLeft, Type } from 'lucide-react';
 
 const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
-    const { socket } = useSocket();
     const { toast } = useToast();
-    const [chats, setChats] = useState([]);
     const [selectedChat, setSelectedChat] = useState(null);
-    const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
-    const [loading, setLoading] = useState(false);
     const [showScriptPanel, setShowScriptPanel] = useState(false);
     const [showOrdersPanel, setShowOrdersPanel] = useState(false);
     const [scriptFlow, setScriptFlow] = useState({});
@@ -25,13 +22,24 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
     const [isTracking, setIsTracking] = useState(false);
     const [trackingData, setTrackingData] = useState(null);
     const [prices, setPrices] = useState(null);
-    const [globalPause, setGlobalPause] = useState(false);
-    const messagesEndRef = useRef(null);
-    const scrollContainerRef = useRef(null);
-    const fileInputRef = useRef(null);
-    const [instanceId, setInstanceId] = useState(null);
+
     const [chatFontSize, setChatFontSize] = useState(() => parseInt(localStorage.getItem('herbalis_chat_font_size') || '14', 10));
     const [showFontSlider, setShowFontSlider] = useState(false);
+
+    const {
+        chats,
+        messages,
+        setMessages,
+        isLoadingChats,
+        isLoadingMessages,
+        globalPause,
+        instanceId,
+        sendMessage,
+        sendMedia,
+        deleteMessage,
+        toggleBot,
+        clearChat
+    } = useChat(selectedChat?.id);
 
     useEffect(() => {
         localStorage.setItem('herbalis_chat_font_size', chatFontSize);
@@ -54,117 +62,6 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
             if (onChatSelected) onChatSelected();
         }
     }, [initialChatId, chats, onChatSelected]);
-
-    useEffect(() => {
-        const fetchMetadata = async () => {
-            try {
-                const statusRes = await api.get('/api/status');
-                const id = statusRes.data?.instanceId || 'default';
-                setInstanceId(id);
-
-                const chatsRes = await api.get(`/api/chats?instanceId=${id}`);
-                const chatsWithTime = chatsRes.data.map(c => ({
-                    ...c,
-                    time: c.lastMessage?.timestamp ? new Date(c.lastMessage.timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' }) : ''
-                }));
-                setChats(chatsWithTime);
-
-                const statsRes = await api.get('/api/stats');
-                setGlobalPause(!!statsRes.data.globalPause);
-            } catch (e) {
-                console.error('Error fetching initial comms data', e);
-                setChats([]);
-            }
-        };
-        fetchMetadata();
-    }, []);
-
-    // Use a ref to always have the latest selectedChat without re-binding sockets
-    const selectedChatRef = useRef(selectedChat);
-    useEffect(() => {
-        selectedChatRef.current = selectedChat;
-    }, [selectedChat]);
-
-    useEffect(() => {
-        if (socket) {
-            const handleNewLog = (data) => {
-                try {
-                    if (!data || !data.chatId) return;
-                    let timestamp = data.timestamp ? new Date(data.timestamp).getTime() : Date.now();
-                    const currentSelectedId = selectedChatRef.current?.id;
-
-                    if (currentSelectedId === data.chatId) {
-                        const isMe = data.sender === 'bot' || data.sender === 'admin';
-                        const newMsg = { id: data.messageId || `socket-${timestamp}`, fromMe: isMe, body: data.text || '', type: 'chat', timestamp };
-                        setMessages((prev) => {
-                            if (!Array.isArray(prev)) return [newMsg];
-                            if (isMe) {
-                                const pendingIndex = prev.findIndex(m => m.pending && m.body === newMsg.body && Math.abs(m.timestamp - timestamp) < 10000);
-                                if (pendingIndex !== -1) {
-                                    const updated = [...prev];
-                                    updated[pendingIndex] = newMsg;
-                                    return updated;
-                                }
-                            }
-                            const exists = prev.some(m => (m.id && m.id === newMsg.id) || (m.timestamp === timestamp && m.body === newMsg.body));
-                            if (exists) return prev;
-                            return [...prev, newMsg];
-                        });
-                    }
-
-                    setChats((prev) => {
-                        if (!Array.isArray(prev)) return [];
-                        const currentSelectedId = selectedChatRef.current?.id;
-                        const incomingPhone = data.chatId.replace(/\D/g, '');
-                        const existingChat = prev.find(c => c.id === data.chatId || (incomingPhone && c.id.replace(/\D/g, '').endsWith(incomingPhone.slice(-10))));
-
-                        if (existingChat) {
-                            return prev.map((c) => c.id === existingChat.id ? {
-                                ...c,
-                                lastMessage: { body: data.text || '', timestamp },
-                                unreadCount: currentSelectedId === existingChat.id ? 0 : (c.unreadCount || 0) + 1,
-                                time: new Date(timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' }),
-                                assignedScript: data.assignedScript || c.assignedScript
-                            } : c);
-                        }
-                        // Add new chat to the list if it doesn't exist
-                        return [{
-                            id: data.chatId,
-                            name: data.chatId,
-                            unreadCount: currentSelectedId === data.chatId ? 0 : 1,
-                            lastMessage: { body: data.text || '', timestamp },
-                            time: new Date(timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' }),
-                            assignedScript: data.assignedScript
-                        }, ...prev];
-                    });
-                } catch (err) { }
-            };
-
-            socket.on('new_log', handleNewLog);
-
-            const handleBotStatusChange = (data) => {
-                if (!data) return;
-                setChats(prev => Array.isArray(prev) ? prev.map(c => c.id === data.chatId ? { ...c, isPaused: data.paused } : c) : []);
-                if (selectedChatRef.current?.id === data.chatId) {
-                    setSelectedChat(prev => ({ ...prev, isPaused: data.paused }));
-                }
-            };
-            socket.on('bot_status_change', handleBotStatusChange);
-
-            const handleGlobalPause = (data) => {
-                if (data && typeof data.globalPause !== 'undefined') {
-                    setGlobalPause(data.globalPause);
-                }
-            };
-            socket.on('global_pause_changed', handleGlobalPause);
-
-            return () => {
-                socket.off('new_log', handleNewLog);
-                socket.off('bot_status_change', handleBotStatusChange);
-                socket.off('global_pause_changed', handleGlobalPause);
-            };
-        }
-    }, [socket]);
 
     const [availableScripts, setAvailableScripts] = useState({ v3: {}, v4: {} });
 
@@ -202,26 +99,8 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
 
     useEffect(() => {
         if (!selectedChat) return;
-        setMessages([]);
         setSummaryText(null);
-        const fetchMessages = async () => {
-            setLoading(true);
-            try {
-                const res = await api.get(`/api/history/${selectedChat.id}`);
-                setMessages(res.data);
-            } catch (e) { setMessages([]); }
-            setLoading(false);
-        };
-        fetchMessages();
     }, [selectedChat?.id]);
-
-    const scrollToBottom = () => {
-        if (scrollContainerRef.current) {
-            scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
-        }
-    };
-
-    useLayoutEffect(scrollToBottom, [messages]);
 
     const formatScriptMessage = (text, chat = null) => {
         if (!text) return text;
@@ -251,6 +130,16 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
                 .replace(/{{TOTAL}}/g, total ? `$${total}` : '$0');
         }
         return result;
+    };
+
+    const handleSummarize = async () => {
+        if (!selectedChat) return;
+        setSummarizing(true);
+        try {
+            const res = await api.get(`/api/summarize/${selectedChat.id}`);
+            setSummaryText(res.data.summary || res.data.message);
+        } catch (e) { toast.error('Error generando resumen'); }
+        setSummarizing(false);
     };
 
     const handleDownloadHistory = () => {
@@ -300,7 +189,7 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
     };
 
     const handleSend = async (e) => {
-        e.preventDefault();
+        if (e) e.preventDefault();
         if (!input.trim() || !selectedChat) return;
         const text = input;
 
@@ -312,7 +201,7 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
 
         setInput('');
         setMessages(prev => [...prev, { id: `temp-${Date.now()}`, fromMe: true, body: text, type: 'chat', timestamp: Date.now(), pending: true }]);
-        try { await api.post('/api/send', { chatId: selectedChat.id, message: text }); }
+        try { await sendMessage({ chatId: selectedChat.id, message: text }); }
         catch (e) { toast.error('Error al enviar mensaje'); }
     };
 
@@ -340,9 +229,7 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
         if (!window.confirm('¿Eliminar este mensaje para todos?')) return;
         try {
             setMessages(prev => prev.filter(m => m.id !== msgId));
-            await api.delete('/api/messages', {
-                data: { chatId: selectedChat.id, messageId: msgId }
-            });
+            await deleteMessage({ chatId: selectedChat.id, messageId: msgId });
             toast.success('Mensaje eliminado');
         } catch (e) {
             toast.error('Error eliminando mensaje');
@@ -352,7 +239,7 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
     const handleToggleBot = async () => {
         const newStatus = !selectedChat.isPaused;
         try {
-            await api.post('/api/toggle-bot', { chatId: selectedChat.id, paused: newStatus });
+            await toggleBot({ chatId: selectedChat.id, paused: newStatus });
             setSelectedChat(prev => ({ ...prev, isPaused: newStatus }));
             toast.success(newStatus ? 'Bot pausado' : 'Bot reactivado');
         } catch (e) { toast.error('Error cambiando estado del bot'); }
@@ -361,23 +248,14 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
     const handleClearChat = async () => {
         if (window.confirm("¿Reiniciar historial de este usuario?")) {
             try {
-                await api.post('/api/reset-chat', { chatId: selectedChat.id });
+                await clearChat(selectedChat.id);
                 setMessages([]);
                 toast.success('Chat reiniciado');
             } catch (e) {
                 console.error("Error al reiniciar chat:", e);
-                toast.error('Error: ' + (e.response?.data?.error || e.message));
+                toast.error('Error: ' + (e.message));
             }
         }
-    };
-
-    const handleSummarize = async () => {
-        setSummarizing(true);
-        try {
-            const res = await api.get(`/api/summarize/${selectedChat.id}`);
-            setSummaryText(res.data.summary || res.data.message);
-        } catch (e) { toast.error('Error generating resumen'); }
-        setSummarizing(false);
     };
 
     const handleTrackOrder = async (trackingCode) => {
@@ -392,19 +270,6 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
         } finally {
             setIsTracking(false);
         }
-    };
-
-    const handleFileSelect = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        if (!file.type.startsWith('image/')) return toast.warning('Solo imágenes');
-        const reader = new FileReader();
-        reader.onload = () => {
-            const base64Full = reader.result;
-            setAttachment({ file, preview: base64Full, base64: base64Full.split(',')[1], mimetype: file.type });
-        };
-        reader.readAsDataURL(file);
-        e.target.value = '';
     };
 
     const handleCopySale = (order) => {
@@ -427,7 +292,7 @@ Teléfono: ${phoneDisplay}`;
     const handleSendMedia = async () => {
         setSendingMedia(true);
         try {
-            await api.post('/api/send-media', {
+            await sendMedia({
                 chatId: selectedChat.id, base64: attachment.base64, mimetype: attachment.mimetype, filename: attachment.file.name, caption: input.trim()
             });
             setMessages(prev => [...prev, { id: `temp-media-${Date.now()}`, fromMe: true, body: `📷 Imagen enviada: ${input.trim()}`, type: 'chat', timestamp: Date.now(), pending: true }]);
@@ -435,50 +300,6 @@ Teléfono: ${phoneDisplay}`;
             setInput('');
         } catch (e) { toast.error('Error al enviar imagen'); }
         setSendingMedia(false);
-    };
-
-    const renderMessageBody = (msg) => {
-        if (msg.body && msg.body.startsWith('MEDIA_IMAGE:')) {
-            const url = msg.body.split('|')[0].replace('MEDIA_IMAGE:', '');
-            return <img src={`${API_URL}${url}`} alt="Media" className="rounded-2xl max-w-full h-auto max-h-64 object-cover border border-white/2 dark:border-slate-700/20 shadow-sm" />;
-        }
-        if (msg.body && (msg.body.startsWith('MEDIA_AUDIO:') || msg.body.startsWith('🎤'))) {
-            let audioUrl = '';
-            let transcription = msg.body.includes('TRANSCRIPTION:') ? msg.body.split('TRANSCRIPTION:')[1].trim() : msg.body.replace(/^🎤\s*Audio:\s*/, '').replace(/^"|"$/g, '').trim();
-
-            if (msg.body.startsWith('MEDIA_AUDIO:')) {
-                audioUrl = msg.body.split('|')[0].replace('MEDIA_AUDIO:', '').trim();
-            }
-
-            return (
-                <div className="space-y-3 min-w-[200px] sm:min-w-[250px]">
-                    {audioUrl && audioUrl !== 'PENDING' ? (
-                        <div className="bg-black/5 dark:bg-white/5 rounded-2xl p-2 border border-white/10 dark:border-slate-700/30">
-                            <audio
-                                controls
-                                preload="metadata"
-                                className="w-full h-10 drop-shadow-sm [&::-webkit-media-controls-panel]:bg-emerald-50 [&::-webkit-media-controls-play-button]:bg-emerald-500 [&::-webkit-media-controls-play-button]:rounded-full [&::-webkit-media-controls-current-time-display]:text-emerald-700 [&::-webkit-media-controls-time-remaining-display]:text-emerald-700 pl-1"
-                                src={`${API_URL}${audioUrl}`}
-                            >
-                                Tu navegador no soporta el elemento de audio.
-                            </audio>
-                        </div>
-                    ) : (
-                        <div className="flex items-center gap-3 bg-black/10 rounded-2xl p-3 border border-white/1 dark:border-slate-700/10">
-                            <div className="w-10 h-10 rounded-full bg-slate-400/90 text-white flex items-center justify-center shadow-lg"><Play className="w-5 h-5" /></div>
-                            <div className="flex-1 h-2 bg-black/10 rounded-full overflow-hidden text-slate-500 font-mono text-[8px] leading-none text-center">Audio PENDING...</div>
-                        </div>
-                    )}
-                    {transcription && transcription !== 'PENDING' && (
-                        <div className="bg-white/4 dark:bg-slate-800/40 p-3 rounded-xl text-xs flex items-start gap-2 text-slate-700 dark:text-slate-300 font-medium">
-                            <span className="text-emerald-600 mt-0.5">📝</span>
-                            <span className="italic leading-relaxed flex-1">"{transcription}"</span>
-                        </div>
-                    )}
-                </div>
-            );
-        }
-        return <p className="whitespace-pre-wrap font-medium">{msg.body}</p>;
     };
 
     return (
@@ -505,7 +326,16 @@ Teléfono: ${phoneDisplay}`;
 
                 {/* Contact List */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
-                    {filteredChats.map(chat => (
+                    {isLoadingChats && chats.length === 0 ? (
+                        Array.from({ length: 6 }).map((_, i) => (
+                            <div key={i} className="p-4 mb-2 rounded-2xl animate-pulse bg-slate-100 dark:bg-slate-800/50 flex gap-3 h-[72px]">
+                                <div className="flex-1 space-y-2">
+                                    <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-1/2"></div>
+                                    <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded w-3/4"></div>
+                                </div>
+                            </div>
+                        ))
+                    ) : filteredChats.map(chat => (
                         <div key={chat.id} onClick={() => setSelectedChat(chat)} className={`p-4 mb-2 rounded-2xl flex cursor-pointer transition-all duration-300 ${selectedChat?.id === chat.id ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/30 transform scale-[1.02]' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}>
                             <div className="flex-1 min-w-0">
                                 <div className="flex justify-between items-start mb-1 gap-2">
@@ -610,8 +440,20 @@ Teléfono: ${phoneDisplay}`;
                                 <button onClick={() => setShowScriptPanel(!showScriptPanel)} className="p-2.5 sm:p-3 flex-shrink-0 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500/30 hover:shadow-lg hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all active:scale-95" title="Guión">
                                     <ScriptIcon className="w-5 h-5" />
                                 </button>
+                                <button onClick={handleSummarize} disabled={summarizing} className="p-2.5 sm:p-3 flex-shrink-0 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md hover:-translate-y-0.5 transition-all disabled:opacity-50" title="Resumen Inteligente">
+                                    {summarizing ? <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin mx-0.5"></div> : <Bot className="w-5 h-5" />}
+                                </button>
                             </div>
                         </div>
+
+                        {/* Summary Modal/Banner */}
+                        {summaryText && (
+                            <div className="mx-4 sm:mx-8 mt-4 p-4 rounded-xl bg-blue-50/90 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800 text-slate-800 dark:text-blue-100/90 relative shadow-sm text-sm">
+                                <button onClick={() => setSummaryText(null)} className="absolute top-2 right-2 p-1.5 text-blue-400 hover:text-rose-500 transition-colors">✕</button>
+                                <h4 className="font-bold flex items-center gap-2 mb-2"><Bot className="w-4 h-4 text-blue-600" /> Resumen de la Conversación</h4>
+                                <div className="whitespace-pre-wrap">{summaryText}</div>
+                            </div>
+                        )}
 
                         {/* Orders Panel */}
                         {showOrdersPanel && selectedChat.hasBought && (
@@ -727,65 +569,24 @@ Teléfono: ${phoneDisplay}`;
                             </div>
                         )}
 
-                        {/* Messages Area */}
-                        <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 pt-8 pb-2 space-y-6 custom-scrollbar relative z-10">
-                            {loading ? (
-                                <div className="w-full h-full flex items-center justify-center">
-                                    <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-                                </div>
-                            ) : messages.map((msg, idx) => (
-                                <div key={idx} className={`flex ${msg.fromMe ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`max-w-[75%] p-4 leading-relaxed shadow-sm relative group ${msg.fromMe ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-3xl rounded-tr-sm shadow-indigo-500/20' : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-3xl rounded-tl-sm border border-slate-100 dark:border-slate-700'}`} style={{ fontSize: `${chatFontSize}px` }}>
-                                        {renderMessageBody(msg)}
-                                        <span className={`text-[10px] block text-right mt-2 font-mono font-bold ${msg.fromMe ? 'text-indigo-200' : 'text-slate-400'}`}>
-                                            {new Date(msg.timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' })}
-                                        </span>
-
-                                        {/* Delete Button (Only for own messages) */}
-                                        {msg.fromMe && (
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); handleDeleteMessage(msg.id); }}
-                                                className="absolute -left-9 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all"
-                                                title="Eliminar mensaje para todos"
-                                            >
-                                                <Trash className="w-5 h-5" />
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                            <div ref={messagesEndRef} />
-                        </div>
+                        {/* Messages Area (Virtualized) */}
+                        <ChatMessageList
+                            messages={messages}
+                            isLoading={isLoadingMessages}
+                            chatFontSize={chatFontSize}
+                            handleDeleteMessage={handleDeleteMessage}
+                        />
 
                         {/* Input Area */}
-                        <div className="flex-shrink-0 p-3 sm:px-6 sm:py-4 pb-[max(1rem,env(safe-area-inset-bottom))] lg:pb-4 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-800 z-20">
-                            {attachment && (
-                                <div className="mb-2 p-3 sm:p-4 bg-white/8 dark:bg-slate-800/80 rounded-2xl border border-indigo-100 shadow-sm flex items-center gap-4">
-                                    <img src={attachment.preview} alt="Preview" className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-xl" />
-                                    <div className="flex-1 min-w-0">
-                                        <p className="font-bold text-slate-800 text-sm truncate">{attachment.file.name}</p>
-                                        <p className="text-xs text-slate-500">{(attachment.file.size / 1024).toFixed(0)} KB</p>
-                                    </div>
-                                    <button type="button" onClick={() => setAttachment(null)} className="p-2 sm:p-2 bg-slate-100 hover:bg-rose-100 hover:text-rose-600 rounded-xl transition-colors shrink-0">✕</button>
-                                </div>
-                            )}
-                            <form onSubmit={attachment ? (e) => { e.preventDefault(); handleSendMedia(); } : handleSend} className="flex gap-1.5 sm:gap-4 items-center w-full">
-                                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
-                                <button type="button" onClick={() => fileInputRef.current?.click()} className="w-11 h-11 sm:w-14 sm:h-14 flex items-center justify-center shrink-0 rounded-xl sm:rounded-2xl bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 transition-all shadow-sm">
-                                    <Paperclip className="w-6 h-6" />
-                                </button>
-                                <input
-                                    type="text"
-                                    value={input}
-                                    onChange={(e) => setInput(e.target.value)}
-                                    placeholder="Mensaje..."
-                                    className="w-full min-w-0 flex-1 bg-white border border-slate-200 rounded-xl sm:rounded-2xl px-3 sm:px-6 py-2.5 sm:py-4 text-slate-800 font-medium focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all shadow-inner placeholder:text-slate-400 text-[15px] sm:text-base"
-                                />
-                                <button type="submit" disabled={(!input.trim() && !attachment) || sendingMedia} className="w-11 h-11 sm:w-14 sm:h-14 flex items-center justify-center shrink-0 rounded-xl sm:rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100">
-                                    {sendingMedia ? <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-white/5 dark:border-slate-700/50 border-t-white rounded-full animate-spin"></div> : <Send className="w-5 h-5" />}
-                                </button>
-                            </form>
-                        </div>
+                        <ChatInputArea
+                            input={input}
+                            setInput={setInput}
+                            attachment={attachment}
+                            setAttachment={setAttachment}
+                            handleSend={handleSend}
+                            handleSendMedia={handleSendMedia}
+                            sendingMedia={sendingMedia}
+                        />
                     </>
                 ) : (
                     <div className="flex-1 flex items-center justify-center p-12">
