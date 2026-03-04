@@ -1,4 +1,5 @@
 import { UserState, FlowStep } from '../types/state';
+import { pauseUser } from '../services/pauseService';
 const { processGlobals } = require('./globals');
 const { processStep } = require('./steps');
 const { _pauseAndAlert, _setStep, _extractSilentVariables } = require('./utils/flowHelpers');
@@ -55,7 +56,7 @@ export async function processSalesFlow(
             const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
             const cleanPhone = userId.split('@')[0].replace(/\D/g, '');
             const existingOrder = await prisma.order.findFirst({
-                where: { userPhone: cleanPhone, instanceId: INSTANCE_ID },
+                where: { userPhone: cleanPhone }, // cross-instance: any prior order from this phone
                 orderBy: { createdAt: 'desc' }
             });
 
@@ -146,9 +147,7 @@ export async function processSalesFlow(
 
                 if (hasPostSaleMessage) {
                     console.log(`[POST-SALE] User ${userId} has post-sale messages in local DB. Auto-pausing.`);
-                    if (dependencies.sharedState && dependencies.sharedState.pausedUsers) {
-                        dependencies.sharedState.pausedUsers.add(userId);
-                    }
+                    await pauseUser(userId, '📦 Cliente post-venta (historial en DB)', { sharedState: dependencies.sharedState, notifyAdmin: dependencies.notifyAdmin }, `El usuario tiene mensajes post-venta en el historial. No ha iniciado conversación nueva.`);
                     return { matched: true, paused: true };
                 }
 
@@ -162,19 +161,14 @@ export async function processSalesFlow(
                     if (showsPurchaseIntent) {
                         console.log(`[SMART-DETECT] User ${userId} has prior history (outgoing bot: ${outgoingMessages.length}) but shows purchase intent. Allowing sales flow.`);
                     } else {
-                        const reason = `Ya tenía ${outgoingMessages.length} mensaje(s) del bot previos en DB`;
-                        console.log(`[SMART-DETECT] User ${userId}: ${reason} and NO purchase intent. Auto-pausing.`);
-
-                        if (dependencies.sharedState && dependencies.sharedState.pausedUsers) {
-                            dependencies.sharedState.pausedUsers.add(userId);
-                            try {
-                                if (dependencies.notifyAdmin) dependencies.notifyAdmin(
-                                    '😴 Cliente con historial extenso',
-                                    userId,
-                                    `${reason}. Volvió a escribir: "${text.substring(0, 100)}"\nEl bot se silenció automáticamente.`
-                                );
-                            } catch (e) { }
-                        }
+                        const reason = `😴 Cliente con historial extenso (${outgoingMessages.length}+ mensajes)`;
+                        console.log(`[SMART-DETECT] User ${userId}: has ${outgoingMessages.length} msgs and NO purchase intent. Auto-pausing.`);
+                        await pauseUser(
+                            userId,
+                            reason,
+                            { sharedState: dependencies.sharedState, notifyAdmin: dependencies.notifyAdmin },
+                            `${outgoingMessages.length} mensajes previos. Volvió a escribir: "${text.substring(0, 100)}"`
+                        );
                         return { matched: true, paused: true };
                     }
                 } else if (outgoingMessages.length > 0) {
@@ -188,6 +182,31 @@ export async function processSalesFlow(
     saveState(userId);
 
     const currentState = userState[userId];
+
+    // --- NEW REQUIREMENT (Unconditional Post-Sale Stop) ---
+    // If the user's step is 'completed', it means they are a past customer.
+    // Pause immediately and alert admin if not already paused.
+    if (currentState.step === 'completed' || currentState.step === 'cross_bot_redirected') {
+        const isAlreadyPaused = dependencies.sharedState?.pausedUsers?.has(userId);
+
+        // Save User message in history regardless
+        if (!currentState.history) currentState.history = [];
+        currentState.history.push({ role: 'user', content: text, timestamp: Date.now() });
+        saveState(userId);
+
+        if (!isAlreadyPaused && currentState.step === 'completed') {
+            await pauseUser(
+                userId,
+                '👤 Cliente post-venta',
+                { sharedState: dependencies.sharedState, notifyAdmin: dependencies.notifyAdmin },
+                `El cliente ya compró y volvió a escribir.\n\nMensaje: "${text}"\n\nEl bot se pausó automáticamente.`
+            );
+        } else {
+            console.log(`[HARD STOP] User ${userId} is past customer/redirected. Already paused or redirected. Ignoring silently.`);
+        }
+
+        return { matched: true, paused: true };
+    }
 
     // Safety fallback for empty history
     if (!currentState.history) currentState.history = [];

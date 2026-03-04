@@ -165,6 +165,11 @@ const userState = new Proxy({}, {
 const chatResets: Record<string, number> = {}; // Tracks timestamp of last history clear per user
 let lastAlertUser: string | null = null;
 let pausedUsers = new Set<string>();
+
+// Restore paused users from DB immediately on boot so they survive restarts
+const { restorePausedUsersFromDB } = require('./src/services/pauseService');
+restorePausedUsersFromDB({ pausedUsers }).catch((e: any) => logger.error('[BOOT] Failed to restore paused users:', e.message));
+
 const pendingMessages = new Map<string, { messages: { text: string; timestamp: number }[]; timer: ReturnType<typeof setTimeout>; startTime: number }>(); // Debounce: userId -> { messages: [{text, timestamp}], timer }
 const DEBOUNCE_MS = 10000; // Wait 10s for more messages before processing (makes bot look more human)
 let schedulerStarted = false; // Guard against duplicate scheduler on reconnect

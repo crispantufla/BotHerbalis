@@ -14,7 +14,9 @@ model User {
   name        String?
   createdAt   DateTime @default(now())
   profileData String?  // Extracted by AI (e.g., weight goals, allergies)
-  
+  pausedAt    DateTime? // Set when bot auto-pauses this user
+  pauseReason String?   // Human-readable reason for the pause
+
   orders      Order[]
   chats       ChatLog[]
 

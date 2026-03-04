@@ -436,20 +436,34 @@ module.exports = (client, sharedState) => {
         try {
             let { chatId, paused } = req.body;
             chatId = await resolveChatId(chatId);
+            const { pauseUser, unpauseUser } = require('../../services/pauseService');
 
-            if (paused) pausedUsers.add(chatId);
-            else pausedUsers.delete(chatId);
+            if (paused) {
+                await pauseUser(chatId, '⏸️ Pausado manualmente por el panel', { sharedState });
+            } else {
+                await unpauseUser(chatId, sharedState);
+            }
 
             console.log(`[API] toggle-bot: ${chatId} → ${paused ? 'PAUSED' : 'UNPAUSED'} (via dashboard)`);
-
             if (sharedState.saveState) sharedState.saveState();
-
             if (sharedState.io) sharedState.io.emit('bot_status_change', { chatId, paused });
             res.json({ success: true });
         } catch (e) {
             res.status(500).json({ error: e.message });
         }
     });
+
+    // GET /waiting-customers — returns paused users with their pause reason (for dashboard panel)
+    router.get('/waiting-customers', authMiddleware, async (req, res) => {
+        try {
+            const { getPausedUsersWithDetails } = require('../../services/pauseService');
+            const paused = await getPausedUsersWithDetails();
+            res.json({ customers: paused });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
 
     // DELETE /messages (Delete for everyone)
     router.delete('/messages', authMiddleware, async (req, res) => {
