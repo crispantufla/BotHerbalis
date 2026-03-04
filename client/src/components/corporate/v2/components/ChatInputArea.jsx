@@ -1,5 +1,6 @@
-import React, { useRef } from 'react';
-import { Send, Paperclip } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { Send, Paperclip, Smile } from 'lucide-react';
+import EmojiPicker from 'emoji-picker-react';
 
 const ChatInputArea = ({
     input,
@@ -11,6 +12,7 @@ const ChatInputArea = ({
     sendingMedia
 }) => {
     const fileInputRef = useRef(null);
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
     const handleFileSelect = (e) => {
         const file = e.target.files[0];
@@ -28,8 +30,26 @@ const ChatInputArea = ({
         e.target.value = '';
     };
 
+    const onEmojiClick = (emojiObject) => {
+        setInput(prev => prev + emojiObject.emoji);
+    };
+
     return (
-        <div className="flex-shrink-0 p-3 sm:px-6 sm:py-4 pb-[max(1rem,env(safe-area-inset-bottom))] lg:pb-4 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-800 z-20">
+        <div className="flex-shrink-0 p-3 sm:px-6 sm:py-4 pb-[max(1rem,env(safe-area-inset-bottom))] lg:pb-4 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-800 z-20 relative">
+            {showEmojiPicker && (
+                <div className="absolute bottom-full left-4 sm:left-6 mb-2 z-50 shadow-2xl rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 animate-fade-in origin-bottom-left">
+                    <EmojiPicker
+                        onEmojiClick={onEmojiClick}
+                        autoFocusSearch={false}
+                        theme="auto"
+                        lazyLoadEmojis={true}
+                        searchPlaceHolder="Buscar emoji..."
+                        width={320}
+                        height={400}
+                    />
+                </div>
+            )}
+
             {attachment && (
                 <div className="mb-2 p-3 sm:p-4 bg-white/8 dark:bg-slate-800/80 rounded-2xl border border-indigo-100 shadow-sm flex items-center gap-4">
                     <img src={attachment.preview} alt="Preview" className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-xl" />
@@ -42,13 +62,20 @@ const ChatInputArea = ({
             )}
             <form onSubmit={attachment ? (e) => { e.preventDefault(); handleSendMedia(); } : handleSend} className="flex gap-1.5 sm:gap-4 items-center w-full">
                 <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
+
+                <button type="button" onClick={() => setShowEmojiPicker(prev => !prev)} className={`w-11 h-11 sm:w-14 sm:h-14 flex items-center justify-center shrink-0 rounded-xl sm:rounded-2xl border transition-all shadow-sm ${showEmojiPicker ? 'bg-indigo-50 dark:bg-slate-600 border-indigo-300 text-indigo-600 dark:text-indigo-400' : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 hover:bg-indigo-50 dark:hover:bg-slate-600'}`}>
+                    <Smile className="w-6 h-6" />
+                </button>
+
                 <button type="button" onClick={() => fileInputRef.current?.click()} className="w-11 h-11 sm:w-14 sm:h-14 flex items-center justify-center shrink-0 rounded-xl sm:rounded-2xl bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 hover:bg-indigo-50 dark:hover:bg-slate-600 transition-all shadow-sm">
                     <Paperclip className="w-6 h-6" />
                 </button>
+
                 <input
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
+                    onFocus={() => setShowEmojiPicker(false)}
                     placeholder="Mensaje..."
                     className="w-full min-w-0 flex-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl sm:rounded-2xl px-3 sm:px-6 py-2.5 sm:py-4 text-slate-800 dark:text-slate-200 font-medium focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all shadow-inner placeholder:text-slate-400 text-[15px] sm:text-base"
                 />
