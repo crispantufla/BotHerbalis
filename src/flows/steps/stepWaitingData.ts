@@ -144,18 +144,28 @@ export async function handleWaitingData(
     const isHesitation = /\b(pensar|pienso|despues|luego|mañana|te confirmo|te aviso|ver|veo|rato|lueguito|mas tarde|en un rato|aguanti|aguanta|espera|bancame)\b/i.test(normalizedText)
         || /\b(voy a|dejam[eo])\s+(pasar|pensar|ver)\b/i.test(normalizedText);
 
+    // Detect payment-timing objections: "no cobro todavía", "cobro el 15", "cuando cobre", "espero el sueldo"
+    // These should get a postdate offer, NOT fall through to address parsing and trigger a false pause.
+    const isPaymentTiming = /\b(no cobro|cobro el|cobro a|cobro la|cuando cobre|hasta que cobre|sueldo|quincena|cobrar|depositan|depósito|deposito|me pagan|me depositan)\b/i.test(normalizedText)
+        || (/\b(cobro|pago|sueldo|plata|efectivo)\b/i.test(normalizedText) && /\b(todavía|aun|aún|después|despues|próximo|proximo|el \d+|fin de mes)\b/i.test(normalizedText));
+
     const isShortConfirmation = /^(si|sisi|ok|dale|bueno|joya|de una|perfecto)[\s\?\!]*$/i.test(normalizedText);
 
     const isDataQuestionOrEmotion = !isShortConfirmation && (explicitQuestionKeywords
         || /\b(pregunte|no quiero|no acepto|no acepte|como|donde|por que|para que)\b/i.test(normalizedText)
         || isHesitation
+        || isPaymentTiming
         || isVeryLongMessage);
 
     if (isDataQuestionOrEmotion && (!looksLikeAddress || isVeryLongMessage)) {
         console.log(`[AI-FALLBACK] waiting_data: Detected question/objection or long emotional text from ${userId}: "${text}"`);
+        const aiGoal = isPaymentTiming
+            ? `El cliente dice que todavía no cobró o que está esperando su sueldo/pago. Ofrecele amablemente la opción de programar el pedido para cuando cobre: "Si querés podemos programar el pedido a futuro, así llega cuando cobrás 😊. ¿Para qué fecha te quedaría mejor recibirlo?". Si el cliente te dice la fecha, confirmala cálidamente. Nunca lo presiones. NUNCA le pidas dinero ni datos de envío todavía.`
+            : `El usuario tiene una duda o expresa una preocupación en plena toma de datos (ej: pregunta cómo se paga, cuándo llega, si le entregan en el trabajo, o cuenta un largo problema personal). DEBES RESPONDER SU TEXTO DIRECTAMENTE de forma EXTENSA Y MUY EMPÁTICA usando el Knowledge. Si expresa miedos sobre demoras o recepción, redactá un párrafo largo brindando tranquilidad absoluta. Si pregunta si puede recibir en su TRABAJO: "Si estás en horario laboral del cartero no hay problema. Si no te encuentra, vas con el DNI a la sucursal.". Si pregunta formas de pago: "El pago a domicilio es al cartero en efectivo". Si pregunta tiempos: "Tarda de 7 a 10 días hábiles en promedio.". Nunca lo obligues a dar los datos, respondé su duda o drama con muchísima calidez, tómate tu tiempo, y cerrá sutilmente con: "¿Te parece que lo dejemos anotado?" o "¿Te tomo los datos?".`;
+
         const aiData = await aiService.chat(text, {
             step: FlowStep.WAITING_DATA,
-            goal: 'El usuario tiene una duda o expresa una preocupación en plena toma de datos (ej: pregunta cómo se paga, cuándo llega, si le entregan en el trabajo, o cuenta un largo problema personal). DEBES RESPONDER SU TEXTO DIRECTAMENTE de forma EXTENSA Y MUY EMPÁTICA usando el Knowledge. Si expresa miedos sobre demoras o recepción, redactá un párrafo largo brindando tranquilidad absoluta. Si pregunta si puede recibir en su TRABAJO: "Si estás en horario laboral del cartero no hay problema. Si no te encuentra, vas con el DNI a la sucursal.". Si pregunta formas de pago: "El pago a domicilio es al cartero en efectivo". Si pregunta tiempos: "Tarda de 7 a 10 días hábiles en promedio.". Nunca lo obligues a dar los datos, respondé su duda o drama con muchísima calidez, tómate tu tiempo, y cerrá sutilmente con: "¿Te parece que lo dejemos anotado?" o "¿Te tomo los datos?".',
+            goal: aiGoal,
             history: currentState.history,
             summary: currentState.summary,
             knowledge: knowledge,
