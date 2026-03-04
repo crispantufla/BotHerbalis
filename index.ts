@@ -835,6 +835,20 @@ client.on('message', async (msg: any) => {
             } catch (e: any) {
                 logger.error(`[LID-RESOLVE] Error resolving @lid ${msg.from}:`, e.message);
             }
+        } else if (userId.length > 18) {
+            // Meta proxy number fallback (e.g. 47253465116865@c.us is 19 chars)
+            try {
+                const contact = await msg.getContact();
+                const possibleName = contact?.name || contact?.pushname || '';
+                const cleanName = possibleName.replace(/\D/g, '');
+                // If the proxy ID is huge but the name is a local AR number (10-13 digits)
+                if (cleanName.length >= 10 && cleanName.length <= 13) {
+                    userId = `${cleanName}@c.us`;
+                    logger.info(`[PROXY-RESOLVE] Resolved proxy ${msg.from} to real phone ${userId} via contact name`);
+                }
+            } catch (e: any) {
+                logger.error(`[PROXY-RESOLVE] Error resolving proxy ${msg.from}:`, e.message);
+            }
         }
 
         const adminNumber = process.env.ADMIN_NUMBER;
