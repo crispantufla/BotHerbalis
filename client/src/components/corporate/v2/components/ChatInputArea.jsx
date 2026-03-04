@@ -44,8 +44,8 @@ const ChatInputArea = ({
                         theme="auto"
                         lazyLoadEmojis={true}
                         searchPlaceHolder="Buscar emoji..."
-                        width={320}
-                        height={400}
+                        width={380}
+                        height={450}
                     />
                 </div>
             )}
