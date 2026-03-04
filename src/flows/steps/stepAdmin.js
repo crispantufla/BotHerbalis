@@ -1,4 +1,4 @@
-const { pauseUser } = require('../services/pauseService');
+const { pauseUser } = require('../../services/pauseService');
 
 async function handleAdminSteps(userId, text, normalizedText, currentState, knowledge, dependencies) {
     const { saveState } = dependencies;
