@@ -33,7 +33,20 @@ export async function handleWaitingPreference(
     // FIX: Only treat as comparison if they ACTUALLY mention more than one, or explicitly ask for comparison.
     // Answering "Capsulas" to "con cual preferis avanzar, capsulas o semillas?" should NOT be a comparison.
     const hasObjection = /\b(tragar|ahogar|grandes|cuestan|complicado|dificil|miedo a ahogarme)\b/i.test(normalizedText);
-    const isComparison = totalMatches > 1 || hasObjection || (totalMatches === 0 && /\b(cual|recomend|mejor|diferencia|que me recomiendas|que me conviene|cual me das|asesorame)\b/i.test(normalizedText));
+    const isComparison = totalMatches > 1 || hasObjection || (totalMatches === 0 && /\b(cual|recomend|mejor|diferencia|que me recomiendas|que me conviene|cual me das|asesorame|efectiv|rapido)\b/i.test(normalizedText));
+
+    const adaptResponsePrefix = (rawResponse: string, userText: string, extString: string) => {
+        if (/\b(cual|recomend|mejor|efectiv|rapido|diferencia)\b/i.test(userText)) {
+            if (extString.includes('capsula')) {
+                return rawResponse.replace(/Dale, buenísimo 👍 Excelente elección\./i, "Lo más efectivo sin duda son las cápsulas 💪.");
+            } else if (extString.includes('semilla')) {
+                return rawResponse.replace(/Dale, buenísimo 🌿 La semilla natural es la clásica, súper potente\./i, "Si buscás lo más natural, te recomiendo las semillas 🌿.");
+            } else if (extString.includes('gota')) {
+                return rawResponse.replace(/Dale, buenísimo 🌿 Las gotas son discretas y se absorben rápido\./i, "En tu caso, lo mejor y más suave van a ser las gotas 🌿.");
+            }
+        }
+        return rawResponse;
+    };
 
     if (isComparison) {
         if (/^(capsulas? o gotas?|gotas? o capsulas?|capsulas o gotas porfa(?:vor)?)$/i.test(normalizedText.trim())) {
@@ -86,7 +99,8 @@ export async function handleWaitingPreference(
             }
 
             if (priceNode) {
-                const msg = _formatMessage(priceNode.response, currentState);
+                const adaptedResponse = adaptResponsePrefix(priceNode.response, normalizedText, ext);
+                const msg = _formatMessage(adaptedResponse, currentState);
                 _setStep(currentState, priceNode.nextStep);
                 currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
                 saveState(userId);
@@ -169,7 +183,8 @@ export async function handleWaitingPreference(
             }
 
             if (priceNode) {
-                const msg = _formatMessage(priceNode.response, currentState);
+                const adaptedResponse = adaptResponsePrefix(priceNode.response, normalizedText, ext);
+                const msg = _formatMessage(adaptedResponse, currentState);
                 _setStep(currentState, priceNode.nextStep);
                 currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
                 saveState(userId);
