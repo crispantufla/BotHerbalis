@@ -182,8 +182,16 @@ module.exports = (client, sharedState) => {
                 const { resolvedId, resolvedName, chatData } = item;
                 const c = chatData;
 
-                const phoneNumeric = resolvedId.replace(/\D/g, '');
-                const last10Chat = phoneNumeric.slice(-10);
+                const phoneNumericId = resolvedId.replace(/\D/g, '');
+                const phoneNumericName = resolvedName.replace(/\D/g, '');
+
+                // Si el ID es un proxy gigante, tomamos el nombre como telefono real (si parece valido)
+                let actualNumericPhone = phoneNumericId;
+                if (phoneNumericId.length > 13 && phoneNumericName.length >= 10 && phoneNumericName.length <= 13) {
+                    actualNumericPhone = phoneNumericName;
+                }
+
+                const last10Chat = actualNumericPhone.slice(-10);
 
                 // Find all past orders matching this phone (comparing last 10 digits for robustness)
                 const userOrders = orders.filter(o => {
