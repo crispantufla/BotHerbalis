@@ -360,8 +360,8 @@ function startScheduler(sharedState: SchedulerSharedState, dependencies: Schedul
     // Railway (o PM2) volverá a levantar el contenedor y reconectará en menos de 10s.
     cron.schedule('0 8 * * *', () => {
         logger.info('[SCHEDULER] 🔄 Ejecutando reinicio preventivo diario (Anti-Memory Leak)...');
-        // El manejador SIGTERM de index.ts atrapará el kill() / exit() y limpiará los candados de Chrome.
-        process.exit(0);
+        // El manejador en index.ts atrapará SIGUSR2 para limpiar clientes y forzar salida con error 1 para que el contenedor reinicie.
+        process.kill(process.pid, 'SIGUSR2');
     }, { timezone: TIMEZONE });
     logger.info('[SCHEDULER] ✅ Reinicio Preventivo Diario → 08:00 ARG (diario)');
 

@@ -1110,7 +1110,7 @@ process.on('unhandledRejection', (reason) => {
 });
 
 // Graceful Shutdown
-const _shutdown = async (signal: string): Promise<void> => {
+const _shutdown = async (signal: string, exitCode: number = 0): Promise<void> => {
     logger.info(`[SHUTDOWN] Received ${signal}. Cleaning up...`);
     try {
         // CRITICAL: Destroy WhatsApp client FIRST so Chrome cleans up its lock files.
@@ -1131,7 +1131,7 @@ const _shutdown = async (signal: string): Promise<void> => {
         await pool.end();
         logger.info('[SHUTDOWN] DB connections closed.');
     } catch (e: any) { logger.error('[SHUTDOWN] Error closing DB:', e.message); }
-    process.exit(0);
+    process.exit(exitCode);
 };
 process.on('SIGTERM', () => _shutdown('SIGTERM'));
 
@@ -1149,6 +1149,7 @@ if (process.platform === "win32") {
 }
 
 process.on('SIGINT', () => _shutdown('SIGINT'));
+process.on('SIGUSR2', () => _shutdown('SIGUSR2', 1)); // Restart forcing node to exit with 1
 
 // Inicializar el Worker de background que consumirá Redis
 initWorker({
