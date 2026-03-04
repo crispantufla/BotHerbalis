@@ -13,8 +13,9 @@ import SettingsViewV2 from '../../../components/corporate/v2/SettingsViewV2';
 import ScriptViewV2 from '../../../components/corporate/v2/ScriptViewV2';
 import GalleryViewV2 from '../../../components/corporate/v2/GalleryViewV2';
 import AdvancedAnalyticsViewV2 from '../../../components/corporate/v2/AdvancedAnalyticsViewV2';
+import WaitingCustomersPanel from '../../../components/corporate/v2/dashboard/WaitingCustomersPanel';
 
-import { Wifi, MessageCircle, Database, Settings, FileText, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity } from 'lucide-react';
+import { Wifi, MessageCircle, Database, Settings, FileText, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall } from 'lucide-react';
 
 const CorporateDashboardV2 = () => {
     const { socket } = useSocket();
@@ -154,6 +155,15 @@ const CorporateDashboardV2 = () => {
             case 'script': return <ScriptViewV2 />;
             case 'gallery': return <GalleryViewV2 />;
             case 'settings': return <SettingsViewV2 status={status} />;
+            case 'espera': return (
+                <div className="p-6 md:p-8 max-w-3xl mx-auto w-full">
+                    <div className="mb-7">
+                        <h1 className="text-2xl font-extrabold text-slate-800 dark:text-white tracking-tight">Clientes Esperando Atención</h1>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">El bot se silenció automáticamente para estos usuarios. Respondeles desde WhatsApp y luego reanudarlos.</p>
+                    </div>
+                    <WaitingCustomersPanel />
+                </div>
+            );
             default: return <DashboardViewV2 alerts={alerts} config={config} handleQuickAction={handleQuickAction} status={status} qrData={qrData} />;
         }
     };
@@ -236,6 +246,7 @@ const CorporateDashboardV2 = () => {
                     <NavItem tab="comms" icon={MessageCircle} label="Chat & Atencion" />
                     <NavItem tab="logistics" icon={Database} label="Ventas & Logística" />
                     <NavItem tab="statistics" icon={BarChart2} label="Estadísticas" />
+                    <NavItem tab="espera" icon={PhoneCall} label="Clientes Esperando" />
                     <NavItem tab="script" icon={FileText} label="Guión & Prompts" />
                     <NavItem tab="gallery" icon={ImageIcon} label="Galería de Medios" />
 
