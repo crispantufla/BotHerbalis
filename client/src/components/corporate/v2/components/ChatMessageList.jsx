@@ -89,14 +89,16 @@ const ChatMessageList = ({ messages, isLoading, chatFontSize, handleDeleteMessag
                     const msg = messages[virtualRow.index];
                     return (
                         <div
-                            key={virtualRow.index}
+                            key={virtualRow.key}
+                            ref={rowVirtualizer.measureElement}
+                            data-index={virtualRow.index}
                             style={{
                                 position: 'absolute',
                                 top: 0,
                                 left: 0,
                                 width: '100%',
                                 transform: `translateY(${virtualRow.start}px)`,
-                                paddingBottom: '24px', // acts like space-y-6
+                                paddingBottom: '32px', // increased slightly to give breathing room for long messages
                             }}
                         >
                             <div className={`flex ${msg.fromMe ? 'justify-end' : 'justify-start'}`}>
