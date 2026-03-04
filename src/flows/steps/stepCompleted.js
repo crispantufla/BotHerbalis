@@ -11,21 +11,32 @@ async function handleCompleted(userId, text, normalizedText, currentState, knowl
         step: 'post_sale',
         goal: `Este cliente YA COMPRÓ. Sos un asistente post-venta amable. Hoy es ${today}. Reglas:
 1. Si saluda ("hola", "buenas"), respondé breve. NO reiniciar el flujo.
-2. Si pregunta por su envío/demora, respondé que tarda de 7 a 10 días hábiles por Correo Argentino y le avisaremos con el seguimiento.
+2. Si pregunta por su paquete, seguimiento, correo, demora, donde está el pedido o si ya lo despacharon: extraé "TRACKING_INFO" en la variable extractedData. NUNCA respondas nada ante estas consultas, solo extraelo.
 3. Si pide postergar EL ENVÍO (ej. "el 8 de marzo", "el mes que viene", "dentro de 5 días"):
-   - Si la fecha que pide es en MENOS DE 10 DÍAS desde hoy: decile amablemente que los envíos de por sí tardan mínimo 10 días, así que no hay problema, llegará cerca o después de esa fecha (NO pidas datos).
-   - Si la fecha es en MÁS DE 10 DÍAS desde hoy: aceptá amablemente, confirmá que se pospone ("Dale, lo postergamos para que te llegue a partir del [fecha]") y devolvé "POSTDATE: [fecha clara]" en extractedData.
-   - ⚠️ BAJO NINGÚN PUNTO DE VISTA le vuelvas a pedir datos de envío (la venta ya está cerrada, ya los tenemos).
+   - Si la fecha que pide es en MENOS DE 10 DÍAS desde hoy: decile amablemente que los envíos de por sí tardan mínimo 10 días.
+   - Si la fecha es en MÁS DE 10 DÍAS desde hoy: aceptá amablemente, confirmá que se pospone y devolvé "POSTDATE: [fecha]" en extractedData.
+   - ⚠️ BAJO NINGÚN PUNTO DE VISTA le vuelvas a pedir datos de envío.
 4. Si tiene reclamo o duda compleja: extractedData="NEED_ADMIN" y avisá que lo comunicás.
 5. Si quiere VOLVER A COMPRAR (MÁS productos): extractedData="RE_PURCHASE" y preguntale qué quiere.
-6. Si pide CANCELAR SU PEDIDO o ANULAR LA COMPRA: preguntale amablemente el motivo ("¿Me podrías contar por qué querés cancelarlo?") y devolvé "CANCEL_ORDER" en extractedData. ATENCIÓN: Solo hacé esto si es claro que quiere cancelar la compra.
-7. NUNCA inventes información. NUNCA pidas datos de envío/dirección.`,
+6. Si pide CANCELAR SU PEDIDO o ANULAR LA COMPRA: preguntale amablemente el motivo y devolvé "CANCEL_ORDER" en extractedData. ATENCIÓN: Solo hacé esto si es muy claro.
+7. NUNCA inventes información. NUNCA pidas datos de envío ni intentes venderle cápsulas/semillas/gotas sin que lo pida.`,
         history: currentState.history,
         summary: currentState.summary,
-        knowledge: knowledge
+        // Eliminamos "knowledge: knowledge" para que el bot no se contamine con el agresivo guion de ventas
+        userState: currentState
     });
 
-    if (postSaleAI.extractedData === 'RE_PURCHASE') {
+    if (postSaleAI.extractedData === 'TRACKING_INFO') {
+        console.log(`[POST-SALE] Customer ${userId} is asking for tracking/shipping info. Auto-pausing silently.`);
+        if (dependencies.sharedState && dependencies.sharedState.pausedUsers) {
+            dependencies.sharedState.pausedUsers.add(userId);
+        }
+        if (dependencies.notifyAdmin) {
+            await dependencies.notifyAdmin('📦 Consulta de Código/Envío', userId, `El cliente post-venta preguntó por su envío o código de seguimiento.\n\nMensaje original: "${text}"\n\nEl bot se silenció automáticamente para que le respondas.`);
+        }
+        // Devuelve paused: true para evitar que globals/salesFlow continúen. No enviamos ningún SMS.
+        return { matched: true, paused: true };
+    } else if (postSaleAI.extractedData === 'RE_PURCHASE') {
         console.log(`[POST-SALE] Customer ${userId} wants to re-purchase. Skipping to preference.`);
         _setStep(currentState, 'waiting_preference');
         currentState.cart = [];
