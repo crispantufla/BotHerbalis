@@ -100,8 +100,35 @@ const ChatMessageList = ({ messages, isLoading, chatFontSize, handleDeleteMessag
         );
     }
 
+    const virtualItems = rowVirtualizer.getVirtualItems();
+    let floatingDateText = '';
+
+    if (virtualItems.length > 0) {
+        const scrollOffset = parentRef.current ? parentRef.current.scrollTop : 0;
+        let topVisibleRow = virtualItems[0];
+        for (const item of virtualItems) {
+            // Buscamos el primer mensaje que aún sea visible en pantalla
+            if (item.end > scrollOffset) {
+                topVisibleRow = item;
+                break;
+            }
+        }
+        const msg = messages[topVisibleRow.index];
+        if (msg && msg.timestamp) {
+            floatingDateText = formatDateSeparator(msg.timestamp);
+        }
+    }
+
     return (
-        <div ref={parentRef} className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 pt-8 pb-2 custom-scrollbar relative z-10 w-full">
+        <div ref={parentRef} className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 pt-4 pb-2 custom-scrollbar relative z-10 w-full">
+            {floatingDateText && (
+                <div className="sticky top-2 z-50 flex justify-center mb-[-28px] pointer-events-none">
+                    <div className="bg-slate-200/95 dark:bg-slate-700/95 backdrop-blur-md px-4 py-1.5 rounded-full text-[11px] font-medium text-slate-600 dark:text-slate-300 shadow-sm border border-slate-300/50 dark:border-slate-600/50">
+                        {floatingDateText}
+                    </div>
+                </div>
+            )}
+
             <div
                 style={{
                     height: `${rowVirtualizer.getTotalSize()}px`,
@@ -142,7 +169,7 @@ const ChatMessageList = ({ messages, isLoading, chatFontSize, handleDeleteMessag
                         >
                             {showDateSeparator && (
                                 <div className="flex justify-center mb-6 mt-2">
-                                    <div className="bg-slate-200/80 dark:bg-slate-700/60 backdrop-blur-sm px-4 py-1.5 rounded-full text-[11px] font-medium text-slate-600 dark:text-slate-300 shadow-sm border border-slate-300/30 dark:border-slate-600/30">
+                                    <div className="bg-slate-200/80 dark:bg-slate-700/60 px-4 py-1.5 rounded-full text-[11px] font-medium text-slate-600 dark:text-slate-300 border border-transparent">
                                         {dateSeparatorText}
                                     </div>
                                 </div>

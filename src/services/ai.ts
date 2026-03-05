@@ -331,6 +331,8 @@ EXTRACCIÓN DE DATOS PARA LA HERRAMIENTA DE FLUJO:
             - Si quieren CANCELAR: extrae "CANCEL_ORDER"
                 - Si EMBARAZADA / LACTANDO / +80 / CÁNCER: rechazar venta, extrae "REJECT_MEDICAL"
 
+🔴 REGLA DE ORO DE EXTRACCIÓN 🔴: NUNCA, NUNCA devuelvas \`goalMet=true\` si dejás \`extractedData=null\` en el caso de la elección de un plan de días (60 o 120). Si el cliente elige un plan, DEBES poner el número (ej: "60" o "120") en \`extractedData\`. La herramienta falla si lo haces mal.
+
 DEBES LLAMAR A LA HERRAMIENTA 'control_dialog_flow' PARA EMITIR TU RESPUESTA AL USUARIO Y ASIGNAR EL ESTADO(goalMet).`;
 }
 
