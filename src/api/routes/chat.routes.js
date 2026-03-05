@@ -190,6 +190,19 @@ module.exports = (client, sharedState) => {
                 }
             }
 
+            // OPTIMIZATION: Pre-calculate orders by phone to avoid O(N*M) complexity
+            const ordersByPhone = new Map();
+            orders.forEach(o => {
+                if (!o.userPhone) return;
+                const cleanOrderPhone = o.userPhone.replace(/\D/g, '');
+                const last10Order = cleanOrderPhone.slice(-10);
+                const key = `${o.instanceId}_${last10Order}`;
+                if (!ordersByPhone.has(key)) {
+                    ordersByPhone.set(key, []);
+                }
+                ordersByPhone.get(key).push(o);
+            });
+
             // 3. Map to final output
             const relevantChats = Array.from(resolvedChatsMap.values()).map(item => {
                 const { resolvedId, resolvedName, chatData } = item;
@@ -205,16 +218,10 @@ module.exports = (client, sharedState) => {
                 }
 
                 const last10Chat = actualNumericPhone.slice(-10);
+                const key = `${instanceFilterId}_${last10Chat}`;
 
-                // Find all past orders matching this phone (comparing last 10 digits for robustness)
-                const userOrders = orders.filter(o => {
-                    if (!o.userPhone) return false;
-                    const cleanOrderPhone = o.userPhone.replace(/\D/g, '');
-                    const last10Order = cleanOrderPhone.slice(-10);
-
-                    // Match by phone AND instanceId for accurate "Solo este Bot" context
-                    return (last10Order === last10Chat && o.instanceId === instanceFilterId);
-                });
+                // Find all past orders matching this phone (O(1) lookup)
+                const userOrders = ordersByPhone.get(key) || [];
 
                 // Map DB order to legacy format for frontend
                 const legacyUserOrders = userOrders.map(o => {
@@ -387,6 +394,13 @@ module.exports = (client, sharedState) => {
 
             _recordAdminMessage(chatId, message);
 
+            // Auto-pause bot on admin intervention
+            if (!pausedUsers.has(chatId)) {
+                const { pauseUser } = require('../../services/pauseService');
+                await pauseUser(chatId, '⏸️ Pausado automáticamente por intervención en panel', { sharedState });
+                if (sharedState.io) sharedState.io.emit('bot_status_change', { chatId, paused: true });
+            }
+
             if (sharedState.logAndEmit) sharedState.logAndEmit(chatId, 'admin', message, 'dashboard_reply', sentMsg.id._serialized);
             res.json({ success: true, messageId: sentMsg.id._serialized });
         } catch (e) {
@@ -407,6 +421,13 @@ module.exports = (client, sharedState) => {
 
             const logText = `📷 Imagen enviada${caption ? ': ' + caption : ''}`;
             _recordAdminMessage(chatId, logText);
+
+            // Auto-pause bot on admin intervention
+            if (!pausedUsers.has(chatId)) {
+                const { pauseUser } = require('../../services/pauseService');
+                await pauseUser(chatId, '⏸️ Pausado automáticamente por intervención en panel', { sharedState });
+                if (sharedState.io) sharedState.io.emit('bot_status_change', { chatId, paused: true });
+            }
 
             if (sharedState.logAndEmit) {
                 sharedState.logAndEmit(chatId, 'admin', logText, 'dashboard_media', sentMsg.id._serialized);

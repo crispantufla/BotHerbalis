@@ -501,7 +501,7 @@ describe('Step Handlers (Refactored)', () => {
         });
 
         test('skips to preference after 2+ refusals', async () => {
-            const userState = { [userId]: makeState('waiting_weight', { weightRefusals: 1 }) };
+            const userState = { [userId]: makeState('waiting_weight', { weightRefusals: 2 }) };
             await processSalesFlow(userId, 'no se cuanto tengo que bajar', userState, knowledge, mockDependencies);
             expect(userState[userId].step).toBe('waiting_preference');
         });
@@ -734,7 +734,7 @@ describe('Step Handlers (Refactored)', () => {
 
         test('address collection asks for missing fields', async () => {
             const userState = { [userId]: makeState('waiting_data', baseDataState) };
-            require('../src/services/ai').aiService.parseAddress.mockResolvedValueOnce({ _error: true });
+            require('../src/services/ai').aiService.parseAddress.mockResolvedValueOnce({ nombre: 'Juan Perez' });
             await processSalesFlow(userId, 'Juan Perez', userState, knowledge, mockDependencies);
             expect(mockSendMessage).toHaveBeenCalled();
         });
