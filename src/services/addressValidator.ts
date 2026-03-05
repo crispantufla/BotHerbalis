@@ -1,18 +1,46 @@
+import { Address } from '../types/state';
 const logger = require('../utils/logger');
-const path = require('path');
-const fs = require('fs');
 
 /**
- * addressValidator.js — Address validation service
- * 
+ * addressValidator.ts — Address validation service
+ *
  * Features:
  * 1. CP format validation (4 digits, valid Argentine range)
  * 2. Province auto-detection from CP
  * 3. Google Maps Geocoding (optional — enabled when GOOGLE_MAPS_KEY is in .env)
  */
 
+interface CPRange {
+    min: number;
+    max: number;
+    province: string;
+}
+
+interface CPValidationResult {
+    valid: boolean;
+    cp?: string;
+    province: string | null;
+    error: string | null;
+}
+
+interface MapsValidationResult {
+    valid: boolean | null;
+    formatted: string | null;
+    location: { lat: number; lng: number } | null;
+    error: string | null;
+}
+
+interface AddressValidationResult {
+    cpValid: boolean;
+    cpCleaned: string | null;
+    province: string | null;
+    mapsValid: boolean | null;
+    mapsFormatted: string | null;
+    warnings: string[];
+}
+
 // Argentine CP → Province mapping (official ranges)
-const CP_PROVINCES = [
+const CP_PROVINCES: CPRange[] = [
     { min: 1000, max: 1999, province: 'Buenos Aires / CABA' },
     { min: 2000, max: 2999, province: 'Santa Fe' },
     { min: 3000, max: 3699, province: 'Entre Ríos / Corrientes / Misiones' },
@@ -26,14 +54,9 @@ const CP_PROVINCES = [
     { min: 9000, max: 9999, province: 'Chubut / Santa Cruz / Tierra del Fuego' },
 ];
 
-/**
- * Validates a 4-digit Argentine postal code
- * @returns {{ valid: boolean, province: string|null, error: string|null }}
- */
-function validateCP(cp) {
+export function validateCP(cp: string | number | null | undefined): CPValidationResult {
     if (!cp) return { valid: false, province: null, error: 'No se proporcionó código postal' };
 
-    // Clean: remove spaces, letters (for CPA format like "X5000")
     const cleaned = String(cp).replace(/[^0-9]/g, '');
 
     if (cleaned.length !== 4) {
@@ -45,7 +68,6 @@ function validateCP(cp) {
         return { valid: false, province: null, error: `CP fuera de rango: ${num}` };
     }
 
-    // Find province
     const match = CP_PROVINCES.find(r => num >= r.min && num <= r.max);
     return {
         valid: true,
@@ -55,12 +77,7 @@ function validateCP(cp) {
     };
 }
 
-/**
- * Validates full address using Google Maps Geocoding API (optional)
- * Only runs if GOOGLE_MAPS_KEY is set in environment
- * @returns {{ valid: boolean, formatted: string|null, location: object|null, error: string|null }}
- */
-async function validateWithGoogleMaps(address) {
+export async function validateWithGoogleMaps(address: string): Promise<MapsValidationResult> {
     const apiKey = process.env.GOOGLE_MAPS_KEY;
     if (!apiKey) {
         return { valid: null, formatted: null, location: null, error: 'GOOGLE_MAPS_KEY not configured' };
@@ -71,15 +88,14 @@ async function validateWithGoogleMaps(address) {
         const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${query}&key=${apiKey}&region=ar&language=es`;
 
         const response = await fetch(url);
-        const data = await response.json();
+        const data = await response.json() as any;
 
         if (data.status === 'OK' && data.results && data.results.length > 0) {
             const result = data.results[0];
-            const location = result.geometry?.location;
+            const location = result.geometry?.location ?? null;
 
-            // Check if it's actually in Argentina
             const isArgentina = result.address_components?.some(
-                c => c.short_name === 'AR' && c.types.includes('country')
+                (c: any) => c.short_name === 'AR' && c.types.includes('country')
             );
 
             if (!isArgentina) {
@@ -91,32 +107,21 @@ async function validateWithGoogleMaps(address) {
                 };
             }
 
-            return {
-                valid: true,
-                formatted: result.formatted_address,
-                location,
-                error: null
-            };
+            return { valid: true, formatted: result.formatted_address, location, error: null };
         } else if (data.status === 'ZERO_RESULTS') {
             return { valid: false, formatted: null, location: null, error: 'No se encontró la dirección en Google Maps' };
         } else {
             logger.error(`[MAPS] Geocoding error: ${data.status} — ${data.error_message || ''}`);
             return { valid: null, formatted: null, location: null, error: `Error de geocoding: ${data.status}` };
         }
-    } catch (e) {
+    } catch (e: any) {
         logger.error(`[MAPS] Fetch error: ${e.message}`);
         return { valid: null, formatted: null, location: null, error: e.message };
     }
 }
 
-/**
- * Full address validation pipeline
- * 1. Validate CP format + get province
- * 2. If Google Maps key exists, validate full address
- * @returns {{ cpValid, province, mapsValid, mapsFormatted, warnings[] }}
- */
-async function validateAddress(addr) {
-    const result = {
+export async function validateAddress(addr: Address): Promise<AddressValidationResult> {
+    const result: AddressValidationResult = {
         cpValid: false,
         cpCleaned: null,
         province: null,

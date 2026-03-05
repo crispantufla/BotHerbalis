@@ -1,3 +1,4 @@
+import { UserState } from '../../types/state';
 const { handleGreeting } = require('./stepGreeting');
 const { handleWaitingWeight } = require('./stepWaitingWeight');
 const { handleWaitingPreference } = require('./stepWaitingPreference');
@@ -9,9 +10,16 @@ const { handleWaitingFinalConfirmation } = require('./stepWaitingFinalConfirmati
 const { handleAdminSteps } = require('./stepAdmin');
 const { handleCompleted } = require('./stepCompleted');
 
-async function processStep(userId, text, normalizedText, currentState, knowledge, dependencies) {
+export async function processStep(
+    userId: string,
+    text: string,
+    normalizedText: string,
+    currentState: UserState,
+    knowledge: any,
+    dependencies: any
+): Promise<{ matched: boolean; staleReprocess?: boolean; paused?: boolean }> {
     const step = currentState.step;
-    let result = null;
+    let result: { matched: boolean; staleReprocess?: boolean; paused?: boolean } | null = null;
 
     switch (step) {
         case 'greeting':
@@ -45,10 +53,10 @@ async function processStep(userId, text, normalizedText, currentState, knowledge
         case 'completed':
             result = await handleCompleted(userId, text, normalizedText, currentState, knowledge, dependencies);
             break;
-        default:
+        default: {
             const { _setStep } = require('../utils/flowHelpers');
             console.log(`[STALE-STEP] User ${userId} has unknown step "${currentState.step}". Migrating...`);
-            const stepMigrations = { 'waiting_legal_acceptance': 'waiting_final_confirmation' };
+            const stepMigrations: Record<string, string> = { 'waiting_legal_acceptance': 'waiting_final_confirmation' };
             const migratedStep = stepMigrations[currentState.step];
 
             if (migratedStep) {
@@ -66,6 +74,7 @@ async function processStep(userId, text, normalizedText, currentState, knowledge
                 dependencies.saveState(userId);
                 return { matched: false, staleReprocess: true };
             }
+        }
     }
     return result || { matched: false };
 }

@@ -1,9 +1,17 @@
+import { UserState } from '../../types/state';
 const { handleSystemGlobals } = require('./globalSystem');
 const { handleSafetyCheck } = require('./globalSafety');
 const { handleMediaGlobals } = require('./globalMedia');
 
-async function processGlobals(userId, text, normalizedText, currentState, knowledge, dependencies) {
-    let result;
+export async function processGlobals(
+    userId: string,
+    text: string,
+    normalizedText: string,
+    currentState: UserState,
+    knowledge: any,
+    dependencies: any
+): Promise<{ matched: boolean; paused?: boolean } | null> {
+    let result: { matched: boolean; paused?: boolean } | null;
 
     result = await handleSystemGlobals(userId, text, normalizedText, currentState, dependencies);
     if (result && result.matched) return result;

@@ -1,29 +1,54 @@
-const { exec } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+import { exec } from 'child_process';
+import fs from 'fs';
+import path from 'path';
 const { aiService } = require('./ai');
 
 /**
  * Módulo de Servicios de Administrador
- * Refactorizado de src/controllers/admin.js a services/adminService.js
+ * Refactorizado de src/controllers/admin.js a services/adminService.ts
  */
 
+interface OrderData {
+    product: string | null;
+    plan: string | null;
+    price: string | number | null;
+    address: any | null;
+    step: string | null;
+}
+
+interface AlertEntry {
+    id: number;
+    timestamp: Date;
+    reason: string;
+    userPhone: string;
+    userName: string;
+    details: string;
+    orderData: OrderData;
+}
+
 // Helper: Notify Admin
-async function notifyAdmin(reason, userPhone, details = null, sharedState, client, config) {
+export async function notifyAdmin(
+    reason: string,
+    userPhone: string,
+    details: string | null = null,
+    sharedState: any,
+    client: any,
+    config: any
+): Promise<void> {
     if (process.platform === 'win32') {
-        exec('powershell "[console]::beep(1000, 500)"', (err) => { if (err) console.error("Beep failed:", err); });
+        exec('powershell "[console]::beep(1000, 500)"', (err) => { if (err) console.error('Beep failed:', err); });
     }
     console.error(`⚠️ [ADMIN ALERT] ${reason} (User: ${userPhone})`);
 
     const now = Date.now();
-    const lastAlert = sharedState.sessionAlerts[0];
+    const lastAlert: AlertEntry | undefined = sharedState.sessionAlerts[0];
     if (lastAlert && lastAlert.userPhone === userPhone && lastAlert.reason === reason && (now - lastAlert.id < 8000)) return;
 
     sharedState.lastAlertUser = userPhone;
 
     // Extract order data from user state for rich alerts
     const state = sharedState.userState[userPhone] || {};
-    const orderData = {
+    const orderData: OrderData = {
         product: state.selectedProduct || null,
         plan: state.selectedPlan || null,
         price: state.price || null,
@@ -31,13 +56,13 @@ async function notifyAdmin(reason, userPhone, details = null, sharedState, clien
         step: state.step || null
     };
 
-    const newAlert = {
+    const newAlert: AlertEntry = {
         id: Date.now(),
         timestamp: new Date(),
         reason,
         userPhone,
         userName: state.userName || userPhone,
-        details: details || "",
+        details: details || '',
         orderData
     };
 
@@ -47,33 +72,45 @@ async function notifyAdmin(reason, userPhone, details = null, sharedState, clien
     if (sharedState.io) sharedState.io.emit('new_alert', newAlert);
 
     if (config.alertNumbers && config.alertNumbers.length > 0) {
-        const addrStr = orderData.address ? `${orderData.address.nombre || '?'}, ${orderData.address.calle || '?'}, ${orderData.address.ciudad || '?'}, CP ${orderData.address.cp || '?'}` : 'Sin dirección';
-        const alertMsg = `⚠️ *ALERTA SISTEMA*\n\n*Motivo:* ${reason}\n*Cliente:* ${userPhone}\n${orderData.product ? `*Producto:* ${orderData.product} (${orderData.plan || '?'} días) - $${orderData.price || '?'}\n*Dirección:* ${addrStr}\n` : ''}*Detalles:* ${details || "Sin detalles"}`;
+        const addrStr = orderData.address
+            ? `${orderData.address.nombre || '?'}, ${orderData.address.calle || '?'}, ${orderData.address.ciudad || '?'}, CP ${orderData.address.cp || '?'}`
+            : 'Sin dirección';
+        const alertMsg = `⚠️ *ALERTA SISTEMA*\n\n*Motivo:* ${reason}\n*Cliente:* ${userPhone}\n${orderData.product ? `*Producto:* ${orderData.product} (${orderData.plan || '?'} días) - $${orderData.price || '?'}\n*Dirección:* ${addrStr}\n` : ''}*Detalles:* ${details || 'Sin detalles'}`;
         for (const num of config.alertNumbers) {
             const targetAlert = `${num}@c.us`;
-            client.sendMessage(targetAlert, alertMsg).catch(e => console.error(`[ALERT] Failed to forward to ${num}:`, e.message));
+            client.sendMessage(targetAlert, alertMsg).catch((e: Error) => console.error(`[ALERT] Failed to forward to ${num}:`, e.message));
         }
     }
 }
 
 // Helper: Build the WhatsApp confirmation sent to client after admin approves
-function buildAdminApprovalMessage(clientState) {
-    if (!clientState.pendingOrder) return "Pedido confirmado.";
+export function buildAdminApprovalMessage(clientState: any): string {
+    if (!clientState.pendingOrder) return 'Pedido confirmado.';
 
     const { nombre, calle, ciudad, provincia, cp } = clientState.pendingOrder;
-    const prod = clientState.selectedProduct || 'Producto desconocido';
-    const plan = clientState.selectedPlan ? `${clientState.selectedPlan} días` : (clientState.cart?.[0]?.plan ? `${clientState.cart[0].plan} días` : '');
-    const details = [prod, plan].filter(Boolean).join(' - ');
+    const prod: string = clientState.selectedProduct || 'Producto desconocido';
+    const planDays: string = clientState.selectedPlan
+        ? `${clientState.selectedPlan} días`
+        : (clientState.cart?.[0]?.plan ? `${clientState.cart[0].plan} días` : '');
+    const details = [prod, planDays].filter(Boolean).join(' - ');
     const priceText = clientState.totalPrice ? `Total a pagar: $${clientState.totalPrice}` : '';
 
-    let addrObj = clientState.partialAddress || clientState.pendingOrder || {};
-    const deliveryNotes = addrObj.postdatado || clientState.postdatado ? `\n\n📌 *Nota de entrega:* ${addrObj.postdatado || clientState.postdatado}` : '';
+    const addrObj = clientState.partialAddress || clientState.pendingOrder || {};
+    const deliveryNotes = addrObj.postdatado || clientState.postdatado
+        ? `\n\n📌 *Nota de entrega:* ${addrObj.postdatado || clientState.postdatado}`
+        : '';
 
     return `✅ *¡Genial! Pedido en preparación.*\n\nRecibió este mensaje porque su pedido fue aprobado.\n\n*Detalle:*\n${details}\n\n*Envío a:*\n${nombre || 'Sin nombre'}\n${calle || ''}\n${ciudad || ''}${provincia ? ', ' + provincia : ''}\nCP: ${cp || '?'}\n${priceText}${deliveryNotes}\n\nEn las próximas 24/48hs hábiles te enviaremos el código de seguimiento. ¡Gracias por confiar en Herbalis! 🌱`;
 }
 
 // Helper: Handle Admin Command
-async function handleAdminCommand(targetChatId, commandText, isApi = false, sharedState, client) {
+export async function handleAdminCommand(
+    targetChatId: string | null,
+    commandText: string,
+    isApi: boolean = false,
+    sharedState: any,
+    client: any
+): Promise<string> {
     const lowerMsg = commandText.toLowerCase().trim();
     const userId = process.env.ADMIN_NUMBER ? `${process.env.ADMIN_NUMBER.replace(/\D/g, '')}@c.us` : null;
 
@@ -82,25 +119,24 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false, shar
         try {
             const { analyzeDailyLogs } = require('../../analyze_day');
             const report = await analyzeDailyLogs();
-            if (isApi) return report || "No hay logs para hoy.";
-            if (userId) await client.sendMessage(userId, report || "No hay logs.");
-            return "Report sent to WA";
+            if (isApi) return report || 'No hay logs para hoy.';
+            if (userId) await client.sendMessage(userId, report || 'No hay logs.');
+            return 'Report sent to WA';
         } catch (e) {
-            return "⚠️ Función de análisis no disponible.";
+            return '⚠️ Función de análisis no disponible.';
         }
     }
 
-    // 3. Takeover ("Me encargo")
+    // 2. Takeover ("Me encargo")
     if (lowerMsg.includes('me encargo') || lowerMsg.includes('intervenir')) {
         const actualTarget = targetChatId || sharedState.lastAlertUser;
-        if (!actualTarget) return "No pending user.";
+        if (!actualTarget) return 'No pending user.';
 
         sharedState.pausedUsers.add(actualTarget);
         if (sharedState.saveState) sharedState.saveState();
         if (sharedState.io) sharedState.io.emit('bot_status_change', { chatId: actualTarget, paused: true });
 
-        // Clear alerts
-        const index = sharedState.sessionAlerts.findIndex(a => a.userPhone === actualTarget);
+        const index: number = sharedState.sessionAlerts.findIndex((a: AlertEntry) => a.userPhone === actualTarget);
         if (index !== -1) {
             sharedState.sessionAlerts.splice(index, 1);
             if (sharedState.io) sharedState.io.emit('alerts_updated', sharedState.sessionAlerts);
@@ -110,10 +146,10 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false, shar
         return `✅ Bot pausado. El usuario ${actualTarget} es todo tuyo.`;
     }
 
-    // 4. Confirmation
+    // 3. Confirmation
     if (lowerMsg === 'ok' || lowerMsg === 'dale' || lowerMsg === 'si' || lowerMsg === 'confirmar') {
         const actualTarget = targetChatId || sharedState.lastAlertUser;
-        if (!actualTarget) return "No pending user.";
+        if (!actualTarget) return 'No pending user.';
         const clientState = sharedState.userState[actualTarget];
 
         if (clientState && clientState.step === 'waiting_admin_ok' && clientState.pendingOrder) {
@@ -125,8 +161,7 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false, shar
             clientState.history.push({ role: 'bot', content: summary });
             if (sharedState.saveState) sharedState.saveState();
 
-            // Clear alerts
-            const index = sharedState.sessionAlerts.findIndex(a => a.userPhone === actualTarget);
+            const index: number = sharedState.sessionAlerts.findIndex((a: AlertEntry) => a.userPhone === actualTarget);
             if (index !== -1) {
                 sharedState.sessionAlerts.splice(index, 1);
                 if (sharedState.io) sharedState.io.emit('alerts_updated', sharedState.sessionAlerts);
@@ -150,11 +185,12 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false, shar
                     data: { status: 'Confirmado' }
                 });
 
-                const msg = "¡Excelente! Tu pedido ya fue ingresado 🚀\n\nTe vamos a avisar cuando lo despachemos con el número de seguimiento.\n\n¡Muchas gracias por confiar en Herbalis!";
+                const msg = '¡Excelente! Tu pedido ya fue ingresado 🚀\n\nTe vamos a avisar cuando lo despachemos con el número de seguimiento.\n\n¡Muchas gracias por confiar en Herbalis!';
                 await client.sendMessage(actualTarget, msg);
 
                 if (sharedState.userState[actualTarget]) {
                     sharedState.userState[actualTarget].step = 'completed';
+                    sharedState.userState[actualTarget].hasSoldBefore = true;
                     sharedState.userState[actualTarget].history = sharedState.userState[actualTarget].history || [];
                     sharedState.userState[actualTarget].history.push({ role: 'bot', content: msg, timestamp: Date.now() });
                     if (sharedState.saveState) sharedState.saveState();
@@ -166,7 +202,7 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false, shar
                     sharedState.io.emit('order_update', { action: 'updated', order: { id: existingOrder.id, status: 'Confirmado' } });
                 }
 
-                const index = sharedState.sessionAlerts.findIndex(a => a.userPhone === actualTarget);
+                const index: number = sharedState.sessionAlerts.findIndex((a: AlertEntry) => a.userPhone === actualTarget);
                 if (index !== -1) {
                     sharedState.sessionAlerts.splice(index, 1);
                     if (sharedState.io) sharedState.io.emit('alerts_updated', sharedState.sessionAlerts);
@@ -178,7 +214,7 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false, shar
             console.error('[ADMIN] Error confirming order in DB:', e);
         }
 
-        return "⚠️ No hay pedido pendiente de aprobación.";
+        return '⚠️ No hay pedido pendiente de aprobación.';
     }
 
     const actualTarget = targetChatId || sharedState.lastAlertUser;
@@ -186,15 +222,15 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false, shar
         try {
             const state = sharedState.userState[actualTarget] || {};
             const history = (state.history || [])
-                .map(m => `${m.role.toUpperCase()}: ${m.content} `).join('\n');
+                .map((m: any) => `${m.role.toUpperCase()}: ${m.content} `).join('\n');
             const cartStr = state.cart && state.cart.length > 0
-                ? state.cart.map(i => `${i.product} (${i.plan} días)`).join(' + ')
+                ? state.cart.map((i: any) => `${i.product} (${i.plan} días)`).join(' + ')
                 : `${state.selectedProduct || 'Producto desconocido'} (${state.selectedPlan || '?'} días)`;
             const totalStr = state.totalPrice ? `$${state.totalPrice}` : 'Desconocido';
 
             const contextStr = `HISTORIAL DEL CHAT:\n${history}\n\nDATOS DEL PEDIDO ACTUAL (USALOS SI DEBÉS CONFIRMAR O ARMAR RESUMEN):\n- Productos: ${cartStr}\n- Total a pagar al recibir: ${totalStr}`;
 
-            const suggestion = await aiService.generateSuggestion(commandText, contextStr);
+            const suggestion: string | null = await aiService.generateSuggestion(commandText, contextStr);
 
             if (suggestion) {
                 await client.sendMessage(actualTarget, suggestion);
@@ -204,7 +240,7 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false, shar
                     sharedState.pausedUsers.delete(actualTarget);
                 }
 
-                const index = sharedState.sessionAlerts.findIndex(a => a.userPhone === actualTarget);
+                const index: number = sharedState.sessionAlerts.findIndex((a: AlertEntry) => a.userPhone === actualTarget);
                 if (index !== -1) {
                     sharedState.sessionAlerts.splice(index, 1);
                     if (sharedState.io) sharedState.io.emit('alerts_updated', sharedState.sessionAlerts);
@@ -214,11 +250,11 @@ async function handleAdminCommand(targetChatId, commandText, isApi = false, shar
             }
         } catch (e) {
             console.error('AI Suggestion Error:', e);
-            return "⚠️ Error generando sugerencia IA.";
+            return '⚠️ Error generando sugerencia IA.';
         }
     }
 
-    return "⚠️ Comando no reconocido o sin usuario activo.";
+    return '⚠️ Comando no reconocido o sin usuario activo.';
 }
 
 module.exports = {

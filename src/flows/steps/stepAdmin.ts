@@ -1,6 +1,19 @@
+import { UserState } from '../../types/state';
 const { pauseUser } = require('../../services/pauseService');
 
-async function handleAdminSteps(userId, text, normalizedText, currentState, knowledge, dependencies) {
+interface AdminStepDependencies {
+    saveState: (userId: string) => void;
+    sharedState?: any;
+}
+
+export async function handleAdminSteps(
+    userId: string,
+    text: string,
+    normalizedText: string,
+    currentState: UserState,
+    knowledge: any,
+    dependencies: AdminStepDependencies
+): Promise<{ matched: boolean; paused: boolean }> {
     const { saveState } = dependencies;
 
     // Pedido pendiente de validación manual — el bot se mantiene completamente en silencio.

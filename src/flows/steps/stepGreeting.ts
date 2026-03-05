@@ -1,10 +1,25 @@
-const path = require('path');
-const fs = require('fs');
+import path from 'path';
+import fs from 'fs';
+import { UserState } from '../../types/state';
 const { MessageMedia } = require('whatsapp-web.js');
 const { _formatMessage } = require('../utils/messages');
 const { _setStep } = require('../utils/flowHelpers');
 
-async function handleGreeting(userId, text, currentState, knowledge, dependencies) {
+interface GreetingDependencies {
+    client: any;
+    sendMessageWithDelay: (chatId: string, content: string) => Promise<void>;
+    saveState: (userId: string) => void;
+    effectiveScript?: string;
+    config?: { scriptStats?: Record<string, { started: number; completed: number }>; activeScript?: string };
+}
+
+export async function handleGreeting(
+    userId: string,
+    text: string,
+    currentState: UserState,
+    knowledge: any,
+    dependencies: GreetingDependencies
+): Promise<{ matched: boolean }> {
     const { client, sendMessageWithDelay, saveState } = dependencies;
     // We defer requiring processSalesFlow to prevent circular dependency issues
     const { processSalesFlow } = require('../salesFlow');
@@ -23,17 +38,13 @@ async function handleGreeting(userId, text, currentState, knowledge, dependencie
         _setStep(currentState, 'waiting_weight');
         saveState(userId);
 
-        // Let the caller (salesFlow.js) know it should yield/continue the recursive call, 
-        // to avoid circular promise loops, it's safer to just set the state and let the caller re-run or we can run it here
+        // Defer to salesFlow to avoid circular promise loops
         const fakeUserStateMap = { [userId]: currentState };
         await processSalesFlow(userId, text, fakeUserStateMap, knowledge, dependencies);
         return { matched: true };
     }
 
     // --- CHECK: Ad Interaction ---
-    // When a user clicks a Facebook/Instagram ad, WhatsApp sends an e2e_notification
-    // which gets converted to "Hola! (Vengo de un anuncio)" by the message handler.
-    // We treat this as a normal greeting and send the full presentation.
     if (text.trim() === 'Hola! (Vengo de un anuncio)') {
         console.log(`[GREETING] Ad trigger detected for ${userId}. Sending full greeting.`);
         // Fall through to the normal greeting logic below (don't return early)
@@ -49,11 +60,10 @@ async function handleGreeting(userId, text, currentState, knowledge, dependencie
     }
 
     // 1. Send Text FIRST (Presentation part)
-    const rawGreetMsg = _formatMessage(knowledge.flow.greeting.response, currentState);
+    const rawGreetMsg: string = _formatMessage(knowledge.flow.greeting.response, currentState);
 
-    // Attempt to split the greeting naturally if it contains the question at the end
     let greetingPart1 = rawGreetMsg;
-    let greetingPart2 = null;
+    let greetingPart2: string | null = null;
 
     const splitIndex = rawGreetMsg.lastIndexOf('Para recomendarte bien:');
     if (splitIndex !== -1) {
@@ -74,7 +84,7 @@ async function handleGreeting(userId, text, currentState, knowledge, dependencie
     try {
         const greetingNode = knowledge.flow.greeting;
         if (greetingNode && greetingNode.image && greetingNode.imageEnabled) {
-            let media;
+            let media: any;
             if (greetingNode.image.startsWith('/media/')) {
                 const relativePath = greetingNode.image.replace(/^\//, '');
                 const localPath = path.join(__dirname, '../../../public', relativePath);
@@ -90,13 +100,12 @@ async function handleGreeting(userId, text, currentState, knowledge, dependencie
                     greetingNode.imageFilename || 'welcome.jpg'
                 );
             }
-
             if (media) {
                 await client.sendMessage(userId, media, { caption: '' });
                 console.log(`[GREETING] Image sent to ${userId} from knowledge config`);
             }
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('[GREETING] Failed to send image:', e.message);
     }
 

@@ -1,17 +1,31 @@
+import { UserState } from '../../types/state';
 const { _formatMessage } = require('../utils/messages');
 const { _setStep } = require('../utils/flowHelpers');
 const { _isAffirmative } = require('../utils/validation');
 
-async function handleWaitingPriceConfirmation(userId, text, normalizedText, currentState, knowledge, dependencies) {
+interface PriceConfirmationDependencies {
+    sendMessageWithDelay: (chatId: string, content: string) => Promise<void>;
+    aiService: any;
+    saveState: (userId: string) => void;
+}
+
+export async function handleWaitingPriceConfirmation(
+    userId: string,
+    text: string,
+    normalizedText: string,
+    currentState: UserState,
+    knowledge: any,
+    dependencies: PriceConfirmationDependencies
+): Promise<{ matched: boolean }> {
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
 
     const wantsPrices = /\b(precio|precios|info|cuanto|cuánto|pasame|decime|conta)\b/.test(normalizedText);
     if (wantsPrices || _isAffirmative(normalizedText)) {
-        let msg = "";
-        if (currentState.selectedProduct && currentState.selectedProduct.includes("Cápsulas")) {
+        let msg = '';
+        if (currentState.selectedProduct && currentState.selectedProduct.includes('Cápsulas')) {
             msg = _formatMessage(knowledge.flow.price_capsulas.response, currentState);
             _setStep(currentState, knowledge.flow.price_capsulas.nextStep);
-        } else if (currentState.selectedProduct && currentState.selectedProduct.includes("Gotas")) {
+        } else if (currentState.selectedProduct && currentState.selectedProduct.includes('Gotas')) {
             msg = _formatMessage(knowledge.flow.price_gotas.response, currentState);
             _setStep(currentState, knowledge.flow.price_gotas.nextStep);
         } else {
@@ -20,7 +34,6 @@ async function handleWaitingPriceConfirmation(userId, text, normalizedText, curr
         }
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);
-
         await sendMessageWithDelay(userId, msg);
         return { matched: true };
     } else {
