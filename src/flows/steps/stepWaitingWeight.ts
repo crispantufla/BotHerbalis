@@ -73,31 +73,29 @@ export async function handleWaitingWeight(
     } else {
         (currentState as any).weightRefusals = ((currentState as any).weightRefusals || 0) + 1;
 
-        if (isRefusal || (currentState as any).weightRefusals >= 2) {
-            console.log(`[LOGIC] User ${userId} refused/failed weight question. Skipping to preference.`);
+        if (isRefusal || (currentState as any).weightRefusals > 2) {
+            console.log(`[LOGIC] User ${userId} refused/failed weight question too many times (${(currentState as any).weightRefusals}). Skipping to preference.`);
             const skipMsg = "¡Entiendo, no hay problema! 👌 Pasemos directo a ver qué opción es mejor para vos.\n\nTenemos:\n1️⃣ Cápsulas (Lo más efectivo y práctico)\n2️⃣ Semillas/Infusión (Más natural)\n3️⃣ Gotas (Para >70 años o poquitos kilos)\n\n¿Cuál te gustaría probar?";
-            await sendMessageWithDelay(userId, skipMsg);
 
             _setStep(currentState, FlowStep.WAITING_PREFERENCE);
             currentState.history.push({ role: 'bot', content: skipMsg, timestamp: Date.now() });
             saveState(userId);
+            await sendMessageWithDelay(userId, skipMsg);
             return { matched: true };
         } else {
             console.log(`[AI-FALLBACK] waiting_weight: No number detected for ${userId}`);
             const aiWeight = await aiService.chat(text, {
                 step: FlowStep.WAITING_WEIGHT,
-                goal: 'Explicar brevemente el producto seleccionado y preguntar sutilmente cuánto peso buscan bajar para continuar. RESPONDÉ NATURALMENTE Y COMO HUMANO. 1) Si la persona envía un mensaje largo contando una historia, un problema personal, de salud, inseguridades de peso o miedos: TÓMATE TODO TU TIEMPO, usa párrafos largos, muestra muchísima empatía conectando tu respuesta con cada una de sus palabras antes de decirle nada del producto. No te limites, sé humana, reconfortala. 2) No te limites si el usuario hace preguntas sobre dietas, rebote o cuidados, dales respuestas completísimas, tenés espacio para escribir. 3) Solo si el usuario envía un texto rápido o escueto como "hola" o un número, sé más concisa. 4) TERMINA SIEMPRE con la pregunta "¿Cuántos kilos te gustaría bajar aproximadamente?" al final de tu respuesta de validación. 5) Si preguntan "cápsulas o gotas", o piden recomendación general, decirle EXACTAMENTE: "Mirá, las cápsulas son la opción más efectiva y práctica para la mayoría. ¿Cuántos kilos querés bajar?".',
+                goal: 'El usuario NO te ha dicho cuántos kilos quiere bajar. Tu objetivo es explicar brevemente el producto seleccionado y PREGUNTAR SUTÍLMENTE CUÁNTO PESO BUSCAN BAJAR para continuar. RESPONDÉ NATURALMENTE Y COMO HUMANO. 1) Si la persona envía una pregunta fuera de contexto, o una palabra sin sentido, respóndele brevemente intentando volver al tema de la baja de peso. 2) Si dice no saberlo, ofrécele una estimación. 3) TERMINA SIEMPRE con la pregunta "¿Cuántos kilos te gustaría bajar aproximadamente?" al final de tu respuesta de validación.',
                 history: currentState.history,
                 summary: currentState.summary,
                 knowledge: knowledge,
                 userState: currentState
             });
 
-            if (aiWeight.goalMet) {
-                if (aiWeight.extractedData) {
-                    const extNum = aiWeight.extractedData.match(/\d+/);
-                    if (extNum) currentState.weightGoal = parseInt(extNum[0], 10);
-                }
+            if (aiWeight.goalMet && aiWeight.extractedData) {
+                const extNum = aiWeight.extractedData.match(/\d+/);
+                if (extNum) currentState.weightGoal = parseInt(extNum[0], 10);
 
                 if ((currentState as any).suggestedProduct) {
                     console.log(`[LOGIC] AI goalMet weight, user already suggested ${(currentState as any).suggestedProduct}, skipping preference.`);
