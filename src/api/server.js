@@ -29,7 +29,10 @@ function startServer(client, sharedState) {
         cors: {
             origin: allowedOrigin,
             methods: ["GET", "POST"]
-        }
+        },
+        pingTimeout: 60000,
+        pingInterval: 25000,
+        transports: ['websocket', 'polling']
     });
 
     // Share IO with global state so index.js can use it
