@@ -1,7 +1,22 @@
+import { UserState } from '../../types/state';
 const { _isNegative } = require('../utils/validation');
 const { _pauseAndAlert, _setStep } = require('../utils/flowHelpers');
 
-async function handleSystemGlobals(userId, text, normalizedText, currentState, dependencies) {
+interface SystemDependencies {
+    sendMessageWithDelay: (chatId: string, content: string) => Promise<void>;
+    aiService: any;
+    saveState: (userId: string) => void;
+    notifyAdmin?: (subject: string, userId: string, detail?: string) => Promise<any>;
+    sharedState?: { pausedUsers?: Set<string>; io?: any };
+}
+
+export async function handleSystemGlobals(
+    userId: string,
+    text: string,
+    normalizedText: string,
+    currentState: UserState,
+    dependencies: SystemDependencies
+): Promise<{ matched: boolean } | null> {
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
     const isNegative = _isNegative(normalizedText);
 
@@ -9,7 +24,7 @@ async function handleSystemGlobals(userId, text, normalizedText, currentState, d
     const CANCEL_REGEX = /\b(cancelar|cancelarlo|anular|dar de baja|no quiero (el|mi) pedido|baja al pedido|me arrepenti)\b/i;
     if (CANCEL_REGEX.test(normalizedText) && !isNegative && currentState.step !== 'completed') {
         console.log(`[GLOBAL] User ${userId} requested cancellation.`);
-        const msg = "Qué pena... 😔 ¿Por qué querés cancelarlo? (Respondeme y le aviso a mi compañero para que te ayude)";
+        const msg = 'Qué pena... 😔 ¿Por qué querés cancelarlo? (Respondeme y le aviso a mi compañero para que te ayude)';
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         await sendMessageWithDelay(userId, msg);
 
@@ -21,7 +36,7 @@ async function handleSystemGlobals(userId, text, normalizedText, currentState, d
     const MEDICAL_REJECT_REGEX = /\b(embarazada|embarazo|lactancia|lactar|amamantar|amamantando|dando la teta|dando el pecho|8[0-9]\s*a[ñn]os|9[0-9]\s*a[ñn]os)\b/i;
     if ((MEDICAL_REJECT_REGEX.test(normalizedText) && !isNegative) || currentState.step === 'rejected_medical') {
         console.log(`[MEDICAL REJECT] User ${userId} mentioned contraindicated condition or is already rejected.`);
-        const msg = "Lamentablemente, por estricta precaución, no recomendamos ni permitimos el uso de la Nuez de la India durante el embarazo, la lactancia o en personas mayores de 80 años. Priorizamos tu salud por encima de todo. 🌿😊\n\nPor este motivo, damos por finalizada la consulta y no podremos avanzar con el envío. ¡Cuidate mucho!";
+        const msg = 'Lamentablemente, por estricta precaución, no recomendamos ni permitimos el uso de la Nuez de la India durante el embarazo, la lactancia o en personas mayores de 80 años. Priorizamos tu salud por encima de todo. 🌿😊\n\nPor este motivo, damos por finalizada la consulta y no podremos avanzar con el envío. ¡Cuidate mucho!';
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         await sendMessageWithDelay(userId, msg);
 
@@ -34,7 +49,7 @@ async function handleSystemGlobals(userId, text, normalizedText, currentState, d
     const ABUSIVE_REGEX = /\b(estafador|estafadores|estafa|robo|ladron|ladrones|mierda|puta|puto|boludos|boludeo|boludear|mentirosos|mentira|chantas|chanta|garcas|garca|denunciar|defensa al consumidor)\b/i;
     if (ABUSIVE_REGEX.test(normalizedText) && currentState.step !== 'rejected_abusive') {
         console.log(`[ABUSIVE REJECT] User ${userId} used aggressive language.`);
-        const msg = "Lamento mucho que te sientas de esta manera. Voy a suspender la interacción automática para que un asesor humano atienda y analice tu caso a la brevedad.";
+        const msg = 'Lamento mucho que te sientas de esta manera. Voy a suspender la interacción automática para que un asesor humano atienda y analice tu caso a la brevedad.';
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         await sendMessageWithDelay(userId, msg);
 
@@ -52,7 +67,7 @@ async function handleSystemGlobals(userId, text, normalizedText, currentState, d
     if (GEO_REGEX.test(normalizedText) && !currentState.geoRejected) {
         console.log(`[GEO REJECT] User ${userId} is outside Argentina: "${text}"`);
         currentState.geoRejected = true;
-        const msg = "Lamentablemente solo hacemos envíos dentro de Argentina 😔 Si en algún momento necesitás para alguien de acá, ¡con gusto te ayudamos!";
+        const msg = 'Lamentablemente solo hacemos envíos dentro de Argentina 😔 Si en algún momento necesitás para alguien de acá, ¡con gusto te ayudamos!';
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         await sendMessageWithDelay(userId, msg);
         _setStep(currentState, 'rejected_geo');
@@ -61,7 +76,7 @@ async function handleSystemGlobals(userId, text, normalizedText, currentState, d
     }
     if (currentState.geoRejected || currentState.step === 'rejected_geo') {
         console.log(`[GEO REJECT] User ${userId} already geo-rejected, blocking.`);
-        const msg = "Como te comenté, lamentablemente solo realizamos envíos dentro de Argentina 😔";
+        const msg = 'Como te comenté, lamentablemente solo realizamos envíos dentro de Argentina 😔';
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         await sendMessageWithDelay(userId, msg);
         return { matched: true };
@@ -69,16 +84,13 @@ async function handleSystemGlobals(userId, text, normalizedText, currentState, d
 
     // 3.5 CLIENT INQUIRY
     // Si el usuario es un cliente previo (ya compró antes), el bot se detiene siempre.
-    // Detectamos si es cliente por un Tag explícito del CRM en currentState
-    const isTaggedClient = currentState.tags && currentState.tags.some(tag => tag.name === 'Cliente');
+    const isTaggedClient = (currentState as any).tags?.some((tag: any) => tag.name === 'Cliente') ?? false;
 
-    // O detectamos si en el estado del bot se marca que se realizó una venta exitosa
-    // (flag booleano persistido en currentState, evita depender de texto literal frágil)
+    // Flag booleano persistido en currentState (evita depender de texto literal frágil)
     const historyIndicatesSale = currentState.hasSoldBefore === true;
 
     if (isTaggedClient || historyIndicatesSale) {
         console.log(`[CLIENT SUPPORT] User ${userId} is an existing client speaking. Pausing bot.`);
-        // Note: No auto-reply here as requested by user ("Simplemente te pausabas te pedias ayuda al administrador")
         await _pauseAndAlert(userId, currentState, dependencies, text, '🚨 Cliente recurrente o con compra reciente escribiendo. Intervención humana requerida.');
         return { matched: true };
     }
@@ -93,7 +105,7 @@ async function handleSystemGlobals(userId, text, normalizedText, currentState, d
         currentState.selectedProduct = null;
         currentState.selectedPlan = null;
 
-        const msg = "¡Ningún problema! 😊 Volvamos a elegir. ¿Qué te gustaría llevar entonces? (Cápsulas, Semillas, Gotas)";
+        const msg = '¡Ningún problema! 😊 Volvamos a elegir. ¿Qué te gustaría llevar entonces? (Cápsulas, Semillas, Gotas)';
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         await sendMessageWithDelay(userId, msg);
 

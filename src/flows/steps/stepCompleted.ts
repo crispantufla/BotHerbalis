@@ -1,7 +1,24 @@
+import { UserState } from '../../types/state';
 const { _setStep } = require('../utils/flowHelpers');
 const { _isAffirmative, _isNegative } = require('../utils/validation');
 
-async function handleCompleted(userId, text, normalizedText, currentState, knowledge, dependencies) {
+interface CompletedDependencies {
+    sendMessageWithDelay: (chatId: string, content: string) => Promise<void>;
+    aiService: any;
+    saveState: (userId: string) => void;
+    notifyAdmin?: (subject: string, userId: string, detail?: string) => Promise<any>;
+    cancelLatestOrder?: (userId: string) => Promise<{ success: boolean; reason?: string; currentStatus?: string }>;
+    sharedState?: { pausedUsers?: Set<string> };
+}
+
+export async function handleCompleted(
+    userId: string,
+    text: string,
+    normalizedText: string,
+    currentState: UserState,
+    knowledge: any,
+    dependencies: CompletedDependencies
+): Promise<{ matched: boolean; paused?: boolean }> {
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
 
     console.log(`[POST-SALE] Message from completed customer ${userId}: "${text}"`);
@@ -74,11 +91,11 @@ async function handleCompleted(userId, text, normalizedText, currentState, knowl
 
     if (postSaleAI.extractedData === 'TRACKING_INFO') {
         console.log(`[POST-SALE] Customer ${userId} is asking for tracking/shipping info. Auto-pausing silently.`);
-        if (dependencies.sharedState && dependencies.sharedState.pausedUsers) {
+        if (dependencies.sharedState?.pausedUsers) {
             dependencies.sharedState.pausedUsers.add(userId);
         }
         if (dependencies.notifyAdmin) {
-            await dependencies.notifyAdmin('📦 Consulta de Código/Envío', userId, `El cliente post-venta preguntó por su envío o código de seguimiento.\n\nMensaje original: "${text}"\n\nEl bot se silenció automáticamente para que le respondas.`);
+            await dependencies.notifyAdmin('📦 Consulta de Código/Envío', userId, `El cliente post-venta preguntó por su envío.\n\nMensaje original: "${text}"\n\nEl bot se silenció automáticamente para que le respondas.`);
         }
         return { matched: true, paused: true };
     } else if (postSaleAI.extractedData === 'RE_PURCHASE') {
@@ -110,7 +127,7 @@ async function handleCompleted(userId, text, normalizedText, currentState, knowl
             await sendMessageWithDelay(userId, confirmMsg);
         }
         return { matched: true };
-    } else if (postSaleAI.extractedData && postSaleAI.extractedData.startsWith('POSTDATE:')) {
+    } else if (postSaleAI.extractedData?.startsWith('POSTDATE:')) {
         const newDate = postSaleAI.extractedData.replace('POSTDATE:', '').trim();
         console.log(`[POST-SALE] Customer ${userId} wants to post-date delivery to: ${newDate}`);
         currentState.postdatado = newDate;
@@ -126,7 +143,9 @@ async function handleCompleted(userId, text, normalizedText, currentState, knowl
         }
         return { matched: true };
     } else if (postSaleAI.extractedData === 'NEED_ADMIN') {
-        if (dependencies.notifyAdmin) await dependencies.notifyAdmin('⚠️ Cliente post-venta necesita asistencia', userId, `Mensaje: "${text}"`);
+        if (dependencies.notifyAdmin) {
+            await dependencies.notifyAdmin('⚠️ Cliente post-venta necesita asistencia', userId, `Mensaje: "${text}"`);
+        }
         if (postSaleAI.response) {
             currentState.history.push({ role: 'bot', content: postSaleAI.response, timestamp: Date.now() });
             await sendMessageWithDelay(userId, postSaleAI.response);
@@ -137,6 +156,7 @@ async function handleCompleted(userId, text, normalizedText, currentState, knowl
         await sendMessageWithDelay(userId, postSaleAI.response);
         return { matched: true };
     }
+
     return { matched: true };
 }
 
