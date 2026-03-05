@@ -6,6 +6,12 @@ const { MessageMedia } = require('whatsapp-web.js');
 
 const globalContactCache = new Map();
 
+let ordersCache = {
+    data: [],
+    lastFetch: 0
+};
+const CACHE_TTL = 60000; // 60 seconds
+
 const withTimeout = (promise, ms, rejectMessage) => {
     let timeoutId;
     const timeout = new Promise((_, reject) => {
@@ -99,15 +105,22 @@ module.exports = (client, sharedState) => {
         try {
             const chats = await withTimeout(client.getChats(), 10000, "Timeout retrieving chats");
 
-            // Read orders from Database to cross-reference past purchases
+            // Read orders from Database to cross-reference past purchases (With 60s TTL Cache)
             let orders = [];
             try {
-                const { prisma } = require('../../../db');
-                orders = await prisma.order.findMany({
-                    where: { status: { not: 'Cancelado' } }
-                });
+                const now = Date.now();
+                if (now - ordersCache.lastFetch > CACHE_TTL) {
+                    const { prisma } = require('../../../db');
+                    const dbOrders = await prisma.order.findMany({
+                        where: { status: { not: 'Cancelado' } }
+                    });
+                    ordersCache.data = dbOrders;
+                    ordersCache.lastFetch = now;
+                }
+                orders = ordersCache.data;
             } catch (err) {
                 console.error("🔴 Error fetching DB orders in /chats:", err.message);
+                orders = ordersCache.data || []; // Fallback to stale cache if DB fails
             }
 
             const instanceFilterId = req.query.instanceId || process.env.INSTANCE_ID || 'default';
