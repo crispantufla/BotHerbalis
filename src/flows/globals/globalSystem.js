@@ -67,6 +67,23 @@ async function handleSystemGlobals(userId, text, normalizedText, currentState, d
         return { matched: true };
     }
 
+    // 3.5 CLIENT INQUIRY
+    // Si el usuario es un cliente previo (ya compró antes), el bot se detiene siempre.
+    // Detectamos si es cliente por un Tag explícito del CRM en currentState
+    const isTaggedClient = currentState.tags && currentState.tags.some(tag => tag.name === 'Cliente');
+
+    // O detectamos si en el historial de esta conversación el bot le vendió exitosamente
+    const historyIndicatesSale = currentState.history && currentState.history.some(msg =>
+        msg.role === 'bot' && (msg.content.includes('CONFIRMACIÓN DE ENVÍO') || msg.content.includes('etiqueta de envío'))
+    );
+
+    if (isTaggedClient || historyIndicatesSale) {
+        console.log(`[CLIENT SUPPORT] User ${userId} is an existing client speaking. Pausing bot.`);
+        // Note: No auto-reply here as requested by user ("Simplemente te pausabas te pedias ayuda al administrador")
+        await _pauseAndAlert(userId, currentState, dependencies, text, '🚨 Cliente recurrente o con compra reciente escribiendo. Intervención humana requerida.');
+        return { matched: true };
+    }
+
     // 4. CHANGE ORDER
     const CHANGE_REGEX = /\b(cambiar|cambiarlo|modificar|otro producto|otra cosa|en vez de|quiero otra)\b/i;
     if (CHANGE_REGEX.test(normalizedText) && currentState.step !== 'greeting' && currentState.step !== 'waiting_data' && !isNegative) {

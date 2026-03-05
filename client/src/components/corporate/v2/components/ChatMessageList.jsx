@@ -3,13 +3,37 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { Trash2 as Trash, Play } from 'lucide-react';
 import { API_URL } from '../../../../config/api';
 
+const formatDateSeparator = (date) => {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    // Normalize to midnight for accurate day comparison
+    const targetDate = new Date(date);
+    targetDate.setHours(0, 0, 0, 0);
+    const todayNormalized = new Date(today);
+    todayNormalized.setHours(0, 0, 0, 0);
+    const yesterdayNormalized = new Date(yesterday);
+    yesterdayNormalized.setHours(0, 0, 0, 0);
+
+    if (targetDate.getTime() === todayNormalized.getTime()) {
+        return 'Hoy';
+    } else if (targetDate.getTime() === yesterdayNormalized.getTime()) {
+        return 'Ayer';
+    } else {
+        // Formato dd/mm/yyyy
+        return targetDate.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    }
+};
+
 const ChatMessageList = ({ messages, isLoading, chatFontSize, handleDeleteMessage, onScrollBottom }) => {
     const parentRef = useRef(null);
 
     const rowVirtualizer = useVirtualizer({
         count: messages.length,
         getScrollElement: () => parentRef.current,
-        estimateSize: () => 64, // estimated message height
+        // Increment estimated size if there tends to be date dividers
+        estimateSize: () => 80,
         overscan: 10,
     });
 
@@ -87,6 +111,21 @@ const ChatMessageList = ({ messages, isLoading, chatFontSize, handleDeleteMessag
             >
                 {rowVirtualizer.getVirtualItems().map((virtualRow) => {
                     const msg = messages[virtualRow.index];
+                    const prevMsg = virtualRow.index > 0 ? messages[virtualRow.index - 1] : null;
+
+                    let showDateSeparator = false;
+                    let dateSeparatorText = '';
+
+                    if (msg && msg.timestamp) {
+                        const msgDate = new Date(msg.timestamp).toDateString();
+                        const prevMsgDate = prevMsg && prevMsg.timestamp ? new Date(prevMsg.timestamp).toDateString() : null;
+
+                        if (!prevMsgDate || msgDate !== prevMsgDate) {
+                            showDateSeparator = true;
+                            dateSeparatorText = formatDateSeparator(msg.timestamp);
+                        }
+                    }
+
                     return (
                         <div
                             key={virtualRow.key}
@@ -101,6 +140,14 @@ const ChatMessageList = ({ messages, isLoading, chatFontSize, handleDeleteMessag
                                 paddingBottom: '32px', // increased slightly to give breathing room for long messages
                             }}
                         >
+                            {showDateSeparator && (
+                                <div className="flex justify-center mb-6 mt-2">
+                                    <div className="bg-slate-200/80 dark:bg-slate-700/60 backdrop-blur-sm px-4 py-1.5 rounded-full text-[11px] font-medium text-slate-600 dark:text-slate-300 shadow-sm border border-slate-300/30 dark:border-slate-600/30">
+                                        {dateSeparatorText}
+                                    </div>
+                                </div>
+                            )}
+
                             <div className={`flex ${msg.fromMe ? 'justify-end' : 'justify-start'}`}>
                                 <div className={`max-w-[75%] p-4 leading-relaxed shadow-sm relative group ${msg.fromMe ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-3xl rounded-tr-sm shadow-indigo-500/20' : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-3xl rounded-tl-sm border border-slate-100 dark:border-slate-700'}`} style={{ fontSize: `${chatFontSize}px` }}>
                                     {renderMessageBody(msg)}

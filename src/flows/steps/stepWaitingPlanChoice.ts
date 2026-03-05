@@ -3,6 +3,7 @@ const { _getPrice, _getAdicionalMAX } = require('../utils/pricing');
 const { _setStep } = require('../utils/flowHelpers');
 const { buildConfirmationMessage } = require('../../utils/messageTemplates');
 const { buildCartFromSelection, calculateTotal } = require('../utils/cartHelpers');
+const { _isDuplicate } = require('../utils/messages');
 
 function _handleExtractedData(userId: string, extractedData: string, currentState: UserState) {
     if (!extractedData || extractedData === 'null') return;
@@ -89,15 +90,15 @@ async function handleWaitingPlanChoice(
     let selectedPlanId = null;
 
     // GUARD: Detect any questions BEFORE interpreting numbers as plan selection blindly
-    // e.g. "el de 120 cuánto sale", "quiero el de 60, como se toma?", "el de 60 pero me cuesta tragar"
+    // e.g. "el de 120 cuánto sale", "quiero el de 60, como se toma?", "el de 60 pero me cuesta tragar", "cuanto bajo en 60 dias?"
     // If the user has a question AND a plan, we want the AI to handle it so it answers their question first.
-    const hasQuestion = /\b(como|cómo|cuando|cuándo|que|qué|donde|dónde|por que|por qué|cual|cuál|duda|consulta|precio|costo|sale|cuesta|valor|paga|cobr|tarjeta|efectivo|transferencia|contraindicaciones|efectos|mal|dieta|rebote|tragar|ahogar|grandes|cuestan|complicado|dificil|seguridad|garantia|garantía|efectiva|efectivo|funciona|seguro)\b/i.test(normalizedText) || normalizedText.includes('?');
+    const hasQuestionText = /\b(como|cómo|cuando|cuándo|que|qué|donde|dónde|por que|por qué|cual|cuál|duda|consulta|consulto|precio|costo|sale|cuesta|valor|paga|cobr|tarjeta|efectivo|transferencia|contraindicaciones|efectos|mal|dieta|rebote|tragar|ahogar|grandes|cuestan|complicado|dificil|seguridad|garantia|garantía|garantiza|efectiva|efectivo|funciona|seguro|cuanto|cuánto|cuantos|cuántos|kilo|kilos|bajar|bajo)\b/i.test(normalizedText) || text.includes('?');
 
     // If text is super long (like a transcription), force AI to handle it so we don't look robotic
     const isVeryLongMessage = text.split(/\s+/).length > 20;
 
     const planMatch = normalizedText.match(/\b(60|120|180|240|300|360|420|480|540|600)\b/);
-    if (planMatch && !hasQuestion && !isVeryLongMessage) {
+    if (planMatch && !hasQuestionText && !isVeryLongMessage) {
         selectedPlanId = planMatch[1];
     }
 
@@ -203,9 +204,10 @@ async function handleWaitingPlanChoice(
                 goal: `El usuario debe elegir un plan (60 o 120 días).
 RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.
 1) SI EL USUARIO HACE PREGUNTAS (ej: "cómo se toma", "tiene contraindicaciones", sobre su salud, o pide info de otro producto): TÓMATE TODO EL ESPACIO NECESARIO. Respóndele con párrafos muy detallados, extensos y con muchísima empatía. Explayate sobre los efectos del producto, dietas o garantías si lo piden. Y después preguntá sutilmente con cuál plan avanzar. goalMet=false.
-2) CAMBIO DE PRODUCTO: Si el usuario dice "quiero semillas" o "gotas", confirmá el cambio usando extractedData="CHANGE_PRODUCT: [Producto]" (SIN preguntarle de nuevo) y dale los precios de ese nuevo producto para que elija el plan. goalMet=false.
-3) Si el usuario confirma un plan (60/120) en su mensaje y también pregunta algo: respondé su pregunta explayándote todo lo necesario, extrae el número en extractedData y establece goalMet=true.
-4) Si pone excusas ("después te aviso", "no tengo ahora"): decile con mucha calidez "Dale, tranqui, avisame y te mantengo el precio congelado, ¿te lo dejo anotado para alguna fecha futura?", goalMet=false.`,
+2) SI PREGUNTA CUÁNTOS KILOS BAJARÁ o pide garantías: Respondé textualmente "Cada cuerpo tiene su ritmo. Quienes tienen más kilos para bajar suelen notar cambios más visibles al inicio, y quienes necesitan bajar menos ven descensos más progresivos. Lo importante es que el descenso sea natural y sostenido." Luego preguntale con cuál plan quiere avanzar. goalMet=false.
+3) CAMBIO DE PRODUCTO: Si el usuario dice "quiero semillas" o "gotas", confirmá el cambio usando extractedData="CHANGE_PRODUCT: [Producto]" (SIN preguntarle de nuevo) y dale los precios de ese nuevo producto para que elija el plan. goalMet=false.
+4) Si el usuario confirma un plan (60/120) en su mensaje y también pregunta algo: respondé su pregunta explayándote todo lo necesario, extrae el número en extractedData y establece goalMet=true.
+5) Si pone excusas ("después te aviso", "no tengo ahora"): decile con mucha calidez "Dale, tranqui, avisame y te mantengo el precio congelado, ¿te lo dejo anotado para alguna fecha futura?", goalMet=false.`,
                 history: currentState.history,
                 summary: currentState.summary,
                 knowledge: knowledge,
@@ -285,6 +287,16 @@ RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.
                     }
                 }
             } else if (planAI.response) {
+                // Anti-duplicate protection logic
+                if (_isDuplicate(planAI.response, currentState.history)) {
+                    console.log(`[ANTI-DUP] Skipping duplicate AI response for ${userId} in plan_choice`);
+                    const fallbackMsg = "¡Dale! Quedo a tu disposición para cuando puedas avisarme. 😊";
+                    currentState.history.push({ role: 'bot', content: fallbackMsg, timestamp: Date.now() });
+                    await sendMessageWithDelay(userId, fallbackMsg);
+                    saveState(userId);
+                    return { matched: true };
+                }
+
                 _handleExtractedData(userId, planAI.extractedData, currentState);
                 currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });
                 await sendMessageWithDelay(userId, planAI.response);
