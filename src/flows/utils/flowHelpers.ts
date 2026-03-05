@@ -121,22 +121,25 @@ function _extractSilentVariables(normalizedText: string, currentState: any): { a
         currentState.age = result.ageUpdated;
     }
 
-    // Catch "peso X", "X kilos"
-    const weightMatch = normalizedText.match(/\b(peso|estoy pesando|kilos|kg)\s+(\d{2,3})\s*(kilos|kg|kgs)?\b/i) || normalizedText.match(/\b(\d{2,3})\s*(kilos|kg|kgs)\b/i);
-    if (weightMatch) {
-        // The number might be in group 2 or 1 depending on which regex branch matched
-        const numStr = weightMatch[2] && !isNaN(parseInt(weightMatch[2], 10)) ? weightMatch[2] : weightMatch[1];
-        if (numStr) {
-            result.weightUpdated = parseInt(numStr, 10);
-            // If we don't already have a weight goal, set it. Otherwise just update currentWeight.
-            if (!currentState.weightGoal) {
-                // If they say "peso X" we don't know the goal yet, but we can store it as info
-                currentState.currentWeight = result.weightUpdated;
-            } else {
-                // If they correct their goal out-of-band
-                currentState.weightGoal = result.weightUpdated;
-            }
+    // Catch "peso X", "X kilos", "quiero bajar X"
+    const weightGoalMatch = normalizedText.match(/\b(bajar|adelgazar|perder|quiero bajar|quisiera bajar|necesito bajar)\s+(\d{1,3})\s*(kilos|kg|kgs)?\b/i)
+        || normalizedText.match(/\b(\d{1,3})\s*(kilos|kg|kgs)\b/i) && /\b(bajar|adelgazar|perder)\b/i.test(normalizedText);
+    const currentWeightMatch = normalizedText.match(/\b(peso|estoy pesando)\s+(\d{2,3})\s*(kilos|kg|kgs)?\b/i);
+
+    if (weightGoalMatch && weightGoalMatch[2]) {
+        // This is a GOAL (how much they want to lose)
+        const numStr = weightGoalMatch[2];
+        result.weightUpdated = parseInt(numStr, 10);
+        if (!currentState.weightGoal) {
+            currentState.weightGoal = result.weightUpdated;
+        } else {
+            // Out-of-band correction of goal
+            currentState.weightGoal = result.weightUpdated;
         }
+    } else if (currentWeightMatch && currentWeightMatch[2]) {
+        // This is their CURRENT body weight — never set it as a goal
+        result.weightUpdated = parseInt(currentWeightMatch[2], 10);
+        currentState.currentWeight = result.weightUpdated;
     }
 
     // Determine if the message was ONLY this correction (short message)

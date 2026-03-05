@@ -72,10 +72,9 @@ async function handleSystemGlobals(userId, text, normalizedText, currentState, d
     // Detectamos si es cliente por un Tag explícito del CRM en currentState
     const isTaggedClient = currentState.tags && currentState.tags.some(tag => tag.name === 'Cliente');
 
-    // O detectamos si en el historial de esta conversación el bot le vendió exitosamente
-    const historyIndicatesSale = currentState.history && currentState.history.some(msg =>
-        msg.role === 'bot' && (msg.content.includes('CONFIRMACIÓN DE ENVÍO') || msg.content.includes('etiqueta de envío'))
-    );
+    // O detectamos si en el estado del bot se marca que se realizó una venta exitosa
+    // (flag booleano persistido en currentState, evita depender de texto literal frágil)
+    const historyIndicatesSale = currentState.hasSoldBefore === true;
 
     if (isTaggedClient || historyIndicatesSale) {
         console.log(`[CLIENT SUPPORT] User ${userId} is an existing client speaking. Pausing bot.`);

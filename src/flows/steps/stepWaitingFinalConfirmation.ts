@@ -99,6 +99,7 @@ export async function handleWaitingFinalConfirmation(
 
         if (currentState.pendingOrder) {
             const orderData = _buildOrderData({ postdatado });
+            currentState.hasSoldBefore = true; // Flag for globalSystem.js to detect returning customer
             if (dependencies.saveOrderToLocal) dependencies.saveOrderToLocal(orderData);
 
             const o = currentState.pendingOrder || currentState.partialAddress || {};
@@ -120,6 +121,7 @@ export async function handleWaitingFinalConfirmation(
 
         if (currentState.pendingOrder) {
             const orderData = _buildOrderData();
+            currentState.hasSoldBefore = true; // Flag for globalSystem.js to detect returning customer
             if (dependencies.saveOrderToLocal) dependencies.saveOrderToLocal(orderData);
 
             const o = currentState.pendingOrder || currentState.partialAddress || {};
@@ -152,6 +154,7 @@ export async function handleWaitingFinalConfirmation(
 
             if (currentState.pendingOrder) {
                 const orderData = _buildOrderData();
+                currentState.hasSoldBefore = true; // Flag for globalSystem.js to detect returning customer
                 if (dependencies.saveOrderToLocal) dependencies.saveOrderToLocal(orderData);
 
                 const o = currentState.pendingOrder || currentState.partialAddress || {};
@@ -181,6 +184,7 @@ export async function handleWaitingFinalConfirmation(
 
         if (currentState.pendingOrder) {
             const orderData = _buildOrderData({ createdAt: new Date().toISOString(), status: 'Pendiente (revisar respuesta)' });
+            currentState.hasSoldBefore = true; // Flag for globalSystem.js to detect returning customer
             if (dependencies.saveOrderToLocal) dependencies.saveOrderToLocal(orderData);
 
             const trackScript = dependencies.effectiveScript || dependencies.config?.activeScript || 'v3';

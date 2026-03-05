@@ -81,6 +81,11 @@ export interface UserState {
 
     // Objeto usado cuando el pedido está listo para guardarse
     pendingOrder?: Address & { cart: CartItem[] } | null;
+
+    // Flags de estados especiales del cliente
+    hasSoldBefore?: boolean;         // true si ya se concretó al menos una venta exitosa
+    pendingCancelConfirm?: boolean;  // true si el bot está esperando confirmación de cancelación
+    currentWeight?: number;          // Peso corporal actual del cliente (distinto de weightGoal)
 }
 
 export interface SharedState {

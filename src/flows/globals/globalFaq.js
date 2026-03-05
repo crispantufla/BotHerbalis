@@ -95,9 +95,11 @@ async function handleFaqGlobals(userId, text, normalizedText, currentState, know
             );
 
             if (productImages.length > 0) {
-                const shuffled = productImages.sort(() => 0.5 - Math.random()).slice(0, 3);
-                await sendMessageWithDelay(userId, `Acá tenés fotos de nuestras ${targetCategory} 👇`);
+                const introMsg = `Acá tenés fotos de nuestras ${targetCategory} 👇`;
+                currentState.history.push({ role: 'bot', content: introMsg, timestamp: Date.now() });
+                await sendMessageWithDelay(userId, introMsg);
 
+                const shuffled = productImages.sort(() => 0.5 - Math.random()).slice(0, 3);
                 for (const img of shuffled) {
                     try {
                         const relativePath = img.url.replace(/^\//, '');
@@ -105,9 +107,12 @@ async function handleFaqGlobals(userId, text, normalizedText, currentState, know
                         if (fs.existsSync(localPath)) {
                             const media = MessageMedia.fromFilePath(localPath);
                             await client.sendMessage(userId, media);
+                            // Register the image in history so AI knows it was sent
+                            currentState.history.push({ role: 'bot', content: `[Imagen adjunta: ${targetCategory}]`, timestamp: Date.now() });
                         }
                     } catch (e) { console.error('Error sending gallery image:', e); }
                 }
+                saveState(userId);
 
                 const redirect = _getStepRedirect(currentState.step, currentState);
                 if (redirect) {
