@@ -46,8 +46,9 @@ export async function handleWaitingData(
     const productChangeMatch = normalizedText.match(/\b(mejor|quiero|prefiero|cambio|cambia|dame|paso a|en vez)\b.*\b(capsula|capsulas|pastilla|pastillas|semilla|semillas|gota|gotas|natural|infusion)\b/i)
         || normalizedText.match(/\b(capsula|capsulas|pastilla|pastillas|semilla|semillas|gota|gotas)\b.*\b(mejor|quiero|prefiero|cambio|en vez)\b/i);
 
-    const planChangeMatch = normalizedText.match(/\b(mejor|quiero|prefiero|cambio|cambia|dame|paso a|en vez)\b.*\b(60|120|sesenta|ciento veinte)\b/i)
-        || normalizedText.match(/\b(60|120|sesenta|ciento veinte)\b.*\b(mejor|quiero|prefiero|cambio|en vez)\b/i);
+    const planChangeMatch = normalizedText.match(/\b(mejor|quiero|quisiera|prefiero|cambio|cambia|dame|paso a|en vez|voy a querer|me quedo con|tomaria|tomare|en realidad)\b.*\b(60|120|sesenta|ciento veinte)\b/i)
+        || normalizedText.match(/\b(60|120|sesenta|ciento veinte)\b.*\b(mejor|quiero|quisiera|prefiero|cambio|en vez)\b/i)
+        || (/\b(de|el|plan)\s+(60|120)\b/i.test(normalizedText) && /\b(dia|dias|d\u00edas)\b/i.test(normalizedText));
 
     if (productChangeMatch || planChangeMatch) {
         let newProduct = currentState.selectedProduct;
@@ -66,6 +67,9 @@ export async function handleWaitingData(
             currentState.selectedProduct = newProduct;
             currentState.selectedPlan = newPlan;
             currentState.pendingOrder = null;
+            currentState.partialAddress = {};  // Reset address from previous cycle
+            currentState.addressAttempts = 0;
+            currentState.fieldReaskCount = {};
             if (oldGoal) currentState.weightGoal = oldGoal;
 
             const postdatadoMatch = normalizedText.match(/\b(lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo|semana|mes|cobro|mañana|despues|después|principio|el \d+ de [a-z]+|el \d+)\b/i);

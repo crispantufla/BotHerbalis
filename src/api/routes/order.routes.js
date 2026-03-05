@@ -284,9 +284,16 @@ module.exports = (client, sharedState) => {
             const cart = state.cart || [];
             const addr = state.partialAddress || {};
             const plan = state.selectedPlan || cart[0]?.plan || '60';
-            const subtotal = cart.reduce((sum, i) => sum + parseInt((i.price || '0').toString().replace(/\D/g, '')), 0);
-            const adicional = state.adicionalMAX || 0;
-            const total = subtotal + adicional;
+            // Prefer state.totalPrice (already includes adicionalMAX and reflects latest plan change)
+            // Fall back to recalculating from cart only if totalPrice is missing.
+            let total;
+            if (state.totalPrice) {
+                total = parseInt(state.totalPrice.toString().replace(/\./g, '').replace(/[^\d]/g, '')) || 0;
+            } else {
+                const subtotal = cart.reduce((sum, i) => sum + parseInt((i.price || '0').toString().replace(/\D/g, '')), 0);
+                const adicional = state.adicionalMAX || 0;
+                total = subtotal + adicional;
+            }
 
             // Normalize product name to standard format: "Cápsulas (120 días)"
             const normalizeProductName = (rawProduct, rawPlan, price) => {
