@@ -1,8 +1,8 @@
 import { formatInTimeZone } from 'date-fns-tz';
 
 const ARG_TZ = 'America/Argentina/Buenos_Aires';
-export const BUSINESS_START = 10;    // 10:00 AM
-export const BUSINESS_END = 22;      // 10:00 PM
+export const BUSINESS_START = 9;     // 9:00 AM
+export const BUSINESS_END = 21;      // 9:00 PM
 
 /**
  * Get current hour in Argentina timezone (0-23)

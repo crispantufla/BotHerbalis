@@ -83,7 +83,7 @@ function _getAdminSuggestions(step: string, userMessage: string): string[] {
     }
     if (/estafa|trucho|mentira|robo|engaño|chanta/i.test(normalized)) {
         return [
-            '"Entiendo, por eso trabajamos con pago al recibir. No tenés que adelantar nada."',
+            '"Entiendo, por eso ofrecemos pago en efectivo al recibir. También aceptamos tarjeta o transferencia si preferís."',
             '"Llevamos 13 años con más de 15.000 clientes. ¿Querés seguir?"',
             ...base
         ];

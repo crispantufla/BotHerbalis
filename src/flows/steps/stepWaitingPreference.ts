@@ -76,7 +76,7 @@ export async function handleWaitingPreference(
             3) EMOCIÓN Y SALUD: Si cuenta su historia de peso, problemas médicos (tiroides, operaciones) o inseguridades, REDACTA UN PÁRRAFO EXTENSO Y PROFUNDAMENTE EMPÁTICO validando sus sentimientos ANTES de recomendar nada.
             4) Si duda o insiste entre GOTAS y CÁPSULAS o te pide recomendación: Decile con mucha calidez y detalle "Personalmente te recomiendo las cápsulas, suelen ser más efectivas. Las gotas las recomendamos ya para gente mayor o con problemas digestivos." Luego preguntale con cuál prefiere avanzar.
             5) Si pide "info de las 3", "precio de las 3" o "todas": brindá un resumen explicativo detallado con los precios base de 60 días para Cápsulas, Gotas y Semillas (extraídos del knowledge) y luego preguntá cuál prefiere probar.
-            6) Si pregunta por envío o medios de pago, aclara con amabilidad que el envío es gratis y se abona en efectivo al recibir. Luego preguntale con cuál producto prefiere avanzar.
+            6) Si pregunta por envío o medios de pago, aclara con amabilidad que el envío es gratis y que el pago se puede realizar con tarjeta o transferencia al momento del pedido, o en efectivo al recibir. Luego preguntale con cuál producto prefiere avanzar.
             SOLO marcá goalMet=true si el cliente ya eligió o si explícitamente pidió "lo mejor/más rápido" (asumiendo cápsulas).`,
             history: currentState.history,
             summary: currentState.summary,
@@ -159,7 +159,7 @@ export async function handleWaitingPreference(
 4) Si habla en PASADO ("yo tomaba", "antes usé"), decile tipo "Ah mirá que bueno que ya las conoces y pudiste sacarles provecho! Entonces vayamos con las CÁPSULAS directamente". 
 5) Si pide información o precios de "las 3", "todas", o "los 3", brindá una explicación extensa y amable de Cápsulas, Semillas y Gotas con sus precios correspondientes de 60 días (usando el knowledge) y luego preguntá cuál prefiere. 
 6) Si el usuario pregunta si puede recibir el pedido o pagarlo un día concreto, DALE EL OK Y CONFIRMÁ EL PRODUCTO. 
-7) Si pregunta por envío o medios de pago, aclará de forma cálida que el envío es gratis a todo el país y se abona en dinero físico al recibir. Luego preguntale con cuál producto prefiere avanzar. 
+7) Si pregunta por envío o medios de pago, aclará de forma cálida que el envío es gratis a todo el país y que el pago se puede realizar con tarjeta o transferencia al momento del pedido, o en efectivo al recibir. Luego preguntale con cuál producto prefiere avanzar. 
 
 🔴 REGLA ABSOLUTA DE CONFIRMACIÓN: Si el usuario ya aceptó tu sugerencia o eligió explícita O implícitamente (ej: "dale", "si", "bueno"), NO DEBES GENERAR RESPUESTA. Debes marcar goalMet=true y extractedData="PRODUCTO: Cápsulas de nuez de la india" inmediatamente.`,
             history: currentState.history,

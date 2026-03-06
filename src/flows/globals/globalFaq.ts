@@ -55,17 +55,71 @@ export async function handleFaqGlobals(
         return { matched: true };
     }
 
-    // Payment Method Check
-    const PAYMENT_REGEX = /\b(tarjeta|credito|crédito|debito|débito|transferencia|mercadopago|mercado\s*pago|visa|mastercard|rapipago|pago\s*facil|pago\s*fácil|pagofacil|billetera|virtual|nequi|uala|ualá|cuenta\s*bancaria|cbu|alias|deposito|depósito)\b/i;
-    if (PAYMENT_REGEX.test(normalizedText)) {
-        const paymentMsg = 'Te cuento, el pago es únicamente en efectivo al recibir el pedido en tu casa 😊';
-        const paymentMsg2 = 'El cartero te lo entrega y ahí mismo abonás. Cero riesgos por transferencia.\n\n¿Te gustaría continuar entonces?';
+    // Payment Method Check — Two-Phase Logic
+    // Phase 1: User is CHOOSING tarjeta/transferencia (→ pause + alert admin)
+    const PAYMENT_CHOICE_REGEX = /\b(tarjeta|credito|crédito|debito|débito|transferencia|mercadopago|mercado\s*pago|visa|mastercard|rapipago|pago\s*facil|pago\s*fácil|pagofacil|billetera|virtual|nequi|uala|ualá|cuenta\s*bancaria|cbu|alias|deposito|depósito)\b/i;
+    const CHOICE_INTENT_REGEX = /\b(quiero|prefiero|elijo|pago con|pagar con|por tarjeta|por transferencia|con tarjeta|con transferencia|con mercadopago|dale|si|sí|bueno|perfecto|con eso|esa opcion|esa opción)\b/i;
 
-        currentState.history.push({ role: 'bot', content: paymentMsg, timestamp: Date.now() });
-        await sendMessageWithDelay(userId, paymentMsg);
+    // Check if the bot's last message was the payment options question
+    const lastBotMsg = currentState.history?.filter((h: any) => h.role === 'bot').slice(-1)[0]?.content || '';
+    const botJustAskedPayment = lastBotMsg.includes('tarjeta o transferencia al momento de realizar el pedido');
 
-        currentState.history.push({ role: 'bot', content: paymentMsg2, timestamp: Date.now() });
-        await sendMessageWithDelay(userId, paymentMsg2);
+    if (PAYMENT_CHOICE_REGEX.test(normalizedText)) {
+        const isChoosingElectronic = CHOICE_INTENT_REGEX.test(normalizedText) || botJustAskedPayment;
+        const isChoosingEfectivo = /\b(efectivo|en efectivo|al recibir|contrareembolso|contra\s*reembolso|al cartero|cuando llegue|cuando me llegue)\b/i.test(normalizedText);
+
+        if (isChoosingElectronic && !isChoosingEfectivo) {
+            const { isBusinessHours } = require('../../services/timeUtils');
+            const { _pauseAndAlert } = require('../utils/flowHelpers');
+
+            let paymentMsg: string;
+            if (isBusinessHours()) {
+                paymentMsg = 'Perfecto, te derivo al sector donde te tomarán el pedido a pagar con tarjeta 😊';
+            } else {
+                paymentMsg = 'Se comunicarán con vos a la brevedad 😊';
+            }
+
+            currentState.history.push({ role: 'bot', content: paymentMsg, timestamp: Date.now() });
+            await sendMessageWithDelay(userId, paymentMsg);
+
+            await _pauseAndAlert(userId, currentState, dependencies, text,
+                `💳 Cliente eligió pagar con tarjeta/transferencia. Derivar al sector de cobros.`);
+            return { matched: true };
+        }
+
+        // If choosing efectivo, just acknowledge and continue
+        if (isChoosingEfectivo) {
+            const efectivoMsg = '¡Perfecto! El pago se realiza en efectivo al cartero cuando recibís el paquete en tu casa 😊';
+            currentState.history.push({ role: 'bot', content: efectivoMsg, timestamp: Date.now() });
+            await sendMessageWithDelay(userId, efectivoMsg);
+
+            const redirect: string | null = _getStepRedirect(currentState.step, currentState);
+            if (redirect) {
+                currentState.history.push({ role: 'bot', content: redirect, timestamp: Date.now() });
+                await sendMessageWithDelay(userId, redirect);
+            }
+            return { matched: true };
+        }
+
+        // Phase 2: General payment question (not a direct choice) — inform about options
+        const paymentInfoMsg = 'El pago se puede realizar con tarjeta o transferencia al momento de realizar el pedido, o en efectivo al recibir 😊';
+        currentState.history.push({ role: 'bot', content: paymentInfoMsg, timestamp: Date.now() });
+        await sendMessageWithDelay(userId, paymentInfoMsg);
+
+        const redirect: string | null = _getStepRedirect(currentState.step, currentState);
+        if (redirect) {
+            currentState.history.push({ role: 'bot', content: redirect, timestamp: Date.now() });
+            await sendMessageWithDelay(userId, redirect);
+        }
+        return { matched: true };
+    }
+
+    // Phase 2b: Generic payment question without specific method keywords
+    const GENERIC_PAYMENT_REGEX = /\b(como se paga|como pago|formas? de pago|medios? de pago|que pago|metodos? de pago|metodo de pago|medio de pago|forma de pago)\b/i;
+    if (GENERIC_PAYMENT_REGEX.test(normalizedText)) {
+        const paymentInfoMsg = 'El pago se puede realizar con tarjeta o transferencia al momento de realizar el pedido, o en efectivo al recibir 😊';
+        currentState.history.push({ role: 'bot', content: paymentInfoMsg, timestamp: Date.now() });
+        await sendMessageWithDelay(userId, paymentInfoMsg);
 
         const redirect: string | null = _getStepRedirect(currentState.step, currentState);
         if (redirect) {
