@@ -141,9 +141,10 @@ export async function handleWaitingData(
     const mentionsPlanOrPrice = /\b(de 60|de 120|el de 60|el de 120|plan|dias|días)\b/i.test(normalizedText);
 
     // If text is super long (like a personal story), force AI to handle it so we don't look robotic even if they gave an address
-    const isVeryLongMessage = text.split(/\s+/).length > 20;
+    // Escape hatch: if it explicitly contains structural address words, forgive the length up to 50 words.
+    const isVeryLongMessage = text.split(/\s+/).length > 35 && !/\b(provincia|pcia|localidad|calle|código postal|codigo postal|barrio)\b/i.test(text);
 
-    const looksLikeAddress = text.length > 8 && (!explicitQuestionKeywords) && !mentionsPlanOrPrice && (/\d/.test(text) || /\b(calle|av|avenida|barrio|mz|lote|piso|dpto|depto|departamento|casa|block|manzana)\b/i.test(text) || text.includes('\n'));
+    const looksLikeAddress = text.length > 8 && (!explicitQuestionKeywords) && !mentionsPlanOrPrice && (/\d/.test(text) || /\b(calle|av|avenida|barrio|mz|lote|piso|dpto|depto|departamento|casa|block|manzana|localidad|provincia|pcia|código postal)\b/i.test(text) || text.includes('\n'));
 
     const isHesitation = /\b(pensar|pienso|despues|luego|mañana|te confirmo|te aviso|ver|veo|rato|lueguito|mas tarde|en un rato|aguanti|aguanta|espera|bancame)\b/i.test(normalizedText)
         || /\b(voy a|dejam[eo])\s+(pasar|pensar|ver)\b/i.test(normalizedText);
