@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AlertTriangle, Copy, X, ArrowUpCircle } from 'lucide-react';
-import { useToast } from '../../../../../ui/Toast';
+import { useToast } from '../../../ui/Toast';
 
 const AiCorrectionModal = ({ isOpen, onClose, messages = [], reportedMsgId, selectedChat }) => {
     const { toast } = useToast();
