@@ -89,7 +89,7 @@ export async function handleFaqGlobals(
 
         // If choosing efectivo, just acknowledge and continue
         if (isChoosingEfectivo) {
-            const efectivoMsg = '¡Perfecto! El pago se realiza en efectivo al cartero cuando recibís el paquete en tu casa 😊';
+            const efectivoMsg = 'El pago al recibir es una opción muy conveniente. Vas a poder pagar al cartero en efectivo cuando te traiga el paquete. Así que no hay problema en que el pago sea de esa manera. Además, si elegís la opción de transferencia, también está bien, pero solo si te resulta más cómodo.\n\nNo te preocupes, todo está diseñado para que sea fácil y seguro para vos.\n\n¿Te parece que lo dejemos anotado y avancemos con los datos para el envío? Estoy aquí para ayudarte con lo que necesites. 😊';
             currentState.history.push({ role: 'bot', content: efectivoMsg, timestamp: Date.now() });
             await sendMessageWithDelay(userId, efectivoMsg);
 
