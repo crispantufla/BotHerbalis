@@ -647,6 +647,12 @@ const sendMessageWithDelay = async (chatId: string, content: string, startTime: 
         await new Promise(resolve => setTimeout(resolve, remainingDelay));
     }
 
+    // CRITICAL BUG FIX: Check if the user was paused manually DURING the delay
+    if (pausedUsers.has(chatId) || (config.globalPause && !process.env.ADMIN_NUMBER?.includes(chatId.split('@')[0]))) {
+        logger.info(`[DELAY] aborted message to ${chatId}: User was paused during delay`);
+        return;
+    }
+
     // Send the actual message
     try {
         await client.sendMessage(chatId, content);

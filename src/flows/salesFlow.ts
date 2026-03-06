@@ -129,15 +129,15 @@ export async function processSalesFlow(
                 const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
                 const cleanPhone = userId.split('@')[0].replace(/\D/g, '');
 
-                // Grab the last 15 messages from DB locally (sub-millisecond compared to API)
+                // Grab the last 15 messages from DB locally (cross-instance)
                 const messagesConfig = await prisma.chatLog.findMany({
-                    where: { userPhone: cleanPhone, instanceId: INSTANCE_ID },
+                    where: { userPhone: cleanPhone },
                     orderBy: { timestamp: 'desc' },
                     take: 15
                 });
 
                 // Check for existence of any prior post-sale outgoing message
-                const outgoingMessages = messagesConfig.filter((m: any) => m.role === 'bot');
+                const outgoingMessages = messagesConfig.filter((m: any) => m.role === 'bot' || m.role === 'admin' || m.role === 'system');
                 const hasPostSaleMessage = outgoingMessages.some((m: any) => {
                     const body = (m.content || '').trim();
                     if (body.includes('MENSAJE DE HERBALIS') || body.includes('MENSAJDE DE HERBALIS')) return true;
@@ -152,8 +152,8 @@ export async function processSalesFlow(
                 }
 
                 // If no post-sale message exists, let's see if there's extensive prior interaction
-                // 1-9 outgoing = likely bots replying to ads. 10+ means extensive interaction history.
-                const hasSignificantHistory = outgoingMessages.length >= 10;
+                // 1-4 outgoing = likely bots replying to ads. 5+ means extensive interaction history.
+                const hasSignificantHistory = outgoingMessages.length >= 5;
 
                 if (hasSignificantHistory) {
                     const showsPurchaseIntent = PURCHASE_INTENT_KEYWORDS.test(normalizedText);
