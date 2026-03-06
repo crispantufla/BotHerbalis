@@ -167,7 +167,41 @@ export async function handleWaitingData(
         || isObjectionOrComment
         || isVeryLongMessage);
 
-    if (isDataQuestionOrEmotion && (!looksLikeAddress || isVeryLongMessage)) {
+    let textToAnalyze = text;
+    if (currentState.lastImageMime && currentState.lastImageContext === 'waiting_data') {
+        console.log(`[ADDRESS] Analyzing image for address for user ${userId}`);
+        try {
+            const ocrResponse = await aiService.analyzeImage(
+                currentState.lastImageData,
+                currentState.lastImageMime,
+                `Extrae cualquier dato que parezca una dirección, nombre, calle, ciudad, provincia o código postal de esta imagen. Responde SOLO con los datos legibles.`
+            );
+            if (ocrResponse) {
+                textToAnalyze += ` [Datos extraídos de imagen: ${ocrResponse}]`;
+            }
+        } catch (e) {
+            console.error("[ADDRESS] Error analyzing image:", e);
+        }
+        currentState.lastImageMime = null;
+        currentState.lastImageData = null;
+        currentState.lastImageContext = null;
+    }
+
+    let extractedData = null;
+    let didTryToParse = false;
+    let hasValidAddressData = false;
+
+    // Si parece una dirección o no es explícitamente una pregunta de soporte/objeción, intentamos extraer los datos PRIMERO
+    if (looksLikeAddress || (isVeryLongMessage && !explicitQuestionKeywords) || (!isDataQuestionOrEmotion)) {
+        extractedData = await (dependencies.mockAiService || aiService).parseAddress(textToAnalyze);
+        didTryToParse = true;
+        if (extractedData && !extractedData._error && (extractedData.calle || extractedData.ciudad || extractedData.cp || extractedData.nombre)) {
+            hasValidAddressData = true; // ⚠️ Si tenemos datos útiles, BLOQUEA el fallback "anti-locura" porque el usuario cumplió la directiva.
+        }
+    }
+
+    // Solo disparamos el AI Fallback de objeciones/dudas si el usuario NO proporcionó datos válidos
+    if (isDataQuestionOrEmotion && !hasValidAddressData && (!looksLikeAddress || isVeryLongMessage)) {
         console.log(`[AI-FALLBACK] waiting_data: Detected question/objection or long emotional text from ${userId}: "${text}"`);
 
         let aiGoal = "";
@@ -210,27 +244,10 @@ export async function handleWaitingData(
         }
     }
 
-    let textToAnalyze = text;
-    if (currentState.lastImageMime && currentState.lastImageContext === 'waiting_data') {
-        console.log(`[ADDRESS] Analyzing image for address for user ${userId}`);
-        try {
-            const ocrResponse = await aiService.analyzeImage(
-                currentState.lastImageData,
-                currentState.lastImageMime,
-                `Extrae cualquier dato que parezca una dirección, nombre, calle, ciudad, provincia o código postal de esta imagen. Responde SOLO con los datos legibles.`
-            );
-            if (ocrResponse) {
-                textToAnalyze += ` [Datos extraídos de imagen: ${ocrResponse}]`;
-            }
-        } catch (e) {
-            console.error("[ADDRESS] Error analyzing image:", e);
-        }
-        currentState.lastImageMime = null;
-        currentState.lastImageData = null;
-        currentState.lastImageContext = null;
+    let data = extractedData;
+    if (!didTryToParse) {
+        data = await (dependencies.mockAiService || aiService).parseAddress(textToAnalyze);
     }
-
-    const data = await (dependencies.mockAiService || aiService).parseAddress(textToAnalyze);
     let madeProgress = false;
 
     // Hard-pause conditions from AI Parsing
