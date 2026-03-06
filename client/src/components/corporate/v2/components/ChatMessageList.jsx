@@ -1,6 +1,6 @@
 import React, { useRef, useLayoutEffect, useEffect } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Trash2 as Trash, Play } from 'lucide-react';
+import { Trash2 as Trash, Play, AlertTriangle } from 'lucide-react';
 import { API_URL } from '../../../../config/api';
 
 const formatDateSeparator = (date) => {
@@ -26,7 +26,7 @@ const formatDateSeparator = (date) => {
     }
 };
 
-const ChatMessageList = ({ messages, isLoading, chatFontSize, handleDeleteMessage, onScrollBottom }) => {
+const ChatMessageList = ({ messages, isLoading, chatFontSize, handleDeleteMessage, handleReportMessage, onScrollBottom }) => {
     const parentRef = useRef(null);
 
     const rowVirtualizer = useVirtualizer({
@@ -182,13 +182,22 @@ const ChatMessageList = ({ messages, isLoading, chatFontSize, handleDeleteMessag
                                         {new Date(msg.timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' })}
                                     </span>
                                     {msg.fromMe && (
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); handleDeleteMessage(msg.id); }}
-                                            className="absolute -left-9 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all opacity-0 group-hover:opacity-100"
-                                            title="Eliminar mensaje para todos"
-                                        >
-                                            <Trash className="w-5 h-5" />
-                                        </button>
+                                        <div className="absolute -left-16 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); if (typeof handleReportMessage === 'function') handleReportMessage(msg.id); }}
+                                                className="p-1.5 text-amber-500 hover:text-white hover:bg-amber-500 rounded-full transition-all shadow-sm"
+                                                title="Reportar mensaje incorrecto a la IA"
+                                            >
+                                                <AlertTriangle className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); handleDeleteMessage(msg.id); }}
+                                                className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all shadow-sm"
+                                                title="Eliminar mensaje para todos"
+                                            >
+                                                <Trash className="w-4 h-4" />
+                                            </button>
+                                        </div>
                                     )}
                                 </div>
                             </div>

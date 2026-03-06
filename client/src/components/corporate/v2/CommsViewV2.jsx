@@ -4,6 +4,7 @@ import { useToast } from '../../ui/Toast';
 import { useChat } from '../../../hooks/useChat';
 import ChatMessageList from './components/ChatMessageList';
 import ChatInputArea from './components/ChatInputArea';
+import AiCorrectionModal from './components/AiCorrectionModal';
 
 import { Search, Bot, Play, Pause, Trash2 as Trash, FileText as ScriptIcon, ChevronDown, Send, Paperclip, ShoppingCart, ArrowLeft, Type } from 'lucide-react';
 
@@ -25,6 +26,9 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
 
     const [chatFontSize, setChatFontSize] = useState(() => parseInt(localStorage.getItem('herbalis_chat_font_size') || '14', 10));
     const [showFontSlider, setShowFontSlider] = useState(false);
+
+    const [showCorrectionModal, setShowCorrectionModal] = useState(false);
+    const [reportedMsgId, setReportedMsgId] = useState(null);
 
     const {
         chats,
@@ -256,6 +260,18 @@ const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
                 toast.error('Error: ' + (e.message));
             }
         }
+    };
+
+    const handleReportMessage = async (msgId) => {
+        if (!selectedChat) return;
+        setReportedMsgId(msgId);
+
+        // Auto-pause bot so human can take over
+        if (!selectedChat.isPaused) {
+            await handleToggleBot();
+        }
+
+        setShowCorrectionModal(true);
     };
 
     const handleTrackOrder = async (trackingCode) => {
@@ -595,6 +611,7 @@ Teléfono: ${phoneDisplay}`;
                             isLoading={isLoadingMessages}
                             chatFontSize={chatFontSize}
                             handleDeleteMessage={handleDeleteMessage}
+                            handleReportMessage={handleReportMessage}
                         />
 
                         {/* Input Area */}
@@ -717,6 +734,18 @@ Teléfono: ${phoneDisplay}`;
                     </div>
                 </div>
             )}
+
+            {/* AI Correction Modal */}
+            <AiCorrectionModal
+                isOpen={showCorrectionModal}
+                onClose={() => {
+                    setShowCorrectionModal(false);
+                    setReportedMsgId(null);
+                }}
+                messages={messages}
+                reportedMsgId={reportedMsgId}
+                selectedChat={selectedChat}
+            />
         </div>
     );
 };
