@@ -34,6 +34,13 @@ jest_all_out.json
 flow_test.out
 route_error.txt
 test_results.txt
+test_results.json
+address_test.txt
+full_test_run.txt
+railway_logs*.txt
+simulation_*.txt
+test_leaks*.txt
+salesFlow_output.txt
 
 # Temporary scripts
 fix*.js

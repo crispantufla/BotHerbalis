@@ -84,7 +84,7 @@ describe('Sales Flow Logic', () => {
 
     // TEST 3: Weight Refusal (Count > 2)
     test('Should skip to products after 2 failed/refused attempts', async () => {
-        userState[userId] = { step: 'waiting_weight', history: [], weightRefusals: 1 };
+        userState[userId] = { step: 'waiting_weight', history: [], weightRefusals: 2 };
 
         // User says something irrelevant that isn't a number
         await processSalesFlow(userId, "bla bla bla", userState, knowledge, mockDependencies);

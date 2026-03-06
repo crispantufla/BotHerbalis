@@ -14,9 +14,15 @@ jest.mock('../safeWrite', () => ({
 // Mock Database
 jest.mock('../db', () => ({
     prisma: {
-        order: { create: jest.fn().mockResolvedValue({ id: 'mock-order' }) },
+        order: {
+            create: jest.fn().mockResolvedValue({ id: 'mock-order' }),
+            findFirst: jest.fn().mockResolvedValue(null)
+        },
         user: { upsert: jest.fn().mockResolvedValue({}) },
-        chatLog: { create: jest.fn().mockResolvedValue({}) }
+        chatLog: {
+            create: jest.fn().mockResolvedValue({}),
+            findMany: jest.fn().mockResolvedValue([])
+        }
     }
 }));
 

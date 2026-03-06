@@ -143,15 +143,19 @@ export async function handleWaitingData(
     // If text is super long (like a personal story), force AI to handle it so we don't look robotic even if they gave an address
     const isVeryLongMessage = text.split(/\s+/).length > 20;
 
-    const looksLikeAddress = text.length > 8 && (!explicitQuestionKeywords) && !mentionsPlanOrPrice && (/\d/.test(text) || /\b(calle|av|avenida|barrio|mz|lote|piso|dpto|depto|departamento|casa|block|manzana)\b/i.test(text) || text.split(/[,\n]/).length >= 2);
+    const looksLikeAddress = text.length > 8 && (!explicitQuestionKeywords) && !mentionsPlanOrPrice && (/\d/.test(text) || /\b(calle|av|avenida|barrio|mz|lote|piso|dpto|depto|departamento|casa|block|manzana)\b/i.test(text) || text.includes('\n'));
 
     const isHesitation = /\b(pensar|pienso|despues|luego|mañana|te confirmo|te aviso|ver|veo|rato|lueguito|mas tarde|en un rato|aguanti|aguanta|espera|bancame)\b/i.test(normalizedText)
         || /\b(voy a|dejam[eo])\s+(pasar|pensar|ver)\b/i.test(normalizedText);
 
     // Detect payment-timing objections: "no cobro todavía", "cobro el 15", "cuando cobre", "espero el sueldo"
     // These should get a postdate offer, NOT fall through to address parsing and trigger a false pause.
-    const isPaymentTiming = /\b(no cobro|cobro el|cobro a|cobro la|cuando cobre|hasta que cobre|sueldo|quincena|cobrar|depositan|depósito|deposito|me pagan|me depositan)\b/i.test(normalizedText)
-        || (/\b(cobro|pago|sueldo|plata|efectivo)\b/i.test(normalizedText) && /\b(todavía|aun|aún|después|despues|próximo|proximo|el \d+|fin de mes)\b/i.test(normalizedText));
+    const cleanText = normalizedText.replace(/[.,;?!]/g, ' ');
+    const isPaymentTiming = /\b(no cobro|cobro el|cobro a|cobro la|cuando cobre|hasta que cobre|sueldo|quincena|cobrar|depositan|depósito|deposito|me pagan|me depositan)\b/i.test(cleanText)
+        || (/\b(cobro|pago|sueldo|plata|efectivo)\b/i.test(cleanText) && /\b(todavía|aun|aún|después|despues|próximo|proximo|el \d+|fin de mes)\b/i.test(cleanText));
+
+    const isObjectionOrComment = /\b(resultado|miedo|desconfianza|seguro|funciona|funcionará|efecto|rebote|garantía|garantia|probar|probando|duda|dudas|riesgo)\b/i.test(normalizedText)
+        || /\b(si me va bien|si me funciona|si resulta|mas adelante|despues compro|luego compro)\b/i.test(normalizedText);
 
     const isShortConfirmation = /^(si|sisi|ok|dale|bueno|joya|de una|perfecto)[\s\?\!]*$/i.test(normalizedText);
 
@@ -159,13 +163,20 @@ export async function handleWaitingData(
         || /\b(pregunte|no quiero|no acepto|no acepte|como|donde|por que|para que)\b/i.test(normalizedText)
         || isHesitation
         || isPaymentTiming
+        || isObjectionOrComment
         || isVeryLongMessage);
 
     if (isDataQuestionOrEmotion && (!looksLikeAddress || isVeryLongMessage)) {
         console.log(`[AI-FALLBACK] waiting_data: Detected question/objection or long emotional text from ${userId}: "${text}"`);
-        const aiGoal = isPaymentTiming
-            ? `El cliente dice que todavía no cobró o que está esperando su sueldo/pago. Ofrecele amablemente la opción de programar el pedido para cuando cobre: "Si querés podemos programar el pedido a futuro, así llega cuando cobrás 😊. ¿Para qué fecha te quedaría mejor recibirlo?". Si el cliente te dice la fecha, confirmala cálidamente. Nunca lo presiones. NUNCA le pidas dinero ni datos de envío todavía.`
-            : `El usuario tiene una duda o expresa una preocupación en plena toma de datos (ej: pregunta cómo se paga, cuándo llega, si le entregan en el trabajo, o cuenta un largo problema personal). DEBES RESPONDER SU TEXTO DIRECTAMENTE de forma EXTENSA Y MUY EMPÁTICA usando el Knowledge. Si expresa miedos sobre demoras o recepción, redactá un párrafo largo brindando tranquilidad absoluta. Si pregunta si puede recibir en su TRABAJO, responde sus opciones. Si pregunta formas de pago: "El pago a domicilio es al cartero en efectivo". Si pregunta tiempos: "Tarda de 7 a 10 días hábiles en promedio.". Nunca lo obligues a dar los datos, respondé su duda o drama con muchísima calidez, tómate tu tiempo, y cerrá sutilmente con: "¿Te parece que lo dejemos anotado?" o "¿Te tomo los datos?".\n\nEXCEPCIÓN CRÍTICA: Si el cliente dice que te pasa los datos luego, mañana o después (ej "mañana lo consulto y te mando", "luego te los paso", "te confirmo mas tarde"): NO hagas más preguntas. Respondé de forma muy breve y complaciente: "¡Dale! Quedo a tu disposición, cualquier cosa acá estoy. 😊"`;
+
+        let aiGoal = "";
+        if (isPaymentTiming) {
+            aiGoal = `El cliente dice que todavía no cobró o que está esperando su sueldo/pago. Ofrecele amablemente la opción de programar el pedido para cuando cobre: "Si querés podemos programar el pedido a futuro, así llega cuando cobrás 😊. ¿Para qué fecha te quedaría mejor recibirlo?". Si el cliente te dice la fecha, confirmala cálidamente. Nunca lo presiones. NUNCA le pidas dinero ni datos de envío todavía.`;
+        } else if (isObjectionOrComment) {
+            aiGoal = `El usuario hizo un comentario sobre probar el producto primero, o expresó dudas sobre los resultados (ej: "si me da resultado compro más"). Respondé validando su decisión con extrema seguridad y empatía. A continuación, VOLVÉ a pedir sutilmente los datos de envío que estaban pendientes (Nombre, Dirección, Ciudad). NO ofrezcas otros productos.`;
+        } else {
+            aiGoal = `El usuario tiene una duda o expresa una preocupación en plena toma de datos (ej: pregunta cómo se paga, cuándo llega, si le entregan en el trabajo, o cuenta un largo problema personal). DEBES RESPONDER SU TEXTO DIRECTAMENTE de forma EXTENSA Y MUY EMPÁTICA usando el Knowledge. Si expresa miedos sobre demoras o recepción, redactá un párrafo largo brindando tranquilidad absoluta. Si pregunta si puede recibir en su TRABAJO, responde sus opciones. Si pregunta formas de pago: "El pago a domicilio es al cartero en efectivo". Si pregunta tiempos: "Tarda de 7 a 10 días hábiles en promedio.". Nunca lo obligues a dar los datos, respondé su duda o drama con muchísima calidez, tómate tu tiempo, y cerrá sutilmente con: "¿Te parece que lo dejemos anotado?" o "¿Te tomo los datos?".\n\nEXCEPCIÓN CRÍTICA: Si el cliente dice que te pasa los datos luego, mañana o después (ej "mañana lo consulto y te mando", "luego te los paso", "te confirmo mas tarde"): NO hagas más preguntas. Respondé de forma muy breve y complaciente: "¡Dale! Quedo a tu disposición, cualquier cosa acá estoy. 😊"`;
+        }
 
         const aiData = await aiService.chat(text, {
             step: FlowStep.WAITING_DATA,
