@@ -182,7 +182,7 @@ const ChatMessageList = ({ messages, isLoading, chatFontSize, handleDeleteMessag
                                         {new Date(msg.timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' })}
                                     </span>
                                     {msg.fromMe && (
-                                        <div className="absolute -left-16 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <div className="absolute -left-16 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); if (typeof handleReportMessage === 'function') handleReportMessage(msg.id); }}
                                                 className="p-1.5 text-amber-500 hover:text-white hover:bg-amber-500 rounded-full transition-all shadow-sm"
