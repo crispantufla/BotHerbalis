@@ -282,7 +282,40 @@ module.exports = (client, sharedState) => {
             }
 
             const cart = state.cart || [];
-            const addr = state.partialAddress || {};
+            let addr = state.partialAddress || {};
+
+            // FALLBACK DATA RESCUE: If admin clicks "Manual Complete" and the bot hasn't extracted the address yet
+            // (e.g. because they paused the bot or the bot failed to parse), we run a quick AI extraction over the last few user messages.
+            if (!addr.nombre || !addr.calle || !addr.ciudad) {
+                console.log(`[MANUAL-COMPLETE] Datos de envío incompletos. Intentando rescatarlos del historial para ${chatId}...`);
+                const history = state.history || [];
+                // Get the last 10 messages from the user only
+                const recentUserMessages = history.filter(m => m.role === 'user').slice(-10);
+                if (recentUserMessages.length > 0) {
+                    const textToAnalyze = recentUserMessages.map(m => m.content).join(" | ");
+
+                    try {
+                        const { aiService } = require('../../services/ai');
+                        const extracted = await aiService.parseAddress(textToAnalyze);
+
+                        if (!extracted._error) {
+                            console.log(`[MANUAL-COMPLETE] Extracción AI exitosa:`, extracted);
+                            addr = {
+                                nombre: extracted.nombre || addr.nombre,
+                                calle: extracted.calle || addr.calle,
+                                ciudad: extracted.ciudad || addr.ciudad,
+                                provincia: extracted.provincia || addr.provincia,
+                                cp: extracted.cp || addr.cp
+                            };
+
+                            // Save rescued data to state
+                            state.partialAddress = addr;
+                        }
+                    } catch (extError) {
+                        console.error(`[MANUAL-COMPLETE] Error en extracción AI de rescate:`, extError.message);
+                    }
+                }
+            }
             const plan = state.selectedPlan || cart[0]?.plan || '60';
             // Prefer state.totalPrice (already includes adicionalMAX and reflects latest plan change)
             // Fall back to recalculating from cart only if totalPrice is missing.
