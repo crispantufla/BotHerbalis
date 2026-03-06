@@ -109,7 +109,7 @@ export async function restorePausedUsersFromDB(
 
         let count = 0;
         for (const u of pausedUsers) {
-            const whatsappId = `${u.phone}@s.whatsapp.net`;
+            const whatsappId = `${u.phone}@c.us`;
             sharedState.pausedUsers.add(whatsappId);
             count++;
         }
