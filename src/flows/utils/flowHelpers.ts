@@ -3,6 +3,14 @@ import { UserState, SharedState } from '../../types/state';
 const logger = require('../../utils/logger');
 
 /**
+ * _cleanPhone
+ * Extracts the raw phone number from a WhatsApp userId (e.g. "5491155551234@c.us" → "5491155551234").
+ */
+function _cleanPhone(userId: string): string {
+    return userId.split('@')[0].replace(/\D/g, '');
+}
+
+/**
  * _setStep
  * Helper to update the conversation step with timestamp tracking.
  * Resets staleAlerted and reengagementSent flags when step changes.
@@ -134,12 +142,7 @@ function _extractSilentVariables(normalizedText: string, currentState: any): { a
         // This is a GOAL (how much they want to lose)
         const numStr = weightGoalMatch[2];
         result.weightUpdated = parseInt(numStr, 10);
-        if (!currentState.weightGoal) {
-            currentState.weightGoal = result.weightUpdated;
-        } else {
-            // Out-of-band correction of goal
-            currentState.weightGoal = result.weightUpdated;
-        }
+        currentState.weightGoal = result.weightUpdated;
     } else if (currentWeightMatch && currentWeightMatch[2]) {
         // This is their CURRENT body weight — never set it as a goal
         result.weightUpdated = parseInt(currentWeightMatch[2], 10);
@@ -192,6 +195,7 @@ function _resolveNewProductPlan(normalizedText: string, currentProduct: string |
 }
 
 module.exports = {
+    _cleanPhone,
     _setStep,
     _maybeUpsell,
     _hasCompleteAddress,

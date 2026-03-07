@@ -54,6 +54,13 @@ export async function processStep(
         case 'completed':
             result = await handleCompleted(userId, text, normalizedText, currentState, knowledge, dependencies);
             break;
+        case 'rejected_medical':
+        case 'rejected_abusive':
+        case 'rejected_geo':
+            // Terminal states — bot stays silent, message is swallowed
+            logger.info(`[STEP] User ${userId} is in terminal state "${step}". Ignoring message.`);
+            result = { matched: true };
+            break;
         default: {
             const { _setStep } = require('../utils/flowHelpers');
             logger.info(`[STALE-STEP] User ${userId} has unknown step "${currentState.step}". Migrating...`);

@@ -9,6 +9,15 @@ const logger = require('../utils/logger');
  * Refactorizado de src/controllers/admin.js a services/adminService.ts
  */
 
+/** Helper: remove alert for a user and emit update to dashboard */
+function _dismissAlert(userPhone: string, sharedState: any): void {
+    const index: number = sharedState.sessionAlerts.findIndex((a: AlertEntry) => a.userPhone === userPhone);
+    if (index !== -1) {
+        sharedState.sessionAlerts.splice(index, 1);
+        if (sharedState.io) sharedState.io.emit('alerts_updated', sharedState.sessionAlerts);
+    }
+}
+
 interface OrderData {
     product: string | null;
     plan: string | null;
@@ -112,6 +121,7 @@ export async function handleAdminCommand(
     sharedState: any,
     client: any
 ): Promise<string> {
+    if (!commandText) return '⚠️ Comando vacío.';
     const lowerMsg = commandText.toLowerCase().trim();
     const userId = process.env.ADMIN_NUMBER ? `${process.env.ADMIN_NUMBER.replace(/\D/g, '')}@c.us` : null;
 
@@ -137,11 +147,7 @@ export async function handleAdminCommand(
         if (sharedState.saveState) sharedState.saveState();
         if (sharedState.io) sharedState.io.emit('bot_status_change', { chatId: actualTarget, paused: true });
 
-        const index: number = sharedState.sessionAlerts.findIndex((a: AlertEntry) => a.userPhone === actualTarget);
-        if (index !== -1) {
-            sharedState.sessionAlerts.splice(index, 1);
-            if (sharedState.io) sharedState.io.emit('alerts_updated', sharedState.sessionAlerts);
-        }
+        _dismissAlert(actualTarget, sharedState);
 
         logger.info(`[ADMIN] Takeover for ${actualTarget}. Bot PAUSED.`);
         return `✅ Bot pausado. El usuario ${actualTarget} es todo tuyo.`;
@@ -162,11 +168,7 @@ export async function handleAdminCommand(
             clientState.history.push({ role: 'bot', content: summary });
             if (sharedState.saveState) sharedState.saveState();
 
-            const index: number = sharedState.sessionAlerts.findIndex((a: AlertEntry) => a.userPhone === actualTarget);
-            if (index !== -1) {
-                sharedState.sessionAlerts.splice(index, 1);
-                if (sharedState.io) sharedState.io.emit('alerts_updated', sharedState.sessionAlerts);
-            }
+            _dismissAlert(actualTarget, sharedState);
             return `✅ Confirmación enviada a ${actualTarget}. Esperando respuesta del cliente.`;
         }
 
@@ -203,11 +205,7 @@ export async function handleAdminCommand(
                     sharedState.io.emit('order_update', { action: 'updated', order: { id: existingOrder.id, status: 'Confirmado' } });
                 }
 
-                const index: number = sharedState.sessionAlerts.findIndex((a: AlertEntry) => a.userPhone === actualTarget);
-                if (index !== -1) {
-                    sharedState.sessionAlerts.splice(index, 1);
-                    if (sharedState.io) sharedState.io.emit('alerts_updated', sharedState.sessionAlerts);
-                }
+                _dismissAlert(actualTarget, sharedState);
 
                 return `✅ Estado del pedido cambiado a Confirmado. Cliente notificado con éxito.`;
             }
@@ -241,11 +239,7 @@ export async function handleAdminCommand(
                     sharedState.pausedUsers.delete(actualTarget);
                 }
 
-                const index: number = sharedState.sessionAlerts.findIndex((a: AlertEntry) => a.userPhone === actualTarget);
-                if (index !== -1) {
-                    sharedState.sessionAlerts.splice(index, 1);
-                    if (sharedState.io) sharedState.io.emit('alerts_updated', sharedState.sessionAlerts);
-                }
+                _dismissAlert(actualTarget, sharedState);
 
                 return `✅ Instrucción enviada: "${suggestion}"`;
             }

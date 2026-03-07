@@ -12,9 +12,16 @@ const PRICES_PATHS = [
     '/app/config/prices.json',                                // Docker safe copy (survives volume mount)
 ];
 
+// Cached resolved path to avoid searching 4 paths on every call
+let _resolvedPricesPath: string | null = null;
+
 function _findPricesFile(): string | null {
+    if (_resolvedPricesPath && fs.existsSync(_resolvedPricesPath)) return _resolvedPricesPath;
     for (const p of PRICES_PATHS) {
-        if (fs.existsSync(p)) return p;
+        if (fs.existsSync(p)) {
+            _resolvedPricesPath = p;
+            return p;
+        }
     }
     return null;
 }
@@ -48,7 +55,7 @@ const FALLBACK_PRICES: Record<string, any> = {
 function _getAdicionalMAX(): number {
     try {
         const prices = _loadPricesCache();
-        return parseInt((prices.adicionalMAX || '6.000').replace('.', ''));
+        return parseInt((prices.adicionalMAX || '6.000').replace(/\./g, ''), 10);
     } catch (e) { return 6000; }
 }
 
@@ -70,9 +77,15 @@ function _getPrices(): Record<string, any> {
 
 function _getPrice(product: string | null | undefined, plan: string): string {
     const prices = _getPrices();
-    if (product && product.includes('Cápsulas')) return prices['Cápsulas'][plan] || prices['Cápsulas']['60'];
-    if (product && product.includes('Gotas')) return prices['Gotas'][plan] || prices['Gotas']['60'];
-    return prices['Semillas'][plan] || prices['Semillas']['60'];
+    let result: string | undefined;
+    if (product && product.includes('Cápsulas')) {
+        result = prices['Cápsulas']?.[plan] || prices['Cápsulas']?.['60'];
+    } else if (product && product.includes('Gotas')) {
+        result = prices['Gotas']?.[plan] || prices['Gotas']?.['60'];
+    } else {
+        result = prices['Semillas']?.[plan] || prices['Semillas']?.['60'];
+    }
+    return result || FALLBACK_PRICES['Semillas']['60'];
 }
 
 export {

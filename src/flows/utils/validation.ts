@@ -8,6 +8,7 @@
  */
 function _isAffirmative(normalizedText: string): boolean {
     const trimmed = normalizedText.trim();
+    if (!trimmed) return false;
     const words = trimmed.split(/\s+/);
 
     // NEVER match if it contains a question mark
@@ -30,6 +31,7 @@ function _isAffirmative(normalizedText: string): boolean {
 
 function _isNegative(normalizedText: string): boolean {
     const trimmed = normalizedText.trim();
+    if (!trimmed) return false;
     const words = trimmed.split(/\s+/);
 
     if (trimmed.includes('?')) return false;

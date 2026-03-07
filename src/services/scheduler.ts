@@ -177,7 +177,7 @@ function autoApproveOrders(sharedState: SchedulerSharedState, dependencies: Sche
  * checkColdLeads — P3 #5
  * Sends a follow-up message to users inactive for 24h+ on re-engageable steps
  */
-function checkColdLeads(sharedState: SchedulerSharedState, dependencies: SchedulerDependencies): void {
+async function checkColdLeads(sharedState: SchedulerSharedState, dependencies: SchedulerDependencies): Promise<void> {
     const { userState, pausedUsers } = sharedState;
     const { sendMessageWithDelay, saveState } = dependencies;
     const now = Date.now();
@@ -201,11 +201,15 @@ function checkColdLeads(sharedState: SchedulerSharedState, dependencies: Schedul
                 msg = GENERIC_FOLLOW_UPS[Math.floor(Math.random() * GENERIC_FOLLOW_UPS.length)];
             }
 
-            sendMessageWithDelay(userId, msg);
-            state.history = state.history || [];
-            state.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
-            state.reengagementSent = true;
-            saveState();
+            try {
+                await sendMessageWithDelay(userId, msg);
+                state.history = state.history || [];
+                state.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+                state.reengagementSent = true;
+                saveState();
+            } catch (e: any) {
+                logger.error(`[SCHEDULER] Failed to send cold lead message to ${userId}:`, e.message);
+            }
         }
     }
 }
@@ -214,7 +218,7 @@ function checkColdLeads(sharedState: SchedulerSharedState, dependencies: Schedul
  * checkAbandonedCarts 
  * Specific retargeting for users stuck in the 24-48h window.
  */
-function checkAbandonedCarts(sharedState: SchedulerSharedState, dependencies: SchedulerDependencies): void {
+async function checkAbandonedCarts(sharedState: SchedulerSharedState, dependencies: SchedulerDependencies): Promise<void> {
     const { userState, pausedUsers } = sharedState;
     const { sendMessageWithDelay, saveState } = dependencies;
     const now = Date.now();
@@ -225,7 +229,7 @@ function checkAbandonedCarts(sharedState: SchedulerSharedState, dependencies: Sc
         if (pausedUsers && pausedUsers.has(userId)) continue;
         if (state.cartRecovered) continue;
 
-        const lastActivity = state.lastInteraction || state.lastActivityAt;
+        const lastActivity = state.lastActivityAt || state.stepEnteredAt;
         if (!lastActivity) continue;
 
         const hours = differenceInHours(now, lastActivity);
@@ -233,12 +237,15 @@ function checkAbandonedCarts(sharedState: SchedulerSharedState, dependencies: Sc
             logger.info(`[SCHEDULER] Abandoned cart detected: ${userId} inactive for ${hours}h on "${state.step}"`);
 
             const msg = 'Hola, ¿te quedó alguna duda con los planes? Avisame que te guardo la promo con envío gratis.';
-            sendMessageWithDelay(userId, msg);
-
-            state.history = state.history || [];
-            state.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
-            state.cartRecovered = true;
-            saveState();
+            try {
+                await sendMessageWithDelay(userId, msg);
+                state.history = state.history || [];
+                state.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+                state.cartRecovered = true;
+                saveState();
+            } catch (e: any) {
+                logger.error(`[SCHEDULER] Failed to send abandoned cart message to ${userId}:`, e.message);
+            }
         }
     }
 }
@@ -254,9 +261,15 @@ function cleanupOldUsers(sharedState: SchedulerSharedState, dependencies: Schedu
     let cleaned = 0;
 
     for (const [userId, state] of Object.entries(userState)) {
-        const lastActivity = state.lastActivityAt || state.stepEnteredAt || 0;
-        if (lastActivity && differenceInDays(now, lastActivity) > CLEANUP_THRESHOLD_DAYS) {
-            if (state.step === 'completed') continue;
+        if (state.step === 'completed') continue;
+        const lastActivity = state.lastActivityAt || state.stepEnteredAt;
+        if (!lastActivity) {
+            // No timestamp — stale entry, clean it up
+            delete userState[userId];
+            cleaned++;
+            continue;
+        }
+        if (differenceInDays(now, lastActivity) > CLEANUP_THRESHOLD_DAYS) {
             delete userState[userId];
             cleaned++;
         }
@@ -299,8 +312,15 @@ function cleanStalePausedUsers(sharedState: SchedulerSharedState, dependencies: 
         // Don't auto-unpause users in active admin-managed steps
         if (ACTIVE_STEPS.has(state.step)) continue;
 
-        const lastActivity = state.lastActivityAt || state.stepEnteredAt || 0;
-        if (lastActivity && differenceInDays(now, lastActivity) > STALE_PAUSE_DAYS) {
+        const lastActivity = state.lastActivityAt || state.stepEnteredAt;
+        if (!lastActivity) {
+            // No timestamp at all — treat as stale and clean up
+            logger.info(`[SCHEDULER] Removing stale pause for ${userId} (no activity timestamp, step: ${state.step})`);
+            pausedUsers.delete(userId);
+            cleaned++;
+            continue;
+        }
+        if (differenceInDays(now, lastActivity) > STALE_PAUSE_DAYS) {
             logger.info(`[SCHEDULER] Removing stale pause for ${userId} (inactive ${differenceInDays(now, lastActivity)} days, step: ${state.step})`);
             pausedUsers.delete(userId);
             cleaned++;

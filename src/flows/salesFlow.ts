@@ -3,7 +3,7 @@ import { pauseUser } from '../services/pauseService';
 const logger = require('../utils/logger');
 const { processGlobals } = require('./globals');
 const { processStep } = require('./steps');
-const { _pauseAndAlert, _setStep, _extractSilentVariables } = require('./utils/flowHelpers');
+const { _pauseAndAlert, _setStep, _extractSilentVariables, _cleanPhone } = require('./utils/flowHelpers');
 
 interface SalesFlowDependencies {
     saveState: (userId?: string) => void;
@@ -47,14 +47,22 @@ export async function processSalesFlow(
             selectedProduct: null,
             selectedPlan: null,
             geoRejected: false,
-            stepEnteredAt: Date.now()
+            stepEnteredAt: Date.now(),
+            addressAttempts: 0,
+            fieldReaskCount: {},
+            lastAddressMsg: null,
+            postdatado: null,
+            pendingOrder: null,
+            currentWeight: undefined,
+            consultativeSale: false,
+            lastActivityAt: Date.now()
         };
 
         // --- CHECK 1: Cross-reference against Orders DB ---
         // If this phone has an existing order, they're a past customer — route to post-sale
         try {
             const { prisma } = require('../../db');
-            const cleanPhone = userId.split('@')[0].replace(/\D/g, '');
+            const cleanPhone = _cleanPhone(userId);
             const existingOrder = await prisma.order.findFirst({
                 where: { userPhone: cleanPhone }, // cross-instance: any prior order from this phone
                 orderBy: { createdAt: 'desc' }
@@ -80,7 +88,7 @@ export async function processSalesFlow(
             try {
                 const { prisma } = require('../../db');
                 const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
-                const cleanPhone = userId.split('@')[0].replace(/\D/g, '');
+                const cleanPhone = _cleanPhone(userId);
 
                 const otherInstanceUsers = await prisma.user.findMany({
                     where: {
@@ -127,7 +135,7 @@ export async function processSalesFlow(
             try {
                 const { prisma } = require('../../db');
                 const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
-                const cleanPhone = userId.split('@')[0].replace(/\D/g, '');
+                const cleanPhone = _cleanPhone(userId);
 
                 // Grab the last 15 messages from DB locally (cross-instance)
                 const messagesConfig = await prisma.chatLog.findMany({
@@ -211,8 +219,9 @@ export async function processSalesFlow(
     // Safety fallback for empty history
     if (!currentState.history) currentState.history = [];
 
-    // Save User message
+    // Save User message and update activity timestamp
     currentState.history.push({ role: 'user', content: text, timestamp: Date.now() });
+    currentState.lastActivityAt = Date.now();
     saveState(userId);
 
     // 1.5. Silent Variable Extraction (Age/Weight out of band)

@@ -11,12 +11,21 @@ const { _getPrice, _getAdicionalMAX } = require('./pricing');
  * @param state - UserState to update with cart, plan, price, and MAX surcharge
  */
 function buildCartFromSelection(product: string, plan: string, state: UserState): void {
-    const factor = parseInt(plan) / 60;
-    const base120 = parseInt(_getPrice(product, '120').replace(/\./g, ''));
-    const base60 = parseInt(_getPrice(product, '60').replace(/\./g, ''));
+    const planDays = parseInt(plan, 10);
+    const raw120 = _getPrice(product, '120');
+    const raw60 = _getPrice(product, '60');
+    const base120 = parseInt((raw120 || '0').replace(/\./g, ''), 10);
+    const base60 = parseInt((raw60 || '0').replace(/\./g, ''), 10);
 
-    const pairs = Math.floor(factor / 2);
-    const remainder = factor % 2;
+    if (isNaN(base120) || isNaN(base60) || base60 === 0) {
+        const logger = require('../../utils/logger');
+        logger.error(`[CART] Invalid prices for "${product}": base60=${raw60}, base120=${raw120}`);
+    }
+
+    // Use integer division to avoid float modulo issues
+    const units = Math.round(planDays / 60);
+    const pairs = Math.floor(units / 2);
+    const remainder = units % 2;
     const calculatedPrice = (pairs * base120) + (remainder * base60);
 
     state.cart = [{

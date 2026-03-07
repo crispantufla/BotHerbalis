@@ -10,6 +10,7 @@
 
 const NOTIFY_DEBOUNCE_MS = 5 * 60 * 1000; // 5 minutes
 const logger = require('../utils/logger');
+const { _cleanPhone } = require('../flows/utils/flowHelpers');
 
 // In-memory debounce: userId → last notification timestamp
 const adminNotifiedAt: Map<string, number> = new Map();
@@ -38,7 +39,7 @@ export async function pauseUser(
     try {
         const { prisma } = require('../../db');
         const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
-        const cleanPhone = userId.split('@')[0].replace(/\D/g, '');
+        const cleanPhone = _cleanPhone(userId);
 
         await prisma.user.upsert({
             where: { phone_instanceId: { phone: cleanPhone, instanceId: INSTANCE_ID } },
@@ -81,7 +82,7 @@ export async function unpauseUser(userId: string, sharedState: { pausedUsers: Se
     try {
         const { prisma } = require('../../db');
         const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
-        const cleanPhone = userId.split('@')[0].replace(/\D/g, '');
+        const cleanPhone = _cleanPhone(userId);
 
         await prisma.user.updateMany({
             where: { phone: cleanPhone, instanceId: INSTANCE_ID },

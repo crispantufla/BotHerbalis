@@ -15,7 +15,9 @@ export enum FlowStep {
     SAFETY_CHECK = "safety_check",
     CLOSING = "closing",
     COMPLETED = "completed",
-    REJECTED_MEDICAL = "rejected_medical"
+    REJECTED_MEDICAL = "rejected_medical",
+    REJECTED_ABUSIVE = "rejected_abusive",
+    REJECTED_GEO = "rejected_geo"
 }
 
 export interface Address {

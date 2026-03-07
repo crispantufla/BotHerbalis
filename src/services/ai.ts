@@ -449,15 +449,15 @@ class AIService {
                 break;
             } catch (e: any) {
                 const status = e.status || e.statusCode;
-                if (status === 429) {
+                const isRetryable = status === 429 || status === 500 || status === 502 || status === 503 || e.code === 'ETIMEDOUT' || e.code === 'ECONNRESET';
+                if (isRetryable) {
                     this.stats.retries++;
                     const waitTime = Math.pow(2, attempt + 1) * 1000 + Math.floor(Math.random() * 1000);
-                    logger.warn(`⚠️[AI] Rate Limit(429).Attempt ${attempt + 1} /${MAX_RETRIES}. Backing off ${waitTime / 1000
-                        }s...`);
+                    logger.warn(`⚠️[AI] Retryable error (${status || e.code}). Attempt ${attempt + 1}/${MAX_RETRIES}. Backing off ${waitTime / 1000}s...`);
                     await new Promise(r => setTimeout(r, waitTime));
                 } else {
                     this.stats.errors++;
-                    throw e; // Non-rate limit errors bubble up to BullMQ worker explicitly
+                    throw e;
                 }
             }
         }
@@ -816,6 +816,7 @@ CRÍTICO: Usá la "Fecha Actual" provista arriba para calcular el día exacto y 
             }
             return { _error: true };
         } catch (e: any) {
+            logger.error("🔴 [AI] parseAddress Error:", e.message);
             return { _error: true };
         }
     }
@@ -976,18 +977,6 @@ SITUACION: El ADMINISTRADOR del negocio te da una instrucción DIRECTA para envi
         };
     }
 
-    _parseJSON(text: string): AIParsedResponse {
-        try {
-            const jsonStr = text.replace(/```json\s*/gi, '').replace(/```/g, '').trim();
-            const parsed = JSON.parse(jsonStr);
-            if (typeof parsed.response !== 'string') {
-                parsed.response = String(parsed.response || "");
-            }
-            return parsed as AIParsedResponse;
-        } catch (e: any) {
-            return { response: typeof text === 'string' ? text.replace(/```/g, '') : "", goalMet: false };
-        }
-    }
 }
 
 // Singleton Instance

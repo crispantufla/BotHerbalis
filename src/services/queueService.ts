@@ -63,15 +63,25 @@ export function initWorker(dependencies: any) {
             logger.info(`[BULLMQ] ✅ Job ${job.id} de ${userId} completado con éxito.`);
         } catch (error: any) {
             logger.error(`[BULLMQ] ❌ Job ${job.id} falló:`, error.message);
-            // Al relanzar, BullMQ reintenta automáticamente con backoff exponencial
+            // Non-retryable errors: don't re-throw so BullMQ won't retry
+            const NON_RETRYABLE = ['INVALID_INPUT', 'AUTH_FAILED', 'VALIDATION_ERROR'];
+            const isNonRetryable = NON_RETRYABLE.some(code => error.code === code)
+                || (error.status && error.status >= 400 && error.status < 500 && error.status !== 429);
+            if (isNonRetryable) {
+                logger.error(`[BULLMQ] Job ${job.id} is non-retryable (status: ${error.status || error.code}). Discarding.`);
+                return; // Don't throw — BullMQ marks as completed, preventing infinite retries
+            }
             throw error;
         }
     }, {
         connection: workerConnection,
-        concurrency: 3, // Máximo 3 clientes procesándose en IA de forma verdaderamente paralela en Node
+        concurrency: 3,
         settings: {
             backoffStrategy: (attemptsMade: number, type: string, err: Error, job: Job) => {
-                return Math.round(Math.pow(2, attemptsMade) * 1000) + Math.round(Math.random() * 500);
+                // Cap backoff at 5 minutes to prevent hour-long waits
+                const MAX_BACKOFF_MS = 5 * 60 * 1000;
+                const backoff = Math.round(Math.pow(2, attemptsMade) * 1000) + Math.round(Math.random() * 500);
+                return Math.min(backoff, MAX_BACKOFF_MS);
             }
         }
     });

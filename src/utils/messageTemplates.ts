@@ -24,7 +24,7 @@ function buildConfirmationMessage(state: any): string {
     let serviceFee = 0;
     let productVal = 0;
 
-    const totalInt = parseInt(totalPriceStr.replace(/\./g, '')) || 0;
+    const totalInt = parseInt(totalPriceStr.replace(/\./g, ''), 10) || 0;
 
     // Logic: If 60 days AND ContrareembolsoMAX implies +6000.
     // Safest way: check if total match known price + 6000? 

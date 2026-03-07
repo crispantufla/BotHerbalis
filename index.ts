@@ -232,9 +232,9 @@ function saveState(changedUserId: string | null = null): void {
             const stateToSave = { userState, chatResets, lastAlertUser, pausedUsers: Array.from(pausedUsers), config };
             atomicWriteFile(STATE_FILE, JSON.stringify(stateToSave, null, 2));
 
-            // Persist only the accumulated changed users to DB
+            // Snapshot and clear atomically — new saves during async DB write accumulate in a fresh set
             const usersToProcess = Array.from(_pendingSaveUsers);
-            _pendingSaveUsers.clear(); // Clear immediately so new saves start accumulating
+            _pendingSaveUsers.clear();
 
             const usersToSave = usersToProcess.length > 0
                 ? usersToProcess.map(id => [id, userState[id]]).filter(([, v]) => v)
@@ -286,7 +286,7 @@ async function loadState() {
 
         // Hydrate config from DB
         dbConfig.forEach((c: any) => {
-            try { config[c.key] = JSON.parse(c.value); } catch (e: any) { }
+            try { config[c.key] = JSON.parse(c.value); } catch (e: any) { logger.warn(`[LOAD] Failed to parse config key "${c.key}":`, e.message); }
         });
 
         // Hydrate users from DB into Memory
@@ -295,7 +295,7 @@ async function loadState() {
                 try {
                     const parsed = JSON.parse(u.profileData);
                     userState[u.phone + '@c.us'] = parsed;
-                } catch (e) { }
+                } catch (e: any) { logger.warn(`[LOAD] Failed to parse profile for ${u.phone}:`, e.message); }
             }
         });
 
@@ -1015,7 +1015,13 @@ client.on('message', async (msg: any) => {
         }
 
         if (pausedUsers.has(userId)) {
-            logger.info(`[PAUSED] Ignoring message from ${userId} `);
+            // Cancel any pending debounce timers so they don't fire after pause
+            const pendingEntry = pendingMessages.get(userId);
+            if (pendingEntry) {
+                clearTimeout(pendingEntry.timer);
+                pendingMessages.delete(userId);
+            }
+            logger.info(`[PAUSED] Ignoring message from ${userId}`);
             return;
         }
 
