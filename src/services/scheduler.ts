@@ -187,6 +187,7 @@ async function checkColdLeads(sharedState: SchedulerSharedState, dependencies: S
         if (!isBusinessHours()) continue;
         if (pausedUsers && pausedUsers.has(userId)) continue;
         if (state.reengagementSent) continue;
+        if (state.cartRecovered) continue; // Already got an abandoned cart message
         if (!state.lastActivityAt) continue;
 
         const hours = differenceInHours(now, state.lastActivityAt);
@@ -228,6 +229,7 @@ async function checkAbandonedCarts(sharedState: SchedulerSharedState, dependenci
         if (!isBusinessHours()) continue;
         if (pausedUsers && pausedUsers.has(userId)) continue;
         if (state.cartRecovered) continue;
+        if (state.reengagementSent) continue; // Already got a cold lead message
 
         const lastActivity = state.lastActivityAt || state.stepEnteredAt;
         if (!lastActivity) continue;
@@ -387,11 +389,13 @@ function startScheduler(sharedState: SchedulerSharedState, dependencies: Schedul
     // Railway (o PM2) volverá a levantar el contenedor y reconectará en menos de 10s.
     cron.schedule('0 8 * * *', async () => {
         logger.info('[SCHEDULER] 🔄 Ejecutando reinicio preventivo diario (Anti-Memory Leak)...');
-        // Flush pending state saves before restarting to prevent data loss
-        if (dependencies.saveState) dependencies.saveState();
-        // Give the debounced saveState time to flush to DB before killing
-        await new Promise(r => setTimeout(r, 6000));
-        // El manejador en index.ts atrapará SIGUSR2 para limpiar clientes y forzar salida con error 1 para que el contenedor reinicie.
+        // Flush pending state directly to DB (uses flushState if available, falls back to saveState + delay)
+        if (dependencies.flushState) {
+            await dependencies.flushState();
+        } else if (dependencies.saveState) {
+            dependencies.saveState();
+            await new Promise(r => setTimeout(r, 6000));
+        }
         process.kill(process.pid, 'SIGUSR2');
     }, { timezone: TIMEZONE });
     logger.info('[SCHEDULER] ✅ Reinicio Preventivo Diario → 08:00 ARG (diario)');

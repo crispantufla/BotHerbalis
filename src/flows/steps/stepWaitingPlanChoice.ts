@@ -215,7 +215,7 @@ RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.
             });
 
             if (planAI.extractedData && typeof planAI.extractedData === 'string' && planAI.extractedData.startsWith('CHANGE_PRODUCT:')) {
-                const newProd = planAI.extractedData.split(':')[1].trim();
+                const newProd = (planAI.extractedData.split(':')[1] || '').trim();
                 logger.info(`[FLOW-UPDATE] User changed product to: ${newProd}`);
                 currentState.selectedProduct = newProd;
                 saveState(userId);

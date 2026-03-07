@@ -24,7 +24,7 @@ function startServer(client, sharedState) {
 
     const app = express();
     const server = http.createServer(app);
-    const allowedOrigin = process.env.DASHBOARD_URL || '*';
+    const allowedOrigin = process.env.DASHBOARD_URL || 'http://localhost:3000';
     const io = new Server(server, {
         cors: {
             origin: allowedOrigin,
@@ -57,7 +57,7 @@ function startServer(client, sharedState) {
 
     app.use(express.json({ limit: '10mb' }));
 
-    // Rate Limiting — Protect API from abuse (100 reqs / 15 min)
+    // Rate Limiting — Protect API from abuse
     const { rateLimit } = require('express-rate-limit');
     const limiter = rateLimit({
         windowMs: 15 * 60 * 1000, // 15 minutes
@@ -67,6 +67,16 @@ function startServer(client, sharedState) {
         message: { error: 'Too many requests, please try again later.' }
     });
     app.use('/api', limiter);
+
+    // Stricter rate limit for auth endpoints to prevent brute force
+    const authLimiter = rateLimit({
+        windowMs: 15 * 60 * 1000,
+        limit: 10,
+        standardHeaders: 'draft-7',
+        legacyHeaders: false,
+        message: { error: 'Too many login attempts, please try again later.' }
+    });
+    app.use('/api/login', authLimiter);
 
     // Serve Static Files (Production/Docker)
     const clientDistPath = path.join(__dirname, '../../client/dist');

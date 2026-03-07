@@ -96,7 +96,7 @@ const { startServer } = require('./src/api/server'); // Centralized Server
 const { startScheduler } = require('./src/services/scheduler'); // P3: Stale/Re-engagement checks
 const { isBusinessHours, isDeepNight, getArgentinaHour } = require('./src/services/timeUtils');
 const { buildConfirmationMessage } = require('./src/utils/messageTemplates');
-const { botQueue, initWorker } = require('./src/services/queueService');
+const { botQueue, initWorker, shutdownQueue } = require('./src/services/queueService');
 
 // --- PRISMA DATABASE SETUP ---
 const { prisma } = require('./db');
@@ -219,6 +219,41 @@ function saveKnowledge(scriptName = null) {
 let _saveStateTimeout: ReturnType<typeof setTimeout> | null = null;
 const _pendingSaveUsers = new Set<string>();
 
+async function _persistState(): Promise<void> {
+    try {
+        const stateToSave = { userState, chatResets, lastAlertUser, pausedUsers: Array.from(pausedUsers), config };
+        atomicWriteFile(STATE_FILE, JSON.stringify(stateToSave, null, 2));
+
+        const usersToProcess = Array.from(_pendingSaveUsers);
+        _pendingSaveUsers.clear();
+
+        const usersToSave = usersToProcess.length > 0
+            ? usersToProcess.map(id => [id, userState[id]]).filter(([, v]) => v)
+            : Object.entries(userState);
+
+        const userPromises = usersToSave.map(([phone, data]) => {
+            const cleanPhone = (phone as string).replace('@c.us', '');
+            return prisma.user.upsert({
+                where: { phone_instanceId: { phone: cleanPhone, instanceId: INSTANCE_ID } },
+                update: { profileData: JSON.stringify(data) },
+                create: { phone: cleanPhone, instanceId: INSTANCE_ID, profileData: JSON.stringify(data) }
+            });
+        });
+
+        const configPromises = Object.entries(config).map(([key, value]) => {
+            return prisma.botConfig.upsert({
+                where: { instanceId_key: { instanceId: INSTANCE_ID, key } },
+                update: { value: JSON.stringify(value) },
+                create: { instanceId: INSTANCE_ID, key, value: JSON.stringify(value) }
+            });
+        });
+
+        await Promise.all([...userPromises, ...configPromises]);
+    } catch (e: any) {
+        logger.error('🔴 Error saving state to DB:', e.message);
+    }
+}
+
 function saveState(changedUserId: string | null = null): void {
     if (changedUserId) {
         _pendingSaveUsers.add(changedUserId);
@@ -226,43 +261,16 @@ function saveState(changedUserId: string | null = null): void {
 
     if (_saveStateTimeout) clearTimeout(_saveStateTimeout);
 
-    _saveStateTimeout = setTimeout(async () => {
-        try {
-            // Backup locally just in case (optional, but harmless)
-            const stateToSave = { userState, chatResets, lastAlertUser, pausedUsers: Array.from(pausedUsers), config };
-            atomicWriteFile(STATE_FILE, JSON.stringify(stateToSave, null, 2));
+    _saveStateTimeout = setTimeout(() => { _persistState(); }, 5000);
+}
 
-            // Snapshot and clear atomically — new saves during async DB write accumulate in a fresh set
-            const usersToProcess = Array.from(_pendingSaveUsers);
-            _pendingSaveUsers.clear();
-
-            const usersToSave = usersToProcess.length > 0
-                ? usersToProcess.map(id => [id, userState[id]]).filter(([, v]) => v)
-                : Object.entries(userState);
-
-            const userPromises = usersToSave.map(([phone, data]) => {
-                const cleanPhone = (phone as string).replace('@c.us', '');
-                return prisma.user.upsert({
-                    where: { phone_instanceId: { phone: cleanPhone, instanceId: INSTANCE_ID } },
-                    update: { profileData: JSON.stringify(data) },
-                    create: { phone: cleanPhone, instanceId: INSTANCE_ID, profileData: JSON.stringify(data) }
-                });
-            });
-
-            // Persist dynamic config
-            const configPromises = Object.entries(config).map(([key, value]) => {
-                return prisma.botConfig.upsert({
-                    where: { instanceId_key: { instanceId: INSTANCE_ID, key } },
-                    update: { value: JSON.stringify(value) },
-                    create: { instanceId: INSTANCE_ID, key, value: JSON.stringify(value) }
-                });
-            });
-
-            await Promise.all([...userPromises, ...configPromises]);
-        } catch (e: any) {
-            logger.error('🔴 Error saving state to DB:', e.message);
-        }
-    }, 5000); // 5-second debounce to batch multiple concurrent DB updates
+/** Immediately flush pending state to DB (for shutdown). */
+async function flushState(): Promise<void> {
+    if (_saveStateTimeout) {
+        clearTimeout(_saveStateTimeout);
+        _saveStateTimeout = null;
+    }
+    await _persistState();
 }
 
 async function loadState() {
@@ -328,8 +336,10 @@ async function loadState() {
     }
 }
 
-// Initial Load
-loadState();
+// Initial Load — await loadState to ensure DB data is ready before accepting requests
+(async () => {
+    await loadState();
+})().catch(e => logger.error('[BOOT] loadState failed:', e.message));
 loadKnowledge();
 
 // --- WHATSAPP CLIENT ---
@@ -720,10 +730,10 @@ sharedState.requestPairingCode = async (phoneNumber: string) => {
 };
 
 if (!process.env.OPENAI_API_KEY) {
-    logger.error("âŒ CRITICAL: OPENAI_API_KEY is missing in .env!");
+    logger.error("CRITICAL: OPENAI_API_KEY is missing in .env! AI features will not work.");
+    process.exit(1);
 } else {
-    // Basic mask check log
-    logger.info(`âœ… OPENAI_API_KEY initialized.`);
+    logger.info("OPENAI_API_KEY initialized.");
 }
 
 if (!process.env.API_KEY) {
@@ -755,6 +765,7 @@ client.on('ready', () => {
             notifyAdmin,
             sendMessageWithDelay,
             saveState,
+            flushState,
             saveOrderToLocal
         });
         schedulerStarted = true;
@@ -1144,6 +1155,10 @@ process.on('unhandledRejection', (reason) => {
 const _shutdown = async (signal: string, exitCode: number = 0): Promise<void> => {
     logger.info(`[SHUTDOWN] Received ${signal}. Cleaning up...`);
     try {
+        logger.info('[SHUTDOWN] Flushing pending state to DB...');
+        await flushState();
+    } catch (e: any) { logger.error('[SHUTDOWN] Error flushing state:', e.message); }
+    try {
         // CRITICAL: Destroy WhatsApp client FIRST so Chrome cleans up its lock files.
         // Without this, Chrome leaves a SingletonLock symlink in the persistent volume
         // which prevents the next container from starting Chrome.
@@ -1156,6 +1171,9 @@ const _shutdown = async (signal: string, exitCode: number = 0): Promise<void> =>
             logger.info('[SHUTDOWN] WhatsApp client destroyed.');
         }
     } catch (e: any) { logger.error('[SHUTDOWN] Error destroying client:', e.message); }
+    try {
+        await shutdownQueue();
+    } catch (e: any) { logger.error('[SHUTDOWN] Error closing Redis/Queue:', e.message); }
     try {
         await prisma.$disconnect();
         const { pool } = require('./db');
@@ -1189,4 +1207,4 @@ initWorker({
     saveOrderToLocal, cancelLatestOrder, config
 });
 
-safeInitialize();
+safeInitialize().catch(e => logger.error('[INIT] Fatal initialization error:', e.message));

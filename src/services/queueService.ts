@@ -96,3 +96,17 @@ export function initWorker(dependencies: any) {
 
     return worker;
 }
+
+/**
+ * Graceful shutdown: close worker, queue, and Redis connections.
+ */
+export async function shutdownQueue(): Promise<void> {
+    try {
+        await botQueue.close();
+        await redisConnection.quit();
+        await workerConnection.quit();
+        logger.info('[BULLMQ] Queue and Redis connections closed.');
+    } catch (e: any) {
+        logger.error('[BULLMQ] Shutdown error:', e.message);
+    }
+}

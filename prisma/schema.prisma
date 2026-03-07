@@ -27,34 +27,41 @@ model Order {
   id          String   @id @default(uuid())
   instanceId  String   @default("default")
   userPhone   String
-  user        User     @relation(fields: [userPhone, instanceId], references: [phone, instanceId])
-  
+  user        User     @relation(fields: [userPhone, instanceId], references: [phone, instanceId], onDelete: Cascade)
+
   status      String   @default("Pendiente") // Pendiente, Confirmado, Enviado...
   products    String   // List of products bought
   totalPrice  Float
   tracking    String?
   postdated   String?
   seller      String?  // Phone number of the WhatsApp session that created the order
-  
+
   nombre      String?
   calle       String?
   ciudad      String?
   provincia   String?
   cp          String?
-  
+
   createdAt   DateTime @default(now())
+
+  @@index([userPhone])
+  @@index([instanceId])
+  @@index([createdAt])
 }
 
 model ChatLog {
   id          String   @id @default(uuid())
   instanceId  String   @default("default")
   userPhone   String
-  user        User     @relation(fields: [userPhone, instanceId], references: [phone, instanceId])
-  
+  user        User     @relation(fields: [userPhone, instanceId], references: [phone, instanceId], onDelete: Cascade)
+
   role        String   // "user" or "bot" or "system"
   content     String
-  
+
   timestamp   DateTime @default(now())
+
+  @@index([userPhone])
+  @@index([timestamp])
 }
 
 model BotConfig {

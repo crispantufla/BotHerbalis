@@ -15,6 +15,14 @@ const { _cleanPhone } = require('../flows/utils/flowHelpers');
 // In-memory debounce: userId → last notification timestamp
 const adminNotifiedAt: Map<string, number> = new Map();
 
+// Periodically prune stale debounce entries to prevent unbounded growth
+setInterval(() => {
+    const now = Date.now();
+    for (const [userId, ts] of adminNotifiedAt) {
+        if (now - ts > NOTIFY_DEBOUNCE_MS) adminNotifiedAt.delete(userId);
+    }
+}, NOTIFY_DEBOUNCE_MS).unref();
+
 interface PauseServiceDeps {
     sharedState: { pausedUsers: Set<string> };
     notifyAdmin?: (reason: string, userId: string, details?: string) => Promise<any>;

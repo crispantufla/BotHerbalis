@@ -825,12 +825,11 @@ CRÍTICO: Usá la "Fecha Actual" provista arriba para calcular el día exacto y 
      * Transcribe Audio — Uses OpenAI Whisper API
      */
     async transcribeAudio(mediaData: string, mimeType: string): Promise<string | null> {
-        try {
-            // Convert base64 to buffer and write temp file (Whisper needs a file)
-            const buffer = Buffer.from(mediaData, 'base64');
-            const ext = mimeType.includes('ogg') ? 'ogg' : mimeType.includes('mp4') ? 'mp4' : 'webm';
-            const tmpPath = path.join(os.tmpdir(), `herbalis_audio_${Date.now()}.${ext} `);
+        const buffer = Buffer.from(mediaData, 'base64');
+        const ext = mimeType.includes('ogg') ? 'ogg' : mimeType.includes('mp4') ? 'mp4' : 'webm';
+        const tmpPath = path.join(os.tmpdir(), `herbalis_audio_${Date.now()}.${ext}`);
 
+        try {
             fs.writeFileSync(tmpPath, buffer);
 
             const result = await this._callQueued(
@@ -842,13 +841,12 @@ CRÍTICO: Usá la "Fecha Actual" provista arriba para calcular el día exacto y 
                 null
             );
 
-            // Cleanup temp file
-            try { fs.unlinkSync(tmpPath); } catch (e) { /* ignore */ }
-
             return result.text || null;
         } catch (e: any) {
             logger.error("🔴 [AI] Transcribe Error:", e.message);
             return null;
+        } finally {
+            try { fs.unlinkSync(tmpPath); } catch (e) { /* ignore */ }
         }
     }
 

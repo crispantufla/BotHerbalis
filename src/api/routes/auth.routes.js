@@ -10,9 +10,11 @@ module.exports = (client, sharedState) => {
     router.post('/login', (req, res) => {
         const { username, password } = req.body;
 
-        // Check against environment variables or default to 'admin'/'admin' if not set
-        const validUser = process.env.ADMIN_USER || 'admin';
-        const validPass = process.env.ADMIN_PASSWORD || 'admin';
+        if (!process.env.ADMIN_USER || !process.env.ADMIN_PASSWORD) {
+            return res.status(503).json({ error: 'Credenciales de admin no configuradas en el servidor' });
+        }
+        const validUser = process.env.ADMIN_USER;
+        const validPass = process.env.ADMIN_PASSWORD;
 
         if (username === validUser && password === validPass) {
             return res.json({
