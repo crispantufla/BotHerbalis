@@ -35,6 +35,7 @@ export async function handleWaitingOk(
         if (aiOk.response) {
             currentState.history.push({ role: 'bot', content: aiOk.response, timestamp: Date.now() });
             await sendMessageWithDelay(userId, aiOk.response);
+            saveState(userId);
             return { matched: true };
         }
     }
@@ -63,6 +64,7 @@ export async function handleWaitingOk(
         if (aiOk.response) {
             currentState.history.push({ role: 'bot', content: aiOk.response, timestamp: Date.now() });
             await sendMessageWithDelay(userId, aiOk.response);
+            saveState(userId);
             return { matched: true };
         }
     }

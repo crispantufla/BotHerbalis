@@ -83,7 +83,7 @@ function _getAdminSuggestions(step: string, userMessage: string): string[] {
     }
     if (/estafa|trucho|mentira|robo|engaño|chanta/i.test(normalized)) {
         return [
-            '"Entiendo, por eso ofrecemos pago en efectivo al recibir. También aceptamos tarjeta o transferencia si preferís."',
+            '"Entiendo, por eso ofrecemos pago únicamente en efectivo al recibir. No pedimos datos bancarios ni pagos por adelantado."',
             '"Llevamos 13 años con más de 15.000 clientes. ¿Querés seguir?"',
             ...base
         ];

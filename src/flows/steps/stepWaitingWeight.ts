@@ -37,7 +37,7 @@ export async function handleWaitingWeight(
         logger.info(`[LOGIC] Implicitly detected product: ${implicitProduct}`);
     }
 
-    const isRefusal = /\b(no (quiero|voy|puedo)|prefiero no|pasame|decime|precio|que tenes|mostrame)\b/i.test(normalizedText);
+    const isRefusal = /\b(no (quiero|voy|puedo)|prefiero no|que tenes|mostrame)\b/i.test(normalizedText);
 
     if (hasNumber && hasQuestion && !isVeryLongMessage) {
         // User gave weight AND asked a health/product question — extract weight but respond to the concern
