@@ -55,3 +55,6 @@ orig_salesFlow.js
 
 # Sheets (removed)
 sheets_sync.js
+
+# Claude
+.claude/
