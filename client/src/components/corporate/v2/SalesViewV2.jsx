@@ -696,7 +696,7 @@ Teléfono: ${phoneDisplay}`;
                                         <div className="flex items-start justify-center md:justify-end">
                                             <span className="text-emerald-500 font-bold mt-1 mr-1 text-lg">$</span>
                                             {isDetailEditing ? (
-                                                <input type="text" value={detailEditData.precio || ''} onChange={e => handleDetailField('precio', e.target.value)} className="font-black text-emerald-500 dark:text-emerald-400 text-4xl w-full bg-white dark:bg-slate-700 rounded-xl px-3 py-2 border border-slate-200 dark:border-slate-600 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 dark:focus:ring-emerald-900/50 outline-none" placeholder="0" />
+                                                <input type="text" value={detailEditData.precio || ''} onChange={e => handleDetailField('precio', e.target.value)} className="font-black text-emerald-500 dark:text-emerald-400 text-4xl w-32 md:w-48 text-center md:text-right bg-white dark:bg-slate-700 rounded-xl px-3 py-2 border border-slate-200 dark:border-slate-600 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 dark:focus:ring-emerald-900/50 outline-none" placeholder="0" />
                                             ) : (
                                                 <h4 className="font-black text-emerald-500 dark:text-emerald-400 text-4xl tabular-nums tracking-tighter">{viewingOrder.precio}</h4>
                                             )}
