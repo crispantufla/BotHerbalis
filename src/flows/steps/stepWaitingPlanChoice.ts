@@ -90,10 +90,11 @@ async function handleWaitingPlanChoice(
     let planSelected = false;
     let selectedPlanId = null;
 
-    // GUARD: Detect any questions BEFORE interpreting numbers as plan selection blindly
+    // GUARD: Detect any questions OR objections BEFORE interpreting numbers as plan selection blindly
     // e.g. "el de 120 cuánto sale", "quiero el de 60, como se toma?", "el de 60 pero me cuesta tragar", "cuanto bajo en 60 dias?"
-    // If the user has a question AND a plan, we want the AI to handle it so it answers their question first.
-    const hasQuestionText = /\b(como|cómo|cuando|cuándo|que|qué|donde|dónde|por que|por qué|cual|cuál|duda|consulta|consulto|precio|costo|sale|cuesta|valor|paga|cobr|tarjeta|efectivo|transferencia|contraindicaciones|efectos|mal|dieta|rebote|tragar|ahogar|grandes|cuestan|complicado|dificil|seguridad|garantia|garantía|garantiza|efectiva|efectivo|funciona|seguro|cuanto|cuánto|cuantos|cuántos|kilo|kilos|bajar|bajo)\b/i.test(normalizedText) || text.includes('?');
+    // Also catch objections like "no me conviene por el envio", "es muy caro el de 60"
+    // If the user has a question/objection AND a plan, we want the AI to handle it so it answers their concern first.
+    const hasQuestionText = /\b(como|cómo|cuando|cuándo|que|qué|donde|dónde|por que|por qué|cual|cuál|duda|consulta|consulto|precio|costo|sale|cuesta|valor|paga|cobr|tarjeta|efectivo|transferencia|diabetes|diabetica|presion|hipertens|salud|enfermedad|tiroides|hipotiroidismo|operada|cirugia|bypass|manga|estomago|gastritis|acidez|contraindicaciones|efectos|mal|dieta|rebote|tragar|ahogar|grandes|cuestan|complicado|dificil|seguridad|garantia|garantía|garantiza|efectiva|efectivo|funciona|seguro|cuanto|cuánto|cuantos|cuántos|kilo|kilos|bajar|bajo|envio|envío|conviene|caro|carisimo|no me conviene|no me sirve)\b/i.test(normalizedText) || text.includes('?');
 
     // If text is super long (like a transcription), force AI to handle it so we don't look robotic
     const isVeryLongMessage = text.split(/\s+/).length > 20;
@@ -207,7 +208,9 @@ RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.
 2) SI PREGUNTA CUÁNTOS KILOS BAJARÁ o pide garantías: Respondé textualmente "Cada cuerpo tiene su ritmo. Quienes tienen más kilos para bajar suelen notar cambios más visibles al inicio, y quienes necesitan bajar menos ven descensos más progresivos. Lo importante es que el descenso sea natural y sostenido." Luego preguntale con cuál plan quiere avanzar. goalMet=false.
 3) CAMBIO DE PRODUCTO: Si el usuario dice "quiero semillas" o "gotas", confirmá el cambio usando extractedData="CHANGE_PRODUCT: [Producto]" (SIN preguntarle de nuevo) y dale los precios de ese nuevo producto para que elija el plan. goalMet=false.
 4) Si el usuario confirma explícitamente un plan (ej: "el de 60" o "120") en su mensaje y también pregunta algo: respondé su pregunta explayándote todo lo necesario, PERO OBLIGATORIAMENTE DEBES PONER el número de plan en "extractedData" (ej: "60" o "120") y establecer goalMet=true. NUNCA pongas goalMet=true si en extractedData devuelves null.
-5) Si pone excusas ("después te aviso", "no tengo ahora"): decile con mucha calidez "Dale, tranqui, avisame y te mantengo el precio congelado, ¿te lo dejo anotado para alguna fecha futura?", goalMet=false.`,
+5) Si pone excusas ("después te aviso", "no tengo ahora"): decile con mucha calidez "Dale, tranqui, avisame y te mantengo el precio congelado, ¿te lo dejo anotado para alguna fecha futura?", goalMet=false.
+6) OBJECCIÓN DE ENVÍO O CONVENIENCIA (ej: "el de 60 no me conviene por el envío", "es caro el envío"): Respondé con mucha empatía explicando que el costo del envío en el plan de 60 es por el servicio de pago en destino que cobra el correo, y recalca que por eso el de 120 es la opción más elegida ya que tiene el ENVÍO GRATIS y rinde el doble. Intentá que elija el de 120 pero sé amable si insiste en el de 60. goalMet=false.
+7) HORARIO DE ENVÍO: Si pregunta cuándo o a qué hora llega, aclará que Correo Argentino maneja su propia logística y no podemos asegurar el horario, pero que avisamos si hay que retirar. Luego volvé al plan. goalMet=false.`,
                 history: currentState.history,
                 summary: currentState.summary,
                 knowledge: knowledge,

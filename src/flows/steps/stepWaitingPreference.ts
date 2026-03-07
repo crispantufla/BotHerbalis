@@ -21,6 +21,9 @@ export async function handleWaitingPreference(
         saveState(userId);
     }
 
+    // SCRIPT FIRST: Check if the user has a health concern or explicit question that must be answered
+    const hasQuestionOrConcern = /\b(diabetes|diabetica|presion|hipertens|salud|enfermedad|tiroides|hipotiroidismo|operada|cirugia|bypass|manga|estomago|gastritis|acidez|contraindicacion|lactancia|embarazo|peligro|efecto|secundario|laxante|diarrea|consulta|duda|pregunta|horario)\b|[?¿]/i.test(normalizedText);
+
     // SCRIPT FIRST: Check keywords for capsulas or semillas
     const isMatch = (keywords: string[], text: string) => keywords.some((k: string) => new RegExp(`\\b${k}\\b`, 'i').test(text));
 
@@ -31,10 +34,10 @@ export async function handleWaitingPreference(
     const totalMatches = (mentionsCapsulas ? 1 : 0) + (mentionsSemillas ? 1 : 0) + (mentionsGotas ? 1 : 0);
 
     // Or if they ask for a recommendation or express a physical objection (e.g., hard to swallow)
-    // FIX: Only treat as comparison if they ACTUALLY mention more than one, or explicitly ask for comparison.
-    // Answering "Capsulas" to "con cual preferis avanzar, capsulas o semillas?" should NOT be a comparison.
+    // FIX: Only treat as comparison if they ACTUALLY mention more than one, explicitly ask for comparison,
+    // OR have a health concern/question while also mentioning a product (so the AI can answer before proceeding).
     const hasObjection = /\b(tragar|ahogar|grandes|cuestan|complicado|dificil|miedo a ahogarme)\b/i.test(normalizedText);
-    const isComparison = totalMatches > 1 || hasObjection || (totalMatches === 0 && /\b(cual|recomend|mejor|diferencia|que me recomiendas|que me conviene|cual me das|asesorame|efectiv|rapido)\b/i.test(normalizedText));
+    const isComparison = totalMatches > 1 || hasObjection || (hasQuestionOrConcern && totalMatches >= 1) || (totalMatches === 0 && /\b(cual|recomend|mejor|diferencia|que me recomiendas|que me conviene|cual me das|asesorame|efectiv|rapido)\b/i.test(normalizedText));
 
     const adaptResponsePrefix = (rawResponse: string, userText: string, extString: string) => {
         if (/\b(cual|recomend|mejor|efectiv|rapido|diferencia)\b/i.test(userText)) {
@@ -77,7 +80,8 @@ export async function handleWaitingPreference(
             3) EMOCIÓN Y SALUD: Si cuenta su historia de peso, problemas médicos (tiroides, operaciones) o inseguridades, REDACTA UN PÁRRAFO EXTENSO Y PROFUNDAMENTE EMPÁTICO validando sus sentimientos ANTES de recomendar nada.
             4) Si duda o insiste entre GOTAS y CÁPSULAS o te pide recomendación: Decile con mucha calidez y detalle "Personalmente te recomiendo las cápsulas, suelen ser más efectivas. Las gotas las recomendamos ya para gente mayor o con problemas digestivos." Luego preguntale con cuál prefiere avanzar.
             5) Si pide "info de las 3", "precio de las 3" o "todas": brindá un resumen explicativo detallado con los precios base de 60 días para Cápsulas, Gotas y Semillas (extraídos del knowledge) y luego preguntá cuál prefiere probar.
-            6) Si pregunta por envío o medios de pago, aclara con amabilidad que el envío es gratis y que el pago se puede realizar con tarjeta o transferencia al momento del pedido, o en efectivo al recibir. Luego preguntale con cuál producto prefiere avanzar.
+            6) Si pregunta por envío o medios de pago, aclara con amabilidad que el envío es gratis a todo el país y que el pago se realiza ÚNICAMENTE en efectivo al momento de recibir el paquete (contra reembolso). Luego preguntale con cuál producto prefiere avanzar.
+            7) HORARIOS DE ENVÍO: Si pregunta a qué hora llega o pide un horario (tarde/mañana), respondé con firmeza pero amabilidad: "No tenemos ningún control sobre los carteros del Correo Argentino, por lo que no podemos asegurar en qué horario pasará por tu domicilio. Pero quedate tranqui que monitoreamos el envío y si no te encuentran te avisamos en el acto para que lo retires por sucursal". Luego preguntá con cuál producto avanzar.
             SOLO marcá goalMet=true si el cliente ya eligió o si explícitamente pidió "lo mejor/más rápido" (asumiendo cápsulas).`,
             history: currentState.history,
             summary: currentState.summary,
@@ -86,6 +90,12 @@ export async function handleWaitingPreference(
         });
 
         if (aiRecommendation.goalMet && aiRecommendation.extractedData) {
+            // First send the AI's natural response if it exists (e.g., to answer a health question)
+            if (aiRecommendation.response) {
+                currentState.history.push({ role: 'bot', content: aiRecommendation.response, timestamp: Date.now() });
+                await sendMessageWithDelay(userId, aiRecommendation.response);
+            }
+
             const ext = aiRecommendation.extractedData.toLowerCase();
             let priceNode;
             if (ext.includes('cápsula') || ext.includes('capsula')) {
@@ -160,8 +170,7 @@ export async function handleWaitingPreference(
 4) Si habla en PASADO ("yo tomaba", "antes usé"), decile tipo "Ah mirá que bueno que ya las conoces y pudiste sacarles provecho! Entonces vayamos con las CÁPSULAS directamente". 
 5) Si pide información o precios de "las 3", "todas", o "los 3", brindá una explicación extensa y amable de Cápsulas, Semillas y Gotas con sus precios correspondientes de 60 días (usando el knowledge) y luego preguntá cuál prefiere. 
 6) Si el usuario pregunta si puede recibir el pedido o pagarlo un día concreto, DALE EL OK Y CONFIRMÁ EL PRODUCTO. 
-7) Si pregunta por envío o medios de pago, aclará de forma cálida que el envío es gratis a todo el país y que el pago se puede realizar con tarjeta o transferencia al momento del pedido, o en efectivo al recibir. Luego preguntale con cuál producto prefiere avanzar. 
-
+7) Si pregunta por envío o medios de pago, aclará de forma cálida que el envío es gratis a todo el país y que el pago se realiza ÚNICAMENTE en efectivo al recibir el paquete. Si pregunta por horarios, aclará que no tenemos control sobre los carteros de Correo Argentino pero que avisamos si no lo encuentran. Luego preguntale con cuál producto prefiere avanzar.
 🔴 REGLA ABSOLUTA DE CONFIRMACIÓN: Si el usuario ya aceptó tu sugerencia o eligió explícita O implícitamente (ej: "dale", "si", "bueno"), NO DEBES GENERAR RESPUESTA. Debes marcar goalMet=true y extractedData="PRODUCTO: Cápsulas de nuez de la india" inmediatamente.`,
             history: currentState.history,
             summary: currentState.summary,
@@ -170,6 +179,12 @@ export async function handleWaitingPreference(
         });
 
         if (aiPref.goalMet && aiPref.extractedData) {
+            // First send the AI's natural response if it exists (e.g., to answer a health question)
+            if (aiPref.response) {
+                currentState.history.push({ role: 'bot', content: aiPref.response, timestamp: Date.now() });
+                await sendMessageWithDelay(userId, aiPref.response);
+            }
+
             const ext = aiPref.extractedData.toLowerCase();
             let priceNode;
             if (ext.includes('cápsula') || ext.includes('capsula')) {

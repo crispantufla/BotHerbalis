@@ -143,9 +143,12 @@
                 "avisa",
                 "cartero",
                 "llaman",
-                "visita"
+                "visita",
+                "horario",
+                "tarde",
+                "mañana"
             ],
-            "response": "No tenemos control sobre el momento exacto de la visita del cartero.\n\nSi no te encuentra, puede dejar aviso para retirar en sucursal."
+            "response": "No tenemos ningún control sobre los carteros del Correo Argentino, por lo que no podemos saber ni asegurar en qué horario llegará a tu domicilio. Sin embargo, hacemos el seguimiento constante de todos nuestros envíos y, si el cartero llega a tu casa y no te encuentra, te avisamos en el día para que puedas retirarlo en la sucursal más cercana dentro de las 72 hs."
         },
         {
             "keywords": [
@@ -488,7 +491,7 @@
                 "numero de seguimiento",
                 "donde esta mi pedido"
             ],
-            "response": "¡Sí! Te damos el código de seguimiento y además te avisamos cuando el pedido llega al correo de tu zona 📦😊"
+            "response": "¡Sí! Te damos el código de seguimiento y además te avisamos cuando el pedido llega al correo de tu zona por si el cartero no te encuentra 📦😊"
         },
         {
             "keywords": [
