@@ -4,6 +4,17 @@ Este documento mantiene un registro de los problemas resueltos, características
 Al cambiar de cuenta de Google, puedes pedirle a la IA: *"Lee el archivo AI_SESSION_NOTES.md para tener todo el contexto de lo que estábamos haciendo"*.
 
 ---
+## 🛑 [7 Mar 2026] Fix: Bot se pausa con preguntas FAQ durante `waiting_data`
+**Problema:** Durante la etapa de recolección de datos de envío (`waiting_data`), clientes preguntan cosas como "los envíos tienen día especial?", "que función tienen las cápsulas", "me tengo que cuidar con las comidas", "dónde tenés oficina". El bot intenta parsear estos textos como dirección, falla, y se pausa con "La IA no pudo procesar correctamente los datos ingresados en el primer intento."
+
+**Causa Raíz:** La regex `explicitQuestionKeywords` era un whitelist que siempre dejaba huecos. Además, el `\b` de JS con caracteres acentuados (`dónde`, `envíos`, `función`) genera falsos negativos. Cualquier texto que no matcheara iba directo a `parseAddress` → fallo → `addressAttempts >= 1` → `_pauseAndAlert` inmediato.
+
+**Solución (3 capas):**
+1. **Regex expandida** (`stepWaitingData.ts` L137): Se agregaron `envios|envíos|contraindicacion|contraindicaciones|efectos|hipertens|presion|presión|diabetes|embaraz|lactancia`.
+2. **`aiGoal` enriquecido** (L213): Se añadieron respuestas explícitas de FAQ sobre envíos y contraindicaciones.
+3. **🆕 AI SAFETY NET** (L331): Antes de pausar, si el mensaje NO tiene patrones de dirección (sin dígitos, sin keywords de calle/barrio/etc.), se envía al AI fallback como último recurso. Solo pausa si la IA también falla. Esto ELIMINA el problema de whitelisting — cualquier pregunta que se escape de las regex será capturada por esta red de seguridad.
+
+---
 ## 🏗️ [28 Feb 2026] Refactorización Arquitectónica: Eliminación de globalFaq, StepRedirect y Bridge
 **Problemas Raíz Identificados:**
 1. **Doble Respuesta:** `globalFaq.js` interceptaba mensajes ANTES de los step handlers y luego `_getStepRedirect()` re-inyectaba la pregunta del paso, generando respuestas robóticas.

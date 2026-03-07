@@ -134,7 +134,7 @@ export async function handleWaitingData(
         }
     }
 
-    const explicitQuestionKeywords = /\b(cuanto|cuánto|precio|costo|sale|cuesta|valor|paga|pagan|abona|tarjeta|transferencia|tarda|llega|envio|envío)\b/i.test(normalizedText) || text.includes('?');
+    const explicitQuestionKeywords = /\b(cuanto|cuánto|precio|costo|sale|cuesta|valor|paga|pagan|abona|tarjeta|transferencia|tarda|llega|envio|envío|envios|envíos|contraindicacion|contraindicaciones|efectos|hipertens|presion|presión|diabetes|embaraz|lactancia)\b/i.test(normalizedText) || text.includes('?');
 
     // Detect if the numbers in the text are plan references (60/120) not address numbers
     const onlyPlanNumbers = /\b(60|120)\b/.test(text) && !/\b(calle|av|avenida|barrio|mz|lote|piso|dpto|depto|departamento|casa|block|manzana)\b/i.test(text);
@@ -210,7 +210,7 @@ export async function handleWaitingData(
         } else if (isObjectionOrComment) {
             aiGoal = `El usuario hizo un comentario sobre probar el producto primero, o expresó dudas sobre los resultados (ej: "si me da resultado compro más"). Respondé validando su decisión con extrema seguridad y empatía. A continuación, VOLVÉ a pedir sutilmente los datos de envío que estaban pendientes (Nombre, Dirección, Ciudad). NO ofrezcas otros productos.`;
         } else {
-            aiGoal = `El usuario tiene una duda o expresa una preocupación en plena toma de datos (ej: pregunta cómo se paga, cuándo llega, si le entregan en el trabajo, o cuenta un largo problema personal). DEBES RESPONDER SU TEXTO DIRECTAMENTE de forma EXTENSA Y MUY EMPÁTICA usando el Knowledge. Si expresa miedos sobre demoras o recepción, redactá un párrafo largo brindando tranquilidad absoluta. Si pregunta si puede recibir en su TRABAJO, responde sus opciones. Si pregunta formas de pago: \"El pago se puede realizar con tarjeta o transferencia al momento de realizar el pedido, o en efectivo al recibir\". Si pregunta tiempos: \"Tarda de 7 a 10 días hábiles en promedio.\". Nunca lo obligues a dar los datos, respondé su duda o drama con muchísima calidez, tómate tu tiempo, y cerrá sutilmente con: \"¿Te parece que lo dejemos anotado?\" o \"¿Te tomo los datos?\".\n\nEXCEPCIÓN CRÍTICA: Si el cliente dice que te pasa los datos luego, mañana o después (ej \"mañana lo consulto y te mando\", \"luego te los paso\", \"te confirmo mas tarde\"): NO hagas más preguntas. Respondé de forma muy breve y complaciente: \"¡Dale! Quedo a tu disposición, cualquier cosa acá estoy. 😊\"`;
+            aiGoal = `El usuario tiene una duda o expresa una preocupación en plena toma de datos (ej: pregunta cómo se paga, cuándo llega, si le entregan en el trabajo, o cuenta un largo problema personal). DEBES RESPONDER SU TEXTO DIRECTAMENTE de forma EXTENSA Y MUY EMPÁTICA usando el Knowledge. Si expresa miedos sobre demoras o recepción, redactá un párrafo largo brindando tranquilidad absoluta. Si pregunta si puede recibir en su TRABAJO, responde sus opciones. Si pregunta sobre la función del producto o qué hace: "La Nuez de la India ayuda a acompañar el proceso natural del cuerpo para eliminar excesos. Muchas personas notan menos hinchazón, más liviandad y un descenso progresivo de peso. Es un apoyo natural para sentirte mejor sin métodos agresivos.". Si pregunta sobre dieta/comidas/si tiene que cuidarse: "La Nuez de la India puede utilizarse sin hacer dietas estrictas, porque ayuda a acompañar el proceso natural del metabolismo. Obviamente, si además cuidás un poco la alimentación o sumás algo de movimiento, los resultados suelen verse más rápido.". Si pregunta dónde queda la oficina/local/de dónde son: "Somos Herbalis, una empresa internacional especializada en productos naturales a base de Nuez de la India. Nuestra central está en Barcelona (España) y en Argentina distribuimos desde Rosario. NO tenemos revendedores. Hace 13 años enviamos a todo el país por Correo Argentino, con envío sin costo y la posibilidad de pago al recibir.". Si pregunta formas de pago: "El pago se puede realizar con tarjeta o transferencia al momento de realizar el pedido, o en efectivo al recibir". Si pregunta tiempos o si los envíos tienen un día especial: "Los envíos se realizan cuanto antes, no tienen un día especial. Tardan aproximadamente 10 días hábiles en llegar.". Si pregunta por contraindicaciones o si es seguro para alguna condición de salud: "No hay ninguna contraindicación para tu condición. Es un producto 100% natural, las únicas contraindicaciones son embarazo y lactancia.". Nunca lo obligues a dar los datos, respondé su duda o drama con muchísima calidez, tómate tu tiempo, y cerrá sutilmente con: "¿Te parece que lo dejemos anotado?" o "¿Te tomo los datos?".\\n\\nEXCEPCIÓN CRÍTICA: Si el cliente dice que te pasa los datos luego, mañana o después (ej "mañana lo consulto y te mando", "luego te los paso", "te confirmo mas tarde"): NO hagas más preguntas. Respondé de forma muy breve y complaciente: "¡Dale! Quedo a tu disposición, cualquier cosa acá estoy. 😊"`;
         }
 
         const aiData = await aiService.chat(text, {
@@ -327,7 +327,38 @@ export async function handleWaitingData(
         currentState.addressAttempts = (currentState.addressAttempts || 0) + 1;
     }
 
-    // "Pide ayuda al administrador al primer intento"
+    // SAFETY NET: If address parsing failed and the message doesn't look like an address attempt at all,
+    // give the AI a chance to respond before pausing. This catches FAQ questions, product doubts,
+    // location questions, etc. that slip past the keyword whitelist above.
+    const hasAddressPatterns = /\d/.test(text) || /\b(calle|av|avenida|barrio|mz|lote|piso|dpto|depto|departamento|casa|block|manzana|localidad|provincia|pcia|código postal|codigo postal)\b/i.test(text);
+    if (!madeProgress && currentState.addressAttempts >= 1 && !hasAddressPatterns) {
+        console.log(`[AI-SAFETY-NET] waiting_data: Message doesn't look like address for ${userId}: "${text}". Trying AI fallback before pausing.`);
+        const safetyGoal = `El usuario NO está dando datos de envío, sino que hace una pregunta o comentario. Respondé su pregunta con empatía usando el Knowledge. Si pregunta sobre la función del producto o qué hace: "La Nuez de la India ayuda a acompañar el proceso natural del cuerpo para eliminar excesos. Muchas personas notan menos hinchazón, más liviandad y un descenso progresivo de peso. Es un apoyo natural para sentirte mejor sin métodos agresivos." Si pregunta sobre dieta/comidas/si tiene que cuidarse: "La Nuez de la India puede utilizarse sin hacer dietas estrictas, porque ayuda a acompañar el proceso natural del metabolismo. Obviamente, si además cuidás un poco la alimentación o sumás algo de movimiento, los resultados suelen verse más rápido." Si pregunta dónde queda la oficina/local/de dónde son: "Somos Herbalis, una empresa internacional especializada en productos naturales a base de Nuez de la India. Nuestra central está en Barcelona (España) y en Argentina distribuimos desde Rosario. NO tenemos revendedores. Hace 13 años enviamos a todo el país por Correo Argentino, con envío sin costo y la posibilidad de pago al recibir." Si pregunta por contraindicaciones: "Es 100% natural. Las únicas contraindicaciones son embarazo y lactancia." Si pregunta sobre envíos o si tienen día especial: "Los envíos se realizan cuanto antes, sin día especial. Tardan aproximadamente 10 días hábiles." Si pregunta formas de pago: "El pago se puede realizar con tarjeta o transferencia al momento de realizar el pedido, o en efectivo al recibir." Para CUALQUIER OTRA pregunta, respondé con naturalidad usando el Knowledge. Al final, cerrá sutilmente retomando los datos de envío: "¿Te paso a tomar los datos para el envío?" o "¿Me pasás los datos de envío?".`;
+        try {
+            const safetyAiData = await aiService.chat(text, {
+                step: FlowStep.WAITING_DATA,
+                goal: safetyGoal,
+                history: currentState.history,
+                summary: currentState.summary,
+                knowledge: knowledge,
+                userState: currentState
+            });
+            if (safetyAiData.response && !_isDuplicate(safetyAiData.response, currentState.history)) {
+                currentState.addressAttempts = 0; // Reset attempts since we handled it
+                currentState.history.push({ role: 'bot', content: safetyAiData.response, timestamp: Date.now() });
+                saveState(userId);
+                await sendMessageWithDelay(userId, safetyAiData.response);
+                return { matched: true };
+            }
+        } catch (e) {
+            console.error(`[AI-SAFETY-NET] Error for ${userId}:`, e);
+        }
+        // If AI also failed, fall through to pause
+        await _pauseAndAlert(userId, currentState, dependencies, text, 'La IA no pudo procesar correctamente los datos ingresados en el primer intento.');
+        return { matched: true };
+    }
+
+    // Original pause for messages that DO look like address attempts but failed
     if (!madeProgress && currentState.addressAttempts >= 1) {
         await _pauseAndAlert(userId, currentState, dependencies, text, 'La IA no pudo procesar correctamente los datos ingresados en el primer intento.');
         return { matched: true };

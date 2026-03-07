@@ -13,7 +13,7 @@ export async function handleWaitingWeight(
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
 
     const hasNumber = /\d+/.test(text.trim());
-    const hasQuestion = /\b(como|cómo|cuando|cuándo|que|qué|donde|dónde|por que|por qué|cual|cuál|duda|consulta|precio|costo|sale|cuesta|valor|paga|cobr|tarjeta|efectivo|transferencia|contraindicaciones|efectos|mal|dieta|rebote)\b/i.test(normalizedText) || normalizedText.includes('?');
+    const hasQuestion = /\b(como|cómo|cuando|cuándo|que|qué|donde|dónde|por que|por qué|cual|cuál|duda|consulta|precio|costo|sale|cuesta|valor|paga|cobr|tarjeta|efectivo|transferencia|contraindicaciones|contraindicacion|efectos|mal|dieta|rebote|salud|dañin|riñon|riñón|higado|hígado|corazon|corazón|diabetes|diabetico|diabética|diabético|presion|presión|hipertens|operad|cirugía|cirugia|enferm|tiroides|medicamento|medica|pastillas para)\b/i.test(normalizedText) || normalizedText.includes('?');
     // If text is super long (like a transcription), force AI to handle it so we don't look robotic
     const isVeryLongMessage = text.split(/\s+/).length > 20;
 
@@ -37,6 +37,31 @@ export async function handleWaitingWeight(
     }
 
     const isRefusal = /\b(no (quiero|voy|puedo)|prefiero no|pasame|decime|precio|que tenes|mostrame)\b/i.test(normalizedText);
+
+    if (hasNumber && hasQuestion && !isVeryLongMessage) {
+        // User gave weight AND asked a health/product question — extract weight but respond to the concern
+        const wMatch = text.match(/\d+/);
+        if (wMatch) currentState.weightGoal = parseInt(wMatch[0], 10);
+        console.log(`[LOGIC] User ${userId} gave weight (${currentState.weightGoal}kg) AND asked a question. Responding to both.`);
+        const dualGoal = `El usuario dijo cuántos kilos quiere bajar (${currentState.weightGoal} kg) PERO TAMBIÉN hizo una pregunta sobre salud, contraindicaciones o el producto. DEBES responder su pregunta con MUCHA empatía y detalle PRIMERO. Si pregunta si es dañino/seguro para alguna condición de salud (riñón, presión, diabetes, etc.): "No hay ninguna contraindicación para tu condición. Es un producto 100% natural, las únicas contraindicaciones son embarazo y lactancia." Después confirmá su objetivo de peso y preguntá qué formato prefiere: "Perfecto, ${currentState.weightGoal} kg es un objetivo totalmente alcanzable 👌 ¿Preferís algo súper práctico (cápsulas o gotas) o más natural (semillas)?"."`;
+        const aiDual = await aiService.chat(text, {
+            step: FlowStep.WAITING_WEIGHT,
+            goal: dualGoal,
+            history: currentState.history,
+            summary: currentState.summary,
+            knowledge: knowledge,
+            userState: currentState
+        });
+        if (aiDual.response) {
+            const recNode = knowledge.flow.recommendation;
+            _setStep(currentState, recNode.nextStep);
+            currentState.history.push({ role: 'bot', content: aiDual.response, timestamp: Date.now() });
+            saveState(userId);
+            await sendMessageWithDelay(userId, aiDual.response);
+            return { matched: true };
+        }
+        // If AI failed, fall through to normal weight-only handling below
+    }
 
     if (hasNumber && !hasQuestion && !isVeryLongMessage) {
         const wMatch = text.match(/\d+/);
