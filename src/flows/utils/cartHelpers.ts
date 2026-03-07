@@ -23,7 +23,7 @@ function buildCartFromSelection(product: string, plan: string, state: UserState)
     }
 
     // Use integer division to avoid float modulo issues
-    const units = Math.round(planDays / 60);
+    const units = Math.floor(planDays / 60);
     const pairs = Math.floor(units / 2);
     const remainder = units % 2;
     const calculatedPrice = (pairs * base120) + (remainder * base60);
