@@ -93,11 +93,36 @@ function startServer(client, sharedState) {
     app.use('/media', express.static(path.join(__dirname, '../../public/media')));
 
     // --- HEALTHCHECK (no auth required) ---
-    app.get('/health', (req, res) => {
+    app.get('/health', async (req, res) => {
         const memUsage = process.memoryUsage();
-        res.json({
-            status: 'ok',
+        const checks = {
             whatsapp: sharedState.isConnected ? 'connected' : 'disconnected',
+            database: 'unknown',
+            redis: 'unknown'
+        };
+
+        // DB check
+        try {
+            const { prisma } = require('../../db');
+            await prisma.$queryRaw`SELECT 1`;
+            checks.database = 'connected';
+        } catch (e) {
+            checks.database = 'disconnected';
+        }
+
+        // Redis check
+        try {
+            const { redisConnection } = require('../services/queueService');
+            checks.redis = redisConnection.status === 'ready' ? 'connected' : 'disconnected';
+        } catch (e) {
+            checks.redis = 'disconnected';
+        }
+
+        const allHealthy = checks.whatsapp === 'connected' && checks.database === 'connected' && checks.redis === 'connected';
+
+        res.status(allHealthy ? 200 : 503).json({
+            status: allHealthy ? 'ok' : 'degraded',
+            services: checks,
             uptime: Math.floor(process.uptime()),
             memory: {
                 rss: Math.round(memUsage.rss / 1024 / 1024) + 'MB',
@@ -135,9 +160,9 @@ function startServer(client, sharedState) {
     // --- EXPRESS 5 GLOBAL ERROR HANDLER ---
     // Express 5 natively passes unhandled Promise rejections to the next(err) middleware
     app.use((err, req, res, next) => {
-        logger.error(`❌ [API ERROR] ${req.method} ${req.url}:`, err.message);
-        if (err.stack) {
-            console.error(err.stack);
+        logger.error(`[API ERROR] ${req.method} ${req.url}:`, err.message);
+        if (err.stack && process.env.NODE_ENV !== 'production') {
+            logger.error(err.stack);
         }
         res.status(err.status || 500).json({
             error: err.message || 'Internal Server Error',

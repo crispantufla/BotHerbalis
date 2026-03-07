@@ -658,7 +658,9 @@ const sendMessageWithDelay = async (chatId: string, content: string, startTime: 
     }
 
     // CRITICAL BUG FIX: Check if the user was paused manually DURING the delay
-    if (pausedUsers.has(chatId) || (config.globalPause && !process.env.ADMIN_NUMBER?.includes(chatId.split('@')[0]))) {
+    const alertNums = (config.alertNumbers || []).map((n: string) => n.replace(/\D/g, ''));
+    const isAdminChat = alertNums.some((n: string) => chatId.startsWith(n));
+    if (pausedUsers.has(chatId) || (config.globalPause && !isAdminChat)) {
         logger.info(`[DELAY] aborted message to ${chatId}: User was paused during delay`);
         return;
     }
@@ -980,9 +982,12 @@ client.on('message', async (msg: any) => {
         // Some ads arrive with empty body or as system notifications.
         // Also if a user taps a wa.me link sometimes it registers as an empty chat creation.
         if (!msgText || msgText.trim() === '') {
-            if (msg.type === 'chat' || msg.type === 'e2e_notification' || msg.type === 'unknown' || msg.type === 'template_button_reply') {
+            if (msg.type === 'chat' || msg.type === 'e2e_notification' || msg.type === 'template_button_reply') {
                 logger.info(`[AD-HANDLE] Empty/System message (${msg.type}) from ${userId}. Treating as ad click/greeting.`);
                 msgText = "Hola! (Vengo de un anuncio)";
+            } else if (msg.type === 'unknown') {
+                logger.warn(`[MSG] Unknown message type from ${userId}. Ignoring.`);
+                return;
             } else {
                 return; // Ignore other truly empty unsupported types
             }

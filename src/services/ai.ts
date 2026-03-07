@@ -521,12 +521,9 @@ class AIService {
                 const pSem = f.price_semillas?.response || "";
                 if (pCaps || pSem) knowledgeContext += `- PRECIOS: Capsulas($46.900 / $66.900) | Semillas($36.900 / $49.900) \n`;
 
-                // Get dynamic prices for context too
-                let adMax = '6.000';
-                try {
-                    const pd = JSON.parse(fs.readFileSync(PRICES_PATH, 'utf8'));
-                    if (pd.adicionalMAX) adMax = pd.adicionalMAX;
-                } catch (e: any) { }
+                // Get dynamic prices from cache (non-blocking)
+                const priceData = await _getPrices();
+                const adMax = priceData.adicionalMAX || '6.000';
 
                 knowledgeContext += `- Plan 120 días SIN adicional. Plan 60 días con Contra Reembolso MAX (+$${adMax}).\n`;
                 knowledgeContext += `- SOBRE CARGO ADICIONAL: El cargo extra es el costo del servicio de Contra Reembolso (pagar al recibir). Se cobra IGUAL sea envío a domicilio o retiro en sucursal. Para el plan 120 días está BONIFICADO (es gratis). Si eligió 60 días y pide retirar en correo para no pagar envío, explicá esto y ofrecé pasar a 120 días para ahorrarlo.\n`;
