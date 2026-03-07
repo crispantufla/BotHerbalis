@@ -63,15 +63,17 @@ export async function handleWaitingFinalConfirmation(
             cliente: phone, nombre: o.nombre, calle: o.calle, ciudad: o.ciudad, cp: o.cp, provincia: o.provincia,
             producto: cart.map(i => i.product).join(' + ') || currentState.selectedProduct || '',
             plan: cart.map(i => `${i.plan} días`).join(' + ') || `${currentState.selectedPlan || '60'} días`,
-            precio: currentState.totalPrice || '0', ...extra
+            precio: currentState.totalPrice || '0',
+            postdatado: currentState.postdatado || null,
+            ...extra
         };
     };
 
     let hasNewPostdate = false;
     if (!currentState.postdatado) {
-        const dateMatch = _detectPostdatado(text, text) || text.match(/(?:a partir del?|desde el?|para el?|despu[eé]s del?)\s*(?:d[ií]a\s*)?(\d{1,2})\s*(?:de\s*)?(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
-        if (dateMatch) {
-            currentState.postdatado = typeof dateMatch === 'string' ? dateMatch : `${dateMatch[1]} de ${dateMatch[2]}`;
+        const postdatadoResult = _detectPostdatado(normalizedText);
+        if (postdatadoResult) {
+            currentState.postdatado = postdatadoResult;
             hasNewPostdate = true;
         }
     }
@@ -116,7 +118,8 @@ export async function handleWaitingFinalConfirmation(
             if (dependencies.saveOrderToLocal) dependencies.saveOrderToLocal(orderData);
 
             const o = currentState.pendingOrder || currentState.partialAddress || {};
-            if (notifyAdmin) await notifyAdmin(`⌛ Pedido Requiere Aprobación`, userId, `Datos: ${o.nombre}, ${o.calle}\nCiudad: ${o.ciudad} | CP: ${o.cp}\nProvincia: ${o.provincia || '?'}\nItems: ${orderData.producto}\nTotal: $${currentState.totalPrice || '0'}`);
+            const postdataLabel = currentState.postdatado ? `\n📅 POSTDATADO: ${currentState.postdatado}` : '';
+            if (notifyAdmin) await notifyAdmin(`⌛ Pedido Requiere Aprobación`, userId, `Datos: ${o.nombre}, ${o.calle}\nCiudad: ${o.ciudad} | CP: ${o.cp}\nProvincia: ${o.provincia || '?'}\nItems: ${orderData.producto}\nTotal: $${currentState.totalPrice || '0'}${postdataLabel}`);
 
             if (dependencies.config && dependencies.config.scriptStats && dependencies.config.activeScript) {
                 if (!dependencies.config.scriptStats[dependencies.config.activeScript]) dependencies.config.scriptStats[dependencies.config.activeScript] = { started: 0, completed: 0 };
@@ -149,7 +152,8 @@ export async function handleWaitingFinalConfirmation(
                 if (dependencies.saveOrderToLocal) dependencies.saveOrderToLocal(orderData);
 
                 const o = currentState.pendingOrder || currentState.partialAddress || {};
-                if (notifyAdmin) await notifyAdmin(`⌛ Pedido Requiere Aprobación`, userId, `Datos: ${o.nombre}, ${o.calle}\nCiudad: ${o.ciudad} | CP: ${o.cp}\nProvincia: ${o.provincia || '?'}\nItems: ${orderData.producto}\nTotal: $${currentState.totalPrice || '0'}`);
+                const postdataLabel = currentState.postdatado ? `\n📅 POSTDATADO: ${currentState.postdatado}` : '';
+                if (notifyAdmin) await notifyAdmin(`⌛ Pedido Requiere Aprobación`, userId, `Datos: ${o.nombre}, ${o.calle}\nCiudad: ${o.ciudad} | CP: ${o.cp}\nProvincia: ${o.provincia || '?'}\nItems: ${orderData.producto}\nTotal: $${currentState.totalPrice || '0'}${postdataLabel}`);
 
                 if (dependencies.config && dependencies.config.scriptStats && dependencies.config.activeScript) {
                     if (!dependencies.config.scriptStats[dependencies.config.activeScript]) dependencies.config.scriptStats[dependencies.config.activeScript] = { started: 0, completed: 0 };

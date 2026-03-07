@@ -49,14 +49,40 @@ function _hasCompleteAddress(state: UserState): boolean {
 
 /**
  * _detectPostdatado
- * Checks if text contains a postdating request (future delivery date).
- * Returns the matched text or null.
+ * Detects if text contains a postdating request (future delivery date).
+ * Returns a CLEAN date string (e.g. "1 de julio", "principio de mes") or null.
+ * Filters out "mañana/ya/ahora" which mean the user wants it SOONER (not postdatado).
  */
-function _detectPostdatado(normalizedText: string, originalText: string): string | null {
-    const dateMatch = normalizedText.match(/\b(lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo|semana|mes|cobro|mañana|despues|después|principio|el \d+ de [a-z]+|el \d+)\b/i);
-    if (dateMatch && /\b(recibir|llega|enviar|mandar|cobro|pago|puedo|entregar)\b/i.test(normalizedText)) {
-        return originalText;
+function _detectPostdatado(normalizedText: string): string | null {
+    // "mañana", "ya", "ahora" = wants SOONER, NOT a postdatado request
+    const wantsSooner = /\b(mañana|ya mismo|ya|ahora|urgente|inmediato|cuanto antes|lo antes posible)\b/i.test(normalizedText);
+    if (wantsSooner && !/\b(pasado mañana|cobro|principio|fin de mes|\d{1,2}\s+de\s+(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre))\b/i.test(normalizedText)) {
+        return null;
     }
+
+    // Must have delivery/payment action context
+    const hasActionContext = /\b(recibir|recibirlo|llega|llegue|enviar|enviame|envialo|mandalo|mandame|entregar|cobro|depositan|sueldo|pago|puedo|para el|a partir|no puedo ahora)\b/i.test(normalizedText);
+    if (!hasActionContext) return null;
+
+    // Extract clean date portion (most specific patterns first)
+    const patterns: RegExp[] = [
+        /\d{1,2}\s+de\s+(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i,
+        /(?:principio|fin|final|fines|mediados)\s+de\s+mes/i,
+        /cuando\s+(?:cobre|cobr[eo]|me\s+deposit[ae]n|me\s+pagu?en)/i,
+        /(?:cobro|depositan|pagan)\s+(?:el\s+\d{1,2}|a\s+principio|la\s+quincena)/i,
+        /el\s+\d{1,2}(?=[\s,.]|$)/i,
+        /(?:la\s+)?(?:quincena|semana\s+que\s+viene|mes\s+que\s+viene|pr[oó]ximo\s+mes)/i,
+        /(?:el\s+)?(?:lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo)(?:\s+que\s+viene)?/i,
+        /pasado\s+mañana/i,
+    ];
+
+    for (const pattern of patterns) {
+        const match = normalizedText.match(pattern);
+        if (match) {
+            return match[0].trim();
+        }
+    }
+
     return null;
 }
 

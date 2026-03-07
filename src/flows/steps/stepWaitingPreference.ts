@@ -1,6 +1,6 @@
 import { UserState, FlowStep } from '../../types/state';
 const { _formatMessage } = require('../utils/messages');
-const { _setStep, _maybeUpsell } = require('../utils/flowHelpers');
+const { _setStep, _maybeUpsell, _detectPostdatado } = require('../utils/flowHelpers');
 const logger = require('../../utils/logger');
 
 export async function handleWaitingPreference(
@@ -14,10 +14,10 @@ export async function handleWaitingPreference(
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
 
     // SCRIPT FIRST: Check if the user is asking for a deferred "postdatado" date early
-    const earlyPostdatadoMatch = text.match(/\b(lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo|semana|mes|cobro|mañana|despues|después|principio|el \d+ de [a-z]+|el \d+)\b/i);
-    if (earlyPostdatadoMatch && /\b(recibir|llega|enviar|mandar|cobro|pago|puedo)\b/i.test(normalizedText)) {
-        logger.info(`[EARLY POSTDATADO] Captured in waiting_preference: ${text}`);
-        if (!currentState.postdatado) currentState.postdatado = text; // Save it to output later
+    const earlyPostdatado = _detectPostdatado(normalizedText);
+    if (earlyPostdatado) {
+        logger.info(`[EARLY POSTDATADO] Captured in waiting_preference: ${earlyPostdatado}`);
+        if (!currentState.postdatado) currentState.postdatado = earlyPostdatado;
         saveState(userId);
     }
 

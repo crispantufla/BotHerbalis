@@ -638,11 +638,11 @@ Teléfono: ${phoneDisplay}`;
                                         {viewingOrder.postdatado && String(viewingOrder.postdatado).trim() !== '' && String(viewingOrder.postdatado).toLowerCase() !== 'no' && String(viewingOrder.postdatado).toLowerCase() !== 'false' ? (
                                             <span className="text-[10px] font-black bg-amber-100 text-amber-600 px-3 py-1 rounded-full border border-amber-200 uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
                                                 <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div>
-                                                POSTDATADO: {viewingOrder.postdatado}
+                                                Postdatado: {viewingOrder.postdatado}
                                             </span>
                                         ) : (
                                             <span className="text-[10px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-300 px-3 py-1 rounded-full border border-slate-200 dark:border-slate-600 uppercase tracking-widest">
-                                                Inmediato
+                                                Postdatado: NO
                                             </span>
                                         )}
                                     </div>

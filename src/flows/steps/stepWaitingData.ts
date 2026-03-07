@@ -1,7 +1,7 @@
 import { UserState, FlowStep } from '../../types/state';
 const { validateAddress } = require('../../services/addressValidator');
 const { buildConfirmationMessage } = require('../../utils/messageTemplates');
-const { _setStep, _pauseAndAlert, _detectProductPlanChange, _resolveNewProductPlan } = require('../utils/flowHelpers');
+const { _setStep, _pauseAndAlert, _detectProductPlanChange, _resolveNewProductPlan, _detectPostdatado } = require('../utils/flowHelpers');
 const { _getPrice, _getAdicionalMAX } = require('../utils/pricing');
 const { buildCartFromSelection, calculateTotal } = require('../utils/cartHelpers');
 const { _isDuplicate } = require('../utils/messages');
@@ -63,9 +63,9 @@ export async function handleWaitingData(
             currentState.fieldReaskCount = {};
             if (oldGoal) currentState.weightGoal = oldGoal;
 
-            const postdatadoMatch = normalizedText.match(/\b(lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo|semana|mes|cobro|mañana|despues|después|principio|el \d+ de [a-z]+|el \d+)\b/i);
-            if (postdatadoMatch && /\b(recibir|llega|enviar|mandar|cobro|pago|puedo|entregar)\b/i.test(normalizedText)) {
-                if (!currentState.postdatado) currentState.postdatado = text;
+            const postdatadoResult = _detectPostdatado(normalizedText);
+            if (postdatadoResult && !currentState.postdatado) {
+                currentState.postdatado = postdatadoResult;
             }
 
             if (newPlan) {
@@ -115,9 +115,10 @@ export async function handleWaitingData(
             }
         } else if (newProduct === currentState.selectedProduct) {
             let prefixIterated = `Ok, ${newProduct.split(' de ')[0].toLowerCase()} entonces 😊. `;
-            const postdatadoMatch = normalizedText.match(/\b(lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo|semana|mes|cobro|mañana|despues|después|principio)\b/i);
-            if (postdatadoMatch) {
-                prefixIterated += `Anotado para enviarlo en esa fecha 📅. `;
+            const postdatadoResult2 = _detectPostdatado(normalizedText);
+            if (postdatadoResult2) {
+                currentState.postdatado = postdatadoResult2;
+                prefixIterated += `Anotado para enviarlo ${postdatadoResult2} 📅. `;
             }
             currentState.history.push({ role: 'bot', content: prefixIterated, timestamp: Date.now() });
             saveState(userId);
@@ -219,9 +220,9 @@ export async function handleWaitingData(
             await sendMessageWithDelay(userId, aiData.response);
 
             if (/\b(reservado|pactado|anotado|programado)\b/i.test(aiData.response) && /\b(para el|el \d+|en esa fecha)\b/.test(aiData.response)) {
-                const postdatadoMatch = text.match(/\b(lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo|semana|mes|cobro|mañana|despues|después|principio|el \d+ de [a-z]+|el \d+)\b/i);
-                if (postdatadoMatch) {
-                    currentState.postdatado = text;
+                const postdatadoFromMsg = _detectPostdatado(normalizedText);
+                if (postdatadoFromMsg) {
+                    currentState.postdatado = postdatadoFromMsg;
                     saveState(userId);
                 }
             }
@@ -252,8 +253,7 @@ export async function handleWaitingData(
     }
 
     if (data && !data._error) {
-        const postdateKeywords = /\b(lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo|semana|mes|cobro|depositan|sueldo|mañana|despues|después|quincena|principio|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\b/i;
-        const userActuallyAskedPostdate = postdateKeywords.test(normalizedText) && /\b(recibir|llega|enviar|mandar|cobro|depositan|sueldo|pago|puedo|entregar|envio|después|despues|más adelante|otro momento|no puedo ahora|para el)\b/i.test(normalizedText);
+        const userActuallyAskedPostdate = _detectPostdatado(normalizedText);
 
         if (data.postdatado && userActuallyAskedPostdate) {
             if (!currentState.postdatado) {

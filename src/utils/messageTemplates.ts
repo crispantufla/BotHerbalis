@@ -53,13 +53,17 @@ function buildConfirmationMessage(state: any): string {
     // If 120 days, service is usually free, we can optionally explicitly say "$0" or just hide it.
     // User requested: "en el total pon el valor del producto + lo que paga por el servicio max + el total"
 
+    const postdatadoLine = state.postdatado
+        ? `📅 Envío programado: ${state.postdatado}\n`
+        : `✔ Entrega estimada: 7 a 10 días hábiles\n`;
+
     return `📦 CONFIRMACIÓN DE ENVÍO\n\n` +
         `Producto: ${productStr}\n` +
         `Plan: ${planStr}\n` +
         breakdown +
         `Total a pagar al recibir:\n$${totalPriceStr}\n\n` +
         `✔ Correo Argentino\n` +
-        `✔ Entrega estimada: 7 a 10 días hábiles\n` +
+        postdatadoLine +
         `✔ Pago en efectivo al recibir\n\n` +
         `Importante:\n` +
         `Si el cartero no encuentra a nadie,\n` +
