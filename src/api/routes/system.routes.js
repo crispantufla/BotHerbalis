@@ -169,20 +169,28 @@ module.exports = (client, sharedState) => {
             thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
             thirtyDaysAgo.setHours(0, 0, 0, 0);
 
-            // Fetch all orders from the last 30 days for this instance
-            const orders = await prisma.order.findMany({
-                where: {
-                    createdAt: { gte: thirtyDaysAgo },
-                    status: { not: 'Cancelado' },
-                    instanceId: INSTANCE_ID
-                },
-                select: {
-                    createdAt: true,
-                    totalPrice: true,
-                    products: true,
-                    status: true
-                }
-            });
+            // Fetch all orders and stats from the last 30 days for this instance
+            const [orders, dailyStatsRecords] = await Promise.all([
+                prisma.order.findMany({
+                    where: {
+                        createdAt: { gte: thirtyDaysAgo },
+                        status: { not: 'Cancelado' },
+                        instanceId: INSTANCE_ID
+                    },
+                    select: {
+                        createdAt: true,
+                        totalPrice: true,
+                        products: true,
+                        status: true
+                    }
+                }),
+                prisma.dailyStats.findMany({
+                    where: {
+                        date: { gte: thirtyDaysAgo },
+                        instanceId: INSTANCE_ID
+                    }
+                })
+            ]);
 
             // Group by day for the line/bar chart
             const dailyData = {};
@@ -198,10 +206,21 @@ module.exports = (client, sharedState) => {
                 const d = new Date();
                 d.setDate(d.getDate() - i);
                 const dateStr = d.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', month: 'short', day: 'numeric' });
-                dailyData[dateStr] = { date: dateStr, orders: 0, revenue: 0, sortKey: d.getTime() };
+                dailyData[dateStr] = { date: dateStr, orders: 0, revenue: 0, chats: 0, sortKey: d.getTime() };
             }
 
-            // Populate data
+            // Populate daily stats (Chats)
+            dailyStatsRecords.forEach(stat => {
+                const dateObj = new Date(stat.date);
+                // Compensar el UTC para que coincida exactamente con el dashboard
+                dateObj.setMinutes(dateObj.getMinutes() + dateObj.getTimezoneOffset());
+                const dateStr = dateObj.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', month: 'short', day: 'numeric' });
+                if (dailyData[dateStr]) {
+                    dailyData[dateStr].chats = Math.max(dailyData[dateStr].chats, stat.totalChats || 0);
+                }
+            });
+
+            // Populate data from orders
             orders.forEach(order => {
                 const dateObj = new Date(order.createdAt);
                 const dateStr = dateObj.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', month: 'short', day: 'numeric' });
@@ -226,7 +245,8 @@ module.exports = (client, sharedState) => {
             const chartData = Object.values(dailyData).sort((a, b) => a.sortKey - b.sortKey).map(d => ({
                 date: d.date,
                 orders: d.orders,
-                revenue: d.revenue
+                revenue: d.revenue,
+                chats: d.chats
             }));
 
             // Format product data for recharts PieChart
@@ -473,6 +493,43 @@ module.exports = (client, sharedState) => {
         try {
             const { prisma } = require('../../../db');
             const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
+
+            // 0. Snapshot daily stats before deleting users
+            const startOfDay = new Date();
+            startOfDay.setHours(0, 0, 0, 0);
+
+            // Get total chats currently in DB before wiping
+            const totalUsersBefore = await prisma.user.count({ where: { instanceId: INSTANCE_ID } });
+
+            // Get today's completed orders + revenue
+            const todayStats = await prisma.order.aggregate({
+                _count: true,
+                _sum: { totalPrice: true },
+                where: { createdAt: { gte: startOfDay }, instanceId: INSTANCE_ID, status: { not: 'Cancelado' } }
+            });
+
+            try {
+                // Upsert to ensure we only have 1 row per day per instance
+                await prisma.dailyStats.upsert({
+                    where: { instanceId_date: { instanceId: INSTANCE_ID, date: startOfDay } },
+                    create: {
+                        instanceId: INSTANCE_ID,
+                        date: startOfDay,
+                        totalChats: totalUsersBefore,
+                        completedOrders: todayStats._count,
+                        totalRevenue: todayStats._sum.totalPrice || 0
+                    },
+                    update: {
+                        // In case of multiple manual resets a day, keep the highest totalChats observed
+                        totalChats: { set: totalUsersBefore },
+                        completedOrders: { set: todayStats._count },
+                        totalRevenue: { set: todayStats._sum.totalPrice || 0 }
+                    }
+                });
+                logger.info(`[STATS] Saved daily snapshot before reset for ${startOfDay.toISOString()}`);
+            } catch (statsErr) {
+                logger.error('[STATS] Failed to save daily snapshot:', statsErr);
+            }
 
             // 1. Purge DB user states (safe: preserves users with orders/chatlogs)
             // Delete users WITHOUT any orders (safe to remove entirely)

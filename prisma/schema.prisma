@@ -64,3 +64,17 @@ model BotConfig {
 
   @@id([instanceId, key])
 }
+
+model DailyStats {
+  id              String   @id @default(uuid())
+  instanceId      String   @default("default")
+  date            DateTime // Date representing the specific day (e.g. at midnight)
+  
+  totalChats      Int      // Encompasses total users/chats in memory before clearing
+  completedOrders Int      // Number of completed orders for the day
+  totalRevenue    Float    // Total revenue for the day
+  
+  createdAt       DateTime @default(now())
+
+  @@unique([instanceId, date])
+}

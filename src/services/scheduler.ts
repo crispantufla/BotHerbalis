@@ -341,6 +341,13 @@ function startScheduler(sharedState: SchedulerSharedState, dependencies: Schedul
     }, { timezone: TIMEZONE });
     logger.info('[SCHEDULER] ✅ checkAbandonedCarts → cada hora de 10 a 21 ARG');
 
+    // ── DAILY STATS SNAPSHOT: a las 23:55 Argentina ──
+    // Guarda el total de chats en BD antes de perderlos por rotación.
+    cron.schedule('55 23 * * *', () => {
+        snapshotDailyStats();
+    }, { timezone: TIMEZONE });
+    logger.info('[SCHEDULER] ✅ snapshotDailyStats → 23:55 ARG (diario)');
+
     // ── CLEANUP: a las 4am Argentina ──
     // Limpieza de memoria nocturna. Borra usuarios inactivos >30 días.
     cron.schedule('0 4 * * *', () => {
@@ -376,4 +383,44 @@ function startScheduler(sharedState: SchedulerSharedState, dependencies: Schedul
     }, 15000);
 }
 
-export { startScheduler, checkStaleUsers, checkColdLeads, checkAbandonedCarts, autoApproveOrders, cleanStalePausedUsers };
+/**
+ * snapshotDailyStats
+ * Saves the total number of chats to the database before the daily cleanup
+ * so we don't lose the metrics for the dashboard's historical chart.
+ */
+async function snapshotDailyStats() {
+    try {
+        const { prisma } = require('../../db');
+        const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+
+        const totalUsers = await prisma.user.count({ where: { instanceId: INSTANCE_ID } });
+        const todayStats = await prisma.order.aggregate({
+            _count: true,
+            _sum: { totalPrice: true },
+            where: { createdAt: { gte: startOfDay }, instanceId: INSTANCE_ID, status: { not: 'Cancelado' } }
+        });
+
+        await prisma.dailyStats.upsert({
+            where: { instanceId_date: { instanceId: INSTANCE_ID, date: startOfDay } },
+            create: {
+                instanceId: INSTANCE_ID,
+                date: startOfDay,
+                totalChats: totalUsers,
+                completedOrders: todayStats._count,
+                totalRevenue: todayStats._sum.totalPrice || 0
+            },
+            update: {
+                totalChats: { set: totalUsers },
+                completedOrders: { set: todayStats._count },
+                totalRevenue: { set: todayStats._sum.totalPrice || 0 }
+            }
+        });
+        logger.info(`[SCHEDULER] Daily Stats Snapshot saved for ${startOfDay.toISOString()}`);
+    } catch (e) {
+        logger.error('[SCHEDULER] Failed to save daily stats snapshot:', e);
+    }
+}
+
+export { startScheduler, checkStaleUsers, checkColdLeads, checkAbandonedCarts, autoApproveOrders, cleanStalePausedUsers, snapshotDailyStats };
