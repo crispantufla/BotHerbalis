@@ -2,6 +2,7 @@ import { UserState } from '../../types/state';
 const { _formatMessage } = require('../utils/messages');
 const { _setStep } = require('../utils/flowHelpers');
 const { _isAffirmative } = require('../utils/validation');
+const logger = require('../../utils/logger');
 
 interface PriceConfirmationDependencies {
     sendMessageWithDelay: (chatId: string, content: string) => Promise<void>;
@@ -37,7 +38,7 @@ export async function handleWaitingPriceConfirmation(
         await sendMessageWithDelay(userId, msg);
         return { matched: true };
     } else {
-        console.log(`[AI-FALLBACK] waiting_price_confirmation: No match for ${userId}`);
+        logger.info(`[AI-FALLBACK] waiting_price_confirmation: No match for ${userId}`);
         const aiPrice = await aiService.chat(text, {
             step: 'waiting_price_confirmation',
             goal: 'El usuario debe confirmar si quiere ver los precios. Si tiene dudas, respondé de manera detallada, humana y empática, resolviendo sus ansiedades de forma cálida y extensa, tómate tu tiempo, y luego preguntale si quiere que le pases los precios.',

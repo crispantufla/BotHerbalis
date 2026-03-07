@@ -3,6 +3,7 @@ import fs from 'fs';
 import { UserState } from '../../types/state';
 const { MessageMedia } = require('whatsapp-web.js');
 const { _getGallery } = require('../utils/gallery');
+const logger = require('../../utils/logger');
 
 interface GalleryImage {
     url: string;
@@ -35,7 +36,7 @@ export async function handleMediaGlobals(
     const PHOTOS_REGEX = /\b(foto|fotos|imagen|imagenes|ver\s*producto|ver\s*fotos)\b/i;
     if (!PHOTOS_REGEX.test(normalizedText)) return null;
 
-    console.log(`[GLOBAL-MEDIA] User ${userId} requested photos.`);
+    logger.info(`[GLOBAL-MEDIA] User ${userId} requested photos.`);
     const gallery: GalleryImage[] = _getGallery();
     let targetCategory: string | null = null;
 
@@ -70,7 +71,7 @@ export async function handleMediaGlobals(
                         await client.sendMessage(userId, media);
                         currentState.history.push({ role: 'bot', content: `[Imagen adjunta: ${targetCategory}]`, timestamp: Date.now() });
                     }
-                } catch (e) { console.error('Error sending gallery image:', e); }
+                } catch (e) { logger.error('Error sending gallery image:', e); }
             }
             saveState(userId);
             // NO step redirect here — the AI will naturally re-ask if needed

@@ -1,10 +1,11 @@
 import { UserState, FlowStep } from '../../types/state';
 const { validateAddress } = require('../../services/addressValidator');
 const { buildConfirmationMessage } = require('../../utils/messageTemplates');
-const { _setStep, _pauseAndAlert } = require('../utils/flowHelpers');
+const { _setStep, _pauseAndAlert, _detectProductPlanChange, _resolveNewProductPlan } = require('../utils/flowHelpers');
 const { _getPrice, _getAdicionalMAX } = require('../utils/pricing');
 const { buildCartFromSelection, calculateTotal } = require('../utils/cartHelpers');
 const { _isDuplicate } = require('../utils/messages');
+const logger = require('../../utils/logger');
 
 export async function handleWaitingData(
     userId: string,
@@ -18,7 +19,7 @@ export async function handleWaitingData(
 
     // GUARD: Ensure product + plan are selected before collecting data
     if (!currentState.selectedProduct) {
-        console.log(`[GUARD] waiting_data: No product selected for ${userId}, redirecting to preference`);
+        logger.info(`[GUARD] waiting_data: No product selected for ${userId}, redirecting to preference`);
         const skipMsg = "Antes de los datos de envío, necesito saber qué producto te interesa 😊\n\nTenemos:\n1️⃣ Cápsulas\n2️⃣ Semillas/Infusión\n3️⃣ Gotas\n\n¿Cuál preferís?";
         _setStep(currentState, FlowStep.WAITING_PREFERENCE);
         currentState.history.push({ role: 'bot', content: skipMsg, timestamp: Date.now() });
@@ -28,7 +29,7 @@ export async function handleWaitingData(
     }
 
     if (!currentState.selectedPlan) {
-        console.log(`[GUARD] waiting_data: No plan selected for ${userId}, redirecting to plan_choice`);
+        logger.info(`[GUARD] waiting_data: No plan selected for ${userId}, redirecting to plan_choice`);
         let priceNode;
         if (currentState.selectedProduct.includes('Cápsulas')) priceNode = knowledge.flow.preference_capsulas;
         else if (currentState.selectedProduct.includes('Gotas')) priceNode = knowledge.flow.preference_gotas;
@@ -43,25 +44,15 @@ export async function handleWaitingData(
         return { matched: true };
     }
     // PRIORITY 0: Detect product or plan change
-    const productChangeMatch = normalizedText.match(/\b(mejor|quiero|prefiero|cambio|cambia|dame|paso a|en vez)\b.*\b(capsula|capsulas|pastilla|pastillas|semilla|semillas|gota|gotas|natural|infusion)\b/i)
-        || normalizedText.match(/\b(capsula|capsulas|pastilla|pastillas|semilla|semillas|gota|gotas)\b.*\b(mejor|quiero|prefiero|cambio|en vez)\b/i);
-
-    const planChangeMatch = normalizedText.match(/\b(mejor|quiero|quisiera|prefiero|cambio|cambia|dame|paso a|en vez|voy a querer|me quedo con|tomaria|tomare|en realidad)\b.*\b(60|120|sesenta|ciento veinte)\b/i)
-        || normalizedText.match(/\b(60|120|sesenta|ciento veinte)\b.*\b(mejor|quiero|quisiera|prefiero|cambio|en vez)\b/i)
-        || (/\b(de|el|plan)\s+(60|120)\b/i.test(normalizedText) && /\b(dia|dias|d\u00edas)\b/i.test(normalizedText));
+    const { productChange: productChangeMatch, planChange: planChangeMatch } = _detectProductPlanChange(normalizedText);
 
     if (productChangeMatch || planChangeMatch) {
-        let newProduct = currentState.selectedProduct;
-        if (/capsula|pastilla/i.test(normalizedText)) newProduct = "Cápsulas de nuez de la india";
-        else if (/semilla|natural|infusion/i.test(normalizedText)) newProduct = "Semillas de nuez de la india";
-        else if (/gota/i.test(normalizedText)) newProduct = "Gotas de nuez de la india";
-
-        let newPlan = currentState.selectedPlan;
-        if (/\b(120|ciento veinte)\b/i.test(normalizedText)) newPlan = "120";
-        else if (/\b(60|sesenta)\b/i.test(normalizedText)) newPlan = "60";
+        const resolved = _resolveNewProductPlan(normalizedText, currentState.selectedProduct, currentState.selectedPlan);
+        let newProduct = resolved.newProduct;
+        let newPlan = resolved.newPlan;
 
         if (newProduct !== currentState.selectedProduct || newPlan !== currentState.selectedPlan) {
-            console.log(`[BACKTRACK] User ${userId} changed product from "${currentState.selectedProduct} - ${currentState.selectedPlan}" to "${newProduct} - ${newPlan}" during waiting_data`);
+            logger.info(`[BACKTRACK] User ${userId} changed product from "${currentState.selectedProduct} - ${currentState.selectedPlan}" to "${newProduct} - ${newPlan}" during waiting_data`);
             const oldGoal = currentState.weightGoal;
 
             currentState.selectedProduct = newProduct;
@@ -169,7 +160,7 @@ export async function handleWaitingData(
 
     let textToAnalyze = text;
     if (currentState.lastImageMime && currentState.lastImageContext === 'waiting_data') {
-        console.log(`[ADDRESS] Analyzing image for address for user ${userId}`);
+        logger.info(`[ADDRESS] Analyzing image for address for user ${userId}`);
         try {
             const ocrResponse = await aiService.analyzeImage(
                 currentState.lastImageData,
@@ -180,7 +171,7 @@ export async function handleWaitingData(
                 textToAnalyze += ` [Datos extraídos de imagen: ${ocrResponse}]`;
             }
         } catch (e) {
-            console.error("[ADDRESS] Error analyzing image:", e);
+            logger.error("[ADDRESS] Error analyzing image:", e);
         }
         currentState.lastImageMime = null;
         currentState.lastImageData = null;
@@ -202,7 +193,7 @@ export async function handleWaitingData(
 
     // Solo disparamos el AI Fallback de objeciones/dudas si el usuario NO proporcionó datos válidos
     if (isDataQuestionOrEmotion && !hasValidAddressData && (!looksLikeAddress || isVeryLongMessage)) {
-        console.log(`[AI-FALLBACK] waiting_data: Detected question/objection or long emotional text from ${userId}: "${text}"`);
+        logger.info(`[AI-FALLBACK] waiting_data: Detected question/objection or long emotional text from ${userId}: "${text}"`);
 
         let aiGoal = "";
         if (isPaymentTiming) {
@@ -236,7 +227,7 @@ export async function handleWaitingData(
             }
             return { matched: true };
         } else if (aiData.response) {
-            console.log(`[ANTI-DUP] Skipping duplicate AI response for ${userId}`);
+            logger.info(`[ANTI-DUP] Skipping duplicate AI response for ${userId}`);
             return { matched: true };
         } else {
             await _pauseAndAlert(userId, currentState, dependencies, text, `Cliente duda o objeta. Dice: "${text}"`);
@@ -332,7 +323,7 @@ export async function handleWaitingData(
     // location questions, etc. that slip past the keyword whitelist above.
     const hasAddressPatterns = /\d/.test(text) || /\b(calle|av|avenida|barrio|mz|lote|piso|dpto|depto|departamento|casa|block|manzana|localidad|provincia|pcia|código postal|codigo postal)\b/i.test(text);
     if (!madeProgress && currentState.addressAttempts >= 1 && !hasAddressPatterns) {
-        console.log(`[AI-SAFETY-NET] waiting_data: Message doesn't look like address for ${userId}: "${text}". Trying AI fallback before pausing.`);
+        logger.info(`[AI-SAFETY-NET] waiting_data: Message doesn't look like address for ${userId}: "${text}". Trying AI fallback before pausing.`);
         const safetyGoal = `El usuario NO está dando datos de envío, sino que hace una pregunta o comentario. Respondé su pregunta con empatía usando el Knowledge. Si pregunta sobre la función del producto o qué hace: "La Nuez de la India ayuda a acompañar el proceso natural del cuerpo para eliminar excesos. Muchas personas notan menos hinchazón, más liviandad y un descenso progresivo de peso. Es un apoyo natural para sentirte mejor sin métodos agresivos." Si pregunta sobre dieta/comidas/si tiene que cuidarse: "La Nuez de la India puede utilizarse sin hacer dietas estrictas, porque ayuda a acompañar el proceso natural del metabolismo. Obviamente, si además cuidás un poco la alimentación o sumás algo de movimiento, los resultados suelen verse más rápido." Si pregunta dónde queda la oficina/local/de dónde son: "Somos Herbalis, una empresa internacional especializada en productos naturales a base de Nuez de la India. Nuestra central está en Barcelona (España) y en Argentina distribuimos desde Rosario. NO tenemos revendedores. Hace 13 años enviamos a todo el país por Correo Argentino, con envío sin costo y la posibilidad de pago al recibir." Si pregunta por contraindicaciones: "Es 100% natural. Las únicas contraindicaciones son embarazo y lactancia." Si pregunta sobre envíos o si tienen día especial: "Los envíos se realizan cuanto antes, sin día especial. Tardan aproximadamente 10 días hábiles." Si pregunta formas de pago: "El pago se puede realizar con tarjeta o transferencia al momento de realizar el pedido, o en efectivo al recibir." Para CUALQUIER OTRA pregunta, respondé con naturalidad usando el Knowledge. Al final, cerrá sutilmente retomando los datos de envío: "¿Te paso a tomar los datos para el envío?" o "¿Me pasás los datos de envío?".`;
         try {
             const safetyAiData = await aiService.chat(text, {
@@ -351,7 +342,7 @@ export async function handleWaitingData(
                 return { matched: true };
             }
         } catch (e) {
-            console.error(`[AI-SAFETY-NET] Error for ${userId}:`, e);
+            logger.error(`[AI-SAFETY-NET] Error for ${userId}:`, e);
         }
         // If AI also failed, fall through to pause
         await _pauseAndAlert(userId, currentState, dependencies, text, 'La IA no pudo procesar correctamente los datos ingresados en el primer intento.');

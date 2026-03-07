@@ -4,6 +4,7 @@ import { UserState } from '../../types/state';
 const { MessageMedia } = require('whatsapp-web.js');
 const { _formatMessage } = require('../utils/messages');
 const { _setStep } = require('../utils/flowHelpers');
+const logger = require('../../utils/logger');
 
 interface GreetingDependencies {
     client: any;
@@ -34,7 +35,7 @@ export async function handleGreeting(
     );
 
     if (hasManualGreeting) {
-        console.log(`[GREETING] Manual greeting detected for ${userId}, skipping to waiting_weight.`);
+        logger.info(`[GREETING] Manual greeting detected for ${userId}, skipping to waiting_weight.`);
         _setStep(currentState, 'waiting_weight');
         saveState(userId);
 
@@ -46,7 +47,7 @@ export async function handleGreeting(
 
     // --- CHECK: Ad Interaction ---
     if (text.trim() === 'Hola! (Vengo de un anuncio)') {
-        console.log(`[GREETING] Ad trigger detected for ${userId}. Sending full greeting.`);
+        logger.info(`[GREETING] Ad trigger detected for ${userId}. Sending full greeting.`);
         // Fall through to the normal greeting logic below (don't return early)
     }
 
@@ -91,7 +92,7 @@ export async function handleGreeting(
                 if (fs.existsSync(localPath)) {
                     media = MessageMedia.fromFilePath(localPath);
                 } else {
-                    console.error(`[GREETING] Gallery image not found at: ${localPath}`);
+                    logger.error(`[GREETING] Gallery image not found at: ${localPath}`);
                 }
             } else {
                 media = new MessageMedia(
@@ -102,11 +103,11 @@ export async function handleGreeting(
             }
             if (media) {
                 await client.sendMessage(userId, media, { caption: '' });
-                console.log(`[GREETING] Image sent to ${userId} from knowledge config`);
+                logger.info(`[GREETING] Image sent to ${userId} from knowledge config`);
             }
         }
     } catch (e: any) {
-        console.error('[GREETING] Failed to send image:', e.message);
+        logger.error('[GREETING] Failed to send image:', e.message);
     }
 
     // 3. Send Question Part THIRD

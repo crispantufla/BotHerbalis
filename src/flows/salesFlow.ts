@@ -1,5 +1,6 @@
 import { UserState, FlowStep } from '../types/state';
 import { pauseUser } from '../services/pauseService';
+const logger = require('../utils/logger');
 const { processGlobals } = require('./globals');
 const { processStep } = require('./steps');
 const { _pauseAndAlert, _setStep, _extractSilentVariables } = require('./utils/flowHelpers');
@@ -26,17 +27,17 @@ export async function processSalesFlow(
     text: string,
     userState: Record<string, any>,
     knowledge: any,
-    dependencies: SalesFlowDependencies
+    dependencies: SalesFlowDependencies,
+    _recursionDepth: number = 0
 ): Promise<{ matched: boolean; paused?: boolean } | void> {
     const { saveState } = dependencies;
 
     // Remove accents and lowercase
-    const lowerText = text.toLowerCase();
-    const normalizedText = lowerText.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const normalizedText = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
     // 1. Initialization
     if (!userState[userId]) {
-        console.log(`[STATE] Initializing new internal state for user ${userId}`);
+        logger.info(`[STATE] Initializing new internal state for user ${userId}`);
         userState[userId] = {
             step: knowledge.flow.greeting ? 'greeting' : 'completed',
             history: [],
@@ -53,7 +54,6 @@ export async function processSalesFlow(
         // If this phone has an existing order, they're a past customer — route to post-sale
         try {
             const { prisma } = require('../../db');
-            const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
             const cleanPhone = userId.split('@')[0].replace(/\D/g, '');
             const existingOrder = await prisma.order.findFirst({
                 where: { userPhone: cleanPhone }, // cross-instance: any prior order from this phone
@@ -61,14 +61,14 @@ export async function processSalesFlow(
             });
 
             if (existingOrder) {
-                console.log(`[ORDER-CHECK] User ${userId} has existing order (status: ${existingOrder.status}). Routing to post-sale.`);
+                logger.info(`[ORDER-CHECK] User ${userId} has existing order (status: ${existingOrder.status}). Routing to post-sale.`);
                 userState[userId].step = 'completed';
                 userState[userId].selectedProduct = existingOrder.products;
                 saveState(userId);
                 // Don't return — let the flow continue into stepCompleted handler below
             }
         } catch (err: any) {
-            console.error(`[ORDER-CHECK] Failed to query orders for ${userId}:`, err.message);
+            logger.error(`[ORDER-CHECK] Failed to query orders for ${userId}:`, err.message);
         }
 
         // --- CHECK 1.5: Cross-Instance Duplicate Detection ---
@@ -101,7 +101,7 @@ export async function processSalesFlow(
                 });
 
                 if (activeInOtherBot) {
-                    console.log(`[CROSS-BOT] User ${userId} is already active in another bot instance. Sending redirect.`);
+                    logger.info(`[CROSS-BOT] User ${userId} is already active in another bot instance. Sending redirect.`);
                     if (dependencies.sendMessageWithDelay) {
                         await dependencies.sendMessageWithDelay(
                             userId,
@@ -116,7 +116,7 @@ export async function processSalesFlow(
                     return { matched: true, paused: true };
                 }
             } catch (err: any) {
-                console.error(`[CROSS-BOT] Failed to check other instances for ${userId}:`, err.message);
+                logger.error(`[CROSS-BOT] Failed to check other instances for ${userId}:`, err.message);
             }
         }
         */
@@ -146,7 +146,7 @@ export async function processSalesFlow(
                 });
 
                 if (hasPostSaleMessage) {
-                    console.log(`[POST-SALE] User ${userId} has post-sale messages in local DB. Auto-pausing.`);
+                    logger.info(`[POST-SALE] User ${userId} has post-sale messages in local DB. Auto-pausing.`);
                     await pauseUser(userId, '📦 Cliente post-venta (historial en DB)', { sharedState: dependencies.sharedState, notifyAdmin: dependencies.notifyAdmin }, `El usuario tiene mensajes post-venta en el historial. No ha iniciado conversación nueva.`);
                     return { matched: true, paused: true };
                 }
@@ -159,10 +159,10 @@ export async function processSalesFlow(
                     const showsPurchaseIntent = PURCHASE_INTENT_KEYWORDS.test(normalizedText);
 
                     if (showsPurchaseIntent) {
-                        console.log(`[SMART-DETECT] User ${userId} has prior history (outgoing bot: ${outgoingMessages.length}) but shows purchase intent. Allowing sales flow.`);
+                        logger.info(`[SMART-DETECT] User ${userId} has prior history (outgoing bot: ${outgoingMessages.length}) but shows purchase intent. Allowing sales flow.`);
                     } else {
                         const reason = `😴 Cliente con historial extenso (${outgoingMessages.length}+ mensajes)`;
-                        console.log(`[SMART-DETECT] User ${userId}: has ${outgoingMessages.length} msgs and NO purchase intent. Auto-pausing.`);
+                        logger.info(`[SMART-DETECT] User ${userId}: has ${outgoingMessages.length} msgs and NO purchase intent. Auto-pausing.`);
                         await pauseUser(
                             userId,
                             reason,
@@ -172,10 +172,10 @@ export async function processSalesFlow(
                         return { matched: true, paused: true };
                     }
                 } else if (outgoingMessages.length > 0) {
-                    console.log(`[SMART-DETECT] User ${userId} has ${outgoingMessages.length} prior message(s) (< 10 threshold) in DB. Treating as active prospect.`);
+                    logger.info(`[SMART-DETECT] User ${userId} has ${outgoingMessages.length} prior message(s) (< 10 threshold) in DB. Treating as active prospect.`);
                 }
             } catch (err: any) {
-                console.error(`[SMART-DETECT] Failed to fetch local chat history DB for ${userId}:`, err.message);
+                logger.error(`[SMART-DETECT] Failed to fetch local chat history DB for ${userId}:`, err.message);
             }
         }
     }
@@ -202,7 +202,7 @@ export async function processSalesFlow(
                 `El cliente ya compró y volvió a escribir.\n\nMensaje: "${text}"\n\nEl bot se pausó automáticamente.`
             );
         } else {
-            console.log(`[HARD STOP] User ${userId} is past customer/redirected. Already paused or redirected. Ignoring silently.`);
+            logger.info(`[HARD STOP] User ${userId} is past customer/redirected. Already paused or redirected. Ignoring silently.`);
         }
 
         return { matched: true, paused: true };
@@ -226,7 +226,7 @@ export async function processSalesFlow(
             // If the user's message was merely "tengo 40 años" we don't want to confuse the AI
             // We just ACK and repeat the state's main question if it was merely a correction
             if (extraction.isSolelyCorrection) {
-                console.log(`[GLOBAL EXTRACTION] Intercepted sole correction for ${userId}. Age:${extraction.ageUpdated}, Weight:${extraction.weightUpdated}`);
+                logger.info(`[GLOBAL EXTRACTION] Intercepted sole correction for ${userId}. Age:${extraction.ageUpdated}, Weight:${extraction.weightUpdated}`);
                 let ackMsg = "¡Anotado! 😊\n\nEntonces, decime...";
 
                 // Customize the re-prompt based on the step we are stalled in
@@ -264,14 +264,19 @@ export async function processSalesFlow(
     // 3. Process Specific Step Logic
     const stepResult = await processStep(userId, text, normalizedText, currentState, knowledge, dependencies);
 
-    // Recursive safety for stale steps
+    // Recursive safety for stale steps (max 2 retries to prevent infinite recursion)
     if (stepResult && stepResult.staleReprocess) {
-        return await processSalesFlow(userId, text, userState, knowledge, dependencies);
+        if (_recursionDepth >= 2) {
+            logger.error(`[SAFETY] Max recursion depth reached for ${userId} at step "${currentState.step}". Pausing.`);
+            await _pauseAndAlert(userId, currentState, dependencies, text, `Recursion limit: step "${currentState.step}" no pudo resolverse tras ${_recursionDepth} intentos.`);
+            return { matched: true, paused: true };
+        }
+        return await processSalesFlow(userId, text, userState, knowledge, dependencies, _recursionDepth + 1);
     }
 
     // 4. Safety Net / Fallback
     if (!stepResult || !stepResult.matched) {
-        console.log(`[PAUSE] No match for user ${userId} at step "${currentState.step}". Pausing and alerting admin.`);
+        logger.info(`[PAUSE] No match for user ${userId} at step "${currentState.step}". Pausing and alerting admin.`);
         await _pauseAndAlert(userId, currentState, dependencies, text, `Bot no pudo responder en paso "${currentState.step}".`);
     }
 
@@ -282,31 +287,31 @@ export async function processSalesFlow(
             const botMsg = lastHistory.content;
 
             if (botMsg.includes('por precaución no recomendamos el consumo') || botMsg.includes('por precaución no recomendamos el uso durante')) {
-                console.log(`[AI MEDICAL REJECT] Intercepted AI rejection for user ${userId}. Halting flow.`);
+                logger.info(`[AI MEDICAL REJECT] Intercepted AI rejection for user ${userId}. Halting flow.`);
                 _setStep(currentState, FlowStep.REJECTED_MEDICAL);
                 saveState(userId);
             }
 
             if (botMsg.includes('Por falta de respeto damos por terminada la comunicación')) {
-                console.log(`[ABUSE REJECT] Intercepted AI abuse rejection for user ${userId}. Halting flow.`);
+                logger.info(`[ABUSE REJECT] Intercepted AI abuse rejection for user ${userId}. Halting flow.`);
                 await _pauseAndAlert(userId, currentState, dependencies, text, 'El cliente insultó al bot y fue bloqueado automáticamente.');
                 saveState(userId);
             }
 
             if (botMsg.includes('Pensalo tranquilo y cuando estés 100% segura retomamos el pedido')) {
-                console.log(`[INDECISION PAUSE] Intercepted AI indecision limit for user ${userId}. Halting flow.`);
+                logger.info(`[INDECISION PAUSE] Intercepted AI indecision limit for user ${userId}. Halting flow.`);
                 await _pauseAndAlert(userId, currentState, dependencies, text, 'El cliente cruzó el umbral de indecisión/cambios. Pausa preventiva.');
                 saveState(userId);
             }
 
             if (botMsg.includes('Voy a derivar tu caso a un asesor')) {
-                console.log(`[CANCEL PAUSE] Intercepted cancel/complaint for user ${userId}. Halting flow.`);
+                logger.info(`[CANCEL PAUSE] Intercepted cancel/complaint for user ${userId}. Halting flow.`);
                 await _pauseAndAlert(userId, currentState, dependencies, text, 'El cliente desea cancelar, reclamar o derivar el caso a un humano.');
                 saveState(userId);
             }
 
             if (botMsg.includes('3413755757') || botMsg.includes('Horacio')) {
-                console.log(`[RESELLER PAUSE] Intercepted reseller intent for user ${userId}. Halting flow.`);
+                logger.info(`[RESELLER PAUSE] Intercepted reseller intent for user ${userId}. Halting flow.`);
                 await _pauseAndAlert(userId, currentState, dependencies, text, 'El cliente está interesado en reventa/compras por mayor. Derivado a Horacio.');
                 saveState(userId);
             }

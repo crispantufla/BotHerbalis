@@ -1,4 +1,5 @@
 import { UserState } from '../../types/state';
+const logger = require('../../utils/logger');
 
 interface SafetyDependencies {
     sendMessageWithDelay: (chatId: string, content: string) => Promise<void>;
@@ -25,7 +26,7 @@ export async function handleSafetyCheck(
         const age = parseInt(ageStr, 10);
         if (!isNaN(age) && age >= 18) {
             (currentState as any).safetyResolved = true;
-            console.log(`[SAFETY] Age clarified: ${age} years. Safety resolved.`);
+            logger.info(`[SAFETY] Age clarified: ${age} years. Safety resolved.`);
         }
     }
     if (AGE_CLARIFICATION.test(normalizedText) && /\b(mayor|adulto|adulta|grande)\b/i.test(normalizedText)) {
@@ -33,7 +34,7 @@ export async function handleSafetyCheck(
     }
 
     if (SAFETY_REGEX.test(normalizedText) && !(currentState as any).safetyResolved) {
-        console.log(`[SAFETY] Potential Red Flag detected: "${text}"`);
+        logger.info(`[SAFETY] Potential Red Flag detected: "${text}"`);
         const safetyCheck = await aiService.chat(text, {
             step: 'safety_check',
             goal: 'Verificar si hay contraindicación o riesgo para menor de edad. Si el usuario ya aclaró que la persona es mayor de 18 años, respondé que SÍ puede tomarla y goalMet=true. Si es menor de 18, rechazar venta amablemente.',

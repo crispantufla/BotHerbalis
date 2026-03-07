@@ -4,15 +4,16 @@ const { _setStep } = require('../utils/flowHelpers');
 const { buildConfirmationMessage } = require('../../utils/messageTemplates');
 const { buildCartFromSelection, calculateTotal } = require('../utils/cartHelpers');
 const { _isDuplicate } = require('../utils/messages');
+const logger = require('../../utils/logger');
 
 function _handleExtractedData(userId: string, extractedData: string, currentState: UserState) {
     if (!extractedData || extractedData === 'null') return;
-    console.log(`[DATA EXTRACTION] User ${userId}: ${extractedData}`);
+    logger.info(`[DATA EXTRACTION] User ${userId}: ${extractedData}`);
 
     if (extractedData.startsWith('PROFILE:')) {
         const profileData = extractedData.replace('PROFILE:', '').trim();
         currentState.profile = currentState.profile ? `${currentState.profile} | ${profileData}` : profileData;
-        console.log(`[PROFILE SAVED] ${currentState.profile}`);
+        logger.info(`[PROFILE SAVED] ${currentState.profile}`);
     } else if (extractedData === 'CHANGE_ORDER') { //Logic
         currentState.cart = [];
         currentState.pendingOrder = null;
@@ -22,7 +23,7 @@ function _handleExtractedData(userId: string, extractedData: string, currentStat
     } else if (extractedData.startsWith('POSTDATADO:')) {
         const fecha = extractedData.replace('POSTDATADO:', '').trim();
         currentState.postdatado = fecha;
-        console.log(`[POSTDATADO SAVED] Fecha: ${fecha}`);
+        logger.info(`[POSTDATADO SAVED] Fecha: ${fecha}`);
     }
 }
 
@@ -114,7 +115,7 @@ async function handleWaitingPlanChoice(
         const hasAddress = addr.nombre && addr.calle && addr.ciudad;
 
         if (hasAddress) {
-            console.log(`[FLOW-SKIP] Address already collected for ${userId}, skipping data request.`);
+            logger.info(`[FLOW-SKIP] Address already collected for ${userId}, skipping data request.`);
             const skipMsg1 = `¡Perfecto! 😊 Ya tengo tus datos de envío guardados de antes.`;
             const skipMsg2 = `Voy a confirmar todo para armar tu ficha...`;
 
@@ -139,9 +140,8 @@ async function handleWaitingPlanChoice(
         saveState(userId);
         return { matched: true };
     } else {
-        const isAffirmative = /^(si|sisi|ok|oka|dale|bueno|joya|de una|perfecto|genial)[\s\?\!\.]*$/i.test(normalizedText)
-            || /^(si|ok|oka|dale|perfecto|bueno|hacelo)\s+(si|ok|oka|dale|perfecto|bueno|hacelo)[\s\?\!\.]*$/i.test(normalizedText)
-            || /\b(si|ok|oka|dale|perfecto|bueno|hacelo)\b/i.test(normalizedText);
+        const { _isAffirmative } = require('../utils/validation');
+        const isAffirmative = _isAffirmative(normalizedText);
 
         let recentBotMessages = "";
         let botMsgCount = 0;
@@ -161,7 +161,7 @@ async function handleWaitingPlanChoice(
             || (recentBotMessages.includes('120') && recentBotMessages.includes('recomen'));
 
         if (isAffirmative && aiRecommended120) {
-            console.log(`[FLOW-INTERCEPT] User said OK to 120-day plan upsell/AI recommendation: ${userId}`);
+            logger.info(`[FLOW-INTERCEPT] User said OK to 120-day plan upsell/AI recommendation: ${userId}`);
 
             const product = currentState.selectedProduct || "Nuez de la India";
             buildCartFromSelection(product, '120', currentState);
@@ -171,7 +171,7 @@ async function handleWaitingPlanChoice(
             const hasAddress = addr.nombre && addr.calle && addr.ciudad;
 
             if (hasAddress) {
-                console.log(`[FLOW-SKIP] Address already collected for ${userId}, skipping data request after upsell.`);
+                logger.info(`[FLOW-SKIP] Address already collected for ${userId}, skipping data request after upsell.`);
                 const skipMsg1 = `¡Genial! 😊 Entonces confirmamos el plan de 120 días.`;
                 const skipMsg2 = `Ya tengo tus datos de envío acá a mano, voy a armar la etiqueta...`;
 
@@ -197,7 +197,7 @@ async function handleWaitingPlanChoice(
             saveState(userId);
             return { matched: true };
         } else {
-            console.log(`[AI-FALLBACK] waiting_plan_choice: No plan number detected for ${userId}`);
+            logger.info(`[AI-FALLBACK] waiting_plan_choice: No plan number detected for ${userId}`);
 
             const planAI = await aiService.chat(text, {
                 step: 'waiting_plan_choice',
@@ -216,7 +216,7 @@ RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.
 
             if (planAI.extractedData && typeof planAI.extractedData === 'string' && planAI.extractedData.startsWith('CHANGE_PRODUCT:')) {
                 const newProd = planAI.extractedData.split(':')[1].trim();
-                console.log(`[FLOW-UPDATE] User changed product to: ${newProd}`);
+                logger.info(`[FLOW-UPDATE] User changed product to: ${newProd}`);
                 currentState.selectedProduct = newProd;
                 saveState(userId);
             }
@@ -250,7 +250,7 @@ RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.
                     const hasAddress = addr.nombre && addr.calle && addr.ciudad;
 
                     if (hasAddress) {
-                        console.log(`[FLOW-SKIP] Address already collected for ${userId}, skipping data request after AI plan.`);
+                        logger.info(`[FLOW-SKIP] Address already collected for ${userId}, skipping data request after AI plan.`);
                         if (planAI.response) {
                             currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });
                             await sendMessageWithDelay(userId, planAI.response);
@@ -278,7 +278,7 @@ RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.
                     saveState(userId);
                     return { matched: true };
                 } else {
-                    console.warn(`[AI-SAFEGUARD] waiting_plan_choice: AI returned goalMet=true but no 60/120/180/240 etc in extractedData (${extractedStr}). Downgrading to false.`);
+                    logger.warn(`[AI-SAFEGUARD] waiting_plan_choice: AI returned goalMet=true but no 60/120/180/240 etc in extractedData (${extractedStr}). Downgrading to false.`);
                     if (planAI.response) {
                         currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });
                         await sendMessageWithDelay(userId, planAI.response);
@@ -289,7 +289,7 @@ RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.
             } else if (planAI.response) {
                 // Anti-duplicate protection logic
                 if (_isDuplicate(planAI.response, currentState.history)) {
-                    console.log(`[ANTI-DUP] Skipping duplicate AI response for ${userId} in plan_choice`);
+                    logger.info(`[ANTI-DUP] Skipping duplicate AI response for ${userId} in plan_choice`);
                     const fallbackMsg = "¡Dale! Quedo a tu disposición para cuando puedas avisarme. 😊";
                     currentState.history.push({ role: 'bot', content: fallbackMsg, timestamp: Date.now() });
                     await sendMessageWithDelay(userId, fallbackMsg);
@@ -305,7 +305,7 @@ RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.
                 // Setup Follow Up check for delayed answers ("despues hablamos")
                 if (planAI.response.includes('después hablamos') || planAI.response.includes('cualquier cosa acá estoy')) {
                     // Just set state as paused or track time, cron cleans up cold leads next day
-                    console.log(`[FLOW] User ${userId} delayed step. Will follow up later.`);
+                    logger.info(`[FLOW] User ${userId} delayed step. Will follow up later.`);
                 }
 
                 return { matched: true };

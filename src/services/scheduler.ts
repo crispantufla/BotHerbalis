@@ -365,8 +365,12 @@ function startScheduler(sharedState: SchedulerSharedState, dependencies: Schedul
     // ── GRACEFUL RESTART: a las 8am Argentina ──
     // Fuerza un inicio en frío eliminando por completo cualquier fuga de RAM de Chromium/Puppeteer.
     // Railway (o PM2) volverá a levantar el contenedor y reconectará en menos de 10s.
-    cron.schedule('0 8 * * *', () => {
+    cron.schedule('0 8 * * *', async () => {
         logger.info('[SCHEDULER] 🔄 Ejecutando reinicio preventivo diario (Anti-Memory Leak)...');
+        // Flush pending state saves before restarting to prevent data loss
+        if (dependencies.saveState) dependencies.saveState();
+        // Give the debounced saveState time to flush to DB before killing
+        await new Promise(r => setTimeout(r, 6000));
         // El manejador en index.ts atrapará SIGUSR2 para limpiar clientes y forzar salida con error 1 para que el contenedor reinicie.
         process.kill(process.pid, 'SIGUSR2');
     }, { timezone: TIMEZONE });
@@ -392,7 +396,9 @@ async function snapshotDailyStats() {
     try {
         const { prisma } = require('../../db');
         const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
-        const startOfDay = new Date();
+        // Use Argentina timezone so the date is correct regardless of server location
+        const argNow = new Date(new Date().toLocaleString('en-US', { timeZone: TIMEZONE }));
+        const startOfDay = new Date(argNow);
         startOfDay.setHours(0, 0, 0, 0);
 
         const totalUsers = await prisma.user.count({ where: { instanceId: INSTANCE_ID } });

@@ -9,6 +9,7 @@
  */
 
 const NOTIFY_DEBOUNCE_MS = 5 * 60 * 1000; // 5 minutes
+const logger = require('../utils/logger');
 
 // In-memory debounce: userId → last notification timestamp
 const adminNotifiedAt: Map<string, number> = new Map();
@@ -50,7 +51,7 @@ export async function pauseUser(
             }
         });
     } catch (err: any) {
-        console.error(`[PAUSE-SERVICE] Failed to persist pause for ${userId}:`, err.message);
+        logger.error(`[PAUSE-SERVICE] Failed to persist pause for ${userId}:`, err.message);
     }
 
     // 3. Admin notification with debounce — only if not already paused and not notified recently
@@ -62,10 +63,10 @@ export async function pauseUser(
             try {
                 await notifyAdmin(reason, userId, adminDetails);
             } catch (e) {
-                console.error(`[PAUSE-SERVICE] Failed to notify admin for ${userId}:`, e);
+                logger.error(`[PAUSE-SERVICE] Failed to notify admin for ${userId}:`, e);
             }
         } else {
-            console.log(`[PAUSE-SERVICE] Admin notification debounced for ${userId}. Last notified ${Math.round((now - lastNotified) / 1000)}s ago.`);
+            logger.info(`[PAUSE-SERVICE] Admin notification debounced for ${userId}. Last notified ${Math.round((now - lastNotified) / 1000)}s ago.`);
         }
     }
 }
@@ -87,7 +88,7 @@ export async function unpauseUser(userId: string, sharedState: { pausedUsers: Se
             data: { pausedAt: null, pauseReason: null }
         });
     } catch (err: any) {
-        console.error(`[PAUSE-SERVICE] Failed to unpause in DB for ${userId}:`, err.message);
+        logger.error(`[PAUSE-SERVICE] Failed to unpause in DB for ${userId}:`, err.message);
     }
 }
 
@@ -114,9 +115,9 @@ export async function restorePausedUsersFromDB(
             count++;
         }
 
-        console.log(`[PAUSE-SERVICE] Restored ${count} paused user(s) from DB on startup.`);
+        logger.info(`[PAUSE-SERVICE] Restored ${count} paused user(s) from DB on startup.`);
     } catch (err: any) {
-        console.error(`[PAUSE-SERVICE] Failed to restore paused users:`, err.message);
+        logger.error(`[PAUSE-SERVICE] Failed to restore paused users:`, err.message);
     }
 }
 
@@ -138,7 +139,7 @@ export async function getPausedUsersWithDetails(): Promise<Array<{
             orderBy: { pausedAt: 'desc' }
         });
     } catch (err: any) {
-        console.error(`[PAUSE-SERVICE] Failed to get paused users:`, err.message);
+        logger.error(`[PAUSE-SERVICE] Failed to get paused users:`, err.message);
         return [];
     }
 }

@@ -1,6 +1,7 @@
 import { UserState, FlowStep } from '../../types/state';
 const { _formatMessage } = require('../utils/messages');
 const { _setStep, _maybeUpsell } = require('../utils/flowHelpers');
+const logger = require('../../utils/logger');
 
 export async function handleWaitingWeight(
     userId: string,
@@ -33,7 +34,7 @@ export async function handleWaitingWeight(
 
     if (implicitProduct) {
         (currentState as any).suggestedProduct = implicitProduct;
-        console.log(`[LOGIC] Implicitly detected product: ${implicitProduct}`);
+        logger.info(`[LOGIC] Implicitly detected product: ${implicitProduct}`);
     }
 
     const isRefusal = /\b(no (quiero|voy|puedo)|prefiero no|pasame|decime|precio|que tenes|mostrame)\b/i.test(normalizedText);
@@ -42,7 +43,7 @@ export async function handleWaitingWeight(
         // User gave weight AND asked a health/product question — extract weight but respond to the concern
         const wMatch = text.match(/\d+/);
         if (wMatch) currentState.weightGoal = parseInt(wMatch[0], 10);
-        console.log(`[LOGIC] User ${userId} gave weight (${currentState.weightGoal}kg) AND asked a question. Responding to both.`);
+        logger.info(`[LOGIC] User ${userId} gave weight (${currentState.weightGoal}kg) AND asked a question. Responding to both.`);
         const dualGoal = `El usuario dijo cuántos kilos quiere bajar (${currentState.weightGoal} kg) PERO TAMBIÉN hizo una pregunta sobre salud, contraindicaciones o el producto. DEBES responder su pregunta con MUCHA empatía y detalle PRIMERO. Si pregunta si es dañino/seguro para alguna condición de salud (riñón, presión, diabetes, etc.): "No hay ninguna contraindicación para tu condición. Es un producto 100% natural, las únicas contraindicaciones son embarazo y lactancia." Después confirmá su objetivo de peso y preguntá qué formato prefiere: "Perfecto, ${currentState.weightGoal} kg es un objetivo totalmente alcanzable 👌 ¿Preferís algo súper práctico (cápsulas o gotas) o más natural (semillas)?"."`;
         const aiDual = await aiService.chat(text, {
             step: FlowStep.WAITING_WEIGHT,
@@ -68,7 +69,7 @@ export async function handleWaitingWeight(
         if (wMatch) currentState.weightGoal = parseInt(wMatch[0], 10);
 
         if ((currentState as any).suggestedProduct) {
-            console.log(`[LOGIC] User ${userId} already suggested ${(currentState as any).suggestedProduct}, skipping preference question.`);
+            logger.info(`[LOGIC] User ${userId} already suggested ${(currentState as any).suggestedProduct}, skipping preference question.`);
             currentState.selectedProduct = (currentState as any).suggestedProduct;
 
             let priceNode;
@@ -99,7 +100,7 @@ export async function handleWaitingWeight(
         (currentState as any).weightRefusals = ((currentState as any).weightRefusals || 0) + 1;
 
         if (isRefusal || (currentState as any).weightRefusals > 2) {
-            console.log(`[LOGIC] User ${userId} refused/failed weight question too many times (${(currentState as any).weightRefusals}). Skipping to preference.`);
+            logger.info(`[LOGIC] User ${userId} refused/failed weight question too many times (${(currentState as any).weightRefusals}). Skipping to preference.`);
             const skipMsg = "¡Entiendo, no hay problema! 👌 Pasemos directo a ver qué opción es mejor para vos.\n\nTenemos:\n1️⃣ Cápsulas (Lo más efectivo y práctico)\n2️⃣ Semillas/Infusión (Más natural)\n3️⃣ Gotas (Para >70 años o poquitos kilos)\n\n¿Cuál te gustaría probar?";
 
             _setStep(currentState, FlowStep.WAITING_PREFERENCE);
@@ -108,7 +109,7 @@ export async function handleWaitingWeight(
             await sendMessageWithDelay(userId, skipMsg);
             return { matched: true };
         } else {
-            console.log(`[AI-FALLBACK] waiting_weight: No number detected for ${userId}`);
+            logger.info(`[AI-FALLBACK] waiting_weight: No number detected for ${userId}`);
             const aiWeight = await aiService.chat(text, {
                 step: FlowStep.WAITING_WEIGHT,
                 goal: 'El usuario NO te ha dicho cuántos kilos quiere bajar. Tu objetivo es explicar brevemente el producto seleccionado y PREGUNTAR SUTÍLMENTE CUÁNTO PESO BUSCAN BAJAR para continuar. RESPONDÉ NATURALMENTE Y COMO HUMANO. 1) Si la persona envía una pregunta fuera de contexto, o una palabra sin sentido, respóndele brevemente intentando volver al tema de la baja de peso. 2) Si dice no saberlo, ofrécele una estimación. 3) TERMINA SIEMPRE con la pregunta "¿Cuántos kilos te gustaría bajar aproximadamente?" al final de tu respuesta de validación.',
@@ -123,7 +124,7 @@ export async function handleWaitingWeight(
                 if (extNum) currentState.weightGoal = parseInt(extNum[0], 10);
 
                 if ((currentState as any).suggestedProduct) {
-                    console.log(`[LOGIC] AI goalMet weight, user already suggested ${(currentState as any).suggestedProduct}, skipping preference.`);
+                    logger.info(`[LOGIC] AI goalMet weight, user already suggested ${(currentState as any).suggestedProduct}, skipping preference.`);
                     currentState.selectedProduct = (currentState as any).suggestedProduct;
 
                     let priceNode;

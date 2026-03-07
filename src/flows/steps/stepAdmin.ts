@@ -20,8 +20,7 @@ export async function handleAdminSteps(
     // pauseUser maneja debounce, DB y in-memory en un solo lugar.
     await pauseUser(userId, '⌛ Pedido pendiente de validación', { sharedState: dependencies.sharedState });
 
-    // Guardamos el mensaje del usuario en el historial pero NO respondemos nada.
-    currentState.history.push({ role: 'user', content: text, timestamp: Date.now() });
+    // El mensaje del usuario ya fue guardado en salesFlow.ts, no lo duplicamos.
     saveState(userId);
 
     return { matched: true, paused: true };

@@ -9,6 +9,7 @@ const { handleWaitingData } = require('./stepWaitingData');
 const { handleWaitingFinalConfirmation } = require('./stepWaitingFinalConfirmation');
 const { handleAdminSteps } = require('./stepAdmin');
 const { handleCompleted } = require('./stepCompleted');
+const logger = require('../../utils/logger');
 
 export async function processStep(
     userId: string,
@@ -55,17 +56,17 @@ export async function processStep(
             break;
         default: {
             const { _setStep } = require('../utils/flowHelpers');
-            console.log(`[STALE-STEP] User ${userId} has unknown step "${currentState.step}". Migrating...`);
+            logger.info(`[STALE-STEP] User ${userId} has unknown step "${currentState.step}". Migrating...`);
             const stepMigrations: Record<string, string> = { 'waiting_legal_acceptance': 'waiting_final_confirmation' };
             const migratedStep = stepMigrations[currentState.step];
 
             if (migratedStep) {
-                console.log(`[STALE-STEP] Migrating ${currentState.step} → ${migratedStep}`);
+                logger.info(`[STALE-STEP] Migrating ${currentState.step} → ${migratedStep}`);
                 _setStep(currentState, migratedStep);
                 dependencies.saveState(userId);
                 return { matched: false, staleReprocess: true };
             } else {
-                console.log(`[STALE-STEP] No migration for "${currentState.step}". Resetting to greeting.`);
+                logger.info(`[STALE-STEP] No migration for "${currentState.step}". Resetting to greeting.`);
                 _setStep(currentState, 'greeting');
                 currentState.cart = [];
                 currentState.pendingOrder = null;
@@ -78,5 +79,3 @@ export async function processStep(
     }
     return result || { matched: false };
 }
-
-module.exports = { processStep };

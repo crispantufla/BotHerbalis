@@ -1,5 +1,6 @@
 const { _getAdminSuggestions } = require('./messages');
 import { UserState, SharedState } from '../../types/state';
+const logger = require('../../utils/logger');
 
 /**
  * _setStep
@@ -103,7 +104,7 @@ async function _pauseAndAlert(userId: string, currentState: UserState, dependenc
         });
     }
 
-    console.log(`⏸️ [BOT] User ${userId} paused. Reason: ${reason}${nightLabel}`);
+    logger.info(`⏸️ [BOT] User ${userId} paused. Reason: ${reason}${nightLabel}`);
 }
 
 /**
@@ -122,8 +123,11 @@ function _extractSilentVariables(normalizedText: string, currentState: any): { a
     }
 
     // Catch "peso X", "X kilos", "quiero bajar X"
-    const weightGoalMatch = normalizedText.match(/\b(bajar|adelgazar|perder|quiero bajar|quisiera bajar|necesito bajar)\s+(\d{1,3})\s*(kilos|kg|kgs)?\b/i)
-        || normalizedText.match(/\b(\d{1,3})\s*(kilos|kg|kgs)\b/i) && /\b(bajar|adelgazar|perder)\b/i.test(normalizedText);
+    const weightGoalMatchDirect = normalizedText.match(/\b(bajar|adelgazar|perder|quiero bajar|quisiera bajar|necesito bajar)\s+(\d{1,3})\s*(kilos|kg|kgs)?\b/i);
+    const weightGoalMatchIndirect = !weightGoalMatchDirect && /\b(bajar|adelgazar|perder)\b/i.test(normalizedText)
+        ? normalizedText.match(/\b(\d{1,3})\s*(kilos|kg|kgs)\b/i)
+        : null;
+    const weightGoalMatch = weightGoalMatchDirect || weightGoalMatchIndirect;
     const currentWeightMatch = normalizedText.match(/\b(peso|estoy pesando)\s+(\d{2,3})\s*(kilos|kg|kgs)?\b/i);
 
     if (weightGoalMatch && weightGoalMatch[2]) {
@@ -153,11 +157,47 @@ function _extractSilentVariables(normalizedText: string, currentState: any): { a
     return result;
 }
 
+/**
+ * _detectProductPlanChange
+ * Detects if the user's message contains intent to change product or plan.
+ * Extracted from stepWaitingData, stepWaitingFinalConfirmation, stepWaitingPlanChoice
+ * to eliminate duplication.
+ */
+function _detectProductPlanChange(normalizedText: string): { productChange: RegExpMatchArray | null; planChange: RegExpMatchArray | boolean | null } {
+    const productChange = normalizedText.match(/\b(mejor|quiero|prefiero|cambio|cambia|dame|paso a|en vez)\b.*\b(capsula|capsulas|pastilla|pastillas|semilla|semillas|gota|gotas|natural|infusion)\b/i)
+        || normalizedText.match(/\b(capsula|capsulas|pastilla|pastillas|semilla|semillas|gota|gotas)\b.*\b(mejor|quiero|prefiero|cambio|en vez)\b/i);
+
+    const planChange = normalizedText.match(/\b(mejor|quiero|quisiera|prefiero|cambio|cambia|dame|paso a|en vez|voy a querer|me quedo con|tomaria|tomare|en realidad)\b.*\b(60|120|sesenta|ciento veinte)\b/i)
+        || normalizedText.match(/\b(60|120|sesenta|ciento veinte)\b.*\b(mejor|quiero|quisiera|prefiero|cambio|en vez)\b/i)
+        || (/\b(de|el|plan)\s+(60|120)\b/i.test(normalizedText) && /\b(dia|dias|d\u00edas)\b/i.test(normalizedText));
+
+    return { productChange, planChange: planChange || null };
+}
+
+/**
+ * _resolveNewProductPlan
+ * Given normalizedText and current state, resolves the new product and plan names.
+ */
+function _resolveNewProductPlan(normalizedText: string, currentProduct: string | null | undefined, currentPlan: string | null | undefined): { newProduct: string; newPlan: string } {
+    let newProduct = currentProduct || "Nuez de la India";
+    if (/capsula|pastilla/i.test(normalizedText)) newProduct = "Cápsulas de nuez de la india";
+    else if (/semilla|natural|infusion/i.test(normalizedText)) newProduct = "Semillas de nuez de la india";
+    else if (/gota/i.test(normalizedText)) newProduct = "Gotas de nuez de la india";
+
+    let newPlan = currentPlan || "60";
+    if (/\b(120|ciento veinte)\b/i.test(normalizedText)) newPlan = "120";
+    else if (/\b(60|sesenta)\b/i.test(normalizedText)) newPlan = "60";
+
+    return { newProduct, newPlan };
+}
+
 module.exports = {
     _setStep,
     _maybeUpsell,
     _hasCompleteAddress,
     _detectPostdatado,
     _pauseAndAlert,
-    _extractSilentVariables
+    _extractSilentVariables,
+    _detectProductPlanChange,
+    _resolveNewProductPlan
 };

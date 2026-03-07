@@ -28,5 +28,3 @@ export async function processGlobals(
 
     return null; // Not matched by any global interceptor
 }
-
-module.exports = { processGlobals };

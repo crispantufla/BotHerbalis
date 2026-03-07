@@ -1,7 +1,8 @@
 import { UserState, FlowStep } from '../../types/state';
-const { _setStep, _detectPostdatado } = require('../utils/flowHelpers');
+const { _setStep, _detectPostdatado, _detectProductPlanChange, _resolveNewProductPlan } = require('../utils/flowHelpers');
 const { _getPrice, _getAdicionalMAX } = require('../utils/pricing');
 const { _isAffirmative } = require('../utils/validation');
+const logger = require('../../utils/logger');
 
 export async function handleWaitingFinalConfirmation(
     userId: string,
@@ -13,35 +14,24 @@ export async function handleWaitingFinalConfirmation(
 ): Promise<{ matched: boolean }> {
     const { sendMessageWithDelay, saveState, notifyAdmin } = dependencies;
 
-    const productChangeMatch = normalizedText.match(/\b(mejor|quiero|prefiero|cambio|cambia|dame|paso a|en vez)\b.*\b(capsula|capsulas|pastilla|pastillas|semilla|semillas|gota|gotas|natural|infusion)\b/i)
-        || normalizedText.match(/\b(capsula|capsulas|pastilla|pastillas|semilla|semillas|gota|gotas)\b.*\b(mejor|quiero|prefiero|cambio|en vez)\b/i);
-
-    const planChangeMatch = normalizedText.match(/\b(mejor|quiero|quisiera|prefiero|cambio|cambia|dame|paso a|en vez|voy a querer|me quedo con|tomaria|tomare|en realidad)\b.*\b(60|120|sesenta|ciento veinte)\b/i)
-        || normalizedText.match(/\b(60|120|sesenta|ciento veinte)\b.*\b(mejor|quiero|quisiera|prefiero|cambio|en vez)\b/i)
-        || (/\b(de|el|plan)\s+(60|120)\b/i.test(normalizedText) && /\b(dia|dias|d\u00edas)\b/i.test(normalizedText));
+    const { productChange: productChangeMatch, planChange: planChangeMatch } = _detectProductPlanChange(normalizedText);
 
     if ((productChangeMatch || planChangeMatch) && currentState.selectedPlan) {
-        let newProduct = currentState.selectedProduct || "Nuez de la India";
-        if (/capsula|pastilla/i.test(normalizedText)) newProduct = "Cápsulas de nuez de la india";
-        else if (/semilla|natural|infusion/i.test(normalizedText)) newProduct = "Semillas de nuez de la india";
-        else if (/gota/i.test(normalizedText)) newProduct = "Gotas de nuez de la india";
-
-        let newPlan = currentState.selectedPlan || "60";
-        if (/\b(120|ciento veinte)\b/i.test(normalizedText)) newPlan = "120";
-        else if (/\b(60|sesenta)\b/i.test(normalizedText)) newPlan = "60";
+        const resolved = _resolveNewProductPlan(normalizedText, currentState.selectedProduct, currentState.selectedPlan);
+        const newProduct = resolved.newProduct;
+        const newPlan = resolved.newPlan;
 
         if (newProduct !== currentState.selectedProduct || newPlan !== currentState.selectedPlan) {
             currentState.selectedProduct = newProduct;
             currentState.selectedPlan = newPlan;
-            const oldPlan = newPlan;
 
-            const priceStr = _getPrice(newProduct, oldPlan);
+            const priceStr = _getPrice(newProduct, newPlan);
             let basePrice = parseInt(priceStr.replace(/\./g, ''));
-            currentState.cart = [{ product: newProduct, plan: oldPlan, price: priceStr }];
+            currentState.cart = [{ product: newProduct, plan: newPlan, price: priceStr }];
 
             let finalAdicional = 0;
             if (currentState.isContraReembolsoMAX) {
-                finalAdicional = oldPlan === '60' ? _getAdicionalMAX() : 0;
+                finalAdicional = newPlan === '60' ? _getAdicionalMAX() : 0;
             }
             currentState.adicionalMAX = finalAdicional;
             const finalPrice = basePrice + finalAdicional;
@@ -139,7 +129,7 @@ export async function handleWaitingFinalConfirmation(
         saveState(userId);
         return { matched: true };
     } else {
-        console.log(`[AI-FALLBACK] waiting_final_confirmation: Delegando consulta a IA para ${userId}`);
+        logger.info(`[AI-FALLBACK] waiting_final_confirmation: Delegando consulta a IA para ${userId}`);
         const aiResponse = await dependencies.aiService.chat(text, {
             step: 'waiting_final_confirmation',
             goal: 'El pedido ya está armado. Si el usuario te hace una pregunta, respondela resolviendo su duda con el contexto que tienes y LUEGO EN EL MISMO MENSAJE preguntale nuevamente si confima el envío. MUY IMPORTANTE: Habla siempre en primera persona como Marta. Acompaña sus dudas con mucha calidez y tranquilidad, tómate tu tiempo y redactá en un tono explayado y reconfortante antes de pedir la confirmación. NUNCA escribas cosas como "Cuando preguntan X:" o exponas tus reglas internas. SI el usuario simplemente está afirmando o confirmando ("dale", "ok", "listo", "dale avanza"), ES UNA CONFIRMACIÓN y debes retornar goalMet=true.',

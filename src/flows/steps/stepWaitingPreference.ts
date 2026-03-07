@@ -1,6 +1,7 @@
 import { UserState, FlowStep } from '../../types/state';
 const { _formatMessage } = require('../utils/messages');
 const { _setStep, _maybeUpsell } = require('../utils/flowHelpers');
+const logger = require('../../utils/logger');
 
 export async function handleWaitingPreference(
     userId: string,
@@ -15,7 +16,7 @@ export async function handleWaitingPreference(
     // SCRIPT FIRST: Check if the user is asking for a deferred "postdatado" date early
     const earlyPostdatadoMatch = text.match(/\b(lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo|semana|mes|cobro|mañana|despues|después|principio|el \d+ de [a-z]+|el \d+)\b/i);
     if (earlyPostdatadoMatch && /\b(recibir|llega|enviar|mandar|cobro|pago|puedo)\b/i.test(normalizedText)) {
-        console.log(`[EARLY POSTDATADO] Captured in waiting_preference: ${text}`);
+        logger.info(`[EARLY POSTDATADO] Captured in waiting_preference: ${text}`);
         if (!currentState.postdatado) currentState.postdatado = text; // Save it to output later
         saveState(userId);
     }
@@ -50,7 +51,7 @@ export async function handleWaitingPreference(
 
     if (isComparison) {
         if (/^(capsulas? o gotas?|gotas? o capsulas?|capsulas o gotas porfa(?:vor)?)$/i.test(normalizedText.trim())) {
-            console.log(`[HARDCODED-PREF] User asked "capsulas o gotas", sending hardcoded recommendation.`);
+            logger.info(`[HARDCODED-PREF] User asked "capsulas o gotas", sending hardcoded recommendation.`);
             const hardcodedRec1 = "Personalmente te recomiendo las cápsulas, suelen ser más efectivas 💪.";
             const hardcodedRec2 = "Las gotas las recomendamos ya para gente mayor o con problemas digestivos.\n\n👉 ¿Avanzamos con cápsulas entonces?";
 
@@ -66,7 +67,7 @@ export async function handleWaitingPreference(
             return { matched: true };
         }
 
-        console.log(`[INDICISION] User ${userId} compares products or asks for recommendation.`);
+        logger.info(`[INDICISION] User ${userId} compares products or asks for recommendation.`);
 
         const aiRecommendation = await aiService.chat(text, {
             step: FlowStep.WAITING_PREF_CONSULT,
@@ -149,7 +150,7 @@ export async function handleWaitingPreference(
         await _maybeUpsell(currentState, sendMessageWithDelay, userId, saveState);
         return { matched: true };
     } else {
-        console.log(`[AI-FALLBACK] waiting_preference: No keyword match for ${userId}`);
+        logger.info(`[AI-FALLBACK] waiting_preference: No keyword match for ${userId}`);
         const aiPref = await aiService.chat(text, {
             step: FlowStep.WAITING_PREFERENCE,
             goal: `Determinar si quiere cápsulas/gotas (opción práctica), semillas (opción natural) o AMBAS. REGLAS CRÍTICAS DE HUMANIZACIÓN: 

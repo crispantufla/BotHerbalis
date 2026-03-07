@@ -2,6 +2,7 @@ import { exec } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 const { aiService } = require('./ai');
+const logger = require('../utils/logger');
 
 /**
  * Módulo de Servicios de Administrador
@@ -36,9 +37,9 @@ export async function notifyAdmin(
     config: any
 ): Promise<void> {
     if (process.platform === 'win32') {
-        exec('powershell "[console]::beep(1000, 500)"', (err) => { if (err) console.error('Beep failed:', err); });
+        exec('powershell "[console]::beep(1000, 500)"', (err) => { if (err) logger.error('Beep failed:', err); });
     }
-    console.error(`⚠️ [ADMIN ALERT] ${reason} (User: ${userPhone})`);
+    logger.info(`[ADMIN ALERT] ${reason} (User: ${userPhone})`);
 
     const now = Date.now();
     const lastAlert: AlertEntry | undefined = sharedState.sessionAlerts[0];
@@ -78,7 +79,7 @@ export async function notifyAdmin(
         const alertMsg = `⚠️ *ALERTA SISTEMA*\n\n*Motivo:* ${reason}\n*Cliente:* ${userPhone}\n${orderData.product ? `*Producto:* ${orderData.product} (${orderData.plan || '?'} días) - $${orderData.price || '?'}\n*Dirección:* ${addrStr}\n` : ''}*Detalles:* ${details || 'Sin detalles'}`;
         for (const num of config.alertNumbers) {
             const targetAlert = `${num}@c.us`;
-            client.sendMessage(targetAlert, alertMsg).catch((e: Error) => console.error(`[ALERT] Failed to forward to ${num}:`, e.message));
+            client.sendMessage(targetAlert, alertMsg).catch((e: Error) => logger.error(`[ALERT] Failed to forward to ${num}:`, e.message));
         }
     }
 }
@@ -142,7 +143,7 @@ export async function handleAdminCommand(
             if (sharedState.io) sharedState.io.emit('alerts_updated', sharedState.sessionAlerts);
         }
 
-        console.log(`[ADMIN] Takeover for ${actualTarget}. Bot PAUSED.`);
+        logger.info(`[ADMIN] Takeover for ${actualTarget}. Bot PAUSED.`);
         return `✅ Bot pausado. El usuario ${actualTarget} es todo tuyo.`;
     }
 
@@ -211,7 +212,7 @@ export async function handleAdminCommand(
                 return `✅ Estado del pedido cambiado a Confirmado. Cliente notificado con éxito.`;
             }
         } catch (e) {
-            console.error('[ADMIN] Error confirming order in DB:', e);
+            logger.error('[ADMIN] Error confirming order in DB:', e);
         }
 
         return '⚠️ No hay pedido pendiente de aprobación.';
@@ -249,7 +250,7 @@ export async function handleAdminCommand(
                 return `✅ Instrucción enviada: "${suggestion}"`;
             }
         } catch (e) {
-            console.error('AI Suggestion Error:', e);
+            logger.error('AI Suggestion Error:', e);
             return '⚠️ Error generando sugerencia IA.';
         }
     }

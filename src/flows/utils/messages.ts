@@ -103,9 +103,5 @@ function _getAdminSuggestions(step: string, userMessage: string): string[] {
     return base;
 }
 
-module.exports = {
-    _formatMessage,
-    _isDuplicate,
-    _getAdminSuggestions
-};
-export { };
+export { _formatMessage, _isDuplicate, _getAdminSuggestions };
+

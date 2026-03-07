@@ -1,6 +1,7 @@
 import { UserState } from '../../types/state';
 const { _setStep } = require('../utils/flowHelpers');
 const { _isAffirmative, _isNegative } = require('../utils/validation');
+const logger = require('../../utils/logger');
 
 interface CompletedDependencies {
     sendMessageWithDelay: (chatId: string, content: string) => Promise<void>;
@@ -21,7 +22,7 @@ export async function handleCompleted(
 ): Promise<{ matched: boolean; paused?: boolean }> {
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
 
-    console.log(`[POST-SALE] Message from completed customer ${userId}: "${text}"`);
+    logger.info(`[POST-SALE] Message from completed customer ${userId}: "${text}"`);
 
     // --- GUARD: Pending cancel confirmation ---
     // If we asked the customer to confirm cancellation and are waiting for yes/no
@@ -90,7 +91,7 @@ export async function handleCompleted(
     });
 
     if (postSaleAI.extractedData === 'TRACKING_INFO') {
-        console.log(`[POST-SALE] Customer ${userId} is asking for tracking/shipping info. Auto-pausing silently.`);
+        logger.info(`[POST-SALE] Customer ${userId} is asking for tracking/shipping info. Auto-pausing silently.`);
         if (dependencies.sharedState?.pausedUsers) {
             dependencies.sharedState.pausedUsers.add(userId);
         }
@@ -99,7 +100,7 @@ export async function handleCompleted(
         }
         return { matched: true, paused: true };
     } else if (postSaleAI.extractedData === 'RE_PURCHASE') {
-        console.log(`[POST-SALE] Customer ${userId} wants to re-purchase. Skipping to preference.`);
+        logger.info(`[POST-SALE] Customer ${userId} wants to re-purchase. Skipping to preference.`);
         _setStep(currentState, 'waiting_preference');
         currentState.cart = [];
         currentState.pendingOrder = null;
@@ -114,7 +115,7 @@ export async function handleCompleted(
         return { matched: true };
     } else if (postSaleAI.extractedData === 'CANCEL_ORDER') {
         // Don't cancel yet — ask for confirmation first
-        console.log(`[POST-SALE] Customer ${userId} wants to cancel. Setting pendingCancelConfirm and asking for confirmation.`);
+        logger.info(`[POST-SALE] Customer ${userId} wants to cancel. Setting pendingCancelConfirm and asking for confirmation.`);
         currentState.pendingCancelConfirm = true;
         saveState(userId);
 
@@ -129,7 +130,7 @@ export async function handleCompleted(
         return { matched: true };
     } else if (postSaleAI.extractedData?.startsWith('POSTDATE:')) {
         const newDate = postSaleAI.extractedData.replace('POSTDATE:', '').trim();
-        console.log(`[POST-SALE] Customer ${userId} wants to post-date delivery to: ${newDate}`);
+        logger.info(`[POST-SALE] Customer ${userId} wants to post-date delivery to: ${newDate}`);
         currentState.postdatado = newDate;
         saveState(userId);
 
