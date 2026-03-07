@@ -130,7 +130,7 @@ export async function handleWaitingData(
 
     // Detect if the numbers in the text are plan references (60/120) not address numbers
     const onlyPlanNumbers = /\b(60|120)\b/.test(text) && !/\b(calle|av|avenida|barrio|mz|lote|piso|dpto|depto|departamento|casa|block|manzana)\b/i.test(text);
-    const mentionsPlanOrPrice = /\b(de 60|de 120|el de 60|el de 120|plan|dias|días)\b/i.test(normalizedText);
+    const mentionsPlanOrPrice = /\b(de 60|de 120|el de 60|el de 120|plan|60 d[ií]as|120 d[ií]as)\b/i.test(normalizedText);
 
     // If text is super long (like a personal story), force AI to handle it so we don't look robotic even if they gave an address
     // Escape hatch: if it explicitly contains structural address words, forgive the length up to 50 words.
@@ -150,12 +150,17 @@ export async function handleWaitingData(
     const isObjectionOrComment = /\b(resultado|miedo|desconfianza|seguro|funciona|funcionará|efecto|rebote|garantía|garantia|probar|probando|duda|dudas|riesgo)\b/i.test(normalizedText)
         || /\b(si me va bien|si me funciona|si resulta|mas adelante|despues compro|luego compro)\b/i.test(normalizedText);
 
+    // Detect delivery timing requests: "dentro de 10 dias", "me lo podes mandar en 10 dias", "cuanto demora"
+    // These are NOT addresses — should go to AI fallback, not cause a pause.
+    const isDeliveryTimingRequest = /\b(dentro de \d+|mandar.{0,15}d[ií]as|enviar.{0,15}d[ií]as|cu[aá]ntos? d[ií]as|demora|demorará|cu[aá]ndo lo mandan|cu[aá]ndo me lo env[ií]an|podes mandar|pueden mandar|lo mandan|me lo mandan)\b/i.test(normalizedText);
+
     const isShortConfirmation = /^(si|sisi|ok|dale|bueno|joya|de una|perfecto)[\s\?\!]*$/i.test(normalizedText);
 
     const isDataQuestionOrEmotion = !isShortConfirmation && (explicitQuestionKeywords
         || /\b(pregunte|no quiero|no acepto|no acepte|como|donde|por que|para que)\b/i.test(normalizedText)
         || isHesitation
         || isPaymentTiming
+        || isDeliveryTimingRequest
         || isObjectionOrComment
         || isVeryLongMessage);
 
