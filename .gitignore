@@ -16,7 +16,13 @@ Thumbs.db
 
 /src/generated/prisma
 
+# Railway logs
+logs.*.json
+
 # Debug / Test outputs
+*_test_output.txt
+full_test_output.txt
+health_test_output.txt
 *.diff
 *.patch
 *_out.txt
@@ -46,6 +52,8 @@ salesFlow_output.txt
 fix*.js
 test_*.js
 test-*.js
+tests/objection_handling.test.js
+tests/preference_health_fix.test.js
 simulate_*.js
 replace_*.js
 fix.py
