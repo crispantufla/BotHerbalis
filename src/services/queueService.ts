@@ -6,7 +6,7 @@ const logger = require('../utils/logger');
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 
 // BullMQ requires separate Redis connections for Queues, Workers, and Events
-const connectionParams = { maxRetriesPerRequest: null };
+const connectionParams = { maxRetriesPerRequest: null, keepAlive: 10000, enableOfflineQueue: false };
 
 export const redisConnection = new Redis(REDIS_URL, connectionParams);
 const workerConnection = new Redis(REDIS_URL, connectionParams);

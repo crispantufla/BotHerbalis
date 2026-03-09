@@ -83,7 +83,8 @@ const { Redis } = require('ioredis');
 const Redlock = require('redlock').default || require('redlock');
 
 // --- Redis y Redlock Setup ---
-const redisClient = new Redis(env.REDIS_URL);
+const redisClient = new Redis(env.REDIS_URL, { keepAlive: 10000, enableOfflineQueue: false });
+redisClient.on('error', (err: any) => logger.error(`[REDIS REDLOCK] Error de conexión: ${err?.message || String(err)}`));
 const redlock = new Redlock([redisClient], {
     driftFactor: 0.01,
     retryCount: 10,
@@ -250,7 +251,7 @@ async function _persistState(): Promise<void> {
 
         await Promise.all([...userPromises, ...configPromises]);
     } catch (e: any) {
-        logger.error('🔴 Error saving state to DB:', e.message);
+        logger.error(`🔴 Error saving state to DB: ${e?.message || String(e)}`);
     }
 }
 
@@ -282,7 +283,7 @@ async function loadState() {
             dbUsers = await prisma.user.findMany({ where: { instanceId: INSTANCE_ID } });
             dbConfig = await prisma.botConfig.findMany({ where: { instanceId: INSTANCE_ID } });
         } catch (dbErr: any) {
-            logger.warn('⚠️ DB Connection failed, falling back to local persistence.json', dbErr.message);
+            logger.warn(`⚠️ DB Connection failed, falling back to local persistence.json: ${dbErr?.message || String(dbErr)}`);
             if (fs.existsSync(STATE_FILE)) {
                 const raw = fs.readFileSync(STATE_FILE);
                 const data = JSON.parse(raw);
@@ -373,7 +374,7 @@ function cleanAuth(dir: string): void {
 
         // Locks can be in session-session or session-session/Default depending on Puppeteer version
         const pathsToClean = [sessionPath, defaultPath];
-        const locks = ['SingletonLock', 'SingletonCookie', 'SingletonSocket'];
+        const locks = ['SingletonLock', 'SingletonCookie', 'SingletonSocket', '.lock', 'lockfile'];
 
         let clearedLocks = 0;
         pathsToClean.forEach(targetPath => {
@@ -1129,8 +1130,18 @@ async function safeInitialize(attempt: number = 1): Promise<void> {
         if (attempt < MAX_INIT_RETRIES) {
             const authDir = path.join(DATA_DIR, '.wwebjs_auth');
 
+            // Kill any Chrome processes that are holding the profile dir locked
+            try {
+                const { execSync } = require('child_process');
+                if (process.platform === 'win32') {
+                    execSync(`taskkill /F /IM chrome.exe 2>nul & taskkill /F /IM chromium.exe 2>nul`, { stdio: 'ignore', shell: true, timeout: 5000 });
+                } else {
+                    execSync(`pkill -9 -f ".wwebjs_auth" 2>/dev/null || true`, { stdio: 'ignore', shell: true, timeout: 5000 });
+                }
+                logger.info(`[INIT] Chrome processes killed.`);
+            } catch (e) { /* No Chrome running — fine */ }
+
             // Clean Chrome lock files between retries (preserves WhatsApp session!)
-            // The lock is a broken symlink on Linux — cleanAuth handles this correctly now.
             logger.info(`[INIT] Cleaning Chrome locks before retry...`);
             cleanAuth(authDir);
 

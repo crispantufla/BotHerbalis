@@ -126,7 +126,7 @@ export async function restorePausedUsersFromDB(
 
         logger.info(`[PAUSE-SERVICE] Restored ${count} paused user(s) from DB on startup.`);
     } catch (err: any) {
-        logger.error(`[PAUSE-SERVICE] Failed to restore paused users:`, err.message);
+        logger.error(`[PAUSE-SERVICE] Failed to restore paused users: ${err?.message || String(err)}`);
     }
 }
 

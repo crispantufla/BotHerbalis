@@ -153,8 +153,8 @@ module.exports = (client, sharedState) => {
                 globalPause: !!config.globalPause
             });
         } catch (e) {
-            logger.error("🔴 [STATS ERROR]", e);
-            res.status(500).json({ error: e.message });
+            logger.error(`🔴 [STATS ERROR]: ${e?.message || String(e)}`);
+            res.status(500).json({ error: e?.message || String(e) });
         }
     });
 
@@ -293,13 +293,16 @@ module.exports = (client, sharedState) => {
                 await client.logout();
                 if (io) io.emit('status_change', { status: 'disconnected' });
             } else {
-                // No active session: directly initialize to generate QR
+                // No active session: destroy existing Chrome (if any) then reinitialize for QR
                 logger.info('[WHATSAPP] No active session — triggering initialize for QR...');
                 sharedState.qrCodeData = null;
                 if (io) io.emit('status_change', { status: 'disconnected' });
-                client.initialize().catch(err => {
-                    logger.error('[WHATSAPP] Initialize failed:', err.message);
-                });
+                (async () => {
+                    try { await client.destroy(); } catch (e) { /* Chrome may not have been started yet */ }
+                    client.initialize().catch(err => {
+                        logger.error('[WHATSAPP] Initialize failed:', err.message);
+                    });
+                })();
             }
             res.json({ success: true });
         } catch (e) {

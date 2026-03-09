@@ -43,13 +43,26 @@ const logger = pino({
     }
 });
 
+// Pino ignores extra string args (unlike console.log).
+// This helper merges ('prefix:', 'value') into a single string so nothing gets silently dropped.
+function mergeArgs(args: any[]): any[] {
+    if (args.length <= 1) return args;
+    // Pino native pattern: (mergingObject, 'message') — keep as-is
+    if (typeof args[0] === 'object' && args[0] !== null && !(args[0] instanceof Error)) return args;
+    // All primitives: concatenate like console.log would
+    if (args.every(a => a == null || typeof a !== 'object')) {
+        return [args.map(a => (a == null ? '' : String(a))).join(' ')];
+    }
+    return args;
+}
+
 // Polyfill the old legacy custom logger for backwards compatibility with legacy UI/sockets
 const customLogger = {
-    info: (...args: any[]) => logger.info(...args),
-    warn: (...args: any[]) => logger.warn(...args),
-    error: (...args: any[]) => logger.error(...args),
-    debug: (...args: any[]) => logger.debug(...args),
-    fatal: (...args: any[]) => logger.fatal(...args),
+    info: (...args: any[]) => logger.info(...mergeArgs(args)),
+    warn: (...args: any[]) => logger.warn(...mergeArgs(args)),
+    error: (...args: any[]) => logger.error(...mergeArgs(args)),
+    debug: (...args: any[]) => logger.debug(...mergeArgs(args)),
+    fatal: (...args: any[]) => logger.fatal(...mergeArgs(args)),
 
     logMessage: (chatId: string, sender: string, text: string, step = 'unknown') => {
         // Just delegating local logs to Pino
