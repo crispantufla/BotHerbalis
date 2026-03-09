@@ -51,6 +51,14 @@ export function initWorker(dependencies: any) {
         const { userId, combinedText, effectiveScript, startTime } = job.data;
         logger.info(`[BULLMQ] 🚀 Procesando Job ${job.id} para ${userId}`);
 
+        // Safety net: if user was paused after the job was enqueued, skip processing
+        const alertNums = (config.alertNumbers || []).map((n: string) => n.replace(/\D/g, ''));
+        const isAdminUser = alertNums.some((n: string) => userId.startsWith(n));
+        if (sharedState.pausedUsers.has(userId) || (sharedState.config?.globalPause && !isAdminUser)) {
+            logger.info(`[BULLMQ] ⏸️ Job ${job.id} skipped — ${userId} is paused`);
+            return;
+        }
+
         const effectiveKnowledge = sharedState.multiKnowledge[effectiveScript] || sharedState.knowledge;
 
         try {

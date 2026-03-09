@@ -110,13 +110,7 @@ const ScriptViewV2 = () => {
                         </div>
                         <p className="text-slate-500 mt-1 font-medium text-sm">Revisa, edita y activa diferentes estrategias de venta para tu bot.</p>
 
-                        {/* WARNING MESSAGE ADDED PER USER REQUEST */}
-                        <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50 rounded-xl flex items-start gap-3">
-                            <div className="text-amber-500 mt-0.5">⚠️</div>
-                            <p className="text-xs md:text-sm text-amber-800 dark:text-amber-200 font-medium">
-                                <strong className="font-bold">Aviso importante:</strong> Este editor aún no funciona para guardar permanentemente, solo hace cambios temporales en memoria. Cualquier cambio constante necesario, <strong className="font-bold">pedíselo a Cristian</strong>.
-                            </p>
-                        </div>
+                        {/* INFO: changes are saved via "Guardar Cambios" button */}
 
                         {/* Version Selector Buttons */}
                         <div className="flex flex-wrap gap-2 mt-4">

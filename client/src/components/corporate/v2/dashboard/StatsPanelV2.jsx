@@ -21,20 +21,20 @@ const StatsPanelV2 = ({ stats, loadingStats, alertsCount = 0 }) => {
     }
 
     const StatCard = ({ title, value, subtext, icon: Icon, colorClass, gradientClass }) => (
-        <div className="relative overflow-hidden bg-white/6 dark:bg-slate-800/60 dark:bg-slate-800/60 backdrop-blur-xl p-4 lg:p-5 rounded-[1.25rem] border border-white/8 dark:border-slate-700/80 dark:border-slate-700/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 group hover:-translate-y-1">
+        <div className="relative overflow-hidden bg-white/6 dark:bg-slate-800/60 dark:bg-slate-800/60 backdrop-blur-xl p-4 lg:p-5 2xl:p-7 rounded-[1.25rem] border border-white/8 dark:border-slate-700/80 dark:border-slate-700/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 group hover:-translate-y-1">
             {/* Soft background glow */}
-            <div className={`absolute -right-6 -top-6 w-24 h-24 rounded-full blur-2xl opacity-20 ${gradientClass} group-hover:opacity-40 transition-opacity duration-500`}></div>
+            <div className={`absolute -right-6 -top-6 w-24 h-24 2xl:w-32 2xl:h-32 rounded-full blur-2xl opacity-20 ${gradientClass} group-hover:opacity-40 transition-opacity duration-500`}></div>
 
             <div className="flex items-start justify-between mb-2 relative z-10">
-                <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">{title}</p>
-                <div className={`w-8 h-8 rounded-xl ${gradientClass} flex items-center justify-center text-white shadow-lg shadow-${colorClass}-500/30 transform group-hover:scale-110 transition-transform duration-300`}>
-                    <Icon className="w-4 h-4" />
+                <p className="text-[11px] 2xl:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">{title}</p>
+                <div className={`w-8 h-8 2xl:w-11 2xl:h-11 rounded-xl ${gradientClass} flex items-center justify-center text-white shadow-lg shadow-${colorClass}-500/30 transform group-hover:scale-110 transition-transform duration-300`}>
+                    <Icon className="w-4 h-4 2xl:w-5 2xl:h-5" />
                 </div>
             </div>
 
             <div className="relative z-10">
-                <h3 className="text-2xl font-extrabold text-slate-800 dark:text-white tracking-tight">{value}</h3>
-                <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-1 font-medium leading-tight">{subtext}</p>
+                <h3 className="text-2xl 2xl:text-3xl font-extrabold text-slate-800 dark:text-white tracking-tight">{value}</h3>
+                <p className="text-[13px] 2xl:text-sm text-slate-500 dark:text-slate-400 mt-1 font-medium leading-tight">{subtext}</p>
             </div>
         </div>
     );

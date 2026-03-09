@@ -193,6 +193,36 @@ const AdvancedAnalyticsViewV2 = () => {
                     </div>
                 </div>
 
+                {/* Empty state: no data for the selected period */}
+                {!loading && (!data.overview || (data.overview.orders?.value === 0 && data.overview.revenue?.value === 0)) && (
+                    <div className={`flex-1 flex flex-col items-center justify-center py-20 rounded-3xl border-2 border-dashed mb-8 ${isDark ? 'border-slate-700 bg-slate-800/20' : 'border-slate-200 bg-slate-50/50'}`}>
+                        <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mb-6 ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
+                            <Activity size={36} className="text-indigo-400" />
+                        </div>
+                        <h3 className="text-xl font-bold text-slate-700 dark:text-slate-200 mb-2">Sin datos para este período</h3>
+                        <p className="text-slate-500 dark:text-slate-400 text-sm text-center max-w-sm mb-6">
+                            No hay órdenes ni ingresos registrados en los últimos {daysAgoToFetch === 1 ? 'día' : `${daysAgoToFetch} días`}. Probá con un rango más amplio.
+                        </p>
+                        <div className="flex gap-3">
+                            {[7, 30].map(days => (
+                                <button
+                                    key={days}
+                                    onClick={() => setDaysAgoToFetch(days)}
+                                    className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all ${daysAgoToFetch === days
+                                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/30'
+                                        : (isDark ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-white text-slate-700 border border-slate-200 hover:border-indigo-300 hover:text-indigo-600 shadow-sm')
+                                    }`}
+                                >
+                                    {days} días
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Only render charts when there IS data */}
+                {(loading || (data.overview && (data.overview.orders?.value > 0 || data.overview.revenue?.value > 0))) && (<>
+
                 {/* --- SECCIÓN A: RESUMEN EJECUTIVO --- */}
                 <h2 className={`text-sm font-bold uppercase tracking-widest mb-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Resumen Ejecutivo</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
@@ -461,6 +491,8 @@ const AdvancedAnalyticsViewV2 = () => {
                         </div>
                     </div>
                 </div>
+
+                </>)}
 
             </div>
         </div>

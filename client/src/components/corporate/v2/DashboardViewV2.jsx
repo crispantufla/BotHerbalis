@@ -114,10 +114,10 @@ const DashboardViewV2 = ({ alerts = [], config, handleQuickAction, status, qrDat
             {/* Header de la vista */}
             <div className="mb-8 flex justify-between items-stretch gap-6 h-[5.5rem]">
                 <div className="flex flex-col justify-center">
-                    <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-700 to-purple-600 dark:from-indigo-400 dark:to-purple-400 leading-none mb-2">
+                    <h1 className="text-3xl 2xl:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-700 to-purple-600 dark:from-indigo-400 dark:to-purple-400 leading-none mb-2">
                         Dashboard Overview
                     </h1>
-                    <p className="text-slate-500 dark:text-slate-400 font-medium m-0 leading-none">Resumen del sistema y métricas en tiempo real</p>
+                    <p className="text-slate-500 dark:text-slate-400 font-medium 2xl:text-lg m-0 leading-none">Resumen del sistema y métricas en tiempo real</p>
                 </div>
 
                 {/* Global Pause Button */}
@@ -213,12 +213,16 @@ const DashboardViewV2 = ({ alerts = [], config, handleQuickAction, status, qrDat
             <StatsPanelV2 stats={stats} loadingStats={loadingStats} alertsCount={alerts.length} />
 
             {/* B. MAIN GRID V2 */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* B1. ALERTS V2 */}
-                <AlertsPanelV2 alerts={alerts} onCommand={handleAdminCommand} onQuickAction={handleQuickAction} />
+            <div className="grid grid-cols-1 lg:grid-cols-3 2xl:grid-cols-5 gap-8">
+                {/* B1. ALERTS V2 — takes 2/3 on lg, 3/5 on 2xl */}
+                <div className="lg:col-span-2 2xl:col-span-3">
+                    <AlertsPanelV2 alerts={alerts} onCommand={handleAdminCommand} onQuickAction={handleQuickAction} />
+                </div>
 
-                {/* B2. SYSTEM STATUS V2 */}
-                <SystemStatusPanelV2 status={status} activeConversations={stats?.activeConversations} adminNumbers={adminNumbers} onAddPhone={handleAddPhone} onRemovePhone={handleRemovePhone} onRegenerateQR={handleRegenerateQR} />
+                {/* B2. SYSTEM STATUS V2 — takes 1/3 on lg, 2/5 on 2xl */}
+                <div className="lg:col-span-1 2xl:col-span-2">
+                    <SystemStatusPanelV2 status={status} activeConversations={stats?.activeConversations} adminNumbers={adminNumbers} onAddPhone={handleAddPhone} onRemovePhone={handleRemovePhone} onRegenerateQR={handleRegenerateQR} />
+                </div>
             </div>
         </div>
     );

@@ -476,8 +476,15 @@ module.exports = (client, sharedState) => {
     // POST /toggle-bot
     router.post('/toggle-bot', authMiddleware, async (req, res) => {
         try {
+            const originalChatId = req.body.chatId;
             let { chatId, paused } = req.body;
             chatId = await resolveChatId(chatId);
+
+            // Warn if LID resolution failed — pause key would mismatch message key
+            if (chatId.includes('@lid')) {
+                console.warn(`[API] toggle-bot: LID resolution failed for ${chatId}, pause key may not match incoming message key`);
+            }
+
             const { pauseUser, unpauseUser } = require('../../services/pauseService');
 
             if (paused) {
@@ -486,7 +493,7 @@ module.exports = (client, sharedState) => {
                 await unpauseUser(chatId, sharedState);
             }
 
-            console.log(`[API] toggle-bot: ${chatId} → ${paused ? 'PAUSED' : 'UNPAUSED'} (via dashboard)`);
+            console.log(`[API] toggle-bot: ${originalChatId}${chatId !== originalChatId ? ` → ${chatId}` : ''} → ${paused ? 'PAUSED' : 'UNPAUSED'} (via dashboard)`);
             if (sharedState.saveState) sharedState.saveState();
             if (sharedState.io) sharedState.io.emit('bot_status_change', { chatId, paused });
             res.json({ success: true });

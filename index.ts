@@ -1031,7 +1031,15 @@ client.on('message', async (msg: any) => {
             return;
         }
 
-        if (pausedUsers.has(userId)) {
+        // Check pause with both resolved (@c.us) and original (@lid) forms — prevents key mismatch
+        // when the dashboard pause API failed to resolve the LID and stored the @lid form
+        if (pausedUsers.has(userId) || (msg.from !== userId && pausedUsers.has(msg.from))) {
+            // Normalize: if we matched on @lid form, migrate the key to @c.us
+            if (!pausedUsers.has(userId) && msg.from !== userId && pausedUsers.has(msg.from)) {
+                pausedUsers.delete(msg.from);
+                pausedUsers.add(userId);
+                logger.info(`[PAUSE-NORMALIZE] Migrated pause key ${msg.from} → ${userId}`);
+            }
             // Cancel any pending debounce timers so they don't fire after pause
             const pendingEntry = pendingMessages.get(userId);
             if (pendingEntry) {
@@ -1074,6 +1082,15 @@ client.on('message', async (msg: any) => {
 async function _processDebounced(userId: string): Promise<void> {
     const pending = pendingMessages.get(userId);
     if (!pending) return;
+
+    // Re-check pause state — user may have been paused DURING the debounce window
+    const alertNums = (config.alertNumbers || []).map((n: string) => n.replace(/\D/g, ''));
+    const isAdminUser = alertNums.some((n: string) => userId.startsWith(n));
+    if (pausedUsers.has(userId) || (config.globalPause && !isAdminUser)) {
+        logger.info(`[DEBOUNCE] Skipping enqueue for ${userId}: paused during debounce window`);
+        pendingMessages.delete(userId);
+        return;
+    }
 
     // Sort chronologically by the exact WhatsApp timestamp (fixes audio transcription delay ordering)
     const sortedMessages = pending.messages.sort((a, b) => a.timestamp - b.timestamp);

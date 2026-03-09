@@ -76,7 +76,15 @@ const ChatInputArea = ({
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onFocus={() => setShowEmojiPicker(false)}
-                    placeholder="Mensaje..."
+                    onKeyDown={(e) => {
+                        if (e.key === 'Escape') { setShowEmojiPicker(false); }
+                        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                            e.preventDefault();
+                            if (attachment) handleSendMedia();
+                            else handleSend(e);
+                        }
+                    }}
+                    placeholder="Mensaje... (Ctrl+Enter para enviar)"
                     className="w-full min-w-0 flex-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl sm:rounded-2xl px-3 sm:px-6 py-2.5 sm:py-4 text-slate-800 dark:text-slate-200 font-medium focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all shadow-inner placeholder:text-slate-400 text-[15px] sm:text-base"
                 />
                 <button type="submit" disabled={(!input.trim() && !attachment) || sendingMedia} className="w-11 h-11 sm:w-14 sm:h-14 flex items-center justify-center shrink-0 rounded-xl sm:rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100">

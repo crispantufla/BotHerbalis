@@ -13,6 +13,7 @@ const WaitingCustomersPanel = () => {
     const [customers, setCustomers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [resuming, setResuming] = useState(null);
+    const [, setTick] = useState(0); // forces re-render every minute for live countdown
 
     const fetchWaiting = useCallback(async () => {
         try {
@@ -34,6 +35,12 @@ const WaitingCustomersPanel = () => {
         return () => clearInterval(interval);
     }, [fetchWaiting]);
 
+    // Live countdown: re-render every minute
+    useEffect(() => {
+        const timer = setInterval(() => setTick(v => v + 1), 60_000);
+        return () => clearInterval(timer);
+    }, []);
+
     const handleResume = async (phone) => {
         try {
             setResuming(phone);
@@ -49,15 +56,26 @@ const WaitingCustomersPanel = () => {
         }
     };
 
+    const getWaitingMinutes = (dateStr) => {
+        if (!dateStr) return 999;
+        return Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
+    };
+
     const formatTimeAgo = (dateStr) => {
         if (!dateStr) return 'Hace un rato';
-        const diff = Date.now() - new Date(dateStr).getTime();
-        const mins = Math.floor(diff / 60000);
+        const mins = getWaitingMinutes(dateStr);
         const hrs = Math.floor(mins / 60);
         const days = Math.floor(hrs / 24);
         if (days > 0) return `Hace ${days}d ${hrs % 24}h`;
         if (hrs > 0) return `Hace ${hrs}h ${mins % 60}m`;
         return `Hace ${mins}m`;
+    };
+
+    const getSemaphoreClass = (dateStr) => {
+        const mins = getWaitingMinutes(dateStr);
+        if (mins < 5) return { dot: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400' };
+        if (mins < 15) return { dot: 'bg-amber-500', text: 'text-amber-600 dark:text-amber-400' };
+        return { dot: 'bg-rose-500 animate-pulse', text: 'text-rose-600 dark:text-rose-400' };
     };
 
     return (
@@ -121,9 +139,10 @@ const WaitingCustomersPanel = () => {
                                 </p>
                             </div>
 
-                            {/* Time */}
+                            {/* Time — semaphore color: green <5min, yellow <15min, red >15min */}
                             <div className="flex flex-col items-end gap-1.5 shrink-0">
-                                <div className="flex items-center gap-1 text-[11px] text-amber-500 dark:text-amber-400 font-medium">
+                                <div className={`flex items-center gap-1.5 text-[11px] font-semibold ${getSemaphoreClass(c.pausedAt).text}`}>
+                                    <span className={`w-2 h-2 rounded-full ${getSemaphoreClass(c.pausedAt).dot}`} />
                                     <Clock className="w-3 h-3" />
                                     {formatTimeAgo(c.pausedAt)}
                                 </div>

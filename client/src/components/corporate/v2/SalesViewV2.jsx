@@ -6,7 +6,7 @@ import { useOrders } from '../../../hooks/useOrders';
 
 import { RefreshCw as Refresh, Download, Search, Filter, MessageCircle as Chat, Edit2 as Edit, Trash2 as Trash, FileText as Script, Save, X as XIcon } from 'lucide-react';
 
-const SalesViewV2 = ({ onGoToChat }) => {
+const SalesViewV2 = ({ onGoToChat, initialSearch = '' }) => {
     const { toast, confirm } = useToast();
     const [page, setPage] = useState(1);
 
@@ -14,7 +14,7 @@ const SalesViewV2 = ({ onGoToChat }) => {
     const { orders, pagination, isLoading, isFetching, updateDetails, updateStatus, deleteOrder, refetch } = useOrders(page, 50);
 
     // Advanced Filters V2
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchTerm, setSearchTerm] = useState(initialSearch);
     const [statusFilter, setStatusFilter] = useState('Todos');
 
     // Viewing / Details State
@@ -352,7 +352,7 @@ Teléfono: ${phoneDisplay}`;
                                                     return (
                                                         <div className="flex flex-col whitespace-nowrap">
                                                             <span className="font-sans text-[13px] font-extrabold text-slate-700">{datePart.trim()}</span>
-                                                            <span className="font-mono text-[10px] font-bold text-indigo-400 tracking-wider mt-0.5">{timePart.trim()}</span>
+                                                            <span className="font-mono text-xs font-bold text-indigo-400 tracking-wider mt-0.5">{timePart.trim()}</span>
                                                         </div>
                                                     );
                                                 }
@@ -387,7 +387,7 @@ Teléfono: ${phoneDisplay}`;
                                             )}
                                         </td>
                                         <td className="px-4 sm:px-8 py-5 text-center">
-                                            <span className={`px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-widest border ${statusStyles[order.status] || statusStyles['Pendiente']}`}>
+                                            <span className={`px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-widest border ${statusStyles[order.status] || statusStyles['Pendiente']}`}>
                                                 {order.status || 'Pendiente'}
                                             </span>
                                         </td>
@@ -477,7 +477,7 @@ Teléfono: ${phoneDisplay}`;
 
                 {/* V2 Pagination Controls */}
                 <div className="px-8 py-5 border-t border-white/6 dark:border-slate-700/60 flex flex-col sm:flex-row justify-between items-center bg-white/3 dark:bg-slate-800/30 backdrop-blur-md gap-4">
-                    <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                    <span className="text-sm font-bold text-slate-500 uppercase tracking-widest">
                         Página <span className="text-indigo-600">{page}</span> de {pagination.totalPages}
                     </span>
                     <div className="flex gap-2">
@@ -496,7 +496,7 @@ Teléfono: ${phoneDisplay}`;
                             Siguiente
                         </button>
                     </div>
-                    <span className="text-xs font-bold text-indigo-500 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">{pagination.total} Totales en BD</span>
+                    <span className="text-sm font-bold text-indigo-500 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">{pagination.total} Totales en BD</span>
                 </div>
             </div>
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../../../config/axios';
 import { useSocket } from '../../../context/SocketContext';
 import { useAuth } from '../../../context/AuthContext';
@@ -15,7 +15,7 @@ import GalleryViewV2 from '../../../components/corporate/v2/GalleryViewV2';
 import AdvancedAnalyticsViewV2 from '../../../components/corporate/v2/AdvancedAnalyticsViewV2';
 import WaitingCustomersPanel from '../../../components/corporate/v2/dashboard/WaitingCustomersPanel';
 
-import { Wifi, MessageCircle, Database, Settings, FileText, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall } from 'lucide-react';
+import { Wifi, MessageCircle, Database, Settings, FileText, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Search } from 'lucide-react';
 
 const CorporateDashboardV2 = () => {
     const { socket } = useSocket();
@@ -32,6 +32,8 @@ const CorporateDashboardV2 = () => {
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [globalSearch, setGlobalSearch] = useState('');
+    const globalSearchRef = useRef(null);
 
     // Detección de Mobile
     useEffect(() => {
@@ -45,6 +47,29 @@ const CorporateDashboardV2 = () => {
         window.addEventListener('resize', checkMobile);
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
+
+    // Ctrl+K global shortcut → focus search
+    useEffect(() => {
+        const handler = (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                e.preventDefault();
+                globalSearchRef.current?.focus();
+                globalSearchRef.current?.select();
+            }
+        };
+        window.addEventListener('keydown', handler);
+        return () => window.removeEventListener('keydown', handler);
+    }, []);
+
+    const handleGlobalSearch = (e) => {
+        e.preventDefault();
+        const q = globalSearch.trim();
+        if (!q) return;
+        // Navigate to chats if looks like a phone number, else sales
+        const looksLikePhone = /^\+?[\d\s\-()]{4,}$/.test(q);
+        setActiveTab(looksLikePhone ? 'comms' : 'logistics');
+        globalSearchRef.current?.blur();
+    };
 
     const fetchConfig = useCallback(async () => {
         try {
@@ -150,8 +175,8 @@ const CorporateDashboardV2 = () => {
         switch (activeTab) {
             case 'dashboard': return <DashboardViewV2 alerts={alerts} config={config} handleQuickAction={handleQuickAction} status={status} qrData={qrData} />;
             case 'statistics': return <AdvancedAnalyticsViewV2 />;
-            case 'comms': return <CommsViewV2 initialChatId={targetChatId} onChatSelected={() => setTargetChatId(null)} />;
-            case 'logistics': return <SalesViewV2 onGoToChat={(chatId) => handleQuickAction(chatId, 'chat')} />;
+            case 'comms': return <CommsViewV2 initialChatId={targetChatId} onChatSelected={() => setTargetChatId(null)} initialSearch={globalSearch} />;
+            case 'logistics': return <SalesViewV2 onGoToChat={(chatId) => handleQuickAction(chatId, 'chat')} initialSearch={globalSearch} />;
             case 'script': return <ScriptViewV2 />;
             case 'gallery': return <GalleryViewV2 />;
             case 'settings': return <SettingsViewV2 status={status} />;
@@ -180,9 +205,9 @@ const CorporateDashboardV2 = () => {
                 title={(sidebarCollapsed && !isMobile) ? label : ''}
             >
                 <div className={`${(sidebarCollapsed && !isMobile) ? '' : 'mr-4'} transition-transform duration-300 group-hover:scale-110`}>
-                    <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 dark:text-slate-500 dark:group-hover:text-white transition-colors duration-300'}`} strokeWidth={isActive ? 2.5 : 2} />
+                    <Icon className={`w-5 h-5 2xl:w-6 2xl:h-6 ${isActive ? 'text-white' : 'text-slate-400 dark:text-slate-500 dark:group-hover:text-white transition-colors duration-300'}`} strokeWidth={isActive ? 2.5 : 2} />
                 </div>
-                {(!sidebarCollapsed || isMobile) && <span className={`font-medium ${isActive ? 'text-white font-bold tracking-wide' : 'dark:group-hover:text-white transition-colors duration-300'}`}>{label}</span>}
+                {(!sidebarCollapsed || isMobile) && <span className={`font-medium text-sm 2xl:text-base ${isActive ? 'text-white font-bold tracking-wide' : 'dark:group-hover:text-white transition-colors duration-300'}`}>{label}</span>}
             </button>
         );
     };
@@ -202,7 +227,7 @@ const CorporateDashboardV2 = () => {
             <aside className={`
                 fixed lg:sticky top-0 z-40 lg:z-20 flex flex-col h-screen bg-white/95 dark:bg-slate-900/95 lg:bg-white/70 dark:lg:bg-slate-900/70 backdrop-blur-3xl border-r border-slate-200/60 dark:border-slate-700/60 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)] dark:shadow-[4px_0_24px_-12px_rgba(0,0,0,0.5)] 
                 transition-transform duration-300 ease-in-out lg:translate-x-0
-                ${isMobile ? 'w-72 left-0 top-0 bottom-0' : (sidebarCollapsed ? 'w-20' : 'w-72')}
+                ${isMobile ? 'w-72 left-0 top-0 bottom-0' : (sidebarCollapsed ? 'w-20' : 'w-72 xl:w-80 2xl:w-[22rem]')}
                 ${isMobile && !mobileMenuOpen ? '-translate-x-full' : 'translate-x-0'}
             `}>
 
@@ -243,7 +268,7 @@ const CorporateDashboardV2 = () => {
 
                 <div className="flex-1 py-6 px-4 space-y-1 overflow-y-auto hide-scrollbar">
                     <NavItem tab="dashboard" icon={Wifi} label="Inicio" />
-                    <NavItem tab="comms" icon={MessageCircle} label="Chat & Atencion" />
+                    <NavItem tab="comms" icon={MessageCircle} label="Chat & Atención" />
                     <NavItem tab="logistics" icon={Database} label="Ventas & Logística" />
                     <NavItem tab="statistics" icon={BarChart2} label="Estadísticas" />
                     <NavItem tab="espera" icon={PhoneCall} label="Clientes Esperando" />
@@ -251,7 +276,7 @@ const CorporateDashboardV2 = () => {
                     <NavItem tab="gallery" icon={ImageIcon} label="Galería de Medios" />
 
                     <div className="pt-6 mt-6 border-t border-slate-200/50 dark:border-slate-700/50">
-                        {(!sidebarCollapsed || isMobile) && <p className="text-xs font-semibold text-slate-400 dark:text-slate-300 uppercase tracking-wider mb-4 px-4">Administración</p>}
+                        {(!sidebarCollapsed || isMobile) && <p className="text-xs 2xl:text-sm font-semibold text-slate-400 dark:text-slate-300 uppercase tracking-wider mb-4 px-4">Administración</p>}
                         <NavItem tab="settings" icon={Settings} label="Configuración" />
                     </div>
                 </div>
@@ -306,9 +331,11 @@ const CorporateDashboardV2 = () => {
                             </button>
                         )}
 
-                        <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 lg:w-2.5 lg:h-2.5 rounded-full ${status === 'ready' ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-rose-500 animate-pulse'}`}></div>
-                            <span className={`text-xs lg:text-sm font-semibold tracking-wide ${status === 'ready' ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'} whitespace-nowrap`}>
+                        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all ${status === 'ready'
+                            ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50'
+                            : 'bg-rose-50 dark:bg-rose-900/30 border-rose-300 dark:border-rose-700 shadow-md shadow-rose-500/20 animate-pulse'}`}>
+                            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${status === 'ready' ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_10px_rgba(239,68,68,0.6)]'}`}></div>
+                            <span className={`text-xs lg:text-sm font-bold tracking-wide whitespace-nowrap ${status === 'ready' ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-300'}`}>
                                 {status === 'ready' ? 'ONLINE' : 'OFFLINE'}
                             </span>
                             {status === 'ready' && connectedPhone && (
@@ -318,6 +345,22 @@ const CorporateDashboardV2 = () => {
                             )}
                         </div>
                     </div>
+
+                    {/* Global Search */}
+                    <form onSubmit={handleGlobalSearch} className="hidden lg:flex items-center flex-1 max-w-sm mx-6">
+                        <div className="relative w-full">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                            <input
+                                ref={globalSearchRef}
+                                type="text"
+                                value={globalSearch}
+                                onChange={(e) => setGlobalSearch(e.target.value)}
+                                placeholder="Buscar cliente, pedido... (Ctrl+K)"
+                                onKeyDown={(e) => { if (e.key === 'Escape') { setGlobalSearch(''); globalSearchRef.current?.blur(); } }}
+                                className="w-full pl-9 pr-4 py-1.5 text-sm bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 dark:focus:border-indigo-600 text-slate-700 dark:text-slate-200 placeholder-slate-400 transition-all"
+                            />
+                        </div>
+                    </form>
 
                     <div className="flex items-center gap-2 lg:gap-6">
                         <div className="flex items-center gap-3 pl-6">

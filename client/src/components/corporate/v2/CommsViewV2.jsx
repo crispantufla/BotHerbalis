@@ -8,11 +8,11 @@ import AiCorrectionModal from './components/AiCorrectionModal';
 
 import { Search, Bot, Play, Pause, Trash2 as Trash, FileText as ScriptIcon, ChevronDown, Send, Paperclip, ShoppingCart, ArrowLeft, Type } from 'lucide-react';
 
-const CommsViewV2 = ({ initialChatId, onChatSelected }) => {
+const CommsViewV2 = ({ initialChatId, onChatSelected, initialSearch = '' }) => {
     const { toast } = useToast();
     const [selectedChat, setSelectedChat] = useState(null);
     const [input, setInput] = useState('');
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchTerm, setSearchTerm] = useState(initialSearch);
     const [showScriptPanel, setShowScriptPanel] = useState(false);
     const [showOrdersPanel, setShowOrdersPanel] = useState(false);
     const [scriptFlow, setScriptFlow] = useState({});
@@ -325,7 +325,7 @@ Teléfono: ${phoneDisplay}`;
             <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-400/10 blur-[100px] rounded-full pointer-events-none"></div>
 
             {/* SIDEBAR: Contacts */}
-            <div className={`w-full md:w-72 lg:w-[300px] flex-shrink-0 border-r border-slate-200 dark:border-slate-800 flex-col bg-white dark:bg-slate-800 z-10 ${selectedChat ? 'hidden md:flex' : 'flex'} min-h-0`}>
+            <div className={`w-full md:w-72 lg:w-[300px] xl:w-[340px] 2xl:w-[400px] flex-shrink-0 border-r border-slate-200 dark:border-slate-800 flex-col bg-white dark:bg-slate-800 z-10 ${selectedChat ? 'hidden md:flex' : 'flex'} min-h-0`}>
                 {/* Search Header */}
                 <div className="p-5 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800">
                     <div className="relative group">
@@ -387,10 +387,10 @@ Teléfono: ${phoneDisplay}`;
                                             })()}
                                         </span>
                                     </div>
-                                    <span className={`text-[10px] font-bold font-mono mt-0.5 ${selectedChat?.id === chat.id ? 'text-indigo-100' : 'text-slate-500 dark:text-slate-400'}`}>{chat.time}</span>
+                                    <span className={`text-xs font-bold font-mono mt-0.5 flex-shrink-0 ${selectedChat?.id === chat.id ? 'text-indigo-100' : 'text-slate-500 dark:text-slate-400'}`}>{chat.time}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <p className={`text-xs truncate font-medium flex-1 ${selectedChat?.id === chat.id ? 'text-indigo-100' : 'text-slate-500 dark:text-slate-300'}`}>{chat.lastMessage?.body || 'Sin mensajes'}</p>
+                                    <p className={`text-[13px] truncate font-medium flex-1 ${selectedChat?.id === chat.id ? 'text-indigo-100' : 'text-slate-500 dark:text-slate-300'}`}>{chat.lastMessage?.body || 'Sin mensajes'}</p>
                                     {chat.unread > 0 && selectedChat?.id !== chat.id && (
                                         <span className="w-5 h-5 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-md">
                                             {chat.unread}
