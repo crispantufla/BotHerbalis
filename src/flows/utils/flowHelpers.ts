@@ -103,9 +103,10 @@ async function _pauseAndAlert(userId: string, currentState: UserState, dependenc
     const { notifyAdmin, saveState, sendMessageWithDelay, sharedState } = dependencies;
     const { isBusinessHours } = require('../../services/timeUtils');
 
-    // Pause the user (pausedUsers is a Set)
+    // Pause the user — use pauseService for DB persistence + debounce
     if (sharedState && sharedState.pausedUsers) {
-        sharedState.pausedUsers.add(userId);
+        const { pauseUser } = require('../../services/pauseService');
+        await pauseUser(userId, reason, { sharedState });
         saveState(userId);
     }
 

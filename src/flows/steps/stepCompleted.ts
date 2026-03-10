@@ -93,7 +93,8 @@ export async function handleCompleted(
     if (postSaleAI.extractedData === 'TRACKING_INFO') {
         logger.info(`[POST-SALE] Customer ${userId} is asking for tracking/shipping info. Auto-pausing silently.`);
         if (dependencies.sharedState?.pausedUsers) {
-            dependencies.sharedState.pausedUsers.add(userId);
+            const { pauseUser } = require('../../services/pauseService');
+            await pauseUser(userId, '📦 Consulta de tracking post-venta', { sharedState: dependencies.sharedState });
         }
         if (dependencies.notifyAdmin) {
             await dependencies.notifyAdmin('📦 Consulta de Código/Envío', userId, `El cliente post-venta preguntó por su envío.\n\nMensaje original: "${text}"\n\nEl bot se silenció automáticamente para que le respondas.`);

@@ -117,7 +117,8 @@ export async function processSalesFlow(
                         );
                     }
                     if (dependencies.sharedState?.pausedUsers) {
-                        dependencies.sharedState.pausedUsers.add(userId);
+                        const { pauseUser } = require('../services/pauseService');
+                        await pauseUser(userId, '🔀 Redirigido a otro bot (cross-bot)', { sharedState: dependencies.sharedState });
                     }
                     userState[userId].step = 'cross_bot_redirected';
                     saveState(userId);

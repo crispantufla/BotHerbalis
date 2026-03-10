@@ -147,7 +147,8 @@ export async function handleAdminCommand(
         const actualTarget = targetChatId || sharedState.lastAlertUser;
         if (!actualTarget) return 'No pending user.';
 
-        sharedState.pausedUsers.add(actualTarget);
+        const { pauseUser: pauseUserFn } = require('./pauseService');
+        await pauseUserFn(actualTarget, '⏸️ Admin tomó control ("me encargo")', { sharedState });
         if (sharedState.saveState) sharedState.saveState();
         if (sharedState.io) sharedState.io.emit('bot_status_change', { chatId: actualTarget, paused: true });
 
@@ -240,7 +241,8 @@ export async function handleAdminCommand(
                 if (sharedState.logAndEmit) sharedState.logAndEmit(actualTarget, 'admin', suggestion, 'admin_instruction');
 
                 if (sharedState.pausedUsers.has(actualTarget)) {
-                    sharedState.pausedUsers.delete(actualTarget);
+                    const { unpauseUser: unpauseUserFn } = require('./pauseService');
+                    await unpauseUserFn(actualTarget, sharedState);
                 }
 
                 _dismissAlert(actualTarget, sharedState);
