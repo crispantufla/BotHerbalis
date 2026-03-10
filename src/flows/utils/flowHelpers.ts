@@ -68,7 +68,7 @@ function _detectPostdatado(normalizedText: string): string | null {
     }
 
     // Must have delivery/payment action context
-    const hasActionContext = /\b(recibir|recibirlo|llega|llegue|enviar|enviame|envialo|mandalo|mandame|entregar|cobro|depositan|sueldo|pago|puedo|para el|a partir|no puedo ahora)\b/i.test(normalizedText);
+    const hasActionContext = /\b(recibir|recibirlo|llega|llegue|enviar|enviame|envialo|mandalo|mandame|entregar|cobro|depositan|sueldo|pago|puedo|pueden|venir|mandar|no tengo|para el|a partir|no puedo ahora)\b/i.test(normalizedText);
     if (!hasActionContext) return null;
 
     // Extract clean date portion (most specific patterns first)

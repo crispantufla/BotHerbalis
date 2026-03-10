@@ -198,7 +198,8 @@ export async function handleWaitingData(
     }
 
     // Solo disparamos el AI Fallback de objeciones/dudas si el usuario NO proporcionó datos válidos
-    if (isDataQuestionOrEmotion && !hasValidAddressData && (!looksLikeAddress || isVeryLongMessage)) {
+    // isPaymentTiming always takes priority — "el 22" is a date, not a street number
+    if (isDataQuestionOrEmotion && !hasValidAddressData && (!looksLikeAddress || isVeryLongMessage || isPaymentTiming || isDeliveryTimingRequest)) {
         logger.info(`[AI-FALLBACK] waiting_data: Detected question/objection or long emotional text from ${userId}: "${text}"`);
 
         let aiGoal = "";

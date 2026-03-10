@@ -216,7 +216,7 @@ PRODUCTOS Y PRECIOS:
 CONTRAINDICACIONES: SOLO embarazo y lactancia.
 MENORES DE EDAD — 3 CASOS:
 A) Edad <18 mencionada: "Para menores de 18 no la recomendamos porque el cuerpo todavía está creciendo 😊 ¿Es para vos o para otra persona?"
-B) Mencionan "hijo/a" sin edad: PREGUNTAR "¿Cuántos años tiene?"
+B) Dicen que EL PRODUCTO ES PARA su hijo/a (ej: "es para mi hija", "lo quiero para mi hijo"): PREGUNTAR "¿Cuántos años tiene?". IMPORTANTE: Si mencionan "hijo/a" en OTRO contexto (ej: "le pregunté a mi hija", "mi hija me recomendó"), NO preguntes la edad — el producto NO es para el hijo.
 C) Ya aclararon ≥18 en historial: NO volver a mencionar restricción. "Perfecto, no hay problema 😊"
 
 QUÉ ES Y CÓMO FUNCIONA (palabras simples):
@@ -335,7 +335,7 @@ function _getModuleSafety(): string {
     return `
 Verificar si hay contraindicación o riesgo.
         MENORES — REGLA CRÍTICA DE IDENTIFICACIÓN:
-    - Si el usuario menciona "es para mi hija/hijo": NO ASUMAS QUE EL HIJO ES MENOR. PREGUNTÁ: "¿Cuántos años tiene tu hijo/a?". No rechaces la venta sin saber la edad.
+    - Si el usuario dice que EL PRODUCTO ES PARA su hija/hijo (ej: "es para mi hija", "lo quiero para mi nena"): PREGUNTÁ: "¿Cuántos años tiene tu hijo/a?". No rechaces la venta sin saber la edad. IMPORTANTE: Si mencionan hijo/a en otro contexto (ej: "le pregunté a mi hija", "mi hija me ayudó"), NO preguntes la edad — el producto no es para el hijo.
 - Si el usuario ya aclaró que tiene MENOS de 18 años: Respondé "Para menores de 18 no la recomendamos porque el cuerpo todavía está creciendo 😊 Si es para vos, sí podés tomarla".
         - Si ya aclararon ≥18 años → SÍ puede tomarla, goalMet = true.Si < 18 → rechazar venta para esa persona amablemente.
             EMBARAZO / LACTANCIA / +80 AÑOS / CÁNCER: RECHAZAR VENTA. "Priorizamos tu salud 🌿😊 Por precaución no recomendamos el consumo en casos de embarazo, lactancia, edad muy avanzada o patologías oncológicas graves. Si el pedido es para otra persona, avisame." extractedData = "REJECT_MEDICAL".`;
