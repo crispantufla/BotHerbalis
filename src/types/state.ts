@@ -78,11 +78,15 @@ export interface UserState {
     staleAlerted?: boolean;
     reengagementSent?: boolean;
     cartRecovered?: boolean;
+    secondFollowUpSent?: boolean;
     lastInteraction?: number;
     lastActivityAt?: number;
 
     // Objeto usado cuando el pedido está listo para guardarse
     pendingOrder?: Address & { cart: CartItem[] } | null;
+
+    // Funnel analytics
+    funnelLog?: { step: string; enteredAt: number; exitedAt?: number }[];
 
     // Flags de estados especiales del cliente
     hasSoldBefore?: boolean;         // true si ya se concretó al menos una venta exitosa

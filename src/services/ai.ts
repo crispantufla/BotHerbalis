@@ -116,13 +116,17 @@ export interface AIParsedResponse {
 
 // --- CONFIGURATION ---
 const MODEL = "gpt-4o-mini";
-const MAX_RETRIES = 5;
+const MAX_RETRIES = 3;
 const MAX_HISTORY_LENGTH = 50;
 
 // --- RATE LIMIT CONFIGURATION ---
 const MAX_CONCURRENT = 3;
 const MIN_DELAY_MS = 200;
 const CACHE_TTL_SECONDS = 45 * 60; // 45 min cache for node-cache
+
+// --- CIRCUIT BREAKER ---
+const CIRCUIT_BREAKER_THRESHOLD = 3;   // consecutive failures to open circuit
+const CIRCUIT_BREAKER_RESET_MS = 30_000; // 30s cooldown before retrying
 
 // --- PRICES PATH ---
 const PRICES_PATH = path.join(__dirname, '../../data/prices.json');
@@ -394,7 +398,8 @@ class AIService {
     client: OpenAI;
     model: string;
     cache: NodeCache;
-    stats: { calls: number, cached: number, retries: number, errors: number };
+    stats: { calls: number, cached: number, retries: number, errors: number, promptTokens: number, completionTokens: number, estimatedCostUSD: number };
+    _circuitBreaker: { failures: number, openUntil: number };
 
     constructor() {
         const apiKey = process.env.OPENAI_API_KEY || "";
@@ -404,10 +409,11 @@ class AIService {
 
         logger.info(`📡[AI] Initializing OpenAI(model: ${MODEL})`);
 
-        this.client = new OpenAI({ apiKey, timeout: 30_000 });
+        this.client = new OpenAI({ apiKey, timeout: 15_000 });
         this.model = MODEL;
         this.cache = new NodeCache({ stdTTL: CACHE_TTL_SECONDS, checkperiod: 120, maxKeys: 1000 });
-        this.stats = { calls: 0, cached: 0, retries: 0, errors: 0 };
+        this.stats = { calls: 0, cached: 0, retries: 0, errors: 0, promptTokens: 0, completionTokens: 0, estimatedCostUSD: 0 };
+        this._circuitBreaker = { failures: 0, openUntil: 0 };
     }
 
     /**
@@ -439,6 +445,13 @@ class AIService {
         }
         this.stats.calls++;
 
+        // Circuit breaker: if open, fail fast
+        const now = Date.now();
+        if (this._circuitBreaker.failures >= CIRCUIT_BREAKER_THRESHOLD && now < this._circuitBreaker.openUntil) {
+            this.stats.errors++;
+            throw new Error("AI Service Unavailable (Circuit Breaker Open)");
+        }
+
         let result: T | undefined;
         let success = false;
 
@@ -446,6 +459,7 @@ class AIService {
             try {
                 result = await apiCallFn();
                 success = true;
+                this._circuitBreaker.failures = 0; // Reset on success
                 break;
             } catch (e: any) {
                 const status = e.status || e.statusCode;
@@ -464,7 +478,20 @@ class AIService {
 
         if (!success || result === undefined) {
             this.stats.errors++;
-            throw new Error("AI Service Unavailable (Max Retries Exceeded or Unhandled Error)");
+            this._circuitBreaker.failures++;
+            if (this._circuitBreaker.failures >= CIRCUIT_BREAKER_THRESHOLD) {
+                this._circuitBreaker.openUntil = Date.now() + CIRCUIT_BREAKER_RESET_MS;
+                logger.warn(`⚠️[AI] Circuit breaker OPEN — ${CIRCUIT_BREAKER_THRESHOLD} consecutive failures. Cooling down ${CIRCUIT_BREAKER_RESET_MS / 1000}s.`);
+            }
+            throw new Error("AI Service Unavailable (Max Retries Exceeded)");
+        }
+
+        // Track token usage (gpt-4o-mini: $0.15/1M input, $0.60/1M output)
+        const usage = (result as any)?.usage;
+        if (usage) {
+            this.stats.promptTokens += usage.prompt_tokens || 0;
+            this.stats.completionTokens += usage.completion_tokens || 0;
+            this.stats.estimatedCostUSD += ((usage.prompt_tokens || 0) * 0.00000015) + ((usage.completion_tokens || 0) * 0.0000006);
         }
 
         // Cache the result
@@ -606,7 +633,7 @@ INSTRUCCIONES:
                     temperature: 0.6,
                     max_tokens: 1500
                 }),
-                `chat_${systemPrompt.length}_${userPrompt}` // Caché activo para FAQs y etapas repetitivas
+                `chat_${systemPrompt}_${userPrompt}` // Caché activo para FAQs y etapas repetitivas
             );
 
             const toolCalls = result.choices[0].message?.tool_calls;
@@ -626,32 +653,20 @@ INSTRUCCIONES:
     }
 
     /**
-     * Check if history needs summarization
+     * Check if history needs summarization.
+     * Triggers when history exceeds 80 messages — summarizes the oldest and keeps the last 50.
      */
     async checkAndSummarize(history: any[]): Promise<{ summary: string; prunedHistory: any[] } | null> {
-        if (!history || history.length <= 50) return null;
+        if (!history || history.length <= 80) return null;
 
-        const now = Date.now();
-
-        // Find how many messages are within the last 3 days
-        const recentMessages = history.filter(msg => {
-            if (!msg.timestamp) return false;
-            return differenceInDays(now, msg.timestamp) <= 3;
-        });
-
-        const messagesToKeepCount = Math.max(50, recentMessages.length);
-
-        // Only summarize if history exceeds the target bounds
-        if (history.length > messagesToKeepCount) {
-            logger.info(`[AI] Summarizing history(${history.length} messages down to ${messagesToKeepCount})...`);
-            const summary = await this._callQueuedSummarize(history);
-            if (summary) {
-                logger.info(`[AI] Summary created: "${summary.substring(0, 50)}..."`);
-                return {
-                    summary: summary,
-                    prunedHistory: history.slice(-messagesToKeepCount)
-                };
-            }
+        logger.info(`[AI] Summarizing history (${history.length} messages down to ${MAX_HISTORY_LENGTH})...`);
+        const summary = await this._callQueuedSummarize(history.slice(0, -MAX_HISTORY_LENGTH));
+        if (summary) {
+            logger.info(`[AI] Summary created: "${summary.substring(0, 50)}..."`);
+            return {
+                summary,
+                prunedHistory: history.slice(-MAX_HISTORY_LENGTH)
+            };
         }
         return null;
     }

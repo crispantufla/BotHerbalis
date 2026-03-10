@@ -85,6 +85,11 @@ const GENERIC_FOLLOW_UPS = [
     '¡Hola! Vi que quedaste a medio camino. ¿Te puedo ayudar con algo? 😊'
 ];
 
+const SECOND_FOLLOW_UP_MESSAGES = [
+    'Solo te aviso que tu consulta sigue activa. Cualquier cosa, escribime 😊',
+    '¡Hola! Tu consulta sigue abierta por si querés retomar. Sin compromiso 👋'
+];
+
 // ══════════════════════════════════════════════════════════════
 // TASK FUNCTIONS (unchanged logic, now called by cron instead of setInterval)
 // ══════════════════════════════════════════════════════════════
@@ -250,7 +255,11 @@ async function checkAbandonedCarts(sharedState: SchedulerSharedState, dependenci
         if (hours > ABANDONED_CART_MIN_HOURS && hours < ABANDONED_CART_MAX_HOURS) {
             logger.info(`[SCHEDULER] Abandoned cart detected: ${userId} inactive for ${hours}h on "${state.step}"`);
 
-            const msg = 'Hola, ¿te quedó alguna duda con los planes? Avisame que te guardo la promo con envío gratis.';
+            // Use step-specific message instead of generic one
+            const stepMessages = CONTEXTUAL_FOLLOW_UPS[state.step];
+            const msg = stepMessages && stepMessages.length > 0
+                ? stepMessages[Math.floor(Math.random() * stepMessages.length)]
+                : 'Hola, ¿te quedó alguna duda? Avisame que te ayudo a terminar 😊';
             try {
                 await sendMessageWithDelay(userId, msg);
                 state.history = state.history || [];
@@ -259,6 +268,42 @@ async function checkAbandonedCarts(sharedState: SchedulerSharedState, dependenci
                 saveState();
             } catch (e: any) {
                 logger.error(`[SCHEDULER] Failed to send abandoned cart message to ${userId}:`, e.message);
+            }
+        }
+    }
+}
+
+/**
+ * checkSecondFollowUp — Soft second touch for users who got one follow-up but didn't respond (48-72h)
+ */
+async function checkSecondFollowUp(sharedState: SchedulerSharedState, dependencies: SchedulerDependencies): Promise<void> {
+    const { userState, pausedUsers } = sharedState;
+    const { sendMessageWithDelay, saveState } = dependencies;
+    const now = Date.now();
+
+    for (const [userId, state] of Object.entries(userState)) {
+        if (!RE_ENGAGEABLE_STEPS.has(state.step)) continue;
+        if (!isBusinessHours()) continue;
+        if (pausedUsers && pausedUsers.has(userId)) continue;
+        if (state.secondFollowUpSent) continue;
+        // Only target users who already got a first follow-up
+        if (!state.reengagementSent && !state.cartRecovered) continue;
+
+        const lastActivity = state.lastActivityAt || state.stepEnteredAt;
+        if (!lastActivity) continue;
+
+        const hours = differenceInHours(now, lastActivity);
+        if (hours >= 48 && hours < 72) {
+            const msg = SECOND_FOLLOW_UP_MESSAGES[Math.floor(Math.random() * SECOND_FOLLOW_UP_MESSAGES.length)];
+            try {
+                await sendMessageWithDelay(userId, msg);
+                state.history = state.history || [];
+                state.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+                state.secondFollowUpSent = true;
+                saveState();
+                logger.info(`[SCHEDULER] Second follow-up sent to ${userId} (${hours}h inactive on "${state.step}")`);
+            } catch (e: any) {
+                logger.error(`[SCHEDULER] Failed to send second follow-up to ${userId}:`, e.message);
             }
         }
     }
@@ -375,10 +420,17 @@ function startScheduler(sharedState: SchedulerSharedState, dependencies: Schedul
     }, { timezone: TIMEZONE });
     logger.info('[SCHEDULER] ✅ checkAbandonedCarts → cada hora de 10 a 21 ARG');
 
+    // ── SECOND FOLLOW-UP: a las 14:00 Argentina ──
+    // Segundo toque suave para usuarios que ya recibieron un follow-up pero no respondieron (48-72h).
+    cron.schedule('0 14 * * *', () => {
+        checkSecondFollowUp(sharedState, dependencies);
+    }, { timezone: TIMEZONE });
+    logger.info('[SCHEDULER] ✅ checkSecondFollowUp → 14:00 ARG (diario)');
+
     // ── DAILY STATS SNAPSHOT: a las 23:55 Argentina ──
     // Guarda el total de chats en BD antes de perderlos por rotación.
     cron.schedule('55 23 * * *', () => {
-        snapshotDailyStats();
+        snapshotDailyStats(sharedState);
     }, { timezone: TIMEZONE });
     logger.info('[SCHEDULER] ✅ snapshotDailyStats → 23:55 ARG (diario)');
 
@@ -434,7 +486,7 @@ function startScheduler(sharedState: SchedulerSharedState, dependencies: Schedul
  * Saves the total number of chats to the database before the daily cleanup
  * so we don't lose the metrics for the dashboard's historical chart.
  */
-async function snapshotDailyStats() {
+async function snapshotDailyStats(sharedState?: SchedulerSharedState) {
     try {
         const { prisma } = require('../../db');
         const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
@@ -450,6 +502,16 @@ async function snapshotDailyStats() {
             where: { createdAt: { gte: startOfDay }, instanceId: INSTANCE_ID, status: { not: 'Cancelado' } }
         });
 
+        // Count users at each step for funnel analytics
+        let stepCounts: string | undefined;
+        if (sharedState?.userState) {
+            const counts: Record<string, number> = {};
+            for (const state of Object.values(sharedState.userState)) {
+                if (state.step) counts[state.step] = (counts[state.step] || 0) + 1;
+            }
+            stepCounts = JSON.stringify(counts);
+        }
+
         await prisma.dailyStats.upsert({
             where: { instanceId_date: { instanceId: INSTANCE_ID, date: startOfDay } },
             create: {
@@ -457,12 +519,14 @@ async function snapshotDailyStats() {
                 date: startOfDay,
                 totalChats: totalUsers,
                 completedOrders: todayStats._count,
-                totalRevenue: todayStats._sum.totalPrice || 0
+                totalRevenue: todayStats._sum.totalPrice || 0,
+                ...(stepCounts && { stepCounts })
             },
             update: {
                 totalChats: { set: totalUsers },
                 completedOrders: { set: todayStats._count },
-                totalRevenue: { set: todayStats._sum.totalPrice || 0 }
+                totalRevenue: { set: todayStats._sum.totalPrice || 0 },
+                ...(stepCounts && { stepCounts: { set: stepCounts } })
             }
         });
         logger.info(`[SCHEDULER] Daily Stats Snapshot saved for ${startOfDay.toISOString()}`);

@@ -101,9 +101,11 @@ export async function unpauseUser(userId: string, sharedState: { pausedUsers: Se
     }
 }
 
+const STALE_PAUSE_DAYS = 7;
+
 /**
- * On server startup: restore paused users from DB into in-memory Set.
- * Call this once after initializing sharedState.
+ * On server startup: restore recently-paused users from DB into in-memory Set.
+ * Users paused more than STALE_PAUSE_DAYS ago are skipped and cleaned from DB.
  */
 export async function restorePausedUsersFromDB(
     sharedState: { pausedUsers: Set<string> }
@@ -112,19 +114,24 @@ export async function restorePausedUsersFromDB(
         const { prisma } = require('../../db');
         const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
 
-        const pausedUsers = await prisma.user.findMany({
-            where: { instanceId: INSTANCE_ID, pausedAt: { not: null } },
-            select: { phone: true }
-        });
+        const cutoff = new Date(Date.now() - STALE_PAUSE_DAYS * 24 * 60 * 60 * 1000);
 
-        let count = 0;
-        for (const u of pausedUsers) {
-            const whatsappId = `${u.phone}@c.us`;
-            sharedState.pausedUsers.add(whatsappId);
-            count++;
+        const [recent, stale] = await Promise.all([
+            prisma.user.findMany({
+                where: { instanceId: INSTANCE_ID, pausedAt: { gte: cutoff } },
+                select: { phone: true }
+            }),
+            prisma.user.updateMany({
+                where: { instanceId: INSTANCE_ID, pausedAt: { not: null, lt: cutoff } },
+                data: { pausedAt: null, pauseReason: null }
+            })
+        ]);
+
+        for (const u of recent) {
+            sharedState.pausedUsers.add(`${u.phone}@c.us`);
         }
 
-        logger.info(`[PAUSE-SERVICE] Restored ${count} paused user(s) from DB on startup.`);
+        logger.info(`[PAUSE-SERVICE] Restored ${recent.length} paused user(s) from DB on startup. Cleared ${stale.count} stale (>${STALE_PAUSE_DAYS}d).`);
     } catch (err: any) {
         logger.error(`[PAUSE-SERVICE] Failed to restore paused users: ${err?.message || String(err)}`);
     }

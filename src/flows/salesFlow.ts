@@ -219,6 +219,11 @@ export async function processSalesFlow(
     // Safety fallback for empty history
     if (!currentState.history) currentState.history = [];
 
+    // Defensive cap: prevent unbounded history growth
+    if (currentState.history.length > 200) {
+        currentState.history = currentState.history.slice(-100);
+    }
+
     // Save User message and update activity timestamp
     currentState.history.push({ role: 'user', content: text, timestamp: Date.now() });
     currentState.lastActivityAt = Date.now();

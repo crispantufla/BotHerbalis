@@ -277,5 +277,46 @@ module.exports = (client, sharedState) => {
         }
     });
 
+    // GET /analytics/funnel - Step-by-step funnel snapshot from DailyStats
+    router.get('/analytics/funnel', authMiddleware, async (req, res) => {
+        try {
+            const days = parseInt(req.query.days) || 7;
+            const instanceId = req.query.instanceId || process.env.INSTANCE_ID || 'default';
+            const since = new Date();
+            since.setDate(since.getDate() - days);
+            since.setHours(0, 0, 0, 0);
+
+            const snapshots = await prisma.dailyStats.findMany({
+                where: { instanceId, date: { gte: since }, stepCounts: { not: null } },
+                select: { date: true, stepCounts: true },
+                orderBy: { date: 'asc' }
+            });
+
+            // Aggregate step counts across the period
+            const aggregated = {};
+            for (const snap of snapshots) {
+                try {
+                    const counts = JSON.parse(snap.stepCounts);
+                    for (const [step, count] of Object.entries(counts)) {
+                        aggregated[step] = (aggregated[step] || 0) + count;
+                    }
+                } catch {}
+            }
+
+            // Also include live snapshot from current in-memory state
+            const liveStepCounts = {};
+            if (sharedState?.userState) {
+                for (const state of Object.values(sharedState.userState)) {
+                    if (state.step) liveStepCounts[state.step] = (liveStepCounts[state.step] || 0) + 1;
+                }
+            }
+
+            res.json({ period: snapshots.map(s => ({ date: s.date, stepCounts: JSON.parse(s.stepCounts || '{}') })), aggregated, live: liveStepCounts });
+        } catch (e) {
+            logger.error("🔴 [ANALYTICS] Error in /funnel:", e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     return router;
 };

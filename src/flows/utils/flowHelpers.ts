@@ -17,8 +17,15 @@ function _cleanPhone(userId: string): string {
  */
 function _setStep(state: any, newStep: string) {
     if (state.step !== newStep) {
+        // Log funnel transition
+        if (!state.funnelLog) state.funnelLog = [];
+        if (state.step && state.stepEnteredAt) {
+            state.funnelLog.push({ step: state.step, enteredAt: state.stepEnteredAt, exitedAt: Date.now() });
+        }
         state.staleAlerted = false;
         state.reengagementSent = false;
+        state.secondFollowUpSent = false;
+        state.cartRecovered = false;
     }
     state.step = newStep;
     state.stepEnteredAt = Date.now();

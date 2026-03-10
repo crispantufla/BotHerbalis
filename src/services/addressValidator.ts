@@ -54,6 +54,34 @@ const CP_PROVINCES: CPRange[] = [
     { min: 9000, max: 9999, province: 'Chubut / Santa Cruz / Tierra del Fuego' },
 ];
 
+// Common Argentine cities → CP lookup (top ~50 cities by population)
+const CITY_CP_MAP: Record<string, string> = {
+    'caba': '1000', 'capital federal': '1000', 'buenos aires': '1000', 'ciudad de buenos aires': '1000',
+    'la plata': '1900', 'mar del plata': '7600', 'bahia blanca': '8000', 'tandil': '7000', 'quilmes': '1878', 'lomas de zamora': '1832', 'avellaneda': '1870', 'lanus': '1824', 'moron': '1708', 'san isidro': '1642', 'tigre': '1648',
+    'cordoba': '5000', 'villa carlos paz': '5152', 'rio cuarto': '5800',
+    'rosario': '2000', 'santa fe': '3000', 'rafaela': '2300', 'venado tuerto': '2600',
+    'mendoza': '5500', 'san rafael': '5600', 'godoy cruz': '5501',
+    'tucuman': '4000', 'san miguel de tucuman': '4000',
+    'salta': '4400', 'san salvador de jujuy': '4600', 'jujuy': '4600',
+    'neuquen': '8300', 'san carlos de bariloche': '8400', 'bariloche': '8400',
+    'comodoro rivadavia': '9000', 'trelew': '9100', 'rawson': '9103',
+    'rio gallegos': '9400', 'ushuaia': '9410',
+    'posadas': '3300', 'resistencia': '3500', 'corrientes': '3400', 'formosa': '3600',
+    'parana': '3100', 'concordia': '3200',
+    'san juan': '5400', 'san luis': '5700', 'la rioja': '5300', 'catamarca': '4700',
+    'santiago del estero': '4200', 'santa rosa': '6300', 'viedma': '8500',
+    'rio grande': '9420', 'cipolletti': '8324', 'general roca': '8332',
+};
+
+/**
+ * Suggest a CP based on city name. Returns null if city not found in lookup.
+ */
+export function suggestCPByCity(city: string | null | undefined): string | null {
+    if (!city) return null;
+    const normalized = city.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    return CITY_CP_MAP[normalized] || null;
+}
+
 export function validateCP(cp: string | number | null | undefined): CPValidationResult {
     if (!cp) return { valid: false, province: null, error: 'No se proporcionó código postal' };
 
@@ -161,4 +189,4 @@ export async function validateAddress(addr: Address): Promise<AddressValidationR
     return result;
 }
 
-module.exports = { validateCP, validateWithGoogleMaps, validateAddress };
+module.exports = { validateCP, validateWithGoogleMaps, validateAddress, suggestCPByCity };

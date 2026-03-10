@@ -1,5 +1,5 @@
 import { UserState, FlowStep } from '../../types/state';
-const { validateAddress } = require('../../services/addressValidator');
+const { validateAddress, suggestCPByCity } = require('../../services/addressValidator');
 const { buildConfirmationMessage } = require('../../utils/messageTemplates');
 const { _setStep, _pauseAndAlert, _detectProductPlanChange, _resolveNewProductPlan, _detectPostdatado } = require('../utils/flowHelpers');
 const { _getPrice, _getAdicionalMAX } = require('../utils/pricing');
@@ -327,7 +327,7 @@ export async function handleWaitingData(
     // give the AI a chance to respond before pausing. This catches FAQ questions, product doubts,
     // location questions, etc. that slip past the keyword whitelist above.
     const hasAddressPatterns = /\d/.test(text) || /\b(calle|av|avenida|barrio|mz|lote|piso|dpto|depto|departamento|casa|block|manzana|localidad|provincia|pcia|código postal|codigo postal)\b/i.test(text);
-    if (!madeProgress && currentState.addressAttempts >= 1 && !hasAddressPatterns) {
+    if (!madeProgress && currentState.addressAttempts >= 2 && !hasAddressPatterns) {
         logger.info(`[AI-SAFETY-NET] waiting_data: Message doesn't look like address for ${userId}: "${text}". Trying AI fallback before pausing.`);
         const safetyGoal = `El usuario NO está dando datos de envío, sino que hace una pregunta o comentario. Respondé su pregunta con empatía usando el Knowledge. Si pregunta sobre la función del producto o qué hace: "La Nuez de la India ayuda a acompañar el proceso natural del cuerpo para eliminar excesos. Muchas personas notan menos hinchazón, más liviandad y un descenso progresivo de peso. Es un apoyo natural para sentirte mejor sin métodos agresivos." Si pregunta sobre dieta/comidas/si tiene que cuidarse: "La Nuez de la India puede utilizarse sin hacer dietas estrictas, porque ayuda a acompañar el proceso natural del metabolismo. Obviamente, si además cuidás un poco la alimentación o sumás algo de movimiento, los resultados suelen verse más rápido." Si pregunta dónde queda la oficina/local/de dónde son: "Somos Herbalis, una empresa internacional especializada en productos naturales a base de Nuez de la India. Nuestra central está en Barcelona (España) y en Argentina distribuimos desde Rosario. NO tenemos revendedores. Hace 13 años enviamos a todo el país por Correo Argentino, con envío sin costo y la posibilidad de pago al recibir." Si pregunta por contraindicaciones: "Es 100% natural. Las únicas contraindicaciones son embarazo y lactancia." Si pregunta sobre envíos o si tienen día especial: "Los envíos se realizan cuanto antes, sin día especial. Tardan aproximadamente 10 días hábiles." Si pregunta formas de pago: "El pago es únicamente en efectivo, ya sea cuando recibís en tu domicilio o si retirás en la sucursal del correo. No pedimos pagos por adelantado ni datos bancarios." Para CUALQUIER OTRA pregunta, respondé con naturalidad usando el Knowledge. Al final, cerrá sutilmente retomando los datos de envío: "¿Te paso a tomar los datos para el envío?" o "¿Me pasás los datos de envío?".`;
         try {
@@ -355,12 +355,22 @@ export async function handleWaitingData(
     }
 
     // Original pause for messages that DO look like address attempts but failed
-    if (!madeProgress && currentState.addressAttempts >= 1) {
+    if (!madeProgress && currentState.addressAttempts >= 2) {
         await _pauseAndAlert(userId, currentState, dependencies, text, 'La IA no pudo procesar correctamente los datos ingresados en el primer intento.');
         return { matched: true };
     }
 
     const addr = currentState.partialAddress;
+
+    // Auto-suggest CP from city if city is known but CP is missing
+    if (addr.ciudad && !addr.cp) {
+        const suggestedCP = suggestCPByCity(addr.ciudad);
+        if (suggestedCP) {
+            addr.cp = suggestedCP;
+            logger.info(`[ADDRESS] Auto-suggested CP ${suggestedCP} for city "${addr.ciudad}" (user ${userId})`);
+        }
+    }
+
     const missing = [];
     const missingTier1 = [];
     if (!addr.nombre) missingTier1.push('Nombre y Apellido');
@@ -385,7 +395,7 @@ export async function handleWaitingData(
             let shouldEscalate = false;
             for (const field of criticalMissing) {
                 currentState.fieldReaskCount[field] = (currentState.fieldReaskCount[field] || 0) + 1;
-                if (currentState.fieldReaskCount[field] >= 2) shouldEscalate = true;
+                if (currentState.fieldReaskCount[field] >= 3) shouldEscalate = true;
             }
 
             if (shouldEscalate) {

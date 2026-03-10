@@ -80,7 +80,8 @@ model DailyStats {
   totalChats      Int      // Encompasses total users/chats in memory before clearing
   completedOrders Int      // Number of completed orders for the day
   totalRevenue    Float    // Total revenue for the day
-  
+  stepCounts      String?  // JSON: users per step at snapshot time (funnel analytics)
+
   createdAt       DateTime @default(now())
 
   @@unique([instanceId, date])
