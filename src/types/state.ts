@@ -24,6 +24,7 @@ export enum FlowStep {
 export interface Address {
     nombre?: string | null;
     calle?: string | null;
+    calleOriginal?: string | null;
     ciudad?: string | null;
     provincia?: string | null;
     cp?: string | null;

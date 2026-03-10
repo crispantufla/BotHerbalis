@@ -32,6 +32,7 @@ const SalesViewV2 = ({ onGoToChat, initialSearch = '' }) => {
     // Tracking State
     const [isTracking, setIsTracking] = useState(false);
     const [trackingData, setTrackingData] = useState(null);
+    const [showOriginalAddress, setShowOriginalAddress] = useState(false);
 
     const startDetailEdit = (order) => {
         setDetailEditData({
@@ -646,7 +647,7 @@ Teléfono: ${phoneDisplay}`;
                                             </span>
                                         )}
                                     </div>
-                                    <div className={`bg-slate-50 dark:bg-slate-800 rounded-2xl p-5 border ${isDetailEditing ? 'border-indigo-200 dark:border-indigo-500/50' : 'border-slate-100 dark:border-slate-700'} h-[calc(100%-28px)] flex flex-col justify-center`}>
+                                    <div className={`bg-slate-50 dark:bg-slate-800 rounded-2xl p-5 border ${isDetailEditing ? 'border-indigo-200 dark:border-indigo-500/50' : 'border-slate-100 dark:border-slate-700'} h-[calc(100%-28px)] flex flex-col justify-center relative`}>
                                         {isDetailEditing ? (
                                             <>
                                                 <input type="text" value={detailEditData.calle || ''} onChange={e => handleDetailField('calle', e.target.value)} className="w-full font-bold text-slate-700 dark:text-slate-200 text-base bg-white dark:bg-slate-700 rounded-lg px-3 py-2 border border-slate-200 dark:border-slate-600 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none mb-2" placeholder="Calle y número" />
@@ -658,8 +659,35 @@ Teléfono: ${phoneDisplay}`;
                                             </>
                                         ) : (
                                             <>
-                                                <p className="font-bold text-slate-700 dark:text-slate-200 text-base leading-relaxed">{viewingOrder.calle || 'Sin domicilio'}</p>
-                                                <p className="font-medium text-slate-600 dark:text-slate-400 text-sm mt-1">{viewingOrder.ciudad || 'Sin ciudad'} <span className="text-slate-400 dark:text-slate-500 ml-1">(CP: {viewingOrder.cp || '—'})</span></p>
+                                                {/* Toggle button: show original address */}
+                                                {viewingOrder.calleOriginal && viewingOrder.calleOriginal !== viewingOrder.calle && (
+                                                    <button
+                                                        onClick={() => setShowOriginalAddress(!showOriginalAddress)}
+                                                        className={`absolute top-3 right-3 px-2 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all border shadow-sm ${
+                                                            showOriginalAddress
+                                                                ? 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100'
+                                                                : 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'
+                                                        }`}
+                                                        title={showOriginalAddress ? 'Ver dirección corregida por Maps' : 'Ver dirección original del cliente'}
+                                                    >
+                                                        {showOriginalAddress ? '📍 Maps' : '✏️ Original'}
+                                                    </button>
+                                                )}
+                                                {showOriginalAddress && viewingOrder.calleOriginal ? (
+                                                    <>
+                                                        <p className="font-bold text-amber-700 dark:text-amber-400 text-base leading-relaxed pr-20">{viewingOrder.calleOriginal}</p>
+                                                        <p className="font-medium text-amber-600/70 dark:text-amber-500/70 text-[10px] mt-1 uppercase tracking-wider">Dirección original del cliente</p>
+                                                        <p className="font-medium text-slate-600 dark:text-slate-400 text-sm mt-1">{viewingOrder.ciudad || 'Sin ciudad'} <span className="text-slate-400 dark:text-slate-500 ml-1">(CP: {viewingOrder.cp || '—'})</span></p>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <p className={`font-bold text-slate-700 dark:text-slate-200 text-base leading-relaxed ${viewingOrder.calleOriginal && viewingOrder.calleOriginal !== viewingOrder.calle ? 'pr-20' : ''}`}>{viewingOrder.calle || 'Sin domicilio'}</p>
+                                                        {viewingOrder.calleOriginal && viewingOrder.calleOriginal !== viewingOrder.calle && (
+                                                            <p className="font-medium text-emerald-600/70 dark:text-emerald-500/70 text-[10px] mt-1 uppercase tracking-wider">✓ Verificada por Google Maps</p>
+                                                        )}
+                                                        <p className="font-medium text-slate-600 dark:text-slate-400 text-sm mt-1">{viewingOrder.ciudad || 'Sin ciudad'} <span className="text-slate-400 dark:text-slate-500 ml-1">(CP: {viewingOrder.cp || '—'})</span></p>
+                                                    </>
+                                                )}
                                             </>
                                         )}
                                     </div>

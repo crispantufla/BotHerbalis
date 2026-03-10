@@ -493,6 +493,19 @@ export async function handleWaitingData(
         }
         // If mapsValid === null (not configured or API error) → proceed normally
 
+        // Save the original address typed by the client before any Maps formatting
+        const calleOriginal = addr.calle;
+
+        // If Maps validated and returned a formatted address, use it
+        if (currentState.mapsFormattedAddress) {
+            // Extract just the street part from Maps (first part before the city/postal)
+            // Maps returns "Pampa 1729, B1624AQM Rincón de Milberg, Provincia de Buenos Aires, Argentina"
+            const mapsParts = currentState.mapsFormattedAddress.split(',');
+            if (mapsParts.length >= 2) {
+                addr.calle = mapsParts[0].trim(); // Use Maps-formatted street
+            }
+        }
+
         if (!currentState.cart || currentState.cart.length === 0) {
             const product = currentState.selectedProduct;
             if (!product) {
@@ -505,7 +518,7 @@ export async function handleWaitingData(
             currentState.cart = [{ product, plan, price }];
         }
 
-        currentState.pendingOrder = { ...addr, cart: currentState.cart };
+        currentState.pendingOrder = { ...addr, calleOriginal, cart: currentState.cart };
         delete currentState.partialAddress; // cleanup: no longer needed after full address captured
 
         const subtotal = currentState.cart.reduce((sum, i) => sum + parseInt(i.price.toString().replace(/\./g, '')), 0);

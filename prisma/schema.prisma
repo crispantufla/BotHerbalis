@@ -39,6 +39,7 @@ model Order {
 
   nombre      String?
   calle       String?
+  calleOriginal String?  // Raw address as typed by the client (before Maps formatting)
   ciudad      String?
   provincia   String?
   cp          String?
