@@ -81,7 +81,10 @@ const SettingsView = ({ status }) => {
         setResetting(true);
         try {
             const res = await api.post('/api/reset-memory');
-            toast.success(`Memoria limpiada. ${res.data.deletedUsers} estados eliminados.`);
+            const { deletedUsers, protected48h } = res.data;
+            let msg = `Memoria limpiada. ${deletedUsers} estados eliminados.`;
+            if (protected48h > 0) msg += ` (${protected48h} usuarios activos en 48h fueron protegidos)`;
+            toast.success(msg);
             fetchMemoryStats();
         } catch (e) { toast.error('Error al limpiar la memoria'); }
         setResetting(false);

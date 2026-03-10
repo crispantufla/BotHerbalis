@@ -240,10 +240,11 @@ async function _persistState(): Promise<void> {
 
         const userPromises = usersToSave.map(([phone, data]) => {
             const cleanPhone = (phone as string).replace('@c.us', '');
+            const lastSeenDate = (data as any)?.lastActivityAt ? new Date((data as any).lastActivityAt) : new Date();
             return prisma.user.upsert({
                 where: { phone_instanceId: { phone: cleanPhone, instanceId: INSTANCE_ID } },
-                update: { profileData: JSON.stringify(data) },
-                create: { phone: cleanPhone, instanceId: INSTANCE_ID, profileData: JSON.stringify(data) }
+                update: { profileData: JSON.stringify(data), lastSeen: lastSeenDate },
+                create: { phone: cleanPhone, instanceId: INSTANCE_ID, profileData: JSON.stringify(data), lastSeen: lastSeenDate }
             });
         });
 

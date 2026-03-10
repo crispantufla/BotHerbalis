@@ -534,27 +534,34 @@ module.exports = (client, sharedState) => {
                 logger.error('[STATS] Failed to save daily snapshot:', statsErr);
             }
 
-            // 1. Purge DB user states (safe: preserves users with orders/chatlogs)
-            // Delete users WITHOUT any orders (safe to remove entirely)
+            // 1. Purge DB user states — ONLY users inactive for 48+ hours
+            const cutoffDate = new Date(Date.now() - 48 * 60 * 60 * 1000); // 48h ago
+
+            // Delete users WITHOUT any orders AND inactive for 48h+
             const deleted = await prisma.user.deleteMany({
-                where: { orders: { none: {} }, instanceId: INSTANCE_ID }
+                where: { orders: { none: {} }, instanceId: INSTANCE_ID, lastSeen: { lt: cutoffDate } }
             });
-            // For users WITH orders, just clear their profile data
+            // For users WITH orders, just clear their profile data if inactive 48h+
             const cleaned = await prisma.user.updateMany({
-                where: { orders: { some: {} }, profileData: { not: null }, instanceId: INSTANCE_ID },
+                where: { orders: { some: {} }, profileData: { not: null }, instanceId: INSTANCE_ID, lastSeen: { lt: cutoffDate } },
                 data: { profileData: null }
+            });
+
+            // Count recent users that were protected (for UI feedback)
+            const protected48h = await prisma.user.count({
+                where: { instanceId: INSTANCE_ID, lastSeen: { gte: cutoffDate } }
             });
 
             // 2. Clear RAM cache
             const { userCache } = require('../../utils/cache');
             userCache.flushAll();
 
-            logger.info(`[RESET] Memory purged. Deleted ${deleted.count} users sin pedidos, limpiado ${cleaned.count} con pedidos.`);
+            logger.info(`[RESET] Memory purged (48h filter). Deleted ${deleted.count} users sin pedidos, limpiado ${cleaned.count} con pedidos. Protected ${protected48h} active users.`);
 
             // 3. Notify dashboard
             if (io) io.emit('memory_reset', { deletedCount: deleted.count });
 
-            res.json({ success: true, deletedUsers: deleted.count });
+            res.json({ success: true, deletedUsers: deleted.count, protected48h });
         } catch (e) {
             logger.error('[RESET] Error purging memory:', e);
             res.status(500).json({ error: e.message });
