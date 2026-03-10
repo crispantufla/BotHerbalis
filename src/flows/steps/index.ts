@@ -7,6 +7,7 @@ const { handleWaitingPlanChoice } = require('./stepWaitingPlanChoice');
 const { handleWaitingOk } = require('./stepWaitingOk');
 const { handleWaitingData } = require('./stepWaitingData');
 const { handleWaitingFinalConfirmation } = require('./stepWaitingFinalConfirmation');
+const { handleWaitingMapsConfirmation } = require('./stepWaitingMapsConfirmation');
 const { handleAdminSteps } = require('./stepAdmin');
 const { handleCompleted } = require('./stepCompleted');
 const logger = require('../../utils/logger');
@@ -46,6 +47,9 @@ export async function processStep(
             break;
         case 'waiting_final_confirmation':
             result = await handleWaitingFinalConfirmation(userId, text, normalizedText, currentState, knowledge, dependencies);
+            break;
+        case 'waiting_maps_confirmation':
+            result = await handleWaitingMapsConfirmation(userId, text, normalizedText, currentState, knowledge, dependencies);
             break;
         case 'waiting_admin_ok':
         case 'waiting_admin_validation':

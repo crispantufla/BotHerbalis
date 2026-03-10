@@ -254,8 +254,24 @@ export async function handleWaitingData(
         return { matched: true };
     }
     if (data && data.provincia === 'CONFLICT') {
-        await _pauseAndAlert(userId, currentState, dependencies, text, 'El cliente brindó datos de envíos contradictorios (ej: calle de Mendoza pero dice ser de Rosario).');
-        return { matched: true };
+        const tries = currentState.addressIssueTries || 0;
+        if (tries === 0 && currentState.addressIssueType !== 'conflict') {
+            // First time: ask for clarification
+            currentState.addressIssueType = 'conflict';
+            currentState.addressIssueTries = 1;
+            currentState.partialAddress.ciudad = null;
+            currentState.partialAddress.provincia = null;
+            currentState.partialAddress.cp = null;
+            const clarifyMsg = `Mmm, los datos me quedaron un poco confusos 🤔\n\n¿Me aclarás tu *Localidad*, *Ciudad* y *Provincia*? Así armo bien la etiqueta del envío 📦`;
+            currentState.history.push({ role: 'bot', content: clarifyMsg, timestamp: Date.now() });
+            saveState(userId);
+            await sendMessageWithDelay(userId, clarifyMsg);
+            return { matched: true };
+        } else {
+            // Second time: escalate
+            await _pauseAndAlert(userId, currentState, dependencies, text, '⚠️ Datos contradictorios: el cliente no pudo aclarar localidad/ciudad/provincia después de 2 intentos.');
+            return { matched: true };
+        }
     }
 
     if (data && !data._error) {
@@ -291,17 +307,46 @@ export async function handleWaitingData(
 
             // Detect intersections/corners: "X y calle Y", "X y Y", "X entre Y", "X esq Y"
             const isIntersection = /\b(y\s+calle|y\s+pasaje|y\s+av\b|y\s+avenida|entre\s+calle|entre\s+.+\s+y\s+|esq\b|esquina)\b/i.test(textToAnalyze)
-                || /\bcalle\s+\d+\b/i.test(textToAnalyze) && /\by\b/i.test(textToAnalyze); // "calle 1406" + "y" = intersection
+                || /\bcalle\s+\d+\b/i.test(textToAnalyze) && /\by\b/i.test(textToAnalyze);
 
-            if (isIntersection) {
-                await _pauseAndAlert(userId, currentState, dependencies, text, '⚠️ Intersección detectada: El correo no admite esquinas. Se requiere intervención de administrador para pedirle dirección exacta.');
-                return { matched: true };
+            // Detect numbers ending in 00 (likely corners: 1200, 3400, etc.)
+            const streetNumberMatch = textToAnalyze.match(/\b(\d{3,})\b/);
+            const endsIn00 = streetNumberMatch && streetNumberMatch[1].endsWith('00') && streetNumberMatch[1] !== '100'; // 100 is valid
+
+            if (isIntersection || endsIn00) {
+                const tries = currentState.addressIssueTries || 0;
+                if (tries === 0 && currentState.addressIssueType !== 'intersection') {
+                    currentState.addressIssueType = 'intersection';
+                    currentState.addressIssueTries = 1;
+                    const cornerMsg = `¡Ojo! El Correo Argentino no nos permite enviar a esquinas o intersecciones 📦\n\nNecesito la *calle y el número exacto* donde está tu casa. Ej: "Belgrano 350"\n\n¿Me lo pasás? 🙏`;
+                    currentState.history.push({ role: 'bot', content: cornerMsg, timestamp: Date.now() });
+                    saveState(userId);
+                    await sendMessageWithDelay(userId, cornerMsg);
+                    return { matched: true };
+                } else {
+                    await _pauseAndAlert(userId, currentState, dependencies, text, '⚠️ Esquina/intersección detectada: el cliente no pudo corregir después de 2 intentos. Intervención manual requerida.');
+                    return { matched: true };
+                }
             }
 
             if (!hasNumber && !hasSN) {
-                await _pauseAndAlert(userId, currentState, dependencies, text, '⚠️ Dirección sin número detectada: Faltó especificar la altura de la calle o "S/N". Intervención requerida para no enviar paquete a destino impreciso.');
-                return { matched: true };
+                const tries = currentState.addressIssueTries || 0;
+                if (tries === 0 && currentState.addressIssueType !== 'no_number') {
+                    currentState.addressIssueType = 'no_number';
+                    currentState.addressIssueTries = 1;
+                    const noNumMsg = `¡Uy! No me llegó el número de la calle 😅\n\nEl Correo Argentino no nos deja enviar sin número. ¿Me lo podés agregar?\n\nEj: "San Martín 1425". Si no tenés número, escribí *S/N* 🙏`;
+                    currentState.history.push({ role: 'bot', content: noNumMsg, timestamp: Date.now() });
+                    saveState(userId);
+                    await sendMessageWithDelay(userId, noNumMsg);
+                    return { matched: true };
+                } else {
+                    await _pauseAndAlert(userId, currentState, dependencies, text, '⚠️ Dirección sin número: el cliente no pudo corregir después de 2 intentos. Intervención manual requerida.');
+                    return { matched: true };
+                }
             } else {
+                // Valid street with number — clear any previous issue
+                currentState.addressIssueType = null;
+                currentState.addressIssueTries = 0;
                 currentState.partialAddress.calle = data.calle;
                 madeProgress = true;
             }
@@ -429,6 +474,25 @@ export async function handleWaitingData(
         if (validation.cpCleaned) addr.cp = validation.cpCleaned;
         if (validation.province) addr.provincia = validation.province;
 
+        // --- GOOGLE MAPS FINAL VALIDATION ---
+        if (validation.mapsValid === true && validation.mapsFormatted) {
+            // Maps found the address — use the formatted version
+            logger.info(`[MAPS] Address verified for ${userId}: "${validation.mapsFormatted}"`);
+            currentState.mapsFormattedAddress = validation.mapsFormatted;
+        } else if (validation.mapsValid === false) {
+            // Maps did NOT find the address — ask the client to confirm
+            logger.info(`[MAPS] Address NOT found for ${userId}. Asking for confirmation.`);
+            const addrStr = `${addr.calle}, ${addr.ciudad}${addr.cp ? `, CP ${addr.cp}` : ''}`;
+            const mapsMsg = `No pude verificar tu dirección en el mapa 🤔\n\n¿Está bien escrita así?:\n📍 *${addrStr}*\n\nSi es correcta, respondé *sí*. Si no, pasame la dirección corregida 🙏`;
+            currentState.mapsFormattedAddress = null;
+            currentState.history.push({ role: 'bot', content: mapsMsg, timestamp: Date.now() });
+            _setStep(currentState, FlowStep.WAITING_MAPS_CONFIRMATION);
+            saveState(userId);
+            await sendMessageWithDelay(userId, mapsMsg);
+            return { matched: true };
+        }
+        // If mapsValid === null (not configured or API error) → proceed normally
+
         if (!currentState.cart || currentState.cart.length === 0) {
             const product = currentState.selectedProduct;
             if (!product) {
@@ -454,6 +518,8 @@ export async function handleWaitingData(
         await sendMessageWithDelay(userId, summaryMsg);
 
         currentState.fieldReaskCount = {};
+        currentState.addressIssueType = null;
+        currentState.addressIssueTries = 0;
         _setStep(currentState, FlowStep.WAITING_FINAL_CONFIRMATION);
         saveState(userId);
         return { matched: true };

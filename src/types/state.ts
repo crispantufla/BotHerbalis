@@ -15,6 +15,7 @@ export enum FlowStep {
     SAFETY_CHECK = "safety_check",
     CLOSING = "closing",
     COMPLETED = "completed",
+    WAITING_MAPS_CONFIRMATION = "waiting_maps_confirmation",
     REJECTED_MEDICAL = "rejected_medical",
     REJECTED_ABUSIVE = "rejected_abusive",
     REJECTED_GEO = "rejected_geo"
@@ -59,6 +60,9 @@ export interface UserState {
     // Variables de iteración y validación de direcciones
     addressAttempts?: number;
     fieldReaskCount?: Record<string, number>;
+    addressIssueType?: string | null;       // 'no_number' | 'intersection' | 'conflict'
+    addressIssueTries?: number;             // 0 = fresh, 1 = already explained once
+    mapsFormattedAddress?: string | null;   // Address returned by Google Maps
     lastAddressMsg?: string;
 
     // Multi-modal (Para envío de fotos / OCR)
