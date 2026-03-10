@@ -116,8 +116,25 @@ export interface AIParsedResponse {
 
 // --- CONFIGURATION ---
 const MODEL = "gpt-4o-mini";
+const MODEL_PREMIUM = "gpt-4o";
 const MAX_RETRIES = 3;
 const MAX_HISTORY_LENGTH = 50;
+
+// Steps that use the premium model (high-conversion, complex reasoning)
+const PREMIUM_STEPS = new Set([
+    'waiting_preference',
+    'waiting_preference_consultation',
+    'waiting_plan_choice',
+    'waiting_price_confirmation',
+    'waiting_ok',
+    'waiting_data',
+    'waiting_final_confirmation',
+    'closing'
+]);
+
+function _getModelForStep(step: string): string {
+    return PREMIUM_STEPS.has(step) ? MODEL_PREMIUM : MODEL;
+}
 
 // --- RATE LIMIT CONFIGURATION ---
 const MAX_CONCURRENT = 3;
@@ -407,7 +424,7 @@ class AIService {
             logger.error("❌ CRITICAL: OPENAI_API_KEY is missing!");
         }
 
-        logger.info(`📡[AI] Initializing OpenAI(model: ${MODEL})`);
+        logger.info(`📡[AI] Initializing OpenAI(base: ${MODEL}, premium: ${MODEL_PREMIUM})`);
 
         this.client = new OpenAI({ apiKey, timeout: 15_000 });
         this.model = MODEL;
@@ -486,12 +503,18 @@ class AIService {
             throw new Error("AI Service Unavailable (Max Retries Exceeded)");
         }
 
-        // Track token usage (gpt-4o-mini: $0.15/1M input, $0.60/1M output)
+        // Track token usage — pricing per model
+        // gpt-4o-mini: $0.15/1M input, $0.60/1M output
+        // gpt-4o:      $2.50/1M input, $10.00/1M output
         const usage = (result as any)?.usage;
         if (usage) {
+            const model = (result as any)?.model || '';
+            const isPremium = model.startsWith('gpt-4o') && !model.includes('mini');
+            const inputRate  = isPremium ? 0.0000025 : 0.00000015;
+            const outputRate = isPremium ? 0.00001   : 0.0000006;
             this.stats.promptTokens += usage.prompt_tokens || 0;
             this.stats.completionTokens += usage.completion_tokens || 0;
-            this.stats.estimatedCostUSD += ((usage.prompt_tokens || 0) * 0.00000015) + ((usage.completion_tokens || 0) * 0.0000006);
+            this.stats.estimatedCostUSD += ((usage.prompt_tokens || 0) * inputRate) + ((usage.completion_tokens || 0) * outputRate);
         }
 
         // Cache the result
@@ -605,10 +628,12 @@ INSTRUCCIONES:
 `;
 
         try {
-            const systemPrompt = await _buildSystemPrompt(context.step || 'general', userText);
+            const step = context.step || 'general';
+            const chatModel = _getModelForStep(step);
+            const systemPrompt = await _buildSystemPrompt(step, userText);
             const result: any = await this._callQueued(
                 () => this.client.chat.completions.create({
-                    model: this.model,
+                    model: chatModel,
                     messages: [
                         { role: "system", content: systemPrompt },
                         { role: "user", content: userPrompt }
