@@ -252,15 +252,15 @@ module.exports = (client, sharedState) => {
                     unreadCount: c.unreadCount,
                     lastMessage: c.lastMessage ? { body: c.lastMessage.hasMedia ? 'Media' : c.lastMessage.body, timestamp: c.lastMessage.timestamp * 1000 } : null,
                     timestamp: c.timestamp,
-                    isPaused: pausedUsers.has(c.id._serialized),
-                    step: userState[c.id._serialized]?.step || 'new',
-                    assignedScript: userState[c.id._serialized]?.assignedScript || (sharedState.config?.activeScript === 'rotacion' ? 'v3' : sharedState.config?.activeScript || 'v3'),
-                    // Sales context for script placeholder resolution
-                    selectedProduct: userState[c.id._serialized]?.selectedProduct || null,
-                    selectedPlan: userState[c.id._serialized]?.selectedPlan || null,
-                    cart: userState[c.id._serialized]?.cart || null,
-                    totalPrice: userState[c.id._serialized]?.totalPrice || null,
-                    partialAddress: userState[c.id._serialized]?.partialAddress || null,
+                    isPaused: pausedUsers.has(resolvedId) || pausedUsers.has(c.id._serialized),
+                    step: userState[resolvedId]?.step || userState[c.id._serialized]?.step || 'new',
+                    assignedScript: (userState[resolvedId] || userState[c.id._serialized])?.assignedScript || (sharedState.config?.activeScript === 'rotacion' ? 'v3' : sharedState.config?.activeScript || 'v3'),
+                    // Sales context for script placeholder resolution (check resolvedId first, fallback to raw serialized)
+                    selectedProduct: (userState[resolvedId] || userState[c.id._serialized])?.selectedProduct || null,
+                    selectedPlan: (userState[resolvedId] || userState[c.id._serialized])?.selectedPlan || null,
+                    cart: (userState[resolvedId] || userState[c.id._serialized])?.cart || null,
+                    totalPrice: (userState[resolvedId] || userState[c.id._serialized])?.totalPrice || null,
+                    partialAddress: (userState[resolvedId] || userState[c.id._serialized])?.partialAddress || null,
                     pastOrders: legacyUserOrders.length > 0 ? legacyUserOrders : null,
                     hasBought: legacyUserOrders.length > 0
                 };
@@ -388,6 +388,7 @@ module.exports = (client, sharedState) => {
     // POST /send
     router.post('/send', authMiddleware, async (req, res) => {
         try {
+            const originalChatId = req.body.chatId;
             let { chatId, message } = req.body;
             chatId = await resolveChatId(chatId);
             const sentMsg = await client.sendMessage(chatId, message);
@@ -398,7 +399,10 @@ module.exports = (client, sharedState) => {
             if (!pausedUsers.has(chatId)) {
                 const { pauseUser } = require('../../services/pauseService');
                 await pauseUser(chatId, '⏸️ Pausado automáticamente por intervención en panel', { sharedState });
-                if (sharedState.io) sharedState.io.emit('bot_status_change', { chatId, paused: true });
+                if (sharedState.io) {
+                    sharedState.io.emit('bot_status_change', { chatId, paused: true });
+                    if (originalChatId !== chatId) sharedState.io.emit('bot_status_change', { chatId: originalChatId, paused: true });
+                }
             }
 
             if (sharedState.logAndEmit) sharedState.logAndEmit(chatId, 'admin', message, 'dashboard_reply', sentMsg.id._serialized);
@@ -411,6 +415,7 @@ module.exports = (client, sharedState) => {
     // POST /send-media (send image from dashboard)
     router.post('/send-media', authMiddleware, async (req, res) => {
         try {
+            const originalChatId = req.body.chatId;
             let { chatId, base64, mimetype, filename, caption } = req.body;
             chatId = await resolveChatId(chatId);
             if (!chatId || !base64 || !mimetype) {
@@ -426,7 +431,10 @@ module.exports = (client, sharedState) => {
             if (!pausedUsers.has(chatId)) {
                 const { pauseUser } = require('../../services/pauseService');
                 await pauseUser(chatId, '⏸️ Pausado automáticamente por intervención en panel', { sharedState });
-                if (sharedState.io) sharedState.io.emit('bot_status_change', { chatId, paused: true });
+                if (sharedState.io) {
+                    sharedState.io.emit('bot_status_change', { chatId, paused: true });
+                    if (originalChatId !== chatId) sharedState.io.emit('bot_status_change', { chatId: originalChatId, paused: true });
+                }
             }
 
             if (sharedState.logAndEmit) {
@@ -495,7 +503,13 @@ module.exports = (client, sharedState) => {
 
             console.log(`[API] toggle-bot: ${originalChatId}${chatId !== originalChatId ? ` → ${chatId}` : ''} → ${paused ? 'PAUSED' : 'UNPAUSED'} (via dashboard)`);
             if (sharedState.saveState) sharedState.saveState();
-            if (sharedState.io) sharedState.io.emit('bot_status_change', { chatId, paused });
+            // Emit both resolved and original ID so frontend matches regardless of LID vs @c.us
+            if (sharedState.io) {
+                sharedState.io.emit('bot_status_change', { chatId, paused });
+                if (originalChatId !== chatId) {
+                    sharedState.io.emit('bot_status_change', { chatId: originalChatId, paused });
+                }
+            }
             res.json({ success: true });
         } catch (e) {
             res.status(500).json({ error: e.message });
