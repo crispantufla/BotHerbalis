@@ -20,6 +20,9 @@ import { UserState } from '../types/state';
 // ── Constants ──
 const TIMEZONE = 'America/Argentina/Buenos_Aires';
 
+// ── Mutex flags (prevent concurrent executions from cron + boot overlap) ──
+let _autoApproveRunning = false;
+
 interface SchedulerSharedState {
     userState: Record<string, UserState>;
     pausedUsers: Set<string>;
@@ -123,6 +126,12 @@ function checkStaleUsers(sharedState: SchedulerSharedState, dependencies: Schedu
  * Auto-approves orders stuck in waiting_admin_ok for >15 min.
  */
 function autoApproveOrders(sharedState: SchedulerSharedState, dependencies: SchedulerDependencies): void {
+    if (_autoApproveRunning) {
+        logger.info('[SCHEDULER] autoApproveOrders already running, skipping.');
+        return;
+    }
+    _autoApproveRunning = true;
+    try {
     const { userState } = sharedState;
     const { sendMessageWithDelay, notifyAdmin, saveState, saveOrderToLocal } = dependencies;
     const now = Date.now();
@@ -170,6 +179,9 @@ function autoApproveOrders(sharedState: SchedulerSharedState, dependencies: Sche
                 `El pedido fue aprobado automáticamente.\nProducto: ${state.cart ? state.cart.map(i => i.product).join(' + ') : '?'}\nTotal: $${state.totalPrice || '?'}\n⚠️ Revisar en panel de ventas.`
             ).catch(e => logger.error('[SCHEDULER] Auto-approve notify error:', e.message));
         }
+    }
+    } finally {
+        _autoApproveRunning = false;
     }
 }
 
@@ -400,9 +412,15 @@ function startScheduler(sharedState: SchedulerSharedState, dependencies: Schedul
     }, { timezone: TIMEZONE });
     logger.info('[SCHEDULER] ✅ Reinicio Preventivo Diario → 08:00 ARG (diario)');
 
-    // ── Run auto-approve once 10s after boot (no cold lead/cleanup needed at startup) ──
+    // ── Run auto-approve once 10s after boot — only during business hours (9-23h ARG) ──
+    // This prevents a spurious run at 4am on restart from double-firing with the 9am cron tick.
     setTimeout(() => {
-        autoApproveOrders(sharedState, dependencies);
+        const argHour = parseInt(new Date().toLocaleString('en-US', { timeZone: TIMEZONE, hour: 'numeric', hour12: false }), 10);
+        if (argHour >= 9 && argHour < 23) {
+            autoApproveOrders(sharedState, dependencies);
+        } else {
+            logger.info(`[SCHEDULER] Skipping boot-time autoApproveOrders (hour ${argHour} ARG, outside 9-23h)`);
+        }
     }, 10000);
 
     // ── Run stale pause cleanup once 15s after boot ──

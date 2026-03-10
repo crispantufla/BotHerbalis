@@ -404,7 +404,7 @@ class AIService {
 
         logger.info(`📡[AI] Initializing OpenAI(model: ${MODEL})`);
 
-        this.client = new OpenAI({ apiKey });
+        this.client = new OpenAI({ apiKey, timeout: 30_000 });
         this.model = MODEL;
         this.cache = new NodeCache({ stdTTL: CACHE_TTL_SECONDS, checkperiod: 120, maxKeys: 1000 });
         this.stats = { calls: 0, cached: 0, retries: 0, errors: 0 };

@@ -400,7 +400,12 @@ export async function handleWaitingData(
             return { matched: true };
         }
 
-        const validation = await validateAddress(addr);
+        let validation: any = { cpValid: true };
+        try {
+            validation = await validateAddress(addr);
+        } catch (e: any) {
+            logger.warn(`[ADDRESS] validateAddress failed for ${userId}, proceeding without validation: ${e.message}`);
+        }
 
         if (addr.cp && !validation.cpValid) {
             const cpMsg = `El código postal "${addr.cp}" no parece válido 🤔\nDebe ser de 4 dígitos (ej: 1425, 5000). ¿Me lo corregís?`;
@@ -414,13 +419,19 @@ export async function handleWaitingData(
         if (validation.province) addr.provincia = validation.province;
 
         if (!currentState.cart || currentState.cart.length === 0) {
-            const product = currentState.selectedProduct || "Nuez de la India";
+            const product = currentState.selectedProduct;
+            if (!product) {
+                logger.error(`[ADDRESS] No selectedProduct for ${userId} at order confirmation. Pausing.`);
+                await _pauseAndAlert(userId, currentState, dependencies, text, '⚠️ No hay producto seleccionado al confirmar dirección. Revisión manual requerida.');
+                return { matched: true };
+            }
             const plan = currentState.selectedPlan || "60";
             const price = currentState.price || _getPrice(product, plan);
             currentState.cart = [{ product, plan, price }];
         }
 
         currentState.pendingOrder = { ...addr, cart: currentState.cart };
+        delete currentState.partialAddress; // cleanup: no longer needed after full address captured
 
         const subtotal = currentState.cart.reduce((sum, i) => sum + parseInt(i.price.toString().replace(/\./g, '')), 0);
         const adicional = currentState.adicionalMAX || 0;

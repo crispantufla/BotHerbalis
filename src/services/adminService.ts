@@ -51,8 +51,12 @@ export async function notifyAdmin(
     logger.info(`[ADMIN ALERT] ${reason} (User: ${userPhone})`);
 
     const now = Date.now();
-    const lastAlert: AlertEntry | undefined = sharedState.sessionAlerts[0];
-    if (lastAlert && lastAlert.userPhone === userPhone && lastAlert.reason === reason && (now - lastAlert.id < 8000)) return;
+    // Search for the most recent alert from THIS user+reason, not just sessionAlerts[0]
+    // (avoids missed dedup when another user's alert is at the front of the list)
+    const lastAlert: AlertEntry | undefined = sharedState.sessionAlerts.find(
+        (a: AlertEntry) => a.userPhone === userPhone && a.reason === reason
+    );
+    if (lastAlert && (now - lastAlert.id < 8000)) return;
 
     sharedState.lastAlertUser = userPhone;
 

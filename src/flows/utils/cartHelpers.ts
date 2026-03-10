@@ -20,6 +20,9 @@ function buildCartFromSelection(product: string, plan: string, state: UserState)
     if (isNaN(base120) || isNaN(base60) || base60 === 0) {
         const logger = require('../../utils/logger');
         logger.error(`[CART] Invalid prices for "${product}": base60=${raw60}, base120=${raw120}`);
+        const err: any = new Error(`Precio inválido para el producto "${product}". Verificar prices.json.`);
+        err.code = 'INVALID_PRICE';
+        throw err;
     }
 
     // Use integer division to avoid float modulo issues
@@ -52,8 +55,15 @@ function buildCartFromSelection(product: string, plan: string, state: UserState)
  * Updates state.totalPrice with the formatted string.
  */
 function calculateTotal(state: UserState): string {
-    const subtotal = state.cart.reduce((sum: number, i: any) =>
-        sum + parseInt(i.price.toString().replace(/\./g, '')), 0);
+    const subtotal = state.cart.reduce((sum: number, i: any) => {
+        const parsed = parseInt(i.price.toString().replace(/\./g, ''), 10);
+        if (isNaN(parsed)) {
+            const logger = require('../../utils/logger');
+            logger.error(`[CART] calculateTotal: invalid price value "${i.price}" for product "${i.product}"`);
+            return sum; // skip corrupt item instead of propagating NaN
+        }
+        return sum + parsed;
+    }, 0);
     const adicional = state.adicionalMAX || 0;
     const total = subtotal + adicional;
     const formatted = total.toLocaleString('es-AR').replace(/,/g, '.');

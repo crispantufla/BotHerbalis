@@ -219,8 +219,14 @@ function saveKnowledge(scriptName = null) {
 
 let _saveStateTimeout: ReturnType<typeof setTimeout> | null = null;
 const _pendingSaveUsers = new Set<string>();
+let _isSaving = false;
 
 async function _persistState(): Promise<void> {
+    if (_isSaving) {
+        logger.info('[STATE] _persistState already in progress, skipping concurrent call.');
+        return;
+    }
+    _isSaving = true;
     try {
         const stateToSave = { userState, chatResets, lastAlertUser, pausedUsers: Array.from(pausedUsers), config };
         atomicWriteFile(STATE_FILE, JSON.stringify(stateToSave, null, 2));
@@ -252,6 +258,8 @@ async function _persistState(): Promise<void> {
         await Promise.all([...userPromises, ...configPromises]);
     } catch (e: any) {
         logger.error(`🔴 Error saving state to DB: ${e?.message || String(e)}`);
+    } finally {
+        _isSaving = false;
     }
 }
 
