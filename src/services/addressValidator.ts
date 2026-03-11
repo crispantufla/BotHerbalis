@@ -39,19 +39,35 @@ interface AddressValidationResult {
     warnings: string[];
 }
 
-// Argentine CP → Province mapping (official ranges)
+// Argentine CP → Province mapping (official ranges - more granular)
 const CP_PROVINCES: CPRange[] = [
     { min: 1000, max: 1999, province: 'Buenos Aires / CABA' },
     { min: 2000, max: 2999, province: 'Santa Fe' },
-    { min: 3000, max: 3699, province: 'Entre Ríos / Corrientes / Misiones' },
-    { min: 3700, max: 3899, province: 'Chaco / Formosa' },
-    { min: 4000, max: 4699, province: 'Tucumán / Salta / Jujuy / Catamarca / Santiago del Estero' },
-    { min: 4700, max: 4999, province: 'Catamarca / La Rioja' },
-    { min: 5000, max: 5999, province: 'Córdoba / San Luis / Mendoza' },
-    { min: 6000, max: 6999, province: 'Buenos Aires (Interior)' },
+    { min: 3000, max: 3299, province: 'Santa Fe / Entre Ríos' },
+    { min: 3300, max: 3399, province: 'Misiones' },
+    { min: 3400, max: 3499, province: 'Corrientes' },
+    { min: 3500, max: 3599, province: 'Chaco' },
+    { min: 3600, max: 3699, province: 'Formosa' },
+    { min: 3700, max: 3899, province: 'Chaco / Corrientes' },
+    { min: 3900, max: 3999, province: 'N/A' },
+    { min: 4000, max: 4199, province: 'Tucumán' },
+    { min: 4200, max: 4399, province: 'Santiago del Estero' },
+    { min: 4400, max: 4499, province: 'Salta' },
+    { min: 4500, max: 4699, province: 'Jujuy' },
+    { min: 4700, max: 4799, province: 'Catamarca' },
+    { min: 4800, max: 4999, province: 'Catamarca / La Rioja' },
+    { min: 5000, max: 5299, province: 'Córdoba' },
+    { min: 5300, max: 5399, province: 'La Rioja' },
+    { min: 5400, max: 5499, province: 'San Juan' },
+    { min: 5500, max: 5699, province: 'Mendoza' },
+    { min: 5700, max: 5799, province: 'San Luis' },
+    { min: 5800, max: 5999, province: 'Córdoba' },
+    { min: 6000, max: 6999, province: 'Buenos Aires / La Pampa' },
     { min: 7000, max: 7999, province: 'Buenos Aires (Costa / Sur)' },
-    { min: 8000, max: 8999, province: 'Buenos Aires (Sur) / La Pampa / Neuquén / Río Negro' },
-    { min: 9000, max: 9999, province: 'Chubut / Santa Cruz / Tierra del Fuego' },
+    { min: 8000, max: 8399, province: 'Buenos Aires (Sur) / Neuquén / Río Negro' },
+    { min: 8400, max: 8599, province: 'Río Negro' },
+    { min: 9000, max: 9399, province: 'Chubut / Santa Cruz' },
+    { min: 9400, max: 9499, province: 'Tierra del Fuego / Santa Cruz' },
 ];
 
 // Common Argentine cities → CP lookup (top ~50 cities by population)
