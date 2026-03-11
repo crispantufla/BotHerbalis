@@ -64,8 +64,11 @@ export async function handleSystemGlobals(
     }
 
     // 3. GEO REJECT
+    // Skip when collecting address (waiting_data) — street names like "Avenida España", "Calle Chile" etc.
+    // would false-positive. Google Maps in stepWaitingData validates the country instead.
     const GEO_REGEX = /\b(espana|españa|mexico|méxico|chile|colombia|peru|perú|uruguay|bolivia|paraguay|ecuador|venezuela|brasil|panama|panamá|costa rica|eeuu|estados unidos|usa|europa|fuera del pais|fuera de argentina|otro pais|no estoy en argentina|vivo en el exterior|desde afuera|no soy de argentina)\b/i;
-    if (GEO_REGEX.test(normalizedText) && !currentState.geoRejected) {
+    const isCollectingAddress = currentState.step === 'waiting_data';
+    if (GEO_REGEX.test(normalizedText) && !currentState.geoRejected && !isCollectingAddress) {
         logger.info(`[GEO REJECT] User ${userId} is outside Argentina: "${text}"`);
         currentState.geoRejected = true;
         const msg = 'Lamentablemente solo hacemos envíos dentro de Argentina 😔 Si en algún momento necesitás para alguien de acá, ¡con gusto te ayudamos!';

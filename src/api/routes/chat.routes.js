@@ -3,6 +3,8 @@ const { authMiddleware } = require('../../middleware/auth');
 const { getLocalHistory } = require('../../utils/chatHistory');
 const { aiService } = require('../../services/ai');
 const { MessageMedia } = require('whatsapp-web.js');
+const fs = require('fs');
+const path = require('path');
 
 const globalContactCache = new Map();
 
@@ -293,22 +295,54 @@ module.exports = (client, sharedState) => {
             try {
                 const chat = await withTimeout(client.getChatById(chatId), 5000, "Timeout getting chat history");
                 const waMessages = await withTimeout(chat.fetchMessages({ limit: 100 }), 10000, "Timeout fetching history messages");
-                messages = waMessages
-                    .filter(m => m.timestamp >= resetAt) // Filter WA messages after reset
-                    .map(m => {
-                        let body = m.body;
-                        if (m.hasMedia && !body) {
-                            if (m.type === 'audio' || m.type === 'ptt') body = 'MEDIA_AUDIO:PENDING';
-                            else if (m.type === 'image' || m.type === 'sticker') body = 'MEDIA_IMAGE:PENDING';
+                const filtered = waMessages.filter(m => m.timestamp >= resetAt);
+
+                // Download audio media in parallel (with individual timeouts)
+                const audioDir = path.join(__dirname, '../../../public/media/audio');
+                const mappedPromises = filtered.map(async (m) => {
+                    let body = m.body;
+                    if (m.hasMedia && !body) {
+                        if (m.type === 'audio' || m.type === 'ptt') {
+                            // Check if already downloaded (idempotent using WA timestamp)
+                            const ext = 'ogg';
+                            const audioFilename = `${chatId.replace('@c.us', '')}_${m.timestamp}.${ext}`;
+                            const audioPath = path.join(audioDir, audioFilename);
+                            if (fs.existsSync(audioPath)) {
+                                body = `MEDIA_AUDIO:/media/audio/${audioFilename}`;
+                            } else {
+                                try {
+                                    const media = await withTimeout(
+                                        m.downloadMedia(), 10000, "Audio download timeout"
+                                    );
+                                    if (media) {
+                                        if (!fs.existsSync(audioDir)) fs.mkdirSync(audioDir, { recursive: true });
+                                        const realExt = media.mimetype?.includes('ogg') ? 'ogg' : 'mp3';
+                                        const realFilename = `${chatId.replace('@c.us', '')}_${m.timestamp}.${realExt}`;
+                                        const realPath = path.join(audioDir, realFilename);
+                                        fs.writeFileSync(realPath, Buffer.from(media.data, 'base64'));
+                                        body = `MEDIA_AUDIO:/media/audio/${realFilename}`;
+                                    } else {
+                                        body = 'MEDIA_AUDIO:PENDING';
+                                    }
+                                } catch (dlErr) {
+                                    body = 'MEDIA_AUDIO:PENDING';
+                                }
+                            }
                         }
-                        return {
-                            fromMe: m.fromMe,
-                            body: body,
-                            timestamp: m.timestamp * 1000, // WhatsApp returns seconds, frontend expects ms
-                            type: m.type,
-                            id: m.id._serialized
-                        };
-                    });
+                        else if (m.type === 'image' || m.type === 'sticker') body = 'MEDIA_IMAGE:PENDING';
+                    }
+                    return {
+                        fromMe: m.fromMe,
+                        body: body,
+                        timestamp: m.timestamp * 1000,
+                        type: m.type,
+                        id: m.id._serialized
+                    };
+                });
+                const settled = await Promise.allSettled(mappedPromises);
+                messages = settled
+                    .filter(r => r.status === 'fulfilled')
+                    .map(r => r.value);
             } catch (waErr) {
                 console.error(`[HISTORY] WA Fetch Error for ${chatId}:`, waErr.message);
             }

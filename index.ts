@@ -555,6 +555,7 @@ function saveOrderToLocal(order: Record<string, any>): void {
                 postdated: order.postdatado || null,
                 nombre: order.nombre || null,
                 calle: order.calle || null,
+                calleOriginal: order.calleOriginal || null,
                 ciudad: order.ciudad || null,
                 provincia: order.provincia || null,
                 cp: order.cp || null,

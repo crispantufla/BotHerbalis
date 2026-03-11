@@ -126,6 +126,38 @@ export async function handleWaitingData(
         }
     }
 
+    // PRIORITY 1: Detect "retiro en sucursal" / "voy al correo" intent
+    // When the user says they'll pick up at the post office branch, set calle to 'A sucursal'
+    // and only require localidad/provincia/CP from here on.
+    const isSucursalIntent = /\b(voy al correo|voy yo al correo|retiro en sucursal|lo retiro|lo busco|busco yo|paso por el correo|paso yo por|sucursal|sucursal del correo|retiro yo|voy a buscarlo|voy a retirarlo|lo paso a buscar|paso a buscar|paso a retirar|voy a retirar|no tengo direcci[oó]n exacta|vivo en.{0,20}(distrito|paraje|ruta|campo|zona rural))\b/i.test(normalizedText)
+        && !/\b(cuanto|cuánto|precio|costo|sale|cuesta|valor|tarda|llega|contraindicacion)\b/i.test(normalizedText); // Exclude if it's clearly a question
+
+    if (isSucursalIntent && !currentState.partialAddress?.calle) {
+        logger.info(`[SUCURSAL] Detected sucursal pickup intent for ${userId}: "${text}"`);
+        if (!currentState.partialAddress) currentState.partialAddress = {};
+        currentState.partialAddress.calle = 'A sucursal';
+        currentState.addressIssueType = null;
+        currentState.addressIssueTries = 0;
+
+        // Check what else we still need
+        const addr = currentState.partialAddress;
+        const stillMissing = [];
+        if (!addr.nombre) stillMissing.push('Nombre y Apellido');
+        if (!addr.ciudad) stillMissing.push('Localidad/Ciudad');
+        if (!addr.cp) stillMissing.push('Código Postal');
+
+        let ackMsg: string;
+        if (stillMissing.length > 0) {
+            ackMsg = `¡Dale, perfecto! Lo enviamos a la sucursal de Correo Argentino más cercana a tu zona 📦\n\nSolo necesito: *${stillMissing.join(', ')}* para armar la etiqueta 🙌`;
+        } else {
+            ackMsg = `¡Dale, perfecto! Lo enviamos a la sucursal de Correo Argentino más cercana a tu zona 📦`;
+        }
+        currentState.history.push({ role: 'bot', content: ackMsg, timestamp: Date.now() });
+        saveState(userId);
+        await sendMessageWithDelay(userId, ackMsg);
+        return { matched: true };
+    }
+
     const explicitQuestionKeywords = /\b(cuanto|cuánto|precio|costo|sale|cuesta|valor|paga|pagan|abona|tarjeta|transferencia|tarda|llega|envio|envío|envios|envíos|contraindicacion|contraindicaciones|efectos|hipertens|presion|presión|diabetes|embaraz|lactancia)\b/i.test(normalizedText) || text.includes('?');
 
     // Detect if the numbers in the text are plan references (60/120) not address numbers
@@ -457,8 +489,11 @@ export async function handleWaitingData(
         }
 
         let validation: any = { cpValid: true };
+        const isSucursalAddress = addr.calle?.toLowerCase() === 'a sucursal';
         try {
-            validation = await validateAddress(addr);
+            if (!isSucursalAddress) {
+                validation = await validateAddress(addr);
+            }
         } catch (e: any) {
             logger.warn(`[ADDRESS] validateAddress failed for ${userId}, proceeding without validation: ${e.message}`);
         }

@@ -57,20 +57,22 @@ function buildConfirmationMessage(state: any): string {
         ? `📅 Envío programado: ${state.postdatado}\n`
         : `✔ Entrega estimada: 7 a 10 días hábiles\n`;
 
+    const isSucursal = state.pendingOrder?.calle?.toLowerCase() === 'a sucursal';
+    const deliveryNote = isSucursal
+        ? `✔ Retiro en sucursal de Correo Argentino\n` + postdatadoLine + `✔ Pago en efectivo al retirar\n\n` +
+          `Importante:\nEl paquete permanece en sucursal 72 hs.\nEl no retiro genera un costo logístico de $18.000.\n\n` +
+          `👉 ¿Me confirmás que podés retirarlo en sucursal dentro de las 72 hs?`
+        : `✔ Correo Argentino\n` + postdatadoLine + `✔ Pago en efectivo al recibir\n\n` +
+          `Importante:\nSi el cartero no encuentra a nadie,\nel correo puede solicitar retiro en sucursal.\nPlazo: 72 hs.\n\n` +
+          `El rechazo o no retiro genera un costo logístico de $18.000.\n\n` +
+          `👉 El envío va a tu domicilio, pero necesito que me confirmes que en caso de que el correo lo determine, podrás retirarlo en la sucursal dentro de las 72 hs.`;
+
     return `📦 CONFIRMACIÓN DE ENVÍO\n\n` +
         `Producto: ${productStr}\n` +
         `Plan: ${planStr}\n` +
         breakdown +
         `Total a pagar al recibir:\n$${totalPriceStr}\n\n` +
-        `✔ Correo Argentino\n` +
-        postdatadoLine +
-        `✔ Pago en efectivo al recibir\n\n` +
-        `Importante:\n` +
-        `Si el cartero no encuentra a nadie,\n` +
-        `el correo puede solicitar retiro en sucursal.\n` +
-        `Plazo: 72 hs.\n\n` +
-        `El rechazo o no retiro genera un costo logístico de $18.000.\n\n` +
-        `👉 El envío va a tu domicilio, pero necesito que me confirmes que en caso de que el correo lo determine, podrás retirarlo en la sucursal dentro de las 72 hs.`;
+        deliveryNote;
 }
 
 export { buildConfirmationMessage };

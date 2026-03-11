@@ -55,12 +55,13 @@ export async function handleWaitingFinalConfirmation(
         const addr = currentState.partialAddress || {};
         const cart = currentState.cart || [];
         const o = currentState.pendingOrder || {
-            nombre: addr.nombre, calle: addr.calle, ciudad: addr.ciudad, cp: addr.cp, provincia: addr.provincia
+            nombre: addr.nombre, calle: addr.calle, ciudad: addr.ciudad, cp: addr.cp, provincia: addr.provincia, calleOriginal: null as string | null
         };
 
         const phone = userId.split('@')[0];
         return {
             cliente: phone, nombre: o.nombre, calle: o.calle, ciudad: o.ciudad, cp: o.cp, provincia: o.provincia,
+            calleOriginal: o.calleOriginal || null,
             producto: cart.map(i => i.product).join(' + ') || currentState.selectedProduct || '',
             plan: cart.map(i => `${i.plan} días`).join(' + ') || `${currentState.selectedPlan || '60'} días`,
             precio: currentState.totalPrice || '0',
