@@ -192,7 +192,7 @@ const SalesViewV2 = ({ onGoToChat, initialSearch = '' }) => {
         const phoneDisplay = rawPhone.length > 13 ? `Oculto por Anuncio Meta (${rawPhone})` : rawPhone || 'Desconocido';
 
         const textToCopy = `Nombre: ${order.nombre || 'Cliente'}
-Dirección: ${order.calle}, ${order.ciudad} (CP: ${order.cp})
+Dirección: ${order.calle}, ${order.ciudad}${order.provincia ? ', ' + order.provincia : ''} (CP: ${order.cp})
 Producto: ${order.producto}
 Plan: ${order.plan} Días
 A pagar: ${order.precio}
@@ -677,7 +677,7 @@ Teléfono: ${phoneDisplay}`;
                                                     <>
                                                         <p className="font-bold text-amber-700 dark:text-amber-400 text-base leading-relaxed pr-20">{viewingOrder.calleOriginal}</p>
                                                         <p className="font-medium text-amber-600/70 dark:text-amber-500/70 text-[10px] mt-1 uppercase tracking-wider">Dirección original del cliente</p>
-                                                        <p className="font-medium text-slate-600 dark:text-slate-400 text-sm mt-1">{viewingOrder.ciudad || 'Sin ciudad'} <span className="text-slate-400 dark:text-slate-500 ml-1">(CP: {viewingOrder.cp || '—'})</span></p>
+                                                        <p className="font-medium text-slate-600 dark:text-slate-400 text-sm mt-1">{viewingOrder.ciudad || 'Sin ciudad'}{viewingOrder.provincia ? `, ${viewingOrder.provincia}` : ''} <span className="text-slate-400 dark:text-slate-500 ml-1">(CP: {viewingOrder.cp || '—'})</span></p>
                                                     </>
                                                 ) : (
                                                     <>
@@ -685,7 +685,7 @@ Teléfono: ${phoneDisplay}`;
                                                         {viewingOrder.calleOriginal && viewingOrder.calleOriginal !== viewingOrder.calle && (
                                                             <p className="font-medium text-emerald-600/70 dark:text-emerald-500/70 text-[10px] mt-1 uppercase tracking-wider">✓ Verificada por Google Maps</p>
                                                         )}
-                                                        <p className="font-medium text-slate-600 dark:text-slate-400 text-sm mt-1">{viewingOrder.ciudad || 'Sin ciudad'} <span className="text-slate-400 dark:text-slate-500 ml-1">(CP: {viewingOrder.cp || '—'})</span></p>
+                                                        <p className="font-medium text-slate-600 dark:text-slate-400 text-sm mt-1">{viewingOrder.ciudad || 'Sin ciudad'}{viewingOrder.provincia ? `, ${viewingOrder.provincia}` : ''} <span className="text-slate-400 dark:text-slate-500 ml-1">(CP: {viewingOrder.cp || '—'})</span></p>
                                                     </>
                                                 )}
                                             </>
