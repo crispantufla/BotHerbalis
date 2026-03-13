@@ -51,7 +51,13 @@ const ChatMessageList = ({ messages, isLoading, chatFontSize, handleDeleteMessag
         }
         if (msg.body && (msg.body.startsWith('MEDIA_AUDIO:') || msg.body.startsWith('🎤'))) {
             let audioUrl = '';
-            let transcription = msg.body.includes('TRANSCRIPTION:') ? msg.body.split('TRANSCRIPTION:')[1].trim() : msg.body.replace(/^🎤\s*Audio:\s*/, '').replace(/^"|"$/g, '').trim();
+            let transcription = '';
+
+            if (msg.body.includes('TRANSCRIPTION:')) {
+                transcription = msg.body.split('TRANSCRIPTION:')[1].trim();
+            } else if (msg.body.startsWith('🎤')) {
+                transcription = msg.body.replace(/^🎤\s*Audio:\s*/, '').replace(/^"|"$/g, '').trim();
+            }
 
             if (msg.body.startsWith('MEDIA_AUDIO:')) {
                 audioUrl = msg.body.split('|')[0].replace('MEDIA_AUDIO:', '').trim();
