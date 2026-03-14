@@ -72,6 +72,35 @@ export async function handleCompleted(
 
     const today = new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
 
+    // --- REGEX PRE-DETECTION (works even when AI is unavailable) ---
+    const TRACKING_REGEX = /\b(seguimiento|tracking|donde.{0,10}(pedido|paquete|envio|envío)|cuando.{0,10}llega|ya.{0,10}(despacha|enviar|mand)|llego.{0,10}(pedido|paquete)|estado.{0,10}(pedido|envio|envío)|codigo.{0,10}(seguimiento|envio|envío)|me lo traen|no.{0,10}(llego|llega|recibi)|demora|tarda.{0,10}(mucho|en llegar)|lo despacharon|rastreo|rastrear|correo.{0,10}(argentino|llego)|movimiento.{0,10}pedido)\b/i;
+    const CANCEL_REGEX = /\b(cancelar|cancela|anular|anulo|dar de baja|no.{0,3}quiero.{0,10}pedido|devolver|devolucion|devolución|reembolso)\b/i;
+    const COMPLAINT_REGEX = /\b(reclam|queja|denuncia|estafa|defensa.{0,10}consumidor|mal.{0,10}estado|vino.{0,10}(roto|mal)|no.{0,10}(sirve|funciona)|me hizo mal|diarrea|dolor|malestar|vomit|intoxic)\b/i;
+
+    if (TRACKING_REGEX.test(normalizedText)) {
+        logger.info(`[POST-SALE] [REGEX] Tracking query detected from ${userId}: "${text}". Auto-pausing.`);
+        if (dependencies.sharedState?.pausedUsers) {
+            const { pauseUser } = require('../../services/pauseService');
+            await pauseUser(userId, '📦 Consulta de tracking post-venta', { sharedState: dependencies.sharedState });
+        }
+        if (dependencies.notifyAdmin) {
+            await dependencies.notifyAdmin('📦 Consulta de Código/Envío', userId, `El cliente post-venta preguntó por su envío.\n\nMensaje original: "${text}"\n\nEl bot se silenció automáticamente para que le respondas.`);
+        }
+        return { matched: true, paused: true };
+    }
+
+    if (COMPLAINT_REGEX.test(normalizedText)) {
+        logger.info(`[POST-SALE] [REGEX] Complaint detected from ${userId}: "${text}". Auto-pausing.`);
+        if (dependencies.sharedState?.pausedUsers) {
+            const { pauseUser } = require('../../services/pauseService');
+            await pauseUser(userId, '🚨 Reclamo post-venta', { sharedState: dependencies.sharedState });
+        }
+        if (dependencies.notifyAdmin) {
+            await dependencies.notifyAdmin('🚨 Reclamo Post-Venta', userId, `El cliente tiene un reclamo/queja.\n\nMensaje original: "${text}"\n\nEl bot se silenció automáticamente para que le respondas.`);
+        }
+        return { matched: true, paused: true };
+    }
+
     const postSaleAI = await aiService.chat(text, {
         step: 'post_sale',
         goal: `Este cliente YA COMPRÓ. Sos un asistente post-venta amable. Hoy es ${today}. Reglas:
@@ -89,6 +118,19 @@ export async function handleCompleted(
         summary: currentState.summary,
         userState: currentState
     });
+
+    // --- AI UNAVAILABLE: auto-pause for safety (post-sale needs human attention) ---
+    if (postSaleAI.aiUnavailable) {
+        logger.info(`[POST-SALE] AI unavailable for ${userId}. Auto-pausing for admin.`);
+        if (dependencies.sharedState?.pausedUsers) {
+            const { pauseUser } = require('../../services/pauseService');
+            await pauseUser(userId, '⚠️ Post-venta (IA no disponible)', { sharedState: dependencies.sharedState });
+        }
+        if (dependencies.notifyAdmin) {
+            await dependencies.notifyAdmin('⚠️ Cliente post-venta (IA caída)', userId, `La IA no pudo responder al cliente post-venta.\n\nMensaje original: "${text}"\n\nEl bot se silenció automáticamente para que le respondas.`);
+        }
+        return { matched: true, paused: true };
+    }
 
     if (postSaleAI.extractedData === 'TRACKING_INFO') {
         logger.info(`[POST-SALE] Customer ${userId} is asking for tracking/shipping info. Auto-pausing silently.`);

@@ -670,10 +670,11 @@ INSTRUCCIONES:
                     extractedData: args.extractedData || null
                 };
             }
-            return { response: "Estoy teniendo un pequeño problema técnico, ¿me repetís?", goalMet: false };
+            logger.warn("⚠️[AI] No tool_calls in response. Returning aiUnavailable.");
+            return { response: null, goalMet: false, aiUnavailable: true };
         } catch (e: any) {
             logger.error("🔴 [AI] Chat Error:", e.message);
-            return { response: "Estoy teniendo un pequeño problema técnico, ¿me repetís?", goalMet: false };
+            return { response: null, goalMet: false, aiUnavailable: true };
         }
     }
 
