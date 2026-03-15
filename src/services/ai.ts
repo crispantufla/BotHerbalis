@@ -376,6 +376,7 @@ async function _buildSystemPrompt(step: string, userText: string = ""): Promise<
             break;
         case 'waiting_price_confirmation':
         case 'waiting_ok':
+        case 'waiting_final_confirmation':
         case 'closing':
             module = _getModuleObjection(prices);
             break;

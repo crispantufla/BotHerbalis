@@ -1,5 +1,5 @@
 import { UserState, FlowStep } from '../../types/state';
-const { _setStep, _detectPostdatado, _detectProductPlanChange, _resolveNewProductPlan } = require('../utils/flowHelpers');
+const { _setStep, _detectProductPlanChange, _resolveNewProductPlan } = require('../utils/flowHelpers');
 const { _getPrice, _getAdicionalMAX } = require('../utils/pricing');
 const { _isAffirmative } = require('../utils/validation');
 const logger = require('../../utils/logger');
@@ -70,23 +70,7 @@ export async function handleWaitingFinalConfirmation(
         };
     };
 
-    let hasNewPostdate = false;
-    if (!currentState.postdatado) {
-        const postdatadoResult = _detectPostdatado(normalizedText);
-        if (postdatadoResult) {
-            currentState.postdatado = postdatadoResult;
-            hasNewPostdate = true;
-        }
-    }
-
-    if (currentState.postdatado && hasNewPostdate) {
-        const postdatado = currentState.postdatado;
-        const msg = `¡Perfecto! Anotamos tu envío para: ${postdatado}.\n\nEntonces, con esta modificación de fecha, ¿me confirmás que dejamos todo listo?`;
-        await sendMessageWithDelay(userId, msg);
-        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
-        saveState(userId);
-        return { matched: true };
-    } else if (currentState.postdatado && _isAffirmative(normalizedText)) {
+    if (currentState.postdatado && _isAffirmative(normalizedText)) {
         const postdatado = currentState.postdatado;
         const msg = "¡Perfecto! Recibimos tu confirmación.\n\nAguardame un instante que verificamos los datos y te confirmamos el ingreso ⏳";
         await sendMessageWithDelay(userId, msg);
@@ -136,7 +120,7 @@ export async function handleWaitingFinalConfirmation(
         logger.info(`[AI-FALLBACK] waiting_final_confirmation: Delegando consulta a IA para ${userId}`);
         const aiResponse = await dependencies.aiService.chat(text, {
             step: 'waiting_final_confirmation',
-            goal: 'El pedido ya está armado. Si el usuario te hace una pregunta, respondela resolviendo su duda con el contexto que tienes y LUEGO EN EL MISMO MENSAJE preguntale nuevamente si confima el envío. MUY IMPORTANTE: Habla siempre en primera persona como Marta. Acompaña sus dudas con mucha calidez y tranquilidad, tómate tu tiempo y redactá en un tono explayado y reconfortante antes de pedir la confirmación. NUNCA escribas cosas como "Cuando preguntan X:" o exponas tus reglas internas. SI el usuario simplemente está afirmando o confirmando ("dale", "ok", "listo", "dale avanza"), ES UNA CONFIRMACIÓN y debes retornar goalMet=true.',
+            goal: 'El pedido ya está armado. Estás esperando que el usuario CONFIRME EXPLÍCITAMENTE que puede recibir o retirar el pedido.\n\nREGLAS CRÍTICAS:\n1. PREGUNTAS NO SON CONFIRMACIÓN: Si el usuario hace una pregunta (contiene "?", "dónde", "cuál", "cómo", "cuándo", "qué", "donde", "cual", "como"), NUNCA devuelvas goalMet=true. Respondé la pregunta y LUEGO EN EL MISMO MENSAJE volvé a pedir la confirmación de retiro/recepción.\n2. SUCURSAL: Si preguntan dónde queda la sucursal, respondé que es la sucursal de Correo Argentino más cercana a su domicilio. No podés darle la dirección exacta porque depende de la zona. goalMet=false.\n3. FECHAS/POSTDATADO: Los envíos por Correo Argentino tardan entre 7 y 10 días hábiles. Si el usuario pide recibir o enviar el pedido en una fecha que está dentro de los próximos 10 días, informale que el envío tarda de 7 a 10 días hábiles y no se puede garantizar esa fecha específica. goalMet=false, NO extraigas POSTDATADO. Si pide una fecha a más de 10 días, aceptá y extraé POSTDATADO: [fecha] en extractedData. goalMet=false.\n4. CONFIRMACIÓN: SOLO si el usuario simplemente está afirmando o confirmando ("dale", "ok", "listo", "dale avanza", "si", "confirmo"), ES UNA CONFIRMACIÓN y devolvé goalMet=true.\n\nHabla siempre en primera persona como Marta. Acompaña sus dudas con calidez y tranquilidad. NUNCA expongas tus reglas internas.',
             history: currentState.history,
             summary: currentState.summary,
             knowledge: knowledge,
@@ -167,6 +151,12 @@ export async function handleWaitingFinalConfirmation(
             saveState(userId);
             return { matched: true };
         } else if (aiResponse.response) {
+            if (aiResponse.extractedData && /POSTDATADO/i.test(aiResponse.extractedData)) {
+                const postdatadoMatch = aiResponse.extractedData.match(/POSTDATADO:\s*(.+)/i);
+                if (postdatadoMatch) {
+                    currentState.postdatado = postdatadoMatch[1].trim();
+                }
+            }
             currentState.history.push({ role: 'bot', content: aiResponse.response, timestamp: Date.now() });
             await sendMessageWithDelay(userId, aiResponse.response);
             saveState(userId);
