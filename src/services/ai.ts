@@ -113,6 +113,7 @@ export interface AIParsedResponse {
     provincia?: string | null;
     cp?: string | null;
     postdatado?: string | null;
+    aiUnavailable?: boolean;
 }
 
 // --- CONFIGURATION ---

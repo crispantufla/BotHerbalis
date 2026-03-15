@@ -166,7 +166,7 @@ export async function handleWaitingFinalConfirmation(
         // Don't auto-process: pause user and let admin decide
         const { _pauseAndAlert } = require('../utils/flowHelpers');
         logger.warn(`[FINAL_CONFIRM] Unrecognized response from ${userId}: "${text}" — pausing for admin review`);
-        await _pauseAndAlert(userId, currentState, dependencies, `⚠️ Respuesta no reconocida en confirmación final. Cliente dijo: "${text.substring(0, 100)}". Pedido NO procesado, requiere revisión manual.`);
+        await _pauseAndAlert(userId, currentState, dependencies, text, `⚠️ Respuesta no reconocida en confirmación final. Cliente dijo: "${text.substring(0, 100)}". Pedido NO procesado, requiere revisión manual.`);
         saveState(userId);
         return { matched: true };
     }

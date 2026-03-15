@@ -795,7 +795,7 @@ client.on('auth_failure', (msg: string) => {
     sharedState.isConnected = false;
     if (sharedState.io) sharedState.io.emit('status_change', { status: 'auth_failure' });
     // Clean session and re-initialize after a delay
-    const authDir = path.join(__dirname, '.wwebjs_auth');
+    const authDir = path.join(DATA_DIR, '.wwebjs_auth');
     try { fs.rmSync(authDir, { recursive: true, force: true }); } catch (e) { /* ignore */ }
     setTimeout(() => {
         safeInitialize().catch(err => logger.error('[WA] Re-init after auth_failure failed:', err.message));
@@ -1133,7 +1133,7 @@ async function _processDebounced(userId: string): Promise<void> {
             saveState(userId);
         }
 
-        const effectiveKnowledge = sharedState.multiKnowledge[effectiveScript] || sharedState.knowledge;
+
 
         // Inyectar el payload en Redis a través de BullMQ en vez de bloquear el proceso de Node.js
         await botQueue.add('process-message', {

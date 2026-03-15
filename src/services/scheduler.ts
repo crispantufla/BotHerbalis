@@ -122,7 +122,7 @@ function checkStaleUsers(sharedState: SchedulerSharedState, dependencies: Schedu
             ).catch(e => logger.error('[SCHEDULER] notifyAdmin error:', e.message));
 
             state.staleAlerted = true;
-            dependencies.saveState();
+            dependencies.saveState(userId);
         }
     }
 }
@@ -182,7 +182,7 @@ async function autoApproveOrders(sharedState: SchedulerSharedState, dependencies
 
                 state.step = 'waiting_final_confirmation';
                 state.stepEnteredAt = now;
-                saveState();
+                saveState(userId);
 
                 notifyAdmin(
                     '⚡ Pedido AUTO-APROBADO (15 min sin revisión)',
@@ -230,7 +230,7 @@ async function checkColdLeads(sharedState: SchedulerSharedState, dependencies: S
                 state.history = state.history || [];
                 state.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
                 state.reengagementSent = true;
-                saveState();
+                saveState(userId);
             } catch (e: any) {
                 logger.error(`[SCHEDULER] Failed to send cold lead message to ${userId}:`, e.message);
             }
@@ -271,7 +271,7 @@ async function checkAbandonedCarts(sharedState: SchedulerSharedState, dependenci
                 state.history = state.history || [];
                 state.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
                 state.cartRecovered = true;
-                saveState();
+                saveState(userId);
             } catch (e: any) {
                 logger.error(`[SCHEDULER] Failed to send abandoned cart message to ${userId}:`, e.message);
             }
@@ -306,7 +306,7 @@ async function checkSecondFollowUp(sharedState: SchedulerSharedState, dependenci
                 state.history = state.history || [];
                 state.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
                 state.secondFollowUpSent = true;
-                saveState();
+                saveState(userId);
                 logger.info(`[SCHEDULER] Second follow-up sent to ${userId} (${hours}h inactive on "${state.step}")`);
             } catch (e: any) {
                 logger.error(`[SCHEDULER] Failed to send second follow-up to ${userId}:`, e.message);
@@ -326,7 +326,6 @@ function cleanupOldUsers(sharedState: SchedulerSharedState, dependencies: Schedu
     let cleaned = 0;
 
     for (const [userId, state] of Object.entries(userState)) {
-        if (state.step === 'completed') continue;
         const lastActivity = state.lastActivityAt || state.stepEnteredAt;
         if (!lastActivity) {
             // No timestamp — stale entry, clean it up

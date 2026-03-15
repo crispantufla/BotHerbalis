@@ -107,8 +107,8 @@ export async function handleCompleted(
 1. Si saluda ("hola", "buenas"), respondé breve. NO reiniciar el flujo.
 2. Si pregunta por su paquete, seguimiento, correo, demora, donde está el pedido o si ya lo despacharon: extraé "TRACKING_INFO" en la variable extractedData. NUNCA respondas nada ante estas consultas, solo extraelo.
 3. Si pide postergar EL ENVÍO (ej. "el 8 de marzo", "el mes que viene", "dentro de 5 días"):
-   - Si la fecha que pide es en MENOS DE 10 DÍAS desde hoy: decile amablemente que los envíos de por sí tardan mínimo 10 días.
-   - Si la fecha es en MÁS DE 10 DÍAS desde hoy: aceptá amablemente, confirmá que se pospone y devolvé "POSTDATE: [fecha]" en extractedData.
+   - SEGUÍ NORMALMENTE. Si la fecha es VAGA (ej: "el mes que viene", "a fin de mes"), PROPONÉ UNA FECHA CONCRETA temprana del período (ej: "¿A partir del 5 de [mes] estaría bien, o necesitás que sea más adelante?"). Si confirma → devolvé "POSTDATE: [fecha]" en extractedData. Si dice que no → preguntá qué día prefiere.
+   - Si da una fecha exacta: aceptá amablemente y devolvé "POSTDATE: [fecha]" en extractedData.
    - ⚠️ BAJO NINGÚN PUNTO DE VISTA le vuelvas a pedir datos de envío.
 4. Si tiene reclamo o duda compleja: extractedData="NEED_ADMIN" y avisá que lo comunicás.
 5. Si quiere VOLVER A COMPRAR (MÁS productos): extractedData="RE_PURCHASE" y preguntale qué quiere.
