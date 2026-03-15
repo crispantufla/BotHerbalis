@@ -83,6 +83,9 @@ function _getPrice(product: string | null | undefined, plan: string): string {
     } else if (product && product.includes('Gotas')) {
         result = prices['Gotas']?.[plan] || prices['Gotas']?.['60'];
     } else {
+        if (product && !product.includes('Semillas')) {
+            logger.warn(`[PRICING] _getPrice: unrecognized product "${product}", defaulting to Semillas`);
+        }
         result = prices['Semillas']?.[plan] || prices['Semillas']?.['60'];
     }
     return result || FALLBACK_PRICES['Semillas']['60'];

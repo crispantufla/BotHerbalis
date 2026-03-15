@@ -127,6 +127,15 @@ async function handleWaitingPlanChoice(
             await sendMessageWithDelay(userId, skipMsg2);
 
             calculateTotal(currentState);
+            currentState.pendingOrder = {
+                nombre: addr.nombre,
+                calle: addr.calle,
+                ciudad: addr.ciudad,
+                cp: addr.cp,
+                provincia: addr.provincia,
+                calleOriginal: addr.calleOriginal || addr.calle,
+                cart: currentState.cart
+            };
             const summaryMsg = buildConfirmationMessage(currentState);
 
             currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
@@ -183,6 +192,15 @@ async function handleWaitingPlanChoice(
                 await sendMessageWithDelay(userId, skipMsg2);
 
                 calculateTotal(currentState);
+                currentState.pendingOrder = {
+                    nombre: addr.nombre,
+                    calle: addr.calle,
+                    ciudad: addr.ciudad,
+                    cp: addr.cp,
+                    provincia: addr.provincia,
+                    calleOriginal: addr.calleOriginal || addr.calle,
+                    cart: currentState.cart
+                };
                 const summaryMsg = buildConfirmationMessage(currentState);
 
                 currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
@@ -263,6 +281,15 @@ RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.
                         await sendMessageWithDelay(userId, skipMsg);
 
                         calculateTotal(currentState);
+                        currentState.pendingOrder = {
+                            nombre: addr.nombre,
+                            calle: addr.calle,
+                            ciudad: addr.ciudad,
+                            cp: addr.cp,
+                            provincia: addr.provincia,
+                            calleOriginal: addr.calleOriginal || addr.calle,
+                            cart: currentState.cart
+                        };
                         const summaryMsg = buildConfirmationMessage(currentState);
 
                         currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
@@ -300,7 +327,7 @@ RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.
                     return { matched: true };
                 }
 
-                _handleExtractedData(userId, planAI.extractedData, currentState);
+                if (planAI.extractedData) _handleExtractedData(userId, planAI.extractedData, currentState);
                 currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });
                 await sendMessageWithDelay(userId, planAI.response);
                 saveState(userId);

@@ -65,7 +65,7 @@ const CP_PROVINCES: CPRange[] = [
     { min: 6000, max: 6999, province: 'Buenos Aires / La Pampa' },
     { min: 7000, max: 7999, province: 'Buenos Aires (Costa / Sur)' },
     { min: 8000, max: 8399, province: 'Buenos Aires (Sur) / Neuquén / Río Negro' },
-    { min: 8400, max: 8599, province: 'Río Negro' },
+    { min: 8400, max: 8999, province: 'Río Negro' },
     { min: 9000, max: 9399, province: 'Chubut / Santa Cruz' },
     { min: 9400, max: 9499, province: 'Tierra del Fuego / Santa Cruz' },
 ];

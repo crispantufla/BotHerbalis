@@ -34,7 +34,7 @@ module.exports = (client, sharedState) => {
         try {
             const days = parseInt(req.query.days) || 30;
             const instanceFilter = req.query.instance; // e.g. "current" or "all"
-            const instanceId = req.query.instanceId || process.env.INSTANCE_ID || 'default';
+            const instanceId = process.env.INSTANCE_ID || 'default';
             const { currentStart, previousStart, previousEnd } = getPeriods(days);
 
             const baseWhere = { status: { not: 'Cancelado' } };
@@ -90,7 +90,7 @@ module.exports = (client, sharedState) => {
         try {
             const days = parseInt(req.query.days) || 30;
             const instanceFilter = req.query.instance;
-            const instanceId = req.query.instanceId || process.env.INSTANCE_ID || 'default';
+            const instanceId = process.env.INSTANCE_ID || 'default';
             const { currentStart } = getPeriods(days);
 
             const baseWhere = { status: { not: 'Cancelado' } };
@@ -173,7 +173,7 @@ module.exports = (client, sharedState) => {
         try {
             const days = parseInt(req.query.days) || 30;
             const instanceFilter = req.query.instance;
-            const instanceId = req.query.instanceId || process.env.INSTANCE_ID || 'default';
+            const instanceId = process.env.INSTANCE_ID || 'default';
             const { currentStart } = getPeriods(days);
 
             const baseWhere = { status: { not: 'Cancelado' } };
@@ -281,7 +281,7 @@ module.exports = (client, sharedState) => {
     router.get('/analytics/funnel', authMiddleware, async (req, res) => {
         try {
             const days = parseInt(req.query.days) || 7;
-            const instanceId = req.query.instanceId || process.env.INSTANCE_ID || 'default';
+            const instanceId = process.env.INSTANCE_ID || 'default';
             const since = new Date();
             since.setDate(since.getDate() - days);
             since.setHours(0, 0, 0, 0);

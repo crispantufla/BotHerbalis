@@ -34,7 +34,7 @@ export async function handleWaitingMapsConfirmation(
         logger.info(`[MAPS-CONFIRM] User ${userId} confirmed unverified address. Pausing for admin review.`);
 
         // Build the order before pausing
-        const addr = currentState.partialAddress;
+        const addr = currentState.partialAddress || {};
         if (!currentState.cart || currentState.cart.length === 0) {
             const product = currentState.selectedProduct;
             if (product) {
@@ -44,7 +44,7 @@ export async function handleWaitingMapsConfirmation(
             }
         }
 
-        currentState.pendingOrder = { ...addr, cart: currentState.cart };
+        currentState.pendingOrder = { ...addr, calleOriginal: addr.calleOriginal || addr.calle, cart: currentState.cart };
 
         const subtotal = currentState.cart.reduce((sum: number, i: any) => sum + parseInt(i.price.toString().replace(/\./g, '')), 0);
         const adicional = currentState.adicionalMAX || 0;
@@ -109,8 +109,8 @@ export async function handleWaitingMapsConfirmation(
                     }
                 }
 
-                currentState.pendingOrder = { ...addr, cart: currentState.cart };
-                delete currentState.partialAddress;
+                currentState.pendingOrder = { ...addr, calleOriginal: addr.calleOriginal || addr.calle, cart: currentState.cart };
+                currentState.partialAddress = {} as any;
 
                 const subtotal = currentState.cart.reduce((sum: number, i: any) => sum + parseInt(i.price.toString().replace(/\./g, '')), 0);
                 const adicional = currentState.adicionalMAX || 0;

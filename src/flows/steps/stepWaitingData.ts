@@ -554,7 +554,7 @@ export async function handleWaitingData(
         }
 
         currentState.pendingOrder = { ...addr, calleOriginal, cart: currentState.cart };
-        delete currentState.partialAddress; // cleanup: no longer needed after full address captured
+        currentState.partialAddress = {} as any; // cleanup: no longer needed after full address captured
 
         const subtotal = currentState.cart.reduce((sum, i) => sum + parseInt(i.price.toString().replace(/\./g, '')), 0);
         const adicional = currentState.adicionalMAX || 0;

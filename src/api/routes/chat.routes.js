@@ -424,6 +424,14 @@ module.exports = (client, sharedState) => {
         try {
             const originalChatId = req.body.chatId;
             let { chatId, message } = req.body;
+
+            if (!chatId || typeof chatId !== 'string' || chatId.length > 100) {
+                return res.status(400).json({ error: 'Invalid or missing chatId' });
+            }
+            if (!message || typeof message !== 'string' || message.length === 0 || message.length > 5000) {
+                return res.status(400).json({ error: 'Invalid or missing message (max 5000 chars)' });
+            }
+
             chatId = await resolveChatId(chatId);
             const sentMsg = await client.sendMessage(chatId, message);
 
@@ -451,9 +459,19 @@ module.exports = (client, sharedState) => {
         try {
             const originalChatId = req.body.chatId;
             let { chatId, base64, mimetype, filename, caption } = req.body;
+
+            if (!chatId || typeof chatId !== 'string' || chatId.length > 100) {
+                return res.status(400).json({ error: 'Invalid or missing chatId' });
+            }
+
             chatId = await resolveChatId(chatId);
-            if (!chatId || !base64 || !mimetype) {
-                return res.status(400).json({ error: 'Missing chatId, base64, or mimetype' });
+            if (!base64 || !mimetype) {
+                return res.status(400).json({ error: 'Missing base64 or mimetype' });
+            }
+
+            const allowedMimetypes = ['image/jpeg', 'image/png', 'image/webp', 'audio/ogg', 'audio/mpeg', 'video/mp4'];
+            if (!allowedMimetypes.includes(mimetype)) {
+                return res.status(400).json({ error: 'Invalid mimetype. Allowed: ' + allowedMimetypes.join(', ') });
             }
             const media = new MessageMedia(mimetype, base64, filename || 'image.jpg');
             const sentMsg = await client.sendMessage(chatId, media, { caption: caption || '' });
@@ -487,6 +505,13 @@ module.exports = (client, sharedState) => {
             let { chatId } = req.body;
             chatId = await resolveChatId(chatId);
 
+            // Warn if there's an active order in progress (but don't block the reset)
+            let warning = null;
+            const currentState = userState[chatId];
+            if (currentState && (currentState.step === 'waiting_admin_validation' || currentState.step === 'waiting_final_confirmation')) {
+                warning = `Chat has an active order in step "${currentState.step}". The reset will proceed but the order state will be lost.`;
+            }
+
             delete userState[chatId];
             sharedState.chatResets[chatId] = Math.floor(Date.now() / 1000); // 1. Record reset timestamp
             pausedUsers.delete(chatId);
@@ -509,7 +534,9 @@ module.exports = (client, sharedState) => {
             await chat.clearMessages();
 
             if (sharedState.logAndEmit) sharedState.logAndEmit(chatId, 'system', 'Memoria de chat reiniciada', 'new');
-            res.json({ success: true });
+            const response = { success: true };
+            if (warning) response.warning = warning;
+            res.json(response);
         } catch (e) {
             res.status(500).json({ error: e.message });
         }

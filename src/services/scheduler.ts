@@ -12,6 +12,7 @@ const logger = require('../utils/logger');
 import cron from 'node-cron';
 import { isBusinessHours } from './timeUtils';
 import { differenceInMinutes, differenceInHours, differenceInDays } from 'date-fns';
+import { toZonedTime } from 'date-fns-tz';
 
 const messageTemplates = require('../utils/messageTemplates');
 const buildConfirmationMessage = messageTemplates.buildConfirmationMessage;
@@ -130,61 +131,66 @@ function checkStaleUsers(sharedState: SchedulerSharedState, dependencies: Schedu
  * autoApproveOrders — P0 #1
  * Auto-approves orders stuck in waiting_admin_ok for >15 min.
  */
-function autoApproveOrders(sharedState: SchedulerSharedState, dependencies: SchedulerDependencies): void {
+async function autoApproveOrders(sharedState: SchedulerSharedState, dependencies: SchedulerDependencies): Promise<void> {
     if (_autoApproveRunning) {
         logger.info('[SCHEDULER] autoApproveOrders already running, skipping.');
         return;
     }
     _autoApproveRunning = true;
     try {
-    const { userState } = sharedState;
-    const { sendMessageWithDelay, notifyAdmin, saveState, saveOrderToLocal } = dependencies;
-    const now = Date.now();
+        const { userState } = sharedState;
+        const { sendMessageWithDelay, notifyAdmin, saveState, saveOrderToLocal } = dependencies;
+        const now = Date.now();
 
-    for (const [userId, state] of Object.entries(userState)) {
-        if (state.step !== 'waiting_admin_ok') continue;
-        if (!state.stepEnteredAt) continue;
+        for (const [userId, state] of Object.entries(userState)) {
+            if (state.step !== 'waiting_admin_ok') continue;
+            if (!state.stepEnteredAt) continue;
 
-        const minutes = differenceInMinutes(now, state.stepEnteredAt);
-        if (minutes > AUTO_APPROVE_THRESHOLD_MINS) {
-            logger.info(`[AUTO-APPROVE] Order for ${userId} auto-approved after ${minutes} min without admin review`);
+            const minutes = differenceInMinutes(now, state.stepEnteredAt);
+            if (minutes > AUTO_APPROVE_THRESHOLD_MINS) {
+                logger.info(`[AUTO-APPROVE] Order for ${userId} auto-approved after ${minutes} min without admin review`);
 
-            const confirmMsg = buildConfirmationMessage(state);
+                const confirmMsg = buildConfirmationMessage(state);
 
-            sendMessageWithDelay(userId, confirmMsg);
-            state.history = state.history || [];
-            state.history.push({ role: 'bot', content: confirmMsg, timestamp: Date.now() });
+                try {
+                    await sendMessageWithDelay(userId, confirmMsg);
+                } catch (e: any) {
+                    logger.error(`[AUTO-APPROVE] Failed to send confirmation to ${userId}:`, e.message);
+                    continue;
+                }
+                state.history = state.history || [];
+                state.history.push({ role: 'bot', content: confirmMsg, timestamp: Date.now() });
 
-            if (state.pendingOrder) {
-                const o = state.pendingOrder;
-                const cart = o.cart || [];
-                const prodStr = cart.map(i => i.product).join(' + ');
-                const planStr = cart.map(i => `${i.plan} días`).join(' + ');
+                if (state.pendingOrder) {
+                    const o = state.pendingOrder;
+                    const cart = o.cart || [];
+                    const prodStr = cart.map(i => i.product).join(' + ');
+                    const planStr = cart.map(i => `${i.plan} días`).join(' + ');
 
-                const phone = userId.split('@')[0];
-                const orderData = {
-                    cliente: phone,
-                    nombre: o.nombre, calle: o.calle, ciudad: o.ciudad, cp: o.cp,
-                    producto: prodStr, plan: planStr,
-                    precio: state.totalPrice || '0',
-                    status: 'Auto-aprobado (sin revisión manual)',
-                    createdAt: new Date().toISOString()
-                };
+                    const phone = userId.split('@')[0];
+                    const orderData = {
+                        cliente: phone,
+                        nombre: o.nombre, calle: o.calle, ciudad: o.ciudad, cp: o.cp,
+                        producto: prodStr, plan: planStr,
+                        precio: state.totalPrice || '0',
+                        status: 'Auto-aprobado (sin revisión manual)',
+                        createdAt: new Date().toISOString()
+                    };
 
-                if (saveOrderToLocal) saveOrderToLocal(orderData);
+                    if (saveOrderToLocal) saveOrderToLocal(orderData);
+                }
+
+                state.step = 'waiting_final_confirmation';
+                state.stepEnteredAt = now;
+                saveState();
+
+                notifyAdmin(
+                    '⚡ Pedido AUTO-APROBADO (15 min sin revisión)',
+                    userId,
+                    `El pedido fue aprobado automáticamente.\nProducto: ${state.cart ? state.cart.map(i => i.product).join(' + ') : '?'}\nTotal: $${state.totalPrice || '?'}\n⚠️ Revisar en panel de ventas.`
+                ).catch(e => logger.error('[SCHEDULER] Auto-approve notify error:', e.message));
             }
-
-            state.step = 'waiting_final_confirmation';
-            state.stepEnteredAt = now;
-            saveState();
-
-            notifyAdmin(
-                '⚡ Pedido AUTO-APROBADO (15 min sin revisión)',
-                userId,
-                `El pedido fue aprobado automáticamente.\nProducto: ${state.cart ? state.cart.map(i => i.product).join(' + ') : '?'}\nTotal: $${state.totalPrice || '?'}\n⚠️ Revisar en panel de ventas.`
-            ).catch(e => logger.error('[SCHEDULER] Auto-approve notify error:', e.message));
         }
-    }
     } finally {
         _autoApproveRunning = false;
     }
@@ -460,7 +466,11 @@ function startScheduler(sharedState: SchedulerSharedState, dependencies: Schedul
             dependencies.saveState();
             await new Promise(r => setTimeout(r, 6000));
         }
-        process.kill(process.pid, 'SIGUSR2');
+        if (process.platform === 'win32') {
+            process.exit(0);
+        } else {
+            process.kill(process.pid, 'SIGUSR2');
+        }
     }, { timezone: TIMEZONE });
     logger.info('[SCHEDULER] ✅ Reinicio Preventivo Diario → 08:00 ARG (diario)');
 
@@ -491,7 +501,7 @@ async function snapshotDailyStats(sharedState?: SchedulerSharedState) {
         const { prisma } = require('../../db');
         const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
         // Use Argentina timezone so the date is correct regardless of server location
-        const argNow = new Date(new Date().toLocaleString('en-US', { timeZone: TIMEZONE }));
+        const argNow = toZonedTime(new Date(), TIMEZONE);
         const startOfDay = new Date(argNow);
         startOfDay.setHours(0, 0, 0, 0);
 

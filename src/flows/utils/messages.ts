@@ -1,5 +1,9 @@
 const { _getPrices } = require('./pricing');
 
+function _formatPriceNum(n: number): string {
+    return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
 function _formatMessage(text: string | string[], state: any): string {
     if (!text) return "";
 
@@ -10,12 +14,12 @@ function _formatMessage(text: string | string[], state: any): string {
 
     let formatted = textToFormat;
     // Replace {{PRICE_PRODUCT_PLAN}}
-    formatted = formatted.replace(/{{PRICE_CAPSULAS_60}}/g, prices['Cápsulas']['60']);
-    formatted = formatted.replace(/{{PRICE_CAPSULAS_120}}/g, prices['Cápsulas']['120']);
-    formatted = formatted.replace(/{{PRICE_SEMILLAS_60}}/g, prices['Semillas']['60']);
-    formatted = formatted.replace(/{{PRICE_SEMILLAS_120}}/g, prices['Semillas']['120']);
-    formatted = formatted.replace(/{{PRICE_GOTAS_60}}/g, prices['Gotas']['60']);
-    formatted = formatted.replace(/{{PRICE_GOTAS_120}}/g, prices['Gotas']['120']);
+    formatted = formatted.replace(/{{PRICE_CAPSULAS_60}}/g, prices['Cápsulas']?.['60'] || '');
+    formatted = formatted.replace(/{{PRICE_CAPSULAS_120}}/g, prices['Cápsulas']?.['120'] || '');
+    formatted = formatted.replace(/{{PRICE_SEMILLAS_60}}/g, prices['Semillas']?.['60'] || '');
+    formatted = formatted.replace(/{{PRICE_SEMILLAS_120}}/g, prices['Semillas']?.['120'] || '');
+    formatted = formatted.replace(/{{PRICE_GOTAS_60}}/g, prices['Gotas']?.['60'] || '');
+    formatted = formatted.replace(/{{PRICE_GOTAS_120}}/g, prices['Gotas']?.['120'] || '');
     formatted = formatted.replace(/{{ADICIONAL_MAX}}/g, prices.adicionalMAX || '6.000');
     formatted = formatted.replace(/{{COSTO_LOGISTICO}}/g, prices.costoLogistico || '18.000');
 
@@ -31,9 +35,9 @@ function _formatMessage(text: string | string[], state: any): string {
             let displayPrice = state.totalPrice;
             // If Contra Reembolso MAX, show breakdown
             if (state.isContraReembolsoMAX && state.adicionalMAX > 0) {
-                const basePriceInt = parseInt(state.totalPrice.replace(/\./g, '')) - state.adicionalMAX;
-                const basePrice = basePriceInt.toLocaleString('es-AR').replace(/,/g, '.'); // Format back to 00.000
-                const adicional = state.adicionalMAX.toLocaleString('es-AR').replace(/,/g, '.');
+                const basePriceInt = Math.max(0, parseInt(String(state.totalPrice).replace(/\./g, '')) - state.adicionalMAX);
+                const basePrice = _formatPriceNum(basePriceInt);
+                const adicional = _formatPriceNum(state.adicionalMAX);
                 displayPrice = `$${basePrice} + $${adicional}`;
             }
             formatted = formatted.replace(/{{TOTAL}}/g, displayPrice);

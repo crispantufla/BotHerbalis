@@ -2,6 +2,15 @@ import { UserState } from '../../types/state';
 const { _getPrice, _getAdicionalMAX } = require('./pricing');
 
 /**
+ * _formatPrice
+ * Deterministic thousands-separator formatter (dot-separated, e.g. 46.900).
+ * Avoids platform-dependent toLocaleString behavior.
+ */
+function _formatPrice(n: number): string {
+    return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+/**
  * buildCartFromSelection
  * Centralizes the repeated cart/price calculation logic that was duplicated
  * across stepWaitingPlanChoice.ts and stepWaitingData.ts.
@@ -34,7 +43,7 @@ function buildCartFromSelection(product: string, plan: string, state: UserState)
     state.cart = [{
         product: product,
         plan: plan,
-        price: calculatedPrice.toLocaleString('es-AR').replace(/,/g, '.')
+        price: _formatPrice(calculatedPrice)
     }];
 
     state.selectedPlan = plan;
@@ -66,7 +75,7 @@ function calculateTotal(state: UserState): string {
     }, 0);
     const adicional = state.adicionalMAX || 0;
     const total = subtotal + adicional;
-    const formatted = total.toLocaleString('es-AR').replace(/,/g, '.');
+    const formatted = _formatPrice(total);
     state.totalPrice = formatted;
     return formatted;
 }

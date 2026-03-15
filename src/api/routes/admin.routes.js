@@ -3,7 +3,7 @@ const express = require('express');
 const { authMiddleware } = require('../../middleware/auth');
 const validate = require('../../middleware/validate');
 const { configSchema, scriptSchema } = require('../../schemas/admin.schema');
-const { toggleBotSchema, adminCommandSchema } = require('../../schemas/system.schema');
+const { adminCommandSchema } = require('../../schemas/system.schema');
 
 module.exports = (client, sharedState) => {
     const router = express.Router();
@@ -22,20 +22,6 @@ module.exports = (client, sharedState) => {
         } catch (e) {
             res.status(500).json({ error: e.message });
         }
-    });
-
-    // POST /toggle-bot
-    router.post('/toggle-bot', authMiddleware, validate(toggleBotSchema), async (req, res) => {
-        const { chatId, paused } = req.body;
-        if (paused) {
-            pausedUsers.add(chatId);
-        } else {
-            pausedUsers.delete(chatId);
-        }
-        logger.info(`[API] admin toggle-bot: ${chatId} → ${paused ? 'PAUSED' : 'UNPAUSED'} (via admin API)`);
-        saveState();
-        if (io) io.emit('bot_status_change', { chatId, paused });
-        res.json({ success: true, paused });
     });
 
     // GET /script
@@ -68,6 +54,7 @@ module.exports = (client, sharedState) => {
         if (action && number) {
             if (!config.alertNumbers) config.alertNumbers = [];
             const cleanNum = number.replace(/\D/g, '');
+            if (cleanNum.length < 8) return res.status(400).json({ error: 'Invalid phone number' });
 
             if (action === 'add') {
                 if (!config.alertNumbers.includes(cleanNum)) {

@@ -18,7 +18,7 @@ function _isAffirmative(normalizedText: string): boolean {
     if (words.length > 6) return false;
 
     // NEVER match if contains negation/conditional/doubt words
-    if (/\b(pero|no se|no estoy|primero|antes|aunque|capaz|quizas|tal vez|todavia|mejor|ni idea|no quiero|no puedo)\b/.test(trimmed)) return false;
+    if (/\b(pero|no s[eé]|no estoy|primero|antes|aunque|capaz|quizas|tal vez|todavia|mejor|ni idea|no quiero|no puedo)\b/.test(trimmed)) return false;
 
     // Match: standalone strong affirmatives (any length ≤ 6)
     if (/\b(dale|listo|de una|joya|buenisimo|genial|perfecto|por supuesto)\b/.test(trimmed)) return true;

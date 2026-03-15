@@ -30,7 +30,7 @@ module.exports = (client, sharedState) => {
     router.get('/orders', authMiddleware, async (req, res) => {
         try {
             const page = parseInt(req.query.page) || 1;
-            const limit = parseInt(req.query.limit) || 100;
+            const limit = Math.min(parseInt(req.query.limit) || 100, 500);
             const skip = (page - 1) * limit;
 
             const { prisma } = require('../../../db');
@@ -189,6 +189,7 @@ module.exports = (client, sharedState) => {
 
                     if (sharedState.userState && sharedState.userState[targetPhone]) {
                         sharedState.userState[targetPhone].step = 'completed';
+                        sharedState.userState[targetPhone].history = sharedState.userState[targetPhone].history || [];
                         sharedState.userState[targetPhone].history.push({ role: 'bot', content: msg, timestamp: Date.now() });
                         if (sharedState.saveState) {
                             try { sharedState.saveState(targetPhone); } catch (e) { sharedState.saveState(); }

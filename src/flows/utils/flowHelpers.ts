@@ -102,16 +102,17 @@ function _detectPostdatado(normalizedText: string): string | null {
 async function _pauseAndAlert(userId: string, currentState: UserState, dependencies: any, userMessage: string, reason: string) {
     const { notifyAdmin, saveState, sendMessageWithDelay, sharedState } = dependencies;
     const { isBusinessHours } = require('../../services/timeUtils');
+    const duringBusinessHours = isBusinessHours();
 
     // Pause the user — use pauseService for DB persistence + debounce
     if (sharedState && sharedState.pausedUsers) {
         const { pauseUser } = require('../../services/pauseService');
         await pauseUser(userId, reason, { sharedState });
-        saveState(userId);
+        await saveState(userId);
     }
 
     // NIGHT MODE: Send polite night message
-    if (!isBusinessHours()) {
+    if (!duringBusinessHours) {
         const nightMsg = "Necesito consultar esto con mi compañero, pero entenderás que por la hora me es imposible. Apenas pueda te respondo, ¡quedate tranquilo/a! 😊🌙";
         currentState.history.push({ role: 'bot', content: nightMsg, timestamp: Date.now() });
         await sendMessageWithDelay(userId, nightMsg);
@@ -123,7 +124,7 @@ async function _pauseAndAlert(userId: string, currentState: UserState, dependenc
         ? `\n\n💡 *Sugerencias:*\n${suggestions.map((s: string, i: number) => `${i + 1}. ${s}`).join('\n')}`
         : '';
 
-    const nightLabel = !isBusinessHours() ? ' (FUERA DE HORARIO)' : '';
+    const nightLabel = !duringBusinessHours ? ' (FUERA DE HORARIO)' : '';
 
     // Alert admin with suggestions
     if (notifyAdmin) {
@@ -141,7 +142,7 @@ async function _pauseAndAlert(userId: string, currentState: UserState, dependenc
             reason,
             lastMessage: userMessage,
             step: currentState.step,
-            nightMode: !isBusinessHours(),
+            nightMode: !duringBusinessHours,
             timestamp: new Date()
         });
     }
@@ -158,10 +159,9 @@ function _extractSilentVariables(normalizedText: string, currentState: any): { a
     let result: { ageUpdated?: number, weightUpdated?: number, isSolelyCorrection: boolean } = { isSolelyCorrection: false };
 
     // Catch "tengo X años", "mi edad X"
-    const ageMatch = normalizedText.match(/\b(tengo|mi edad es(?:\sde)?)\s+(\d{2})\s*(años|añitos)?\b/i);
+    const ageMatch = normalizedText.match(/\b(tengo|mi edad es(?:\sde)?)\s+(\d{1,3})\s*(años|añitos)?\b/i);
     if (ageMatch && ageMatch[2]) {
         result.ageUpdated = parseInt(ageMatch[2], 10);
-        currentState.age = result.ageUpdated;
     }
 
     // Catch "peso X", "X kilos", "quiero bajar X"
@@ -172,11 +172,13 @@ function _extractSilentVariables(normalizedText: string, currentState: any): { a
     const weightGoalMatch = weightGoalMatchDirect || weightGoalMatchIndirect;
     const currentWeightMatch = normalizedText.match(/\b(peso|estoy pesando)\s+(\d{2,3})\s*(kilos|kg|kgs)?\b/i);
 
-    if (weightGoalMatch && weightGoalMatch[2]) {
-        // This is a GOAL (how much they want to lose)
-        const numStr = weightGoalMatch[2];
-        result.weightUpdated = parseInt(numStr, 10);
-        currentState.weightGoal = result.weightUpdated;
+    if (weightGoalMatch) {
+        // Direct regex captures number in group 2; indirect regex captures in group 1
+        const numStr = weightGoalMatchDirect ? weightGoalMatch[2] : weightGoalMatch[1];
+        if (numStr) {
+            result.weightUpdated = parseInt(numStr, 10);
+            currentState.weightGoal = result.weightUpdated;
+        }
     } else if (currentWeightMatch && currentWeightMatch[2]) {
         // This is their CURRENT body weight — never set it as a goal
         result.weightUpdated = parseInt(currentWeightMatch[2], 10);

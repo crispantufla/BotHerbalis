@@ -68,7 +68,7 @@ const path = require('path');
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 
-const { exec } = require('child_process'); // For sound
+// const { exec } = require('child_process'); // Unused
 // const { logMessage } = require('./logger'); // Import Logger - Replaced by new logger
 // const { analyzeDailyLogs } = require('./analyze_day'); // Import Analyzer
 // Google Sheets removed — PostgreSQL is now the sole source of truth
@@ -223,7 +223,10 @@ let _isSaving = false;
 
 async function _persistState(): Promise<void> {
     if (_isSaving) {
-        logger.info('[STATE] _persistState already in progress, skipping concurrent call.');
+        // Re-schedule to avoid dropping pending changes
+        if (!_saveStateTimeout) {
+            _saveStateTimeout = setTimeout(() => { _saveStateTimeout = null; _persistState(); }, 2000);
+        }
         return;
     }
     _isSaving = true;
@@ -437,7 +440,7 @@ const client = new Client({
             '--single-process',
             '--disable-features=IsolateOrigins,site-per-process', // Specific fix for "Frame detached" error
             '--no-first-run',
-            '--disable-web-security',
+            // '--disable-web-security', // Removed: unnecessary security risk
             '--disable-features=NetworkService',
             '--no-experiments',
             '--ignore-certificate-errors',
@@ -450,7 +453,7 @@ const client = new Client({
             '--disable-hang-monitor',
             '--disable-prompt-on-repost',
             '--disable-sync',
-            '--disk-cache-dir=/dev/null',
+            '--disk-cache-size=0',
             '--disable-gpu-shader-disk-cache'
         ],
         timeout: 120000 // 2 minutes timeout for slow startups
@@ -546,7 +549,7 @@ function saveOrderToLocal(order: Record<string, any>): void {
             const normalizedProduct = normalizeProductName(order.producto || '', order.plan || '', priceNum);
 
             const newOrderData = {
-                id: Date.now().toString(),
+                id: require('crypto').randomUUID(),
                 userPhone: cleanPhone || 'desconocido',
                 status: 'Pendiente',
                 products: normalizedProduct,
@@ -585,57 +588,53 @@ function saveOrderToLocal(order: Record<string, any>): void {
 }
 
 // Helper: Cancel Latest User Order
-function cancelLatestOrder(userId: string): Promise<{ success: boolean; order?: any; reason?: string; currentStatus?: string }> {
-    return new Promise((resolve) => {
-        (async () => {
-            let lock;
-            const phone = userId.split('@')[0].replace(/\D/g, '');
-            try {
-                // Shared lock to avoid colliding with saveOrderToLocal
-                lock = await redlock.acquire([`order_lock:${phone}`], 3000);
+async function cancelLatestOrder(userId: string): Promise<{ success: boolean; order?: any; reason?: string; currentStatus?: string }> {
+    let lock;
+    const phone = userId.split('@')[0].replace(/\D/g, '');
+    try {
+        // Shared lock to avoid colliding with saveOrderToLocal
+        lock = await redlock.acquire([`order_lock:${phone}`], 3000);
 
-                // Find the newest order for this user
-                const targetOrder = await prisma.order.findFirst({
-                    where: { userPhone: phone, instanceId: INSTANCE_ID },
-                    orderBy: { createdAt: 'desc' }
-                });
+        // Find the newest order for this user
+        const targetOrder = await prisma.order.findFirst({
+            where: { userPhone: phone, instanceId: INSTANCE_ID },
+            orderBy: { createdAt: 'desc' }
+        });
 
-                if (!targetOrder) {
-                    return resolve({ success: false, reason: "NOT_FOUND" });
-                }
+        if (!targetOrder) {
+            return { success: false, reason: "NOT_FOUND" };
+        }
 
-                if (targetOrder.status !== 'Pendiente' && targetOrder.status !== 'Confirmado') {
-                    return resolve({ success: false, reason: "INVALID_STATUS", currentStatus: targetOrder.status });
-                }
+        if (targetOrder.status !== 'Pendiente' && targetOrder.status !== 'Confirmado') {
+            return { success: false, reason: "INVALID_STATUS", currentStatus: targetOrder.status };
+        }
 
-                const updatedOrder = await prisma.order.update({
-                    where: { id: targetOrder.id },
-                    data: { status: 'Cancelado' }
-                });
+        const updatedOrder = await prisma.order.update({
+            where: { id: targetOrder.id },
+            data: { status: 'Cancelado' }
+        });
 
-                // Map to legacy format for Dashboard and Sheets
-                const legacyFormatUpdate = {
-                    id: updatedOrder.id,
-                    status: 'Cancelado',
-                    cliente: userId,
-                    producto: updatedOrder.products,
-                    precio: updatedOrder.totalPrice.toString(),
-                    createdAt: updatedOrder.createdAt.toISOString()
-                };
+        // Map to legacy format for Dashboard and Sheets
+        const legacyFormatUpdate = {
+            id: updatedOrder.id,
+            status: 'Cancelado',
+            cliente: userId,
+            producto: updatedOrder.products,
+            precio: updatedOrder.totalPrice.toString(),
+            createdAt: updatedOrder.createdAt.toISOString()
+        };
 
-                if (sharedState.io) sharedState.io.emit('order_update', legacyFormatUpdate);
+        if (sharedState.io) sharedState.io.emit('order_update', legacyFormatUpdate);
 
-                resolve({ success: true, order: legacyFormatUpdate });
-            } catch (err: any) {
-                logger.error('[CANCEL] Error canceling:', err.message);
-                resolve({ success: false, reason: "ERROR" });
-            } finally {
-                if (lock) {
-                    await lock.release().catch((e: any) => logger.warn('Failed to release lock:', e));
-                }
-            }
-        })();
-    });
+        return { success: true, order: legacyFormatUpdate };
+    } catch (err: any) {
+        logger.error('[CANCEL] Error canceling:', err.message);
+        return { success: false, reason: "ERROR" };
+    } finally {
+        if (lock) {
+            await lock.release().catch((e: any) => logger.warn('Failed to release lock:', e));
+        }
+    }
 }
 
 // Helper: Send with Delay (async/await — messages arrive in order)
@@ -772,6 +771,12 @@ client.on('ready', () => {
     logger.info(`[READY] connectedAt = ${sharedState.connectedAt}. Ignoring older messages.`);
     if (sharedState.io) sharedState.io.emit('ready', { info: client.info });
 
+    // Reset reconnect counter on successful connection
+    if (reconnectAttempts > 0) {
+        logger.info(`[WA] Reconectado exitosamente después de ${reconnectAttempts} intento(s)`);
+    }
+    reconnectAttempts = 0;
+
     // P3: Start scheduler for stale user alerts, re-engagement, and auto-approve
     if (!schedulerStarted) {
         startScheduler(sharedState, {
@@ -783,6 +788,18 @@ client.on('ready', () => {
         });
         schedulerStarted = true;
     }
+});
+
+client.on('auth_failure', (msg: string) => {
+    logger.error(`[WA] Authentication failure: ${msg}`);
+    sharedState.isConnected = false;
+    if (sharedState.io) sharedState.io.emit('status_change', { status: 'auth_failure' });
+    // Clean session and re-initialize after a delay
+    const authDir = path.join(__dirname, '.wwebjs_auth');
+    try { fs.rmSync(authDir, { recursive: true, force: true }); } catch (e) { /* ignore */ }
+    setTimeout(() => {
+        safeInitialize().catch(err => logger.error('[WA] Re-init after auth_failure failed:', err.message));
+    }, 5000);
 });
 
 // --- AUTO-RECONNECTION with exponential backoff ---
@@ -834,13 +851,7 @@ client.on('disconnected', (reason: string) => {
     }, delay);
 });
 
-// Reset reconnect counter on successful connection
-client.on('ready', () => {
-    if (reconnectAttempts > 0) {
-        logger.info(`[WA] ✅ Reconectado exitosamente después de ${reconnectAttempts} intento(s)`);
-    }
-    reconnectAttempts = 0;
-});
+// Reconnect counter reset is now handled in the main 'ready' handler above
 
 client.on('message', async (msg: any) => {
     try {

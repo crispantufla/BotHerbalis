@@ -54,6 +54,13 @@ module.exports = (client, sharedState) => {
                 return res.status(400).json({ error: "Missing image data or filename" });
             }
 
+            // Validate file extension against allowlist
+            const allowedExts = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
+            const ext_check = path.extname(filename).toLowerCase();
+            if (!allowedExts.includes(ext_check)) {
+                return res.status(400).json({ error: 'Invalid file type' });
+            }
+
             // Decode base64
             // Handle data:image/png;base64, prefix if present
             const matches = image.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);

@@ -49,14 +49,8 @@ module.exports = (client, sharedState) => {
         const qrData = sharedState.qrCodeData;
         if (!qrData) return res.send('<h1>No QR Code active</h1><p>Bot is either connected or initializing. Check logs.</p>');
 
-        // Sanitize qrData to prevent XSS
-        const safeQrData = qrData
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#x27;')
-            .replace(/\\/g, '\\\\');
+        // Sanitize qrData using JSON.stringify for safe JavaScript embedding
+        const safeQrData = JSON.stringify(qrData);
 
         const html = `
             <html>
@@ -68,7 +62,7 @@ module.exports = (client, sharedState) => {
                     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
                     <script>
                         new QRCode(document.getElementById("qrcode"), {
-                            text: "${safeQrData}",
+                            text: ${safeQrData},
                             width: 300,
                             height: 300
                         });

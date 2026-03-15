@@ -8,7 +8,8 @@ const GALLERY_JSON = path.join(DATA_DIR, 'gallery.json');
 function _getGallery(): any[] {
     try {
         if (fs.existsSync(GALLERY_JSON)) {
-            return JSON.parse(fs.readFileSync(GALLERY_JSON, 'utf8'));
+            const data = JSON.parse(fs.readFileSync(GALLERY_JSON, 'utf8'));
+            return Array.isArray(data) ? data : [];
         }
     } catch (e) { logger.error('Error reading gallery:', e); }
     return [];

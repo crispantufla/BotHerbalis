@@ -19,6 +19,7 @@ export async function handleWaitingOk(
     if (/\b(buscar|recoger|ir yo|ir a buscar|retirar yo|retiro yo|paso a buscar)\b/.test(normalizedText)) {
         const msg = 'No tenemos local de venta al público. Los envíos se hacen exclusivamente por Correo Argentino 📦. Pero tranqui, si el cartero no te encuentra, podés retirarlo en la sucursal más cercana.\n\n👉 ¿Te resulta posible recibirlo así? SÍ o NO';
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        saveState(userId);
         await sendMessageWithDelay(userId, msg);
         return { matched: true };
     }

@@ -50,6 +50,7 @@ export async function handleWaitingPriceConfirmation(
 
         if (aiPrice.response) {
             currentState.history.push({ role: 'bot', content: aiPrice.response, timestamp: Date.now() });
+            saveState(userId);
             await sendMessageWithDelay(userId, aiPrice.response);
             return { matched: true };
         }

@@ -9,11 +9,11 @@ const logger = require('../utils/logger');
  * Refactorizado de src/controllers/admin.js a services/adminService.ts
  */
 
-/** Helper: remove alert for a user and emit update to dashboard */
+/** Helper: remove ALL alerts for a user and emit update to dashboard */
 function _dismissAlert(userPhone: string, sharedState: any): void {
-    const index: number = sharedState.sessionAlerts.findIndex((a: AlertEntry) => a.userPhone === userPhone);
-    if (index !== -1) {
-        sharedState.sessionAlerts.splice(index, 1);
+    const before = sharedState.sessionAlerts.length;
+    sharedState.sessionAlerts = sharedState.sessionAlerts.filter((a: AlertEntry) => a.userPhone !== userPhone);
+    if (sharedState.sessionAlerts.length !== before) {
         if (sharedState.io) sharedState.io.emit('alerts_updated', sharedState.sessionAlerts);
     }
 }
@@ -126,6 +126,12 @@ export async function handleAdminCommand(
     client: any
 ): Promise<string> {
     if (!commandText) return '⚠️ Comando vacío.';
+
+    // Validate targetChatId format if provided
+    if (targetChatId && !/^\d+@(c|g)\.us$/.test(targetChatId)) {
+        return '⚠️ ID de chat inválido. Formato esperado: <número>@c.us o <número>@g.us';
+    }
+
     const lowerMsg = commandText.toLowerCase().trim();
     const userId = process.env.ADMIN_NUMBER ? `${process.env.ADMIN_NUMBER.replace(/\D/g, '')}@c.us` : null;
 
@@ -243,6 +249,7 @@ export async function handleAdminCommand(
                 if (sharedState.pausedUsers.has(actualTarget)) {
                     const { unpauseUser: unpauseUserFn } = require('./pauseService');
                     await unpauseUserFn(actualTarget, sharedState);
+                    if (sharedState.io) sharedState.io.emit('bot_status_change', { chatId: actualTarget, paused: false });
                 }
 
                 _dismissAlert(actualTarget, sharedState);

@@ -20,7 +20,8 @@ interface SalesFlowDependencies {
 }
 
 // Keywords that signal clear purchase intent — if present, don't auto-pause
-const PURCHASE_INTENT_KEYWORDS = /\b(comprar|quiero comprar|quiero pedir|me interesa|precio|precios|cuanto sale|cuánto sale|cuanto cuesta|cuánto cuesta|quiero encargar|necesito comprar|hagan envios|hacen envíos|hacen envios|quisiera pedir|quisiera comprar|quiero adquirir|quiero ordenar|tienen capsulas|tienen semillas|tienen gotas|nuez de la india|la direccion|la dirección|mi direccion|mi dirección|te paso mis datos|mis datos|los datos|te paso la direccion|te paso la dirección|informacion|información|quiero saber|quiero mas info|bajar|adelgazar|kilos|kilo|capsulas|cápsulas|semillas|gotas|peso|perder peso|bajar de peso|10 kg|20 kg|mas de 20)\b/i;
+// Note: normalizedText is accent-stripped, so only unaccented variants are needed
+const PURCHASE_INTENT_KEYWORDS = /\b(comprar|quiero comprar|quiero pedir|me interesa|precio|precios|cuanto sale|cuanto cuesta|quiero encargar|necesito comprar|hagan envios|hacen envios|quisiera pedir|quisiera comprar|quiero adquirir|quiero ordenar|tienen capsulas|tienen semillas|tienen gotas|nuez de la india|la direccion|mi direccion|te paso mis datos|mis datos|los datos|te paso la direccion|informacion|quiero saber|quiero mas info|bajar|adelgazar|kilos|kilo|capsulas|semillas|gotas|peso|perder peso|bajar de peso|10 kg|20 kg|mas de 20)\b/i;
 
 export async function processSalesFlow(
     userId: string,
@@ -293,6 +294,7 @@ export async function processSalesFlow(
     if (!stepResult || !stepResult.matched) {
         logger.info(`[PAUSE] No match for user ${userId} at step "${currentState.step}". Pausing and alerting admin.`);
         await _pauseAndAlert(userId, currentState, dependencies, text, `Bot no pudo responder en paso "${currentState.step}".`);
+        return { matched: true, paused: true };
     }
 
     // 5. Post-Processing Context Triggers Check

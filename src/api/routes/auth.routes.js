@@ -4,6 +4,14 @@ const crypto = require('crypto');
 // Generate a random session token at startup (not hardcoded)
 const SESSION_TOKEN = crypto.randomBytes(32).toString('hex');
 
+function safeCompare(a, b) {
+    if (typeof a !== 'string' || typeof b !== 'string') return false;
+    const bufA = Buffer.from(a);
+    const bufB = Buffer.from(b);
+    if (bufA.length !== bufB.length) return false;
+    return crypto.timingSafeEqual(bufA, bufB);
+}
+
 module.exports = (client, sharedState) => {
     const router = express.Router();
 
@@ -16,7 +24,7 @@ module.exports = (client, sharedState) => {
         const validUser = process.env.ADMIN_USER;
         const validPass = process.env.ADMIN_PASSWORD;
 
-        if (username === validUser && password === validPass) {
+        if (safeCompare(username, validUser) && safeCompare(password, validPass)) {
             return res.json({
                 success: true,
                 token: SESSION_TOKEN,

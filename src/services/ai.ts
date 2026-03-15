@@ -419,12 +419,14 @@ class AIService {
     cache: NodeCache;
     stats: { calls: number, cached: number, retries: number, errors: number, promptTokens: number, completionTokens: number, estimatedCostUSD: number };
     _circuitBreaker: { failures: number, openUntil: number };
+    _disabled: boolean;
 
     constructor() {
         const apiKey = process.env.OPENAI_API_KEY || "";
         if (!apiKey) {
             logger.error("❌ CRITICAL: OPENAI_API_KEY is missing!");
         }
+        this._disabled = !apiKey;
 
         logger.info(`📡[AI] Initializing OpenAI(base: ${MODEL}, premium: ${MODEL_PREMIUM})`);
 
@@ -446,6 +448,7 @@ class AIService {
      * Core API call with retry + rate limit handling
      */
     async _callQueued<T>(apiCallFn: () => Promise<T>, rawCacheKey: string | null = null, customTTL: number | undefined = undefined): Promise<T> {
+        if (this._disabled) throw new Error('AI Service disabled: missing API key');
         // Check cache first
         let cacheKey = null;
         if (rawCacheKey) {
@@ -832,7 +835,7 @@ CRÍTICO: Usá la "Fecha Actual" provista arriba para calcular el día exacto y 
                     temperature: 0,
                     max_tokens: 200
                 }),
-                `addr_${text.substring(0, 50)} `, // Clave de caché para deduplicar textos crudos como "1", "2" o direcciones comunes
+                `addr_${crypto.createHash('sha256').update(text).digest('hex').substring(0, 24)}`, // Hashed cache key for full text deduplication
                 5 * 60 // 5 MINUTOS DE TTL para extracciones
             );
 
@@ -900,7 +903,7 @@ CRÍTICO: Usá la "Fecha Actual" provista arriba para calcular el día exacto y 
                                 {
                                     type: "image_url",
                                     image_url: {
-                                        url: `data:${mimeType}; base64, ${mediaData} `,
+                                        url: `data:${mimeType};base64,${mediaData}`,
                                         detail: "low"
                                     }
                                 }

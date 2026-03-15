@@ -116,16 +116,17 @@ export async function restorePausedUsersFromDB(
 
         const cutoff = new Date(Date.now() - STALE_PAUSE_DAYS * 24 * 60 * 60 * 1000);
 
-        const [recent, stale] = await Promise.all([
-            prisma.user.findMany({
-                where: { instanceId: INSTANCE_ID, pausedAt: { gte: cutoff } },
-                select: { phone: true }
-            }),
-            prisma.user.updateMany({
-                where: { instanceId: INSTANCE_ID, pausedAt: { not: null, lt: cutoff } },
-                data: { pausedAt: null, pauseReason: null }
-            })
-        ]);
+        // Run sequentially: clear stale users first, then find recent ones
+        // (avoids race where a stale user could appear in both results)
+        const stale = await prisma.user.updateMany({
+            where: { instanceId: INSTANCE_ID, pausedAt: { not: null, lt: cutoff } },
+            data: { pausedAt: null, pauseReason: null }
+        });
+
+        const recent = await prisma.user.findMany({
+            where: { instanceId: INSTANCE_ID, pausedAt: { gte: cutoff } },
+            select: { phone: true }
+        });
 
         for (const u of recent) {
             sharedState.pausedUsers.add(`${u.phone}@c.us`);

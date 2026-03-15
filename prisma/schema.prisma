@@ -46,7 +46,7 @@ model Order {
 
   createdAt   DateTime @default(now())
 
-  @@index([userPhone])
+  @@index([userPhone, instanceId])
   @@index([instanceId])
   @@index([createdAt])
 }
@@ -62,7 +62,7 @@ model ChatLog {
 
   timestamp   DateTime @default(now())
 
-  @@index([userPhone])
+  @@index([userPhone, instanceId])
   @@index([timestamp])
 }
 

@@ -29,6 +29,9 @@ workerConnection.on('ready', () => {
 const QUEUE_NAME = `whatsapp-messages-${process.env.INSTANCE_ID || 'default'}`;
 export const botQueue = new Queue(QUEUE_NAME, { connection: redisConnection });
 
+// --- MODULE-LEVEL WORKER REF (for shutdown) ---
+let _worker: Worker | null = null;
+
 // --- WORKER FACTORY ---
 // We initialize the worker injecting the required dependencies from index.ts
 export function initWorker(dependencies: any) {
@@ -102,6 +105,7 @@ export function initWorker(dependencies: any) {
 
     logger.info('✅ [BULLMQ] Worker inicializado. Listo para despachar mensajes en segundo plano.');
 
+    _worker = worker;
     return worker;
 }
 
@@ -110,10 +114,14 @@ export function initWorker(dependencies: any) {
  */
 export async function shutdownQueue(): Promise<void> {
     try {
+        if (_worker) {
+            await _worker.close();
+            _worker = null;
+        }
         await botQueue.close();
         await redisConnection.quit();
         await workerConnection.quit();
-        logger.info('[BULLMQ] Queue and Redis connections closed.');
+        logger.info('[BULLMQ] Worker, Queue, and Redis connections closed.');
     } catch (e: any) {
         logger.error('[BULLMQ] Shutdown error:', e.message);
     }

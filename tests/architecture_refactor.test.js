@@ -502,7 +502,7 @@ describe('Step Handlers (Refactored)', () => {
 
         test('skips to preference after 2+ refusals', async () => {
             const userState = { [userId]: makeState('waiting_weight', { weightRefusals: 2 }) };
-            await processSalesFlow(userId, 'no se cuanto tengo que bajar', userState, knowledge, mockDependencies);
+            await processSalesFlow(userId, 'no se la verdad', userState, knowledge, mockDependencies);
             expect(userState[userId].step).toBe('waiting_preference');
         });
 

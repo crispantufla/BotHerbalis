@@ -61,7 +61,16 @@ export async function handleWaitingWeight(
             await sendMessageWithDelay(userId, aiDual.response);
             return { matched: true };
         }
-        // If AI failed, fall through to normal weight-only handling below
+        // AI failed but we already extracted weight — proceed to next step with the weight we have
+        logger.warn(`[AI-FALLBACK] Dual-goal AI failed for ${userId}, but weight (${currentState.weightGoal}kg) was extracted. Proceeding.`);
+        const recNode = knowledge.flow.recommendation;
+        const { _formatMessage: fmtMsg } = require('../utils/messages');
+        const recMsg = fmtMsg(recNode.response, currentState);
+        _setStep(currentState, recNode.nextStep);
+        currentState.history.push({ role: 'bot', content: recMsg, timestamp: Date.now() });
+        saveState(userId);
+        await sendMessageWithDelay(userId, recMsg);
+        return { matched: true };
     }
 
     if (hasNumber && !hasQuestion && !isVeryLongMessage) {
@@ -97,7 +106,9 @@ export async function handleWaitingWeight(
             return { matched: true };
         }
     } else {
-        (currentState as any).weightRefusals = ((currentState as any).weightRefusals || 0) + 1;
+        if (!hasQuestion) {
+            (currentState as any).weightRefusals = ((currentState as any).weightRefusals || 0) + 1;
+        }
 
         if (isRefusal || (currentState as any).weightRefusals > 2) {
             logger.info(`[LOGIC] User ${userId} refused/failed weight question too many times (${(currentState as any).weightRefusals}). Skipping to preference.`);

@@ -149,6 +149,11 @@ export async function handleCompleted(
         currentState.pendingOrder = null;
         currentState.partialAddress = {};
         currentState.addressAttempts = 0;
+        currentState.selectedProduct = null;
+        currentState.selectedPlan = null;
+        currentState.totalPrice = null;
+        currentState.postdatado = null;
+        currentState.weightGoal = null;
         saveState(userId);
 
         if (postSaleAI.response) {
