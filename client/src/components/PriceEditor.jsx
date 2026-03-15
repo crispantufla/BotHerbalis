@@ -15,7 +15,11 @@ const PriceEditor = () => {
     const fetchPrices = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`${API_URL}/api/prices`);
+            const res = await fetch(`${API_URL}/api/prices`, {
+                headers: {
+                    'x-api-key': import.meta.env.VITE_API_KEY
+                }
+            });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
 
