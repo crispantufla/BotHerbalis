@@ -13,7 +13,7 @@ module.exports = (client, sharedState) => {
     const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../../..');
 
     // GET /health — Real system health check
-    router.get('/health', (req, res) => {
+    router.get('/health', authMiddleware, (req, res) => {
         const memUsage = process.memoryUsage();
         res.json({
             status: sharedState.isConnected ? 'ok' : 'degraded',
@@ -32,7 +32,7 @@ module.exports = (client, sharedState) => {
     });
 
     // GET /status
-    router.get('/status', (req, res) => {
+    router.get('/status', authMiddleware, (req, res) => {
         const isConnected = sharedState.isConnected;
         const qrCodeData = sharedState.qrCodeData;
         res.json({
@@ -44,8 +44,8 @@ module.exports = (client, sharedState) => {
         });
     });
 
-    // GET /scan - Public QR Page (Emergency Fallback)
-    router.get('/scan', (req, res) => {
+    // GET /scan - QR Page (requires auth)
+    router.get('/scan', authMiddleware, (req, res) => {
         const qrData = sharedState.qrCodeData;
         if (!qrData) return res.send('<h1>No QR Code active</h1><p>Bot is either connected or initializing. Check logs.</p>');
 
@@ -408,7 +408,7 @@ module.exports = (client, sharedState) => {
     const PRICES_FILE = path.join(__dirname, '../../../data/prices.json');
 
     // GET /prices
-    router.get('/prices', (req, res) => {
+    router.get('/prices', authMiddleware, (req, res) => {
         try {
             if (fs.existsSync(PRICES_FILE)) {
                 res.json(JSON.parse(fs.readFileSync(PRICES_FILE)));

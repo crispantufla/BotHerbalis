@@ -5,6 +5,7 @@ import OpenAI from 'openai';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import * as crypto from 'crypto';
 import { UserState } from '../types/state';
 
 // --- RAG RULE BASE ---
@@ -438,13 +439,7 @@ class AIService {
      * Hash string utility for Keys
      */
     _hashKey(str: string): string {
-        let hash = 0;
-        for (let i = 0; i < str.length; i++) {
-            hash = ((hash << 5) - hash) + str.charCodeAt(i);
-            hash |= 0;
-        }
-        // Prefab with standard length for collision awareness
-        return 'ai_' + hash.toString(36) + '_' + str.length;
+        return 'ai_' + crypto.createHash('sha256').update(str).digest('hex').substring(0, 24);
     }
 
     /**
@@ -659,7 +654,7 @@ INSTRUCCIONES:
                     temperature: 0.6,
                     max_tokens: 1500
                 }),
-                `chat_${systemPrompt}_${userPrompt}` // Caché activo para FAQs y etapas repetitivas
+                `chat_${step}_${userText}` // Caché activo para FAQs y etapas repetitivas
             );
 
             const toolCalls = result.choices[0].message?.tool_calls;

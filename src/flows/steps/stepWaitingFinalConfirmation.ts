@@ -163,25 +163,10 @@ export async function handleWaitingFinalConfirmation(
             return { matched: true };
         }
 
-        if (notifyAdmin) await notifyAdmin('⚠️ Respuesta inesperada en confirmación final', userId, `Cliente respondió: "${text}". El pedido se procesó igual.`);
-
-        const msg = "Voy a revisar los datos, ya te confirmo el pedido ⏳";
-        await sendMessageWithDelay(userId, msg);
-
-        if (currentState.pendingOrder) {
-            const orderData = _buildOrderData({ createdAt: new Date().toISOString(), status: 'Pendiente (revisar respuesta)' });
-            currentState.hasSoldBefore = true; // Flag for globalSystem.js to detect returning customer
-            if (dependencies.saveOrderToLocal) dependencies.saveOrderToLocal(orderData);
-
-            const trackScript = dependencies.effectiveScript || dependencies.config?.activeScript || 'v3';
-            if (dependencies.config && dependencies.config.scriptStats && trackScript !== 'rotacion') {
-                if (!dependencies.config.scriptStats[trackScript]) dependencies.config.scriptStats[trackScript] = { started: 0, completed: 0 };
-                dependencies.config.scriptStats[trackScript].completed++;
-            }
-        }
-
-        _setStep(currentState, FlowStep.WAITING_ADMIN_VALIDATION);
-        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        // Don't auto-process: pause user and let admin decide
+        const { _pauseAndAlert } = require('../utils/flowHelpers');
+        logger.warn(`[FINAL_CONFIRM] Unrecognized response from ${userId}: "${text}" — pausing for admin review`);
+        await _pauseAndAlert(userId, currentState, dependencies, `⚠️ Respuesta no reconocida en confirmación final. Cliente dijo: "${text.substring(0, 100)}". Pedido NO procesado, requiere revisión manual.`);
         saveState(userId);
         return { matched: true };
     }

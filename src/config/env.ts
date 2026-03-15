@@ -5,7 +5,7 @@ dotenv.config();
 const env = cleanEnv(process.env, {
     // Servidor / Instancia
     PORT: num({ default: 3000 }),
-    INSTANCE_ID: str({ default: 'herbalis_main' }),
+    INSTANCE_ID: str({ default: 'default' }),
     PORT_INTERNAL: num({ default: 3001 }),
     DASHBOARD_URL: url(),
 

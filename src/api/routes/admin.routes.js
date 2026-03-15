@@ -39,7 +39,7 @@ module.exports = (client, sharedState) => {
     });
 
     // GET /script
-    router.get('/script', (req, res) => res.json(knowledge));
+    router.get('/script', authMiddleware, (req, res) => res.json(knowledge));
 
     // POST /script
     router.post('/script', authMiddleware, validate(scriptSchema), (req, res) => {

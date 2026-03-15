@@ -170,6 +170,17 @@ function startServer(client, sharedState) {
         });
     });
 
+    // --- SOCKET AUTH ---
+    const SOCKET_API_KEY = process.env.API_KEY;
+    io.use((socket, next) => {
+        const apiKey = socket.handshake.auth?.apiKey || socket.handshake.headers['x-api-key'];
+        if (!SOCKET_API_KEY || apiKey !== SOCKET_API_KEY) {
+            logger.warn(`[SOCKET] Unauthorized connection attempt from ${socket.handshake.address}`);
+            return next(new Error('Unauthorized'));
+        }
+        next();
+    });
+
     // --- SOCKET SYNC ---
     io.on('connection', (socket) => {
         if (sharedState.isConnected && client && client.info) {

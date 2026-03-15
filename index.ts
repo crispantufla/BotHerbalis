@@ -349,8 +349,8 @@ async function loadState() {
 // Initial Load — await loadState to ensure DB data is ready before accepting requests
 (async () => {
     await loadState();
-})().catch(e => logger.error('[BOOT] loadState failed:', e.message));
-loadKnowledge();
+    loadKnowledge();
+})().catch(e => logger.error('[BOOT] startup failed:', e.message));
 
 // --- WHATSAPP CLIENT ---
 // ─────────────────────────────────────────────────────────────
