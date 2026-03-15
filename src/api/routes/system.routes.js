@@ -399,7 +399,7 @@ module.exports = (client, sharedState) => {
     });
 
     // --- PRICES API ---
-    const PRICES_FILE = path.join(__dirname, '../../../data/prices.json');
+    const PRICES_FILE = path.join(DATA_DIR, 'prices.json');
 
     // GET /prices
     router.get('/prices', authMiddleware, (req, res) => {

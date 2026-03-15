@@ -147,8 +147,8 @@ const CACHE_TTL_SECONDS = 45 * 60; // 45 min cache for node-cache
 const CIRCUIT_BREAKER_THRESHOLD = 3;   // consecutive failures to open circuit
 const CIRCUIT_BREAKER_RESET_MS = 30_000; // 30s cooldown before retrying
 
-// --- PRICES PATH ---
-const PRICES_PATH = path.join(__dirname, '../../data/prices.json');
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../../..');
+const PRICES_PATH = path.join(DATA_DIR, 'prices.json');
 
 // Steps that require longer AI responses
 const COMPLEX_STEPS = new Set(['waiting_preference_consultation', 'waiting_data', 'waiting_ok', 'safety_check']);
