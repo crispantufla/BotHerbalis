@@ -14,6 +14,7 @@ export const SocketProvider = ({ children }) => {
 
     useEffect(() => {
         const newSocket = io(API_URL, {
+            auth: { apiKey: import.meta.env.VITE_API_KEY },
             reconnection: true,
             reconnectionAttempts: Infinity,
             reconnectionDelay: 1000,
