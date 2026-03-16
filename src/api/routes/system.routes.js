@@ -492,33 +492,36 @@ module.exports = (client, sharedState) => {
             const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
 
             // 0. Snapshot daily stats before deleting users
-            const startOfDay = new Date();
-            startOfDay.setHours(0, 0, 0, 0);
+            // Use Argentina timezone to match dashboard
+            const argNow = new Date(new Date().getTime() - 3 * 3600000); // approx Arg time
+            const startOfDay = new Date(argNow);
+            startOfDay.setUTCHours(0, 0, 0, 0);
 
-            // Get total chats currently in DB before wiping
-            const totalUsersBefore = await prisma.user.count({ where: { instanceId: INSTANCE_ID } });
-
-            // Get today's completed orders + revenue
-            const todayStats = await prisma.order.aggregate({
-                _count: true,
-                _sum: { totalPrice: true },
-                where: { createdAt: { gte: startOfDay }, instanceId: INSTANCE_ID, status: { not: 'Cancelado' } }
+            // Get total chats created TODAY in DB before wiping
+            const totalUsersToday = await prisma.user.count({ 
+                where: { instanceId: INSTANCE_ID, createdAt: { gte: startOfDay } } 
             });
 
+            // Save daily stat BEFORE resetting
             try {
-                // Upsert to ensure we only have 1 row per day per instance
+                const todayStats = await prisma.order.aggregate({
+                    _count: true,
+                    _sum: { totalPrice: true },
+                    where: { createdAt: { gte: startOfDay }, instanceId: INSTANCE_ID, status: { not: 'Cancelado' } }
+                });
+
                 await prisma.dailyStats.upsert({
                     where: { instanceId_date: { instanceId: INSTANCE_ID, date: startOfDay } },
                     create: {
                         instanceId: INSTANCE_ID,
                         date: startOfDay,
-                        totalChats: totalUsersBefore,
+                        totalChats: totalUsersToday,
                         completedOrders: todayStats._count,
                         totalRevenue: todayStats._sum.totalPrice || 0
                     },
                     update: {
                         // In case of multiple manual resets a day, keep the highest totalChats observed
-                        totalChats: { set: totalUsersBefore },
+                        totalChats: { set: totalUsersToday },
                         completedOrders: { set: todayStats._count },
                         totalRevenue: { set: todayStats._sum.totalPrice || 0 }
                     }
@@ -528,16 +531,18 @@ module.exports = (client, sharedState) => {
                 logger.error('[STATS] Failed to save daily snapshot:', statsErr);
             }
 
-            // 1. Purge DB user states — ONLY users inactive for 48+ hours
+            // 1. Purge DB memory — ONLY users inactive for 48+ hours
             const cutoffDate = new Date(Date.now() - 48 * 60 * 60 * 1000); // 48h ago
 
-            // Delete users WITHOUT any orders AND inactive for 48h+
-            const deleted = await prisma.user.deleteMany({
-                where: { orders: { none: {} }, instanceId: INSTANCE_ID, lastSeen: { lt: cutoffDate } }
+            // INSTEAD of deleting User records (which breaks historical analytics counts),
+            // delete their heavy ChatLogs to save DB space.
+            const deletedChats = await prisma.chatLog.deleteMany({
+                where: { user: { orders: { none: {} }, instanceId: INSTANCE_ID, lastSeen: { lt: cutoffDate } } }
             });
-            // For users WITH orders, just clear their profile data if inactive 48h+
+
+            // For ALL inactive users (with or without orders), clear their profileData to save space
             const cleaned = await prisma.user.updateMany({
-                where: { orders: { some: {} }, profileData: { not: null }, instanceId: INSTANCE_ID, lastSeen: { lt: cutoffDate } },
+                where: { profileData: { not: null }, instanceId: INSTANCE_ID, lastSeen: { lt: cutoffDate } },
                 data: { profileData: null }
             });
 
@@ -550,12 +555,12 @@ module.exports = (client, sharedState) => {
             const { userCache } = require('../../utils/cache');
             userCache.flushAll();
 
-            logger.info(`[RESET] Memory purged (48h filter). Deleted ${deleted.count} users sin pedidos, limpiado ${cleaned.count} con pedidos. Protected ${protected48h} active users.`);
+            logger.info(`[RESET] Memory purged (48h filter). Deleted ${deletedChats.count} ChatLogs, cleared ${cleaned.count} user profiles. Protected ${protected48h} active users.`);
 
             // 3. Notify dashboard
-            if (io) io.emit('memory_reset', { deletedCount: deleted.count });
+            if (io) io.emit('memory_reset', { deletedCount: deletedChats.count });
 
-            res.json({ success: true, deletedUsers: deleted.count, protected48h });
+            res.json({ success: true, deletedUsers: 0, deletedChats: deletedChats.count, protected48h });
         } catch (e) {
             logger.error('[RESET] Error purging memory:', e);
             res.status(500).json({ error: e.message });

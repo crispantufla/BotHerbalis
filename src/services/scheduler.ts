@@ -504,7 +504,11 @@ async function snapshotDailyStats(sharedState?: SchedulerSharedState) {
         const startOfDay = new Date(argNow);
         startOfDay.setHours(0, 0, 0, 0);
 
-        const totalUsers = await prisma.user.count({ where: { instanceId: INSTANCE_ID } });
+        // Count ONLY new users generated today
+        const totalUsersToday = await prisma.user.count({ 
+            where: { instanceId: INSTANCE_ID, createdAt: { gte: startOfDay } } 
+        });
+
         const todayStats = await prisma.order.aggregate({
             _count: true,
             _sum: { totalPrice: true },
@@ -526,13 +530,13 @@ async function snapshotDailyStats(sharedState?: SchedulerSharedState) {
             create: {
                 instanceId: INSTANCE_ID,
                 date: startOfDay,
-                totalChats: totalUsers,
+                totalChats: totalUsersToday,
                 completedOrders: todayStats._count,
                 totalRevenue: todayStats._sum.totalPrice || 0,
                 ...(stepCounts && { stepCounts })
             },
             update: {
-                totalChats: { set: totalUsers },
+                totalChats: { set: totalUsersToday },
                 completedOrders: { set: todayStats._count },
                 totalRevenue: { set: todayStats._sum.totalPrice || 0 },
                 ...(stepCounts && { stepCounts: { set: stepCounts } })
