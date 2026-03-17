@@ -16,7 +16,7 @@ const Icons = {
     Clip: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
 };
 
-const CommsView = ({ initialChatId, onChatSelected }) => {
+const CommsView = ({ initialChatId, onChatSelected, alerts = [], onAlertAction }) => {
     const { socket } = useSocket();
     const { toast } = useToast();
     const [chats, setChats] = useState([]);
@@ -37,6 +37,9 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
     const [loadingOrder, setLoadingOrder] = useState(false);
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
+
+    // Find alert for selected chat
+    const chatAlert = selectedChat ? alerts.find(a => a.userPhone === selectedChat.id) : null;
 
     // Filter chats
     const filteredChats = searchTerm
@@ -629,11 +632,15 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
                             >
                                 <div className="w-10 h-10 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 font-bold text-xs uppercase shadow-sm relative">
                                     {chat.name.substring(0, 2)}
-                                    {chat.isPaused && (
+                                    {alerts.some(a => a.userPhone === chat.id) ? (
+                                        <span className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-rose-500 to-pink-600 rounded-full border-2 border-white dark:border-slate-800 flex items-center justify-center animate-pulse" title="Alerta pendiente">
+                                            <span className="text-[9px] text-white">⚡</span>
+                                        </span>
+                                    ) : chat.isPaused ? (
                                         <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-amber-500 rounded-full border-2 border-white dark:border-slate-800 flex items-center justify-center">
                                             <span className="text-[8px] text-white tooltip" title="Bot Pausado">||</span>
                                         </span>
-                                    )}
+                                    ) : null}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex justify-between items-baseline mb-0.5">
@@ -682,109 +689,173 @@ const CommsView = ({ initialChatId, onChatSelected }) => {
                 </div>
             </div>
 
-            <span className="text-sm">Cargando mensajes...</span>
-        </div>
-                                    </div >
-                                ) : messages.length === 0 ? (
-    <div className="flex items-center justify-center h-full text-slate-400 dark:text-slate-500 text-sm">
-        No hay mensajes en este chat
-    </div>
-) : (
-    messages.map((msg, idx) => (
-        <div key={idx} className={`flex ${msg.fromMe ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[70%] p-3 text-sm leading-relaxed shadow-sm relative group ${msg.fromMe
-                ? 'bg-blue-600 text-white rounded-l-lg rounded-br-lg'
-                : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-white rounded-r-lg rounded-bl-lg border border-slate-200 dark:border-slate-600'
-                }`}>
-                {renderMessageBody(msg)}
-                <span className={`text-[10px] block text-right mt-1 font-mono opacity-80 ${msg.fromMe ? 'text-blue-100' : 'text-slate-400 dark:text-slate-400'}`}>
-                    {(() => {
-                        try {
-                            const d = new Date(msg.timestamp);
-                            return isNaN(d.getTime()) ? '' : d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' });
-                        } catch (e) { return ''; }
-                    })()}
-                </span>
+            {/* 2. MAIN CHAT AREA */}
+            {selectedChat ? (
+                <>
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                        {/* Chat Header */}
+                        <div className="h-16 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-5 bg-white dark:bg-slate-800 shadow-sm z-10">
+                            <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-9 h-9 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 font-bold text-xs uppercase">
+                                    {selectedChat.name?.substring(0, 2) || '??'}
+                                </div>
+                                <div className="min-w-0">
+                                    <h3 className="font-bold text-slate-800 dark:text-slate-100 text-sm truncate">+{selectedChat.id?.split('@')[0]}</h3>
+                                    <p className="text-xs text-slate-400 dark:text-slate-500 truncate">{selectedChat.name}</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button onClick={handleToggleBot} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${selectedChat.isPaused ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'}`}>
+                                    {selectedChat.isPaused ? <><Icons.Play /> Reactivar Bot</> : <><Icons.Pause /> Pausar Bot</>}
+                                </button>
+                                <button onClick={handleClearChat} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-md transition-colors" title="Reiniciar chat"><Icons.Trash /></button>
+                                <button onClick={() => setShowScriptPanel(!showScriptPanel)} className={`p-2 rounded-md transition-colors ${showScriptPanel ? 'bg-indigo-100 text-indigo-600' : 'text-slate-400 hover:text-indigo-500 hover:bg-indigo-50'}`} title="Asistente IA"><Icons.AI /></button>
+                            </div>
+                        </div>
 
-                {/* Delete Button (Only for own messages) */}
-                {msg.fromMe && (
-                    <button
-                        onClick={(e) => { e.stopPropagation(); handleDeleteMessage(msg.id); }}
-                        className="absolute -left-8 top-1/2 -translate-y-1/2 p-1.5 text-slate-300 dark:text-slate-500 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-full opacity-0 group-hover:opacity-100 transition-all"
-                        title="Eliminar mensaje para todos"
-                    >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                    </button>
-                )}
-            </div>
-        </div>
-    ))
-)}
-<div ref={messagesEndRef} />
-                            </div >
+                        {/* INLINE ALERT BANNER */}
+                        {chatAlert && (() => {
+                            const od = chatAlert.orderData || {};
+                            const addr = od.address || {};
+                            const hasOrder = od.product || od.price;
+                            return (
+                                <div className="mx-4 mt-3 mb-1 rounded-xl border border-rose-200 bg-gradient-to-r from-rose-50 via-pink-50 to-orange-50 shadow-sm overflow-hidden animate-fade-in">
+                                    <div className="h-1 bg-gradient-to-r from-rose-500 via-pink-500 to-orange-400" />
+                                    <div className="px-4 py-3">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="flex items-start gap-3 flex-1 min-w-0">
+                                                <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center text-white text-base shadow-md shadow-rose-500/20 flex-shrink-0">
+                                                    ⚡
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 mb-0.5">
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-gradient-to-r from-rose-500 to-pink-600 text-white uppercase tracking-wider">Alerta</span>
+                                                    </div>
+                                                    <p className="text-sm font-bold text-slate-800 leading-snug">{chatAlert.reason}</p>
+                                                    {hasOrder && (
+                                                        <p className="text-xs text-slate-500 mt-1">
+                                                            {od.product || '—'} ({od.plan || '?'} días) — <span className="font-bold text-emerald-600">${od.price || '?'}</span>
+                                                            {addr.nombre ? ` — ${addr.nombre}` : ''}
+                                                        </p>
+                                                    )}
+                                                    {chatAlert.details && (
+                                                        <p className="text-xs text-slate-500 mt-0.5 italic">💬 {chatAlert.details}</p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                                                {hasOrder && (chatAlert.reason.toLowerCase().includes('inesperada') || chatAlert.reason.toLowerCase().includes('aprobaci')) && (
+                                                    <button
+                                                        onClick={() => onAlertAction && onAlertAction(chatAlert.userPhone, 'confirmar')}
+                                                        className="px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg text-xs font-bold hover:from-emerald-600 hover:to-teal-600 transition-all shadow-sm shadow-emerald-500/20 active:scale-95"
+                                                    >
+                                                        APROBAR
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={() => onAlertAction && onAlertAction(chatAlert.userPhone, 'descartar')}
+                                                    className="px-2.5 py-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-100 rounded-lg transition-colors"
+                                                    title="Descartar alerta"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
 
-    {/* Input */ }
-    < div className = "p-4 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700" >
-        {/* Attachment Preview */ }
-{
-    attachment && (
-        <div className="mb-3 p-3 bg-slate-50 dark:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-600 flex items-center gap-3 animate-fade-in">
-            <img src={attachment.preview} alt="Preview" className="w-16 h-16 object-cover rounded-lg border border-slate-200 dark:border-slate-600 shadow-sm" />
-            <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{attachment.file.name}</p>
-                <p className="text-xs text-slate-400 dark:text-slate-500">{(attachment.file.size / 1024).toFixed(0)} KB</p>
-            </div>
-            <button
-                onClick={() => setAttachment(null)}
-                className="p-1.5 hover:bg-rose-100 dark:hover:bg-rose-900/30 rounded-lg text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 transition"
-            >
-                ✕
-            </button>
-        </div>
-    )
-}
-<form onSubmit={attachment ? (e) => { e.preventDefault(); handleSendMedia(); } : handleSend} className="flex items-center gap-3">
-    {/* Hidden file input */}
-    <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        onChange={handleFileSelect}
-        className="hidden"
-    />
-    {/* Attachment button */}
-    <button
-        type="button"
-        onClick={() => fileInputRef.current?.click()}
-        className="p-2.5 rounded-md text-slate-400 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/40 transition-all"
-        title="Adjuntar imagen"
-    >
-        <Icons.Clip />
-    </button>
-    <div className="flex-1 relative">
-        <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={attachment ? 'Agregar texto (opcional)...' : 'Escribe un mensaje...'}
-            className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-md pl-4 pr-10 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all text-slate-700 dark:text-white placeholder-slate-400 dark:placeholder-slate-400"
-        />
-    </div>
-    <button
-        type="submit"
-        disabled={attachment ? sendingMedia : !input.trim()}
-        className="bg-slate-900 hover:bg-black text-white p-2.5 rounded-md shadow-lg transition-all disabled:opacity-50"
-    >
-        {sendingMedia ? (
-            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-        ) : (
-            <Icons.Send />
-        )}
-    </button>
-</form>
-                            </div >
-                        </>
-                    ) : (
+                        {/* Messages Area */}
+                        <div className="flex-1 overflow-y-auto p-5 space-y-3 custom-scrollbar bg-slate-50 dark:bg-slate-900/30">
+                            {loading ? (
+                                <div className="flex items-center justify-center h-full text-slate-400 dark:text-slate-500 gap-2">
+                                    <div className="w-5 h-5 border-2 border-slate-300 border-t-transparent rounded-full animate-spin"></div>
+                                    <span className="text-sm">Cargando mensajes...</span>
+                                </div>
+                            ) : messages.length === 0 ? (
+                                <div className="flex items-center justify-center h-full text-slate-400 dark:text-slate-500 text-sm">
+                                    No hay mensajes en este chat
+                                </div>
+                            ) : (
+                                messages.map((msg, idx) => (
+                                    <div key={idx} className={`flex ${msg.fromMe ? 'justify-end' : 'justify-start'}`}>
+                                        <div className={`max-w-[70%] p-3 text-sm leading-relaxed shadow-sm relative group ${msg.fromMe
+                                            ? 'bg-blue-600 text-white rounded-l-lg rounded-br-lg'
+                                            : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-white rounded-r-lg rounded-bl-lg border border-slate-200 dark:border-slate-600'
+                                            }`}>
+                                            {renderMessageBody(msg)}
+                                            <span className={`text-[10px] block text-right mt-1 font-mono opacity-80 ${msg.fromMe ? 'text-blue-100' : 'text-slate-400 dark:text-slate-400'}`}>
+                                                {(() => {
+                                                    try {
+                                                        const d = new Date(msg.timestamp);
+                                                        return isNaN(d.getTime()) ? '' : d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' });
+                                                    } catch (e) { return ''; }
+                                                })()}
+                                            </span>
+                                            {/* Delete Button (Only for own messages) */}
+                                            {msg.fromMe && (
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handleDeleteMessage(msg.id); }}
+                                                    className="absolute -left-8 top-1/2 -translate-y-1/2 p-1.5 text-slate-300 dark:text-slate-500 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-full opacity-0 group-hover:opacity-100 transition-all"
+                                                    title="Eliminar mensaje para todos"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                            <div ref={messagesEndRef} />
+                        </div>
+
+                        {/* Input */}
+                        <div className="p-4 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700">
+                            {/* Attachment Preview */}
+                            {attachment && (
+                                <div className="mb-3 p-3 bg-slate-50 dark:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-600 flex items-center gap-3 animate-fade-in">
+                                    <img src={attachment.preview} alt="Preview" className="w-16 h-16 object-cover rounded-lg border border-slate-200 dark:border-slate-600 shadow-sm" />
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{attachment.file.name}</p>
+                                        <p className="text-xs text-slate-400 dark:text-slate-500">{(attachment.file.size / 1024).toFixed(0)} KB</p>
+                                    </div>
+                                    <button
+                                        onClick={() => setAttachment(null)}
+                                        className="p-1.5 hover:bg-rose-100 dark:hover:bg-rose-900/30 rounded-lg text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 transition"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                            )}
+                            <form onSubmit={attachment ? (e) => { e.preventDefault(); handleSendMedia(); } : handleSend} className="flex items-center gap-3">
+                                {/* Hidden file input */}
+                                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
+                                {/* Attachment button */}
+                                <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2.5 rounded-md text-slate-400 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/40 transition-all" title="Adjuntar imagen">
+                                    <Icons.Clip />
+                                </button>
+                                <div className="flex-1 relative">
+                                    <input
+                                        type="text"
+                                        value={input}
+                                        onChange={(e) => setInput(e.target.value)}
+                                        placeholder={attachment ? 'Agregar texto (opcional)...' : 'Escribe un mensaje...'}
+                                        className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-md pl-4 pr-10 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all text-slate-700 dark:text-white placeholder-slate-400 dark:placeholder-slate-400"
+                                    />
+                                </div>
+                                <button type="submit" disabled={attachment ? sendingMedia : !input.trim()} className="bg-slate-900 hover:bg-black text-white p-2.5 rounded-md shadow-lg transition-all disabled:opacity-50">
+                                    {sendingMedia ? (
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    ) : (
+                                        <Icons.Send />
+                                    )}
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </>
+            ) : (
     <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
         <div className="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center mb-4 text-slate-400">
             <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>

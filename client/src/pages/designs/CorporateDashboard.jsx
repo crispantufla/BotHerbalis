@@ -168,7 +168,7 @@ const CorporateDashboard = () => {
             case 'dashboard':
                 return <DashboardView alerts={alerts} config={config} handleQuickAction={handleQuickAction} status={status} qrData={qrData} />;
             case 'comms':
-                return <CommsView initialChatId={targetChatId} onChatSelected={() => setTargetChatId(null)} />;
+                return <CommsView initialChatId={targetChatId} onChatSelected={() => setTargetChatId(null)} alerts={alerts} onAlertAction={handleQuickAction} />;
             case 'logistics':
                 return <SalesView onGoToChat={(chatId, sellerPhone) => handleQuickAction(chatId, 'chat', sellerPhone)} />;
             case 'script':
