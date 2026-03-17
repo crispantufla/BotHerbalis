@@ -8,7 +8,7 @@ import AiCorrectionModal from './components/AiCorrectionModal';
 
 import { Search, Bot, Play, Pause, Trash2 as Trash, FileText as ScriptIcon, ChevronDown, Send, Paperclip, ShoppingCart, ArrowLeft, Type } from 'lucide-react';
 
-const CommsViewV2 = ({ initialChatId, onChatSelected, initialSearch = '' }) => {
+const CommsViewV2 = ({ initialChatId, onChatSelected, initialSearch = '', alerts = [], onAlertAction }) => {
     const { toast } = useToast();
     const [selectedChat, setSelectedChat] = useState(null);
     const [input, setInput] = useState('');
@@ -58,6 +58,9 @@ const CommsViewV2 = ({ initialChatId, onChatSelected, initialSearch = '' }) => {
             return nameMatch || phoneMatch || messageMatch;
         })
         : chats;
+
+    // Computed property: find an active alert for the selected chat
+    const chatAlert = selectedChat ? alerts.find(a => a.userPhone === selectedChat.id || a.userPhone === selectedChat.id.split('@')[0]) : null;
 
     useEffect(() => {
         if (initialChatId && chats.length > 0) {
@@ -368,7 +371,13 @@ Teléfono: ${phoneDisplay}`;
                                                     return rawId;
                                                 })()}
                                             </h3>
-                                            {chat.isPaused && <span className="w-2 h-2 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)] animate-pulse" title="Bot Pausado"></span>}
+                                            {alerts.some(a => a.userPhone === chat.id || a.userPhone === chat.id.split('@')[0]) ? (
+                                                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(243,24,66,0.8)] animate-pulse flex items-center justify-center" title="Atención Requerida">
+                                                    <span className="text-[6px] text-white">⚡</span>
+                                                </span>
+                                            ) : chat.isPaused && (
+                                                <span className="w-2 h-2 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)] animate-pulse" title="Bot Pausado"></span>
+                                            )}
                                             {chat.hasBought && <span title="Cliente Recurrente" className="inline-flex items-center text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-md font-extrabold shadow-sm"><ShoppingCart className="w-2.5 h-2.5 mr-0.5" /> Cliente</span>}
                                         </div>
                                         <span className={`text-xs truncate ${selectedChat?.id === chat.id ? 'text-indigo-100/90' : 'text-slate-500 dark:text-slate-400'}`}>
@@ -600,6 +609,41 @@ Teléfono: ${phoneDisplay}`;
                                         <div className="text-center p-8 bg-slate-50 rounded-2xl border border-slate-100 border-dashed">
                                             <p className="text-slate-400 font-medium text-sm">No hay registros de compras anteriores.</p>
                                         </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Inline Alert Banner */}
+                        {chatAlert && (
+                            <div className="bg-gradient-to-r from-rose-50 dark:from-rose-900/30 via-pink-50 dark:via-pink-900/20 to-orange-50 dark:to-orange-900/30 border-b border-rose-200 dark:border-rose-800 p-3 sm:p-5 shrink-0 z-10 relative overflow-hidden flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+                                <div className="flex items-start gap-3 w-full sm:w-auto overflow-hidden">
+                                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-rose-500 to-pink-600 shadow-md shadow-rose-500/30 flex items-center justify-center shrink-0">
+                                        <span className="text-white font-black text-sm">⚡</span>
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-2 mb-0.5">
+                                            <span className="bg-rose-500 text-white text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md">Atención</span>
+                                            <h4 className="font-extrabold text-slate-800 dark:text-rose-100 text-sm truncate">{chatAlert.reason || 'Notificación del Sistema'}</h4>
+                                        </div>
+                                        <p className="text-xs text-slate-700 dark:text-rose-200/80 font-medium truncate">
+                                            {chatAlert.product ? `Pedido: ${chatAlert.product} - Nuez de la India` : chatAlert.details || 'Revisar datos'}
+                                        </p>
+                                        <p className="text-xs text-slate-500 dark:text-rose-300/60 font-medium truncate mt-0.5 italic">
+                                            "{chatAlert.details}"
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 self-end sm:self-auto shrink-0 w-full sm:w-auto">
+                                    {chatAlert?.reason?.includes('Pedido') && onAlertAction && (
+                                        <button onClick={() => onAlertAction(chatAlert.userPhone, 'confirmar')} className="flex-1 sm:flex-none px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white text-[11px] font-black uppercase tracking-wider rounded-xl shadow-md shadow-emerald-500/20 transition-all hover:-translate-y-0.5">
+                                            Aprobar Pedido
+                                        </button>
+                                    )}
+                                    {onAlertAction && (
+                                        <button onClick={() => onAlertAction(chatAlert.userPhone, 'descartar')} className="flex-1 sm:flex-none p-2 rounded-xl text-rose-500 hover:text-white hover:bg-rose-500 transition-all border border-rose-200 hover:border-transparent flex items-center justify-center">
+                                            <Trash className="w-4 h-4" />
+                                        </button>
                                     )}
                                 </div>
                             </div>

@@ -175,7 +175,7 @@ const CorporateDashboardV2 = () => {
         switch (activeTab) {
             case 'dashboard': return <DashboardViewV2 alerts={alerts} config={config} handleQuickAction={handleQuickAction} status={status} qrData={qrData} />;
             case 'statistics': return <AdvancedAnalyticsViewV2 />;
-            case 'comms': return <CommsViewV2 initialChatId={targetChatId} onChatSelected={() => setTargetChatId(null)} initialSearch={globalSearch} />;
+            case 'comms': return <CommsViewV2 initialChatId={targetChatId} onChatSelected={() => setTargetChatId(null)} initialSearch={globalSearch} alerts={alerts} onAlertAction={handleQuickAction} />;
             case 'logistics': return <SalesViewV2 onGoToChat={(chatId) => handleQuickAction(chatId, 'chat')} initialSearch={globalSearch} />;
             case 'script': return <ScriptViewV2 />;
             case 'gallery': return <GalleryViewV2 />;
