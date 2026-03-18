@@ -16,6 +16,7 @@ const SalesViewV2 = ({ onGoToChat, initialSearch = '' }) => {
     // Advanced Filters V2
     const [searchTerm, setSearchTerm] = useState(initialSearch);
     const [statusFilter, setStatusFilter] = useState('Todos');
+    const [sellerFilter, setSellerFilter] = useState('Todos');
 
     // Viewing / Details State
     const [viewingOrder, setViewingOrder] = useState(null);
@@ -215,6 +216,8 @@ Teléfono: ${phoneDisplay}`;
     };
 
     // Filters logic
+    const uniqueSellers = Array.from(new Set(orders.map(o => o.seller).filter(Boolean)));
+
     const filteredOrders = orders.filter(order => {
         const matchesSearch = searchTerm === '' ||
             (order.nombre || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -222,8 +225,10 @@ Teléfono: ${phoneDisplay}`;
             (order.tracking || '').toLowerCase().includes(searchTerm.toLowerCase());
 
         const matchesStatus = statusFilter === 'Todos' || (order.status || 'Pendiente') === statusFilter;
+        
+        const matchesSeller = sellerFilter === 'Todos' || order.seller === sellerFilter;
 
-        return matchesSearch && matchesStatus;
+        return matchesSearch && matchesStatus && matchesSeller;
     });
 
     // Timezone & Date Formatter
@@ -300,6 +305,22 @@ Teléfono: ${phoneDisplay}`;
                             </button>
                         ))}
                     </div>
+
+                    {/* Vendedor Filter */}
+                    {uniqueSellers.length > 0 && (
+                        <div className="flex items-center gap-2 bg-white/6 dark:bg-slate-800/60 p-2 rounded-xl border border-white/8 dark:border-slate-700/80 shadow-inner overflow-x-auto custom-scrollbar">
+                            <div className="pl-3 pr-2 text-slate-400 text-[10px] font-black uppercase tracking-widest">Vendedor:</div>
+                            {['Todos', ...uniqueSellers].map(seller => (
+                                <button
+                                    key={seller}
+                                    onClick={() => setSellerFilter(seller)}
+                                    className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${sellerFilter === seller ? 'bg-blue-600 text-white shadow-md' : 'bg-transparent text-slate-600 hover:bg-white'}`}
+                                >
+                                    {seller === 'Todos' ? 'Todos' : `+${seller.replace(/\D/g, '')}`}
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
 
