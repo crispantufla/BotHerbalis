@@ -432,9 +432,15 @@ export async function handleWaitingData(
         return { matched: true };
     }
 
+    const textWordCount = text.split(/\s+/).length;
+    const isExplicitTargetingStreet = !currentState.partialAddress?.calle && /\d/.test(text) && textWordCount >= 3 && !isDataQuestionOrEmotion;
+
     // Original pause for messages that DO look like address attempts but failed
-    if (!madeProgress && currentState.addressAttempts >= 2) {
-        await _pauseAndAlert(userId, currentState, dependencies, text, 'La IA no pudo procesar correctamente los datos ingresados en el primer intento.');
+    if (!madeProgress && (currentState.addressAttempts >= 2 || (currentState.addressAttempts >= 1 && isExplicitTargetingStreet))) {
+        const alertReason = isExplicitTargetingStreet 
+            ? 'La IA falló en extraer la calle de un mensaje que parece claramente una dirección.' 
+            : 'La IA no pudo procesar correctamente los datos ingresados en el primer intento.';
+        await _pauseAndAlert(userId, currentState, dependencies, text, alertReason);
         return { matched: true };
     }
 
