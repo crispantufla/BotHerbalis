@@ -73,6 +73,7 @@ const AlertsPanelV2 = ({ alerts, onCommand, onQuickAction }) => {
                         const od = alert.orderData || {};
                         const addr = od.address || {};
                         const hasOrder = !!(od.product || od.price);
+                        const isOrderApproval = hasOrder && Boolean(alert.reason && (alert.reason.toLowerCase().includes('inesperada') || alert.reason.toLowerCase().includes('aprobaci')));
                         const cleanPhone = alert.userPhone ? alert.userPhone.split('@')[0] : 'Desconocido';
                         const inputValue = adminInputs[alert.id] || '';
                         const isSending = sendingCommand[alert.id] || false;
@@ -107,7 +108,7 @@ const AlertsPanelV2 = ({ alerts, onCommand, onQuickAction }) => {
                                             </button>
 
                                             {/* Legacy Approve/Intercede Buttons */}
-                                            {hasOrder && (alert.reason.toLowerCase().includes('inesperada') || alert.reason.toLowerCase().includes('aprobaci')) && (
+                                            {isOrderApproval && (
                                                 <button onClick={(e) => { e.stopPropagation(); onQuickAction(alert.userPhone, 'confirmar'); }} className="px-4 py-2 bg-emerald-500 text-white rounded-xl text-xs font-bold hover:bg-emerald-600 transition-colors shadow-md shadow-emerald-500/20 flex-1 sm:flex-none flex items-center justify-center">
                                                     APROBAR
                                                 </button>
@@ -126,7 +127,7 @@ const AlertsPanelV2 = ({ alerts, onCommand, onQuickAction }) => {
                                 {/* Contenido Expandido */}
                                 {isExpanded && (
                                     <div className="border-t border-slate-200/50 dark:border-slate-700/50 bg-white/3 dark:bg-slate-800/30 dark:bg-slate-800/30 p-6">
-                                        {hasOrder && (
+                                        {isOrderApproval && (
                                             <div className="mb-6 bg-white/8 dark:bg-slate-800/80 dark:bg-slate-900/50 rounded-2xl p-5 border border-slate-100 dark:border-slate-800 shadow-sm">
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                                     <div className="flex gap-4 items-center">
@@ -155,9 +156,9 @@ const AlertsPanelV2 = ({ alerts, onCommand, onQuickAction }) => {
                                         {alert.details && (
                                             <div className="mb-4 bg-amber-50 dark:bg-amber-900/20 rounded-2xl p-4 border border-amber-100 dark:border-amber-900/50 shadow-sm">
                                                 <p className="text-[10px] font-bold text-amber-600 dark:text-amber-500 uppercase tracking-widest mb-1">Detalles de la alerta</p>
-                                                <p className="text-sm font-medium text-amber-900 dark:text-amber-200/80 leading-relaxed italic truncate max-w-full">
-                                                    "{alert.details}"
-                                                </p>
+                                                <div className="text-sm font-medium text-amber-900 dark:text-amber-100 leading-relaxed whitespace-pre-wrap">
+                                                    {alert.details}
+                                                </div>
                                             </div>
                                         )}
 
