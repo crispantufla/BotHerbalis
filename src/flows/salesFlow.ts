@@ -140,14 +140,37 @@ export async function processSalesFlow(
                 const cleanPhone = _cleanPhone(userId);
 
                 // Grab the last 15 messages from DB locally (cross-instance)
-                const messagesConfig = await prisma.chatLog.findMany({
+                let dbMessages = await prisma.chatLog.findMany({
                     where: { userPhone: cleanPhone },
                     orderBy: { timestamp: 'desc' },
                     take: 15
                 });
 
+                // Fallback to WhatsApp's native API if local DB has NO history
+                if (dbMessages.length === 0 && dependencies.client) {
+                    try {
+                        const chat = await dependencies.client.getChatById(userId);
+                        if (chat) {
+                            const waMsgs = await chat.fetchMessages({ limit: 15 });
+                            const waMapped = waMsgs.map((wm: any) => ({
+                                id: wm.id._serialized,
+                                userPhone: cleanPhone,
+                                instanceId: INSTANCE_ID,
+                                role: wm.fromMe ? 'bot' : 'user',
+                                content: wm.body || '',
+                                timestamp: new Date(wm.timestamp * 1000)
+                            }));
+                            // Reverse to match DB descending order (latest first)
+                            dbMessages = waMapped.reverse(); 
+                            logger.info(`[SMART-DETECT] DB vacío para ${userId}. Recuperados ${waMapped.length} msjs nativos de WhatsApp.`);
+                        }
+                    } catch (waErr: any) {
+                        logger.warn(`[SMART-DETECT] Error recuperando historial nativo WA de ${userId}: ${waErr.message}`);
+                    }
+                }
+
                 // Check for existence of any prior post-sale outgoing message
-                const outgoingMessages = messagesConfig.filter((m: any) => m.role === 'bot' || m.role === 'admin' || m.role === 'system');
+                const outgoingMessages = dbMessages.filter((m: any) => m.role === 'bot' || m.role === 'admin' || m.role === 'system');
                 const hasPostSaleMessage = outgoingMessages.some((m: any) => {
                     const body = (m.content || '').trim().toUpperCase();
                     if (body.includes('MENSAJE DE HERBALIS') || body.includes('MENSAJDE DE HERBALIS')) return true;
