@@ -491,6 +491,33 @@ startServer(client, sharedState);
 function logAndEmit(chatId: string, sender: string, text: string, step?: string, messageId: string | null = null): void {
     // Use polyfilled logger.logMessage
     logger.logMessage(chatId, sender, text, step);
+    
+    // Save to PostgreSQL asynchronously so salesFlow.ts can query history later
+    (async () => {
+        try {
+            const cleanPhone = chatId.replace('@c.us', '').replace(/\D/g, '');
+            if (!cleanPhone) return;
+
+            // Ensure User exists to satisfy Foreign Key constraints
+            await prisma.user.upsert({
+                where: { phone_instanceId: { phone: cleanPhone, instanceId: INSTANCE_ID } },
+                update: {},
+                create: { phone: cleanPhone, instanceId: INSTANCE_ID }
+            });
+
+            await prisma.chatLog.create({
+                data: {
+                    userPhone: cleanPhone,
+                    role: sender,
+                    content: text,
+                    instanceId: INSTANCE_ID
+                }
+            });
+        } catch (e: any) {
+            logger.error('[DB] Error saving chat log to Postgres:', e.message);
+        }
+    })();
+
     if (sharedState.io) {
         sharedState.io.emit('new_log', {
             timestamp: new Date(),
