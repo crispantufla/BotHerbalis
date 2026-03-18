@@ -166,6 +166,7 @@ const userState = new Proxy({}, {
 const chatResets: Record<string, number> = {}; // Tracks timestamp of last history clear per user
 let lastAlertUser: string | null = null;
 let pausedUsers = new Set<string>();
+const lastPausedUserAlerts = new Map<string, number>();
 
 // Restore paused users from DB immediately on boot so they survive restarts
 const { restorePausedUsersFromDB } = require('./src/services/pauseService');
@@ -1095,6 +1096,23 @@ client.on('message', async (msg: any) => {
                 pendingMessages.delete(userId);
             }
             logger.info(`[PAUSED] Ignoring message from ${userId}`);
+
+            // Alert the admin that a paused user sent a message (Debounced 30 mins)
+            const now = Date.now();
+            const lastAlert = lastPausedUserAlerts.get(userId) || 0;
+            if (now - lastAlert > 30 * 60 * 1000) {
+                lastPausedUserAlerts.set(userId, now);
+                try {
+                    await notifyAdmin(
+                        '💬 Cliente en pausa te escribió',
+                        userId,
+                        `El cliente envió un mensaje: "${msgText.substring(0, 100)}..."\n\nEl bot sigue pausado automático.`
+                    );
+                } catch (e: any) {
+                    logger.error(`[PAUSED-ALERT] Failed to notify admin for ${userId}:`, e.message);
+                }
+            }
+
             return;
         }
 
