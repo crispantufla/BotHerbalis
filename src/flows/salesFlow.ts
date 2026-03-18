@@ -21,7 +21,7 @@ interface SalesFlowDependencies {
 
 // Keywords that signal clear purchase intent — if present, don't auto-pause
 // Note: normalizedText is accent-stripped, so only unaccented variants are needed
-const PURCHASE_INTENT_KEYWORDS = /\b(comprar|quiero comprar|quiero pedir|me interesa|precio|precios|cuanto sale|cuanto cuesta|quiero encargar|necesito comprar|hagan envios|hacen envios|quisiera pedir|quisiera comprar|quiero adquirir|quiero ordenar|tienen capsulas|tienen semillas|tienen gotas|nuez de la india|la direccion|mi direccion|te paso mis datos|mis datos|los datos|te paso la direccion|informacion|quiero saber|quiero mas info|bajar|adelgazar|kilos|kilo|capsulas|semillas|gotas|peso|perder peso|bajar de peso|10 kg|20 kg|mas de 20)\b/i;
+const PURCHASE_INTENT_KEYWORDS = /\b(comprar|quiero comprar|quiero pedir|me interesa|precio|precios|cuanto sale|cuanto cuesta|quiero encargar|necesito comprar|hagan envios|hacen envios|quisiera pedir|quisiera comprar|quiero adquirir|quiero ordenar|tienen capsulas|tienen semillas|tienen gotas|nuez de la india|la direccion|mi direccion|te paso mis datos|mis datos|los datos|te paso la direccion|informacion|quiero saber|quiero mas info|bajar|adelgazar|kilos|kilo|capsulas|semillas|cemillas|semilla|gotas|gota|peso|perder peso|bajar de peso|10 kg|20 kg|mas de 20)\b/i;
 
 export async function processSalesFlow(
     userId: string,
@@ -149,8 +149,10 @@ export async function processSalesFlow(
                 // Check for existence of any prior post-sale outgoing message
                 const outgoingMessages = messagesConfig.filter((m: any) => m.role === 'bot' || m.role === 'admin' || m.role === 'system');
                 const hasPostSaleMessage = outgoingMessages.some((m: any) => {
-                    const body = (m.content || '').trim();
+                    const body = (m.content || '').trim().toUpperCase();
                     if (body.includes('MENSAJE DE HERBALIS') || body.includes('MENSAJDE DE HERBALIS')) return true;
+                    if (body.includes('CONFIRMACIÓN DE ENVÍO') || body.includes('CONFIRMACION DE ENVIO')) return true;
+                    if (body.includes('PEDIDO INGRESADO')) return true;
                     if (/^CO\d{9}$/i.test(body)) return true;
                     return false;
                 });
