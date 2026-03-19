@@ -56,7 +56,7 @@ module.exports = (client, sharedState) => {
             const chatId = await resolveChatId(req.params.chatId);
             const resetAt = sharedState.chatResets[chatId] || 0;
             // Reusing history logic (simplified for summary - we need text)
-            const localMessages = getLocalHistory(chatId, resetAt);
+            const localMessages = await getLocalHistory(chatId, resetAt);
 
             let waMessages = [];
             try {
@@ -347,7 +347,7 @@ module.exports = (client, sharedState) => {
                 console.error(`[HISTORY] WA Fetch Error for ${chatId}:`, waErr.message);
             }
 
-            const localMessages = getLocalHistory(chatId, resetAt);
+            const localMessages = await getLocalHistory(chatId, resetAt);
 
             const refinedMessages = messages.map(m => {
                 if (m.hasMedia || m.type === 'image' || m.type === 'audio' || m.type === 'ptt' || m.type === 'sticker') {
