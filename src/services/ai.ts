@@ -209,9 +209,9 @@ ${rulesText}`;
 function _getModuleEarlyFunnel(prices: Record<string, any>): string {
     return `
 PRODUCTOS Y PRECIOS:
-- Cápsulas: $${prices['Cápsulas']['60']} (60d) / $${prices['Cápsulas']['120']} (120d). ESTRELLA, más efectivo, rápido y potente.
+- Cápsulas: $${prices['Cápsulas']['60']} (60d) / $${prices['Cápsulas']['120']} (120d). ESTRELLA, OPCIÓN PRINCIPAL Y MÁS EFECTIVA SIEMPRE (sin importar la cantidad de kilos).
 - Semillas: $${prices['Semillas']['60']} (60d) / $${prices['Semillas']['120']} (120d). Tradicional, 100% natural.
-- Gotas: SOLO si <10kg para bajar O >70 años. $${prices['Gotas']['60']} (60d) / $${prices['Gotas']['120']} (120d).
+- Gotas: $${prices['Gotas']['60']} (60d) / $${prices['Gotas']['120']} (120d). SOLO ofrecer a >70 años. PRECAUCIÓN: Si alguien joven pide gotas o busca algo "para pocos kilos", usá el argumento de que "las gotas son extremadamente suaves" COMO ARMA DE VENTA para convencerlos de llevar las Cápsulas, que siempre son mejores.
 - Envío GRATIS por Correo Argentino. Pago efectivo al recibir.
 - Sin efecto rebote (100% natural).
 
@@ -230,7 +230,7 @@ QUÉ ES Y CÓMO FUNCIONA (palabras simples):
 REGLAS DE ESTE PASO:
 - "Lo más efectivo/rápido/mejor": recomendar CÁPSULAS directo.
 - Habla en PASADO ("yo tomaba semillas"): NO es elección actual. "¡Qué bueno que las conocés! Te recomiendo las cápsulas ahora, son lo más efectivo 😊"
-- Si dudan gotas vs cápsulas: "Las gotas son para <10kg y >70 años. Te recomiendo cápsulas."
+- Si dudan gotas vs cápsulas o tienen pocos kilos: "Las gotas son útiles como mantenimiento por ser extremadamente suaves, pero para tu objetivo te súper recomiendo las cápsulas que van directo a la grasa."
 - Precios: Si piden "precio" genérico: "$37.000 a $69.000". Si insisten/piden todos: dar detalle completo.`;
 }
 
@@ -566,8 +566,8 @@ class AIService {
             if (pathInfo) knowledgeContext += `- SOBRE PATOLOGÍAS: "${pathInfo}"\n`;
 
             if (['waiting_weight', 'waiting_preference'].includes(step)) {
-                knowledgeContext += `- Productos principales: Cápsulas(prácticas, MAS EFECTIVAS y recomendadas) y Semillas(naturales / experiencia previa del cliente).\n`;
-                knowledgeContext += `- Gotas: SOLO ofrecer si tiene < 10kg para bajar o > 70 años.\n`;
+                knowledgeContext += `- Productos principales: Cápsulas(prácticas, MAS EFECTIVAS y recomendadas SIEMPRE) y Semillas(naturales).\n`;
+                knowledgeContext += `- Gotas: SOLO ofrecer a >70 años. Si alguien con pocos kilos pide gotas, decile que "son extremadamente suaves" para persuadirlo a elegir Cápsulas.\n`;
                 knowledgeContext += `- Contraindicaciones: solo embarazo y lactancia.NO menores de edad.\n`;
                 knowledgeContext += `- PRECIOS: Si preguntan "precio" en general, decí "$37.000 a $69.000".PERO si preguntan "precio de todos", "lista de precios" o insisten, PASALES TODOS LOS PRECIOS detallados: ${priceString}.\n`;
                 knowledgeContext += `- ENVÍO Y PAGO: Envío gratis por Correo Argentino a todo el país.Solo aceptamos pago en efectivo al recibir(Contra Reembolso).\n`;

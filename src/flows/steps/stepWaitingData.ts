@@ -68,51 +68,22 @@ export async function handleWaitingData(
                 currentState.postdatado = postdatadoResult;
             }
 
-            if (newPlan) {
-                const priceStr = _getPrice(newProduct, newPlan);
-                buildCartFromSelection(newProduct, newPlan, currentState);
+            const priceStr = _getPrice(newProduct, newPlan);
+            buildCartFromSelection(newProduct, newPlan, currentState);
 
-                const planText = newPlan === "120" ? "120 días" : "60 días";
-                calculateTotal(currentState);
-                const changeMsg = `¡Dale, sin problema! 😊 Cambiamos a ${newProduct.split(' de ')[0].toLowerCase()} por ${planText}, tienen un valor de $${currentState.totalPrice}.`;
-                currentState.history.push({ role: 'bot', content: changeMsg, timestamp: Date.now() });
-                await sendMessageWithDelay(userId, changeMsg);
+            const planText = newPlan === "120" ? "120 días" : "60 días";
+            calculateTotal(currentState);
+            const changeMsg = `¡Dale, sin problema! 😊 Cambiamos a ${newProduct.split(' de ')[0].toLowerCase()} por ${planText}, tienen un valor de $${currentState.totalPrice}.`;
+            currentState.history.push({ role: 'bot', content: changeMsg, timestamp: Date.now() });
+            await sendMessageWithDelay(userId, changeMsg);
 
-                let prefix = currentState.postdatado ? `Anotado para enviarlo en esa fecha 📅.` : ``;
-                if (prefix) {
-                    currentState.history.push({ role: 'bot', content: prefix, timestamp: Date.now() });
-                    await sendMessageWithDelay(userId, prefix);
-                }
-
-                saveState(userId);
-            } else {
-                currentState.cart = [];
-                currentState.addressAttempts = 0;
-
-                let priceNode;
-                if (newProduct.includes('Cápsulas')) priceNode = knowledge.flow.preference_capsulas;
-                else if (newProduct.includes('Gotas')) priceNode = knowledge.flow.preference_gotas;
-                else priceNode = knowledge.flow.preference_semillas;
-
-                const changeMsg = `¡Dale, sin problema! 😊 Cambiamos a ${newProduct.split(' de ')[0].toLowerCase()}.`;
-                currentState.history.push({ role: 'bot', content: changeMsg, timestamp: Date.now() });
-                await sendMessageWithDelay(userId, changeMsg);
-
-                const { _formatMessage } = require('../utils/messages');
-                const priceMsg = _formatMessage(priceNode.response, currentState);
-                currentState.history.push({ role: 'bot', content: priceMsg, timestamp: Date.now() });
-                await sendMessageWithDelay(userId, priceMsg);
-
-                if (currentState.weightGoal && Number(currentState.weightGoal) > 10) {
-                    const upsell = "Personalmente yo te recomendaría el de 120 días debido al peso que esperas perder 👌";
-                    currentState.history.push({ role: 'bot', content: upsell, timestamp: Date.now() });
-                    await sendMessageWithDelay(userId, upsell);
-                }
-
-                _setStep(currentState, FlowStep.WAITING_PLAN_CHOICE);
-                saveState(userId);
-                return { matched: true };
+            let prefix = currentState.postdatado ? `Anotado para enviarlo en esa fecha 📅.` : ``;
+            if (prefix) {
+                currentState.history.push({ role: 'bot', content: prefix, timestamp: Date.now() });
+                await sendMessageWithDelay(userId, prefix);
             }
+
+            saveState(userId);
         } else if (newProduct === currentState.selectedProduct) {
             let prefixIterated = `Ok, ${newProduct.split(' de ')[0].toLowerCase()} entonces 😊. `;
             const postdatadoResult2 = _detectPostdatado(normalizedText);
