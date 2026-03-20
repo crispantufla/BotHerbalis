@@ -549,6 +549,17 @@ class AIService {
             const faq = context.knowledge.faq || [];
             const step = context.step || 'general';
 
+            const priceData = await _getPrices();
+            const adMax = priceData.adicionalMAX || '6.000';
+            const priceCaps60 = priceData['Cápsulas']?.['60'] || '46.900';
+            const priceCaps120 = priceData['Cápsulas']?.['120'] || '66.900';
+            const priceSem60 = priceData['Semillas']?.['60'] || '36.900';
+            const priceSem120 = priceData['Semillas']?.['120'] || '49.900';
+            const priceGotas60 = priceData['Gotas']?.['60'] || '48.900';
+            const priceGotas120 = priceData['Gotas']?.['120'] || '68.900';
+
+            const priceString = `Cápsulas($${priceCaps60}/60d, $${priceCaps120}/120d) | Semillas($${priceSem60}/60d, $${priceSem120}/120d) | Gotas($${priceGotas60}/60d, $${priceGotas120}/120d)`;
+
             knowledgeContext = `INFORMACIÓN RELEVANTE PARA ESTE PASO: \n`;
 
             const pathInfo = faq.find((q: any) => q.keywords.includes('diabetes'))?.response || "";
@@ -558,28 +569,21 @@ class AIService {
                 knowledgeContext += `- Productos principales: Cápsulas(prácticas, MAS EFECTIVAS y recomendadas) y Semillas(naturales / experiencia previa del cliente).\n`;
                 knowledgeContext += `- Gotas: SOLO ofrecer si tiene < 10kg para bajar o > 70 años.\n`;
                 knowledgeContext += `- Contraindicaciones: solo embarazo y lactancia.NO menores de edad.\n`;
-                knowledgeContext += `- PRECIOS: Si preguntan "precio" en general, decí "$37.000 a $69.000".PERO si preguntan "precio de todos", "lista de precios" o insisten, PASALES TODOS LOS PRECIOS detallados(Semillas: $36.900 / 60d, $49.900 / 120d; Cápsulas: $46.900 / 60d, $66.900 / 120d, etc).\n`;
+                knowledgeContext += `- PRECIOS: Si preguntan "precio" en general, decí "$37.000 a $69.000".PERO si preguntan "precio de todos", "lista de precios" o insisten, PASALES TODOS LOS PRECIOS detallados: ${priceString}.\n`;
                 knowledgeContext += `- ENVÍO Y PAGO: Envío gratis por Correo Argentino a todo el país.Solo aceptamos pago en efectivo al recibir(Contra Reembolso).\n`;
             } else if (step === 'waiting_price_confirmation') {
                 knowledgeContext += `- El usuario todavía NO vio precios.Tu trabajo es convencerlo de que quiera verlos.\n`;
                 knowledgeContext += `- Contraindicaciones: solo embarazo y lactancia.NO menores de edad.\n`;
                 knowledgeContext += `- (NO menciones precios específicos ni formas de pago, solo que son accesibles) \n`;
             } else if (['waiting_plan_choice', 'closing', 'waiting_ok'].includes(step)) {
-                const pCaps = f.price_capsulas?.response || "";
-                const pSem = f.price_semillas?.response || "";
-                if (pCaps || pSem) knowledgeContext += `- PRECIOS: Capsulas($46.900 / $66.900) | Semillas($36.900 / $49.900) \n`;
-
-                // Get dynamic prices from cache (non-blocking)
-                const priceData = await _getPrices();
-                const adMax = priceData.adicionalMAX || '6.000';
-
+                knowledgeContext += `- PRECIOS: ${priceString} \n`;
                 knowledgeContext += `- Plan 120 días SIN adicional. Plan 60 días con Contra Reembolso MAX (+$${adMax}).\n`;
                 knowledgeContext += `- SOBRE CARGO ADICIONAL: El cargo extra es el costo del servicio de Contra Reembolso (pagar al recibir). Se cobra IGUAL sea envío a domicilio o retiro en sucursal. Para el plan 120 días está BONIFICADO (es gratis). Si eligió 60 días y pide retirar en correo para no pagar envío, explicá esto y ofrecé pasar a 120 días para ahorrarlo.\n`;
                 knowledgeContext += `- Envío gratis por Correo Argentino, pago en efectivo al recibir\n`;
             } else if (step === 'waiting_data') {
                 knowledgeContext += `- Necesitamos: nombre completo, calle y número, ciudad, código postal\n`;
                 knowledgeContext += `- PROHIBIDO PEDIR NÚMERO DE TELÉFONO.Ya estamos hablando por WhatsApp, ¡ya tenemos su número! Nunca pidas este dato.\n`;
-                knowledgeContext += `- (NO menciones precios ni productos, ya están decididos) \n`;
+                knowledgeContext += `- (NO ofrezcas ni menciones precios ni productos a menos que el cliente pregunte explícitamente por ellos. Si preguntan, los precios son: ${priceString}) \n`;
             }
 
             knowledgeContext += `(No inventes datos, usá siempre esta base)`;

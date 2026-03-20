@@ -4,6 +4,11 @@ Este documento mantiene un registro de los problemas resueltos, características
 Al cambiar de cuenta de Google, puedes pedirle a la IA: *"Lee el archivo AI_SESSION_NOTES.md para tener todo el contexto de lo que estábamos haciendo"*.
 
 ---
+## 🛑 [20 Mar 2026] Fix: Bot omite precio de gotas durante toma de datos (`waiting_data`)
+**Problema:** Cuando el cliente pedía el precio exacto de las gotas en plena recolección de dirección (`waiting_data`), el bot respondía con evasivas ("su precio varía... si querés lo busco"). Esto ocurría porque la directiva del prompt para ese paso indicaba explícitamente "NO menciones precios ni productos, ya están decididos" y no le pasaba los montos, dejando a la IA ciega sobre esos datos para evitar distracciones.
+**Solución:** Se modificó la inyección de `knowledgeContext` en `src/services/ai.ts` para extraer los precios reales dinámicamente con `_getPrices()`. Ahora, para `waiting_data`, se le adjunta el catálogo de precios exactos junto a la directiva: "NO ofrezcas ni menciones precios ni productos a menos que el cliente pregunte explícitamente por ellos. Si preguntan, los precios son: [...]". Esto le devuelve la capacidad de respuesta oportuna sin desviar el objetivo.
+
+---
 ## 🛑 [7 Mar 2026] Fix: Bot se pausa con preguntas FAQ durante `waiting_data`
 **Problema:** Durante la etapa de recolección de datos de envío (`waiting_data`), clientes preguntan cosas como "los envíos tienen día especial?", "que función tienen las cápsulas", "me tengo que cuidar con las comidas", "dónde tenés oficina". El bot intenta parsear estos textos como dirección, falla, y se pausa con "La IA no pudo procesar correctamente los datos ingresados en el primer intento."
 
