@@ -15,7 +15,7 @@ import GalleryViewV2 from '../../../components/corporate/v2/GalleryViewV2';
 import AdvancedAnalyticsViewV2 from '../../../components/corporate/v2/AdvancedAnalyticsViewV2';
 import WaitingCustomersPanel from '../../../components/corporate/v2/dashboard/WaitingCustomersPanel';
 
-import { Wifi, MessageCircle, Database, Settings, FileText, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Search } from 'lucide-react';
+import { Wifi, MessageCircle, Database, Settings, FileText, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Search, Bell, AlertTriangle } from 'lucide-react';
 
 const CorporateDashboardV2 = () => {
     const { socket } = useSocket();
@@ -34,6 +34,19 @@ const CorporateDashboardV2 = () => {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [globalSearch, setGlobalSearch] = useState('');
     const globalSearchRef = useRef(null);
+    const [showNotifications, setShowNotifications] = useState(false);
+    const notifRef = useRef(null);
+
+    // Click outside to close notifications box
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (notifRef.current && !notifRef.current.contains(event.target)) {
+                setShowNotifications(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     // Detección de Mobile
     useEffect(() => {
@@ -363,7 +376,70 @@ const CorporateDashboardV2 = () => {
                     </form>
 
                     <div className="flex items-center gap-2 lg:gap-6">
-                        <div className="flex items-center gap-3 pl-6">
+                        {/* Notifications Bell */}
+                        <div className="relative" ref={notifRef}>
+                            <button 
+                                onClick={() => setShowNotifications(!showNotifications)}
+                                className="relative p-2 rounded-xl text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-sm cursor-pointer"
+                            >
+                                <Bell className="w-5 h-5 lg:w-6 lg:h-6" />
+                                {alerts.length > 0 && (
+                                    <span className="absolute top-0 right-0 -mt-1 -mr-1 flex items-center justify-center w-5 h-5 text-[10px] font-bold text-white bg-rose-500 border-2 border-white dark:border-slate-900 rounded-full leading-none shadow-sm">
+                                        {alerts.length > 9 ? '9+' : alerts.length}
+                                    </span>
+                                )}
+                            </button>
+                            
+                            {/* Dropdown */}
+                            {showNotifications && (
+                                <div className="absolute right-0 mt-3 w-[18rem] sm:w-96 bg-white dark:bg-slate-800 rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)] border border-slate-200 dark:border-slate-700 z-50 overflow-hidden animate-fade-in flex flex-col">
+                                    <div className="p-4 border-b border-slate-100 dark:border-slate-700/50 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50">
+                                        <h3 className="font-extrabold text-slate-800 dark:text-slate-100 text-sm">Notificaciones</h3>
+                                        {alerts.length > 0 && (
+                                            <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/40 px-2 py-1 rounded-lg uppercase tracking-wider">{alerts.length} Novedades</span>
+                                        )}
+                                    </div>
+                                    <div className="max-h-[60vh] overflow-y-auto custom-scrollbar">
+                                        {alerts.length === 0 ? (
+                                            <div className="p-10 text-center text-slate-500 dark:text-slate-400">
+                                                <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-700/50 flex items-center justify-center mx-auto mb-4 border border-slate-200 dark:border-slate-700/50">
+                                                    <Bell className="w-6 h-6 text-slate-400 dark:text-slate-500" />
+                                                </div>
+                                                <p className="text-sm font-bold text-slate-700 dark:text-slate-300">Todo al día</p>
+                                                <p className="text-xs mt-1 font-medium">No hay alertas pendientes en este momento.</p>
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col">
+                                                {alerts.map(alert => (
+                                                    <div 
+                                                        key={alert.id} 
+                                                        className="p-4 border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer flex gap-3 group relative overflow-hidden" 
+                                                        onClick={() => { 
+                                                            setShowNotifications(false); 
+                                                            handleQuickAction(alert.userPhone, 'chat'); 
+                                                        }}
+                                                    >
+                                                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                                        <div className="w-10 h-10 rounded-full bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
+                                                            <AlertTriangle className="w-5 h-5" />
+                                                        </div>
+                                                        <div className="min-w-0 pr-2">
+                                                            <p className="text-sm font-bold text-slate-800 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors line-clamp-2 leading-tight mb-1">{alert.reason}</p>
+                                                            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium font-mono">{alert.userPhone ? alert.userPhone.split('@')[0] : 'Desconocido'}</p>
+                                                            {alert.details && (
+                                                                <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1.5 truncate italic border-l-2 border-slate-200 dark:border-slate-600 pl-2">"{alert.details}"</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex items-center gap-3 pl-4 lg:pl-6 border-l border-slate-200 dark:border-slate-700/60 ml-2">
                             <div className="text-right hidden md:block">
                                 <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Administrador</p>
                                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Root Access</p>
