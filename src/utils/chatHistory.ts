@@ -16,15 +16,15 @@ async function getLocalHistory(chatId: string, sinceTimestamp: number = 0): Prom
             where: {
                 userPhone: cleanPhone,
                 instanceId: INSTANCE_ID,
-                createdAt: { gte: new Date(sinceTimestamp * 1000) }
+                timestamp: { gte: new Date(sinceTimestamp * 1000) }
             },
-            orderBy: { createdAt: 'asc' }
+            orderBy: { timestamp: 'asc' }
         });
 
         return dbLogs.map((log: any) => ({
             fromMe: log.role === 'bot' || log.role === 'admin' || log.role === 'system',
             body: log.content,
-            timestamp: new Date(log.createdAt).getTime(),
+            timestamp: new Date(log.timestamp).getTime(),
             type: 'chat',
             isLocal: true
         }));

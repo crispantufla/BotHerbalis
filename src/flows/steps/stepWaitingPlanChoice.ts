@@ -94,7 +94,7 @@ async function handleWaitingPlanChoice(
     // e.g. "el de 120 cuánto sale", "quiero el de 60, como se toma?", "el de 60 pero me cuesta tragar", "cuanto bajo en 60 dias?"
     // Also catch objections like "no me conviene por el envio", "es muy caro el de 60"
     // If the user has a question/objection AND a plan, we want the AI to handle it so it answers their concern first.
-    const hasQuestionText = /\b(como|cómo|cuando|cuándo|que|qué|donde|dónde|por que|por qué|cual|cuál|duda|consulta|consulto|precio|costo|sale|cuesta|valor|paga|cobr|tarjeta|efectivo|transferencia|diabetes|diabetica|presion|hipertens|salud|enfermedad|tiroides|hipotiroidismo|operada|cirugia|bypass|manga|estomago|gastritis|acidez|contraindicaciones|efectos|mal|dieta|rebote|tragar|ahogar|grandes|cuestan|complicado|dificil|seguridad|garantia|garantía|garantiza|efectiva|efectivo|funciona|seguro|cuanto|cuánto|cuantos|cuántos|kilo|kilos|bajar|bajo|envio|envío|conviene|caro|carisimo|no me conviene|no me sirve)\b/i.test(normalizedText) || text.includes('?');
+    const hasQuestionText = /\b(como|cómo|cuando|cuándo|que|qué|donde|dónde|por que|por qué|cual|cuál|duda|consulta|consulto|precio|costo|sale|cuesta|valor|paga|cobr|tarjeta|efectivo|transferencia|diabetes|diabetica|presion|hipertens|salud|enfermedad|tiroides|hipotiroidismo|operada|cirugia|bypass|manga|estomago|gastritis|acidez|contraindicaciones|efectos|mal|dieta|rebote|tragar|ahogar|grandes|cuestan|complicado|dificil|seguridad|garantia|garantía|garantiza|efectiva|efectivo|funciona|seguro|cuanto|cuánto|cuantos|cuántos|kilo|kilos|bajar|bajo|envio|envío|conviene|caro|carisimo|no me conviene|no me sirve|esperar|espera|aguardar|aguanta|bancame|recien|recién|cobro|cobre|sueldo|quincena|depositan|pagan|plata|pensar|pienso|despues|después|luego|mañana|aviso)\b/i.test(normalizedText) || text.includes('?');
 
     // If text is super long (like a transcription), force AI to handle it so we don't look robotic
     const isVeryLongMessage = text.split(/\s+/).length > 20;
@@ -248,6 +248,19 @@ RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.
 
                 if (extractedStr.startsWith('POSTDATADO:') && currentState.selectedProduct) {
                     const closingNode = knowledge.flow.closing;
+                    
+                    // The user might have specified the plan ALONG WITH the postdate 
+                    // (e.g., "espero al 27 y quiero el de 60")
+                    let userChosePlan = extractedStr.match(/\b(60|120|180|240|300|360|420|480|540|600)\b/);
+                    if (!userChosePlan) userChosePlan = normalizedText.match(/\b(60|120|180|240|300|360|420|480|540|600)\b/);
+                    
+                    if (userChosePlan) {
+                        const plan = userChosePlan[1];
+                        const product = currentState.selectedProduct || "Nuez de la India";
+                        buildCartFromSelection(product, plan, currentState);
+                        logger.info(`[FLOW-UPDATE] Saved plan ${plan} along with POSTDATADO.`);
+                    }
+
                     _setStep(currentState, closingNode.nextStep);
                     if (planAI.response) {
                         currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });
