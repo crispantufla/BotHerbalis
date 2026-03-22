@@ -37,6 +37,7 @@ interface AddressValidationResult {
     mapsValid: boolean | null;
     mapsFormatted: string | null;
     warnings: string[];
+    notArgentina?: boolean;  // true when Maps confirms address is outside Argentina
 }
 
 // Argentine CP → Province mapping (official ranges - more granular)
@@ -167,6 +168,54 @@ export async function validateWithGoogleMaps(address: string): Promise<MapsValid
     }
 }
 
+/**
+ * lookupCPFromMaps
+ * Uses Google Maps Geocoding to find the postal code for a street + city.
+ * Returns the CP string (4 digits) or null if not found.
+ */
+export async function lookupCPFromMaps(calle: string, ciudad: string): Promise<string | null> {
+    const apiKey = process.env.GOOGLE_MAPS_KEY;
+    if (!apiKey) return null;
+
+    try {
+        const query = encodeURIComponent(`${calle}, ${ciudad}, Argentina`);
+        const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${query}&key=${apiKey}&region=ar&language=es`;
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10_000);
+        const response = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        const data = await response.json() as any;
+
+        if (data.status === 'OK' && data.results && data.results.length > 0) {
+            const result = data.results[0];
+
+            // Verify it's in Argentina
+            const isArgentina = result.address_components?.some(
+                (c: any) => c.short_name === 'AR' && c.types.includes('country')
+            );
+            if (!isArgentina) return null;
+
+            // Extract postal_code from address_components
+            const postalComponent = result.address_components?.find(
+                (c: any) => c.types.includes('postal_code')
+            );
+            if (postalComponent) {
+                const cp = postalComponent.long_name.replace(/[^0-9]/g, '');
+                if (cp.length === 4) {
+                    logger.info(`[MAPS] Found CP ${cp} for "${calle}, ${ciudad}"`);
+                    return cp;
+                }
+            }
+        }
+
+        return null;
+    } catch (e: any) {
+        logger.error(`[MAPS] lookupCPFromMaps error: ${e.message}`);
+        return null;
+    }
+}
+
 export async function validateAddress(addr: Address): Promise<AddressValidationResult> {
     const result: AddressValidationResult = {
         cpValid: false,
@@ -201,6 +250,9 @@ export async function validateAddress(addr: Address): Promise<AddressValidationR
         } else if (mapsResult.valid === false) {
             result.mapsValid = false;
             result.warnings.push(`📍 ${mapsResult.error}`);
+            if (mapsResult.error?.includes('Argentina')) {
+                result.notArgentina = true;
+            }
         }
         // If valid === null, Maps is not configured or errored — skip silently
     }

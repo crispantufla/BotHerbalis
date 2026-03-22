@@ -65,6 +65,7 @@ export interface UserState {
     addressIssueType?: string | null;       // 'no_number' | 'intersection' | 'conflict'
     addressIssueTries?: number;             // 0 = fresh, 1 = already explained once
     mapsFormattedAddress?: string | null;   // Address returned by Google Maps
+    pendingCPFromMaps?: string | null;      // CP suggested by Google Maps, awaiting user confirmation
     lastAddressMsg?: string;
 
     // Multi-modal (Para envío de fotos / OCR)

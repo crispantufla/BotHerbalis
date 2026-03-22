@@ -152,7 +152,7 @@ describe('cartHelpers', () => {
             expect(state.adicionalMAX).toBe(0);
         });
 
-        test.each(['180', '240', '300', '360'])('extended plan %s calculates correctly', (plan) => {
+        test.each(['180', '240', '300', '360'])('extended plan %s calculates correctly with 3+ unit discount', (plan) => {
             const state60 = makeState('waiting_plan_choice');
             const state120 = makeState('waiting_plan_choice');
             const stateExtended = makeState('waiting_plan_choice');
@@ -167,7 +167,9 @@ describe('cartHelpers', () => {
             const factor = parseInt(plan) / 60;
             const pairs = Math.floor(factor / 2);
             const remainder = factor % 2;
-            const expected = (pairs * price120) + (remainder * price60);
+            // Plans with 3+ units get 50% off one base60 unit
+            const discount = factor >= 3 ? Math.round(price60 * 0.5) : 0;
+            const expected = (pairs * price120) + (remainder * price60) - discount;
 
             expect(priceExt).toBe(expected);
         });

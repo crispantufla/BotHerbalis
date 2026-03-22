@@ -21,15 +21,55 @@ export async function handleSystemGlobals(
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
     const isNegative = _isNegative(normalizedText);
 
-    // 1. CANCEL
-    const CANCEL_REGEX = /\b(cancelar|cancelarlo|anular|dar de baja|no quiero (el|mi) pedido|baja al pedido|me arrepenti)\b/i;
-    if (CANCEL_REGEX.test(normalizedText) && !isNegative && currentState.step !== 'completed') {
-        logger.info(`[GLOBAL] User ${userId} requested cancellation.`);
-        const msg = 'Qué pena... 😔 ¿Por qué querés cancelarlo? (Respondeme y le aviso a mi compañero para que te ayude)';
-        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
-        await sendMessageWithDelay(userId, msg);
+    // 0. PENDING CANCEL CONFIRMATION — intercept before any other logic
+    if (currentState.pendingCancelConfirm && currentState.step !== 'completed') {
+        const confirmYes = /\b(si|sí|sip|sep|dale|confirmo|claro|seguro|exacto|afirmativo|cancelar)\b/i.test(normalizedText)
+            && !/\b(no|para nada|olvida|seguir|quiero seguir|no\s+s[eé])\b/i.test(normalizedText);
+        // confirmNo: starts with "no" (direct answer) but NOT "no sé" (uncertainty)
+        const startsWithNo = /^no\b/i.test(normalizedText);
+        const hasUncertainty = /\b(s[eé]|todav[ií]a|no\s+s[eé])\b/i.test(normalizedText);
+        const confirmNo = (startsWithNo && !hasUncertainty)
+            || /\b(para nada|olvídalo|olvidalo|seguimos|quiero seguir|dejalo)\b/i.test(normalizedText);
 
-        await _pauseAndAlert(userId, currentState, dependencies, text, '🚫 Solicitud de cancelación. El bot preguntó motivo.');
+        if (confirmYes) {
+            currentState.pendingCancelConfirm = false;
+            const byeMsg = 'Entendido, lamentamos no poder ayudarte en esta oportunidad 😔 ¡Si en algún momento nos necesitás, acá estamos!';
+            currentState.history.push({ role: 'bot', content: byeMsg, timestamp: Date.now() });
+            await sendMessageWithDelay(userId, byeMsg);
+            saveState(userId);
+            await _pauseAndAlert(userId, currentState, dependencies, text, '🚫 Cancelación confirmada por el cliente durante el proceso de venta.');
+            return { matched: true };
+        } else if (confirmNo) {
+            currentState.pendingCancelConfirm = false;
+            const continueMsg = '¡Qué bien! Seguimos entonces 😊 ¿En qué te puedo ayudar?';
+            currentState.history.push({ role: 'bot', content: continueMsg, timestamp: Date.now() });
+            await sendMessageWithDelay(userId, continueMsg);
+            saveState(userId);
+            return { matched: true };
+        } else {
+            // Ambiguous — ask again
+            const askMsg = 'Perdoname, ¿confirmás que querés cancelar? Respondé *sí* o *no* 😊';
+            currentState.history.push({ role: 'bot', content: askMsg, timestamp: Date.now() });
+            await sendMessageWithDelay(userId, askMsg);
+            saveState(userId);
+            return { matched: true };
+        }
+    }
+
+    // 1. CANCEL
+    //    Explicit: "cancelar", "anular" — allowed unless the user is saying "no quiero cancelar"
+    //    Implicit: "ya no quiero", "me arrepenti" — always triggers (these ARE the cancel intent)
+    const NO_CANCEL_PHRASE = /\b(no\s+(quiero|quería)\s+cancelar|sin\s+cancelar|no\s+cancelar)\b/i;
+    const EXPLICIT_CANCEL_REGEX = /\b(cancelar|cancelarlo|anular|dar de baja|no quiero (el|mi) pedido|baja al pedido)\b/i;
+    const IMPLICIT_CANCEL_REGEX = /\b(ya no quiero|me arrepenti|no me interesa mas|no me interesa más)\b/i;
+    if (((EXPLICIT_CANCEL_REGEX.test(normalizedText) && !NO_CANCEL_PHRASE.test(normalizedText))
+        || IMPLICIT_CANCEL_REGEX.test(normalizedText)) && currentState.step !== 'completed') {
+        logger.info(`[GLOBAL] User ${userId} requested cancellation.`);
+        currentState.pendingCancelConfirm = true;
+        const msg = '¿Estás seguro/a de que no querés continuar? Antes de decidir, puedo responder cualquier duda que tengas 😊\n\nRespondé *sí* para cancelar o *no* para seguir.';
+        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        saveState(userId);
+        await sendMessageWithDelay(userId, msg);
         return { matched: true };
     }
 

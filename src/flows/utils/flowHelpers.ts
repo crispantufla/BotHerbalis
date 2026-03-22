@@ -62,18 +62,20 @@ function _hasCompleteAddress(state: UserState): boolean {
  */
 function _detectPostdatado(normalizedText: string): string | null {
     // "mañana", "ya", "ahora" = wants SOONER, NOT a postdatado request
-    const wantsSooner = /\b(mañana|ya mismo|ya|ahora|urgente|inmediato|cuanto antes|lo antes posible)\b/i.test(normalizedText);
-    if (wantsSooner && !/\b(pasado mañana|cobro|principio|fin de mes|\d{1,2}\s+de\s+(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre))\b/i.test(normalizedText)) {
+    // But "ahora no puedo" / "no puedo ahora" means LATER, not sooner
+    const hasNegatedAhora = /\b(ahora\s+no|no\s+puedo\s+ahora|ahora\s+no\s+puedo)\b/i.test(normalizedText);
+    const wantsSooner = !hasNegatedAhora && /\b(mañana|ya mismo|ya|ahora|urgente|inmediato|cuanto antes|lo antes posible)\b/i.test(normalizedText);
+    if (wantsSooner && !/\b(pasado mañana|cobro|principio|fin de mes|semana\s+que\s+viene|mes\s+que\s+viene|pr[oó]ximo\s+mes|\d{1,2}\s+(?:de\s+)?(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre))\b/i.test(normalizedText)) {
         return null;
     }
 
     // Must have delivery/payment action context
-    const hasActionContext = /\b(recibir|recibirlo|llega|llegue|enviar|enviame|envialo|mandalo|mandame|entregar|cobro|depositan|sueldo|pago|puedo|pueden|venir|mandar|no tengo|para el|a partir|no puedo ahora)\b/i.test(normalizedText);
+    const hasActionContext = /\b(recibir|recibirlo|llega|llegue|enviar|enviame|envialo|enviamela|enviamelo|mandalo|mandame|mandamela|mandamelo|entregar|cobro|depositan|sueldo|pago|puedo|pueden|venir|mandar|comprar|no tengo|para el|a partir|no puedo ahora|no puedo comprar)\b/i.test(normalizedText);
     if (!hasActionContext) return null;
 
     // Extract clean date portion (most specific patterns first)
     const patterns: RegExp[] = [
-        /\d{1,2}\s+de\s+(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i,
+        /\d{1,2}\s+(?:de\s+)?(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i,
         /(?:principio|fin|final|fines|mediados)\s+de\s+mes/i,
         /cuando\s+(?:cobre|cobr[eo]|me\s+deposit[ae]n|me\s+pagu?en)/i,
         /(?:cobro|depositan|pagan)\s+(?:el\s+\d{1,2}|a\s+principio|la\s+quincena)/i,
@@ -201,14 +203,21 @@ function _extractSilentVariables(normalizedText: string, currentState: any): { a
  * Detects if the user's message contains intent to change product or plan.
  * Extracted from stepWaitingData, stepWaitingFinalConfirmation, stepWaitingPlanChoice
  * to eliminate duplication.
+ * Also detects multi-unit intent ("3 cajas", "2 unidades", "180 días").
  */
 function _detectProductPlanChange(normalizedText: string): { productChange: RegExpMatchArray | null; planChange: RegExpMatchArray | boolean | null } {
     const productChange = normalizedText.match(/\b(mejor|quiero|prefiero|cambio|cambia|dame|paso a|en vez)\b.*\b(capsula|capsulas|pastilla|pastillas|semilla|semillas|gota|gotas|natural|infusion)\b/i)
         || normalizedText.match(/\b(capsula|capsulas|pastilla|pastillas|semilla|semillas|gota|gotas)\b.*\b(mejor|quiero|prefiero|cambio|en vez)\b/i);
 
+    // Multi-unit detection: "3 cajas", "dos unidades", "180 días", etc.
+    const multiUnitMatch = /\b(\d+)\s*(cajas?|unidades?|cajitas?|frascos?)\b/i.test(normalizedText)
+        || /\b(180|240|300|360)\s*d[ií]as?\b/i.test(normalizedText)
+        || /\b(dos|tres|cuatro|cinco|seis)\s*(cajas?|unidades?|cajitas?|frascos?)\b/i.test(normalizedText);
+
     const planChange = normalizedText.match(/\b(mejor|quiero|quisiera|prefiero|cambio|cambia|dame|paso a|en vez|voy a querer|me quedo con|tomaria|tomare|en realidad)\b.*\b(60|120|sesenta|ciento veinte)\b/i)
         || normalizedText.match(/\b(60|120|sesenta|ciento veinte)\b.*\b(mejor|quiero|quisiera|prefiero|cambio|en vez)\b/i)
-        || (/\b(de|el|plan)\s+(60|120)\b/i.test(normalizedText) && /\b(dia|dias|d\u00edas)\b/i.test(normalizedText));
+        || (/\b(de|el|plan)\s+(60|120)\b/i.test(normalizedText) && /\b(dia|dias|d\u00edas)\b/i.test(normalizedText))
+        || multiUnitMatch;
 
     return { productChange, planChange: planChange || null };
 }
@@ -216,6 +225,7 @@ function _detectProductPlanChange(normalizedText: string): { productChange: RegE
 /**
  * _resolveNewProductPlan
  * Given normalizedText and current state, resolves the new product and plan names.
+ * Multi-unit requests ("3 cajas", "180 días") take priority over 60/120 detection.
  */
 function _resolveNewProductPlan(normalizedText: string, currentProduct: string | null | undefined, currentPlan: string | null | undefined): { newProduct: string; newPlan: string } {
     let newProduct = currentProduct || "Nuez de la India";
@@ -223,9 +233,28 @@ function _resolveNewProductPlan(normalizedText: string, currentProduct: string |
     else if (/semilla|natural|infusion/i.test(normalizedText)) newProduct = "Semillas de nuez de la india";
     else if (/gota/i.test(normalizedText)) newProduct = "Gotas de nuez de la india";
 
+    const WORD_TO_NUM: Record<string, number> = { dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6 };
+
+    // Multi-unit takes priority over plain 60/120 detection
+    const multiNumericMatch = normalizedText.match(/\b(\d+)\s*(cajas?|unidades?|cajitas?|frascos?)\b/i);
+    const multiWordMatch = normalizedText.match(/\b(dos|tres|cuatro|cinco|seis)\s*(cajas?|unidades?|cajitas?|frascos?)\b/i);
+    const multiDaysMatch = normalizedText.match(/\b(180|240|300|360)\s*d[ií]as?\b/i);
+
     let newPlan = currentPlan || "60";
-    if (/\b(120|ciento veinte)\b/i.test(normalizedText)) newPlan = "120";
-    else if (/\b(60|sesenta)\b/i.test(normalizedText)) newPlan = "60";
+    if (multiNumericMatch) {
+        const units = parseInt(multiNumericMatch[1], 10);
+        if (units >= 2 && units <= 10) newPlan = (units * 60).toString();
+    } else if (multiWordMatch) {
+        const units = WORD_TO_NUM[multiWordMatch[1].toLowerCase()];
+        if (units && units >= 2) newPlan = (units * 60).toString();
+    } else if (multiDaysMatch) {
+        const days = parseInt(multiDaysMatch[1], 10);
+        if (days % 60 === 0) newPlan = days.toString();
+    } else if (/\b(120|ciento veinte)\b/i.test(normalizedText)) {
+        newPlan = "120";
+    } else if (/\b(60|sesenta)\b/i.test(normalizedText)) {
+        newPlan = "60";
+    }
 
     return { newProduct, newPlan };
 }

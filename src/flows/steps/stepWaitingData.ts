@@ -1,5 +1,5 @@
 import { UserState, FlowStep } from '../../types/state';
-import { validateAddress, suggestCPByCity } from '../../services/addressValidator';
+import { validateAddress, suggestCPByCity, lookupCPFromMaps } from '../../services/addressValidator';
 import { buildConfirmationMessage } from '../../utils/messageTemplates';
 import { _setStep, _pauseAndAlert, _detectProductPlanChange, _resolveNewProductPlan, _detectPostdatado } from '../utils/flowHelpers';
 import { _getPrice, _getAdicionalMAX } from '../utils/pricing';
@@ -85,12 +85,15 @@ async function _handleProductPlanChange(
             currentState.postdatado = postdatadoResult;
         }
 
-        const priceStr = _getPrice(newProduct, newPlan);
         buildCartFromSelection(newProduct, newPlan, currentState);
 
-        const planText = newPlan === "120" ? "120 días" : "60 días";
+        const planDaysNum = parseInt(newPlan, 10);
+        const unitsCount = Math.floor(planDaysNum / 60);
+        const planText = unitsCount > 1 ? `${unitsCount} unidades (${planDaysNum} días)` : `${planDaysNum} días`;
         calculateTotal(currentState);
-        const changeMsg = `¡Dale, sin problema! 😊 Cambiamos a ${newProduct.split(' de ')[0].toLowerCase()} por ${planText}, tienen un valor de $${currentState.totalPrice}.`;
+        const changeMsg = unitsCount >= 3
+            ? `¡Excelente! 🎉 Anotamos ${planText} de ${newProduct.split(' de ')[0].toLowerCase()} con 50% de descuento en la unidad más barata. Total: $${currentState.totalPrice}.`
+            : `¡Dale, sin problema! 😊 Cambiamos a ${newProduct.split(' de ')[0].toLowerCase()} por ${planText}, tienen un valor de $${currentState.totalPrice}.`;
         currentState.history.push({ role: 'bot', content: changeMsg, timestamp: Date.now() });
         await sendMessageWithDelay(userId, changeMsg);
 
@@ -158,10 +161,15 @@ function _classifyMessage(text: string, normalizedText: string): MessageClassifi
 
     const isVeryLongMessage = text.split(/\s+/).length > 35 && !/\b(provincia|pcia|localidad|calle|código postal|codigo postal|barrio)\b/i.test(text);
 
-    const looksLikeAddress = text.length > 8 && (!explicitQuestionKeywords) && !mentionsPlanOrPrice && (/\d/.test(text) || /\b(calle|av|avenida|barrio|mz|lote|piso|dpto|depto|departamento|casa|block|manzana|localidad|provincia|pcia|código postal)\b/i.test(text) || text.includes('\n'));
+    const hasExplicitAddressKeywords = /\b(calle|av|avenida|barrio|mz|lote|piso|dpto|depto|departamento|casa|block|manzana|localidad|provincia|pcia|código postal|codigo postal)\b/i.test(text);
+    const looksLikeAddress = text.length > 8 && !mentionsPlanOrPrice && (
+        hasExplicitAddressKeywords
+        || (!explicitQuestionKeywords && (/\d/.test(text) || text.includes('\n')))
+    );
 
     const isHesitation = /\b(pensar|pienso|despues|luego|mañana|te confirmo|te aviso|ver|veo|rato|lueguito|mas tarde|en un rato|aguanti|aguanta|espera|bancame)\b/i.test(normalizedText)
-        || /\b(voy a|dejam[eo])\s+(pasar|pensar|ver)\b/i.test(normalizedText);
+        || /\b(voy a|dejam[eo])\s+(pasar|pensar|ver)\b/i.test(normalizedText)
+        || /\b(no puedo comprar|no puedo ahora|ahora no puedo|ahora no|no tengo plata|no tengo la plata|no me alcanza|semana que viene)\b/i.test(normalizedText);
 
     const cleanText = normalizedText.replace(/[.,;?!]/g, ' ');
     const isPaymentTiming = /\b(no cobro|cobro el|cobro a|cobro la|cuando cobre|hasta que cobre|sueldo|quincena|cobrar|depositan|depósito|deposito|me pagan|me depositan)\b/i.test(cleanText)
@@ -225,10 +233,12 @@ async function _handleAiFallback(
     let aiGoal = "";
     if (classification.isPaymentTiming) {
         aiGoal = `El cliente dice que todavía no cobró, que está esperando su sueldo, o que va a esperar a cobrar para escribirte. DEBES INSISTIR y ofrecerle congelar el precio programando el envío a futuro. Respondé algo como: "¡No hace falta que esperes a cobrar para pedirlo! 😊 Podemos dejar el pedido cargado hoy para congelarte el precio actual, y yo te lo envío recién la fecha que me digas que cobrás. ¿A partir de qué fecha de la semana que viene te quedaría bien recibirlo?". NO aceptes un "te escribo después" sin antes ofrecerle fervientemente congelar el precio postdatando el envío.`;
+    } else if (classification.isHesitation) {
+        aiGoal = `El cliente dice que ahora no puede, que la semana que viene, que no tiene plata, o alguna variación de "todavía no". IMPORTANTE: El envío tarda entre 7 a 10 días hábiles y el pago es ÚNICAMENTE en efectivo AL RECIBIR, así que no necesita tener la plata ahora mismo. Respondé con MUCHA empatía y mencioná estos dos puntos clave: (1) "El envío tarda entre 7 y 10 días hábiles, así que para cuando te llegue seguramente ya vas a poder" y (2) "El pago es al recibir, no necesitás pagar nada ahora". Si aún así dice que no puede, ofrecé postdatar: "Si preferís, podemos agendar el envío para la fecha que te quede mejor, por ejemplo principio de mes. ¿Qué te parece?". NO aceptes un rechazo directo sin antes explicarle que el pago es al recibir y ofrecer postdatar.`;
     } else if (classification.isObjectionOrComment) {
         aiGoal = `El usuario hizo un comentario sobre probar el producto primero, o expresó dudas sobre los resultados (ej: "si me da resultado compro más"). Respondé validando su decisión con extrema seguridad y empatía. A continuación, VOLVÉ a pedir sutilmente los datos de envío que estaban pendientes (Nombre, Dirección, Ciudad). NO ofrezcas otros productos.`;
     } else {
-        aiGoal = `El usuario tiene una duda o expresa una preocupación en plena toma de datos (ej: pregunta cómo se paga, cuándo llega, si le entregan en el trabajo, o cuenta un largo problema personal). DEBES RESPONDER SU TEXTO DIRECTAMENTE de forma EXTENSA Y MUY EMPÁTICA usando el Knowledge. Si expresa miedos sobre demoras o recepción, redactá un párrafo largo brindando tranquilidad absoluta. Si pregunta si puede recibir en su TRABAJO, responde sus opciones. Si pregunta sobre la función del producto o qué hace: "La Nuez de la India ayuda a acompañar el proceso natural del cuerpo para eliminar excesos. Muchas personas notan menos hinchazón, más liviandad y un descenso progresivo de peso. Es un apoyo natural para sentirte mejor sin métodos agresivos.". Si pregunta sobre dieta/comidas: "La Nuez de la India puede utilizarse sin hacer dietas estrictas...". Si pregunta dónde queda la oficina/local: "Somos Herbalis...". Si pregunta formas de pago: "El pago es únicamente en efectivo...". Si pregunta tiempos: "Los envíos se realizan cuanto antes...". Si pregunta contraindicaciones: "Es un producto 100% natural...". Nunca lo obligues a dar los datos bruscamente, respondé su duda con muchísima calidez, y cerrá sutilmente preguntando: "¿Te parece que lo dejemos anotado?" o "¿Te tomo los datos?".\n\nEXCEPCIÓN CRÍTICA - HESITACIÓN TIPO "TE AVISO": Si el cliente dice "luego te escribo", "te confirmo después", o "lo pienso y te aviso": NO LO ACEPTES A LA PRIMERA. Respondé ofreciendo congelar el precio: "¡Dale! Igual, si querés podemos dejar el paquete ya separado a tu nombre para congelarte el precio actual y te lo mando recién cuando vos me des el ok. ¿Te parece bien así aprovechás la promo de envío?".`;
+        aiGoal = `El usuario tiene una duda o expresa una preocupación en plena toma de datos (ej: pregunta cómo se paga, cuándo llega, si le entregan en el trabajo, o cuenta un largo problema personal). DEBES RESPONDER SU TEXTO DIRECTAMENTE de forma EXTENSA Y MUY EMPÁTICA usando el Knowledge. Si expresa miedos sobre demoras o recepción, redactá un párrafo largo brindando tranquilidad absoluta. Si pregunta si puede recibir en su TRABAJO, responde sus opciones. Si pregunta sobre la función del producto o qué hace: "La Nuez de la India ayuda a acompañar el proceso natural del cuerpo para eliminar excesos. Muchas personas notan menos hinchazón, más liviandad y un descenso progresivo de peso. Es un apoyo natural para sentirte mejor sin métodos agresivos.". Si pregunta sobre dieta/comidas: "La Nuez de la India puede utilizarse sin hacer dietas estrictas...". Si pregunta dónde queda la oficina/local: "Somos Herbalis...". Si pregunta formas de pago: "El pago es únicamente en efectivo...". Si pregunta tiempos: "Los envíos se realizan cuanto antes y tardan entre 7 a 10 días hábiles.". Si pregunta contraindicaciones: "Es un producto 100% natural...". Nunca lo obligues a dar los datos bruscamente, respondé su duda con muchísima calidez, y cerrá sutilmente preguntando: "¿Te parece que lo dejemos anotado?" o "¿Te tomo los datos?".\n\nEXCEPCIÓN CRÍTICA - HESITACIÓN TIPO "TE AVISO": Si el cliente dice "luego te escribo", "te confirmo después", o "lo pienso y te aviso": NO LO ACEPTES A LA PRIMERA. Respondé ofreciendo congelar el precio: "¡Dale! Igual, si querés podemos dejar el paquete ya separado a tu nombre para congelarte el precio actual y te lo mando recién cuando vos me des el ok. ¿Te parece bien así aprovechás la promo de envío?".`;
     }
 
     const aiData = await aiService.chat(text, {
@@ -320,16 +330,27 @@ async function _processAddressData(
         }
 
         if (data.nombre && !currentState.partialAddress.nombre) { currentState.partialAddress.nombre = data.nombre; madeProgress = true; }
+        if (data.ciudad && !currentState.partialAddress.ciudad) { currentState.partialAddress.ciudad = data.ciudad; madeProgress = true; }
+        if (data.cp && !currentState.partialAddress.cp) { currentState.partialAddress.cp = data.cp; madeProgress = true; }
 
         if (data.calle && !currentState.partialAddress.calle) {
-            const hasNumber = /\d+/.test(textToAnalyze);
-            const hasSN = /\b(s\/n|sn|sin numero|sin número)\b/i.test(textToAnalyze);
+            // Validate against the AI-parsed street (data.calle), NOT the full message text.
+            // The full text may contain references like "entre X y Y" that are not the actual address.
+            const calleToCheck = data.calle;
+            const hasNumber = /\d+/.test(calleToCheck);
+            const hasSN = /\b(s\/n|sn|sin numero|sin número)\b/i.test(calleToCheck) || /\b(s\/n|sn|sin numero|sin número)\b/i.test(textToAnalyze);
 
-            const isIntersection = /\b(y\s+calle|y\s+pasaje|y\s+av\b|y\s+avenida|entre\s+calle|entre\s+.+\s+y\s+|esq\b|esquina)\b/i.test(textToAnalyze)
-                || /\bcalle\s+\d+\b/i.test(textToAnalyze) && /\by\b/i.test(textToAnalyze);
+            const hasNegatedEsquina = /\b(no\s+(es|hay|tiene|sea)\s+(esquina|esq\b)|no\s+esquina|ni\s+esquina|sin\s+esquina|mitad\s+de?\s+cuadra)\b/i.test(textToAnalyze);
+            const isIntersection = !hasNegatedEsquina && (
+                /\b(y\s+calle|y\s+pasaje|y\s+av\b|y\s+avenida|entre\s+calle|entre\s+.+\s+y\s+|esq\b|esquina)\b/i.test(calleToCheck)
+                || /\bcalle\s+\d+\b/i.test(calleToCheck) && /\by\b/i.test(calleToCheck)
+            );
 
-            const streetNumberMatch = textToAnalyze.match(/\b(\d{3,})\b/);
-            const endsIn00 = streetNumberMatch && streetNumberMatch[1].endsWith('00') && streetNumberMatch[1] !== '100';
+            const streetNumberMatch = calleToCheck.match(/\b(\d{3,})\b/);
+            // Only flag endsIn00 if the calle looks like a bare intersection (e.g., "calle 200")
+            // NOT when it's a named street with a number (e.g., "Mitre 300", "Belgrano 1200")
+            const hasStreetName = /[a-záéíóúñ]{3,}/i.test(calleToCheck);
+            const endsIn00 = streetNumberMatch && streetNumberMatch[1].endsWith('00') && streetNumberMatch[1] !== '100' && !hasStreetName;
 
             if (isIntersection || endsIn00) {
                 const tries = currentState.addressIssueTries || 0;
@@ -369,10 +390,7 @@ async function _processAddressData(
             }
         }
 
-        if (data.ciudad && !currentState.partialAddress.ciudad) { currentState.partialAddress.ciudad = data.ciudad; madeProgress = true; }
-        if (data.cp && !currentState.partialAddress.cp) { currentState.partialAddress.cp = data.cp; madeProgress = true; }
-
-        if (data.cp && currentState.partialAddress.cp !== data.cp) {
+        if (data.cp && currentState.partialAddress.cp && currentState.partialAddress.cp !== data.cp) {
             currentState.partialAddress.cp = data.cp;
             madeProgress = true;
         }
@@ -399,7 +417,7 @@ async function _handleSafetyNet(
     if (currentState.addressAttempts < 2 || hasAddressPatterns) return null;
 
     logger.info(`[AI-SAFETY-NET] waiting_data: Message doesn't look like address for ${userId}: "${text}". Trying AI fallback before pausing.`);
-    const safetyGoal = `El usuario NO está dando datos de envío, sino que hace una pregunta o comentario. Respondé su pregunta con empatía usando el Knowledge. Si pregunta sobre la función del producto o qué hace: "La Nuez de la India ayuda a acompañar el proceso natural del cuerpo para eliminar excesos. Muchas personas notan menos hinchazón, más liviandad y un descenso progresivo de peso. Es un apoyo natural para sentirte mejor sin métodos agresivos." Si pregunta sobre dieta/comidas/si tiene que cuidarse: "La Nuez de la India puede utilizarse sin hacer dietas estrictas, porque ayuda a acompañar el proceso natural del metabolismo. Obviamente, si además cuidás un poco la alimentación o sumás algo de movimiento, los resultados suelen verse más rápido." Si pregunta dónde queda la oficina/local/de dónde son: "Somos Herbalis, una empresa internacional especializada en productos naturales a base de Nuez de la India. Nuestra central está en Barcelona (España) y en Argentina distribuimos desde Rosario. NO tenemos revendedores. Hace 13 años enviamos a todo el país por Correo Argentino, con envío sin costo y la posibilidad de pago al recibir." Si pregunta por contraindicaciones: "Es 100% natural. Las únicas contraindicaciones son embarazo y lactancia." Si pregunta sobre envíos o si tienen día especial: "Los envíos se realizan cuanto antes, sin día especial. Tardan aproximadamente 10 días hábiles." Si pregunta formas de pago: "El pago es únicamente en efectivo, ya sea cuando recibís en tu domicilio o si retirás en la sucursal del correo. No pedimos pagos por adelantado ni datos bancarios." Para CUALQUIER OTRA pregunta, respondé con naturalidad usando el Knowledge. Al final, cerrá sutilmente retomando los datos de envío: "¿Te paso a tomar los datos para el envío?" o "¿Me pasás los datos de envío?".`;
+    const safetyGoal = `El usuario NO está dando datos de envío, sino que hace una pregunta o comentario. Respondé su pregunta con empatía usando el Knowledge. Si pregunta sobre la función del producto o qué hace: "La Nuez de la India ayuda a acompañar el proceso natural del cuerpo para eliminar excesos. Muchas personas notan menos hinchazón, más liviandad y un descenso progresivo de peso. Es un apoyo natural para sentirte mejor sin métodos agresivos." Si pregunta sobre dieta/comidas/si tiene que cuidarse: "La Nuez de la India puede utilizarse sin hacer dietas estrictas, porque ayuda a acompañar el proceso natural del metabolismo. Obviamente, si además cuidás un poco la alimentación o sumás algo de movimiento, los resultados suelen verse más rápido." Si pregunta dónde queda la oficina/local/de dónde son: "Somos Herbalis, una empresa internacional especializada en productos naturales a base de Nuez de la India. Nuestra central está en Barcelona (España) y en Argentina distribuimos desde Rosario. NO tenemos revendedores. Hace 13 años enviamos a todo el país por Correo Argentino, con envío sin costo y la posibilidad de pago al recibir." Si pregunta por contraindicaciones: "Es 100% natural. Las únicas contraindicaciones son embarazo y lactancia." Si pregunta sobre envíos o si tienen día especial: "Los envíos se realizan cuanto antes, sin día especial. Tardan entre 7 a 10 días hábiles." Si pregunta formas de pago: "El pago es únicamente en efectivo, ya sea cuando recibís en tu domicilio o si retirás en la sucursal del correo. No pedimos pagos por adelantado ni datos bancarios." Para CUALQUIER OTRA pregunta, respondé con naturalidad usando el Knowledge. Al final, cerrá sutilmente retomando los datos de envío: "¿Te paso a tomar los datos para el envío?" o "¿Me pasás los datos de envío?".`;
     try {
         const safetyAiData = await aiService.chat(text, {
             step: FlowStep.WAITING_DATA,
@@ -431,12 +449,23 @@ async function _validateAndAssembleOrder(
     const { sendMessageWithDelay, saveState } = dependencies;
     const addr = currentState.partialAddress;
 
-    // Auto-suggest CP from city
+    // Auto-suggest CP from city (static table first, then Google Maps)
     if (addr.ciudad && !addr.cp) {
         const suggestedCP = suggestCPByCity(addr.ciudad);
         if (suggestedCP) {
             addr.cp = suggestedCP;
             logger.info(`[ADDRESS] Auto-suggested CP ${suggestedCP} for city "${addr.ciudad}" (user ${userId})`);
+        } else if (addr.calle) {
+            // Lookup CP via Google Maps geocoding
+            const mapsCP = await lookupCPFromMaps(addr.calle, addr.ciudad);
+            if (mapsCP) {
+                currentState.pendingCPFromMaps = mapsCP;
+                const cpMsg = `Encontré que tu código postal podría ser *${mapsCP}*. ¿Es correcto? 😊`;
+                currentState.history.push({ role: 'bot', content: cpMsg, timestamp: Date.now() });
+                await sendMessageWithDelay(userId, cpMsg);
+                saveState(userId);
+                return { matched: true };
+            }
         }
     }
 
@@ -493,6 +522,17 @@ async function _validateAndAssembleOrder(
         }
     } catch (e: any) {
         logger.warn(`[ADDRESS] validateAddress failed for ${userId}, proceeding without validation: ${e.message}`);
+    }
+
+    // Non-Argentina supersedes everything else (checked before cpValid)
+    if (validation.notArgentina) {
+        logger.info(`[MAPS] Non-Argentina address detected for ${userId}. Rejecting.`);
+        const geoMsg = `Lo lamento, solo realizamos envíos dentro de Argentina 😔\n\n¿Tenés una dirección en Argentina? Si es así, pasámela y con gusto seguimos.`;
+        currentState.history.push({ role: 'bot', content: geoMsg, timestamp: Date.now() });
+        await sendMessageWithDelay(userId, geoMsg);
+        currentState.partialAddress = {};
+        saveState(userId);
+        return { matched: true };
     }
 
     if (addr.cp && !validation.cpValid) {
@@ -658,6 +698,43 @@ export async function handleWaitingData(
     const guardResult = await _checkGuards(userId, currentState, knowledge, dependencies);
     if (guardResult) return guardResult;
 
+    // 1b. Handle pending CP confirmation from Google Maps lookup
+    if (currentState.pendingCPFromMaps) {
+        const { sendMessageWithDelay, saveState } = dependencies;
+        const isNo = /\b(no|nop|nope|negativo|incorrecto|mal|ese no|otro)\b/i.test(normalizedText);
+        const isYes = !isNo && /\b(si|sí|sep|sip|claro|correcto|exacto|ese|eso|ok|dale|afirmativo)\b/i.test(normalizedText);
+        const cpFromMessage = normalizedText.match(/\b(\d{4})\b/);
+
+        if (isYes) {
+            currentState.partialAddress.cp = currentState.pendingCPFromMaps;
+            logger.info(`[ADDRESS] User confirmed Maps CP ${currentState.pendingCPFromMaps} (user ${userId})`);
+            currentState.pendingCPFromMaps = null;
+            saveState(userId);
+            // Continue to validate and assemble order
+            const orderResult = await _validateAndAssembleOrder(userId, text, currentState, dependencies, false);
+            if (orderResult) return orderResult;
+            return await _askMissingFields(userId, currentState, dependencies, true);
+        } else if (cpFromMessage) {
+            // User provided their actual CP
+            currentState.partialAddress.cp = cpFromMessage[1];
+            logger.info(`[ADDRESS] User corrected CP to ${cpFromMessage[1]} (was suggested ${currentState.pendingCPFromMaps}) (user ${userId})`);
+            currentState.pendingCPFromMaps = null;
+            saveState(userId);
+            const orderResult = await _validateAndAssembleOrder(userId, text, currentState, dependencies, false);
+            if (orderResult) return orderResult;
+            return await _askMissingFields(userId, currentState, dependencies, true);
+        } else if (isNo) {
+            currentState.pendingCPFromMaps = null;
+            const askCPMsg = `No hay problema. ¿Me pasás tu código postal? 😊`;
+            currentState.history.push({ role: 'bot', content: askCPMsg, timestamp: Date.now() });
+            await sendMessageWithDelay(userId, askCPMsg);
+            saveState(userId);
+            return { matched: true };
+        }
+        // If neither yes/no/cp, clear the pending and continue normal flow
+        currentState.pendingCPFromMaps = null;
+    }
+
     // 2. Product/plan change detection
     await _handleProductPlanChange(userId, normalizedText, currentState, dependencies);
 
@@ -689,6 +766,29 @@ export async function handleWaitingData(
         (!classification.looksLikeAddress || classification.isVeryLongMessage || classification.isPaymentTiming || classification.isDeliveryTimingRequest)) {
         const fallbackResult = await _handleAiFallback(userId, text, normalizedText, currentState, knowledge, dependencies, classification);
         if (fallbackResult) return fallbackResult;
+    }
+
+    // 7b. If message has BOTH address data AND a question, save the data first then answer
+    if (classification.isDataQuestionOrEmotion && hasValidAddressData && extractedData) {
+        // Process the address data before handling the question
+        const { madeProgress: dataProgress, earlyReturn: dataEarly } = await _processAddressData(userId, text, textToAnalyze, extractedData, currentState, dependencies);
+        if (dataEarly) return dataEarly;
+
+        // Now handle the question via AI fallback
+        if (classification.isDeliveryTimingRequest || classification.isPaymentTiming || classification.isObjectionOrComment) {
+            const fallbackResult = await _handleAiFallback(userId, text, normalizedText, currentState, knowledge, dependencies, classification);
+            if (fallbackResult) {
+                // Check if order is now complete after saving data
+                const orderResult = await _validateAndAssembleOrder(userId, text, currentState, dependencies, classification.isDataQuestionOrEmotion);
+                if (orderResult) return orderResult;
+                return fallbackResult;
+            }
+        }
+
+        // Skip re-processing in step 8 since we already processed
+        const orderResult = await _validateAndAssembleOrder(userId, text, currentState, dependencies, classification.isDataQuestionOrEmotion);
+        if (orderResult) return orderResult;
+        return await _askMissingFields(userId, currentState, dependencies, dataProgress);
     }
 
     // 8. Process parsed address data
