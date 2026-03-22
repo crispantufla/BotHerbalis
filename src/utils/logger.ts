@@ -71,3 +71,7 @@ const customLogger = {
 };
 
 export default customLogger;
+
+// Dual export: CommonJS require() compatibility for files that haven't migrated to import
+module.exports = customLogger;
+module.exports.default = customLogger;
