@@ -1,5 +1,5 @@
-const NodeCache = require("node-cache");
-const logger = require("./logger");
+import NodeCache from "node-cache";
+import logger from "./logger";
 
 // Initialize NodeCache
 // stdTTL: 30 days (2592000 seconds) - Increased from 24h to prevent session loss for 30 days.

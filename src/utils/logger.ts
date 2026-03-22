@@ -70,4 +70,4 @@ const customLogger = {
     }
 };
 
-module.exports = customLogger;
+export default customLogger;

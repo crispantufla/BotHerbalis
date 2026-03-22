@@ -1,5 +1,5 @@
 import { Address } from '../types/state';
-const logger = require('../utils/logger');
+import logger from '../utils/logger';
 
 /**
  * addressValidator.ts — Address validation service
@@ -131,7 +131,10 @@ export async function validateWithGoogleMaps(address: string): Promise<MapsValid
         const query = encodeURIComponent(`${address}, Argentina`);
         const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${query}&key=${apiKey}&region=ar&language=es`;
 
-        const response = await fetch(url);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10_000);
+        const response = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
         const data = await response.json() as any;
 
         if (data.status === 'OK' && data.results && data.results.length > 0) {
@@ -205,4 +208,4 @@ export async function validateAddress(addr: Address): Promise<AddressValidationR
     return result;
 }
 
-module.exports = { validateCP, validateWithGoogleMaps, validateAddress, suggestCPByCity };
+// Functions exported inline above

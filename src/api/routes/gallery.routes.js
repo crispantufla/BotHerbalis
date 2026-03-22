@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { authMiddleware } = require('../../middleware/auth');
 const { atomicWriteFile } = require('../../../safeWrite');
+const logger = require('../../utils/logger');
 
 module.exports = (client, sharedState) => {
     const router = express.Router();
@@ -27,7 +28,7 @@ module.exports = (client, sharedState) => {
             try {
                 return JSON.parse(fs.readFileSync(GALLERY_JSON, 'utf8'));
             } catch (e) {
-                console.error("Error reading gallery.json:", e);
+                logger.error("Error reading gallery.json:", e);
                 return [];
             }
         }
@@ -102,7 +103,7 @@ module.exports = (client, sharedState) => {
             res.json({ success: true, image: newImage });
 
         } catch (e) {
-            console.error("Error uploading image:", e);
+            logger.error("Error uploading image:", e);
             res.status(500).json({ error: "Internal server error uploading image" });
         }
     });
@@ -135,7 +136,7 @@ module.exports = (client, sharedState) => {
             res.json({ success: true, message: "Image deleted" });
 
         } catch (e) {
-            console.error("Error deleting image:", e);
+            logger.error("Error deleting image:", e);
             res.status(500).json({ error: "Internal server error deleting image" });
         }
     });

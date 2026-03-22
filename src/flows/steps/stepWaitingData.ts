@@ -1,23 +1,31 @@
 import { UserState, FlowStep } from '../../types/state';
-const { validateAddress, suggestCPByCity } = require('../../services/addressValidator');
-const { buildConfirmationMessage } = require('../../utils/messageTemplates');
-const { _setStep, _pauseAndAlert, _detectProductPlanChange, _resolveNewProductPlan, _detectPostdatado } = require('../utils/flowHelpers');
-const { _getPrice, _getAdicionalMAX } = require('../utils/pricing');
-const { buildCartFromSelection, calculateTotal } = require('../utils/cartHelpers');
-const { _isDuplicate } = require('../utils/messages');
-const logger = require('../../utils/logger');
+import { validateAddress, suggestCPByCity } from '../../services/addressValidator';
+import { buildConfirmationMessage } from '../../utils/messageTemplates';
+import { _setStep, _pauseAndAlert, _detectProductPlanChange, _resolveNewProductPlan, _detectPostdatado } from '../utils/flowHelpers';
+import { _getPrice, _getAdicionalMAX } from '../utils/pricing';
+import { _formatPrice, buildCartFromSelection, calculateTotal } from '../utils/cartHelpers';
+import { _isDuplicate } from '../utils/messages';
+import logger from '../../utils/logger';
 
-export async function handleWaitingData(
-    userId: string,
-    text: string,
-    normalizedText: string,
-    currentState: UserState,
-    knowledge: any,
-    dependencies: any
-): Promise<{ matched: boolean }> {
-    const { sendMessageWithDelay, aiService, saveState } = dependencies;
+// --- Helper types ---
+interface MessageClassification {
+    explicitQuestionKeywords: boolean;
+    looksLikeAddress: boolean;
+    isDataQuestionOrEmotion: boolean;
+    isPaymentTiming: boolean;
+    isHesitation: boolean;
+    isDeliveryTimingRequest: boolean;
+    isObjectionOrComment: boolean;
+    isVeryLongMessage: boolean;
+    isShortConfirmation: boolean;
+}
 
-    // GUARD: Ensure product + plan are selected before collecting data
+// --- Helper: Guards for missing product/plan ---
+async function _checkGuards(
+    userId: string, currentState: UserState, knowledge: any, dependencies: any
+): Promise<{ matched: boolean } | null> {
+    const { sendMessageWithDelay, saveState } = dependencies;
+
     if (!currentState.selectedProduct) {
         logger.info(`[GUARD] waiting_data: No product selected for ${userId}, redirecting to preference`);
         const skipMsg = "Antes de los datos de envío, necesito saber qué producto te interesa 😊\n\nTenemos:\n1️⃣ Cápsulas\n2️⃣ Semillas/Infusión\n3️⃣ Gotas\n\n¿Cuál preferís?";
@@ -43,100 +51,111 @@ export async function handleWaitingData(
         await sendMessageWithDelay(userId, msg);
         return { matched: true };
     }
-    // PRIORITY 0: Detect product or plan change
+
+    return null;
+}
+
+// --- Helper: Detect and handle product/plan change ---
+async function _handleProductPlanChange(
+    userId: string, normalizedText: string, currentState: UserState, dependencies: any
+): Promise<void> {
+    const { sendMessageWithDelay, saveState } = dependencies;
     const { productChange: productChangeMatch, planChange: planChangeMatch } = _detectProductPlanChange(normalizedText);
 
-    if (productChangeMatch || planChangeMatch) {
-        const resolved = _resolveNewProductPlan(normalizedText, currentState.selectedProduct, currentState.selectedPlan);
-        let newProduct = resolved.newProduct;
-        let newPlan = resolved.newPlan;
+    if (!productChangeMatch && !planChangeMatch) return;
 
-        if (newProduct !== currentState.selectedProduct || newPlan !== currentState.selectedPlan) {
-            logger.info(`[BACKTRACK] User ${userId} changed product from "${currentState.selectedProduct} - ${currentState.selectedPlan}" to "${newProduct} - ${newPlan}" during waiting_data`);
-            const oldGoal = currentState.weightGoal;
+    const resolved = _resolveNewProductPlan(normalizedText, currentState.selectedProduct, currentState.selectedPlan);
+    let newProduct = resolved.newProduct;
+    let newPlan = resolved.newPlan;
 
-            currentState.selectedProduct = newProduct;
-            currentState.selectedPlan = newPlan;
-            currentState.pendingOrder = null;
-            currentState.partialAddress = {};  // Reset address from previous cycle
-            currentState.addressAttempts = 0;
-            currentState.fieldReaskCount = {};
-            if (oldGoal) currentState.weightGoal = oldGoal;
+    if (newProduct !== currentState.selectedProduct || newPlan !== currentState.selectedPlan) {
+        logger.info(`[BACKTRACK] User ${userId} changed product from "${currentState.selectedProduct} - ${currentState.selectedPlan}" to "${newProduct} - ${newPlan}" during waiting_data`);
+        const oldGoal = currentState.weightGoal;
 
-            const postdatadoResult = _detectPostdatado(normalizedText);
-            if (postdatadoResult && !currentState.postdatado) {
-                currentState.postdatado = postdatadoResult;
-            }
+        currentState.selectedProduct = newProduct;
+        currentState.selectedPlan = newPlan;
+        currentState.pendingOrder = null;
+        currentState.partialAddress = {};
+        currentState.addressAttempts = 0;
+        currentState.fieldReaskCount = {};
+        if (oldGoal) currentState.weightGoal = oldGoal;
 
-            const priceStr = _getPrice(newProduct, newPlan);
-            buildCartFromSelection(newProduct, newPlan, currentState);
-
-            const planText = newPlan === "120" ? "120 días" : "60 días";
-            calculateTotal(currentState);
-            const changeMsg = `¡Dale, sin problema! 😊 Cambiamos a ${newProduct.split(' de ')[0].toLowerCase()} por ${planText}, tienen un valor de $${currentState.totalPrice}.`;
-            currentState.history.push({ role: 'bot', content: changeMsg, timestamp: Date.now() });
-            await sendMessageWithDelay(userId, changeMsg);
-
-            let prefix = currentState.postdatado ? `Anotado para enviarlo en esa fecha 📅.` : ``;
-            if (prefix) {
-                currentState.history.push({ role: 'bot', content: prefix, timestamp: Date.now() });
-                await sendMessageWithDelay(userId, prefix);
-            }
-
-            saveState(userId);
-        } else if (newProduct === currentState.selectedProduct) {
-            let prefixIterated = `Ok, ${newProduct.split(' de ')[0].toLowerCase()} entonces 😊. `;
-            const postdatadoResult2 = _detectPostdatado(normalizedText);
-            if (postdatadoResult2) {
-                currentState.postdatado = postdatadoResult2;
-                prefixIterated += `Anotado para enviarlo ${postdatadoResult2} 📅. `;
-            }
-            currentState.history.push({ role: 'bot', content: prefixIterated, timestamp: Date.now() });
-            saveState(userId);
-            await sendMessageWithDelay(userId, prefixIterated);
+        const postdatadoResult = _detectPostdatado(normalizedText);
+        if (postdatadoResult && !currentState.postdatado) {
+            currentState.postdatado = postdatadoResult;
         }
-    }
 
-    // PRIORITY 1: Detect "retiro en sucursal" / "voy al correo" intent
-    // When the user says they'll pick up at the post office branch, set calle to 'A sucursal'
-    // and only require localidad/provincia/CP from here on.
-    const isSucursalIntent = /\b(voy al correo|voy yo al correo|retiro en sucursal|lo retiro|lo busco|busco yo|paso por el correo|paso yo por|sucursal|sucursal del correo|retiro yo|voy a buscarlo|voy a retirarlo|lo paso a buscar|paso a buscar|paso a retirar|voy a retirar|no tengo direcci[oó]n exacta|vivo en.{0,20}(distrito|paraje|ruta|campo|zona rural))\b/i.test(normalizedText)
-        && !/\b(cuanto|cuánto|precio|costo|sale|cuesta|valor|tarda|llega|contraindicacion)\b/i.test(normalizedText); // Exclude if it's clearly a question
+        const priceStr = _getPrice(newProduct, newPlan);
+        buildCartFromSelection(newProduct, newPlan, currentState);
 
-    if (isSucursalIntent && !currentState.partialAddress?.calle) {
-        logger.info(`[SUCURSAL] Detected sucursal pickup intent for ${userId}: "${text}"`);
-        if (!currentState.partialAddress) currentState.partialAddress = {};
-        currentState.partialAddress.calle = 'A sucursal';
-        currentState.addressIssueType = null;
-        currentState.addressIssueTries = 0;
+        const planText = newPlan === "120" ? "120 días" : "60 días";
+        calculateTotal(currentState);
+        const changeMsg = `¡Dale, sin problema! 😊 Cambiamos a ${newProduct.split(' de ')[0].toLowerCase()} por ${planText}, tienen un valor de $${currentState.totalPrice}.`;
+        currentState.history.push({ role: 'bot', content: changeMsg, timestamp: Date.now() });
+        await sendMessageWithDelay(userId, changeMsg);
 
-        // Check what else we still need
-        const addr = currentState.partialAddress;
-        const stillMissing = [];
-        if (!addr.nombre) stillMissing.push('Nombre y Apellido');
-        if (!addr.ciudad) stillMissing.push('Localidad/Ciudad');
-        if (!addr.cp) stillMissing.push('Código Postal');
-
-        let ackMsg: string;
-        if (stillMissing.length > 0) {
-            ackMsg = `¡Dale, perfecto! Lo enviamos a la sucursal de Correo Argentino más cercana a tu zona 📦\n\nSolo necesito: *${stillMissing.join(', ')}* para armar la etiqueta 🙌`;
-        } else {
-            ackMsg = `¡Dale, perfecto! Lo enviamos a la sucursal de Correo Argentino más cercana a tu zona 📦`;
+        let prefix = currentState.postdatado ? `Anotado para enviarlo en esa fecha 📅.` : ``;
+        if (prefix) {
+            currentState.history.push({ role: 'bot', content: prefix, timestamp: Date.now() });
+            await sendMessageWithDelay(userId, prefix);
         }
-        currentState.history.push({ role: 'bot', content: ackMsg, timestamp: Date.now() });
+
         saveState(userId);
-        await sendMessageWithDelay(userId, ackMsg);
-        return { matched: true };
+    } else if (newProduct === currentState.selectedProduct) {
+        let prefixIterated = `Ok, ${newProduct.split(' de ')[0].toLowerCase()} entonces 😊. `;
+        const postdatadoResult2 = _detectPostdatado(normalizedText);
+        if (postdatadoResult2) {
+            currentState.postdatado = postdatadoResult2;
+            prefixIterated += `Anotado para enviarlo ${postdatadoResult2} 📅. `;
+        }
+        currentState.history.push({ role: 'bot', content: prefixIterated, timestamp: Date.now() });
+        saveState(userId);
+        await sendMessageWithDelay(userId, prefixIterated);
     }
+}
 
+// --- Helper: Detect sucursal/pickup intent ---
+async function _handleSucursalIntent(
+    userId: string, normalizedText: string, currentState: UserState, dependencies: any
+): Promise<{ matched: boolean } | null> {
+    const { sendMessageWithDelay, saveState } = dependencies;
+
+    const isSucursalIntent = /\b(voy al correo|voy yo al correo|retiro en sucursal|lo retiro|lo busco|busco yo|paso por el correo|paso yo por|sucursal|sucursal del correo|retiro yo|voy a buscarlo|voy a retirarlo|lo paso a buscar|paso a buscar|paso a retirar|voy a retirar|no tengo direcci[oó]n exacta|vivo en.{0,20}(distrito|paraje|ruta|campo|zona rural))\b/i.test(normalizedText)
+        && !/\b(cuanto|cuánto|precio|costo|sale|cuesta|valor|tarda|llega|contraindicacion)\b/i.test(normalizedText);
+
+    if (!isSucursalIntent || currentState.partialAddress?.calle) return null;
+
+    logger.info(`[SUCURSAL] Detected sucursal pickup intent for ${userId}`);
+    if (!currentState.partialAddress) currentState.partialAddress = {};
+    currentState.partialAddress.calle = 'A sucursal';
+    currentState.addressIssueType = null;
+    currentState.addressIssueTries = 0;
+
+    const addr = currentState.partialAddress;
+    const stillMissing = [];
+    if (!addr.nombre) stillMissing.push('Nombre y Apellido');
+    if (!addr.ciudad) stillMissing.push('Localidad/Ciudad');
+    if (!addr.cp) stillMissing.push('Código Postal');
+
+    let ackMsg: string;
+    if (stillMissing.length > 0) {
+        ackMsg = `¡Dale, perfecto! Lo enviamos a la sucursal de Correo Argentino más cercana a tu zona 📦\n\nSolo necesito: *${stillMissing.join(', ')}* para armar la etiqueta 🙌`;
+    } else {
+        ackMsg = `¡Dale, perfecto! Lo enviamos a la sucursal de Correo Argentino más cercana a tu zona 📦`;
+    }
+    currentState.history.push({ role: 'bot', content: ackMsg, timestamp: Date.now() });
+    saveState(userId);
+    await sendMessageWithDelay(userId, ackMsg);
+    return { matched: true };
+}
+
+// --- Helper: Classify the incoming message ---
+function _classifyMessage(text: string, normalizedText: string): MessageClassification {
     const explicitQuestionKeywords = /\b(cuanto|cuánto|precio|costo|sale|cuesta|valor|paga|pagan|abona|tarjeta|transferencia|tarda|llega|envio|envío|envios|envíos|contraindicacion|contraindicaciones|efectos|hipertens|presion|presión|diabetes|embaraz|lactancia)\b/i.test(normalizedText) || text.includes('?');
 
-    // Detect if the numbers in the text are plan references (60/120) not address numbers
     const onlyPlanNumbers = /\b(60|120)\b/.test(text) && !/\b(calle|av|avenida|barrio|mz|lote|piso|dpto|depto|departamento|casa|block|manzana)\b/i.test(text);
     const mentionsPlanOrPrice = /\b(de 60|de 120|el de 60|el de 120|plan|60 d[ií]as|120 d[ií]as)\b/i.test(normalizedText);
 
-    // If text is super long (like a personal story), force AI to handle it so we don't look robotic even if they gave an address
-    // Escape hatch: if it explicitly contains structural address words, forgive the length up to 50 words.
     const isVeryLongMessage = text.split(/\s+/).length > 35 && !/\b(provincia|pcia|localidad|calle|código postal|codigo postal|barrio)\b/i.test(text);
 
     const looksLikeAddress = text.length > 8 && (!explicitQuestionKeywords) && !mentionsPlanOrPrice && (/\d/.test(text) || /\b(calle|av|avenida|barrio|mz|lote|piso|dpto|depto|departamento|casa|block|manzana|localidad|provincia|pcia|código postal)\b/i.test(text) || text.includes('\n'));
@@ -144,8 +163,6 @@ export async function handleWaitingData(
     const isHesitation = /\b(pensar|pienso|despues|luego|mañana|te confirmo|te aviso|ver|veo|rato|lueguito|mas tarde|en un rato|aguanti|aguanta|espera|bancame)\b/i.test(normalizedText)
         || /\b(voy a|dejam[eo])\s+(pasar|pensar|ver)\b/i.test(normalizedText);
 
-    // Detect payment-timing objections: "no cobro todavía", "cobro el 15", "cuando cobre", "espero el sueldo"
-    // These should get a postdate offer, NOT fall through to address parsing and trigger a false pause.
     const cleanText = normalizedText.replace(/[.,;?!]/g, ' ');
     const isPaymentTiming = /\b(no cobro|cobro el|cobro a|cobro la|cuando cobre|hasta que cobre|sueldo|quincena|cobrar|depositan|depósito|deposito|me pagan|me depositan)\b/i.test(cleanText)
         || (/\b(cobro|pago|sueldo|plata|efectivo)\b/i.test(cleanText) && /\b(todavía|aun|aún|después|despues|próximo|proximo|el \d+|fin de mes)\b/i.test(cleanText));
@@ -153,8 +170,6 @@ export async function handleWaitingData(
     const isObjectionOrComment = /\b(resultado|miedo|desconfianza|seguro|funciona|funcionará|efecto|rebote|garantía|garantia|probar|probando|duda|dudas|riesgo)\b/i.test(normalizedText)
         || /\b(si me va bien|si me funciona|si resulta|mas adelante|despues compro|luego compro)\b/i.test(normalizedText);
 
-    // Detect delivery timing requests: "dentro de 10 dias", "me lo podes mandar en 10 dias", "cuanto demora"
-    // These are NOT addresses — should go to AI fallback, not cause a pause.
     const isDeliveryTimingRequest = /\b(dentro de \d+|mandar.{0,15}d[ií]as|enviar.{0,15}d[ií]as|cu[aá]ntos? d[ií]as|demora|demorará|cu[aá]ndo lo mandan|cu[aá]ndo me lo env[ií]an|podes mandar|pueden mandar|lo mandan|me lo mandan)\b/i.test(normalizedText);
 
     const isShortConfirmation = /^(si|sisi|ok|dale|bueno|joya|de una|perfecto)[\s\?\!]*$/i.test(normalizedText);
@@ -167,9 +182,20 @@ export async function handleWaitingData(
         || isObjectionOrComment
         || isVeryLongMessage);
 
+    return {
+        explicitQuestionKeywords, looksLikeAddress, isDataQuestionOrEmotion,
+        isPaymentTiming, isHesitation, isDeliveryTimingRequest, isObjectionOrComment,
+        isVeryLongMessage, isShortConfirmation
+    };
+}
+
+// --- Helper: Process image OCR for address data ---
+async function _handleImageOCR(
+    text: string, currentState: UserState, aiService: any
+): Promise<string> {
     let textToAnalyze = text;
     if (currentState.lastImageMime && currentState.lastImageContext === 'waiting_data') {
-        logger.info(`[ADDRESS] Analyzing image for address for user ${userId}`);
+        logger.info(`[ADDRESS] Analyzing image for address for user`);
         try {
             const ocrResponse = await aiService.analyzeImage(
                 currentState.lastImageData,
@@ -186,80 +212,72 @@ export async function handleWaitingData(
         currentState.lastImageData = null;
         currentState.lastImageContext = null;
     }
+    return textToAnalyze;
+}
 
-    let extractedData = null;
-    let didTryToParse = false;
-    let hasValidAddressData = false;
+// --- Helper: AI fallback for questions/objections during data collection ---
+async function _handleAiFallback(
+    userId: string, text: string, normalizedText: string, currentState: UserState,
+    knowledge: any, dependencies: any, classification: MessageClassification
+): Promise<{ matched: boolean } | null> {
+    const { sendMessageWithDelay, aiService, saveState } = dependencies;
 
-    // Si parece una dirección o no es explícitamente una pregunta de soporte/objeción, intentamos extraer los datos PRIMERO
-    if (looksLikeAddress || (isVeryLongMessage && !explicitQuestionKeywords) || (!isDataQuestionOrEmotion)) {
-        extractedData = await (dependencies.mockAiService || aiService).parseAddress(textToAnalyze);
-        didTryToParse = true;
-        if (extractedData && !extractedData._error && (extractedData.calle || extractedData.ciudad || extractedData.cp || extractedData.nombre)) {
-            hasValidAddressData = true; // ⚠️ Si tenemos datos útiles, BLOQUEA el fallback "anti-locura" porque el usuario cumplió la directiva.
-        }
+    let aiGoal = "";
+    if (classification.isPaymentTiming) {
+        aiGoal = `El cliente dice que todavía no cobró, que está esperando su sueldo, o que va a esperar a cobrar para escribirte. DEBES INSISTIR y ofrecerle congelar el precio programando el envío a futuro. Respondé algo como: "¡No hace falta que esperes a cobrar para pedirlo! 😊 Podemos dejar el pedido cargado hoy para congelarte el precio actual, y yo te lo envío recién la fecha que me digas que cobrás. ¿A partir de qué fecha de la semana que viene te quedaría bien recibirlo?". NO aceptes un "te escribo después" sin antes ofrecerle fervientemente congelar el precio postdatando el envío.`;
+    } else if (classification.isObjectionOrComment) {
+        aiGoal = `El usuario hizo un comentario sobre probar el producto primero, o expresó dudas sobre los resultados (ej: "si me da resultado compro más"). Respondé validando su decisión con extrema seguridad y empatía. A continuación, VOLVÉ a pedir sutilmente los datos de envío que estaban pendientes (Nombre, Dirección, Ciudad). NO ofrezcas otros productos.`;
+    } else {
+        aiGoal = `El usuario tiene una duda o expresa una preocupación en plena toma de datos (ej: pregunta cómo se paga, cuándo llega, si le entregan en el trabajo, o cuenta un largo problema personal). DEBES RESPONDER SU TEXTO DIRECTAMENTE de forma EXTENSA Y MUY EMPÁTICA usando el Knowledge. Si expresa miedos sobre demoras o recepción, redactá un párrafo largo brindando tranquilidad absoluta. Si pregunta si puede recibir en su TRABAJO, responde sus opciones. Si pregunta sobre la función del producto o qué hace: "La Nuez de la India ayuda a acompañar el proceso natural del cuerpo para eliminar excesos. Muchas personas notan menos hinchazón, más liviandad y un descenso progresivo de peso. Es un apoyo natural para sentirte mejor sin métodos agresivos.". Si pregunta sobre dieta/comidas: "La Nuez de la India puede utilizarse sin hacer dietas estrictas...". Si pregunta dónde queda la oficina/local: "Somos Herbalis...". Si pregunta formas de pago: "El pago es únicamente en efectivo...". Si pregunta tiempos: "Los envíos se realizan cuanto antes...". Si pregunta contraindicaciones: "Es un producto 100% natural...". Nunca lo obligues a dar los datos bruscamente, respondé su duda con muchísima calidez, y cerrá sutilmente preguntando: "¿Te parece que lo dejemos anotado?" o "¿Te tomo los datos?".\n\nEXCEPCIÓN CRÍTICA - HESITACIÓN TIPO "TE AVISO": Si el cliente dice "luego te escribo", "te confirmo después", o "lo pienso y te aviso": NO LO ACEPTES A LA PRIMERA. Respondé ofreciendo congelar el precio: "¡Dale! Igual, si querés podemos dejar el paquete ya separado a tu nombre para congelarte el precio actual y te lo mando recién cuando vos me des el ok. ¿Te parece bien así aprovechás la promo de envío?".`;
     }
 
-    // Solo disparamos el AI Fallback de objeciones/dudas si el usuario NO proporcionó datos válidos
-    // isPaymentTiming always takes priority — "el 22" is a date, not a street number
-    if (isDataQuestionOrEmotion && !hasValidAddressData && (!looksLikeAddress || isVeryLongMessage || isPaymentTiming || isDeliveryTimingRequest)) {
-        logger.info(`[AI-FALLBACK] waiting_data: Detected question/objection or long emotional text from ${userId}: "${text}"`);
+    const aiData = await aiService.chat(text, {
+        step: FlowStep.WAITING_DATA,
+        goal: aiGoal,
+        history: currentState.history,
+        summary: currentState.summary,
+        knowledge: knowledge,
+        userState: currentState
+    });
 
-        let aiGoal = "";
-        if (isPaymentTiming) {
-            aiGoal = `El cliente dice que todavía no cobró, que está esperando su sueldo, o que va a esperar a cobrar para escribirte. DEBES INSISTIR y ofrecerle congelar el precio programando el envío a futuro. Respondé algo como: "¡No hace falta que esperes a cobrar para pedirlo! 😊 Podemos dejar el pedido cargado hoy para congelarte el precio actual, y yo te lo envío recién la fecha que me digas que cobrás. ¿A partir de qué fecha de la semana que viene te quedaría bien recibirlo?". NO aceptes un "te escribo después" sin antes ofrecerle fervientemente congelar el precio postdatando el envío.`;
-        } else if (isObjectionOrComment) {
-            aiGoal = `El usuario hizo un comentario sobre probar el producto primero, o expresó dudas sobre los resultados (ej: "si me da resultado compro más"). Respondé validando su decisión con extrema seguridad y empatía. A continuación, VOLVÉ a pedir sutilmente los datos de envío que estaban pendientes (Nombre, Dirección, Ciudad). NO ofrezcas otros productos.`;
-        } else {
-            aiGoal = `El usuario tiene una duda o expresa una preocupación en plena toma de datos (ej: pregunta cómo se paga, cuándo llega, si le entregan en el trabajo, o cuenta un largo problema personal). DEBES RESPONDER SU TEXTO DIRECTAMENTE de forma EXTENSA Y MUY EMPÁTICA usando el Knowledge. Si expresa miedos sobre demoras o recepción, redactá un párrafo largo brindando tranquilidad absoluta. Si pregunta si puede recibir en su TRABAJO, responde sus opciones. Si pregunta sobre la función del producto o qué hace: "La Nuez de la India ayuda a acompañar el proceso natural del cuerpo para eliminar excesos. Muchas personas notan menos hinchazón, más liviandad y un descenso progresivo de peso. Es un apoyo natural para sentirte mejor sin métodos agresivos.". Si pregunta sobre dieta/comidas: "La Nuez de la India puede utilizarse sin hacer dietas estrictas...". Si pregunta dónde queda la oficina/local: "Somos Herbalis...". Si pregunta formas de pago: "El pago es únicamente en efectivo...". Si pregunta tiempos: "Los envíos se realizan cuanto antes...". Si pregunta contraindicaciones: "Es un producto 100% natural...". Nunca lo obligues a dar los datos bruscamente, respondé su duda con muchísima calidez, y cerrá sutilmente preguntando: "¿Te parece que lo dejemos anotado?" o "¿Te tomo los datos?".\n\nEXCEPCIÓN CRÍTICA - HESITACIÓN TIPO "TE AVISO": Si el cliente dice "luego te escribo", "te confirmo después", o "lo pienso y te aviso": NO LO ACEPTES A LA PRIMERA. Respondé ofreciendo congelar el precio: "¡Dale! Igual, si querés podemos dejar el paquete ya separado a tu nombre para congelarte el precio actual y te lo mando recién cuando vos me des el ok. ¿Te parece bien así aprovechás la promo de envío?".`;
-        }
+    if (aiData.response && !_isDuplicate(aiData.response, currentState.history)) {
+        currentState.history.push({ role: 'bot', content: aiData.response, timestamp: Date.now() });
+        saveState(userId);
+        await sendMessageWithDelay(userId, aiData.response);
 
-        const aiData = await aiService.chat(text, {
-            step: FlowStep.WAITING_DATA,
-            goal: aiGoal,
-            history: currentState.history,
-            summary: currentState.summary,
-            knowledge: knowledge,
-            userState: currentState
-        });
-
-        if (aiData.response && !_isDuplicate(aiData.response, currentState.history)) {
-            currentState.history.push({ role: 'bot', content: aiData.response, timestamp: Date.now() });
-            saveState(userId);
-            await sendMessageWithDelay(userId, aiData.response);
-
-            if (/\b(reservado|pactado|anotado|programado)\b/i.test(aiData.response) && /\b(para el|el \d+|en esa fecha)\b/.test(aiData.response)) {
-                const postdatadoFromMsg = _detectPostdatado(normalizedText);
-                if (postdatadoFromMsg) {
-                    currentState.postdatado = postdatadoFromMsg;
-                    saveState(userId);
-                }
+        if (/\b(reservado|pactado|anotado|programado)\b/i.test(aiData.response) && /\b(para el|el \d+|en esa fecha)\b/.test(aiData.response)) {
+            const postdatadoFromMsg = _detectPostdatado(normalizedText);
+            if (postdatadoFromMsg) {
+                currentState.postdatado = postdatadoFromMsg;
+                saveState(userId);
             }
-            return { matched: true };
-        } else if (aiData.response) {
-            logger.info(`[ANTI-DUP] Skipping duplicate AI response for ${userId}`);
-            return { matched: true };
-        } else {
-            await _pauseAndAlert(userId, currentState, dependencies, text, `Cliente duda o objeta. Dice: "${text}"`);
-            return { matched: true };
         }
+        return { matched: true };
+    } else if (aiData.response) {
+        logger.info(`[ANTI-DUP] Skipping duplicate AI response for ${userId}`);
+        return { matched: true };
+    } else {
+        await _pauseAndAlert(userId, currentState, dependencies, text, `Cliente duda o objeta. Dice: "${text}"`);
+        return { matched: true };
     }
+}
 
-    let data = extractedData;
-    if (!didTryToParse) {
-        data = await (dependencies.mockAiService || aiService).parseAddress(textToAnalyze);
-    }
+// --- Helper: Process parsed address data (hard-pause, intersection, missing number, merge fields) ---
+async function _processAddressData(
+    userId: string, text: string, textToAnalyze: string, data: any,
+    currentState: UserState, dependencies: any
+): Promise<{ madeProgress: boolean; earlyReturn: { matched: boolean } | null }> {
+    const { sendMessageWithDelay, saveState } = dependencies;
     let madeProgress = false;
 
-    // Hard-pause conditions from AI Parsing
+    // Hard-pause conditions
     if (data && data.cp === 'UNKNOWN') {
         await _pauseAndAlert(userId, currentState, dependencies, text, 'El cliente reportó explícitamente no saber su Código Postal.');
-        return { matched: true };
+        return { madeProgress: false, earlyReturn: { matched: true } };
     }
     if (data && data.provincia === 'CONFLICT') {
         const tries = currentState.addressIssueTries || 0;
         if (tries === 0 && currentState.addressIssueType !== 'conflict') {
-            // First time: ask for clarification
             currentState.addressIssueType = 'conflict';
             currentState.addressIssueTries = 1;
             currentState.partialAddress.ciudad = null;
@@ -269,16 +287,15 @@ export async function handleWaitingData(
             currentState.history.push({ role: 'bot', content: clarifyMsg, timestamp: Date.now() });
             saveState(userId);
             await sendMessageWithDelay(userId, clarifyMsg);
-            return { matched: true };
+            return { madeProgress: false, earlyReturn: { matched: true } };
         } else {
-            // Second time: escalate
             await _pauseAndAlert(userId, currentState, dependencies, text, '⚠️ Datos contradictorios: el cliente no pudo aclarar localidad/ciudad/provincia después de 2 intentos.');
-            return { matched: true };
+            return { madeProgress: false, earlyReturn: { matched: true } };
         }
     }
 
     if (data && !data._error) {
-        const userActuallyAskedPostdate = _detectPostdatado(normalizedText);
+        const userActuallyAskedPostdate = _detectPostdatado(textToAnalyze.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase());
 
         if (data.postdatado && userActuallyAskedPostdate) {
             if (!currentState.postdatado) {
@@ -289,7 +306,7 @@ export async function handleWaitingData(
                 ];
                 const ackMsg = postponedAcks[Math.floor(Math.random() * postponedAcks.length)];
                 currentState.history.push({ role: 'bot', content: ackMsg, timestamp: Date.now() });
-                await sendMessageWithDelay(userId, ackMsg);
+                await dependencies.sendMessageWithDelay(userId, ackMsg);
             }
             currentState.postdatado = data.postdatado;
 
@@ -308,13 +325,11 @@ export async function handleWaitingData(
             const hasNumber = /\d+/.test(textToAnalyze);
             const hasSN = /\b(s\/n|sn|sin numero|sin número)\b/i.test(textToAnalyze);
 
-            // Detect intersections/corners: "X y calle Y", "X y Y", "X entre Y", "X esq Y"
             const isIntersection = /\b(y\s+calle|y\s+pasaje|y\s+av\b|y\s+avenida|entre\s+calle|entre\s+.+\s+y\s+|esq\b|esquina)\b/i.test(textToAnalyze)
                 || /\bcalle\s+\d+\b/i.test(textToAnalyze) && /\by\b/i.test(textToAnalyze);
 
-            // Detect numbers ending in 00 (likely corners: 1200, 3400, etc.)
             const streetNumberMatch = textToAnalyze.match(/\b(\d{3,})\b/);
-            const endsIn00 = streetNumberMatch && streetNumberMatch[1].endsWith('00') && streetNumberMatch[1] !== '100'; // 100 is valid
+            const endsIn00 = streetNumberMatch && streetNumberMatch[1].endsWith('00') && streetNumberMatch[1] !== '100';
 
             if (isIntersection || endsIn00) {
                 const tries = currentState.addressIssueTries || 0;
@@ -325,10 +340,10 @@ export async function handleWaitingData(
                     currentState.history.push({ role: 'bot', content: cornerMsg, timestamp: Date.now() });
                     saveState(userId);
                     await sendMessageWithDelay(userId, cornerMsg);
-                    return { matched: true };
+                    return { madeProgress: false, earlyReturn: { matched: true } };
                 } else {
                     await _pauseAndAlert(userId, currentState, dependencies, text, '⚠️ Esquina/intersección detectada: el cliente no pudo corregir después de 2 intentos. Intervención manual requerida.');
-                    return { matched: true };
+                    return { madeProgress: false, earlyReturn: { matched: true } };
                 }
             }
 
@@ -341,13 +356,12 @@ export async function handleWaitingData(
                     currentState.history.push({ role: 'bot', content: noNumMsg, timestamp: Date.now() });
                     saveState(userId);
                     await sendMessageWithDelay(userId, noNumMsg);
-                    return { matched: true };
+                    return { madeProgress: false, earlyReturn: { matched: true } };
                 } else {
                     await _pauseAndAlert(userId, currentState, dependencies, text, '⚠️ Dirección sin número: el cliente no pudo corregir después de 2 intentos. Intervención manual requerida.');
-                    return { matched: true };
+                    return { madeProgress: false, earlyReturn: { matched: true } };
                 }
             } else {
-                // Valid street with number — clear any previous issue
                 currentState.addressIssueType = null;
                 currentState.addressIssueTries = 0;
                 currentState.partialAddress.calle = data.calle;
@@ -372,52 +386,52 @@ export async function handleWaitingData(
         currentState.addressAttempts = (currentState.addressAttempts || 0) + 1;
     }
 
-    // SAFETY NET: If address parsing failed and the message doesn't look like an address attempt at all,
-    // give the AI a chance to respond before pausing. This catches FAQ questions, product doubts,
-    // location questions, etc. that slip past the keyword whitelist above.
+    return { madeProgress, earlyReturn: null };
+}
+
+// --- Helper: AI safety net for non-address messages ---
+async function _handleSafetyNet(
+    userId: string, text: string, currentState: UserState, knowledge: any, dependencies: any
+): Promise<{ matched: boolean } | null> {
+    const { sendMessageWithDelay, aiService, saveState } = dependencies;
+
     const hasAddressPatterns = /\d/.test(text) || /\b(calle|av|avenida|barrio|mz|lote|piso|dpto|depto|departamento|casa|block|manzana|localidad|provincia|pcia|código postal|codigo postal)\b/i.test(text);
-    if (!madeProgress && currentState.addressAttempts >= 2 && !hasAddressPatterns) {
-        logger.info(`[AI-SAFETY-NET] waiting_data: Message doesn't look like address for ${userId}: "${text}". Trying AI fallback before pausing.`);
-        const safetyGoal = `El usuario NO está dando datos de envío, sino que hace una pregunta o comentario. Respondé su pregunta con empatía usando el Knowledge. Si pregunta sobre la función del producto o qué hace: "La Nuez de la India ayuda a acompañar el proceso natural del cuerpo para eliminar excesos. Muchas personas notan menos hinchazón, más liviandad y un descenso progresivo de peso. Es un apoyo natural para sentirte mejor sin métodos agresivos." Si pregunta sobre dieta/comidas/si tiene que cuidarse: "La Nuez de la India puede utilizarse sin hacer dietas estrictas, porque ayuda a acompañar el proceso natural del metabolismo. Obviamente, si además cuidás un poco la alimentación o sumás algo de movimiento, los resultados suelen verse más rápido." Si pregunta dónde queda la oficina/local/de dónde son: "Somos Herbalis, una empresa internacional especializada en productos naturales a base de Nuez de la India. Nuestra central está en Barcelona (España) y en Argentina distribuimos desde Rosario. NO tenemos revendedores. Hace 13 años enviamos a todo el país por Correo Argentino, con envío sin costo y la posibilidad de pago al recibir." Si pregunta por contraindicaciones: "Es 100% natural. Las únicas contraindicaciones son embarazo y lactancia." Si pregunta sobre envíos o si tienen día especial: "Los envíos se realizan cuanto antes, sin día especial. Tardan aproximadamente 10 días hábiles." Si pregunta formas de pago: "El pago es únicamente en efectivo, ya sea cuando recibís en tu domicilio o si retirás en la sucursal del correo. No pedimos pagos por adelantado ni datos bancarios." Para CUALQUIER OTRA pregunta, respondé con naturalidad usando el Knowledge. Al final, cerrá sutilmente retomando los datos de envío: "¿Te paso a tomar los datos para el envío?" o "¿Me pasás los datos de envío?".`;
-        try {
-            const safetyAiData = await aiService.chat(text, {
-                step: FlowStep.WAITING_DATA,
-                goal: safetyGoal,
-                history: currentState.history,
-                summary: currentState.summary,
-                knowledge: knowledge,
-                userState: currentState
-            });
-            if (safetyAiData.response && !_isDuplicate(safetyAiData.response, currentState.history)) {
-                currentState.addressAttempts = 0; // Reset attempts since we handled it
-                currentState.history.push({ role: 'bot', content: safetyAiData.response, timestamp: Date.now() });
-                saveState(userId);
-                await sendMessageWithDelay(userId, safetyAiData.response);
-                return { matched: true };
-            }
-        } catch (e) {
-            logger.error(`[AI-SAFETY-NET] Error for ${userId}:`, e);
+    if (currentState.addressAttempts < 2 || hasAddressPatterns) return null;
+
+    logger.info(`[AI-SAFETY-NET] waiting_data: Message doesn't look like address for ${userId}: "${text}". Trying AI fallback before pausing.`);
+    const safetyGoal = `El usuario NO está dando datos de envío, sino que hace una pregunta o comentario. Respondé su pregunta con empatía usando el Knowledge. Si pregunta sobre la función del producto o qué hace: "La Nuez de la India ayuda a acompañar el proceso natural del cuerpo para eliminar excesos. Muchas personas notan menos hinchazón, más liviandad y un descenso progresivo de peso. Es un apoyo natural para sentirte mejor sin métodos agresivos." Si pregunta sobre dieta/comidas/si tiene que cuidarse: "La Nuez de la India puede utilizarse sin hacer dietas estrictas, porque ayuda a acompañar el proceso natural del metabolismo. Obviamente, si además cuidás un poco la alimentación o sumás algo de movimiento, los resultados suelen verse más rápido." Si pregunta dónde queda la oficina/local/de dónde son: "Somos Herbalis, una empresa internacional especializada en productos naturales a base de Nuez de la India. Nuestra central está en Barcelona (España) y en Argentina distribuimos desde Rosario. NO tenemos revendedores. Hace 13 años enviamos a todo el país por Correo Argentino, con envío sin costo y la posibilidad de pago al recibir." Si pregunta por contraindicaciones: "Es 100% natural. Las únicas contraindicaciones son embarazo y lactancia." Si pregunta sobre envíos o si tienen día especial: "Los envíos se realizan cuanto antes, sin día especial. Tardan aproximadamente 10 días hábiles." Si pregunta formas de pago: "El pago es únicamente en efectivo, ya sea cuando recibís en tu domicilio o si retirás en la sucursal del correo. No pedimos pagos por adelantado ni datos bancarios." Para CUALQUIER OTRA pregunta, respondé con naturalidad usando el Knowledge. Al final, cerrá sutilmente retomando los datos de envío: "¿Te paso a tomar los datos para el envío?" o "¿Me pasás los datos de envío?".`;
+    try {
+        const safetyAiData = await aiService.chat(text, {
+            step: FlowStep.WAITING_DATA,
+            goal: safetyGoal,
+            history: currentState.history,
+            summary: currentState.summary,
+            knowledge: knowledge,
+            userState: currentState
+        });
+        if (safetyAiData.response && !_isDuplicate(safetyAiData.response, currentState.history)) {
+            currentState.addressAttempts = 0;
+            currentState.history.push({ role: 'bot', content: safetyAiData.response, timestamp: Date.now() });
+            saveState(userId);
+            await sendMessageWithDelay(userId, safetyAiData.response);
+            return { matched: true };
         }
-        // If AI also failed, fall through to pause
-        await _pauseAndAlert(userId, currentState, dependencies, text, 'La IA no pudo procesar correctamente los datos ingresados en el primer intento.');
-        return { matched: true };
+    } catch (e) {
+        logger.error(`[AI-SAFETY-NET] Error for ${userId}:`, e);
     }
+    await _pauseAndAlert(userId, currentState, dependencies, text, 'La IA no pudo procesar correctamente los datos ingresados en el primer intento.');
+    return { matched: true };
+}
 
-    const textWordCount = text.split(/\s+/).length;
-    const isExplicitTargetingStreet = !currentState.partialAddress?.calle && /\d/.test(text) && textWordCount >= 3 && !isDataQuestionOrEmotion;
-
-    // Original pause for messages that DO look like address attempts but failed
-    if (!madeProgress && (currentState.addressAttempts >= 2 || (currentState.addressAttempts >= 1 && isExplicitTargetingStreet))) {
-        const alertReason = isExplicitTargetingStreet 
-            ? 'La IA falló en extraer la calle de un mensaje que parece claramente una dirección.' 
-            : 'La IA no pudo procesar correctamente los datos ingresados en el primer intento.';
-        await _pauseAndAlert(userId, currentState, dependencies, text, alertReason);
-        return { matched: true };
-    }
-
+// --- Helper: Validate address, Maps check, assemble order ---
+async function _validateAndAssembleOrder(
+    userId: string, text: string, currentState: UserState, dependencies: any,
+    isDataQuestionOrEmotion: boolean
+): Promise<{ matched: boolean } | null> {
+    const { sendMessageWithDelay, saveState } = dependencies;
     const addr = currentState.partialAddress;
 
-    // Auto-suggest CP from city if city is known but CP is missing
+    // Auto-suggest CP from city
     if (addr.ciudad && !addr.cp) {
         const suggestedCP = suggestCPByCity(addr.ciudad);
         if (suggestedCP) {
@@ -426,7 +440,6 @@ export async function handleWaitingData(
         }
     }
 
-    const missing = [];
     const missingTier1 = [];
     if (!addr.nombre) missingTier1.push('Nombre y Apellido');
     if (!addr.calle) missingTier1.push('Dirección (Calle y Número)');
@@ -435,176 +448,279 @@ export async function handleWaitingData(
     if (!addr.ciudad) missingTier2.push('Localidad/Ciudad');
     if (!addr.cp) missingTier2.push('Código postal');
 
+    const missing: string[] = [];
     if (missingTier1.length > 0) missing.push(...missingTier1);
     else if (missingTier2.length > 0) missing.push(...missingTier2);
 
-    if (missing.length === 0 || (addr.calle && addr.ciudad && missing.length <= 1)) {
-        const criticalMissing = [];
-        if (!addr.nombre) criticalMissing.push('Nombre completo');
-        if (!addr.calle) criticalMissing.push('Calle y número');
-        if (!addr.ciudad) criticalMissing.push('Ciudad');
-        if (!addr.cp) criticalMissing.push('Código postal');
+    // Not enough data yet — return null so caller handles missing fields
+    if (missing.length > 0 && !(addr.calle && addr.ciudad && missing.length <= 1)) {
+        return null;
+    }
 
-        if (criticalMissing.length > 0) {
-            if (!currentState.fieldReaskCount) currentState.fieldReaskCount = {};
-            let shouldEscalate = false;
-            for (const field of criticalMissing) {
-                currentState.fieldReaskCount[field] = (currentState.fieldReaskCount[field] || 0) + 1;
-                if (currentState.fieldReaskCount[field] >= 3) shouldEscalate = true;
-            }
+    // Almost complete — check critical missing fields with re-ask counter
+    const criticalMissing = [];
+    if (!addr.nombre) criticalMissing.push('Nombre completo');
+    if (!addr.calle) criticalMissing.push('Calle y número');
+    if (!addr.ciudad) criticalMissing.push('Ciudad');
+    if (!addr.cp) criticalMissing.push('Código postal');
 
-            if (shouldEscalate) {
-                await _pauseAndAlert(userId, currentState, dependencies, text,
-                    `⚠️ No se pudo obtener dato del cliente después de 2 intentos. Faltan: ${criticalMissing.join(', ')}. Intervención manual requerida.`);
-                return { matched: true };
-            }
+    if (criticalMissing.length > 0) {
+        if (!currentState.fieldReaskCount) currentState.fieldReaskCount = {};
+        let shouldEscalate = false;
+        for (const field of criticalMissing) {
+            currentState.fieldReaskCount[field] = (currentState.fieldReaskCount[field] || 0) + 1;
+            if (currentState.fieldReaskCount[field] >= 3) shouldEscalate = true;
+        }
 
-            const askMsg = `¡Perfecto! Ya tengo la primera parte anotada ✍️\n\nPara terminar la etiqueta me faltaría: *${criticalMissing.join(' y ')}* 🙏`;
-            currentState.history.push({ role: 'bot', content: askMsg, timestamp: Date.now() });
-            await sendMessageWithDelay(userId, askMsg);
+        if (shouldEscalate) {
+            await _pauseAndAlert(userId, currentState, dependencies, text,
+                `⚠️ No se pudo obtener dato del cliente después de 2 intentos. Faltan: ${criticalMissing.join(', ')}. Intervención manual requerida.`);
             return { matched: true };
         }
 
-        let validation: any = { cpValid: true };
-        const isSucursalAddress = addr.calle?.toLowerCase() === 'a sucursal';
-        try {
-            if (!isSucursalAddress) {
-                validation = await validateAddress(addr);
-            }
-        } catch (e: any) {
-            logger.warn(`[ADDRESS] validateAddress failed for ${userId}, proceeding without validation: ${e.message}`);
-        }
-
-        if (addr.cp && !validation.cpValid) {
-            const cpMsg = `El código postal "${addr.cp}" no parece válido 🤔\nDebe ser de 4 dígitos (ej: 1425, 5000). ¿Me lo corregís?`;
-            currentState.history.push({ role: 'bot', content: cpMsg, timestamp: Date.now() });
-            await sendMessageWithDelay(userId, cpMsg);
-            currentState.partialAddress.cp = null;
-            return { matched: true };
-        }
-
-        if (validation.cpCleaned) addr.cp = validation.cpCleaned;
-        if (validation.province) addr.provincia = validation.province;
-
-        // --- GOOGLE MAPS FINAL VALIDATION ---
-        if (validation.mapsValid === true && validation.mapsFormatted) {
-            // Maps found the address — use the formatted version
-            logger.info(`[MAPS] Address verified for ${userId}: "${validation.mapsFormatted}"`);
-            currentState.mapsFormattedAddress = validation.mapsFormatted;
-        } else if (validation.mapsValid === false) {
-            // Maps did NOT find the address — ask the client to confirm
-            logger.info(`[MAPS] Address NOT found for ${userId}. Asking for confirmation.`);
-            const addrStr = `${addr.calle}, ${addr.ciudad}${addr.cp ? `, CP ${addr.cp}` : ''}`;
-            const mapsMsg = `No pude verificar tu dirección en el mapa 🤔\n\n¿Está bien escrita así?:\n📍 *${addrStr}*\n\nSi es correcta, respondé *sí*. Si no, pasame la dirección corregida 🙏`;
-            currentState.mapsFormattedAddress = null;
-            currentState.history.push({ role: 'bot', content: mapsMsg, timestamp: Date.now() });
-            _setStep(currentState, FlowStep.WAITING_MAPS_CONFIRMATION);
-            saveState(userId);
-            await sendMessageWithDelay(userId, mapsMsg);
-            return { matched: true };
-        }
-        // If mapsValid === null (not configured or API error) → proceed normally
-
-        // Save the original address typed by the client before any Maps formatting
-        const calleOriginal = addr.calle;
-
-        // If Maps validated and returned a formatted address, use it
-        if (currentState.mapsFormattedAddress) {
-            // Extract just the street part from Maps (first part before the city/postal)
-            // Maps returns "Pampa 1729, B1624AQM Rincón de Milberg, Provincia de Buenos Aires, Argentina"
-            const mapsParts = currentState.mapsFormattedAddress.split(',');
-            if (mapsParts.length >= 2) {
-                addr.calle = mapsParts[0].trim(); // Use Maps-formatted street
-            }
-        }
-
-        if (!currentState.cart || currentState.cart.length === 0) {
-            const product = currentState.selectedProduct;
-            if (!product) {
-                logger.error(`[ADDRESS] No selectedProduct for ${userId} at order confirmation. Pausing.`);
-                await _pauseAndAlert(userId, currentState, dependencies, text, '⚠️ No hay producto seleccionado al confirmar dirección. Revisión manual requerida.');
-                return { matched: true };
-            }
-            const plan = currentState.selectedPlan || "60";
-            const price = currentState.price || _getPrice(product, plan);
-            currentState.cart = [{ product, plan, price }];
-        }
-
-        currentState.pendingOrder = { ...addr, calleOriginal, cart: currentState.cart };
-        currentState.partialAddress = {} as any; // cleanup: no longer needed after full address captured
-
-        const subtotal = currentState.cart.reduce((sum, i) => sum + parseInt(i.price.toString().replace(/\./g, '')), 0);
-        const adicional = currentState.adicionalMAX || 0;
-        const total = subtotal + adicional;
-        currentState.totalPrice = total.toLocaleString('es-AR').replace(/,/g, '.');
-
-        const summaryMsg = buildConfirmationMessage(currentState);
-        currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
-        await sendMessageWithDelay(userId, summaryMsg);
-
-        currentState.fieldReaskCount = {};
-        currentState.addressIssueType = null;
-        currentState.addressIssueTries = 0;
-        _setStep(currentState, FlowStep.WAITING_FINAL_CONFIRMATION);
-        saveState(userId);
-        return { matched: true };
-    } else {
-        let msg;
-        if ((missingTier1.length === 2 && missingTier2.length === 2) || (missingTier1.length > 0 && !madeProgress)) {
-            const intros = [
-                `¿Me pasás tu *Nombre y Apellido* y tú *Dirección* para armar la etiqueta? 😉`,
-                `¡Dale! Pasame tu *Nombre completo* y la *Calle y Número* de tu casa 👇`,
-                `Necesito un par de datitos para el envío: *Nombre* y *Dirección* literal (calle y número) 📦`,
-                `Para prepararte paquete necesito: *Nombre y apellido* y a qué *Dirección* enviarlo 🙌`
-            ];
-            msg = intros[Math.floor(Math.random() * intros.length)];
-            const lastMsg = currentState.lastAddressMsg || "";
-            if (lastMsg === msg || (intros.indexOf(lastMsg) !== -1)) {
-                const currentIdx = Math.max(0, intros.indexOf(lastMsg));
-                msg = intros[(currentIdx + 1) % intros.length];
-            }
-        } else if (madeProgress) {
-            const acks = [
-                `¡Perfecto! Ya agendé esos datos. 👌\n\nSolo me falta: *${missing.join(', ')}*. ¿Me los pasás?`,
-                `Buenísimo. Me queda pendiente: *${missing.join(', ')}*.`,
-                `¡Dale! Ya casi estamos. Me faltaría: *${missing.join(', ')}*.`
-            ];
-            msg = acks[Math.floor(Math.random() * acks.length)];
-            const lastMsg = currentState.lastAddressMsg || "";
-            if (lastMsg === msg || (acks.indexOf(lastMsg) !== -1)) {
-                const currentIdx = Math.max(0, acks.indexOf(lastMsg));
-                msg = acks[(currentIdx + 1) % acks.length];
-            }
-        } else if (currentState.addressAttempts > 2) {
-            const frustrated = [
-                `Me falta: *${missing.join(', ')}*. ¿Me lo pasás? 🙏`,
-                `Aún necesito: *${missing.join(', ')}* para avanzar con tu envío.`,
-                `Solo me falta que me pases: *${missing.join(', ')}* 😅`
-            ];
-            msg = frustrated[Math.floor(Math.random() * frustrated.length)];
-            const lastMsg = currentState.lastAddressMsg || "";
-            if (lastMsg === msg || (frustrated.indexOf(lastMsg) !== -1)) {
-                const currentIdx = Math.max(0, frustrated.indexOf(lastMsg));
-                msg = frustrated[(currentIdx + 1) % frustrated.length];
-            }
-        } else {
-            const shorts = [
-                `Gracias! Ya tengo algunos datos. Solo me falta: *${missing.join(', ')}*. ¿Me los pasás?`,
-                `Tengo casi todo. Me falta indicarte: *${missing.join(', ')}*.`,
-                `Solo me estaría faltando: *${missing.join(', ')}*.`
-            ];
-            msg = shorts[Math.floor(Math.random() * shorts.length)];
-            const lastMsg = currentState.lastAddressMsg || "";
-            if (lastMsg === msg || (shorts.indexOf(lastMsg) !== -1)) {
-                const currentIdx = Math.max(0, shorts.indexOf(lastMsg));
-                msg = shorts[(currentIdx + 1) % shorts.length];
-            }
-        }
-
-        await sendMessageWithDelay(userId, msg);
-        currentState.lastAddressMsg = msg;
-        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
-        saveState(userId);
+        const askMsg = `¡Perfecto! Ya tengo la primera parte anotada ✍️\n\nPara terminar la etiqueta me faltaría: *${criticalMissing.join(' y ')}* 🙏`;
+        currentState.history.push({ role: 'bot', content: askMsg, timestamp: Date.now() });
+        await sendMessageWithDelay(userId, askMsg);
         return { matched: true };
     }
+
+    // Address complete — validate
+    let validation: any = { cpValid: true };
+    const isSucursalAddress = addr.calle?.toLowerCase() === 'a sucursal';
+    try {
+        if (!isSucursalAddress) {
+            validation = await validateAddress(addr);
+        }
+    } catch (e: any) {
+        logger.warn(`[ADDRESS] validateAddress failed for ${userId}, proceeding without validation: ${e.message}`);
+    }
+
+    if (addr.cp && !validation.cpValid) {
+        const cpMsg = `El código postal "${addr.cp}" no parece válido 🤔\nDebe ser de 4 dígitos (ej: 1425, 5000). ¿Me lo corregís?`;
+        currentState.history.push({ role: 'bot', content: cpMsg, timestamp: Date.now() });
+        await sendMessageWithDelay(userId, cpMsg);
+        currentState.partialAddress.cp = null;
+        return { matched: true };
+    }
+
+    if (validation.cpCleaned) addr.cp = validation.cpCleaned;
+    if (validation.province) addr.provincia = validation.province;
+
+    // Google Maps validation
+    if (validation.mapsValid === true && validation.mapsFormatted) {
+        logger.info(`[MAPS] Address verified for ${userId}: "${validation.mapsFormatted}"`);
+        currentState.mapsFormattedAddress = validation.mapsFormatted;
+    } else if (validation.mapsValid === false) {
+        logger.info(`[MAPS] Address NOT found for ${userId}. Asking for confirmation.`);
+        const addrStr = `${addr.calle}, ${addr.ciudad}${addr.cp ? `, CP ${addr.cp}` : ''}`;
+        const mapsMsg = `No pude verificar tu dirección en el mapa 🤔\n\n¿Está bien escrita así?:\n📍 *${addrStr}*\n\nSi es correcta, respondé *sí*. Si no, pasame la dirección corregida 🙏`;
+        currentState.mapsFormattedAddress = null;
+        currentState.history.push({ role: 'bot', content: mapsMsg, timestamp: Date.now() });
+        _setStep(currentState, FlowStep.WAITING_MAPS_CONFIRMATION);
+        saveState(userId);
+        await sendMessageWithDelay(userId, mapsMsg);
+        return { matched: true };
+    }
+
+    // Save original address before Maps formatting
+    const calleOriginal = addr.calle;
+    if (currentState.mapsFormattedAddress) {
+        const mapsParts = currentState.mapsFormattedAddress.split(',');
+        if (mapsParts.length >= 2) {
+            addr.calle = mapsParts[0].trim();
+        }
+    }
+
+    // Build cart if empty
+    if (!currentState.cart || currentState.cart.length === 0) {
+        const product = currentState.selectedProduct;
+        if (!product) {
+            logger.error(`[ADDRESS] No selectedProduct for ${userId} at order confirmation. Pausing.`);
+            await _pauseAndAlert(userId, currentState, dependencies, text, '⚠️ No hay producto seleccionado al confirmar dirección. Revisión manual requerida.');
+            return { matched: true };
+        }
+        const plan = currentState.selectedPlan || "60";
+        const price = currentState.price || _getPrice(product, plan);
+        currentState.cart = [{ product, plan, price }];
+    }
+
+    currentState.pendingOrder = { ...addr, calleOriginal, cart: currentState.cart };
+    currentState.partialAddress = {} as any;
+
+    const subtotal = currentState.cart.reduce((sum: number, i: any) => sum + parseInt(i.price.toString().replace(/\./g, '')), 0);
+    const adicional = currentState.adicionalMAX || 0;
+    const total = subtotal + adicional;
+    currentState.totalPrice = _formatPrice(total);
+
+    const summaryMsg = buildConfirmationMessage(currentState);
+    currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
+    await sendMessageWithDelay(userId, summaryMsg);
+
+    currentState.fieldReaskCount = {};
+    currentState.addressIssueType = null;
+    currentState.addressIssueTries = 0;
+    _setStep(currentState, FlowStep.WAITING_FINAL_CONFIRMATION);
+    saveState(userId);
+    return { matched: true };
+}
+
+// --- Helper: Ask for missing address fields with varied messages ---
+async function _askMissingFields(
+    userId: string, currentState: UserState, dependencies: any,
+    madeProgress: boolean
+): Promise<{ matched: boolean }> {
+    const { sendMessageWithDelay, saveState } = dependencies;
+    const addr = currentState.partialAddress;
+
+    const missingTier1 = [];
+    if (!addr.nombre) missingTier1.push('Nombre y Apellido');
+    if (!addr.calle) missingTier1.push('Dirección (Calle y Número)');
+    const missingTier2 = [];
+    if (!addr.ciudad) missingTier2.push('Localidad/Ciudad');
+    if (!addr.cp) missingTier2.push('Código postal');
+    const missing: string[] = [];
+    if (missingTier1.length > 0) missing.push(...missingTier1);
+    else if (missingTier2.length > 0) missing.push(...missingTier2);
+
+    let msg;
+    if ((missingTier1.length === 2 && missingTier2.length === 2) || (missingTier1.length > 0 && !madeProgress)) {
+        const intros = [
+            `¿Me pasás tu *Nombre y Apellido* y tú *Dirección* para armar la etiqueta? 😉`,
+            `¡Dale! Pasame tu *Nombre completo* y la *Calle y Número* de tu casa 👇`,
+            `Necesito un par de datitos para el envío: *Nombre* y *Dirección* literal (calle y número) 📦`,
+            `Para prepararte paquete necesito: *Nombre y apellido* y a qué *Dirección* enviarlo 🙌`
+        ];
+        msg = intros[Math.floor(Math.random() * intros.length)];
+        const lastMsg = currentState.lastAddressMsg || "";
+        if (lastMsg === msg || (intros.indexOf(lastMsg) !== -1)) {
+            const currentIdx = Math.max(0, intros.indexOf(lastMsg));
+            msg = intros[(currentIdx + 1) % intros.length];
+        }
+    } else if (madeProgress) {
+        const acks = [
+            `¡Perfecto! Ya agendé esos datos. 👌\n\nSolo me falta: *${missing.join(', ')}*. ¿Me los pasás?`,
+            `Buenísimo. Me queda pendiente: *${missing.join(', ')}*.`,
+            `¡Dale! Ya casi estamos. Me faltaría: *${missing.join(', ')}*.`
+        ];
+        msg = acks[Math.floor(Math.random() * acks.length)];
+        const lastMsg = currentState.lastAddressMsg || "";
+        if (lastMsg === msg || (acks.indexOf(lastMsg) !== -1)) {
+            const currentIdx = Math.max(0, acks.indexOf(lastMsg));
+            msg = acks[(currentIdx + 1) % acks.length];
+        }
+    } else if (currentState.addressAttempts > 2) {
+        const frustrated = [
+            `Me falta: *${missing.join(', ')}*. ¿Me lo pasás? 🙏`,
+            `Aún necesito: *${missing.join(', ')}* para avanzar con tu envío.`,
+            `Solo me falta que me pases: *${missing.join(', ')}* 😅`
+        ];
+        msg = frustrated[Math.floor(Math.random() * frustrated.length)];
+        const lastMsg = currentState.lastAddressMsg || "";
+        if (lastMsg === msg || (frustrated.indexOf(lastMsg) !== -1)) {
+            const currentIdx = Math.max(0, frustrated.indexOf(lastMsg));
+            msg = frustrated[(currentIdx + 1) % frustrated.length];
+        }
+    } else {
+        const shorts = [
+            `Gracias! Ya tengo algunos datos. Solo me falta: *${missing.join(', ')}*. ¿Me los pasás?`,
+            `Tengo casi todo. Me falta indicarte: *${missing.join(', ')}*.`,
+            `Solo me estaría faltando: *${missing.join(', ')}*.`
+        ];
+        msg = shorts[Math.floor(Math.random() * shorts.length)];
+        const lastMsg = currentState.lastAddressMsg || "";
+        if (lastMsg === msg || (shorts.indexOf(lastMsg) !== -1)) {
+            const currentIdx = Math.max(0, shorts.indexOf(lastMsg));
+            msg = shorts[(currentIdx + 1) % shorts.length];
+        }
+    }
+
+    await sendMessageWithDelay(userId, msg);
+    currentState.lastAddressMsg = msg;
+    currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+    saveState(userId);
+    return { matched: true };
+}
+
+// ============================================================
+// MAIN HANDLER — Orchestrates all helpers above
+// ============================================================
+export async function handleWaitingData(
+    userId: string,
+    text: string,
+    normalizedText: string,
+    currentState: UserState,
+    knowledge: any,
+    dependencies: any
+): Promise<{ matched: boolean }> {
+    const { aiService } = dependencies;
+
+    // 1. Guards: ensure product + plan selected
+    const guardResult = await _checkGuards(userId, currentState, knowledge, dependencies);
+    if (guardResult) return guardResult;
+
+    // 2. Product/plan change detection
+    await _handleProductPlanChange(userId, normalizedText, currentState, dependencies);
+
+    // 3. Sucursal intent
+    const sucursalResult = await _handleSucursalIntent(userId, normalizedText, currentState, dependencies);
+    if (sucursalResult) return sucursalResult;
+
+    // 4. Classify message
+    const classification = _classifyMessage(text, normalizedText);
+
+    // 5. Image OCR
+    const textToAnalyze = await _handleImageOCR(text, currentState, aiService);
+
+    // 6. Try to parse address if it looks like one
+    let extractedData = null;
+    let didTryToParse = false;
+    let hasValidAddressData = false;
+
+    if (classification.looksLikeAddress || (classification.isVeryLongMessage && !classification.explicitQuestionKeywords) || (!classification.isDataQuestionOrEmotion)) {
+        extractedData = await (dependencies.mockAiService || aiService).parseAddress(textToAnalyze);
+        didTryToParse = true;
+        if (extractedData && !extractedData._error && (extractedData.calle || extractedData.ciudad || extractedData.cp || extractedData.nombre)) {
+            hasValidAddressData = true;
+        }
+    }
+
+    // 7. AI fallback for questions/objections (only if no valid address data)
+    if (classification.isDataQuestionOrEmotion && !hasValidAddressData &&
+        (!classification.looksLikeAddress || classification.isVeryLongMessage || classification.isPaymentTiming || classification.isDeliveryTimingRequest)) {
+        const fallbackResult = await _handleAiFallback(userId, text, normalizedText, currentState, knowledge, dependencies, classification);
+        if (fallbackResult) return fallbackResult;
+    }
+
+    // 8. Process parsed address data
+    let data = extractedData;
+    if (!didTryToParse) {
+        data = await (dependencies.mockAiService || aiService).parseAddress(textToAnalyze);
+    }
+
+    const { madeProgress, earlyReturn } = await _processAddressData(userId, text, textToAnalyze, data, currentState, dependencies);
+    if (earlyReturn) return earlyReturn;
+
+    // 9. Safety net: non-address messages that failed parsing
+    if (!madeProgress) {
+        const safetyResult = await _handleSafetyNet(userId, text, currentState, knowledge, dependencies);
+        if (safetyResult) return safetyResult;
+    }
+
+    // 10. Check for explicit address targeting pause
+    const textWordCount = text.split(/\s+/).length;
+    const isExplicitTargetingStreet = !currentState.partialAddress?.calle && /\d/.test(text) && textWordCount >= 3 && !classification.isDataQuestionOrEmotion;
+    if (!madeProgress && (currentState.addressAttempts >= 2 || (currentState.addressAttempts >= 1 && isExplicitTargetingStreet))) {
+        const alertReason = isExplicitTargetingStreet
+            ? 'La IA falló en extraer la calle de un mensaje que parece claramente una dirección.'
+            : 'La IA no pudo procesar correctamente los datos ingresados en el primer intento.';
+        await _pauseAndAlert(userId, currentState, dependencies, text, alertReason);
+        return { matched: true };
+    }
+
+    // 11. Validate and assemble order (if address complete)
+    const orderResult = await _validateAndAssembleOrder(userId, text, currentState, dependencies, classification.isDataQuestionOrEmotion);
+    if (orderResult) return orderResult;
+
+    // 12. Ask for missing fields
+    return await _askMissingFields(userId, currentState, dependencies, madeProgress);
 }

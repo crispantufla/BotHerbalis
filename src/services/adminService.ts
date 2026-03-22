@@ -1,8 +1,9 @@
 import { exec } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-const { aiService } = require('./ai');
-const logger = require('../utils/logger');
+import { UserState, SharedState, AlertEntry, AlertOrderData, BotConfig } from '../types/state';
+import { aiService } from './ai';
+import logger from '../utils/logger';
 
 /**
  * Módulo de Servicios de Administrador
@@ -10,7 +11,7 @@ const logger = require('../utils/logger');
  */
 
 /** Helper: remove ALL alerts for a user and emit update to dashboard */
-function _dismissAlert(userPhone: string, sharedState: any): void {
+function _dismissAlert(userPhone: string, sharedState: SharedState): void {
     const before = sharedState.sessionAlerts.length;
     sharedState.sessionAlerts = sharedState.sessionAlerts.filter((a: AlertEntry) => a.userPhone !== userPhone);
     if (sharedState.sessionAlerts.length !== before) {
@@ -18,32 +19,14 @@ function _dismissAlert(userPhone: string, sharedState: any): void {
     }
 }
 
-interface OrderData {
-    product: string | null;
-    plan: string | null;
-    price: string | number | null;
-    address: any | null;
-    step: string | null;
-}
-
-interface AlertEntry {
-    id: number;
-    timestamp: Date;
-    reason: string;
-    userPhone: string;
-    userName: string;
-    details: string;
-    orderData: OrderData;
-}
-
 // Helper: Notify Admin
 export async function notifyAdmin(
     reason: string,
     userPhone: string,
     details: string | null = null,
-    sharedState: any,
-    client: any,
-    config: any
+    sharedState: SharedState,
+    client: Record<string, any>,
+    config: BotConfig
 ): Promise<void> {
     if (process.platform === 'win32') {
         exec('powershell "[console]::beep(1000, 500)"', (err) => { if (err) logger.error('Beep failed:', err); });
@@ -61,8 +44,8 @@ export async function notifyAdmin(
     sharedState.lastAlertUser = userPhone;
 
     // Extract order data from user state for rich alerts
-    const state = sharedState.userState[userPhone] || {};
-    const orderData: OrderData = {
+    const state: Partial<UserState> = sharedState.userState[userPhone] || {};
+    const orderData: AlertOrderData = {
         product: state.selectedProduct || null,
         plan: state.selectedPlan || null,
         price: state.price || null,
@@ -98,7 +81,7 @@ export async function notifyAdmin(
 }
 
 // Helper: Build the WhatsApp confirmation sent to client after admin approves
-export function buildAdminApprovalMessage(clientState: any): string {
+export function buildAdminApprovalMessage(clientState: UserState): string {
     if (!clientState.pendingOrder) return 'Pedido confirmado.';
 
     const { nombre, calle, ciudad, provincia, cp } = clientState.pendingOrder;
@@ -122,8 +105,8 @@ export async function handleAdminCommand(
     targetChatId: string | null,
     commandText: string,
     isApi: boolean = false,
-    sharedState: any,
-    client: any
+    sharedState: SharedState,
+    client: Record<string, any>
 ): Promise<string> {
     if (!commandText) return '⚠️ Comando vacío.';
 
@@ -176,7 +159,7 @@ export async function handleAdminCommand(
             if (sharedState.logAndEmit) sharedState.logAndEmit(actualTarget, 'bot', summary, 'waiting_final_confirmation');
             clientState.step = 'waiting_final_confirmation';
             clientState.history = clientState.history || [];
-            clientState.history.push({ role: 'bot', content: summary });
+            clientState.history.push({ role: 'bot', content: summary, timestamp: Date.now() });
             if (sharedState.saveState) sharedState.saveState();
 
             _dismissAlert(actualTarget, sharedState);
@@ -230,11 +213,11 @@ export async function handleAdminCommand(
     const actualTarget = targetChatId || sharedState.lastAlertUser;
     if (actualTarget) {
         try {
-            const state = sharedState.userState[actualTarget] || {};
+            const state: Partial<UserState> = sharedState.userState[actualTarget] || {};
             const history = (state.history || [])
-                .map((m: any) => `${m.role.toUpperCase()}: ${m.content} `).join('\n');
+                .map((m) => `${m.role.toUpperCase()}: ${m.content} `).join('\n');
             const cartStr = state.cart && state.cart.length > 0
-                ? state.cart.map((i: any) => `${i.product} (${i.plan} días)`).join(' + ')
+                ? state.cart.map((i) => `${i.product} (${i.plan} días)`).join(' + ')
                 : `${state.selectedProduct || 'Producto desconocido'} (${state.selectedPlan || '?'} días)`;
             const totalStr = state.totalPrice ? `$${state.totalPrice}` : 'Desconocido';
 
@@ -265,8 +248,4 @@ export async function handleAdminCommand(
     return '⚠️ Comando no reconocido o sin usuario activo.';
 }
 
-module.exports = {
-    notifyAdmin,
-    handleAdminCommand,
-    buildAdminApprovalMessage
-};
+// Functions exported inline above

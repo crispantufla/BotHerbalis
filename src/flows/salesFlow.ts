@@ -1,21 +1,21 @@
-import { UserState, FlowStep } from '../types/state';
+import { UserState, FlowStep, SharedState, BotConfig } from '../types/state';
 import { pauseUser } from '../services/pauseService';
-const logger = require('../utils/logger');
-const { processGlobals } = require('./globals');
-const { processStep } = require('./steps');
-const { _pauseAndAlert, _setStep, _extractSilentVariables, _cleanPhone } = require('./utils/flowHelpers');
+import logger from '../utils/logger';
+import { processGlobals } from './globals';
+import { processStep } from './steps';
+import { _pauseAndAlert, _setStep, _extractSilentVariables, _cleanPhone } from './utils/flowHelpers';
 
 interface SalesFlowDependencies {
     saveState: (userId?: string) => void;
-    client?: any;
-    sharedState?: any;
-    notifyAdmin?: (reason: string, userPhone: string, details?: string | null) => Promise<any>;
-    aiService?: any;
+    client?: Record<string, any>;
+    sharedState?: SharedState;
+    notifyAdmin?: (reason: string, userPhone: string, details?: string | null) => Promise<void>;
+    aiService?: Record<string, any>;
     sendMessageWithDelay?: (chatId: string, content: string, startTime?: number) => Promise<void>;
     logAndEmit?: (chatId: string, sender: string, text: string, step?: string) => void;
-    saveOrderToLocal?: (order: any) => void;
-    cancelLatestOrder?: (userId: string) => Promise<any>;
-    config?: any;
+    saveOrderToLocal?: (order: Record<string, unknown>) => void;
+    cancelLatestOrder?: (userId: string) => Promise<Record<string, unknown>>;
+    config?: BotConfig;
     effectiveScript?: string;
 }
 
@@ -26,8 +26,8 @@ const PURCHASE_INTENT_KEYWORDS = /\b(comprar|quiero comprar|quiero pedir|me inte
 export async function processSalesFlow(
     userId: string,
     text: string,
-    userState: Record<string, any>,
-    knowledge: any,
+    userState: Record<string, UserState>,
+    knowledge: Record<string, any>,
     dependencies: SalesFlowDependencies,
     _recursionDepth: number = 0
 ): Promise<{ matched: boolean; paused?: boolean } | void> {

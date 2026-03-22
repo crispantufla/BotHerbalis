@@ -1,6 +1,6 @@
-const path = require('path');
-const fs = require('fs');
-const logger = require('../../utils/logger');
+import path from 'path';
+import fs from 'fs';
+import logger from '../../utils/logger';
 
 // Check DATA_DIR first (Railway volume), then source code data/ dir as fallback
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../../..');
@@ -34,13 +34,20 @@ function _loadPricesCache(): Record<string, any> {
     const pricesFile = _findPricesFile();
     if (!pricesFile) throw new Error('prices.json not found in any location');
 
-    // Reload only if file was modified since last read
-    const mtime = fs.statSync(pricesFile).mtimeMs;
-    if (_pricesCache && mtime === _pricesCacheMtime) return _pricesCache;
+    try {
+        // Reload only if file was modified since last read
+        const mtime = fs.statSync(pricesFile).mtimeMs;
+        if (_pricesCache && mtime === _pricesCacheMtime) return _pricesCache;
 
-    _pricesCache = JSON.parse(fs.readFileSync(pricesFile, 'utf8'));
-    _pricesCacheMtime = mtime;
-    return _pricesCache!;
+        _pricesCache = JSON.parse(fs.readFileSync(pricesFile, 'utf8'));
+        _pricesCacheMtime = mtime;
+        return _pricesCache!;
+    } catch (err: any) {
+        logger.error(`[PRICING] Failed to read/parse ${pricesFile}: ${err.message}`);
+        _pricesCache = null;
+        _pricesCacheMtime = 0;
+        throw new Error(`prices.json corrupted or unreadable at ${pricesFile}: ${err.message}`);
+    }
 }
 
 const FALLBACK_PRICES: Record<string, any> = {

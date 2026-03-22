@@ -1,10 +1,10 @@
 import { UserState, FlowStep } from '../../types/state';
-const { _getPrice, _getAdicionalMAX } = require('../utils/pricing');
-const { _setStep } = require('../utils/flowHelpers');
-const { buildConfirmationMessage } = require('../../utils/messageTemplates');
-const { buildCartFromSelection, calculateTotal } = require('../utils/cartHelpers');
-const { _isDuplicate } = require('../utils/messages');
-const logger = require('../../utils/logger');
+import { _getPrice, _getAdicionalMAX } from '../utils/pricing';
+import { _setStep } from '../utils/flowHelpers';
+import { buildConfirmationMessage } from '../../utils/messageTemplates';
+import { buildCartFromSelection, calculateTotal } from '../utils/cartHelpers';
+import { _isDuplicate } from '../utils/messages';
+import logger from '../../utils/logger';
 
 function _handleExtractedData(userId: string, extractedData: string, currentState: UserState) {
     if (!extractedData || extractedData === 'null') return;
@@ -27,7 +27,7 @@ function _handleExtractedData(userId: string, extractedData: string, currentStat
     }
 }
 
-async function handleWaitingPlanChoice(
+export async function handleWaitingPlanChoice(
     userId: string,
     text: string,
     normalizedText: string,
@@ -357,5 +357,3 @@ RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.
     }
     return { matched: false };
 }
-
-module.exports = { handleWaitingPlanChoice };

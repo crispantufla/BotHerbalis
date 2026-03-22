@@ -1,10 +1,10 @@
 import { UserState, FlowStep } from '../../types/state';
-const { _setStep, _pauseAndAlert } = require('../utils/flowHelpers');
-const { validateWithGoogleMaps } = require('../../services/addressValidator');
-const { buildConfirmationMessage } = require('../../utils/messageTemplates');
-const { _getPrice } = require('../utils/pricing');
-const { _isDuplicate } = require('../utils/messages');
-const logger = require('../../utils/logger');
+import { _setStep, _pauseAndAlert } from '../utils/flowHelpers';
+import { validateWithGoogleMaps } from '../../services/addressValidator';
+import { buildConfirmationMessage } from '../../utils/messageTemplates';
+import { _getPrice } from '../utils/pricing';
+import { _isDuplicate } from '../utils/messages';
+import logger from '../../utils/logger';
 
 /**
  * WAITING_MAPS_CONFIRMATION step
@@ -156,5 +156,3 @@ export async function handleWaitingMapsConfirmation(
     await sendMessageWithDelay(userId, fallbackMsg);
     return { matched: true };
 }
-
-module.exports = { handleWaitingMapsConfirmation };

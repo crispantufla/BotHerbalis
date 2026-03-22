@@ -1,7 +1,7 @@
 import { UserState } from '../../types/state';
-const { _isNegative } = require('../utils/validation');
-const { _pauseAndAlert, _setStep } = require('../utils/flowHelpers');
-const logger = require('../../utils/logger');
+import { _isNegative } from '../utils/validation';
+import { _pauseAndAlert, _setStep } from '../utils/flowHelpers';
+import logger from '../../utils/logger';
 
 interface SystemDependencies {
     sendMessageWithDelay: (chatId: string, content: string) => Promise<void>;
@@ -130,5 +130,3 @@ export async function handleSystemGlobals(
 
     return null;
 }
-
-module.exports = { handleSystemGlobals };

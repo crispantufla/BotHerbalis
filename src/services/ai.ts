@@ -1,4 +1,4 @@
-const logger = require('../utils/logger');
+import logger from '../utils/logger';
 import { differenceInDays } from 'date-fns';
 import NodeCache from 'node-cache';
 import OpenAI from 'openai';
@@ -6,7 +6,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import * as crypto from 'crypto';
-import { UserState } from '../types/state';
+import { UserState, HistoryMessage } from '../types/state';
 
 // --- RAG RULE BASE ---
 const RULE_BASE = [
@@ -94,7 +94,7 @@ function _getRelevantRules(userText: string): string[] {
 
 // Interfaces locales
 export interface APIContext {
-    history?: any[];
+    history?: HistoryMessage[];
     summary?: string;
     knowledge?: any;
     step?: string;
@@ -684,7 +684,7 @@ INSTRUCCIONES:
      * Check if history needs summarization.
      * Triggers when history exceeds 80 messages — summarizes the oldest and keeps the last 50.
      */
-    async checkAndSummarize(history: any[]): Promise<{ summary: string; prunedHistory: any[] } | null> {
+    async checkAndSummarize(history: HistoryMessage[]): Promise<{ summary: string; prunedHistory: HistoryMessage[] } | null> {
         if (!history || history.length <= 80) return null;
 
         logger.info(`[AI] Summarizing history (${history.length} messages down to ${MAX_HISTORY_LENGTH})...`);
@@ -702,14 +702,14 @@ INSTRUCCIONES:
     /**
      * Manual Summary Trigger (for API)
      */
-    async generateManualSummary(history: any[]): Promise<string | null> {
+    async generateManualSummary(history: HistoryMessage[]): Promise<string | null> {
         return await this._callQueuedSummarize(history);
     }
 
     /**
      * Summarize history through the queue
      */
-    async _callQueuedSummarize(history: any[]): Promise<string | null> {
+    async _callQueuedSummarize(history: HistoryMessage[]): Promise<string | null> {
         const conversationText = history.map(msg =>
             `${msg.role === 'user' ? 'Cliente' : 'Vendedor'}: ${msg.content} `
         ).join('\n');

@@ -1,8 +1,8 @@
 import { UserState, FlowStep } from '../../types/state';
-const { _formatMessage } = require('../utils/messages');
-const { _setStep, _pauseAndAlert } = require('../utils/flowHelpers');
-const { _isAffirmative, _isNegative } = require('../utils/validation');
-const logger = require('../../utils/logger');
+import { _formatMessage } from '../utils/messages';
+import { _setStep, _pauseAndAlert } from '../utils/flowHelpers';
+import { _isAffirmative, _isNegative } from '../utils/validation';
+import logger from '../../utils/logger';
 
 export async function handleWaitingOk(
     userId: string,

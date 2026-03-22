@@ -1,8 +1,8 @@
 import { UserState, FlowStep } from '../../types/state';
-const { _setStep, _detectProductPlanChange, _resolveNewProductPlan } = require('../utils/flowHelpers');
-const { _getPrice, _getAdicionalMAX } = require('../utils/pricing');
-const { _isAffirmative } = require('../utils/validation');
-const logger = require('../../utils/logger');
+import { _setStep, _detectProductPlanChange, _resolveNewProductPlan } from '../utils/flowHelpers';
+import { _getPrice, _getAdicionalMAX } from '../utils/pricing';
+import { _isAffirmative } from '../utils/validation';
+import logger from '../../utils/logger';
 
 export async function handleWaitingFinalConfirmation(
     userId: string,

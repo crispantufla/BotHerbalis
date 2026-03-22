@@ -1,10 +1,10 @@
 import path from 'path';
 import fs from 'fs';
 import { UserState } from '../../types/state';
-const { MessageMedia } = require('whatsapp-web.js');
-const { _formatMessage } = require('../utils/messages');
-const { _setStep } = require('../utils/flowHelpers');
-const logger = require('../../utils/logger');
+import { MessageMedia } from 'whatsapp-web.js';
+import { _formatMessage } from '../utils/messages';
+import { _setStep } from '../utils/flowHelpers';
+import logger from '../../utils/logger';
 
 interface GreetingDependencies {
     client: any;
@@ -121,5 +121,3 @@ export async function handleGreeting(
 
     return { matched: true };
 }
-
-module.exports = { handleGreeting };

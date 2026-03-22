@@ -1,6 +1,6 @@
-const path = require('path');
-const fs = require('fs');
-const logger = require('../../utils/logger');
+import path from 'path';
+import fs from 'fs';
+import logger from '../../utils/logger';
 
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../../..');
 const GALLERY_JSON = path.join(DATA_DIR, 'gallery.json');

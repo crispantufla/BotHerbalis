@@ -254,7 +254,7 @@ module.exports = (client, sharedState) => {
             });
 
         } catch (e) {
-            console.error("🔴 [STATS/CHARTS ERROR]", e);
+            logger.error("[STATS/CHARTS ERROR]", e);
             res.status(500).json({ error: e.message });
         }
     });

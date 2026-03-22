@@ -57,6 +57,14 @@ function startServer(client, sharedState) {
 
     app.use(express.json({ limit: '10mb' }));
 
+    // Request ID — unique identifier for each request (traceability)
+    const crypto = require('crypto');
+    app.use((req, res, next) => {
+        req.requestId = req.headers['x-request-id'] || crypto.randomUUID();
+        res.setHeader('x-request-id', req.requestId);
+        next();
+    });
+
     // Rate Limiting — Protect API from abuse
     const { rateLimit } = require('express-rate-limit');
     const limiter = rateLimit({
@@ -92,9 +100,8 @@ function startServer(client, sharedState) {
     // Always serve /media from public/ for audio files, images, etc.
     app.use('/media', express.static(path.join(__dirname, '../../public/media')));
 
-    // --- HEALTHCHECK (no auth required) ---
+    // --- HEALTHCHECK (public — minimal info for load balancers/uptime monitors) ---
     app.get('/health', async (req, res) => {
-        const memUsage = process.memoryUsage();
         const checks = {
             whatsapp: sharedState.isConnected ? 'connected' : 'disconnected',
             database: 'unknown',
@@ -120,6 +127,42 @@ function startServer(client, sharedState) {
 
         const allHealthy = checks.whatsapp === 'connected' && checks.database === 'connected' && checks.redis === 'connected';
 
+        // Public response: only status + timestamp (no memory/uptime details)
+        res.status(allHealthy ? 200 : 503).json({
+            status: allHealthy ? 'ok' : 'degraded',
+            timestamp: new Date().toISOString()
+        });
+    });
+
+    // --- DETAILED HEALTHCHECK (authenticated — full diagnostics for dashboard) ---
+    app.get('/api/health/details', (req, res, next) => {
+        const { authMiddleware } = require('../middleware/auth');
+        authMiddleware(req, res, next);
+    }, async (req, res) => {
+        const memUsage = process.memoryUsage();
+        const checks = {
+            whatsapp: sharedState.isConnected ? 'connected' : 'disconnected',
+            database: 'unknown',
+            redis: 'unknown'
+        };
+
+        try {
+            const { prisma } = require('../../db');
+            await prisma.$queryRaw`SELECT 1`;
+            checks.database = 'connected';
+        } catch (e) {
+            checks.database = 'disconnected';
+        }
+
+        try {
+            const { redisConnection } = require('../services/queueService');
+            checks.redis = redisConnection.status === 'ready' ? 'connected' : 'disconnected';
+        } catch (e) {
+            checks.redis = 'disconnected';
+        }
+
+        const allHealthy = checks.whatsapp === 'connected' && checks.database === 'connected' && checks.redis === 'connected';
+
         res.status(allHealthy ? 200 : 503).json({
             status: allHealthy ? 'ok' : 'degraded',
             services: checks,
@@ -128,6 +171,9 @@ function startServer(client, sharedState) {
                 rss: Math.round(memUsage.rss / 1024 / 1024) + 'MB',
                 heap: Math.round(memUsage.heapUsed / 1024 / 1024) + 'MB'
             },
+            activeUsers: Object.keys(sharedState.userState || {}).length,
+            pausedUsers: sharedState.pausedUsers?.size || 0,
+            alerts: sharedState.sessionAlerts?.length || 0,
             timestamp: new Date().toISOString()
         });
     });
@@ -160,7 +206,7 @@ function startServer(client, sharedState) {
     // --- EXPRESS 5 GLOBAL ERROR HANDLER ---
     // Express 5 natively passes unhandled Promise rejections to the next(err) middleware
     app.use((err, req, res, next) => {
-        logger.error(`[API ERROR] ${req.method} ${req.url}:`, err.message);
+        logger.error(`[API ERROR] [${req.requestId}] ${req.method} ${req.url}:`, err.message);
         if (err.stack && process.env.NODE_ENV !== 'production') {
             logger.error(err.stack);
         }
@@ -189,6 +235,10 @@ function startServer(client, sharedState) {
             // Send the last generated QR code immediately
             socket.emit('qr', sharedState.qrCodeData);
         }
+
+        socket.on('disconnect', (reason) => {
+            logger.debug(`[SOCKET] Client disconnected: ${reason}`);
+        });
     });
 
     const PORT = process.env.PORT || 3000;
@@ -196,7 +246,7 @@ function startServer(client, sharedState) {
         logger.info(`✅ Server running on http://localhost:${PORT}`);
     });
 
-    return { io, app };
+    return { io, app, server };
 }
 
 module.exports = { startServer };

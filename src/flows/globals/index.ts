@@ -1,7 +1,7 @@
 import { UserState } from '../../types/state';
-const { handleSystemGlobals } = require('./globalSystem');
-const { handleSafetyCheck } = require('./globalSafety');
-const { handleMediaGlobals } = require('./globalMedia');
+import { handleSystemGlobals } from './globalSystem';
+import { handleSafetyCheck } from './globalSafety';
+import { handleMediaGlobals } from './globalMedia';
 
 export async function processGlobals(
     userId: string,

@@ -9,6 +9,7 @@ module.exports = (client, sharedState) => {
     // Helper: Get date objects for current and previous periods
     const getPeriods = (days) => {
         const now = new Date();
+        days = Math.min(days, 365); // Cap at 1 year to prevent full-table scans
 
         const currentStart = new Date();
         currentStart.setDate(now.getDate() - days);
@@ -100,7 +101,8 @@ module.exports = (client, sharedState) => {
 
             const orders = await prisma.order.findMany({
                 where: { ...baseWhere, createdAt: { gte: currentStart } },
-                select: { products: true }
+                select: { products: true },
+                take: 10000 // Safety limit to prevent unbounded memory usage
             });
 
             const popularity = {
@@ -207,13 +209,15 @@ module.exports = (client, sharedState) => {
             // Heatmap: Orders by Hour of Day
             const orders = await prisma.order.findMany({
                 where: { ...baseWhere, createdAt: { gte: currentStart } },
-                select: { createdAt: true }
+                select: { createdAt: true },
+                take: 10000 // Safety limit
             });
 
             // Daily new chats
             const users = await prisma.user.findMany({
                 where: { ...baseUserWhere, createdAt: { gte: currentStart } },
-                select: { createdAt: true }
+                select: { createdAt: true },
+                take: 10000 // Safety limit
             });
 
             const hourCounts = new Array(24).fill(0);
@@ -311,7 +315,15 @@ module.exports = (client, sharedState) => {
                 }
             }
 
-            res.json({ period: snapshots.map(s => ({ date: s.date, stepCounts: JSON.parse(s.stepCounts || '{}') })), aggregated, live: liveStepCounts });
+            res.json({
+                period: snapshots.map(s => {
+                    let stepCounts = {};
+                    try { stepCounts = JSON.parse(s.stepCounts || '{}'); } catch {}
+                    return { date: s.date, stepCounts };
+                }),
+                aggregated,
+                live: liveStepCounts
+            });
         } catch (e) {
             logger.error("🔴 [ANALYTICS] Error in /funnel:", e);
             res.status(500).json({ error: e.message });

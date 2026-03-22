@@ -28,6 +28,7 @@ export interface Address {
     ciudad?: string | null;
     provincia?: string | null;
     cp?: string | null;
+    postdatado?: string | null;
 }
 
 export interface HistoryMessage {
@@ -97,25 +98,51 @@ export interface UserState {
     hasSoldBefore?: boolean;         // true si ya se concretó al menos una venta exitosa
     pendingCancelConfirm?: boolean;  // true si el bot está esperando confirmación de cancelación
     currentWeight?: number;          // Peso corporal actual del cliente (distinto de weightGoal)
+    userName?: string;               // Nombre del cliente extraído del chat
+}
+
+export interface AlertOrderData {
+    product: string | null;
+    plan: string | null;
+    price: string | number | null;
+    address: Address | null;
+    step: string | null;
+}
+
+export interface AlertEntry {
+    id: number;
+    timestamp: Date;
+    reason: string;
+    userPhone: string;
+    userName: string;
+    details: string | null;
+    orderData: AlertOrderData;
+}
+
+export interface BotConfig {
+    activeScript: string;
+    alertNumbers: string[];
+    [key: string]: any;
 }
 
 export interface SharedState {
     userState: Record<string, UserState>;
     chatResets: Record<string, number>;
     pausedUsers: Set<string>;
-    sessionAlerts: any[];
-    config: any;
+    sessionAlerts: AlertEntry[];
+    config: BotConfig;
     knowledge: any;
     multiKnowledge: Record<string, any>;
     isConnected: boolean;
     qrCodeData: string | null;
+    lastAlertUser?: string;
     saveState: (userId?: string | null) => void;
     saveKnowledge: (scriptName?: string | null) => void;
     loadKnowledge: (scriptName?: string | null) => void;
     reloadKnowledge: (scriptName?: string | null) => void;
     availableScripts: string[];
-    handleAdminCommand: any;
-    logAndEmit: any;
+    handleAdminCommand: (targetChatId: string | null, commandText: string, isApi?: boolean) => Promise<string>;
+    logAndEmit: (chatId: string, sender: string, text: string, step?: string) => void;
     io: any;
     requestPairingCode?: (phone: string) => Promise<string>;
 }

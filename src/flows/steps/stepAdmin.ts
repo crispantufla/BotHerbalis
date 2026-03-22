@@ -1,5 +1,5 @@
 import { UserState } from '../../types/state';
-const { pauseUser } = require('../../services/pauseService');
+import { pauseUser } from '../../services/pauseService';
 
 interface AdminStepDependencies {
     saveState: (userId: string) => void;
@@ -25,5 +25,3 @@ export async function handleAdminSteps(
 
     return { matched: true, paused: true };
 }
-
-module.exports = { handleAdminSteps };

@@ -5,8 +5,27 @@ const { aiService } = require('../../services/ai');
 const { MessageMedia } = require('whatsapp-web.js');
 const fs = require('fs');
 const path = require('path');
+const logger = require('../../utils/logger');
 
+// LRU cache with max size to prevent unbounded memory growth
+const CONTACT_CACHE_MAX = 500;
 const globalContactCache = new Map();
+function _cacheSet(key, value) {
+    if (globalContactCache.size >= CONTACT_CACHE_MAX) {
+        // Evict oldest entry (first inserted key)
+        const oldest = globalContactCache.keys().next().value;
+        globalContactCache.delete(oldest);
+    }
+    globalContactCache.set(key, value);
+}
+function _cacheGet(key) {
+    if (!globalContactCache.has(key)) return undefined;
+    // Move to end (most recently used)
+    const val = globalContactCache.get(key);
+    globalContactCache.delete(key);
+    globalContactCache.set(key, val);
+    return val;
+}
 
 let ordersCache = {
     data: [],
@@ -30,16 +49,17 @@ module.exports = (client, sharedState) => {
         if (!id) return id;
         // Handle @lid format
         if (id.includes('@lid')) {
-            if (globalContactCache.has(id)) return globalContactCache.get(id).id;
+            const cached = _cacheGet(id);
+            if (cached) return cached.id;
             try {
                 const contact = await client.getContactById(id);
                 if (contact && contact.number) {
                     const resolvedId = `${contact.number}@c.us`;
-                    globalContactCache.set(id, { id: resolvedId, name: contact.name || contact.pushname || `+${contact.number}` });
+                    _cacheSet(id, { id: resolvedId, name: contact.name || contact.pushname || `+${contact.number}` });
                     return resolvedId;
                 }
             } catch (e) {
-                console.error(`[LID-RESOLVE] API Error for ${id}:`, e.message);
+                logger.error(`[LID-RESOLVE] API Error for ${id}:`, e.message);
             }
             return id;
         }
@@ -64,7 +84,7 @@ module.exports = (client, sharedState) => {
                 const rawMessages = await withTimeout(chat.fetchMessages({ limit: 50 }), 10000, "Timeout fetching messages for summary");
                 waMessages = rawMessages.filter(m => m.timestamp >= resetAt);
             } catch (e) {
-                console.warn(`[SUMMARIZE] WA Fetch failed for ${chatId}`);
+                logger.warn(`[SUMMARIZE] WA Fetch failed for ${chatId}`);
             }
 
             // Combine and format for AI
@@ -94,7 +114,7 @@ module.exports = (client, sharedState) => {
             const summary = await aiService.generateManualSummary(formattedHistory);
             res.json({ summary });
         } catch (e) {
-            console.error(`[SUMMARIZE] Error:`, e);
+            logger.error(`[SUMMARIZE] Error:`, e);
             res.status(500).json({ error: e.message });
         }
     });
@@ -121,7 +141,7 @@ module.exports = (client, sharedState) => {
                 }
                 orders = ordersCache.data;
             } catch (err) {
-                console.error("🔴 Error fetching DB orders in /chats:", err.message);
+                logger.error("Error fetching DB orders in /chats:", err.message);
                 orders = ordersCache.data || []; // Fallback to stale cache if DB fails
             }
 
@@ -133,10 +153,10 @@ module.exports = (client, sharedState) => {
                 let actualName = c.name || c.id.user;
 
                 if (actualId.includes('@lid')) {
-                    if (globalContactCache.has(actualId)) {
-                        const cached = globalContactCache.get(actualId);
-                        actualId = cached.id;
-                        actualName = cached.name;
+                    const cachedContact = _cacheGet(actualId);
+                    if (cachedContact) {
+                        actualId = cachedContact.id;
+                        actualName = cachedContact.name;
                     } else {
                         try {
                             const contact = await withTimeout(client.getContactById(actualId), 1500, "Timeout");
@@ -147,12 +167,12 @@ module.exports = (client, sharedState) => {
                                 } else {
                                     actualName = `+${contact.number}`;
                                 }
-                                globalContactCache.set(c.id._serialized, { id: actualId, name: actualName });
+                                _cacheSet(c.id._serialized, { id: actualId, name: actualName });
                             }
                         } catch (e) {
-                            // Silenciar el spam: Si Meta hace timeout, guardamos el @lid temporalmente 
+                            // Silenciar el spam: Si Meta hace timeout, guardamos el @lid temporalmente
                             // para no atorar la red iterando 50 veces por segundo en futuras recargas.
-                            globalContactCache.set(c.id._serialized, { id: actualId, name: actualName });
+                            _cacheSet(c.id._serialized, { id: actualId, name: actualName });
                         }
                     }
                 }
@@ -344,7 +364,7 @@ module.exports = (client, sharedState) => {
                     .filter(r => r.status === 'fulfilled')
                     .map(r => r.value);
             } catch (waErr) {
-                console.error(`[HISTORY] WA Fetch Error for ${chatId}:`, waErr.message);
+                logger.error(`[HISTORY] WA Fetch Error for ${chatId}:`, waErr.message);
             }
 
             const localMessages = await getLocalHistory(chatId, resetAt);
@@ -385,7 +405,7 @@ module.exports = (client, sharedState) => {
             combined.sort((a, b) => a.timestamp - b.timestamp);
             res.json(combined);
         } catch (e) {
-            console.error(`[HISTORY] Global Error:`, e.message);
+            logger.error(`[HISTORY] Global Error:`, e.message);
             res.status(500).json({ error: e.message });
         }
     });
@@ -395,7 +415,7 @@ module.exports = (client, sharedState) => {
         if (!userState[chatId]) {
             // Initialize userState as if they had just been greeted
             const autoScript = Math.random() < 0.5 ? 'v3' : 'v4';
-            console.log(`[DASHBOARD] Initializing new state for ${chatId} (Script: ${autoScript})`);
+            logger.info(`[DASHBOARD] Initializing new state for ${chatId} (Script: ${autoScript})`);
             userState[chatId] = {
                 step: 'waiting_weight', // Skip the greeting since admin just sent a message
                 lastMessage: null,
@@ -494,7 +514,7 @@ module.exports = (client, sharedState) => {
             }
             res.json({ success: true, messageId: sentMsg.id._serialized });
         } catch (e) {
-            console.error('[SEND-MEDIA] Error:', e.message);
+            logger.error('[SEND-MEDIA] Error:', e.message);
             res.status(500).json({ error: e.message });
         }
     });
@@ -527,7 +547,7 @@ module.exports = (client, sharedState) => {
                     data: { profileData: null }
                 });
             } catch (dbErr) {
-                console.warn(`[RESET] Could not clear DB state for ${phoneStr}:`, dbErr.message);
+                logger.warn(`[RESET] Could not clear DB state for ${phoneStr}:`, dbErr.message);
             }
 
             const chat = await client.getChatById(chatId);
@@ -551,7 +571,7 @@ module.exports = (client, sharedState) => {
 
             // Warn if LID resolution failed — pause key would mismatch message key
             if (chatId.includes('@lid')) {
-                console.warn(`[API] toggle-bot: LID resolution failed for ${chatId}, pause key may not match incoming message key`);
+                logger.warn(`[API] toggle-bot: LID resolution failed for ${chatId}, pause key may not match incoming message key`);
             }
 
             const { pauseUser, unpauseUser } = require('../../services/pauseService');
@@ -562,7 +582,7 @@ module.exports = (client, sharedState) => {
                 await unpauseUser(chatId, sharedState);
             }
 
-            console.log(`[API] toggle-bot: ${originalChatId}${chatId !== originalChatId ? ` → ${chatId}` : ''} → ${paused ? 'PAUSED' : 'UNPAUSED'} (via dashboard)`);
+            logger.info(`[API] toggle-bot: ${originalChatId}${chatId !== originalChatId ? ` → ${chatId}` : ''} → ${paused ? 'PAUSED' : 'UNPAUSED'} (via dashboard)`);
             if (sharedState.saveState) sharedState.saveState();
             // Emit both resolved and original ID so frontend matches regardless of LID vs @c.us
             if (sharedState.io) {
@@ -605,11 +625,11 @@ module.exports = (client, sharedState) => {
                 await msgToDel.delete(true); // true = delete for everyone
                 res.json({ success: true });
             } else {
-                console.warn(`[DELETE-MSG] 404 Not Found in last 200 msgs. Requested messageId: ${messageId}`);
+                logger.warn(`[DELETE-MSG] 404 Not Found in last 200 msgs. Requested messageId: ${messageId}`);
                 res.status(404).json({ error: 'Message not found in recent history' });
             }
         } catch (e) {
-            console.error('[DELETE-MSG] Error:', e.message);
+            logger.error('[DELETE-MSG] Error:', e.message);
             res.status(500).json({ error: e.message });
         }
     });

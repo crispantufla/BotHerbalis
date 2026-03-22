@@ -1,9 +1,9 @@
 import path from 'path';
 import fs from 'fs';
 import { UserState } from '../../types/state';
-const { MessageMedia } = require('whatsapp-web.js');
-const { _getGallery } = require('../utils/gallery');
-const logger = require('../../utils/logger');
+import { MessageMedia } from 'whatsapp-web.js';
+import { _getGallery } from '../utils/gallery';
+import logger from '../../utils/logger';
 
 interface GalleryImage {
     url: string;
@@ -86,5 +86,3 @@ export async function handleMediaGlobals(
 
     return { matched: true };
 }
-
-module.exports = { handleMediaGlobals };

@@ -9,19 +9,20 @@
  */
 
 const NOTIFY_DEBOUNCE_MS = 5 * 60 * 1000; // 5 minutes
-const logger = require('../utils/logger');
-const { _cleanPhone } = require('../flows/utils/flowHelpers');
+import logger from '../utils/logger';
+import { _cleanPhone } from '../flows/utils/flowHelpers';
 
 // In-memory debounce: userId → last notification timestamp
 const adminNotifiedAt: Map<string, number> = new Map();
 
 // Periodically prune stale debounce entries to prevent unbounded growth
-setInterval(() => {
+let _pruneIntervalId: ReturnType<typeof setInterval> | null = setInterval(() => {
     const now = Date.now();
     for (const [userId, ts] of adminNotifiedAt) {
         if (now - ts > NOTIFY_DEBOUNCE_MS) adminNotifiedAt.delete(userId);
     }
-}, NOTIFY_DEBOUNCE_MS).unref();
+}, NOTIFY_DEBOUNCE_MS);
+_pruneIntervalId.unref();
 
 interface PauseServiceDeps {
     sharedState: { pausedUsers: Set<string> };
@@ -159,4 +160,15 @@ export async function getPausedUsersWithDetails(): Promise<Array<{
         logger.error(`[PAUSE-SERVICE] Failed to get paused users:`, err.message);
         return [];
     }
+}
+
+/**
+ * Cleanup interval and debounce map on shutdown.
+ */
+export function cleanupPauseService(): void {
+    if (_pruneIntervalId) {
+        clearInterval(_pruneIntervalId);
+        _pruneIntervalId = null;
+    }
+    adminNotifiedAt.clear();
 }

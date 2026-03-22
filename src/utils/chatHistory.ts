@@ -1,5 +1,5 @@
-const logger = require('./logger');
-const { prisma } = require('../../db');
+import logger from './logger';
+import { prisma } from '../../db';
 
 /**
  * Get chat history from local database.

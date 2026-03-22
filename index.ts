@@ -486,7 +486,7 @@ const sharedState = {
 
 // --- INITIALIZE SERVER ---
 // Pass client and sharedState so Server can handle API routes
-startServer(client, sharedState);
+const { server: httpServer } = startServer(client, sharedState);
 
 // Helper: Log and Emit to Dashboard (Now uses sharedState.io)
 function logAndEmit(chatId: string, sender: string, text: string, step?: string, messageId: string | null = null): void {
@@ -1273,6 +1273,23 @@ const _shutdown = async (signal: string, exitCode: number = 0): Promise<void> =>
     try {
         await shutdownQueue();
     } catch (e: any) { logger.error('[SHUTDOWN] Error closing Redis/Queue:', e.message); }
+    try {
+        const { cleanupPauseService } = require('./src/services/pauseService');
+        cleanupPauseService();
+        logger.info('[SHUTDOWN] PauseService cleaned up.');
+    } catch (e: any) { logger.error('[SHUTDOWN] Error cleaning pause service:', e.message); }
+    try {
+        if (sharedState.io) {
+            sharedState.io.close();
+            logger.info('[SHUTDOWN] Socket.IO closed.');
+        }
+    } catch (e: any) { logger.error('[SHUTDOWN] Error closing Socket.IO:', e.message); }
+    try {
+        if (httpServer) {
+            await new Promise<void>((resolve) => httpServer.close(() => resolve()));
+            logger.info('[SHUTDOWN] HTTP server closed.');
+        }
+    } catch (e: any) { logger.error('[SHUTDOWN] Error closing HTTP server:', e.message); }
     try {
         await prisma.$disconnect();
         const { pool } = require('./db');

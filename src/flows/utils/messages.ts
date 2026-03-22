@@ -1,8 +1,5 @@
-const { _getPrices } = require('./pricing');
-
-function _formatPriceNum(n: number): string {
-    return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-}
+import { _getPrices } from './pricing';
+import { _formatPrice } from './cartHelpers';
 
 function _formatMessage(text: string | string[], state: any): string {
     if (!text) return "";
@@ -36,8 +33,8 @@ function _formatMessage(text: string | string[], state: any): string {
             // If Contra Reembolso MAX, show breakdown
             if (state.isContraReembolsoMAX && state.adicionalMAX > 0) {
                 const basePriceInt = Math.max(0, parseInt(String(state.totalPrice).replace(/\./g, '')) - state.adicionalMAX);
-                const basePrice = _formatPriceNum(basePriceInt);
-                const adicional = _formatPriceNum(state.adicionalMAX);
+                const basePrice = _formatPrice(basePriceInt);
+                const adicional = _formatPrice(state.adicionalMAX);
                 displayPrice = `$${basePrice} + $${adicional}`;
             }
             formatted = formatted.replace(/{{TOTAL}}/g, displayPrice);

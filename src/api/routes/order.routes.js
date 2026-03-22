@@ -2,6 +2,29 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const { authMiddleware } = require('../../middleware/auth');
+const logger = require('../../utils/logger');
+const { z } = require('zod');
+
+// --- Input validation schemas ---
+const uuidSchema = z.string().uuid('ID de orden inválido');
+
+const orderUpdateSchema = z.object({
+    nombre: z.string().max(200).optional(),
+    calle: z.string().max(500).optional(),
+    ciudad: z.string().max(200).optional(),
+    provincia: z.string().max(100).optional(),
+    cp: z.string().max(20).optional(),
+    producto: z.string().max(500).optional(),
+    precio: z.union([z.string(), z.number()]).optional(),
+    tracking: z.string().max(200).optional(),
+    status: z.enum(['Pendiente', 'Confirmado', 'Enviado', 'Entregado', 'Cancelado']).optional(),
+    postdatado: z.string().max(200).optional()
+}).strict();
+
+const statusUpdateSchema = z.object({
+    status: z.enum(['Pendiente', 'Confirmado', 'Enviado', 'Entregado', 'Cancelado']).optional(),
+    tracking: z.string().max(200).optional()
+}).strict();
 
 module.exports = (client, sharedState) => {
     const router = express.Router();
@@ -15,7 +38,7 @@ module.exports = (client, sharedState) => {
                 const contact = await client.getContactById(id);
                 if (contact && contact.number) return `${contact.number}@c.us`;
             } catch (e) {
-                console.error(`[LID-RESOLVE] API Error for ${id}:`, e.message);
+                logger.error(`[LID-RESOLVE] API Error for ${id}:`, e.message);
             }
             return id;
         }
@@ -95,15 +118,20 @@ module.exports = (client, sharedState) => {
                 }
             });
         } catch (error) {
-            console.error('🔴 [ROUTES] Error fetching orders from DB:', error);
+            logger.error('[ROUTES] Error fetching orders from DB:', error);
             res.status(500).json({ error: "Failed to fetch orders" });
         }
     });
 
     // PUT /orders/:id (Edit order details) - Authenticated
     router.put('/orders/:id', authMiddleware, async (req, res) => {
-        const { id } = req.params;
-        const { nombre, calle, ciudad, provincia, cp, producto, precio, tracking, status, postdatado } = req.body;
+        const idResult = uuidSchema.safeParse(req.params.id);
+        if (!idResult.success) return res.status(400).json({ error: idResult.error.issues[0].message });
+        const id = idResult.data;
+
+        const bodyResult = orderUpdateSchema.safeParse(req.body);
+        if (!bodyResult.success) return res.status(400).json({ error: 'Datos inválidos', details: bodyResult.error.issues });
+        const { nombre, calle, ciudad, provincia, cp, producto, precio, tracking, status, postdatado } = bodyResult.data;
 
         try {
             const { prisma } = require('../../../db');
@@ -149,15 +177,20 @@ module.exports = (client, sharedState) => {
             if (io) io.emit('order_update', legacyOrder);
             res.json({ success: true, order: legacyOrder });
         } catch (error) {
-            console.error('🔴 [ROUTES] Error updating order:', error);
+            logger.error('[ROUTES] Error updating order:', error);
             res.status(500).json({ error: "Failed to update order" });
         }
     });
 
     // POST /orders/:id/status (Update status) - Authenticated
     router.post('/orders/:id/status', authMiddleware, async (req, res) => {
-        const { id } = req.params;
-        const { status, tracking } = req.body;
+        const idResult = uuidSchema.safeParse(req.params.id);
+        if (!idResult.success) return res.status(400).json({ error: idResult.error.issues[0].message });
+        const id = idResult.data;
+
+        const bodyResult = statusUpdateSchema.safeParse(req.body);
+        if (!bodyResult.success) return res.status(400).json({ error: 'Datos inválidos', details: bodyResult.error.issues });
+        const { status, tracking } = bodyResult.data;
 
         try {
             const { prisma } = require('../../../db');
@@ -174,7 +207,7 @@ module.exports = (client, sharedState) => {
 
             // Trigger confirmation message if marked as confirmed
             if (status && status.toLowerCase() === 'confirmado') {
-                console.log(`[ORDER-STATUS] El dashboard marcó la orden ${id} como Confirmado.`);
+                logger.info(`[ORDER-STATUS] El dashboard marcó la orden ${id} como Confirmado.`);
 
                 // Extraemos solo los números por si vino mezclado o con @lid
                 const rawPhone = updatedOrder.userPhone.replace(/\D/g, '');
@@ -183,9 +216,10 @@ module.exports = (client, sharedState) => {
                 const msg = "¡Excelente! Tu pedido ya fue ingresado 🚀\n\nTe vamos a avisar cuando lo despachemos con el número de seguimiento.\n\n¡Muchas gracias por confiar en Herbalis!";
 
                 try {
-                    console.log(`[ORDER-STATUS] Intentando enviar WhatsApp a ${targetPhone}...`);
-                    await client.sendMessage(targetPhone, msg);
-                    console.log(`[ORDER-STATUS] ✅ WhatsApp enviado exitosamente a ${targetPhone}`);
+                    const { sendWithRetry } = require('../../utils/retry');
+                    logger.info(`[ORDER-STATUS] Intentando enviar WhatsApp a ${targetPhone}...`);
+                    await sendWithRetry(client, targetPhone, msg);
+                    logger.info(`[ORDER-STATUS] WhatsApp enviado exitosamente a ${targetPhone}`);
 
                     if (sharedState.userState && sharedState.userState[targetPhone]) {
                         sharedState.userState[targetPhone].step = 'completed';
@@ -199,7 +233,7 @@ module.exports = (client, sharedState) => {
                         sharedState.logAndEmit(targetPhone, 'bot', msg, 'completed');
                     }
                 } catch (e) {
-                    console.error(`🔴 [ORDER-STATUS] FALLO AL ENVIAR WHATSAPP a ${targetPhone}. Motivo: ${e.message}`);
+                    logger.error(`[ORDER-STATUS] FALLO AL ENVIAR WHATSAPP a ${targetPhone}. Motivo: ${e.message}`);
                 }
             }
 
@@ -227,14 +261,16 @@ module.exports = (client, sharedState) => {
             res.json({ success: true, order: legacyOrder });
 
         } catch (error) {
-            console.error('🔴 [ROUTES] Error updating DB:', error);
+            logger.error('[ROUTES] Error updating DB:', error);
             res.status(500).json({ error: "Failed to update order info" });
         }
     });
 
     // DELETE /orders/:id (Delete order) - Authenticated
     router.delete('/orders/:id', authMiddleware, async (req, res) => {
-        const { id } = req.params;
+        const idResult = uuidSchema.safeParse(req.params.id);
+        if (!idResult.success) return res.status(400).json({ error: idResult.error.issues[0].message });
+        const id = idResult.data;
 
         try {
             const { prisma } = require('../../../db');
@@ -248,7 +284,7 @@ module.exports = (client, sharedState) => {
             res.json({ success: true, deleted: { id } });
 
         } catch (error) {
-            console.error('🔴 [ROUTES] Error deleting from DB:', error);
+            logger.error('[ROUTES] Error deleting from DB:', error);
             res.status(500).json({ error: "Failed to delete order" });
         }
     });
@@ -263,7 +299,7 @@ module.exports = (client, sharedState) => {
             const result = await getTrackingNacional(code);
             res.json(result);
         } catch (e) {
-            console.error('🔴 [ROUTES] Error consultando tracking:', e);
+            logger.error('[ROUTES] Error consultando tracking:', e);
             res.status(500).json({ error: "Error interno rastreando el código." });
         }
     });
@@ -275,13 +311,13 @@ module.exports = (client, sharedState) => {
 
         try {
             chatId = await resolveChatId(chatId);
-            console.log(`[MANUAL-COMPLETE] Resolved chatId: ${chatId}`);
+            logger.info(`[MANUAL-COMPLETE] Resolved chatId: ${chatId}`);
 
             const { userState } = sharedState;
             const state = userState?.[chatId];
 
             if (!state) {
-                console.log(`[MANUAL-COMPLETE] No state found for ${chatId}. Available keys sample:`, Object.keys(userState || {}).slice(0, 5));
+                logger.info(`[MANUAL-COMPLETE] No state found for ${chatId}. Available keys sample:`, Object.keys(userState || {}).slice(0, 5));
                 return res.status(404).json({ error: 'No hay estado de conversación para este chat' });
             }
 
@@ -291,7 +327,7 @@ module.exports = (client, sharedState) => {
             // FALLBACK DATA RESCUE: If admin clicks "Manual Complete" and the bot hasn't extracted the address yet
             // (e.g. because they paused the bot or the bot failed to parse), we run a quick AI extraction over the last few user messages.
             if (!addr.nombre || !addr.calle || !addr.ciudad) {
-                console.log(`[MANUAL-COMPLETE] Datos de envío incompletos. Intentando rescatarlos del historial para ${chatId}...`);
+                logger.info(`[MANUAL-COMPLETE] Datos de envío incompletos. Intentando rescatarlos del historial para ${chatId}...`);
                 const history = state.history || [];
                 // Get the last 10 messages from the user only
                 const recentUserMessages = history.filter(m => m.role === 'user').slice(-10);
@@ -303,7 +339,7 @@ module.exports = (client, sharedState) => {
                         const extracted = await aiService.parseAddress(textToAnalyze);
 
                         if (!extracted._error) {
-                            console.log(`[MANUAL-COMPLETE] Extracción AI exitosa:`, extracted);
+                            logger.info(`[MANUAL-COMPLETE] Extracción AI exitosa:`, extracted);
                             addr = {
                                 nombre: extracted.nombre || addr.nombre,
                                 calle: extracted.calle || addr.calle,
@@ -316,7 +352,7 @@ module.exports = (client, sharedState) => {
                             state.partialAddress = addr;
                         }
                     } catch (extError) {
-                        console.error(`[MANUAL-COMPLETE] Error en extracción AI de rescate:`, extError.message);
+                        logger.error(`[MANUAL-COMPLETE] Error en extracción AI de rescate:`, extError.message);
                     }
                 }
             }
@@ -359,58 +395,57 @@ module.exports = (client, sharedState) => {
             const { prisma } = require('../../../db');
             const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
 
-            // Upsert user
-            await prisma.user.upsert({
-                where: { phone_instanceId: { phone: phoneNumeric, instanceId: INSTANCE_ID } },
-                update: { name: addr.nombre || null },
-                create: { phone: phoneNumeric, instanceId: INSTANCE_ID, name: addr.nombre || null }
-            });
-
             const seller = client?.info?.wid?.user || null;
 
-            // Check if there's already a Pendiente order for this user — update it instead of creating a duplicate
-            const existingOrder = await prisma.order.findFirst({
-                where: { userPhone: phoneNumeric, status: 'Pendiente', instanceId: INSTANCE_ID },
-                orderBy: { createdAt: 'desc' }
-            });
+            // Atomic transaction: upsert user + find/create order to prevent duplicates
+            const order = await prisma.$transaction(async (tx) => {
+                await tx.user.upsert({
+                    where: { phone_instanceId: { phone: phoneNumeric, instanceId: INSTANCE_ID } },
+                    update: { name: addr.nombre || null },
+                    create: { phone: phoneNumeric, instanceId: INSTANCE_ID, name: addr.nombre || null }
+                });
 
-            let order;
-            if (existingOrder) {
-                console.log(`[MANUAL-COMPLETE] Found existing Pendiente order ${existingOrder.id}, updating to Confirmado...`);
-                order = await prisma.order.update({
-                    where: { id: existingOrder.id },
-                    data: {
-                        status: 'Confirmado',
-                        seller: seller,
-                        // Update address fields in case they were collected after the initial order
-                        nombre: addr.nombre || existingOrder.nombre,
-                        calle: addr.calle || existingOrder.calle,
-                        calleOriginal: addr.calleOriginal || existingOrder.calleOriginal || addr.calle || existingOrder.calle,
-                        ciudad: addr.ciudad || existingOrder.ciudad,
-                        provincia: addr.provincia || existingOrder.provincia,
-                        cp: addr.cp || existingOrder.cp,
-                    }
+                const existingOrder = await tx.order.findFirst({
+                    where: { userPhone: phoneNumeric, status: 'Pendiente', instanceId: INSTANCE_ID },
+                    orderBy: { createdAt: 'desc' }
                 });
-            } else {
-                console.log(`[MANUAL-COMPLETE] No existing order found, creating new Confirmado order...`);
-                order = await prisma.order.create({
-                    data: {
-                        instanceId: INSTANCE_ID,
-                        userPhone: phoneNumeric,
-                        status: 'Confirmado',
-                        products: product,
-                        totalPrice: total,
-                        postdated: state.postdatado || null,
-                        nombre: addr.nombre || null,
-                        calle: addr.calle || null,
-                        calleOriginal: addr.calleOriginal || addr.calle || null,
-                        ciudad: addr.ciudad || null,
-                        provincia: addr.provincia || null,
-                        cp: addr.cp || null,
-                        seller: seller,
-                    }
-                });
-            }
+
+                if (existingOrder) {
+                    logger.info(`[MANUAL-COMPLETE] Found existing Pendiente order ${existingOrder.id}, updating to Confirmado...`);
+                    return await tx.order.update({
+                        where: { id: existingOrder.id },
+                        data: {
+                            status: 'Confirmado',
+                            seller: seller,
+                            nombre: addr.nombre || existingOrder.nombre,
+                            calle: addr.calle || existingOrder.calle,
+                            calleOriginal: addr.calleOriginal || existingOrder.calleOriginal || addr.calle || existingOrder.calle,
+                            ciudad: addr.ciudad || existingOrder.ciudad,
+                            provincia: addr.provincia || existingOrder.provincia,
+                            cp: addr.cp || existingOrder.cp,
+                        }
+                    });
+                } else {
+                    logger.info(`[MANUAL-COMPLETE] No existing order found, creating new Confirmado order...`);
+                    return await tx.order.create({
+                        data: {
+                            instanceId: INSTANCE_ID,
+                            userPhone: phoneNumeric,
+                            status: 'Confirmado',
+                            products: product,
+                            totalPrice: total,
+                            postdated: state.postdatado || null,
+                            nombre: addr.nombre || null,
+                            calle: addr.calle || null,
+                            calleOriginal: addr.calleOriginal || addr.calle || null,
+                            ciudad: addr.ciudad || null,
+                            provincia: addr.provincia || null,
+                            cp: addr.cp || null,
+                            seller: seller,
+                        }
+                    });
+                }
+            });
 
 
 
@@ -419,7 +454,7 @@ module.exports = (client, sharedState) => {
 
             try {
                 const targetPhone = `${phoneNumeric}@c.us`;
-                console.log(`[MANUAL-COMPLETE] Enviando WhatsApp de confirmación a ${targetPhone}...`);
+                logger.info(`[MANUAL-COMPLETE] Enviando WhatsApp de confirmación a ${targetPhone}...`);
                 await client.sendMessage(targetPhone, msg);
 
                 if (state) {
@@ -434,7 +469,7 @@ module.exports = (client, sharedState) => {
                     sharedState.logAndEmit(chatId, 'bot', msg, 'completed');
                 }
             } catch (e) {
-                console.error(`🔴 [MANUAL-COMPLETE] Error enviando WhatsApp:`, e.message);
+                logger.error(`[MANUAL-COMPLETE] Error enviando WhatsApp:`, e.message);
             }
 
             const legacyOrder = {
@@ -464,13 +499,13 @@ module.exports = (client, sharedState) => {
             if (alertIndex !== -1) {
                 sharedState.sessionAlerts.splice(alertIndex, 1);
                 if (io) io.emit('alerts_updated', sharedState.sessionAlerts);
-                console.log(`[MANUAL-COMPLETE] Alert cleared for ${phoneNumeric}`);
+                logger.info(`[MANUAL-COMPLETE] Alert cleared for ${phoneNumeric}`);
             }
 
-            console.log(`✅ [MANUAL-COMPLETE] Order confirmed for ${phoneNumeric}: ${product} — $${total}`);
+            logger.info(`[MANUAL-COMPLETE] Order confirmed for ${phoneNumeric}: ${product} — $${total}`);
             res.json({ success: true, orderId: order.id });
         } catch (e) {
-            console.error('🔴 [MANUAL-COMPLETE] Error:', e);
+            logger.error('[MANUAL-COMPLETE] Error:', e);
             res.status(500).json({ error: e.message });
         }
     });

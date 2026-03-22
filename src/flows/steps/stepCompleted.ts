@@ -1,7 +1,7 @@
 import { UserState } from '../../types/state';
-const { _setStep } = require('../utils/flowHelpers');
-const { _isAffirmative, _isNegative } = require('../utils/validation');
-const logger = require('../../utils/logger');
+import { _setStep } from '../utils/flowHelpers';
+import { _isAffirmative, _isNegative } from '../utils/validation';
+import logger from '../../utils/logger';
 
 interface CompletedDependencies {
     sendMessageWithDelay: (chatId: string, content: string) => Promise<void>;
@@ -208,5 +208,3 @@ export async function handleCompleted(
 
     return { matched: true };
 }
-
-module.exports = { handleCompleted };

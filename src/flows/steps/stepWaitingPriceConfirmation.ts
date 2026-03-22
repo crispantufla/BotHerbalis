@@ -1,8 +1,8 @@
 import { UserState } from '../../types/state';
-const { _formatMessage } = require('../utils/messages');
-const { _setStep } = require('../utils/flowHelpers');
-const { _isAffirmative } = require('../utils/validation');
-const logger = require('../../utils/logger');
+import { _formatMessage } from '../utils/messages';
+import { _setStep } from '../utils/flowHelpers';
+import { _isAffirmative } from '../utils/validation';
+import logger from '../../utils/logger';
 
 interface PriceConfirmationDependencies {
     sendMessageWithDelay: (chatId: string, content: string) => Promise<void>;
@@ -57,5 +57,3 @@ export async function handleWaitingPriceConfirmation(
     }
     return { matched: false };
 }
-
-module.exports = { handleWaitingPriceConfirmation };

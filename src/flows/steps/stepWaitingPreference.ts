@@ -1,7 +1,7 @@
 import { UserState, FlowStep } from '../../types/state';
-const { _formatMessage } = require('../utils/messages');
-const { _setStep, _maybeUpsell, _detectPostdatado } = require('../utils/flowHelpers');
-const logger = require('../../utils/logger');
+import { _formatMessage } from '../utils/messages';
+import { _setStep, _maybeUpsell, _detectPostdatado } from '../utils/flowHelpers';
+import logger from '../../utils/logger';
 
 export async function handleWaitingPreference(
     userId: string,

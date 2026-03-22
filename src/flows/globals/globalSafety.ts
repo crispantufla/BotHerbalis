@@ -1,5 +1,5 @@
 import { UserState } from '../../types/state';
-const logger = require('../../utils/logger');
+import logger from '../../utils/logger';
 
 interface SafetyDependencies {
     sendMessageWithDelay: (chatId: string, content: string) => Promise<void>;
@@ -52,5 +52,3 @@ export async function handleSafetyCheck(
 
     return null;
 }
-
-module.exports = { handleSafetyCheck };

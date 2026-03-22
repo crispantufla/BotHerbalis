@@ -1,16 +1,16 @@
 import { UserState } from '../../types/state';
-const { handleGreeting } = require('./stepGreeting');
-const { handleWaitingWeight } = require('./stepWaitingWeight');
-const { handleWaitingPreference } = require('./stepWaitingPreference');
-const { handleWaitingPriceConfirmation } = require('./stepWaitingPriceConfirmation');
-const { handleWaitingPlanChoice } = require('./stepWaitingPlanChoice');
-const { handleWaitingOk } = require('./stepWaitingOk');
-const { handleWaitingData } = require('./stepWaitingData');
-const { handleWaitingFinalConfirmation } = require('./stepWaitingFinalConfirmation');
-const { handleWaitingMapsConfirmation } = require('./stepWaitingMapsConfirmation');
-const { handleAdminSteps } = require('./stepAdmin');
-const { handleCompleted } = require('./stepCompleted');
-const logger = require('../../utils/logger');
+import { handleGreeting } from './stepGreeting';
+import { handleWaitingWeight } from './stepWaitingWeight';
+import { handleWaitingPreference } from './stepWaitingPreference';
+import { handleWaitingPriceConfirmation } from './stepWaitingPriceConfirmation';
+import { handleWaitingPlanChoice } from './stepWaitingPlanChoice';
+import { handleWaitingOk } from './stepWaitingOk';
+import { handleWaitingData } from './stepWaitingData';
+import { handleWaitingFinalConfirmation } from './stepWaitingFinalConfirmation';
+import { handleWaitingMapsConfirmation } from './stepWaitingMapsConfirmation';
+import { handleAdminSteps } from './stepAdmin';
+import { handleCompleted } from './stepCompleted';
+import logger from '../../utils/logger';
 
 export async function processStep(
     userId: string,

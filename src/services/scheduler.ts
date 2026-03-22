@@ -1,4 +1,4 @@
-const logger = require('../utils/logger');
+import logger from '../utils/logger';
 // scheduler.ts - Cron-based periodic checks for stale users, cold leads, and auto-approval
 //
 // Uses node-cron with America/Argentina/Buenos_Aires timezone so schedules
@@ -14,8 +14,7 @@ import { isBusinessHours } from './timeUtils';
 import { differenceInMinutes, differenceInHours, differenceInDays } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 
-const messageTemplates = require('../utils/messageTemplates');
-const buildConfirmationMessage = messageTemplates.buildConfirmationMessage;
+import { buildConfirmationMessage } from '../utils/messageTemplates';
 import { UserState } from '../types/state';
 
 // ── Constants ──

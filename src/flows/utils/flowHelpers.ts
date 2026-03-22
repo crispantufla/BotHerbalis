@@ -1,6 +1,6 @@
-const { _getAdminSuggestions } = require('./messages');
+import { _getAdminSuggestions } from './messages';
 import { UserState, SharedState } from '../../types/state';
-const logger = require('../../utils/logger');
+import logger from '../../utils/logger';
 
 /**
  * _cleanPhone
@@ -230,7 +230,7 @@ function _resolveNewProductPlan(normalizedText: string, currentProduct: string |
     return { newProduct, newPlan };
 }
 
-module.exports = {
+export {
     _cleanPhone,
     _setStep,
     _maybeUpsell,

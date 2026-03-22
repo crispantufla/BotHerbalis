@@ -1,5 +1,5 @@
 import { UserState } from '../../types/state';
-const { _getPrice, _getAdicionalMAX } = require('./pricing');
+import { _getPrice, _getAdicionalMAX } from './pricing';
 
 /**
  * _formatPrice
@@ -80,7 +80,8 @@ function calculateTotal(state: UserState): string {
     return formatted;
 }
 
-module.exports = {
+export {
+    _formatPrice,
     buildCartFromSelection,
     calculateTotal
 };
