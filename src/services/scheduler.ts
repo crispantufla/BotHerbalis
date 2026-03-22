@@ -53,6 +53,60 @@ const ABANDONED_CART_MAX_HOURS = 24;
 const AUTO_APPROVE_THRESHOLD_MINS = 15;
 const CLEANUP_THRESHOLD_DAYS = 30;
 
+/**
+ * _detectAbandonReason
+ * Inspects the last user message and state signals to determine why the user
+ * went silent. Used to send a contextually relevant recovery message.
+ */
+function _detectAbandonReason(state: UserState): 'payment_timing' | 'hesitation' | 'objection' | 'address_issue' | 'generic' {
+    if (state.addressIssueType) return 'address_issue';
+
+    const lastUserMsg = [...(state.history || [])].reverse().find(h => h.role === 'user');
+    if (!lastUserMsg) return 'generic';
+
+    const t = lastUserMsg.content.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (/cobro|sueldo|plata|quincena|depositan|me pagan|sin guita|no tengo la plata|no me alcanza/.test(t)) return 'payment_timing';
+    if (/pensar|despues|luego|manana|te aviso|te confirmo|mas tarde|semana que viene|mes que viene/.test(t)) return 'hesitation';
+    if (/resultado|miedo|seguro|funciona|garantia|duda|probar|riesgo|caro|precio|sale|vale/.test(t)) return 'objection';
+    return 'generic';
+}
+
+/**
+ * _withName
+ * Personalizes a message by inserting the user's first name after the greeting.
+ * e.g. "¡Hola! 😊 ..." → "¡Hola, María! 😊 ..."
+ */
+function _withName(msg: string, state: UserState): string {
+    const fullName = state.userName || state.partialAddress?.nombre;
+    if (!fullName) return msg;
+    const firstName = fullName.split(' ')[0];
+    return msg.replace(/^(¡?hola[!]?\s*[👋😊]?)/i, `$1 ${firstName},`);
+}
+
+/** Contextual messages by abandon reason (for abandoned cart + cold lead recovery) */
+const ABANDON_REASON_MESSAGES: Record<string, string[]> = {
+    payment_timing: [
+        '¡Hola! 😊 Una cosa importante: no pagás nada por adelantado. El efectivo lo abonás cuando el correo te entrega el paquete en tu puerta. ¿Seguimos?',
+        'Hola 👋 Recordá que el pago es al recibir, no necesitás tener la plata ahora. Podés pedir hoy y pagar recién cuando llegue. ¿Te tomamos los datos? 📦',
+    ],
+    hesitation: [
+        '¡Hola! 😊 Sin apuro. El envío tarda 7-10 días hábiles y el pago es al recibir, así que no hay nada que adelantar. ¿Avanzamos cuando quieras?',
+        'Hola 👋 Si querés te dejo el pedido reservado con el precio de hoy así no pierde la promo. ¿Te parece?',
+    ],
+    objection: [
+        '¡Hola! 😊 ¿Quedó alguna duda sobre el producto? El 90% de nuestros clientes nota resultados en las primeras semanas. Y si no funciona como esperabas, el pago es al recibir así no arriesgás nada.',
+        'Hola 👋 Más de 13 años enviando a todo el país. Si quedó alguna pregunta, escribime con confianza y te respondo todo 😊',
+    ],
+    address_issue: [
+        '¡Hola! 😊 Quedamos trabados con los datos de envío. ¿Me pasás nombre, dirección y ciudad así lo termino de cargar? 📦',
+        'Hola 👋 Solo falta tu dirección para despachar el pedido. ¿Me la pasás cuando puedas? 😊',
+    ],
+    generic: [
+        '¡Hola! 😊 Quedaste a un paso. ¿Te puedo ayudar con algo para terminar? 📦',
+        'Hola 👋 ¿Todo bien? Avisame si querés retomar tu consulta de Herbalis 😊',
+    ],
+};
+
 const CONTEXTUAL_FOLLOW_UPS: Record<string, string[]> = {
     'waiting_weight': [
         '¡Hola! 😊 Quedó pendiente saber cuántos kilos te gustaría bajar para recomendarte lo mejor. ¿Estás por ahí?',
@@ -216,13 +270,12 @@ async function checkColdLeads(sharedState: SchedulerSharedState, dependencies: S
         if (hours >= COLD_LEAD_THRESHOLD_HOURS) {
             logger.info(`[SCHEDULER] Cold lead detected: ${userId} inactive for ${hours}h on "${state.step}"`);
 
-            let msg = '';
+            const reason = _detectAbandonReason(state);
+            const reasonMessages = ABANDON_REASON_MESSAGES[reason];
             const stepMessages = CONTEXTUAL_FOLLOW_UPS[state.step];
-            if (stepMessages && stepMessages.length > 0) {
-                msg = stepMessages[Math.floor(Math.random() * stepMessages.length)];
-            } else {
-                msg = GENERIC_FOLLOW_UPS[Math.floor(Math.random() * GENERIC_FOLLOW_UPS.length)];
-            }
+            const pool = (reason !== 'generic' ? reasonMessages : null) || stepMessages || GENERIC_FOLLOW_UPS;
+            const rawMsg = pool[Math.floor(Math.random() * pool.length)];
+            const msg = _withName(rawMsg, state);
 
             try {
                 await sendMessageWithDelay(userId, msg);
@@ -260,11 +313,13 @@ async function checkAbandonedCarts(sharedState: SchedulerSharedState, dependenci
         if (hours > ABANDONED_CART_MIN_HOURS && hours < ABANDONED_CART_MAX_HOURS) {
             logger.info(`[SCHEDULER] Abandoned cart detected: ${userId} inactive for ${hours}h on "${state.step}"`);
 
-            // Use step-specific message instead of generic one
+            // Contextual message: first check abandon reason, fall back to step-specific
+            const reason = _detectAbandonReason(state);
+            const reasonMessages = ABANDON_REASON_MESSAGES[reason];
             const stepMessages = CONTEXTUAL_FOLLOW_UPS[state.step];
-            const msg = stepMessages && stepMessages.length > 0
-                ? stepMessages[Math.floor(Math.random() * stepMessages.length)]
-                : 'Hola, ¿te quedó alguna duda? Avisame que te ayudo a terminar 😊';
+            const pool = (reason !== 'generic' ? reasonMessages : null) || stepMessages || ABANDON_REASON_MESSAGES.generic;
+            const rawMsg = pool[Math.floor(Math.random() * pool.length)];
+            const msg = _withName(rawMsg, state);
             try {
                 await sendMessageWithDelay(userId, msg);
                 state.history = state.history || [];
@@ -299,7 +354,8 @@ async function checkSecondFollowUp(sharedState: SchedulerSharedState, dependenci
 
         const hours = differenceInHours(now, lastActivity);
         if (hours >= 48 && hours < 72) {
-            const msg = SECOND_FOLLOW_UP_MESSAGES[Math.floor(Math.random() * SECOND_FOLLOW_UP_MESSAGES.length)];
+            const rawMsg = SECOND_FOLLOW_UP_MESSAGES[Math.floor(Math.random() * SECOND_FOLLOW_UP_MESSAGES.length)];
+            const msg = _withName(rawMsg, state);
             try {
                 await sendMessageWithDelay(userId, msg);
                 state.history = state.history || [];

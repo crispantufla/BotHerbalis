@@ -213,7 +213,7 @@ module.exports = (client, sharedState) => {
                 const rawPhone = updatedOrder.userPhone.replace(/\D/g, '');
                 const targetPhone = `${rawPhone}@c.us`;
 
-                const msg = "¡Excelente! Tu pedido ya fue ingresado 🚀\n\nTe vamos a avisar cuando lo despachemos con el número de seguimiento.\n\n¡Muchas gracias por confiar en Herbalis!";
+                const msg = "Tu envío ya está en curso 🚀, dentro de 48 hs podés pedirnos el código de seguimiento\n\n¡Muchas gracias por confiar en Herbalis!";
 
                 try {
                     const { sendWithRetry } = require('../../utils/retry');
@@ -450,7 +450,7 @@ module.exports = (client, sharedState) => {
 
 
             // Set user state to completed and send confirmation
-            const msg = "¡Excelente! Tu pedido ya fue ingresado 🚀\n\nTe vamos a avisar cuando lo despachemos con el número de seguimiento.\n\n¡Muchas gracias por confiar en Herbalis!";
+            const msg = "Tu envío ya está en curso 🚀, dentro de 48 hs podés pedirnos el código de seguimiento\n\n¡Muchas gracias por confiar en Herbalis!";
 
             try {
                 const targetPhone = `${phoneNumeric}@c.us`;

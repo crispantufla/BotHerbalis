@@ -182,7 +182,7 @@ export async function handleAdminCommand(
                     data: { status: 'Confirmado' }
                 });
 
-                const msg = '¡Excelente! Tu pedido ya fue ingresado 🚀\n\nTe vamos a avisar cuando lo despachemos con el número de seguimiento.\n\n¡Muchas gracias por confiar en Herbalis!';
+                const msg = 'Tu envío ya está en curso 🚀, dentro de 48 hs podés pedirnos el código de seguimiento\n\n¡Muchas gracias por confiar en Herbalis!';
                 await client.sendMessage(actualTarget, msg);
 
                 if (sharedState.userState[actualTarget]) {

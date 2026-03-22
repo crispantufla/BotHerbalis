@@ -153,6 +153,28 @@ async function _pauseAndAlert(userId: string, currentState: UserState, dependenc
 }
 
 /**
+ * _extractUserName
+ * Silently detects when the user introduces themselves ("soy María", "me llamo Juan",
+ * "mi nombre es Ana") and stores the first name in state.userName.
+ * Only fires if the name hasn't been set yet to avoid overwriting.
+ */
+function _extractUserName(normalizedText: string, currentState: any): boolean {
+    if (currentState.userName) return false; // already known
+
+    const nameMatch = normalizedText.match(
+        /\b(?:soy|me\s+llamo|mi\s+nombre\s+es|llamame|me\s+dicen)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]{2,}(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]{2,})?)\b/i
+    );
+    if (!nameMatch || !nameMatch[1]) return false;
+
+    const name = nameMatch[1].trim();
+    const STOP_WORDS = /^(bien|mal|una|uno|por|para|que|como|donde|cuando|mucho|poco|seguro|esto|eso|aca|alla)$/i;
+    if (STOP_WORDS.test(name.split(' ')[0])) return false;
+
+    currentState.userName = name;
+    return true;
+}
+
+/**
  * _extractSilentVariables
  * Preemptively catches out-of-band age or weight updates to prevent
  * AI confusion if the user provides these at the wrong step.
@@ -267,6 +289,7 @@ export {
     _detectPostdatado,
     _pauseAndAlert,
     _extractSilentVariables,
+    _extractUserName,
     _detectProductPlanChange,
     _resolveNewProductPlan
 };

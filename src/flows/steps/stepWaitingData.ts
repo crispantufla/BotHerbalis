@@ -329,7 +329,12 @@ async function _processAddressData(
             data.postdatado = null;
         }
 
-        if (data.nombre && !currentState.partialAddress.nombre) { currentState.partialAddress.nombre = data.nombre; madeProgress = true; }
+        if (data.nombre && !currentState.partialAddress.nombre) {
+            currentState.partialAddress.nombre = data.nombre;
+            // Populate userName from address name if not already detected
+            if (!currentState.userName) currentState.userName = data.nombre;
+            madeProgress = true;
+        }
         if (data.ciudad && !currentState.partialAddress.ciudad) { currentState.partialAddress.ciudad = data.ciudad; madeProgress = true; }
         if (data.cp && !currentState.partialAddress.cp) { currentState.partialAddress.cp = data.cp; madeProgress = true; }
 
