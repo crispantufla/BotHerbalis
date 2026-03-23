@@ -17,12 +17,12 @@ const orderUpdateSchema = z.object({
     producto: z.string().max(500).optional(),
     precio: z.union([z.string(), z.number()]).optional(),
     tracking: z.string().max(200).optional(),
-    status: z.enum(['Pendiente', 'Confirmado', 'Enviado', 'Entregado', 'Cancelado']).optional(),
+    status: z.enum(['Pendiente', 'Confirmado', 'En sistema', 'Enviado', 'Entregado', 'Cancelado']).optional(),
     postdatado: z.string().max(200).optional()
 }).strict();
 
 const statusUpdateSchema = z.object({
-    status: z.enum(['Pendiente', 'Confirmado', 'Enviado', 'Entregado', 'Cancelado']).optional(),
+    status: z.enum(['Pendiente', 'Confirmado', 'En sistema', 'Enviado', 'Entregado', 'Cancelado']).optional(),
     tracking: z.string().max(200).optional()
 }).strict();
 

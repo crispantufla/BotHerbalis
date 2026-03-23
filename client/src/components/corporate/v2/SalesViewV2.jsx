@@ -564,7 +564,7 @@ Teléfono: ${phoneDisplay}`;
                             </div>
 
                             <div>
-                                <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 ml-1">Código de Seguimiento (Andreani)</label>
+                                <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 ml-1">Código de Seguimiento</label>
                                 <input
                                     type="text"
                                     value={editTracking}

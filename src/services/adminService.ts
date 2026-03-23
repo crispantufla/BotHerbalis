@@ -131,6 +131,37 @@ export async function handleAdminCommand(
         }
     }
 
+    // 1b. MercadoPago payment link — "soy tu amo" + "enlace de pago de X pesos"
+    if (/soy tu amo/i.test(commandText)) {
+        const amountMatch = commandText.match(/enlace de pago de\s+([\d.,]+)\s*pesos?/i);
+        if (amountMatch) {
+            const amount = parseFloat(amountMatch[1].replace(',', '.'));
+            if (!isNaN(amount) && amount > 0) {
+                try {
+                    const { MercadoPagoConfig, Preference } = require('mercadopago');
+                    const mpToken = process.env.MP_ACCESS_TOKEN;
+                    if (!mpToken) return '⚠️ MP_ACCESS_TOKEN no configurado en .env';
+                    const mpClient = new MercadoPagoConfig({ accessToken: mpToken });
+                    const preference = new Preference(mpClient);
+                    const response = await preference.create({
+                        body: {
+                            items: [{ title: 'Pago Herbalis', quantity: 1, unit_price: amount, currency_id: 'ARS' }],
+                            back_urls: { success: 'https://herbalis.com.ar', failure: 'https://herbalis.com.ar', pending: 'https://herbalis.com.ar' },
+                            auto_return: 'approved',
+                        }
+                    });
+                    const link = response.init_point;
+                    logger.info(`[MP] Payment link created for $${amount} ARS: ${link}`);
+                    return `✅ Enlace de pago generado:\n💳 $${amount} ARS\n\n${link}`;
+                } catch (e: any) {
+                    logger.error('[MP] Error creating preference:', e);
+                    return `⚠️ Error al generar enlace de MercadoPago: ${e?.message || e}`;
+                }
+            }
+        }
+        return '⚠️ No entendí el monto. Ejemplo: "Soy tu amo, Crea un enlace de pago de 3000 pesos"';
+    }
+
     // 2. Takeover ("Me encargo")
     if (lowerMsg.includes('me encargo') || lowerMsg.includes('intervenir')) {
         const actualTarget = targetChatId || sharedState.lastAlertUser;
