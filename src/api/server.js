@@ -125,7 +125,8 @@ function startServer(client, sharedState) {
             checks.redis = 'disconnected';
         }
 
-        const allHealthy = checks.whatsapp === 'connected' && checks.database === 'connected' && checks.redis === 'connected';
+        // Container must stay alive even if WhatsApp is disconnected so we can scan the QR code
+        const allHealthy = checks.database === 'connected' && checks.redis === 'connected';
 
         // Public response: only status + timestamp (no memory/uptime details)
         res.status(allHealthy ? 200 : 503).json({
