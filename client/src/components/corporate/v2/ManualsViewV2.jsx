@@ -1,119 +1,165 @@
 import React, { useState } from 'react';
-import { BookOpen, ChevronRight, AlertTriangle, CheckCircle, Hand, List, Sparkles, Terminal, HelpCircle, Zap } from 'lucide-react';
+import { BookOpen, ChevronRight, AlertTriangle, CheckCircle, Hand, List, Sparkles, Terminal, HelpCircle, Zap, Users, Package, BarChart3, Settings, Send, Shield } from 'lucide-react';
 
 // ─── Manual data ────────────────────────────────────────────────
 const MANUALS = [
     {
-        id: 'alertas',
-        title: 'Sistema de Alertas',
-        description: 'Como gestionar pedidos, confirmar ventas y atender varios clientes al mismo tiempo.',
-        icon: AlertTriangle,
+        id: 'comandos',
+        title: 'Comandos WhatsApp',
+        description: 'Guia completa para controlar el bot desde WhatsApp. Alertas, pedidos, clientes, tracking, estadisticas y configuracion.',
+        icon: Terminal,
         color: 'indigo',
         sections: [
             {
                 title: 'Como funciona',
                 icon: HelpCircle,
-                content: `Cuando un cliente completa un pedido, el bot te envia una **alerta** por WhatsApp con todos los datos. Cada alerta tiene un **numero** (#1, #2, #3...) que la identifica.\n\nSi llegan varios pedidos al mismo tiempo, cada uno tiene su propio numero y podes responder a cada uno por separado.`
-            },
-            {
-                title: 'Formato de la alerta',
-                icon: BookOpen,
-                content: `Cuando llega un pedido, recibis un mensaje asi:`,
-                codeBlock: `ALERTA #1 (2 activas)\n\nMotivo: Pedido Requiere Aprobacion\nCliente: Juan (5491155551234)\nProducto: Kit Herbalis (30 dias) - $15000\nDireccion: Av. Corrientes 1234, CABA, CP 1043\n\nDetalles: Cliente confirmo pedido\n\nResponde: "1 ok" para confirmar, "1 me encargo" para intervenir`
+                content: `Podes controlar **todo el bot** desde WhatsApp. Cada comando empieza con **!** y podes mandarlo como texto o audio.\n\nCuando llegan alertas de pedidos, cada una tiene un **numero** (#1, #2, #3...). Para responder a una especifica, ponele el numero adelante: **1 ok**, **2 me encargo**.`
             },
             {
                 title: 'Confirmar un pedido',
                 icon: CheckCircle,
-                content: `Para aprobar el pedido de un cliente especifico, manda el **numero de alerta + ok**.`,
+                content: `Manda el **numero de alerta + ok** para aprobar.`,
                 table: {
                     headers: ['Escribis', 'Que hace'],
                     rows: [
                         ['1 ok', 'Confirma el pedido de la alerta #1'],
-                        ['2 ok', 'Confirma el pedido de la alerta #2'],
-                        ['1 dale', 'Igual que "1 ok"'],
-                        ['1 si', 'Igual que "1 ok"'],
-                        ['1 confirmar', 'Igual que "1 ok"'],
+                        ['2 ok', 'Confirma la alerta #2'],
+                        ['1 dale / 1 si', 'Igual que "1 ok"'],
+                        ['ok', 'Confirma la alerta mas reciente'],
                     ]
                 },
-                extra: `Si solo hay **una alerta activa**, podes escribir simplemente **ok**, **dale**, **si** o **confirmar** sin numero.`
             },
             {
                 title: 'Tomar control ("Me encargo")',
                 icon: Hand,
-                content: `Si necesitas hablarle personalmente al cliente y que el bot no interfiera:`,
+                content: `Pausa el bot para un cliente y lo atendes vos directamente.`,
                 table: {
                     headers: ['Escribis', 'Que hace'],
                     rows: [
-                        ['1 me encargo', 'Pausa el bot para el cliente #1 y lo atendes vos'],
-                        ['2 me encargo', 'Pausa el bot para el cliente #2'],
-                        ['me encargo', 'Pausa el bot para la alerta mas reciente'],
-                        ['1 intervenir', 'Igual que "1 me encargo"'],
+                        ['1 me encargo', 'Pausa el bot para cliente #1'],
+                        ['me encargo', 'Pausa la alerta mas reciente'],
                     ]
                 },
-                extra: `Cuando usas "me encargo", el bot se **pausa** para ese cliente. Podes hablarle directamente sin que el bot responda.`
+                extra: `Cuando termines, usa **!despauser [tel]** para reactivar el bot.`
             },
             {
-                title: 'Ver alertas activas',
+                title: 'Alertas activas',
                 icon: List,
-                content: `Manda **!alertas** para ver la lista de alertas pendientes.`,
-                codeBlock: `Alertas activas (3):\n\n#1 -- Juan (5491155551234) -- Kit Herbalis -- hace 2 min\n#2 -- Maria (5491166662345) -- Pack Premium -- hace 30 seg\n#3 -- Carlos (5491177773456) -- Kit Basico -- hace 10 seg\n\nResponde con el # + comando, ej: "1 ok", "2 me encargo"`
+                content: `Manda **!alertas** para ver la cola numerada.`,
+                codeBlock: `Alertas activas (3):\n\n#1 -- Juan (5491155551234) -- Kit Herbalis -- hace 2 min\n#2 -- Maria (5491166662345) -- Pack Premium -- hace 30 seg\n#3 -- Carlos (5491177773456) -- Kit Basico -- hace 10 seg`
             },
             {
                 title: 'Instrucciones por IA',
                 icon: Sparkles,
-                content: `Si queres que el bot le mande un mensaje especifico a un cliente (generado por IA):`,
+                content: `El bot genera un mensaje a partir de tu instruccion y se lo envia al cliente.`,
                 table: {
                     headers: ['Escribis', 'Que hace'],
                     rows: [
-                        ['1 decile que el envio tarda 48hs', 'La IA genera un mensaje para el cliente #1'],
-                        ['2 preguntale si prefiere otro producto', 'La IA genera un mensaje para el cliente #2'],
-                        ['decile que lo llamamos manana', 'Manda al cliente de la alerta mas reciente'],
+                        ['1 decile que el envio tarda 48hs', 'Mensaje IA para cliente #1'],
+                        ['2 preguntale si prefiere otro', 'Mensaje IA para cliente #2'],
                     ]
                 },
             },
             {
-                title: 'Otros comandos',
-                icon: Terminal,
+                title: 'Gestion de clientes',
+                icon: Users,
                 table: {
                     headers: ['Escribis', 'Que hace'],
                     rows: [
-                        ['!ayuda', 'Muestra el menu de comandos'],
-                        ['!resumen', 'Reporte de ventas del dia'],
-                        ['!saltear 5491155551234', 'Fuerza a un usuario al paso de datos'],
+                        ['!pausados', 'Ver clientes con el bot pausado'],
+                        ['!despauser [tel]', 'Reactivar el bot para un cliente'],
+                        ['!reset [tel]', 'Reiniciar estado de un cliente'],
+                        ['!historial [tel]', 'Resumen IA de la conversacion'],
+                        ['!enviar [tel] [msg]', 'Mensaje directo sin IA'],
                     ]
                 },
             },
             {
-                title: 'Ejemplo: 2 alertas al mismo tiempo',
+                title: 'Pedidos y tracking',
+                icon: Package,
+                table: {
+                    headers: ['Escribis', 'Que hace'],
+                    rows: [
+                        ['!pedidos', 'Ultimos 5 pedidos de todos'],
+                        ['!pedido [tel]', 'Pedidos de un cliente'],
+                        ['!tracking [tel] [cod]', 'Cargar codigo de seguimiento y avisar al cliente'],
+                    ]
+                },
+                extra: `**!tracking** envia automaticamente el codigo al cliente por WhatsApp.`
+            },
+            {
+                title: 'Estado y estadisticas',
+                icon: BarChart3,
+                table: {
+                    headers: ['Escribis', 'Que hace'],
+                    rows: [
+                        ['!status', 'Conexion, memoria, sesiones, alertas'],
+                        ['!stats', 'Ventas del dia, revenue, conversion'],
+                        ['!precios', 'Precios actuales de todos los productos'],
+                        ['!resumen', 'Reporte diario completo'],
+                    ]
+                },
+            },
+            {
+                title: 'Configuracion del bot',
+                icon: Settings,
+                table: {
+                    headers: ['Escribis', 'Que hace'],
+                    rows: [
+                        ['!pausa-global on/off', 'Pausar o reanudar todo el bot'],
+                        ['!script', 'Ver script activo y disponibles'],
+                        ['!script v3', 'Cambiar a script v3'],
+                        ['!admin list', 'Ver numeros que reciben alertas'],
+                        ['!admin add [tel]', 'Agregar numero a alertas'],
+                        ['!admin remove [tel]', 'Quitar numero de alertas'],
+                    ]
+                },
+            },
+            {
+                title: 'Ejemplo: 2 alertas + tracking',
                 icon: Zap,
                 steps: [
-                    { label: 'Llega alerta #1', detail: 'Juan (5491155551234) — Kit Herbalis (30 dias) - $15000' },
-                    { label: 'Llega alerta #1 (nueva)', detail: 'Maria (5491166662345) — Pack Premium (60 dias) - $25000. Maria es ahora #1 (mas reciente), Juan paso a #2.' },
+                    { label: 'Llegan 2 alertas', detail: 'Juan (#2) y Maria (#1, mas reciente)' },
                     { label: 'Confirmas a Juan', detail: 'Mandas: 2 ok' },
                     { label: 'Tomas control de Maria', detail: 'Mandas: 1 me encargo' },
-                    { label: 'Verificas la cola', detail: 'Mandas: !alertas — "No hay alertas activas"' },
+                    { label: 'Le hablas a Maria directo', detail: 'Conversas por WhatsApp normal' },
+                    { label: 'Reactivas el bot', detail: 'Mandas: !despauser 5491166662345' },
+                    { label: 'Cargas tracking de Juan', detail: 'Mandas: !tracking 5491155551234 OC123AR' },
+                    { label: 'Verificas todo', detail: 'Mandas: !status' },
                 ],
             },
             {
                 title: 'Reglas importantes',
                 icon: AlertTriangle,
                 bullets: [
-                    'El numero de alerta puede cambiar cuando se agrega o elimina una alerta. Siempre usa !alertas si no estas seguro.',
-                    'Sin numero = la mas reciente. Si escribis solo "ok" sin numero, aplica a la alerta mas nueva.',
-                    '"Me encargo" pausa el bot. El cliente no va a recibir respuestas automaticas hasta que el bot se reactive.',
-                    'Podes mandar audios. El bot los transcribe y los interpreta como texto.',
-                    'Maximo 50 alertas. Las mas viejas se eliminan automaticamente.',
+                    'El numero de alerta puede cambiar. Usa !alertas para verificar.',
+                    'Sin numero = la mas reciente.',
+                    '"Me encargo" pausa el bot. Usa !despauser para reactivar.',
+                    'Podes mandar audios. Se transcriben automaticamente.',
+                    '!pausa-global detiene el bot para TODOS los clientes.',
+                    'Maximo 50 alertas activas.',
                 ],
             },
         ],
         quickRef: [
-            { cmd: '!alertas', desc: 'Ver cola de alertas' },
-            { cmd: '1 ok', desc: 'Confirmar pedido #1' },
-            { cmd: '2 me encargo', desc: 'Tomar control de #2' },
-            { cmd: '1 [instruccion]', desc: 'Mandar mensaje IA a #1' },
-            { cmd: 'ok', desc: 'Confirmar la mas reciente' },
+            { cmd: '!alertas', desc: 'Cola de alertas' },
+            { cmd: '1 ok', desc: 'Confirmar #1' },
+            { cmd: '1 me encargo', desc: 'Tomar control #1' },
+            { cmd: '!pausados', desc: 'Clientes pausados' },
+            { cmd: '!despauser [tel]', desc: 'Reactivar cliente' },
+            { cmd: '!pedidos', desc: 'Ultimos pedidos' },
+            { cmd: '!tracking [tel] [cod]', desc: 'Cargar tracking' },
+            { cmd: '!status', desc: 'Estado del bot' },
+            { cmd: '!stats', desc: 'Ventas del dia' },
+            { cmd: '!precios', desc: 'Ver precios' },
+            { cmd: '!pausa-global', desc: 'Pausar todo' },
+            { cmd: '!enviar [tel] [msg]', desc: 'Mensaje directo' },
+            { cmd: '!historial [tel]', desc: 'Resumen IA' },
+            { cmd: '!reset [tel]', desc: 'Reiniciar cliente' },
+            { cmd: '!script', desc: 'Ver/cambiar script' },
+            { cmd: '!admin list', desc: 'Ver admins' },
+            { cmd: '!resumen', desc: 'Reporte diario' },
             { cmd: '!ayuda', desc: 'Menu de comandos' },
-            { cmd: '!resumen', desc: 'Reporte del dia' },
         ],
     },
 ];

@@ -214,6 +214,339 @@ export async function handleAdminCommand(
         }
     }
 
+    // ── !status — Bot health check ──────────────────────────────
+    if (lowerMsg === '!status' || lowerMsg === '!estado') {
+        const mem = process.memoryUsage();
+        const heapMB = Math.round(mem.heapUsed / 1024 / 1024);
+        const uptimeSec = Math.floor(process.uptime());
+        const uptimeStr = uptimeSec >= 3600
+            ? `${Math.floor(uptimeSec / 3600)}h ${Math.floor((uptimeSec % 3600) / 60)}m`
+            : `${Math.floor(uptimeSec / 60)}m ${uptimeSec % 60}s`;
+        const activeSessions = Object.keys(sharedState.userState || {}).length;
+        const pausedCount = sharedState.pausedUsers ? sharedState.pausedUsers.size : 0;
+        const alertCount = sharedState.sessionAlerts.length;
+        const globalPause = sharedState.config?.globalPause ? '⏸️ SI' : '▶️ NO';
+        const connected = sharedState.isConnected ? '🟢 Conectado' : '🔴 Desconectado';
+
+        return `📊 *Estado del Bot*\n\n*WhatsApp:* ${connected}\n*Uptime:* ${uptimeStr}\n*Memoria:* ${heapMB} MB\n*Sesiones activas:* ${activeSessions}\n*Clientes pausados:* ${pausedCount}\n*Alertas activas:* ${alertCount}\n*Pausa global:* ${globalPause}\n*Script activo:* ${sharedState.config?.activeScript || 'v3'}`;
+    }
+
+    // ── !stats — Quick sales stats ──────────────────────────────
+    if (lowerMsg === '!stats' || lowerMsg === '!estadisticas' || lowerMsg === '!ventas') {
+        try {
+            const { prisma } = require('../../db');
+            const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
+            const startOfDay = new Date();
+            startOfDay.setHours(0, 0, 0, 0);
+
+            const [totalCount, todayStats, completedStats] = await Promise.all([
+                prisma.order.count({ where: { instanceId: INSTANCE_ID } }),
+                prisma.order.aggregate({
+                    _count: true,
+                    _sum: { totalPrice: true },
+                    where: { createdAt: { gte: startOfDay }, instanceId: INSTANCE_ID }
+                }),
+                prisma.order.count({
+                    where: { createdAt: { gte: startOfDay }, status: { not: 'Cancelado' }, instanceId: INSTANCE_ID }
+                })
+            ]);
+
+            const revenue = todayStats._sum.totalPrice || 0;
+            const activeSessions = Object.keys(sharedState.userState || {}).length;
+            const convRate = activeSessions > 0 ? Math.round((completedStats / activeSessions) * 100) : 0;
+
+            return `📈 *Estadisticas del dia*\n\n*Pedidos hoy:* ${todayStats._count}\n*Revenue hoy:* $${Math.round(revenue).toLocaleString('es-AR')}\n*Pedidos totales:* ${totalCount}\n*Conversion:* ${convRate}%\n*Sesiones activas:* ${activeSessions}`;
+        } catch (e) {
+            return '⚠️ Error obteniendo estadísticas.';
+        }
+    }
+
+    // ── !pausados — List paused users ───────────────────────────
+    if (lowerMsg === '!pausados' || lowerMsg === '!espera') {
+        try {
+            const { getPausedUsersWithDetails } = require('./pauseService');
+            const paused = await getPausedUsersWithDetails();
+            if (!paused || paused.length === 0) return '✅ No hay clientes pausados.';
+
+            const lines = paused.map((u: any, i: number) => {
+                const ago = _timeAgo(u.pausedAt);
+                const reason = u.pauseReason ? u.pauseReason.replace(/⏸️\s?/, '').substring(0, 40) : 'Sin motivo';
+                return `*${i + 1}.* ${u.phone} — _${reason}_ — ${ago}`;
+            });
+            return `⏸️ *Clientes pausados (${paused.length}):*\n\n${lines.join('\n')}\n\n_Usá "!despauser [tel]" para reactivar_`;
+        } catch (e) {
+            return '⚠️ Error obteniendo clientes pausados.';
+        }
+    }
+
+    // ── !despauser [tel] — Unpause a user ───────────────────────
+    if (lowerMsg.startsWith('!despauser ') || lowerMsg.startsWith('!reanudar ') || lowerMsg.startsWith('!unpause ')) {
+        const parts = commandText.trim().split(/\s+/);
+        const targetNum = parts[1];
+        if (!targetNum) return '⚠️ Falta el teléfono. Ejemplo: !despauser 5491155551234';
+        const targetChat = targetNum.includes('@') ? targetNum : `${targetNum.replace(/\D/g, '')}@c.us`;
+
+        if (!sharedState.pausedUsers.has(targetChat)) {
+            return `⚠️ El usuario ${targetNum} no está pausado.`;
+        }
+
+        const { unpauseUser: unpauseUserFn } = require('./pauseService');
+        await unpauseUserFn(targetChat, sharedState);
+        if (sharedState.saveState) sharedState.saveState();
+        if (sharedState.io) sharedState.io.emit('bot_status_change', { chatId: targetChat, paused: false });
+
+        logger.info(`[ADMIN] Unpaused ${targetChat} via WhatsApp command.`);
+        return `✅ Bot reactivado para ${targetNum}. El bot volverá a responder automáticamente.`;
+    }
+
+    // ── !pedidos / !pedido [tel] — View recent orders ───────────
+    if (lowerMsg.startsWith('!pedido')) {
+        try {
+            const { prisma } = require('../../db');
+            const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
+            const parts = commandText.trim().split(/\s+/);
+            const phoneArg = parts[1] ? parts[1].replace(/\D/g, '') : null;
+
+            const where: any = { instanceId: INSTANCE_ID };
+            if (phoneArg) where.userPhone = { contains: phoneArg };
+
+            const orders = await prisma.order.findMany({
+                where,
+                orderBy: { createdAt: 'desc' },
+                take: 5,
+                select: { id: true, userPhone: true, products: true, totalPrice: true, status: true, tracking: true, createdAt: true, nombre: true }
+            });
+
+            if (orders.length === 0) return phoneArg ? `⚠️ No hay pedidos para ${phoneArg}.` : '⚠️ No hay pedidos recientes.';
+
+            const lines = orders.map((o: any, i: number) => {
+                const date = new Date(o.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
+                const track = o.tracking ? ` | 📦 ${o.tracking}` : '';
+                return `*${i + 1}.* ${o.nombre || o.userPhone} — ${o.products || '?'} — $${Math.round(o.totalPrice || 0).toLocaleString('es-AR')} — _${o.status}_${track} — ${date}`;
+            });
+
+            const title = phoneArg ? `Pedidos de ${phoneArg}` : 'Ultimos pedidos';
+            return `🛒 *${title} (${orders.length}):*\n\n${lines.join('\n')}`;
+        } catch (e) {
+            return '⚠️ Error obteniendo pedidos.';
+        }
+    }
+
+    // ── !tracking [tel] [codigo] — Update tracking number ───────
+    if (lowerMsg.startsWith('!tracking ')) {
+        const parts = commandText.trim().split(/\s+/);
+        if (parts.length < 3) return '⚠️ Formato: !tracking [telefono] [codigo]\nEjemplo: !tracking 5491155551234 OC123456789AR';
+        const phoneArg = parts[1].replace(/\D/g, '');
+        const trackingCode = parts.slice(2).join(' ');
+
+        try {
+            const { prisma } = require('../../db');
+            const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
+
+            const order = await prisma.order.findFirst({
+                where: { userPhone: { contains: phoneArg }, instanceId: INSTANCE_ID, status: { not: 'Cancelado' } },
+                orderBy: { createdAt: 'desc' }
+            });
+
+            if (!order) return `⚠️ No hay pedido activo para ${phoneArg}.`;
+
+            await prisma.order.update({
+                where: { id: order.id },
+                data: { tracking: trackingCode }
+            });
+
+            // Notify client
+            const targetChat = `${phoneArg}@c.us`;
+            const msg = `📦 *Tu código de seguimiento:*\n\n${trackingCode}\n\nPodés rastrearlo en la web de Correo Argentino. ¡Gracias por confiar en Herbalis! 🌱`;
+            await client.sendMessage(targetChat, msg);
+
+            if (sharedState.logAndEmit) sharedState.logAndEmit(targetChat, 'bot', msg, 'tracking_sent');
+            if (sharedState.io) sharedState.io.emit('order_update', { action: 'updated', order: { id: order.id, tracking: trackingCode } });
+
+            logger.info(`[ADMIN] Tracking updated for ${phoneArg}: ${trackingCode}`);
+            return `✅ Tracking cargado para ${order.nombre || phoneArg}: ${trackingCode}\nCliente notificado por WhatsApp.`;
+        } catch (e) {
+            return '⚠️ Error actualizando tracking.';
+        }
+    }
+
+    // ── !reset [tel] — Reset user state ─────────────────────────
+    if (lowerMsg.startsWith('!reset ')) {
+        const parts = commandText.trim().split(/\s+/);
+        const targetNum = parts[1];
+        if (!targetNum) return '⚠️ Falta el teléfono. Ejemplo: !reset 5491155551234';
+        const targetChat = targetNum.includes('@') ? targetNum : `${targetNum.replace(/\D/g, '')}@c.us`;
+
+        delete sharedState.userState[targetChat];
+        sharedState.chatResets[targetChat] = Math.floor(Date.now() / 1000);
+        sharedState.pausedUsers.delete(targetChat);
+        if (sharedState.saveState) sharedState.saveState();
+
+        // Clear DB state
+        try {
+            const { prisma } = require('../../db');
+            const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
+            const phoneStr = targetChat.replace('@c.us', '');
+            await prisma.user.updateMany({
+                where: { phone: phoneStr, instanceId: INSTANCE_ID },
+                data: { profileData: null, pausedAt: null, pauseReason: null }
+            });
+        } catch (e: any) {
+            logger.warn(`[ADMIN] Could not clear DB state for ${targetNum}:`, e.message);
+        }
+
+        _dismissAlert(targetChat, sharedState);
+        if (sharedState.logAndEmit) sharedState.logAndEmit(targetChat, 'system', 'Memoria reiniciada por admin', 'new');
+        if (sharedState.io) sharedState.io.emit('bot_status_change', { chatId: targetChat, paused: false });
+
+        logger.info(`[ADMIN] Reset user ${targetChat} via WhatsApp command.`);
+        return `✅ Estado de ${targetNum} reiniciado. Próximo mensaje del cliente iniciará un chat nuevo.`;
+    }
+
+    // ── !pausa-global on/off — Toggle global pause ──────────────
+    if (lowerMsg.startsWith('!pausa-global') || lowerMsg.startsWith('!global')) {
+        const parts = commandText.trim().split(/\s+/);
+        const arg = (parts[1] || '').toLowerCase();
+
+        if (arg === 'on' || arg === 'si') {
+            sharedState.config.globalPause = true;
+        } else if (arg === 'off' || arg === 'no') {
+            sharedState.config.globalPause = false;
+        } else {
+            // Toggle
+            sharedState.config.globalPause = !sharedState.config.globalPause;
+        }
+
+        if (sharedState.saveState) sharedState.saveState();
+        if (sharedState.io) sharedState.io.emit('global_pause_changed', { globalPause: sharedState.config.globalPause });
+
+        logger.info(`[ADMIN] Global pause toggled to: ${sharedState.config.globalPause}`);
+        return sharedState.config.globalPause
+            ? '⏸️ *Pausa global ACTIVADA.* El bot no responderá a ningún cliente.'
+            : '▶️ *Pausa global DESACTIVADA.* El bot vuelve a responder normalmente.';
+    }
+
+    // ── !precios — View current prices ──────────────────────────
+    if (lowerMsg === '!precios' || lowerMsg === '!precio' || lowerMsg === '!prices') {
+        try {
+            const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../..');
+            const PRICES_FILE = path.join(DATA_DIR, 'prices.json');
+            if (!fs.existsSync(PRICES_FILE)) return '⚠️ Archivo de precios no encontrado.';
+
+            const prices = JSON.parse(fs.readFileSync(PRICES_FILE, 'utf8'));
+            const lines: string[] = [];
+            for (const [product, plans] of Object.entries(prices)) {
+                const planStr = Object.entries(plans as Record<string, string>)
+                    .map(([days, price]) => `${days} días: $${price}`)
+                    .join(' | ');
+                lines.push(`*${product}:* ${planStr}`);
+            }
+            return `💰 *Precios actuales:*\n\n${lines.join('\n')}`;
+        } catch (e) {
+            return '⚠️ Error leyendo precios.';
+        }
+    }
+
+    // ── !historial [tel] — AI chat summary ──────────────────────
+    if (lowerMsg.startsWith('!historial ') || lowerMsg.startsWith('!historia ')) {
+        const parts = commandText.trim().split(/\s+/);
+        const targetNum = parts[1];
+        if (!targetNum) return '⚠️ Falta el teléfono. Ejemplo: !historial 5491155551234';
+        const targetChat = targetNum.includes('@') ? targetNum : `${targetNum.replace(/\D/g, '')}@c.us`;
+
+        const state: Partial<UserState> = sharedState.userState[targetChat] || {};
+        const history = state.history || [];
+        if (history.length === 0) return `⚠️ No hay historial para ${targetNum}.`;
+
+        const historyText = history.slice(-30).map((m: any) => `${m.role}: ${m.content}`).join('\n');
+        try {
+            const summary: string | null = await aiService.generateSuggestion(
+                'Hacé un resumen breve de esta conversación para el admin. Incluí: qué producto quiere, en qué paso está, si hay algún problema.',
+                historyText
+            );
+            return summary
+                ? `📝 *Resumen de ${state.userName || targetNum}:*\n\n${summary}`
+                : `⚠️ No se pudo generar resumen.`;
+        } catch (e) {
+            return '⚠️ Error generando resumen.';
+        }
+    }
+
+    // ── !enviar [tel] [mensaje] — Send message to any user ──────
+    if (lowerMsg.startsWith('!enviar ') || lowerMsg.startsWith('!msg ')) {
+        const parts = commandText.trim().split(/\s+/);
+        const targetNum = parts[1];
+        const message = parts.slice(2).join(' ');
+        if (!targetNum || !message) return '⚠️ Formato: !enviar [telefono] [mensaje]\nEjemplo: !enviar 5491155551234 Hola, te contactamos desde Herbalis';
+        const targetChat = targetNum.includes('@') ? targetNum : `${targetNum.replace(/\D/g, '')}@c.us`;
+
+        try {
+            await client.sendMessage(targetChat, message);
+            if (sharedState.logAndEmit) sharedState.logAndEmit(targetChat, 'admin', message, 'admin_direct');
+            logger.info(`[ADMIN] Direct message sent to ${targetChat}: "${message.substring(0, 50)}..."`);
+            return `✅ Mensaje enviado a ${targetNum}.`;
+        } catch (e) {
+            return `⚠️ Error enviando mensaje a ${targetNum}.`;
+        }
+    }
+
+    // ── !admin add/remove [tel] — Manage alert numbers ──────────
+    if (lowerMsg.startsWith('!admin ')) {
+        const parts = commandText.trim().split(/\s+/);
+        const action = (parts[1] || '').toLowerCase();
+        const num = parts[2] ? parts[2].replace(/\D/g, '') : '';
+
+        if (action === 'add' && num) {
+            if (!sharedState.config.alertNumbers.includes(num)) {
+                sharedState.config.alertNumbers.push(num);
+                if (sharedState.saveState) sharedState.saveState();
+                return `✅ Número ${num} agregado a alertas. Total: ${sharedState.config.alertNumbers.join(', ')}`;
+            }
+            return `⚠️ El número ${num} ya está en la lista de alertas.`;
+        }
+        if (action === 'remove' && num) {
+            const idx = sharedState.config.alertNumbers.indexOf(num);
+            if (idx >= 0) {
+                sharedState.config.alertNumbers.splice(idx, 1);
+                if (sharedState.saveState) sharedState.saveState();
+                return `✅ Número ${num} removido de alertas. Quedan: ${sharedState.config.alertNumbers.join(', ') || 'ninguno'}`;
+            }
+            return `⚠️ El número ${num} no está en la lista de alertas.`;
+        }
+        if (action === 'list' || !action || action === 'ver') {
+            const nums = sharedState.config.alertNumbers;
+            return nums.length > 0
+                ? `📋 *Números de alerta:*\n${nums.map((n: string, i: number) => `${i + 1}. ${n}`).join('\n')}`
+                : '⚠️ No hay números de alerta configurados.';
+        }
+        return '⚠️ Formato: !admin add/remove/list [telefono]';
+    }
+
+    // ── !script [version] — Switch active script ────────────────
+    if (lowerMsg.startsWith('!script ') || lowerMsg === '!script') {
+        const parts = commandText.trim().split(/\s+/);
+        const version = parts[1];
+
+        if (!version) {
+            const active = sharedState.config?.activeScript || 'v3';
+            const available = sharedState.availableScripts || ['v3'];
+            return `📋 *Script activo:* ${active}\n*Disponibles:* ${available.join(', ')}`;
+        }
+
+        const available = sharedState.availableScripts || ['v3', 'v4'];
+        if (!available.includes(version) && version !== 'rotacion') {
+            return `⚠️ Script "${version}" no existe. Disponibles: ${available.join(', ')} y rotacion`;
+        }
+
+        sharedState.config.activeScript = version;
+        if (sharedState.loadKnowledge) sharedState.loadKnowledge();
+        if (sharedState.io) sharedState.io.emit('script_changed', { active: version });
+        if (sharedState.saveState) sharedState.saveState();
+
+        logger.info(`[ADMIN] Script switched to: ${version} via WhatsApp`);
+        return `✅ Script cambiado a *${version}*.`;
+    }
+
     // 1b. MercadoPago payment link — "soy tu amo" + "enlace de pago de X pesos"
     if (/soy tu amo/i.test(commandText)) {
         const amountMatch = commandText.match(/enlace de pago de\s+([\d.,]+)\s*pesos?/i);
