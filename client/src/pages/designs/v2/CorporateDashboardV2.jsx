@@ -13,9 +13,10 @@ import SettingsViewV2 from '../../../components/corporate/v2/SettingsViewV2';
 import ScriptViewV2 from '../../../components/corporate/v2/ScriptViewV2';
 import GalleryViewV2 from '../../../components/corporate/v2/GalleryViewV2';
 import AdvancedAnalyticsViewV2 from '../../../components/corporate/v2/AdvancedAnalyticsViewV2';
+import ManualsViewV2 from '../../../components/corporate/v2/ManualsViewV2';
 import WaitingCustomersPanel from '../../../components/corporate/v2/dashboard/WaitingCustomersPanel';
 
-import { Wifi, MessageCircle, Database, Settings, FileText, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Search, Bell, AlertTriangle } from 'lucide-react';
+import { Wifi, MessageCircle, Database, Settings, FileText, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Search, Bell, AlertTriangle, BookOpen } from 'lucide-react';
 
 const CorporateDashboardV2 = () => {
     const { socket } = useSocket();
@@ -192,6 +193,7 @@ const CorporateDashboardV2 = () => {
             case 'logistics': return <SalesViewV2 onGoToChat={(chatId) => handleQuickAction(chatId, 'chat')} initialSearch={globalSearch} />;
             case 'script': return <ScriptViewV2 />;
             case 'gallery': return <GalleryViewV2 />;
+            case 'manuals': return <ManualsViewV2 />;
             case 'settings': return <SettingsViewV2 status={status} />;
             case 'espera': return (
                 <div className="p-6 md:p-8 max-w-3xl mx-auto w-full">
@@ -287,6 +289,7 @@ const CorporateDashboardV2 = () => {
                     <NavItem tab="espera" icon={PhoneCall} label="Clientes Esperando" />
                     <NavItem tab="script" icon={FileText} label="Guión & Prompts" />
                     <NavItem tab="gallery" icon={ImageIcon} label="Galería de Medios" />
+                    <NavItem tab="manuals" icon={BookOpen} label="Manuales" />
 
                     <div className="pt-6 mt-6 border-t border-slate-200/50 dark:border-slate-700/50">
                         {(!sidebarCollapsed || isMobile) && <p className="text-xs 2xl:text-sm font-semibold text-slate-400 dark:text-slate-300 uppercase tracking-wider mb-4 px-4">Administración</p>}

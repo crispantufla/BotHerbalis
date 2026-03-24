@@ -719,9 +719,9 @@ async function notifyAdmin(reason: string, userPhone: string, details: string | 
 }
 
 // Helper: Handle Admin Command (Exposed to API)
-async function handleAdminCommand(targetChatId: string | null, commandText: string, isApi: boolean = false): Promise<any> {
+async function handleAdminCommand(targetChatId: string | null, commandText: string, isApi: boolean = false, alertSelector: string | null = null): Promise<any> {
     const { handleAdminCommand: handleAdminCommandCtrl } = require('./src/services/adminService');
-    return await handleAdminCommandCtrl(targetChatId, commandText, isApi, sharedState, client);
+    return await handleAdminCommandCtrl(targetChatId, commandText, isApi, sharedState, client, alertSelector);
 }
 sharedState.handleAdminCommand = handleAdminCommand; // Expose to server
 
@@ -947,7 +947,9 @@ client.on('message', async (msg: any) => {
                     const transcription = await aiService.transcribeAudio(media.data, media.mimetype);
                     if (transcription) {
                         logger.info(`[ADMIN AUDIO] Transcribed: "${transcription}"`);
-                        const result = await handleAdminCommand(lastAlertUser, transcription, false);
+                        const { parseAdminInput } = require('./src/services/adminService');
+                        const { selector: audioSel, command: audioCmd } = parseAdminInput(transcription);
+                        const result = await handleAdminCommand(null, audioCmd, false, audioSel);
                         if (result) await client.sendMessage(msg.from, result);
                     }
                 }
@@ -967,18 +969,20 @@ client.on('message', async (msg: any) => {
                 userState[targetChatId].step = 'waiting_data';
                 saveState();
                 await client.sendMessage(targetChatId, knowledge.flow.data_request.response);
-                await client.sendMessage(msg.from, `📋 *Comandos*: !resumen, !saltear, "ok", "me encargo"`);
+                await client.sendMessage(msg.from, `📋 *Comandos*: !alertas, !resumen, !saltear, "ok", "me encargo", "!ayuda"`);
                 return;
             }
 
             // 2. !ayuda
             if (msgText.toLowerCase() === '!ayuda') {
-                await client.sendMessage(msg.from, `ðŸ“‹ * Comandos *: !resumen, !saltear, "ok", "me encargo"`);
+                await client.sendMessage(msg.from, `📋 *Comandos disponibles:*\n\n*Alertas:*\n• !alertas — Ver cola de alertas activas\n• 1 ok / 2 dale — Confirmar pedido por #\n• 1 me encargo — Tomar control de un cliente\n• ok — Confirmar la alerta más reciente\n\n*Otros:*\n• !resumen — Reporte del día\n• !saltear [tel] — Forzar paso de un usuario\n• !ayuda — Este menú\n• [texto libre] — Instrucción IA al cliente activo`);
                 return;
             }
 
-            // 3. Natural Language Admin
-            const result = await handleAdminCommand(lastAlertUser, msgText);
+            // 3. Parse selector (#N) + command, route through handleAdminCommand
+            const { parseAdminInput } = require('./src/services/adminService');
+            const { selector, command } = parseAdminInput(msgText);
+            const result = await handleAdminCommand(null, command, false, selector);
             if (result) await client.sendMessage(msg.from, result);
             return;
         }

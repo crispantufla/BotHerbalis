@@ -136,7 +136,7 @@ export interface SharedState {
     multiKnowledge: Record<string, any>;
     isConnected: boolean;
     qrCodeData: string | null;
-    lastAlertUser?: string;
+    lastAlertUser?: string; // @deprecated — kept for backward compat; prefer alert queue selector
     saveState: (userId?: string | null) => void;
     saveKnowledge: (scriptName?: string | null) => void;
     loadKnowledge: (scriptName?: string | null) => void;
