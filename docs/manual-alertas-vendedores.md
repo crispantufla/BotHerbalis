@@ -42,6 +42,30 @@ Alertas activas (3):
 #3 -- Carlos (5491177773456) -- Kit Basico -- hace 10 seg
 ```
 
+### Respuestas rapidas contextuales
+
+Cada alerta incluye 3 respuestas rapidas sugeridas segun el contexto del cliente:
+
+```
+⚠️ ALERTA #1
+
+💬 Respuestas rápidas:
+  r1: Aclarar pago
+  r2: Mostrar trayectoria
+  r3: Dejar abierto
+```
+
+| Escribis | Que hace |
+|----------|----------|
+| `1r1` | Envia la respuesta rapida 1 al cliente de alerta #1 |
+| `1r2` | Envia la respuesta rapida 2 al cliente de alerta #1 |
+| `2r3` | Envia la respuesta rapida 3 al cliente de alerta #2 |
+| `r1` | Envia la respuesta rapida 1 al cliente de la alerta mas reciente |
+
+Las sugerencias cambian automaticamente segun:
+- El paso del cliente (datos, precio, confirmacion, etc.)
+- Lo que escribio el cliente (dudas de precio, desconfianza, rechazo)
+
 ### Instruccion personalizada por IA
 
 | Escribis | Que hace |
@@ -204,6 +228,38 @@ Script activo: v3
 
 ---
 
+## 6. Analytics y funnel
+
+### Ver funnel de ventas
+
+| Escribis | Que hace |
+|----------|----------|
+| `!funnel` | Muestra el embudo paso a paso: cuantos clientes hay en cada etapa y la tasa de abandono |
+
+Ejemplo de respuesta:
+```
+📊 Funnel actual (45 sesiones)
+
+██████████ Saludo: 45 (100%)
+███████░░░ Peso: 32 (71%) ↓29%
+██████░░░░ Preferencia: 28 (62%) ↓13%
+█████░░░░░ Precio: 22 (49%) ↓21%
+████░░░░░░ Plan: 18 (40%) ↓18%
+███░░░░░░░ Confirmar: 15 (33%) ↓17%
+██░░░░░░░░ Datos: 8 (18%) ↓47%
+█░░░░░░░░░ Completado: 5 (11%) ↓38%
+```
+
+### Ver abandonos y tests A/B
+
+| Escribis | Que hace |
+|----------|----------|
+| `!abandonos` | Muestra motivos de abandono, tasas de recuperacion, y rendimiento de las variantes A/B de mensajes de seguimiento |
+
+El sistema automaticamente envia mensajes de re-engagement a leads frios y carritos abandonados, probando diferentes variantes. Con `!abandonos` ves cual variante funciona mejor.
+
+---
+
 ## Reglas importantes
 
 - **El numero de alerta puede cambiar** cuando se agrega o elimina una alerta. Siempre usa `!alertas` si no estas seguro.
@@ -221,6 +277,7 @@ ALERTAS:
   !alertas              Ver cola de alertas
   1 ok                  Confirmar pedido #1
   2 me encargo          Tomar control de #2
+  1r1 / 1r2 / 1r3      Respuesta rapida a #1
   1 [instruccion]       Mandar mensaje IA a #1
 
 CLIENTES:
@@ -234,6 +291,10 @@ PEDIDOS:
   !pedidos              Ultimos pedidos
   !pedido [tel]         Pedidos de un cliente
   !tracking [tel] [cod] Cargar codigo seguimiento
+
+ANALYTICS:
+  !funnel               Embudo de ventas paso a paso
+  !abandonos            Motivos de abandono + A/B testing
 
 SISTEMA:
   !status               Estado del bot

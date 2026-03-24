@@ -139,6 +139,14 @@ const GENERIC_FOLLOW_UPS = [
     '¡Hola! Vi que quedaste a medio camino. ¿Te puedo ayudar con algo? 😊'
 ];
 
+// ── A/B variant index helper ────────────────────────────────
+// Instead of pure random, pick variant 0 or 1 deterministically from pool
+// and store which variant was sent for conversion tracking.
+function _pickVariant(pool: string[]): { msg: string; variantIndex: number } {
+    const variantIndex = Math.floor(Math.random() * pool.length);
+    return { msg: pool[variantIndex], variantIndex };
+}
+
 const SECOND_FOLLOW_UP_MESSAGES = [
     'Solo te aviso que tu consulta sigue activa. Cualquier cosa, escribime 😊',
     '¡Hola! Tu consulta sigue abierta por si querés retomar. Sin compromiso 👋'
@@ -274,7 +282,7 @@ async function checkColdLeads(sharedState: SchedulerSharedState, dependencies: S
             const reasonMessages = ABANDON_REASON_MESSAGES[reason];
             const stepMessages = CONTEXTUAL_FOLLOW_UPS[state.step];
             const pool = (reason !== 'generic' ? reasonMessages : null) || stepMessages || GENERIC_FOLLOW_UPS;
-            const rawMsg = pool[Math.floor(Math.random() * pool.length)];
+            const { msg: rawMsg, variantIndex } = _pickVariant(pool);
             const msg = _withName(rawMsg, state);
 
             try {
@@ -282,6 +290,15 @@ async function checkColdLeads(sharedState: SchedulerSharedState, dependencies: S
                 state.history = state.history || [];
                 state.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
                 state.reengagementSent = true;
+                // A/B tracking
+                state.followUpData = {
+                    type: 'cold_lead',
+                    reason,
+                    step: state.step,
+                    variantIndex,
+                    sentAt: Date.now(),
+                    converted: false
+                };
                 saveState(userId);
             } catch (e: any) {
                 logger.error(`[SCHEDULER] Failed to send cold lead message to ${userId}:`, e.message);
@@ -318,13 +335,22 @@ async function checkAbandonedCarts(sharedState: SchedulerSharedState, dependenci
             const reasonMessages = ABANDON_REASON_MESSAGES[reason];
             const stepMessages = CONTEXTUAL_FOLLOW_UPS[state.step];
             const pool = (reason !== 'generic' ? reasonMessages : null) || stepMessages || ABANDON_REASON_MESSAGES.generic;
-            const rawMsg = pool[Math.floor(Math.random() * pool.length)];
+            const { msg: rawMsg, variantIndex } = _pickVariant(pool);
             const msg = _withName(rawMsg, state);
             try {
                 await sendMessageWithDelay(userId, msg);
                 state.history = state.history || [];
                 state.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
                 state.cartRecovered = true;
+                // A/B tracking
+                state.followUpData = {
+                    type: 'abandoned_cart',
+                    reason,
+                    step: state.step,
+                    variantIndex,
+                    sentAt: Date.now(),
+                    converted: false
+                };
                 saveState(userId);
             } catch (e: any) {
                 logger.error(`[SCHEDULER] Failed to send abandoned cart message to ${userId}:`, e.message);

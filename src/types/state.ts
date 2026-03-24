@@ -95,6 +95,16 @@ export interface UserState {
     // Funnel analytics
     funnelLog?: { step: string; enteredAt: number; exitedAt?: number }[];
 
+    // A/B follow-up tracking
+    followUpData?: {
+        type: 'cold_lead' | 'abandoned_cart';
+        reason: string;
+        step: string;
+        variantIndex: number;
+        sentAt: number;
+        converted: boolean;
+    };
+
     // Flags de estados especiales del cliente
     hasSoldBefore?: boolean;         // true si ya se concretó al menos una venta exitosa
     pendingCancelConfirm?: boolean;  // true si el bot está esperando confirmación de cancelación
@@ -110,6 +120,11 @@ export interface AlertOrderData {
     step: string | null;
 }
 
+export interface QuickReply {
+    label: string;       // Short description shown to admin
+    message: string;     // Actual message to send to client
+}
+
 export interface AlertEntry {
     id: number;
     timestamp: Date;
@@ -118,6 +133,7 @@ export interface AlertEntry {
     userName: string;
     details: string | null;
     orderData: AlertOrderData;
+    quickReplies?: QuickReply[];
 }
 
 export interface BotConfig {

@@ -1,8 +1,9 @@
 import { exec } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import { UserState, SharedState, AlertEntry, AlertOrderData, BotConfig } from '../types/state';
+import { UserState, SharedState, AlertEntry, AlertOrderData, BotConfig, QuickReply } from '../types/state';
 import { aiService } from './ai';
+import { _getQuickReplies } from '../flows/utils/messages';
 import logger from '../utils/logger';
 
 /**
@@ -33,6 +34,9 @@ function _dismissAlert(userPhone: string, sharedState: SharedState): void {
  */
 export function parseAdminInput(text: string): { selector: string | null; command: string } {
     const trimmed = text.trim();
+    // Quick reply shorthand: "1r2" → selector "1", command "r2"
+    const qrMatch = trimmed.match(/^(\d{1,2})(r\d+)$/i);
+    if (qrMatch) return { selector: qrMatch[1], command: qrMatch[2].toLowerCase() };
     // Match: starts with 1-2 digit number, then a space, then the rest
     const match = trimmed.match(/^(\d{1,2})\s+(.+)$/);
     if (match) return { selector: match[1], command: match[2].trim() };
@@ -125,6 +129,10 @@ export async function notifyAdmin(
         step: state.step || null
     };
 
+    // Generate contextual quick replies based on step + last user message
+    const lastUserMsg = (state.history as any[])?.filter((h: any) => h.role === 'user').pop()?.content || '';
+    const quickReplies: QuickReply[] = _getQuickReplies(state.step || '', lastUserMsg);
+
     const newAlert: AlertEntry = {
         id: Date.now(),
         timestamp: new Date(),
@@ -132,7 +140,8 @@ export async function notifyAdmin(
         userPhone,
         userName: state.userName || userPhone,
         details: details || '',
-        orderData
+        orderData,
+        quickReplies
     };
 
     sharedState.sessionAlerts.unshift(newAlert);
@@ -148,7 +157,13 @@ export async function notifyAdmin(
             ? `${orderData.address.nombre || '?'}, ${orderData.address.calle || '?'}, ${orderData.address.ciudad || '?'}, CP ${orderData.address.cp || '?'}`
             : 'Sin dirección';
         const cleanPhone = userPhone.split('@')[0];
-        const alertMsg = `⚠️ *ALERTA #${alertNum}* ${totalAlerts > 1 ? `(${totalAlerts} activas)` : ''}\n\n*Motivo:* ${reason}\n*Cliente:* ${state.userName || cleanPhone} (${cleanPhone})\n${orderData.product ? `*Producto:* ${orderData.product} (${orderData.plan || '?'} días) - $${orderData.price || '?'}\n*Dirección:* ${addrStr}\n` : ''}*Detalles:* ${details || 'Sin detalles'}\n\n_Respondé: "${alertNum} ok" para confirmar, "${alertNum} me encargo" para intervenir${totalAlerts > 1 ? ', "!alertas" para ver todas' : ''}_`;
+
+        // Quick reply section
+        const qrText = quickReplies.length > 0
+            ? `\n\n💬 *Respuestas rápidas:*\n${quickReplies.map((qr, i) => `  *r${i + 1}*: ${qr.label}`).join('\n')}`
+            : '';
+
+        const alertMsg = `⚠️ *ALERTA #${alertNum}* ${totalAlerts > 1 ? `(${totalAlerts} activas)` : ''}\n\n*Motivo:* ${reason}\n*Cliente:* ${state.userName || cleanPhone} (${cleanPhone})\n${orderData.product ? `*Producto:* ${orderData.product} (${orderData.plan || '?'} días) - $${orderData.price || '?'}\n*Dirección:* ${addrStr}\n` : ''}*Detalles:* ${details || 'Sin detalles'}${qrText}\n\n_"${alertNum} ok" confirmar | "${alertNum} me encargo" intervenir | "${alertNum} r1/r2/r3" respuesta rápida${totalAlerts > 1 ? ' | "!alertas" ver todas' : ''}_`;
         for (const num of config.alertNumbers) {
             const targetAlert = `${num}@c.us`;
             client.sendMessage(targetAlert, alertMsg).catch((e: Error) => logger.error(`[ALERT] Failed to forward to ${num}:`, e.message));
@@ -522,6 +537,77 @@ export async function handleAdminCommand(
         return '⚠️ Formato: !admin add/remove/list [telefono]';
     }
 
+    // ── !funnel — Step-by-step funnel breakdown ───────────────
+    if (lowerMsg === '!funnel') {
+        const states = Object.values(sharedState.userState) as UserState[];
+        const stepOrder = [
+            'greeting', 'waiting_weight', 'waiting_preference', 'waiting_price_confirmation',
+            'waiting_plan_choice', 'waiting_ok', 'waiting_data', 'waiting_final_confirmation', 'completed'
+        ];
+        const stepLabels: Record<string, string> = {
+            greeting: 'Saludo', waiting_weight: 'Peso', waiting_preference: 'Preferencia',
+            waiting_price_confirmation: 'Precio', waiting_plan_choice: 'Plan',
+            waiting_ok: 'Confirmar', waiting_data: 'Datos', waiting_final_confirmation: 'Confirmacion final',
+            completed: 'Completado'
+        };
+        const counts: Record<string, number> = {};
+        for (const s of states) {
+            if (s.step) counts[s.step] = (counts[s.step] || 0) + 1;
+        }
+        const total = states.length || 1;
+        let msg = `📊 *Funnel actual* (${states.length} sesiones)\n\n`;
+        let prev = total;
+        for (const step of stepOrder) {
+            const count = counts[step] || 0;
+            const pct = ((count / total) * 100).toFixed(0);
+            const drop = prev > 0 && step !== 'greeting' ? ((1 - count / prev) * 100).toFixed(0) : null;
+            const bar = '█'.repeat(Math.round(count / total * 10)) + '░'.repeat(10 - Math.round(count / total * 10));
+            msg += `${bar} *${stepLabels[step] || step}*: ${count} (${pct}%)`;
+            if (drop !== null && parseInt(drop) > 0) msg += ` ↓${drop}%`;
+            msg += '\n';
+            if (count > 0) prev = count;
+        }
+        return msg;
+    }
+
+    // ── !abandonos — Abandon reasons + A/B recovery rates ────
+    if (lowerMsg === '!abandonos') {
+        const states = Object.values(sharedState.userState) as UserState[];
+        const withFollowUp = states.filter(s => s.followUpData);
+        if (withFollowUp.length === 0) {
+            return '📊 No hay datos de seguimiento A/B todavía. Los datos se generan cuando el scheduler envía mensajes de re-engagement.';
+        }
+
+        // Group by type + reason
+        const groups: Record<string, { total: number; converted: number; variants: Record<number, { total: number; converted: number }> }> = {};
+        for (const s of withFollowUp) {
+            const fd = s.followUpData!;
+            const key = `${fd.type}|${fd.reason}`;
+            if (!groups[key]) groups[key] = { total: 0, converted: 0, variants: {} };
+            groups[key].total++;
+            if (fd.converted) groups[key].converted++;
+            if (!groups[key].variants[fd.variantIndex]) groups[key].variants[fd.variantIndex] = { total: 0, converted: 0 };
+            groups[key].variants[fd.variantIndex].total++;
+            if (fd.converted) groups[key].variants[fd.variantIndex].converted++;
+        }
+
+        const typeLabels: Record<string, string> = { cold_lead: '❄️ Lead frio', abandoned_cart: '🛒 Carrito abandonado' };
+        let msg = `📊 *Abandonos y recuperacion A/B*\n_${withFollowUp.length} seguimientos enviados_\n\n`;
+
+        for (const [key, data] of Object.entries(groups)) {
+            const [type, reason] = key.split('|');
+            const rate = ((data.converted / data.total) * 100).toFixed(0);
+            msg += `${typeLabels[type] || type} — *${reason}*\n`;
+            msg += `  Total: ${data.total} | Recuperados: ${data.converted} (${rate}%)\n`;
+            for (const [vi, vd] of Object.entries(data.variants)) {
+                const vRate = ((vd.converted / vd.total) * 100).toFixed(0);
+                msg += `  Variante ${String(Number(vi) + 1)}: ${vd.total} envios → ${vd.converted} conv (${vRate}%)\n`;
+            }
+            msg += '\n';
+        }
+        return msg;
+    }
+
     // ── !script [version] — Switch active script ────────────────
     if (lowerMsg.startsWith('!script ') || lowerMsg === '!script') {
         const parts = commandText.trim().split(/\s+/);
@@ -603,6 +689,35 @@ export async function handleAdminCommand(
         const label = _targetLabel(actualTarget);
         logger.info(`[ADMIN] Takeover for ${actualTarget}. Bot PAUSED.`);
         return `✅ Bot pausado para ${label}. El usuario es todo tuyo.${sharedState.sessionAlerts.length > 0 ? `\n\n_Quedan ${sharedState.sessionAlerts.length} alerta(s) activa(s). Enviá "!alertas" para verlas._` : ''}`;
+    }
+
+    // 2b. Quick reply execution ("r1", "r2", "r3")
+    const qrMatch = lowerMsg.match(/^r(\d+)$/);
+    if (qrMatch) {
+        if (!actualTarget) return '⚠️ No hay usuario pendiente. Usá "!alertas" para ver la cola.';
+        const qrIndex = parseInt(qrMatch[1]) - 1;
+
+        // Find the alert for this target to get its quick replies
+        const alert = sharedState.sessionAlerts.find((a: AlertEntry) => a.userPhone === actualTarget);
+        if (!alert || !alert.quickReplies || !alert.quickReplies[qrIndex]) {
+            return `⚠️ Respuesta rápida r${qrIndex + 1} no disponible. Las opciones eran r1-r${alert?.quickReplies?.length || 0}.`;
+        }
+
+        const qr = alert.quickReplies[qrIndex];
+        await client.sendMessage(actualTarget, qr.message);
+
+        // Log the message in user history
+        const clientState = sharedState.userState[actualTarget];
+        if (clientState) {
+            clientState.history = clientState.history || [];
+            clientState.history.push({ role: 'bot', content: qr.message, timestamp: Date.now() });
+        }
+        if (sharedState.logAndEmit) sharedState.logAndEmit(actualTarget, 'bot', qr.message, clientState?.step);
+        if (sharedState.saveState) sharedState.saveState();
+
+        const label = _targetLabel(actualTarget);
+        logger.info(`[ADMIN] Quick reply r${qrIndex + 1} sent to ${actualTarget}: "${qr.label}"`);
+        return `✅ Respuesta rápida enviada a ${label}:\n"${qr.message}"`;
     }
 
     // 3. Confirmation

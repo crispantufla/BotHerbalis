@@ -26,6 +26,11 @@ function _setStep(state: any, newStep: string) {
         state.reengagementSent = false;
         state.secondFollowUpSent = false;
         state.cartRecovered = false;
+
+        // A/B conversion tracking: mark follow-up as converted when user advances
+        if (state.followUpData && !state.followUpData.converted) {
+            state.followUpData.converted = true;
+        }
     }
     state.step = newStep;
     state.stepEnteredAt = Date.now();

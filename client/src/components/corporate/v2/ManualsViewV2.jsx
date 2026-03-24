@@ -49,6 +49,21 @@ const MANUALS = [
                 codeBlock: `Alertas activas (3):\n\n#1 -- Juan (5491155551234) -- Kit Herbalis -- hace 2 min\n#2 -- Maria (5491166662345) -- Pack Premium -- hace 30 seg\n#3 -- Carlos (5491177773456) -- Kit Basico -- hace 10 seg`
             },
             {
+                title: 'Respuestas rapidas contextuales',
+                icon: Zap,
+                content: `Cada alerta incluye **3 respuestas rapidas** sugeridas segun el contexto. El bot analiza el paso del cliente y su ultimo mensaje para sugerir las mejores respuestas.`,
+                table: {
+                    headers: ['Escribis', 'Que hace'],
+                    rows: [
+                        ['1r1', 'Envia respuesta rapida 1 al cliente de alerta #1'],
+                        ['1r2', 'Envia respuesta rapida 2 al cliente de alerta #1'],
+                        ['2r3', 'Envia respuesta rapida 3 al cliente de alerta #2'],
+                        ['r1', 'Envia respuesta rapida 1 a la alerta mas reciente'],
+                    ]
+                },
+                extra: `Las sugerencias cambian segun: **paso del cliente** (datos, precio, confirmacion) y **lo que escribio** (dudas, desconfianza, rechazo).`
+            },
+            {
                 title: 'Instrucciones por IA',
                 icon: Sparkles,
                 content: `El bot genera un mensaje a partir de tu instruccion y se lo envia al cliente.`,
@@ -101,6 +116,19 @@ const MANUALS = [
                 },
             },
             {
+                title: 'Analytics y funnel',
+                icon: BarChart3,
+                content: `Visualiza el embudo de ventas y analiza abandonos con testing A/B automatico.`,
+                table: {
+                    headers: ['Escribis', 'Que hace'],
+                    rows: [
+                        ['!funnel', 'Embudo paso a paso con tasas de abandono'],
+                        ['!abandonos', 'Motivos de abandono + rendimiento A/B de mensajes de seguimiento'],
+                    ]
+                },
+                extra: `El sistema envia automaticamente mensajes de re-engagement probando diferentes variantes. Con **!abandonos** ves cual funciona mejor.`
+            },
+            {
                 title: 'Configuracion del bot',
                 icon: Settings,
                 table: {
@@ -145,10 +173,13 @@ const MANUALS = [
             { cmd: '!alertas', desc: 'Cola de alertas' },
             { cmd: '1 ok', desc: 'Confirmar #1' },
             { cmd: '1 me encargo', desc: 'Tomar control #1' },
+            { cmd: '1r1 / 1r2 / 1r3', desc: 'Respuesta rapida a #1' },
             { cmd: '!pausados', desc: 'Clientes pausados' },
             { cmd: '!despauser [tel]', desc: 'Reactivar cliente' },
             { cmd: '!pedidos', desc: 'Ultimos pedidos' },
             { cmd: '!tracking [tel] [cod]', desc: 'Cargar tracking' },
+            { cmd: '!funnel', desc: 'Embudo de ventas' },
+            { cmd: '!abandonos', desc: 'Abandonos + A/B' },
             { cmd: '!status', desc: 'Estado del bot' },
             { cmd: '!stats', desc: 'Ventas del dia' },
             { cmd: '!precios', desc: 'Ver precios' },
