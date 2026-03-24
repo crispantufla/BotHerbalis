@@ -73,6 +73,13 @@ function _detectPostdatado(normalizedText: string): string | null {
     const hasActionContext = /\b(recibir|recibirlo|llega|llegue|enviar|enviame|envialo|enviamela|enviamelo|mandalo|mandame|mandamela|mandamelo|entregar|cobro|depositan|sueldo|pago|puedo|pueden|venir|mandar|comprar|no tengo|para el|a partir|no puedo ahora|no puedo comprar)\b/i.test(normalizedText);
     if (!hasActionContext) return null;
 
+    // "cobro el viernes" = worried about money, NOT a postdatado request.
+    // A bare day of the week is always ≤7 days away, which is within the 7-10 day delivery window.
+    // If the ONLY action context is payment-related (cobro/depositan/sueldo/pago) and no delivery
+    // verbs are present, a day-of-week date is not postdatado — they'll have money by delivery time.
+    const hasDeliveryContext = /\b(recibir|recibirlo|llega|llegue|enviar|enviame|envialo|enviamela|enviamelo|mandalo|mandame|mandamela|mandamelo|entregar|mandar|comprar)\b/i.test(normalizedText);
+    const onlyPaymentContext = !hasDeliveryContext && /\b(cobro|depositan|sueldo|pago)\b/i.test(normalizedText);
+
     // Extract clean date portion (most specific patterns first)
     const patterns: RegExp[] = [
         /\d{1,2}\s+(?:de\s+)?(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i,
@@ -81,7 +88,9 @@ function _detectPostdatado(normalizedText: string): string | null {
         /(?:cobro|depositan|pagan)\s+(?:el\s+\d{1,2}|a\s+principio|la\s+quincena)/i,
         /el\s+\d{1,2}(?=[\s,.]|$)/i,
         /(?:la\s+)?(?:quincena|semana\s+que\s+viene|mes\s+que\s+viene|pr[oó]ximo\s+mes)/i,
-        /(?:el\s+)?(?:lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo)(?:\s+que\s+viene)?/i,
+        // Skip day-of-week when user is only talking about when they get paid —
+        // delivery takes 7-10 business days so they'll have the money by then.
+        ...(onlyPaymentContext ? [] : [/(?:el\s+)?(?:lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo)(?:\s+que\s+viene)?/i]),
         /pasado\s+mañana/i,
     ];
 
