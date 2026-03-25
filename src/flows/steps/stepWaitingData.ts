@@ -14,6 +14,7 @@ interface MessageClassification {
     isDataQuestionOrEmotion: boolean;
     isPaymentTiming: boolean;
     isHesitation: boolean;
+    isHardRejection: boolean;
     isDeliveryTimingRequest: boolean;
     isObjectionOrComment: boolean;
     isVeryLongMessage: boolean;
@@ -167,9 +168,13 @@ function _classifyMessage(text: string, normalizedText: string): MessageClassifi
         || (!explicitQuestionKeywords && (/\d/.test(text) || text.includes('\n')))
     );
 
+    const isHardRejection = /\b(solo (queria|preguntaba|averiguaba|consultaba|miraba)|queria (averiguar|consultar|preguntar|saber)|era solo (una consulta|para averiguar|para saber)|nada mas (preguntaba|averiguaba|consultaba))\b/i.test(normalizedText)
+        || /\b(no voy a (comprar|pedir|poder)|no (quiero|deseo) (comprar|pedir|nada)|gracias pero no|por ahora no|no me interesa|no gracias)\b/i.test(normalizedText)
+        || /\b(no tengo (el )?dinero|no tengo (la )?plata)\b/i.test(normalizedText) && /\b(queria (averiguar|consultar|preguntar|saber)|solo|nada mas|averiguar)\b/i.test(normalizedText);
+
     const isHesitation = /\b(pensar|pienso|despues|luego|mañana|te confirmo|te aviso|ver|veo|rato|lueguito|mas tarde|en un rato|aguanti|aguanta|espera|bancame)\b/i.test(normalizedText)
         || /\b(voy a|dejam[eo])\s+(pasar|pensar|ver)\b/i.test(normalizedText)
-        || /\b(no puedo comprar|no puedo ahora|ahora no puedo|ahora no|no tengo plata|no tengo la plata|no me alcanza|semana que viene)\b/i.test(normalizedText);
+        || /\b(no puedo comprar|no puedo ahora|ahora no puedo|ahora no|no tengo plata|no tengo la plata|no tengo dinero|no tengo el dinero|no me alcanza|semana que viene)\b/i.test(normalizedText);
 
     const cleanText = normalizedText.replace(/[.,;?!]/g, ' ');
     const isPaymentTiming = /\b(no cobro|cobro el|cobro a|cobro la|cuando cobre|hasta que cobre|sueldo|quincena|cobrar|depositan|depósito|deposito|me pagan|me depositan)\b/i.test(cleanText)
@@ -185,6 +190,7 @@ function _classifyMessage(text: string, normalizedText: string): MessageClassifi
     const isDataQuestionOrEmotion = !isShortConfirmation && (explicitQuestionKeywords
         || /\b(pregunte|no quiero|no acepto|no acepte|como|donde|por que|para que)\b/i.test(normalizedText)
         || isHesitation
+        || isHardRejection
         || isPaymentTiming
         || isDeliveryTimingRequest
         || isObjectionOrComment
@@ -192,7 +198,7 @@ function _classifyMessage(text: string, normalizedText: string): MessageClassifi
 
     return {
         explicitQuestionKeywords, looksLikeAddress, isDataQuestionOrEmotion,
-        isPaymentTiming, isHesitation, isDeliveryTimingRequest, isObjectionOrComment,
+        isPaymentTiming, isHesitation, isHardRejection, isDeliveryTimingRequest, isObjectionOrComment,
         isVeryLongMessage, isShortConfirmation
     };
 }
@@ -764,6 +770,16 @@ export async function handleWaitingData(
         if (extractedData && !extractedData._error && (extractedData.calle || extractedData.ciudad || extractedData.cp || extractedData.nombre)) {
             hasValidAddressData = true;
         }
+    }
+
+    // 6b. Hard rejection — client explicitly says they were just browsing or don't want to buy
+    if (classification.isHardRejection) {
+        logger.info(`[HARD_REJECTION] User ${userId} explicitly declined purchase during waiting_data: "${text}"`);
+        const closeMsg = `¡Entendido perfectamente! 😊 No hay ningún problema. Si en algún momento te interesa o tenés alguna consulta, escribinos sin compromiso. ¡Que tengas un excelente día! 🙌`;
+        currentState.history.push({ role: 'bot', content: closeMsg, timestamp: Date.now() });
+        await dependencies.sendMessageWithDelay(userId, closeMsg);
+        await _pauseAndAlert(userId, currentState, dependencies, text, `Cliente desistió del pedido. Dijo: "${text}"`);
+        return { matched: true };
     }
 
     // 7. AI fallback for questions/objections (only if no valid address data)
