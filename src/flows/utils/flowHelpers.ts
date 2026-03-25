@@ -197,10 +197,14 @@ function _extractUserName(normalizedText: string, currentState: any): boolean {
 function _extractSilentVariables(normalizedText: string, currentState: any): { ageUpdated?: number, weightUpdated?: number, isSolelyCorrection: boolean } {
     let result: { ageUpdated?: number, weightUpdated?: number, isSolelyCorrection: boolean } = { isSolelyCorrection: false };
 
-    // Catch "tengo X años", "mi edad X"
-    const ageMatch = normalizedText.match(/\b(tengo|mi edad es(?:\sde)?)\s+(\d{1,3})\s*(años|añitos)?\b/i);
-    if (ageMatch && ageMatch[2]) {
-        result.ageUpdated = parseInt(ageMatch[2], 10);
+    // Catch "tengo X años", "mi edad es X"
+    // IMPORTANT: "tengo X" MUST be followed by "años/añitos" — otherwise "tengo 2 hijos" or
+    // "tengo 120 dias" would falsely extract an age. "mi edad es X" is explicit enough to not need it.
+    // NOTE: normalizedText is NFD-stripped, so ñ→n: años→anos, añitos→anitos
+    const ageMatch = normalizedText.match(/\b(?:tengo\s+(\d{1,3})\s+(?:a[nñ]os|a[nñ]itos)|mi edad\s+(?:es\s+(?:de\s+)?)?(\d{1,3}))\b/i);
+    if (ageMatch) {
+        const ageStr = ageMatch[1] || ageMatch[2];
+        if (ageStr) result.ageUpdated = parseInt(ageStr, 10);
     }
 
     // Catch "peso X", "X kilos", "quiero bajar X"
