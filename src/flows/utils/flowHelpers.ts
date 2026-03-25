@@ -181,7 +181,8 @@ function _extractUserName(normalizedText: string, currentState: any): boolean {
     if (!nameMatch || !nameMatch[1]) return false;
 
     const name = nameMatch[1].trim();
-    const STOP_WORDS = /^(bien|mal|una|uno|por|para|que|como|donde|cuando|mucho|poco|seguro|esto|eso|aca|alla)$/i;
+    // Reject common filler/condition words that follow "soy" but aren't names
+    const STOP_WORDS = /^(bien|mal|una|uno|por|para|que|como|donde|cuando|mucho|poco|seguro|esto|eso|aca|alla|jubilad[ao]|pensionad[ao]|emplead[ao]|docente|maestra|maestro|estudiante|trabajador[ao]|ama|ama de casa|enfermera|enfermero|medic[ao]|profesora|profesor|autonomo|autonoma|comerciante|nuevo|nueva|interesad[ao]|curiosa|curioso|dietista|nutricionista)$/i;
     if (STOP_WORDS.test(name.split(' ')[0])) return false;
 
     currentState.userName = name;
