@@ -417,8 +417,8 @@ Teléfono: ${phoneDisplay}`;
                 {selectedChat ? (
                     <>
                         {/* Header */}
-                        <div className="flex-shrink-0 min-h-[5rem] border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 sm:px-8 bg-white dark:bg-slate-800 shadow-[0_2px_10px_rgba(0,0,0,0.02)] z-20 overflow-x-auto custom-scrollbar no-scrollbar py-2">
-                            <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0 w-full sm:w-auto mb-2 sm:mb-0">
+                        <div className="flex-shrink-0 min-h-[5rem] border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 sm:px-8 bg-white dark:bg-slate-800 shadow-[0_2px_10px_rgba(0,0,0,0.02)] z-20 overflow-hidden py-2 gap-2">
+                            <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
                                 {/* Back Button (Mobile Only) */}
                                 <button
                                     onClick={() => setSelectedChat(null)}
@@ -450,22 +450,22 @@ Teléfono: ${phoneDisplay}`;
                                 </div>
                             </div>
 
-                            <div className="flex items-center justify-start sm:justify-end gap-1 sm:gap-3 overflow-x-visible w-full sm:w-auto pb-1 sm:pb-0">
+                            <div className="flex items-center justify-end gap-1 sm:gap-3 flex-shrink-0">
                                 {selectedChat.hasBought && (
-                                    <button onClick={() => setShowOrdersPanel(!showOrdersPanel)} className="p-2.5 sm:p-3 flex-shrink-0 rounded-xl bg-indigo-100/80 text-indigo-700 hover:bg-indigo-200 hover:shadow-md transition-all" title="Registro de Compras">
+                                    <button onClick={() => setShowOrdersPanel(!showOrdersPanel)} className="p-2 sm:p-3 flex-shrink-0 rounded-xl bg-indigo-100/80 text-indigo-700 hover:bg-indigo-200 hover:shadow-md transition-all" title="Registro de Compras">
                                         <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" />
                                     </button>
                                 )}
 
-                                <button onClick={handleClearChat} className="p-2.5 sm:p-3 flex-shrink-0 rounded-xl bg-rose-100/80 text-rose-600 hover:bg-rose-200 hover:shadow-md transition-all" title="Reiniciar Memoria e Historial">
-                                    <Trash className="w-5 h-5" />
+                                <button onClick={handleClearChat} className="p-2 sm:p-3 flex-shrink-0 rounded-xl bg-rose-100/80 text-rose-600 hover:bg-rose-200 hover:shadow-md transition-all" title="Reiniciar Memoria e Historial">
+                                    <Trash className="w-4 h-4 sm:w-5 sm:h-5" />
                                 </button>
-                                <button onClick={handleToggleBot} className={`p-2.5 sm:p-3 flex-shrink-0 rounded-xl text-white shadow-md transition-all hover:brightness-110 hover:-translate-y-0.5 ${globalPause || selectedChat.isPaused ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 'bg-gradient-to-r from-amber-500 to-orange-500'}`} title={globalPause ? 'Bot Pausado Globalmente' : (selectedChat.isPaused ? 'Reactivar Auto-Bot' : 'Pausar Auto-Bot')}>
-                                    {globalPause || selectedChat.isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
+                                <button onClick={handleToggleBot} className={`p-2 sm:p-3 flex-shrink-0 rounded-xl text-white shadow-md transition-all hover:brightness-110 hover:-translate-y-0.5 ${globalPause || selectedChat.isPaused ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 'bg-gradient-to-r from-amber-500 to-orange-500'}`} title={globalPause ? 'Bot Pausado Globalmente' : (selectedChat.isPaused ? 'Reactivar Auto-Bot' : 'Pausar Auto-Bot')}>
+                                    {globalPause || selectedChat.isPaused ? <Play className="w-4 h-4 sm:w-5 sm:h-5" /> : <Pause className="w-4 h-4 sm:w-5 sm:h-5" />}
                                 </button>
                                 <div className="relative">
-                                    <button onClick={(e) => { e.stopPropagation(); setShowFontSlider(!showFontSlider); }} className="p-2.5 sm:p-3 flex-shrink-0 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-indigo-50 hover:text-indigo-600 transition-all shadow-sm" title="Tamaño de Letra">
-                                        <Type className="w-5 h-5" />
+                                    <button onClick={(e) => { e.stopPropagation(); setShowFontSlider(!showFontSlider); }} className="p-2 sm:p-3 flex-shrink-0 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-indigo-50 hover:text-indigo-600 transition-all shadow-sm" title="Tamaño de Letra">
+                                        <Type className="w-4 h-4 sm:w-5 sm:h-5" />
                                     </button>
                                     {showFontSlider && (
                                         <div className="fixed top-[4.5rem] right-4 sm:right-16 md:right-32 lg:right-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-2xl shadow-xl w-64 z-[9999] animate-fade-in flex flex-col gap-3">
