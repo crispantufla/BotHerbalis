@@ -40,7 +40,7 @@ if not exist .env (
     echo [AVISO] No se encontro el archivo .env. 
     echo Creando uno basado en .env.example...
     copy .env.example .env
-    echo [IMPORTANTE] Edita el archivo .env con tu GEMINI_API_KEY y ADMIN_NUMBER antes de volver a ejecutar.
+    echo [IMPORTANTE] Edita el archivo .env con tu OPENAI_API_KEY antes de volver a ejecutar.
     pause
     exit /b
 )

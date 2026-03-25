@@ -920,10 +920,8 @@ client.on('message', async (msg: any) => {
             }
         }
 
-        const adminNumber = process.env.ADMIN_NUMBER;
-        const cleanAdmin = adminNumber ? adminNumber.replace(/\D/g, '') : '';
         const alertNumbers = (config.alertNumbers || []).map(n => n.replace(/\D/g, ''));
-        const isAdmin = msg.fromMe || (cleanAdmin && userId.startsWith(cleanAdmin)) || alertNumbers.some(n => userId.startsWith(n));
+        const isAdmin = msg.fromMe || alertNumbers.some(n => userId.startsWith(n));
         let msgText = (msg.body || '').trim();
 
         // Check for WhatsApp placeholders early

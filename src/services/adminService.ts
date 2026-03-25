@@ -209,21 +209,18 @@ export async function handleAdminCommand(
     }
 
     const lowerMsg = commandText.toLowerCase().trim();
-    const userId = process.env.ADMIN_NUMBER ? `${process.env.ADMIN_NUMBER.replace(/\D/g, '')}@c.us` : null;
 
     // 0. List active alerts
     if (lowerMsg === '!alertas' || lowerMsg === '!alerts' || lowerMsg === '!cola' || lowerMsg === '!queue') {
         return _formatAlertsList(sharedState);
     }
 
-    // 1. Summary
+    // 1. Summary — returns report directly; caller sends to msg.from
     if (lowerMsg === '!resumen' || lowerMsg === '!analisis') {
         try {
             const { analyzeDailyLogs } = require('../../analyze_day');
             const report = await analyzeDailyLogs();
-            if (isApi) return report || 'No hay logs para hoy.';
-            if (userId) await client.sendMessage(userId, report || 'No hay logs.');
-            return 'Report sent to WA';
+            return report || 'No hay logs para hoy.';
         } catch (e) {
             return '⚠️ Función de análisis no disponible.';
         }

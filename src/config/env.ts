@@ -20,7 +20,6 @@ const env = cleanEnv(process.env, {
 
     // Configuración Admin / Panel
     API_KEY: str({ desc: 'Clave interna para autenticación del dashboard' }),
-    ADMIN_NUMBER: str({ default: '5491100000000@c.us' }),
     ADMIN_USER: str(),
     ADMIN_PASSWORD: str()
 });
