@@ -16,7 +16,7 @@ import AdvancedAnalyticsViewV2 from '../../../components/corporate/v2/AdvancedAn
 import ManualsViewV2 from '../../../components/corporate/v2/ManualsViewV2';
 import WaitingCustomersPanel from '../../../components/corporate/v2/dashboard/WaitingCustomersPanel';
 
-import { Wifi, MessageCircle, Database, Settings, FileText, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Search, Bell, AlertTriangle, BookOpen } from 'lucide-react';
+import { Wifi, MessageCircle, Database, Settings, FileText, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Search, Bell, AlertTriangle, BookOpen, MoreHorizontal } from 'lucide-react';
 
 const CorporateDashboardV2 = () => {
     const { socket } = useSocket();
@@ -32,6 +32,7 @@ const CorporateDashboardV2 = () => {
     const [targetChatId, setTargetChatId] = useState(null);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
+    const [isPhone, setIsPhone] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [globalSearch, setGlobalSearch] = useState('');
     const globalSearchRef = useRef(null);
@@ -52,10 +53,10 @@ const CorporateDashboardV2 = () => {
     // Detección de Mobile
     useEffect(() => {
         const checkMobile = () => {
-            setIsMobile(window.innerWidth < 1024);
-            if (window.innerWidth < 1024) {
-                setSidebarCollapsed(true);
-            }
+            const w = window.innerWidth;
+            setIsMobile(w < 1024);
+            setIsPhone(w < 640);
+            if (w < 1024) setSidebarCollapsed(true);
         };
         checkMobile();
         window.addEventListener('resize', checkMobile);
@@ -347,15 +348,15 @@ const CorporateDashboardV2 = () => {
                             </button>
                         )}
 
-                        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all ${status === 'ready'
+                        <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border transition-all ${status === 'ready'
                             ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50'
                             : 'bg-rose-50 dark:bg-rose-900/30 border-rose-300 dark:border-rose-700 shadow-md shadow-rose-500/20 animate-pulse'}`}>
                             <div className={`w-2 h-2 rounded-full flex-shrink-0 ${status === 'ready' ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_10px_rgba(239,68,68,0.6)]'}`}></div>
-                            <span className={`text-xs lg:text-sm font-bold tracking-wide whitespace-nowrap ${status === 'ready' ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-300'}`}>
+                            <span className={`hidden sm:inline text-xs lg:text-sm font-bold tracking-wide whitespace-nowrap ${status === 'ready' ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-300'}`}>
                                 {status === 'ready' ? 'ONLINE' : 'OFFLINE'}
                             </span>
                             {status === 'ready' && connectedPhone && (
-                                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 tracking-wider bg-slate-100 dark:bg-slate-800/80 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 ml-1">
+                                <span className="hidden md:inline text-xs font-semibold text-slate-500 dark:text-slate-400 tracking-wider bg-slate-100 dark:bg-slate-800/80 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 ml-1">
                                     +{connectedPhone}
                                 </span>
                             )}
@@ -460,11 +461,49 @@ const CorporateDashboardV2 = () => {
                     <div className="absolute top-[-10%] right-[-5%] w-[60%] lg:w-[40%] h-[60%] lg:h-[40%] rounded-full bg-purple-300/20 dark:bg-purple-900/20 blur-[80px] lg:blur-[100px] pointer-events-none hidden sm:block"></div>
                     <div className="absolute bottom-[-10%] left-[-10%] w-[70%] lg:w-[50%] h-[70%] lg:h-[50%] rounded-full bg-blue-300/20 dark:bg-indigo-900/20 blur-[100px] lg:blur-[120px] pointer-events-none hidden sm:block"></div>
 
-                    <div className={`flex-1 relative z-0 w-full flex flex-col min-h-0 overflow-hidden ${['comms', 'logistics', 'statistics'].includes(activeTab) ? '' : 'overflow-y-auto custom-scrollbar'} p-3 sm:p-6 lg:p-8`}>
+                    <div className={`flex-1 relative z-0 w-full flex flex-col min-h-0 overflow-hidden ${['comms', 'logistics', 'statistics'].includes(activeTab) ? '' : 'overflow-y-auto custom-scrollbar'} p-3 sm:p-6 lg:p-8 ${isPhone ? 'pb-20' : ''}`}>
                         {renderContent()}
                     </div>
                 </main>
             </div>
+
+            {/* ── BOTTOM NAV (phone only) ── */}
+            {isPhone && (
+                <nav className="fixed bottom-0 inset-x-0 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200/60 dark:border-slate-700/60 shadow-[0_-4px_24px_-8px_rgba(0,0,0,0.12)] flex items-stretch h-16">
+                    {[
+                        { tab: 'dashboard',  icon: Wifi,           label: 'Inicio'  },
+                        { tab: 'comms',      icon: MessageCircle,  label: 'Chat'    },
+                        { tab: 'logistics',  icon: Database,       label: 'Ventas'  },
+                        { tab: 'statistics', icon: BarChart2,      label: 'Stats'   },
+                        { tab: '__more__',   icon: MoreHorizontal, label: 'Más'     },
+                    ].map(({ tab, icon: Icon, label }) => {
+                        const isActive = tab === '__more__' ? mobileMenuOpen : activeTab === tab;
+                        return (
+                            <button
+                                key={tab}
+                                onClick={() => {
+                                    if (tab === '__more__') {
+                                        setMobileMenuOpen(prev => !prev);
+                                    } else {
+                                        setActiveTab(tab);
+                                        setMobileMenuOpen(false);
+                                    }
+                                }}
+                                className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 transition-colors duration-200 ${isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500'}`}
+                            >
+                                <Icon className="w-5 h-5" strokeWidth={isActive ? 2.5 : 2} />
+                                <span className="text-[10px] font-bold tracking-wide">{label}</span>
+                                {isActive && tab !== '__more__' && (
+                                    <span className="absolute bottom-1 w-1 h-1 rounded-full bg-indigo-500" />
+                                )}
+                                {tab !== '__more__' && alerts.length > 0 && tab === 'dashboard' && (
+                                    <span className="absolute top-1 mt-1 flex items-center justify-center w-4 h-4 text-[9px] font-bold text-white bg-rose-500 rounded-full">{alerts.length > 9 ? '9+' : alerts.length}</span>
+                                )}
+                            </button>
+                        );
+                    })}
+                </nav>
+            )}
         </div>
     );
 };

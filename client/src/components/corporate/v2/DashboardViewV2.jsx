@@ -112,35 +112,35 @@ const DashboardViewV2 = ({ alerts = [], config, handleQuickAction, status, qrDat
     return (
         <div className="space-y-8 animate-fade-in relative z-10 w-full">
             {/* Header de la vista */}
-            <div className="mb-8 flex justify-between items-stretch gap-6 h-[5.5rem]">
+            <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:justify-between sm:items-stretch gap-3 sm:gap-6 sm:h-[5.5rem]">
                 <div className="flex flex-col justify-center">
-                    <h1 className="text-3xl 2xl:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-700 to-purple-600 dark:from-indigo-400 dark:to-purple-400 leading-none mb-2">
+                    <h1 className="text-xl sm:text-3xl 2xl:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-700 to-purple-600 dark:from-indigo-400 dark:to-purple-400 leading-none mb-1 sm:mb-2">
                         Dashboard Overview
                     </h1>
-                    <p className="text-slate-500 dark:text-slate-400 font-medium 2xl:text-lg m-0 leading-none">Resumen del sistema y métricas en tiempo real</p>
+                    <p className="text-slate-500 dark:text-slate-400 text-sm font-medium 2xl:text-lg m-0 leading-none">Resumen del sistema y métricas en tiempo real</p>
                 </div>
 
                 {/* Global Pause Button */}
                 <button
                     onClick={handleToggleGlobalPause}
-                    className={`flex items-center justify-center gap-4 px-6 rounded-[1.25rem] font-bold transition-all shadow-sm w-72 h-full ${isGlobalPause
+                    className={`flex items-center justify-center gap-3 sm:gap-4 px-4 sm:px-6 py-3 sm:py-0 rounded-[1.25rem] font-bold transition-all shadow-sm w-full sm:w-72 sm:h-full ${isGlobalPause
                         ? 'bg-amber-100/90 dark:bg-amber-900/30 text-amber-800 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-800/50 border-2 border-amber-200 dark:border-amber-800/50 shadow-amber-500/20'
                         : 'bg-white dark:bg-slate-800/80 border-2 border-slate-100/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-100 dark:hover:border-indigo-800/50 hover:shadow-indigo-500/10'
                         }`}
                 >
                     {isGlobalPause ? (
                         <>
-                            <div className="w-12 h-12 flex items-center justify-center rounded-2xl bg-amber-500 text-white shadow-md shadow-amber-500/40 flex-shrink-0">
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-2xl bg-amber-500 text-white shadow-md shadow-amber-500/40 flex-shrink-0">
+                                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                             </div>
-                            <span className="text-left leading-tight text-[15px] tracking-wide font-extrabold">Reactivar Bot<br />Global</span>
+                            <span className="text-left leading-tight text-[13px] sm:text-[15px] tracking-wide font-extrabold">Reactivar Bot<br />Global</span>
                         </>
                     ) : (
                         <>
-                            <div className="w-12 h-12 flex items-center justify-center rounded-2xl bg-amber-50 dark:bg-amber-900/40 text-amber-500 shadow-inner border border-amber-100 dark:border-amber-800/50 flex-shrink-0">
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-2xl bg-amber-50 dark:bg-amber-900/40 text-amber-500 shadow-inner border border-amber-100 dark:border-amber-800/50 flex-shrink-0">
+                                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                             </div>
-                            <span className="text-left leading-tight text-[15px] tracking-wide font-extrabold">Pausar Bot<br />Global</span>
+                            <span className="text-left leading-tight text-[13px] sm:text-[15px] tracking-wide font-extrabold">Pausar Bot<br />Global</span>
                         </>
                     )}
                 </button>

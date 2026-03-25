@@ -139,28 +139,29 @@ const AdvancedAnalyticsViewV2 = () => {
                 {/* Header & Global Filters */}
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
                     <div>
-                        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
-                            <Activity className="text-indigo-500" /> Business Intelligence
+                        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+                            <Activity className="text-indigo-500 hidden sm:block" /> Business Intelligence
                         </h1>
                         <p className="text-slate-500 dark:text-slate-400 mt-1">
                             Análisis de rendimiento, conversión y ventas detallado del bot.
                         </p>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                        <div className={`flex p-1 rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                        <div className={`flex p-1 rounded-xl border w-full sm:w-auto ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
                             <button
                                 onClick={() => setInstanceScope('current')}
-                                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${instanceScope === 'current'
+                                className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${instanceScope === 'current'
                                     ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300'
                                     : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700'
                                     }`}
                             >
-                                Sólo este Bot
+                                <span className="sm:hidden">Este bot</span>
+                                <span className="hidden sm:inline">Sólo este Bot</span>
                             </button>
                             <button
                                 onClick={() => setInstanceScope('all')}
-                                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${instanceScope === 'all'
+                                className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${instanceScope === 'all'
                                     ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300'
                                     : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700'
                                     }`}
@@ -169,23 +170,24 @@ const AdvancedAnalyticsViewV2 = () => {
                             </button>
                         </div>
 
-                        <div className={`flex p-1 rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+                        <div className={`flex p-1 rounded-xl border w-full sm:w-auto ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
                             {[1, 7, 14, 30].map(days => (
                                 <button
                                     key={days}
                                     onClick={() => setDaysAgoToFetch(days)}
-                                    className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors sm:px-3 sm:py-1 ${daysAgoToFetch === days
+                                    className={`flex-1 sm:flex-none px-2 sm:px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${daysAgoToFetch === days
                                         ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300'
                                         : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700'
                                         }`}
                                 >
-                                    {days === 1 ? 'Ayer' : `${days} Días`}
+                                    <span className="sm:hidden">{days === 1 ? 'Ayer' : `${days}D`}</span>
+                                    <span className="hidden sm:inline">{days === 1 ? 'Ayer' : `${days} Días`}</span>
                                 </button>
                             ))}
                         </div>
                         <button
                             onClick={fetchAllData}
-                            className={`p-2 rounded-xl border transition-colors ${isDark ? 'bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-300' : 'bg-white border-slate-200 hover:bg-slate-100 text-slate-600 shadow-sm'}`}
+                            className={`self-end sm:self-auto p-2 rounded-xl border transition-colors ${isDark ? 'bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-300' : 'bg-white border-slate-200 hover:bg-slate-100 text-slate-600 shadow-sm'}`}
                             title="Actualizar datos"
                         >
                             <RefreshCw size={20} className={loading ? "animate-spin" : ""} />

@@ -263,19 +263,19 @@ Teléfono: ${phoneDisplay}`;
             <div className="bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-5 lg:p-6">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-5">
                     <div>
-                        <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-700 to-purple-600 tracking-tight">
+                        <h1 className="text-xl sm:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-700 to-purple-600 tracking-tight">
                             Logística y Pedidos
                         </h1>
-                        <p className="text-slate-500 mt-2 font-medium">Gestión inteligente de estados y envíos en tiempo real.</p>
+                        <p className="text-slate-500 mt-1 sm:mt-2 text-sm sm:text-base font-medium">Gestión inteligente de estados y envíos en tiempo real.</p>
                     </div>
 
-                    <div className="flex gap-4">
-                        <button onClick={() => refetch()} className="p-3 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 transition-all shadow-sm active:scale-95 group">
-                            <span className={`group-hover:rotate-180 transition-transform duration-500 block ${isFetching ? 'animate-spin text-indigo-500' : ''}`}><Refresh className="w-5 h-5" /></span>
+                    <div className="flex gap-2 sm:gap-4">
+                        <button onClick={() => refetch()} className="p-2.5 sm:p-3 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 transition-all shadow-sm active:scale-95 group">
+                            <span className={`group-hover:rotate-180 transition-transform duration-500 block ${isFetching ? 'animate-spin text-indigo-500' : ''}`}><Refresh className="w-4 h-4 sm:w-5 sm:h-5" /></span>
                         </button>
-                        <button onClick={handleExportCSV} disabled={orders.length === 0} className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-105 transition-all flex items-center gap-2 disabled:opacity-50 disabled:scale-100">
-                            <Download className="w-5 h-5" />
-                            <span>Exportar CSV</span>
+                        <button onClick={handleExportCSV} disabled={orders.length === 0} className="px-3 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-105 transition-all flex items-center gap-2 disabled:opacity-50 disabled:scale-100">
+                            <Download className="w-4 h-4 sm:w-5 sm:h-5" />
+                            <span className="hidden sm:inline">Exportar CSV</span>
                         </button>
                     </div>
                 </div>
@@ -293,7 +293,18 @@ Teléfono: ${phoneDisplay}`;
                         <span className="absolute left-4 top-3.5 text-slate-400 group-focus-within:text-indigo-500 transition-colors"><Search className="w-5 h-5" /></span>
                     </div>
 
-                    <div className="flex items-center gap-2 bg-white/6 dark:bg-slate-800/60 p-2 rounded-xl border border-white/8 dark:border-slate-700/80 shadow-inner overflow-x-auto custom-scrollbar">
+                    {/* Status filter — native select on mobile, pill buttons on tablet+ */}
+                    <div className="sm:hidden flex items-center gap-2">
+                        <Filter className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                        <select
+                            value={statusFilter}
+                            onChange={e => setStatusFilter(e.target.value)}
+                            className="flex-1 bg-white border border-slate-200 dark:bg-slate-800 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 shadow-inner"
+                        >
+                            {['Todos', ...statusOptions].map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                    </div>
+                    <div className="hidden sm:flex items-center gap-2 bg-white/6 dark:bg-slate-800/60 p-2 rounded-xl border border-white/8 dark:border-slate-700/80 shadow-inner overflow-x-auto custom-scrollbar">
                         <div className="pl-3 pr-2 text-slate-400"><Filter className="w-5 h-5" /></div>
                         {['Todos', ...statusOptions].map(status => (
                             <button
@@ -308,18 +319,34 @@ Teléfono: ${phoneDisplay}`;
 
                     {/* Vendedor Filter */}
                     {uniqueSellers.length > 0 && (
-                        <div className="flex items-center gap-2 bg-white/6 dark:bg-slate-800/60 p-2 rounded-xl border border-white/8 dark:border-slate-700/80 shadow-inner overflow-x-auto custom-scrollbar">
-                            <div className="pl-3 pr-2 text-slate-400 text-[10px] font-black uppercase tracking-widest">Vendedor:</div>
-                            {['Todos', ...uniqueSellers].map(seller => (
-                                <button
-                                    key={seller}
-                                    onClick={() => setSellerFilter(seller)}
-                                    className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${sellerFilter === seller ? 'bg-blue-600 text-white shadow-md' : 'bg-transparent text-slate-600 hover:bg-white'}`}
+                        <>
+                            {/* Mobile: native select */}
+                            <div className="sm:hidden flex items-center gap-2">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap">Vendedor:</span>
+                                <select
+                                    value={sellerFilter}
+                                    onChange={e => setSellerFilter(e.target.value)}
+                                    className="flex-1 bg-white border border-slate-200 dark:bg-slate-800 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 shadow-inner"
                                 >
-                                    {seller === 'Todos' ? 'Todos' : `+${seller.replace(/\D/g, '')}`}
-                                </button>
-                            ))}
-                        </div>
+                                    {['Todos', ...uniqueSellers].map(s => (
+                                        <option key={s} value={s}>{s === 'Todos' ? 'Todos' : `+${s.replace(/\D/g, '')}`}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            {/* Tablet+: pill buttons */}
+                            <div className="hidden sm:flex items-center gap-2 bg-white/6 dark:bg-slate-800/60 p-2 rounded-xl border border-white/8 dark:border-slate-700/80 shadow-inner overflow-x-auto custom-scrollbar">
+                                <div className="pl-3 pr-2 text-slate-400 text-[10px] font-black uppercase tracking-widest">Vendedor:</div>
+                                {['Todos', ...uniqueSellers].map(seller => (
+                                    <button
+                                        key={seller}
+                                        onClick={() => setSellerFilter(seller)}
+                                        className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${sellerFilter === seller ? 'bg-blue-600 text-white shadow-md' : 'bg-transparent text-slate-600 hover:bg-white'}`}
+                                    >
+                                        {seller === 'Todos' ? 'Todos' : `+${seller.replace(/\D/g, '')}`}
+                                    </button>
+                                ))}
+                            </div>
+                        </>
                     )}
                 </div>
             </div>
