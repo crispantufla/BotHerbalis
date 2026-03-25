@@ -304,7 +304,6 @@ export {
     _detectPostdatado,
     _pauseAndAlert,
     _extractSilentVariables,
-    _extractUserName,
     _detectProductPlanChange,
     _resolveNewProductPlan
 };

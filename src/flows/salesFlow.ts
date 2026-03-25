@@ -3,7 +3,7 @@ import { pauseUser } from '../services/pauseService';
 import logger from '../utils/logger';
 import { processGlobals } from './globals';
 import { processStep } from './steps';
-import { _pauseAndAlert, _setStep, _extractSilentVariables, _extractUserName, _cleanPhone } from './utils/flowHelpers';
+import { _pauseAndAlert, _setStep, _extractSilentVariables, _cleanPhone } from './utils/flowHelpers';
 
 interface SalesFlowDependencies {
     saveState: (userId?: string) => void;
@@ -280,11 +280,8 @@ export async function processSalesFlow(
     currentState.lastActivityAt = Date.now();
     saveState(userId);
 
-    // 1.4. Silent Name Extraction — runs on every message, all steps
-    if (_extractUserName(normalizedText, currentState)) {
-        logger.info(`[NAME] Detected userName for ${userId}: "${currentState.userName}"`);
-        saveState(userId);
-    }
+    // 1.4. Name extraction is handled by AI (parseAddress) in waiting_data.
+    // This avoids false positives like treating "soy jubilada" as a person's name.
 
     // 1.5. Silent Variable Extraction (Age/Weight out of band)
     // NOTE: We intentionally exclude 'waiting_weight' because in that step the user IS answering
