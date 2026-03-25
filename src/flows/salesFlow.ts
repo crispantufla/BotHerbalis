@@ -17,6 +17,7 @@ interface SalesFlowDependencies {
     cancelLatestOrder?: (userId: string) => Promise<Record<string, unknown>>;
     config?: BotConfig;
     effectiveScript?: string;
+    connectedAt?: number; // Unix timestamp (seconds) of when the bot connected — used to detect pre-existing chats
 }
 
 // Keywords that signal clear purchase intent — if present, don't auto-pause
@@ -161,8 +162,31 @@ export async function processSalesFlow(
                                 timestamp: new Date(wm.timestamp * 1000)
                             }));
                             // Reverse to match DB descending order (latest first)
-                            dbMessages = waMapped.reverse(); 
+                            dbMessages = waMapped.reverse();
                             logger.info(`[SMART-DETECT] DB vacío para ${userId}. Recuperados ${waMapped.length} msjs nativos de WhatsApp.`);
+
+                            // --- CHECK 2b: Pre-existing chat detection ---
+                            // whatsapp-web.js does NOT sync old message bodies on a fresh session,
+                            // so fetchMessages() returns [] for old chats until the chat is opened manually.
+                            // However, chat.lastMessage.timestamp IS available immediately (it's metadata).
+                            // If that timestamp predates our bot's connection → pre-existing conversation → pause.
+                            if (waMsgs.length === 0 && dependencies.connectedAt) {
+                                try {
+                                    const lastTs: number | undefined = chat?.lastMessage?.timestamp; // Unix seconds
+                                    if (lastTs && lastTs < dependencies.connectedAt) {
+                                        logger.info(`[PRE-EXISTING] User ${userId}: last chat msg at ${new Date(lastTs * 1000).toISOString()}, bot connected at ${new Date(dependencies.connectedAt * 1000).toISOString()}. Auto-pausing.`);
+                                        await pauseUser(
+                                            userId,
+                                            '📋 Conversación pre-existente (anterior al bot)',
+                                            { sharedState: dependencies.sharedState, notifyAdmin: dependencies.notifyAdmin },
+                                            `Conversación iniciada antes de que el bot se conectara. Último mensaje: ${new Date(lastTs * 1000).toLocaleString('es-AR')}`
+                                        );
+                                        return { matched: true, paused: true };
+                                    }
+                                } catch (metaErr: any) {
+                                    logger.warn(`[PRE-EXISTING] Could not read chat metadata for ${userId}: ${metaErr.message}`);
+                                }
+                            }
                         }
                     } catch (waErr: any) {
                         logger.warn(`[SMART-DETECT] Error recuperando historial nativo WA de ${userId}: ${waErr.message}`);

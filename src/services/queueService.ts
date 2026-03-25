@@ -47,7 +47,8 @@ export function initWorker(dependencies: any) {
         logAndEmit,
         saveOrderToLocal,
         cancelLatestOrder,
-        config
+        config,
+        connectedAt
     } = dependencies;
 
     const worker = new Worker(QUEUE_NAME, async (job: Job) => {
@@ -69,7 +70,8 @@ export function initWorker(dependencies: any) {
                 client, notifyAdmin, saveState, aiService,
                 sendMessageWithDelay: (id: string, text: string) => sendMessageWithDelay(id, text, startTime),
                 logAndEmit, saveOrderToLocal, cancelLatestOrder, sharedState, config,
-                effectiveScript
+                effectiveScript,
+                connectedAt: typeof connectedAt === 'function' ? connectedAt() : connectedAt
             });
             logger.info(`[BULLMQ] ✅ Job ${job.id} de ${userId} completado con éxito.`);
         } catch (error: any) {

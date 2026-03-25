@@ -1325,7 +1325,8 @@ process.on('SIGUSR2', () => _shutdown('SIGUSR2', 1)); // Restart forcing node to
 initWorker({
     processSalesFlow, userState, sharedState, client, notifyAdmin,
     saveState, aiService, sendMessageWithDelay, logAndEmit,
-    saveOrderToLocal, cancelLatestOrder, config
+    saveOrderToLocal, cancelLatestOrder, config,
+    get connectedAt() { return sharedState.connectedAt; } // live ref — updated after 'ready' fires
 });
 
 safeInitialize().catch(e => logger.error('[INIT] Fatal initialization error:', e.message));

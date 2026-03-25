@@ -138,4 +138,29 @@ describe('Sales Flow Logic', () => {
         expect(userState['user1'].step).toBe('waiting_final_confirmation');
         expect(deps.aiService.chat).toHaveBeenCalled();
     });
+
+    test('[CHECK 2b] Should auto-pause when chat has pre-existing messages (before connectedAt)', async () => {
+        const CONNECTED_AT = Math.floor(Date.now() / 1000); // unix seconds, now
+        const OLD_TIMESTAMP = CONNECTED_AT - 3600; // 1 hour before bot connected
+
+        const mockClientWithChat = {
+            getChatById: jest.fn().mockResolvedValue({
+                fetchMessages: jest.fn().mockResolvedValue([]), // fresh session: no messages synced
+                lastMessage: { timestamp: OLD_TIMESTAMP }      // but metadata is available
+            })
+        };
+
+        const depsWithConnectedAt = {
+            ...deps,
+            client: mockClientWithChat,
+            sharedState: { pausedUsers: new Set(), io: null },
+            connectedAt: CONNECTED_AT
+        };
+
+        const localState = {};
+        const result = await processSalesFlow('preexisting@c.us', 'Hola', localState, knowledge, depsWithConnectedAt);
+
+        expect(result?.paused).toBe(true);
+        expect(depsWithConnectedAt.sharedState.pausedUsers.has('preexisting@c.us')).toBe(true);
+    });
 });
