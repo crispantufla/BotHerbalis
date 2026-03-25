@@ -352,8 +352,15 @@ async function _processAddressData(
             const hasSN = /\b(s\/n|sn|sin numero|sin número)\b/i.test(calleToCheck) || /\b(s\/n|sn|sin numero|sin número)\b/i.test(textToAnalyze);
 
             const hasNegatedEsquina = /\b(no\s+(es|hay|tiene|sea)\s+(esquina|esq\b)|no\s+esquina|ni\s+esquina|sin\s+esquina|mitad\s+de?\s+cuadra)\b/i.test(textToAnalyze);
-            const isIntersection = !hasNegatedEsquina && (
-                /\b(y\s+calle|y\s+pasaje|y\s+av\b|y\s+avenida|entre\s+calle|entre\s+.+\s+y\s+|esq\b|esquina)\b/i.test(calleToCheck)
+
+            // Argentine grid-city address format: "Calle 25 e/28 y 30" or "Calle 25 entre 28 y 30"
+            // means "Street 25 between cross-streets 28 and 30" — this is NOT an intersection.
+            // Commonly used in La Pampa, La Plata, Azul, and other cities with numbered grid layouts.
+            // Pattern: (calle) N (e/|entre) N y N  — all segments are just numbers (cross streets)
+            const isGridCityBetween = /\b(calle\s+)?\d+\s+(e\/|entre\s+)\d+\s+y\s+\d+\b/i.test(calleToCheck);
+
+            const isIntersection = !hasNegatedEsquina && !isGridCityBetween && (
+                /\b(y\s+calle|y\s+pasaje|y\s+av\b|y\s+avenida|entre\s+calle|esq\b|esquina)\b/i.test(calleToCheck)
                 || /\bcalle\s+\d+\b/i.test(calleToCheck) && /\by\b/i.test(calleToCheck)
             );
 
