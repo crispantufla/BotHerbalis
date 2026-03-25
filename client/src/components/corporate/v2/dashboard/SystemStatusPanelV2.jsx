@@ -33,7 +33,7 @@ const SystemStatusPanelV2 = ({ status, activeConversations = 0, adminNumbers = [
                 <h3 className="font-extrabold text-slate-800 dark:text-slate-100 text-sm uppercase tracking-widest">Sistema</h3>
             </div>
 
-            <div className="p-6 flex-1 flex flex-col gap-8 relative z-10">
+            <div className="p-4 sm:p-6 flex-1 flex flex-col gap-4 sm:gap-8 relative z-10">
                 {/* Connection Status */}
                 <div className="space-y-4">
                     <div className="flex justify-between items-center pb-4 border-b border-slate-200/50 dark:border-slate-700/50">

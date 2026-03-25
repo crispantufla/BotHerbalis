@@ -110,7 +110,7 @@ const DashboardViewV2 = ({ alerts = [], config, handleQuickAction, status, qrDat
     };
 
     return (
-        <div className="space-y-8 animate-fade-in relative z-10 w-full">
+        <div className="space-y-4 sm:space-y-8 animate-fade-in relative z-10 w-full">
             {/* Header de la vista */}
             <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:justify-between sm:items-stretch gap-3 sm:gap-6 sm:h-[5.5rem]">
                 <div className="flex flex-col justify-center">
@@ -213,7 +213,7 @@ const DashboardViewV2 = ({ alerts = [], config, handleQuickAction, status, qrDat
             <StatsPanelV2 stats={stats} loadingStats={loadingStats} alertsCount={alerts.length} />
 
             {/* B. MAIN GRID V2 */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 2xl:grid-cols-5 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 2xl:grid-cols-5 gap-4 sm:gap-8">
                 {/* B1. ALERTS V2 — takes 2/3 on lg, 3/5 on 2xl */}
                 <div className="lg:col-span-2 2xl:col-span-3">
                     <AlertsPanelV2 alerts={alerts} onCommand={handleAdminCommand} onQuickAction={handleQuickAction} />

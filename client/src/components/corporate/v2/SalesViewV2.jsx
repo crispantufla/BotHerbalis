@@ -257,11 +257,11 @@ Teléfono: ${phoneDisplay}`;
     };
 
     return (
-        <div className="h-full flex flex-col animate-fade-in relative z-10 w-full space-y-6">
+        <div className="h-full flex flex-col animate-fade-in relative z-10 w-full space-y-2 sm:space-y-6">
 
             {/* V2 Header & Advanced Filters */}
-            <div className="bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl rounded-[1.5rem] sm:rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-3 sm:p-5 lg:p-6">
-                <div className="flex flex-row justify-between items-center gap-2 mb-3 sm:mb-5">
+            <div className="bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl rounded-[1.5rem] sm:rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-2.5 sm:p-5 lg:p-6">
+                <div className="flex flex-row justify-between items-center gap-2 mb-2 sm:mb-5">
                     <div className="min-w-0">
                         <h1 className="text-lg sm:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-700 to-purple-600 tracking-tight truncate">
                             Logística y Pedidos
@@ -281,16 +281,16 @@ Teléfono: ${phoneDisplay}`;
                 </div>
 
                 {/* Filters Bar V2 */}
-                <div className="flex flex-col lg:flex-row gap-4">
+                <div className="flex flex-col lg:flex-row gap-2 sm:gap-4">
                     <div className="flex-1 relative group">
                         <input
                             type="text"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             placeholder="Buscar por cliente, teléfono o tracking..."
-                            className="w-full bg-white/8 dark:bg-slate-800/80 border border-white rounded-xl pl-12 pr-4 py-3.5 text-sm font-medium focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all text-slate-700 shadow-inner placeholder:text-slate-400"
+                            className="w-full bg-white/8 dark:bg-slate-800/80 border border-white rounded-xl pl-10 sm:pl-12 pr-4 py-2 sm:py-3.5 text-sm font-medium focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all text-slate-700 shadow-inner placeholder:text-slate-400"
                         />
-                        <span className="absolute left-4 top-3.5 text-slate-400 group-focus-within:text-indigo-500 transition-colors"><Search className="w-5 h-5" /></span>
+                        <span className="absolute left-3 sm:left-4 top-2 sm:top-3.5 text-slate-400 group-focus-within:text-indigo-500 transition-colors"><Search className="w-4 h-4 sm:w-5 sm:h-5" /></span>
                     </div>
 
                     {/* Status filter — native select on mobile, pill buttons on tablet+ */}
@@ -299,7 +299,7 @@ Teléfono: ${phoneDisplay}`;
                         <select
                             value={statusFilter}
                             onChange={e => setStatusFilter(e.target.value)}
-                            className="flex-1 bg-white border border-slate-200 dark:bg-slate-800 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 shadow-inner"
+                            className="flex-1 bg-white border border-slate-200 dark:bg-slate-800 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 shadow-inner"
                         >
                             {['Todos', ...statusOptions].map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
@@ -326,7 +326,7 @@ Teléfono: ${phoneDisplay}`;
                                 <select
                                     value={sellerFilter}
                                     onChange={e => setSellerFilter(e.target.value)}
-                                    className="flex-1 bg-white border border-slate-200 dark:bg-slate-800 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 shadow-inner"
+                                    className="flex-1 bg-white border border-slate-200 dark:bg-slate-800 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 shadow-inner"
                                 >
                                     {['Todos', ...uniqueSellers].map(s => (
                                         <option key={s} value={s}>{s === 'Todos' ? 'Todos' : `+${s.replace(/\D/g, '')}`}</option>
@@ -352,7 +352,7 @@ Teléfono: ${phoneDisplay}`;
             </div>
 
             {/* V2 Glassmorphism Table */}
-            <div className="flex-1 bg-white/6 dark:bg-slate-800/60 backdrop-blur-xl rounded-[2rem] border border-white/8 dark:border-slate-700/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden flex flex-col relative text-sm">
+            <div className="flex-1 bg-white/6 dark:bg-slate-800/60 backdrop-blur-xl rounded-[1.25rem] sm:rounded-[2rem] border border-white/8 dark:border-slate-700/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden flex flex-col relative text-sm">
 
                 {/* Background Glow */}
                 <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-purple-400/10 blur-[100px] rounded-full pointer-events-none"></div>
@@ -525,27 +525,28 @@ Teléfono: ${phoneDisplay}`;
                 </div>
 
                 {/* V2 Pagination Controls */}
-                <div className="px-8 py-5 border-t border-white/6 dark:border-slate-700/60 flex flex-col sm:flex-row justify-between items-center bg-white/3 dark:bg-slate-800/30 backdrop-blur-md gap-4">
-                    <span className="text-sm font-bold text-slate-500 uppercase tracking-widest">
-                        Página <span className="text-indigo-600">{page}</span> de {pagination.totalPages}
+                <div className="px-3 sm:px-8 py-2 sm:py-4 border-t border-white/6 dark:border-slate-700/60 flex flex-row justify-between items-center bg-white/3 dark:bg-slate-800/30 backdrop-blur-md gap-2">
+                    <span className="text-[10px] sm:text-sm font-bold text-slate-500 uppercase tracking-wider sm:tracking-widest whitespace-nowrap">
+                        <span className="text-indigo-600">{page}</span>/{pagination.totalPages}
+                        <span className="hidden sm:inline"> Página</span>
                     </span>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1.5 sm:gap-2">
                         <button
                             disabled={page <= 1 || isFetching}
                             onClick={() => setPage(p => Math.max(1, p - 1))}
-                            className="px-4 py-2 bg-white/8 dark:bg-slate-800/80 rounded-xl border border-white shadow-sm text-xs font-extrabold text-slate-600 disabled:opacity-50 hover:bg-white hover:text-indigo-600 transition-all active:-translate-y-0.5"
+                            className="px-2.5 sm:px-4 py-1.5 sm:py-2 bg-white/8 dark:bg-slate-800/80 rounded-lg sm:rounded-xl border border-white shadow-sm text-[10px] sm:text-xs font-extrabold text-slate-600 disabled:opacity-50 hover:bg-white hover:text-indigo-600 transition-all active:-translate-y-0.5"
                         >
-                            Anterior
+                            Ant.
                         </button>
                         <button
                             disabled={page >= pagination.totalPages || isFetching}
                             onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
-                            className="px-4 py-2 bg-white/8 dark:bg-slate-800/80 rounded-xl border border-white shadow-sm text-xs font-extrabold text-slate-600 disabled:opacity-50 hover:bg-white hover:text-indigo-600 transition-all active:-translate-y-0.5"
+                            className="px-2.5 sm:px-4 py-1.5 sm:py-2 bg-white/8 dark:bg-slate-800/80 rounded-lg sm:rounded-xl border border-white shadow-sm text-[10px] sm:text-xs font-extrabold text-slate-600 disabled:opacity-50 hover:bg-white hover:text-indigo-600 transition-all active:-translate-y-0.5"
                         >
-                            Siguiente
+                            Sig.
                         </button>
                     </div>
-                    <span className="text-sm font-bold text-indigo-500 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">{pagination.total} Totales en BD</span>
+                    <span className="text-[10px] sm:text-sm font-bold text-indigo-500 bg-indigo-50 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full border border-indigo-100 whitespace-nowrap">{pagination.total} <span className="hidden sm:inline">Totales en BD</span><span className="sm:hidden">total</span></span>
                 </div>
             </div>
 

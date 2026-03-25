@@ -161,18 +161,18 @@ const ScriptViewV2 = () => {
 
                 {/* Glass Tabs */}
                 <div className="border-b border-white/6 dark:border-slate-700/60 flex overflow-x-auto bg-white/3 dark:bg-slate-800/30 backdrop-blur-md sticky top-0 z-20">
-                    <button onClick={() => setActiveTab('flow')} className={`px-8 py-5 font-extrabold text-xs uppercase tracking-widest whitespace-nowrap transition-all ${activeTab === 'flow' ? 'border-b-2 border-indigo-600 text-indigo-700 bg-white/50 dark:bg-slate-800/50' : 'text-slate-400 hover:text-indigo-500 hover:bg-white/20 dark:bg-slate-800/20'}`}>
+                    <button onClick={() => setActiveTab('flow')} className={`px-4 sm:px-8 py-3 sm:py-5 font-extrabold text-[10px] sm:text-xs uppercase tracking-widest whitespace-nowrap transition-all ${activeTab === 'flow' ? 'border-b-2 border-indigo-600 text-indigo-700 bg-white/50 dark:bg-slate-800/50' : 'text-slate-400 hover:text-indigo-500 hover:bg-white/20 dark:bg-slate-800/20'}`}>
                         Pasos del Flujo
                     </button>
-                    <button onClick={() => setActiveTab('map')} className={`px-8 py-5 font-extrabold text-xs uppercase tracking-widest whitespace-nowrap transition-all ${activeTab === 'map' ? 'border-b-2 border-indigo-600 text-indigo-700 bg-white/50 dark:bg-slate-800/50' : 'text-slate-400 hover:text-indigo-500 hover:bg-white/20 dark:bg-slate-800/20'}`}>
+                    <button onClick={() => setActiveTab('map')} className={`px-4 sm:px-8 py-3 sm:py-5 font-extrabold text-[10px] sm:text-xs uppercase tracking-widest whitespace-nowrap transition-all ${activeTab === 'map' ? 'border-b-2 border-indigo-600 text-indigo-700 bg-white/50 dark:bg-slate-800/50' : 'text-slate-400 hover:text-indigo-500 hover:bg-white/20 dark:bg-slate-800/20'}`}>
                         Mapa Visual
                     </button>
-                    <button onClick={() => setActiveTab('faq')} className={`px-8 py-5 font-extrabold text-xs uppercase tracking-widest whitespace-nowrap transition-all ${activeTab === 'faq' ? 'border-b-2 border-indigo-600 text-indigo-700 bg-white/50 dark:bg-slate-800/50' : 'text-slate-400 hover:text-indigo-500 hover:bg-white/20 dark:bg-slate-800/20'}`}>
+                    <button onClick={() => setActiveTab('faq')} className={`px-4 sm:px-8 py-3 sm:py-5 font-extrabold text-[10px] sm:text-xs uppercase tracking-widest whitespace-nowrap transition-all ${activeTab === 'faq' ? 'border-b-2 border-indigo-600 text-indigo-700 bg-white/50 dark:bg-slate-800/50' : 'text-slate-400 hover:text-indigo-500 hover:bg-white/20 dark:bg-slate-800/20'}`}>
                         Preguntas (FAQ)
                     </button>
                 </div>
 
-                <div className="p-8 flex-1 overflow-y-auto custom-scrollbar relative z-10">
+                <div className="p-3 sm:p-8 flex-1 overflow-y-auto custom-scrollbar relative z-10">
                     {loading ? (
                         <div className="flex flex-col items-center justify-center h-full gap-4 text-indigo-500">
                             <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin shadow-lg"></div>
@@ -383,7 +383,7 @@ const ScriptViewV2 = () => {
             {showGallery && createPortal(
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-fade-in">
                     <div className="bg-white/9 dark:bg-slate-800/95 backdrop-blur-2xl rounded-[2rem] shadow-2xl w-full max-w-6xl 2xl:max-w-7xl max-h-[85vh] flex flex-col border border-white relative overflow-hidden">
-                        <div className="p-8 border-b border-white flex justify-between items-center bg-white/4 dark:bg-slate-800/40 sticky top-0 z-10 backdrop-blur-md">
+                        <div className="p-4 sm:p-8 border-b border-white flex justify-between items-center bg-white/4 dark:bg-slate-800/40 sticky top-0 z-10 backdrop-blur-md">
                             <div>
                                 <h3 className="text-2xl font-extrabold text-slate-800 tracking-tight">Galería de Medios</h3>
                                 <p className="text-xs font-bold text-indigo-500 uppercase tracking-widest mt-1">Selecciona una imagen para el paso</p>
@@ -392,7 +392,7 @@ const ScriptViewV2 = () => {
                                 <Close className="w-4 h-4" />
                             </button>
                         </div>
-                        <div className="p-8 overflow-y-auto custom-scrollbar flex-1 bg-slate-50/5 dark:bg-slate-800/50">
+                        <div className="p-3 sm:p-8 overflow-y-auto custom-scrollbar flex-1 bg-slate-50/5 dark:bg-slate-800/50">
                             {galleryImages.length === 0 ? (
                                 <div className="text-center py-20">
                                     <div className="w-20 h-20 bg-white shadow-sm border border-slate-200 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">

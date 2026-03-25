@@ -82,10 +82,10 @@ const AlertsPanelV2 = ({ alerts, onCommand, onQuickAction }) => {
                         return (
                             <div key={alert.id} className="group overflow-hidden rounded-3xl border border-white/8 dark:border-slate-700/80 dark:border-slate-700/80 bg-white/6 dark:bg-slate-800/60 dark:bg-slate-800/60 backdrop-blur-xl shadow-lg hover:shadow-xl transition-all duration-300">
                                 {/* Header del Alerta */}
-                                <div className="p-6 cursor-pointer hover:bg-white/4 dark:bg-slate-800/40 dark:hover:bg-slate-800/40 transition-colors" onClick={() => toggleExpand(alert.id)}>
-                                    <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-4">
-                                        <div className="flex items-start gap-4">
-                                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-100 to-pink-50 dark:from-rose-900/30 dark:to-pink-900/30 flex items-center justify-center text-rose-500 dark:text-rose-400 text-xl shadow-inner border border-rose-100 dark:border-rose-900/50 shrink-0">
+                                <div className="p-3 sm:p-6 cursor-pointer hover:bg-white/4 dark:bg-slate-800/40 dark:hover:bg-slate-800/40 transition-colors" onClick={() => toggleExpand(alert.id)}>
+                                    <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 sm:gap-4">
+                                        <div className="flex items-start gap-2 sm:gap-4">
+                                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-rose-100 to-pink-50 dark:from-rose-900/30 dark:to-pink-900/30 flex items-center justify-center text-rose-500 dark:text-rose-400 text-lg sm:text-xl shadow-inner border border-rose-100 dark:border-rose-900/50 shrink-0">
                                                 🚨
                                             </div>
                                             <div className="min-w-0">
@@ -126,7 +126,7 @@ const AlertsPanelV2 = ({ alerts, onCommand, onQuickAction }) => {
 
                                 {/* Contenido Expandido */}
                                 {isExpanded && (
-                                    <div className="border-t border-slate-200/50 dark:border-slate-700/50 bg-white/3 dark:bg-slate-800/30 dark:bg-slate-800/30 p-6">
+                                    <div className="border-t border-slate-200/50 dark:border-slate-700/50 bg-white/3 dark:bg-slate-800/30 dark:bg-slate-800/30 p-3 sm:p-6">
                                         {isOrderApproval && (
                                             <div className="mb-6 bg-white/8 dark:bg-slate-800/80 dark:bg-slate-900/50 rounded-2xl p-5 border border-slate-100 dark:border-slate-800 shadow-sm">
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">

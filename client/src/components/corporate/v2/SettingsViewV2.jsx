@@ -140,13 +140,13 @@ const SettingsViewV2 = ({ status }) => {
             <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-indigo-50/50 via-transparent to-purple-50/50 pointer-events-none z-0"></div>
 
             {/* Header V2 */}
-            <div className="bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-8 mb-8 relative z-10">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div className="bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl rounded-[1.25rem] sm:rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-4 sm:p-8 mb-4 sm:mb-8 relative z-10">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 sm:gap-6">
                     <div>
-                        <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-700 to-purple-600 dark:from-indigo-400 dark:to-purple-400 tracking-tight">
+                        <h1 className="text-xl sm:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-700 to-purple-600 dark:from-indigo-400 dark:to-purple-400 tracking-tight">
                             Configuración Base
                         </h1>
-                        <p className="text-slate-500 dark:text-slate-400 mt-2 font-medium">Parámetros del sistema, precios y modelos AI operando.</p>
+                        <p className="text-slate-500 dark:text-slate-400 mt-1 sm:mt-2 text-sm sm:text-base font-medium">Parámetros del sistema, precios y modelos AI operando.</p>
                     </div>
 
                     <div className={`px-5 py-2.5 rounded-xl border flex items-center gap-3 backdrop-blur-md shadow-sm ${status === 'ready' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-700' : 'bg-rose-500/10 border-rose-500/20 text-rose-700'}`}>
@@ -158,11 +158,11 @@ const SettingsViewV2 = ({ status }) => {
 
             {/* Content Display */}
             <div className="flex-1 overflow-y-auto custom-scrollbar pb-20 px-1 relative z-10">
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-8">
                     {/* Left Column: Editor & Tools */}
-                    <div className="space-y-8">
+                    <div className="space-y-4 sm:space-y-8">
                         {/* Wrapper for original PriceEditor to adapt it to Glassmorphism */}
-                        <div className="bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl p-8 rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
+                        <div className="bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl p-4 sm:p-8 rounded-[1.25rem] sm:rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
                             <div className="absolute -top-32 -left-32 w-64 h-64 bg-indigo-400/10 blur-[60px] rounded-full pointer-events-none"></div>
                             <div className="relative z-10">
                                 <PriceEditor />
@@ -171,11 +171,11 @@ const SettingsViewV2 = ({ status }) => {
                     </div>
 
                     {/* Right Column: Scripts & Danger */}
-                    <div className="space-y-8">
+                    <div className="space-y-4 sm:space-y-8">
                         {/* Script Switcher V2 */}
-                        <div className="bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl p-8 rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
+                        <div className="bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl p-4 sm:p-8 rounded-[1.25rem] sm:rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
                             <div className="absolute -bottom-20 -right-20 w-80 h-80 bg-purple-400/10 blur-[80px] rounded-full pointer-events-none"></div>
-                            <div className="flex items-center gap-4 mb-8 relative z-10">
+                            <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-8 relative z-10">
                                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-fuchsia-600 text-white flex items-center justify-center shadow-lg shadow-purple-500/20">
                                     <FileText className="w-6 h-6" />
                                 </div>
@@ -230,7 +230,7 @@ const SettingsViewV2 = ({ status }) => {
                         </div>
 
                         {/* Danger Zone */}
-                        <div className="bg-rose-50/50 dark:bg-slate-800/40 backdrop-blur-xl p-8 rounded-[2rem] border border-rose-200/50 dark:border-rose-900/50 shadow-[0_8px_30px_rgba(244,63,94,0.04)] relative overflow-hidden group">
+                        <div className="bg-rose-50/50 dark:bg-slate-800/40 backdrop-blur-xl p-4 sm:p-8 rounded-[1.25rem] sm:rounded-[2rem] border border-rose-200/50 dark:border-rose-900/50 shadow-[0_8px_30px_rgba(244,63,94,0.04)] relative overflow-hidden group">
                             <div className="absolute -left-20 top-1/2 -translate-y-1/2 w-40 h-40 bg-rose-500/10 blur-[40px] rounded-full group-hover:bg-rose-500/20 transition-colors pointer-events-none"></div>
                             <div className="absolute left-0 top-0 bottom-0 w-2 bg-gradient-to-b from-rose-400 to-rose-600 rounded-l-[2rem]"></div>
 
@@ -249,7 +249,7 @@ const SettingsViewV2 = ({ status }) => {
                         </div>
 
                         {/* Herramientas */}
-                        <div className="bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl p-8 rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
+                        <div className="bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl p-4 sm:p-8 rounded-[1.25rem] sm:rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
                             <div className="absolute top-0 right-0 w-32 h-32 bg-blue-400/10 blur-[50px] rounded-full pointer-events-none"></div>
                             <div className="flex items-center gap-4 mb-6 relative z-10">
                                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/20">
@@ -270,7 +270,7 @@ const SettingsViewV2 = ({ status }) => {
 
                     {/* FULL WIDTH: Memory Management Panel */}
                     <div className="xl:col-span-2">
-                        <div className={`bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl p-8 rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden ${memStats ? getMemoryLabel().glow : ''}`}>
+                        <div className={`bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl p-4 sm:p-8 rounded-[1.25rem] sm:rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden ${memStats ? getMemoryLabel().glow : ''}`}>
                             <div className="absolute -top-20 -right-20 w-80 h-80 bg-indigo-400/10 blur-[80px] rounded-full pointer-events-none"></div>
                             <div className="absolute left-0 top-0 bottom-0 w-2 bg-gradient-to-b from-indigo-400 to-purple-600 rounded-l-[2rem]"></div>
 

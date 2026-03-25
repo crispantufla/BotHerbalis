@@ -137,12 +137,12 @@ const AdvancedAnalyticsViewV2 = () => {
             <div className="p-4 sm:p-6 lg:p-8 flex-1 flex flex-col min-h-0">
 
                 {/* Header & Global Filters */}
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-3 sm:gap-4 mb-4 sm:mb-8">
                     <div>
-                        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+                        <h1 className="text-lg sm:text-2xl md:text-3xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
                             <Activity className="text-indigo-500 hidden sm:block" /> Business Intelligence
                         </h1>
-                        <p className="text-slate-500 dark:text-slate-400 mt-1">
+                        <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm sm:text-base hidden sm:block">
                             Análisis de rendimiento, conversión y ventas detallado del bot.
                         </p>
                     </div>
@@ -227,7 +227,7 @@ const AdvancedAnalyticsViewV2 = () => {
 
                 {/* --- SECCIÓN A: RESUMEN EJECUTIVO --- */}
                 <h2 className={`text-sm font-bold uppercase tracking-widest mb-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Resumen Ejecutivo</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-6 sm:mb-8">
                     {/* Revenue */}
                     <div className={`p-5 md:p-6 rounded-3xl border shadow-sm ${isDark ? 'bg-slate-800/40 border-slate-700/50' : 'bg-white border-slate-200'} relative overflow-hidden group`}>
                         <div className="absolute -right-6 -top-6 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl group-hover:bg-emerald-500/10 transition-colors"></div>
