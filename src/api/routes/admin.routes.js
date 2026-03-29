@@ -1,9 +1,13 @@
 const logger = require('../../utils/logger');
 const express = require('express');
+const { v4: uuidv4 } = require('uuid');
+const { PrismaClient } = require('@prisma/client');
 const { authMiddleware } = require('../../middleware/auth');
 const validate = require('../../middleware/validate');
 const { configSchema, scriptSchema } = require('../../schemas/admin.schema');
 const { adminCommandSchema } = require('../../schemas/system.schema');
+
+const prisma = new PrismaClient();
 
 module.exports = (client, sharedState) => {
     const router = express.Router();
@@ -50,6 +54,7 @@ module.exports = (client, sharedState) => {
     // POST /mp-link — generate MercadoPago payment link
     router.post('/mp-link', authMiddleware, async (req, res) => {
         const amount = parseFloat(req.body?.amount);
+        const userPhone = req.body?.userPhone || null;
         if (!amount || amount <= 0) return res.status(400).json({ error: 'Monto inválido' });
 
         const mpToken = process.env.MP_ACCESS_TOKEN;
@@ -57,16 +62,35 @@ module.exports = (client, sharedState) => {
 
         try {
             const { MercadoPagoConfig, Preference } = require('mercadopago');
+            const externalRef = uuidv4();
+            const webhookUrl = process.env.MP_WEBHOOK_URL;
             const mpClient = new MercadoPagoConfig({ accessToken: mpToken });
             const preference = new Preference(mpClient);
-            const response = await preference.create({
-                body: {
-                    items: [{ title: 'Pago Herbalis', quantity: 1, unit_price: amount, currency_id: 'ARS' }],
-                    back_urls: { success: 'https://herbalis.com.ar', failure: 'https://herbalis.com.ar', pending: 'https://herbalis.com.ar' },
-                    auto_return: 'approved',
+            const body = {
+                items: [{ title: 'Pago Herbalis', quantity: 1, unit_price: amount, currency_id: 'ARS' }],
+                back_urls: { success: 'https://herbalis.com.ar', failure: 'https://herbalis.com.ar', pending: 'https://herbalis.com.ar' },
+                auto_return: 'approved',
+                external_reference: externalRef,
+            };
+            if (webhookUrl) body.notification_url = webhookUrl;
+
+            const response = await preference.create({ body });
+            const link = response.init_point;
+
+            const record = await prisma.paymentLink.create({
+                data: {
+                    preferenceId: response.id,
+                    externalRef,
+                    amount,
+                    link,
+                    userPhone,
+                    source: 'dashboard',
+                    status: 'pending',
                 }
             });
-            res.json({ link: response.init_point, amount });
+
+            if (sharedState.io) sharedState.io.emit('payment_created', record);
+            res.json({ link, amount, paymentId: record.id });
         } catch (e) {
             logger.error('[MP] Error creating preference:', e);
             res.status(500).json({ error: e?.message || 'Error generando enlace' });

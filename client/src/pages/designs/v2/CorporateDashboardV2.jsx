@@ -15,8 +15,9 @@ import GalleryViewV2 from '../../../components/corporate/v2/GalleryViewV2';
 import AdvancedAnalyticsViewV2 from '../../../components/corporate/v2/AdvancedAnalyticsViewV2';
 import ManualsViewV2 from '../../../components/corporate/v2/ManualsViewV2';
 import WaitingCustomersPanel from '../../../components/corporate/v2/dashboard/WaitingCustomersPanel';
+import PaymentsViewV2 from '../../../components/corporate/v2/PaymentsViewV2';
 
-import { Wifi, MessageCircle, Database, Settings, FileText, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Search, Bell, AlertTriangle, BookOpen, MoreHorizontal } from 'lucide-react';
+import { Wifi, MessageCircle, Database, Settings, FileText, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Search, Bell, AlertTriangle, BookOpen, MoreHorizontal, CreditCard } from 'lucide-react';
 
 const CorporateDashboardV2 = () => {
     const { socket } = useSocket();
@@ -196,6 +197,11 @@ const CorporateDashboardV2 = () => {
             case 'gallery': return <GalleryViewV2 />;
             case 'manuals': return <ManualsViewV2 />;
             case 'settings': return <SettingsViewV2 status={status} />;
+            case 'payments': return (
+                <div className="p-6 md:p-8 w-full">
+                    <PaymentsViewV2 onGoToChat={(chatId) => handleQuickAction(chatId, 'chat')} />
+                </div>
+            );
             case 'espera': return (
                 <div className="p-6 md:p-8 max-w-3xl mx-auto w-full">
                     <div className="mb-7">
@@ -288,6 +294,7 @@ const CorporateDashboardV2 = () => {
                     <NavItem tab="logistics" icon={Database} label="Ventas & Logística" />
                     <NavItem tab="statistics" icon={BarChart2} label="Estadísticas" />
                     <NavItem tab="espera" icon={PhoneCall} label="Clientes Esperando" />
+                    <NavItem tab="payments" icon={CreditCard} label="Pagos MP" />
                     <NavItem tab="script" icon={FileText} label="Guión & Prompts" />
                     <NavItem tab="gallery" icon={ImageIcon} label="Galería de Medios" />
                     <NavItem tab="manuals" icon={BookOpen} label="Manuales" />

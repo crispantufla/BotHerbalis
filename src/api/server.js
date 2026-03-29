@@ -13,6 +13,7 @@ const systemRoutes = require('./routes/system.routes');
 const analyticsRoutes = require('./routes/analytics.routes');
 const authRoutes = require('./routes/auth.routes');
 const galleryRoutes = require('./routes/gallery.routes');
+const paymentRoutes = require('./routes/payment.routes');
 
 function startServer(client, sharedState) {
     const { userState, sessionAlerts } = sharedState;
@@ -188,6 +189,7 @@ function startServer(client, sharedState) {
     app.use('/api', analyticsRoutes(client, sharedState));
     app.use('/api', authRoutes(client, sharedState));
     app.use('/api', galleryRoutes(client, sharedState));
+    app.use('/api', paymentRoutes(client, sharedState));
 
     // Handle React Routing, return all requests to React app
     // Express 5: using regex or * should work, but let's try a catch-all middleware at the end

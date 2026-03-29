@@ -1,10 +1,14 @@
 import { exec } from 'child_process';
 import fs from 'fs';
 import path from 'path';
+import { randomUUID } from 'crypto';
+import { PrismaClient } from '@prisma/client';
 import { UserState, SharedState, AlertEntry, AlertOrderData, BotConfig, QuickReply } from '../types/state';
 import { aiService } from './ai';
 import { _getQuickReplies } from '../flows/utils/messages';
 import logger from '../utils/logger';
+
+const prisma = new PrismaClient();
 
 /**
  * Módulo de Servicios de Administrador
@@ -640,16 +644,35 @@ export async function handleAdminCommand(
                     const { MercadoPagoConfig, Preference } = require('mercadopago');
                     const mpToken = process.env.MP_ACCESS_TOKEN;
                     if (!mpToken) return '⚠️ MP_ACCESS_TOKEN no configurado en .env';
+                    const externalRef = randomUUID();
+                    const webhookUrl = process.env.MP_WEBHOOK_URL;
                     const mpClient = new MercadoPagoConfig({ accessToken: mpToken });
                     const preference = new Preference(mpClient);
-                    const response = await preference.create({
-                        body: {
-                            items: [{ title: 'Pago Herbalis', quantity: 1, unit_price: amount, currency_id: 'ARS' }],
-                            back_urls: { success: 'https://herbalis.com.ar', failure: 'https://herbalis.com.ar', pending: 'https://herbalis.com.ar' },
-                            auto_return: 'approved',
+                    const body: any = {
+                        items: [{ title: 'Pago Herbalis', quantity: 1, unit_price: amount, currency_id: 'ARS' }],
+                        back_urls: { success: 'https://herbalis.com.ar', failure: 'https://herbalis.com.ar', pending: 'https://herbalis.com.ar' },
+                        auto_return: 'approved',
+                        external_reference: externalRef,
+                    };
+                    if (webhookUrl) body.notification_url = webhookUrl;
+                    const response = await preference.create({ body });
+                    const link = response.init_point;
+
+                    // Persist to DB
+                    const sellerPhone = targetChatId || null;
+                    const record = await prisma.paymentLink.create({
+                        data: {
+                            preferenceId: response.id,
+                            externalRef,
+                            amount,
+                            link,
+                            sellerPhone,
+                            source: 'whatsapp',
+                            status: 'pending',
                         }
                     });
-                    const link = response.init_point;
+                    if (sharedState.io) sharedState.io.emit('payment_created', record);
+
                     logger.info(`[MP] Payment link created for $${amount} ARS: ${link}`);
                     return `✅ Enlace de pago generado:\n💳 $${amount} ARS\n\n${link}`;
                 } catch (e: any) {

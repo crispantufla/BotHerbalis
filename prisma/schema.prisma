@@ -74,6 +74,25 @@ model BotConfig {
   @@id([instanceId, key])
 }
 
+model PaymentLink {
+  id             String    @id @default(uuid())
+  instanceId     String    @default("default")
+  preferenceId   String    @unique
+  externalRef    String    @unique
+  amount         Float
+  status         String    @default("pending") // pending | approved | rejected | expired
+  link           String
+  userPhone      String?
+  sellerPhone    String?
+  source         String    @default("dashboard") // "dashboard" | "whatsapp"
+  paidAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([instanceId])
+}
+
 model DailyStats {
   id              String   @id @default(uuid())
   instanceId      String   @default("default")
