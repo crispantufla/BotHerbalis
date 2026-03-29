@@ -239,57 +239,6 @@ const DashboardViewV2 = ({ alerts = [], config, handleQuickAction, status, qrDat
             {/* A. KPI DECK V2 */}
             <StatsPanelV2 stats={stats} loadingStats={loadingStats} alertsCount={alerts.length} />
 
-            {/* C. MERCADOPAGO LINK GENERATOR */}
-            <div className="bg-white dark:bg-slate-800/80 border border-slate-100/80 dark:border-slate-700/80 rounded-2xl p-5 shadow-sm">
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="w-9 h-9 flex items-center justify-center rounded-xl bg-sky-50 dark:bg-sky-900/30 text-sky-500 border border-sky-100 dark:border-sky-800/50 flex-shrink-0">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
-                    </div>
-                    <div>
-                        <h3 className="font-bold text-slate-800 dark:text-slate-100 text-sm leading-none">Generar Enlace de Pago</h3>
-                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">MercadoPago · ARS</p>
-                    </div>
-                </div>
-                <div className="flex gap-2">
-                    <div className="relative flex-1">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-semibold text-sm">$</span>
-                        <input
-                            type="number"
-                            min="1"
-                            placeholder="0.00"
-                            value={mpAmount}
-                            onChange={e => { setMpAmount(e.target.value); setMpLink(''); }}
-                            onKeyDown={e => e.key === 'Enter' && handleGenerateMpLink()}
-                            className="w-full pl-7 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all text-sm"
-                        />
-                    </div>
-                    <button
-                        onClick={handleGenerateMpLink}
-                        disabled={mpLoading || !mpAmount}
-                        className="px-5 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white font-bold text-sm transition-all shadow-sm shadow-sky-500/30 flex-shrink-0"
-                    >
-                        {mpLoading ? (
-                            <span className="flex items-center gap-1.5"><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>Generando</span>
-                        ) : 'Generar'}
-                    </button>
-                </div>
-                {mpLink && (
-                    <div className="mt-3 flex items-center gap-2 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2">
-                        <a href={mpLink} target="_blank" rel="noopener noreferrer" className="flex-1 text-sky-600 dark:text-sky-400 text-xs font-medium truncate hover:underline">{mpLink}</a>
-                        <button
-                            onClick={handleCopyMpLink}
-                            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex-shrink-0 ${mpCopied ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-sky-100 dark:hover:bg-sky-900/30 hover:text-sky-600 dark:hover:text-sky-400'}`}
-                        >
-                            {mpCopied ? (
-                                <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"/></svg>Copiado</>
-                            ) : (
-                                <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3"/></svg>Copiar</>
-                            )}
-                        </button>
-                    </div>
-                )}
-            </div>
-
             {/* B. MAIN GRID V2 */}
             <div className="grid grid-cols-1 lg:grid-cols-3 2xl:grid-cols-5 gap-4 sm:gap-8">
                 {/* B1. ALERTS V2 — takes 2/3 on lg, 3/5 on 2xl */}
@@ -297,9 +246,57 @@ const DashboardViewV2 = ({ alerts = [], config, handleQuickAction, status, qrDat
                     <AlertsPanelV2 alerts={alerts} onCommand={handleAdminCommand} onQuickAction={handleQuickAction} />
                 </div>
 
-                {/* B2. SYSTEM STATUS V2 — takes 1/3 on lg, 2/5 on 2xl */}
-                <div className="lg:col-span-1 2xl:col-span-2">
+                {/* B2. SYSTEM STATUS + MP WIDGET — takes 1/3 on lg, 2/5 on 2xl */}
+                <div className="lg:col-span-1 2xl:col-span-2 flex flex-col gap-4 sm:gap-8">
                     <SystemStatusPanelV2 status={status} activeConversations={stats?.activeConversations} adminNumbers={adminNumbers} onAddPhone={handleAddPhone} onRemovePhone={handleRemovePhone} onRegenerateQR={handleRegenerateQR} />
+
+                    {/* C. MERCADOPAGO LINK GENERATOR */}
+                    <div className="bg-white dark:bg-slate-800/80 border border-slate-100/80 dark:border-slate-700/80 rounded-2xl p-4 shadow-sm">
+                        <div className="flex items-center gap-2 mb-3">
+                            <div className="w-7 h-7 flex items-center justify-center rounded-lg bg-sky-50 dark:bg-sky-900/30 text-sky-500 border border-sky-100 dark:border-sky-800/50 flex-shrink-0">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                            </div>
+                            <span className="font-bold text-slate-700 dark:text-slate-200 text-xs uppercase tracking-wide">Enlace de Pago · MP</span>
+                        </div>
+                        <div className="flex gap-2">
+                            <div className="relative flex-1">
+                                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-semibold text-xs">$</span>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    placeholder="Monto"
+                                    value={mpAmount}
+                                    onChange={e => { setMpAmount(e.target.value); setMpLink(''); }}
+                                    onKeyDown={e => e.key === 'Enter' && handleGenerateMpLink()}
+                                    className="w-full pl-6 pr-2 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all text-xs"
+                                />
+                            </div>
+                            <button
+                                onClick={handleGenerateMpLink}
+                                disabled={mpLoading || !mpAmount}
+                                className="px-3 py-2 rounded-lg bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white font-bold text-xs transition-all shadow-sm shadow-sky-500/30 flex-shrink-0"
+                            >
+                                {mpLoading ? (
+                                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                                ) : 'Generar'}
+                            </button>
+                        </div>
+                        {mpLink && (
+                            <div className="mt-2 flex items-center gap-2 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5">
+                                <a href={mpLink} target="_blank" rel="noopener noreferrer" className="flex-1 text-sky-600 dark:text-sky-400 text-xs truncate hover:underline">{mpLink}</a>
+                                <button
+                                    onClick={handleCopyMpLink}
+                                    className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold transition-all flex-shrink-0 ${mpCopied ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-sky-100 dark:hover:bg-sky-900/30 hover:text-sky-600'}`}
+                                >
+                                    {mpCopied ? (
+                                        <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"/></svg>OK</>
+                                    ) : (
+                                        <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3"/></svg>Copiar</>
+                                    )}
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
