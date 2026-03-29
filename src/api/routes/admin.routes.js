@@ -47,6 +47,32 @@ module.exports = (client, sharedState) => {
         }
     });
 
+    // POST /mp-link — generate MercadoPago payment link
+    router.post('/mp-link', authMiddleware, async (req, res) => {
+        const amount = parseFloat(req.body?.amount);
+        if (!amount || amount <= 0) return res.status(400).json({ error: 'Monto inválido' });
+
+        const mpToken = process.env.MP_ACCESS_TOKEN;
+        if (!mpToken) return res.status(500).json({ error: 'MP_ACCESS_TOKEN no configurado' });
+
+        try {
+            const { MercadoPagoConfig, Preference } = require('mercadopago');
+            const mpClient = new MercadoPagoConfig({ accessToken: mpToken });
+            const preference = new Preference(mpClient);
+            const response = await preference.create({
+                body: {
+                    items: [{ title: 'Pago Herbalis', quantity: 1, unit_price: amount, currency_id: 'ARS' }],
+                    back_urls: { success: 'https://herbalis.com.ar', failure: 'https://herbalis.com.ar', pending: 'https://herbalis.com.ar' },
+                    auto_return: 'approved',
+                }
+            });
+            res.json({ link: response.init_point, amount });
+        } catch (e) {
+            logger.error('[MP] Error creating preference:', e);
+            res.status(500).json({ error: e?.message || 'Error generando enlace' });
+        }
+    });
+
     // POST /config
     router.post('/config', authMiddleware, validate(configSchema), async (req, res) => {
         const { alertNumber, action, number } = req.body;

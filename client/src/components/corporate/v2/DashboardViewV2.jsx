@@ -95,6 +95,33 @@ const DashboardViewV2 = ({ alerts = [], config, handleQuickAction, status, qrDat
         } catch (e) { toast.error('Error al desconectar'); }
     };
 
+    // MercadoPago link generator
+    const [mpAmount, setMpAmount] = useState('');
+    const [mpLink, setMpLink] = useState('');
+    const [mpLoading, setMpLoading] = useState(false);
+    const [mpCopied, setMpCopied] = useState(false);
+
+    const handleGenerateMpLink = async () => {
+        const amount = parseFloat(mpAmount.replace(',', '.'));
+        if (!amount || amount <= 0) { toast.warning('Ingresá un monto válido'); return; }
+        setMpLoading(true);
+        setMpLink('');
+        try {
+            const res = await api.post('/api/mp-link', { amount });
+            setMpLink(res.data.link);
+        } catch (e) {
+            toast.error(e.response?.data?.error || 'Error generando enlace');
+        } finally {
+            setMpLoading(false);
+        }
+    };
+
+    const handleCopyMpLink = () => {
+        navigator.clipboard.writeText(mpLink);
+        setMpCopied(true);
+        setTimeout(() => setMpCopied(false), 2000);
+    };
+
     const adminNumbers = config?.alertNumbers || (config?.alertNumber ? [config.alertNumber] : []);
 
     const isGlobalPause = !!stats?.globalPause;
@@ -211,6 +238,57 @@ const DashboardViewV2 = ({ alerts = [], config, handleQuickAction, status, qrDat
 
             {/* A. KPI DECK V2 */}
             <StatsPanelV2 stats={stats} loadingStats={loadingStats} alertsCount={alerts.length} />
+
+            {/* C. MERCADOPAGO LINK GENERATOR */}
+            <div className="bg-white dark:bg-slate-800/80 border border-slate-100/80 dark:border-slate-700/80 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="w-9 h-9 flex items-center justify-center rounded-xl bg-sky-50 dark:bg-sky-900/30 text-sky-500 border border-sky-100 dark:border-sky-800/50 flex-shrink-0">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                    </div>
+                    <div>
+                        <h3 className="font-bold text-slate-800 dark:text-slate-100 text-sm leading-none">Generar Enlace de Pago</h3>
+                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">MercadoPago · ARS</p>
+                    </div>
+                </div>
+                <div className="flex gap-2">
+                    <div className="relative flex-1">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-semibold text-sm">$</span>
+                        <input
+                            type="number"
+                            min="1"
+                            placeholder="0.00"
+                            value={mpAmount}
+                            onChange={e => { setMpAmount(e.target.value); setMpLink(''); }}
+                            onKeyDown={e => e.key === 'Enter' && handleGenerateMpLink()}
+                            className="w-full pl-7 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all text-sm"
+                        />
+                    </div>
+                    <button
+                        onClick={handleGenerateMpLink}
+                        disabled={mpLoading || !mpAmount}
+                        className="px-5 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white font-bold text-sm transition-all shadow-sm shadow-sky-500/30 flex-shrink-0"
+                    >
+                        {mpLoading ? (
+                            <span className="flex items-center gap-1.5"><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>Generando</span>
+                        ) : 'Generar'}
+                    </button>
+                </div>
+                {mpLink && (
+                    <div className="mt-3 flex items-center gap-2 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2">
+                        <a href={mpLink} target="_blank" rel="noopener noreferrer" className="flex-1 text-sky-600 dark:text-sky-400 text-xs font-medium truncate hover:underline">{mpLink}</a>
+                        <button
+                            onClick={handleCopyMpLink}
+                            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex-shrink-0 ${mpCopied ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-sky-100 dark:hover:bg-sky-900/30 hover:text-sky-600 dark:hover:text-sky-400'}`}
+                        >
+                            {mpCopied ? (
+                                <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"/></svg>Copiado</>
+                            ) : (
+                                <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3"/></svg>Copiar</>
+                            )}
+                        </button>
+                    </div>
+                )}
+            </div>
 
             {/* B. MAIN GRID V2 */}
             <div className="grid grid-cols-1 lg:grid-cols-3 2xl:grid-cols-5 gap-4 sm:gap-8">
