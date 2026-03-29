@@ -27,7 +27,7 @@ workerConnection.on('ready', () => {
 
 // --- QUEUE ---
 const QUEUE_NAME = `whatsapp-messages-${process.env.INSTANCE_ID || 'default'}`;
-export const botQueue = new Queue(QUEUE_NAME, { connection: redisConnection });
+export const botQueue = new Queue(QUEUE_NAME, { connection: redisConnection as any });
 
 // --- MODULE-LEVEL WORKER REF (for shutdown) ---
 let _worker: Worker | null = null;
@@ -87,7 +87,7 @@ export function initWorker(dependencies: any) {
             throw error;
         }
     }, {
-        connection: workerConnection,
+        connection: workerConnection as any,
         concurrency: 3,
         settings: {
             backoffStrategy: (attemptsMade: number, type: string, err: Error, job: Job) => {

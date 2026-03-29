@@ -25,3 +25,4 @@ const env = cleanEnv(process.env, {
 });
 
 module.exports = { env };
+export {};

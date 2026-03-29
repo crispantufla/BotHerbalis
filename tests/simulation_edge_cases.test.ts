@@ -8,7 +8,7 @@ const mockSendMessage = jest.fn();
 const mockNotifyAdmin = jest.fn();
 const mockSaveState = jest.fn();
 
-const mockDependencies = {
+const mockDependencies: any = {
     client: {},
     notifyAdmin: mockNotifyAdmin,
     saveState: mockSaveState,
@@ -266,3 +266,5 @@ describe('100 Conversations Stress Test with Edge Cases', () => {
     }, 30000);
 
 });
+
+export {};

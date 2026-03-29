@@ -1330,3 +1330,5 @@ initWorker({
 });
 
 safeInitialize().catch(e => logger.error('[INIT] Fatal initialization error:', e.message));
+
+export {};
