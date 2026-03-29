@@ -1,7 +1,7 @@
 const logger = require('../../utils/logger');
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
-const { prisma } = require('../../db');
+const { prisma } = require('../../../db');
 const { authMiddleware } = require('../../middleware/auth');
 const validate = require('../../middleware/validate');
 const { configSchema, scriptSchema } = require('../../schemas/admin.schema');

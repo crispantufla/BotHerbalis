@@ -1,5 +1,5 @@
 const express = require('express');
-const { prisma } = require('../../db');
+const { prisma } = require('../../../db');
 const { authMiddleware } = require('../../middleware/auth');
 const logger = require('../../utils/logger');
 
