@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { SocketProvider } from './context/SocketContext';
 import { ToastProvider } from './components/ui/Toast';
 import { ThemeProvider } from './context/ThemeContext';
-import CorporateDashboardV2 from './pages/designs/v2/CorporateDashboardV2';
+import CorporateDashboard from './pages/designs/CorporateDashboard';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 
@@ -30,7 +30,7 @@ function App() {
                                     {/* Protected Route - Corporate Enterprise V2 (Main Dashboard) */}
                                     <Route path="/*" element={
                                         <ProtectedRoute>
-                                            <CorporateDashboardV2 />
+                                            <CorporateDashboard />
                                         </ProtectedRoute>
                                     } />
 

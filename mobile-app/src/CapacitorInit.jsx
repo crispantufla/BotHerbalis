@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { StatusBar, Style } from '@capacitor/status-bar';
-import { useTheme } from '../context/ThemeContext';
+import { useTheme } from './context/ThemeContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 const CapacitorInit = () => {

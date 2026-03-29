@@ -1,0 +1,510 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import api from '../../config/axios';
+import { useSocket } from '../../context/SocketContext';
+import { useAuth } from '../../context/AuthContext';
+import { Link } from 'react-router-dom';
+import { useToast } from '../../components/ui/Toast';
+import { useTheme } from '../../context/ThemeContext';
+
+import DashboardView from '../../components/corporate/DashboardView';
+import CommsView from '../../components/corporate/CommsView';
+import SalesView from '../../components/corporate/SalesView';
+import SettingsView from '../../components/corporate/SettingsView';
+import ScriptView from '../../components/corporate/ScriptView';
+import GalleryView from '../../components/corporate/GalleryView';
+import AdvancedAnalyticsView from '../../components/corporate/AdvancedAnalyticsView';
+import ManualsView from '../../components/corporate/ManualsView';
+
+import { Wifi, MessageCircle, Database, Settings, FileText, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Search, Bell, AlertTriangle, BookOpen, MoreHorizontal } from 'lucide-react';
+
+const CorporateDashboard = () => {
+    const { socket } = useSocket();
+    const { logout } = useAuth();
+    const { toast } = useToast();
+    const { isDark, toggleTheme } = useTheme();
+    const [status, setStatus] = useState('initializing');
+    const [alerts, setAlerts] = useState([]);
+    const [activeTab, setActiveTab] = useState('dashboard');
+    const [qrData, setQrData] = useState(null);
+    const [config, setConfig] = useState({ alertNumbers: [] });
+    const [connectedPhone, setConnectedPhone] = useState(null);
+    const [targetChatId, setTargetChatId] = useState(null);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [isMobile, setIsMobile] = useState(false);
+    const [isPhone, setIsPhone] = useState(false);
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [globalSearch, setGlobalSearch] = useState('');
+    const globalSearchRef = useRef(null);
+    const [showNotifications, setShowNotifications] = useState(false);
+    const notifRef = useRef(null);
+
+    // Click outside to close notifications box
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (notifRef.current && !notifRef.current.contains(event.target)) {
+                setShowNotifications(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // Detección de Mobile
+    useEffect(() => {
+        const checkMobile = () => {
+            const w = window.innerWidth;
+            setIsMobile(w < 1024);
+            setIsPhone(w < 640);
+            if (w < 1024) setSidebarCollapsed(true);
+        };
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
+    // Ctrl+K global shortcut → focus search
+    useEffect(() => {
+        const handler = (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                e.preventDefault();
+                globalSearchRef.current?.focus();
+                globalSearchRef.current?.select();
+            }
+        };
+        window.addEventListener('keydown', handler);
+        return () => window.removeEventListener('keydown', handler);
+    }, []);
+
+    const handleGlobalSearch = (e) => {
+        e.preventDefault();
+        const q = globalSearch.trim();
+        if (!q) return;
+        // Navigate to chats if looks like a phone number, else sales
+        const looksLikePhone = /^\+?[\d\s\-()]{4,}$/.test(q);
+        setActiveTab(looksLikePhone ? 'comms' : 'logistics');
+        globalSearchRef.current?.blur();
+    };
+
+    const fetchConfig = useCallback(async () => {
+        try {
+            const res = await api.get('/api/status');
+            if (res.data.config) setConfig(res.data.config);
+            if (res.data.info?.wid?.user) setConnectedPhone(res.data.info.wid.user);
+        } catch (e) { }
+    }, []);
+
+    useEffect(() => {
+        if (socket) {
+            socket.on('qr', (data) => { setStatus('scan_qr'); setQrData(data); });
+            socket.on('ready', () => { setStatus('ready'); setQrData(null); fetchConfig(); });
+            socket.on('status_change', ({ status: newStatus }) => {
+                if (newStatus === 'disconnected') {
+                    setStatus('scan_qr');
+                    setQrData(null);
+                } else {
+                    setStatus(newStatus);
+                }
+            });
+            socket.on('new_alert', (newAlert) => {
+                setAlerts(prev => [newAlert, ...prev]);
+            });
+            socket.on('alerts_updated', (updated) => setAlerts(updated));
+        }
+
+        const loadData = async () => {
+            try {
+                const [alertRes, statusRes] = await Promise.all([
+                    api.get('/api/alerts'),
+                    api.get('/api/status')
+                ]);
+                setAlerts(alertRes.data);
+                if (statusRes.data.config) setConfig(statusRes.data.config);
+                if (statusRes.data.info?.wid?.user) setConnectedPhone(statusRes.data.info.wid.user);
+            } catch (e) { }
+        }
+        loadData();
+
+        const handleConfigUpdate = () => fetchConfig();
+        window.addEventListener('config-updated', handleConfigUpdate);
+        return () => window.removeEventListener('config-updated', handleConfigUpdate);
+    }, [socket, fetchConfig]);
+
+    const [processingAction, setProcessingAction] = useState(null); // Prevent double-click
+
+    const handleQuickAction = async (chatId, action, sellerPhone) => {
+        if (action === 'chat') {
+            const toastId = toast.info('Buscando chat...');
+            try {
+                const statusRes = await api.get('/api/status');
+                const connectedPhoneInfo = statusRes.data?.info?.wid?.user;
+                const connectedPhone = connectedPhoneInfo || config.alertNumber; // Fallback
+
+                if (sellerPhone && connectedPhone) {
+                    const cleanedSeller = sellerPhone.replace(/\D/g, '');
+                    const cleanedConnected = connectedPhone.replace(/\D/g, '');
+                    // Only block if we have both values perfectly and they differ
+                    if (!cleanedSeller.endsWith(cleanedConnected) && !cleanedConnected.endsWith(cleanedSeller)) {
+                        toast.dismiss(toastId);
+                        toast.warning('Esta venta se hizo desde otro \u00fanumero.');
+                        return; // Prevent redirecting
+                    }
+                }
+            } catch (e) {
+                // non-fatal, proceed
+            }
+
+            toast.dismiss(toastId);
+            setTargetChatId(chatId);
+            setActiveTab('comms');
+            return;
+        }
+
+        if (action === 'descartar') {
+            setAlerts(prev => prev.filter(a => a.userPhone !== chatId && a.userPhone !== `${chatId}@c.us`));
+            try { await api.delete(`/api/alerts/${chatId}`); } catch (e) { /* silent */ }
+            return;
+        }
+
+        // Prevent double-click
+        const actionKey = `${chatId}_${action}`;
+        if (processingAction === actionKey) return;
+        setProcessingAction(actionKey);
+
+        try {
+            if (action === 'confirmar') {
+                await api.post('/api/orders/manual-complete', { chatId });
+            } else {
+                await api.post('/api/admin-command', { chatId, command: action });
+            }
+            setAlerts(prev => prev.filter(a => a.userPhone !== chatId));
+            toast.success(`Acción ejecutada: ${action}`);
+        } catch (e) {
+            toast.error('Error ejecutando acción: ' + (e.response?.data?.error || e.message));
+        } finally {
+            setProcessingAction(null);
+        }
+    };
+
+    const renderContent = () => {
+        switch (activeTab) {
+            case 'dashboard': return <DashboardView alerts={alerts} config={config} handleQuickAction={handleQuickAction} status={status} qrData={qrData} />;
+            case 'statistics': return <AdvancedAnalyticsView />;
+            case 'comms': return <CommsView initialChatId={targetChatId} onChatSelected={() => setTargetChatId(null)} initialSearch={globalSearch} alerts={alerts} onAlertAction={handleQuickAction} />;
+            case 'logistics': return <SalesView onGoToChat={(chatId) => handleQuickAction(chatId, 'chat')} initialSearch={globalSearch} />;
+            case 'script': return <ScriptView />;
+            case 'gallery': return <GalleryView />;
+            case 'manuals': return <ManualsView />;
+            case 'settings': return <SettingsView status={status} />;
+            default: return <DashboardView alerts={alerts} config={config} handleQuickAction={handleQuickAction} status={status} qrData={qrData} />;
+        }
+    };
+
+    const NavItem = ({ tab, icon: Icon, label }) => {
+        const isActive = activeTab === tab;
+        return (
+            <button
+                onClick={() => { setActiveTab(tab); if (isMobile) setMobileMenuOpen(false); }}
+                className={`w-full flex items-center ${(sidebarCollapsed && !isMobile) ? 'justify-center px-0' : 'px-4'} py-3 mb-2 rounded-xl transition-all duration-300 group
+                ${isActive
+                        ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md shadow-indigo-500/30 border border-transparent'
+                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-indigo-600 dark:hover:text-white hover:shadow-sm border border-transparent'}`}
+                title={(sidebarCollapsed && !isMobile) ? label : ''}
+            >
+                <div className={`${(sidebarCollapsed && !isMobile) ? '' : 'mr-4'} transition-transform duration-300 group-hover:scale-110`}>
+                    <Icon className={`w-5 h-5 2xl:w-6 2xl:h-6 ${isActive ? 'text-white' : 'text-slate-400 dark:text-slate-500 dark:group-hover:text-white transition-colors duration-300'}`} strokeWidth={isActive ? 2.5 : 2} />
+                </div>
+                {(!sidebarCollapsed || isMobile) && <span className={`font-medium text-sm 2xl:text-base ${isActive ? 'text-white font-bold tracking-wide' : 'dark:group-hover:text-white transition-colors duration-300'}`}>{label}</span>}
+            </button>
+        );
+    };
+
+    return (
+        <div className="flex flex-col lg:flex-row h-screen overflow-hidden bg-slate-50 dark:bg-slate-900 font-sans text-slate-800 dark:text-slate-100 selection:bg-indigo-100 dark:selection:bg-indigo-900/50 selection:text-indigo-900 dark:selection:text-indigo-100 relative transition-colors duration-300">
+
+            {/* Overlay para fondo oscurecido en Mobile al abrir el menú */}
+            {isMobile && mobileMenuOpen && (
+                <div
+                    className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-30 transition-opacity"
+                    onClick={() => setMobileMenuOpen(false)}
+                />
+            )}
+
+            {/* 1. GLASSMORPHISM SIDEBAR V2 */}
+            <aside className={`
+                fixed lg:sticky top-0 z-40 lg:z-20 flex flex-col h-screen bg-white/95 dark:bg-slate-900/95 lg:bg-white/70 dark:lg:bg-slate-900/70 backdrop-blur-3xl border-r border-slate-200/60 dark:border-slate-700/60 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)] dark:shadow-[4px_0_24px_-12px_rgba(0,0,0,0.5)] 
+                transition-transform duration-300 ease-in-out lg:translate-x-0
+                ${isMobile ? 'w-72 left-0 top-0 bottom-0' : (sidebarCollapsed ? 'w-20' : 'w-72 xl:w-80 2xl:w-[22rem]')}
+                ${isMobile && !mobileMenuOpen ? '-translate-x-full' : 'translate-x-0'}
+            `}>
+                <div 
+                    className="absolute inset-x-0 top-0 pointer-events-none" 
+                    style={{ height: 'env(safe-area-inset-top)' }} 
+                />
+                
+                {/* Logo & Toggle */}
+                <div 
+                    className="h-14 flex items-center justify-between px-6 border-b border-slate-200/50 dark:border-slate-700/50"
+                    style={{ marginTop: 'env(safe-area-inset-top)' }}
+                >
+                    {(!sidebarCollapsed || isMobile) && (
+                        <div className="flex items-center gap-3 animate-fade-in w-full justify-between lg:justify-start">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 shadow-lg shadow-indigo-500/30 flex items-center justify-center">
+                                    <span className="text-white font-bold text-lg">H</span>
+                                </div>
+                                <div>
+                                    <h1 className="font-bold text-slate-800 dark:text-slate-100 leading-tight">Herbalis</h1>
+                                    <p className="text-[10px] font-semibold tracking-widest text-indigo-500 dark:text-indigo-400 uppercase">Workspace</p>
+                                </div>
+                            </div>
+                            {isMobile && (
+                                <button onClick={() => setMobileMenuOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-2">
+                                    <X className="w-5 h-5" />
+                                </button>
+                            )}
+                        </div>
+                    )}
+                    {sidebarCollapsed && !isMobile && (
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 shadow-lg shadow-indigo-500/30 flex items-center justify-center mx-auto animate-fade-in">
+                            <span className="text-white font-bold text-lg">H</span>
+                        </div>
+                    )}
+                    {!isMobile && (
+                        <button
+                            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                            className={`p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-slate-100 transition-colors ${sidebarCollapsed ? 'hidden' : 'block'}`}
+                        >
+                            <Menu className="w-5 h-5" />
+                        </button>
+                    )}
+                </div>
+
+                <div className="flex-1 py-6 px-4 space-y-1 overflow-y-auto hide-scrollbar">
+                    <NavItem tab="dashboard" icon={Wifi} label="Inicio" />
+                    <NavItem tab="comms" icon={MessageCircle} label="Chat & Atención" />
+                    <NavItem tab="logistics" icon={Database} label="Ventas & Logística" />
+                    <NavItem tab="statistics" icon={BarChart2} label="Estadísticas" />
+                    <NavItem tab="script" icon={FileText} label="Guión & Prompts" />
+                    <NavItem tab="gallery" icon={ImageIcon} label="Galería de Medios" />
+                    <NavItem tab="manuals" icon={BookOpen} label="Manuales" />
+
+                    <div className="pt-6 mt-6 border-t border-slate-200/50 dark:border-slate-700/50">
+                        {(!sidebarCollapsed || isMobile) && <p className="text-xs 2xl:text-sm font-semibold text-slate-400 dark:text-slate-300 uppercase tracking-wider mb-4 px-4">Administración</p>}
+                        <NavItem tab="settings" icon={Settings} label="Configuración" />
+                    </div>
+                </div>
+
+                {/* User Profile & Logout (Bottom) */}
+                <div className="p-4 border-t border-slate-200/50 dark:border-slate-700/50 bg-white/40 dark:bg-slate-800/40">
+                    {/* Theme Toggle */}
+                    <button
+                        onClick={toggleTheme}
+                        className={`w-full flex items-center ${(sidebarCollapsed && !isMobile) ? 'justify-center p-2' : 'px-4 py-3'} mb-2 rounded-xl transition-all duration-300 border border-transparent hover:border-indigo-200 dark:hover:border-indigo-800/50 group
+                            ${isDark
+                                ? 'bg-gradient-to-r from-indigo-500/10 to-purple-500/10 text-amber-400 hover:from-indigo-500/20 hover:to-purple-500/20'
+                                : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-indigo-600 dark:hover:text-indigo-400'
+                            }`}
+                        title={(sidebarCollapsed && !isMobile) ? (isDark ? 'Modo Claro' : 'Modo Oscuro') : ''}
+                    >
+                        <div className={`${(sidebarCollapsed && !isMobile) ? '' : 'mr-3'} group-hover:scale-110 transition-transform duration-300`}>
+                            {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                        </div>
+                        {(!sidebarCollapsed || isMobile) && <span className="font-medium text-sm">{isDark ? 'Modo Claro' : 'Modo Oscuro'}</span>}
+                    </button>
+                    <button
+                        onClick={() => { logout(); if (isMobile) setMobileMenuOpen(false); }}
+                        className={`w-full flex items-center ${(sidebarCollapsed && !isMobile) ? 'justify-center p-2' : 'px-4 py-3'} rounded-xl bg-gradient-to-r hover:from-rose-50 hover:to-orange-50 text-rose-600 transition-all duration-300 border border-transparent hover:border-rose-200 group`}
+                        title={(sidebarCollapsed && !isMobile) ? "Cerrar Sesión" : ""}
+                    >
+                        <div className={`${(sidebarCollapsed && !isMobile) ? '' : 'mr-3'} group-hover:scale-110 transition-transform`}>
+                            <LogOut className="w-5 h-5" />
+                        </div>
+                        {(!sidebarCollapsed || isMobile) && <span className="font-medium text-sm">Cerrar Sesión</span>}
+                    </button>
+                </div>
+            </aside>
+
+            {/* 2. MAIN CONTENT AREA V2 */}
+            <div className={`flex-1 flex flex-col overflow-hidden bg-gradient-to-br from-slate-50 dark:from-slate-900 to-blue-50/30 dark:to-indigo-900/10 w-full relative transition-all duration-300 ${!isMobile && !sidebarCollapsed ? '' : ''}`}>
+                {/* Header Superior V2 */}
+                <header className="flex-shrink-0 h-14 bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border-b border-white dark:border-slate-800 flex justify-between items-center px-4 lg:px-8 z-10 shadow-sm shadow-slate-200/20 dark:shadow-black/20">
+                    <div className="flex items-center gap-3 w-full lg:w-auto">
+                        <button
+                            onClick={() => isMobile ? setMobileMenuOpen(true) : setSidebarCollapsed(false)}
+                            className={`p-2 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-white shadow-sm transition-colors border border-slate-200/50 block lg:hidden`}
+                        >
+                            <Menu className="w-5 h-5" />
+                        </button>
+                        {!isMobile && sidebarCollapsed && (
+                            <button
+                                onClick={() => setSidebarCollapsed(false)}
+                                className={`p-2 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-white shadow-sm transition-colors border border-slate-200/50 block`}
+                            >
+                                <Menu className="w-5 h-5" />
+                            </button>
+                        )}
+
+                        <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border transition-all ${status === 'ready'
+                            ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50'
+                            : 'bg-rose-50 dark:bg-rose-900/30 border-rose-300 dark:border-rose-700 shadow-md shadow-rose-500/20 animate-pulse'}`}>
+                            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${status === 'ready' ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_10px_rgba(239,68,68,0.6)]'}`}></div>
+                            <span className={`text-[10px] sm:text-xs lg:text-sm font-bold tracking-wide whitespace-nowrap ${status === 'ready' ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-300'}`}>
+                                {status === 'ready' ? 'ONLINE' : 'OFFLINE'}
+                            </span>
+                            {status === 'ready' && connectedPhone && (
+                                <span className="hidden sm:inline text-xs font-semibold text-slate-500 dark:text-slate-400 tracking-wider bg-slate-100 dark:bg-slate-800/80 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 ml-1">
+                                    +{connectedPhone}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Global Search */}
+                    <form onSubmit={handleGlobalSearch} className="hidden lg:flex items-center flex-1 max-w-sm mx-6">
+                        <div className="relative w-full">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                            <input
+                                ref={globalSearchRef}
+                                type="text"
+                                value={globalSearch}
+                                onChange={(e) => setGlobalSearch(e.target.value)}
+                                placeholder="Buscar cliente, pedido... (Ctrl+K)"
+                                onKeyDown={(e) => { if (e.key === 'Escape') { setGlobalSearch(''); globalSearchRef.current?.blur(); } }}
+                                className="w-full pl-9 pr-4 py-1.5 text-sm bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 dark:focus:border-indigo-600 text-slate-700 dark:text-slate-200 placeholder-slate-400 transition-all"
+                            />
+                        </div>
+                    </form>
+
+                    <div className="flex items-center gap-2 lg:gap-6">
+                        {/* Notifications Bell */}
+                        <div className="relative" ref={notifRef}>
+                            <button 
+                                onClick={() => setShowNotifications(!showNotifications)}
+                                className="relative p-2 rounded-xl text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-sm cursor-pointer"
+                            >
+                                <Bell className="w-5 h-5 lg:w-6 lg:h-6" />
+                                {alerts.length > 0 && (
+                                    <span className="absolute top-0 right-0 -mt-1 -mr-1 flex items-center justify-center w-5 h-5 text-[10px] font-bold text-white bg-rose-500 border-2 border-white dark:border-slate-900 rounded-full leading-none shadow-sm">
+                                        {alerts.length > 9 ? '9+' : alerts.length}
+                                    </span>
+                                )}
+                            </button>
+                            
+                            {/* Dropdown */}
+                            {showNotifications && (
+                                <div className="absolute right-0 mt-3 w-[18rem] sm:w-96 bg-white dark:bg-slate-800 rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)] border border-slate-200 dark:border-slate-700 z-50 overflow-hidden animate-fade-in flex flex-col">
+                                    <div className="p-4 border-b border-slate-100 dark:border-slate-700/50 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50">
+                                        <h3 className="font-extrabold text-slate-800 dark:text-slate-100 text-sm">Notificaciones</h3>
+                                        {alerts.length > 0 && (
+                                            <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/40 px-2 py-1 rounded-lg uppercase tracking-wider">{alerts.length} Novedades</span>
+                                        )}
+                                    </div>
+                                    <div className="max-h-[60vh] overflow-y-auto custom-scrollbar">
+                                        {alerts.length === 0 ? (
+                                            <div className="p-10 text-center text-slate-500 dark:text-slate-400">
+                                                <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-700/50 flex items-center justify-center mx-auto mb-4 border border-slate-200 dark:border-slate-700/50">
+                                                    <Bell className="w-6 h-6 text-slate-400 dark:text-slate-500" />
+                                                </div>
+                                                <p className="text-sm font-bold text-slate-700 dark:text-slate-300">Todo al día</p>
+                                                <p className="text-xs mt-1 font-medium">No hay alertas pendientes en este momento.</p>
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col">
+                                                {alerts.map(alert => (
+                                                    <div 
+                                                        key={alert.id} 
+                                                        className="p-4 border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer flex gap-3 group relative overflow-hidden" 
+                                                        onClick={() => { 
+                                                            setShowNotifications(false); 
+                                                            handleQuickAction(alert.userPhone, 'chat'); 
+                                                        }}
+                                                    >
+                                                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                                        <div className="w-10 h-10 rounded-full bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
+                                                            <AlertTriangle className="w-5 h-5" />
+                                                        </div>
+                                                        <div className="min-w-0 pr-2">
+                                                            <p className="text-sm font-bold text-slate-800 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors line-clamp-2 leading-tight mb-1">{alert.reason}</p>
+                                                            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium font-mono">{alert.userPhone ? alert.userPhone.split('@')[0] : 'Desconocido'}</p>
+                                                            {alert.details && (
+                                                                <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1.5 truncate italic border-l-2 border-slate-200 dark:border-slate-600 pl-2">"{alert.details}"</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex items-center gap-3 pl-4 lg:pl-6 border-l border-slate-200 dark:border-slate-700/60 ml-2">
+                            <div className="text-right hidden md:block">
+                                <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Administrador</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Root Access</p>
+                            </div>
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shadow-md shadow-indigo-500/30 border border-white/20">
+                                <span className="text-white font-bold text-sm tracking-widest">AD</span>
+                            </div>
+                        </div>
+                    </div>
+                </header>
+
+                {/* Área de Contenido Principal */}
+                <main className="flex-1 relative flex flex-col min-h-0 overflow-hidden" onClick={() => { if (isMobile && mobileMenuOpen) setMobileMenuOpen(false); }}>
+                    {/* Elementos decorativos de fondo (Blur Orbs) */}
+                    <div className="absolute top-[-10%] right-[-5%] w-[60%] lg:w-[40%] h-[60%] lg:h-[40%] rounded-full bg-purple-300/20 dark:bg-purple-900/20 blur-[80px] lg:blur-[100px] pointer-events-none hidden sm:block"></div>
+                    <div className="absolute bottom-[-10%] left-[-10%] w-[70%] lg:w-[50%] h-[70%] lg:h-[50%] rounded-full bg-blue-300/20 dark:bg-indigo-900/20 blur-[100px] lg:blur-[120px] pointer-events-none hidden sm:block"></div>
+
+                    <div className={`flex-1 relative z-0 w-full flex flex-col min-h-0 overflow-hidden ${['comms', 'logistics', 'statistics'].includes(activeTab) ? '' : 'overflow-y-auto custom-scrollbar'} p-3 sm:p-6 lg:p-8 ${isPhone ? 'pb-20' : ''}`}>
+                        {renderContent()}
+                    </div>
+                </main>
+            </div>
+
+            {/* ── BOTTOM NAV (phone only) ── */}
+            {isPhone && (
+                <nav 
+                    className="fixed bottom-0 inset-x-0 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200/60 dark:border-slate-700/60 shadow-[0_-4px_24px_-8px_rgba(0,0,0,0.12)] flex items-stretch h-auto min-h-[4rem]"
+                    style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+                >
+                    {[
+                        { tab: 'dashboard',  icon: Wifi,           label: 'Inicio'  },
+                        { tab: 'comms',      icon: MessageCircle,  label: 'Chat'    },
+                        { tab: 'logistics',  icon: Database,       label: 'Ventas'  },
+                        { tab: 'statistics', icon: BarChart2,      label: 'Stats'   },
+                        { tab: '__more__',   icon: MoreHorizontal, label: 'Más'     },
+                    ].map(({ tab, icon: Icon, label }) => {
+                        const isActive = tab === '__more__' ? mobileMenuOpen : activeTab === tab;
+                        return (
+                            <button
+                                key={tab}
+                                onClick={() => {
+                                    if (tab === '__more__') {
+                                        setMobileMenuOpen(prev => !prev);
+                                    } else {
+                                        setActiveTab(tab);
+                                        setMobileMenuOpen(false);
+                                    }
+                                }}
+                                className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 transition-colors duration-200 ${isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500'}`}
+                            >
+                                <Icon className="w-5 h-5" strokeWidth={isActive ? 2.5 : 2} />
+                                <span className="text-[10px] font-bold tracking-wide">{label}</span>
+                                {isActive && tab !== '__more__' && (
+                                    <span className="absolute bottom-1 w-1 h-1 rounded-full bg-indigo-500" />
+                                )}
+                                {tab !== '__more__' && alerts.length > 0 && tab === 'dashboard' && (
+                                    <span className="absolute top-1 mt-1 flex items-center justify-center w-4 h-4 text-[9px] font-bold text-white bg-rose-500 rounded-full">{alerts.length > 9 ? '9+' : alerts.length}</span>
+                                )}
+                            </button>
+                        );
+                    })}
+                </nav>
+            )}
+        </div>
+    );
+};
+
+export default CorporateDashboard;
