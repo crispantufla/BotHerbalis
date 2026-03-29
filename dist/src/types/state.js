@@ -1,0 +1,26 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.FlowStep = void 0;
+var FlowStep;
+(function (FlowStep) {
+    FlowStep["GREETING"] = "greeting";
+    FlowStep["GENERAL"] = "general";
+    FlowStep["WAITING_WEIGHT"] = "waiting_weight";
+    FlowStep["WAITING_PREFERENCE"] = "waiting_preference";
+    FlowStep["WAITING_PREF_CONSULT"] = "waiting_preference_consultation";
+    FlowStep["WAITING_PLAN_CHOICE"] = "waiting_plan_choice";
+    FlowStep["WAITING_PRICE_CONFIRMATION"] = "waiting_price_confirmation";
+    FlowStep["WAITING_OK"] = "waiting_ok";
+    FlowStep["WAITING_DATA"] = "waiting_data";
+    FlowStep["WAITING_FINAL_CONFIRMATION"] = "waiting_final_confirmation";
+    FlowStep["WAITING_ADMIN_OK"] = "waiting_admin_ok";
+    FlowStep["WAITING_ADMIN_VALIDATION"] = "waiting_admin_validation";
+    FlowStep["POST_SALE"] = "post_sale";
+    FlowStep["SAFETY_CHECK"] = "safety_check";
+    FlowStep["CLOSING"] = "closing";
+    FlowStep["COMPLETED"] = "completed";
+    FlowStep["WAITING_MAPS_CONFIRMATION"] = "waiting_maps_confirmation";
+    FlowStep["REJECTED_MEDICAL"] = "rejected_medical";
+    FlowStep["REJECTED_ABUSIVE"] = "rejected_abusive";
+    FlowStep["REJECTED_GEO"] = "rejected_geo";
+})(FlowStep || (exports.FlowStep = FlowStep = {}));

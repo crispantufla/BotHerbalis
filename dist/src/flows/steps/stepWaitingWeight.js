@@ -1,0 +1,168 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.handleWaitingWeight = handleWaitingWeight;
+const state_1 = require("../../types/state");
+const messages_1 = require("../utils/messages");
+const flowHelpers_1 = require("../utils/flowHelpers");
+const logger_1 = __importDefault(require("../../utils/logger"));
+async function handleWaitingWeight(userId, text, normalizedText, currentState, knowledge, dependencies) {
+    const { sendMessageWithDelay, aiService, saveState } = dependencies;
+    const hasNumber = /\d+/.test(text.trim());
+    const hasQuestion = /\b(como|cómo|cuando|cuándo|que|qué|donde|dónde|por que|por qué|cual|cuál|duda|consulta|precio|costo|sale|cuesta|valor|paga|cobr|tarjeta|efectivo|transferencia|contraindicaciones|contraindicacion|efectos|mal|dieta|rebote|salud|dañin|riñon|riñón|higado|hígado|corazon|corazón|diabetes|diabetico|diabética|diabético|presion|presión|hipertens|operad|cirugía|cirugia|enferm|tiroides|medicamento|medica|pastillas para)\b/i.test(normalizedText) || normalizedText.includes('?');
+    // If text is super long (like a transcription), force AI to handle it so we don't look robotic
+    const isVeryLongMessage = text.split(/\s+/).length > 20;
+    const tLow = text.toLowerCase();
+    let implicitProduct = null;
+    if (tLow.includes('cápsula') || tLow.includes('capsula') || tLow.includes('pastilla') || tLow.includes('pastillas'))
+        implicitProduct = "Cápsulas de nuez de la india";
+    else if (tLow.includes('gota'))
+        implicitProduct = "Gotas de nuez de la india";
+    else if (tLow.includes('semilla'))
+        implicitProduct = "Semillas de nuez de la india";
+    if (!implicitProduct && currentState.history && currentState.history.length > 0) {
+        const lastBotMsg = [...currentState.history].reverse().find(m => m.role === 'bot');
+        if (lastBotMsg && lastBotMsg.content.toLowerCase().includes('cápsulas son la opción más efectiva')) {
+            implicitProduct = "Cápsulas de nuez de la india";
+        }
+    }
+    if (implicitProduct) {
+        currentState.suggestedProduct = implicitProduct;
+        logger_1.default.info(`[LOGIC] Implicitly detected product: ${implicitProduct}`);
+    }
+    const isRefusal = /\b(no (quiero|voy|puedo)|prefiero no|que tenes|mostrame)\b/i.test(normalizedText);
+    if (hasNumber && hasQuestion && !isVeryLongMessage) {
+        // User gave weight AND asked a health/product question — extract weight but respond to the concern
+        const wMatch = text.match(/\d+/);
+        if (wMatch)
+            currentState.weightGoal = parseInt(wMatch[0], 10);
+        logger_1.default.info(`[LOGIC] User ${userId} gave weight (${currentState.weightGoal}kg) AND asked a question. Responding to both.`);
+        const dualGoal = `El usuario dijo cuántos kilos quiere bajar (${currentState.weightGoal} kg) PERO TAMBIÉN hizo una pregunta sobre salud, contraindicaciones o el producto. DEBES responder su pregunta con MUCHA empatía y detalle PRIMERO. Si pregunta si es dañino/seguro para alguna condición de salud (riñón, presión, diabetes, etc.): "No hay ninguna contraindicación para tu condición. Es un producto 100% natural, las únicas contraindicaciones son embarazo y lactancia." Después confirmá su objetivo de peso y preguntá qué formato prefiere: "Perfecto, ${currentState.weightGoal} kg es un objetivo totalmente alcanzable 👌 ¿Preferís algo súper práctico (cápsulas o gotas) o más natural (semillas)?"."`;
+        const aiDual = await aiService.chat(text, {
+            step: state_1.FlowStep.WAITING_WEIGHT,
+            goal: dualGoal,
+            history: currentState.history,
+            summary: currentState.summary,
+            knowledge: knowledge,
+            userState: currentState
+        });
+        if (aiDual.response) {
+            const recNode = knowledge.flow.recommendation;
+            (0, flowHelpers_1._setStep)(currentState, recNode.nextStep);
+            currentState.history.push({ role: 'bot', content: aiDual.response, timestamp: Date.now() });
+            saveState(userId);
+            await sendMessageWithDelay(userId, aiDual.response);
+            return { matched: true };
+        }
+        // AI failed but we already extracted weight — proceed to next step with the weight we have
+        logger_1.default.warn(`[AI-FALLBACK] Dual-goal AI failed for ${userId}, but weight (${currentState.weightGoal}kg) was extracted. Proceeding.`);
+        const recNode = knowledge.flow.recommendation;
+        const { _formatMessage: fmtMsg } = require('../utils/messages');
+        const recMsg = fmtMsg(recNode.response, currentState);
+        (0, flowHelpers_1._setStep)(currentState, recNode.nextStep);
+        currentState.history.push({ role: 'bot', content: recMsg, timestamp: Date.now() });
+        saveState(userId);
+        await sendMessageWithDelay(userId, recMsg);
+        return { matched: true };
+    }
+    if (hasNumber && !hasQuestion && !isVeryLongMessage) {
+        const wMatch = text.match(/\d+/);
+        if (wMatch)
+            currentState.weightGoal = parseInt(wMatch[0], 10);
+        if (currentState.suggestedProduct) {
+            logger_1.default.info(`[LOGIC] User ${userId} already suggested ${currentState.suggestedProduct}, skipping preference question.`);
+            currentState.selectedProduct = currentState.suggestedProduct;
+            let priceNode;
+            const currentProduct = currentState.selectedProduct || "";
+            if (currentProduct.includes('Cápsulas'))
+                priceNode = knowledge.flow.preference_capsulas;
+            else if (currentProduct.includes('Gotas'))
+                priceNode = knowledge.flow.preference_gotas;
+            else
+                priceNode = knowledge.flow.preference_semillas;
+            const msg = (0, messages_1._formatMessage)(priceNode.response, currentState);
+            (0, flowHelpers_1._setStep)(currentState, priceNode.nextStep);
+            currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+            saveState(userId);
+            await sendMessageWithDelay(userId, msg);
+            await (0, flowHelpers_1._maybeUpsell)(currentState, sendMessageWithDelay, userId, saveState);
+            return { matched: true };
+        }
+        else {
+            const recNode = knowledge.flow.recommendation;
+            const recMsg = (0, messages_1._formatMessage)(recNode.response, currentState);
+            (0, flowHelpers_1._setStep)(currentState, recNode.nextStep);
+            currentState.history.push({ role: 'bot', content: recMsg, timestamp: Date.now() });
+            saveState(userId);
+            await sendMessageWithDelay(userId, recMsg);
+            return { matched: true };
+        }
+    }
+    else {
+        if (!hasQuestion) {
+            currentState.weightRefusals = (currentState.weightRefusals || 0) + 1;
+        }
+        if (isRefusal || currentState.weightRefusals > 2) {
+            logger_1.default.info(`[LOGIC] User ${userId} refused/failed weight question too many times (${currentState.weightRefusals}). Skipping to preference.`);
+            const skipMsg = "¡Entiendo, no hay problema! 👌 Pasemos directo a ver qué opción es mejor para vos.\n\nTenemos:\n1️⃣ Cápsulas (Lo más efectivo y práctico)\n2️⃣ Semillas/Infusión (Más natural)\n3️⃣ Gotas (Para >70 años o poquitos kilos)\n\n¿Cuál te gustaría probar?";
+            (0, flowHelpers_1._setStep)(currentState, state_1.FlowStep.WAITING_PREFERENCE);
+            currentState.history.push({ role: 'bot', content: skipMsg, timestamp: Date.now() });
+            saveState(userId);
+            await sendMessageWithDelay(userId, skipMsg);
+            return { matched: true };
+        }
+        else {
+            logger_1.default.info(`[AI-FALLBACK] waiting_weight: No number detected for ${userId}`);
+            const aiWeight = await aiService.chat(text, {
+                step: state_1.FlowStep.WAITING_WEIGHT,
+                goal: 'El usuario NO te ha dicho cuántos kilos quiere bajar. Tu objetivo es explicar brevemente el producto seleccionado y PREGUNTAR SUTÍLMENTE CUÁNTO PESO BUSCAN BAJAR para continuar. RESPONDÉ NATURALMENTE Y COMO HUMANO. 1) Si la persona envía una pregunta fuera de contexto, o una palabra sin sentido, respóndele brevemente intentando volver al tema de la baja de peso. 2) Si dice no saberlo, ofrécele una estimación. 3) TERMINA SIEMPRE con la pregunta "¿Cuántos kilos te gustaría bajar aproximadamente?" al final de tu respuesta de validación.',
+                history: currentState.history,
+                summary: currentState.summary,
+                knowledge: knowledge,
+                userState: currentState
+            });
+            if (aiWeight.goalMet && aiWeight.extractedData) {
+                const extNum = aiWeight.extractedData.match(/\d+/);
+                if (extNum)
+                    currentState.weightGoal = parseInt(extNum[0], 10);
+                if (currentState.suggestedProduct) {
+                    logger_1.default.info(`[LOGIC] AI goalMet weight, user already suggested ${currentState.suggestedProduct}, skipping preference.`);
+                    currentState.selectedProduct = currentState.suggestedProduct;
+                    let priceNode;
+                    const currentProduct = currentState.selectedProduct || "";
+                    if (currentProduct.includes('Cápsulas'))
+                        priceNode = knowledge.flow.preference_capsulas;
+                    else if (currentProduct.includes('Gotas'))
+                        priceNode = knowledge.flow.preference_gotas;
+                    else
+                        priceNode = knowledge.flow.preference_semillas;
+                    const msg = (0, messages_1._formatMessage)(priceNode.response, currentState);
+                    (0, flowHelpers_1._setStep)(currentState, priceNode.nextStep);
+                    currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+                    saveState(userId);
+                    await sendMessageWithDelay(userId, msg);
+                    await (0, flowHelpers_1._maybeUpsell)(currentState, sendMessageWithDelay, userId, saveState);
+                    return { matched: true };
+                }
+                else {
+                    const recNode = knowledge.flow.recommendation;
+                    const recMsg = (0, messages_1._formatMessage)(recNode.response, currentState);
+                    (0, flowHelpers_1._setStep)(currentState, recNode.nextStep);
+                    currentState.history.push({ role: 'bot', content: recMsg, timestamp: Date.now() });
+                    saveState(userId);
+                    await sendMessageWithDelay(userId, recMsg);
+                    return { matched: true };
+                }
+            }
+            else if (aiWeight.response) {
+                currentState.history.push({ role: 'bot', content: aiWeight.response, timestamp: Date.now() });
+                await sendMessageWithDelay(userId, aiWeight.response);
+                saveState(userId);
+                return { matched: true };
+            }
+        }
+    }
+    return { matched: false };
+}
