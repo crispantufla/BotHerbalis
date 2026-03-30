@@ -57,6 +57,21 @@ function buildConfirmationMessage(state: any): string {
         ? `📅 Envío programado: ${state.postdatado}\n`
         : `✔ Entrega estimada: 7 a 10 días hábiles\n`;
 
+    // MercadoPago pre-paid: different payment line and no rejection cost warning
+    if (state.paymentMethod === 'mercadopago') {
+        const postdatadoLineMp = state.postdatado
+            ? `📅 Envío programado: ${state.postdatado}\n`
+            : `✔ Entrega estimada: 7 a 10 días hábiles\n`;
+        return `📦 CONFIRMACIÓN DE ENVÍO\n\n` +
+            `Producto: ${productStr}\n` +
+            `Plan: ${planStr}\n` +
+            breakdown +
+            `✅ Pago recibido via MercadoPago\n\n` +
+            `✔ Correo Argentino\n` + postdatadoLineMp +
+            `Importante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs para retirar.\n\n` +
+            `👉 ¿Me confirmás que podés retirarlo en sucursal dentro de las 72 hs si fuera necesario?`;
+    }
+
     const isSucursal = state.pendingOrder?.calle?.toLowerCase() === 'a sucursal';
     const deliveryNote = isSucursal
         ? `✔ Retiro en sucursal de Correo Argentino\n` + postdatadoLine + `✔ Pago en efectivo al retirar\n\n` +

@@ -16,6 +16,8 @@ export enum FlowStep {
     CLOSING = "closing",
     COMPLETED = "completed",
     WAITING_MAPS_CONFIRMATION = "waiting_maps_confirmation",
+    WAITING_PAYMENT_METHOD = "waiting_payment_method",
+    WAITING_MP_PAYMENT = "waiting_mp_payment",
     REJECTED_MEDICAL = "rejected_medical",
     REJECTED_ABUSIVE = "rejected_abusive",
     REJECTED_GEO = "rejected_geo"
@@ -110,6 +112,11 @@ export interface UserState {
     pendingCancelConfirm?: boolean;  // true si el bot está esperando confirmación de cancelación
     currentWeight?: number;          // Peso corporal actual del cliente (distinto de weightGoal)
     userName?: string;               // Nombre del cliente extraído del chat
+
+    // MercadoPago payment flow
+    paymentMethod?: 'mercadopago' | 'efectivo' | null;
+    mpPaymentLinkId?: string | null;  // ID of the PaymentLink record in DB
+    mpPaymentLinkUrl?: string | null; // The init_point URL sent to the client
 }
 
 export interface AlertOrderData {
