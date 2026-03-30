@@ -23,7 +23,9 @@ export async function handleWaitingMpPayment(
     }
 
     // --- Client says they paid ---
-    if (PAID_KEYWORDS.test(text)) {
+    // Check both original (for accents like "pagué") and normalized (for "pague")
+    const normalizedForPaid = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    if (PAID_KEYWORDS.test(text) || PAID_KEYWORDS.test(normalizedForPaid)) {
         const verified = await _verifyPayment(currentState);
 
         if (verified === 'approved') {
