@@ -26,6 +26,18 @@ export async function handleWaitingPaymentMethod(
 
     if (MP_KEYWORDS.test(text)) {
         currentState.paymentMethod = 'mercadopago';
+
+        // Waive the ContraReembolsoMAX adicional for MP payers on 60-day plans
+        if (currentState.selectedPlan === '60' && currentState.adicionalMAX && currentState.adicionalMAX > 0) {
+            const totalRaw = typeof currentState.totalPrice === 'string'
+                ? parseFloat(currentState.totalPrice.replace(/\./g, '').replace(',', '.'))
+                : Number(currentState.totalPrice || 0);
+            const newTotal = totalRaw - currentState.adicionalMAX;
+            currentState.totalPrice = newTotal.toLocaleString('es-AR').replace(/,/g, '.');
+            currentState.adicionalMAX = 0;
+            logger.info(`[PAYMENT_METHOD] MP selected — adicionalMAX waived. New total: $${currentState.totalPrice}`);
+        }
+
         _setStep(currentState, FlowStep.WAITING_MP_PAYMENT);
         saveState(userId);
         // The next message is sent by stepWaitingMpPayment on entry — trigger re-process

@@ -1,0 +1,743 @@
+{
+    "meta": {
+        "name": "Guión V5 — MP First (Pago Online Preferido)",
+        "description": "Guión optimizado para persuadir al cliente a pagar con MercadoPago. Plan 60 días sin adicional si paga online. Beneficio económico como palanca principal.",
+        "version": "5.0"
+    },
+    "flow": {
+        "greeting": {
+            "step": "greeting",
+            "keywords": [
+                "hola",
+                "precio",
+                "info",
+                "buenas",
+                "herbalis",
+                "nuez",
+                "kilos",
+                "bajar",
+                "cuanto",
+                "vale",
+                "costo",
+                "gotas"
+            ],
+            "response": "¡Hola! 👋 Te cuento, somos *Herbalis*, especialistas en descenso de peso natural hace *13 años*. Ya ayudamos a más de *15.000 personas* a lograr su objetivo.\n\nNuestros tratamientos rondan entre $37.000 y $69.000 (depende de los días que elijas).\n\nPara asesorarte bien sobre qué producto te va a ser más rápido:\n👉 ¿Cuántos kilos buscás bajar en total?",
+            "nextStep": "waiting_weight"
+        },
+        "recommendation": {
+            "step": "waiting_weight",
+            "response": "Genial 👌\n\nQuedate tranqui que ese objetivo es re posible. Pasemos directo a ver qué opción es mejor para vos.\n\nTenemos:\n1️⃣ Cápsulas (Lo más efectivo y práctico)\n2️⃣ Semillas/Infusión (Más natural)\n3️⃣ Gotas (Para >70 años o poquitos kilos)\n\n¿Cuál te gustaría probar?",
+            "nextStep": "waiting_preference"
+        },
+        "preference_capsulas": {
+            "step": "waiting_preference",
+            "match": [
+                "capsula",
+                "capsulas",
+                "pastilla",
+                "pastillas",
+                "practico",
+                "practica"
+            ],
+            "response": "Dale, buenísimo 👍 Excelente elección.\n\nLas cápsulas concentran el principio activo, logrando un efecto quemagrasas parejo durante todo el día sin que tengas que preparar nada. Es lo más efectivo y práctico que hay.\n\n💊 Se toman así:\n• 1 al día\n• 30 min antes de la comida principal\n\nPara que logres tu objetivo, armamos dos opciones para vos:\n\n🏆 *OPCIÓN RECOMENDADA (120 días)*: Hacés el tratamiento completo de una y te asegurás el resultado.\n💲 *${{PRICE_CAPSULAS_120}}*\n*Beneficio: Envío Gratis + Pago a domicilio cien por ciento BONIFICADO (de regalo).*\n\n🔥 *OPCIÓN INICIO (60 días)*:\n💲 *${{PRICE_CAPSULAS_60}}*\n*✅ Pagando online con MercadoPago: ¡sin costo adicional! Ahorrás ${{ADICIONAL_MAX}} 🎉*\n*(Pago en efectivo al cartero: + ${{ADICIONAL_MAX}})*\n\n👉 ¿Te reservo el de 120 para asegurar el resultado o preferís arrancar con 60?",
+            "nextStep": "waiting_plan_choice"
+        },
+        "preference_semillas": {
+            "step": "waiting_preference",
+            "match": [
+                "infusion",
+                "té",
+                "yuyos",
+                "semillas",
+                "semilla",
+                "natural",
+                "tradicional"
+            ],
+            "response": "Dale, buenísimo 🌿 La semilla natural es la clásica, súper potente.\n\nSe prepara como una infusión a la noche, re fácil.\n\nMirá, tenés dos opciones:\n\n🏆 *OPCIÓN RECOMENDADA (120 días)*: Tratamiento completo.\n💲 *${{PRICE_SEMILLAS_120}}*\n*Beneficio: Envío Gratis + Pago a domicilio cien por ciento BONIFICADO (de regalo).*\n\n🔥 *OPCIÓN INICIO (60 días)*:\n💲 *${{PRICE_SEMILLAS_60}}*\n*✅ Pagando online con MercadoPago: ¡sin costo adicional! Ahorrás ${{ADICIONAL_MAX}} 🎉*\n*(Pago en efectivo al cartero: + ${{ADICIONAL_MAX}})*\n\n💡 *Tip: Si llevás 3 unidades (para amigas/os), tenés 30% DE DESCUENTO.*\n\n👉 ¿Le metemos con 120 o arrancamos con 60?",
+            "nextStep": "waiting_plan_choice"
+        },
+        "preference_gotas": {
+            "step": "waiting_preference",
+            "match": [
+                "gotas",
+                "liquido",
+                "gotero"
+            ],
+            "response": "Dale, buenísimo 🌿 Las gotas son discretas y se absorben rápido.\n\nMirá, tenés dos opciones:\n\n🏆 *OPCIÓN RECOMENDADA (120 días)*\n💲 *${{PRICE_GOTAS_120}}*\n*Beneficio: Envío Gratis + Pago a domicilio cien por ciento BONIFICADO (de regalo).*\n\n🔥 *OPCIÓN INICIO (60 días)*:\n💲 *${{PRICE_GOTAS_60}}*\n*✅ Pagando online con MercadoPago: ¡sin costo adicional! Ahorrás ${{ADICIONAL_MAX}} 🎉*\n*(Pago en efectivo al cartero: + ${{ADICIONAL_MAX}})*\n\n👉 ¿Le metemos con 120 o arrancamos con 60?",
+            "nextStep": "waiting_plan_choice"
+        },
+        "price_capsulas": {
+            "step": "waiting_price_confirmation",
+            "response": "💊 CÁPSULAS:\n\n🏆 *Plan 120 días* → *${{PRICE_CAPSULAS_120}}* (Envío Gratis + Pago a domicilio DE REGALO)\n🔥 *Plan 60 días* → *${{PRICE_CAPSULAS_60}}* pagando online con MP *(ahorrás ${{ADICIONAL_MAX}})* · o ${{PRICE_CAPSULAS_60}} + ${{ADICIONAL_MAX}} en efectivo\n\n👉 ¿Con cuál avanzamos?",
+            "nextStep": "waiting_plan_choice"
+        },
+        "price_semillas": {
+            "step": "waiting_price_confirmation",
+            "response": "🌱 SEMILLAS:\n\n🏆 *Plan 120 días* → *${{PRICE_SEMILLAS_120}}* (Envío Gratis + Pago a domicilio DE REGALO)\n🔥 *Plan 60 días* → *${{PRICE_SEMILLAS_60}}* pagando online con MP *(ahorrás ${{ADICIONAL_MAX}})* · o ${{PRICE_SEMILLAS_60}} + ${{ADICIONAL_MAX}} en efectivo\n\n👉 ¿Con cuál avanzamos?",
+            "nextStep": "waiting_plan_choice"
+        },
+        "price_gotas": {
+            "step": "waiting_price_confirmation",
+            "response": "💧 GOTAS:\n\n🏆 *Plan 120 días* → *${{PRICE_GOTAS_120}}* (Envío Gratis + Pago a domicilio DE REGALO)\n🔥 *Plan 60 días* → *${{PRICE_GOTAS_60}}* pagando online con MP *(ahorrás ${{ADICIONAL_MAX}})* · o ${{PRICE_GOTAS_60}} + ${{ADICIONAL_MAX}} en efectivo\n\n👉 ¿Con cuál avanzamos?",
+            "nextStep": "waiting_plan_choice"
+        },
+        "closing": {
+            "step": "waiting_plan_choice",
+            "match": [
+                "si",
+                "sisi",
+                "precio",
+                "precios",
+                "dale",
+                "bueno",
+                "ok"
+            ],
+            "response": "¡Excelente! 🎉\n\nPasame estos datos exactos para armar la etiqueta de envío 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(Fijate que la dirección sea exacta 🙏)",
+            "nextStep": "waiting_data"
+        },
+        "confirmation": {
+            "step": "waiting_data",
+            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT}}\nPlan: {{PLAN}} días\nTotal a pagar al recibir: {{TOTAL}}\n\n✔ Correo Argentino\n✔ Entrega estimada: 7 a 10 días hábiles\n✔ Pago exclusivo en EFECTIVO al recibir\n\n👉 Importante: El cartero no avisa cuando pasa, y si por cualquier motivo (a veces andan apurados) asienta que no te encontró o no le dejaste el efectivo, el paquete volverá a sucursal y tenés 72hs para retirarlo allí de forma gratuita.\n\nEl rechazo o no retiro genera un costo logístico de ${{COSTO_LOGISTICO}}.\n\n👉 Confirmame con un \"SÍ\" o un \"DALE\" para despachar YA mismo.",
+            "nextStep": "completed"
+        }
+    },
+    "faq": [
+        {
+            "keywords": [
+                "envio",
+                "costo de envio",
+                "cuanto el envio",
+                "gastos de envio"
+            ],
+            "response": "El envío es gratuito."
+        },
+        {
+            "keywords": [
+                "que medio",
+                "que correo",
+                "por donde",
+                "empresa de envio"
+            ],
+            "response": "Realizamos los envíos exclusivamente por Correo Argentino 📦."
+        },
+        {
+            "keywords": [
+                "demora",
+                "tarda",
+                "tiempo",
+                "llega",
+                "cuanto demora"
+            ],
+            "response": "La entrega es de 7 a 10 días hábiles o a partir de la fecha que nos indiques."
+        },
+        {
+            "keywords": [
+                "programar",
+                "agendar",
+                "fecha"
+            ],
+            "response": "Sí.\n\nPodemos enviarlo dentro de 7 a 10 días o programarlo para una fecha posterior que te quede cómoda."
+        },
+        {
+            "keywords": [
+                "avisa",
+                "cartero",
+                "llaman",
+                "visita",
+                "horario",
+                "tarde",
+                "mañana"
+            ],
+            "response": "No tenemos ningún control sobre los carteros del Correo Argentino, por lo que no podemos saber ni asegurar en qué horario llegará a tu domicilio. Sin embargo, hacemos el seguimiento constante de todos nuestros envíos y, si el cartero llega a tu casa y no te encuentra, te avisamos en el día para que puedas retirarlo en la sucursal más cercana dentro de las 72 hs."
+        },
+        {
+            "keywords": [
+                "sucursal",
+                "no quiero retirar",
+                "no puedo retirar"
+            ],
+            "response": "El envío va a domicilio.\n\nSolo en algunos casos el correo solicita retiro. El plazo es de 72 hs."
+        },
+        {
+            "keywords": [
+                "que pasa si no retiro",
+                "rechazo",
+                "no retiro"
+            ],
+            "response": "El rechazo o no retiro genera un costo logístico de $18.000."
+        },
+        {
+            "keywords": [
+                "tarjeta",
+                "cuotas",
+                "mercadopago",
+                "mp",
+                "cbu",
+                "alias",
+                "transferencia"
+            ],
+            "response": "¡Sí, ahora aceptamos MercadoPago! 💳\n\nPodés pagar con tarjeta de débito/crédito, desde la app de MercadoPago o escaneando el QR. Es el método más cómodo y seguro.\n\n🎉 Además, si elegís el plan de 60 días pagando online, ¡te ahorrás el costo adicional!\n\n¿Querés el plan de 60 o 120 días?"
+        },
+        {
+            "keywords": [
+                "pago online",
+                "pagar online",
+                "pago digital",
+                "quiero pagar online",
+                "quiero pagar ahora",
+                "pago anticipado",
+                "pagar antes"
+            ],
+            "response": "¡Perfecto! 💳 Con MercadoPago podés pagar ahora de forma segura y te despachamos inmediatamente.\n\nPodés usar tarjeta de débito o crédito, la app de MercadoPago o el QR.\n\n¿Querés que avancemos?"
+        },
+        {
+            "keywords": [
+                "pago",
+                "pagar",
+                "como se paga"
+            ],
+            "response": "Tenés dos opciones:\n\n💳 *MercadoPago* (recomendado): Pagás online ahora con tarjeta, desde la app o por QR. Es lo más cómodo y seguro. En el plan de 60 días te ahorrás el adicional.\n\n💵 *Efectivo al recibir*: El cartero te lo entrega en casa y recién ahí le pagás en efectivo.\n\n¿Cuál preferís?"
+        },
+        {
+            "keywords": [
+                "no tengo",
+                "no me alcanza",
+                "cobro",
+                "quincena",
+                "fin de mes"
+            ],
+            "response": "Podemos programar la entrega para después de la fecha que cobrás.\n\n¿Desde qué día te queda cómodo recibirlo?"
+        },
+        {
+            "keywords": [
+                "descuento",
+                "mas barato",
+                "precio especial",
+                "precio mp",
+                "precio mercadopago"
+            ],
+            "response": "¡Sí! 🎉 Si elegís el plan de 60 días y pagás online con MercadoPago, no se aplica el costo adicional por pago en destino — eso significa $6.000 menos de tu bolsillo.\n\nEs la opción más económica disponible. ¿Avanzamos?"
+        },
+        {
+            "keywords": [
+                "muy caro",
+                "es mucho",
+                "mucha plata",
+                "sale un monton"
+            ],
+            "response": "Te súper entiendo. La plata hoy cuesta ganarla.\n\nFijate que si pagás ahora con MercadoPago en el plan de 60 días, te ahorrás los $6.000 del costo por pago a domicilio. Es la opción más económica para arrancar y ver resultados reales 😊\n\n¿Te parece bien?"
+        },
+        {
+            "keywords": [
+                "cual me conviene",
+                "cual es mejor",
+                "diferencia",
+                "que recomendas",
+                "estoy dudando"
+            ],
+            "response": "Hagamos algo: Si elegís las cápsulas o gotas por lo prácticas que son sin preparar nada, de cortesía oficial te mando unas semillas de regalo para que pruebes los dos mundos.\n\nY si pagás con MercadoPago en el plan de 60 días, te ahorrás el adicional 🎉\n\n¿Te reservo el de 60 o 120 días?"
+        },
+        {
+            "keywords": [
+                "lo pienso",
+                "despues veo",
+                "mas tarde"
+            ],
+            "response": "Perfecto 😊\n\n¿Hay algo puntual que te genere duda?"
+        },
+        {
+            "keywords": [
+                "cuantos kilos",
+                "cuanto bajo",
+                "cuanto se pierde",
+                "en un mes",
+                "en 60 dias"
+            ],
+            "response": "Cada cuerpo tiene su ritmo.\n\nQuienes tienen más kilos para bajar suelen notar cambios más visibles al inicio, y quienes necesitan bajar menos ven descensos más progresivos.\n\nLo importante es que el descenso sea natural y sostenido."
+        },
+        {
+            "keywords": [
+                "cuanto cuesta",
+                "cuanto sale",
+                "que precio"
+            ],
+            "response": "Los tratamientos están entre $37.000 y $69.000,\nsegún duración y formato.\n\n🎉 Si elegís el plan de 60 días y pagás online con MercadoPago, ¡ahorrás el adicional!\n\n¿Buscás bajar hasta 10 kg, entre 10 y 20 kg o más de 20 kg?",
+            "triggerStep": "waiting_weight"
+        },
+        {
+            "keywords": [
+                "que hace",
+                "para que sirve",
+                "de que se trata"
+            ],
+            "response": "Ayuda al cuerpo a eliminar excesos de forma natural, favoreciendo un descenso progresivo de peso.\n\n¿Querés que te recomiende la mejor opción para tu objetivo?"
+        },
+        {
+            "keywords": [
+                "como funciona",
+                "como actua"
+            ],
+            "response": "Acompaña el proceso natural del cuerpo, ayudando a eliminar excesos de manera progresiva.\n\n¿Buscás algo práctico o más natural?"
+        },
+        {
+            "keywords": [
+                "dieta",
+                "comer",
+                "comida"
+            ],
+            "response": "No necesitás dietas estrictas.\n\nSi además cuidás un poco la alimentación o sumás movimiento, los resultados suelen verse más rápido."
+        },
+        {
+            "keywords": [
+                "rebote"
+            ],
+            "response": "No.\n\nEl rebote suele aparecer con métodos agresivos. La Nuez es natural y el descenso es progresivo."
+        },
+        {
+            "keywords": [
+                "diabetes",
+                "hipotiroidismo",
+                "tiroides",
+                "presion",
+                "hipertension"
+            ],
+            "response": "Muchas personas con esas condiciones lo consumen sin inconvenientes.\n\nEs natural y no interfiere con tratamientos habituales.\nLa única contraindicación es embarazo o lactancia."
+        },
+        {
+            "keywords": [
+                "gastritis",
+                "estomago",
+                "ulcera",
+                "acidez"
+            ],
+            "response": "Con gastritis te recomendamos cápsulas o gotas, que son más suaves para el estómago. Las semillas no, porque son más fuertes para digerir 😊"
+        },
+        {
+            "keywords": [
+                "colesterol",
+                "colesterol alto",
+                "trigliceridos"
+            ],
+            "response": "Todas las opciones son buenas para vos 😊 Bajar de peso de hecho ayuda muchísimo a reducir el colesterol. ¡Es un beneficio doble!"
+        },
+        {
+            "keywords": [
+                "corazon",
+                "cardiaco",
+                "arritmia",
+                "marcapasos",
+                "problema cardiaco"
+            ],
+            "response": "No hay inconveniente 😊 Es 100% natural y bajar de peso beneficia mucho la salud cardiovascular."
+        },
+        {
+            "keywords": [
+                "bypass",
+                "manga gastrica",
+                "bariatrica",
+                "operada del estomago",
+                "cirugia bariatrica"
+            ],
+            "response": "Por precaución, en casos de cirugía bariátrica (bypass, manga gástrica) no recomendamos el consumo. Priorizamos tu salud 🌿😊"
+        },
+        {
+            "keywords": [
+                "contraindicaciones",
+                "embarazo",
+                "lactancia"
+            ],
+            "response": "No se recomienda durante embarazo, lactancia, ni en personas con cirugía bariátrica (bypass/manga gástrica)."
+        },
+        {
+            "keywords": [
+                "efecto negativo",
+                "efecto secundario",
+                "efectos secundarios",
+                "efectos negativos",
+                "efectos adversos",
+                "efecto adverso",
+                "efecto laxante",
+                "laxante",
+                "diarrea",
+                "sintomas",
+                "me va a hacer mal"
+            ],
+            "response": "Solo podés notar algún efecto laxante y diurético los primeros días, es totalmente normal y señal de que el cuerpo está limpiándose 😊 Se va solo en la primera semana tomando agua."
+        },
+        {
+            "keywords": [
+                "peligrosa",
+                "mala",
+                "me dijeron",
+                "hace mal",
+                "dañina",
+                "toxica",
+                "veneno",
+                "murio",
+                "muerte"
+            ],
+            "response": "La nuez de la India y sus derivados son el producto natural líder en pérdida de peso con los que trabajamos hace 13 años con más de 70 mil clientes.\n\nSi te dijeron eso y no sentís la seguridad para avanzar, lo dejamos acá sin problema. Nuestra prioridad es tu tranquilidad.\n\n¿Avanzamos o preferís dejarlo acá?"
+        },
+        {
+            "keywords": [
+                "cuantas capsulas",
+                "cuantas vienen",
+                "cuantas trae",
+                "cuanto trae",
+                "cuantas unidades",
+                "cantidad de capsulas"
+            ],
+            "response": "Se toma 1 por día, así que el plan de 60 días trae 60 cápsulas y el de 120 trae 120 😊"
+        },
+        {
+            "keywords": [
+                "ingredientes",
+                "composicion",
+                "que tiene adentro",
+                "de que esta hecho",
+                "que contiene"
+            ],
+            "response": "Las cápsulas son la extracción del componente activo puro de la Nuez de la India. 100% natural, sin químicos ni conservantes 🌿"
+        },
+        {
+            "keywords": [
+                "puedo tomar 2",
+                "tomar dos",
+                "doble dosis",
+                "tomar mas",
+                "mas rapido"
+            ],
+            "response": "No, la dosis es 1 sola cápsula por día, 30 minutos antes de tu almuerzo o cena. Más no acelera resultados y puede causar malestar innecesario 😊"
+        },
+        {
+            "keywords": [
+                "medico",
+                "doctor"
+            ],
+            "response": "Perfecto 😊\n\nEs un producto natural y no tiene contraindicaciones más allá de embarazo o lactancia.\n\nCuando decidas avanzar, lo dejamos programado."
+        },
+        {
+            "keywords": [
+                "como se toman",
+                "como tomo",
+                "como se usa"
+            ],
+            "response": "📝 INSTRUCCIONES DE CONSUMO:\n\n🌿 **SEMILLAS:**\nPara la primera semana, partís una nuez en 8 pedacitos. Las demás van a ser en 4.\nCada noche hervís un pedacito 5 minutos. Cuando se enfría, te tomás el agua junto con el pedacito antes de dormir.\n(No tiene gusto a nada)\n\n💊 **CÁPSULAS:**\nUna al día, media hora antes de tu comida principal (almuerzo o cena, la que sea más abundante o donde tengas más ansiedad), con un vaso de agua.\n\n💧 **GOTAS:**\n**Semana 1:** 10 gotas al día, media hora antes de la comida principal con un vaso de agua.\n**Semana 2 en adelante:** Podés tomarlas antes del almuerzo o cena, ajustando según cómo vayas perdiendo peso y ansiedad."
+        },
+        {
+            "keywords": [
+                "30 dias",
+                "un mes",
+                "menos tiempo"
+            ],
+            "response": "Trabajamos con planes completos de 60 o 120 días."
+        },
+        {
+            "keywords": [
+                "estafa",
+                "trucho",
+                "mentira",
+                "robo",
+                "engaño",
+                "chanta"
+            ],
+            "response": "Es normal desconfiar hoy en día por internet. Por eso ofrecemos dos opciones súper seguras:\n\n💳 *MercadoPago*: Procesado por la plataforma oficial, con protección al comprador.\n💵 *Contra Reembolso*: El cartero llega a tu casa, te da el paquete en la mano y recién ahí pagás.\n\nRiesgo cero en ambos casos 😊"
+        },
+        {
+            "keywords": [
+                "farmacia",
+                "suplemento",
+                "pastillas de farmacia",
+                "otro producto",
+                "marca"
+            ],
+            "response": "Las cosas de farmacia suelen tener químicos y efecto rebote. Nosotras trabajamos lo natural. Por eso tenemos gente que nos compra hace 13 años: porque funciona y el cuerpo no se acostumbra mal.\n\nAdemás tenés envío gratis a tu casa 😊"
+        },
+        {
+            "keywords": [
+                "funciona",
+                "sirve",
+                "verdad",
+                "posta"
+            ],
+            "response": "Trabajamos hace más de 13 años con este producto. Es natural y el descenso es progresivo.\n\nSi pagás con MercadoPago no corrés ningún riesgo, y si elegís efectivo al recibir, tampoco 😊"
+        },
+        {
+            "keywords": [
+                "whatsapp",
+                "este numero",
+                "numero de herbalis"
+            ],
+            "response": "Sí, este es el WhatsApp oficial de Herbalis 😊\n\n¿En qué te puedo ayudar?"
+        },
+        {
+            "keywords": [
+                "gusto",
+                "sabor",
+                "feo",
+                "rico"
+            ],
+            "response": "Las cápsulas no tienen gusto, se tragan con agua.\nLas semillas se preparan en infusión y son suaves, sin sabor fuerte.\nLas gotas tienen sabor neutro."
+        },
+        {
+            "keywords": [
+                "donde estan",
+                "tienen local",
+                "puedo ir",
+                "punto de venta",
+                "direccion",
+                "donde compro",
+                "local fisico",
+                "de donde son",
+                "de donde envian",
+                "de que parte"
+            ],
+            "response": "No tenemos local de venta al público. Trabajamos 100% online y los envíos son por Correo Argentino a todo el país 📦"
+        },
+        {
+            "keywords": [
+                "factura",
+                "factura a",
+                "factura b",
+                "comprobante",
+                "ticket"
+            ],
+            "response": "No emitimos factura. El comprobante de tu compra es el que te da el correo al momento de la entrega 😊"
+        },
+        {
+            "keywords": [
+                "tracking",
+                "seguimiento",
+                "rastreo",
+                "codigo de seguimiento",
+                "numero de seguimiento",
+                "donde esta mi pedido"
+            ],
+            "response": "¡Sí! Te damos el código de seguimiento y además te avisamos cuando el pedido llega al correo de tu zona por si el cartero no te encuentra 📦😊"
+        },
+        {
+            "keywords": [
+                "discreto",
+                "paquete discreto",
+                "que dice el paquete",
+                "viene marcado",
+                "se nota"
+            ],
+            "response": "Sí, el envío es totalmente discreto. El paquete no tiene ninguna marca ni indicación del contenido 📦😊"
+        },
+        {
+            "keywords": [
+                "anmat",
+                "aprobado",
+                "regulado",
+                "habilitado",
+                "cuit"
+            ],
+            "response": "Es un producto natural a base de un fruto, no requiere aprobación de ANMAT. Trabajamos hace más de 13 años con más de 70 mil clientes 😊"
+        },
+        {
+            "keywords": [
+                "70 anos",
+                "setenta",
+                "mayor de 70",
+                "persona mayor",
+                "abuelo",
+                "abuela",
+                "tercera edad"
+            ],
+            "response": "Para personas de 70 años o más recomendamos SOLO gotas, que son la opción más suave. Es importante empezar con dosis baja 😊"
+        },
+        {
+            "keywords": [
+                "80 anos",
+                "ochenta",
+                "mayor de 80",
+                "mas de 80"
+            ],
+            "response": "Por precaución, para personas mayores de 80 años no recomendamos el consumo. Priorizamos siempre la salud 🌿😊"
+        },
+        {
+            "keywords": [
+                "nuez de brasil",
+                "nuez del brasil",
+                "es lo mismo",
+                "para de brasil",
+                "castana"
+            ],
+            "response": "No, la Nuez de la India no es lo mismo que la nuez de Brasil. Son frutos completamente diferentes 😊"
+        },
+        {
+            "keywords": [
+                "combinar",
+                "dieta",
+                "ejercicio",
+                "gimnasio",
+                "puedo hacer dieta",
+                "complementar"
+            ],
+            "response": "¡Sí! La combinación con dieta y ejercicio potencia muchísimo los resultados 💪 El tratamiento trabaja de base y lo demás lo complementa."
+        },
+        {
+            "keywords": [
+                "llego roto",
+                "llego danado",
+                "roto",
+                "danado",
+                "en mal estado",
+                "se rompio"
+            ],
+            "response": "Si el producto llega dañado, lo reenviamos y nos hacemos cargo nosotros. ¡Quedate tranquilo/a! 📦😊"
+        },
+        {
+            "keywords": [
+                "garantia",
+                "devolucion",
+                "devolver",
+                "no me gusto",
+                "quiero devolver",
+                "cambio",
+                "devuelven la plata",
+                "no funciona"
+            ],
+            "response": "No hacemos devolución de dinero. Si el producto llega dañado lo reenviamos sin costo, pero no hay garantía de resultados ni reembolso 😊"
+        },
+        {
+            "keywords": [
+                "qr",
+                "pago qr"
+            ],
+            "response": "¡Sí! Con MercadoPago podés pagar escaneando el QR del enlace que te enviamos, con tarjeta o desde la app 💳\n\n¿Querés avanzar?"
+        },
+        {
+            "keywords": [
+                "retirar",
+                "retiro",
+                "pick up",
+                "pickup",
+                "buscar",
+                "puedo ir a buscar",
+                "sucursal",
+                "oficina correo"
+            ],
+            "response": "¡Sí! Podés retirar en la sucursal del Correo Argentino. Decime cuál sucursal te queda cómoda o lo enviamos a la de tu código postal 📦😊"
+        },
+        {
+            "keywords": [
+                "es real",
+                "negocio real",
+                "como se que",
+                "es confiable",
+                "confiar"
+            ],
+            "response": "Absolutamente 😊 Tenés dos formas de pagar sin riesgo:\n\n💳 Con MercadoPago, la plataforma más segura del país — protección al comprador incluida.\n💵 O en efectivo al recibir el paquete — el cartero te lo entrega en mano y recién ahí pagás.\n\n¡En ningún caso perdés plata!"
+        },
+        {
+            "keywords": [
+                "ya compre",
+                "compre antes",
+                "soy cliente",
+                "cliente anterior",
+                "segunda vez"
+            ],
+            "response": "¡Bienvenido/a de nuevo! 😊 Como ya sos cliente, no pagás el adicional del plan de 60 días. Y si pagás con MercadoPago, también te lo bonificamos 🎉"
+        },
+        {
+            "keywords": [
+                "muestra",
+                "muestra gratis",
+                "probar",
+                "prueba",
+                "probar gratis"
+            ],
+            "response": "No manejamos muestras gratis. Pero recordá que podés pagar con MercadoPago (con protección al comprador) o contra reembolso, así que no arriesgás nada 😊"
+        },
+        {
+            "keywords": [
+                "cuanto dura",
+                "duracion",
+                "cuanto tiempo",
+                "tratamiento completo"
+            ],
+            "response": "La duración depende del plan que elijas: tenemos de 60 días y de 120 días 😊"
+        },
+        {
+            "keywords": [
+                "amamantando",
+                "dando de mamar",
+                "dando pecho",
+                "teta",
+                "leche materna"
+            ],
+            "response": "Si estás amamantando no podemos venderte el producto, sin importar la edad del bebé. Priorizamos tu salud y la del bebé 🌿😊"
+        },
+        {
+            "keywords": [
+                "3 kilos",
+                "5 kilos",
+                "poco peso",
+                "poquito",
+                "unos kilos"
+            ],
+            "response": "Para objetivos de pocos kilos te recomendamos cápsulas, que son lo más efectivo y práctico. Con el plan de 60 días vas a ver resultados geniales 😊"
+        },
+        {
+            "keywords": [
+                "para mi amiga",
+                "para mis amigas",
+                "precio por 3",
+                "precio por cantidad",
+                "comprar varios",
+                "mayorista"
+            ],
+            "response": "¡Sí! Si comprás más de 120 días (puede ser combinado, ej: 60 de gotas + 60 de cápsulas), el tercer producto más barato va al 50% de descuento 🎉"
+        },
+        {
+            "keywords": [
+                "cuit",
+                "registrados",
+                "monotributo",
+                "empresa"
+            ],
+            "response": "Sí, estamos registrados. Trabajamos hace más de 13 años con más de 70 mil clientes en todo el país 😊"
+        },
+        {
+            "keywords": [
+                "no me llego",
+                "no llego",
+                "no recibi",
+                "pedido anterior",
+                "pedido perdido"
+            ],
+            "response": "Lamento eso 😔 Voy a derivar tu caso a un asesor para que lo resuelva lo antes posible."
+        },
+        {
+            "keywords": [
+                "cancelar",
+                "cancelar pedido",
+                "anular",
+                "anular pedido",
+                "no quiero"
+            ],
+            "response": "Voy a derivar tu caso a un asesor para gestionar la cancelación 😊"
+        }
+    ],
+    "rules": {
+        "alwaysEndWithQuestion": true,
+        "maxFollowUps": 1,
+        "noNegotiatePrice": true,
+        "noDiscounts": true,
+        "noCreditCard": false,
+        "noArgue": true,
+        "keepResponsesShort": true,
+        "mpFirst": true,
+        "contraReembolsoMAX": {
+            "enabled": true,
+            "adicional": 6000,
+            "appliesTo": "60",
+            "description": "Modalidad Contra Reembolso MAX — adicional de $6.000 en planes de 60 días. Se BONIFICA si el cliente paga con MercadoPago.",
+            "waiveForMercadoPago": true
+        },
+        "costoLogisticoRechazo": 18000,
+        "closeIfNotAccepted": "Trabajamos bajo estas modalidades.\n\nSi en algún momento te resulta cómodo avanzar, acá estamos 😊"
+    }
+}

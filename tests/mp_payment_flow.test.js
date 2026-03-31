@@ -193,6 +193,26 @@ describe('stepWaitingPaymentMethod', () => {
         expect(state.step).toBe('waiting_data');
         expect(result.staleReprocess).toBe(true);
     });
+
+    test('choosing MP on plan 60 removes adicionalMAX from totalPrice', async () => {
+        // makeState has totalPrice: '52.900' and adicionalMAX: 6000 (plan 60)
+        const state = makeState({ step: 'waiting_payment_method', selectedPlan: '60', totalPrice: '52.900', adicionalMAX: 6000 });
+        await handleWaitingPaymentMethod('user1@c.us', '1', '1', state, knowledge, deps);
+
+        expect(state.paymentMethod).toBe('mercadopago');
+        expect(state.adicionalMAX).toBe(0);
+        // 52900 - 6000 = 46900
+        expect(state.totalPrice).toBe('46.900');
+    });
+
+    test('choosing MP on plan 120 does NOT change totalPrice (no adicional)', async () => {
+        const state = makeState({ step: 'waiting_payment_method', selectedPlan: '120', totalPrice: '69.000', adicionalMAX: 0 });
+        await handleWaitingPaymentMethod('user1@c.us', '1', '1', state, knowledge, deps);
+
+        expect(state.paymentMethod).toBe('mercadopago');
+        expect(state.totalPrice).toBe('69.000');
+        expect(state.adicionalMAX).toBe(0);
+    });
 });
 
 // ─── waiting_mp_payment ──────────────────────────────────────────────────────

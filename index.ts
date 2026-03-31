@@ -132,11 +132,12 @@ const ORDERS_FILE = path.join(DATA_DIR, `orders_${INSTANCE_ID}.json`);
 const KNOWLEDGE_SAVE_DIR = DATA_DIR; // Where edits are saved (persistent volume on Railway)
 const KNOWLEDGE_FILES: Record<string, { save: string; source: string }> = {
     'v3': { save: path.join(KNOWLEDGE_SAVE_DIR, `knowledge_v3_${INSTANCE_ID}.json`), source: path.join(__dirname, 'knowledge_v3.json') },
-    'v4': { save: path.join(KNOWLEDGE_SAVE_DIR, `knowledge_v4_${INSTANCE_ID}.json`), source: path.join(__dirname, 'knowledge_v4.json') }
+    'v4': { save: path.join(KNOWLEDGE_SAVE_DIR, `knowledge_v4_${INSTANCE_ID}.json`), source: path.join(__dirname, 'knowledge_v4.json') },
+    'v5': { save: path.join(KNOWLEDGE_SAVE_DIR, `knowledge_v5_${INSTANCE_ID}.json`), source: path.join(__dirname, 'knowledge_v5.json') }
 };
 
 // --- STATE MANAGEMENT ---
-let multiKnowledge: Record<string, any> = { 'v3': { flow: {}, faq: [] }, 'v4': { flow: {}, faq: [] } };
+let multiKnowledge: Record<string, any> = { 'v3': { flow: {}, faq: [] }, 'v4': { flow: {}, faq: [] }, 'v5': { flow: {}, faq: [] } };
 // Fallback reference for legacy code if any still defaults to picking 'knowledge'
 let knowledge = multiKnowledge['v3'];
 const { userCache } = require('./src/utils/cache');
