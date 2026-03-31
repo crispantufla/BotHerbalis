@@ -672,10 +672,11 @@ describe('Step Handlers (Refactored)', () => {
 
     // --- WAITING OK ---
     describe('stepWaitingOk', () => {
-        test('affirmative moves to closing', async () => {
+        test('affirmative moves to waiting_payment_method when MP enabled, or waiting_data when disabled', async () => {
             const userState = { [userId]: makeState('waiting_ok') };
             await processSalesFlow(userId, 'si', userState, knowledge, mockDependencies);
-            expect(userState[userId].step).toBe('waiting_data');
+            const expectedStep = process.env.MP_ACCESS_TOKEN ? 'waiting_payment_method' : 'waiting_data';
+            expect(userState[userId].step).toBe(expectedStep);
         });
 
         test('negative pauses bot', async () => {

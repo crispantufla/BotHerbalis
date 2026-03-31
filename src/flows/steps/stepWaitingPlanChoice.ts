@@ -101,10 +101,11 @@ export async function handleWaitingPlanChoice(
 
     // PRE-GUARD: If the user says exactly "el de 60", "plan de 60", "quiero el 60", bypass the question guard
     // for the plan selection (we still want AI to answer the question, but we lock the cart first)
+    // Exception: if the message is clearly a price question ("cuanto sale el de 120"), let AI handle it.
     const strictPlanMatch = normalizedText.match(/\b(el de|plan de|quiero el|opcion de|promo de)\s*(60|120|180|240|300|360|420|480|540|600)\b/i);
     const planMatch = normalizedText.match(/\b(60|120|180|240|300|360|420|480|540|600)\b/);
-    
-    if (strictPlanMatch && !isVeryLongMessage) {
+
+    if (strictPlanMatch && !isVeryLongMessage && !hasQuestionText) {
         selectedPlanId = strictPlanMatch[2];
     } else if (planMatch && !hasQuestionText && !isVeryLongMessage) {
         selectedPlanId = planMatch[1];
