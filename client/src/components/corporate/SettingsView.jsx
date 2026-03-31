@@ -11,7 +11,7 @@ const SettingsView = ({ status }) => {
     const { socket } = useSocket();
     const { toast, confirm } = useToast();
     const [config, setConfig] = useState({ alertNumber: '' });
-    const [activeScript, setActiveScript] = useState('v1');
+    const [activeScript, setActiveScript] = useState('v5');
     const [scriptStats, setScriptStats] = useState({});
     const [switchingScript, setSwitchingScript] = useState(false);
 
@@ -189,6 +189,7 @@ const SettingsView = ({ status }) => {
                                 {[
                                     { id: 'v3', name: 'Flujo V3 Estándar', desc: 'Directo y profesional.', color: 'blue', stats: scriptStats.v3 },
                                     { id: 'v4', name: 'Flujo V4 Psicológico', desc: 'Escasez y Urgencia.', color: 'purple', stats: scriptStats.v4 },
+                                    { id: 'v5', name: 'Flujo V5 MP First', desc: 'Pago online preferido.', color: 'green', stats: scriptStats.v5 },
                                     { id: 'rotacion', name: 'A/B Testing (50/50)', desc: 'Distribuye equitativamente.', color: 'orange', stats: null }
                                 ].map((script) => (
                                     <div

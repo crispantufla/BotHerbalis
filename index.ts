@@ -179,7 +179,7 @@ let schedulerStarted = false; // Guard against duplicate scheduler on reconnect
 // Variables for API / Dashboard State
 let qrCodeData: string | null = null;
 let sessionAlerts: any[] = [];
-let config: BotConfig = { alertNumbers: [], activeScript: 'v3', scriptStats: { v3: { started: 0, completed: 0 }, v4: { started: 0, completed: 0 } } };
+let config: BotConfig = { alertNumbers: [], activeScript: 'v5', scriptStats: { v3: { started: 0, completed: 0 }, v4: { started: 0, completed: 0 }, v5: { started: 0, completed: 0 } } };
 let isConnected = false;
 
 // --- PERSISTENCE HELPERS ---
@@ -201,7 +201,7 @@ function loadKnowledge(scriptName = null) {
         if (scriptName && KNOWLEDGE_FILES[scriptName]) {
             config.activeScript = scriptName;
         }
-        knowledge = multiKnowledge[config.activeScript || 'v3'];
+        knowledge = multiKnowledge[config.activeScript || 'v5'];
     } catch (e: any) {
         logger.error('🔴 Error loading knowledge:', e.message);
     }
@@ -209,7 +209,7 @@ function loadKnowledge(scriptName = null) {
 
 function saveKnowledge(scriptName = null) {
     try {
-        const nameToSave = scriptName || config.activeScript || 'v3';
+        const nameToSave = scriptName || config.activeScript || 'v5';
         const paths = KNOWLEDGE_FILES[nameToSave];
         if (paths && multiKnowledge[nameToSave]) {
             atomicWriteFile(paths.save, JSON.stringify(multiKnowledge[nameToSave], null, 2));
@@ -470,7 +470,7 @@ const sharedState = {
     pausedUsers,
     sessionAlerts,
     config,
-    get knowledge() { return multiKnowledge[config.activeScript || 'v3']; }, // Dynamic getter for legacy
+    get knowledge() { return multiKnowledge[config.activeScript || 'v5']; }, // Dynamic getter for legacy
     multiKnowledge, // Expose for specific lookups
     isConnected,
     qrCodeData,
@@ -1175,7 +1175,7 @@ async function _processDebounced(userId: string): Promise<void> {
 
     try {
         // Enforce the A/B test assigned script, fallback to global activeScript
-        const globalScript = config.activeScript === 'rotacion' ? 'v3' : (config.activeScript || 'v3');
+        const globalScript = config.activeScript === 'rotacion' ? 'v3' : (config.activeScript || 'v5');
         const effectiveScript = userState[userId]?.assignedScript || globalScript;
 
         // Self-heal: Ensure assignedScript is populated for the dashboard UI
