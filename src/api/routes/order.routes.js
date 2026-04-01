@@ -215,7 +215,10 @@ module.exports = (client, sharedState) => {
 
                 const msg = "Tu envío ya está en curso 🚀, dentro de 48 hs podés pedirnos el código de seguimiento\n\n¡Muchas gracias por confiar en Herbalis!";
 
-                try {
+                // Skip if user already received confirmation (step already 'completed')
+                if (sharedState.userState && sharedState.userState[targetPhone] && sharedState.userState[targetPhone].step === 'completed') {
+                    logger.info(`[ORDER-STATUS] Skipping confirmation for ${targetPhone} — already completed`);
+                } else try {
                     const { sendWithRetry } = require('../../utils/retry');
                     logger.info(`[ORDER-STATUS] Intentando enviar WhatsApp a ${targetPhone}...`);
                     await sendWithRetry(client, targetPhone, msg);
