@@ -66,7 +66,7 @@ module.exports = (client, sharedState) => {
             if (sharedState.io) sharedState.io.emit('payment_updated', updated);
             res.json({ payment: updated, changed: updated.status !== payment.status });
         } catch (e) {
-            logger.error('[PAYMENTS] Error refreshing payment:', e);
+            logger.error(`[PAYMENTS] Error refreshing payment: ${e?.message || e} | status: ${e?.status} | cause: ${JSON.stringify(e?.cause || e?.response?.data || '')}`);
             res.status(500).json({ error: e.message });
         }
     });
