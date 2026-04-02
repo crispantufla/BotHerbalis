@@ -20,16 +20,16 @@ interface SalesFlowDependencies {
     connectedAt?: number; // Unix timestamp (seconds) of when the bot connected — used to detect pre-existing chats
 }
 
-// Ad source detection from pre-filled Click-to-WhatsApp messages
-const AD_SOURCES: { pattern: RegExp; name: string }[] = [
-    { pattern: /quiero m[aá]s informaci[oó]n$/i, name: 'anuncio_1' },
-    { pattern: /me gustar[ií]a conseguir m[aá]s informaci[oó]n sobre esto/i, name: 'anuncio_2' }
+// Ad source detection from pre-filled Click-to-WhatsApp messages (literal match)
+const AD_SOURCES: { text: string; name: string }[] = [
+    { text: '¡Hola! Quiero más información', name: 'anuncio_1' },
+    { text: '¡Hola! Me gustaría conseguir más información sobre esto.', name: 'anuncio_2' }
 ];
 
 function _detectAdSource(text: string): string | null {
-    const cleaned = text.trim().replace(/^[¡!¿?]+/, '').trim();
+    const trimmed = text.trim();
     for (const ad of AD_SOURCES) {
-        if (ad.pattern.test(cleaned)) return ad.name;
+        if (trimmed === ad.text) return ad.name;
     }
     return null;
 }
