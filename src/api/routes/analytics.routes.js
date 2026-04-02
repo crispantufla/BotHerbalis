@@ -330,5 +330,115 @@ module.exports = (client, sharedState) => {
         }
     });
 
+    // GET /analytics/ad-performance - Funnel breakdown by ad source
+    router.get('/analytics/ad-performance', authMiddleware, async (req, res) => {
+        try {
+            const days = parseInt(req.query.days) || 30;
+            const instanceId = process.env.INSTANCE_ID || 'default';
+            const since = new Date();
+            since.setDate(since.getDate() - days);
+            since.setHours(0, 0, 0, 0);
+
+            // Fetch users with profileData to extract adSource
+            const users = await prisma.user.findMany({
+                where: { instanceId, createdAt: { gte: since } },
+                select: { phone: true, profileData: true, createdAt: true }
+            });
+
+            // Fetch orders in the same period
+            const orders = await prisma.order.findMany({
+                where: { instanceId, createdAt: { gte: since }, status: { not: 'Cancelado' } },
+                select: { userPhone: true, totalPrice: true, createdAt: true }
+            });
+            const ordersByPhone = {};
+            orders.forEach(o => {
+                if (!ordersByPhone[o.userPhone]) ordersByPhone[o.userPhone] = [];
+                ordersByPhone[o.userPhone].push(o);
+            });
+
+            // Define funnel steps in order
+            const FUNNEL_STEPS = [
+                'greeting', 'waiting_weight', 'waiting_preference',
+                'waiting_plan_choice', 'waiting_ok', 'waiting_data',
+                'waiting_final_confirmation', 'waiting_admin_ok', 'completed'
+            ];
+
+            // Aggregate by adSource
+            const adStats = {}; // { [adSource]: { total, steps: {}, orders, revenue, daily: {} } }
+
+            for (const user of users) {
+                let adSource = null;
+                let currentStep = null;
+                let funnelLog = null;
+
+                try {
+                    const data = JSON.parse(user.profileData || '{}');
+                    adSource = data.adSource || null;
+                    currentStep = data.step || null;
+                    funnelLog = data.funnelLog || null;
+                } catch {}
+
+                const key = adSource || 'orgánico';
+                if (!adStats[key]) {
+                    adStats[key] = { total: 0, steps: {}, orders: 0, revenue: 0, daily: {} };
+                }
+
+                adStats[key].total++;
+
+                // Count which step each user reached (at minimum)
+                if (currentStep) {
+                    const reachedIdx = FUNNEL_STEPS.indexOf(currentStep);
+                    // If user is at step X, they passed through all previous steps
+                    for (let i = 0; i <= Math.max(reachedIdx, 0); i++) {
+                        const s = FUNNEL_STEPS[i];
+                        adStats[key].steps[s] = (adStats[key].steps[s] || 0) + 1;
+                    }
+                    // Also count the current step if it's not in the standard list
+                    if (reachedIdx < 0) {
+                        adStats[key].steps[currentStep] = (adStats[key].steps[currentStep] || 0) + 1;
+                    }
+                }
+
+                // Count orders for this user
+                const userOrders = ordersByPhone[user.phone] || [];
+                if (userOrders.length > 0) {
+                    adStats[key].orders += userOrders.length;
+                    adStats[key].revenue += userOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
+                }
+
+                // Daily breakdown
+                const d = new Date(user.createdAt.getTime() - (3 * 60 * 60 * 1000));
+                const dateStr = d.toISOString().split('T')[0];
+                if (!adStats[key].daily[dateStr]) adStats[key].daily[dateStr] = { chats: 0, orders: 0 };
+                adStats[key].daily[dateStr].chats++;
+                if (userOrders.length > 0) {
+                    adStats[key].daily[dateStr].orders += userOrders.length;
+                }
+            }
+
+            // Format output
+            const result = Object.entries(adStats).map(([source, stats]) => ({
+                source,
+                total: stats.total,
+                orders: stats.orders,
+                revenue: Math.round(stats.revenue),
+                conversionRate: stats.total > 0 ? parseFloat(((stats.orders / stats.total) * 100).toFixed(1)) : 0,
+                funnel: FUNNEL_STEPS.map(step => ({
+                    step,
+                    count: stats.steps[step] || 0,
+                    rate: stats.total > 0 ? parseFloat(((( stats.steps[step] || 0) / stats.total) * 100).toFixed(1)) : 0
+                })),
+                daily: Object.entries(stats.daily)
+                    .map(([date, d]) => ({ date, chats: d.chats, orders: d.orders, rate: d.chats > 0 ? parseFloat(((d.orders / d.chats) * 100).toFixed(1)) : 0 }))
+                    .sort((a, b) => a.date.localeCompare(b.date))
+            }));
+
+            res.json(result);
+        } catch (e) {
+            logger.error("🔴 [ANALYTICS] Error in /ad-performance:", e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     return router;
 };

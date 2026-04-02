@@ -20,6 +20,20 @@ interface SalesFlowDependencies {
     connectedAt?: number; // Unix timestamp (seconds) of when the bot connected — used to detect pre-existing chats
 }
 
+// Ad source detection from pre-filled Click-to-WhatsApp messages
+const AD_SOURCES: { pattern: RegExp; name: string }[] = [
+    { pattern: /quiero m[aá]s informaci[oó]n$/i, name: 'anuncio_1' },
+    { pattern: /me gustar[ií]a conseguir m[aá]s informaci[oó]n sobre esto/i, name: 'anuncio_2' }
+];
+
+function _detectAdSource(text: string): string | null {
+    const cleaned = text.trim().replace(/^[¡!¿?]+/, '').trim();
+    for (const ad of AD_SOURCES) {
+        if (ad.pattern.test(cleaned)) return ad.name;
+    }
+    return null;
+}
+
 // Keywords that signal clear purchase intent — if present, don't auto-pause
 // Note: normalizedText is accent-stripped, so only unaccented variants are needed
 const PURCHASE_INTENT_KEYWORDS = /\b(comprar|quiero comprar|quiero pedir|me interesa|precio|precios|cuanto sale|cuanto cuesta|quiero encargar|necesito comprar|hagan envios|hacen envios|quisiera pedir|quisiera comprar|quiero adquirir|quiero ordenar|tienen capsulas|tienen semillas|tienen gotas|nuez de la india|la direccion|mi direccion|te paso mis datos|mis datos|los datos|te paso la direccion|informacion|quiero saber|quiero mas info|bajar|adelgazar|kilos|kilo|capsulas|semillas|cemillas|semilla|gotas|gota|peso|perder peso|bajar de peso|10 kg|20 kg|mas de 20)\b/i;
@@ -57,7 +71,8 @@ export async function processSalesFlow(
             pendingOrder: null,
             currentWeight: undefined,
             consultativeSale: false,
-            lastActivityAt: Date.now()
+            lastActivityAt: Date.now(),
+            adSource: _detectAdSource(text)
         };
 
         // --- CHECK 1: Cross-reference against Orders DB ---
