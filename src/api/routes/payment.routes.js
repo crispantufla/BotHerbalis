@@ -39,7 +39,7 @@ module.exports = (client, sharedState) => {
             const mpPayment = new Payment(mpClient);
 
             const result = await mpPayment.search({
-                options: { filters: { external_reference: payment.externalRef } }
+                options: { external_reference: payment.externalRef }
             });
 
             const results = result?.results || [];
