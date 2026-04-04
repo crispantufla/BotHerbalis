@@ -2,6 +2,9 @@ const express = require('express');
 const { authMiddleware } = require('../../middleware/auth');
 const logger = require('../../utils/logger');
 const { prisma } = require('../../../db');
+const { toZonedTime } = require('date-fns-tz');
+
+const AR_TZ = 'America/Argentina/Buenos_Aires';
 
 module.exports = (client, sharedState) => {
     const router = express.Router();
@@ -194,7 +197,7 @@ module.exports = (client, sharedState) => {
                 where: {
                     ...baseWhere,
                     createdAt: { gte: currentStart },
-                    provincia: { not: null, not: '' }
+                    provincia: { not: null, notIn: [''] }
                 },
                 orderBy: { _count: { id: 'desc' } },
                 take: 10
@@ -222,10 +225,8 @@ module.exports = (client, sharedState) => {
 
             const hourCounts = new Array(24).fill(0);
             orders.forEach(o => {
-                // Adjust for Argentina timezone roughly (UTC-3)
-                let hour = o.createdAt.getUTCHours() - 3;
-                if (hour < 0) hour += 24;
-                hourCounts[hour]++;
+                const arDate = toZonedTime(o.createdAt, AR_TZ);
+                hourCounts[arDate.getHours()]++;
             });
 
             const heatmap = hourCounts.map((count, hour) => ({
@@ -236,17 +237,15 @@ module.exports = (client, sharedState) => {
             // Structure daily chats and daily orders into an array
             const dailyChatsMap = {};
             users.forEach(u => {
-                // Approximate Argentina time
-                const d = new Date(u.createdAt.getTime() - (3 * 60 * 60 * 1000));
-                const dateRaw = d.toISOString().split('T')[0];
+                const arDate = toZonedTime(u.createdAt, AR_TZ);
+                const dateRaw = arDate.toISOString().split('T')[0];
                 dailyChatsMap[dateRaw] = (dailyChatsMap[dateRaw] || 0) + 1;
             });
 
             const dailyOrdersMap = {};
             orders.forEach(o => {
-                // Approximate Argentina time
-                const d = new Date(o.createdAt.getTime() - (3 * 60 * 60 * 1000));
-                const dateRaw = d.toISOString().split('T')[0];
+                const arDate = toZonedTime(o.createdAt, AR_TZ);
+                const dateRaw = arDate.toISOString().split('T')[0];
                 dailyOrdersMap[dateRaw] = (dailyOrdersMap[dateRaw] || 0) + 1;
             });
 
@@ -254,7 +253,7 @@ module.exports = (client, sharedState) => {
             let currentDate = new Date(currentStart);
             const now = new Date();
             while (currentDate <= now) {
-                const ds = new Date(currentDate.getTime() - (3 * 60 * 60 * 1000)).toISOString().split('T')[0];
+                const ds = toZonedTime(currentDate, AR_TZ).toISOString().split('T')[0];
 
                 const chatsCount = dailyChatsMap[ds] || 0;
                 const ordersCount = dailyOrdersMap[ds] || 0;
@@ -407,8 +406,8 @@ module.exports = (client, sharedState) => {
                 }
 
                 // Daily breakdown
-                const d = new Date(user.createdAt.getTime() - (3 * 60 * 60 * 1000));
-                const dateStr = d.toISOString().split('T')[0];
+                const arDate = toZonedTime(user.createdAt, AR_TZ);
+                const dateStr = arDate.toISOString().split('T')[0];
                 if (!adStats[key].daily[dateStr]) adStats[key].daily[dateStr] = { chats: 0, orders: 0 };
                 adStats[key].daily[dateStr].chats++;
                 if (userOrders.length > 0) {

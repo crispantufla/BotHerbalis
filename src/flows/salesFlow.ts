@@ -96,60 +96,9 @@ export async function processSalesFlow(
             logger.error(`[ORDER-CHECK] Failed to query orders for ${userId}:`, err.message);
         }
 
-        // --- CHECK 1.5: Cross-Instance Duplicate Detection ---
-        // (DISABLED PER USER REQUEST)
-        // If this phone is already in an active sales flow on ANOTHER bot instance,
-        // redirect them politely instead of starting a duplicate conversation.
-        /*
-        if (userState[userId].step !== 'completed') {
-            try {
-                const { prisma } = require('../../db');
-                const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
-                const cleanPhone = _cleanPhone(userId);
-
-                const otherInstanceUsers = await prisma.user.findMany({
-                    where: {
-                        phone: cleanPhone,
-                        instanceId: { not: INSTANCE_ID }
-                    },
-                    select: { instanceId: true, profileData: true }
-                });
-
-                // Check if any of those other instances have an active (mid-funnel) conversation
-                const activeInOtherBot = otherInstanceUsers.some((u: any) => {
-                    try {
-                        const data = JSON.parse(u.profileData || '{}');
-                        const step = data.step || 'greeting';
-                        const activeSteps = ['waiting_weight', 'waiting_preference', 'waiting_price_confirmation', 'waiting_plan_choice', 'waiting_ok', 'waiting_data', 'waiting_final_confirmation'];
-                        return activeSteps.includes(step);
-                    } catch (e) { return false; }
-                });
-
-                if (activeInOtherBot) {
-                    logger.info(`[CROSS-BOT] User ${userId} is already active in another bot instance. Sending redirect.`);
-                    if (dependencies.sendMessageWithDelay) {
-                        await dependencies.sendMessageWithDelay(
-                            userId,
-                            "¡Hola! Ya te está atendiendo mi compañera por el otro número 😊 Seguí la charla por ahí así no nos pisamos. ¡Cualquier cosa acá estoy!"
-                        );
-                    }
-                    if (dependencies.sharedState?.pausedUsers) {
-                        const { pauseUser } = require('../services/pauseService');
-                        await pauseUser(userId, '🔀 Redirigido a otro bot (cross-bot)', { sharedState: dependencies.sharedState });
-                    }
-                    userState[userId].step = 'cross_bot_redirected';
-                    saveState(userId);
-                    return { matched: true, paused: true };
-                }
-            } catch (err: any) {
-                logger.error(`[CROSS-BOT] Failed to check other instances for ${userId}:`, err.message);
-            }
-        }
-        */
-
         // --- CHECK 2: WhatsApp Chat History Detection ---
         // Only run this if we didn't already route to post-sale via Orders
-        if (userState[userId].step !== 'completed' && userState[userId].step !== 'cross_bot_redirected') {
+        if (userState[userId].step !== 'completed') {
             try {
                 const { prisma } = require('../../db');
                 const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
@@ -260,7 +209,7 @@ export async function processSalesFlow(
     // --- NEW REQUIREMENT (Unconditional Post-Sale Stop) ---
     // If the user's step is 'completed', it means they are a past customer.
     // Pause immediately and alert admin if not already paused.
-    if (currentState.step === 'completed' || currentState.step === 'cross_bot_redirected') {
+    if (currentState.step === 'completed') {
         const isAlreadyPaused = dependencies.sharedState?.pausedUsers?.has(userId);
 
         // Save User message in history regardless
@@ -276,7 +225,7 @@ export async function processSalesFlow(
                 `El cliente ya compró y volvió a escribir.\n\nMensaje: "${text}"\n\nEl bot se pausó automáticamente.`
             );
         } else {
-            logger.info(`[HARD STOP] User ${userId} is past customer/redirected. Already paused or redirected. Ignoring silently.`);
+            logger.info(`[HARD STOP] User ${userId} is past customer. Already paused. Ignoring silently.`);
         }
 
         return { matched: true, paused: true };

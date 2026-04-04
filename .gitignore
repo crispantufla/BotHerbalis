@@ -1,4 +1,5 @@
 node_modules
+dist/
 .env
 .wwebjs_auth
 .wwebjs_cache
@@ -63,6 +64,10 @@ orig_salesFlow.js
 
 # Sheets (removed)
 sheets_sync.js
+
+# Screenshots / audit images
+audit*.png
+v2-*.png
 
 # Claude
 .claude/
