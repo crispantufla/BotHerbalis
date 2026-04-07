@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BookOpen, ChevronRight, AlertTriangle, CheckCircle, Hand, List, Sparkles, Terminal, HelpCircle, Zap, Users, Package, BarChart3, Settings, Send, Shield } from 'lucide-react';
+import { BookOpen, ChevronRight, AlertTriangle, CheckCircle, Hand, List, Sparkles, Terminal, HelpCircle, Zap, Users, Package, BarChart3, Settings, Send, Shield, MessageSquareWarning, Eye, Trash2, MousePointerClick } from 'lucide-react';
 
 // ─── Manual data ────────────────────────────────────────────────
 const MANUALS = [
@@ -191,6 +191,86 @@ const MANUALS = [
             { cmd: '!admin list', desc: 'Ver admins' },
             { cmd: '!resumen', desc: 'Reporte diario' },
             { cmd: '!ayuda', desc: 'Menu de comandos' },
+        ],
+    },
+    {
+        id: 'reporte-ia',
+        title: 'Reportar Error de IA',
+        description: 'Como marcar una respuesta incorrecta del bot, guardar el contexto y leer los reportes desde el panel.',
+        icon: AlertTriangle,
+        color: 'amber',
+        sections: [
+            {
+                title: '¿Para que sirve?',
+                icon: HelpCircle,
+                content: `Cuando el bot responde algo **incorrecto, confuso o fuera de contexto**, podés reportarlo en segundos.\n\nEl reporte guarda la conversacion completa y tu correccion en la base de datos. Desde la seccion **"Errores de IA"** del panel podes leerlos todos y usarlos para mejorar el guion del bot.`,
+            },
+            {
+                title: 'Paso 1: Abrí el chat',
+                icon: MousePointerClick,
+                content: `Anda a la seccion **Chat & Atencion** y abri la conversacion donde el bot se equivoco.`,
+                steps: [
+                    { label: 'Ir a "Chat & Atencion"', detail: 'En el menu lateral, segundo icono.' },
+                    { label: 'Buscar al cliente', detail: 'Por nombre o numero de telefono.' },
+                    { label: 'Abrir la conversacion', detail: 'Hacer click en el chat.' },
+                ],
+            },
+            {
+                title: 'Paso 2: Marcar el mensaje erróneo',
+                icon: AlertTriangle,
+                content: `Posate sobre el **mensaje del bot** que esta mal. Aparece un boton naranja con el texto **"Reportar Error de IA"**.`,
+                steps: [
+                    { label: 'Pasar el mouse sobre el mensaje', detail: 'El mensaje del bot se resalta.' },
+                    { label: 'Click en "Reportar Error de IA"', detail: 'Se abre el modal de reporte.' },
+                ],
+                extra: `El boton solo aparece en mensajes del **bot** (burbuja derecha/violeta), no en los del cliente.`
+            },
+            {
+                title: 'Paso 3: Completar el reporte',
+                icon: Send,
+                content: `El modal muestra las **ultimas 4 mensajes** del chat con el erroneo resaltado en rojo.\n\nPodés cargar más contexto con el botón **"Cargar más"** si necesitas mostrar más antecedentes.`,
+                steps: [
+                    { label: 'Revisar el contexto', detail: 'Las burbujas muestran quien dijo que. La roja es el mensaje erroneo.' },
+                    { label: 'Cargar mas contexto (opcional)', detail: 'Click en "Cargar mas" para ver mensajes anteriores.' },
+                    { label: 'Escribir la correccion', detail: 'Explicar que hizo mal o que deberia haber respondido.' },
+                    { label: 'Click en "Guardar Reporte"', detail: 'Se guarda en la base de datos y aparece confirmacion.' },
+                ],
+            },
+            {
+                title: 'Paso 4: Leer los reportes',
+                icon: Eye,
+                content: `Todos los reportes guardados estan en la seccion **"Errores de IA"** del menu lateral.`,
+                steps: [
+                    { label: 'Click en "Errores de IA"', detail: 'En el menu lateral, icono de triangulo naranja.' },
+                    { label: 'Ver el listado', detail: 'Cada tarjeta muestra el telefono, fecha, mensaje erroneo y tu correccion.' },
+                    { label: 'Expandir la conversacion', detail: 'Click en la flecha para ver el contexto completo del chat.' },
+                    { label: 'Eliminar cuando ya lo revisaste', detail: 'Click en el icono de basura para borrar el reporte.' },
+                ],
+            },
+            {
+                title: 'Ejemplo de buena corrección',
+                icon: CheckCircle,
+                content: `Al escribir la correccion, cuanto mas especifica mejor. Algunos ejemplos:`,
+                table: {
+                    headers: ['Mala correccion', 'Buena correccion'],
+                    rows: [
+                        ['Esta mal', 'Asumio que no teniamos stock de capsulas de 60 dias, pero si tenemos. Deberia haber ofrecido ese plan.'],
+                        ['No debio decir eso', 'La cliente dijo que esta amamantando. El bot igual intento venderle. Deberia haber cerrado la conversacion.'],
+                        ['Respuesta incorrecta', 'Confundio "Nuez de Brasil" con "Nuez de la India". Son productos distintos. Deberia haber aclarado la diferencia.'],
+                    ]
+                },
+            },
+            {
+                title: 'Reglas importantes',
+                icon: Shield,
+                bullets: [
+                    'Reporta solo mensajes del bot, no respuestas del cliente.',
+                    'Sé especifico en la correccion: que estuvo mal y que deberia haber dicho.',
+                    'Podes cargar hasta la conversacion entera con "Cargar mas".',
+                    'Los reportes quedan guardados permanentemente hasta que los borres.',
+                    'Usa los reportes para actualizar el guion del bot en la seccion "Guion & Prompts".',
+                ],
+            },
         ],
     },
 ];
