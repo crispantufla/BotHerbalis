@@ -634,5 +634,60 @@ module.exports = (client, sharedState) => {
         }
     });
 
+    // ── AI Error Reports ──
+
+    // POST /ai-reports — save a new AI error report
+    router.post('/ai-reports', authMiddleware, async (req, res) => {
+        try {
+            const { userPhone, reportedMessage, conversation, correction } = req.body;
+            if (!reportedMessage || !correction || !conversation) {
+                return res.status(400).json({ error: 'Missing required fields' });
+            }
+            const { prisma } = require('../../../db');
+            const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
+            const report = await prisma.aiErrorReport.create({
+                data: {
+                    instanceId: INSTANCE_ID,
+                    userPhone: userPhone || 'unknown',
+                    reportedMessage: reportedMessage.slice(0, 2000),
+                    conversation: JSON.stringify(conversation),
+                    correction: correction.slice(0, 2000),
+                }
+            });
+            logger.info(`[AI-REPORT] New report saved: ${report.id} (phone: ${userPhone})`);
+            res.json({ success: true, id: report.id });
+        } catch (e) {
+            logger.error('[AI-REPORT] Error saving report:', e.message);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // GET /ai-reports — list all AI error reports
+    router.get('/ai-reports', authMiddleware, async (req, res) => {
+        try {
+            const { prisma } = require('../../../db');
+            const reports = await prisma.aiErrorReport.findMany({
+                orderBy: { createdAt: 'desc' },
+                take: 200,
+            });
+            res.json(reports);
+        } catch (e) {
+            logger.error('[AI-REPORT] Error fetching reports:', e.message);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // DELETE /ai-reports/:id — delete a single report
+    router.delete('/ai-reports/:id', authMiddleware, async (req, res) => {
+        try {
+            const { prisma } = require('../../../db');
+            await prisma.aiErrorReport.delete({ where: { id: req.params.id } });
+            res.json({ success: true });
+        } catch (e) {
+            logger.error('[AI-REPORT] Error deleting report:', e.message);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     return router;
 };
