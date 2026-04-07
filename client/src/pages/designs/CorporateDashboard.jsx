@@ -16,6 +16,7 @@ import AdvancedAnalyticsView from '../../components/corporate/AdvancedAnalyticsV
 import ManualsView from '../../components/corporate/ManualsView';
 
 import PaymentsView from '../../components/corporate/PaymentsView';
+import AiReportsView from '../../components/corporate/AiReportsView';
 
 import { Wifi, MessageCircle, Database, Settings, FileText, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Search, Bell, AlertTriangle, BookOpen, MoreHorizontal, CreditCard } from 'lucide-react';
 
@@ -202,6 +203,11 @@ const CorporateDashboard = () => {
                     <PaymentsView onGoToChat={(chatId) => handleQuickAction(chatId, 'chat')} />
                 </div>
             );
+            case 'ai-reports': return (
+                <div className="p-6 md:p-8 w-full">
+                    <AiReportsView />
+                </div>
+            );
             default: return <DashboardView alerts={alerts} config={config} handleQuickAction={handleQuickAction} status={status} qrData={qrData} />;
         }
     };
@@ -288,6 +294,7 @@ const CorporateDashboard = () => {
                     <NavItem tab="script" icon={FileText} label="Guión & Prompts" />
                     <NavItem tab="gallery" icon={ImageIcon} label="Galería de Medios" />
                     <NavItem tab="manuals" icon={BookOpen} label="Manuales" />
+                    <NavItem tab="ai-reports" icon={AlertTriangle} label="Errores de IA" />
 
                     <div className="pt-6 mt-6 border-t border-slate-200/50 dark:border-slate-700/50">
                         {(!sidebarCollapsed || isMobile) && <p className="text-xs 2xl:text-sm font-semibold text-slate-400 dark:text-slate-300 uppercase tracking-wider mb-4 px-4">Administración</p>}

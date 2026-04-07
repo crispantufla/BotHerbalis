@@ -93,6 +93,19 @@ model PaymentLink {
   @@index([instanceId])
 }
 
+model AiErrorReport {
+  id              String   @id @default(uuid())
+  instanceId      String   @default("default")
+  userPhone       String   // The client's phone number
+  reportedMessage String   // The bot message flagged as wrong
+  conversation    String   // JSON array of context messages
+  correction      String   // Admin's correction/explanation
+  createdAt       DateTime @default(now())
+
+  @@index([instanceId])
+  @@index([createdAt])
+}
+
 model DailyStats {
   id              String   @id @default(uuid())
   instanceId      String   @default("default")

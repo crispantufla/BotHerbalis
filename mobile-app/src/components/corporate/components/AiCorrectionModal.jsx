@@ -1,23 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { AlertTriangle, Copy, X, ArrowUpCircle } from 'lucide-react';
+import { AlertTriangle, Send, X, ArrowUpCircle } from 'lucide-react';
 import { useToast } from '../../ui/Toast';
+import api from '../../../config/axios';
 
 const AiCorrectionModal = ({ isOpen, onClose, messages = [], reportedMsgId, selectedChat }) => {
     const { toast } = useToast();
-    const [contextCount, setContextCount] = useState(4); // default 4 messages (1 reported + 3 before)
+    const [contextCount, setContextCount] = useState(4);
     const [correctionText, setCorrectionText] = useState('');
     const [contextMessages, setContextMessages] = useState([]);
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         if (!isOpen || !reportedMsgId) return;
-
         const reportedIndex = messages.findIndex(m => m.id === reportedMsgId);
         if (reportedIndex === -1) return;
-
-        // Get up to `contextCount` messages ending at reportedIndex
         const startIdx = Math.max(0, reportedIndex - contextCount + 1);
-        const sliced = messages.slice(startIdx, reportedIndex + 1);
-        setContextMessages(sliced);
+        setContextMessages(messages.slice(startIdx, reportedIndex + 1));
     }, [isOpen, reportedMsgId, messages, contextCount]);
 
     useEffect(() => {
@@ -29,48 +27,42 @@ const AiCorrectionModal = ({ isOpen, onClose, messages = [], reportedMsgId, sele
 
     if (!isOpen) return null;
 
-    const handleLoadMore = () => {
-        setContextCount(prev => prev + 4);
-    };
+    const handleLoadMore = () => setContextCount(prev => prev + 4);
 
-    const generateAndCopyReport = () => {
+    const handleSubmit = async () => {
         if (!correctionText.trim()) {
             toast.error('Por favor, escribe tus sugerencias de corrección.');
             return;
         }
+        setLoading(true);
+        try {
+            const reportedMsg = contextMessages.find(m => m.id === reportedMsgId);
+            const userPhone = selectedChat?.id?.split('@')[0] || 'unknown';
 
-        let markdown = `# ⚠ Reporte de Corrección de Flujo\n\n**Contexto de la conversación:**\n`;
-
-        contextMessages.forEach(msg => {
-            const sender = msg.fromMe ? '🤖 Bot' : '👤 Usuario';
-            const body = msg.body || '[Contenido oculto/Media]';
-            const isReported = msg.id === reportedMsgId;
-
-            if (isReported) {
-                markdown += `❌ **Bot (Respuesta Errónea):** ${body}\n`;
-            } else {
-                markdown += `${sender}: ${body}\n`;
-            }
-        });
-
-        markdown += `\n💡 **Corrección del Administrador:**\n"${correctionText.trim()}"\n`;
-
-        navigator.clipboard.writeText(markdown)
-            .then(() => {
-                toast.success('Reporte copiado al portapapeles ✅. ¡Pegalo en el chat con la IA!');
-                onClose();
-            })
-            .catch(() => {
-                toast.error('Error al copiar al portapapeles');
+            await api.post('/api/ai-reports', {
+                userPhone,
+                reportedMessage: reportedMsg?.body || '',
+                conversation: contextMessages.map(m => ({
+                    role: m.fromMe ? 'bot' : 'user',
+                    body: m.body || '[Media]',
+                    isReported: m.id === reportedMsgId,
+                })),
+                correction: correctionText.trim(),
             });
+
+            toast.success('Reporte guardado ✅');
+            onClose();
+        } catch (e) {
+            toast.error('Error al guardar el reporte: ' + (e.response?.data?.error || e.message));
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
         <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
-            {/* Backdrop */}
             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}></div>
 
-            {/* Modal */}
             <div className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl overflow-hidden relative z-10 animate-fade-in flex flex-col max-h-[90vh]">
 
                 {/* Header */}
@@ -90,7 +82,7 @@ const AiCorrectionModal = ({ isOpen, onClose, messages = [], reportedMsgId, sele
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto p-5 sm:p-6 custom-scrollbar Space-y-6">
+                <div className="flex-1 overflow-y-auto p-5 sm:p-6 custom-scrollbar space-y-6">
                     <div>
                         <div className="flex justify-between items-end mb-4">
                             <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm tracking-wide uppercase">Contexto de la Conversación</h3>
@@ -103,10 +95,8 @@ const AiCorrectionModal = ({ isOpen, onClose, messages = [], reportedMsgId, sele
                         </div>
 
                         <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 space-y-3">
-                            {contextMessages.map((msg, idx) => {
+                            {contextMessages.map((msg) => {
                                 const isReported = msg.id === reportedMsgId;
-                                const isLast = idx === contextMessages.length - 1;
-
                                 return (
                                     <div key={msg.id} className={`flex flex-col ${msg.fromMe ? 'items-end' : 'items-start'}`}>
                                         <div className={`
@@ -134,7 +124,7 @@ const AiCorrectionModal = ({ isOpen, onClose, messages = [], reportedMsgId, sele
                         </div>
                     </div>
 
-                    <div className="mt-8">
+                    <div>
                         <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm tracking-wide mb-3 flex items-center gap-2">
                             <span className="w-2 h-2 rounded-full bg-amber-500 outline outline-2 outline-amber-200"></span>
                             ¿Qué hizo mal o qué debería haber dicho?
@@ -152,14 +142,19 @@ const AiCorrectionModal = ({ isOpen, onClose, messages = [], reportedMsgId, sele
                 {/* Footer */}
                 <div className="p-5 sm:p-6 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900">
                     <div className="flex gap-3 justify-end">
-                        <button onClick={onClose} className="px-5 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors">
+                        <button onClick={onClose} className="px-5 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors">
                             Cancelar
                         </button>
                         <button
-                            onClick={generateAndCopyReport}
-                            className="px-6 py-2.5 rounded-xl font-bold text-white bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-md shadow-amber-500/20 hover:shadow-lg transition-all flex items-center gap-2 transform active:scale-95"
+                            onClick={handleSubmit}
+                            disabled={loading}
+                            className="px-6 py-2.5 rounded-xl font-bold text-white bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-md shadow-amber-500/20 hover:shadow-lg transition-all flex items-center gap-2 transform active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
                         >
-                            <Copy className="w-5 h-5" /> Generar y Copiar
+                            {loading
+                                ? <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                : <Send className="w-4 h-4" />
+                            }
+                            {loading ? 'Guardando...' : 'Guardar Reporte'}
                         </button>
                     </div>
                 </div>
