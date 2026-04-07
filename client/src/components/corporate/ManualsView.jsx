@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BookOpen, ChevronRight, AlertTriangle, CheckCircle, Hand, List, Sparkles, Terminal, HelpCircle, Zap, Users, Package, BarChart3, Settings, Send, Shield, MessageSquareWarning, Eye, Trash2, MousePointerClick } from 'lucide-react';
+import { BookOpen, ChevronRight, AlertTriangle, CheckCircle, Hand, List, Sparkles, Terminal, HelpCircle, Zap, Users, Package, BarChart3, Settings, Send, Shield, Eye, Trash2, MousePointerClick, MessageCircle, ShoppingCart, CreditCard, FileText, ImageIcon, Bell, PauseCircle, PlayCircle, RotateCcw, TrendingUp, Filter, Download, Edit2 } from 'lucide-react';
 
 // ─── Manual data ────────────────────────────────────────────────
 const MANUALS = [
@@ -194,6 +194,515 @@ const MANUALS = [
         ],
     },
     {
+        id: 'panel-alertas',
+        title: 'Panel Principal & Alertas',
+        description: 'Como leer el estado del bot, gestionar alertas de pedidos y entender los indicadores del panel de inicio.',
+        icon: Bell,
+        color: 'indigo',
+        sections: [
+            {
+                title: '¿Qué muestra el panel?',
+                icon: HelpCircle,
+                content: `El panel de inicio es tu vista general del negocio en tiempo real. Tiene 4 bloques principales:\n\n- **Estado del sistema** — si el bot está conectado o no\n- **Alertas activas** — pedidos que esperan tu atención\n- **Clientes esperando** — usuarios con el bot pausado\n- **Estadísticas del día** — ventas, ingresos y conversiones`,
+            },
+            {
+                title: 'Indicador de estado (ONLINE / OFFLINE)',
+                icon: CheckCircle,
+                content: `En la barra superior hay un punto de color con el texto **ONLINE** o **OFFLINE**.\n\n- 🟢 **ONLINE** — el bot está conectado y funcionando\n- 🔴 **OFFLINE** — el bot se desconectó, nadie está siendo atendido\n\nSi aparece OFFLINE, revisá la sección **Configuración** → Estado del Sistema para ver el motivo. Normalmente se resuelve solo en unos minutos.`,
+            },
+            {
+                title: 'Alertas: qué son y cómo funcionan',
+                icon: AlertTriangle,
+                content: `Las alertas aparecen cuando el bot **necesita tu intervención** en una conversación. Tipos más comunes:`,
+                table: {
+                    headers: ['Tipo de alerta', 'Qué significa'],
+                    rows: [
+                        ['Pedido listo para confirmar', 'El cliente completó todos sus datos y espera confirmación'],
+                        ['Cliente con dudas', 'El bot detectó resistencia o preguntas que no pudo resolver'],
+                        ['Dirección problemática', 'El bot no pudo validar la dirección del cliente'],
+                        ['Modo noche', 'Un mensaje llegó fuera del horario de atención'],
+                    ]
+                },
+            },
+            {
+                title: 'Acciones rápidas desde una alerta',
+                icon: Zap,
+                steps: [
+                    { label: 'Confirmar pedido', detail: 'Click en el botón verde "Confirmar" — el bot cierra la venta automáticamente.' },
+                    { label: 'Ir al chat', detail: 'Click en el ícono de chat — te lleva directamente a la conversación.' },
+                    { label: 'Descartar', detail: 'Click en la X roja — elimina la alerta sin hacer nada (el bot sigue activo).' },
+                ],
+                extra: `También podés gestionar alertas desde WhatsApp con los comandos **1 ok**, **1 me encargo**, etc. Ver manual "Comandos WhatsApp".`
+            },
+            {
+                title: 'Clientes esperando',
+                icon: Users,
+                content: `El bloque **"Clientes Esperando"** muestra usuarios que tienen el bot **pausado manualmente**.\n\nEsto pasa cuando:\n- Vos pausaste el bot desde el chat para atenderlos\n- El bot se pausó automáticamente por una situación especial\n\nPara reactivar el bot a un cliente, andá al chat y clickeá el botón naranja/verde de pausa.`,
+            },
+            {
+                title: 'Notificaciones (campana)',
+                icon: Bell,
+                content: `El ícono de campana en la barra superior muestra las alertas pendientes. El número en rojo indica cuántas hay.\n\nClickeá la campana para ver el listado sin salir del panel. Clickeá una alerta para ir directo al chat del cliente.`,
+            },
+            {
+                title: 'Reglas importantes',
+                icon: Shield,
+                bullets: [
+                    'Las alertas nuevas suenan en tiempo real — el número en la campana se actualiza automáticamente.',
+                    'Confirmar un pedido desde el panel tiene el mismo efecto que confirmar por WhatsApp.',
+                    'Descartar una alerta NO pausa ni afecta al cliente, solo limpia tu lista.',
+                    'Si el bot dice OFFLINE más de 5 minutos, revisá Configuración → Estado del Sistema.',
+                ],
+            },
+        ],
+    },
+    {
+        id: 'chat-atencion',
+        title: 'Chat & Atención',
+        description: 'Como leer conversaciones, pausar/reactivar el bot, enviar mensajes manuales, reiniciar chats y usar el resumen de IA.',
+        icon: MessageCircle,
+        color: 'indigo',
+        sections: [
+            {
+                title: 'Navegación de la pantalla',
+                icon: HelpCircle,
+                content: `La pantalla de Chat tiene dos paneles:\n\n- **Izquierda** — lista de todos los chats activos con indicadores de estado\n- **Derecha** — la conversación seleccionada con los botones de control`,
+                table: {
+                    headers: ['Indicador', 'Significado'],
+                    rows: [
+                        ['Punto rojo parpadeando', 'Alerta activa — requiere tu atención'],
+                        ['Punto naranja', 'Bot pausado para ese cliente'],
+                        ['Badge "Cliente"', 'Ya compró antes (cliente recurrente)'],
+                        ['Número en gris', 'Mensajes sin leer'],
+                    ]
+                },
+            },
+            {
+                title: 'Pausar y reactivar el bot',
+                icon: PauseCircle,
+                content: `En la barra superior del chat abierto hay un botón naranja/verde:`,
+                steps: [
+                    { label: 'Bot activo (botón naranja)', detail: 'Clickealo para pausarlo. El bot deja de responder a ese cliente.' },
+                    { label: 'Bot pausado (botón verde)', detail: 'Clickealo para reactivarlo. El bot retoma la conversación.' },
+                ],
+                extra: `Cuando pausás el bot, el cliente queda en tu lista de "Clientes Esperando" del panel principal. Recordá siempre reactivarlo cuando terminés.`
+            },
+            {
+                title: 'Enviar mensajes manuales',
+                icon: Send,
+                content: `Con el bot pausado (o activo), podés escribir en la caja de texto abajo y enviar mensajes directamente.\n\n**El bot se pausa automáticamente** cuando enviás un mensaje manual, para que no se pisen las respuestas.`,
+                steps: [
+                    { label: 'Escribí tu mensaje en la caja de texto', detail: 'En la parte inferior del chat.' },
+                    { label: 'Presioná Enter o el botón de enviar', detail: 'El mensaje se envía como si fuera el bot.' },
+                    { label: 'Reactivá el bot cuando termines', detail: 'Con el botón verde de la barra superior.' },
+                ],
+            },
+            {
+                title: 'Enviar imágenes',
+                icon: ImageIcon,
+                content: `Podés enviar imágenes directamente desde el panel. Clickeá el ícono de imagen en la barra de mensajes, seleccioná el archivo y opcionalmente agregá un texto.`,
+                extra: `Las imágenes de la galería también se pueden enviar desde la sección **Galería de Medios**.`
+            },
+            {
+                title: 'Reiniciar un chat',
+                icon: RotateCcw,
+                content: `El botón rojo de la papelera/reset en la barra superior **borra el historial y reinicia el estado** del cliente. Usalo cuando:\n\n- El cliente quiere empezar desde cero\n- Hubo un error grave en el flujo\n- Querés que el bot lo salude de nuevo`,
+                extra: `⚠️ Esta acción es irreversible. El historial de WhatsApp y la memoria del bot se pierden.`
+            },
+            {
+                title: 'Resumen inteligente (IA)',
+                icon: Sparkles,
+                content: `El botón azul con el ícono de rayo genera un **resumen de la conversación** usando IA. En segundos te muestra:\n\n- Qué quiere el cliente\n- En qué paso del proceso está\n- Si hay algún bloqueo o duda pendiente\n\nÚtil para ponerse al día rápido sin leer todo el historial.`,
+            },
+            {
+                title: 'Ver historial de compras',
+                icon: ShoppingCart,
+                content: `El ícono de carrito en la barra superior muestra todos los pedidos anteriores del cliente:\n\n- Producto, plan y precio de cada compra\n- Estado del envío y tracking\n- Fecha de cada pedido`,
+            },
+            {
+                title: 'Reglas importantes',
+                icon: Shield,
+                bullets: [
+                    'Pausar el bot no notifica al cliente — la conversación queda igual para él.',
+                    'Siempre reactivá el bot cuando termines de atender manualmente.',
+                    'El resumen IA toma los últimos 50 mensajes del chat.',
+                    'Reiniciar el chat no cancela pedidos ya registrados en la base de datos.',
+                ],
+            },
+        ],
+    },
+    {
+        id: 'ventas-logistica',
+        title: 'Ventas & Logística',
+        description: 'Como ver y filtrar pedidos, cambiar estados, cargar tracking y exportar datos.',
+        icon: ShoppingCart,
+        color: 'indigo',
+        sections: [
+            {
+                title: '¿Qué muestra esta sección?',
+                icon: HelpCircle,
+                content: `La sección **Ventas & Logística** lista todos los pedidos registrados por el bot y el panel. Desde acá podés ver el estado de cada venta, actualizar datos y gestionar envíos.`,
+            },
+            {
+                title: 'Estados de un pedido',
+                icon: Package,
+                table: {
+                    headers: ['Estado', 'Significado'],
+                    rows: [
+                        ['Pendiente', 'El bot tomó los datos pero aún no fue confirmado'],
+                        ['Confirmado', 'Aprobado — a preparar el paquete'],
+                        ['En sistema', 'Ingresado al sistema de despacho'],
+                        ['Enviado', 'Despachado con número de tracking'],
+                        ['Entregado', 'El cliente recibió el paquete'],
+                        ['Cancelado', 'Venta cancelada'],
+                    ]
+                },
+            },
+            {
+                title: 'Filtrar y buscar pedidos',
+                icon: Filter,
+                content: `Usá la barra de búsqueda y los filtros de la parte superior para encontrar pedidos rápido.`,
+                table: {
+                    headers: ['Filtro', 'Para qué sirve'],
+                    rows: [
+                        ['Barra de búsqueda', 'Buscar por nombre, teléfono o código de tracking'],
+                        ['Filtro de estado', 'Ver solo "Enviados", "Pendientes", etc.'],
+                        ['Filtro de vendedor', 'Ver pedidos de un número de WhatsApp específico'],
+                    ]
+                },
+            },
+            {
+                title: 'Cambiar el estado de un pedido',
+                icon: Edit2,
+                steps: [
+                    { label: 'Buscá el pedido en la lista', detail: 'Usá la barra de búsqueda o filtrá por estado.' },
+                    { label: 'Click en el ícono de edición (lápiz)', detail: 'Aparece un panel de edición.' },
+                    { label: 'Seleccioná el nuevo estado', detail: 'Usá el selector desplegable.' },
+                    { label: 'Guardá los cambios', detail: 'Click en "Guardar".' },
+                ],
+            },
+            {
+                title: 'Cargar número de tracking',
+                icon: Package,
+                steps: [
+                    { label: 'Abrí el pedido (ícono de lápiz)', detail: 'En la fila del pedido.' },
+                    { label: 'Ingresá el código de tracking', detail: 'En el campo "Tracking".' },
+                    { label: 'Guardá', detail: 'El cliente recibe automáticamente un WhatsApp con el código.' },
+                ],
+                extra: `También podés cargar tracking por WhatsApp con **!tracking [tel] [codigo]**.`
+            },
+            {
+                title: 'Ir al chat desde un pedido',
+                icon: MessageCircle,
+                content: `En cada pedido hay un botón de chat que te lleva directo a la conversación de ese cliente en la sección **Chat & Atención**.`,
+            },
+            {
+                title: 'Exportar a CSV',
+                icon: Download,
+                content: `El botón **"Exportar CSV"** en la parte superior descarga todos los pedidos visibles (según los filtros activos) en un archivo Excel-compatible.\n\nIdeal para compartir con el equipo o cargar en sistemas externos.`,
+            },
+        ],
+    },
+    {
+        id: 'pagos-mp',
+        title: 'Pagos MercadoPago',
+        description: 'Como generar links de pago, enviárselos a clientes, verificar el estado y entender los plazos de acreditación.',
+        icon: CreditCard,
+        color: 'amber',
+        sections: [
+            {
+                title: '¿Para qué sirve esta sección?',
+                icon: HelpCircle,
+                content: `La sección **Pagos MP** te permite generar links de pago de MercadoPago y enviárselos a clientes que quieran pagar por adelantado.\n\nTodos los pagos se rastrean automáticamente — el sistema revisa cada 5 minutos si fueron pagados y actualiza el estado.`,
+            },
+            {
+                title: 'Generar un link de pago',
+                icon: CreditCard,
+                steps: [
+                    { label: 'Click en "Nuevo Link de Pago"', detail: 'Botón morado en la parte superior.' },
+                    { label: 'Ingresá el monto', detail: 'En pesos argentinos, sin puntos ni comas.' },
+                    { label: 'Ingresá el teléfono del cliente (opcional)', detail: 'Para poder ir al chat desde el listado.' },
+                    { label: 'Click en "Generar"', detail: 'El link se crea en MercadoPago y aparece en la lista.' },
+                ],
+            },
+            {
+                title: 'Enviar el link al cliente',
+                icon: Send,
+                steps: [
+                    { label: 'Encontrá el pago en la lista', detail: 'Aparece inmediatamente tras generarlo.' },
+                    { label: 'Click en el ícono de copiar', detail: 'Copia el link al portapapeles.' },
+                    { label: 'Pegalo en el chat del cliente', detail: 'Desde la sección Chat & Atención o WhatsApp directo.' },
+                ],
+                extra: `También podés hacer click en el ícono externo para abrirlo en MercadoPago y verificar los detalles.`
+            },
+            {
+                title: 'Estados de un pago',
+                icon: CheckCircle,
+                table: {
+                    headers: ['Estado', 'Significado'],
+                    rows: [
+                        ['Pendiente', 'El link fue creado pero el cliente aún no pagó'],
+                        ['Aprobado', 'El pago fue acreditado exitosamente'],
+                        ['Rechazado', 'El pago fue rechazado por MercadoPago'],
+                        ['Expirado', 'El link venció sin ser usado'],
+                    ]
+                },
+            },
+            {
+                title: 'Verificar si ya pagó',
+                icon: Eye,
+                content: `El sistema actualiza los estados automáticamente cada **5 minutos** de 9 a 23hs.\n\nSi necesitás verificar inmediatamente, clickeá el ícono de **recargar** en la fila del pago. También podés usar el botón **"Actualizar todos"** para refrescar todos los pendientes de una vez.`,
+            },
+            {
+                title: 'Plazos de acreditación',
+                icon: AlertTriangle,
+                content: `El dinero no se acredita en tu cuenta al instante. MercadoPago tiene plazos según la comisión elegida:\n\n- **Inmediato** — comisión más alta (~6.29% + IVA)\n- **14 días** — comisión media\n- **35 días** — comisión más baja (~1.49% + IVA)\n\nEsto se configura en tu cuenta de MercadoPago en **Tu negocio → Costos y cuotas**, no desde el sistema.`,
+            },
+            {
+                title: 'Reglas importantes',
+                icon: Shield,
+                bullets: [
+                    'Cada link es de un solo uso — si el cliente necesita pagar de nuevo, generá uno nuevo.',
+                    'Los links de MercadoPago vencen a los 30 días si no se usan.',
+                    'El estado "Aprobado" no significa que el dinero está en tu cuenta — depende del plazo de acreditación configurado.',
+                    'Si un pago figura como Pendiente pero el cliente dice que pagó, usá el botón de recarga individual.',
+                ],
+            },
+        ],
+    },
+    {
+        id: 'guion-prompts',
+        title: 'Guión & Prompts',
+        description: 'Como ver y editar el guion del bot, cambiar entre versiones y gestionar las respuestas frecuentes (FAQ).',
+        icon: FileText,
+        color: 'indigo',
+        sections: [
+            {
+                title: '¿Qué es el guión?',
+                icon: HelpCircle,
+                content: `El **guión** es el texto que le dice a la IA cómo comportarse en cada paso de la conversación. Define:\n\n- Qué decir en el saludo inicial\n- Cómo preguntar el peso del cliente\n- Cómo presentar los planes y precios\n- Cómo manejar objeciones y cerrar la venta`,
+            },
+            {
+                title: 'Versiones del guión',
+                icon: List,
+                content: `Hay múltiples versiones del guión (v3, v4, v5). Cada una tiene un enfoque distinto:`,
+                table: {
+                    headers: ['Versión', 'Enfoque'],
+                    rows: [
+                        ['v3', 'Guión original — flujo clásico de ventas, pago contra reembolso'],
+                        ['v4', 'Variante mejorada — mismo flujo con copy optimizado'],
+                        ['v5 (MP First)', 'Prioriza el pago con MercadoPago antes que el contra reembolso'],
+                    ]
+                },
+                extra: `La versión activa tiene un punto verde parpadeante al lado. Solo una versión puede estar activa a la vez.`
+            },
+            {
+                title: 'Cambiar la versión activa',
+                icon: Zap,
+                steps: [
+                    { label: 'Clickeá en el nombre de la versión', detail: 'En la barra superior (ej: "V3", "V4", "V5").' },
+                    { label: 'Confirmá el cambio', detail: 'El bot empieza a usar la nueva versión en todas las conversaciones nuevas.' },
+                ],
+                extra: `Las conversaciones en curso no se ven afectadas — siguen con el guión asignado al inicio.`
+            },
+            {
+                title: 'Editar el guión (pestaña "Flujo")',
+                icon: FileText,
+                steps: [
+                    { label: 'Seleccioná la versión a editar', detail: 'Con los botones V3, V4, V5 de la barra.' },
+                    { label: 'Andá a la pestaña "Flujo"', detail: 'Muestra cada paso de la conversación.' },
+                    { label: 'Editá el texto del paso que querés cambiar', detail: 'El campo de texto es editable directamente.' },
+                    { label: 'Click en "Guardar Cambios"', detail: 'Los cambios se aplican al instante.' },
+                ],
+                extra: `⚠️ Cambiá una cosa a la vez y probá antes de guardar. Un error en el guión puede romper el flujo de ventas.`
+            },
+            {
+                title: 'Editar FAQ (respuestas frecuentes)',
+                icon: HelpCircle,
+                content: `La pestaña **"FAQ"** contiene respuestas a preguntas frecuentes que el bot detecta por palabras clave (ej: "garantía", "muestras", "devolución").\n\nPodés:\n- Editar la respuesta de una pregunta existente\n- Agregar nuevas palabras clave a una pregunta\n- Eliminar una pregunta completa`,
+            },
+            {
+                title: 'Mapa del guión',
+                icon: Eye,
+                content: `La pestaña **"Mapa"** muestra visualmente el flujo completo de la conversación: desde el saludo hasta el cierre. Útil para entender en qué punto está cada cliente y cuál es el camino esperado.`,
+            },
+            {
+                title: 'Reglas importantes',
+                icon: Shield,
+                bullets: [
+                    'Siempre guardá los cambios antes de cambiar de versión — se perderán si no.',
+                    'Probá los cambios mandando un mensaje de prueba al bot antes de dejarlo con clientes reales.',
+                    'Si algo se rompe, recargá el guión con el botón de recarga — restaura la última versión guardada.',
+                    'Cambios en el guión no afectan conversaciones ya iniciadas, solo las nuevas.',
+                ],
+            },
+        ],
+    },
+    {
+        id: 'estadisticas',
+        title: 'Estadísticas',
+        description: 'Como leer el embudo de ventas, métricas de conversión, actividad por hora y rendimiento de anuncios.',
+        icon: BarChart3,
+        color: 'indigo',
+        sections: [
+            {
+                title: '¿Qué muestra esta sección?',
+                icon: HelpCircle,
+                content: `La sección de **Estadísticas** muestra el rendimiento histórico del bot en 4 áreas:\n\n- **Embudo de ventas** — cuántos clientes avanzan en cada paso\n- **Actividad por hora** — cuándo se generan más ventas\n- **Origen de clientes** — si vienen de anuncios o tráfico orgánico\n- **Tendencias diarias** — evolución de ventas y revenue`,
+            },
+            {
+                title: 'Embudo de ventas',
+                icon: TrendingUp,
+                content: `El embudo muestra cuántos usuarios llegan a cada paso del flujo:\n\n**Saludo → Peso → Preferencia → Plan → Datos → Confirmación → Completado**\n\nLa diferencia entre pasos es el **abandono**. Si hay mucho abandono entre "Plan" y "Datos", por ejemplo, el problema está en ese paso del guión.`,
+                table: {
+                    headers: ['Paso', 'Alta tasa de abandono significa...'],
+                    rows: [
+                        ['Saludo → Peso', 'El saludo no engancha o el cliente no está interesado'],
+                        ['Plan → Datos', 'El precio o las opciones generan dudas'],
+                        ['Datos → Confirmación', 'Problemas con la dirección o el cliente se arrepiente'],
+                    ]
+                },
+            },
+            {
+                title: 'Actividad por hora',
+                icon: BarChart3,
+                content: `El gráfico de barras muestra **en qué horarios se cierran más ventas**.\n\nUsá este dato para:\n- Saber cuándo estar más atento a las alertas\n- Planificar el horario de tus anuncios\n- Entender si hay horas muertas donde conviene ajustar el bot`,
+            },
+            {
+                title: 'Origen de clientes (anuncios)',
+                icon: Zap,
+                content: `Si usás anuncios de Click-to-WhatsApp, el sistema detecta automáticamente si el cliente viene de un anuncio o de forma orgánica.\n\nVes el rendimiento de cada fuente:\n- Cuántos iniciaron conversación\n- Cuántos llegaron hasta la confirmación\n- Tasa de conversión por fuente`,
+                extra: `Si no ves datos de anuncios, verificá que los mensajes pre-llenados de tus anuncios coincidan con los configurados en el sistema.`
+            },
+            {
+                title: 'Métricas clave a monitorear',
+                icon: CheckCircle,
+                table: {
+                    headers: ['Métrica', 'Qué indica', 'Señal de alerta'],
+                    rows: [
+                        ['Tasa de conversión', '% de chats que terminan en venta', 'Menor al 5%'],
+                        ['Abandono en datos', '% que no completa la dirección', 'Mayor al 40%'],
+                        ['Revenue del día', 'Total facturado', 'Caída brusca respecto al día anterior'],
+                    ]
+                },
+            },
+            {
+                title: 'Reglas importantes',
+                icon: Shield,
+                bullets: [
+                    'Las estadísticas se calculan sobre el período visible — por defecto los últimos 7 días.',
+                    'Un día con 0 ventas puede indicar un problema en el bot, no necesariamente poca demanda.',
+                    'El embudo solo cuenta conversaciones del bot activo — las atendidas manualmente no se contabilizan.',
+                    'Los datos se actualizan diariamente a las 4am hora Argentina.',
+                ],
+            },
+        ],
+    },
+    {
+        id: 'galeria',
+        title: 'Galería de Medios',
+        description: 'Como subir, organizar y enviar imágenes desde el panel.',
+        icon: ImageIcon,
+        color: 'indigo',
+        sections: [
+            {
+                title: '¿Para qué sirve la galería?',
+                icon: HelpCircle,
+                content: `La **Galería de Medios** almacena imágenes que el bot puede enviar automáticamente o que vos enviás manualmente desde el chat.\n\nIdeal para:\n- Fotos del producto\n- Imágenes de resultados de clientes\n- Flyers de promociones`,
+            },
+            {
+                title: 'Subir una imagen',
+                icon: ImageIcon,
+                steps: [
+                    { label: 'Ir a "Galería de Medios"', detail: 'En el menú lateral, ícono de imagen.' },
+                    { label: 'Click en "Subir imagen"', detail: 'Se abre el selector de archivo.' },
+                    { label: 'Seleccioná el archivo', detail: 'Formatos soportados: JPG, PNG, WebP.' },
+                    { label: 'Esperá la confirmación', detail: 'La imagen aparece en la galería.' },
+                ],
+            },
+            {
+                title: 'Enviar una imagen a un cliente',
+                icon: Send,
+                steps: [
+                    { label: 'Andá a la galería y copiá el nombre de la imagen', detail: 'O recordá su nombre.' },
+                    { label: 'Abrí el chat del cliente en "Chat & Atención"', detail: 'Buscá al cliente.' },
+                    { label: 'Usá el ícono de imagen en la barra de mensajes', detail: 'También podés arrastrar y soltar.' },
+                ],
+            },
+            {
+                title: 'Eliminar una imagen',
+                icon: Trash2,
+                content: `Clickeá el ícono de basura sobre la imagen. Esta acción es irreversible — si el bot estaba usando esa imagen en el guión, puede dejar de funcionar correctamente.`,
+                extra: `Antes de eliminar, verificá que la imagen no esté referenciada en el guión del bot.`
+            },
+        ],
+    },
+    {
+        id: 'configuracion',
+        title: 'Configuración',
+        description: 'Como agregar números de alerta, pausar el bot globalmente y monitorear el estado del sistema.',
+        icon: Settings,
+        color: 'indigo',
+        sections: [
+            {
+                title: '¿Qué se configura acá?',
+                icon: HelpCircle,
+                content: `La sección **Configuración** tiene tres bloques:\n\n- **Números de alerta** — quiénes reciben las alertas de pedidos por WhatsApp\n- **Estado del sistema** — memoria, conexiones y salud del bot\n- **Pausa global** — detener el bot para todos los clientes`,
+            },
+            {
+                title: 'Agregar un número de alerta',
+                icon: Bell,
+                steps: [
+                    { label: 'Ir a Configuración', detail: 'En el menú lateral, ícono de engranaje.' },
+                    { label: 'Sección "Números de Alerta"', detail: 'Muestra los números que reciben alertas.' },
+                    { label: 'Ingresá el número completo', detail: 'Con código de país, sin espacios (ej: 5491155551234).' },
+                    { label: 'Click en "Agregar"', detail: 'El número empieza a recibir alertas de inmediato.' },
+                ],
+                extra: `También podés hacerlo por WhatsApp con **!admin add 5491155551234**.`
+            },
+            {
+                title: 'Quitar un número de alerta',
+                icon: Trash2,
+                content: `En la lista de números de alerta, clickeá la X al lado del número que querés eliminar. Ese número dejará de recibir alertas.\n\n⚠️ Asegurate de que siempre haya al menos un número activo, o los pedidos no se notificarán.`,
+            },
+            {
+                title: 'Pausa global del bot',
+                icon: PauseCircle,
+                content: `La **pausa global** detiene el bot para **todos** los clientes al mismo tiempo. Usala cuando:\n\n- Necesitás hacer mantenimiento\n- Hay un problema con los precios o el stock\n- El equipo no puede atender alertas por un período`,
+                steps: [
+                    { label: 'Activar pausa global', detail: 'Click en "Pausar Todo" en Configuración. O mandá !pausa-global on por WhatsApp.' },
+                    { label: 'Desactivar pausa global', detail: 'Click en "Reanudar" o mandá !pausa-global off.' },
+                ],
+                extra: `⚠️ Durante la pausa global, los clientes que escriban no reciben respuesta. Avisales si va a ser prolongada.`
+            },
+            {
+                title: 'Estado del sistema',
+                icon: BarChart3,
+                content: `El bloque de estado muestra la salud del bot en tiempo real:`,
+                table: {
+                    headers: ['Indicador', 'Qué significa'],
+                    rows: [
+                        ['Usuarios en RAM', 'Conversaciones activas en memoria (normal: < 200)'],
+                        ['Base de Datos', 'Total de clientes históricos'],
+                        ['Heap Usada', 'Memoria del servidor (alerta si supera 500 MB)'],
+                        ['Activos Ahora', 'Clientes con conversación en curso'],
+                    ]
+                },
+                extra: `Si el heap supera 500 MB de forma sostenida, el bot puede volverse lento. Contactá soporte técnico.`
+            },
+            {
+                title: 'Reglas importantes',
+                icon: Shield,
+                bullets: [
+                    'Siempre dejá al menos un número de alerta activo.',
+                    'La pausa global afecta a todos los clientes, incluso los que están en medio de una compra.',
+                    'Cambios en la configuración se aplican en tiempo real, sin necesidad de reiniciar.',
+                    'El número de alerta debe ser el mismo que tiene la cuenta de WhatsApp del administrador.',
+                ],
+            },
+        ],
+    },
+    {
         id: 'reporte-ia',
         title: 'Reportar Error de IA',
         description: 'Como marcar una respuesta incorrecta del bot, guardar el contexto y leer los reportes desde el panel.',
@@ -234,17 +743,6 @@ const MANUALS = [
                     { label: 'Cargar mas contexto (opcional)', detail: 'Click en "Cargar mas" para ver mensajes anteriores.' },
                     { label: 'Escribir la correccion', detail: 'Explicar que hizo mal o que deberia haber respondido.' },
                     { label: 'Click en "Guardar Reporte"', detail: 'Se guarda en la base de datos y aparece confirmacion.' },
-                ],
-            },
-            {
-                title: 'Paso 4: Leer los reportes',
-                icon: Eye,
-                content: `Todos los reportes guardados estan en la seccion **"Errores de IA"** del menu lateral.`,
-                steps: [
-                    { label: 'Click en "Errores de IA"', detail: 'En el menu lateral, icono de triangulo naranja.' },
-                    { label: 'Ver el listado', detail: 'Cada tarjeta muestra el telefono, fecha, mensaje erroneo y tu correccion.' },
-                    { label: 'Expandir la conversacion', detail: 'Click en la flecha para ver el contexto completo del chat.' },
-                    { label: 'Eliminar cuando ya lo revisaste', detail: 'Click en el icono de basura para borrar el reporte.' },
                 ],
             },
             {
