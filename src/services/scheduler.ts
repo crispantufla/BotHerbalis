@@ -95,7 +95,7 @@ const ABANDON_REASON_MESSAGES: Record<string, string[]> = {
         'Hola 👋 Si querés te dejo el pedido reservado con el precio de hoy así no pierde la promo. ¿Te parece?',
     ],
     objection: [
-        '¡Hola! 😊 ¿Quedó alguna duda sobre el producto? El 90% de nuestros clientes nota resultados en las primeras semanas. Y si no funciona como esperabas, el pago es al recibir así no arriesgás nada.',
+        '¡Hola! 😊 ¿Quedó alguna duda sobre el producto? Hace más de 13 años que distribuimos a todo el país, con más de 70 mil clientes satisfechos y casos de más de 40 kilos perdidos. Si tenés alguna pregunta te la respondo con gusto 💪',
         'Hola 👋 Más de 13 años enviando a todo el país. Si quedó alguna pregunta, escribime con confianza y te respondo todo 😊',
     ],
     address_issue: [
