@@ -20,6 +20,20 @@ interface SalesFlowDependencies {
     connectedAt?: number; // Unix timestamp (seconds) of when the bot connected — used to detect pre-existing chats
 }
 
+// Ad source detection from pre-filled Click-to-WhatsApp messages (literal match)
+const AD_SOURCES: { text: string; name: string }[] = [
+    { text: '¡Hola! Quiero más información', name: 'anuncio_1' },
+    { text: '¡Hola! Me gustaría conseguir más información sobre esto.', name: 'anuncio_2' }
+];
+
+function _detectAdSource(text: string): string | null {
+    const trimmed = text.trim();
+    for (const ad of AD_SOURCES) {
+        if (trimmed === ad.text) return ad.name;
+    }
+    return null;
+}
+
 // Keywords that signal clear purchase intent — if present, don't auto-pause
 // Note: normalizedText is accent-stripped, so only unaccented variants are needed
 const PURCHASE_INTENT_KEYWORDS = /\b(comprar|quiero comprar|quiero pedir|me interesa|precio|precios|cuanto sale|cuanto cuesta|quiero encargar|necesito comprar|hagan envios|hacen envios|quisiera pedir|quisiera comprar|quiero adquirir|quiero ordenar|tienen capsulas|tienen semillas|tienen gotas|nuez de la india|la direccion|mi direccion|te paso mis datos|mis datos|los datos|te paso la direccion|informacion|quiero saber|quiero mas info|bajar|adelgazar|kilos|kilo|capsulas|semillas|cemillas|semilla|gotas|gota|peso|perder peso|bajar de peso|10 kg|20 kg|mas de 20)\b/i;
@@ -57,7 +71,8 @@ export async function processSalesFlow(
             pendingOrder: null,
             currentWeight: undefined,
             consultativeSale: false,
-            lastActivityAt: Date.now()
+            lastActivityAt: Date.now(),
+            adSource: _detectAdSource(text)
         };
 
         // --- CHECK 1: Cross-reference against Orders DB ---
@@ -81,60 +96,9 @@ export async function processSalesFlow(
             logger.error(`[ORDER-CHECK] Failed to query orders for ${userId}:`, err.message);
         }
 
-        // --- CHECK 1.5: Cross-Instance Duplicate Detection ---
-        // (DISABLED PER USER REQUEST)
-        // If this phone is already in an active sales flow on ANOTHER bot instance,
-        // redirect them politely instead of starting a duplicate conversation.
-        /*
-        if (userState[userId].step !== 'completed') {
-            try {
-                const { prisma } = require('../../db');
-                const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
-                const cleanPhone = _cleanPhone(userId);
-
-                const otherInstanceUsers = await prisma.user.findMany({
-                    where: {
-                        phone: cleanPhone,
-                        instanceId: { not: INSTANCE_ID }
-                    },
-                    select: { instanceId: true, profileData: true }
-                });
-
-                // Check if any of those other instances have an active (mid-funnel) conversation
-                const activeInOtherBot = otherInstanceUsers.some((u: any) => {
-                    try {
-                        const data = JSON.parse(u.profileData || '{}');
-                        const step = data.step || 'greeting';
-                        const activeSteps = ['waiting_weight', 'waiting_preference', 'waiting_price_confirmation', 'waiting_plan_choice', 'waiting_ok', 'waiting_data', 'waiting_final_confirmation'];
-                        return activeSteps.includes(step);
-                    } catch (e) { return false; }
-                });
-
-                if (activeInOtherBot) {
-                    logger.info(`[CROSS-BOT] User ${userId} is already active in another bot instance. Sending redirect.`);
-                    if (dependencies.sendMessageWithDelay) {
-                        await dependencies.sendMessageWithDelay(
-                            userId,
-                            "¡Hola! Ya te está atendiendo mi compañera por el otro número 😊 Seguí la charla por ahí así no nos pisamos. ¡Cualquier cosa acá estoy!"
-                        );
-                    }
-                    if (dependencies.sharedState?.pausedUsers) {
-                        const { pauseUser } = require('../services/pauseService');
-                        await pauseUser(userId, '🔀 Redirigido a otro bot (cross-bot)', { sharedState: dependencies.sharedState });
-                    }
-                    userState[userId].step = 'cross_bot_redirected';
-                    saveState(userId);
-                    return { matched: true, paused: true };
-                }
-            } catch (err: any) {
-                logger.error(`[CROSS-BOT] Failed to check other instances for ${userId}:`, err.message);
-            }
-        }
-        */
-
         // --- CHECK 2: WhatsApp Chat History Detection ---
         // Only run this if we didn't already route to post-sale via Orders
-        if (userState[userId].step !== 'completed' && userState[userId].step !== 'cross_bot_redirected') {
+        if (userState[userId].step !== 'completed') {
             try {
                 const { prisma } = require('../../db');
                 const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
@@ -245,7 +209,7 @@ export async function processSalesFlow(
     // --- NEW REQUIREMENT (Unconditional Post-Sale Stop) ---
     // If the user's step is 'completed', it means they are a past customer.
     // Pause immediately and alert admin if not already paused.
-    if (currentState.step === 'completed' || currentState.step === 'cross_bot_redirected') {
+    if (currentState.step === 'completed') {
         const isAlreadyPaused = dependencies.sharedState?.pausedUsers?.has(userId);
 
         // Save User message in history regardless
@@ -261,7 +225,7 @@ export async function processSalesFlow(
                 `El cliente ya compró y volvió a escribir.\n\nMensaje: "${text}"\n\nEl bot se pausó automáticamente.`
             );
         } else {
-            logger.info(`[HARD STOP] User ${userId} is past customer/redirected. Already paused or redirected. Ignoring silently.`);
+            logger.info(`[HARD STOP] User ${userId} is past customer. Already paused. Ignoring silently.`);
         }
 
         return { matched: true, paused: true };

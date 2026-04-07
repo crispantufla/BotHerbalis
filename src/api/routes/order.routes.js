@@ -28,7 +28,8 @@ const statusUpdateSchema = z.object({
 
 module.exports = (client, sharedState) => {
     const router = express.Router();
-    const { io } = sharedState;
+    // Access io dynamically via sharedState.io (it's set after routes are mounted)
+    const io = () => sharedState.io;
 
     const resolveChatId = async (id) => {
         if (!id) return id;
@@ -174,7 +175,7 @@ module.exports = (client, sharedState) => {
                 createdAt: updatedOrder.createdAt.toISOString()
             };
 
-            if (io) io.emit('order_update', legacyOrder);
+            if (io()) io().emit('order_update', legacyOrder);
             res.json({ success: true, order: legacyOrder });
         } catch (error) {
             logger.error('[ROUTES] Error updating order:', error);
@@ -215,7 +216,10 @@ module.exports = (client, sharedState) => {
 
                 const msg = "Tu envío ya está en curso 🚀, dentro de 48 hs podés pedirnos el código de seguimiento\n\n¡Muchas gracias por confiar en Herbalis!";
 
-                try {
+                // Skip if user already received confirmation (step already 'completed')
+                if (sharedState.userState && sharedState.userState[targetPhone] && sharedState.userState[targetPhone].step === 'completed') {
+                    logger.info(`[ORDER-STATUS] Skipping confirmation for ${targetPhone} — already completed`);
+                } else try {
                     const { sendWithRetry } = require('../../utils/retry');
                     logger.info(`[ORDER-STATUS] Intentando enviar WhatsApp a ${targetPhone}...`);
                     await sendWithRetry(client, targetPhone, msg);
@@ -257,7 +261,7 @@ module.exports = (client, sharedState) => {
             };
 
 
-            if (io) io.emit('order_update', legacyOrder);
+            if (io()) io().emit('order_update', legacyOrder);
             res.json({ success: true, order: legacyOrder });
 
         } catch (error) {
@@ -280,7 +284,7 @@ module.exports = (client, sharedState) => {
 
             // (Google Sheets fallback removed via DB migration)
 
-            if (io) io.emit('order_delete', { id });
+            if (io()) io().emit('order_delete', { id });
             res.json({ success: true, deleted: { id } });
 
         } catch (error) {
@@ -490,15 +494,15 @@ module.exports = (client, sharedState) => {
             };
 
             // Emit socket event for real-time dashboard update
-            if (io) {
-                io.emit('order_update', { action: 'created', order: legacyOrder });
+            if (io()) {
+                io().emit('order_update', { action: 'created', order: legacyOrder });
             }
 
             // Clear the alert from sessionAlerts so it doesn't reappear on reload
             const alertIndex = sharedState.sessionAlerts.findIndex(a => a.userPhone === phoneNumeric || a.userPhone === chatId);
             if (alertIndex !== -1) {
                 sharedState.sessionAlerts.splice(alertIndex, 1);
-                if (io) io.emit('alerts_updated', sharedState.sessionAlerts);
+                if (io()) io().emit('alerts_updated', sharedState.sessionAlerts);
                 logger.info(`[MANUAL-COMPLETE] Alert cleared for ${phoneNumeric}`);
             }
 

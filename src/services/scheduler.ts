@@ -5,9 +5,10 @@ import logger from '../utils/logger';
 // always run at Argentina time regardless of server location (Europe/Railway).
 //
 // CRON SCHEDULE (all times Argentina UTC-3):
-//   autoApproveOrders  -> cada 3 min de 9-23h
-//   checkColdLeads     -> 10:00 y 18:00
-//   cleanupOldUsers    -> 04:00 diario
+//   autoApproveOrders       -> cada 3 min de 9-23h
+//   refreshPendingPayments  -> cada 5 min de 9-23h (si MP_ACCESS_TOKEN está seteado)
+//   checkColdLeads          -> 10:00 y 18:00
+//   cleanupOldUsers         -> 04:00 diario
 
 import cron from 'node-cron';
 import { isBusinessHours } from './timeUtils';
@@ -534,6 +535,15 @@ function startScheduler(sharedState: SchedulerSharedState, dependencies: Schedul
     }, { timezone: TIMEZONE });
     logger.info('[SCHEDULER] ✅ cleanStalePausedUsers → 05:00 ARG (diario)');
 
+    // ── MP PAYMENT REFRESH: cada 5 minutos de 9-23h Argentina ──
+    // Polls MercadoPago for pending payments and updates status automatically.
+    if (process.env.MP_ACCESS_TOKEN) {
+        cron.schedule('*/5 9-23 * * *', () => {
+            refreshPendingPayments(sharedState);
+        }, { timezone: TIMEZONE });
+        logger.info('[SCHEDULER] ✅ refreshPendingPayments → cada 5 min (9-23h ARG)');
+    }
+
     // ── GRACEFUL RESTART: a las 8am Argentina ──
     // Fuerza un inicio en frío eliminando por completo cualquier fuga de RAM de Chromium/Puppeteer.
     // Railway (o PM2) volverá a levantar el contenedor y reconectará en menos de 10s.
@@ -629,4 +639,72 @@ async function snapshotDailyStats(sharedState?: SchedulerSharedState) {
     }
 }
 
-export { startScheduler, checkStaleUsers, checkColdLeads, checkAbandonedCarts, autoApproveOrders, cleanStalePausedUsers, snapshotDailyStats };
+/**
+ * refreshPendingPayments
+ * Polls MercadoPago for any PaymentLink still in 'pending' status (created < 48h ago)
+ * and updates the DB + emits socket if the status changed.
+ */
+let _refreshPaymentsRunning = false;
+async function refreshPendingPayments(sharedState: SchedulerSharedState): Promise<void> {
+    if (_refreshPaymentsRunning) return;
+    _refreshPaymentsRunning = true;
+    try {
+        const mpToken = process.env.MP_ACCESS_TOKEN;
+        if (!mpToken) return;
+
+        const { prisma } = require('../../db');
+        const { MercadoPagoConfig, Payment } = require('mercadopago');
+        const mpClient = new MercadoPagoConfig({ accessToken: mpToken });
+        const mpPayment = new Payment(mpClient);
+
+        // Only check payments created in the last 48h to avoid polling ancient ones
+        const since = new Date();
+        since.setHours(since.getHours() - 48);
+
+        const pending = await prisma.paymentLink.findMany({
+            where: { status: 'pending', createdAt: { gte: since } },
+            take: 50,
+        });
+
+        if (pending.length === 0) return;
+        logger.info(`[SCHEDULER] Refreshing ${pending.length} pending MP payment(s)...`);
+
+        for (const payment of pending) {
+            try {
+                const result = await mpPayment.search({
+                    options: { external_reference: payment.externalRef }
+                });
+                const results = result?.results || [];
+                if (results.length === 0) continue;
+
+                const approved = results.find((p: any) => p.status === 'approved');
+                const latest = approved || results[0];
+                const newStatus = latest.status === 'approved' ? 'approved'
+                    : latest.status === 'rejected' ? 'rejected'
+                    : latest.status === 'cancelled' ? 'expired'
+                    : 'pending';
+
+                if (newStatus === payment.status) continue;
+
+                const updated = await prisma.paymentLink.update({
+                    where: { id: payment.id },
+                    data: {
+                        status: newStatus,
+                        paidAt: newStatus === 'approved' ? new Date(latest.date_approved || Date.now()) : payment.paidAt,
+                    }
+                });
+
+                if (sharedState.io) sharedState.io.emit('payment_updated', updated);
+                logger.info(`[SCHEDULER] Payment ${payment.id} updated: pending → ${newStatus}`);
+            } catch (e: any) {
+                logger.error(`[SCHEDULER] Error refreshing payment ${payment.id}: ${e?.message || e}`);
+            }
+        }
+    } catch (e: any) {
+        logger.error('[SCHEDULER] Error in refreshPendingPayments:', e.message);
+    } finally {
+        _refreshPaymentsRunning = false;
+    }
+}
+
+export { startScheduler, checkStaleUsers, checkColdLeads, checkAbandonedCarts, autoApproveOrders, cleanStalePausedUsers, snapshotDailyStats, refreshPendingPayments };

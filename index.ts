@@ -68,10 +68,6 @@ const path = require('path');
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 
-// const { exec } = require('child_process'); // Unused
-// const { logMessage } = require('./logger'); // Import Logger - Replaced by new logger
-// const { analyzeDailyLogs } = require('./analyze_day'); // Import Analyzer
-// Google Sheets removed — PostgreSQL is now the sole source of truth
 const { atomicWriteFile } = require('./safeWrite');
 const { processSalesFlow } = require('./src/flows/salesFlow');
 const { aiService } = require('./src/services/ai'); // Centralized AI

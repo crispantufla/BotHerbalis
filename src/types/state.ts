@@ -107,6 +107,9 @@ export interface UserState {
         converted: boolean;
     };
 
+    // Ad source tracking
+    adSource?: string | null;        // Which ad the client came from (detected from first message)
+
     // Flags de estados especiales del cliente
     hasSoldBefore?: boolean;         // true si ya se concretó al menos una venta exitosa
     pendingCancelConfirm?: boolean;  // true si el bot está esperando confirmación de cancelación
