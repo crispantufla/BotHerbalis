@@ -679,6 +679,12 @@ module.exports = (clientPool) => {
     router.delete('/ai-reports/:id', ...withSeller(clientPool), async (req, res) => {
         try {
             const { prisma } = require('../../../db');
+
+            // Verify report belongs to this seller
+            const existing = await prisma.aiErrorReport.findUnique({ where: { id: req.params.id }, select: { instanceId: true } });
+            if (!existing) return res.status(404).json({ error: 'Reporte no encontrado' });
+            if (existing.instanceId !== getInstanceId(req)) return res.status(403).json({ error: 'No autorizado' });
+
             await prisma.aiErrorReport.delete({ where: { id: req.params.id } });
             res.json({ success: true });
         } catch (e) {

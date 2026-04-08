@@ -36,6 +36,10 @@ module.exports = (clientPool) => {
             const payment = await prisma.paymentLink.findUnique({ where: { id: req.params.id } });
             if (!payment) return res.status(404).json({ error: 'Enlace no encontrado' });
 
+            // Verify payment belongs to this seller
+            const instanceId = getInstanceId(req);
+            if (instanceId && payment.instanceId !== instanceId) return res.status(403).json({ error: 'No autorizado' });
+
             const mpToken = process.env.MP_ACCESS_TOKEN;
             if (!mpToken) return res.status(500).json({ error: 'MP_ACCESS_TOKEN no configurado' });
 
