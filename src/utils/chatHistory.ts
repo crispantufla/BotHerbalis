@@ -22,6 +22,7 @@ async function getLocalHistory(chatId: string, sinceTimestamp: number = 0): Prom
         });
 
         return dbLogs.map((log: any) => ({
+            id: log.id,
             fromMe: log.role === 'bot' || log.role === 'admin' || log.role === 'system',
             body: log.content,
             timestamp: new Date(log.timestamp).getTime(),
