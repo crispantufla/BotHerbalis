@@ -1,33 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { AlertTriangle, Send, X, ArrowUpCircle } from 'lucide-react';
+import { AlertTriangle, Send, X } from 'lucide-react';
 import { useToast } from '../../ui/Toast';
 import api from '../../../config/axios';
 
 const AiCorrectionModal = ({ isOpen, onClose, messages = [], reportedMsgId, selectedChat }) => {
     const { toast } = useToast();
-    const [contextCount, setContextCount] = useState(4);
     const [correctionText, setCorrectionText] = useState('');
-    const [contextMessages, setContextMessages] = useState([]);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        if (!isOpen || !reportedMsgId) return;
-        const reportedIndex = messages.findIndex(m => m.id === reportedMsgId);
-        if (reportedIndex === -1) return;
-        const startIdx = Math.max(0, reportedIndex - contextCount + 1);
-        setContextMessages(messages.slice(startIdx, reportedIndex + 1));
-    }, [isOpen, reportedMsgId, messages, contextCount]);
-
-    useEffect(() => {
-        if (!isOpen) {
-            setCorrectionText('');
-            setContextCount(4);
-        }
+        if (!isOpen) setCorrectionText('');
     }, [isOpen]);
 
     if (!isOpen) return null;
 
-    const handleLoadMore = () => setContextCount(prev => prev + 4);
+    const reportedMsg = messages.find(m => m.id === reportedMsgId);
+
+    const getConversationContext = () => {
+        const reportedIndex = messages.findIndex(m => m.id === reportedMsgId);
+        if (reportedIndex === -1) return [];
+        const startIdx = Math.max(0, reportedIndex - 7);
+        return messages.slice(startIdx, reportedIndex + 1);
+    };
 
     const handleSubmit = async () => {
         if (!correctionText.trim()) {
@@ -36,13 +30,13 @@ const AiCorrectionModal = ({ isOpen, onClose, messages = [], reportedMsgId, sele
         }
         setLoading(true);
         try {
-            const reportedMsg = contextMessages.find(m => m.id === reportedMsgId);
             const userPhone = selectedChat?.id?.split('@')[0] || 'unknown';
+            const context = getConversationContext();
 
             await api.post('/api/ai-reports', {
                 userPhone,
                 reportedMessage: reportedMsg?.body || '',
-                conversation: contextMessages.map(m => ({
+                conversation: context.map(m => ({
                     role: m.fromMe ? 'bot' : 'user',
                     body: m.body || '[Media]',
                     isReported: m.id === reportedMsgId,
@@ -83,47 +77,19 @@ const AiCorrectionModal = ({ isOpen, onClose, messages = [], reportedMsgId, sele
 
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-5 sm:p-6 custom-scrollbar space-y-6">
-                    <div>
-                        <div className="flex justify-between items-end mb-4">
-                            <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm tracking-wide uppercase">Contexto de la Conversación</h3>
-                            <button
-                                onClick={handleLoadMore}
-                                className="text-xs font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors"
-                            >
-                                <ArrowUpCircle className="w-4 h-4" /> Cargar más
-                            </button>
-                        </div>
 
-                        <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 space-y-3">
-                            {contextMessages.map((msg) => {
-                                const isReported = msg.id === reportedMsgId;
-                                return (
-                                    <div key={msg.id} className={`flex flex-col ${msg.fromMe ? 'items-end' : 'items-start'}`}>
-                                        <div className={`
-                                            max-w-[85%] p-3 rounded-2xl text-[13px] leading-relaxed relative
-                                            ${isReported
-                                                ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-800 dark:text-rose-200 border-2 border-rose-400'
-                                                : msg.fromMe
-                                                    ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-800 dark:text-indigo-200'
-                                                    : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
-                                            }
-                                        `}>
-                                            {isReported && (
-                                                <div className="absolute -top-3 -right-2 bg-rose-500 text-white text-[10px] font-black uppercase px-2 py-0.5 rounded-full shadow-sm">
-                                                    Respuesta Errónea
-                                                </div>
-                                            )}
-                                            <span className="font-bold block text-[10px] opacity-60 uppercase mb-1">
-                                                {msg.fromMe ? 'Bot' : 'Usuario'}
-                                            </span>
-                                            {msg.body || '[Media Oculta]'}
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                    {/* Reported message */}
+                    <div>
+                        <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm tracking-wide uppercase mb-3">Estás reportando este mensaje</h3>
+                        <div className="flex justify-end">
+                            <div className="max-w-[85%] p-3 rounded-2xl text-[13px] leading-relaxed bg-rose-100 dark:bg-rose-900/30 text-rose-800 dark:text-rose-200 border-2 border-rose-400">
+                                <span className="font-bold block text-[10px] opacity-60 uppercase mb-1">Bot</span>
+                                {reportedMsg?.body || '[Media Oculta]'}
+                            </div>
                         </div>
                     </div>
 
+                    {/* Correction */}
                     <div>
                         <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm tracking-wide mb-3 flex items-center gap-2">
                             <span className="w-2 h-2 rounded-full bg-amber-500 outline outline-2 outline-amber-200"></span>
