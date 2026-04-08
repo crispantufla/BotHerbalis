@@ -1,8 +1,7 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _getPrice, _getAdicionalMAX } from '../utils/pricing';
 import { _setStep } from '../utils/flowHelpers';
-import { buildConfirmationMessage } from '../../utils/messageTemplates';
-import { buildCartFromSelection, calculateTotal } from '../utils/cartHelpers';
+import { buildCartFromSelection } from '../utils/cartHelpers';
 import { _isDuplicate } from '../utils/messages';
 import logger from '../../utils/logger';
 
@@ -123,31 +122,11 @@ export async function handleWaitingPlanChoice(
         const hasAddress = addr.nombre && addr.calle && addr.ciudad;
 
         if (hasAddress) {
-            logger.info(`[FLOW-SKIP] Address already collected for ${userId}, skipping data request.`);
-            const skipMsg1 = `¡Perfecto! 😊 Ya tengo tus datos de envío guardados de antes.`;
-            const skipMsg2 = `Voy a confirmar todo para armar tu ficha...`;
-
-            currentState.history.push({ role: 'bot', content: skipMsg1, timestamp: Date.now() });
-            await sendMessageWithDelay(userId, skipMsg1);
-
-            currentState.history.push({ role: 'bot', content: skipMsg2, timestamp: Date.now() });
-            await sendMessageWithDelay(userId, skipMsg2);
-
-            calculateTotal(currentState);
-            currentState.pendingOrder = {
-                nombre: addr.nombre,
-                calle: addr.calle,
-                ciudad: addr.ciudad,
-                cp: addr.cp,
-                provincia: addr.provincia,
-                calleOriginal: addr.calleOriginal || addr.calle,
-                cart: currentState.cart
-            };
-            const summaryMsg = buildConfirmationMessage(currentState);
-
-            currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
-            await sendMessageWithDelay(userId, summaryMsg);
-            _setStep(currentState, FlowStep.WAITING_FINAL_CONFIRMATION);
+            logger.info(`[FLOW-SKIP] Address already collected for ${userId}, asking payment method.`);
+            const paymentMsg = `¡Perfecto! 😊 Ya tengo tus datos de envío guardados de antes.\n\n¿Cómo preferís pagar?\n\n💳 *MercadoPago* — pagás ahora online con tarjeta, app o QR\n💵 *Efectivo al recibir* — le pagás al cartero cuando llega\n\n¿Con cuál vas?`;
+            currentState.history.push({ role: 'bot', content: paymentMsg, timestamp: Date.now() });
+            await sendMessageWithDelay(userId, paymentMsg);
+            _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
         } else {
             currentState.history.push({ role: 'bot', content: closingNode.response, timestamp: Date.now() });
             await sendMessageWithDelay(userId, closingNode.response);
@@ -188,31 +167,11 @@ export async function handleWaitingPlanChoice(
             const hasAddress = addr.nombre && addr.calle && addr.ciudad;
 
             if (hasAddress) {
-                logger.info(`[FLOW-SKIP] Address already collected for ${userId}, skipping data request after upsell.`);
-                const skipMsg1 = `¡Genial! 😊 Entonces confirmamos el plan de 120 días.`;
-                const skipMsg2 = `Ya tengo tus datos de envío acá a mano, voy a armar la etiqueta...`;
-
-                currentState.history.push({ role: 'bot', content: skipMsg1, timestamp: Date.now() });
-                await sendMessageWithDelay(userId, skipMsg1);
-
-                currentState.history.push({ role: 'bot', content: skipMsg2, timestamp: Date.now() });
-                await sendMessageWithDelay(userId, skipMsg2);
-
-                calculateTotal(currentState);
-                currentState.pendingOrder = {
-                    nombre: addr.nombre,
-                    calle: addr.calle,
-                    ciudad: addr.ciudad,
-                    cp: addr.cp,
-                    provincia: addr.provincia,
-                    calleOriginal: addr.calleOriginal || addr.calle,
-                    cart: currentState.cart
-                };
-                const summaryMsg = buildConfirmationMessage(currentState);
-
-                currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
-                await sendMessageWithDelay(userId, summaryMsg);
-                _setStep(currentState, FlowStep.WAITING_FINAL_CONFIRMATION);
+                logger.info(`[FLOW-SKIP] Address already collected for ${userId}, asking payment method after upsell.`);
+                const paymentMsg = `¡Genial! 😊 Entonces confirmamos el plan de 120 días. Ya tengo tus datos de envío de antes.\n\n¿Cómo preferís pagar?\n\n💳 *MercadoPago* — pagás ahora online con tarjeta, app o QR\n💵 *Efectivo al recibir* — le pagás al cartero cuando llega\n\n¿Con cuál vas?`;
+                currentState.history.push({ role: 'bot', content: paymentMsg, timestamp: Date.now() });
+                await sendMessageWithDelay(userId, paymentMsg);
+                _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
             } else {
                 const combinedResponse = `¡Genial! 😊 Entonces confirmamos el plan de 120 días.\n\n${closingNode.response}`;
                 currentState.history.push({ role: 'bot', content: combinedResponse, timestamp: Date.now() });
@@ -292,30 +251,15 @@ RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.
                     const hasAddress = addr.nombre && addr.calle && addr.ciudad;
 
                     if (hasAddress) {
-                        logger.info(`[FLOW-SKIP] Address already collected for ${userId}, skipping data request after AI plan.`);
+                        logger.info(`[FLOW-SKIP] Address already collected for ${userId}, asking payment method after AI plan.`);
                         if (planAI.response) {
                             currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });
                             await sendMessageWithDelay(userId, planAI.response);
                         }
-                        const skipMsg = `Ya tengo tus datos de envío. Voy a confirmar todo...`;
-                        currentState.history.push({ role: 'bot', content: skipMsg, timestamp: Date.now() });
-                        await sendMessageWithDelay(userId, skipMsg);
-
-                        calculateTotal(currentState);
-                        currentState.pendingOrder = {
-                            nombre: addr.nombre,
-                            calle: addr.calle,
-                            ciudad: addr.ciudad,
-                            cp: addr.cp,
-                            provincia: addr.provincia,
-                            calleOriginal: addr.calleOriginal || addr.calle,
-                            cart: currentState.cart
-                        };
-                        const summaryMsg = buildConfirmationMessage(currentState);
-
-                        currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
-                        await sendMessageWithDelay(userId, summaryMsg);
-                        _setStep(currentState, FlowStep.WAITING_FINAL_CONFIRMATION);
+                        const paymentMsg = `¡Perfecto! Ya tengo tus datos de envío de antes.\n\n¿Cómo preferís pagar?\n\n💳 *MercadoPago* — pagás ahora online con tarjeta, app o QR\n💵 *Efectivo al recibir* — le pagás al cartero cuando llega\n\n¿Con cuál vas?`;
+                        currentState.history.push({ role: 'bot', content: paymentMsg, timestamp: Date.now() });
+                        await sendMessageWithDelay(userId, paymentMsg);
+                        _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
                     } else {
                         if (planAI.response) {
                             currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });

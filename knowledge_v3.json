@@ -92,8 +92,8 @@
                 "bueno",
                 "ok"
             ],
-            "response": "¡Excelente! 🎉 Tomamos los datos para armar la etiqueta de envío 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(La dirección debe ser exacta, sin esquinas ni \"aprox\")",
-            "nextStep": "waiting_data"
+            "response": "¡Perfecto! 😊 Una última pregunta antes de los datos de envío: ¿cómo preferís pagar?\n\n💳 *MercadoPago* — pagás ahora online con tarjeta, desde la app o escaneando el QR. Es más rápido y evitás tener que juntar el efectivo para el cartero.\n💵 *Efectivo al recibir* — le pagás al cartero cuando llega el paquete.\n\n¿Con cuál vas?",
+            "nextStep": "waiting_payment_method"
         },
         "confirmation": {
             "step": "waiting_data",

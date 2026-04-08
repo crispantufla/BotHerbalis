@@ -29,11 +29,37 @@ export async function handleWaitingMpPayment(
         const verified = await _verifyPayment(currentState);
 
         if (verified === 'approved') {
-            const msg = '¡Perfecto, el pago fue confirmado! 🎉\n\nAhora necesito los datos de envío para despachar tu pedido 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:';
-            _setStep(currentState, FlowStep.WAITING_DATA);
-            currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
-            saveState(userId);
-            await sendMessageWithDelay(userId, msg);
+            const addr = currentState.partialAddress || {};
+            const hasAddress = !!(addr.nombre && addr.calle && addr.ciudad);
+
+            if (hasAddress) {
+                const { buildConfirmationMessage } = require('../../utils/messageTemplates');
+                const { calculateTotal } = require('../utils/cartHelpers');
+                calculateTotal(currentState);
+                currentState.pendingOrder = {
+                    nombre: addr.nombre,
+                    calle: addr.calle,
+                    ciudad: addr.ciudad,
+                    cp: addr.cp,
+                    provincia: addr.provincia,
+                    calleOriginal: (addr as any).calleOriginal || addr.calle,
+                    cart: currentState.cart
+                };
+                const summaryMsg = buildConfirmationMessage(currentState);
+                _setStep(currentState, FlowStep.WAITING_FINAL_CONFIRMATION);
+                const successMsg = '¡Perfecto, el pago fue confirmado! 🎉';
+                currentState.history.push({ role: 'bot', content: successMsg, timestamp: Date.now() });
+                await sendMessageWithDelay(userId, successMsg);
+                currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
+                saveState(userId);
+                await sendMessageWithDelay(userId, summaryMsg);
+            } else {
+                const msg = '¡Perfecto, el pago fue confirmado! 🎉\n\nAhora necesito los datos de envío para despachar tu pedido 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:';
+                _setStep(currentState, FlowStep.WAITING_DATA);
+                currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+                saveState(userId);
+                await sendMessageWithDelay(userId, msg);
+            }
             return { matched: true };
         } else if (verified === 'pending') {
             const msg = '⏳ Todavía no veo el pago confirmado en el sistema.\n\nEsperá unos minutos y escribime "listo" cuando esté acreditado. Los pagos con tarjeta de crédito pueden demorar hasta 5 minutos.';

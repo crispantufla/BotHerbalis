@@ -92,8 +92,8 @@
                 "bueno",
                 "ok"
             ],
-            "response": "¡Excelente decisión! 🎉\n\nMe acaba de figurar que tengo cupo para meter tu paquete en el camión de las encomiendas que sale temprano mañana 🚚, así te llega lo más rápido posible.\n\nPasame estos datos exactos para armar la etiqueta de envío ya mismo 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(Fijate que la dirección sea exacta 🙏)",
-            "nextStep": "waiting_data"
+            "response": "¡Excelente decisión! 🎉 Una última cosa antes de los datos: ¿cómo preferís pagar?\n\n💳 *MercadoPago* — pagás ahora online con tarjeta, desde la app o escaneando el QR. Es lo más cómodo y tu pedido queda registrado al instante.\n💵 *Efectivo al recibir* — le pagás al cartero cuando llega el paquete.\n\n¿Con cuál vas?",
+            "nextStep": "waiting_payment_method"
         },
         "confirmation": {
             "step": "waiting_data",
