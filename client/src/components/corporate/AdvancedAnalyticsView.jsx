@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../config/axios';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 import {
     LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
     XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, ComposedChart
@@ -24,10 +25,9 @@ const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
 
 const AdvancedAnalyticsView = () => {
     const { isDark } = useTheme();
+    const { isAdmin } = useAuth();
     const [loading, setLoading] = useState(true);
     const [daysAgoToFetch, setDaysAgoToFetch] = useState(30);
-    const [instanceScope, setInstanceScope] = useState('current'); // 'current' or 'all'
-    const [currentInstanceId, setCurrentInstanceId] = useState(null); // actual INSTANCE_ID from server
     const [data, setData] = useState({
         overview: null,
         products: { popularity: [], duration: [] },
@@ -36,29 +36,17 @@ const AdvancedAnalyticsView = () => {
         adPerformance: [] // Ad source breakdown
     });
 
-    // Fetch the current bot's INSTANCE_ID from /status on mount
-    useEffect(() => {
-        api.get('/api/status').then(res => {
-            const id = res.data?.instanceId || res.data?.info?.wid?.user || null;
-            setCurrentInstanceId(id);
-        }).catch(() => { });
-    }, []);
-
     const fetchAllData = async () => {
         try {
             setLoading(true);
 
-            // Build instanceId param for 'Solo este bot' filter
-            const instanceIdParam = instanceScope === 'current' && currentInstanceId
-                ? `&instanceId=${encodeURIComponent(currentInstanceId)}`
-                : '';
-
-            // Fetch all 5 endpoints in parallel
+            // The x-seller-id header (injected by axios interceptor) handles seller scoping.
+            // Admins without a selected seller see aggregated data for all sellers.
             const [overviewRes, productsRes, demoRes, chartsRes, adPerfRes] = await Promise.all([
-                api.get(`/api/analytics/overview?days=${daysAgoToFetch}&instance=${instanceScope}${instanceIdParam}`),
-                api.get(`/api/analytics/products?days=${daysAgoToFetch}&instance=${instanceScope}${instanceIdParam}`),
-                api.get(`/api/analytics/demographics?days=${daysAgoToFetch}&instance=${instanceScope}${instanceIdParam}`),
-                api.get('/api/stats/charts'), // Kept for the daily revenue line chart
+                api.get(`/api/analytics/overview?days=${daysAgoToFetch}`),
+                api.get(`/api/analytics/products?days=${daysAgoToFetch}`),
+                api.get(`/api/analytics/demographics?days=${daysAgoToFetch}`),
+                api.get('/api/stats/charts'),
                 api.get(`/api/analytics/ad-performance?days=${daysAgoToFetch}`).catch(() => ({ data: [] }))
             ]);
 
@@ -79,7 +67,7 @@ const AdvancedAnalyticsView = () => {
 
     useEffect(() => {
         fetchAllData();
-    }, [daysAgoToFetch, instanceScope]);
+    }, [daysAgoToFetch]);
 
     // Custom Tooltip for charts
     const CustomTooltip = ({ active, payload, label }) => {
@@ -152,28 +140,6 @@ const AdvancedAnalyticsView = () => {
                     </div>
 
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-                        <div className={`flex p-1 rounded-xl border w-full sm:w-auto ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-                            <button
-                                onClick={() => setInstanceScope('current')}
-                                className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${instanceScope === 'current'
-                                    ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300'
-                                    : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700'
-                                    }`}
-                            >
-                                <span className="sm:hidden">Este bot</span>
-                                <span className="hidden sm:inline">Sólo este Bot</span>
-                            </button>
-                            <button
-                                onClick={() => setInstanceScope('all')}
-                                className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${instanceScope === 'all'
-                                    ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300'
-                                    : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700'
-                                    }`}
-                            >
-                                Todos
-                            </button>
-                        </div>
-
                         <div className={`flex p-1 rounded-xl border w-full sm:w-auto ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
                             {[1, 7, 14, 30].map(days => (
                                 <button

@@ -3,11 +3,15 @@ import { createPortal } from 'react-dom';
 import api from '../../config/axios';
 import { useToast } from '../ui/Toast';
 import { useOrders } from '../../hooks/useOrders';
+import { useAuth } from '../../context/AuthContext';
+import { useSeller } from '../../context/SellerContext';
 
 import { RefreshCw as Refresh, Download, Search, Filter, MessageCircle as Chat, Edit2 as Edit, Trash2 as Trash, FileText as Script, Save, X as XIcon } from 'lucide-react';
 
 const SalesView = ({ onGoToChat, initialSearch = '' }) => {
     const { toast, confirm } = useToast();
+    const { isAdmin } = useAuth();
+    const { sellers } = useSeller();
     const [page, setPage] = useState(1);
 
     // Custom Hook Data
@@ -216,7 +220,12 @@ Teléfono: ${phoneDisplay}`;
     };
 
     // Filters logic
-    const uniqueSellers = Array.from(new Set(orders.map(o => o.seller).filter(Boolean)));
+    // Admin: filter by seller account (instanceId → name). Seller: filter by phone number (order.seller).
+    const sellerIdToName = Object.fromEntries((sellers || []).map(s => [s.sellerId, s.name]));
+
+    const uniqueFilterOptions = isAdmin
+        ? Array.from(new Set(orders.map(o => o.instanceId).filter(Boolean)))
+        : Array.from(new Set(orders.map(o => o.seller).filter(Boolean)));
 
     const filteredOrders = orders.filter(order => {
         const matchesSearch = searchTerm === '' ||
@@ -225,8 +234,9 @@ Teléfono: ${phoneDisplay}`;
             (order.tracking || '').toLowerCase().includes(searchTerm.toLowerCase());
 
         const matchesStatus = statusFilter === 'Todos' || (order.status || 'Pendiente') === statusFilter;
-        
-        const matchesSeller = sellerFilter === 'Todos' || order.seller === sellerFilter;
+
+        const matchesSeller = sellerFilter === 'Todos'
+            || (isAdmin ? order.instanceId === sellerFilter : order.seller === sellerFilter);
 
         return matchesSearch && matchesStatus && matchesSeller;
     });
@@ -317,32 +327,38 @@ Teléfono: ${phoneDisplay}`;
                         ))}
                     </div>
 
-                    {/* Vendedor Filter */}
-                    {uniqueSellers.length > 0 && (
+                    {/* Vendedor (admin) / Número (seller) filter — only shown when there are multiple options */}
+                    {uniqueFilterOptions.length > 1 && (
                         <>
                             {/* Mobile: native select */}
                             <div className="sm:hidden flex items-center gap-2">
-                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap">Vendedor:</span>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap">
+                                    {isAdmin ? 'Vendedor:' : 'Número:'}
+                                </span>
                                 <select
                                     value={sellerFilter}
                                     onChange={e => setSellerFilter(e.target.value)}
                                     className="flex-1 bg-white border border-slate-200 dark:bg-slate-800 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 shadow-inner"
                                 >
-                                    {['Todos', ...uniqueSellers].map(s => (
-                                        <option key={s} value={s}>{s === 'Todos' ? 'Todos' : `+${s.replace(/\D/g, '')}`}</option>
+                                    {['Todos', ...uniqueFilterOptions].map(opt => (
+                                        <option key={opt} value={opt}>
+                                            {opt === 'Todos' ? 'Todos' : isAdmin ? (sellerIdToName[opt] || opt) : `+${opt.replace(/\D/g, '')}`}
+                                        </option>
                                     ))}
                                 </select>
                             </div>
                             {/* Tablet+: pill buttons */}
                             <div className="hidden sm:flex items-center gap-2 bg-white/6 dark:bg-slate-800/60 p-2 rounded-xl border border-white/8 dark:border-slate-700/80 shadow-inner overflow-x-auto custom-scrollbar">
-                                <div className="pl-3 pr-2 text-slate-400 text-[10px] font-black uppercase tracking-widest">Vendedor:</div>
-                                {['Todos', ...uniqueSellers].map(seller => (
+                                <div className="pl-3 pr-2 text-slate-400 text-[10px] font-black uppercase tracking-widest">
+                                    {isAdmin ? 'Vendedor:' : 'Número:'}
+                                </div>
+                                {['Todos', ...uniqueFilterOptions].map(opt => (
                                     <button
-                                        key={seller}
-                                        onClick={() => setSellerFilter(seller)}
-                                        className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${sellerFilter === seller ? 'bg-blue-600 text-white shadow-md' : 'bg-transparent text-slate-600 hover:bg-white'}`}
+                                        key={opt}
+                                        onClick={() => setSellerFilter(opt)}
+                                        className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${sellerFilter === opt ? 'bg-blue-600 text-white shadow-md' : 'bg-transparent text-slate-600 hover:bg-white'}`}
                                     >
-                                        {seller === 'Todos' ? 'Todos' : `+${seller.replace(/\D/g, '')}`}
+                                        {opt === 'Todos' ? 'Todos' : isAdmin ? (sellerIdToName[opt] || opt) : `+${opt.replace(/\D/g, '')}`}
                                     </button>
                                 ))}
                             </div>
