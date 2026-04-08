@@ -293,10 +293,10 @@ const CorporateDashboard = () => {
                     <NavItem tab="logistics" icon={Database} label="Ventas & Logística" />
                     <NavItem tab="statistics" icon={BarChart2} label="Estadísticas" />
                     <NavItem tab="payments" icon={CreditCard} label="Pagos MP" />
-                    <NavItem tab="script" icon={FileText} label="Guión & Prompts" />
+                    {isAdmin && <NavItem tab="script" icon={FileText} label="Guión & Prompts" />}
                     <NavItem tab="gallery" icon={ImageIcon} label="Galería de Medios" />
                     <NavItem tab="manuals" icon={BookOpen} label="Manuales" />
-                    <NavItem tab="ai-reports" icon={AlertTriangle} label="Errores de IA" />
+                    {isAdmin && <NavItem tab="ai-reports" icon={AlertTriangle} label="Errores de IA" />}
 
                     <div className="pt-6 mt-6 border-t border-slate-200/50 dark:border-slate-700/50">
                         {(!sidebarCollapsed || isMobile) && <p className="text-xs 2xl:text-sm font-semibold text-slate-400 dark:text-slate-300 uppercase tracking-wider mb-4 px-4">Administración</p>}

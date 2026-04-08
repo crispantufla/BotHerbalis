@@ -125,9 +125,8 @@ model DailyStats {
 
 model Account {
   id        String   @id @default(uuid())
-  email     String   @unique
+  name      String   @unique            // "nombre de usuario" — used for login
   password  String   // bcrypt hash
-  name      String
   role      String   @default("seller") // "admin" | "seller"
   sellerId  String?  @unique            // maps to instanceId; null for admin-only accounts
   isActive  Boolean  @default(true)

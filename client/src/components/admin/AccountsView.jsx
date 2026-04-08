@@ -7,7 +7,7 @@ import {
     Play, Square, RotateCcw, Wifi, WifiOff, AlertTriangle, Shield, User
 } from 'lucide-react';
 
-const EMPTY_FORM = { name: '', email: '', password: '', role: 'seller', sellerId: '' };
+const EMPTY_FORM = { name: '', password: '', role: 'seller', sellerId: '' };
 
 const AccountsView = () => {
     const { toast } = useToast();
@@ -20,6 +20,7 @@ const AccountsView = () => {
     const [form, setForm] = useState(EMPTY_FORM);
     const [saving, setSaving] = useState(false);
     const [actionLoading, setActionLoading] = useState({});
+    const [sellerIdManuallyEdited, setSellerIdManuallyEdited] = useState(false);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -39,13 +40,36 @@ const AccountsView = () => {
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
-    const openCreate = () => { setEditingId(null); setForm(EMPTY_FORM); setShowForm(true); };
-    const openEdit = (acc) => {
-        setEditingId(acc.id);
-        setForm({ name: acc.name, email: acc.email, password: '', role: acc.role, sellerId: acc.sellerId || '' });
+    // Auto-generate sellerId from username when creating a new seller account
+    useEffect(() => {
+        if (editingId || form.role !== 'seller' || sellerIdManuallyEdited) return;
+        if (!form.name) { setForm(f => ({ ...f, sellerId: '' })); return; }
+        const base = form.name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+        const existingIds = new Set(accounts.map(a => a.sellerId).filter(Boolean));
+        let candidate = `${base}_bot`;
+        let i = 2;
+        while (existingIds.has(candidate)) { candidate = `${base}_bot${i}`; i++; }
+        setForm(f => ({ ...f, sellerId: candidate }));
+    }, [form.name, form.role, editingId, sellerIdManuallyEdited, accounts]);
+
+    const openCreate = () => {
+        setEditingId(null);
+        setSellerIdManuallyEdited(false);
+        setForm(EMPTY_FORM);
         setShowForm(true);
     };
-    const closeForm = () => { setShowForm(false); setEditingId(null); setForm(EMPTY_FORM); };
+    const openEdit = (acc) => {
+        setEditingId(acc.id);
+        setSellerIdManuallyEdited(true); // Don't auto-overwrite on edit
+        setForm({ name: acc.name, password: '', role: acc.role, sellerId: acc.sellerId || '' });
+        setShowForm(true);
+    };
+    const closeForm = () => {
+        setShowForm(false);
+        setEditingId(null);
+        setSellerIdManuallyEdited(false);
+        setForm(EMPTY_FORM);
+    };
 
     const handleSave = async (e) => {
         e.preventDefault();
@@ -144,26 +168,17 @@ const AccountsView = () => {
                         </div>
                         <form onSubmit={handleSave} className="p-6 space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nombre</label>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nombre de usuario</label>
                                 <input
                                     type="text"
                                     value={form.name}
                                     onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-slate-700 dark:text-slate-200"
-                                    placeholder="Nombre completo"
+                                    placeholder="ej: alejandra"
                                     required
+                                    autoComplete="off"
                                 />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Email</label>
-                                <input
-                                    type="email"
-                                    value={form.email}
-                                    onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-slate-700 dark:text-slate-200"
-                                    placeholder="usuario@email.com"
-                                    required
-                                />
+                                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Se usa para iniciar sesión</p>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
@@ -183,7 +198,10 @@ const AccountsView = () => {
                                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Rol</label>
                                 <select
                                     value={form.role}
-                                    onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
+                                    onChange={e => {
+                                        setSellerIdManuallyEdited(false);
+                                        setForm(f => ({ ...f, role: e.target.value }));
+                                    }}
                                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-slate-700 dark:text-slate-200"
                                 >
                                     <option value="seller">Vendedor</option>
@@ -196,11 +214,15 @@ const AccountsView = () => {
                                     <input
                                         type="text"
                                         value={form.sellerId}
-                                        onChange={e => setForm(f => ({ ...f, sellerId: e.target.value }))}
-                                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-slate-700 dark:text-slate-200"
-                                        placeholder="ej: vendedor_pedro"
+                                        onChange={e => {
+                                            setSellerIdManuallyEdited(true);
+                                            setForm(f => ({ ...f, sellerId: e.target.value }));
+                                        }}
+                                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-slate-700 dark:text-slate-200 font-mono"
+                                        placeholder="ej: alejandra_bot"
+                                        required
                                     />
-                                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Identificador único de la sesión WhatsApp de este vendedor</p>
+                                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Auto-generado — podés editarlo si querés</p>
                                 </div>
                             )}
                             <div className="flex gap-3 pt-2">
@@ -249,7 +271,6 @@ const AccountsView = () => {
                                                 <span className="font-semibold text-slate-800 dark:text-slate-100 text-sm truncate">{acc.name}</span>
                                                 {!acc.isActive && <span className="text-xs bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full">Inactivo</span>}
                                             </div>
-                                            <div className="text-xs text-slate-400 dark:text-slate-500 truncate">{acc.email}</div>
                                             {acc.sellerId && (
                                                 <div className="flex items-center gap-1.5 mt-1">
                                                     <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isConnected ? 'bg-emerald-500' : isRunning ? 'bg-amber-400' : 'bg-slate-300 dark:bg-slate-600'}`} />
@@ -330,7 +351,6 @@ const AccountsView = () => {
                                             <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium">Admin</span>
                                             {!acc.isActive && <span className="text-xs bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full">Inactivo</span>}
                                         </div>
-                                        <div className="text-xs text-slate-400 dark:text-slate-500">{acc.email}</div>
                                     </div>
                                     <div className="flex items-center gap-1.5">
                                         <button onClick={() => openEdit(acc)} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-indigo-500 transition-colors" title="Editar">

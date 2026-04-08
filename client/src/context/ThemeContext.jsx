@@ -8,8 +8,7 @@ export const ThemeProvider = ({ children }) => {
     const [isDark, setIsDark] = useState(() => {
         const saved = localStorage.getItem('herbalis-theme');
         if (saved) return saved === 'dark';
-        // Default to system preference
-        return window.matchMedia?.('(prefers-color-scheme: dark)').matches || false;
+        return false; // Default: light mode
     });
 
     useEffect(() => {

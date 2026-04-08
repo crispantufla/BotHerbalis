@@ -16,7 +16,7 @@ import bcrypt from 'bcryptjs';
 const { prisma } = require('../db');
 
 async function main() {
-    const email = process.env.SEED_ADMIN_EMAIL || 'admin@herbalis.com';
+    const name = process.env.SEED_ADMIN_USERNAME || process.env.SEED_ADMIN_EMAIL || 'admin';
     const password = process.env.SEED_ADMIN_PASSWORD;
 
     if (!password) {
@@ -27,11 +27,10 @@ async function main() {
     const hashed = await bcrypt.hash(password, 10);
 
     const account = await prisma.account.upsert({
-        where: { email },
+        where: { name },
         create: {
-            email,
+            name,
             password: hashed,
-            name: 'Admin',
             role: 'admin',
             sellerId: null,
         },
@@ -42,7 +41,7 @@ async function main() {
         },
     });
 
-    console.log(`Admin account ready: ${account.email} (id: ${account.id})`);
+    console.log(`Admin account ready: ${account.name} (id: ${account.id})`);
 }
 
 main()
