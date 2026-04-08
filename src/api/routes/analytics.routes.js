@@ -1,13 +1,13 @@
 const express = require('express');
-const { authMiddleware } = require('../../middleware/auth');
 const logger = require('../../utils/logger');
 const { prisma } = require('../../../db');
 const { toZonedTime } = require('date-fns-tz');
 
 const AR_TZ = 'America/Argentina/Buenos_Aires';
 
-module.exports = (client, sharedState) => {
+module.exports = (clientPool) => {
     const router = express.Router();
+    const { withSeller, getInstanceId } = require('./routeHelpers');
 
     // Helper: Get date objects for current and previous periods
     const getPeriods = (days) => {
@@ -34,17 +34,14 @@ module.exports = (client, sharedState) => {
     };
 
     // GET /analytics/overview - High-level financial metrics and performance
-    router.get('/analytics/overview', authMiddleware, async (req, res) => {
+    router.get('/analytics/overview', ...withSeller(clientPool), async (req, res) => {
         try {
             const days = parseInt(req.query.days) || 30;
-            const instanceFilter = req.query.instance; // e.g. "current" or "all"
-            const instanceId = process.env.INSTANCE_ID || 'default';
+            const instanceId = getInstanceId(req);
             const { currentStart, previousStart, previousEnd } = getPeriods(days);
 
             const baseWhere = { status: { not: 'Cancelado' } };
-            if (instanceFilter === 'current') {
-                baseWhere.instanceId = instanceId;
-            }
+            if (instanceId) baseWhere.instanceId = instanceId;
 
             // Fetch current period data
             const currentAgg = await prisma.order.aggregate({
@@ -90,17 +87,14 @@ module.exports = (client, sharedState) => {
     });
 
     // GET /analytics/products - Product Popularity and Duration metrics
-    router.get('/analytics/products', authMiddleware, async (req, res) => {
+    router.get('/analytics/products', ...withSeller(clientPool), async (req, res) => {
         try {
             const days = parseInt(req.query.days) || 30;
-            const instanceFilter = req.query.instance;
-            const instanceId = process.env.INSTANCE_ID || 'default';
+            const instanceId = getInstanceId(req);
             const { currentStart } = getPeriods(days);
 
             const baseWhere = { status: { not: 'Cancelado' } };
-            if (instanceFilter === 'current') {
-                baseWhere.instanceId = instanceId;
-            }
+            if (instanceId) baseWhere.instanceId = instanceId;
 
             const orders = await prisma.order.findMany({
                 where: { ...baseWhere, createdAt: { gte: currentStart } },
@@ -174,17 +168,16 @@ module.exports = (client, sharedState) => {
     });
 
     // GET /analytics/demographics - Heatmap/Geography data
-    router.get('/analytics/demographics', authMiddleware, async (req, res) => {
+    router.get('/analytics/demographics', ...withSeller(clientPool), async (req, res) => {
         try {
             const days = parseInt(req.query.days) || 30;
-            const instanceFilter = req.query.instance;
-            const instanceId = process.env.INSTANCE_ID || 'default';
+            const instanceId = getInstanceId(req);
             const { currentStart } = getPeriods(days);
 
             const baseWhere = { status: { not: 'Cancelado' } };
-            const baseUserWhere = {}; // Users table has no 'status' field
+            const baseUserWhere = {};
 
-            if (instanceFilter === 'current') {
+            if (instanceId) {
                 baseWhere.instanceId = instanceId;
                 baseUserWhere.instanceId = instanceId;
             }
@@ -281,16 +274,18 @@ module.exports = (client, sharedState) => {
     });
 
     // GET /analytics/funnel - Step-by-step funnel snapshot from DailyStats
-    router.get('/analytics/funnel', authMiddleware, async (req, res) => {
+    router.get('/analytics/funnel', ...withSeller(clientPool), async (req, res) => {
         try {
             const days = parseInt(req.query.days) || 7;
-            const instanceId = process.env.INSTANCE_ID || 'default';
+            const instanceId = getInstanceId(req);
             const since = new Date();
             since.setDate(since.getDate() - days);
             since.setHours(0, 0, 0, 0);
 
+            const whereBase = instanceId ? { instanceId } : {};
+
             const snapshots = await prisma.dailyStats.findMany({
-                where: { instanceId, date: { gte: since }, stepCounts: { not: null } },
+                where: { ...whereBase, date: { gte: since }, stepCounts: { not: null } },
                 select: { date: true, stepCounts: true },
                 orderBy: { date: 'asc' }
             });
@@ -308,8 +303,9 @@ module.exports = (client, sharedState) => {
 
             // Also include live snapshot from current in-memory state
             const liveStepCounts = {};
-            if (sharedState?.userState) {
-                for (const state of Object.values(sharedState.userState)) {
+            const ss = req.sellerInstance?.sharedState;
+            if (ss?.userState) {
+                for (const state of Object.values(ss.userState)) {
                     if (state.step) liveStepCounts[state.step] = (liveStepCounts[state.step] || 0) + 1;
                 }
             }
@@ -330,23 +326,25 @@ module.exports = (client, sharedState) => {
     });
 
     // GET /analytics/ad-performance - Funnel breakdown by ad source
-    router.get('/analytics/ad-performance', authMiddleware, async (req, res) => {
+    router.get('/analytics/ad-performance', ...withSeller(clientPool), async (req, res) => {
         try {
             const days = parseInt(req.query.days) || 30;
-            const instanceId = process.env.INSTANCE_ID || 'default';
+            const instanceId = getInstanceId(req);
             const since = new Date();
             since.setDate(since.getDate() - days);
             since.setHours(0, 0, 0, 0);
 
+            const whereBase = instanceId ? { instanceId } : {};
+
             // Fetch users with profileData to extract adSource
             const users = await prisma.user.findMany({
-                where: { instanceId, createdAt: { gte: since } },
+                where: { ...whereBase, createdAt: { gte: since } },
                 select: { phone: true, profileData: true, createdAt: true }
             });
 
             // Fetch orders in the same period
             const orders = await prisma.order.findMany({
-                where: { instanceId, createdAt: { gte: since }, status: { not: 'Cancelado' } },
+                where: { ...whereBase, createdAt: { gte: since }, status: { not: 'Cancelado' } },
                 select: { userPhone: true, totalPrice: true, createdAt: true }
             });
             const ordersByPhone = {};
@@ -368,13 +366,11 @@ module.exports = (client, sharedState) => {
             for (const user of users) {
                 let adSource = null;
                 let currentStep = null;
-                let funnelLog = null;
 
                 try {
                     const data = JSON.parse(user.profileData || '{}');
                     adSource = data.adSource || null;
                     currentStep = data.step || null;
-                    funnelLog = data.funnelLog || null;
                 } catch {}
 
                 const key = adSource || 'orgánico';

@@ -1,13 +1,13 @@
 const express = require('express');
 const { prisma } = require('../../../db');
-const { authMiddleware } = require('../../middleware/auth');
 const logger = require('../../utils/logger');
 
-module.exports = (client, sharedState) => {
+module.exports = (clientPool) => {
     const router = express.Router();
+    const { withSeller } = require('./routeHelpers');
 
     // GET /payments — list all payment links, newest first
-    router.get('/payments', authMiddleware, async (req, res) => {
+    router.get('/payments', ...withSeller(clientPool), async (req, res) => {
         try {
             const { status } = req.query;
             const where = {};
@@ -26,8 +26,9 @@ module.exports = (client, sharedState) => {
     });
 
     // POST /payments/:id/refresh — query real status from MercadoPago
-    router.post('/payments/:id/refresh', authMiddleware, async (req, res) => {
+    router.post('/payments/:id/refresh', ...withSeller(clientPool), async (req, res) => {
         try {
+            const io = req.sellerInstance?.sharedState?.io;
             const payment = await prisma.paymentLink.findUnique({ where: { id: req.params.id } });
             if (!payment) return res.status(404).json({ error: 'Enlace no encontrado' });
 
@@ -63,7 +64,7 @@ module.exports = (client, sharedState) => {
                 }
             });
 
-            if (sharedState.io) sharedState.io.emit('payment_updated', updated);
+            if (io) io.emit('payment_updated', updated);
             res.json({ payment: updated, changed: updated.status !== payment.status });
         } catch (e) {
             logger.error(`[PAYMENTS] Error refreshing payment: ${e?.message || e} | status: ${e?.status} | cause: ${JSON.stringify(e?.cause || e?.response?.data || '')}`);
@@ -140,7 +141,10 @@ module.exports = (client, sharedState) => {
                 }
             });
 
-            if (sharedState.io) sharedState.io.emit('payment_updated', updated);
+            // Emit to any available seller's socket (MP is global, emit to all)
+            const anyInstance = clientPool.getAllSellers()?.[0];
+            const io = anyInstance?.sharedState?.io;
+            if (io) io.emit('payment_updated', updated);
             logger.info(`[MP-WEBHOOK] Payment ${payment.id} updated to ${newStatus}`);
         } catch (e) {
             logger.error('[MP-WEBHOOK] Error processing webhook:', e);

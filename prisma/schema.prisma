@@ -110,7 +110,7 @@ model DailyStats {
   id              String   @id @default(uuid())
   instanceId      String   @default("default")
   date            DateTime // Date representing the specific day (e.g. at midnight)
-  
+
   totalChats      Int      // Encompasses total users/chats in memory before clearing
   completedOrders Int      // Number of completed orders for the day
   totalRevenue    Float    // Total revenue for the day
@@ -119,4 +119,29 @@ model DailyStats {
   createdAt       DateTime @default(now())
 
   @@unique([instanceId, date])
+}
+
+// --- Multi-tenant: Accounts & Sessions ---
+
+model Account {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String   // bcrypt hash
+  name      String
+  role      String   @default("seller") // "admin" | "seller"
+  sellerId  String?  @unique            // maps to instanceId; null for admin-only accounts
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([role])
+}
+
+model WhatsAppSession {
+  sellerId    String   @id              // matches instanceId across all tables
+  status      String   @default("disconnected") // disconnected | qr_pending | connected
+  phoneNumber String?  // connected WhatsApp phone number
+  lastSeen    DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

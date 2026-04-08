@@ -1,5 +1,4 @@
 const express = require('express');
-const { authMiddleware } = require('../../middleware/auth');
 const { getLocalHistory } = require('../../utils/chatHistory');
 const { aiService } = require('../../services/ai');
 const { MessageMedia } = require('whatsapp-web.js');
@@ -41,18 +40,18 @@ const withTimeout = (promise, ms, rejectMessage) => {
     return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
 };
 
-module.exports = (client, sharedState) => {
+module.exports = (clientPool) => {
     const router = express.Router();
-    const { userState, pausedUsers } = sharedState;
+    const { withSeller, getInstanceId } = require('./routeHelpers');
 
-    const resolveChatId = async (id) => {
+    const resolveChatId = async (id, client) => {
         if (!id) return id;
         // Handle @lid format
         if (id.includes('@lid')) {
             const cached = _cacheGet(id);
             if (cached) return cached.id;
             try {
-                const contact = await client.getContactById(id);
+                const contact = await client?.getContactById(id);
                 if (contact && contact.number) {
                     const resolvedId = `${contact.number}@c.us`;
                     _cacheSet(id, { id: resolvedId, name: contact.name || contact.pushname || `+${contact.number}` });
@@ -71,17 +70,18 @@ module.exports = (client, sharedState) => {
     };
 
     // GET /summarize/:chatId
-    router.get('/summarize/:chatId', authMiddleware, async (req, res) => {
+    router.get('/summarize/:chatId', ...withSeller(clientPool), async (req, res) => {
         try {
-            const chatId = await resolveChatId(req.params.chatId);
-            const resetAt = sharedState.chatResets[chatId] || 0;
+            const { client: cl, sharedState: ss } = req.sellerInstance || {};
+            const chatId = await resolveChatId(req.params.chatId, cl);
+            const resetAt = ss?.chatResets?.[chatId] || 0;
             // Reusing history logic (simplified for summary - we need text)
             const localMessages = await getLocalHistory(chatId, resetAt);
 
             let waMessages = [];
             try {
-                const chat = await withTimeout(client.getChatById(chatId), 5000, "Timeout getting chat for summary");
-                const rawMessages = await withTimeout(chat.fetchMessages({ limit: 50 }), 10000, "Timeout fetching messages for summary");
+                const chat = await withTimeout(cl?.getChatById(chatId), 5000, 'Timeout getting chat for summary');
+                const rawMessages = await withTimeout(chat?.fetchMessages({ limit: 50 }), 10000, 'Timeout fetching messages for summary');
                 waMessages = rawMessages.filter(m => m.timestamp >= resetAt);
             } catch (e) {
                 logger.warn(`[SUMMARIZE] WA Fetch failed for ${chatId}`);
@@ -120,12 +120,13 @@ module.exports = (client, sharedState) => {
     });
 
     // GET /chats
-    router.get('/chats', authMiddleware, async (req, res) => {
-        if (!sharedState.isConnected) {
+    router.get('/chats', ...withSeller(clientPool), async (req, res) => {
+        const { client: cl, sharedState: ss } = req.sellerInstance || {};
+        if (!ss?.isConnected) {
             return res.json([]); // Return empty list if WA is still initializing
         }
         try {
-            const chats = await withTimeout(client.getChats(), 10000, "Timeout retrieving chats");
+            const chats = await withTimeout(cl.getChats(), 10000, 'Timeout retrieving chats');
 
             // Read orders from Database to cross-reference past purchases (With 60s TTL Cache)
             let orders = [];
@@ -145,7 +146,7 @@ module.exports = (client, sharedState) => {
                 orders = ordersCache.data || []; // Fallback to stale cache if DB fails
             }
 
-            const instanceFilterId = req.query.instanceId || process.env.INSTANCE_ID || 'default';
+            const instanceFilterId = getInstanceId(req);
 
             // 1. Resolve @lid and Pre-process
             const mappedPromises = chats.filter(c => !c.isGroup).map(async (c) => {
@@ -159,7 +160,7 @@ module.exports = (client, sharedState) => {
                         actualName = cachedContact.name;
                     } else {
                         try {
-                            const contact = await withTimeout(client.getContactById(actualId), 1500, "Timeout");
+                            const contact = await withTimeout(cl.getContactById(actualId), 1500, 'Timeout');
                             if (contact && contact.number) {
                                 actualId = `${contact.number}@c.us`;
                                 if (contact.name || contact.pushname) {
@@ -274,15 +275,14 @@ module.exports = (client, sharedState) => {
                     unreadCount: c.unreadCount,
                     lastMessage: c.lastMessage ? { body: c.lastMessage.hasMedia ? 'Media' : c.lastMessage.body, timestamp: c.lastMessage.timestamp * 1000 } : null,
                     timestamp: c.timestamp,
-                    isPaused: pausedUsers.has(resolvedId) || pausedUsers.has(c.id._serialized),
-                    step: userState[resolvedId]?.step || userState[c.id._serialized]?.step || 'new',
-                    assignedScript: (userState[resolvedId] || userState[c.id._serialized])?.assignedScript || (sharedState.config?.activeScript === 'rotacion' ? 'v3' : sharedState.config?.activeScript || 'v3'),
-                    // Sales context for script placeholder resolution (check resolvedId first, fallback to raw serialized)
-                    selectedProduct: (userState[resolvedId] || userState[c.id._serialized])?.selectedProduct || null,
-                    selectedPlan: (userState[resolvedId] || userState[c.id._serialized])?.selectedPlan || null,
-                    cart: (userState[resolvedId] || userState[c.id._serialized])?.cart || null,
-                    totalPrice: (userState[resolvedId] || userState[c.id._serialized])?.totalPrice || null,
-                    partialAddress: (userState[resolvedId] || userState[c.id._serialized])?.partialAddress || null,
+                    isPaused: ss?.pausedUsers?.has(resolvedId) || ss?.pausedUsers?.has(c.id._serialized),
+                    step: ss?.userState?.[resolvedId]?.step || ss?.userState?.[c.id._serialized]?.step || 'new',
+                    assignedScript: (ss?.userState?.[resolvedId] || ss?.userState?.[c.id._serialized])?.assignedScript || (ss?.config?.activeScript === 'rotacion' ? 'v3' : ss?.config?.activeScript || 'v3'),
+                    selectedProduct: (ss?.userState?.[resolvedId] || ss?.userState?.[c.id._serialized])?.selectedProduct || null,
+                    selectedPlan: (ss?.userState?.[resolvedId] || ss?.userState?.[c.id._serialized])?.selectedPlan || null,
+                    cart: (ss?.userState?.[resolvedId] || ss?.userState?.[c.id._serialized])?.cart || null,
+                    totalPrice: (ss?.userState?.[resolvedId] || ss?.userState?.[c.id._serialized])?.totalPrice || null,
+                    partialAddress: (ss?.userState?.[resolvedId] || ss?.userState?.[c.id._serialized])?.partialAddress || null,
                     pastOrders: legacyUserOrders.length > 0 ? legacyUserOrders : null,
                     hasBought: legacyUserOrders.length > 0
                 };
@@ -294,10 +294,11 @@ module.exports = (client, sharedState) => {
     });
 
     // POST /chats/:id/read
-    router.post('/chats/:id/read', authMiddleware, async (req, res) => {
+    router.post('/chats/:id/read', ...withSeller(clientPool), async (req, res) => {
         try {
-            const chatId = await resolveChatId(req.params.id);
-            const chat = await client.getChatById(chatId);
+            const cl = req.sellerInstance?.client;
+            const chatId = await resolveChatId(req.params.id, cl);
+            const chat = await cl?.getChatById(chatId);
             await chat.sendSeen();
             res.json({ success: true });
         } catch (e) {
@@ -306,15 +307,16 @@ module.exports = (client, sharedState) => {
     });
 
     // GET /history/:id
-    router.get('/history/:id', authMiddleware, async (req, res) => {
+    router.get('/history/:id', ...withSeller(clientPool), async (req, res) => {
         try {
-            const chatId = await resolveChatId(req.params.id);
-            const resetAt = sharedState.chatResets[chatId] || 0;
+            const { client: cl, sharedState: ss } = req.sellerInstance || {};
+            const chatId = await resolveChatId(req.params.id, cl);
+            const resetAt = ss?.chatResets?.[chatId] || 0;
             let messages = [];
 
             try {
-                const chat = await withTimeout(client.getChatById(chatId), 5000, "Timeout getting chat history");
-                const waMessages = await withTimeout(chat.fetchMessages({ limit: 100 }), 10000, "Timeout fetching history messages");
+                const chat = await withTimeout(cl?.getChatById(chatId), 5000, 'Timeout getting chat history');
+                const waMessages = await withTimeout(chat?.fetchMessages({ limit: 100 }), 10000, 'Timeout fetching history messages');
                 const filtered = waMessages.filter(m => m.timestamp >= resetAt);
 
                 // Download audio media in parallel (with individual timeouts)
@@ -411,37 +413,28 @@ module.exports = (client, sharedState) => {
     });
 
     // Helper to ensure userState exists and record admin message
-    const _recordAdminMessage = (chatId, text) => {
+    const _recordAdminMessage = (chatId, text, ss) => {
+        const userState = ss?.userState;
+        if (!userState) return;
         if (!userState[chatId]) {
-            // Initialize userState as if they had just been greeted
-            const autoScript = Math.random() < 0.5 ? 'v3' : 'v4';
-            logger.info(`[DASHBOARD] Initializing new state for ${chatId} (Script: ${autoScript})`);
+            const autoScript = 'v3';
             userState[chatId] = {
-                step: 'waiting_weight', // Skip the greeting since admin just sent a message
-                lastMessage: null,
-                addressAttempts: 0,
-                partialAddress: {},
-                cart: [],
-                assignedScript: autoScript,
-                history: [],
-                summary: null,
-                stepEnteredAt: Date.now(),
-                lastActivityAt: Date.now(),
-                lastInteraction: Date.now()
+                step: 'waiting_weight',
+                lastMessage: null, addressAttempts: 0, partialAddress: {}, cart: [],
+                assignedScript: autoScript, history: [], summary: null,
+                stepEnteredAt: Date.now(), lastActivityAt: Date.now(), lastInteraction: Date.now()
             };
         }
-
-        // Add admin message to history so the AI has context
         userState[chatId].history.push({ role: 'bot', content: text, timestamp: Date.now() });
         userState[chatId].lastActivityAt = Date.now();
         userState[chatId].staleAlerted = false;
-
-        if (sharedState.saveState) sharedState.saveState();
+        if (ss?.saveState) ss.saveState();
     };
 
     // POST /send
-    router.post('/send', authMiddleware, async (req, res) => {
+    router.post('/send', ...withSeller(clientPool), async (req, res) => {
         try {
+            const { client: cl, sharedState: ss } = req.sellerInstance || {};
             const originalChatId = req.body.chatId;
             let { chatId, message } = req.body;
 
@@ -452,67 +445,62 @@ module.exports = (client, sharedState) => {
                 return res.status(400).json({ error: 'Invalid or missing message (max 5000 chars)' });
             }
 
-            chatId = await resolveChatId(chatId);
-            const sentMsg = await client.sendMessage(chatId, message);
+            chatId = await resolveChatId(chatId, cl);
+            const sentMsg = await cl?.sendMessage(chatId, message);
 
-            _recordAdminMessage(chatId, message);
+            _recordAdminMessage(chatId, message, ss);
 
             // Auto-pause bot on admin intervention
-            if (!pausedUsers.has(chatId)) {
+            if (!ss?.pausedUsers?.has(chatId)) {
                 const { pauseUser } = require('../../services/pauseService');
-                await pauseUser(chatId, '⏸️ Pausado automáticamente por intervención en panel', { sharedState });
-                if (sharedState.io) {
-                    sharedState.io.emit('bot_status_change', { chatId, paused: true });
-                    if (originalChatId !== chatId) sharedState.io.emit('bot_status_change', { chatId: originalChatId, paused: true });
+                await pauseUser(chatId, '⏸️ Pausado automáticamente por intervención en panel', { sharedState: ss });
+                if (ss?.io) {
+                    ss.io.emit('bot_status_change', { chatId, paused: true });
+                    if (originalChatId !== chatId) ss.io.emit('bot_status_change', { chatId: originalChatId, paused: true });
                 }
             }
 
-            if (sharedState.logAndEmit) sharedState.logAndEmit(chatId, 'admin', message, 'dashboard_reply', sentMsg.id._serialized);
-            res.json({ success: true, messageId: sentMsg.id._serialized });
+            if (ss?.logAndEmit) ss.logAndEmit(chatId, 'admin', message, 'dashboard_reply', sentMsg?.id?._serialized);
+            res.json({ success: true, messageId: sentMsg?.id?._serialized });
         } catch (e) {
             res.status(500).json({ error: e.message });
         }
     });
 
     // POST /send-media (send image from dashboard)
-    router.post('/send-media', authMiddleware, async (req, res) => {
+    router.post('/send-media', ...withSeller(clientPool), async (req, res) => {
         try {
+            const { client: cl, sharedState: ss } = req.sellerInstance || {};
             const originalChatId = req.body.chatId;
             let { chatId, base64, mimetype, filename, caption } = req.body;
 
             if (!chatId || typeof chatId !== 'string' || chatId.length > 100) {
                 return res.status(400).json({ error: 'Invalid or missing chatId' });
             }
-
-            chatId = await resolveChatId(chatId);
-            if (!base64 || !mimetype) {
-                return res.status(400).json({ error: 'Missing base64 or mimetype' });
-            }
+            chatId = await resolveChatId(chatId, cl);
+            if (!base64 || !mimetype) return res.status(400).json({ error: 'Missing base64 or mimetype' });
 
             const allowedMimetypes = ['image/jpeg', 'image/png', 'image/webp', 'audio/ogg', 'audio/mpeg', 'video/mp4'];
             if (!allowedMimetypes.includes(mimetype)) {
                 return res.status(400).json({ error: 'Invalid mimetype. Allowed: ' + allowedMimetypes.join(', ') });
             }
             const media = new MessageMedia(mimetype, base64, filename || 'image.jpg');
-            const sentMsg = await client.sendMessage(chatId, media, { caption: caption || '' });
+            const sentMsg = await cl?.sendMessage(chatId, media, { caption: caption || '' });
 
             const logText = `📷 Imagen enviada${caption ? ': ' + caption : ''}`;
-            _recordAdminMessage(chatId, logText);
+            _recordAdminMessage(chatId, logText, ss);
 
-            // Auto-pause bot on admin intervention
-            if (!pausedUsers.has(chatId)) {
+            if (!ss?.pausedUsers?.has(chatId)) {
                 const { pauseUser } = require('../../services/pauseService');
-                await pauseUser(chatId, '⏸️ Pausado automáticamente por intervención en panel', { sharedState });
-                if (sharedState.io) {
-                    sharedState.io.emit('bot_status_change', { chatId, paused: true });
-                    if (originalChatId !== chatId) sharedState.io.emit('bot_status_change', { chatId: originalChatId, paused: true });
+                await pauseUser(chatId, '⏸️ Pausado automáticamente por intervención en panel', { sharedState: ss });
+                if (ss?.io) {
+                    ss.io.emit('bot_status_change', { chatId, paused: true });
+                    if (originalChatId !== chatId) ss.io.emit('bot_status_change', { chatId: originalChatId, paused: true });
                 }
             }
 
-            if (sharedState.logAndEmit) {
-                sharedState.logAndEmit(chatId, 'admin', logText, 'dashboard_media', sentMsg.id._serialized);
-            }
-            res.json({ success: true, messageId: sentMsg.id._serialized });
+            if (ss?.logAndEmit) ss.logAndEmit(chatId, 'admin', logText, 'dashboard_media', sentMsg?.id?._serialized);
+            res.json({ success: true, messageId: sentMsg?.id?._serialized });
         } catch (e) {
             logger.error('[SEND-MEDIA] Error:', e.message);
             res.status(500).json({ error: e.message });
@@ -520,26 +508,27 @@ module.exports = (client, sharedState) => {
     });
 
     // POST /reset-chat
-    router.post('/reset-chat', authMiddleware, async (req, res) => {
+    router.post('/reset-chat', ...withSeller(clientPool), async (req, res) => {
         try {
+            const { client: cl, sharedState: ss } = req.sellerInstance || {};
+            const INSTANCE_ID = getInstanceId(req);
             let { chatId } = req.body;
-            chatId = await resolveChatId(chatId);
+            chatId = await resolveChatId(chatId, cl);
 
             // Warn if there's an active order in progress (but don't block the reset)
             let warning = null;
-            const currentState = userState[chatId];
+            const currentState = ss?.userState?.[chatId];
             if (currentState && (currentState.step === 'waiting_admin_validation' || currentState.step === 'waiting_final_confirmation')) {
                 warning = `Chat has an active order in step "${currentState.step}". The reset will proceed but the order state will be lost.`;
             }
 
-            delete userState[chatId];
-            sharedState.chatResets[chatId] = Math.floor(Date.now() / 1000); // 1. Record reset timestamp
-            pausedUsers.delete(chatId);
-            sharedState.saveState();
+            if (ss?.userState) delete ss.userState[chatId];
+            if (ss?.chatResets) ss.chatResets[chatId] = Math.floor(Date.now() / 1000);
+            ss?.pausedUsers?.delete(chatId);
+            if (ss?.saveState) ss.saveState();
 
             // Clear the saved state from the PostgreSQL database too
             const { prisma } = require('../../../db');
-            const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
             const phoneStr = chatId.replace('@c.us', '');
             try {
                 await prisma.user.update({
@@ -550,10 +539,14 @@ module.exports = (client, sharedState) => {
                 logger.warn(`[RESET] Could not clear DB state for ${phoneStr}:`, dbErr.message);
             }
 
-            const chat = await client.getChatById(chatId);
-            await chat.clearMessages();
+            try {
+                const chat = await cl?.getChatById(chatId);
+                await chat?.clearMessages();
+            } catch (clearErr) {
+                logger.warn(`[RESET] Could not clear WA messages for ${chatId}:`, clearErr.message);
+            }
 
-            if (sharedState.logAndEmit) sharedState.logAndEmit(chatId, 'system', 'Memoria de chat reiniciada', 'new');
+            if (ss?.logAndEmit) ss.logAndEmit(chatId, 'system', 'Memoria de chat reiniciada', 'new');
             const response = { success: true };
             if (warning) response.warning = warning;
             res.json(response);
@@ -563,11 +556,13 @@ module.exports = (client, sharedState) => {
     });
 
     // POST /toggle-bot
-    router.post('/toggle-bot', authMiddleware, async (req, res) => {
+    router.post('/toggle-bot', ...withSeller(clientPool), async (req, res) => {
         try {
+            const { sharedState: ss } = req.sellerInstance || {};
             const originalChatId = req.body.chatId;
+            const cl = req.sellerInstance?.client;
             let { chatId, paused } = req.body;
-            chatId = await resolveChatId(chatId);
+            chatId = await resolveChatId(chatId, cl);
 
             // Warn if LID resolution failed — pause key would mismatch message key
             if (chatId.includes('@lid')) {
@@ -577,18 +572,18 @@ module.exports = (client, sharedState) => {
             const { pauseUser, unpauseUser } = require('../../services/pauseService');
 
             if (paused) {
-                await pauseUser(chatId, '⏸️ Pausado manualmente por el panel', { sharedState });
+                await pauseUser(chatId, '⏸️ Pausado manualmente por el panel', { sharedState: ss });
             } else {
-                await unpauseUser(chatId, sharedState);
+                await unpauseUser(chatId, ss);
             }
 
             logger.info(`[API] toggle-bot: ${originalChatId}${chatId !== originalChatId ? ` → ${chatId}` : ''} → ${paused ? 'PAUSED' : 'UNPAUSED'} (via dashboard)`);
-            if (sharedState.saveState) sharedState.saveState();
+            if (ss?.saveState) ss.saveState();
             // Emit both resolved and original ID so frontend matches regardless of LID vs @c.us
-            if (sharedState.io) {
-                sharedState.io.emit('bot_status_change', { chatId, paused });
+            if (ss?.io) {
+                ss.io.emit('bot_status_change', { chatId, paused });
                 if (originalChatId !== chatId) {
-                    sharedState.io.emit('bot_status_change', { chatId: originalChatId, paused });
+                    ss.io.emit('bot_status_change', { chatId: originalChatId, paused });
                 }
             }
             res.json({ success: true });
@@ -598,10 +593,10 @@ module.exports = (client, sharedState) => {
     });
 
     // GET /waiting-customers — returns paused users with their pause reason (for dashboard panel)
-    router.get('/waiting-customers', authMiddleware, async (req, res) => {
+    router.get('/waiting-customers', ...withSeller(clientPool), async (req, res) => {
         try {
             const { getPausedUsersWithDetails } = require('../../services/pauseService');
-            const paused = await getPausedUsersWithDetails();
+            const paused = await getPausedUsersWithDetails(getInstanceId(req));
             res.json({ customers: paused });
         } catch (e) {
             res.status(500).json({ error: e.message });
@@ -610,16 +605,17 @@ module.exports = (client, sharedState) => {
 
 
     // DELETE /messages (Delete for everyone)
-    router.delete('/messages', authMiddleware, async (req, res) => {
+    router.delete('/messages', ...withSeller(clientPool), async (req, res) => {
         try {
+            const cl = req.sellerInstance?.client;
             let { chatId, messageId } = req.body;
-            chatId = await resolveChatId(chatId);
+            chatId = await resolveChatId(chatId, cl);
 
             if (!chatId || !messageId) return res.status(400).json({ error: 'Missing parameters' });
 
-            const chat = await client.getChatById(chatId);
-            const messages = await chat.fetchMessages({ limit: 200 }); // Increased from 50 to 200 to find older messages
-            const msgToDel = messages.find(m => m.id._serialized === messageId);
+            const chat = await cl?.getChatById(chatId);
+            const messages = await chat?.fetchMessages({ limit: 200 });
+            const msgToDel = messages?.find(m => m.id._serialized === messageId);
 
             if (msgToDel) {
                 await msgToDel.delete(true); // true = delete for everyone
@@ -637,14 +633,14 @@ module.exports = (client, sharedState) => {
     // ── AI Error Reports ──
 
     // POST /ai-reports — save a new AI error report
-    router.post('/ai-reports', authMiddleware, async (req, res) => {
+    router.post('/ai-reports', ...withSeller(clientPool), async (req, res) => {
         try {
+            const INSTANCE_ID = getInstanceId(req);
             const { userPhone, reportedMessage, conversation, correction } = req.body;
             if (!reportedMessage || !correction || !conversation) {
                 return res.status(400).json({ error: 'Missing required fields' });
             }
             const { prisma } = require('../../../db');
-            const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
             const report = await prisma.aiErrorReport.create({
                 data: {
                     instanceId: INSTANCE_ID,
@@ -663,10 +659,12 @@ module.exports = (client, sharedState) => {
     });
 
     // GET /ai-reports — list all AI error reports
-    router.get('/ai-reports', authMiddleware, async (req, res) => {
+    router.get('/ai-reports', ...withSeller(clientPool), async (req, res) => {
         try {
             const { prisma } = require('../../../db');
+            const INSTANCE_ID = getInstanceId(req);
             const reports = await prisma.aiErrorReport.findMany({
+                where: { instanceId: INSTANCE_ID },
                 orderBy: { createdAt: 'desc' },
                 take: 200,
             });
@@ -678,7 +676,7 @@ module.exports = (client, sharedState) => {
     });
 
     // DELETE /ai-reports/:id — delete a single report
-    router.delete('/ai-reports/:id', authMiddleware, async (req, res) => {
+    router.delete('/ai-reports/:id', ...withSeller(clientPool), async (req, res) => {
         try {
             const { prisma } = require('../../../db');
             await prisma.aiErrorReport.delete({ where: { id: req.params.id } });

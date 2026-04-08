@@ -1,22 +1,10 @@
 const logger = require('../utils/logger');
-const API_KEY = process.env.API_KEY;
+const { jwtAuthMiddleware } = require('./jwtAuth');
 
-if (!API_KEY) {
-    logger.warn('[AUTH] WARNING: API_KEY env var is not set! API will reject all requests.');
-}
-
-const authMiddleware = (req, res, next) => {
-    // Allow public routes
-    if (req.path === '/health') return next();
-
-    const apiKey = req.headers['x-api-key'];
-
-    if (!API_KEY || !apiKey || apiKey !== API_KEY) {
-        logger.warn(`[AUTH] Unauthorized access attempt from ${req.ip} to ${req.path}`);
-        return res.status(401).json({ error: 'Unauthorized: Invalid API Key' });
-    }
-
-    next();
-};
+// Re-export the JWT-based middleware as the primary auth middleware.
+// This replaces the old API_KEY-only check while maintaining backward compatibility:
+// - JWT Bearer tokens (new)
+// - x-api-key header (legacy, for existing dashboard/mobile-app during migration)
+const authMiddleware = jwtAuthMiddleware;
 
 module.exports = { authMiddleware };

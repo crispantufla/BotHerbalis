@@ -12,26 +12,27 @@ export const AuthProvider = ({ children }) => {
     const { toast } = useToast();
 
     useEffect(() => {
-        // Check initial auth state
+        // Restore session from localStorage
         const storedUser = localStorage.getItem('user');
-        if (storedUser) {
+        const storedToken = localStorage.getItem('token');
+        if (storedUser && storedToken) {
             try {
                 setUser(JSON.parse(storedUser));
             } catch (e) {
-                console.error("Failed to parse user", e);
                 localStorage.removeItem('user');
+                localStorage.removeItem('token');
             }
         }
         setLoading(false);
     }, []);
 
-    const login = async (username, password) => {
+    const login = async (email, password) => {
         try {
-            const res = await api.post('/api/login', { username, password });
-            if (res.data.success) {
+            const res = await api.post('/api/login', { email, password });
+            if (res.data.token) {
+                localStorage.setItem('token', res.data.token);
+                localStorage.setItem('user', JSON.stringify(res.data.user));
                 setUser(res.data.user);
-                localStorage.setItem('user', JSON.stringify(res.data.user)); // Simple Persistence
-                // Optionally store token if needed for API calls (current axios config uses hardcoded)
                 return true;
             }
         } catch (e) {
@@ -45,11 +46,14 @@ export const AuthProvider = ({ children }) => {
     const logout = () => {
         setUser(null);
         localStorage.removeItem('user');
-        // api.post('/api/logout'); // Optional
+        localStorage.removeItem('token');
+        localStorage.removeItem('selectedSellerId');
     };
 
+    const isAdmin = user?.role === 'admin';
+
     return (
-        <AuthContext.Provider value={{ user, login, logout, loading }}>
+        <AuthContext.Provider value={{ user, login, logout, loading, isAdmin }}>
             {!loading && children}
         </AuthContext.Provider>
     );

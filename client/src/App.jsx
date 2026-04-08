@@ -3,8 +3,9 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { SocketProvider } from './context/SocketContext';
 import { ToastProvider } from './components/ui/Toast';
 import { ThemeProvider } from './context/ThemeContext';
-import CorporateDashboard from './pages/designs/CorporateDashboard';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { SellerProvider } from './context/SellerContext';
+import CorporateDashboard from './pages/designs/CorporateDashboard';
 import Login from './pages/Login';
 
 // Protected Route Component
@@ -20,27 +21,28 @@ function App() {
         <ThemeProvider>
             <ToastProvider>
                 <AuthProvider>
-                    <SocketProvider>
-                        <Router>
-                            <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
-                                <Routes>
-                                    {/* Public Route */}
-                                    <Route path="/login" element={<Login />} />
+                    <SellerProvider>
+                        <SocketProvider>
+                            <Router>
+                                <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
+                                    <Routes>
+                                        {/* Public Route */}
+                                        <Route path="/login" element={<Login />} />
 
-                                    {/* Protected Route - Corporate Enterprise V2 (Main Dashboard) */}
-                                    <Route path="/*" element={
-                                        <ProtectedRoute>
-                                            <CorporateDashboard />
-                                        </ProtectedRoute>
-                                    } />
+                                        {/* Protected Route - Corporate Enterprise V2 (Main Dashboard) */}
+                                        <Route path="/*" element={
+                                            <ProtectedRoute>
+                                                <CorporateDashboard />
+                                            </ProtectedRoute>
+                                        } />
 
-
-                                    {/* Catch all - Redirect to Home */}
-                                    <Route path="*" element={<Navigate to="/" replace />} />
-                                </Routes>
-                            </div>
-                        </Router>
-                    </SocketProvider>
+                                        {/* Catch all - Redirect to Home */}
+                                        <Route path="*" element={<Navigate to="/" replace />} />
+                                    </Routes>
+                                </div>
+                            </Router>
+                        </SocketProvider>
+                    </SellerProvider>
                 </AuthProvider>
             </ToastProvider>
         </ThemeProvider>

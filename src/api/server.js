@@ -14,51 +14,37 @@ const analyticsRoutes = require('./routes/analytics.routes');
 const authRoutes = require('./routes/auth.routes');
 const galleryRoutes = require('./routes/gallery.routes');
 const paymentRoutes = require('./routes/payment.routes');
+const sellersRoutes = require('./routes/sellers.routes');
 
-function startServer(client, sharedState) {
-    const { userState, sessionAlerts } = sharedState;
+const { jwtAuthMiddleware } = require('../middleware/jwtAuth');
+const { verifyToken } = require('../middleware/jwtAuth');
 
-    // Validate sharedState
-    if (!userState || !sessionAlerts) {
-        logger.error("❌ [SERVER] Critical: Shared State missing!");
-    }
-
+/**
+ * startServer(clientPool)
+ * Accepts a ClientPool instance instead of a single client+sharedState.
+ * Routes resolve the correct seller via sellerContext middleware.
+ */
+function startServer(clientPool) {
     const app = express();
     const server = http.createServer(app);
     const allowedOrigin = process.env.DASHBOARD_URL || 'http://localhost:3000';
     const io = new Server(server, {
-        cors: {
-            origin: allowedOrigin,
-            methods: ["GET", "POST"]
-        },
+        cors: { origin: allowedOrigin, methods: ['GET', 'POST'] },
         pingTimeout: 60000,
         pingInterval: 25000,
         transports: ['websocket', 'polling']
     });
 
-    // Share IO with global state so index.js can use it
-    sharedState.io = io;
-
     // Middleware
-    app.set('trust proxy', 1); // Trust first proxy (Railway/Load Balancer)
-    app.use(cors({
-        origin: allowedOrigin
-    }));
-
-    // Security Headers — protects against common web vulnerabilities
+    app.set('trust proxy', 1);
+    app.use(cors({ origin: allowedOrigin }));
     const helmet = require('helmet');
-    app.use(helmet({
-        contentSecurityPolicy: false, // Disable CSP — the SPA dashboard needs inline scripts/styles
-        crossOriginEmbedderPolicy: false // Allow loading external resources (fonts, etc)
-    }));
-
-    // Gzip Compression — reduces response size ~70% (1MB bundle → 330KB)
+    app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
     const compression = require('compression');
     app.use(compression());
-
     app.use(express.json({ limit: '10mb' }));
 
-    // Request ID — unique identifier for each request (traceability)
+    // Request ID
     const crypto = require('crypto');
     app.use((req, res, next) => {
         req.requestId = req.headers['x-request-id'] || crypto.randomUUID();
@@ -66,178 +52,132 @@ function startServer(client, sharedState) {
         next();
     });
 
-    // Rate Limiting — Protect API from abuse
+    // Rate limiting
     const { rateLimit } = require('express-rate-limit');
-    const limiter = rateLimit({
-        windowMs: 15 * 60 * 1000, // 15 minutes
-        limit: 300, // Limit each IP to 300 requests per windowMs (dashboard needs many)
-        standardHeaders: 'draft-7',
-        legacyHeaders: false,
-        message: { error: 'Too many requests, please try again later.' }
-    });
-    app.use('/api', limiter);
+    app.use('/api', rateLimit({ windowMs: 15 * 60 * 1000, limit: 300, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many requests' } }));
+    app.use('/api/login', rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many login attempts' } }));
 
-    // Stricter rate limit for auth endpoints to prevent brute force
-    const authLimiter = rateLimit({
-        windowMs: 15 * 60 * 1000,
-        limit: 10,
-        standardHeaders: 'draft-7',
-        legacyHeaders: false,
-        message: { error: 'Too many login attempts, please try again later.' }
-    });
-    app.use('/api/login', authLimiter);
-
-    // Serve Static Files (Production/Docker)
+    // Static files
     const clientDistPath = path.join(__dirname, '../../client/dist');
     if (require('fs').existsSync(clientDistPath)) {
         app.use(express.static(clientDistPath));
         logger.info(`✅ Serving static files from: ${clientDistPath}`);
     } else {
-        // Fallback for local development if dist doesn't exist yet
         app.use(express.static(path.join(__dirname, '../../public')));
-        logger.info(`ℹ️ Client build not found. Serving public folder only.`);
     }
-
-    // Always serve /media from public/ for audio files, images, etc.
     app.use('/media', express.static(path.join(__dirname, '../../public/media')));
 
-    // --- HEALTHCHECK (public — minimal info for load balancers/uptime monitors) ---
+    // --- PUBLIC HEALTHCHECK ---
     app.get('/health', async (req, res) => {
-        const checks = {
-            whatsapp: sharedState.isConnected ? 'connected' : 'disconnected',
-            database: 'unknown',
-            redis: 'unknown'
-        };
-
-        // DB check
-        try {
-            const { prisma } = require('../../db');
-            await prisma.$queryRaw`SELECT 1`;
-            checks.database = 'connected';
-        } catch (e) {
-            checks.database = 'disconnected';
-        }
-
-        // Redis check
-        try {
-            const { redisConnection } = require('../services/queueService');
-            checks.redis = redisConnection.status === 'ready' ? 'connected' : 'disconnected';
-        } catch (e) {
-            checks.redis = 'disconnected';
-        }
-
-        // Container must stay alive even if WhatsApp is disconnected so we can scan the QR code
-        const allHealthy = checks.database === 'connected' && checks.redis === 'connected';
-
-        // Public response: only status + timestamp (no memory/uptime details)
-        res.status(allHealthy ? 200 : 503).json({
-            status: allHealthy ? 'ok' : 'degraded',
-            timestamp: new Date().toISOString()
-        });
+        const checks = { database: 'unknown', redis: 'unknown' };
+        try { const { prisma } = require('../../db'); await prisma.$queryRaw`SELECT 1`; checks.database = 'connected'; } catch (e) { checks.database = 'disconnected'; }
+        try { const { redisConnection } = require('../services/queueService'); checks.redis = redisConnection.status === 'ready' ? 'connected' : 'disconnected'; } catch (e) { checks.redis = 'disconnected'; }
+        const ok = checks.database === 'connected' && checks.redis === 'connected';
+        res.status(ok ? 200 : 503).json({ status: ok ? 'ok' : 'degraded', timestamp: new Date().toISOString() });
     });
 
-    // --- DETAILED HEALTHCHECK (authenticated — full diagnostics for dashboard) ---
-    app.get('/api/health/details', (req, res, next) => {
-        const { authMiddleware } = require('../middleware/auth');
-        authMiddleware(req, res, next);
-    }, async (req, res) => {
-        const memUsage = process.memoryUsage();
-        const checks = {
-            whatsapp: sharedState.isConnected ? 'connected' : 'disconnected',
-            database: 'unknown',
-            redis: 'unknown'
-        };
+    // --- MOUNT API ROUTES ---
+    // Auth routes (login, accounts CRUD) — no sellerContext needed
+    app.use('/api', authRoutes(null, null));
 
-        try {
-            const { prisma } = require('../../db');
-            await prisma.$queryRaw`SELECT 1`;
-            checks.database = 'connected';
-        } catch (e) {
-            checks.database = 'disconnected';
-        }
+    // All other routes receive clientPool; sellerContext is applied inside each router
+    app.use('/api', chatRoutes(clientPool));
+    app.use('/api', orderRoutes(clientPool));
+    app.use('/api', adminRoutes(clientPool));
+    app.use('/api', systemRoutes(clientPool));
+    app.use('/api', analyticsRoutes(clientPool));
+    app.use('/api', galleryRoutes(clientPool));
+    app.use('/api', paymentRoutes(clientPool));
+    app.use('/api', sellersRoutes(clientPool));
 
-        try {
-            const { redisConnection } = require('../services/queueService');
-            checks.redis = redisConnection.status === 'ready' ? 'connected' : 'disconnected';
-        } catch (e) {
-            checks.redis = 'disconnected';
-        }
-
-        const allHealthy = checks.whatsapp === 'connected' && checks.database === 'connected' && checks.redis === 'connected';
-
-        res.status(allHealthy ? 200 : 503).json({
-            status: allHealthy ? 'ok' : 'degraded',
-            services: checks,
-            uptime: Math.floor(process.uptime()),
-            memory: {
-                rss: Math.round(memUsage.rss / 1024 / 1024) + 'MB',
-                heap: Math.round(memUsage.heapUsed / 1024 / 1024) + 'MB'
-            },
-            activeUsers: Object.keys(sharedState.userState || {}).length,
-            pausedUsers: sharedState.pausedUsers?.size || 0,
-            alerts: sharedState.sessionAlerts?.length || 0,
-            timestamp: new Date().toISOString()
-        });
-    });
-
-    // --- MOUNT ROUTES ---
-    // All API routes are mounted under /api to preserve existing contract
-    app.use('/api', chatRoutes(client, sharedState));
-    app.use('/api', orderRoutes(client, sharedState));
-    app.use('/api', adminRoutes(client, sharedState));
-    app.use('/api', systemRoutes(client, sharedState));
-    app.use('/api', analyticsRoutes(client, sharedState));
-    app.use('/api', authRoutes(client, sharedState));
-    app.use('/api', galleryRoutes(client, sharedState));
-    app.use('/api', paymentRoutes(client, sharedState));
-
-    // Handle React Routing, return all requests to React app
-    // Express 5: using regex or * should work, but let's try a catch-all middleware at the end
+    // SPA fallback
     app.use((req, res, next) => {
         if (req.method !== 'GET') return next();
-
-        const clientDistPath = path.join(__dirname, '../../client/dist');
         const indexPath = path.join(clientDistPath, 'index.html');
-
-        if (require('fs').existsSync(indexPath)) {
-            res.sendFile(indexPath);
-        } else {
-            next(); // Allow 404 handler to take over if index doesn't exist
-        }
-    });
-
-    // --- EXPRESS 5 GLOBAL ERROR HANDLER ---
-    // Express 5 natively passes unhandled Promise rejections to the next(err) middleware
-    app.use((err, req, res, next) => {
-        logger.error(`[API ERROR] [${req.requestId}] ${req.method} ${req.url}:`, err.message);
-        if (err.stack && process.env.NODE_ENV !== 'production') {
-            logger.error(err.stack);
-        }
-        res.status(err.status || 500).json({
-            error: err.message || 'Internal Server Error',
-            details: process.env.NODE_ENV === 'development' ? err.stack : undefined
-        });
-    });
-
-    // --- SOCKET AUTH ---
-    const SOCKET_API_KEY = process.env.API_KEY;
-    io.use((socket, next) => {
-        const apiKey = socket.handshake.auth?.apiKey || socket.handshake.headers['x-api-key'];
-        if (!SOCKET_API_KEY || apiKey !== SOCKET_API_KEY) {
-            logger.warn(`[SOCKET] Unauthorized connection attempt from ${socket.handshake.address}`);
-            return next(new Error('Unauthorized'));
-        }
+        if (require('fs').existsSync(indexPath)) return res.sendFile(indexPath);
         next();
     });
 
-    // --- SOCKET SYNC ---
-    io.on('connection', (socket) => {
-        if (sharedState.isConnected && client && client.info) {
-            socket.emit('ready', { info: client.info });
-        } else if (!sharedState.isConnected && sharedState.qrCodeData) {
-            // Send the last generated QR code immediately
-            socket.emit('qr', sharedState.qrCodeData);
+    // Global error handler
+    app.use((err, req, res, next) => {
+        logger.error(`[API ERROR] [${req.requestId}] ${req.method} ${req.url}:`, err.message);
+        res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
+    });
+
+    // --- SOCKET.IO AUTH ---
+    // Accepts JWT token (new) or API_KEY (legacy)
+    io.use((socket, next) => {
+        const token = socket.handshake.auth?.token;
+        const apiKey = socket.handshake.auth?.apiKey || socket.handshake.headers['x-api-key'];
+        const SOCKET_API_KEY = process.env.API_KEY;
+
+        if (token) {
+            try {
+                const decoded = verifyToken(token);
+                socket.data.account = decoded;
+                return next();
+            } catch (e) {
+                // Fall through to API_KEY check
+            }
         }
+
+        if (SOCKET_API_KEY && apiKey === SOCKET_API_KEY) {
+            socket.data.account = { role: 'admin', sellerId: process.env.INSTANCE_ID || 'default', accountId: 'legacy' };
+            return next();
+        }
+
+        logger.warn(`[SOCKET] Unauthorized from ${socket.handshake.address}`);
+        return next(new Error('Unauthorized'));
+    });
+
+    // --- SOCKET ROOMS & SYNC ---
+    io.on('connection', (socket) => {
+        const account = socket.data.account;
+        const role = account?.role || 'seller';
+        const sellerId = account?.sellerId;
+
+        if (role === 'admin') {
+            socket.join('admin');
+            logger.debug(`[SOCKET] Admin joined room "admin"`);
+        } else if (sellerId) {
+            socket.join(sellerId);
+            logger.debug(`[SOCKET] Seller ${sellerId} joined room "${sellerId}"`);
+        }
+
+        // Send initial state for this socket
+        const instance = sellerId ? clientPool.getSeller(sellerId) : null;
+        if (instance) {
+            if (instance.sharedState.isConnected && instance.client?.info) {
+                socket.emit('ready', { info: instance.client.info, sellerId });
+            } else if (!instance.sharedState.isConnected && instance.sharedState.qrCodeData) {
+                socket.emit('qr', instance.sharedState.qrCodeData);
+            }
+        }
+
+        // Admin can switch which seller they're watching
+        socket.on('switch-seller', (newSellerId) => {
+            if (role !== 'admin') return;
+            // Leave current seller rooms (but stay in 'admin')
+            const rooms = Array.from(socket.rooms);
+            rooms.filter(r => r !== socket.id && r !== 'admin').forEach(r => socket.leave(r));
+
+            if (newSellerId) {
+                socket.join(newSellerId);
+                logger.debug(`[SOCKET] Admin switched to seller room: ${newSellerId}`);
+
+                // Send current state for selected seller
+                const sel = clientPool.getSeller(newSellerId);
+                if (sel) {
+                    if (sel.sharedState.isConnected && sel.client?.info) {
+                        socket.emit('ready', { info: sel.client.info, sellerId: newSellerId });
+                    } else if (sel.sharedState.qrCodeData) {
+                        socket.emit('qr', { sellerId: newSellerId, qr: sel.sharedState.qrCodeData });
+                    } else {
+                        socket.emit('status_change', { status: 'initializing', sellerId: newSellerId });
+                    }
+                }
+            }
+        });
 
         socket.on('disconnect', (reason) => {
             logger.debug(`[SOCKET] Client disconnected: ${reason}`);

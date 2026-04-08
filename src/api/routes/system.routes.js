@@ -2,22 +2,35 @@ const logger = require('../../utils/logger');
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
-const { authMiddleware } = require('../../middleware/auth');
 const validate = require('../../middleware/validate');
 const { pricesSchema, scriptSwitchSchema, pairingCodeSchema } = require('../../schemas/system.schema');
 const { aiService } = require('../../../src/services/ai');
 
-module.exports = (client, sharedState) => {
+module.exports = (clientPool) => {
     const router = express.Router();
-    const { config, sessionAlerts, userState, pausedUsers, io } = sharedState;
+    const { withSeller, getInstanceId } = require('./routeHelpers');
     const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../../..');
 
+    const getCtx = (req) => {
+        const ss = req.sellerInstance?.sharedState;
+        return {
+            client: req.sellerInstance?.client,
+            ss,
+            config: ss?.config || {},
+            userState: ss?.userState || {},
+            sessionAlerts: ss?.sessionAlerts || [],
+            pausedUsers: ss?.pausedUsers || new Set(),
+            io: ss?.io || null,
+        };
+    };
+
     // GET /health — Real system health check
-    router.get('/health', authMiddleware, (req, res) => {
+    router.get('/health', ...withSeller(clientPool), (req, res) => {
+        const { ss, userState, pausedUsers, sessionAlerts } = getCtx(req);
         const memUsage = process.memoryUsage();
         res.json({
-            status: sharedState.isConnected ? 'ok' : 'degraded',
-            whatsapp: sharedState.isConnected ? 'connected' : 'disconnected',
+            status: ss?.isConnected ? 'ok' : 'degraded',
+            whatsapp: ss?.isConnected ? 'connected' : 'disconnected',
             uptime: Math.round(process.uptime()),
             activeUsers: Object.keys(userState).length,
             pausedUsers: pausedUsers ? pausedUsers.size : 0,
@@ -32,21 +45,23 @@ module.exports = (client, sharedState) => {
     });
 
     // GET /status
-    router.get('/status', authMiddleware, (req, res) => {
-        const isConnected = sharedState.isConnected;
-        const qrCodeData = sharedState.qrCodeData;
+    router.get('/status', ...withSeller(clientPool), (req, res) => {
+        const { client: cl, ss, config } = getCtx(req);
+        const isConnected = ss?.isConnected;
+        const qrCodeData = ss?.qrCodeData;
         res.json({
             status: qrCodeData ? 'scan_qr' : (isConnected ? 'ready' : 'initializing'),
             qr: qrCodeData,
-            info: isConnected && client ? client.info : null,
-            instanceId: process.env.INSTANCE_ID || 'default',
-            config: config
+            info: isConnected && cl ? cl.info : null,
+            instanceId: getInstanceId(req),
+            config
         });
     });
 
     // GET /scan - QR Page (requires auth)
-    router.get('/scan', authMiddleware, (req, res) => {
-        const qrData = sharedState.qrCodeData;
+    router.get('/scan', ...withSeller(clientPool), (req, res) => {
+        const { ss } = getCtx(req);
+        const qrData = ss?.qrCodeData;
         if (!qrData) return res.send('<h1>No QR Code active</h1><p>Bot is either connected or initializing. Check logs.</p>');
 
         // Sanitize qrData using JSON.stringify for safe JavaScript embedding
@@ -75,12 +90,14 @@ module.exports = (client, sharedState) => {
     });
 
     // GET /alerts
-    router.get('/alerts', authMiddleware, (req, res) => {
+    router.get('/alerts', ...withSeller(clientPool), (req, res) => {
+        const { sessionAlerts } = getCtx(req);
         res.json(sessionAlerts);
     });
 
     // DELETE /alerts/:userPhone — Dismiss a specific alert permanently
-    router.delete('/alerts/:userPhone', authMiddleware, (req, res) => {
+    router.delete('/alerts/:userPhone', ...withSeller(clientPool), (req, res) => {
+        const { sessionAlerts, io } = getCtx(req);
         const { userPhone } = req.params;
         const index = sessionAlerts.findIndex(a => a.userPhone === userPhone || a.userPhone === `${userPhone}@c.us`);
         if (index !== -1) {
@@ -92,44 +109,33 @@ module.exports = (client, sharedState) => {
     });
 
     // GET /stats
-    router.get('/stats', authMiddleware, async (req, res) => {
+    router.get('/stats', ...withSeller(clientPool), async (req, res) => {
         try {
-            let todayRevenue = 0;
-            let totalOrders = 0;
-            let todayOrders = 0;
-            let completedToday = 0;
-
-            // Generate comparison date in YYYY-MM-DD format
-            const now = new Date();
-            const todayStr = now.toISOString().split('T')[0];
-
+            const { config, userState, pausedUsers } = getCtx(req);
+            const INSTANCE_ID = getInstanceId(req);
             const { prisma } = require('../../../db');
-            const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
 
             const startOfDay = new Date();
             startOfDay.setHours(0, 0, 0, 0);
 
+            const whereBase = INSTANCE_ID ? { instanceId: INSTANCE_ID } : {};
+
             // Fetch database aggregations in parallel for performance
             const [totalCount, todayStats, completedStats] = await Promise.all([
-                prisma.order.count({ where: { instanceId: INSTANCE_ID } }),
+                prisma.order.count({ where: whereBase }),
                 prisma.order.aggregate({
                     _count: true,
                     _sum: { totalPrice: true },
-                    where: { createdAt: { gte: startOfDay }, instanceId: INSTANCE_ID }
+                    where: { createdAt: { gte: startOfDay }, ...whereBase }
                 }),
                 prisma.order.count({
                     where: {
                         createdAt: { gte: startOfDay },
                         status: { not: 'Cancelado' },
-                        instanceId: INSTANCE_ID
+                        ...whereBase
                     }
                 })
             ]);
-
-            totalOrders = totalCount;
-            todayOrders = todayStats._count;
-            todayRevenue = todayStats._sum.totalPrice || 0;
-            completedToday = completedStats;
 
             const activeSessions = Object.keys(userState || {}).length;
             const activeConversations = Object.values(userState || {}).filter(
@@ -137,13 +143,13 @@ module.exports = (client, sharedState) => {
             ).length;
 
             res.json({
-                todayRevenue,
-                todayOrders,
-                totalOrders,
+                todayRevenue: todayStats._sum.totalPrice || 0,
+                todayOrders: todayStats._count,
+                totalOrders: totalCount,
                 activeSessions,
                 activeConversations,
-                conversionRate: activeSessions > 0 ? Math.round((completedToday / activeSessions) * 100) : 0,
-                pausedUsers: (pausedUsers ? pausedUsers.size : 0),
+                conversionRate: activeSessions > 0 ? Math.round((completedStats / activeSessions) * 100) : 0,
+                pausedUsers: pausedUsers ? pausedUsers.size : 0,
                 globalPause: !!config.globalPause
             });
         } catch (e) {
@@ -153,15 +159,17 @@ module.exports = (client, sharedState) => {
     });
 
     // GET /stats/charts - Get historical data for the last 30 days
-    router.get('/stats/charts', authMiddleware, async (req, res) => {
+    router.get('/stats/charts', ...withSeller(clientPool), async (req, res) => {
         try {
+            const INSTANCE_ID = getInstanceId(req);
             const { prisma } = require('../../../db');
-            const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
 
             // Get date 30 days ago
             const thirtyDaysAgo = new Date();
             thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
             thirtyDaysAgo.setHours(0, 0, 0, 0);
+
+            const whereBase = INSTANCE_ID ? { instanceId: INSTANCE_ID } : {};
 
             // Fetch all orders and stats from the last 30 days for this instance
             const [orders, dailyStatsRecords] = await Promise.all([
@@ -169,7 +177,7 @@ module.exports = (client, sharedState) => {
                     where: {
                         createdAt: { gte: thirtyDaysAgo },
                         status: { not: 'Cancelado' },
-                        instanceId: INSTANCE_ID
+                        ...whereBase
                     },
                     select: {
                         createdAt: true,
@@ -181,7 +189,7 @@ module.exports = (client, sharedState) => {
                 prisma.dailyStats.findMany({
                     where: {
                         date: { gte: thirtyDaysAgo },
-                        instanceId: INSTANCE_ID
+                        ...whereBase
                     }
                 })
             ]);
@@ -248,10 +256,7 @@ module.exports = (client, sharedState) => {
                 .filter(key => productData[key] > 0)
                 .map(key => ({ name: key, value: productData[key] }));
 
-            res.json({
-                chartData,
-                pieData
-            });
+            res.json({ chartData, pieData });
 
         } catch (e) {
             logger.error("[STATS/CHARTS ERROR]", e);
@@ -260,10 +265,11 @@ module.exports = (client, sharedState) => {
     });
 
     // POST /global-pause - Toggle bot global pause state
-    router.post('/global-pause', authMiddleware, (req, res) => {
+    router.post('/global-pause', ...withSeller(clientPool), (req, res) => {
         try {
+            const { config, ss, io } = getCtx(req);
             config.globalPause = !config.globalPause;
-            if (sharedState.saveState) sharedState.saveState();
+            if (ss?.saveState) ss.saveState();
 
             if (io) io.emit('global_pause_changed', { globalPause: config.globalPause });
 
@@ -276,49 +282,50 @@ module.exports = (client, sharedState) => {
     });
 
     // POST /logout — Disconnect or generate new QR
-    router.post('/logout', authMiddleware, async (req, res) => {
+    router.post('/logout', ...withSeller(clientPool), async (req, res) => {
         try {
-            if (client && client.info && sharedState.isConnected) {
+            const { client: cl, ss, io } = getCtx(req);
+            if (cl && cl.info && ss?.isConnected) {
                 // Active session: disconnect first, then reconnect event will trigger QR
                 logger.info('[WHATSAPP] Manual logout requested...');
-                sharedState.manualDisconnect = true;
-                sharedState.isConnected = false;
-                sharedState.qrCodeData = null;
-                await client.logout();
+                ss.manualDisconnect = true;
+                ss.isConnected = false;
+                ss.qrCodeData = null;
+                await cl.logout();
                 if (io) io.emit('status_change', { status: 'disconnected' });
             } else {
                 // No active session: destroy existing Chrome (if any) then reinitialize for QR
                 logger.info('[WHATSAPP] No active session — triggering initialize for QR...');
-                sharedState.qrCodeData = null;
+                if (ss) ss.qrCodeData = null;
                 if (io) io.emit('status_change', { status: 'disconnected' });
                 (async () => {
-                    try { await client.destroy(); } catch (e) { /* Chrome may not have been started yet */ }
-                    client.initialize().catch(err => {
+                    try { await cl?.destroy(); } catch (e) { /* Chrome may not have been started yet */ }
+                    cl?.initialize().catch(err => {
                         logger.error('[WHATSAPP] Initialize failed:', err.message);
                     });
                 })();
             }
             res.json({ success: true });
         } catch (e) {
-            sharedState.manualDisconnect = false;
+            const { ss } = getCtx(req);
+            if (ss) ss.manualDisconnect = false;
             res.status(500).json({ error: e.message });
         }
     });
 
-
-
     // POST /pairing-code - Request WhatsApp Pairing Code instead of QR
-    router.post('/pairing-code', authMiddleware, validate(pairingCodeSchema), async (req, res) => {
+    router.post('/pairing-code', ...withSeller(clientPool), validate(pairingCodeSchema), async (req, res) => {
         try {
+            const { ss } = getCtx(req);
             const { phoneNumber } = req.body;
             if (!phoneNumber) return res.status(400).json({ error: 'Falta el campo "phoneNumber"' });
 
-            if (!sharedState.requestPairingCode) {
+            if (!ss?.requestPairingCode) {
                 return res.status(501).json({ error: 'El backend no soporta Pairing Code aún.' });
             }
 
             logger.info(`[PAIRING] Solicitando código para el número: ${phoneNumber}`);
-            const code = await sharedState.requestPairingCode(phoneNumber);
+            const code = await ss.requestPairingCode(phoneNumber);
             res.json({ success: true, code });
         } catch (e) {
             logger.error("Error solicitando Pairing Code:", e);
@@ -327,10 +334,11 @@ module.exports = (client, sharedState) => {
     });
 
     // GET /script/active — show current script and available options
-    router.get('/script/active', authMiddleware, (req, res) => {
+    router.get('/script/active', ...withSeller(clientPool), (req, res) => {
+        const { config, ss } = getCtx(req);
         res.json({
             active: config.activeScript || 'v3',
-            available: sharedState.availableScripts || ['v3'],
+            available: ss?.availableScripts || ['v3'],
             stats: config.scriptStats || {},
             labels: {
                 'v3': 'Guión Profesional + CRM MAX'
@@ -339,20 +347,20 @@ module.exports = (client, sharedState) => {
     });
 
     // POST /script/switch — switch to a different script
-    router.post('/script/switch', authMiddleware, validate(scriptSwitchSchema), (req, res) => {
+    router.post('/script/switch', ...withSeller(clientPool), validate(scriptSwitchSchema), (req, res) => {
         try {
+            const { config, ss, io } = getCtx(req);
             const { script } = req.body;
             if (!script) return res.status(400).json({ error: 'Falta el campo "script"' });
 
-            const available = sharedState.availableScripts || ['v3', 'v4'];
+            const available = ss?.availableScripts || ['v3', 'v4'];
             if (!available.includes(script) && script !== 'rotacion') {
                 return res.status(400).json({ error: `Script "${script}" no existe. Disponibles: ${available.join(', ')} y rotacion` });
             }
 
             config.activeScript = script;
-            if (sharedState.loadKnowledge) {
-                // Ensure all knowledge configurations are loaded
-                sharedState.loadKnowledge();
+            if (ss?.loadKnowledge) {
+                ss.loadKnowledge();
             }
 
             if (io) io.emit('script_changed', { active: script });
@@ -366,7 +374,7 @@ module.exports = (client, sharedState) => {
     });
 
     // GET /script/:version
-    router.get('/script/:version', authMiddleware, (req, res) => {
+    router.get('/script/:version', ...withSeller(clientPool), (req, res) => {
         try {
             const { version } = req.params;
             const available = ['v1', 'v2', 'v3', 'v4'];
@@ -382,7 +390,6 @@ module.exports = (client, sharedState) => {
             if (version === 'v4') filename = 'knowledge_v4.json';
 
             // Check DATA_DIR (persistent edits) first, then source code
-            const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../../..');
             const persistPath = path.join(DATA_DIR, filename);
             const sourcePath = path.join(__dirname, '../../../', filename);
             const filePath = fs.existsSync(persistPath) ? persistPath : sourcePath;
@@ -402,7 +409,7 @@ module.exports = (client, sharedState) => {
     const PRICES_FILE = path.join(DATA_DIR, 'prices.json');
 
     // GET /prices
-    router.get('/prices', authMiddleware, (req, res) => {
+    router.get('/prices', ...withSeller(clientPool), (req, res) => {
         try {
             if (fs.existsSync(PRICES_FILE)) {
                 res.json(JSON.parse(fs.readFileSync(PRICES_FILE)));
@@ -420,8 +427,9 @@ module.exports = (client, sharedState) => {
     });
 
     // POST /prices
-    router.post('/prices', authMiddleware, validate(pricesSchema), (req, res) => {
+    router.post('/prices', ...withSeller(clientPool), validate(pricesSchema), (req, res) => {
         try {
+            const { io } = getCtx(req);
             const newPrices = req.body;
             if (!newPrices || typeof newPrices !== 'object') {
                 return res.status(400).json({ error: 'Invalid data' });
@@ -444,14 +452,17 @@ module.exports = (client, sharedState) => {
     // --- MEMORY MANAGEMENT ---
 
     // GET /memory-stats — Dashboard memory gauge
-    router.get('/memory-stats', authMiddleware, async (req, res) => {
+    router.get('/memory-stats', ...withSeller(clientPool), async (req, res) => {
         try {
+            const { userState } = getCtx(req);
+            const INSTANCE_ID = getInstanceId(req);
             const { prisma } = require('../../../db');
             const memUsage = process.memoryUsage();
-            const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
+
+            const whereBase = INSTANCE_ID ? { instanceId: INSTANCE_ID } : {};
 
             // Count total users in DB
-            const totalUsers = await prisma.user.count({ where: { instanceId: INSTANCE_ID } });
+            const totalUsers = await prisma.user.count({ where: whereBase });
 
             // Count users with active (non-completed) conversations in RAM
             const allKeys = Object.keys(userState || {});
@@ -486,10 +497,13 @@ module.exports = (client, sharedState) => {
     });
 
     // POST /reset-memory — Purge all user states (keeps orders intact)
-    router.post('/reset-memory', authMiddleware, async (req, res) => {
+    router.post('/reset-memory', ...withSeller(clientPool), async (req, res) => {
         try {
+            const { io } = getCtx(req);
+            const INSTANCE_ID = getInstanceId(req);
             const { prisma } = require('../../../db');
-            const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
+
+            const whereBase = INSTANCE_ID ? { instanceId: INSTANCE_ID } : {};
 
             // 0. Snapshot daily stats before deleting users
             // Use Argentina timezone to match dashboard
@@ -498,57 +512,54 @@ module.exports = (client, sharedState) => {
             startOfDay.setUTCHours(0, 0, 0, 0);
 
             // Get total chats created TODAY in DB before wiping
-            const totalUsersToday = await prisma.user.count({ 
-                where: { instanceId: INSTANCE_ID, createdAt: { gte: startOfDay } } 
+            const totalUsersToday = await prisma.user.count({
+                where: { ...whereBase, createdAt: { gte: startOfDay } }
             });
 
             // Save daily stat BEFORE resetting
-            try {
-                const todayStats = await prisma.order.aggregate({
-                    _count: true,
-                    _sum: { totalPrice: true },
-                    where: { createdAt: { gte: startOfDay }, instanceId: INSTANCE_ID, status: { not: 'Cancelado' } }
-                });
+            if (INSTANCE_ID) {
+                try {
+                    const todayStats = await prisma.order.aggregate({
+                        _count: true,
+                        _sum: { totalPrice: true },
+                        where: { createdAt: { gte: startOfDay }, ...whereBase, status: { not: 'Cancelado' } }
+                    });
 
-                await prisma.dailyStats.upsert({
-                    where: { instanceId_date: { instanceId: INSTANCE_ID, date: startOfDay } },
-                    create: {
-                        instanceId: INSTANCE_ID,
-                        date: startOfDay,
-                        totalChats: totalUsersToday,
-                        completedOrders: todayStats._count,
-                        totalRevenue: todayStats._sum.totalPrice || 0
-                    },
-                    update: {
-                        // In case of multiple manual resets a day, keep the highest totalChats observed
-                        totalChats: { set: totalUsersToday },
-                        completedOrders: { set: todayStats._count },
-                        totalRevenue: { set: todayStats._sum.totalPrice || 0 }
-                    }
-                });
-                logger.info(`[STATS] Saved daily snapshot before reset for ${startOfDay.toISOString()}`);
-            } catch (statsErr) {
-                logger.error('[STATS] Failed to save daily snapshot:', statsErr);
+                    await prisma.dailyStats.upsert({
+                        where: { instanceId_date: { instanceId: INSTANCE_ID, date: startOfDay } },
+                        create: {
+                            instanceId: INSTANCE_ID,
+                            date: startOfDay,
+                            totalChats: totalUsersToday,
+                            completedOrders: todayStats._count,
+                            totalRevenue: todayStats._sum.totalPrice || 0
+                        },
+                        update: {
+                            totalChats: { set: totalUsersToday },
+                            completedOrders: { set: todayStats._count },
+                            totalRevenue: { set: todayStats._sum.totalPrice || 0 }
+                        }
+                    });
+                    logger.info(`[STATS] Saved daily snapshot before reset for ${startOfDay.toISOString()}`);
+                } catch (statsErr) {
+                    logger.error('[STATS] Failed to save daily snapshot:', statsErr);
+                }
             }
 
             // 1. Purge DB memory — ONLY users inactive for 48+ hours
             const cutoffDate = new Date(Date.now() - 48 * 60 * 60 * 1000); // 48h ago
 
-            // INSTEAD of deleting User records (which breaks historical analytics counts),
-            // delete their heavy ChatLogs to save DB space.
             const deletedChats = await prisma.chatLog.deleteMany({
-                where: { user: { orders: { none: {} }, instanceId: INSTANCE_ID, lastSeen: { lt: cutoffDate } } }
+                where: { user: { orders: { none: {} }, ...whereBase, lastSeen: { lt: cutoffDate } } }
             });
 
-            // For ALL inactive users (with or without orders), clear their profileData to save space
             const cleaned = await prisma.user.updateMany({
-                where: { profileData: { not: null }, instanceId: INSTANCE_ID, lastSeen: { lt: cutoffDate } },
+                where: { profileData: { not: null }, ...whereBase, lastSeen: { lt: cutoffDate } },
                 data: { profileData: null }
             });
 
-            // Count recent users that were protected (for UI feedback)
             const protected48h = await prisma.user.count({
-                where: { instanceId: INSTANCE_ID, lastSeen: { gte: cutoffDate } }
+                where: { ...whereBase, lastSeen: { gte: cutoffDate } }
             });
 
             // 2. Clear RAM cache

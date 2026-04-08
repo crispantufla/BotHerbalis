@@ -14,15 +14,16 @@ import ScriptView from '../../components/corporate/ScriptView';
 import GalleryView from '../../components/corporate/GalleryView';
 import AdvancedAnalyticsView from '../../components/corporate/AdvancedAnalyticsView';
 import ManualsView from '../../components/corporate/ManualsView';
-
 import PaymentsView from '../../components/corporate/PaymentsView';
 import AiReportsView from '../../components/corporate/AiReportsView';
+import AccountsView from '../../components/admin/AccountsView';
+import SellerSelector from '../../components/admin/SellerSelector';
 
-import { Wifi, MessageCircle, Database, Settings, FileText, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Search, Bell, AlertTriangle, BookOpen, MoreHorizontal, CreditCard } from 'lucide-react';
+import { Wifi, MessageCircle, Database, Settings, FileText, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Search, Bell, AlertTriangle, BookOpen, MoreHorizontal, CreditCard, Users } from 'lucide-react';
 
 const CorporateDashboard = () => {
     const { socket } = useSocket();
-    const { logout } = useAuth();
+    const { logout, user, isAdmin } = useAuth();
     const { toast } = useToast();
     const { isDark, toggleTheme } = useTheme();
     const [status, setStatus] = useState('initializing');
@@ -208,6 +209,7 @@ const CorporateDashboard = () => {
                     <AiReportsView />
                 </div>
             );
+            case 'accounts': return <AccountsView />;
             default: return <DashboardView alerts={alerts} config={config} handleQuickAction={handleQuickAction} status={status} qrData={qrData} />;
         }
     };
@@ -299,6 +301,7 @@ const CorporateDashboard = () => {
                     <div className="pt-6 mt-6 border-t border-slate-200/50 dark:border-slate-700/50">
                         {(!sidebarCollapsed || isMobile) && <p className="text-xs 2xl:text-sm font-semibold text-slate-400 dark:text-slate-300 uppercase tracking-wider mb-4 px-4">Administración</p>}
                         <NavItem tab="settings" icon={Settings} label="Configuración" />
+                        {isAdmin && <NavItem tab="accounts" icon={Users} label="Usuarios" />}
                     </div>
                 </div>
 
@@ -383,7 +386,10 @@ const CorporateDashboard = () => {
                         </div>
                     </form>
 
-                    <div className="flex items-center gap-2 lg:gap-6">
+                    <div className="flex items-center gap-2 lg:gap-4">
+                        {/* Seller Selector — admin only */}
+                        {isAdmin && <div className="hidden md:block"><SellerSelector /></div>}
+
                         {/* Notifications Bell */}
                         <div className="relative" ref={notifRef}>
                             <button 
@@ -449,11 +455,13 @@ const CorporateDashboard = () => {
 
                         <div className="flex items-center gap-3 pl-4 lg:pl-6 border-l border-slate-200 dark:border-slate-700/60 ml-2">
                             <div className="text-right hidden md:block">
-                                <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Administrador</p>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Root Access</p>
+                                <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{user?.name || 'Usuario'}</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium capitalize">{user?.role || 'seller'}</p>
                             </div>
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shadow-md shadow-indigo-500/30 border border-white/20">
-                                <span className="text-white font-bold text-sm tracking-widest">AD</span>
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-md border border-white/20 ${isAdmin ? 'bg-gradient-to-br from-amber-500 to-orange-500 shadow-amber-500/30' : 'bg-gradient-to-br from-indigo-600 to-purple-600 shadow-indigo-500/30'}`}>
+                                <span className="text-white font-bold text-sm">
+                                    {(user?.name || 'U').charAt(0).toUpperCase()}
+                                </span>
                             </div>
                         </div>
                     </div>

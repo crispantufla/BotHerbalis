@@ -1,13 +1,12 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
-const { authMiddleware } = require('../../middleware/auth');
 const { atomicWriteFile } = require('../../../safeWrite');
 const logger = require('../../utils/logger');
 
-module.exports = (client, sharedState) => {
+module.exports = (clientPool) => {
     const router = express.Router();
-    const { io } = sharedState;
+    const { withSeller } = require('./routeHelpers');
 
     // DATA_DIR for metadata (persistent on Railway)
     const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../../..');
@@ -41,14 +40,15 @@ module.exports = (client, sharedState) => {
     };
 
     // GET /gallery - List all images
-    router.get('/gallery', authMiddleware, (req, res) => {
+    router.get('/gallery', ...withSeller(clientPool), (req, res) => {
         const gallery = loadGallery();
         res.json(gallery);
     });
 
     // POST /gallery - Upload new image
-    router.post('/gallery', authMiddleware, (req, res) => {
+    router.post('/gallery', ...withSeller(clientPool), (req, res) => {
         try {
+            const io = req.sellerInstance?.sharedState?.io;
             const { image, filename, tags, category } = req.body; // image is base64
 
             if (!image || !filename) {
@@ -109,8 +109,9 @@ module.exports = (client, sharedState) => {
     });
 
     // DELETE /gallery/:id - Delete image
-    router.delete('/gallery/:id', authMiddleware, (req, res) => {
+    router.delete('/gallery/:id', ...withSeller(clientPool), (req, res) => {
         try {
+            const io = req.sellerInstance?.sharedState?.io;
             const { id } = req.params;
             let gallery = loadGallery();
             const imageIndex = gallery.findIndex(img => img.id === id);

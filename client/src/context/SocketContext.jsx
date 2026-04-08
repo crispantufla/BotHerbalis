@@ -4,17 +4,21 @@ import { API_URL } from '../config/api';
 
 const SocketContext = createContext();
 
-export const useSocket = () => {
-    return useContext(SocketContext);
-};
+export const useSocket = () => useContext(SocketContext);
 
 export const SocketProvider = ({ children }) => {
     const [socket, setSocket] = useState(null);
     const [isConnected, setIsConnected] = useState(false);
 
     useEffect(() => {
+        // Read token at connection time (JWT preferred, API key fallback)
+        const token = localStorage.getItem('token');
+        const apiKey = import.meta.env.VITE_API_KEY;
+
+        const auth = token ? { token } : (apiKey ? { apiKey } : {});
+
         const newSocket = io(API_URL, {
-            auth: { apiKey: import.meta.env.VITE_API_KEY },
+            auth,
             reconnection: true,
             reconnectionAttempts: Infinity,
             reconnectionDelay: 1000,
@@ -38,6 +42,7 @@ export const SocketProvider = ({ children }) => {
         return () => newSocket.close();
     }, []);
 
+    // Let components call socket.emit('switch-seller', id) directly
     return (
         <SocketContext.Provider value={{ socket, isConnected }}>
             {children}

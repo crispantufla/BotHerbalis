@@ -26,10 +26,12 @@ const statusUpdateSchema = z.object({
     tracking: z.string().max(200).optional()
 }).strict();
 
-module.exports = (client, sharedState) => {
+module.exports = (clientPool) => {
     const router = express.Router();
-    // Access io dynamically via sharedState.io (it's set after routes are mounted)
-    const io = () => sharedState.io;
+    const { withSeller, getInstanceId } = require('./routeHelpers');
+
+    // Access io dynamically via the seller's sharedState
+    const io = (req) => req.sellerInstance?.sharedState?.io || null;
 
     const resolveChatId = async (id) => {
         if (!id) return id;
@@ -51,18 +53,22 @@ module.exports = (client, sharedState) => {
     };
 
     // GET /orders (List orders from PostgreSQL with Pagination)
-    router.get('/orders', authMiddleware, async (req, res) => {
+    router.get('/orders', ...withSeller(clientPool), async (req, res) => {
         try {
             const page = parseInt(req.query.page) || 1;
             const limit = Math.min(parseInt(req.query.limit) || 100, 500);
             const skip = (page - 1) * limit;
+            const instanceId = getInstanceId(req);
 
             const { prisma } = require('../../../db');
 
+            const where = instanceId ? { instanceId } : {};
+
             // Get total count for metadata
-            const total = await prisma.order.count();
+            const total = await prisma.order.count({ where });
 
             const orders = await prisma.order.findMany({
+                where,
                 orderBy: { createdAt: 'desc' },
                 skip,
                 take: limit
@@ -125,7 +131,7 @@ module.exports = (client, sharedState) => {
     });
 
     // PUT /orders/:id (Edit order details) - Authenticated
-    router.put('/orders/:id', authMiddleware, async (req, res) => {
+    router.put('/orders/:id', ...withSeller(clientPool), async (req, res) => {
         const idResult = uuidSchema.safeParse(req.params.id);
         if (!idResult.success) return res.status(400).json({ error: idResult.error.issues[0].message });
         const id = idResult.data;
@@ -175,7 +181,7 @@ module.exports = (client, sharedState) => {
                 createdAt: updatedOrder.createdAt.toISOString()
             };
 
-            if (io()) io().emit('order_update', legacyOrder);
+            if (io(req)) io(req).emit('order_update', legacyOrder);
             res.json({ success: true, order: legacyOrder });
         } catch (error) {
             logger.error('[ROUTES] Error updating order:', error);
@@ -184,7 +190,7 @@ module.exports = (client, sharedState) => {
     });
 
     // POST /orders/:id/status (Update status) - Authenticated
-    router.post('/orders/:id/status', authMiddleware, async (req, res) => {
+    router.post('/orders/:id/status', ...withSeller(clientPool), async (req, res) => {
         const idResult = uuidSchema.safeParse(req.params.id);
         if (!idResult.success) return res.status(400).json({ error: idResult.error.issues[0].message });
         const id = idResult.data;
@@ -217,25 +223,23 @@ module.exports = (client, sharedState) => {
                 const msg = "Tu envío ya está en curso 🚀, dentro de 48 hs podés pedirnos el código de seguimiento\n\n¡Muchas gracias por confiar en Herbalis!";
 
                 // Skip if user already received confirmation (step already 'completed')
-                if (sharedState.userState && sharedState.userState[targetPhone] && sharedState.userState[targetPhone].step === 'completed') {
+                const ss = req.sellerInstance?.sharedState;
+                const cl = req.sellerInstance?.client;
+                if (ss?.userState && ss.userState[targetPhone]?.step === 'completed') {
                     logger.info(`[ORDER-STATUS] Skipping confirmation for ${targetPhone} — already completed`);
-                } else try {
+                } else if (cl) try {
                     const { sendWithRetry } = require('../../utils/retry');
                     logger.info(`[ORDER-STATUS] Intentando enviar WhatsApp a ${targetPhone}...`);
-                    await sendWithRetry(client, targetPhone, msg);
+                    await sendWithRetry(cl, targetPhone, msg);
                     logger.info(`[ORDER-STATUS] WhatsApp enviado exitosamente a ${targetPhone}`);
 
-                    if (sharedState.userState && sharedState.userState[targetPhone]) {
-                        sharedState.userState[targetPhone].step = 'completed';
-                        sharedState.userState[targetPhone].history = sharedState.userState[targetPhone].history || [];
-                        sharedState.userState[targetPhone].history.push({ role: 'bot', content: msg, timestamp: Date.now() });
-                        if (sharedState.saveState) {
-                            try { sharedState.saveState(targetPhone); } catch (e) { sharedState.saveState(); }
-                        }
+                    if (ss?.userState && ss.userState[targetPhone]) {
+                        ss.userState[targetPhone].step = 'completed';
+                        ss.userState[targetPhone].history = ss.userState[targetPhone].history || [];
+                        ss.userState[targetPhone].history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+                        if (ss.saveState) { try { ss.saveState(targetPhone); } catch (e) { ss.saveState(); } }
                     }
-                    if (sharedState.logAndEmit) {
-                        sharedState.logAndEmit(targetPhone, 'bot', msg, 'completed');
-                    }
+                    if (ss?.logAndEmit) ss.logAndEmit(targetPhone, 'bot', msg, 'completed');
                 } catch (e) {
                     logger.error(`[ORDER-STATUS] FALLO AL ENVIAR WHATSAPP a ${targetPhone}. Motivo: ${e.message}`);
                 }
@@ -261,7 +265,7 @@ module.exports = (client, sharedState) => {
             };
 
 
-            if (io()) io().emit('order_update', legacyOrder);
+            if (io(req)) io(req).emit('order_update', legacyOrder);
             res.json({ success: true, order: legacyOrder });
 
         } catch (error) {
@@ -271,7 +275,7 @@ module.exports = (client, sharedState) => {
     });
 
     // DELETE /orders/:id (Delete order) - Authenticated
-    router.delete('/orders/:id', authMiddleware, async (req, res) => {
+    router.delete('/orders/:id', ...withSeller(clientPool), async (req, res) => {
         const idResult = uuidSchema.safeParse(req.params.id);
         if (!idResult.success) return res.status(400).json({ error: idResult.error.issues[0].message });
         const id = idResult.data;
@@ -284,7 +288,7 @@ module.exports = (client, sharedState) => {
 
             // (Google Sheets fallback removed via DB migration)
 
-            if (io()) io().emit('order_delete', { id });
+            if (io(req)) io(req).emit('order_delete', { id });
             res.json({ success: true, deleted: { id } });
 
         } catch (error) {
@@ -294,7 +298,7 @@ module.exports = (client, sharedState) => {
     });
 
     // GET /orders/tracking/:code (Rastrear envío en Correo Argentino) - Authenticated
-    router.get('/orders/tracking/:code', authMiddleware, async (req, res) => {
+    router.get('/orders/tracking/:code', ...withSeller(clientPool), async (req, res) => {
         const { code } = req.params;
         if (!code || code.length < 8) return res.status(400).json({ error: "Código inválido" });
 
@@ -309,15 +313,29 @@ module.exports = (client, sharedState) => {
     });
 
     // POST /orders/manual-complete — Admin manually completes a sale from the script panel
-    router.post('/orders/manual-complete', authMiddleware, async (req, res) => {
+    router.post('/orders/manual-complete', ...withSeller(clientPool), async (req, res) => {
         let { chatId } = req.body;
         if (!chatId) return res.status(400).json({ error: 'chatId es requerido' });
 
         try {
-            chatId = await resolveChatId(chatId);
+            const sellerClient = req.sellerInstance?.client;
+            const sellerSharedState = req.sellerInstance?.sharedState;
+            const INSTANCE_ID = getInstanceId(req);
+
+            const resolveChatIdLocal = async (id) => {
+                if (!id) return id;
+                if (id.includes('@lid')) {
+                    try { const c = await sellerClient?.getContactById(id); if (c?.number) return `${c.number}@c.us`; } catch (e) { /* ignore */ }
+                    return id;
+                }
+                if (!id.includes('@')) return `${id.replace(/\D/g, '')}@c.us`;
+                return id;
+            };
+
+            chatId = await resolveChatIdLocal(chatId);
             logger.info(`[MANUAL-COMPLETE] Resolved chatId: ${chatId}`);
 
-            const { userState } = sharedState;
+            const userState = sellerSharedState?.userState;
             const state = userState?.[chatId];
 
             if (!state) {
@@ -397,9 +415,8 @@ module.exports = (client, sharedState) => {
             const phoneNumeric = chatId.split('@')[0];
 
             const { prisma } = require('../../../db');
-            const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
 
-            const seller = client?.info?.wid?.user || null;
+            const seller = sellerClient?.info?.wid?.user || null;
 
             // Atomic transaction: upsert user + find/create order to prevent duplicates
             const order = await prisma.$transaction(async (tx) => {
@@ -459,19 +476,17 @@ module.exports = (client, sharedState) => {
             try {
                 const targetPhone = `${phoneNumeric}@c.us`;
                 logger.info(`[MANUAL-COMPLETE] Enviando WhatsApp de confirmación a ${targetPhone}...`);
-                await client.sendMessage(targetPhone, msg);
+                if (sellerClient) await sellerClient.sendMessage(targetPhone, msg);
 
                 if (state) {
                     state.step = 'completed';
                     state.history = state.history || [];
                     state.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
-                    if (sharedState.saveState) {
-                        try { sharedState.saveState(chatId); } catch (e) { sharedState.saveState(); }
+                    if (sellerSharedState?.saveState) {
+                        try { sellerSharedState.saveState(chatId); } catch (e) { sellerSharedState.saveState(); }
                     }
                 }
-                if (sharedState.logAndEmit) {
-                    sharedState.logAndEmit(chatId, 'bot', msg, 'completed');
-                }
+                if (sellerSharedState?.logAndEmit) sellerSharedState.logAndEmit(chatId, 'bot', msg, 'completed');
             } catch (e) {
                 logger.error(`[MANUAL-COMPLETE] Error enviando WhatsApp:`, e.message);
             }
@@ -494,16 +509,19 @@ module.exports = (client, sharedState) => {
             };
 
             // Emit socket event for real-time dashboard update
-            if (io()) {
-                io().emit('order_update', { action: 'created', order: legacyOrder });
+            if (io(req)) {
+                io(req).emit('order_update', { action: 'created', order: legacyOrder });
             }
 
             // Clear the alert from sessionAlerts so it doesn't reappear on reload
-            const alertIndex = sharedState.sessionAlerts.findIndex(a => a.userPhone === phoneNumeric || a.userPhone === chatId);
-            if (alertIndex !== -1) {
-                sharedState.sessionAlerts.splice(alertIndex, 1);
-                if (io()) io().emit('alerts_updated', sharedState.sessionAlerts);
-                logger.info(`[MANUAL-COMPLETE] Alert cleared for ${phoneNumeric}`);
+            const alerts = sellerSharedState?.sessionAlerts;
+            if (alerts) {
+                const alertIndex = alerts.findIndex(a => a.userPhone === phoneNumeric || a.userPhone === chatId);
+                if (alertIndex !== -1) {
+                    alerts.splice(alertIndex, 1);
+                    if (io(req)) io(req).emit('alerts_updated', alerts);
+                    logger.info(`[MANUAL-COMPLETE] Alert cleared for ${phoneNumeric}`);
+                }
             }
 
             logger.info(`[MANUAL-COMPLETE] Order confirmed for ${phoneNumeric}: ${product} — $${total}`);
