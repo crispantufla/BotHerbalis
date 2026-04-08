@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BookOpen, ChevronRight, AlertTriangle, CheckCircle, Hand, List, Sparkles, Terminal, HelpCircle, Zap, Users, Package, BarChart3, Settings, Send, Shield, Eye, Trash2, MousePointerClick, MessageCircle, ShoppingCart, CreditCard, FileText, ImageIcon, Bell, PauseCircle, PlayCircle, RotateCcw, TrendingUp, Filter, Download, Edit2 } from 'lucide-react';
+import { BookOpen, ChevronRight, AlertTriangle, CheckCircle, Hand, List, Sparkles, Terminal, HelpCircle, Zap, Users, Package, BarChart3, Settings, Send, Shield, Eye, Trash2, MousePointerClick, MessageCircle, ShoppingCart, CreditCard, FileText, ImageIcon, Bell, PauseCircle, PlayCircle, RotateCcw, TrendingUp, Filter, Edit2 } from 'lucide-react';
 
 // ─── Manual data ────────────────────────────────────────────────
 const MANUALS = [
@@ -334,7 +334,7 @@ const MANUALS = [
     {
         id: 'ventas-logistica',
         title: 'Ventas & Logística',
-        description: 'Como ver y filtrar pedidos, cambiar estados, cargar tracking y exportar datos.',
+        description: 'Como ver y filtrar pedidos, cambiar estados y cargar tracking.',
         icon: ShoppingCart,
         color: 'indigo',
         sections: [
@@ -395,11 +395,6 @@ const MANUALS = [
                 title: 'Ir al chat desde un pedido',
                 icon: MessageCircle,
                 content: `En cada pedido hay un botón de chat que te lleva directo a la conversación de ese cliente en la sección **Chat & Atención**.`,
-            },
-            {
-                title: 'Exportar a CSV',
-                icon: Download,
-                content: `El botón **"Exportar CSV"** en la parte superior descarga todos los pedidos visibles (según los filtros activos) en un archivo Excel-compatible.\n\nIdeal para compartir con el equipo o cargar en sistemas externos.`,
             },
         ],
     },
