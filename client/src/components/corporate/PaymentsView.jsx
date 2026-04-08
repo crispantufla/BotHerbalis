@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { CreditCard, RefreshCw, Copy, Check, ExternalLink, MessageCircle, AlertCircle } from 'lucide-react';
+import { CreditCard, RefreshCw, Copy, Check, ExternalLink, MessageCircle, AlertCircle, User } from 'lucide-react';
 import api from '../../config/axios';
 import { useSocket } from '../../context/SocketContext';
 import { useToast } from '../ui/Toast';
+import { useAuth } from '../../context/AuthContext';
+import { useSeller } from '../../context/SellerContext';
 
 const STATUS_CONFIG = {
     pending:  { label: 'Pendiente',  bg: 'bg-amber-100 dark:bg-amber-900/30',  text: 'text-amber-700 dark:text-amber-400',  dot: 'bg-amber-500' },
@@ -35,7 +37,7 @@ function formatPhone(phone) {
     return phone.replace('@c.us', '').replace('@s.whatsapp.net', '');
 }
 
-const PaymentRow = ({ payment, onRefresh, onGoToChat, refreshing }) => {
+const PaymentRow = ({ payment, onRefresh, onGoToChat, refreshing, sellerName }) => {
     const [copied, setCopied] = useState(false);
     const st = STATUS_CONFIG[payment.status] || STATUS_CONFIG.pending;
     const src = SOURCE_CONFIG[payment.source] || SOURCE_CONFIG.dashboard;
@@ -70,7 +72,13 @@ const PaymentRow = ({ payment, onRefresh, onGoToChat, refreshing }) => {
                 </span>
                 {/* Source */}
                 <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${src.bg} ${src.text}`}>{src.label}</span>
-                {/* Seller */}
+                {/* Seller name (admin only) */}
+                {sellerName && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
+                        <User className="w-3 h-3" /> {sellerName}
+                    </span>
+                )}
+                {/* Seller phone */}
                 {sellerPhone && (
                     <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300">
                         📱 {sellerPhone}
@@ -148,10 +156,15 @@ const FILTERS = [
 const PaymentsView = ({ onGoToChat }) => {
     const { toast } = useToast();
     const { socket } = useSocket();
+    const { isAdmin } = useAuth();
+    const { sellers } = useSeller();
     const [payments, setPayments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(null);
     const [filter, setFilter] = useState('all');
+
+    // Map instanceId → seller account name (for admin badge)
+    const sellerIdToName = Object.fromEntries((sellers || []).map(s => [s.sellerId, s.name]));
 
     // Generate link state
     const [mpAmount, setMpAmount] = useState('');
@@ -340,6 +353,7 @@ const PaymentsView = ({ onGoToChat }) => {
                             onRefresh={handleRefresh}
                             onGoToChat={onGoToChat}
                             refreshing={refreshing}
+                            sellerName={isAdmin ? (sellerIdToName[p.instanceId] || null) : null}
                         />
                     ))}
                 </div>

@@ -4,14 +4,18 @@ const logger = require('../../utils/logger');
 
 module.exports = (clientPool) => {
     const router = express.Router();
-    const { withSeller } = require('./routeHelpers');
+    const { withSeller, getInstanceId } = require('./routeHelpers');
 
-    // GET /payments — list all payment links, newest first
+    // GET /payments — list payment links scoped by seller
     router.get('/payments', ...withSeller(clientPool), async (req, res) => {
         try {
             const { status } = req.query;
             const where = {};
             if (status && status !== 'all') where.status = status;
+
+            // Scope by instanceId — sellers see only their own, admins see all (or selected seller)
+            const instanceId = getInstanceId(req);
+            if (instanceId) where.instanceId = instanceId;
 
             const payments = await prisma.paymentLink.findMany({
                 where,
