@@ -81,11 +81,9 @@ const AiCorrectionModal = ({ isOpen, onClose, messages = [], reportedMsgId, sele
                     {/* Reported message */}
                     <div>
                         <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm tracking-wide uppercase mb-3">Estás reportando este mensaje</h3>
-                        <div className="flex justify-end">
-                            <div className="max-w-[85%] p-3 rounded-2xl text-[13px] leading-relaxed bg-rose-100 dark:bg-rose-900/30 text-rose-800 dark:text-rose-200 border-2 border-rose-400">
-                                <span className="font-bold block text-[10px] opacity-60 uppercase mb-1">Bot</span>
-                                {reportedMsg?.body || '[Media Oculta]'}
-                            </div>
+                        <div className="p-4 rounded-2xl text-[13px] leading-relaxed bg-rose-100 dark:bg-rose-900/30 text-rose-800 dark:text-rose-200 border-2 border-rose-400 break-words">
+                            <span className="font-bold block text-[10px] opacity-60 uppercase mb-1">Bot</span>
+                            {reportedMsg?.body || '[Media Oculta]'}
                         </div>
                     </div>
 
