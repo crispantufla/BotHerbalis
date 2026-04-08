@@ -9,6 +9,7 @@ const { aiService } = require('../../../src/services/ai');
 module.exports = (clientPool) => {
     const router = express.Router();
     const { withSeller, getInstanceId } = require('./routeHelpers');
+    const { requireAdmin } = require('../../middleware/jwtAuth');
     const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../../..');
 
     const getCtx = (req) => {
@@ -333,8 +334,8 @@ module.exports = (clientPool) => {
         }
     });
 
-    // GET /script/active — show current script and available options
-    router.get('/script/active', ...withSeller(clientPool), (req, res) => {
+    // GET /script/active — show current script and available options (admin only)
+    router.get('/script/active', ...withSeller(clientPool), requireAdmin, (req, res) => {
         const { config, ss } = getCtx(req);
         res.json({
             active: config.activeScript || 'v3',
@@ -346,8 +347,8 @@ module.exports = (clientPool) => {
         });
     });
 
-    // POST /script/switch — switch to a different script
-    router.post('/script/switch', ...withSeller(clientPool), validate(scriptSwitchSchema), (req, res) => {
+    // POST /script/switch — switch to a different script (admin only)
+    router.post('/script/switch', ...withSeller(clientPool), requireAdmin, validate(scriptSwitchSchema), (req, res) => {
         try {
             const { config, ss, io } = getCtx(req);
             const { script } = req.body;
@@ -373,8 +374,8 @@ module.exports = (clientPool) => {
         }
     });
 
-    // GET /script/:version
-    router.get('/script/:version', ...withSeller(clientPool), (req, res) => {
+    // GET /script/:version (admin only)
+    router.get('/script/:version', ...withSeller(clientPool), requireAdmin, (req, res) => {
         try {
             const { version } = req.params;
             const available = ['v1', 'v2', 'v3', 'v4'];

@@ -9,7 +9,8 @@ const { adminCommandSchema } = require('../../schemas/system.schema');
 
 module.exports = (clientPool) => {
     const router = express.Router();
-    const { withSeller } = require('./routeHelpers');
+    const { withSeller, getInstanceId } = require('./routeHelpers');
+    const { requireAdmin } = require('../../middleware/jwtAuth');
 
     const getCtx = (req) => {
         const ss = req.sellerInstance?.sharedState;
@@ -41,11 +42,11 @@ module.exports = (clientPool) => {
         }
     });
 
-    // GET /script
-    router.get('/script', ...withSeller(clientPool), (req, res) => res.json(getCtx(req).knowledge));
+    // GET /script (admin only)
+    router.get('/script', ...withSeller(clientPool), requireAdmin, (req, res) => res.json(getCtx(req).knowledge));
 
-    // POST /script
-    router.post('/script', ...withSeller(clientPool), validate(scriptSchema), (req, res) => {
+    // POST /script (admin only)
+    router.post('/script', ...withSeller(clientPool), requireAdmin, validate(scriptSchema), (req, res) => {
         try {
             const { sharedState, config, knowledge, saveKnowledge } = getCtx(req);
             const { version } = req.body;
@@ -100,6 +101,7 @@ module.exports = (clientPool) => {
                     userPhone,
                     source: 'dashboard',
                     status: 'pending',
+                    instanceId: getInstanceId(req),
                 }
             });
 
