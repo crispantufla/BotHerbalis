@@ -10,10 +10,10 @@
  * This script is idempotent (uses upsert).
  */
 
-import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
-const prisma = new PrismaClient();
+// Use the shared db module which has the PrismaPg adapter configured
+const { prisma } = require('../db');
 
 async function main() {
     const email = process.env.SEED_ADMIN_EMAIL || 'admin@herbalis.com';
