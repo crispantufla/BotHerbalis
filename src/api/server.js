@@ -15,6 +15,7 @@ const authRoutes = require('./routes/auth.routes');
 const galleryRoutes = require('./routes/gallery.routes');
 const paymentRoutes = require('./routes/payment.routes');
 const sellersRoutes = require('./routes/sellers.routes');
+const quickRepliesRoutes = require('./routes/quickReplies.routes');
 
 const { jwtAuthMiddleware } = require('../middleware/jwtAuth');
 const { verifyToken } = require('../middleware/jwtAuth');
@@ -89,6 +90,7 @@ function startServer(clientPool) {
     app.use('/api', galleryRoutes(clientPool));
     app.use('/api', paymentRoutes(clientPool));
     app.use('/api', sellersRoutes(clientPool));
+    app.use('/api', quickRepliesRoutes(clientPool));
 
     // SPA fallback
     app.use((req, res, next) => {

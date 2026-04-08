@@ -14,7 +14,7 @@ module.exports = (clientPool) => {
         try {
             const accounts = await prisma.account.findMany({
                 where: { role: 'seller', isActive: true },
-                select: { id: true, name: true, email: true, sellerId: true, isActive: true, createdAt: true }
+                select: { id: true, name: true, sellerId: true, isActive: true, createdAt: true }
             });
 
             const sessions = await prisma.whatsAppSession.findMany();
@@ -27,7 +27,6 @@ module.exports = (clientPool) => {
                 return {
                     id: acc.id,
                     name: acc.name,
-                    email: acc.email,
                     sellerId: acc.sellerId,
                     isActive: acc.isActive,
                     createdAt: acc.createdAt,

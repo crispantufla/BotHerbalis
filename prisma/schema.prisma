@@ -144,3 +144,14 @@ model WhatsAppSession {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+
+model QuickReply {
+  id          String   @id @default(uuid())
+  instanceId  String   @default("default")
+  title       String
+  message     String
+  createdAt   DateTime @default(now())
+
+  @@index([instanceId])
+  @@unique([instanceId, title])
+}

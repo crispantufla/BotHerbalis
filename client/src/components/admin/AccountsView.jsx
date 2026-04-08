@@ -4,7 +4,7 @@ import { useToast } from '../ui/Toast';
 import { useSeller } from '../../context/SellerContext';
 import {
     Users, Plus, Trash2, Edit2, X, Check, RefreshCw,
-    Play, Square, RotateCcw, Wifi, WifiOff, AlertTriangle, Shield, User
+    Play, Square, RotateCcw, Wifi, WifiOff, AlertTriangle, Shield, User, KeyRound, Loader2
 } from 'lucide-react';
 
 const EMPTY_FORM = { name: '', password: '', role: 'seller', sellerId: '' };
@@ -21,6 +21,9 @@ const AccountsView = () => {
     const [saving, setSaving] = useState(false);
     const [actionLoading, setActionLoading] = useState({});
     const [sellerIdManuallyEdited, setSellerIdManuallyEdited] = useState(false);
+    const [pwModal, setPwModal] = useState(null); // { id, name }
+    const [newPw, setNewPw] = useState('');
+    const [pwSaving, setPwSaving] = useState(false);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -104,6 +107,22 @@ const AccountsView = () => {
             fetchData();
         } catch (e) {
             toast.error(e.response?.data?.error || 'Error desactivando cuenta');
+        }
+    };
+
+    const handleResetPassword = async (e) => {
+        e.preventDefault();
+        if (newPw.length < 8) return toast.error('Mínimo 8 caracteres');
+        setPwSaving(true);
+        try {
+            await api.put(`/api/accounts/${pwModal.id}/password`, { newPassword: newPw });
+            toast.success(`Contraseña de "${pwModal.name}" actualizada`);
+            setPwModal(null);
+            setNewPw('');
+        } catch (e) {
+            toast.error(e.response?.data?.error || 'Error al cambiar contraseña');
+        } finally {
+            setPwSaving(false);
         }
     };
 
@@ -243,6 +262,47 @@ const AccountsView = () => {
                 </div>
             )}
 
+            {/* Reset Password Modal */}
+            {pwModal && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-sm border border-slate-200 dark:border-slate-700">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-700">
+                            <h3 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                                <KeyRound className="w-4 h-4 text-indigo-500" />
+                                Resetear contraseña
+                            </h3>
+                            <button onClick={() => { setPwModal(null); setNewPw(''); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <form onSubmit={handleResetPassword} className="p-6 space-y-4">
+                            <p className="text-sm text-slate-500 dark:text-slate-400">
+                                Nueva contraseña para <strong className="text-slate-700 dark:text-slate-200">{pwModal.name}</strong>
+                            </p>
+                            <input
+                                type="password"
+                                placeholder="Nueva contraseña (mín. 8 caracteres)"
+                                value={newPw}
+                                onChange={e => setNewPw(e.target.value)}
+                                required
+                                minLength={8}
+                                autoFocus
+                                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-slate-700 dark:text-slate-200 placeholder:text-slate-400"
+                            />
+                            <div className="flex gap-3">
+                                <button type="button" onClick={() => { setPwModal(null); setNewPw(''); }} className="flex-1 px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+                                    Cancelar
+                                </button>
+                                <button type="submit" disabled={pwSaving} className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-sm font-semibold rounded-xl shadow hover:shadow-md transition-all disabled:opacity-50">
+                                    {pwSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                                    Guardar
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
             {loading ? (
                 <div className="flex items-center justify-center py-20">
                     <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
@@ -316,6 +376,9 @@ const AccountsView = () => {
                                         )}
                                         {/* Account Controls */}
                                         <div className="flex items-center gap-1.5">
+                                            <button onClick={() => { setPwModal({ id: acc.id, name: acc.name }); setNewPw(''); }} className="p-1.5 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/20 text-slate-400 hover:text-indigo-500 transition-colors" title="Cambiar contraseña">
+                                                <KeyRound className="w-4 h-4" />
+                                            </button>
                                             <button onClick={() => openEdit(acc)} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-indigo-500 transition-colors" title="Editar">
                                                 <Edit2 className="w-4 h-4" />
                                             </button>
@@ -353,6 +416,9 @@ const AccountsView = () => {
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-1.5">
+                                        <button onClick={() => { setPwModal({ id: acc.id, name: acc.name }); setNewPw(''); }} className="p-1.5 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/20 text-slate-400 hover:text-indigo-500 transition-colors" title="Cambiar contraseña">
+                                            <KeyRound className="w-4 h-4" />
+                                        </button>
                                         <button onClick={() => openEdit(acc)} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-indigo-500 transition-colors" title="Editar">
                                             <Edit2 className="w-4 h-4" />
                                         </button>

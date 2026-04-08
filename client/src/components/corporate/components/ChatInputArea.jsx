@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
-import { Send, Paperclip, Smile } from 'lucide-react';
+import { Send, Paperclip, Smile, Zap } from 'lucide-react';
 import EmojiPicker from 'emoji-picker-react';
+import QuickRepliesPanel from './QuickRepliesPanel';
 
 const ChatInputArea = ({
     input,
@@ -13,6 +14,7 @@ const ChatInputArea = ({
 }) => {
     const fileInputRef = useRef(null);
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const [showQuickReplies, setShowQuickReplies] = useState(false);
 
     const handleFileSelect = (e) => {
         const file = e.target.files[0];
@@ -36,6 +38,16 @@ const ChatInputArea = ({
 
     return (
         <div className="flex-shrink-0 p-3 sm:px-6 sm:py-4 pb-[max(1rem,env(safe-area-inset-bottom))] lg:pb-4 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-800 z-20 relative">
+            {showQuickReplies && (
+                <QuickRepliesPanel
+                    onSelect={(text) => {
+                        setInput(prev => prev ? prev + ' ' + text : text);
+                        setShowQuickReplies(false);
+                    }}
+                    onClose={() => setShowQuickReplies(false)}
+                />
+            )}
+
             {showEmojiPicker && (
                 <div className="absolute bottom-full left-4 sm:left-6 mb-2 z-50 shadow-2xl rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 animate-fade-in origin-bottom-left">
                     <EmojiPicker
@@ -63,8 +75,12 @@ const ChatInputArea = ({
             <form onSubmit={attachment ? (e) => { e.preventDefault(); handleSendMedia(); } : handleSend} className="flex gap-1.5 sm:gap-4 items-center w-full">
                 <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
 
-                <button type="button" onClick={() => setShowEmojiPicker(prev => !prev)} className={`w-11 h-11 sm:w-14 sm:h-14 flex items-center justify-center shrink-0 rounded-xl sm:rounded-2xl border transition-all shadow-sm ${showEmojiPicker ? 'bg-indigo-50 dark:bg-slate-600 border-indigo-300 text-indigo-600 dark:text-indigo-400' : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 hover:bg-indigo-50 dark:hover:bg-slate-600'}`}>
+                <button type="button" onClick={() => { setShowEmojiPicker(prev => !prev); setShowQuickReplies(false); }} className={`w-11 h-11 sm:w-14 sm:h-14 flex items-center justify-center shrink-0 rounded-xl sm:rounded-2xl border transition-all shadow-sm ${showEmojiPicker ? 'bg-indigo-50 dark:bg-slate-600 border-indigo-300 text-indigo-600 dark:text-indigo-400' : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 hover:bg-indigo-50 dark:hover:bg-slate-600'}`}>
                     <Smile className="w-6 h-6" />
+                </button>
+
+                <button type="button" onClick={() => { setShowQuickReplies(prev => !prev); setShowEmojiPicker(false); }} title="Respuestas rápidas" className={`w-11 h-11 sm:w-14 sm:h-14 flex items-center justify-center shrink-0 rounded-xl sm:rounded-2xl border transition-all shadow-sm ${showQuickReplies ? 'bg-indigo-50 dark:bg-slate-600 border-indigo-300 text-indigo-600 dark:text-indigo-400' : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 hover:bg-indigo-50 dark:hover:bg-slate-600'}`}>
+                    <Zap className="w-5 h-5" />
                 </button>
 
                 <button type="button" onClick={() => fileInputRef.current?.click()} className="w-11 h-11 sm:w-14 sm:h-14 flex items-center justify-center shrink-0 rounded-xl sm:rounded-2xl bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 hover:bg-indigo-50 dark:hover:bg-slate-600 transition-all shadow-sm">
@@ -75,7 +91,7 @@ const ChatInputArea = ({
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    onFocus={() => setShowEmojiPicker(false)}
+                    onFocus={() => { setShowEmojiPicker(false); setShowQuickReplies(false); }}
                     onKeyDown={(e) => {
                         if (e.key === 'Escape') { setShowEmojiPicker(false); }
                         if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {

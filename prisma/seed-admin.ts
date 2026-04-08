@@ -42,6 +42,25 @@ async function main() {
     });
 
     console.log(`Admin account ready: ${account.name} (id: ${account.id})`);
+
+    // Seed a sample quick reply for any seller accounts that exist
+    const sellers = await prisma.account.findMany({
+        where: { role: 'seller', sellerId: { not: null } },
+        select: { sellerId: true },
+    });
+
+    for (const seller of sellers) {
+        await (prisma.quickReply as any).upsert({
+            where: { instanceId_title: { instanceId: seller.sellerId!, title: '¡Gracias por tu consulta!' } },
+            update: {},
+            create: {
+                instanceId: seller.sellerId!,
+                title: '¡Gracias por tu consulta!',
+                message: '¡Hola! Gracias por comunicarte con nosotros. En breve te respondemos 😊',
+            },
+        });
+        console.log(`Sample quick reply created for seller: ${seller.sellerId}`);
+    }
 }
 
 main()

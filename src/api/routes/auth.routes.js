@@ -212,6 +212,61 @@ module.exports = (client, sharedState) => {
         }
     });
 
+    // ─── POST /api/change-password ─────────────────────────────────
+    // Any authenticated user changes their own password
+    router.post('/change-password', jwtAuthMiddleware, async (req, res) => {
+        const { currentPassword, newPassword } = req.body;
+        if (!currentPassword || !newPassword)
+            return res.status(400).json({ error: 'currentPassword y newPassword son requeridos' });
+        if (newPassword.length < 8)
+            return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 8 caracteres' });
+
+        if (req.account.id === 'legacy' || req.account.id === 'legacy-admin')
+            return res.status(403).json({ error: 'Las cuentas legacy no pueden cambiar contraseña aquí' });
+
+        try {
+            const account = await prisma.account.findUnique({ where: { id: req.account.id } });
+            if (!account || !account.isActive)
+                return res.status(404).json({ error: 'Cuenta no encontrada' });
+
+            const valid = await comparePassword(currentPassword, account.password);
+            if (!valid)
+                return res.status(401).json({ error: 'La contraseña actual es incorrecta' });
+
+            await prisma.account.update({
+                where: { id: req.account.id },
+                data: { password: await hashPassword(newPassword) },
+            });
+            logger.info(`[AUTH] Password changed for: ${account.name}`);
+            res.json({ success: true });
+        } catch (e) {
+            logger.error('[AUTH] Error changing password:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // ─── PUT /api/accounts/:id/password ────────────────────────────
+    // Admin resets any account's password (no current password needed)
+    router.put('/accounts/:id/password', jwtAuthMiddleware, requireAdmin, async (req, res) => {
+        const { newPassword } = req.body;
+        if (!newPassword || newPassword.length < 8)
+            return res.status(400).json({ error: 'newPassword debe tener al menos 8 caracteres' });
+
+        try {
+            const account = await prisma.account.update({
+                where: { id: req.params.id },
+                data: { password: await hashPassword(newPassword) },
+                select: { id: true, name: true },
+            });
+            logger.info(`[AUTH] Admin reset password for: ${account.name}`);
+            res.json({ success: true, name: account.name });
+        } catch (e) {
+            if (e.code === 'P2025') return res.status(404).json({ error: 'Cuenta no encontrada' });
+            logger.error('[AUTH] Error resetting password:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     // ─── POST /api/logout ───────────────────────────────────────────
     router.post('/logout', (req, res) => {
         res.json({ success: true });

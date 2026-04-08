@@ -5,7 +5,7 @@ import { useSocket } from '../../context/SocketContext';
 import PriceEditor from '../PriceEditor';
 import { useToast } from '../ui/Toast';
 
-import { Settings, Download, FileText, Power, Trash2, HardDrive, RefreshCw } from 'lucide-react';
+import { Settings, Download, FileText, Power, Trash2, HardDrive, RefreshCw, KeyRound } from 'lucide-react';
 
 const SettingsView = ({ status }) => {
     const { socket } = useSocket();
@@ -111,6 +111,28 @@ const SettingsView = ({ status }) => {
             toast.success(`Modelo de IA cambiado exitosamente.`);
         } catch (e) { toast.error('Error al cambiar el guión'); }
         setSwitchingScript(false);
+    };
+
+    // Change password state
+    const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
+    const [pwSaving, setPwSaving] = useState(false);
+
+    const handleChangePassword = async (e) => {
+        e.preventDefault();
+        if (pwForm.next !== pwForm.confirm)
+            return toast.error('Las contraseñas nuevas no coinciden');
+        if (pwForm.next.length < 8)
+            return toast.error('La nueva contraseña debe tener al menos 8 caracteres');
+        setPwSaving(true);
+        try {
+            await api.post('/api/change-password', { currentPassword: pwForm.current, newPassword: pwForm.next });
+            toast.success('Contraseña cambiada exitosamente');
+            setPwForm({ current: '', next: '', confirm: '' });
+        } catch (e) {
+            toast.error(e.response?.data?.error || 'Error al cambiar contraseña');
+        } finally {
+            setPwSaving(false);
+        }
     };
 
     // Memory gauge helpers
@@ -227,6 +249,54 @@ const SettingsView = ({ status }) => {
                                     </div>
                                 ))}
                             </div>
+                        </div>
+
+                        {/* Cambiar contraseña */}
+                        <div className="bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl p-4 sm:p-8 rounded-[1.25rem] sm:rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
+                            <div className="flex items-center gap-3 sm:gap-4 mb-5 relative z-10">
+                                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                                    <KeyRound className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <h3 className="font-extrabold text-slate-800 dark:text-slate-100 text-lg">Cambiar contraseña</h3>
+                                    <p className="text-xs font-bold text-slate-500 dark:text-slate-300 uppercase tracking-widest">Tu cuenta</p>
+                                </div>
+                            </div>
+                            <form onSubmit={handleChangePassword} className="space-y-3 relative z-10">
+                                <input
+                                    type="password"
+                                    placeholder="Contraseña actual"
+                                    value={pwForm.current}
+                                    onChange={e => setPwForm(f => ({ ...f, current: e.target.value }))}
+                                    required
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 placeholder:text-slate-400"
+                                />
+                                <input
+                                    type="password"
+                                    placeholder="Nueva contraseña (mín. 8 caracteres)"
+                                    value={pwForm.next}
+                                    onChange={e => setPwForm(f => ({ ...f, next: e.target.value }))}
+                                    required
+                                    minLength={8}
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 placeholder:text-slate-400"
+                                />
+                                <input
+                                    type="password"
+                                    placeholder="Repetir nueva contraseña"
+                                    value={pwForm.confirm}
+                                    onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))}
+                                    required
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 placeholder:text-slate-400"
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={pwSaving}
+                                    className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 text-white text-sm font-extrabold uppercase tracking-widest shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:scale-[1.01] active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                    {pwSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
+                                    {pwSaving ? 'Guardando...' : 'Cambiar contraseña'}
+                                </button>
+                            </form>
                         </div>
 
                         {/* Danger Zone */}
