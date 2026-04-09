@@ -22,7 +22,7 @@ module.exports = (client, sharedState) => {
         if (username && password) {
             try {
                 const account = await prisma.account.findUnique({
-                    where: { name: username },
+                    where: { name: username.toLowerCase() },
                 });
 
                 if (account && account.isActive && await comparePassword(password, account.password)) {
@@ -133,10 +133,10 @@ module.exports = (client, sharedState) => {
             const hashed = await hashPassword(password);
             const account = await prisma.account.create({
                 data: {
-                    name,
+                    name: name.toLowerCase(),
                     password: hashed,
                     role: effectiveRole,
-                    sellerId: sellerId || null, // admins can optionally have a sellerId (seller-admin hybrid)
+                    sellerId: sellerId ? sellerId.toLowerCase() : null,
                 },
                 select: { id: true, name: true, role: true, sellerId: true, isActive: true },
             });

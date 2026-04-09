@@ -28,14 +28,14 @@ export function verifyToken(token: string): AccountPayload {
     return jwt.verify(token, JWT_SECRET) as AccountPayload;
 }
 
-/** Hash a plaintext password */
+/** Hash a plaintext password (case-insensitive: stored lowercase) */
 export async function hashPassword(plain: string): Promise<string> {
-    return bcrypt.hash(plain, 10);
+    return bcrypt.hash(plain.toLowerCase(), 10);
 }
 
-/** Compare plaintext against hash */
+/** Compare plaintext against hash (case-insensitive) */
 export async function comparePassword(plain: string, hash: string): Promise<boolean> {
-    return bcrypt.compare(plain, hash);
+    return bcrypt.compare(plain.toLowerCase(), hash);
 }
 
 /**
