@@ -33,25 +33,6 @@ module.exports = (clientPool) => {
     // Access io dynamically via the seller's sharedState
     const io = (req) => req.sellerInstance?.sharedState?.io || null;
 
-    const resolveChatId = async (id) => {
-        if (!id) return id;
-        // Handle @lid format
-        if (id.includes('@lid')) {
-            try {
-                const contact = await client.getContactById(id);
-                if (contact && contact.number) return `${contact.number}@c.us`;
-            } catch (e) {
-                logger.error(`[LID-RESOLVE] API Error for ${id}:`, e.message);
-            }
-            return id;
-        }
-        // Normalize bare phone numbers to @c.us format
-        if (!id.includes('@')) {
-            return `${id.replace(/\D/g, '')}@c.us`;
-        }
-        return id;
-    };
-
     // GET /orders (List orders from PostgreSQL with Pagination)
     router.get('/orders', ...withSeller(clientPool), async (req, res) => {
         try {

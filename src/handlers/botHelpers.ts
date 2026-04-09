@@ -89,62 +89,86 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
     }
 
     function saveOrderToLocal(order: Record<string, any>): void {
-        (async () => {
-            let lock;
-            const cleanPhone = (order.cliente || '').replace('@c.us', '').replace(/\D/g, '');
-            try {
-                lock = await redlock.acquire([`order_lock:${cleanPhone}:${sellerId}`], 3000);
-
-                let priceNum = 0;
-                if (order.precio) {
-                    priceNum = parseInt(order.precio.toString().replace(/\./g, '').replace(/[^\d]/g, ''), 10);
-                }
-
-                const normalizedProduct = normalizeProductName(order.producto || '', order.plan || '', priceNum);
-
-                const newOrderData = {
-                    id: crypto.randomUUID(),
-                    userPhone: cleanPhone || 'desconocido',
-                    status: 'Pendiente',
-                    products: normalizedProduct,
-                    totalPrice: isNaN(priceNum) ? 0 : priceNum,
-                    tracking: null,
-                    postdated: order.postdatado || null,
-                    nombre: order.nombre || null,
-                    calle: order.calle || null,
-                    calleOriginal: order.calleOriginal || null,
-                    ciudad: order.ciudad || null,
-                    provincia: order.provincia || null,
-                    cp: order.cp || null,
-                    seller: client?.info?.wid?.user || null,
-                    instanceId: sellerId
-                };
-
-                await prisma.order.create({ data: newOrderData });
-
-                const legacyOrder = { ...order, id: newOrderData.id, createdAt: new Date().toISOString(), status: 'Pendiente', tracking: '' };
-                if (sharedState.io) {
-                    sharedState.io.to(sellerId).emit('new_order', legacyOrder);
-                    sharedState.io.to('admin').emit('new_order', { ...legacyOrder, sellerId });
-                }
-            } catch (e: any) {
-                logger.error(`[ORDER][${sellerId}] Write error or Lock timeout:`, e.message);
-            } finally {
-                if (lock) await lock.release().catch((e: any) => logger.warn('Failed to release lock:', e));
+        const cleanPhone = (order.cliente || '').replace('@c.us', '').replace(/\D/g, '');
+        _saveOrderAsync(order, cleanPhone).catch((e: any) => {
+            logger.error(`[ORDER][${sellerId}] CRITICAL: Order save failed for ${cleanPhone}. Data may be lost:`, e.message);
+            // Notify admin so lost orders are visible
+            if (sharedState.io) {
+                sharedState.io.to(sellerId).emit('new_log', {
+                    chatId: order.cliente || cleanPhone,
+                    role: 'system',
+                    text: `⚠️ ERROR: No se pudo guardar el pedido en la base de datos. Revisar logs.`,
+                    timestamp: Date.now(),
+                    sellerId
+                });
+                sharedState.io.to('admin').emit('new_log', {
+                    chatId: order.cliente || cleanPhone,
+                    role: 'system',
+                    text: `⚠️ ERROR: No se pudo guardar el pedido en la base de datos. Revisar logs.`,
+                    timestamp: Date.now(),
+                    sellerId
+                });
             }
-        })();
+        });
+    }
+
+    async function _saveOrderAsync(order: Record<string, any>, cleanPhone: string): Promise<void> {
+        let lock;
+        try {
+            lock = await redlock.acquire([`order_lock:${cleanPhone}:${sellerId}`], 3000);
+
+            let priceNum = 0;
+            if (order.precio) {
+                priceNum = parseInt(order.precio.toString().replace(/\./g, '').replace(/[^\d]/g, ''), 10);
+            }
+
+            const normalizedProduct = normalizeProductName(order.producto || '', order.plan || '', priceNum);
+
+            const newOrderData = {
+                id: crypto.randomUUID(),
+                userPhone: cleanPhone || 'desconocido',
+                status: 'Pendiente',
+                products: normalizedProduct,
+                totalPrice: isNaN(priceNum) ? 0 : priceNum,
+                tracking: null,
+                postdated: order.postdatado || null,
+                nombre: order.nombre || null,
+                calle: order.calle || null,
+                calleOriginal: order.calleOriginal || null,
+                ciudad: order.ciudad || null,
+                provincia: order.provincia || null,
+                cp: order.cp || null,
+                seller: client?.info?.wid?.user || null,
+                instanceId: sellerId
+            };
+
+            await prisma.order.create({ data: newOrderData });
+
+            const legacyOrder = { ...order, id: newOrderData.id, createdAt: new Date().toISOString(), status: 'Pendiente', tracking: '' };
+            if (sharedState.io) {
+                sharedState.io.to(sellerId).emit('new_order', legacyOrder);
+                sharedState.io.to('admin').emit('new_order', { ...legacyOrder, sellerId });
+            }
+        } finally {
+            if (lock) await lock.release().catch((e: any) => logger.warn('Failed to release lock:', e));
+        }
     }
 
     async function cancelLatestOrder(userId: string): Promise<{ success: boolean; order?: any; reason?: string; currentStatus?: string }> {
         let lock;
         const phone = userId.split('@')[0].replace(/\D/g, '');
+        const LOCK_TTL = 3000;
+        const QUERY_TIMEOUT = 2500; // Must be < lock TTL to avoid expired-lock writes
         try {
-            lock = await redlock.acquire([`order_lock:${phone}:${sellerId}`], 3000);
+            lock = await redlock.acquire([`order_lock:${phone}:${sellerId}`], LOCK_TTL);
 
-            const targetOrder = await prisma.order.findFirst({
-                where: { userPhone: phone, instanceId: sellerId },
-                orderBy: { createdAt: 'desc' }
-            });
+            const targetOrder = await Promise.race([
+                prisma.order.findFirst({
+                    where: { userPhone: phone, instanceId: sellerId },
+                    orderBy: { createdAt: 'desc' }
+                }),
+                new Promise<never>((_, rej) => setTimeout(() => rej(new Error('Prisma query timeout within lock')), QUERY_TIMEOUT))
+            ]);
 
             if (!targetOrder) return { success: false, reason: 'NOT_FOUND' };
             if (targetOrder.status !== 'Pendiente' && targetOrder.status !== 'Confirmado') {

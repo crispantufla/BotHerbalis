@@ -114,17 +114,32 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
         }
     }
 
-    // Debounced persistence
+    // Debounced persistence with proper serialization (no concurrent writes)
     let _saveTimeout: ReturnType<typeof setTimeout> | null = null;
     const _pendingUsers = new Set<string>();
-    let _isSaving = false;
+    let _persistPromise: Promise<void> | null = null;
+    let _pendingRetry = false;
 
     async function _persistState(): Promise<void> {
-        if (_isSaving) {
-            if (!_saveTimeout) _saveTimeout = setTimeout(() => { _saveTimeout = null; _persistState(); }, 2000);
+        // If already running, mark for retry after current finishes (no concurrent writes)
+        if (_persistPromise) {
+            _pendingRetry = true;
             return;
         }
-        _isSaving = true;
+        _persistPromise = _doPersist();
+        try {
+            await _persistPromise;
+        } finally {
+            _persistPromise = null;
+            // If another save was requested while we were writing, run it now
+            if (_pendingRetry) {
+                _pendingRetry = false;
+                _persistState();
+            }
+        }
+    }
+
+    async function _doPersist(): Promise<void> {
         try {
             const snapshot = { userState, chatResets, pausedUsers: Array.from(pausedUsers), config };
             atomicWriteFile(stateFile, JSON.stringify(snapshot, null, 2));
@@ -157,8 +172,6 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
             await Promise.all([...userPromises, ...configPromises]);
         } catch (e: any) {
             logger.error(`[STATE][${sellerId}] Error saving state:`, e.message);
-        } finally {
-            _isSaving = false;
         }
     }
 

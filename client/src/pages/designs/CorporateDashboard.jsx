@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../../config/axios';
 import { useSocket } from '../../context/SocketContext';
 import { useAuth } from '../../context/AuthContext';
-import { Link } from 'react-router-dom';
 import { useToast } from '../../components/ui/Toast';
 import { useTheme } from '../../context/ThemeContext';
 

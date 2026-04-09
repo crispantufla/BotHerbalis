@@ -117,7 +117,7 @@ export const useChat = (selectedChatId) => {
                         assignedScript: data.assignedScript
                     }, ...prev];
                 });
-            } catch (err) { }
+            } catch (err) { console.error('[useChat] Error handling socket message:', err); }
         };
 
         const handleBotStatusChange = (data) => {

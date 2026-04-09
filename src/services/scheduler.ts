@@ -22,7 +22,9 @@ import { UserState } from '../types/state';
 const TIMEZONE = 'America/Argentina/Buenos_Aires';
 
 // ── Mutex flags (prevent concurrent executions from cron + boot overlap) ──
-let _autoApproveRunning = false;
+// Timestamp-based guard: if previous run started >5 min ago, assume it hung and allow re-entry
+let _autoApproveStartedAt = 0;
+const AUTO_APPROVE_MAX_DURATION_MS = 5 * 60 * 1000;
 
 interface SchedulerSharedState {
     userState: Record<string, UserState>;
@@ -194,11 +196,15 @@ function checkStaleUsers(sharedState: SchedulerSharedState, dependencies: Schedu
  * Auto-approves orders stuck in waiting_admin_ok for >15 min.
  */
 async function autoApproveOrders(sharedState: SchedulerSharedState, dependencies: SchedulerDependencies): Promise<void> {
-    if (_autoApproveRunning) {
+    const now0 = Date.now();
+    if (_autoApproveStartedAt > 0 && (now0 - _autoApproveStartedAt) < AUTO_APPROVE_MAX_DURATION_MS) {
         logger.info('[SCHEDULER] autoApproveOrders already running, skipping.');
         return;
     }
-    _autoApproveRunning = true;
+    if (_autoApproveStartedAt > 0) {
+        logger.warn(`[SCHEDULER] Previous autoApproveOrders appears hung (started ${Math.round((now0 - _autoApproveStartedAt) / 1000)}s ago). Re-entering.`);
+    }
+    _autoApproveStartedAt = now0;
     try {
         const { userState } = sharedState;
         const { sendMessageWithDelay, notifyAdmin, saveState, saveOrderToLocal } = dependencies;
@@ -254,7 +260,7 @@ async function autoApproveOrders(sharedState: SchedulerSharedState, dependencies
             }
         }
     } finally {
-        _autoApproveRunning = false;
+        _autoApproveStartedAt = 0;
     }
 }
 

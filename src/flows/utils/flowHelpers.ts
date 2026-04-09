@@ -67,9 +67,10 @@ function _hasCompleteAddress(state: UserState): boolean {
  */
 function _detectPostdatado(normalizedText: string): string | null {
     // "mañana", "ya", "ahora" = wants SOONER, NOT a postdatado request
-    // But "ahora no puedo" / "no puedo ahora" means LATER, not sooner
+    // But "ahora no puedo" / "no puedo ahora" / "no puedo comprar ahora" means LATER, not sooner
     const hasNegatedAhora = /\b(ahora\s+no|no\s+puedo\s+ahora|ahora\s+no\s+puedo)\b/i.test(normalizedText);
-    const wantsSooner = !hasNegatedAhora && /\b(mañana|ya mismo|ya|ahora|urgente|inmediato|cuanto antes|lo antes posible)\b/i.test(normalizedText);
+    const hasNegationBeforeKeyword = /\bno\s+(?:puedo|quiero|tengo|me|voy\s+a)\b/i.test(normalizedText);
+    const wantsSooner = !hasNegatedAhora && !hasNegationBeforeKeyword && /\b(mañana|ya mismo|ya|ahora|urgente|inmediato|cuanto antes|lo antes posible)\b/i.test(normalizedText);
     if (wantsSooner && !/\b(pasado mañana|cobro|principio|fin de mes|semana\s+que\s+viene|mes\s+que\s+viene|pr[oó]ximo\s+mes|\d{1,2}\s+(?:de\s+)?(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre))\b/i.test(normalizedText)) {
         return null;
     }
