@@ -9,12 +9,12 @@ module.exports = (clientPool) => {
     // All sellers routes require admin role
     router.use(jwtAuthMiddleware, requireAdmin);
 
-    // GET /sellers — list all seller accounts with their WhatsApp session status
+    // GET /sellers — list all accounts with a sellerId (sellers + admin-sellers)
     router.get('/sellers', async (req, res) => {
         try {
             const accounts = await prisma.account.findMany({
-                where: { role: 'seller', isActive: true },
-                select: { id: true, name: true, sellerId: true, isActive: true, createdAt: true }
+                where: { isActive: true, sellerId: { not: null } },
+                select: { id: true, name: true, role: true, sellerId: true, isActive: true, createdAt: true }
             });
 
             const sessions = await prisma.whatsAppSession.findMany();
@@ -23,14 +23,17 @@ module.exports = (clientPool) => {
             const result = accounts.map(acc => {
                 const instance = acc.sellerId ? clientPool.getSeller(acc.sellerId) : null;
                 const session = acc.sellerId ? sessionMap[acc.sellerId] : null;
+                const registered = acc.sellerId ? clientPool.isKnown(acc.sellerId) : false;
 
                 return {
                     id: acc.id,
                     name: acc.name,
+                    role: acc.role,
                     sellerId: acc.sellerId,
                     isActive: acc.isActive,
                     createdAt: acc.createdAt,
                     // Live runtime status
+                    registered,
                     running: !!instance,
                     connected: instance?.sharedState?.isConnected || false,
                     phoneNumber: session?.phoneNumber || null,
@@ -51,7 +54,7 @@ module.exports = (clientPool) => {
         try {
             const { id } = req.params;
             const account = await prisma.account.findFirst({
-                where: { sellerId: id, role: 'seller', isActive: true }
+                where: { sellerId: id, isActive: true }
             });
             if (!account) return res.status(404).json({ error: 'Seller no encontrado' });
 

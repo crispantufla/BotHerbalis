@@ -2,7 +2,8 @@ const { z } = require('zod');
 
 // Validador para POST /prices
 // Requiere un record de strings para los productos, donde cada uno o es un objeto o tiene valores de precio
-const pricesSchema = z.record(z.string(), z.record(z.string(), z.string()));
+// Prices can be nested (product -> plan -> price) or flat (adicionalMAX, costoLogistico)
+const pricesSchema = z.record(z.string(), z.union([z.string(), z.record(z.string(), z.string())]));
 
 // Validador para POST /script/switch
 const scriptSwitchSchema = z.object({

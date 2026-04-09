@@ -141,18 +141,29 @@ function startServer(clientPool) {
         if (role === 'admin') {
             socket.join('admin');
             logger.debug(`[SOCKET] Admin joined room "admin"`);
-        } else if (sellerId) {
-            socket.join(sellerId);
-            logger.debug(`[SOCKET] Seller ${sellerId} joined room "${sellerId}"`);
         }
 
-        // Send initial state for this socket
-        const instance = sellerId ? clientPool.getSeller(sellerId) : null;
-        if (instance) {
-            if (instance.sharedState.isConnected && instance.client?.info) {
-                socket.emit('ready', { info: instance.client.info, sellerId });
-            } else if (!instance.sharedState.isConnected && instance.sharedState.qrCodeData) {
-                socket.emit('qr', instance.sharedState.qrCodeData);
+        if (sellerId) {
+            socket.join(sellerId);
+            logger.debug(`[SOCKET] ${role} ${sellerId} joined room "${sellerId}"`);
+        }
+
+        // Auto-start Chrome for this seller (lazy start)
+        if (sellerId && clientPool.isKnown(sellerId) && !clientPool.getSeller(sellerId)) {
+            logger.info(`[SOCKET] Lazy-starting seller ${sellerId} (user logged in)`);
+            socket.emit('status_change', { status: 'initializing', sellerId });
+            clientPool.ensureStarted(sellerId).catch(e =>
+                logger.error(`[SOCKET] Failed to lazy-start ${sellerId}:`, e.message)
+            );
+        } else {
+            // Send initial state for this socket
+            const instance = sellerId ? clientPool.getSeller(sellerId) : null;
+            if (instance) {
+                if (instance.sharedState.isConnected && instance.client?.info) {
+                    socket.emit('ready', { info: instance.client.info, sellerId });
+                } else if (!instance.sharedState.isConnected && instance.sharedState.qrCodeData) {
+                    socket.emit('qr', instance.sharedState.qrCodeData);
+                }
             }
         }
 
@@ -167,15 +178,24 @@ function startServer(clientPool) {
                 socket.join(newSellerId);
                 logger.debug(`[SOCKET] Admin switched to seller room: ${newSellerId}`);
 
-                // Send current state for selected seller
-                const sel = clientPool.getSeller(newSellerId);
-                if (sel) {
-                    if (sel.sharedState.isConnected && sel.client?.info) {
-                        socket.emit('ready', { info: sel.client.info, sellerId: newSellerId });
-                    } else if (sel.sharedState.qrCodeData) {
-                        socket.emit('qr', { sellerId: newSellerId, qr: sel.sharedState.qrCodeData });
-                    } else {
-                        socket.emit('status_change', { status: 'initializing', sellerId: newSellerId });
+                // Auto-start if not running (lazy)
+                if (clientPool.isKnown(newSellerId) && !clientPool.getSeller(newSellerId)) {
+                    logger.info(`[SOCKET] Lazy-starting seller ${newSellerId} (admin switched)`);
+                    socket.emit('status_change', { status: 'initializing', sellerId: newSellerId });
+                    clientPool.ensureStarted(newSellerId).catch(e =>
+                        logger.error(`[SOCKET] Failed to lazy-start ${newSellerId}:`, e.message)
+                    );
+                } else {
+                    // Send current state for selected seller
+                    const sel = clientPool.getSeller(newSellerId);
+                    if (sel) {
+                        if (sel.sharedState.isConnected && sel.client?.info) {
+                            socket.emit('ready', { info: sel.client.info, sellerId: newSellerId });
+                        } else if (sel.sharedState.qrCodeData) {
+                            socket.emit('qr', { sellerId: newSellerId, qr: sel.sharedState.qrCodeData });
+                        } else {
+                            socket.emit('status_change', { status: 'initializing', sellerId: newSellerId });
+                        }
                     }
                 }
             }

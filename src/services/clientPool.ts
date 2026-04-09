@@ -67,11 +67,45 @@ function cleanChromeLocks(authPath: string): void {
 
 class ClientPool {
     private instances: Map<string, SellerInstance> = new Map();
+    private knownSellers: Set<string> = new Set();
+    private startingPromises: Map<string, Promise<void>> = new Map();
     private io: any = null;
     private redlock: any = null;
 
     setIo(io: any) { this.io = io; }
     setRedlock(redlock: any) { this.redlock = redlock; }
+
+    /** Register a seller as known without starting Chrome. */
+    registerSeller(sellerId: string): void {
+        this.knownSellers.add(sellerId);
+        logger.info(`[POOL] Registered seller: ${sellerId} (lazy — Chrome not started)`);
+    }
+
+    /** Get all known seller IDs (registered, whether running or not). */
+    getKnownSellers(): string[] {
+        return Array.from(this.knownSellers);
+    }
+
+    /** Check if a seller is known (registered). */
+    isKnown(sellerId: string): boolean {
+        return this.knownSellers.has(sellerId);
+    }
+
+    /** Start seller if registered but not yet running. Returns immediately if already running. */
+    async ensureStarted(sellerId: string): Promise<void> {
+        if (this.instances.has(sellerId)) return;
+        if (!this.knownSellers.has(sellerId)) {
+            logger.warn(`[POOL] ensureStarted: ${sellerId} is not a known seller`);
+            return;
+        }
+        // Deduplicate concurrent start requests
+        if (this.startingPromises.has(sellerId)) {
+            return this.startingPromises.get(sellerId);
+        }
+        const p = this.startSeller(sellerId).finally(() => this.startingPromises.delete(sellerId));
+        this.startingPromises.set(sellerId, p);
+        return p;
+    }
 
     getSeller(sellerId: string): SellerInstance | undefined {
         return this.instances.get(sellerId);
@@ -350,6 +384,7 @@ class ClientPool {
         }
 
         this.instances.set(sellerId, instance);
+        this.knownSellers.add(sellerId);
 
         // Start initialization
         safeInit().catch(e => logger.error(`[POOL][${sellerId}] Fatal init error:`, e.message));

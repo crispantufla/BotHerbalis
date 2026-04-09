@@ -49,7 +49,7 @@ const RULE_BASE = [
     { id: 'discreto', keywords: ['discreto', 'paquete', 'envuelto', 'que dice la caja', 'se ve que es'], text: 'PAQUETE DISCRETO: Sí, el envío es totalmente discreto, sin marcas ni indicación del contenido.' },
     { id: 'solo_efectivo', keywords: ['qr', 'mercadopago', 'mercadolibre', 'transferencia', 'debito', 'credito', 'cbu', 'alias'], text: 'PAGO SOLO EFECTIVO: Si preguntan por QR, MercadoPago, transferencia, tarjeta, débito o crédito: "El pago es únicamente en efectivo, ya sea cuando recibe a domicilio o cuando retira de la sucursal. No existe la posibilidad de hacer otro medio de pago". NUNCA ofrezcas otro medio.' },
     { id: 'sucursal', keywords: ['retirar en sucursal', 'buscar en correo', 'ir al correo', 'sucursal correo'], text: 'RETIRO EN SUCURSAL: Si preguntan si pueden retirar en persona o en sucursal: "¡Sí! Podés retirar en la sucursal del Correo Argentino. Decime cuál te queda cómoda o lo enviamos a la de tu código postal". En este caso, anotá como domicilio "Retiro en sucursal".' },
-    { id: 'repetido', keywords: ['ya compre', 'volvi a escribir', 'soy cliente', 'otra vez'], text: 'CLIENTE REPETIDO: Si dicen que ya compraron antes, son clientes anteriores o quieren volver a comprar: NO pagan el adicional de $6.000 por contra reembolso. Decíselo como beneficio.' },
+    { id: 'repetido', keywords: ['ya compre', 'volvi a escribir', 'soy cliente', 'otra vez'], text: 'CLIENTE REPETIDO: Si dicen que ya compraron antes, son clientes anteriores o quieren volver a comprar: NO pagan el adicional por contra reembolso. Decíselo como beneficio.' },
     { id: 'muestra', keywords: ['muestra gratis', 'probar', 'regalan'], text: 'MUESTRAS GRATIS: No hay muestras gratis. Recordales que llevamos más de 13 años distribuyendo con más de 70 mil clientes satisfechos.' },
     { id: 'amamantando', keywords: ['amamantando', 'dando la teta', 'lactancia', 'bebe', 'amamantar'], text: 'AMAMANTANDO ESTRICTO: Si la persona está amamantando, NO vendemos. Sin importar la edad del bebé (ni aunque tenga 2 o 3 años). Priorizamos la salud del bebé.' },
     { id: 'pocos_kilos', keywords: ['pocos kilos', 'bajar 2', 'bajar 3', 'bajar 4', 'bajar 5', 'un par de kilos'], text: 'BAJAR POCOS KILOS: Si quieren bajar pocos kilos (3, 5, etc.), SIEMPRE recomendá CÁPSULAS como primera opción. NUNCA recomiendes gotas para poco peso. Cápsulas son lo más efectivo y práctico.' },
@@ -231,7 +231,7 @@ REGLAS DE ESTE PASO:
 - "Lo más efectivo/rápido/mejor": recomendar CÁPSULAS directo.
 - Habla en PASADO ("yo tomaba semillas"): NO es elección actual. "¡Qué bueno que las conocés! Te recomiendo las cápsulas ahora, son lo más efectivo 😊"
 - Si dudan gotas vs cápsulas o tienen pocos kilos: "Las gotas son útiles como mantenimiento por ser extremadamente suaves, pero para tu objetivo te súper recomiendo las cápsulas que van directo a la grasa."
-- Precios: Si piden "precio" genérico: "$37.000 a $69.000". Si insisten/piden todos: dar detalle completo.`;
+- Precios: Si piden "precio" genérico: "$${prices['Semillas']?.['60'] || '36.900'} a $${prices['Gotas']?.['120'] || '68.900'}". Si insisten/piden todos: dar detalle completo.`;
 }
 
 function _getModulePlanChoice(prices: Record<string, any>): string {
@@ -252,7 +252,7 @@ DESCUENTOS POR VOLUMEN (SOLO si preguntan por varias unidades):
 
 ENVÍO: Gratis por Correo Argentino. Demora: 7 a 10 días hábiles (NUNCA digas otro plazo, NUNCA digas "4 a 7" ni ningún otro número). Pago ÚNICAMENTE en efectivo (tanto a domicilio como en sucursal).
 NO aceptamos tarjeta, transferencia ni MercadoPago. No existe posibilidad de otro medio de pago.
-CARGO ADICIONAL: El cargo extra es el costo del servicio de "Contra Reembolso" (pagar al recibir) y SE COBRA IGUAL sea a domicilio o en sucursal del correo. Este costo está BONIFICADO (es GRATIS) para el plan de 120 días. Para el de 60 días tiene un costo (ej: $6.000). Si el cliente elige 60 días y pregunta por retirar en correo para evitar el cargo, explicá muy amablemente esto y ofrecé cambiar al de 120 días para que se lo ahorre. Si elige el de 120 días, confirmale que NO tiene ningún cargo adicional.
+CARGO ADICIONAL: El cargo extra es el costo del servicio de "Contra Reembolso" (pagar al recibir) y SE COBRA IGUAL sea a domicilio o en sucursal del correo. Este costo está BONIFICADO (es GRATIS) para el plan de 120 días. Para el de 60 días tiene un costo de $${prices.adicionalMAX || '6.000'}. Si el cliente elige 60 días y pregunta por retirar en correo para evitar el cargo, explicá muy amablemente esto y ofrecé cambiar al de 120 días para que se lo ahorre. Si elige el de 120 días, confirmale que NO tiene ningún cargo adicional.
 
 EFECTOS: Solo efecto laxante/diurético leve los primeros días. Normal y transitorio. Se va en la primera semana tomando agua.
 
@@ -569,7 +569,7 @@ class AIService {
                 knowledgeContext += `- Productos principales: Cápsulas(prácticas, MAS EFECTIVAS y recomendadas SIEMPRE) y Semillas(naturales).\n`;
                 knowledgeContext += `- Gotas: SOLO ofrecer a >70 años. Si alguien con pocos kilos pide gotas, decile que "son extremadamente suaves" para persuadirlo a elegir Cápsulas.\n`;
                 knowledgeContext += `- Contraindicaciones: solo embarazo y lactancia.NO menores de edad.\n`;
-                knowledgeContext += `- PRECIOS: Si preguntan "precio" en general, decí "$37.000 a $69.000".PERO si preguntan "precio de todos", "lista de precios" o insisten, PASALES TODOS LOS PRECIOS detallados: ${priceString}.\n`;
+                knowledgeContext += `- PRECIOS: Si preguntan "precio" en general, decí "$${priceSem60} a $${priceGotas120}".PERO si preguntan "precio de todos", "lista de precios" o insisten, PASALES TODOS LOS PRECIOS detallados: ${priceString}.\n`;
                 knowledgeContext += `- ENVÍO Y PAGO: Envío gratis por Correo Argentino a todo el país.Solo aceptamos pago en efectivo al recibir(Contra Reembolso).\n`;
             } else if (step === 'waiting_price_confirmation') {
                 knowledgeContext += `- El usuario todavía NO vio precios.Tu trabajo es convencerlo de que quiera verlos.\n`;

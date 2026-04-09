@@ -98,7 +98,11 @@ const CorporateDashboard = () => {
 
     useEffect(() => {
         if (socket) {
-            socket.on('qr', (data) => { setStatus('scan_qr'); setQrData(data); });
+            socket.on('qr', (data) => {
+                setStatus('scan_qr');
+                // Admin socket sends { sellerId, qr }, seller socket sends raw string
+                setQrData(typeof data === 'string' ? data : data?.qr || null);
+            });
             socket.on('ready', () => { setStatus('ready'); setQrData(null); fetchConfig(); });
             socket.on('status_change', ({ status: newStatus }) => {
                 if (newStatus === 'disconnected') {

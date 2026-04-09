@@ -71,16 +71,12 @@ async function boot() {
     // Wire Socket.IO into clientPool so sellers can emit events
     clientPool.registerIo(io);
 
-    // Start sellers sequentially to avoid RAM spikes from concurrent Chrome launches
+    // Register sellers (lazy — Chrome starts only when the user logs in)
     for (const id of sellerIds) {
-        try {
-            await clientPool.startSeller(id);
-        } catch (e: any) {
-            logger.error(`[BOOT] Failed to start seller ${id}:`, e.message);
-        }
+        clientPool.registerSeller(id);
     }
 
-    logger.info('[BOOT] ✅ All sellers started. Platform ready.');
+    logger.info(`[BOOT] ✅ ${sellerIds.length} seller(s) registered (lazy start). Platform ready.`);
 
     // Graceful shutdown
     const _shutdown = async (signal: string, exitCode: number = 0): Promise<void> => {

@@ -1,6 +1,7 @@
 /**
  * messageTemplates.js — Shared message builders to avoid duplication
  */
+import { _getCostoLogistico } from '../flows/utils/pricing';
 
 /**
  * Build the order confirmation message sent to the client.
@@ -57,14 +58,15 @@ function buildConfirmationMessage(state: any): string {
         ? `📅 Envío programado: ${state.postdatado}\n`
         : `✔ Entrega estimada: 7 a 10 días hábiles\n`;
 
+    const costoLog = _getCostoLogistico();
     const isSucursal = state.pendingOrder?.calle?.toLowerCase() === 'a sucursal';
     const deliveryNote = isSucursal
         ? `✔ Retiro en sucursal de Correo Argentino\n` + postdatadoLine + `✔ Pago en efectivo al retirar\n\n` +
-          `Importante:\nEl paquete permanece en sucursal 72 hs.\nEl no retiro genera un costo logístico de $18.000.\n\n` +
+          `Importante:\nEl paquete permanece en sucursal 72 hs.\nEl no retiro genera un costo logístico de $${costoLog}.\n\n` +
           `👉 ¿Me confirmás que podés retirarlo en sucursal dentro de las 72 hs?`
         : `✔ Correo Argentino\n` + postdatadoLine + `✔ Pago en efectivo al recibir\n\n` +
           `Importante:\nSi el cartero no encuentra a nadie,\nel correo puede solicitar retiro en sucursal.\nPlazo: 72 hs.\n\n` +
-          `El rechazo o no retiro genera un costo logístico de $18.000.\n\n` +
+          `El rechazo o no retiro genera un costo logístico de $${costoLog}.\n\n` +
           `👉 El envío va a tu domicilio, pero necesito que me confirmes que en caso de que el correo lo determine, podrás retirarlo en la sucursal dentro de las 72 hs.`;
 
     return `📦 CONFIRMACIÓN DE ENVÍO\n\n` +
