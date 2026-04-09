@@ -1,19 +1,20 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../config/axios';
 import { useSocket } from '../context/SocketContext';
-import { useSeller } from '../context/SellerContext';
+import { useAuth } from '../context/AuthContext';
 import { useEffect } from 'react';
 
 export const useOrders = (page = 1, limit = 50) => {
     const queryClient = useQueryClient();
     const { socket } = useSocket();
-    const { selectedSellerId } = useSeller();
+    const { isAdmin } = useAuth();
 
-    // Fetch Orders — include selectedSellerId in key so switching seller refetches
+    // Admin always sees ALL orders (panel filter handles narrowing down)
     const query = useQuery({
-        queryKey: ['orders', page, limit, selectedSellerId],
+        queryKey: ['orders', page, limit],
         queryFn: async () => {
-            const res = await api.get(`/api/orders?page=${page}&limit=${limit}`);
+            const headers = isAdmin ? { 'x-seller-id': '' } : {};
+            const res = await api.get(`/api/orders?page=${page}&limit=${limit}`, { headers });
             if (res.data.data) {
                 return {
                     orders: res.data.data,
