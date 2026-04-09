@@ -25,8 +25,9 @@ let _pruneIntervalId: ReturnType<typeof setInterval> | null = setInterval(() => 
 _pruneIntervalId.unref();
 
 interface PauseServiceDeps {
-    sharedState: { pausedUsers: Set<string> };
+    sharedState: { pausedUsers: Set<string>; sellerId?: string };
     notifyAdmin?: (reason: string, userId: string, details?: string) => Promise<any>;
+    instanceId?: string;
 }
 
 /**
@@ -47,7 +48,7 @@ export async function pauseUser(
     // 2. Persist to DB
     try {
         const { prisma } = require('../../db');
-        const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
+        const INSTANCE_ID = deps.instanceId || deps.sharedState?.sellerId || process.env.INSTANCE_ID || 'default';
         const cleanPhone = _cleanPhone(userId);
 
         await prisma.user.upsert({
@@ -84,13 +85,13 @@ export async function pauseUser(
 /**
  * Unpause a user, clearing DB fields and in-memory set.
  */
-export async function unpauseUser(userId: string, sharedState: { pausedUsers: Set<string> }): Promise<void> {
+export async function unpauseUser(userId: string, sharedState: { pausedUsers: Set<string>; sellerId?: string }, instanceId?: string): Promise<void> {
     sharedState.pausedUsers.delete(userId);
     adminNotifiedAt.delete(userId);
 
     try {
         const { prisma } = require('../../db');
-        const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
+        const INSTANCE_ID = instanceId || sharedState?.sellerId || process.env.INSTANCE_ID || 'default';
         const cleanPhone = _cleanPhone(userId);
 
         await prisma.user.updateMany({
@@ -109,11 +110,12 @@ const STALE_PAUSE_DAYS = 7;
  * Users paused more than STALE_PAUSE_DAYS ago are skipped and cleaned from DB.
  */
 export async function restorePausedUsersFromDB(
-    sharedState: { pausedUsers: Set<string> }
+    sharedState: { pausedUsers: Set<string> },
+    instanceId?: string
 ): Promise<void> {
     try {
         const { prisma } = require('../../db');
-        const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
+        const INSTANCE_ID = instanceId || process.env.INSTANCE_ID || 'default';
 
         const cutoff = new Date(Date.now() - STALE_PAUSE_DAYS * 24 * 60 * 60 * 1000);
 
@@ -142,14 +144,14 @@ export async function restorePausedUsersFromDB(
 /**
  * Get all currently paused users with their reason (for the dashboard panel).
  */
-export async function getPausedUsersWithDetails(): Promise<Array<{
+export async function getPausedUsersWithDetails(instanceId?: string | null): Promise<Array<{
     phone: string;
     pauseReason: string;
     pausedAt: Date;
 }>> {
     try {
         const { prisma } = require('../../db');
-        const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
+        const INSTANCE_ID = instanceId || process.env.INSTANCE_ID || 'default';
 
         return await prisma.user.findMany({
             where: { instanceId: INSTANCE_ID, pausedAt: { not: null } },

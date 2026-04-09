@@ -124,7 +124,7 @@ function startServer(clientPool) {
         }
 
         if (SOCKET_API_KEY && apiKey === SOCKET_API_KEY) {
-            socket.data.account = { role: 'admin', sellerId: process.env.INSTANCE_ID || 'default', accountId: 'legacy' };
+            socket.data.account = { role: 'admin', sellerId: null, accountId: 'legacy' };
             return next();
         }
 

@@ -18,6 +18,7 @@ interface SalesFlowDependencies {
     config?: BotConfig;
     effectiveScript?: string;
     connectedAt?: number; // Unix timestamp (seconds) of when the bot connected — used to detect pre-existing chats
+    sellerId?: string; // seller identity for scoped DB queries
 }
 
 // Ad source detection from pre-filled Click-to-WhatsApp messages (literal match)
@@ -76,12 +77,13 @@ export async function processSalesFlow(
         };
 
         // --- CHECK 1: Cross-reference against Orders DB ---
-        // If this phone has an existing order, they're a past customer — route to post-sale
+        // If this phone has an existing order under this seller, they're a past customer — route to post-sale
         try {
             const { prisma } = require('../../db');
             const cleanPhone = _cleanPhone(userId);
+            const instanceId = dependencies.sellerId || dependencies.sharedState?.sellerId || process.env.INSTANCE_ID || 'default';
             const existingOrder = await prisma.order.findFirst({
-                where: { userPhone: cleanPhone }, // cross-instance: any prior order from this phone
+                where: { userPhone: cleanPhone, instanceId },
                 orderBy: { createdAt: 'desc' }
             });
 
@@ -101,12 +103,12 @@ export async function processSalesFlow(
         if (userState[userId].step !== 'completed') {
             try {
                 const { prisma } = require('../../db');
-                const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
+                const INSTANCE_ID = dependencies.sellerId || dependencies.sharedState?.sellerId || process.env.INSTANCE_ID || 'default';
                 const cleanPhone = _cleanPhone(userId);
 
-                // Grab the last 15 messages from DB locally (cross-instance)
+                // Grab the last 15 messages from DB for this seller
                 let dbMessages = await prisma.chatLog.findMany({
-                    where: { userPhone: cleanPhone },
+                    where: { userPhone: cleanPhone, instanceId: INSTANCE_ID },
                     orderBy: { timestamp: 'desc' },
                     take: 15
                 });

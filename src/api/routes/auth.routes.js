@@ -52,7 +52,7 @@ module.exports = (client, sharedState) => {
             const legacyPayload = {
                 id: 'legacy-admin',
                 role: 'admin',
-                sellerId: process.env.INSTANCE_ID || 'default',
+                sellerId: null, // admin without a specific seller — sees all
             };
             const token = signToken(legacyPayload);
             return res.json({
@@ -62,7 +62,7 @@ module.exports = (client, sharedState) => {
                     id: 'legacy-admin',
                     name: validUser,
                     role: 'admin',
-                    sellerId: process.env.INSTANCE_ID || 'default',
+                    sellerId: null,
                 },
             });
         }

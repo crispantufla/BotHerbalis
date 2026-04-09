@@ -586,10 +586,11 @@ module.exports = (clientPool) => {
 
             const { pauseUser, unpauseUser } = require('../../services/pauseService');
 
+            const instanceId = getInstanceId(req);
             if (paused) {
-                await pauseUser(chatId, '⏸️ Pausado manualmente por el panel', { sharedState: ss });
+                await pauseUser(chatId, '⏸️ Pausado manualmente por el panel', { sharedState: ss, instanceId });
             } else {
-                await unpauseUser(chatId, ss);
+                await unpauseUser(chatId, ss, instanceId);
             }
 
             logger.info(`[API] toggle-bot: ${originalChatId}${chatId !== originalChatId ? ` → ${chatId}` : ''} → ${paused ? 'PAUSED' : 'UNPAUSED'} (via dashboard)`);

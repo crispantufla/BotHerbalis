@@ -27,6 +27,7 @@ let _autoApproveStartedAt = 0;
 const AUTO_APPROVE_MAX_DURATION_MS = 5 * 60 * 1000;
 
 interface SchedulerSharedState {
+    sellerId?: string;  // seller identity for scoped DB queries
     userState: Record<string, UserState>;
     pausedUsers: Set<string>;
     [key: string]: any;
@@ -595,7 +596,7 @@ function startScheduler(sharedState: SchedulerSharedState, dependencies: Schedul
 async function snapshotDailyStats(sharedState?: SchedulerSharedState) {
     try {
         const { prisma } = require('../../db');
-        const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
+        const INSTANCE_ID = sharedState?.sellerId || process.env.INSTANCE_ID || 'default';
         // Use Argentina timezone so the date is correct regardless of server location
         const argNow = toZonedTime(new Date(), TIMEZONE);
         const startOfDay = new Date(argNow);

@@ -250,7 +250,7 @@ export async function handleAdminCommand(
     if (lowerMsg === '!stats' || lowerMsg === '!estadisticas' || lowerMsg === '!ventas') {
         try {
             const { prisma } = require('../../db');
-            const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
+            const INSTANCE_ID = sharedState?.sellerId || process.env.INSTANCE_ID || 'default';
             const startOfDay = new Date();
             startOfDay.setHours(0, 0, 0, 0);
 
@@ -318,7 +318,7 @@ export async function handleAdminCommand(
     if (lowerMsg.startsWith('!pedido')) {
         try {
             const { prisma } = require('../../db');
-            const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
+            const INSTANCE_ID = sharedState?.sellerId || process.env.INSTANCE_ID || 'default';
             const parts = commandText.trim().split(/\s+/);
             const phoneArg = parts[1] ? parts[1].replace(/\D/g, '') : null;
 
@@ -356,7 +356,7 @@ export async function handleAdminCommand(
 
         try {
             const { prisma } = require('../../db');
-            const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
+            const INSTANCE_ID = sharedState?.sellerId || process.env.INSTANCE_ID || 'default';
 
             const order = await prisma.order.findFirst({
                 where: { userPhone: { contains: phoneArg }, instanceId: INSTANCE_ID, status: { not: 'Cancelado' } },
@@ -400,7 +400,7 @@ export async function handleAdminCommand(
         // Clear DB state
         try {
             const { prisma } = require('../../db');
-            const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
+            const INSTANCE_ID = sharedState?.sellerId || process.env.INSTANCE_ID || 'default';
             const phoneStr = targetChat.replace('@c.us', '');
             await prisma.user.updateMany({
                 where: { phone: phoneStr, instanceId: INSTANCE_ID },
@@ -762,7 +762,7 @@ export async function handleAdminCommand(
         const cleanPhone = actualTarget.split('@')[0];
         try {
             const { prisma } = require('../../db');
-            const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
+            const INSTANCE_ID = sharedState?.sellerId || process.env.INSTANCE_ID || 'default';
             const existingOrder = await prisma.order.findFirst({
                 where: { userPhone: cleanPhone, status: 'Pendiente', instanceId: INSTANCE_ID },
                 orderBy: { createdAt: 'desc' }

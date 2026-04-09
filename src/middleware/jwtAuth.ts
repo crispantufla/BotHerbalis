@@ -68,11 +68,11 @@ export function jwtAuthMiddleware(req: any, res: any, next: any) {
     const API_KEY = process.env.API_KEY;
     const apiKey = req.headers['x-api-key'];
     if (API_KEY && apiKey && apiKey === API_KEY) {
-        // Legacy API key auth — treat as admin with the current INSTANCE_ID
+        // Legacy API key auth — treat as admin with no specific seller (sees all)
         req.account = {
             id: 'legacy',
             role: 'admin',
-            sellerId: process.env.INSTANCE_ID || 'default',
+            sellerId: null,
         };
         return next();
     }

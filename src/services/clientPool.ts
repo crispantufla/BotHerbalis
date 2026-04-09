@@ -144,8 +144,8 @@ class ClientPool {
         await stateManager.loadState();
         stateManager.loadKnowledge();
 
-        // Restore paused users
-        await restorePausedUsersFromDB({ pausedUsers: stateManager.pausedUsers }).catch((e: any) =>
+        // Restore paused users for this specific seller
+        await restorePausedUsersFromDB({ pausedUsers: stateManager.pausedUsers }, sellerId).catch((e: any) =>
             logger.error(`[POOL][${sellerId}] Failed to restore paused users:`, e.message)
         );
 
@@ -181,6 +181,7 @@ class ClientPool {
 
         // SharedState
         const sharedState: any = {
+            sellerId,  // seller identity — used by services (pauseService, adminService, etc.)
             get userState() { return stateManager.userState; },
             get chatResets() { return stateManager.chatResets; },
             get pausedUsers() { return stateManager.pausedUsers; },

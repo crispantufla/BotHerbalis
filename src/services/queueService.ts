@@ -54,7 +54,8 @@ export function createWorker(sellerId: string, dependencies: any): Worker {
                 sendMessageWithDelay: (id: string, text: string) => sendMessageWithDelay(id, text, startTime),
                 logAndEmit, saveOrderToLocal, cancelLatestOrder, sharedState, config,
                 effectiveScript,
-                connectedAt: typeof connectedAt === 'function' ? connectedAt() : connectedAt
+                connectedAt: typeof connectedAt === 'function' ? connectedAt() : connectedAt,
+                sellerId,
             });
             logger.info(`[BULLMQ][${sellerId}] ✅ Job ${job.id} completed`);
         } catch (error: any) {
