@@ -164,7 +164,7 @@ const PaymentsView = ({ onGoToChat }) => {
     const [filter, setFilter] = useState('all');
 
     // Map instanceId → seller account name (for admin badge)
-    const sellerIdToName = Object.fromEntries((sellers || []).map(s => [s.sellerId, s.name]));
+    const sellerIdToName = Object.fromEntries((sellers || []).map(s => [s.sellerId, s.name.charAt(0).toUpperCase() + s.name.slice(1)]));
 
     // Generate link state
     const [mpAmount, setMpAmount] = useState('');

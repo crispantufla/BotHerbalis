@@ -328,7 +328,7 @@ const AccountsView = () => {
                                         {/* Info */}
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2">
-                                                <span className="font-semibold text-slate-800 dark:text-slate-100 text-sm truncate">{acc.name}</span>
+                                                <span className="font-semibold text-slate-800 dark:text-slate-100 text-sm truncate capitalize">{acc.name}</span>
                                                 {!acc.isActive && <span className="text-xs bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full">Inactivo</span>}
                                             </div>
                                             {acc.sellerId && (
@@ -410,7 +410,7 @@ const AccountsView = () => {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2">
-                                            <span className="font-semibold text-slate-800 dark:text-slate-100 text-sm truncate">{acc.name}</span>
+                                            <span className="font-semibold text-slate-800 dark:text-slate-100 text-sm truncate capitalize">{acc.name}</span>
                                             <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium">Admin</span>
                                             {!acc.isActive && <span className="text-xs bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full">Inactivo</span>}
                                         </div>

@@ -36,7 +36,7 @@ const SellerSelector = () => {
             >
                 <Users className="w-4 h-4 text-indigo-500" />
                 <span className="max-w-[140px] truncate">
-                    {selectedSeller ? selectedSeller.name : 'Todos los vendedores'}
+                    {selectedSeller ? selectedSeller.name.charAt(0).toUpperCase() + selectedSeller.name.slice(1) : 'Todos los vendedores'}
                 </span>
                 {selectedSeller && (
                     <span className={`w-2 h-2 rounded-full ${statusDot(selectedSeller)} flex-shrink-0`} />
@@ -67,7 +67,7 @@ const SellerSelector = () => {
                         >
                             <span className={`w-2 h-2 rounded-full flex-shrink-0 ${statusDot(seller)}`} />
                             <div className="flex-1 text-left min-w-0">
-                                <div className="truncate">{seller.name}</div>
+                                <div className="truncate capitalize">{seller.name}</div>
                                 {seller.phoneNumber && (
                                     <div className="text-xs text-slate-400 dark:text-slate-500 truncate">+{seller.phoneNumber}</div>
                                 )}

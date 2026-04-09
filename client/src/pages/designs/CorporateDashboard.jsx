@@ -460,7 +460,7 @@ const CorporateDashboard = () => {
 
                         <div className="flex items-center gap-3 pl-4 lg:pl-6 border-l border-slate-200 dark:border-slate-700/60 ml-2">
                             <div className="text-right hidden md:block">
-                                <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{user?.name || 'Usuario'}</p>
+                                <p className="text-sm font-bold text-slate-800 dark:text-slate-100 capitalize">{user?.name || 'Usuario'}</p>
                                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium capitalize">{user?.role || 'seller'}</p>
                             </div>
                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-md border border-white/20 ${isAdmin ? 'bg-gradient-to-br from-amber-500 to-orange-500 shadow-amber-500/30' : 'bg-gradient-to-br from-indigo-600 to-purple-600 shadow-indigo-500/30'}`}>

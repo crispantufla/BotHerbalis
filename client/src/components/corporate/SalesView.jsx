@@ -221,7 +221,8 @@ Teléfono: ${phoneDisplay}`;
 
     // Filters logic
     // Admin: filter by seller account (instanceId → name). Seller: filter by phone number (order.seller).
-    const sellerIdToName = Object.fromEntries((sellers || []).map(s => [s.sellerId, s.name]));
+    const capitalize = (str) => str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
+    const sellerIdToName = Object.fromEntries((sellers || []).map(s => [s.sellerId, capitalize(s.name)]));
 
     const uniqueFilterOptions = isAdmin
         ? Array.from(new Set(orders.map(o => o.instanceId).filter(Boolean)))
@@ -342,7 +343,7 @@ Teléfono: ${phoneDisplay}`;
                                 >
                                     {['Todos', ...uniqueFilterOptions].map(opt => (
                                         <option key={opt} value={opt}>
-                                            {opt === 'Todos' ? 'Todos' : isAdmin ? (sellerIdToName[opt] || opt) : `+${opt.replace(/\D/g, '')}`}
+                                            {opt === 'Todos' ? 'Todos' : isAdmin ? (sellerIdToName[opt] || capitalize(opt)) : `+${opt.replace(/\D/g, '')}`}
                                         </option>
                                     ))}
                                 </select>
@@ -358,7 +359,7 @@ Teléfono: ${phoneDisplay}`;
                                         onClick={() => setSellerFilter(opt)}
                                         className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${sellerFilter === opt ? 'bg-blue-600 text-white shadow-md' : 'bg-transparent text-slate-600 hover:bg-white'}`}
                                     >
-                                        {opt === 'Todos' ? 'Todos' : isAdmin ? (sellerIdToName[opt] || opt) : `+${opt.replace(/\D/g, '')}`}
+                                        {opt === 'Todos' ? 'Todos' : isAdmin ? (sellerIdToName[opt] || capitalize(opt)) : `+${opt.replace(/\D/g, '')}`}
                                     </button>
                                 ))}
                             </div>
