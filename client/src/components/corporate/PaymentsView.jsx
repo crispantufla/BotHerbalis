@@ -175,14 +175,16 @@ const PaymentsView = ({ onGoToChat }) => {
     const fetchPayments = useCallback(async (f = filter) => {
         try {
             const params = f !== 'all' ? `?status=${f}` : '';
-            const res = await api.get(`/api/payments${params}`);
+            // Admin sees ALL payments regardless of selected seller
+            const headers = isAdmin ? { 'x-seller-id': '' } : {};
+            const res = await api.get(`/api/payments${params}`, { headers });
             setPayments(res.data.payments || []);
         } catch (e) {
             toast.error('Error cargando pagos');
         } finally {
             setLoading(false);
         }
-    }, [filter]);
+    }, [filter, isAdmin]);
 
     useEffect(() => { fetchPayments(); }, []);
 

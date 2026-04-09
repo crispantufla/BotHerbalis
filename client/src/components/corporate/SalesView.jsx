@@ -225,7 +225,7 @@ Teléfono: ${phoneDisplay}`;
     const sellerIdToName = Object.fromEntries((sellers || []).map(s => [s.sellerId, capitalize(s.name)]));
 
     const uniqueFilterOptions = isAdmin
-        ? Array.from(new Set(orders.map(o => o.instanceId).filter(Boolean)))
+        ? (sellers || []).map(s => s.sellerId)
         : Array.from(new Set(orders.map(o => o.seller).filter(Boolean)));
 
     const filteredOrders = orders.filter(order => {

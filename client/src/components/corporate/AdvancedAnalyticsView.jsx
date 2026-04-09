@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../config/axios';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 import { useSeller } from '../../context/SellerContext';
+import { capitalize } from '../../utils/format';
 import {
     LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
     XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, ComposedChart
@@ -25,9 +27,12 @@ const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
 
 const AdvancedAnalyticsView = () => {
     const { isDark } = useTheme();
-    const { selectedSellerId } = useSeller();
+    const { isAdmin } = useAuth();
+    const { sellers } = useSeller();
     const [loading, setLoading] = useState(true);
     const [daysAgoToFetch, setDaysAgoToFetch] = useState(30);
+    // Admin-only local seller filter — "all" means aggregated across all sellers
+    const [analyticsSellerFilter, setAnalyticsSellerFilter] = useState('all');
     const [data, setData] = useState({
         overview: null,
         products: { popularity: [], duration: [] },
@@ -40,14 +45,18 @@ const AdvancedAnalyticsView = () => {
         try {
             setLoading(true);
 
-            // The x-seller-id header (injected by axios interceptor) handles seller scoping.
-            // Admins without a selected seller see aggregated data for all sellers.
+            // Admin can filter by seller or see all; seller always sees own data
+            const headers = {};
+            if (isAdmin) {
+                headers['x-seller-id'] = analyticsSellerFilter === 'all' ? '' : analyticsSellerFilter;
+            }
+            const opts = { headers };
             const [overviewRes, productsRes, demoRes, chartsRes, adPerfRes] = await Promise.all([
-                api.get(`/api/analytics/overview?days=${daysAgoToFetch}`),
-                api.get(`/api/analytics/products?days=${daysAgoToFetch}`),
-                api.get(`/api/analytics/demographics?days=${daysAgoToFetch}`),
-                api.get('/api/stats/charts'),
-                api.get(`/api/analytics/ad-performance?days=${daysAgoToFetch}`).catch(() => ({ data: [] }))
+                api.get(`/api/analytics/overview?days=${daysAgoToFetch}`, opts),
+                api.get(`/api/analytics/products?days=${daysAgoToFetch}`, opts),
+                api.get(`/api/analytics/demographics?days=${daysAgoToFetch}`, opts),
+                api.get('/api/stats/charts', opts),
+                api.get(`/api/analytics/ad-performance?days=${daysAgoToFetch}`, opts).catch(() => ({ data: [] }))
             ]);
 
             setData({
@@ -67,7 +76,7 @@ const AdvancedAnalyticsView = () => {
 
     useEffect(() => {
         fetchAllData();
-    }, [daysAgoToFetch, selectedSellerId]);
+    }, [daysAgoToFetch, analyticsSellerFilter]);
 
     // Custom Tooltip for charts
     const CustomTooltip = ({ active, payload, label }) => {
@@ -155,6 +164,31 @@ const AdvancedAnalyticsView = () => {
                                 </button>
                             ))}
                         </div>
+                        {isAdmin && sellers.length > 0 && (
+                            <div className={`flex p-1 rounded-xl border w-full sm:w-auto overflow-x-auto ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+                                <button
+                                    onClick={() => setAnalyticsSellerFilter('all')}
+                                    className={`flex-shrink-0 px-2 sm:px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${analyticsSellerFilter === 'all'
+                                        ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300'
+                                        : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700'
+                                        }`}
+                                >
+                                    Todos
+                                </button>
+                                {sellers.map(s => (
+                                    <button
+                                        key={s.sellerId}
+                                        onClick={() => setAnalyticsSellerFilter(s.sellerId)}
+                                        className={`flex-shrink-0 px-2 sm:px-4 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${analyticsSellerFilter === s.sellerId
+                                            ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300'
+                                            : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700'
+                                            }`}
+                                    >
+                                        {capitalize(s.name)}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                         <button
                             onClick={fetchAllData}
                             className={`self-end sm:self-auto p-2 rounded-xl border transition-colors ${isDark ? 'bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-300' : 'bg-white border-slate-200 hover:bg-slate-100 text-slate-600 shadow-sm'}`}

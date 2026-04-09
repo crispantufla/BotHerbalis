@@ -1,6 +1,6 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _formatMessage } from '../utils/messages';
-import { _setStep, _maybeUpsell } from '../utils/flowHelpers';
+import { _setStep, _maybeUpsell, _pauseAndAlert } from '../utils/flowHelpers';
 import logger from '../../utils/logger';
 
 export async function handleWaitingWeight(
@@ -37,7 +37,11 @@ export async function handleWaitingWeight(
         logger.info(`[LOGIC] Implicitly detected product: ${implicitProduct}`);
     }
 
-    const isRefusal = /\b(no (quiero|voy|puedo)|prefiero no|que tenes|mostrame)\b/i.test(normalizedText);
+    // Hard rejection = not interested in the product at all → pause & alert admin
+    const isHardRejection = /\b(no (quiero|me interesa)\s*(nada|comprar|saber)?|callate|callate|dejame|basta|no molest|spam)\b/i.test(normalizedText)
+        && /\b(nada|comprar|saber|callate|dejame|basta|molest|spam|paz)\b/i.test(normalizedText);
+    // Soft refusal = doesn't want to answer weight specifically → skip to preference
+    const isRefusal = !isHardRejection && /\b(no (voy|puedo)|prefiero no|que tenes|mostrame)\b/i.test(normalizedText);
 
     if (hasNumber && hasQuestion && !isVeryLongMessage) {
         // User gave weight AND asked a health/product question — extract weight but respond to the concern
@@ -108,6 +112,16 @@ export async function handleWaitingWeight(
     } else {
         if (!hasQuestion) {
             (currentState as any).weightRefusals = ((currentState as any).weightRefusals || 0) + 1;
+        }
+
+        if (isHardRejection) {
+            logger.info(`[REJECTION] User ${userId} explicitly rejected at weight step. Pausing.`);
+            const rejectMsg = '¡Disculpá la molestia! Si en algún momento necesitás algo, acá estamos 😊';
+            currentState.history.push({ role: 'bot', content: rejectMsg, timestamp: Date.now() });
+            saveState(userId);
+            await sendMessageWithDelay(userId, rejectMsg);
+            await _pauseAndAlert(userId, currentState, dependencies, text, 'El cliente rechazó la conversación explícitamente.');
+            return { matched: true };
         }
 
         if (isRefusal || (currentState as any).weightRefusals > 2) {
