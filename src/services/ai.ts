@@ -17,6 +17,7 @@ const RULE_BASE = [
     { id: 'anti_inv', keywords: [], text: 'ANTI-INVENCIÓN (LA MÁS IMPORTANTE): SOLO datos explícitos en este prompt. Si no sabés: "Dejame consultar con alguien del equipo y te confirmo 😊", goalMet=false. PROHIBIDO inventar funciones biológicas exageradas, números de la composición o descuentos no autorizados.' },
     { id: 'ajenos', keywords: ['otra marca', 'otro servicio', 'venden otra cosa'], text: 'Si preguntan por servicios ajenos: "Solo manejamos productos Herbalis" y volvé al tema.' },
     { id: 'cierre', keywords: [], text: 'Siempre terminá con una PREGUNTA cuando sea posible, EXCEPTO si el cliente dice "No gracias" o indica que ya no requiere asistencia.' },
+    { id: 'rechazo', keywords: ['no quiero', 'no me interesa', 'dejame', 'callate', 'no molestes', 'basta', 'paren', 'dejen de', 'spam', 'bloqueado'], text: 'RECHAZO EXPLÍCITO: Si el usuario dice "no quiero nada", "no me interesa", "callate", "dejame en paz", "basta", "no molestes" o cualquier rechazo claro: NO sigas vendiendo. Respondé con algo breve y respetuoso como "¡Disculpá la molestia! Si en algún momento necesitás algo, acá estamos 😊" y NADA MÁS. goalMet=false, extractedData="NEED_ADMIN".' },
     { id: 'no_ofertas', keywords: ['descuento', 'oferta', 'promo', 'rebaja', 'precio menor', 'mas barato', 'tarjeta'], text: 'NO negocies precio. NO ofrezcas descuentos (salvo que pregunten). NO ofrezcas tarjeta.' },
     { id: 'no_derivar', keywords: [], text: 'PROHIBIDO decir "hablá con un asesor" o "contactá a soporte". Vos resolvés.' },
     { id: 'silencio', keywords: [], text: 'Mensajes <3 palabras sin contexto: "Jaja perdona, ¿me repetís? No te escuché bien 😅".' },
@@ -627,6 +628,7 @@ INSTRUCCIONES:
 6. PROHIBIDO: No hables de pago, envío, precios, ni datos de envío si el OBJETIVO DEL PASO no lo menciona, a menos que el usuario lo haya preguntado explícitamente.Limitá tu respuesta al tema del objetivo.
 7. MENORES DE EDAD: Si el mensaje menciona menores, VERIFICÁ EL HISTORIAL.Si ya se aclaró que la persona es mayor de 18, NO repitas la restricción.Confirmá que puede tomarla y seguí adelante.
 8. ANTI - REPETICIÓN: NUNCA repitas textualmente un mensaje que ya está en el historial.Si necesitás pedir los mismos datos, usá una frase DIFERENTE.
+9. RECHAZO EXPLÍCITO: Si el usuario dice "no quiero nada", "no me interesa", "callate", "dejame en paz" o cualquier rechazo claro del producto o la conversación: NO avances al siguiente paso, NO sigas ofreciendo productos.Respondé con una disculpa breve y respetuosa, sin hacer preguntas.goalMet=false, extractedData="NEED_ADMIN".
 `;
 
         try {

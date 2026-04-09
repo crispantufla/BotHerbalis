@@ -331,6 +331,12 @@ export async function processSalesFlow(
                 saveState(userId);
             }
 
+            if (botMsg.includes('Disculpá la molestia') || botMsg.includes('Disculpa la molestia') || botMsg.includes('Perdón por la molestia')) {
+                logger.info(`[REJECTION] Client explicitly rejected conversation for ${userId}. Pausing.`);
+                await _pauseAndAlert(userId, currentState, dependencies, text, 'El cliente rechazó la conversación explícitamente ("no quiero nada", "no me interesa", etc.).');
+                saveState(userId);
+            }
+
             if (botMsg.includes('Pensalo tranquilo y cuando estés 100% segura retomamos el pedido')) {
                 logger.info(`[INDECISION PAUSE] Intercepted AI indecision limit for user ${userId}. Halting flow.`);
                 await _pauseAndAlert(userId, currentState, dependencies, text, 'El cliente cruzó el umbral de indecisión/cambios. Pausa preventiva.');
