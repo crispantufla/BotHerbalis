@@ -320,16 +320,15 @@ module.exports = (clientPool) => {
             const localMessagesPromise = getLocalHistory(chatId, resetAt, req.sellerId);
 
             try {
-                // Retry loop for waitForChatLoading race condition in whatsapp-web.js
                 let waMessages = null;
-                for (let attempt = 1; attempt <= 3; attempt++) {
+                for (let attempt = 1; attempt <= 2; attempt++) {
                     try {
                         const chat = await withTimeout(cl?.getChatById(chatId), 3000, 'Timeout getting chat history');
-                        waMessages = await withTimeout(chat?.fetchMessages({ limit: 50 }), 6000, 'Timeout fetching history messages');
-                        break; // success
+                        waMessages = await withTimeout(chat?.fetchMessages({ limit: 20 }), 5000, 'Timeout fetching history messages');
+                        break;
                     } catch (retryErr) {
-                        if (attempt < 3 && retryErr?.message?.includes('waitForChatLoading')) {
-                            await new Promise(r => setTimeout(r, 1000 * attempt));
+                        if (attempt < 2 && retryErr?.message?.includes('waitForChatLoading')) {
+                            await new Promise(r => setTimeout(r, 1500));
                         } else {
                             throw retryErr;
                         }

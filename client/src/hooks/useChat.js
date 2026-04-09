@@ -60,6 +60,7 @@ export const useChat = (selectedChatId) => {
             return res.data;
         },
         enabled: !!selectedChatId,
+        staleTime: 60 * 1000, // consider cached result fresh for 1 min — re-opening same chat is instant
     });
 
     const [messages, setMessages] = useState([]);
