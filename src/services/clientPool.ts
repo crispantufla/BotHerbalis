@@ -378,10 +378,18 @@ class ClientPool {
                     await new Promise(r => setTimeout(r, 5000 * attempt));
                     return safeInit(attempt + 1);
                 } else {
-                    logger.error(`[POOL][${sellerId}] All init attempts failed. Bot offline.`);
+                    // All attempts failed — wipe corrupt session so next try starts fresh
+                    logger.error(`[POOL][${sellerId}] All init attempts failed. Wiping session for clean retry...`);
+                    try { fs.rmSync(authPath, { recursive: true, force: true }); } catch (e) { /* ignore */ }
+                    // Remove from instances so ensureStarted can retry later
+                    pool.instances.delete(sellerId);
+                    try { await shutdownSellerQueue(queue, worker); } catch (e) { /* ignore */ }
                 }
             }
         }
+
+        // Keep reference to pool for safeInit cleanup
+        const pool = this;
 
         this.instances.set(sellerId, instance);
         this.knownSellers.add(sellerId);

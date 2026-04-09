@@ -303,14 +303,20 @@ module.exports = (clientPool) => {
         try {
             const sellerId = getInstanceId(req);
 
-            // If seller not running yet (lazy start), start it to generate QR
+            // If seller not running (failed init or never started), wipe session and start fresh
             if (!req.sellerInstance) {
                 if (clientPool.isKnown(sellerId)) {
-                    logger.info(`[WHATSAPP] Seller ${sellerId} not running — lazy-starting for QR...`);
+                    logger.info(`[WHATSAPP] Seller ${sellerId} not running — wiping session & starting fresh...`);
+                    // Wipe potentially corrupt session
+                    const rootDataDir = process.env.DATA_DIR || (process.env.NODE_ENV === 'production'
+                        ? path.join(__dirname, '../../data') : path.join(__dirname, '../../..'));
+                    const authDir = path.join(rootDataDir, sellerId, '.wwebjs_auth');
+                    try { if (fs.existsSync(authDir)) fs.rmSync(authDir, { recursive: true, force: true }); } catch (e) { /* ignore */ }
+
                     clientPool.ensureStarted(sellerId).catch(e =>
                         logger.error(`[WHATSAPP] Failed to start ${sellerId}:`, e.message)
                     );
-                    return res.json({ success: true, message: 'Iniciando sesión...' });
+                    return res.json({ success: true, message: 'Generando QR...' });
                 }
                 return res.status(404).json({ error: 'Seller no registrado' });
             }
