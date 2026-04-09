@@ -30,10 +30,19 @@ function requireSellerInstance(req, res, next) {
 
 /**
  * resolveInstanceId — returns sellerId for DB queries.
- * Falls back to env INSTANCE_ID for backward compat.
+ * Returns null when admin has no seller selected (= "all sellers" view).
  */
 function getInstanceId(req) {
-    return req.sellerId || process.env.INSTANCE_ID || 'default';
+    return req.sellerId || null;
 }
 
-module.exports = { withSeller, requireSellerInstance, getInstanceId };
+/**
+ * isOwnerOrAdmin — ownership check for write operations.
+ * Admins can operate on any record; sellers only on their own.
+ */
+function isOwnerOrAdmin(req, recordInstanceId) {
+    if (req.account?.role === 'admin') return true;
+    return recordInstanceId === getInstanceId(req);
+}
+
+module.exports = { withSeller, requireSellerInstance, getInstanceId, isOwnerOrAdmin };

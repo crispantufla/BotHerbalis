@@ -28,7 +28,7 @@ const statusUpdateSchema = z.object({
 
 module.exports = (clientPool) => {
     const router = express.Router();
-    const { withSeller, getInstanceId } = require('./routeHelpers');
+    const { withSeller, getInstanceId, isOwnerOrAdmin } = require('./routeHelpers');
 
     // Access io dynamically via the seller's sharedState
     const io = (req) => req.sellerInstance?.sharedState?.io || null;
@@ -79,6 +79,7 @@ module.exports = (clientPool) => {
                 const user = userMap.get(`${o.userPhone}_${o.instanceId}`);
                 return {
                     id: o.id,
+                    instanceId: o.instanceId,
                     cliente: o.userPhone,
                     status: o.status,
                     producto: o.products,
@@ -127,7 +128,7 @@ module.exports = (clientPool) => {
             // Verify order belongs to this seller
             const existing = await prisma.order.findUnique({ where: { id }, select: { instanceId: true } });
             if (!existing) return res.status(404).json({ error: 'Orden no encontrada' });
-            if (existing.instanceId !== getInstanceId(req)) return res.status(403).json({ error: 'No autorizado' });
+            if (!isOwnerOrAdmin(req, existing.instanceId)) return res.status(403).json({ error: 'No autorizado' });
 
             const dataToUpdate = {};
             if (nombre !== undefined) dataToUpdate.nombre = nombre;
@@ -191,7 +192,7 @@ module.exports = (clientPool) => {
             // Verify order belongs to this seller
             const existing = await prisma.order.findUnique({ where: { id }, select: { instanceId: true } });
             if (!existing) return res.status(404).json({ error: 'Orden no encontrada' });
-            if (existing.instanceId !== getInstanceId(req)) return res.status(403).json({ error: 'No autorizado' });
+            if (!isOwnerOrAdmin(req, existing.instanceId)) return res.status(403).json({ error: 'No autorizado' });
 
             // 1. Update DB
             const dataToUpdate = {};
@@ -277,7 +278,7 @@ module.exports = (clientPool) => {
             // Verify order belongs to this seller
             const existing = await prisma.order.findUnique({ where: { id }, select: { instanceId: true } });
             if (!existing) return res.status(404).json({ error: 'Orden no encontrada' });
-            if (existing.instanceId !== getInstanceId(req)) return res.status(403).json({ error: 'No autorizado' });
+            if (!isOwnerOrAdmin(req, existing.instanceId)) return res.status(403).json({ error: 'No autorizado' });
 
             // 1. Delete from DB
             await prisma.order.delete({ where: { id } });

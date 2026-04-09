@@ -42,7 +42,7 @@ const withTimeout = (promise, ms, rejectMessage) => {
 
 module.exports = (clientPool) => {
     const router = express.Router();
-    const { withSeller, getInstanceId } = require('./routeHelpers');
+    const { withSeller, getInstanceId, isOwnerOrAdmin } = require('./routeHelpers');
 
     const resolveChatId = async (id, client) => {
         if (!id) return id;
@@ -683,7 +683,7 @@ module.exports = (clientPool) => {
             // Verify report belongs to this seller
             const existing = await prisma.aiErrorReport.findUnique({ where: { id: req.params.id }, select: { instanceId: true } });
             if (!existing) return res.status(404).json({ error: 'Reporte no encontrado' });
-            if (existing.instanceId !== getInstanceId(req)) return res.status(403).json({ error: 'No autorizado' });
+            if (!isOwnerOrAdmin(req, existing.instanceId)) return res.status(403).json({ error: 'No autorizado' });
 
             await prisma.aiErrorReport.delete({ where: { id: req.params.id } });
             res.json({ success: true });

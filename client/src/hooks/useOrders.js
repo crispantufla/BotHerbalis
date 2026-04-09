@@ -1,15 +1,17 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../config/axios';
 import { useSocket } from '../context/SocketContext';
+import { useSeller } from '../context/SellerContext';
 import { useEffect } from 'react';
 
 export const useOrders = (page = 1, limit = 50) => {
     const queryClient = useQueryClient();
     const { socket } = useSocket();
+    const { selectedSellerId } = useSeller();
 
-    // Fetch Orders
+    // Fetch Orders — include selectedSellerId in key so switching seller refetches
     const query = useQuery({
-        queryKey: ['orders', page, limit],
+        queryKey: ['orders', page, limit, selectedSellerId],
         queryFn: async () => {
             const res = await api.get(`/api/orders?page=${page}&limit=${limit}`);
             if (res.data.data) {
