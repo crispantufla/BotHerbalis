@@ -7,9 +7,9 @@ import { prisma } from '../../db';
  * @param {number} sinceTimestamp - Optional Unix timestamp to filter history.
  * @returns {Array} List of message objects.
  */
-async function getLocalHistory(chatId: string, sinceTimestamp: number = 0): Promise<any[]> {
+async function getLocalHistory(chatId: string, sinceTimestamp: number = 0, instanceId?: string): Promise<any[]> {
     const cleanPhone = chatId.replace('@c.us', '').replace(/\D/g, '');
-    const INSTANCE_ID = process.env.INSTANCE_ID || 'default';
+    const INSTANCE_ID = instanceId || process.env.INSTANCE_ID || 'default';
 
     try {
         const dbLogs = await prisma.chatLog.findMany({
