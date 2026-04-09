@@ -47,6 +47,22 @@ module.exports = (clientPool) => {
 
     // GET /status
     router.get('/status', ...withSeller(clientPool), (req, res) => {
+        const sellerId = getInstanceId(req);
+
+        // Lazy start: if seller not running but registered, start it
+        if (!req.sellerInstance && clientPool.isKnown(sellerId)) {
+            clientPool.ensureStarted(sellerId).catch(e =>
+                logger.error(`[STATUS] Failed to lazy-start ${sellerId}:`, e.message)
+            );
+            return res.json({
+                status: 'initializing',
+                qr: null,
+                info: null,
+                instanceId: sellerId,
+                config: {}
+            });
+        }
+
         const { client: cl, ss, config } = getCtx(req);
         const isConnected = ss?.isConnected;
         const qrCodeData = ss?.qrCodeData;
@@ -54,7 +70,7 @@ module.exports = (clientPool) => {
             status: qrCodeData ? 'scan_qr' : (isConnected ? 'ready' : 'initializing'),
             qr: qrCodeData,
             info: isConnected && cl ? cl.info : null,
-            instanceId: getInstanceId(req),
+            instanceId: sellerId,
             config
         });
     });
@@ -282,9 +298,23 @@ module.exports = (clientPool) => {
         }
     });
 
-    // POST /logout — Disconnect or generate new QR
-    router.post('/logout', ...withSeller(clientPool), async (req, res) => {
+    // POST /whatsapp-logout — Disconnect WhatsApp session or start seller to generate QR
+    router.post('/whatsapp-logout', ...withSeller(clientPool), async (req, res) => {
         try {
+            const sellerId = getInstanceId(req);
+
+            // If seller not running yet (lazy start), start it to generate QR
+            if (!req.sellerInstance) {
+                if (clientPool.isKnown(sellerId)) {
+                    logger.info(`[WHATSAPP] Seller ${sellerId} not running — lazy-starting for QR...`);
+                    clientPool.ensureStarted(sellerId).catch(e =>
+                        logger.error(`[WHATSAPP] Failed to start ${sellerId}:`, e.message)
+                    );
+                    return res.json({ success: true, message: 'Iniciando sesión...' });
+                }
+                return res.status(404).json({ error: 'Seller no registrado' });
+            }
+
             const { client: cl, ss, io } = getCtx(req);
             if (cl && cl.info && ss?.isConnected) {
                 // Active session: disconnect first, then reconnect event will trigger QR

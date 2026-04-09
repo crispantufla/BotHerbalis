@@ -90,7 +90,7 @@ const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData 
         const ok = await confirm('¿Desconectar WhatsApp y generar un nuevo código QR?');
         if (!ok) return;
         try {
-            await api.post('/api/logout');
+            await api.post('/api/whatsapp-logout');
             toast.success('Desconectado. Generando nuevo QR...');
         } catch (e) { toast.error('Error al desconectar'); }
     };
@@ -226,11 +226,13 @@ const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData 
                 </div>
             )}
 
-            {status === 'scan_qr' && !qrData && (
+            {((status === 'scan_qr' && !qrData) || status === 'initializing') && (
                 <div className="bg-white/6 dark:bg-slate-800/60 dark:bg-slate-800/60 backdrop-blur-lg border border-white dark:border-slate-700/50 rounded-3xl p-8 text-center max-w-lg mx-auto shadow-xl">
                     <div className="flex flex-col items-center justify-center gap-4">
                         <div className="w-12 h-12 border-4 border-indigo-200 dark:border-indigo-900 border-t-indigo-600 dark:border-t-indigo-500 rounded-full animate-spin"></div>
-                        <span className="font-bold text-indigo-800 dark:text-indigo-400 text-lg">Generando código QR seguro...</span>
+                        <span className="font-bold text-indigo-800 dark:text-indigo-400 text-lg">
+                            {status === 'initializing' ? 'Iniciando sesión de WhatsApp...' : 'Generando código QR seguro...'}
+                        </span>
                         <span className="text-slate-500 dark:text-slate-400 text-sm">Esto puede demorar unos segundos</span>
                     </div>
                 </div>

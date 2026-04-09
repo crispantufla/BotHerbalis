@@ -125,6 +125,8 @@ const CorporateDashboard = () => {
                     api.get('/api/status')
                 ]);
                 setAlerts(alertRes.data);
+                if (statusRes.data.status) setStatus(statusRes.data.status);
+                if (statusRes.data.qr) setQrData(statusRes.data.qr);
                 if (statusRes.data.config) setConfig(statusRes.data.config);
                 if (statusRes.data.info?.wid?.user) setConnectedPhone(statusRes.data.info.wid.user);
             } catch (e) { }

@@ -58,7 +58,7 @@ const SettingsView = ({ status }) => {
         const ok = await confirm("ATENCIÓN: Esto desconectará el bot de WhatsApp.\n\nEl sistema dejará de responder mensajes automáticamente y deberás escanear el QR nuevamente desde la vista de Dashboard para reconectar.\n\n¿Estás seguro?");
         if (!ok) return;
         try {
-            await api.post('/api/logout');
+            await api.post('/api/whatsapp-logout');
             toast.success('Sesión cerrada. Debes escanear el QR para reconectar.');
         } catch (e) { toast.error('Error al intentar cerrar sesión'); }
     };
