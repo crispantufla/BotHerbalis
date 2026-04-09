@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Trash2, X, Zap, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
-import api from '../../../utils/api';
+import api from '../../../config/axios';
 
 const QuickRepliesPanel = ({ onSelect, onClose }) => {
     const [replies, setReplies] = useState([]);
