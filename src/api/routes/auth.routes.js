@@ -136,7 +136,7 @@ module.exports = (client, sharedState) => {
                     name,
                     password: hashed,
                     role: effectiveRole,
-                    sellerId: effectiveRole === 'seller' ? sellerId : null,
+                    sellerId: sellerId || null, // admins can optionally have a sellerId (seller-admin hybrid)
                 },
                 select: { id: true, name: true, role: true, sellerId: true, isActive: true },
             });

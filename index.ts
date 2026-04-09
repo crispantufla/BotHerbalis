@@ -46,7 +46,7 @@ async function boot() {
     let sellerIds: string[] = [];
     try {
         const accounts = await prisma.account.findMany({
-            where: { role: 'seller', isActive: true, sellerId: { not: null } },
+            where: { isActive: true, sellerId: { not: null } },
             select: { sellerId: true }
         });
         sellerIds = accounts.map((a: any) => a.sellerId).filter(Boolean);
