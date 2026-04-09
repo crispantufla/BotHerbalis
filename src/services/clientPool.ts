@@ -378,6 +378,11 @@ class ClientPool {
             } catch (err: any) {
                 logger.error(`[POOL][${sellerId}] Init failed (${attempt}): ${err.message}`);
                 if (attempt < MAX_INIT) {
+                    // Kill zombie Chrome processes holding the profile dir (same as main branch)
+                    try {
+                        const { execSync } = require('child_process');
+                        execSync(`pkill -9 -f "${sellerId}.*wwebjs" 2>/dev/null || true`, { stdio: 'ignore', shell: true, timeout: 5000 });
+                    } catch (e) { /* no matching processes — fine */ }
                     cleanChromeLocks(authPath);
                     await new Promise(r => setTimeout(r, 5000 * attempt));
                     return safeInit(attempt + 1);
