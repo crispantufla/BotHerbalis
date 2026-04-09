@@ -18,7 +18,7 @@ export function sellerContext(clientPool: any) {
         if (req.account.role === 'admin') {
             // Admins can switch between sellers via query param or header
             const sellerId = req.query.sellerId || req.headers['x-seller-id'] || null;
-            req.sellerId = sellerId;
+            req.sellerId = sellerId ? sellerId.toLowerCase() : null;
         } else {
             // Sellers are locked to their own sellerId
             req.sellerId = req.account.sellerId;
