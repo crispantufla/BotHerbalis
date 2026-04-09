@@ -325,8 +325,9 @@ class ClientPool {
             logger.error(`[POOL][${sellerId}] Auth failure: ${msg}`);
             sharedState.isConnected = false;
             if (this.io) this.io.to(sellerId).emit('status_change', { status: 'auth_failure', sellerId });
-            const authDir = path.join(dataDir, '.wwebjs_auth');
-            try { fs.rmSync(authDir, { recursive: true, force: true }); } catch (e) { /* ignore */ }
+            // Don't wipe session — it may be a transient issue during redeploy.
+            // Just clean Chrome locks and retry. Manual wipe is available via /whatsapp-logout.
+            cleanChromeLocks(authPath);
             setTimeout(() => safeInit().catch(() => {}), 5000);
         });
 
@@ -378,10 +379,10 @@ class ClientPool {
                     await new Promise(r => setTimeout(r, 5000 * attempt));
                     return safeInit(attempt + 1);
                 } else {
-                    // All attempts failed — wipe corrupt session so next try starts fresh
-                    logger.error(`[POOL][${sellerId}] All init attempts failed. Wiping session for clean retry...`);
-                    try { fs.rmSync(authPath, { recursive: true, force: true }); } catch (e) { /* ignore */ }
-                    // Remove from instances so ensureStarted can retry later
+                    // All attempts failed — do NOT wipe session (it persists across deploys).
+                    // Just clean locks and leave instance in pool for manual retry via dashboard.
+                    logger.error(`[POOL][${sellerId}] All init attempts failed. Session preserved. Use /whatsapp-logout to wipe manually if needed.`);
+                    cleanChromeLocks(authPath);
                     pool.instances.delete(sellerId);
                     try { await shutdownSellerQueue(queue, worker); } catch (e) { /* ignore */ }
                 }

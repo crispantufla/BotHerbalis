@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../../config/axios';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
+import { useSeller } from '../../context/SellerContext';
 import {
     LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
     XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, ComposedChart
@@ -26,6 +27,8 @@ const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
 const AdvancedAnalyticsView = () => {
     const { isDark } = useTheme();
     const { isAdmin } = useAuth();
+    const { sellers, selectedSellerId, setSelectedSellerId } = useSeller();
+    const capitalize = (str) => str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
     const [loading, setLoading] = useState(true);
     const [daysAgoToFetch, setDaysAgoToFetch] = useState(30);
     const [data, setData] = useState({
@@ -67,7 +70,7 @@ const AdvancedAnalyticsView = () => {
 
     useEffect(() => {
         fetchAllData();
-    }, [daysAgoToFetch]);
+    }, [daysAgoToFetch, selectedSellerId]);
 
     // Custom Tooltip for charts
     const CustomTooltip = ({ active, payload, label }) => {
@@ -164,6 +167,28 @@ const AdvancedAnalyticsView = () => {
                         </button>
                     </div>
                 </div>
+
+                {/* Seller filter (admin only) */}
+                {isAdmin && sellers.length > 0 && (
+                    <div className={`flex items-center gap-2 p-2 rounded-xl border mb-4 sm:mb-6 overflow-x-auto ${isDark ? 'bg-slate-800/60 border-slate-700' : 'bg-white/60 border-slate-200'}`}>
+                        <div className="pl-3 pr-2 text-[10px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap">Vendedor:</div>
+                        <button
+                            onClick={() => setSelectedSellerId(null)}
+                            className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${!selectedSellerId ? 'bg-indigo-600 text-white shadow-md' : `${isDark ? 'text-slate-400 hover:bg-slate-700' : 'text-slate-600 hover:bg-slate-100'}`}`}
+                        >
+                            Todos
+                        </button>
+                        {sellers.map(s => (
+                            <button
+                                key={s.sellerId}
+                                onClick={() => setSelectedSellerId(s.sellerId)}
+                                className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${selectedSellerId === s.sellerId ? 'bg-blue-600 text-white shadow-md' : `${isDark ? 'text-slate-400 hover:bg-slate-700' : 'text-slate-600 hover:bg-slate-100'}`}`}
+                            >
+                                {capitalize(s.name)}
+                            </button>
+                        ))}
+                    </div>
+                )}
 
                 {/* Empty state: no data for the selected period */}
                 {!loading && (!data.overview || (data.overview.orders?.value === 0 && data.overview.revenue?.value === 0)) && (
