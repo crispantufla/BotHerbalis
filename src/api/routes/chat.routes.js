@@ -289,7 +289,9 @@ module.exports = (clientPool) => {
             });
             res.json(relevantChats);
         } catch (e) {
-            res.status(500).json({ error: e.message });
+            logger.error(`[CHATS] Error fetching chats: ${e.message}`);
+            // Return empty list on transient errors (e.g. WhatsApp still syncing after reconnect)
+            res.json([]);
         }
     });
 

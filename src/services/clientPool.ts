@@ -201,7 +201,7 @@ class ClientPool {
             logAndEmit: null as any,
             requestPairingCode: null as any,
             get io() { return this._io; },
-            _io: null as any,
+            _io: this.io,   // Inherit from pool (set by registerIo at boot)
         };
 
         // Bot helpers
