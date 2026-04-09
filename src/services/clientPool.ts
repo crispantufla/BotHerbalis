@@ -103,9 +103,11 @@ class ClientPool {
         if (this.startingPromises.has(sellerId)) {
             return this.startingPromises.get(sellerId);
         }
-        // Serialize ALL Chrome startups — two Chromium processes starting simultaneously crash each other
+        // Stagger Chrome launches — starting two at the same instant crashes both.
+        // startSeller is fire-and-forget (doesn't await QR scan), so we add a 15s gap.
         const p = this.initQueue = this.initQueue
             .then(() => this.startSeller(sellerId))
+            .then(() => new Promise<void>(r => setTimeout(r, 15000)))
             .catch(e => logger.error(`[POOL] Failed to start ${sellerId}:`, e.message))
             .finally(() => this.startingPromises.delete(sellerId));
         this.startingPromises.set(sellerId, p);
@@ -408,10 +410,11 @@ class ClientPool {
 
         this.instances.set(sellerId, instance);
         this.knownSellers.add(sellerId);
-
-        // Start initialization — await so initQueue serialization works
         logger.info(`[POOL] Seller ${sellerId} started`);
-        await safeInit().catch(e => logger.error(`[POOL][${sellerId}] Fatal init error:`, e.message));
+
+        // Fire-and-forget — don't await authentication (QR scan can take forever).
+        // The initQueue in ensureStarted adds a 15s delay between launches instead.
+        safeInit().catch(e => logger.error(`[POOL][${sellerId}] Fatal init error:`, e.message));
     }
 
     async stopSeller(sellerId: string): Promise<void> {
