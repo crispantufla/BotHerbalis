@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import io from 'socket.io-client';
 import { API_URL } from '../config/api';
+import { useAuth } from './AuthContext';
 
 const SocketContext = createContext();
 
@@ -9,13 +10,21 @@ export const useSocket = () => useContext(SocketContext);
 export const SocketProvider = ({ children }) => {
     const [socket, setSocket] = useState(null);
     const [isConnected, setIsConnected] = useState(false);
+    const { user } = useAuth();
 
+    // Reconnect socket when user changes (login/logout)
     useEffect(() => {
-        // Read token at connection time (JWT preferred, API key fallback)
         const token = localStorage.getItem('token');
         const apiKey = import.meta.env.VITE_API_KEY;
 
-        const auth = token ? { token } : (apiKey ? { apiKey } : {});
+        // Don't connect if no auth available
+        if (!token && !apiKey) {
+            setSocket(null);
+            setIsConnected(false);
+            return;
+        }
+
+        const auth = token ? { token } : { apiKey };
 
         const newSocket = io(API_URL, {
             auth,
@@ -40,7 +49,7 @@ export const SocketProvider = ({ children }) => {
         setSocket(newSocket);
 
         return () => newSocket.close();
-    }, []);
+    }, [user]);
 
     // Let components call socket.emit('switch-seller', id) directly
     return (
