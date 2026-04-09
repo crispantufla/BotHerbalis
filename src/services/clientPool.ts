@@ -69,6 +69,7 @@ class ClientPool {
     private instances: Map<string, SellerInstance> = new Map();
     private knownSellers: Set<string> = new Set();
     private startingPromises: Map<string, Promise<void>> = new Map();
+    private initQueue: Promise<void> = Promise.resolve(); // Serialize Chrome startups
     private io: any = null;
     private redlock: any = null;
 
@@ -98,11 +99,15 @@ class ClientPool {
             logger.warn(`[POOL] ensureStarted: ${sellerId} is not a known seller`);
             return;
         }
-        // Deduplicate concurrent start requests
+        // Deduplicate concurrent start requests for the SAME seller
         if (this.startingPromises.has(sellerId)) {
             return this.startingPromises.get(sellerId);
         }
-        const p = this.startSeller(sellerId).finally(() => this.startingPromises.delete(sellerId));
+        // Serialize ALL Chrome startups — two Chromium processes starting simultaneously crash each other
+        const p = this.initQueue = this.initQueue
+            .then(() => this.startSeller(sellerId))
+            .catch(e => logger.error(`[POOL] Failed to start ${sellerId}:`, e.message))
+            .finally(() => this.startingPromises.delete(sellerId));
         this.startingPromises.set(sellerId, p);
         return p;
     }
