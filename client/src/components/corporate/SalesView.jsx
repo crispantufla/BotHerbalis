@@ -327,8 +327,8 @@ Teléfono: ${phoneDisplay}`;
                         ))}
                     </div>
 
-                    {/* Vendedor (admin) / Número (seller) filter — only shown when there are multiple options */}
-                    {uniqueFilterOptions.length > 1 && (
+                    {/* Vendedor (admin) / Número (seller) filter — always for admin, multi-option for sellers */}
+                    {(isAdmin || uniqueFilterOptions.length > 1) && (
                         <>
                             {/* Mobile: native select */}
                             <div className="sm:hidden flex items-center gap-2">
@@ -443,10 +443,19 @@ Teléfono: ${phoneDisplay}`;
                                             </p>
                                         </td>
                                         <td className="px-4 sm:px-8 py-5 text-center">
-                                            {order.seller ? (
-                                                <span className="px-2 py-1 bg-blue-50 text-blue-600 rounded-md text-[10px] font-bold border border-blue-100 shadow-sm">
-                                                    +{order.seller.replace(/\D/g, '')}
-                                                </span>
+                                            {order.instanceId || order.seller ? (
+                                                <div className="flex flex-col items-center gap-0.5">
+                                                    {order.instanceId && sellerIdToName[order.instanceId] && (
+                                                        <span className="text-[11px] font-extrabold text-slate-700 capitalize">
+                                                            {sellerIdToName[order.instanceId]}
+                                                        </span>
+                                                    )}
+                                                    {order.seller && (
+                                                        <span className="text-[9px] text-blue-500 font-mono">
+                                                            (+{order.seller.replace(/\D/g, '').slice(-10)})
+                                                        </span>
+                                                    )}
+                                                </div>
                                             ) : (
                                                 <span className="text-[10px] text-slate-400 font-medium">—</span>
                                             )}
@@ -511,12 +520,20 @@ Teléfono: ${phoneDisplay}`;
                                                     const [datePart] = dt.split(',');
                                                     return <div className="flex flex-col items-end gap-1">
                                                         <span className="font-extrabold text-[10px] text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">{datePart.trim()}</span>
-                                                        {order.seller && <span className="font-bold text-[9px] text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">+{order.seller.replace(/\D/g, '')}</span>}
+                                                        {(order.instanceId || order.seller) && (
+                                                            <span className="font-bold text-[9px] text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">
+                                                                {sellerIdToName[order.instanceId] || order.instanceId || ''}{order.seller ? ` (+${order.seller.replace(/\D/g, '').slice(-10)})` : ''}
+                                                            </span>
+                                                        )}
                                                     </div>;
                                                 }
                                                 return <div className="flex flex-col items-end gap-1">
                                                     <span className="font-extrabold text-[10px] text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">{dt}</span>
-                                                    {order.seller && <span className="font-bold text-[9px] text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">+{order.seller.replace(/\D/g, '')}</span>}
+                                                    {(order.instanceId || order.seller) && (
+                                                        <span className="font-bold text-[9px] text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">
+                                                            {sellerIdToName[order.instanceId] || order.instanceId || ''}{order.seller ? ` (+${order.seller.replace(/\D/g, '').slice(-10)})` : ''}
+                                                        </span>
+                                                    )}
                                                 </div>;
                                             })()}
                                         </div>
