@@ -163,8 +163,8 @@ class ClientPool {
                 ...(process.env.PUPPETEER_EXECUTABLE_PATH && { executablePath: process.env.PUPPETEER_EXECUTABLE_PATH }),
                 args: [
                     '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
-                    '--disable-accelerated-2d-canvas', '--disable-gpu', '--no-zygote',
-                    '--single-process', '--disable-features=IsolateOrigins,site-per-process',
+                    '--disable-accelerated-2d-canvas', '--disable-gpu',
+                    '--disable-features=IsolateOrigins,site-per-process',
                     '--no-first-run', '--disable-features=NetworkService', '--no-experiments',
                     '--ignore-certificate-errors', '--disable-extensions',
                     '--disable-background-networking', '--disable-background-timer-throttling',
@@ -382,8 +382,7 @@ class ClientPool {
                 await client.initialize();
             } catch (err: any) {
                 logger.error(`[POOL][${sellerId}] Init failed (${attempt}): ${err.message}`);
-                // Clean up crashed Chrome before retrying
-                try { await client.destroy().catch(() => {}); } catch (e) { /* ignore */ }
+                // Kill zombie Chrome processes (same approach as main branch)
                 try {
                     const { execSync } = require('child_process');
                     execSync(`pkill -9 -f ".wwebjs_auth" 2>/dev/null || true`, { stdio: 'ignore', shell: true, timeout: 5000 });
