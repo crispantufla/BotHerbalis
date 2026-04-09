@@ -19,9 +19,12 @@ api.interceptors.request.use((config) => {
         if (apiKey) config.headers['x-api-key'] = apiKey;
     }
 
-    // Inject selected seller for admin multi-tenant context
+    // Inject selected seller for admin multi-tenant context.
+    // Only inject if not already explicitly set by the request (even to '' = "all sellers").
     const sellerId = localStorage.getItem('selectedSellerId');
-    if (sellerId) config.headers['x-seller-id'] = sellerId;
+    if (sellerId && config.headers['x-seller-id'] === undefined) {
+        config.headers['x-seller-id'] = sellerId;
+    }
 
     return config;
 });
