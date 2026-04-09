@@ -316,17 +316,20 @@ module.exports = (clientPool) => {
             const resetAt = ss?.chatResets?.[chatId] || 0;
             let messages = [];
 
+            // Fetch WA messages and DB messages in parallel
+            const localMessagesPromise = getLocalHistory(chatId, resetAt, req.sellerId);
+
             try {
                 // Retry loop for waitForChatLoading race condition in whatsapp-web.js
                 let waMessages = null;
                 for (let attempt = 1; attempt <= 3; attempt++) {
                     try {
-                        const chat = await withTimeout(cl?.getChatById(chatId), 5000, 'Timeout getting chat history');
-                        waMessages = await withTimeout(chat?.fetchMessages({ limit: 100 }), 10000, 'Timeout fetching history messages');
+                        const chat = await withTimeout(cl?.getChatById(chatId), 3000, 'Timeout getting chat history');
+                        waMessages = await withTimeout(chat?.fetchMessages({ limit: 50 }), 6000, 'Timeout fetching history messages');
                         break; // success
                     } catch (retryErr) {
                         if (attempt < 3 && retryErr?.message?.includes('waitForChatLoading')) {
-                            await new Promise(r => setTimeout(r, 2000 * attempt));
+                            await new Promise(r => setTimeout(r, 1000 * attempt));
                         } else {
                             throw retryErr;
                         }
@@ -384,7 +387,7 @@ module.exports = (clientPool) => {
                 logger.error(`[HISTORY] WA Fetch Error for ${chatId}:`, waErr.message);
             }
 
-            const localMessages = await getLocalHistory(chatId, resetAt, req.sellerId);
+            const localMessages = await localMessagesPromise;
 
             const refinedMessages = messages.map(m => {
                 if (m.hasMedia || m.type === 'image' || m.type === 'audio' || m.type === 'ptt' || m.type === 'sticker') {

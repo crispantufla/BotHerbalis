@@ -2,17 +2,25 @@ import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../config/axios';
 import { useSocket } from '../context/SocketContext';
+import { useSeller } from '../context/SellerContext';
 
 export const useChat = (selectedChatId) => {
     const queryClient = useQueryClient();
     const { socket } = useSocket();
+    const { selectedSellerId } = useSeller();
 
     const [instanceId, setInstanceId] = useState('default');
     const [globalPause, setGlobalPause] = useState(false);
 
+    // Reset local chat state when seller changes
+    useEffect(() => {
+        setChats([]);
+        setMessages([]);
+    }, [selectedSellerId]); // eslint-disable-line react-hooks/exhaustive-deps
+
     // Initial Metadata Fetching (Chats list, global status)
     const { data: metaData, isLoading: isLoadingChats } = useQuery({
-        queryKey: ['chatMetadata'],
+        queryKey: ['chatMetadata', selectedSellerId],
         queryFn: async () => {
             const statusRes = await api.get('/api/status');
             const id = statusRes.data?.instanceId || 'default';
@@ -45,7 +53,7 @@ export const useChat = (selectedChatId) => {
     }, [metaData]);
 
     const { data: messagesData, isLoading: isLoadingMessages } = useQuery({
-        queryKey: ['messages', selectedChatId],
+        queryKey: ['messages', selectedChatId, selectedSellerId],
         queryFn: async () => {
             if (!selectedChatId) return [];
             const res = await api.get(`/api/history/${selectedChatId}`);

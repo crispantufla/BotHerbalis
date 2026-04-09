@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import api from '../../config/axios';
 import { useToast } from '../ui/Toast';
 import { useChat } from '../../hooks/useChat';
+import { useSeller } from '../../context/SellerContext';
 import ChatMessageList from './components/ChatMessageList';
 import ChatInputArea from './components/ChatInputArea';
 import AiCorrectionModal from './components/AiCorrectionModal';
@@ -10,7 +11,13 @@ import { Search, Bot, Play, Pause, Trash2 as Trash, FileText as ScriptIcon, Chev
 
 const CommsView = ({ initialChatId, onChatSelected, initialSearch = '', alerts = [], onAlertAction }) => {
     const { toast } = useToast();
+    const { selectedSellerId } = useSeller();
     const [selectedChat, setSelectedChat] = useState(null);
+
+    // Reset selected chat when admin switches seller
+    useEffect(() => {
+        setSelectedChat(null);
+    }, [selectedSellerId]);
     const [input, setInput] = useState('');
     const [searchTerm, setSearchTerm] = useState(initialSearch);
     const [showScriptPanel, setShowScriptPanel] = useState(false);
