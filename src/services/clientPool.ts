@@ -148,7 +148,7 @@ class ClientPool {
         // Queue + Worker
         const queue = createQueue(sellerId);
 
-        // WhatsApp client
+        // WhatsApp client — config aligned with main branch (proven to persist sessions)
         const client = new Client({
             authStrategy: new LocalAuth({ clientId: sellerId, dataPath: authPath }),
             deviceName: 'Herbalis CRM',
@@ -165,7 +165,10 @@ class ClientPool {
                     '--disable-background-networking', '--disable-background-timer-throttling',
                     '--disable-backgrounding-occluded-windows',
                     '--disable-client-side-phishing-detection', '--disable-default-apps',
-                ]
+                    '--disable-hang-monitor', '--disable-prompt-on-repost',
+                    '--disable-sync', '--disk-cache-size=0', '--disable-gpu-shader-disk-cache',
+                ],
+                timeout: 120000
             }
         });
 
