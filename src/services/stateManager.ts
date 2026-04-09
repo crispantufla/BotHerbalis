@@ -131,10 +131,10 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
             await _persistPromise;
         } finally {
             _persistPromise = null;
-            // If another save was requested while we were writing, run it now
+            // If another save was requested while we were writing, run it after a short delay
             if (_pendingRetry) {
                 _pendingRetry = false;
-                _persistState();
+                setTimeout(() => _persistState(), 1000);
             }
         }
     }

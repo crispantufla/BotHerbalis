@@ -105,25 +105,7 @@ module.exports = (clientPool) => {
     router.post('/sellers/:id/wipe-session', async (req, res) => {
         try {
             const { id } = req.params;
-            const path = require('path');
-            const fs = require('fs');
-
-            // Stop seller if running
-            if (clientPool.getSeller(id)) {
-                await clientPool.stopSeller(id);
-            }
-
-            // Wipe session directory
-            const rootDataDir = process.env.DATA_DIR || (process.env.NODE_ENV === 'production'
-                ? path.join(__dirname, '../../data') : path.join(__dirname, '../../..'));
-            const authPath = path.join(rootDataDir, id, '.wwebjs_auth');
-            if (fs.existsSync(authPath)) {
-                fs.rmSync(authPath, { recursive: true, force: true });
-                logger.info(`[SELLERS] Wiped session for ${id}: ${authPath}`);
-            }
-
-            // Restart fresh
-            await clientPool.startSeller(id);
+            await clientPool.wipeSessionAndRestart(id);
             logger.info(`[SELLERS] Seller ${id} restarted with clean session`);
             res.json({ success: true, message: `Sesión de ${id} limpiada. Escaneá el QR.` });
         } catch (e) {

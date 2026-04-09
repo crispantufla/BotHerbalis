@@ -26,13 +26,14 @@ module.exports = (clientPool) => {
     router.post('/quick-replies', ...withSeller(clientPool), async (req, res) => {
         try {
             const instanceId = getInstanceId(req);
+            if (!instanceId) return res.status(400).json({ error: 'Seleccioná un vendedor primero' });
             const { title, message } = req.body;
             if (!title?.trim() || !message?.trim())
                 return res.status(400).json({ error: 'title y message son requeridos' });
 
             const reply = await prisma.quickReply.create({
                 data: {
-                    instanceId: instanceId || 'default',
+                    instanceId,
                     title: title.trim(),
                     message: message.trim(),
                 },

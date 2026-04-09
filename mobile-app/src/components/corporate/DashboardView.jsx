@@ -90,7 +90,7 @@ const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData 
         const ok = await confirm('¿Desconectar WhatsApp y generar un nuevo código QR?');
         if (!ok) return;
         try {
-            await api.post('/api/logout');
+            await api.post('/api/whatsapp-logout');
             toast.success('Desconectado. Generando nuevo QR...');
         } catch (e) { toast.error('Error al desconectar'); }
     };

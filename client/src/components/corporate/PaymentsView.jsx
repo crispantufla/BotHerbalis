@@ -5,6 +5,7 @@ import { useSocket } from '../../context/SocketContext';
 import { useToast } from '../ui/Toast';
 import { useAuth } from '../../context/AuthContext';
 import { useSeller } from '../../context/SellerContext';
+import { capitalize } from '../../utils/format';
 
 const STATUS_CONFIG = {
     pending:  { label: 'Pendiente',  bg: 'bg-amber-100 dark:bg-amber-900/30',  text: 'text-amber-700 dark:text-amber-400',  dot: 'bg-amber-500' },
@@ -164,7 +165,7 @@ const PaymentsView = ({ onGoToChat }) => {
     const [filter, setFilter] = useState('all');
 
     // Map instanceId → seller account name (for admin badge)
-    const sellerIdToName = Object.fromEntries((sellers || []).map(s => [s.sellerId, s.name.charAt(0).toUpperCase() + s.name.slice(1)]));
+    const sellerIdToName = Object.fromEntries((sellers || []).map(s => [s.sellerId, capitalize(s.name)]));
 
     // Generate link state
     const [mpAmount, setMpAmount] = useState('');

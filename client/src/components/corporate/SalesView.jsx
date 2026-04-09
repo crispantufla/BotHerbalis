@@ -5,6 +5,7 @@ import { useToast } from '../ui/Toast';
 import { useOrders } from '../../hooks/useOrders';
 import { useAuth } from '../../context/AuthContext';
 import { useSeller } from '../../context/SellerContext';
+import { capitalize } from '../../utils/format';
 
 import { RefreshCw as Refresh, Download, Search, Filter, MessageCircle as Chat, Edit2 as Edit, Trash2 as Trash, FileText as Script, Save, X as XIcon } from 'lucide-react';
 
@@ -221,7 +222,6 @@ Teléfono: ${phoneDisplay}`;
 
     // Filters logic
     // Admin: filter by seller account (instanceId → name). Seller: filter by phone number (order.seller).
-    const capitalize = (str) => str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
     const sellerIdToName = Object.fromEntries((sellers || []).map(s => [s.sellerId, capitalize(s.name)]));
 
     const uniqueFilterOptions = isAdmin

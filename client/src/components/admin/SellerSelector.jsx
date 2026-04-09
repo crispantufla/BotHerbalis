@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { useSeller } from '../../context/SellerContext';
 import { useSocket } from '../../context/SocketContext';
 import { ChevronDown, Wifi, WifiOff, Users } from 'lucide-react';
+import { capitalize } from '../../utils/format';
 
 const SellerSelector = () => {
     const { sellers, selectedSellerId, setSelectedSellerId, selectedSeller } = useSeller();
@@ -36,7 +37,7 @@ const SellerSelector = () => {
             >
                 <Users className="w-4 h-4 text-indigo-500" />
                 <span className="max-w-[140px] truncate">
-                    {selectedSeller ? selectedSeller.name.charAt(0).toUpperCase() + selectedSeller.name.slice(1) : 'Todos los vendedores'}
+                    {selectedSeller ? capitalize(selectedSeller.name) : 'Seleccionar vendedor'}
                 </span>
                 {selectedSeller && (
                     <span className={`w-2 h-2 rounded-full ${statusDot(selectedSeller)} flex-shrink-0`} />
@@ -46,18 +47,6 @@ const SellerSelector = () => {
 
             {open && (
                 <div className="absolute right-0 top-full mt-1.5 w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
-                    {/* "All sellers" option */}
-                    <button
-                        onClick={() => select(null)}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors
-                            ${!selectedSellerId ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-slate-700 dark:text-slate-200'}`}
-                    >
-                        <Users className="w-4 h-4 opacity-60" />
-                        Todos los vendedores
-                    </button>
-
-                    {sellers.length > 0 && <div className="border-t border-slate-100 dark:border-slate-700" />}
-
                     {sellers.map(seller => (
                         <button
                             key={seller.sellerId}

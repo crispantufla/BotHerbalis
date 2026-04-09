@@ -302,19 +302,14 @@ module.exports = (clientPool) => {
     router.post('/whatsapp-logout', ...withSeller(clientPool), async (req, res) => {
         try {
             const sellerId = getInstanceId(req);
+            if (!sellerId) return res.status(400).json({ error: 'Seleccioná un vendedor primero' });
 
             // If seller not running (failed init or never started), wipe session and start fresh
             if (!req.sellerInstance) {
                 if (clientPool.isKnown(sellerId)) {
                     logger.info(`[WHATSAPP] Seller ${sellerId} not running — wiping session & starting fresh...`);
-                    // Wipe potentially corrupt session
-                    const rootDataDir = process.env.DATA_DIR || (process.env.NODE_ENV === 'production'
-                        ? path.join(__dirname, '../../data') : path.join(__dirname, '../../..'));
-                    const authDir = path.join(rootDataDir, sellerId, '.wwebjs_auth');
-                    try { if (fs.existsSync(authDir)) fs.rmSync(authDir, { recursive: true, force: true }); } catch (e) { /* ignore */ }
-
-                    clientPool.ensureStarted(sellerId).catch(e =>
-                        logger.error(`[WHATSAPP] Failed to start ${sellerId}:`, e.message)
+                    clientPool.wipeSessionAndRestart(sellerId).catch(e =>
+                        logger.error(`[WHATSAPP] Failed to wipe+start ${sellerId}:`, e.message)
                     );
                     return res.json({ success: true, message: 'Generando QR...' });
                 }
@@ -324,23 +319,25 @@ module.exports = (clientPool) => {
             const { client: cl, ss, io } = getCtx(req);
             if (cl && cl.info && ss?.isConnected) {
                 // Active session: disconnect first, then reconnect event will trigger QR
-                logger.info('[WHATSAPP] Manual logout requested...');
+                logger.info(`[WHATSAPP] Manual logout requested for ${sellerId}...`);
                 ss.manualDisconnect = true;
                 ss.isConnected = false;
                 ss.qrCodeData = null;
                 await cl.logout();
-                if (io) io.emit('status_change', { status: 'disconnected' });
+                if (io) {
+                    io.to(sellerId).emit('status_change', { status: 'disconnected', sellerId });
+                    io.to('admin').emit('status_change', { status: 'disconnected', sellerId });
+                }
             } else {
-                // No active session: destroy existing Chrome (if any) then reinitialize for QR
-                logger.info('[WHATSAPP] No active session — triggering initialize for QR...');
-                if (ss) ss.qrCodeData = null;
-                if (io) io.emit('status_change', { status: 'disconnected' });
-                (async () => {
-                    try { await cl?.destroy(); } catch (e) { /* Chrome may not have been started yet */ }
-                    cl?.initialize().catch(err => {
-                        logger.error('[WHATSAPP] Initialize failed:', err.message);
-                    });
-                })();
+                // No active session: full restart via pool (destroy + new Client)
+                logger.info(`[WHATSAPP] No active session for ${sellerId} — restarting...`);
+                if (io) {
+                    io.to(sellerId).emit('status_change', { status: 'disconnected', sellerId });
+                    io.to('admin').emit('status_change', { status: 'disconnected', sellerId });
+                }
+                clientPool.restartSeller(sellerId).catch(e =>
+                    logger.error(`[WHATSAPP] Restart failed for ${sellerId}:`, e.message)
+                );
             }
             res.json({ success: true });
         } catch (e) {

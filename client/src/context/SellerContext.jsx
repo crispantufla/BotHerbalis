@@ -41,6 +41,13 @@ export const SellerProvider = ({ children }) => {
         }
     }, [isAdmin, loadSellers]);
 
+    // Auto-select first seller if none is selected (admin must always have one)
+    useEffect(() => {
+        if (isAdmin && sellers.length > 0 && !sellers.find(s => s.sellerId === selectedSellerId)) {
+            setSelectedSellerId(sellers[0].sellerId);
+        }
+    }, [isAdmin, sellers, selectedSellerId, setSelectedSellerId]);
+
     const selectedSeller = sellers.find(s => s.sellerId === selectedSellerId) || null;
 
     return (

@@ -19,8 +19,8 @@ export const AuthProvider = ({ children }) => {
             try {
                 const parsed = JSON.parse(storedUser);
                 setUser(parsed);
-                // For non-admin users, ensure selectedSellerId is set
-                if (parsed.role !== 'admin' && parsed.sellerId && !localStorage.getItem('selectedSellerId')) {
+                // Ensure selectedSellerId is set on restore
+                if (parsed.sellerId && !localStorage.getItem('selectedSellerId')) {
                     localStorage.setItem('selectedSellerId', parsed.sellerId);
                 }
             } catch (e) {
@@ -38,8 +38,8 @@ export const AuthProvider = ({ children }) => {
                 localStorage.setItem('token', res.data.token);
                 localStorage.setItem('user', JSON.stringify(res.data.user));
                 setUser(res.data.user);
-                // Auto-select seller for non-admin users; admins start with "all sellers" view
-                if (res.data.user.role !== 'admin' && res.data.user.sellerId) {
+                // Auto-select seller on login (for sellers locked to their own, for admins their default)
+                if (res.data.user.sellerId) {
                     localStorage.setItem('selectedSellerId', res.data.user.sellerId);
                 }
                 return true;

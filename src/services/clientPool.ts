@@ -377,36 +377,35 @@ class ClientPool {
 
         client.on('message', messageHandler);
 
-        async function safeInit(attempt: number = 1): Promise<void> {
+        const pool = this;
+        async function safeInit(): Promise<void> {
             const MAX_INIT = 6;
-            try {
-                logger.info(`[POOL][${sellerId}] Initializing (attempt ${attempt}/${MAX_INIT})...`);
-                await client.initialize();
-            } catch (err: any) {
-                logger.error(`[POOL][${sellerId}] Init failed (${attempt}): ${err.message}`);
-                // Kill zombie Chrome processes (same approach as main branch)
+            for (let attempt = 1; attempt <= MAX_INIT; attempt++) {
                 try {
-                    const { execSync } = require('child_process');
-                    execSync(`pkill -9 -f ".wwebjs_auth" 2>/dev/null || true`, { stdio: 'ignore', shell: true, timeout: 5000 });
-                } catch (e) { /* no matching processes — fine */ }
-                cleanChromeLocks(authPath);
+                    logger.info(`[POOL][${sellerId}] Initializing (attempt ${attempt}/${MAX_INIT})...`);
+                    await client.initialize();
+                    return; // Success — exit loop
+                } catch (err: any) {
+                    logger.error(`[POOL][${sellerId}] Init failed (${attempt}): ${err.message}`);
+                    // Kill zombie Chrome processes (same approach as main branch)
+                    try {
+                        const { execSync } = require('child_process');
+                        execSync(`pkill -9 -f ".wwebjs_auth" 2>/dev/null || true`, { stdio: 'ignore', shell: true, timeout: 5000 });
+                    } catch (e) { /* no matching processes — fine */ }
+                    cleanChromeLocks(authPath);
 
-                if (attempt < MAX_INIT) {
-                    const delay = 10000 * attempt; // 10s, 20s, 30s, 40s, 50s
-                    logger.info(`[POOL][${sellerId}] Retrying in ${delay / 1000}s...`);
-                    await new Promise(r => setTimeout(r, delay));
-                    return safeInit(attempt + 1);
-                } else {
-                    // All attempts failed — do NOT wipe session (it persists across deploys).
-                    logger.error(`[POOL][${sellerId}] All ${MAX_INIT} init attempts failed. Session preserved. Use /whatsapp-logout to wipe manually if needed.`);
-                    pool.instances.delete(sellerId);
-                    try { await shutdownSellerQueue(queue, worker); } catch (e) { /* ignore */ }
+                    if (attempt < MAX_INIT) {
+                        const delay = 10000 * attempt; // 10s, 20s, 30s, 40s, 50s
+                        logger.info(`[POOL][${sellerId}] Retrying in ${delay / 1000}s...`);
+                        await new Promise(r => setTimeout(r, delay));
+                    }
                 }
             }
+            // All attempts failed — do NOT wipe session (it persists across deploys).
+            logger.error(`[POOL][${sellerId}] All ${MAX_INIT} init attempts failed. Session preserved. Use /whatsapp-logout to wipe manually if needed.`);
+            pool.instances.delete(sellerId);
+            try { await shutdownSellerQueue(queue, worker); } catch (e) { /* ignore */ }
         }
-
-        // Keep reference to pool for safeInit cleanup
-        const pool = this;
 
         this.instances.set(sellerId, instance);
         this.knownSellers.add(sellerId);
@@ -439,6 +438,20 @@ class ClientPool {
     async restartSeller(sellerId: string): Promise<void> {
         await this.stopSeller(sellerId);
         await new Promise(r => setTimeout(r, 2000));
+        await this.startSeller(sellerId);
+    }
+
+    /** Wipe session directory and start fresh (forces new QR scan). */
+    async wipeSessionAndRestart(sellerId: string): Promise<void> {
+        if (this.instances.has(sellerId)) {
+            await this.stopSeller(sellerId);
+        }
+        const dataDir = getDataDir(sellerId);
+        const authPath = path.join(dataDir, '.wwebjs_auth');
+        if (fs.existsSync(authPath)) {
+            fs.rmSync(authPath, { recursive: true, force: true });
+            logger.info(`[POOL] Wiped session for ${sellerId}: ${authPath}`);
+        }
         await this.startSeller(sellerId);
     }
 
