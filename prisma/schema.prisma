@@ -63,6 +63,7 @@ model ChatLog {
   timestamp   DateTime @default(now())
 
   @@index([userPhone, instanceId])
+  @@index([userPhone, instanceId, timestamp])
   @@index([timestamp])
 }
 

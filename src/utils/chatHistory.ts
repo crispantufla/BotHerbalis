@@ -18,8 +18,10 @@ async function getLocalHistory(chatId: string, sinceTimestamp: number = 0, insta
                 instanceId: INSTANCE_ID,
                 timestamp: { gte: new Date(sinceTimestamp * 1000) }
             },
-            orderBy: { timestamp: 'asc' }
+            orderBy: { timestamp: 'desc' },
+            take: 200,
         });
+        dbLogs.reverse();
 
         return dbLogs.map((log: any) => ({
             id: log.id,
