@@ -408,10 +408,9 @@ class ClientPool {
         this.instances.set(sellerId, instance);
         this.knownSellers.add(sellerId);
 
-        // Start initialization
-        safeInit().catch(e => logger.error(`[POOL][${sellerId}] Fatal init error:`, e.message));
-
+        // Start initialization — await so initQueue serialization works
         logger.info(`[POOL] Seller ${sellerId} started`);
+        await safeInit().catch(e => logger.error(`[POOL][${sellerId}] Fatal init error:`, e.message));
     }
 
     async stopSeller(sellerId: string): Promise<void> {
