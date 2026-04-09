@@ -376,26 +376,28 @@ class ClientPool {
         client.on('message', messageHandler);
 
         async function safeInit(attempt: number = 1): Promise<void> {
-            const MAX_INIT = 3;
+            const MAX_INIT = 6;
             try {
                 logger.info(`[POOL][${sellerId}] Initializing (attempt ${attempt}/${MAX_INIT})...`);
                 await client.initialize();
             } catch (err: any) {
                 logger.error(`[POOL][${sellerId}] Init failed (${attempt}): ${err.message}`);
+                // Clean up crashed Chrome before retrying
+                try { await client.destroy().catch(() => {}); } catch (e) { /* ignore */ }
+                try {
+                    const { execSync } = require('child_process');
+                    execSync(`pkill -9 -f ".wwebjs_auth" 2>/dev/null || true`, { stdio: 'ignore', shell: true, timeout: 5000 });
+                } catch (e) { /* no matching processes — fine */ }
+                cleanChromeLocks(authPath);
+
                 if (attempt < MAX_INIT) {
-                    // Kill zombie Chrome processes holding the profile dir (same as main branch)
-                    try {
-                        const { execSync } = require('child_process');
-                        execSync(`pkill -9 -f "${sellerId}.*wwebjs" 2>/dev/null || true`, { stdio: 'ignore', shell: true, timeout: 5000 });
-                    } catch (e) { /* no matching processes — fine */ }
-                    cleanChromeLocks(authPath);
-                    await new Promise(r => setTimeout(r, 5000 * attempt));
+                    const delay = 10000 * attempt; // 10s, 20s, 30s, 40s, 50s
+                    logger.info(`[POOL][${sellerId}] Retrying in ${delay / 1000}s...`);
+                    await new Promise(r => setTimeout(r, delay));
                     return safeInit(attempt + 1);
                 } else {
                     // All attempts failed — do NOT wipe session (it persists across deploys).
-                    // Just clean locks and leave instance in pool for manual retry via dashboard.
-                    logger.error(`[POOL][${sellerId}] All init attempts failed. Session preserved. Use /whatsapp-logout to wipe manually if needed.`);
-                    cleanChromeLocks(authPath);
+                    logger.error(`[POOL][${sellerId}] All ${MAX_INIT} init attempts failed. Session preserved. Use /whatsapp-logout to wipe manually if needed.`);
                     pool.instances.delete(sellerId);
                     try { await shutdownSellerQueue(queue, worker); } catch (e) { /* ignore */ }
                 }
