@@ -71,10 +71,14 @@ async function boot() {
     // Wire Socket.IO into clientPool so sellers can emit events
     clientPool.registerIo(io);
 
-    // Start all sellers (each launches a Chromium instance)
-    await Promise.all(sellerIds.map(id => clientPool.startSeller(id).catch((e: any) =>
-        logger.error(`[BOOT] Failed to start seller ${id}:`, e.message)
-    )));
+    // Start sellers sequentially to avoid RAM spikes from concurrent Chrome launches
+    for (const id of sellerIds) {
+        try {
+            await clientPool.startSeller(id);
+        } catch (e: any) {
+            logger.error(`[BOOT] Failed to start seller ${id}:`, e.message);
+        }
+    }
 
     logger.info('[BOOT] ✅ All sellers started. Platform ready.');
 
