@@ -17,7 +17,12 @@ export const AuthProvider = ({ children }) => {
         const storedToken = localStorage.getItem('token');
         if (storedUser && storedToken) {
             try {
-                setUser(JSON.parse(storedUser));
+                const parsed = JSON.parse(storedUser);
+                setUser(parsed);
+                // Ensure selectedSellerId is set if user has one
+                if (parsed.sellerId && !localStorage.getItem('selectedSellerId')) {
+                    localStorage.setItem('selectedSellerId', parsed.sellerId);
+                }
             } catch (e) {
                 localStorage.removeItem('user');
                 localStorage.removeItem('token');
@@ -33,6 +38,10 @@ export const AuthProvider = ({ children }) => {
                 localStorage.setItem('token', res.data.token);
                 localStorage.setItem('user', JSON.stringify(res.data.user));
                 setUser(res.data.user);
+                // Auto-select the user's own seller if they have one
+                if (res.data.user.sellerId) {
+                    localStorage.setItem('selectedSellerId', res.data.user.sellerId);
+                }
                 return true;
             }
         } catch (e) {
