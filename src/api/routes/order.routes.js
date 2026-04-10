@@ -311,7 +311,7 @@ module.exports = (clientPool) => {
 
     // POST /orders/manual-complete — Admin manually completes a sale from the script panel
     router.post('/orders/manual-complete', ...withSeller(clientPool), async (req, res) => {
-        let { chatId } = req.body;
+        let { chatId, silent } = req.body;
         if (!chatId) return res.status(400).json({ error: 'chatId es requerido' });
 
         try {
@@ -467,25 +467,33 @@ module.exports = (clientPool) => {
 
 
 
-            // Set user state to completed and send confirmation
-            const msg = "Tu envío ya está en curso 🚀, dentro de 48 hs podés pedirnos el código de seguimiento\n\n¡Muchas gracias por confiar en Herbalis!";
+            // Set user state to completed
+            if (state) {
+                state.step = 'completed';
+            }
 
-            try {
-                const targetPhone = `${phoneNumeric}@c.us`;
-                logger.info(`[MANUAL-COMPLETE] Enviando WhatsApp de confirmación a ${targetPhone}...`);
-                if (sellerClient) await sellerClient.sendMessage(targetPhone, msg);
+            // Send confirmation message unless silent mode
+            if (!silent) {
+                const msg = "Tu envío ya está en curso 🚀, dentro de 48 hs podés pedirnos el código de seguimiento\n\n¡Muchas gracias por confiar en Herbalis!";
+                try {
+                    const targetPhone = `${phoneNumeric}@c.us`;
+                    logger.info(`[MANUAL-COMPLETE] Enviando WhatsApp de confirmación a ${targetPhone}...`);
+                    if (sellerClient) await sellerClient.sendMessage(targetPhone, msg);
 
-                if (state) {
-                    state.step = 'completed';
-                    state.history = state.history || [];
-                    state.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
-                    if (sellerSharedState?.saveState) {
-                        try { sellerSharedState.saveState(chatId); } catch (e) { sellerSharedState.saveState(); }
+                    if (state) {
+                        state.history = state.history || [];
+                        state.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
                     }
+                    if (sellerSharedState?.logAndEmit) sellerSharedState.logAndEmit(chatId, 'bot', msg, 'completed');
+                } catch (e) {
+                    logger.error(`[MANUAL-COMPLETE] Error enviando WhatsApp:`, e.message);
                 }
-                if (sellerSharedState?.logAndEmit) sellerSharedState.logAndEmit(chatId, 'bot', msg, 'completed');
-            } catch (e) {
-                logger.error(`[MANUAL-COMPLETE] Error enviando WhatsApp:`, e.message);
+            } else {
+                logger.info(`[MANUAL-COMPLETE] silent=true, omitiendo mensaje de confirmación a ${phoneNumeric}`);
+            }
+
+            if (state && sellerSharedState?.saveState) {
+                try { sellerSharedState.saveState(chatId); } catch (e) { sellerSharedState.saveState(); }
             }
 
             const legacyOrder = {

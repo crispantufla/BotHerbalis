@@ -225,13 +225,12 @@ const CommsView = ({ initialChatId, onChatSelected, initialSearch = '', alerts =
     };
 
     // Manual order completion — admin clicks the final step button
-    const handleManualCompletion = async () => {
+    const handleManualCompletion = async (silent = false) => {
         if (!selectedChat) return;
-
         try {
-            await api.post('/api/orders/manual-complete', { chatId: selectedChat.id });
-            toast.success('Pedido ingresado y confirmación enviada ✅');
-            setInput(''); // Clear input if it had anything
+            await api.post('/api/orders/manual-complete', { chatId: selectedChat.id, silent });
+            toast.success(silent ? 'Venta registrada sin enviar confirmación ✅' : 'Pedido ingresado y confirmación enviada ✅');
+            setInput('');
         } catch (e) {
             toast.error('Error al registrar pedido: ' + (e.response?.data?.error || e.message));
         }
@@ -763,12 +762,12 @@ Teléfono: ${phoneDisplay}`;
                             )}
                         </div>
 
-                        {/* Manual Completion Button */}
-                        <div className="px-1 pb-6">
+                        {/* Manual Completion Buttons */}
+                        <div className="px-1 pb-6 flex flex-col gap-2">
                             <button
                                 onClick={() => {
                                     if (!selectedChat.isPaused) handleToggleBot();
-                                    handleManualCompletion();
+                                    handleManualCompletion(false);
                                 }}
                                 className="w-full text-left p-4 rounded-2xl border-2 border-dashed border-emerald-300 bg-emerald-50/60 hover:bg-emerald-100 hover:border-emerald-400 transition-all shadow-sm hover:shadow-md group cursor-pointer relative overflow-hidden"
                             >
@@ -778,6 +777,21 @@ Teléfono: ${phoneDisplay}`;
                                 </div>
                                 <p className="text-[11.5px] text-emerald-700 font-medium leading-relaxed relative z-10 line-clamp-2">
                                     Envía la confirmación final y registra el pedido en Ventas automáticamente.
+                                </p>
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (!selectedChat.isPaused) handleToggleBot();
+                                    handleManualCompletion(true);
+                                }}
+                                className="w-full text-left p-4 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50/60 hover:bg-slate-100 hover:border-slate-400 transition-all shadow-sm hover:shadow-md group cursor-pointer"
+                            >
+                                <div className="flex items-center justify-between mb-2 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                    <span>📋 Solo Registrar</span>
+                                    <span className="opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 transition-all duration-300">Sin mensaje</span>
+                                </div>
+                                <p className="text-[11.5px] text-slate-500 font-medium leading-relaxed line-clamp-2">
+                                    Registra la venta sin enviar confirmación al cliente.
                                 </p>
                             </button>
                         </div>
