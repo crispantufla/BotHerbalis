@@ -52,6 +52,31 @@ export const useChat = (selectedChatId) => {
         if (metaData?.chats) setChats(metaData.chats);
     }, [metaData]);
 
+    // Prefetch history for chats with recent activity (last 3h) — one at a time to not overwhelm WA
+    useEffect(() => {
+        if (!metaData?.chats?.length) return;
+        const threeHoursAgo = Date.now() - 3 * 60 * 60 * 1000;
+        const recent = metaData.chats
+            .filter(c => c.lastMessage?.timestamp && c.lastMessage.timestamp > threeHoursAgo)
+            .slice(0, 8); // max 8 chats
+
+        let cancelled = false;
+        (async () => {
+            for (const chat of recent) {
+                if (cancelled) break;
+                const key = ['messages', chat.id, selectedSellerId];
+                if (queryClient.getQueryData(key)) continue; // already cached
+                await queryClient.prefetchQuery({
+                    queryKey: key,
+                    queryFn: () => api.get(`/api/history/${chat.id}`).then(r => r.data),
+                    staleTime: 60 * 1000,
+                });
+                await new Promise(r => setTimeout(r, 800)); // stagger to avoid WA overload
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [metaData, selectedSellerId, queryClient]); // eslint-disable-line react-hooks/exhaustive-deps
+
     const { data: messagesData, isLoading: isLoadingMessages } = useQuery({
         queryKey: ['messages', selectedChatId, selectedSellerId],
         queryFn: async () => {

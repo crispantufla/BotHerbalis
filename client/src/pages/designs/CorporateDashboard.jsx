@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../../config/axios';
 import { useSocket } from '../../context/SocketContext';
 import { useAuth } from '../../context/AuthContext';
+import { useSeller } from '../../context/SellerContext';
 import { useToast } from '../../components/ui/Toast';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -23,8 +24,11 @@ import { Wifi, MessageCircle, Database, Settings, FileText, ImageIcon, LogOut, M
 const CorporateDashboard = () => {
     const { socket } = useSocket();
     const { logout, user, isAdmin } = useAuth();
+    const { selectedSellerId } = useSeller();
     const { toast } = useToast();
     const { isDark, toggleTheme } = useTheme();
+    // The seller whose status this dashboard shows: admin uses selectedSellerId, seller uses their own
+    const viewedSellerId = isAdmin ? selectedSellerId : user?.sellerId;
     const [status, setStatus] = useState('initializing');
     const [alerts, setAlerts] = useState([]);
     const [activeTab, setActiveTab] = useState('dashboard');
@@ -98,26 +102,36 @@ const CorporateDashboard = () => {
 
     useEffect(() => {
         if (socket) {
-            socket.on('qr', (data) => {
+            const handleQr = (data) => {
+                const evtSeller = typeof data === 'string' ? null : data?.sellerId;
+                if (evtSeller && viewedSellerId && evtSeller !== viewedSellerId) return;
                 setStatus('scan_qr');
-                // Admin socket sends { sellerId, qr }, seller socket sends raw string
                 setQrData(typeof data === 'string' ? data : data?.qr || null);
-            });
-            socket.on('ready', () => { setStatus('ready'); setQrData(null); fetchConfig(); });
-            socket.on('status_change', ({ status: newStatus }) => {
-                if (newStatus === 'disconnected') {
-                    setStatus('scan_qr');
-                    setQrData(null);
-                } else {
-                    setStatus(newStatus);
-                }
-            });
-            socket.on('new_alert', (newAlert) => {
-                setAlerts(prev => [newAlert, ...prev]);
-            });
+            };
+            const handleReady = (data) => {
+                if (data?.sellerId && viewedSellerId && data.sellerId !== viewedSellerId) return;
+                setStatus('ready'); setQrData(null); fetchConfig();
+            };
+            const handleStatusChange = ({ status: newStatus, sellerId: evtSeller }) => {
+                if (evtSeller && viewedSellerId && evtSeller !== viewedSellerId) return;
+                if (newStatus === 'disconnected') { setStatus('scan_qr'); setQrData(null); }
+                else setStatus(newStatus);
+            };
+            socket.on('qr', handleQr);
+            socket.on('ready', handleReady);
+            socket.on('status_change', handleStatusChange);
+            socket.on('new_alert', (newAlert) => setAlerts(prev => [newAlert, ...prev]));
             socket.on('alerts_updated', (updated) => setAlerts(updated));
+            return () => {
+                socket.off('qr', handleQr);
+                socket.off('ready', handleReady);
+                socket.off('status_change', handleStatusChange);
+            };
         }
+    }, [socket, fetchConfig, viewedSellerId]);
 
+    // Reload status when admin switches seller
+    useEffect(() => {
         const loadData = async () => {
             try {
                 const [alertRes, statusRes] = await Promise.all([
@@ -125,18 +139,19 @@ const CorporateDashboard = () => {
                     api.get('/api/status')
                 ]);
                 setAlerts(alertRes.data);
-                if (statusRes.data.status) setStatus(statusRes.data.status);
-                if (statusRes.data.qr) setQrData(statusRes.data.qr);
+                setStatus(statusRes.data.status || 'initializing');
+                setQrData(statusRes.data.qr || null);
                 if (statusRes.data.config) setConfig(statusRes.data.config);
                 if (statusRes.data.info?.wid?.user) setConnectedPhone(statusRes.data.info.wid.user);
+                else setConnectedPhone(null);
             } catch (e) { }
-        }
+        };
         loadData();
 
         const handleConfigUpdate = () => fetchConfig();
         window.addEventListener('config-updated', handleConfigUpdate);
         return () => window.removeEventListener('config-updated', handleConfigUpdate);
-    }, [socket, fetchConfig]);
+    }, [fetchConfig, viewedSellerId]);
 
     const [processingAction, setProcessingAction] = useState(null); // Prevent double-click
 
