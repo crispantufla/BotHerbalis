@@ -7,7 +7,7 @@ import ChatMessageList from './components/ChatMessageList';
 import ChatInputArea from './components/ChatInputArea';
 import AiCorrectionModal from './components/AiCorrectionModal';
 
-import { Search, Bot, Play, Pause, Trash2 as Trash, FileText as ScriptIcon, ChevronDown, Send, Paperclip, ShoppingCart, ArrowLeft, Type } from 'lucide-react';
+import { Search, Bot, Play, Pause, Trash2 as Trash, FileText as ScriptIcon, ChevronDown, Send, Paperclip, ShoppingCart, ArrowLeft, Type, X } from 'lucide-react';
 
 const CommsView = ({ initialChatId, onChatSelected, initialSearch = '', alerts = [], onAlertAction }) => {
     const { toast } = useToast();
@@ -36,6 +36,9 @@ const CommsView = ({ initialChatId, onChatSelected, initialSearch = '', alerts =
 
     const [showCorrectionModal, setShowCorrectionModal] = useState(false);
     const [reportedMsgId, setReportedMsgId] = useState(null);
+    const [showConfirmFillModal, setShowConfirmFillModal] = useState(false);
+    const [confirmFillTemplate, setConfirmFillTemplate] = useState('');
+    const [confirmFillData, setConfirmFillData] = useState({ product: '', plan: '60', total: '' });
 
     const {
         chats,
@@ -144,6 +147,42 @@ const CommsView = ({ initialChatId, onChatSelected, initialSearch = '', alerts =
                 .replace(/{{TOTAL}}/g, total ? `$${total}` : '$0');
         }
         return result;
+    };
+
+    // Extract product/plan/total from chat state first, then fallback to scanning messages
+    const extractConfirmationContext = () => {
+        let product = selectedChat?.selectedProduct || selectedChat?.cart?.[0]?.product || null;
+        let plan = selectedChat?.selectedPlan || selectedChat?.cart?.[0]?.plan || null;
+        let total = selectedChat?.totalPrice || null;
+
+        if (!product || !plan || !total) {
+            const allText = messages.map(m => m.body || '').join('\n');
+            if (!product) {
+                if (/c[áa]psulas?/i.test(allText)) product = 'Cápsulas de Nuez de la India';
+                else if (/semillas?/i.test(allText)) product = 'Semillas de Nuez de la India';
+                else if (/gotas?/i.test(allText)) product = 'Gotas de Nuez de la India';
+            }
+            if (!plan) {
+                if (/\b120\b/.test(allText)) plan = '120';
+                else if (/\b60\b/.test(allText)) plan = '60';
+            }
+            if (!total) {
+                const priceMatch = allText.match(/\$\s*(\d{2,3}[.,]\d{3})/);
+                if (priceMatch) total = priceMatch[1].replace(',', '.');
+            }
+        }
+        return { product, plan, total };
+    };
+
+    const buildConfirmMessage = (template, { product, plan, total }) => {
+        const costoLog = prices?.costoLogistico || '18.000';
+        const totalStr = total ? (total.startsWith('$') ? total : `$${total}`) : '$0';
+        return template
+            .replace(/{{PRODUCT}}/g, product || 'Producto')
+            .replace(/{{PLAN}}/g, plan || '60')
+            .replace(/{{TOTAL}}/g, totalStr)
+            .replace(/{{COSTO_LOGISTICO}}/g, costoLog)
+            .replace(/{{ADICIONAL_MAX}}/g, prices?.adicionalMAX || '6.000');
     };
 
     const handleSummarize = async () => {
@@ -739,9 +778,20 @@ Teléfono: ${phoneDisplay}`;
                                             <button
                                                 key={stepKey}
                                                 onClick={() => {
-                                                    // Magic: Auto pause Bot if human takes over
-                                                    if (!selectedChat.isPaused) handleToggleBot();
-                                                    setInput(formatScriptMessage(step.response, selectedChat));
+                                                    if (stepKey === 'confirmation') {
+                                                        const ctx = extractConfirmationContext();
+                                                        if (ctx.product && ctx.plan && ctx.total) {
+                                                            if (!selectedChat.isPaused) handleToggleBot();
+                                                            setInput(buildConfirmMessage(step.response, ctx));
+                                                        } else {
+                                                            setConfirmFillData({ product: ctx.product || '', plan: ctx.plan || '60', total: ctx.total || '' });
+                                                            setConfirmFillTemplate(step.response);
+                                                            setShowConfirmFillModal(true);
+                                                        }
+                                                    } else {
+                                                        if (!selectedChat.isPaused) handleToggleBot();
+                                                        setInput(formatScriptMessage(step.response, selectedChat));
+                                                    }
                                                 }}
                                                 className="w-full text-left p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-indigo-300 transition-all shadow-sm hover:shadow-md group cursor-pointer relative overflow-hidden"
                                             >
@@ -796,6 +846,97 @@ Teléfono: ${phoneDisplay}`;
                             </button>
                         </div>
 
+                    </div>
+                </div>
+            )}
+
+            {/* Confirmation Fill Modal */}
+            {showConfirmFillModal && (
+                <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowConfirmFillModal(false)} />
+                    <div className="relative z-10 w-full max-w-lg bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                        {/* Header */}
+                        <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-indigo-50 dark:bg-indigo-900/20">
+                            <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 flex items-center justify-center">
+                                    <ShoppingCart className="w-4 h-4" />
+                                </div>
+                                <div>
+                                    <h2 className="text-lg font-extrabold text-slate-800 dark:text-slate-100">Completar confirmación</h2>
+                                    <p className="text-xs text-slate-500 font-medium">No se detectó toda la info del pedido en la conversación</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowConfirmFillModal(false)} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        {/* Fields */}
+                        <div className="p-5 space-y-4 overflow-y-auto custom-scrollbar">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Producto</label>
+                                <select
+                                    value={confirmFillData.product}
+                                    onChange={e => setConfirmFillData(d => ({ ...d, product: e.target.value }))}
+                                    className="w-full bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-400 text-slate-800 dark:text-slate-100"
+                                >
+                                    <option value="">— Elegir producto —</option>
+                                    <option value="Cápsulas de Nuez de la India">Cápsulas de Nuez de la India</option>
+                                    <option value="Semillas de Nuez de la India">Semillas de Nuez de la India</option>
+                                    <option value="Gotas de Nuez de la India">Gotas de Nuez de la India</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Plan</label>
+                                <select
+                                    value={confirmFillData.plan}
+                                    onChange={e => setConfirmFillData(d => ({ ...d, plan: e.target.value }))}
+                                    className="w-full bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-400 text-slate-800 dark:text-slate-100"
+                                >
+                                    <option value="60">60 días</option>
+                                    <option value="120">120 días</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Total a pagar</label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">$</span>
+                                    <input
+                                        type="text"
+                                        value={confirmFillData.total}
+                                        onChange={e => setConfirmFillData(d => ({ ...d, total: e.target.value }))}
+                                        placeholder="46.900"
+                                        className="w-full bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl pl-7 pr-3 py-2.5 text-sm focus:outline-none focus:border-indigo-400 text-slate-800 dark:text-slate-100"
+                                    />
+                                </div>
+                            </div>
+                            {/* Live preview */}
+                            {(confirmFillData.product || confirmFillData.total) && (
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Vista previa</label>
+                                    <pre className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-[11px] text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed max-h-44 overflow-y-auto font-sans">
+                                        {buildConfirmMessage(confirmFillTemplate, confirmFillData)}
+                                    </pre>
+                                </div>
+                            )}
+                        </div>
+                        {/* Footer */}
+                        <div className="p-5 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex justify-end gap-3">
+                            <button onClick={() => setShowConfirmFillModal(false)} className="px-5 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors">
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (!confirmFillData.product) { toast.warning('Elegí el producto'); return; }
+                                    if (!confirmFillData.total) { toast.warning('Ingresá el total'); return; }
+                                    if (!selectedChat.isPaused) handleToggleBot();
+                                    setInput(buildConfirmMessage(confirmFillTemplate, confirmFillData));
+                                    setShowConfirmFillModal(false);
+                                }}
+                                className="px-6 py-2.5 rounded-xl font-bold text-white bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 shadow-md transition-all"
+                            >
+                                Insertar mensaje
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
