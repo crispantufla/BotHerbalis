@@ -132,6 +132,16 @@ function startServer(clientPool) {
         return next(new Error('Unauthorized'));
     });
 
+    // --- PRESENCE TRACKING ---
+    // Tracks which sellerId accounts have the web dashboard open (at least one socket connected)
+    const onlineSellers = new Map(); // sellerId → Set of socketIds
+
+    function broadcastPresence() {
+        io.to('admin').emit('sellers_presence', Object.fromEntries(
+            [...onlineSellers.entries()].map(([id, sockets]) => [id, sockets.size > 0])
+        ));
+    }
+
     // --- SOCKET ROOMS & SYNC ---
     io.on('connection', (socket) => {
         const account = socket.data.account;
@@ -146,6 +156,10 @@ function startServer(clientPool) {
         if (sellerId) {
             socket.join(sellerId);
             logger.debug(`[SOCKET] ${role} ${sellerId} joined room "${sellerId}"`);
+            // Track presence
+            if (!onlineSellers.has(sellerId)) onlineSellers.set(sellerId, new Set());
+            onlineSellers.get(sellerId).add(socket.id);
+            broadcastPresence();
         }
 
         // Auto-start Chrome for this seller (lazy start)
@@ -203,6 +217,11 @@ function startServer(clientPool) {
 
         socket.on('disconnect', (reason) => {
             logger.debug(`[SOCKET] Client disconnected: ${reason}`);
+            if (sellerId && onlineSellers.has(sellerId)) {
+                onlineSellers.get(sellerId).delete(socket.id);
+                if (onlineSellers.get(sellerId).size === 0) onlineSellers.delete(sellerId);
+                broadcastPresence();
+            }
         });
     });
 

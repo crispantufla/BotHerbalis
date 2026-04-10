@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useSeller } from '../../context/SellerContext';
 import { useSocket } from '../../context/SocketContext';
-import { ChevronDown, Users } from 'lucide-react';
+import { ChevronDown, Users, Wifi, WifiOff } from 'lucide-react';
 import { capitalize } from '../../utils/format';
 
 const SellerSelector = () => {
@@ -23,9 +23,9 @@ const SellerSelector = () => {
         setOpen(false);
     };
 
-    const statusDot = (seller) => {
-        if (seller.connected) return 'bg-emerald-500';
-        if (seller.running) return 'bg-amber-400';
+    // Dot = seller has web dashboard open
+    const presenceDot = (seller) => {
+        if (seller.webOnline) return 'bg-emerald-500';
         return 'bg-slate-300 dark:bg-slate-600';
     };
 
@@ -40,7 +40,7 @@ const SellerSelector = () => {
                     {selectedSeller ? capitalize(selectedSeller.name) : 'Seleccionar vendedor'}
                 </span>
                 {selectedSeller && (
-                    <span className={`w-2 h-2 rounded-full ${statusDot(selectedSeller)} flex-shrink-0`} />
+                    <span className={`w-2 h-2 rounded-full ${presenceDot(selectedSeller)} flex-shrink-0`} />
                 )}
                 <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
             </button>
@@ -54,13 +54,18 @@ const SellerSelector = () => {
                             className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors
                                 ${selectedSellerId === seller.sellerId ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-slate-700 dark:text-slate-200'}`}
                         >
-                            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${statusDot(seller)}`} />
+                            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${presenceDot(seller)}`} title={seller.webOnline ? 'Con la web abierta' : 'Sin sesión web activa'} />
                             <div className="flex-1 text-left min-w-0">
                                 <div className="truncate capitalize">{seller.name}</div>
                                 {seller.phoneNumber && (
                                     <div className="text-xs text-slate-400 dark:text-slate-500 truncate">+{seller.phoneNumber}</div>
                                 )}
                             </div>
+                            {seller.connected ? (
+                                <Wifi className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" title="Bot conectado" />
+                            ) : (
+                                <WifiOff className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 flex-shrink-0" title="Bot desconectado" />
+                            )}
                         </button>
                     ))}
 
