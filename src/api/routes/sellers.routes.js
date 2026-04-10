@@ -6,11 +6,8 @@ module.exports = (clientPool) => {
     const router = express.Router();
     const { jwtAuthMiddleware, requireAdmin } = require('../../middleware/jwtAuth');
 
-    // All sellers routes require admin role
-    router.use(jwtAuthMiddleware, requireAdmin);
-
     // GET /sellers — list all accounts with a sellerId (sellers + admin-sellers)
-    router.get('/sellers', async (req, res) => {
+    router.get('/sellers', jwtAuthMiddleware, requireAdmin, async (req, res) => {
         try {
             const accounts = await prisma.account.findMany({
                 where: { isActive: true, sellerId: { not: null } },
@@ -50,7 +47,7 @@ module.exports = (clientPool) => {
     });
 
     // POST /sellers/:id/start — start a seller's WhatsApp client
-    router.post('/sellers/:id/start', async (req, res) => {
+    router.post('/sellers/:id/start', jwtAuthMiddleware, requireAdmin, async (req, res) => {
         try {
             const { id } = req.params;
             const account = await prisma.account.findFirst({
@@ -72,7 +69,7 @@ module.exports = (clientPool) => {
     });
 
     // POST /sellers/:id/stop — stop a seller's WhatsApp client
-    router.post('/sellers/:id/stop', async (req, res) => {
+    router.post('/sellers/:id/stop', jwtAuthMiddleware, requireAdmin, async (req, res) => {
         try {
             const { id } = req.params;
             if (!clientPool.getSeller(id)) {
@@ -89,7 +86,7 @@ module.exports = (clientPool) => {
     });
 
     // POST /sellers/:id/restart — restart a seller's WhatsApp client
-    router.post('/sellers/:id/restart', async (req, res) => {
+    router.post('/sellers/:id/restart', jwtAuthMiddleware, requireAdmin, async (req, res) => {
         try {
             const { id } = req.params;
             await clientPool.restartSeller(id);
@@ -102,7 +99,7 @@ module.exports = (clientPool) => {
     });
 
     // POST /sellers/:id/wipe-session — wipe session data and restart fresh (QR scan required)
-    router.post('/sellers/:id/wipe-session', async (req, res) => {
+    router.post('/sellers/:id/wipe-session', jwtAuthMiddleware, requireAdmin, async (req, res) => {
         try {
             const { id } = req.params;
             await clientPool.wipeSessionAndRestart(id);
