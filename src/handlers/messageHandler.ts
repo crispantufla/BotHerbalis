@@ -58,12 +58,18 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
         logger.info(`[DEBOUNCE][${sellerId}] Processing ${sortedMessages.length} msg(s) from ${userId}: "${combinedText}"`);
 
         try {
-            const globalScript = config.activeScript === 'rotacion' ? 'v3' : (config.activeScript || 'v3');
-            const effectiveScript = userState[userId]?.assignedScript || globalScript;
-
-            if (userState[userId] && !userState[userId].assignedScript) {
-                userState[userId].assignedScript = effectiveScript;
-                saveState(userId);
+            const isRotacion = config.activeScript === 'rotacion';
+            let effectiveScript = userState[userId]?.assignedScript;
+            if (!effectiveScript) {
+                if (isRotacion) {
+                    effectiveScript = Math.random() < 0.5 ? 'v3' : 'v4';
+                } else {
+                    effectiveScript = config.activeScript || 'v3';
+                }
+                if (userState[userId]) {
+                    userState[userId].assignedScript = effectiveScript;
+                    saveState(userId);
+                }
             }
 
             await botQueue.add('process-message', { userId, combinedText, effectiveScript, startTime }, {

@@ -68,7 +68,7 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
     const pausedUsers = new Set<string>();
     const config: BotConfig = {
         alertNumbers: [],
-        activeScript: 'v3',
+        activeScript: 'rotacion',
         scriptStats: { v3: { started: 0, completed: 0 }, v4: { started: 0, completed: 0 } }
     };
 

@@ -84,9 +84,10 @@ export async function handleWaitingFinalConfirmation(
             const _payLabel = currentState.paymentMethod === 'mercadopago' ? '\n💳 PAGO: MercadoPago (ya abonado)' : currentState.paymentMethod === 'transferencia' ? '\n🏦 PAGO: Transferencia (pendiente confirmación)' : '\n💵 PAGO: Contra reembolso';
             if (notifyAdmin) await notifyAdmin(`⌛ Pedido POSTDATADO Requiere Aprobación`, userId, `Fecha envío: ${postdatado}\nDatos: ${o.nombre}, ${o.calle}\nCiudad: ${o.ciudad} | CP: ${o.cp}\nTotal: $${currentState.totalPrice || '0'}${_payLabel}`);
 
-            if (dependencies.config && dependencies.config.scriptStats && dependencies.config.activeScript) {
-                if (!dependencies.config.scriptStats[dependencies.config.activeScript]) dependencies.config.scriptStats[dependencies.config.activeScript] = { started: 0, completed: 0 };
-                dependencies.config.scriptStats[dependencies.config.activeScript].completed++;
+            const _trackScript = dependencies.effectiveScript || dependencies.config?.activeScript;
+            if (dependencies.config && dependencies.config.scriptStats && _trackScript && _trackScript !== 'rotacion') {
+                if (!dependencies.config.scriptStats[_trackScript]) dependencies.config.scriptStats[_trackScript] = { started: 0, completed: 0 };
+                dependencies.config.scriptStats[_trackScript].completed++;
             }
         }
 
@@ -108,9 +109,10 @@ export async function handleWaitingFinalConfirmation(
             const payLabel = currentState.paymentMethod === 'mercadopago' ? '\n💳 PAGO: MercadoPago (ya abonado)' : currentState.paymentMethod === 'transferencia' ? '\n🏦 PAGO: Transferencia (pendiente confirmación)' : '\n💵 PAGO: Contra reembolso';
             if (notifyAdmin) await notifyAdmin(`⌛ Pedido Requiere Aprobación`, userId, `Datos: ${o.nombre}, ${o.calle}\nCiudad: ${o.ciudad} | CP: ${o.cp}\nProvincia: ${o.provincia || '?'}\nItems: ${orderData.producto}\nTotal: $${currentState.totalPrice || '0'}${postdataLabel}${payLabel}`);
 
-            if (dependencies.config && dependencies.config.scriptStats && dependencies.config.activeScript) {
-                if (!dependencies.config.scriptStats[dependencies.config.activeScript]) dependencies.config.scriptStats[dependencies.config.activeScript] = { started: 0, completed: 0 };
-                dependencies.config.scriptStats[dependencies.config.activeScript].completed++;
+            const _trackScript = dependencies.effectiveScript || dependencies.config?.activeScript;
+            if (dependencies.config && dependencies.config.scriptStats && _trackScript && _trackScript !== 'rotacion') {
+                if (!dependencies.config.scriptStats[_trackScript]) dependencies.config.scriptStats[_trackScript] = { started: 0, completed: 0 };
+                dependencies.config.scriptStats[_trackScript].completed++;
             }
         }
 
@@ -143,9 +145,10 @@ export async function handleWaitingFinalConfirmation(
                 const payLabelAI = currentState.paymentMethod === 'mercadopago' ? '\n💳 PAGO: MercadoPago (ya abonado)' : currentState.paymentMethod === 'transferencia' ? '\n🏦 PAGO: Transferencia (pendiente confirmación)' : '\n💵 PAGO: Contra reembolso';
                 if (notifyAdmin) await notifyAdmin(`⌛ Pedido Requiere Aprobación`, userId, `Datos: ${o.nombre}, ${o.calle}\nCiudad: ${o.ciudad} | CP: ${o.cp}\nProvincia: ${o.provincia || '?'}\nItems: ${orderData.producto}\nTotal: $${currentState.totalPrice || '0'}${postdataLabel}${payLabelAI}`);
 
-                if (dependencies.config && dependencies.config.scriptStats && dependencies.config.activeScript) {
-                    if (!dependencies.config.scriptStats[dependencies.config.activeScript]) dependencies.config.scriptStats[dependencies.config.activeScript] = { started: 0, completed: 0 };
-                    dependencies.config.scriptStats[dependencies.config.activeScript].completed++;
+                const _trackScriptAI = dependencies.effectiveScript || dependencies.config?.activeScript;
+                if (dependencies.config && dependencies.config.scriptStats && _trackScriptAI && _trackScriptAI !== 'rotacion') {
+                    if (!dependencies.config.scriptStats[_trackScriptAI]) dependencies.config.scriptStats[_trackScriptAI] = { started: 0, completed: 0 };
+                    dependencies.config.scriptStats[_trackScriptAI].completed++;
                 }
             }
 
