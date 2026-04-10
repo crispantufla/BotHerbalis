@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useSeller } from '../../context/SellerContext';
 import { useSocket } from '../../context/SocketContext';
-import { ChevronDown, Wifi, WifiOff, Users } from 'lucide-react';
+import { ChevronDown, Users } from 'lucide-react';
 import { capitalize } from '../../utils/format';
 
 const SellerSelector = () => {
@@ -61,11 +61,6 @@ const SellerSelector = () => {
                                     <div className="text-xs text-slate-400 dark:text-slate-500 truncate">+{seller.phoneNumber}</div>
                                 )}
                             </div>
-                            {seller.connected ? (
-                                <Wifi className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
-                            ) : (
-                                <WifiOff className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 flex-shrink-0" />
-                            )}
                         </button>
                     ))}
 
