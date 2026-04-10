@@ -1,5 +1,4 @@
 import { UserState, FlowStep } from '../../types/state';
-import { _formatMessage } from '../utils/messages';
 import { _setStep, _pauseAndAlert } from '../utils/flowHelpers';
 import { _isAffirmative, _isNegative } from '../utils/validation';
 import logger from '../../utils/logger';
@@ -41,8 +40,23 @@ export async function handleWaitingOk(
         }
     }
     else if (_isAffirmative(normalizedText)) {
-        const msg = _formatMessage(knowledge.flow.closing.response, currentState);
-        _setStep(currentState, knowledge.flow.closing.nextStep);
+        const plan = currentState.selectedPlan || currentState.cart?.[0]?.plan || '60';
+        const adicional = currentState.adicionalMAX || 6000;
+        const adicionalStr = adicional.toLocaleString('es-AR');
+        const planLine = plan === '120'
+            ? `   ▸ Plan 120 días: sin adicional ✅`
+            : `   ▸ Plan 60 días: adicional de $${adicionalStr}\n   ▸ Plan 120 días: ese adicional está bonificado ✅`;
+
+        const msg = `¡Perfecto! 😊 Antes de los datos de envío, te cuento las opciones de pago.\n` +
+            `📦 *En todos los casos el envío es SIN COSTO*\n\n` +
+            `1️⃣ *Contra reembolso* — Pagás al cartero cuando te llega.\n${planLine}\n` +
+            `   Demora: 7 a 10 días hábiles\n\n` +
+            `2️⃣ *MercadoPago* — Sin adicional ni recargos.\n` +
+            `   Demora: 4 a 6 días hábiles 🚀\n\n` +
+            `3️⃣ *Transferencia bancaria* — Sin recargos.\n` +
+            `   Demora: 4 a 6 días hábiles\n\n` +
+            `¿Cuál te resulta más cómoda?`;
+        _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);

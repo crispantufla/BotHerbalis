@@ -252,7 +252,7 @@ export async function processSalesFlow(
     // 1.5. Silent Variable Extraction (Age/Weight out of band)
     // NOTE: We intentionally exclude 'waiting_weight' because in that step the user IS answering
     // the weight question — intercepting it here would send "¡Anotado!" instead of advancing the flow.
-    const activeSteps = ['waiting_preference', 'waiting_preference_consultation', 'waiting_plan_choice', 'waiting_ok', 'waiting_data'];
+    const activeSteps = ['waiting_preference', 'waiting_preference_consultation', 'waiting_plan_choice', 'waiting_ok', 'waiting_payment_method', 'waiting_mp_payment', 'waiting_data'];
     if (activeSteps.includes(currentState.step)) {
         const extraction = _extractSilentVariables(normalizedText, currentState);
         if (extraction.ageUpdated || extraction.weightUpdated) {

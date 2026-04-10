@@ -8,6 +8,8 @@ import { handleWaitingOk } from './stepWaitingOk';
 import { handleWaitingData } from './stepWaitingData';
 import { handleWaitingFinalConfirmation } from './stepWaitingFinalConfirmation';
 import { handleWaitingMapsConfirmation } from './stepWaitingMapsConfirmation';
+import { handleWaitingPaymentMethod } from './stepWaitingPaymentMethod';
+import { handleWaitingMpPayment } from './stepWaitingMpPayment';
 import { handleAdminSteps } from './stepAdmin';
 import { handleCompleted } from './stepCompleted';
 import logger from '../../utils/logger';
@@ -51,6 +53,12 @@ export async function processStep(
         case 'waiting_maps_confirmation':
             result = await handleWaitingMapsConfirmation(userId, text, normalizedText, currentState, knowledge, dependencies);
             break;
+        case 'waiting_payment_method':
+            result = await handleWaitingPaymentMethod(userId, text, normalizedText, currentState, knowledge, dependencies);
+            break;
+        case 'waiting_mp_payment':
+            result = await handleWaitingMpPayment(userId, text, normalizedText, currentState, knowledge, dependencies);
+            break;
         case 'waiting_admin_ok':
         case 'waiting_admin_validation':
             result = await handleAdminSteps(userId, text, normalizedText, currentState, knowledge, dependencies);
@@ -68,7 +76,11 @@ export async function processStep(
         default: {
             const { _setStep } = require('../utils/flowHelpers');
             logger.info(`[STALE-STEP] User ${userId} has unknown step "${currentState.step}". Migrating...`);
-            const stepMigrations: Record<string, string> = { 'waiting_legal_acceptance': 'waiting_final_confirmation' };
+            const stepMigrations: Record<string, string> = {
+                'waiting_legal_acceptance': 'waiting_final_confirmation',
+                'waiting_payment_method': 'waiting_payment_method', // already valid — just re-process
+                'waiting_mp_payment': 'waiting_payment_method',      // MP link likely expired — restart payment
+            };
             const migratedStep = stepMigrations[currentState.step];
 
             if (migratedStep) {

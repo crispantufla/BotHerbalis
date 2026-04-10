@@ -81,7 +81,8 @@ export async function handleWaitingFinalConfirmation(
             if (dependencies.saveOrderToLocal) dependencies.saveOrderToLocal(orderData);
 
             const o = currentState.pendingOrder || currentState.partialAddress || {};
-            if (notifyAdmin) await notifyAdmin(`⌛ Pedido POSTDATADO Requiere Aprobación`, userId, `Fecha envío: ${postdatado}\nDatos: ${o.nombre}, ${o.calle}\nCiudad: ${o.ciudad} | CP: ${o.cp}\nTotal: $${currentState.totalPrice || '0'}`);
+            const _payLabel = currentState.paymentMethod === 'mercadopago' ? '\n💳 PAGO: MercadoPago (ya abonado)' : currentState.paymentMethod === 'transferencia' ? '\n🏦 PAGO: Transferencia (pendiente confirmación)' : '\n💵 PAGO: Contra reembolso';
+            if (notifyAdmin) await notifyAdmin(`⌛ Pedido POSTDATADO Requiere Aprobación`, userId, `Fecha envío: ${postdatado}\nDatos: ${o.nombre}, ${o.calle}\nCiudad: ${o.ciudad} | CP: ${o.cp}\nTotal: $${currentState.totalPrice || '0'}${_payLabel}`);
 
             if (dependencies.config && dependencies.config.scriptStats && dependencies.config.activeScript) {
                 if (!dependencies.config.scriptStats[dependencies.config.activeScript]) dependencies.config.scriptStats[dependencies.config.activeScript] = { started: 0, completed: 0 };
@@ -104,7 +105,8 @@ export async function handleWaitingFinalConfirmation(
 
             const o = currentState.pendingOrder || currentState.partialAddress || {};
             const postdataLabel = currentState.postdatado ? `\n📅 POSTDATADO: ${currentState.postdatado}` : '';
-            if (notifyAdmin) await notifyAdmin(`⌛ Pedido Requiere Aprobación`, userId, `Datos: ${o.nombre}, ${o.calle}\nCiudad: ${o.ciudad} | CP: ${o.cp}\nProvincia: ${o.provincia || '?'}\nItems: ${orderData.producto}\nTotal: $${currentState.totalPrice || '0'}${postdataLabel}`);
+            const payLabel = currentState.paymentMethod === 'mercadopago' ? '\n💳 PAGO: MercadoPago (ya abonado)' : currentState.paymentMethod === 'transferencia' ? '\n🏦 PAGO: Transferencia (pendiente confirmación)' : '\n💵 PAGO: Contra reembolso';
+            if (notifyAdmin) await notifyAdmin(`⌛ Pedido Requiere Aprobación`, userId, `Datos: ${o.nombre}, ${o.calle}\nCiudad: ${o.ciudad} | CP: ${o.cp}\nProvincia: ${o.provincia || '?'}\nItems: ${orderData.producto}\nTotal: $${currentState.totalPrice || '0'}${postdataLabel}${payLabel}`);
 
             if (dependencies.config && dependencies.config.scriptStats && dependencies.config.activeScript) {
                 if (!dependencies.config.scriptStats[dependencies.config.activeScript]) dependencies.config.scriptStats[dependencies.config.activeScript] = { started: 0, completed: 0 };
@@ -138,7 +140,8 @@ export async function handleWaitingFinalConfirmation(
 
                 const o = currentState.pendingOrder || currentState.partialAddress || {};
                 const postdataLabel = currentState.postdatado ? `\n📅 POSTDATADO: ${currentState.postdatado}` : '';
-                if (notifyAdmin) await notifyAdmin(`⌛ Pedido Requiere Aprobación`, userId, `Datos: ${o.nombre}, ${o.calle}\nCiudad: ${o.ciudad} | CP: ${o.cp}\nProvincia: ${o.provincia || '?'}\nItems: ${orderData.producto}\nTotal: $${currentState.totalPrice || '0'}${postdataLabel}`);
+                const payLabelAI = currentState.paymentMethod === 'mercadopago' ? '\n💳 PAGO: MercadoPago (ya abonado)' : currentState.paymentMethod === 'transferencia' ? '\n🏦 PAGO: Transferencia (pendiente confirmación)' : '\n💵 PAGO: Contra reembolso';
+                if (notifyAdmin) await notifyAdmin(`⌛ Pedido Requiere Aprobación`, userId, `Datos: ${o.nombre}, ${o.calle}\nCiudad: ${o.ciudad} | CP: ${o.cp}\nProvincia: ${o.provincia || '?'}\nItems: ${orderData.producto}\nTotal: $${currentState.totalPrice || '0'}${postdataLabel}${payLabelAI}`);
 
                 if (dependencies.config && dependencies.config.scriptStats && dependencies.config.activeScript) {
                     if (!dependencies.config.scriptStats[dependencies.config.activeScript]) dependencies.config.scriptStats[dependencies.config.activeScript] = { started: 0, completed: 0 };
