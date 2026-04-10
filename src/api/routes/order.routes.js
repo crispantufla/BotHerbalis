@@ -375,12 +375,34 @@ module.exports = (clientPool) => {
                     }
                 }
             }
-            const plan = state.selectedPlan || cart[0]?.plan || '60';
+            // FALLBACK PRODUCT/PLAN/PRICE RESCUE: scan bot messages in history for the confirmation template
+            // This handles manually-managed conversations where the bot flow never set cart/selectedProduct.
+            let rescuedProduct = null, rescuedPlan = null, rescuedTotal = null;
+            if (cart.length === 0 && !state.selectedProduct) {
+                const history = state.history || [];
+                const botMessages = history.filter(m => m.role === 'bot').map(m => m.content || '').join('\n');
+                // Match "Producto: Cápsulas de Nuez de la India" style lines
+                const productMatch = botMessages.match(/Producto:\s*(.+?)(?:\n|Plan:|$)/i);
+                if (productMatch) rescuedProduct = productMatch[1].trim();
+                // Match "Plan: 60 días" or "Plan: 120 días"
+                const planMatch = botMessages.match(/Plan:\s*(\d+)/i);
+                if (planMatch) rescuedPlan = planMatch[1];
+                // Match "Total a pagar al recibir:\n$46.900" or "Total a abonar al recibir: $36.900"
+                const totalMatch = botMessages.match(/[Tt]otal[^:]*:\s*\$?\s*([\d.,]+)/);
+                if (totalMatch) rescuedTotal = parseInt(totalMatch[1].replace(/\./g, '').replace(',', '')) || null;
+                if (rescuedProduct || rescuedTotal) {
+                    logger.info(`[MANUAL-COMPLETE] Rescate de producto desde historial: ${rescuedProduct} / ${rescuedPlan} días / $${rescuedTotal}`);
+                }
+            }
+
+            const plan = state.selectedPlan || cart[0]?.plan || rescuedPlan || '60';
             // Prefer state.totalPrice (already includes adicionalMAX and reflects latest plan change)
             // Fall back to recalculating from cart only if totalPrice is missing.
             let total;
             if (state.totalPrice) {
                 total = parseInt(state.totalPrice.toString().replace(/\./g, '').replace(/[^\d]/g, '')) || 0;
+            } else if (rescuedTotal) {
+                total = rescuedTotal;
             } else {
                 const subtotal = cart.reduce((sum, i) => sum + parseInt((i.price || '0').toString().replace(/\D/g, '')), 0);
                 const adicional = state.adicionalMAX || 0;
@@ -405,7 +427,7 @@ module.exports = (clientPool) => {
                 return `${baseType} (${duration} días)`;
             };
 
-            const rawProduct = cart.map(i => i.product).join(' + ') || state.selectedProduct || 'Producto';
+            const rawProduct = cart.map(i => i.product).join(' + ') || state.selectedProduct || rescuedProduct || 'Producto';
             const rawPlan = cart.map(i => `${i.plan} días`).join(' + ') || `${plan} días`;
             const product = normalizeProductName(rawProduct, rawPlan, total);
 
@@ -430,6 +452,9 @@ module.exports = (clientPool) => {
 
                 if (existingOrder) {
                     logger.info(`[MANUAL-COMPLETE] Found existing Pendiente order ${existingOrder.id}, updating to Confirmado...`);
+                    // Also patch products/totalPrice if the existing order has placeholder values
+                    const needsProductPatch = product !== 'Desconocido' && (!existingOrder.products || existingOrder.products === 'Producto' || existingOrder.products === 'Desconocido');
+                    const needsPricePatch = total > 0 && (!existingOrder.totalPrice || existingOrder.totalPrice === 0);
                     return await tx.order.update({
                         where: { id: existingOrder.id },
                         data: {
@@ -441,6 +466,8 @@ module.exports = (clientPool) => {
                             ciudad: addr.ciudad || existingOrder.ciudad,
                             provincia: addr.provincia || existingOrder.provincia,
                             cp: addr.cp || existingOrder.cp,
+                            ...(needsProductPatch && { products: product }),
+                            ...(needsPricePatch && { totalPrice: total }),
                         }
                     });
                 } else {
