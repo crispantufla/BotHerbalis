@@ -149,26 +149,39 @@ const CommsView = ({ initialChatId, onChatSelected, initialSearch = '', alerts =
         return result;
     };
 
-    // Extract product/plan/total from chat state first, then fallback to scanning messages
+    // Extract product/plan/total from chat state first, then fallback to scanning messages.
+    // Plan is only trusted if the USER explicitly said 60 or 120 (not from the bot's price list).
+    // Total is only trusted if the bot mentioned exactly one price (not a multi-option list).
     const extractConfirmationContext = () => {
         let product = selectedChat?.selectedProduct || selectedChat?.cart?.[0]?.product || null;
         let plan = selectedChat?.selectedPlan || selectedChat?.cart?.[0]?.plan || null;
         let total = selectedChat?.totalPrice || null;
 
         if (!product || !plan || !total) {
-            const allText = messages.map(m => m.body || '').join('\n');
+            const userText = messages.filter(m => !m.fromMe).map(m => m.body || '').join('\n');
+            const botText  = messages.filter(m =>  m.fromMe).map(m => m.body || '').join('\n');
+            const allText  = messages.map(m => m.body || '').join('\n');
+
+            // Product: any message (bot usually echoes the choice)
             if (!product) {
                 if (/c[áa]psulas?/i.test(allText)) product = 'Cápsulas de Nuez de la India';
                 else if (/semillas?/i.test(allText)) product = 'Semillas de Nuez de la India';
-                else if (/gotas?/i.test(allText)) product = 'Gotas de Nuez de la India';
+                else if (/gotas?/i.test(allText))    product = 'Gotas de Nuez de la India';
             }
+
+            // Plan: only from USER messages — bot shows both 60 & 120, so scanning all text gives false positives
             if (!plan) {
-                if (/\b120\b/.test(allText)) plan = '120';
-                else if (/\b60\b/.test(allText)) plan = '60';
+                if (/\b120\b/.test(userText)) plan = '120';
+                else if (/\b60\b/.test(userText)) plan = '60';
             }
+
+            // Total: only if the bot mentioned exactly ONE distinct price (not a price list)
             if (!total) {
-                const priceMatch = allText.match(/\$\s*(\d{2,3}[.,]\d{3})/);
-                if (priceMatch) total = priceMatch[1].replace(',', '.');
+                const priceMatches = botText.match(/\$\s*\d{2,3}[.,]\d{3}/g) || [];
+                const uniquePrices = [...new Set(priceMatches)];
+                if (uniquePrices.length === 1) {
+                    total = uniquePrices[0].replace(/\$\s*/, '').replace(',', '.');
+                }
             }
         }
         return { product, plan, total };
