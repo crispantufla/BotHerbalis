@@ -95,11 +95,11 @@ export async function handleWaitingPlanChoice(
         currentState.adicionalMAX = applyMax ? _getAdicionalMAX() : 0;
         currentState.cart = foundItems;
 
-        const closingNode = knowledge.flow.closing;
-        _setStep(currentState, closingNode.nextStep);
-        currentState.history.push({ role: 'bot', content: closingNode.response, timestamp: Date.now() });
+        const paymentMsg = _buildPaymentMsg(currentState);
+        currentState.history.push({ role: 'bot', content: paymentMsg, timestamp: Date.now() });
+        _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
         saveState(userId);
-        await sendMessageWithDelay(userId, closingNode.response);
+        await sendMessageWithDelay(userId, paymentMsg);
         return { matched: true };
     }
 
@@ -144,9 +144,10 @@ export async function handleWaitingPlanChoice(
             await sendMessageWithDelay(userId, paymentMsg);
             _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
         } else {
-            currentState.history.push({ role: 'bot', content: closingNode.response, timestamp: Date.now() });
-            await sendMessageWithDelay(userId, closingNode.response);
-            _setStep(currentState, closingNode.nextStep);
+            const paymentMsg = _buildPaymentMsg(currentState);
+            currentState.history.push({ role: 'bot', content: paymentMsg, timestamp: Date.now() });
+            await sendMessageWithDelay(userId, paymentMsg);
+            _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
         }
 
         saveState(userId);
@@ -189,10 +190,10 @@ export async function handleWaitingPlanChoice(
                 await sendMessageWithDelay(userId, paymentMsg);
                 _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
             } else {
-                const combinedResponse = `¡Genial! 😊 Entonces confirmamos el plan de 120 días.\n\n${closingNode.response}`;
-                currentState.history.push({ role: 'bot', content: combinedResponse, timestamp: Date.now() });
-                await sendMessageWithDelay(userId, combinedResponse);
-                _setStep(currentState, closingNode.nextStep);
+                const paymentMsg = `¡Genial! 😊 Entonces confirmamos el plan de 120 días.\n\n` + _buildPaymentMsg(currentState);
+                currentState.history.push({ role: 'bot', content: paymentMsg, timestamp: Date.now() });
+                await sendMessageWithDelay(userId, paymentMsg);
+                _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
             }
 
             saveState(userId);
@@ -244,14 +245,14 @@ RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.
                         logger.info(`[FLOW-UPDATE] Saved plan ${plan} along with POSTDATADO.`);
                     }
 
-                    _setStep(currentState, closingNode.nextStep);
                     if (planAI.response) {
                         currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });
                         await sendMessageWithDelay(userId, planAI.response);
-                    } else {
-                        currentState.history.push({ role: 'bot', content: closingNode.response, timestamp: Date.now() });
-                        await sendMessageWithDelay(userId, closingNode.response);
                     }
+                    const paymentMsgPost = _buildPaymentMsg(currentState);
+                    currentState.history.push({ role: 'bot', content: paymentMsgPost, timestamp: Date.now() });
+                    await sendMessageWithDelay(userId, paymentMsgPost);
+                    _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
                     saveState(userId);
                     return { matched: true };
                 }
@@ -281,9 +282,10 @@ RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.
                             currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });
                             await sendMessageWithDelay(userId, planAI.response);
                         }
-                        currentState.history.push({ role: 'bot', content: closingNode.response, timestamp: Date.now() });
-                        await sendMessageWithDelay(userId, closingNode.response);
-                        _setStep(currentState, closingNode.nextStep);
+                        const paymentMsgAI = _buildPaymentMsg(currentState);
+                        currentState.history.push({ role: 'bot', content: paymentMsgAI, timestamp: Date.now() });
+                        await sendMessageWithDelay(userId, paymentMsgAI);
+                        _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
                     }
 
                     saveState(userId);
