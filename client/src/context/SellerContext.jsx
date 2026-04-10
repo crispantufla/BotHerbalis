@@ -62,9 +62,10 @@ export const SellerProvider = ({ children }) => {
     const selectedSeller = sellers.find(s => s.sellerId === selectedSellerId) || null;
 
     // Merge presence into sellers list for consumers
+    // sellerPresence[sellerId] = 'online' | 'idle' | undefined (offline)
     const sellersWithPresence = sellers.map(s => ({
         ...s,
-        webOnline: sellerPresence[s.sellerId] || false,
+        webPresence: sellerPresence[s.sellerId] || 'offline', // 'online' | 'idle' | 'offline'
     }));
 
     return (

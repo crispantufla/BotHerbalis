@@ -23,10 +23,17 @@ const SellerSelector = () => {
         setOpen(false);
     };
 
-    // Dot = seller has web dashboard open
+    // Dot = web presence: online=green, idle=orange, offline=grey
     const presenceDot = (seller) => {
-        if (seller.webOnline) return 'bg-emerald-500';
+        if (seller.webPresence === 'online') return 'bg-emerald-500';
+        if (seller.webPresence === 'idle')   return 'bg-orange-400';
         return 'bg-slate-300 dark:bg-slate-600';
+    };
+
+    const presenceTitle = (seller) => {
+        if (seller.webPresence === 'online') return 'Con la web abierta';
+        if (seller.webPresence === 'idle')   return 'Inactivo más de 10 min';
+        return 'Sin sesión web activa';
     };
 
     return (
@@ -54,7 +61,7 @@ const SellerSelector = () => {
                             className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors
                                 ${selectedSellerId === seller.sellerId ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-slate-700 dark:text-slate-200'}`}
                         >
-                            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${presenceDot(seller)}`} title={seller.webOnline ? 'Con la web abierta' : 'Sin sesión web activa'} />
+                            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${presenceDot(seller)}`} title={presenceTitle(seller)} />
                             <div className="flex-1 text-left min-w-0">
                                 <div className="truncate capitalize">{seller.name}</div>
                                 {seller.phoneNumber && (

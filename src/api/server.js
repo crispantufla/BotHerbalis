@@ -133,13 +133,38 @@ function startServer(clientPool) {
     });
 
     // --- PRESENCE TRACKING ---
-    // Tracks which sellerId accounts have the web dashboard open (at least one socket connected)
-    const onlineSellers = new Map(); // sellerId → Set of socketIds
+    // Tracks which sellerId accounts have the web dashboard open
+    // presence state per socket: 'online' | 'idle'
+    const socketPresence = new Map(); // socketId → { sellerId, state, idleTimer }
+    const IDLE_MS = 10 * 60 * 1000; // 10 minutes
+
+    function computeSellerState(sellerId) {
+        // If any socket for this seller is 'online' → online. All idle → idle. None → offline.
+        const sockets = [...socketPresence.values()].filter(p => p.sellerId === sellerId);
+        if (sockets.length === 0) return null;
+        return sockets.some(p => p.state === 'online') ? 'online' : 'idle';
+    }
 
     function broadcastPresence() {
-        io.to('admin').emit('sellers_presence', Object.fromEntries(
-            [...onlineSellers.entries()].map(([id, sockets]) => [id, sockets.size > 0])
-        ));
+        const sellerIds = [...new Set([...socketPresence.values()].map(p => p.sellerId))];
+        const presence = Object.fromEntries(sellerIds.map(id => [id, computeSellerState(id)]));
+        io.to('admin').emit('sellers_presence', presence);
+    }
+
+    function setSocketIdle(socketId) {
+        const entry = socketPresence.get(socketId);
+        if (!entry) return;
+        entry.state = 'idle';
+        broadcastPresence();
+    }
+
+    function resetIdleTimer(socketId) {
+        const entry = socketPresence.get(socketId);
+        if (!entry) return;
+        if (entry.idleTimer) clearTimeout(entry.idleTimer);
+        entry.state = 'online';
+        entry.idleTimer = setTimeout(() => setSocketIdle(socketId), IDLE_MS);
+        broadcastPresence();
     }
 
     // --- SOCKET ROOMS & SYNC ---
@@ -157,9 +182,11 @@ function startServer(clientPool) {
             socket.join(sellerId);
             logger.debug(`[SOCKET] ${role} ${sellerId} joined room "${sellerId}"`);
             // Track presence
-            if (!onlineSellers.has(sellerId)) onlineSellers.set(sellerId, new Set());
-            onlineSellers.get(sellerId).add(socket.id);
-            broadcastPresence();
+            socketPresence.set(socket.id, { sellerId, state: 'online', idleTimer: null });
+            resetIdleTimer(socket.id);
+
+            // Client pings periodically to stay 'online'
+            socket.on('activity_ping', () => resetIdleTimer(socket.id));
         }
 
         // Auto-start Chrome for this seller (lazy start)
@@ -217,9 +244,10 @@ function startServer(clientPool) {
 
         socket.on('disconnect', (reason) => {
             logger.debug(`[SOCKET] Client disconnected: ${reason}`);
-            if (sellerId && onlineSellers.has(sellerId)) {
-                onlineSellers.get(sellerId).delete(socket.id);
-                if (onlineSellers.get(sellerId).size === 0) onlineSellers.delete(sellerId);
+            const entry = socketPresence.get(socket.id);
+            if (entry) {
+                if (entry.idleTimer) clearTimeout(entry.idleTimer);
+                socketPresence.delete(socket.id);
                 broadcastPresence();
             }
         });

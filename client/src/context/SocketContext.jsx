@@ -48,7 +48,15 @@ export const SocketProvider = ({ children }) => {
 
         setSocket(newSocket);
 
-        return () => newSocket.close();
+        // Ping every 2 minutes so the server knows the tab is still active
+        const pingInterval = setInterval(() => {
+            if (newSocket.connected) newSocket.emit('activity_ping');
+        }, 2 * 60 * 1000);
+
+        return () => {
+            clearInterval(pingInterval);
+            newSocket.close();
+        };
     }, [user]);
 
     // Let components call socket.emit('switch-seller', id) directly
