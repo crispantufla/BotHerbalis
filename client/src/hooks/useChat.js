@@ -68,7 +68,7 @@ export const useChat = (selectedChatId) => {
                 if (queryClient.getQueryData(key)) continue; // already cached
                 await queryClient.prefetchQuery({
                     queryKey: key,
-                    queryFn: () => api.get(`/api/history/${chat.id}`).then(r => r.data),
+                    queryFn: () => api.get(`/api/history/${chat.id}?prefetch=1`).then(r => r.data),
                     staleTime: 60 * 1000,
                 });
                 await new Promise(r => setTimeout(r, 800)); // stagger to avoid WA overload

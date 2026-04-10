@@ -317,11 +317,13 @@ module.exports = (clientPool) => {
             let messages = [];
 
             // Fetch WA messages and DB messages in parallel
+            // Skip WA fetch for prefetch requests (background cache warm-up) — DB is enough there
+            const isPrefetch = req.query.prefetch === '1';
             const localMessagesPromise = getLocalHistory(chatId, resetAt, req.sellerId);
 
             try {
                 let waMessages = null;
-                for (let attempt = 1; attempt <= 2; attempt++) {
+                if (!isPrefetch) for (let attempt = 1; attempt <= 2; attempt++) {
                     try {
                         const chat = await withTimeout(cl?.getChatById(chatId), 3000, 'Timeout getting chat history');
                         waMessages = await withTimeout(chat?.fetchMessages({ limit: 20 }), 5000, 'Timeout fetching history messages');
@@ -383,7 +385,7 @@ module.exports = (clientPool) => {
                     .filter(r => r.status === 'fulfilled')
                     .map(r => r.value);
             } catch (waErr) {
-                logger.error(`[HISTORY] WA Fetch Error for ${chatId}:`, waErr.message);
+                logger.warn(`[HISTORY] WA Fetch skipped for ${chatId} (falling back to DB):`, waErr.message);
             }
 
             const localMessages = await localMessagesPromise;
