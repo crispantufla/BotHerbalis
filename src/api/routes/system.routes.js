@@ -407,8 +407,8 @@ module.exports = (clientPool) => {
         }
     });
 
-    // GET /script/:version (admin only)
-    router.get('/script/:version', ...withSeller(clientPool), requireAdmin, (req, res) => {
+    // GET /script/:version — readable by all authenticated users (sellers need it for the Guión panel)
+    router.get('/script/:version', ...withSeller(clientPool), (req, res) => {
         try {
             const { version } = req.params;
             const available = ['v1', 'v2', 'v3', 'v4'];
