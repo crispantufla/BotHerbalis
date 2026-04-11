@@ -120,6 +120,14 @@ export interface UserState {
     paymentMethod?: 'mercadopago' | 'contrarembolso' | 'transferencia' | null;
     mpPaymentLinkId?: string | null;  // ID del registro PaymentLink en DB
     mpPaymentLinkUrl?: string | null; // URL init_point enviada al cliente
+
+    // Objection detector: tracks which objection types already got a
+    // pre-calibrated rebuttal so we don't repeat the same canned line.
+    objectionsHandled?: Record<string, number>;
+
+    // Rolling summary: timestamp of last successful background summarization,
+    // used to rate-limit repeat calls to the summarizer.
+    lastSummarizedAt?: number;
 }
 
 export interface AlertOrderData {

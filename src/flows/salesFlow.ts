@@ -4,6 +4,7 @@ import logger from '../utils/logger';
 import { processGlobals } from './globals';
 import { processStep } from './steps';
 import { _pauseAndAlert, _setStep, _extractSilentVariables, _cleanPhone } from './utils/flowHelpers';
+import { detectObjection } from './utils/objectionDetector';
 
 interface SalesFlowDependencies {
     saveState: (userId?: string) => void;
@@ -296,6 +297,21 @@ export async function processSalesFlow(
     const globalsResult = await processGlobals(userId, text, normalizedText, currentState, knowledge, dependencies);
     if (globalsResult && globalsResult.matched) {
         return; // Handled globally!
+    }
+
+    // 2.5. Centralized objection detector — intercepts common rebuttable
+    // objections ("caro", "tengo que consultar", "lo pienso", etc.) with
+    // a pre-calibrated response. Skips AI entirely on match, which avoids
+    // long generic fallbacks and saves a completion call per objection.
+    const objection = detectObjection(currentState.step, normalizedText, currentState);
+    if (objection) {
+        logger.info(`[OBJECTION] Intercepted "${objection.type}" for ${userId} at step ${currentState.step}`);
+        currentState.history.push({ role: 'bot', content: objection.response, timestamp: Date.now() });
+        if (dependencies.sendMessageWithDelay) {
+            await dependencies.sendMessageWithDelay(userId, objection.response);
+        }
+        saveState(userId);
+        return { matched: true };
     }
 
     // 3. Process Specific Step Logic

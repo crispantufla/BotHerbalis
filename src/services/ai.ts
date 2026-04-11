@@ -7,6 +7,7 @@ import * as path from 'path';
 import * as os from 'os';
 import * as crypto from 'crypto';
 import { UserState, HistoryMessage } from '../types/state';
+import { lookupSemanticCache, storeSemanticCache } from './semanticCache';
 
 // --- RAG RULE BASE ---
 const RULE_BASE = [
@@ -121,7 +122,14 @@ export interface AIParsedResponse {
 const MODEL = "gpt-4o-mini";
 const MODEL_PREMIUM = "gpt-4o";
 const MAX_RETRIES = 3;
-const MAX_HISTORY_LENGTH = 50;
+const MAX_HISTORY_LENGTH = 15;
+// Trigger rolling summary once the active history exceeds this count. Lower
+// than MAX_HISTORY_LENGTH + safety margin so summaries happen earlier and
+// each chunk is small — cheaper per-call and the token budget stays flat.
+const SUMMARIZE_TRIGGER = 30;
+// Don't re-summarize more often than this (in ms). Prevents burning tokens
+// when a user sends many messages in quick succession.
+const SUMMARIZE_COOLDOWN_MS = 10 * 60 * 1000;
 
 // Steps that use the premium model (high-conversion, complex reasoning)
 const PREMIUM_STEPS = new Set([
@@ -651,6 +659,31 @@ INSTRUCCIONES:
 
         try {
             const step = context.step || 'general';
+
+            // ── Semantic cache lookup (FAQs / paraphrased questions) ──
+            // Only hits cacheable steps; skipped automatically otherwise.
+            // Respects conversation-specific state: if totalPrice, cart items,
+            // or a postdatado are present, we skip the cache because a cached
+            // reply could leak the wrong numbers/context into another chat.
+            const userStateSnap = context.userState;
+            const hasOrderContext = !!(
+                userStateSnap?.totalPrice ||
+                (userStateSnap?.cart && userStateSnap.cart.length > 0) ||
+                userStateSnap?.postdatado ||
+                (userStateSnap?.partialAddress && Object.keys(userStateSnap.partialAddress).length > 0)
+            );
+            if (!hasOrderContext) {
+                try {
+                    const cached = await lookupSemanticCache(this.client, step, userText);
+                    if (cached) {
+                        this.stats.cached++;
+                        return { response: cached.response, goalMet: false, extractedData: null };
+                    }
+                } catch (e: any) {
+                    logger.warn(`[AI] Semantic cache lookup errored: ${e.message}`);
+                }
+            }
+
             const chatModel = _getModelForStep(step);
             const systemPrompt = await _buildSystemPrompt(step, userText);
             const result: any = await this._callQueued(
@@ -686,6 +719,19 @@ INSTRUCCIONES:
             const toolCalls = result.choices[0].message?.tool_calls;
             if (toolCalls && toolCalls.length > 0) {
                 const args = JSON.parse(toolCalls[0].function.arguments);
+                // Persist FAQ-style responses into the semantic cache. We only
+                // store when the turn did not advance the flow and no data was
+                // extracted — that's the clearest signal the AI was just
+                // answering a question rather than taking action on the order.
+                if (
+                    args.response &&
+                    !args.goalMet &&
+                    !args.extractedData &&
+                    !hasOrderContext
+                ) {
+                    storeSemanticCache(this.client, step, userText, args.response)
+                        .catch(() => { /* best effort */ });
+                }
                 return {
                     response: args.response,
                     goalMet: args.goalMet,
@@ -701,22 +747,50 @@ INSTRUCCIONES:
     }
 
     /**
-     * Check if history needs summarization.
-     * Triggers when history exceeds 80 messages — summarizes the oldest and keeps the last 50.
+     * Rolling history summary.
+     *
+     * Called from the global flow after each user turn. If the active history
+     * is long enough AND enough time has passed since the last summary, we
+     * take everything older than the last MAX_HISTORY_LENGTH messages, merge
+     * it with the previous rolling summary (so context is never lost), and
+     * prune those messages out of state.
+     *
+     * Returns null when there's nothing to do — either the history is still
+     * short, or we're inside the cooldown window. Non-null results are the
+     * caller's responsibility to persist.
+     *
+     * Params:
+     *   - history: full history array (will NOT be mutated)
+     *   - previousSummary: existing state.summary, or null/empty on first run
+     *   - lastSummarizedAt: state.lastSummarizedAt (ms epoch), for rate limit
      */
-    async checkAndSummarize(history: HistoryMessage[]): Promise<{ summary: string; prunedHistory: HistoryMessage[] } | null> {
-        if (!history || history.length <= 80) return null;
+    async checkAndSummarize(
+        history: HistoryMessage[],
+        previousSummary?: string | null,
+        lastSummarizedAt?: number | null
+    ): Promise<{ summary: string; prunedHistory: HistoryMessage[]; lastSummarizedAt: number } | null> {
+        if (!history || history.length <= SUMMARIZE_TRIGGER) return null;
 
-        logger.info(`[AI] Summarizing history (${history.length} messages down to ${MAX_HISTORY_LENGTH})...`);
-        const summary = await this._callQueuedSummarize(history.slice(0, -MAX_HISTORY_LENGTH));
-        if (summary) {
-            logger.info(`[AI] Summary created: "${summary.substring(0, 50)}..."`);
-            return {
-                summary,
-                prunedHistory: history.slice(-MAX_HISTORY_LENGTH)
-            };
+        // Cooldown: don't thrash the summarizer for chatty users
+        const now = Date.now();
+        if (lastSummarizedAt && (now - lastSummarizedAt) < SUMMARIZE_COOLDOWN_MS) {
+            return null;
         }
-        return null;
+
+        const olderSlice = history.slice(0, -MAX_HISTORY_LENGTH);
+        if (olderSlice.length === 0) return null;
+
+        logger.info(`[AI] Rolling summary: ${history.length} msgs → pruning ${olderSlice.length}, keeping ${MAX_HISTORY_LENGTH} tail`);
+
+        const newSummary = await this._callQueuedSummarize(olderSlice, previousSummary || '');
+        if (!newSummary) return null;
+
+        logger.info(`[AI] Summary updated: "${newSummary.substring(0, 60)}..."`);
+        return {
+            summary: newSummary,
+            prunedHistory: history.slice(-MAX_HISTORY_LENGTH),
+            lastSummarizedAt: now,
+        };
     }
 
     /**
@@ -727,24 +801,47 @@ INSTRUCCIONES:
     }
 
     /**
-     * Summarize history through the queue
+     * Summarize history through the queue.
+     *
+     * If a previousSummary is provided, the prompt asks the model to MERGE
+     * the existing summary with the new chunk so context from the start of
+     * the conversation isn't lost across rolling summarizations.
      */
-    async _callQueuedSummarize(history: HistoryMessage[]): Promise<string | null> {
+    async _callQueuedSummarize(history: HistoryMessage[], previousSummary: string = ''): Promise<string | null> {
         const conversationText = history.map(msg =>
             `${msg.role === 'user' ? 'Cliente' : 'Vendedor'}: ${msg.content} `
         ).join('\n');
 
-        const cacheKey = `summary_${history.length}_${history.slice(-3).map(m => m.content).join('|')} `;
+        const cacheKey = `summary_${history.length}_${(previousSummary || '').substring(0, 20)}_${history.slice(-3).map(m => m.content).join('|')} `;
 
-        const prompt = `
-        Analizá la siguiente conversación de venta de productos naturales(Nuez de la India).
-        Generá un RESUMEN CONCISO(máximo 3 oraciones) que capture:
+        const prompt = previousSummary
+            ? `
+Estás manteniendo un RESUMEN ROLLING de una conversación larga de venta de Nuez de la India.
+Ya tenés un resumen previo del inicio de la conversación. Ahora te paso los MENSAJES NUEVOS
+que ocurrieron después. Tu tarea es producir UN NUEVO RESUMEN ACTUALIZADO (máximo 4 oraciones)
+que combine el resumen previo con lo que pasó en los mensajes nuevos, capturando:
 1. Qué productos le interesan al cliente.
-        2. Datos personales ya proporcionados(nombre, dirección, dudas).
-        3. En qué estado quedó la negociación(¿está dudando ? ¿ya compró ? ¿espera envío ?).
+2. Datos personales ya proporcionados (nombre, dirección, dudas).
+3. En qué estado quedó la negociación (¿está dudando? ¿ya compró? ¿espera envío?).
+4. Cualquier objeción ya respondida para no repetirnos.
 
-    CONVERSACIÓN:
-        ${conversationText}
+RESUMEN PREVIO:
+${previousSummary}
+
+MENSAJES NUEVOS:
+${conversationText}
+
+RESUMEN ACTUALIZADO:
+`
+            : `
+Analizá la siguiente conversación de venta de productos naturales (Nuez de la India).
+Generá un RESUMEN CONCISO (máximo 3 oraciones) que capture:
+1. Qué productos le interesan al cliente.
+2. Datos personales ya proporcionados (nombre, dirección, dudas).
+3. En qué estado quedó la negociación (¿está dudando? ¿ya compró? ¿espera envío?).
+
+CONVERSACIÓN:
+${conversationText}
 
 RESUMEN:
 `;
@@ -758,7 +855,7 @@ RESUMEN:
                         { role: "user", content: prompt }
                     ],
                     temperature: 0.3,
-                    max_tokens: 200
+                    max_tokens: 250
                 }),
                 cacheKey
             );

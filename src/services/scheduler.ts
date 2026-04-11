@@ -488,6 +488,61 @@ function cleanStalePausedUsers(sharedState: SchedulerSharedState, dependencies: 
     }
 }
 
+/**
+ * rollupRescueMetrics — Persists abandoned-cart rescue conversion metrics.
+ *
+ * The scheduler's existing checkAbandonedCarts/checkColdLeads/checkSecondFollowUp
+ * jobs write `followUpData` into each user's state and rely on `_setStep` to
+ * mark `converted: true` when the user advances. That data is only useful if
+ * it's aggregated somewhere durable — otherwise dashboards only show a
+ * point-in-time snapshot of whoever happens to still be in memory.
+ *
+ * This job walks userState looking for `followUpData` entries that haven't
+ * been rolled into `config.rescueStats` yet, bumps the counters, and marks
+ * them as counted so the same conversion can't be double-counted across
+ * scheduler runs. Counters are grouped by type + reason so the dashboard can
+ * show which rebuttal strategy is converting best.
+ */
+function rollupRescueMetrics(sharedState: SchedulerSharedState, dependencies: SchedulerDependencies): void {
+    const { userState, config } = sharedState as SchedulerSharedState & { config?: any };
+    if (!config) return;
+
+    if (!config.rescueStats) {
+        config.rescueStats = { sent: 0, converted: 0, byType: {}, byReason: {} };
+    }
+    const stats = config.rescueStats;
+    stats.byType = stats.byType || {};
+    stats.byReason = stats.byReason || {};
+
+    let dirty = false;
+    for (const [userId, state] of Object.entries(userState)) {
+        const fd: any = state.followUpData;
+        if (!fd) continue;
+        if (fd.counted) continue;
+
+        // Only count once per follow-up. If it was sent but not converted, we
+        // still record the "sent" bucket so conversion rate is meaningful.
+        stats.sent++;
+        stats.byType[fd.type] = (stats.byType[fd.type] || 0) + 1;
+        stats.byReason[fd.reason] = stats.byReason[fd.reason] || { sent: 0, converted: 0 };
+        stats.byReason[fd.reason].sent++;
+        if (fd.converted) {
+            stats.converted++;
+            stats.byReason[fd.reason].converted++;
+        }
+
+        fd.counted = true;
+        dirty = true;
+        dependencies.saveState(userId);
+    }
+
+    if (dirty) {
+        const rate = stats.sent > 0 ? ((stats.converted / stats.sent) * 100).toFixed(1) : '0.0';
+        logger.info(`[SCHEDULER] Rescue metrics: ${stats.converted}/${stats.sent} (${rate}%)`);
+        dependencies.saveState();
+    }
+}
+
 // ══════════════════════════════════════════════════════════════
 // CRON SCHEDULER — All times in Argentina (UTC-3)
 // ══════════════════════════════════════════════════════════════
@@ -522,6 +577,14 @@ function startScheduler(sharedState: SchedulerSharedState, dependencies: Schedul
         checkSecondFollowUp(sharedState, dependencies);
     }, { timezone: TIMEZONE });
     logger.info('[SCHEDULER] ✅ checkSecondFollowUp → 14:00 ARG (diario)');
+
+    // ── RESCUE METRICS ROLLUP: a las 23:50 Argentina ──
+    // Aggrega followUpData pendiente en config.rescueStats para métricas durables.
+    // Corre justo antes del snapshot diario para que los números del día queden persistidos.
+    cron.schedule('50 23 * * *', () => {
+        rollupRescueMetrics(sharedState, dependencies);
+    }, { timezone: TIMEZONE });
+    logger.info('[SCHEDULER] ✅ rollupRescueMetrics → 23:50 ARG (diario)');
 
     // ── DAILY STATS SNAPSHOT: a las 23:55 Argentina ──
     // Guarda el total de chats en BD antes de perderlos por rotación.

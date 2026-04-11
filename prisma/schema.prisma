@@ -156,3 +156,21 @@ model QuickReply {
   @@index([instanceId])
   @@unique([instanceId, title])
 }
+
+// Semantic cache: stores FAQ-style bot responses keyed by embedding similarity.
+// The embedding is persisted as JSON-serialized Float[] in a Text column so
+// Postgres native vector support isn't required. Cosine similarity is computed
+// in-process over a small per-step candidate window.
+model AiSemanticCache {
+  id          String   @id @default(uuid())
+  step        String   // e.g. "waiting_preference", "waiting_ok"
+  userText    String   // raw (lowercased) user message — kept for debug
+  embedding   String   // JSON Float[] (1536 dims for text-embedding-3-small)
+  response    String   // bot response to serve verbatim
+  hits        Int      @default(0)
+  createdAt   DateTime @default(now())
+  lastHit     DateTime @default(now())
+
+  @@index([step])
+  @@index([lastHit])
+}

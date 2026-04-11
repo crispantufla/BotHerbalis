@@ -158,12 +158,19 @@ export async function handleSystemGlobals(
         return { matched: true };
     }
 
-    // Summarize history if too long (Priority 0 background task)
-    if (currentState.history && currentState.history.length > 50) {
-        const summaryResult = await aiService.checkAndSummarize(currentState.history);
+    // Rolling summary: trigger earlier (>30) so each chunk stays small and
+    // token cost per AI call remains flat. checkAndSummarize self-guards
+    // with a cooldown so chatty users don't burn summaries every turn.
+    if (currentState.history && currentState.history.length > 30) {
+        const summaryResult = await aiService.checkAndSummarize(
+            currentState.history,
+            currentState.summary,
+            currentState.lastSummarizedAt
+        );
         if (summaryResult) {
             currentState.summary = summaryResult.summary;
             currentState.history = summaryResult.prunedHistory;
+            currentState.lastSummarizedAt = summaryResult.lastSummarizedAt;
             saveState(userId);
         }
     }
