@@ -4,10 +4,22 @@ const { prisma } = require('../../../db');
 
 module.exports = (clientPool) => {
     const router = express.Router();
-    const { jwtAuthMiddleware, requireAdmin } = require('../../middleware/jwtAuth');
+    const { jwtAuthMiddleware, requireAdmin, requireGlobalAdmin } = require('../../middleware/jwtAuth');
 
-    // GET /sellers — list all accounts with a sellerId (sellers + admin-sellers)
-    router.get('/sellers', jwtAuthMiddleware, requireAdmin, async (req, res) => {
+    /**
+     * Lifecycle ops (start/stop/restart/wipe) are allowed for:
+     *   - global admins (can act on any seller)
+     *   - tenant admins / sellers, but ONLY on their own sellerId
+     */
+    function canOperateOnSeller(req, targetSellerId) {
+        if (!req.account) return false;
+        if (req.account.role === 'admin' && !req.account.sellerId) return true; // global
+        return req.account.sellerId === targetSellerId;
+    }
+
+    // GET /sellers — list all accounts with a sellerId (global admin only;
+    // tenant admins don't need the list since they can't switch).
+    router.get('/sellers', jwtAuthMiddleware, requireGlobalAdmin, async (req, res) => {
         try {
             const accounts = await prisma.account.findMany({
                 where: { isActive: true, sellerId: { not: null } },
@@ -50,6 +62,9 @@ module.exports = (clientPool) => {
     router.post('/sellers/:id/start', jwtAuthMiddleware, requireAdmin, async (req, res) => {
         try {
             const { id } = req.params;
+            if (!canOperateOnSeller(req, id)) {
+                return res.status(403).json({ error: 'Forbidden: cannot operate on another seller' });
+            }
             const account = await prisma.account.findFirst({
                 where: { sellerId: id, isActive: true }
             });
@@ -72,6 +87,9 @@ module.exports = (clientPool) => {
     router.post('/sellers/:id/stop', jwtAuthMiddleware, requireAdmin, async (req, res) => {
         try {
             const { id } = req.params;
+            if (!canOperateOnSeller(req, id)) {
+                return res.status(403).json({ error: 'Forbidden: cannot operate on another seller' });
+            }
             if (!clientPool.getSeller(id)) {
                 return res.status(404).json({ error: 'El seller no está corriendo' });
             }
@@ -89,6 +107,9 @@ module.exports = (clientPool) => {
     router.post('/sellers/:id/restart', jwtAuthMiddleware, requireAdmin, async (req, res) => {
         try {
             const { id } = req.params;
+            if (!canOperateOnSeller(req, id)) {
+                return res.status(403).json({ error: 'Forbidden: cannot operate on another seller' });
+            }
             await clientPool.restartSeller(id);
             logger.info(`[SELLERS] Admin restarted seller: ${id}`);
             res.json({ success: true, message: `Seller ${id} reiniciado` });
@@ -102,6 +123,9 @@ module.exports = (clientPool) => {
     router.post('/sellers/:id/wipe-session', jwtAuthMiddleware, requireAdmin, async (req, res) => {
         try {
             const { id } = req.params;
+            if (!canOperateOnSeller(req, id)) {
+                return res.status(403).json({ error: 'Forbidden: cannot operate on another seller' });
+            }
             await clientPool.wipeSessionAndRestart(id);
             logger.info(`[SELLERS] Seller ${id} restarted with clean session`);
             res.json({ success: true, message: `Sesión de ${id} limpiada. Escaneá el QR.` });

@@ -152,16 +152,23 @@ async function _pauseAndAlert(userId: string, currentState: UserState, dependenc
         );
     }
 
-    // Emit alert to dashboard
+    // Emit alert to dashboard — scoped to this seller + admin room
     if (sharedState && sharedState.io) {
-        sharedState.io.emit('bot_paused', {
+        const payload = {
             userId,
             reason,
             lastMessage: userMessage,
             step: currentState.step,
             nightMode: !duringBusinessHours,
             timestamp: new Date()
-        });
+        };
+        const sellerId = (sharedState as any).sellerId;
+        if (sellerId) {
+            sharedState.io.to(sellerId).emit('bot_paused', payload);
+            sharedState.io.to('admin').emit('bot_paused', { ...payload, sellerId });
+        } else {
+            sharedState.io.emit('bot_paused', payload);
+        }
     }
 
     logger.info(`⏸️ [BOT] User ${userId} paused. Reason: ${reason}${nightLabel}`);

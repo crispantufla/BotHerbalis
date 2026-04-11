@@ -22,8 +22,9 @@ import { UserState } from '../types/state';
 const TIMEZONE = 'America/Argentina/Buenos_Aires';
 
 // ── Mutex flags (prevent concurrent executions from cron + boot overlap) ──
-// Timestamp-based guard: if previous run started >5 min ago, assume it hung and allow re-entry
-let _autoApproveStartedAt = 0;
+// Per-seller, stored on each SharedState so one seller's long-running job
+// does not block other sellers' schedulers. Timestamp-based guard: if previous
+// run started >5 min ago, assume it hung and allow re-entry.
 const AUTO_APPROVE_MAX_DURATION_MS = 5 * 60 * 1000;
 
 interface SchedulerSharedState {
@@ -198,14 +199,15 @@ function checkStaleUsers(sharedState: SchedulerSharedState, dependencies: Schedu
  */
 async function autoApproveOrders(sharedState: SchedulerSharedState, dependencies: SchedulerDependencies): Promise<void> {
     const now0 = Date.now();
-    if (_autoApproveStartedAt > 0 && (now0 - _autoApproveStartedAt) < AUTO_APPROVE_MAX_DURATION_MS) {
-        logger.info('[SCHEDULER] autoApproveOrders already running, skipping.');
+    const startedAt = sharedState._autoApproveStartedAt || 0;
+    if (startedAt > 0 && (now0 - startedAt) < AUTO_APPROVE_MAX_DURATION_MS) {
+        logger.info(`[SCHEDULER][${sharedState.sellerId || '?'}] autoApproveOrders already running, skipping.`);
         return;
     }
-    if (_autoApproveStartedAt > 0) {
-        logger.warn(`[SCHEDULER] Previous autoApproveOrders appears hung (started ${Math.round((now0 - _autoApproveStartedAt) / 1000)}s ago). Re-entering.`);
+    if (startedAt > 0) {
+        logger.warn(`[SCHEDULER][${sharedState.sellerId || '?'}] Previous autoApproveOrders appears hung (started ${Math.round((now0 - startedAt) / 1000)}s ago). Re-entering.`);
     }
-    _autoApproveStartedAt = now0;
+    sharedState._autoApproveStartedAt = now0;
     try {
         const { userState } = sharedState;
         const { sendMessageWithDelay, notifyAdmin, saveState, saveOrderToLocal } = dependencies;
@@ -261,7 +263,7 @@ async function autoApproveOrders(sharedState: SchedulerSharedState, dependencies
             }
         }
     } finally {
-        _autoApproveStartedAt = 0;
+        sharedState._autoApproveStartedAt = 0;
     }
 }
 
@@ -651,10 +653,9 @@ async function snapshotDailyStats(sharedState?: SchedulerSharedState) {
  * Polls MercadoPago for any PaymentLink still in 'pending' status (created < 48h ago)
  * and updates the DB + emits socket if the status changed.
  */
-let _refreshPaymentsRunning = false;
 async function refreshPendingPayments(sharedState: SchedulerSharedState): Promise<void> {
-    if (_refreshPaymentsRunning) return;
-    _refreshPaymentsRunning = true;
+    if (sharedState._refreshPaymentsRunning) return;
+    sharedState._refreshPaymentsRunning = true;
     try {
         const mpToken = process.env.MP_ACCESS_TOKEN;
         if (!mpToken) return;
@@ -668,8 +669,14 @@ async function refreshPendingPayments(sharedState: SchedulerSharedState): Promis
         const since = new Date();
         since.setHours(since.getHours() - 48);
 
+        // Multi-tenant scoping: only this seller's payment links
+        const sellerId = sharedState.sellerId;
         const pending = await prisma.paymentLink.findMany({
-            where: { status: 'pending', createdAt: { gte: since } },
+            where: {
+                status: 'pending',
+                createdAt: { gte: since },
+                ...(sellerId ? { instanceId: sellerId } : {}),
+            },
             take: 50,
         });
 
@@ -701,8 +708,11 @@ async function refreshPendingPayments(sharedState: SchedulerSharedState): Promis
                     }
                 });
 
-                if (sharedState.io) sharedState.io.emit('payment_updated', updated);
-                logger.info(`[SCHEDULER] Payment ${payment.id} updated: pending → ${newStatus}`);
+                if (sharedState.io) {
+                    if (sellerId) sharedState.io.to(sellerId).emit('payment_updated', updated);
+                    sharedState.io.to('admin').emit('payment_updated', { ...updated, sellerId });
+                }
+                logger.info(`[SCHEDULER][${sellerId || '?'}] Payment ${payment.id} updated: pending → ${newStatus}`);
             } catch (e: any) {
                 logger.error(`[SCHEDULER] Error refreshing payment ${payment.id}: ${e?.message || e}`);
             }
@@ -710,7 +720,7 @@ async function refreshPendingPayments(sharedState: SchedulerSharedState): Promis
     } catch (e: any) {
         logger.error('[SCHEDULER] Error in refreshPendingPayments:', e.message);
     } finally {
-        _refreshPaymentsRunning = false;
+        sharedState._refreshPaymentsRunning = false;
     }
 }
 

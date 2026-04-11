@@ -57,11 +57,12 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
                 const cleanPhone = chatId.replace('@c.us', '').replace(/\D/g, '');
                 if (!cleanPhone) return;
 
+                // P2002 = concurrent upsert race — record was just created by another call, safe to ignore
                 await prisma.user.upsert({
                     where: { phone_instanceId: { phone: cleanPhone, instanceId: sellerId } },
                     update: {},
                     create: { phone: cleanPhone, instanceId: sellerId }
-                });
+                }).catch((e: any) => { if (e?.code !== 'P2002') throw e; });
 
                 await prisma.chatLog.create({
                     data: { userPhone: cleanPhone, role: sender, content: text, instanceId: sellerId }

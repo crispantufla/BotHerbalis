@@ -33,6 +33,17 @@ module.exports = (clientPool) => {
     // Access io dynamically via the seller's sharedState
     const io = (req) => req.sellerInstance?.sharedState?.io || null;
 
+    // Emit an event scoped to this seller's room + the admin room, so events
+    // do not leak across tenants. Includes `sellerId` on admin payloads so
+    // admin dashboards can route the event to the correct seller context.
+    const emitScoped = (req, event, payload) => {
+        const socket = io(req);
+        if (!socket) return;
+        const sellerId = req.sellerId;
+        if (sellerId) socket.to(sellerId).emit(event, payload);
+        socket.to('admin').emit(event, sellerId ? { ...payload, sellerId } : payload);
+    };
+
     // GET /orders (List orders from PostgreSQL with Pagination)
     router.get('/orders', ...withSeller(clientPool), async (req, res) => {
         try {
@@ -168,7 +179,7 @@ module.exports = (clientPool) => {
                 createdAt: updatedOrder.createdAt.toISOString()
             };
 
-            if (io(req)) io(req).emit('order_update', legacyOrder);
+            emitScoped(req, 'order_update', legacyOrder);
             res.json({ success: true, order: legacyOrder });
         } catch (error) {
             logger.error('[ROUTES] Error updating order:', error);
@@ -257,7 +268,7 @@ module.exports = (clientPool) => {
             };
 
 
-            if (io(req)) io(req).emit('order_update', legacyOrder);
+            emitScoped(req, 'order_update', legacyOrder);
             res.json({ success: true, order: legacyOrder });
 
         } catch (error) {
@@ -285,7 +296,7 @@ module.exports = (clientPool) => {
 
             // (Google Sheets fallback removed via DB migration)
 
-            if (io(req)) io(req).emit('order_delete', { id });
+            emitScoped(req, 'order_delete', { id });
             res.json({ success: true, deleted: { id } });
 
         } catch (error) {
@@ -541,9 +552,7 @@ module.exports = (clientPool) => {
             };
 
             // Emit socket event for real-time dashboard update
-            if (io(req)) {
-                io(req).emit('order_update', { action: 'created', order: legacyOrder });
-            }
+            emitScoped(req, 'order_update', { action: 'created', order: legacyOrder });
 
             // Clear the alert from sessionAlerts so it doesn't reappear on reload
             const alerts = sellerSharedState?.sessionAlerts;
@@ -551,7 +560,7 @@ module.exports = (clientPool) => {
                 const alertIndex = alerts.findIndex(a => a.userPhone === phoneNumeric || a.userPhone === chatId);
                 if (alertIndex !== -1) {
                     alerts.splice(alertIndex, 1);
-                    if (io(req)) io(req).emit('alerts_updated', alerts);
+                    emitScoped(req, 'alerts_updated', alerts);
                     logger.info(`[MANUAL-COMPLETE] Alert cleared for ${phoneNumeric}`);
                 }
             }

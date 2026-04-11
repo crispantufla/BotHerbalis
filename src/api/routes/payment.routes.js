@@ -72,7 +72,11 @@ module.exports = (clientPool) => {
                 }
             });
 
-            if (io) io.emit('payment_updated', updated);
+            if (io) {
+                const sellerId = req.sellerId || payment.instanceId;
+                if (sellerId) io.to(sellerId).emit('payment_updated', updated);
+                io.to('admin').emit('payment_updated', { ...updated, sellerId });
+            }
             res.json({ payment: updated, changed: updated.status !== payment.status });
         } catch (e) {
             logger.error(`[PAYMENTS] Error refreshing payment: ${e?.message || e} | status: ${e?.status} | cause: ${JSON.stringify(e?.cause || e?.response?.data || '')}`);
@@ -149,10 +153,14 @@ module.exports = (clientPool) => {
                 }
             });
 
-            // Emit to any available seller's socket (MP is global, emit to all)
-            const anyInstance = clientPool.getAllSellers()?.[0];
-            const io = anyInstance?.sharedState?.io;
-            if (io) io.emit('payment_updated', updated);
+            // Route the update to the seller that owns the payment link, plus admin room
+            const sellerId = payment.instanceId;
+            const ownerInstance = sellerId ? clientPool.getSeller(sellerId) : null;
+            const io = ownerInstance?.sharedState?.io || clientPool.getAllSellers()?.[0]?.sharedState?.io;
+            if (io) {
+                if (sellerId) io.to(sellerId).emit('payment_updated', updated);
+                io.to('admin').emit('payment_updated', { ...updated, sellerId });
+            }
             logger.info(`[MP-WEBHOOK] Payment ${payment.id} updated to ${newStatus}`);
         } catch (e) {
             logger.error('[MP-WEBHOOK] Error processing webhook:', e);

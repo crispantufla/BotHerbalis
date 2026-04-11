@@ -25,6 +25,17 @@ module.exports = (clientPool) => {
         };
     };
 
+    // Emit an event scoped to the seller room + admin room so per-seller
+    // events never leak across tenants. For events that should fan out to
+    // every socket (e.g. shared catalog updates) use io.emit directly.
+    const emitScoped = (req, event, payload) => {
+        const socket = req.sellerInstance?.sharedState?.io;
+        if (!socket) return;
+        const sellerId = req.sellerId;
+        if (sellerId) socket.to(sellerId).emit(event, payload);
+        socket.to('admin').emit(event, sellerId ? { ...payload, sellerId } : payload);
+    };
+
     // GET /health — Real system health check
     router.get('/health', ...withSeller(clientPool), (req, res) => {
         const { ss, userState, pausedUsers, sessionAlerts } = getCtx(req);
@@ -119,7 +130,7 @@ module.exports = (clientPool) => {
         const index = sessionAlerts.findIndex(a => a.userPhone === userPhone || a.userPhone === `${userPhone}@c.us`);
         if (index !== -1) {
             sessionAlerts.splice(index, 1);
-            if (io) io.emit('alerts_updated', sessionAlerts);
+            emitScoped(req, 'alerts_updated', sessionAlerts);
             logger.info(`[ALERTS] Dismissed alert for ${userPhone}`);
         }
         res.json({ success: true, remaining: sessionAlerts.length });
@@ -288,7 +299,7 @@ module.exports = (clientPool) => {
             config.globalPause = !config.globalPause;
             if (ss?.saveState) ss.saveState();
 
-            if (io) io.emit('global_pause_changed', { globalPause: config.globalPause });
+            emitScoped(req, 'global_pause_changed', { globalPause: config.globalPause });
 
             logger.info(`[SYSTEM] Global Pause toggled to: ${config.globalPause}`);
             res.json({ success: true, globalPause: config.globalPause });
@@ -397,7 +408,7 @@ module.exports = (clientPool) => {
                 ss.loadKnowledge();
             }
 
-            if (io) io.emit('script_changed', { active: script });
+            emitScoped(req, 'script_changed', { active: script });
 
             logger.info(`📋 [SCRIPT] Switched to: ${script}`);
             res.json({ success: true, active: script });
@@ -605,7 +616,7 @@ module.exports = (clientPool) => {
             logger.info(`[RESET] Memory purged (48h filter). Deleted ${deletedChats.count} ChatLogs, cleared ${cleaned.count} user profiles. Protected ${protected48h} active users.`);
 
             // 3. Notify dashboard
-            if (io) io.emit('memory_reset', { deletedCount: deletedChats.count });
+            emitScoped(req, 'memory_reset', { deletedCount: deletedChats.count });
 
             res.json({ success: true, deletedUsers: 0, deletedChats: deletedChats.count, protected48h });
         } catch (e) {

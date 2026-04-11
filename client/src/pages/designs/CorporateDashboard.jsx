@@ -23,12 +23,13 @@ import { Wifi, MessageCircle, Database, Settings, FileText, ImageIcon, LogOut, M
 
 const CorporateDashboard = () => {
     const { socket } = useSocket();
-    const { logout, user, isAdmin } = useAuth();
+    const { logout, user, isAdmin, isGlobalAdmin } = useAuth();
     const { selectedSellerId } = useSeller();
     const { toast } = useToast();
     const { isDark, toggleTheme } = useTheme();
-    // The seller whose status this dashboard shows: admin uses selectedSellerId, seller uses their own
-    const viewedSellerId = isAdmin ? selectedSellerId : user?.sellerId;
+    // The seller whose status this dashboard shows: global admin uses selectedSellerId,
+    // tenant admin / seller uses their own locked sellerId.
+    const viewedSellerId = isGlobalAdmin ? selectedSellerId : user?.sellerId;
     const [status, setStatus] = useState('initializing');
     const [alerts, setAlerts] = useState([]);
     const [activeTab, setActiveTab] = useState('dashboard');
@@ -321,7 +322,7 @@ const CorporateDashboard = () => {
                     <div className="pt-6 mt-6 border-t border-slate-200/50 dark:border-slate-700/50">
                         {(!sidebarCollapsed || isMobile) && <p className="text-xs 2xl:text-sm font-semibold text-slate-400 dark:text-slate-300 uppercase tracking-wider mb-4 px-4">Administración</p>}
                         <NavItem tab="settings" icon={Settings} label="Configuración" />
-                        {isAdmin && <NavItem tab="accounts" icon={Users} label="Usuarios" />}
+                        {isGlobalAdmin && <NavItem tab="accounts" icon={Users} label="Usuarios" />}
                     </div>
                 </div>
 
@@ -407,8 +408,8 @@ const CorporateDashboard = () => {
                     </form>
 
                     <div className="flex items-center gap-2 lg:gap-4">
-                        {/* Seller Selector — admin only */}
-                        {isAdmin && <div className="hidden md:block"><SellerSelector /></div>}
+                        {/* Seller Selector — global admin only (tenant admins are locked) */}
+                        {isGlobalAdmin && <div className="hidden md:block"><SellerSelector /></div>}
 
                         {/* Notifications Bell */}
                         <div className="relative" ref={notifRef}>

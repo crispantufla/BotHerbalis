@@ -73,7 +73,10 @@ export async function processSalesFlow(
             currentWeight: undefined,
             consultativeSale: false,
             lastActivityAt: Date.now(),
-            adSource: _detectAdSource(text)
+            adSource: _detectAdSource(text),
+            // Freeze the A/B assignment on first message so subsequent messages
+            // don't re-roll the variant mid-conversation under 'rotacion' mode.
+            assignedScript: dependencies.effectiveScript
         };
 
         // --- CHECK 1: Cross-reference against Orders DB ---
@@ -260,7 +263,7 @@ export async function processSalesFlow(
             // If the user's message was merely "tengo 40 años" we don't want to confuse the AI
             // We just ACK and repeat the state's main question if it was merely a correction
             if (extraction.isSolelyCorrection) {
-                logger.info(`[GLOBAL EXTRACTION] Intercepted sole correction for ${userId}. Age:${extraction.ageUpdated}, Weight:${extraction.weightUpdated}`);
+                logger.info(`[GLOBAL EXTRACTION] Intercepted sole correction for ${userId}. Age:${extraction.ageUpdated ?? false}, Weight:${extraction.weightUpdated ?? false}`);
                 let ackMsg = "¡Anotado! 😊\n\nEntonces, decime...";
 
                 // Customize the re-prompt based on the step we are stalled in

@@ -19,12 +19,28 @@ const { prisma } = require('../../db');
  *   - Sin número → se usa la alerta más reciente (backward compat)
  */
 
+/**
+ * Emit a Socket.IO event scoped to this seller's room + the admin room.
+ * Prevents cross-tenant leakage of per-seller events in the multi-tenant setup.
+ */
+function _emitScoped(sharedState: SharedState, event: string, payload: any): void {
+    if (!sharedState.io) return;
+    const sellerId = (sharedState as any).sellerId;
+    if (sellerId) {
+        sharedState.io.to(sellerId).emit(event, payload);
+        sharedState.io.to('admin').emit(event, { ...payload, sellerId });
+    } else {
+        // No sellerId context (legacy single-instance mode) — fall back to broadcast
+        sharedState.io.emit(event, payload);
+    }
+}
+
 /** Helper: remove ALL alerts for a user and emit update to dashboard */
 function _dismissAlert(userPhone: string, sharedState: SharedState): void {
     const before = sharedState.sessionAlerts.length;
     sharedState.sessionAlerts = sharedState.sessionAlerts.filter((a: AlertEntry) => a.userPhone !== userPhone);
     if (sharedState.sessionAlerts.length !== before) {
-        if (sharedState.io) sharedState.io.emit('alerts_updated', sharedState.sessionAlerts);
+        _emitScoped(sharedState, 'alerts_updated', sharedState.sessionAlerts);
     }
 }
 
@@ -150,7 +166,7 @@ export async function notifyAdmin(
     sharedState.sessionAlerts.unshift(newAlert);
     if (sharedState.sessionAlerts.length > 50) sharedState.sessionAlerts.pop();
 
-    if (sharedState.io) sharedState.io.emit('new_alert', newAlert);
+    _emitScoped(sharedState, 'new_alert', newAlert);
 
     if (config.alertNumbers && config.alertNumbers.length > 0) {
         // The new alert is at index 0 (unshifted), so its queue number is #1
@@ -308,7 +324,7 @@ export async function handleAdminCommand(
         const { unpauseUser: unpauseUserFn } = require('./pauseService');
         await unpauseUserFn(targetChat, sharedState);
         if (sharedState.saveState) sharedState.saveState();
-        if (sharedState.io) sharedState.io.emit('bot_status_change', { chatId: targetChat, paused: false });
+        _emitScoped(sharedState, 'bot_status_change', { chatId: targetChat, paused: false });
 
         logger.info(`[ADMIN] Unpaused ${targetChat} via WhatsApp command.`);
         return `✅ Bot reactivado para ${targetNum}. El bot volverá a responder automáticamente.`;
@@ -376,7 +392,7 @@ export async function handleAdminCommand(
             await client.sendMessage(targetChat, msg);
 
             if (sharedState.logAndEmit) sharedState.logAndEmit(targetChat, 'bot', msg, 'tracking_sent');
-            if (sharedState.io) sharedState.io.emit('order_update', { action: 'updated', order: { id: order.id, tracking: trackingCode } });
+            _emitScoped(sharedState, 'order_update', { action: 'updated', order: { id: order.id, tracking: trackingCode } });
 
             logger.info(`[ADMIN] Tracking updated for ${phoneArg}: ${trackingCode}`);
             return `✅ Tracking cargado para ${order.nombre || phoneArg}: ${trackingCode}\nCliente notificado por WhatsApp.`;
@@ -412,7 +428,7 @@ export async function handleAdminCommand(
 
         _dismissAlert(targetChat, sharedState);
         if (sharedState.logAndEmit) sharedState.logAndEmit(targetChat, 'system', 'Memoria reiniciada por admin', 'new');
-        if (sharedState.io) sharedState.io.emit('bot_status_change', { chatId: targetChat, paused: false });
+        _emitScoped(sharedState, 'bot_status_change', { chatId: targetChat, paused: false });
 
         logger.info(`[ADMIN] Reset user ${targetChat} via WhatsApp command.`);
         return `✅ Estado de ${targetNum} reiniciado. Próximo mensaje del cliente iniciará un chat nuevo.`;
@@ -433,7 +449,7 @@ export async function handleAdminCommand(
         }
 
         if (sharedState.saveState) sharedState.saveState();
-        if (sharedState.io) sharedState.io.emit('global_pause_changed', { globalPause: sharedState.config.globalPause });
+        _emitScoped(sharedState, 'global_pause_changed', { globalPause: sharedState.config.globalPause });
 
         logger.info(`[ADMIN] Global pause toggled to: ${sharedState.config.globalPause}`);
         return sharedState.config.globalPause
@@ -626,7 +642,7 @@ export async function handleAdminCommand(
 
         sharedState.config.activeScript = version;
         if (sharedState.loadKnowledge) sharedState.loadKnowledge();
-        if (sharedState.io) sharedState.io.emit('script_changed', { active: version });
+        _emitScoped(sharedState, 'script_changed', { active: version });
         if (sharedState.saveState) sharedState.saveState();
 
         logger.info(`[ADMIN] Script switched to: ${version} via WhatsApp`);
@@ -670,7 +686,7 @@ export async function handleAdminCommand(
                             status: 'pending',
                         }
                     });
-                    if (sharedState.io) sharedState.io.emit('payment_created', record);
+                    _emitScoped(sharedState, 'payment_created', record);
 
                     logger.info(`[MP] Payment link created for $${amount} ARS: ${link}`);
                     return `✅ Enlace de pago generado:\n💳 $${amount} ARS\n\n${link}`;
@@ -701,7 +717,7 @@ export async function handleAdminCommand(
         const { pauseUser: pauseUserFn } = require('./pauseService');
         await pauseUserFn(actualTarget, '⏸️ Admin tomó control ("me encargo")', { sharedState });
         if (sharedState.saveState) sharedState.saveState();
-        if (sharedState.io) sharedState.io.emit('bot_status_change', { chatId: actualTarget, paused: true });
+        _emitScoped(sharedState, 'bot_status_change', { chatId: actualTarget, paused: true });
 
         _dismissAlert(actualTarget, sharedState);
 
@@ -787,9 +803,7 @@ export async function handleAdminCommand(
 
                 if (sharedState.logAndEmit) sharedState.logAndEmit(actualTarget, 'bot', msg, 'completed');
 
-                if (sharedState.io) {
-                    sharedState.io.emit('order_update', { action: 'updated', order: { id: existingOrder.id, status: 'Confirmado' } });
-                }
+                _emitScoped(sharedState, 'order_update', { action: 'updated', order: { id: existingOrder.id, status: 'Confirmado' } });
 
                 _dismissAlert(actualTarget, sharedState);
 
@@ -825,7 +839,7 @@ export async function handleAdminCommand(
                 if (sharedState.pausedUsers.has(actualTarget)) {
                     const { unpauseUser: unpauseUserFn } = require('./pauseService');
                     await unpauseUserFn(actualTarget, sharedState);
-                    if (sharedState.io) sharedState.io.emit('bot_status_change', { chatId: actualTarget, paused: false });
+                    _emitScoped(sharedState, 'bot_status_change', { chatId: actualTarget, paused: false });
                 }
 
                 _dismissAlert(actualTarget, sharedState);

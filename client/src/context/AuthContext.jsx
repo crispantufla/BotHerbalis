@@ -60,9 +60,13 @@ export const AuthProvider = ({ children }) => {
     };
 
     const isAdmin = user?.role === 'admin';
+    // A "global admin" has role=admin AND no sellerId — they can switch between
+    // tenants and see aggregated data. A "tenant admin" (role=admin + sellerId)
+    // is locked to their own seller just like a regular seller.
+    const isGlobalAdmin = isAdmin && !user?.sellerId;
 
     return (
-        <AuthContext.Provider value={{ user, login, logout, loading, isAdmin }}>
+        <AuthContext.Provider value={{ user, login, logout, loading, isAdmin, isGlobalAdmin }}>
             {!loading && children}
         </AuthContext.Provider>
     );

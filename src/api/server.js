@@ -173,9 +173,13 @@ function startServer(clientPool) {
         const role = account?.role || 'seller';
         const sellerId = account?.sellerId;
 
-        if (role === 'admin') {
+        // Only GLOBAL admins (role=admin AND no sellerId tied to account) join
+        // the 'admin' room, which receives cross-tenant events. A user with
+        // role='admin' AND a sellerId is a per-tenant admin — they must only
+        // see events from their own seller room to prevent cross-tenant leaks.
+        if (role === 'admin' && !sellerId) {
             socket.join('admin');
-            logger.debug(`[SOCKET] Admin joined room "admin"`);
+            logger.debug(`[SOCKET] Global admin joined room "admin"`);
         }
 
         if (sellerId) {
@@ -208,9 +212,11 @@ function startServer(clientPool) {
             }
         }
 
-        // Admin can switch which seller they're watching
+        // Admin can switch which seller they're watching.
+        // Only GLOBAL admins (no sellerId tied to account) can switch —
+        // tenant admins are locked to their own seller.
         socket.on('switch-seller', (newSellerId) => {
-            if (role !== 'admin') return;
+            if (role !== 'admin' || sellerId) return;
             // Leave current seller rooms (but stay in 'admin')
             const rooms = Array.from(socket.rooms);
             rooms.filter(r => r !== socket.id && r !== 'admin').forEach(r => socket.leave(r));

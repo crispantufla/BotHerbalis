@@ -26,8 +26,8 @@ module.exports = (clientPool) => {
         };
     };
 
-    // POST /admin-command
-    router.post('/admin-command', ...withSeller(clientPool), validate(adminCommandSchema), async (req, res) => {
+    // POST /admin-command (admin only)
+    router.post('/admin-command', ...withSeller(clientPool), requireAdmin, validate(adminCommandSchema), async (req, res) => {
         const { chatId, command } = req.body;
         const { sharedState } = getCtx(req);
         try {
@@ -66,8 +66,8 @@ module.exports = (clientPool) => {
         }
     });
 
-    // POST /mp-link — generate MercadoPago payment link
-    router.post('/mp-link', ...withSeller(clientPool), async (req, res) => {
+    // POST /mp-link — generate MercadoPago payment link (admin only)
+    router.post('/mp-link', ...withSeller(clientPool), requireAdmin, async (req, res) => {
         const amount = parseFloat(req.body?.amount);
         const userPhone = req.body?.userPhone || null;
         if (!amount || amount <= 0) return res.status(400).json({ error: 'Monto inválido' });
@@ -106,7 +106,11 @@ module.exports = (clientPool) => {
             });
 
             const ctx = getCtx(req);
-            if (ctx.io) ctx.io.emit('payment_created', record);
+            if (ctx.io) {
+                const sellerId = req.sellerId;
+                if (sellerId) ctx.io.to(sellerId).emit('payment_created', record);
+                ctx.io.to('admin').emit('payment_created', { ...record, sellerId });
+            }
             res.json({ link, amount, paymentId: record.id });
         } catch (e) {
             logger.error('[MP] Error creating preference:', e);
@@ -114,8 +118,8 @@ module.exports = (clientPool) => {
         }
     });
 
-    // POST /config
-    router.post('/config', ...withSeller(clientPool), validate(configSchema), async (req, res) => {
+    // POST /config (admin only)
+    router.post('/config', ...withSeller(clientPool), requireAdmin, validate(configSchema), async (req, res) => {
         const { client, config, saveState } = getCtx(req);
         const { alertNumber, action, number } = req.body;
 

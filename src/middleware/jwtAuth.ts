@@ -4,7 +4,14 @@ import { prisma } from '../../db';
 
 const logger = require('../utils/logger');
 
-const JWT_SECRET = process.env.JWT_SECRET || process.env.API_KEY || 'fallback-dev-secret';
+function _loadJwtSecret(): string {
+    const secret = process.env.JWT_SECRET || process.env.API_KEY;
+    if (!secret) {
+        throw new Error('[AUTH] JWT_SECRET (or legacy API_KEY) must be set. Refusing to start with an insecure default.');
+    }
+    return secret;
+}
+const JWT_SECRET: string = _loadJwtSecret();
 const JWT_EXPIRY = '7d';
 
 export interface AccountPayload {
@@ -28,13 +35,18 @@ export function verifyToken(token: string): AccountPayload {
     return jwt.verify(token, JWT_SECRET) as AccountPayload;
 }
 
-/** Hash a plaintext password (case-insensitive: stored lowercase) */
+/** Hash a plaintext password (case-sensitive) */
 export async function hashPassword(plain: string): Promise<string> {
-    return bcrypt.hash(plain.toLowerCase(), 10);
+    return bcrypt.hash(plain, 10);
 }
 
-/** Compare plaintext against hash (case-insensitive) */
+/**
+ * Compare plaintext against hash.
+ * Tries exact match first (new case-sensitive passwords); falls back to
+ * lowercase for legacy pre-migration hashes so existing users are not locked out.
+ */
 export async function comparePassword(plain: string, hash: string): Promise<boolean> {
+    if (await bcrypt.compare(plain, hash)) return true;
     return bcrypt.compare(plain.toLowerCase(), hash);
 }
 
@@ -83,11 +95,25 @@ export function jwtAuthMiddleware(req: any, res: any, next: any) {
 
 /**
  * Middleware that requires admin role.
+ * Allows both global admins (no sellerId) and tenant admins (with a sellerId).
  * Must be used AFTER jwtAuthMiddleware.
  */
 export function requireAdmin(req: any, res: any, next: any) {
     if (!req.account || req.account.role !== 'admin') {
         return res.status(403).json({ error: 'Forbidden: admin access required' });
+    }
+    next();
+}
+
+/**
+ * Middleware that requires a GLOBAL admin (role=admin AND sellerId=null).
+ * Used for cross-tenant operations like creating accounts or starting/stopping
+ * other sellers' bots. Tenant admins (admins tied to a single sellerId) are rejected.
+ * Must be used AFTER jwtAuthMiddleware.
+ */
+export function requireGlobalAdmin(req: any, res: any, next: any) {
+    if (!req.account || req.account.role !== 'admin' || req.account.sellerId) {
+        return res.status(403).json({ error: 'Forbidden: global admin access required' });
     }
     next();
 }

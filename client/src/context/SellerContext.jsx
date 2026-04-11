@@ -8,7 +8,7 @@ const SellerContext = createContext();
 export const useSeller = () => useContext(SellerContext);
 
 export const SellerProvider = ({ children }) => {
-    const { isAdmin } = useAuth();
+    const { isGlobalAdmin, user } = useAuth();
     const { socket } = useSocket();
     const [sellers, setSellers] = useState([]);
     const [sellerPresence, setSellerPresence] = useState({}); // sellerId → boolean (web open)
@@ -26,38 +26,45 @@ export const SellerProvider = ({ children }) => {
     }, []);
 
     const loadSellers = useCallback(async () => {
-        if (!isAdmin) return;
+        if (!isGlobalAdmin) return;
         try {
             const res = await api.get('/api/sellers');
             setSellers(res.data);
         } catch (e) {
             console.error('[SellerContext] Failed to load sellers:', e);
         }
-    }, [isAdmin]);
+    }, [isGlobalAdmin]);
 
     useEffect(() => {
-        if (isAdmin) loadSellers();
-        else {
-            // Sellers only see their own data — clear any lingering selection
-            _setSelectedSellerId(null);
-            localStorage.removeItem('selectedSellerId');
+        if (isGlobalAdmin) {
+            loadSellers();
+        } else {
+            // Tenant admins and sellers are locked to their own sellerId.
+            // Never let them carry a stale selection for another seller.
+            if (user?.sellerId) {
+                _setSelectedSellerId(user.sellerId);
+                localStorage.setItem('selectedSellerId', user.sellerId);
+            } else {
+                _setSelectedSellerId(null);
+                localStorage.removeItem('selectedSellerId');
+            }
         }
-    }, [isAdmin, loadSellers]);
+    }, [isGlobalAdmin, user?.sellerId, loadSellers]);
 
-    // Listen for web presence updates from server
+    // Listen for web presence updates from server (global admin only)
     useEffect(() => {
-        if (!socket || !isAdmin) return;
+        if (!socket || !isGlobalAdmin) return;
         const handler = (presence) => setSellerPresence(presence);
         socket.on('sellers_presence', handler);
         return () => socket.off('sellers_presence', handler);
-    }, [socket, isAdmin]);
+    }, [socket, isGlobalAdmin]);
 
-    // Auto-select first seller if none is selected (admin must always have one)
+    // Auto-select first seller if none is selected (global admin must always have one)
     useEffect(() => {
-        if (isAdmin && sellers.length > 0 && !sellers.find(s => s.sellerId === selectedSellerId)) {
+        if (isGlobalAdmin && sellers.length > 0 && !sellers.find(s => s.sellerId === selectedSellerId)) {
             setSelectedSellerId(sellers[0].sellerId);
         }
-    }, [isAdmin, sellers, selectedSellerId, setSelectedSellerId]);
+    }, [isGlobalAdmin, sellers, selectedSellerId, setSelectedSellerId]);
 
     const selectedSeller = sellers.find(s => s.sellerId === selectedSellerId) || null;
 

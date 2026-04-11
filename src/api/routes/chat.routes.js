@@ -474,8 +474,12 @@ module.exports = (clientPool) => {
                 const { pauseUser } = require('../../services/pauseService');
                 await pauseUser(chatId, '⏸️ Pausado automáticamente por intervención en panel', { sharedState: ss });
                 if (ss?.io) {
-                    ss.io.emit('bot_status_change', { chatId, paused: true });
-                    if (originalChatId !== chatId) ss.io.emit('bot_status_change', { chatId: originalChatId, paused: true });
+                    const sellerId = req.sellerId;
+                    const rooms = [sellerId, 'admin'].filter(Boolean);
+                    for (const room of rooms) {
+                        ss.io.to(room).emit('bot_status_change', { chatId, paused: true, sellerId });
+                        if (originalChatId !== chatId) ss.io.to(room).emit('bot_status_change', { chatId: originalChatId, paused: true, sellerId });
+                    }
                 }
             }
 
@@ -513,8 +517,12 @@ module.exports = (clientPool) => {
                 const { pauseUser } = require('../../services/pauseService');
                 await pauseUser(chatId, '⏸️ Pausado automáticamente por intervención en panel', { sharedState: ss });
                 if (ss?.io) {
-                    ss.io.emit('bot_status_change', { chatId, paused: true });
-                    if (originalChatId !== chatId) ss.io.emit('bot_status_change', { chatId: originalChatId, paused: true });
+                    const sellerId = req.sellerId;
+                    const rooms = [sellerId, 'admin'].filter(Boolean);
+                    for (const room of rooms) {
+                        ss.io.to(room).emit('bot_status_change', { chatId, paused: true, sellerId });
+                        if (originalChatId !== chatId) ss.io.to(room).emit('bot_status_change', { chatId: originalChatId, paused: true, sellerId });
+                    }
                 }
             }
 
@@ -601,9 +609,13 @@ module.exports = (clientPool) => {
             if (ss?.saveState) ss.saveState();
             // Emit both resolved and original ID so frontend matches regardless of LID vs @c.us
             if (ss?.io) {
-                ss.io.emit('bot_status_change', { chatId, paused });
-                if (originalChatId !== chatId) {
-                    ss.io.emit('bot_status_change', { chatId: originalChatId, paused });
+                const sellerId = req.sellerId;
+                const rooms = [sellerId, 'admin'].filter(Boolean);
+                for (const room of rooms) {
+                    ss.io.to(room).emit('bot_status_change', { chatId, paused, sellerId });
+                    if (originalChatId !== chatId) {
+                        ss.io.to(room).emit('bot_status_change', { chatId: originalChatId, paused, sellerId });
+                    }
                 }
             }
             res.json({ success: true });

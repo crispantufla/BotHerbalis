@@ -51,16 +51,21 @@ export async function pauseUser(
         const INSTANCE_ID = deps.instanceId || deps.sharedState?.sellerId || process.env.INSTANCE_ID || 'default';
         const cleanPhone = _cleanPhone(userId);
 
-        await prisma.user.upsert({
-            where: { phone_instanceId: { phone: cleanPhone, instanceId: INSTANCE_ID } },
-            update: { pausedAt: new Date(), pauseReason: reason },
-            create: {
-                phone: cleanPhone,
-                instanceId: INSTANCE_ID,
-                pausedAt: new Date(),
-                pauseReason: reason
-            }
-        });
+        try {
+            await prisma.user.upsert({
+                where: { phone_instanceId: { phone: cleanPhone, instanceId: INSTANCE_ID } },
+                update: { pausedAt: new Date(), pauseReason: reason },
+                create: { phone: cleanPhone, instanceId: INSTANCE_ID, pausedAt: new Date(), pauseReason: reason }
+            });
+        } catch (upsertErr: any) {
+            if (upsertErr?.code === 'P2002') {
+                // Race: user was just created by a concurrent call — do explicit update
+                await prisma.user.update({
+                    where: { phone_instanceId: { phone: cleanPhone, instanceId: INSTANCE_ID } },
+                    data: { pausedAt: new Date(), pauseReason: reason }
+                });
+            } else throw upsertErr;
+        }
     } catch (err: any) {
         logger.error(`[PAUSE-SERVICE] Failed to persist pause for ${userId}:`, err.message);
     }

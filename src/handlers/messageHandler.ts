@@ -66,6 +66,8 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
                 } else {
                     effectiveScript = config.activeScript || 'v3';
                 }
+                // Persist the assignment if the user already has state; otherwise
+                // salesFlow will freeze it when it creates the state on first message.
                 if (userState[userId]) {
                     userState[userId].assignedScript = effectiveScript;
                     saveState(userId);
