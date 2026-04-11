@@ -6,7 +6,6 @@ const {
     hashPassword,
     jwtAuthMiddleware,
     requireAdmin,
-    requireGlobalAdmin,
 } = require('../../middleware/jwtAuth');
 const logger = require('../../utils/logger');
 
@@ -96,8 +95,8 @@ module.exports = (client, sharedState) => {
     });
 
     // ─── GET /api/accounts ──────────────────────────────────────────
-    // List all accounts (global admin only — tenant admins are scoped)
-    router.get('/accounts', jwtAuthMiddleware, requireGlobalAdmin, async (req, res) => {
+    // List all accounts. Any admin (with or without a sellerId) can manage accounts.
+    router.get('/accounts', jwtAuthMiddleware, requireAdmin, async (req, res) => {
         const accounts = await prisma.account.findMany({
             select: {
                 id: true,
@@ -113,8 +112,8 @@ module.exports = (client, sharedState) => {
     });
 
     // ─── POST /api/accounts ─────────────────────────────────────────
-    // Create a new account (global admin only)
-    router.post('/accounts', jwtAuthMiddleware, requireGlobalAdmin, async (req, res) => {
+    // Create a new account (any admin)
+    router.post('/accounts', jwtAuthMiddleware, requireAdmin, async (req, res) => {
         const { name, password, role, sellerId } = req.body;
 
         if (!name || !password) {
@@ -161,8 +160,8 @@ module.exports = (client, sharedState) => {
     });
 
     // ─── PUT /api/accounts/:id ──────────────────────────────────────
-    // Update an account (global admin only)
-    router.put('/accounts/:id', jwtAuthMiddleware, requireGlobalAdmin, async (req, res) => {
+    // Update an account (any admin)
+    router.put('/accounts/:id', jwtAuthMiddleware, requireAdmin, async (req, res) => {
         const { id } = req.params;
         const { name, password, role, sellerId, isActive } = req.body;
 
@@ -193,8 +192,8 @@ module.exports = (client, sharedState) => {
     });
 
     // ─── DELETE /api/accounts/:id ───────────────────────────────────
-    // Soft-delete (deactivate) an account (global admin only)
-    router.delete('/accounts/:id', jwtAuthMiddleware, requireGlobalAdmin, async (req, res) => {
+    // Soft-delete (deactivate) an account (any admin)
+    router.delete('/accounts/:id', jwtAuthMiddleware, requireAdmin, async (req, res) => {
         const { id } = req.params;
 
         try {
@@ -247,8 +246,8 @@ module.exports = (client, sharedState) => {
     });
 
     // ─── PUT /api/accounts/:id/password ────────────────────────────
-    // Global admin resets any account's password (no current password needed)
-    router.put('/accounts/:id/password', jwtAuthMiddleware, requireGlobalAdmin, async (req, res) => {
+    // Any admin resets any account's password (no current password needed)
+    router.put('/accounts/:id/password', jwtAuthMiddleware, requireAdmin, async (req, res) => {
         const { newPassword } = req.body;
         if (!newPassword || newPassword.length < 8)
             return res.status(400).json({ error: 'newPassword debe tener al menos 8 caracteres' });

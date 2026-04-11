@@ -95,25 +95,13 @@ export function jwtAuthMiddleware(req: any, res: any, next: any) {
 
 /**
  * Middleware that requires admin role.
- * Allows both global admins (no sellerId) and tenant admins (with a sellerId).
+ * All admins share the same privileges — the presence of a sellerId only
+ * determines whether the admin runs their own WhatsApp client.
  * Must be used AFTER jwtAuthMiddleware.
  */
 export function requireAdmin(req: any, res: any, next: any) {
     if (!req.account || req.account.role !== 'admin') {
         return res.status(403).json({ error: 'Forbidden: admin access required' });
-    }
-    next();
-}
-
-/**
- * Middleware that requires a GLOBAL admin (role=admin AND sellerId=null).
- * Used for cross-tenant operations like creating accounts or starting/stopping
- * other sellers' bots. Tenant admins (admins tied to a single sellerId) are rejected.
- * Must be used AFTER jwtAuthMiddleware.
- */
-export function requireGlobalAdmin(req: any, res: any, next: any) {
-    if (!req.account || req.account.role !== 'admin' || req.account.sellerId) {
-        return res.status(403).json({ error: 'Forbidden: global admin access required' });
     }
     next();
 }

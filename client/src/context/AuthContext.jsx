@@ -59,14 +59,13 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('selectedSellerId');
     };
 
+    // All admins share the same privileges regardless of sellerId. The only
+    // functional difference is that admins with a sellerId run their own
+    // WhatsApp client (and scan a QR); admins without one don't.
     const isAdmin = user?.role === 'admin';
-    // A "global admin" has role=admin AND no sellerId — they can switch between
-    // tenants and see aggregated data. A "tenant admin" (role=admin + sellerId)
-    // is locked to their own seller just like a regular seller.
-    const isGlobalAdmin = isAdmin && !user?.sellerId;
 
     return (
-        <AuthContext.Provider value={{ user, login, logout, loading, isAdmin, isGlobalAdmin }}>
+        <AuthContext.Provider value={{ user, login, logout, loading, isAdmin }}>
             {!loading && children}
         </AuthContext.Provider>
     );

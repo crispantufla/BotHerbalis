@@ -23,7 +23,7 @@ import { Wifi, MessageCircle, Database, Settings, FileText, ImageIcon, LogOut, M
 
 const CorporateDashboard = () => {
     const { socket } = useSocket();
-    const { logout, user, isAdmin, isGlobalAdmin } = useAuth();
+    const { logout, user, isAdmin } = useAuth();
     const { selectedSellerId } = useSeller();
     const { toast } = useToast();
     const { isDark, toggleTheme } = useTheme();
@@ -326,7 +326,7 @@ const CorporateDashboard = () => {
                     <div className="pt-6 mt-6 border-t border-slate-200/50 dark:border-slate-700/50">
                         {(!sidebarCollapsed || isMobile) && <p className="text-xs 2xl:text-sm font-semibold text-slate-400 dark:text-slate-300 uppercase tracking-wider mb-4 px-4">Administración</p>}
                         <NavItem tab="settings" icon={Settings} label="Configuración" />
-                        {isGlobalAdmin && <NavItem tab="accounts" icon={Users} label="Usuarios" />}
+                        {isAdmin && <NavItem tab="accounts" icon={Users} label="Usuarios" />}
                     </div>
                 </div>
 
