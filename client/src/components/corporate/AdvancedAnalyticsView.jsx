@@ -27,7 +27,7 @@ const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
 
 const AdvancedAnalyticsView = () => {
     const { isDark } = useTheme();
-    const { isGlobalAdmin } = useAuth();
+    const { isAdmin } = useAuth();
     const { sellers } = useSeller();
     const [loading, setLoading] = useState(true);
     const [daysAgoToFetch, setDaysAgoToFetch] = useState(30);
@@ -48,7 +48,7 @@ const AdvancedAnalyticsView = () => {
             // Global admin can filter by seller or see all; tenant admin/seller
             // is locked server-side to their own data.
             const headers = {};
-            if (isGlobalAdmin) {
+            if (isAdmin) {
                 headers['x-seller-id'] = analyticsSellerFilter === 'all' ? '' : analyticsSellerFilter;
             }
             const opts = { headers };
@@ -165,7 +165,7 @@ const AdvancedAnalyticsView = () => {
                                 </button>
                             ))}
                         </div>
-                        {isGlobalAdmin && sellers.length > 0 && (
+                        {isAdmin && sellers.length > 0 && (
                             <div className={`flex p-1 rounded-xl border w-full sm:w-auto overflow-x-auto ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
                                 <button
                                     onClick={() => setAnalyticsSellerFilter('all')}

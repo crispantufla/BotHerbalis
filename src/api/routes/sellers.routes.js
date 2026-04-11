@@ -4,22 +4,22 @@ const { prisma } = require('../../../db');
 
 module.exports = (clientPool) => {
     const router = express.Router();
-    const { jwtAuthMiddleware, requireAdmin, requireGlobalAdmin } = require('../../middleware/jwtAuth');
+    const { jwtAuthMiddleware, requireAdmin } = require('../../middleware/jwtAuth');
 
     /**
      * Lifecycle ops (start/stop/restart/wipe) are allowed for:
-     *   - global admins (can act on any seller)
-     *   - tenant admins / sellers, but ONLY on their own sellerId
+     *   - any admin (can act on any seller — supervision model)
+     *   - regular sellers, but ONLY on their own sellerId
      */
     function canOperateOnSeller(req, targetSellerId) {
         if (!req.account) return false;
-        if (req.account.role === 'admin' && !req.account.sellerId) return true; // global
+        if (req.account.role === 'admin') return true; // any admin
         return req.account.sellerId === targetSellerId;
     }
 
-    // GET /sellers — list all accounts with a sellerId (global admin only;
-    // tenant admins don't need the list since they can't switch).
-    router.get('/sellers', jwtAuthMiddleware, requireGlobalAdmin, async (req, res) => {
+    // GET /sellers — list all accounts with a sellerId.
+    // Any admin needs this to populate the seller selector dropdown.
+    router.get('/sellers', jwtAuthMiddleware, requireAdmin, async (req, res) => {
         try {
             const accounts = await prisma.account.findMany({
                 where: { isActive: true, sellerId: { not: null } },

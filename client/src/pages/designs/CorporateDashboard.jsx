@@ -27,9 +27,13 @@ const CorporateDashboard = () => {
     const { selectedSellerId } = useSeller();
     const { toast } = useToast();
     const { isDark, toggleTheme } = useTheme();
-    // The seller whose status this dashboard shows: global admin uses selectedSellerId,
-    // tenant admin / seller uses their own locked sellerId.
-    const viewedSellerId = isGlobalAdmin ? selectedSellerId : user?.sellerId;
+    // The seller whose status this dashboard shows:
+    //   - Any admin (with or without their own sellerId) uses selectedSellerId,
+    //     falling back to their home sellerId until they pick one.
+    //   - Pure seller accounts are locked to their own sellerId.
+    const viewedSellerId = isAdmin
+        ? (selectedSellerId || user?.sellerId || null)
+        : user?.sellerId;
     const [status, setStatus] = useState('initializing');
     const [alerts, setAlerts] = useState([]);
     const [activeTab, setActiveTab] = useState('dashboard');
@@ -408,8 +412,8 @@ const CorporateDashboard = () => {
                     </form>
 
                     <div className="flex items-center gap-2 lg:gap-4">
-                        {/* Seller Selector — global admin only (tenant admins are locked) */}
-                        {isGlobalAdmin && <div className="hidden md:block"><SellerSelector /></div>}
+                        {/* Seller Selector — any admin, to supervise/intercede in other sellers */}
+                        {isAdmin && <div className="hidden md:block"><SellerSelector /></div>}
 
                         {/* Notifications Bell */}
                         <div className="relative" ref={notifRef}>

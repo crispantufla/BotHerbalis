@@ -11,9 +11,9 @@ import { RefreshCw as Refresh, Download, Search, Filter, MessageCircle as Chat, 
 
 const SalesView = ({ onGoToChat, initialSearch = '' }) => {
     const { toast, confirm } = useToast();
-    // Use isGlobalAdmin: only global admins see the cross-seller filter.
-    // Tenant admins (Ines, Horacio, etc.) are locked to their own seller server-side.
-    const { isGlobalAdmin: isAdmin } = useAuth();
+    // Any admin (with or without home sellerId) sees the cross-seller filter
+    // and can view orders from all sellers to supervise.
+    const { isAdmin } = useAuth();
     const { sellers } = useSeller();
     const [page, setPage] = useState(1);
 

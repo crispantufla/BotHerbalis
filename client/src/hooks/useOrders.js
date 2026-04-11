@@ -7,13 +7,14 @@ import { useEffect } from 'react';
 export const useOrders = (page = 1, limit = 50) => {
     const queryClient = useQueryClient();
     const { socket } = useSocket();
-    // Only GLOBAL admins (no sellerId) see all orders. Tenant admins are locked.
-    const { isGlobalAdmin } = useAuth();
+    // Any admin (with or without a home sellerId) sees all orders across
+    // sellers by default — empty x-seller-id signals aggregated view.
+    const { isAdmin } = useAuth();
 
     const query = useQuery({
         queryKey: ['orders', page, limit],
         queryFn: async () => {
-            const headers = isGlobalAdmin ? { 'x-seller-id': '' } : {};
+            const headers = isAdmin ? { 'x-seller-id': '' } : {};
             const res = await api.get(`/api/orders?page=${page}&limit=${limit}`, { headers });
             if (res.data.data) {
                 return {

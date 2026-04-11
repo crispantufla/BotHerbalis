@@ -213,10 +213,11 @@ function startServer(clientPool) {
         }
 
         // Admin can switch which seller they're watching.
-        // Only GLOBAL admins (no sellerId tied to account) can switch —
-        // tenant admins are locked to their own seller.
+        // Any admin — whether they have a "home" sellerId or not — can
+        // supervise other sellers. The home sellerId just determines which
+        // seller they default to on login; it doesn't lock them in.
         socket.on('switch-seller', (newSellerId) => {
-            if (role !== 'admin' || sellerId) return;
+            if (role !== 'admin') return;
             // Leave current seller rooms (but stay in 'admin')
             const rooms = Array.from(socket.rooms);
             rooms.filter(r => r !== socket.id && r !== 'admin').forEach(r => socket.leave(r));

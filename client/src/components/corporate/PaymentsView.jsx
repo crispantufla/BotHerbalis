@@ -157,8 +157,8 @@ const FILTERS = [
 const PaymentsView = ({ onGoToChat }) => {
     const { toast } = useToast();
     const { socket } = useSocket();
-    // Only global admins can see cross-tenant payments. Tenant admins are scoped.
-    const { isGlobalAdmin: isAdmin } = useAuth();
+    // Any admin (with or without home sellerId) sees cross-seller payments.
+    const { isAdmin } = useAuth();
     const { sellers } = useSeller();
     const [payments, setPayments] = useState([]);
     const [loading, setLoading] = useState(true);
