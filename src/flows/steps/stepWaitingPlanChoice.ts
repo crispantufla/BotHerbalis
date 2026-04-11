@@ -13,7 +13,7 @@ function _buildPaymentMsg(currentState: UserState): string {
         ? `   ▸ Plan 120 días: sin adicional ✅`
         : `   ▸ Plan 60 días: adicional de $${adicionalStr}\n   ▸ Plan 120 días: ese adicional está bonificado ✅`;
     return `¿Cómo preferís abonar?\n📦 *En todos los casos el envío es SIN COSTO*\n\n` +
-        `1️⃣ *Contra reembolso* — Pagás al cartero cuando te llega.\n${planLine}\n` +
+        `1️⃣ *Contra reembolso* — Pagás al cartero cuando te llega (solo en efectivo).\n${planLine}\n` +
         `   Demora: 7 a 10 días hábiles\n\n` +
         `2️⃣ *MercadoPago* — Sin adicional ni recargos.\n` +
         `   Demora: 4 a 6 días hábiles 🚀\n\n` +

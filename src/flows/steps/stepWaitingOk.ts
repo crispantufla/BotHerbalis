@@ -49,7 +49,7 @@ export async function handleWaitingOk(
 
         const msg = `¡Perfecto! 😊 Antes de los datos de envío, te cuento las opciones de pago.\n` +
             `📦 *En todos los casos el envío es SIN COSTO*\n\n` +
-            `1️⃣ *Contra reembolso* — Pagás al cartero cuando te llega.\n${planLine}\n` +
+            `1️⃣ *Contra reembolso* — Pagás al cartero cuando te llega (solo en efectivo).\n${planLine}\n` +
             `   Demora: 7 a 10 días hábiles\n\n` +
             `2️⃣ *MercadoPago* — Sin adicional ni recargos.\n` +
             `   Demora: 4 a 6 días hábiles 🚀\n\n` +
