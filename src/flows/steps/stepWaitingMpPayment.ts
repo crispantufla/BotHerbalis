@@ -1,5 +1,6 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _setStep, _pauseAndAlert, _cleanPhone } from '../utils/flowHelpers';
+import { calculateTotal, _recalcAdicionalMAX } from '../utils/cartHelpers';
 import { randomUUID } from 'crypto';
 import logger from '../../utils/logger';
 
@@ -100,10 +101,13 @@ export async function handleWaitingMpPayment(
 
     // ── Cliente quiere contra reembolso ────────────────────────────────────────
     if (CASH_FALLBACK_KEYWORDS.test(normalizedText)) {
-        // Restaurar adicionalMAX si aplica (plan 60 → vuelve a tener adicional)
+        // Restaurar adicionalMAX (plan 60 → vuelve a tener adicional) — fue waiveado
+        // al elegir MP en el paso anterior.
         currentState.paymentMethod = 'contrarembolso';
         currentState.mpPaymentLinkId = null;
         currentState.mpPaymentLinkUrl = null;
+        _recalcAdicionalMAX(currentState);
+        calculateTotal(currentState);
         const msg = _getClosingMsg(knowledge);
         _setStep(currentState, FlowStep.WAITING_DATA);
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
@@ -157,6 +161,9 @@ async function _generateAndSendLink(
     if (!mpToken) {
         logger.warn('[MP_PAYMENT] MP_ACCESS_TOKEN no configurado — fallback a contra reembolso');
         currentState.paymentMethod = 'contrarembolso';
+        // adicionalMAX fue waiveado al elegir MP — restaurarlo ahora que volvemos a CR
+        _recalcAdicionalMAX(currentState);
+        calculateTotal(currentState);
         const msg = _getClosingMsg(knowledge);
         _setStep(currentState, FlowStep.WAITING_DATA);
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });

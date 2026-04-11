@@ -590,13 +590,30 @@ class AIService {
             knowledgeContext += `(No inventes datos, usá siempre esta base)`;
         }
 
-        // P2 #1: Add user state context (cart, product, address)
+        // P2 #1: Add user state context (cart, product, address, authoritative total)
         let stateContext = "";
         if (context.userState) {
             const s = context.userState;
             if (s.selectedProduct) stateContext += `- Producto elegido: ${s.selectedProduct} \n`;
             if (s.cart && s.cart.length > 0) {
-                stateContext += `- Carrito: ${s.cart.map(i => `${i.product} (${i.plan} días) $${i.price}`).join(', ')} \n`;
+                stateContext += `- Carrito (precios base por ítem, NO son el total a pagar): ${s.cart.map(i => `${i.product} (${i.plan} días) $${i.price}`).join(', ')} \n`;
+            }
+            // Authoritative total — already includes adicional MAX / descuentos si aplican.
+            // Si el AI necesita cotizarle al cliente, DEBE usar este número y NO reconstruirlo.
+            if (s.totalPrice) {
+                stateContext += `- TOTAL AUTORITATIVO A PAGAR: $${s.totalPrice} (este es el ÚNICO total que podés cotizarle al cliente)\n`;
+            }
+            if (s.paymentMethod) {
+                const pmLabel = s.paymentMethod === 'mercadopago' ? 'MercadoPago (ya pagó online)'
+                    : s.paymentMethod === 'transferencia' ? 'Transferencia bancaria'
+                    : s.paymentMethod === 'contrarembolso' || s.paymentMethod === 'efectivo' ? 'Contra reembolso (paga al recibir)'
+                    : s.paymentMethod;
+                stateContext += `- Método de pago elegido: ${pmLabel}\n`;
+            }
+            if (s.adicionalMAX && s.adicionalMAX > 0) {
+                stateContext += `- El total ya incluye $${s.adicionalMAX.toLocaleString('es-AR').replace(/,/g,'.')} de adicional por Contra Reembolso MAX (plan 60 con pago al recibir)\n`;
+            } else if (s.isContraReembolsoMAX === false && (s.paymentMethod === 'mercadopago' || s.paymentMethod === 'transferencia')) {
+                stateContext += `- Adicional MAX BONIFICADO (por pago anticipado)\n`;
             }
             if (s.partialAddress && Object.keys(s.partialAddress).length > 0) {
                 const a = s.partialAddress;
@@ -629,6 +646,7 @@ INSTRUCCIONES:
 7. MENORES DE EDAD: Si el mensaje menciona menores, VERIFICÁ EL HISTORIAL.Si ya se aclaró que la persona es mayor de 18, NO repitas la restricción.Confirmá que puede tomarla y seguí adelante.
 8. ANTI - REPETICIÓN: NUNCA repitas textualmente un mensaje que ya está en el historial.Si necesitás pedir los mismos datos, usá una frase DIFERENTE.
 9. RECHAZO EXPLÍCITO: Si el usuario dice "no quiero nada", "no me interesa", "callate", "dejame en paz" o cualquier rechazo claro del producto o la conversación: NO avances al siguiente paso, NO sigas ofreciendo productos.Respondé con una disculpa breve y respetuosa, sin hacer preguntas.goalMet=false, extractedData="NEED_ADMIN".
+10. PRECIOS Y TOTALES (CRÍTICO): Si el ESTADO DEL CLIENTE trae "TOTAL AUTORITATIVO A PAGAR", ESE es el ÚNICO número que podés cotizarle al cliente para el pedido armado. NUNCA reconstruyas un total sumando precios base del carrito o de la lista de precios — el total autoritativo ya incluye adicional MAX, descuentos por volumen, o bonificaciones de MercadoPago/transferencia según corresponda. Si el cliente cambia de plan o producto y TODAVÍA NO se actualizó el total autoritativo en el estado, NO le des un número: respondé "Dale, sin problema, cambiamos el pedido" y terminá ahí, sin cotizar, para que el sistema recalcule. Los precios de la lista son SOLO referencia conceptual para presentar planes al inicio, nunca para cotizar pedidos en curso.
 `;
 
         try {

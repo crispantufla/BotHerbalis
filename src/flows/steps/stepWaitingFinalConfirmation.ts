@@ -29,11 +29,17 @@ export async function handleWaitingFinalConfirmation(
             let basePrice = parseInt(priceStr.replace(/\./g, ''));
             currentState.cart = [{ product: newProduct, plan: newPlan, price: priceStr }];
 
-            let finalAdicional = 0;
-            if (currentState.isContraReembolsoMAX) {
-                finalAdicional = newPlan === '60' ? _getAdicionalMAX() : 0;
-            }
+            // Recompute adicional based on the NEW plan and current payment method.
+            // The previous isContraReembolsoMAX flag reflects the OLD plan, so it can't
+            // be trusted after a plan change (e.g. plan 120 → 60 needs the adicional
+            // added back). MP/transferencia payments keep the adicional waived.
+            const isCashPayment = !currentState.paymentMethod
+                || currentState.paymentMethod === 'contrarembolso'
+                || currentState.paymentMethod === 'efectivo';
+            const shouldApplyAdicional = isCashPayment && newPlan === '60';
+            const finalAdicional = shouldApplyAdicional ? _getAdicionalMAX() : 0;
             currentState.adicionalMAX = finalAdicional;
+            currentState.isContraReembolsoMAX = shouldApplyAdicional;
             const finalPrice = basePrice + finalAdicional;
             currentState.totalPrice = finalPrice.toLocaleString('es-AR').replace(/,/g, '.');
 

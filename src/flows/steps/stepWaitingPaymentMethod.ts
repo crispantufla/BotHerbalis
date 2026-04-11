@@ -1,7 +1,7 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _setStep, _pauseAndAlert } from '../utils/flowHelpers';
 import { buildConfirmationMessage } from '../../utils/messageTemplates';
-import { calculateTotal } from '../utils/cartHelpers';
+import { calculateTotal, _recalcAdicionalMAX } from '../utils/cartHelpers';
 import logger from '../../utils/logger';
 
 const MP_KEYWORDS = /\b(mercadopago|mercado.?pago|mp|online|digital|qr|transferencia bancaria|tarjeta|debito|debito|credito|2|segundo|pago online|pago digital|pago ahora)\b/i;
@@ -92,6 +92,11 @@ export async function handleWaitingPaymentMethod(
     // ── Opción 1: Contra reembolso ─────────────────────────────────────────────
     if (CASH_KEYWORDS.test(normalizedText)) {
         currentState.paymentMethod = 'contrarembolso';
+
+        // Restaurar adicionalMAX — puede haber sido waiveado por un intento previo
+        // de MP o transferencia en este mismo flujo. _recalcAdicionalMAX es idempotente.
+        _recalcAdicionalMAX(currentState);
+        calculateTotal(currentState);
 
         const addr = currentState.partialAddress || {};
         const hasAddress = !!(addr.nombre && addr.calle && addr.ciudad);

@@ -74,6 +74,7 @@ function buildCartFromSelection(product: string, plan: string, state: UserState)
     state.selectedProduct = product;
 
     _recalcAdicionalMAX(state);
+    calculateTotal(state);
 }
 
 /**
