@@ -156,10 +156,15 @@ class ClientPool {
         const queue = createQueue(sellerId);
 
         // WhatsApp client — config aligned with main branch (proven to persist sessions)
+        const webCachePath = path.join(dataDir, '.wwebjs_cache');
         const client = new Client({
             authStrategy: new LocalAuth({ clientId: sellerId, dataPath: authPath }),
             deviceName: 'Herbalis CRM',
             browserName: 'Panel Empresarial',
+            webVersionCache: {
+                type: 'local',
+                path: webCachePath,
+            },
             puppeteer: {
                 headless: true,
                 ...(process.env.PUPPETEER_EXECUTABLE_PATH && { executablePath: process.env.PUPPETEER_EXECUTABLE_PATH }),
@@ -329,6 +334,27 @@ class ClientPool {
                     saveOrderToLocal: helpers.saveOrderToLocal
                 });
                 instance.schedulerStarted = true;
+            }
+        });
+
+        // Proactive connection health monitoring.
+        // WhatsApp Web degrades when the phone sleeps (battery saver / locked screen).
+        // Listening to change_state lets us detect TIMEOUT/UNPAIRED early and reconnect
+        // before messages start queueing on the phone.
+        client.on('change_state', (state: string) => {
+            logger.info(`[POOL][${sellerId}] State changed: ${state}`);
+            if (this.io) {
+                this.io.to(sellerId).emit('status_change', { status: state.toLowerCase(), sellerId });
+                this.io.to('admin').emit('status_change', { status: state.toLowerCase(), sellerId });
+            }
+            if (state === 'TIMEOUT' || state === 'UNPAIRED') {
+                logger.warn(`[POOL][${sellerId}] Connection degraded (${state}), attempting refresh...`);
+                client.resetState().catch(() => {
+                    // resetState not available in all versions — fall back to re-init
+                    client.initialize().catch((e: any) =>
+                        logger.error(`[POOL][${sellerId}] Re-init after ${state} failed:`, e.message)
+                    );
+                });
             }
         });
 
