@@ -118,8 +118,8 @@ module.exports = (clientPool) => {
         }
     });
 
-    // POST /config (admin only)
-    router.post('/config', ...withSeller(clientPool), requireAdmin, validate(configSchema), async (req, res) => {
+    // POST /config — sellers can configure their own alert numbers, admins can configure any seller's
+    router.post('/config', ...withSeller(clientPool), validate(configSchema), async (req, res) => {
         const { client, config, saveState } = getCtx(req);
         const { alertNumber, action, number } = req.body;
 
