@@ -188,6 +188,10 @@ class ClientPool {
                     '--disable-client-side-phishing-detection', '--disable-default-apps',
                     '--disable-hang-monitor', '--disable-prompt-on-repost',
                     '--disable-sync', '--disk-cache-size=0', '--disable-gpu-shader-disk-cache',
+                    // Reduce process count per Chrome — Railway containers have PID limits.
+                    // Without these, 6 Chrome = ~90 processes → EAGAIN on fork().
+                    '--renderer-process-limit=1',      // 1 renderer instead of ~4-6
+                    '--disable-site-isolation-trials',  // don't spawn extra renderer per origin
                     // Memory limits per Chromium — prevent one instance from starving others
                     '--js-flags=--max-old-space-size=512',
                 ],
@@ -504,6 +508,14 @@ class ClientPool {
         // Remove all listeners before destroy to prevent stale reconnect handlers from firing
         try { instance.client.removeAllListeners(); } catch (e) { /* ignore */ }
         try { await Promise.race([instance.client.destroy(), new Promise(r => setTimeout(r, 5000))]); } catch (e) { /* ignore */ }
+        // Hard-kill Chrome if destroy didn't clean it up (prevents PID leaks)
+        try {
+            const browser = instance.client?.pupBrowser;
+            if (browser?.process()) {
+                browser.process().kill('SIGKILL');
+                logger.info(`[POOL] Hard-killed Chrome for ${sellerId}`);
+            }
+        } catch (e) { /* already dead — fine */ }
         try { await shutdownSellerQueue(instance.queue, instance.worker, sellerId); } catch (e) { /* ignore */ }
 
         await prisma.whatsAppSession.upsert({
