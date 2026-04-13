@@ -151,19 +151,23 @@ const AdvancedAnalyticsView = () => {
 
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                         <div className={`flex p-1 rounded-xl border w-full sm:w-auto ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-                            {[1, 7, 14, 30].map(days => (
-                                <button
-                                    key={days}
-                                    onClick={() => setDaysAgoToFetch(days)}
-                                    className={`flex-1 sm:flex-none px-2 sm:px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${daysAgoToFetch === days
-                                        ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300'
-                                        : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700'
-                                        }`}
-                                >
-                                    <span className="sm:hidden">{days === 1 ? 'Ayer' : `${days}D`}</span>
-                                    <span className="hidden sm:inline">{days === 1 ? 'Ayer' : `${days} Días`}</span>
-                                </button>
-                            ))}
+                            {[7, 14, 30, 90, 365].map(days => {
+                                const label = days === 90 ? 'Trimestral' : days === 365 ? 'Anual' : `${days} Días`;
+                                const shortLabel = days === 90 ? 'Trim' : days === 365 ? 'Año' : `${days}D`;
+                                return (
+                                    <button
+                                        key={days}
+                                        onClick={() => setDaysAgoToFetch(days)}
+                                        className={`flex-1 sm:flex-none px-2 sm:px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${daysAgoToFetch === days
+                                            ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300'
+                                            : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700'
+                                            }`}
+                                    >
+                                        <span className="sm:hidden">{shortLabel}</span>
+                                        <span className="hidden sm:inline">{label}</span>
+                                    </button>
+                                );
+                            })}
                         </div>
                         {isAdmin && sellers.length > 0 && (
                             <div className={`flex p-1 rounded-xl border w-full sm:w-auto overflow-x-auto ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
@@ -208,7 +212,7 @@ const AdvancedAnalyticsView = () => {
                         </div>
                         <h3 className="text-xl font-bold text-slate-700 dark:text-slate-200 mb-2">Sin datos para este período</h3>
                         <p className="text-slate-500 dark:text-slate-400 text-sm text-center max-w-sm mb-6">
-                            No hay órdenes ni ingresos registrados en los últimos {daysAgoToFetch === 1 ? 'día' : `${daysAgoToFetch} días`}. Probá con un rango más amplio.
+                            No hay órdenes ni ingresos registrados en los últimos {daysAgoToFetch === 90 ? '3 meses' : daysAgoToFetch === 365 ? '12 meses' : `${daysAgoToFetch} días`}. Probá con un rango más amplio.
                         </p>
                         <div className="flex gap-3">
                             {[7, 30].map(days => (

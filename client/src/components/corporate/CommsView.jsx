@@ -387,7 +387,7 @@ Teléfono: ${phoneDisplay}`;
             <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-400/10 blur-[100px] rounded-full pointer-events-none"></div>
 
             {/* SIDEBAR: Contacts */}
-            <div className={`w-full md:w-72 lg:w-[300px] xl:w-[340px] 2xl:w-[400px] flex-shrink-0 border-r border-slate-200 dark:border-slate-800 flex-col bg-white dark:bg-slate-800 z-10 ${selectedChat ? 'hidden md:flex' : 'flex'} min-h-0 overflow-hidden`}>
+            <div className={`w-full md:w-72 lg:w-[300px] xl:w-[340px] 2xl:w-[400px] md:flex-shrink-0 border-r border-slate-200 dark:border-slate-800 flex-col bg-white dark:bg-slate-800 z-10 ${selectedChat ? 'hidden md:flex' : 'flex flex-1'} min-h-0 overflow-hidden`}>
                 {/* Search Header */}
                 <div className="p-5 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800">
                     <div className="relative group">
