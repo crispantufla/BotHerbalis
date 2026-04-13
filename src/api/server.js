@@ -188,10 +188,12 @@ function startServer(clientPool) {
             // Track presence
             socketPresence.set(socket.id, { sellerId, state: 'online', idleTimer: null });
             resetIdleTimer(socket.id);
-
-            // Client pings periodically to stay 'online'
-            socket.on('activity_ping', () => resetIdleTimer(socket.id));
         }
+
+        // Client pings periodically to stay 'online' (works for both sellers and admins after switch-seller)
+        socket.on('activity_ping', () => {
+            if (socketPresence.has(socket.id)) resetIdleTimer(socket.id);
+        });
 
         // Auto-start Chrome for this seller (lazy start)
         if (sellerId && clientPool.isKnown(sellerId) && !clientPool.getSeller(sellerId)) {
@@ -221,6 +223,17 @@ function startServer(clientPool) {
             // Leave current seller rooms (but stay in 'admin')
             const rooms = Array.from(socket.rooms);
             rooms.filter(r => r !== socket.id && r !== 'admin').forEach(r => socket.leave(r));
+
+            // Update presence tracking: admin viewing a seller counts as "web open"
+            const oldEntry = socketPresence.get(socket.id);
+            if (oldEntry && oldEntry.idleTimer) clearTimeout(oldEntry.idleTimer);
+            if (newSellerId) {
+                socketPresence.set(socket.id, { sellerId: newSellerId, state: 'online', idleTimer: null });
+                resetIdleTimer(socket.id);
+            } else {
+                socketPresence.delete(socket.id);
+            }
+            broadcastPresence();
 
             if (newSellerId) {
                 socket.join(newSellerId);
