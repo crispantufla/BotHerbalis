@@ -180,8 +180,7 @@ class ClientPool {
                     '--disable-hang-monitor', '--disable-prompt-on-repost',
                     '--disable-sync', '--disk-cache-size=0', '--disable-gpu-shader-disk-cache',
                     // Memory limits per Chromium — prevent one instance from starving others
-                    '--js-flags=--max-old-space-size=256',
-                    '--single-process',
+                    '--js-flags=--max-old-space-size=512',
                 ],
                 timeout: 120000
             }
