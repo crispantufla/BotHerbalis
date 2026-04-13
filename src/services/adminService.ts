@@ -123,7 +123,8 @@ export async function notifyAdmin(
     client: Record<string, any>,
     config: BotConfig
 ): Promise<void> {
-    if (process.platform === 'win32') {
+    // Beep only in dev — spawning powershell on every alert exhausts the libuv thread pool in prod
+    if (process.platform === 'win32' && process.env.NODE_ENV !== 'production') {
         exec('powershell "[console]::beep(1000, 500)"', (err) => { if (err) logger.error('Beep failed:', err); });
     }
     logger.info(`[ADMIN ALERT] ${reason} (User: ${userPhone})`);

@@ -87,27 +87,27 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
     };
     const availableScripts = Object.keys(knowledgeFiles);
 
-    function loadKnowledge(_scriptName: string | null = null) {
+    async function loadKnowledge(_scriptName: string | null = null) {
         try {
-            Object.keys(knowledgeFiles).forEach(name => {
+            for (const name of Object.keys(knowledgeFiles)) {
                 const paths = knowledgeFiles[name];
                 const filePath = fs.existsSync(paths.save) ? paths.save : paths.source;
                 if (fs.existsSync(filePath)) {
-                    multiKnowledge[name] = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+                    multiKnowledge[name] = JSON.parse(await fs.promises.readFile(filePath, 'utf-8'));
                     logger.info(`[STATE][${sellerId}] Knowledge loaded: ${name} from ${path.basename(filePath)}`);
                 }
-            });
+            }
         } catch (e: any) {
             logger.error(`[STATE][${sellerId}] Error loading knowledge:`, e.message);
         }
     }
 
-    function saveKnowledge(scriptName: string | null = null) {
+    async function saveKnowledge(scriptName: string | null = null) {
         try {
             const name = scriptName || config.activeScript || 'v3';
             const paths = knowledgeFiles[name];
             if (paths && multiKnowledge[name]) {
-                atomicWriteFile(paths.save, JSON.stringify(multiKnowledge[name], null, 2));
+                await atomicWriteFile(paths.save, JSON.stringify(multiKnowledge[name], null, 2));
             }
         } catch (e: any) {
             logger.error(`[STATE][${sellerId}] Error saving knowledge:`, e.message);
@@ -142,7 +142,7 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
     async function _doPersist(): Promise<void> {
         try {
             const snapshot = { userState, chatResets, pausedUsers: Array.from(pausedUsers), config };
-            atomicWriteFile(stateFile, JSON.stringify(snapshot, null, 2));
+            await atomicWriteFile(stateFile, JSON.stringify(snapshot, null, 2));
 
             const usersToProcess = Array.from(_pendingUsers);
             _pendingUsers.clear();
@@ -200,7 +200,7 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
             } catch (dbErr: any) {
                 logger.warn(`[STATE][${sellerId}] DB failed, falling back to file: ${dbErr.message}`);
                 if (fs.existsSync(stateFile)) {
-                    const data = JSON.parse(fs.readFileSync(stateFile, 'utf-8'));
+                    const data = JSON.parse(await fs.promises.readFile(stateFile, 'utf-8'));
                     Object.assign(config, data.config || {});
                 }
                 return;
@@ -221,7 +221,7 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
             // Load transient state (pausedUsers, chatResets) from file
             if (fs.existsSync(stateFile)) {
                 try {
-                    const data = JSON.parse(fs.readFileSync(stateFile, 'utf-8'));
+                    const data = JSON.parse(await fs.promises.readFile(stateFile, 'utf-8'));
                     (data.pausedUsers || []).forEach((id: string) => pausedUsers.add(id));
                     Object.assign(chatResets, data.chatResets || {});
                 } catch (e) { /* ignore corrupt file */ }

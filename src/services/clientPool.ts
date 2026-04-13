@@ -352,8 +352,9 @@ class ClientPool {
             if (state === 'TIMEOUT' || state === 'UNPAIRED') {
                 logger.warn(`[POOL][${sellerId}] Connection degraded (${state}), attempting refresh...`);
                 client.resetState().catch(() => {
-                    // resetState not available in all versions — fall back to re-init
-                    client.initialize().catch((e: any) =>
+                    // resetState not available in all versions — fall back to safeInit
+                    // which has retry logic and zombie chrome cleanup
+                    safeInit().catch((e: any) =>
                         logger.error(`[POOL][${sellerId}] Re-init after ${state} failed:`, e.message)
                     );
                 });
@@ -416,10 +417,11 @@ class ClientPool {
                     return; // Success — exit loop
                 } catch (err: any) {
                     logger.error(`[POOL][${sellerId}] Init failed (${attempt}): ${err.message}`);
-                    // Kill zombie Chrome processes (same approach as main branch)
+                    // Kill zombie Chrome processes for THIS seller only (async to avoid blocking event loop)
                     try {
-                        const { execSync } = require('child_process');
-                        execSync(`pkill -9 -f ".wwebjs_auth" 2>/dev/null || true`, { stdio: 'ignore', shell: true, timeout: 5000 });
+                        const { exec } = require('child_process');
+                        const sellerAuthPattern = path.join(authPath, sellerId).replace(/\\/g, '/');
+                        exec(`pkill -9 -f "${sellerAuthPattern}" 2>/dev/null || true`, { timeout: 5000 }, () => {});
                     } catch (e) { /* no matching processes — fine */ }
                     cleanChromeLocks(authPath);
 
@@ -451,6 +453,8 @@ class ClientPool {
 
         logger.info(`[POOL] Stopping seller: ${sellerId}`);
         try { await instance.stateManager.flushState(); } catch (e) { /* ignore */ }
+        // Remove all listeners before destroy to prevent stale reconnect handlers from firing
+        try { instance.client.removeAllListeners(); } catch (e) { /* ignore */ }
         try { await Promise.race([instance.client.destroy(), new Promise(r => setTimeout(r, 5000))]); } catch (e) { /* ignore */ }
         try { await shutdownSellerQueue(instance.queue, instance.worker); } catch (e) { /* ignore */ }
 

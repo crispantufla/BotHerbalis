@@ -617,24 +617,25 @@ function startScheduler(sharedState: SchedulerSharedState, dependencies: Schedul
     }
 
     // ── GRACEFUL RESTART: a las 8am Argentina ──
-    // Fuerza un inicio en frío eliminando por completo cualquier fuga de RAM de Chromium/Puppeteer.
-    // Railway (o PM2) volverá a levantar el contenedor y reconectará en menos de 10s.
-    cron.schedule('0 8 * * *', async () => {
-        logger.info('[SCHEDULER] 🔄 Ejecutando reinicio preventivo diario (Anti-Memory Leak)...');
-        // Flush pending state directly to DB (uses flushState if available, falls back to saveState + delay)
-        if (dependencies.flushState) {
-            await dependencies.flushState();
-        } else if (dependencies.saveState) {
-            dependencies.saveState();
-            await new Promise(r => setTimeout(r, 6000));
-        }
-        if (process.platform === 'win32') {
-            process.exit(0);
-        } else {
-            process.kill(process.pid, 'SIGUSR2');
-        }
-    }, { timezone: TIMEZONE });
-    logger.info('[SCHEDULER] ✅ Reinicio Preventivo Diario → 08:00 ARG (diario)');
+    // Registered ONCE globally (not per seller) to avoid 8 simultaneous process.kill() calls.
+    if (!(global as any).__dailyRestartRegistered) {
+        (global as any).__dailyRestartRegistered = true;
+        cron.schedule('0 8 * * *', async () => {
+            logger.info('[SCHEDULER] 🔄 Ejecutando reinicio preventivo diario (Anti-Memory Leak)...');
+            if (dependencies.flushState) {
+                await dependencies.flushState();
+            } else if (dependencies.saveState) {
+                dependencies.saveState();
+                await new Promise(r => setTimeout(r, 6000));
+            }
+            if (process.platform === 'win32') {
+                process.exit(0);
+            } else {
+                process.kill(process.pid, 'SIGUSR2');
+            }
+        }, { timezone: TIMEZONE });
+        logger.info('[SCHEDULER] ✅ Reinicio Preventivo Diario → 08:00 ARG (diario, registrado 1 vez)');
+    }
 
     // ── Run auto-approve once 10s after boot — only during business hours (9-23h ARG) ──
     // This prevents a spurious run at 4am on restart from double-firing with the 9am cron tick.

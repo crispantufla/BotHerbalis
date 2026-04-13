@@ -56,15 +56,16 @@ module.exports = (clientPool) => {
 
             const where = instanceId ? { instanceId } : {};
 
-            // Get total count for metadata
-            const total = await prisma.order.count({ where });
-
-            const orders = await prisma.order.findMany({
-                where,
-                orderBy: { createdAt: 'desc' },
-                skip,
-                take: limit
-            });
+            // Run count + findMany in parallel (independent queries)
+            const [total, orders] = await Promise.all([
+                prisma.order.count({ where }),
+                prisma.order.findMany({
+                    where,
+                    orderBy: { createdAt: 'desc' },
+                    skip,
+                    take: limit
+                })
+            ]);
 
             // Workaround for Prisma adapter-pg composite key bug with include: { user: true }
             const userPhones = [...new Set(orders.map(o => o.userPhone).filter(Boolean))];

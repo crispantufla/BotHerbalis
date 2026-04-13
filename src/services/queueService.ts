@@ -1,24 +1,24 @@
 /**
  * queueService.ts
  * Multi-tenant BullMQ factory.
- * Each seller gets its own Queue + Worker, sharing the same Redis connections.
+ * Each seller gets its own Queue + Worker with DEDICATED Redis connections.
+ * BullMQ requires exclusive connections per Worker (blocking commands like BRPOP).
  */
 
 import { Queue, Worker, Job } from 'bullmq';
 import Redis from 'ioredis';
 const logger = require('../utils/logger');
 
-// --- SHARED REDIS CONNECTIONS (reused across all seller queues/workers) ---
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 const connectionParams = { maxRetriesPerRequest: null, keepAlive: 10000, enableOfflineQueue: false };
 
+// Shared connection for Queues (non-blocking — safe to share)
 export const redisConnection = new Redis(REDIS_URL, connectionParams);
-const workerConnection = new Redis(REDIS_URL, connectionParams);
-
 redisConnection.on('error', (err) => logger.error('🔴 [REDIS QUEUE] Error:', err.message));
 redisConnection.on('ready', () => logger.info('✅ [REDIS QUEUE] Connected.'));
-workerConnection.on('error', (err) => logger.error('🔴 [REDIS WORKER] Error:', err.message));
-workerConnection.on('ready', () => logger.info('✅ [REDIS WORKER] Connected.'));
+
+// Track per-worker connections for cleanup
+const workerConnections: Redis[] = [];
 
 // --- FACTORY: Create a Queue for a seller ---
 export function createQueue(sellerId: string): Queue {
@@ -27,6 +27,7 @@ export function createQueue(sellerId: string): Queue {
 }
 
 // --- FACTORY: Create a Worker for a seller ---
+// Each Worker gets its own dedicated Redis connection (BullMQ requirement).
 export function createWorker(sellerId: string, dependencies: any): Worker {
     const queueName = `whatsapp-messages-${sellerId}`;
     const {
@@ -34,6 +35,11 @@ export function createWorker(sellerId: string, dependencies: any): Worker {
         saveState, aiService, sendMessageWithDelay, logAndEmit,
         saveOrderToLocal, cancelLatestOrder, config, connectedAt
     } = dependencies;
+
+    // Dedicated connection for this worker — BullMQ uses blocking Redis commands
+    const workerConn = new Redis(REDIS_URL, connectionParams);
+    workerConn.on('error', (err) => logger.error(`🔴 [REDIS WORKER][${sellerId}] Error:`, err.message));
+    workerConnections.push(workerConn);
 
     const worker = new Worker(queueName, async (job: Job) => {
         const { userId, combinedText, effectiveScript, startTime } = job.data;
@@ -67,7 +73,7 @@ export function createWorker(sellerId: string, dependencies: any): Worker {
             throw error;
         }
     }, {
-        connection: workerConnection as any,
+        connection: workerConn as any,
         concurrency: 3,
         settings: {
             backoffStrategy: (attemptsMade: number) => {
@@ -81,7 +87,7 @@ export function createWorker(sellerId: string, dependencies: any): Worker {
         if (job) logger.error(`[BULLMQ][${sellerId}] Job ${job.id} failed permanently: ${err.message}`);
     });
 
-    logger.info(`[BULLMQ][${sellerId}] Worker initialized.`);
+    logger.info(`[BULLMQ][${sellerId}] Worker initialized (dedicated Redis connection).`);
     return worker;
 }
 
@@ -91,15 +97,17 @@ export async function shutdownSellerQueue(queue: Queue, worker: Worker): Promise
     try { await queue.close(); } catch (e: any) { logger.error('[BULLMQ] Queue close error:', e.message); }
 }
 
-// --- SHUTDOWN: Close shared Redis connections (call once on process exit) ---
+// --- SHUTDOWN: Close all Redis connections (call once on process exit) ---
 export async function shutdownRedis(): Promise<void> {
     try { await redisConnection.quit(); } catch (e: any) { /* ignore */ }
-    try { await workerConnection.quit(); } catch (e: any) { /* ignore */ }
-    logger.info('[BULLMQ] Redis connections closed.');
+    for (const conn of workerConnections) {
+        try { await conn.quit(); } catch (e: any) { /* ignore */ }
+    }
+    workerConnections.length = 0;
+    logger.info('[BULLMQ] All Redis connections closed.');
 }
 
 // --- BACKWARD COMPAT: Legacy singleton exports for existing code still using them ---
-// These will be removed once the refactor is complete
 const LEGACY_SELLER_ID = process.env.INSTANCE_ID || 'default';
 export const botQueue = createQueue(LEGACY_SELLER_ID);
 let _legacyWorker: Worker | null = null;

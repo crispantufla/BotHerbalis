@@ -203,10 +203,10 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
 
         logAndEmit(chatId, 'bot', content, userState[chatId]?.step);
 
-        try {
-            const chat = await client.getChatById(chatId);
-            if (chat) await chat.sendStateTyping();
-        } catch (e) { /* ignore typing errors */ }
+        // Fire-and-forget typing indicator — don't block the message pipeline with 2 Puppeteer calls
+        client.getChatById(chatId)
+            .then((chat: any) => chat?.sendStateTyping())
+            .catch(() => {});
 
         if (remainingDelay > 0) {
             await new Promise(resolve => setTimeout(resolve, remainingDelay));

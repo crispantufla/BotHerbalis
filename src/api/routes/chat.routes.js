@@ -6,30 +6,41 @@ const fs = require('fs');
 const path = require('path');
 const logger = require('../../utils/logger');
 
-// LRU cache with max size to prevent unbounded memory growth
+// Per-seller LRU contact cache — prevents cross-tenant data bleeding
 const CONTACT_CACHE_MAX = 500;
-const globalContactCache = new Map();
-function _cacheSet(key, value) {
-    if (globalContactCache.size >= CONTACT_CACHE_MAX) {
-        // Evict oldest entry (first inserted key)
-        const oldest = globalContactCache.keys().next().value;
-        globalContactCache.delete(oldest);
-    }
-    globalContactCache.set(key, value);
+const _contactCaches = new Map(); // sellerId → Map
+function _getContactCache(sellerId) {
+    if (!_contactCaches.has(sellerId)) _contactCaches.set(sellerId, new Map());
+    return _contactCaches.get(sellerId);
 }
-function _cacheGet(key) {
-    if (!globalContactCache.has(key)) return undefined;
-    // Move to end (most recently used)
-    const val = globalContactCache.get(key);
-    globalContactCache.delete(key);
-    globalContactCache.set(key, val);
+function _cacheSet(sellerId, key, value) {
+    const cache = _getContactCache(sellerId);
+    if (cache.size >= CONTACT_CACHE_MAX) {
+        const oldest = cache.keys().next().value;
+        cache.delete(oldest);
+    }
+    cache.set(key, value);
+}
+function _cacheGet(sellerId, key) {
+    const cache = _getContactCache(sellerId);
+    if (!cache.has(key)) return undefined;
+    const val = cache.get(key);
+    cache.delete(key);
+    cache.set(key, val);
     return val;
 }
 
-let ordersCache = {
-    data: [],
-    lastFetch: 0
-};
+// Concurrency limiter for Puppeteer bridge calls (getContactById, etc.)
+// Prevents flooding Chromium with parallel requests during /chats resolution
+const pLimit = require('p-limit');
+const _puppeteerLimit = pLimit(5);
+
+// Per-seller orders cache — each seller only caches their own orders
+const _ordersCaches = new Map(); // sellerId → { data, lastFetch }
+function _getOrdersCache(sellerId) {
+    if (!_ordersCaches.has(sellerId)) _ordersCaches.set(sellerId, { data: [], lastFetch: 0 });
+    return _ordersCaches.get(sellerId);
+}
 const CACHE_TTL = 60000; // 60 seconds
 
 const withTimeout = (promise, ms, rejectMessage) => {
@@ -44,17 +55,17 @@ module.exports = (clientPool) => {
     const router = express.Router();
     const { withSeller, getInstanceId, isOwnerOrAdmin } = require('./routeHelpers');
 
-    const resolveChatId = async (id, client) => {
+    const resolveChatId = async (id, client, sellerId = 'default') => {
         if (!id) return id;
         // Handle @lid format
         if (id.includes('@lid')) {
-            const cached = _cacheGet(id);
+            const cached = _cacheGet(sellerId, id);
             if (cached) return cached.id;
             try {
-                const contact = await client?.getContactById(id);
+                const contact = await _puppeteerLimit(() => client?.getContactById(id));
                 if (contact && contact.number) {
                     const resolvedId = `${contact.number}@c.us`;
-                    _cacheSet(id, { id: resolvedId, name: contact.name || contact.pushname || `+${contact.number}` });
+                    _cacheSet(sellerId, id, { id: resolvedId, name: contact.name || contact.pushname || `+${contact.number}` });
                     return resolvedId;
                 }
             } catch (e) {
@@ -128,22 +139,24 @@ module.exports = (clientPool) => {
         try {
             const chats = await withTimeout(cl.getChats(), 30000, 'Timeout retrieving chats');
 
-            // Read orders from Database to cross-reference past purchases (With 60s TTL Cache)
+            // Read orders from Database to cross-reference past purchases (Per-seller 60s TTL Cache)
+            const currentSellerId = req.sellerId || 'default';
             let orders = [];
+            const oCache = _getOrdersCache(currentSellerId);
             try {
                 const now = Date.now();
-                if (now - ordersCache.lastFetch > CACHE_TTL) {
+                if (now - oCache.lastFetch > CACHE_TTL) {
                     const { prisma } = require('../../../db');
-                    const dbOrders = await prisma.order.findMany({
-                        where: { status: { not: 'Cancelado' } }
-                    });
-                    ordersCache.data = dbOrders;
-                    ordersCache.lastFetch = now;
+                    const whereClause = { status: { not: 'Cancelado' } };
+                    if (currentSellerId !== 'default') whereClause.instanceId = currentSellerId;
+                    const dbOrders = await prisma.order.findMany({ where: whereClause });
+                    oCache.data = dbOrders;
+                    oCache.lastFetch = now;
                 }
-                orders = ordersCache.data;
+                orders = oCache.data;
             } catch (err) {
                 logger.error("Error fetching DB orders in /chats:", err.message);
-                orders = ordersCache.data || []; // Fallback to stale cache if DB fails
+                orders = oCache.data || [];
             }
 
             const instanceFilterId = getInstanceId(req);
@@ -154,13 +167,13 @@ module.exports = (clientPool) => {
                 let actualName = c.name || c.id.user;
 
                 if (actualId.includes('@lid')) {
-                    const cachedContact = _cacheGet(actualId);
+                    const cachedContact = _cacheGet(currentSellerId, actualId);
                     if (cachedContact) {
                         actualId = cachedContact.id;
                         actualName = cachedContact.name;
                     } else {
                         try {
-                            const contact = await withTimeout(cl.getContactById(actualId), 1500, 'Timeout');
+                            const contact = await withTimeout(_puppeteerLimit(() => cl.getContactById(actualId)), 1500, 'Timeout');
                             if (contact && contact.number) {
                                 actualId = `${contact.number}@c.us`;
                                 if (contact.name || contact.pushname) {
@@ -168,12 +181,12 @@ module.exports = (clientPool) => {
                                 } else {
                                     actualName = `+${contact.number}`;
                                 }
-                                _cacheSet(c.id._serialized, { id: actualId, name: actualName });
+                                _cacheSet(currentSellerId, c.id._serialized, { id: actualId, name: actualName });
                             }
                         } catch (e) {
                             // Silenciar el spam: Si Meta hace timeout, guardamos el @lid temporalmente
                             // para no atorar la red iterando 50 veces por segundo en futuras recargas.
-                            _cacheSet(c.id._serialized, { id: actualId, name: actualName });
+                            _cacheSet(currentSellerId, c.id._serialized, { id: actualId, name: actualName });
                         }
                     }
                 }

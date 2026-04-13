@@ -72,10 +72,13 @@ export async function pauseUser(
 
     // 3. Admin notification with debounce — only if not already paused and not notified recently
     if (!wasAlreadyPaused && notifyAdmin) {
-        const lastNotified = adminNotifiedAt.get(userId) ?? 0;
+        // Key includes sellerId to prevent cross-tenant debounce interference
+        const sellerId = deps.instanceId || deps.sharedState?.sellerId || 'default';
+        const debounceKey = `${sellerId}:${userId}`;
+        const lastNotified = adminNotifiedAt.get(debounceKey) ?? 0;
         const now = Date.now();
         if (now - lastNotified > NOTIFY_DEBOUNCE_MS) {
-            adminNotifiedAt.set(userId, now);
+            adminNotifiedAt.set(debounceKey, now);
             try {
                 await notifyAdmin(reason, userId, adminDetails);
             } catch (e) {

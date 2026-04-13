@@ -6,7 +6,7 @@ const connectionString = process.env.DATABASE_URL;
 
 const pool = new Pool({
     connectionString,
-    max: 5,                      // Max 5 connections (Railway free tier friendly)
+    max: 20,                     // 8 sellers × 3 worker concurrency + API headroom
     idleTimeoutMillis: 30000,    // Close idle connections after 30s
     connectionTimeoutMillis: 5000 // Fail fast if DB is unreachable
 });

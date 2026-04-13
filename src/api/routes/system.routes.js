@@ -440,7 +440,7 @@ module.exports = (clientPool) => {
             const filePath = fs.existsSync(persistPath) ? persistPath : sourcePath;
 
             if (fs.existsSync(filePath)) {
-                const content = JSON.parse(fs.readFileSync(filePath));
+                const content = JSON.parse(await fs.promises.readFile(filePath, 'utf-8'));
                 res.json(content);
             } else {
                 res.status(404).json({ error: 'Archivo no encontrado' });
@@ -454,19 +454,24 @@ module.exports = (clientPool) => {
     const PRICES_FILE = path.join(DATA_DIR, 'prices.json');
 
     // GET /prices
-    router.get('/prices', ...withSeller(clientPool), (req, res) => {
+    router.get('/prices', ...withSeller(clientPool), async (req, res) => {
         try {
-            if (fs.existsSync(PRICES_FILE)) {
-                res.json(JSON.parse(fs.readFileSync(PRICES_FILE)));
-            } else {
-                // Return default structure if file missing
-                res.json({
-                    'Cápsulas': { '60': '46.900', '120': '66.900' },
-                    'Semillas': { '60': '36.900', '120': '49.900' },
-                    'Gotas': { '60': '48.900', '120': '68.900' },
-                    'adicionalMAX': '6.000',
-                    'costoLogistico': '18.000'
-                });
+            try {
+                const data = await fs.promises.readFile(PRICES_FILE, 'utf-8');
+                res.json(JSON.parse(data));
+            } catch (readErr) {
+                if (readErr.code === 'ENOENT') {
+                    // Return default structure if file missing
+                    res.json({
+                        'Cápsulas': { '60': '46.900', '120': '66.900' },
+                        'Semillas': { '60': '36.900', '120': '49.900' },
+                        'Gotas': { '60': '48.900', '120': '68.900' },
+                        'adicionalMAX': '6.000',
+                        'costoLogistico': '18.000'
+                    });
+                } else {
+                    throw readErr;
+                }
             }
         } catch (e) {
             res.status(500).json({ error: e.message });
@@ -474,7 +479,7 @@ module.exports = (clientPool) => {
     });
 
     // POST /prices
-    router.post('/prices', ...withSeller(clientPool), validate(pricesSchema), (req, res) => {
+    router.post('/prices', ...withSeller(clientPool), validate(pricesSchema), async (req, res) => {
         try {
             const { io } = getCtx(req);
             const newPrices = req.body;
@@ -483,9 +488,9 @@ module.exports = (clientPool) => {
             }
             // Ensure directory exists
             const dir = path.dirname(PRICES_FILE);
-            if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+            await fs.promises.mkdir(dir, { recursive: true }).catch(() => {});
 
-            fs.writeFileSync(PRICES_FILE, JSON.stringify(newPrices, null, 2));
+            await fs.promises.writeFile(PRICES_FILE, JSON.stringify(newPrices, null, 2));
 
             // Notify clients via Socket (optional but good for realtime UI)
             if (io) io.emit('prices_updated', newPrices);

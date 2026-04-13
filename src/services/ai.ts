@@ -148,7 +148,10 @@ function _getModelForStep(step: string): string {
 }
 
 // --- RATE LIMIT CONFIGURATION ---
-const MAX_CONCURRENT = 3;
+// Process-wide concurrency cap for OpenAI calls (shared across all sellers).
+// With 8 sellers × 3 workers = 24 potential concurrent calls → cap at 8.
+const pLimit = require('p-limit');
+const _aiConcurrencyLimit = pLimit(8);
 const MIN_DELAY_MS = 200;
 const CACHE_TTL_SECONDS = 45 * 60; // 45 min cache for node-cache
 
@@ -426,7 +429,8 @@ class AIService {
     model: string;
     cache: NodeCache;
     stats: { calls: number, cached: number, retries: number, errors: number, promptTokens: number, completionTokens: number, estimatedCostUSD: number };
-    _circuitBreaker: { failures: number, openUntil: number };
+    // Per-seller circuit breakers — prevents one seller's OpenAI failures from blocking all others
+    _circuitBreakers: Map<string, { failures: number, openUntil: number }>;
     _disabled: boolean;
 
     constructor() {
@@ -442,7 +446,14 @@ class AIService {
         this.model = MODEL;
         this.cache = new NodeCache({ stdTTL: CACHE_TTL_SECONDS, checkperiod: 120, maxKeys: 1000 });
         this.stats = { calls: 0, cached: 0, retries: 0, errors: 0, promptTokens: 0, completionTokens: 0, estimatedCostUSD: 0 };
-        this._circuitBreaker = { failures: 0, openUntil: 0 };
+        this._circuitBreakers = new Map();
+    }
+
+    _getCircuitBreaker(sellerId: string = 'global'): { failures: number, openUntil: number } {
+        if (!this._circuitBreakers.has(sellerId)) {
+            this._circuitBreakers.set(sellerId, { failures: 0, openUntil: 0 });
+        }
+        return this._circuitBreakers.get(sellerId)!;
     }
 
     /**
@@ -455,7 +466,7 @@ class AIService {
     /**
      * Core API call with retry + rate limit handling
      */
-    async _callQueued<T>(apiCallFn: () => Promise<T>, rawCacheKey: string | null = null, customTTL: number | undefined = undefined): Promise<T> {
+    async _callQueued<T>(apiCallFn: () => Promise<T>, rawCacheKey: string | null = null, customTTL: number | undefined = undefined, sellerId: string = 'global'): Promise<T> {
         if (this._disabled) throw new Error('AI Service disabled: missing API key');
         // Check cache first
         let cacheKey = null;
@@ -469,11 +480,12 @@ class AIService {
         }
         this.stats.calls++;
 
-        // Circuit breaker: if open, fail fast
+        // Per-seller circuit breaker: if open, fail fast for THIS seller only
+        const cb = this._getCircuitBreaker(sellerId);
         const now = Date.now();
-        if (this._circuitBreaker.failures >= CIRCUIT_BREAKER_THRESHOLD && now < this._circuitBreaker.openUntil) {
+        if (cb.failures >= CIRCUIT_BREAKER_THRESHOLD && now < cb.openUntil) {
             this.stats.errors++;
-            throw new Error("AI Service Unavailable (Circuit Breaker Open)");
+            throw new Error(`AI Service Unavailable (Circuit Breaker Open for ${sellerId})`);
         }
 
         let result: T | undefined;
@@ -481,9 +493,9 @@ class AIService {
 
         for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
             try {
-                result = await apiCallFn();
+                result = await _aiConcurrencyLimit(apiCallFn);
                 success = true;
-                this._circuitBreaker.failures = 0; // Reset on success
+                cb.failures = 0; // Reset on success
                 break;
             } catch (e: any) {
                 const status = e.status || e.statusCode;
@@ -502,10 +514,10 @@ class AIService {
 
         if (!success || result === undefined) {
             this.stats.errors++;
-            this._circuitBreaker.failures++;
-            if (this._circuitBreaker.failures >= CIRCUIT_BREAKER_THRESHOLD) {
-                this._circuitBreaker.openUntil = Date.now() + CIRCUIT_BREAKER_RESET_MS;
-                logger.warn(`⚠️[AI] Circuit breaker OPEN — ${CIRCUIT_BREAKER_THRESHOLD} consecutive failures. Cooling down ${CIRCUIT_BREAKER_RESET_MS / 1000}s.`);
+            cb.failures++;
+            if (cb.failures >= CIRCUIT_BREAKER_THRESHOLD) {
+                cb.openUntil = Date.now() + CIRCUIT_BREAKER_RESET_MS;
+                logger.warn(`⚠️[AI] Circuit breaker OPEN for ${sellerId} — ${CIRCUIT_BREAKER_THRESHOLD} consecutive failures. Cooling down ${CIRCUIT_BREAKER_RESET_MS / 1000}s.`);
             }
             throw new Error("AI Service Unavailable (Max Retries Exceeded)");
         }
@@ -987,7 +999,7 @@ CRÍTICO: Usá la "Fecha Actual" provista arriba para calcular el día exacto y 
         const tmpPath = path.join(os.tmpdir(), `herbalis_audio_${Date.now()}.${ext}`);
 
         try {
-            fs.writeFileSync(tmpPath, buffer);
+            await fs.promises.writeFile(tmpPath, buffer);
 
             const result = await this._callQueued(
                 () => this.client.audio.transcriptions.create({
@@ -1003,7 +1015,7 @@ CRÍTICO: Usá la "Fecha Actual" provista arriba para calcular el día exacto y 
             logger.error("🔴 [AI] Transcribe Error:", e.message);
             return null;
         } finally {
-            try { fs.unlinkSync(tmpPath); } catch (e) { /* ignore */ }
+            try { await fs.promises.unlink(tmpPath); } catch (e) { /* ignore */ }
         }
     }
 

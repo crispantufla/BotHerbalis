@@ -86,10 +86,12 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
     return async function messageHandler(msg: any): Promise<void> {
         try {
             if (msg.from === 'status@broadcast') return;
+            // Short-circuit groups/broadcast before Puppeteer bridge call (avoids expensive getChat)
+            if (msg.from.endsWith('@g.us') || msg.from.endsWith('@broadcast')) return;
             if (sharedState.connectedAt && msg.timestamp && msg.timestamp < sharedState.connectedAt) return;
 
             const chat = await msg.getChat();
-            if (chat.isGroup) return;
+            if (chat.isGroup) return; // Belt-and-suspenders
 
             let userId = msg.from;
 
@@ -176,10 +178,10 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
                 const media = await msg.downloadMedia();
                 if (media) {
                     const audioDir = path.join(dataDir, '..', 'public', 'media', 'audio');
-                    if (!fs.existsSync(audioDir)) fs.mkdirSync(audioDir, { recursive: true });
+                    await fs.promises.mkdir(audioDir, { recursive: true }).catch(() => {});
                     const ext = media.mimetype?.includes('ogg') ? 'ogg' : 'mp3';
                     const audioFilename = `${userId.replace('@c.us', '')}_${Date.now()}.${ext}`;
-                    fs.writeFileSync(path.join(audioDir, audioFilename), Buffer.from(media.data, 'base64'));
+                    await fs.promises.writeFile(path.join(audioDir, audioFilename), Buffer.from(media.data, 'base64'));
                     const audioUrl = `/media/audio/${audioFilename}`;
                     const transcription = await aiService.transcribeAudio(media.data, media.mimetype);
                     if (transcription) {
