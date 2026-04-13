@@ -72,6 +72,7 @@ class ClientPool {
     private initQueue: Promise<void> = Promise.resolve(); // Serialize Chrome startups
     private io: any = null;
     private redlock: any = null;
+    private watchdogInterval: ReturnType<typeof setInterval> | null = null;
 
     setIo(io: any) { this.io = io; }
     setRedlock(redlock: any) { this.redlock = redlock; }
@@ -380,6 +381,7 @@ class ClientPool {
 
         const MAX_RECONNECT = 5;
         const BASE_DELAY = 3000;
+        const RECOVERY_DELAY = 5 * 60 * 1000; // 5 min between recovery cycles after MAX_RECONNECT
 
         client.on('disconnected', (reason: string) => {
             logger.info(`[POOL][${sellerId}] Disconnected: ${reason}`);
@@ -401,15 +403,22 @@ class ClientPool {
             }
 
             if (instance.reconnectAttempts >= MAX_RECONNECT) {
-                logger.error(`[POOL][${sellerId}] Max reconnect attempts reached`);
-                helpers.notifyAdmin('❌ Bot desconectado', 'system', `El bot de ${sellerId} no pudo reconectar. Razón: ${reason}.`).catch(() => {});
+                logger.error(`[POOL][${sellerId}] Max reconnect attempts reached — will retry in ${RECOVERY_DELAY / 1000}s`);
+                helpers.notifyAdmin('❌ Bot desconectado', 'system', `El bot de ${sellerId} no pudo reconectar tras ${MAX_RECONNECT} intentos. Razón: ${reason}. Reintentando en 5 min.`).catch(() => {});
+                // Don't give up — schedule a recovery attempt with reset counter
+                setTimeout(() => {
+                    instance.reconnectAttempts = 0;
+                    logger.info(`[POOL][${sellerId}] Recovery cycle — retrying connection...`);
+                    safeInit().catch(() => {});
+                }, RECOVERY_DELAY);
                 return;
             }
 
             const delay = BASE_DELAY * Math.pow(2, instance.reconnectAttempts);
             instance.reconnectAttempts++;
             logger.info(`[POOL][${sellerId}] Reconnect ${instance.reconnectAttempts}/${MAX_RECONNECT} in ${delay / 1000}s...`);
-            setTimeout(() => client.initialize().catch((e: any) => logger.error(`[POOL][${sellerId}] Re-init failed:`, e.message)), delay);
+            // Use safeInit (6 retries with backoff) instead of raw initialize()
+            setTimeout(() => safeInit().catch(() => {}), delay);
         });
 
         client.on('message', messageHandler);
@@ -441,8 +450,20 @@ class ClientPool {
             }
             // All attempts failed — do NOT wipe session (it persists across deploys).
             logger.error(`[POOL][${sellerId}] All ${MAX_INIT} init attempts failed. Session preserved. Use /whatsapp-logout to wipe manually if needed.`);
+            // Clean up: remove listeners to prevent zombie event handlers, destroy client
+            try { client.removeAllListeners(); } catch (e) { /* ignore */ }
+            try { await Promise.race([client.destroy(), new Promise(r => setTimeout(r, 5000))]); } catch (e) { /* ignore */ }
+            try { await shutdownSellerQueue(queue, worker, sellerId); } catch (e) { /* ignore */ }
             pool.instances.delete(sellerId);
-            try { await shutdownSellerQueue(queue, worker); } catch (e) { /* ignore */ }
+            // Schedule recovery — don't let seller stay dead forever
+            if (pool.knownSellers.has(sellerId)) {
+                logger.info(`[POOL][${sellerId}] Scheduling recovery in 5 min...`);
+                setTimeout(() => {
+                    pool.ensureStarted(sellerId).catch(e =>
+                        logger.error(`[POOL][${sellerId}] Recovery ensureStarted failed:`, e.message)
+                    );
+                }, 5 * 60 * 1000);
+            }
         }
 
         this.instances.set(sellerId, instance);
@@ -463,7 +484,7 @@ class ClientPool {
         // Remove all listeners before destroy to prevent stale reconnect handlers from firing
         try { instance.client.removeAllListeners(); } catch (e) { /* ignore */ }
         try { await Promise.race([instance.client.destroy(), new Promise(r => setTimeout(r, 5000))]); } catch (e) { /* ignore */ }
-        try { await shutdownSellerQueue(instance.queue, instance.worker); } catch (e) { /* ignore */ }
+        try { await shutdownSellerQueue(instance.queue, instance.worker, sellerId); } catch (e) { /* ignore */ }
 
         await prisma.whatsAppSession.upsert({
             where: { sellerId },
@@ -478,7 +499,9 @@ class ClientPool {
     async restartSeller(sellerId: string): Promise<void> {
         await this.stopSeller(sellerId);
         await new Promise(r => setTimeout(r, 2000));
-        await this.startSeller(sellerId);
+        // Go through initQueue to prevent concurrent Chrome launches
+        this.knownSellers.add(sellerId);
+        await this.ensureStarted(sellerId);
     }
 
     /** Wipe session directory and start fresh (forces new QR scan). */
@@ -492,10 +515,13 @@ class ClientPool {
             fs.rmSync(authPath, { recursive: true, force: true });
             logger.info(`[POOL] Wiped session for ${sellerId}: ${authPath}`);
         }
-        await this.startSeller(sellerId);
+        // Go through initQueue to prevent concurrent Chrome launches
+        this.knownSellers.add(sellerId);
+        await this.ensureStarted(sellerId);
     }
 
     async stopAll(): Promise<void> {
+        if (this.watchdogInterval) clearInterval(this.watchdogInterval);
         await Promise.all(Array.from(this.instances.keys()).map(id => this.stopSeller(id)));
     }
 
@@ -506,6 +532,40 @@ class ClientPool {
         for (const instance of this.instances.values()) {
             instance.sharedState._io = io;
         }
+        // Start watchdog after IO is ready (all sellers registered by now)
+        this.startWatchdog();
+    }
+
+    /**
+     * Periodic health check — detects zombie Chrome (connected flag true but
+     * page unresponsive) and restarts affected sellers.
+     * Runs every 3 minutes. Only acts on instances that claim to be connected.
+     */
+    private startWatchdog(): void {
+        if (this.watchdogInterval) return;
+        const WATCHDOG_MS = 3 * 60 * 1000;
+
+        this.watchdogInterval = setInterval(async () => {
+            for (const [sellerId, instance] of this.instances) {
+                if (!instance.sharedState.isConnected) continue;
+                try {
+                    // Lightweight health check — evaluate JS in the WA page
+                    const page = instance.client?.pupPage;
+                    if (!page || page.isClosed()) throw new Error('Page closed');
+                    await Promise.race([
+                        page.evaluate(() => document.title),
+                        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 15000))
+                    ]);
+                } catch (e: any) {
+                    logger.error(`[WATCHDOG] ${sellerId} health check failed: ${e.message} — restarting`);
+                    instance.sharedState.isConnected = false;
+                    if (this.io) this.io.to(sellerId).emit('status_change', { status: 'reconnecting', sellerId });
+                    this.restartSeller(sellerId).catch(err =>
+                        logger.error(`[WATCHDOG] ${sellerId} restart failed:`, err.message)
+                    );
+                }
+            }
+        }, WATCHDOG_MS);
     }
 }
 

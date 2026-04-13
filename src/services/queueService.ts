@@ -17,8 +17,8 @@ export const redisConnection = new Redis(REDIS_URL, connectionParams);
 redisConnection.on('error', (err) => logger.error('🔴 [REDIS QUEUE] Error:', err.message));
 redisConnection.on('ready', () => logger.info('✅ [REDIS QUEUE] Connected.'));
 
-// Track per-worker connections for cleanup
-const workerConnections: Redis[] = [];
+// Track per-worker connections for cleanup (keyed by sellerId for targeted shutdown)
+const workerConnections: Map<string, Redis> = new Map();
 
 // --- FACTORY: Create a Queue for a seller ---
 export function createQueue(sellerId: string): Queue {
@@ -37,9 +37,15 @@ export function createWorker(sellerId: string, dependencies: any): Worker {
     } = dependencies;
 
     // Dedicated connection for this worker — BullMQ uses blocking Redis commands
+    // Close previous connection for this seller if it exists (prevents leak on restart)
+    const prevConn = workerConnections.get(sellerId);
+    if (prevConn) {
+        prevConn.quit().catch(() => {});
+        workerConnections.delete(sellerId);
+    }
     const workerConn = new Redis(REDIS_URL, connectionParams);
     workerConn.on('error', (err) => logger.error(`🔴 [REDIS WORKER][${sellerId}] Error:`, err.message));
-    workerConnections.push(workerConn);
+    workerConnections.set(sellerId, workerConn);
 
     const worker = new Worker(queueName, async (job: Job) => {
         const { userId, combinedText, effectiveScript, startTime } = job.data;
@@ -91,19 +97,26 @@ export function createWorker(sellerId: string, dependencies: any): Worker {
     return worker;
 }
 
-// --- SHUTDOWN: Close a seller's queue + worker ---
-export async function shutdownSellerQueue(queue: Queue, worker: Worker): Promise<void> {
+// --- SHUTDOWN: Close a seller's queue + worker + its dedicated Redis connection ---
+export async function shutdownSellerQueue(queue: Queue, worker: Worker, sellerId?: string): Promise<void> {
     try { await worker.close(); } catch (e: any) { logger.error('[BULLMQ] Worker close error:', e.message); }
     try { await queue.close(); } catch (e: any) { logger.error('[BULLMQ] Queue close error:', e.message); }
+    if (sellerId) {
+        const conn = workerConnections.get(sellerId);
+        if (conn) {
+            try { await conn.quit(); } catch (e: any) { /* ignore */ }
+            workerConnections.delete(sellerId);
+        }
+    }
 }
 
 // --- SHUTDOWN: Close all Redis connections (call once on process exit) ---
 export async function shutdownRedis(): Promise<void> {
     try { await redisConnection.quit(); } catch (e: any) { /* ignore */ }
-    for (const conn of workerConnections) {
+    for (const conn of workerConnections.values()) {
         try { await conn.quit(); } catch (e: any) { /* ignore */ }
     }
-    workerConnections.length = 0;
+    workerConnections.clear();
     logger.info('[BULLMQ] All Redis connections closed.');
 }
 
