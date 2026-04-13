@@ -71,12 +71,19 @@ async function boot() {
     // Wire Socket.IO into clientPool so sellers can emit events
     clientPool.registerIo(io);
 
-    // Register sellers (lazy — Chrome starts only when the user logs in)
+    // Register and start all sellers — WhatsApp sessions must always be connected
     for (const id of sellerIds) {
         clientPool.registerSeller(id);
     }
 
-    logger.info(`[BOOT] ✅ ${sellerIds.length} seller(s) registered (lazy start). Platform ready.`);
+    // Start all sellers immediately (staggered via ensureStarted's initQueue)
+    for (const id of sellerIds) {
+        clientPool.ensureStarted(id).catch(e =>
+            logger.error(`[BOOT] Failed to start seller ${id}:`, e.message)
+        );
+    }
+
+    logger.info(`[BOOT] ✅ ${sellerIds.length} seller(s) registered and starting. Platform ready.`);
 
     // Graceful shutdown
     const _shutdown = async (signal: string, exitCode: number = 0): Promise<void> => {
