@@ -139,6 +139,7 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
                 ciudad: order.ciudad || null,
                 provincia: order.provincia || null,
                 cp: order.cp || null,
+                paymentMethod: order.paymentMethod || null,
                 seller: client?.info?.wid?.user || null,
                 instanceId: sellerId
             };

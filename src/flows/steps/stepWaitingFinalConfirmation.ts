@@ -72,6 +72,7 @@ export async function handleWaitingFinalConfirmation(
             plan: cart.map(i => `${i.plan} días`).join(' + ') || `${currentState.selectedPlan || '60'} días`,
             precio: currentState.totalPrice || '0',
             postdatado: currentState.postdatado || null,
+            paymentMethod: currentState.paymentMethod || 'contrarembolso',
             ...extra
         };
     };

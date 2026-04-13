@@ -104,6 +104,7 @@ module.exports = (clientPool) => {
                     ciudad: o.ciudad || '',
                     provincia: o.provincia || '',
                     cp: o.cp || '',
+                    paymentMethod: o.paymentMethod || null,
                     seller: o.seller || '',
                     createdAt: o.createdAt.toISOString()
                 };
@@ -176,6 +177,7 @@ module.exports = (clientPool) => {
                 ciudad: updatedOrder.ciudad || '',
                 provincia: updatedOrder.provincia || '',
                 cp: updatedOrder.cp || '',
+                paymentMethod: updatedOrder.paymentMethod || null,
                 seller: updatedOrder.seller || '',
                 createdAt: updatedOrder.createdAt.toISOString()
             };
@@ -264,6 +266,7 @@ module.exports = (clientPool) => {
                 ciudad: updatedOrder.ciudad || '',
                 provincia: updatedOrder.provincia || '',
                 cp: updatedOrder.cp || '',
+                paymentMethod: updatedOrder.paymentMethod || null,
                 seller: updatedOrder.seller || '',
                 createdAt: updatedOrder.createdAt.toISOString()
             };
@@ -480,6 +483,7 @@ module.exports = (clientPool) => {
                             cp: addr.cp || existingOrder.cp,
                             ...(needsProductPatch && { products: product }),
                             ...(needsPricePatch && { totalPrice: total }),
+                            paymentMethod: state.paymentMethod || existingOrder.paymentMethod || null,
                         }
                     });
                 } else {
@@ -499,6 +503,7 @@ module.exports = (clientPool) => {
                             provincia: addr.provincia || null,
                             cp: addr.cp || null,
                             seller: seller,
+                            paymentMethod: state.paymentMethod || null,
                         }
                     });
                 }
@@ -549,6 +554,7 @@ module.exports = (clientPool) => {
                 ciudad: order.ciudad || '',
                 provincia: order.provincia || '',
                 cp: order.cp || '',
+                paymentMethod: order.paymentMethod || null,
                 createdAt: order.createdAt.toISOString()
             };
 

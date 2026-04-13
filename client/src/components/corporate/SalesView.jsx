@@ -795,11 +795,25 @@ Teléfono: ${phoneDisplay}`;
 
                                     <div className="w-full md:w-px h-px md:h-16 bg-slate-200 dark:bg-slate-700"></div>
 
-                                    <div className="flex-1 w-full flex flex-col items-start md:items-center">
-                                        <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 block">Estado Actual</span>
-                                        <span className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest border shadow-sm ${statusStyles[viewingOrder.status] || statusStyles['Pendiente']}`}>
-                                            {viewingOrder.status || 'Pendiente'}
-                                        </span>
+                                    <div className="flex-1 w-full flex flex-col items-start md:items-center gap-2">
+                                        <div className="flex flex-col items-start md:items-center">
+                                            <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 block">Estado Actual</span>
+                                            <span className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest border shadow-sm ${statusStyles[viewingOrder.status] || statusStyles['Pendiente']}`}>
+                                                {viewingOrder.status || 'Pendiente'}
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-col items-start md:items-center">
+                                            <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 block">Método de Pago</span>
+                                            <span className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest border shadow-sm ${
+                                                viewingOrder.paymentMethod === 'mercadopago' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800/50'
+                                                : viewingOrder.paymentMethod === 'transferencia' ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-800/50'
+                                                : 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/50'
+                                            }`}>
+                                                {viewingOrder.paymentMethod === 'mercadopago' ? '💳 MercadoPago'
+                                                : viewingOrder.paymentMethod === 'transferencia' ? '🏦 Transferencia'
+                                                : '💵 Contra reembolso'}
+                                            </span>
+                                        </div>
                                     </div>
 
                                     <div className="w-full md:w-px h-px md:h-16 bg-slate-200 dark:bg-slate-700"></div>
@@ -814,7 +828,11 @@ Teléfono: ${phoneDisplay}`;
                                                 <h4 className="font-black text-emerald-500 dark:text-emerald-400 text-4xl tabular-nums tracking-tighter">{viewingOrder.precio}</h4>
                                             )}
                                         </div>
-                                        <p className="text-slate-400 dark:text-slate-500 font-bold text-xs">Pago en efectivo al repartidor</p>
+                                        <p className="text-slate-400 dark:text-slate-500 font-bold text-xs">
+                                            {viewingOrder.paymentMethod === 'mercadopago' ? 'Pagado por MercadoPago'
+                                            : viewingOrder.paymentMethod === 'transferencia' ? 'Pago por transferencia'
+                                            : 'Pago en efectivo al repartidor'}
+                                        </p>
                                     </div>
                                 </div>
                             </div>

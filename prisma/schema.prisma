@@ -36,6 +36,7 @@ model Order {
   tracking    String?
   postdated   String?
   seller      String?  // Phone number of the WhatsApp session that created the order
+  paymentMethod String? // mercadopago | contrarembolso | transferencia
 
   nombre      String?
   calle       String?
