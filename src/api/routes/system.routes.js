@@ -419,7 +419,7 @@ module.exports = (clientPool) => {
     });
 
     // GET /script/:version — readable by all authenticated users (sellers need it for the Guión panel)
-    router.get('/script/:version', ...withSeller(clientPool), (req, res) => {
+    router.get('/script/:version', ...withSeller(clientPool), async (req, res) => {
         try {
             const { version } = req.params;
             const available = ['v1', 'v2', 'v3', 'v4'];
