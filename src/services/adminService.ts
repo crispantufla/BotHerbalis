@@ -144,7 +144,7 @@ export async function notifyAdmin(
     const orderData: AlertOrderData = {
         product: state.selectedProduct || null,
         plan: state.selectedPlan || null,
-        price: state.price || null,
+        price: state.totalPrice || state.price || null,
         address: state.partialAddress || state.pendingOrder || null,
         step: state.step || null
     };

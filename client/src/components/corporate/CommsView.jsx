@@ -7,7 +7,7 @@ import ChatMessageList from './components/ChatMessageList';
 import ChatInputArea from './components/ChatInputArea';
 import AiCorrectionModal from './components/AiCorrectionModal';
 
-import { Search, Bot, Play, Pause, Trash2 as Trash, FileText as ScriptIcon, ChevronDown, Send, Paperclip, ShoppingCart, ArrowLeft, Type, X } from 'lucide-react';
+import { Search, Bot, Play, Pause, Trash2 as Trash, FileText as ScriptIcon, ChevronDown, ChevronUp, Send, Paperclip, ShoppingCart, ArrowLeft, Type, X, Zap, AlertTriangle, Package } from 'lucide-react';
 
 const CommsView = ({ initialChatId, onChatSelected, initialSearch = '', alerts = [], onAlertAction }) => {
     const { toast } = useToast();
@@ -34,6 +34,7 @@ const CommsView = ({ initialChatId, onChatSelected, initialSearch = '', alerts =
     const [chatFontSize, setChatFontSize] = useState(() => parseInt(localStorage.getItem('herbalis_chat_font_size') || '14', 10));
     const [showFontSlider, setShowFontSlider] = useState(false);
 
+    const [alertExpanded, setAlertExpanded] = useState(true);
     const [showCorrectionModal, setShowCorrectionModal] = useState(false);
     const [reportedMsgId, setReportedMsgId] = useState(null);
     const [showConfirmFillModal, setShowConfirmFillModal] = useState(false);
@@ -386,7 +387,7 @@ Teléfono: ${phoneDisplay}`;
             <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-400/10 blur-[100px] rounded-full pointer-events-none"></div>
 
             {/* SIDEBAR: Contacts */}
-            <div className={`w-full md:w-72 lg:w-[300px] xl:w-[340px] 2xl:w-[400px] flex-shrink-0 border-r border-slate-200 dark:border-slate-800 flex-col bg-white dark:bg-slate-800 z-10 ${selectedChat ? 'hidden md:flex' : 'flex'} min-h-0`}>
+            <div className={`w-full md:w-72 lg:w-[300px] xl:w-[340px] 2xl:w-[400px] flex-shrink-0 border-r border-slate-200 dark:border-slate-800 flex-col bg-white dark:bg-slate-800 z-10 ${selectedChat ? 'hidden md:flex' : 'flex'} min-h-0 overflow-hidden`}>
                 {/* Search Header */}
                 <div className="p-5 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800">
                     <div className="relative group">
@@ -674,36 +675,95 @@ Teléfono: ${phoneDisplay}`;
 
                         {/* Inline Alert Banner */}
                         {chatAlert && (
-                            <div className="bg-gradient-to-r from-rose-50 dark:from-rose-900/30 via-pink-50 dark:via-pink-900/20 to-orange-50 dark:to-orange-900/30 border-b border-rose-200 dark:border-rose-800 p-3 sm:p-5 shrink-0 z-10 relative overflow-hidden flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
-                                <div className="flex items-start gap-3 w-full sm:w-auto overflow-hidden">
-                                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-rose-500 to-pink-600 shadow-md shadow-rose-500/30 flex items-center justify-center shrink-0">
-                                        <span className="text-white font-black text-sm">⚡</span>
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                        <div className="flex items-center gap-2 mb-0.5">
-                                            <span className="bg-rose-500 text-white text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md">Atención</span>
-                                            <h4 className="font-extrabold text-slate-800 dark:text-rose-100 text-sm truncate">{chatAlert.reason || 'Notificación del Sistema'}</h4>
+                            <div className="border-b border-rose-200 dark:border-rose-800 shrink-0 z-10 relative overflow-hidden bg-gradient-to-r from-rose-50 dark:from-rose-900/30 via-pink-50 dark:via-pink-900/20 to-orange-50 dark:to-orange-900/30">
+                                {/* Header — always visible */}
+                                <div className="flex items-center justify-between gap-2 p-3 sm:p-4 cursor-pointer" onClick={() => setAlertExpanded(v => !v)}>
+                                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-rose-500 to-pink-600 shadow-md shadow-rose-500/30 flex items-center justify-center shrink-0">
+                                            <AlertTriangle className="w-4 h-4 text-white" />
                                         </div>
-                                        <p className="text-xs text-slate-700 dark:text-rose-200/80 font-medium truncate">
-                                            {chatAlert.product ? `Pedido: ${chatAlert.product} - Nuez de la India` : chatAlert.details || 'Revisar datos'}
-                                        </p>
-                                        <p className="text-xs text-slate-500 dark:text-rose-300/60 font-medium truncate mt-0.5 italic">
-                                            "{chatAlert.details}"
-                                        </p>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-2 mb-0.5">
+                                                <span className="bg-rose-500 text-white text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md shrink-0">Atención</span>
+                                                <h4 className="font-extrabold text-slate-800 dark:text-rose-100 text-sm truncate">{chatAlert.reason || 'Notificación del Sistema'}</h4>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        {chatAlert?.reason?.includes('Pedido') && onAlertAction && (
+                                            <button onClick={(e) => { e.stopPropagation(); onAlertAction(chatAlert.userPhone, 'confirmar'); }} className="px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white text-[10px] font-black uppercase tracking-wider rounded-lg shadow-sm transition-all">
+                                                Aprobar
+                                            </button>
+                                        )}
+                                        {onAlertAction && (
+                                            <button onClick={(e) => { e.stopPropagation(); onAlertAction(chatAlert.userPhone, 'descartar'); }} className="p-1.5 rounded-lg text-rose-400 hover:text-white hover:bg-rose-500 transition-all" title="Descartar alerta">
+                                                <Trash className="w-3.5 h-3.5" />
+                                            </button>
+                                        )}
+                                        {alertExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-2 self-end sm:self-auto shrink-0 w-full sm:w-auto">
-                                    {chatAlert?.reason?.includes('Pedido') && onAlertAction && (
-                                        <button onClick={() => onAlertAction(chatAlert.userPhone, 'confirmar')} className="flex-1 sm:flex-none px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white text-[11px] font-black uppercase tracking-wider rounded-xl shadow-md shadow-emerald-500/20 transition-all hover:-translate-y-0.5">
-                                            Aprobar Pedido
-                                        </button>
-                                    )}
-                                    {onAlertAction && (
-                                        <button onClick={() => onAlertAction(chatAlert.userPhone, 'descartar')} className="flex-1 sm:flex-none p-2 rounded-xl text-rose-500 hover:text-white hover:bg-rose-500 transition-all border border-rose-200 hover:border-transparent flex items-center justify-center">
-                                            <Trash className="w-4 h-4" />
-                                        </button>
-                                    )}
-                                </div>
+
+                                {/* Expanded content — details + suggestions */}
+                                {alertExpanded && (
+                                    <div className="px-3 sm:px-4 pb-3 sm:pb-4 space-y-3">
+                                        {/* Product/Plan status card */}
+                                        {chatAlert.orderData && (chatAlert.orderData.product || chatAlert.orderData.step) && (
+                                            <div className="flex flex-wrap items-center gap-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl p-3 border border-indigo-100 dark:border-indigo-900/40">
+                                                <p className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400 uppercase tracking-widest w-full mb-1">Pedido actual</p>
+                                                {chatAlert.orderData.product && (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-100 dark:bg-indigo-800/40 text-xs font-bold text-indigo-700 dark:text-indigo-300">
+                                                        <Package className="w-3 h-3" /> {chatAlert.orderData.product}
+                                                    </span>
+                                                )}
+                                                {chatAlert.orderData.plan && (
+                                                    <span className="inline-flex items-center px-2 py-1 rounded-lg bg-violet-100 dark:bg-violet-800/40 text-xs font-bold text-violet-700 dark:text-violet-300">
+                                                        {chatAlert.orderData.plan} días
+                                                    </span>
+                                                )}
+                                                {chatAlert.orderData.price && (
+                                                    <span className="inline-flex items-center px-2 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-800/40 text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                                                        ${chatAlert.orderData.price}
+                                                    </span>
+                                                )}
+                                                {chatAlert.orderData.step && (
+                                                    <span className="inline-flex items-center px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-700/40 text-xs font-medium text-slate-600 dark:text-slate-300">
+                                                        Paso: {chatAlert.orderData.step.replace('waiting_', '').replace(/_/g, ' ')}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Alert details */}
+                                        {chatAlert.details && (
+                                            <div className="bg-white/60 dark:bg-slate-800/60 rounded-xl p-3 border border-rose-100 dark:border-rose-900/40">
+                                                <p className="text-[10px] font-bold text-rose-500 dark:text-rose-400 uppercase tracking-widest mb-1.5">Detalles de la alerta</p>
+                                                <p className="text-xs text-slate-700 dark:text-slate-200 leading-relaxed whitespace-pre-wrap">{chatAlert.details}</p>
+                                            </div>
+                                        )}
+
+                                        {/* Quick reply suggestion buttons */}
+                                        {chatAlert.quickReplies && chatAlert.quickReplies.length > 0 && (
+                                            <div>
+                                                <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                                                    <Zap className="w-3 h-3" /> Sugerencias
+                                                </p>
+                                                <div className="flex flex-col gap-1.5">
+                                                    {chatAlert.quickReplies.map((qr, i) => (
+                                                        <button
+                                                            key={i}
+                                                            onClick={() => { setInput(qr.message); setAlertExpanded(false); }}
+                                                            className="text-left w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all group"
+                                                        >
+                                                            <span className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400 uppercase tracking-wider">{qr.label}</span>
+                                                            <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5 leading-snug">{qr.message}</p>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         )}
 

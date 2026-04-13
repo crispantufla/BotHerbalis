@@ -150,7 +150,32 @@ const AlertsPanel = ({ alerts, onCommand, onQuickAction }) => {
                                             </div>
                                         )}
 
-                                        {/* Removed quick suggestions div */}
+                                        {/* Product/Plan info — always shown when available (not just order approvals) */}
+                                        {!isOrderApproval && hasOrder && (
+                                            <div className="mb-4 flex flex-wrap items-center gap-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl p-4 border border-indigo-100 dark:border-indigo-900/40">
+                                                <p className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400 uppercase tracking-widest w-full mb-1">Pedido actual</p>
+                                                {od.product && (
+                                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-100 dark:bg-indigo-800/40 text-xs font-bold text-indigo-700 dark:text-indigo-300">
+                                                        <Package className="w-3.5 h-3.5" /> {od.product}
+                                                    </span>
+                                                )}
+                                                {od.plan && (
+                                                    <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-violet-100 dark:bg-violet-800/40 text-xs font-bold text-violet-700 dark:text-violet-300">
+                                                        {od.plan} días
+                                                    </span>
+                                                )}
+                                                {od.price && (
+                                                    <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-800/40 text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                                                        ${od.price}
+                                                    </span>
+                                                )}
+                                                {od.step && (
+                                                    <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-700/40 text-xs font-medium text-slate-600 dark:text-slate-300">
+                                                        Paso: {od.step.replace('waiting_', '').replace(/_/g, ' ')}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
 
                                         {/* Summary text if available (from fallback text passed via details) */}
                                         {alert.details && (

@@ -255,17 +255,19 @@ function _extractSilentVariables(normalizedText: string, currentState: any): { a
  * Also detects multi-unit intent ("3 cajas", "2 unidades", "180 días").
  */
 function _detectProductPlanChange(normalizedText: string): { productChange: RegExpMatchArray | null; planChange: RegExpMatchArray | boolean | null } {
-    const productChange = normalizedText.match(/\b(mejor|quiero|prefiero|cambio|cambia|dame|paso a|en vez)\b.*\b(capsula|capsulas|pastilla|pastillas|semilla|semillas|gota|gotas|natural|infusion)\b/i)
-        || normalizedText.match(/\b(capsula|capsulas|pastilla|pastillas|semilla|semillas|gota|gotas)\b.*\b(mejor|quiero|prefiero|cambio|en vez)\b/i);
+    const productChange = normalizedText.match(/\b(mejor|quiero|prefiero|cambio|cambia|dame|paso a|en vez|consulto|consulta|posible|puedo|puede|podria|quisiera|seria|serian|cuanto|cuánto|precio|info|cual)\b.*\b(capsula|capsulas|pastilla|pastillas|semilla|semillas|gota|gotas|natural|infusion)\b/i)
+        || normalizedText.match(/\b(capsula|capsulas|pastilla|pastillas|semilla|semillas|gota|gotas)\b.*\b(mejor|quiero|prefiero|cambio|en vez|posible|puede ser|seria|cuanto|cuánto)\b/i)
+        || normalizedText.match(/\b(si|es)\s+(posible|mejor)\s+\w*\s*(capsula|capsulas|pastilla|pastillas|semilla|semillas|gota|gotas)\b/i);
 
     // Multi-unit detection: "3 cajas", "dos unidades", "180 días", etc.
     const multiUnitMatch = /\b(\d+)\s*(cajas?|unidades?|cajitas?|frascos?)\b/i.test(normalizedText)
         || /\b(180|240|300|360)\s*d[ií]as?\b/i.test(normalizedText)
         || /\b(dos|tres|cuatro|cinco|seis)\s*(cajas?|unidades?|cajitas?|frascos?)\b/i.test(normalizedText);
 
-    const planChange = normalizedText.match(/\b(mejor|quiero|quisiera|prefiero|cambio|cambia|dame|paso a|en vez|voy a querer|me quedo con|tomaria|tomare|en realidad)\b.*\b(60|120|sesenta|ciento veinte)\b/i)
-        || normalizedText.match(/\b(60|120|sesenta|ciento veinte)\b.*\b(mejor|quiero|quisiera|prefiero|cambio|en vez)\b/i)
-        || (/\b(de|el|plan)\s+(60|120)\b/i.test(normalizedText) && /\b(dia|dias|d\u00edas)\b/i.test(normalizedText))
+    const planChange = normalizedText.match(/\b(mejor|quiero|quisiera|prefiero|cambio|cambia|dame|paso a|en vez|voy a querer|me quedo con|tomaria|tomare|en realidad|posible|puedo|puede|seria)\b.*\b(60|120|sesenta|ciento veinte)\b/i)
+        || normalizedText.match(/\b(60|120|sesenta|ciento veinte)\b.*\b(mejor|quiero|quisiera|prefiero|cambio|en vez|posible|puede ser)\b/i)
+        || (/\b(de|el|plan)\s+d?e?\s*(60|120)\b/i.test(normalizedText) && /\b(dia|dias|d\u00edas)\b/i.test(normalizedText))
+        || /\bplan\s+d\s+(60|120)\b/i.test(normalizedText)
         || multiUnitMatch;
 
     return { productChange, planChange: planChange || null };
