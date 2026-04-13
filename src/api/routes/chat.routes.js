@@ -80,8 +80,8 @@ module.exports = (clientPool) => {
 
             let waMessages = [];
             try {
-                const chat = await withTimeout(cl?.getChatById(chatId), 5000, 'Timeout getting chat for summary');
-                const rawMessages = await withTimeout(chat?.fetchMessages({ limit: 50 }), 10000, 'Timeout fetching messages for summary');
+                const chat = await withTimeout(cl?.getChatById(chatId), 15000, 'Timeout getting chat for summary');
+                const rawMessages = await withTimeout(chat?.fetchMessages({ limit: 50 }), 20000, 'Timeout fetching messages for summary');
                 waMessages = rawMessages.filter(m => m.timestamp >= resetAt);
             } catch (e) {
                 logger.warn(`[SUMMARIZE] WA Fetch failed for ${chatId}`);
@@ -126,7 +126,7 @@ module.exports = (clientPool) => {
             return res.json([]); // Return empty list if WA is still initializing
         }
         try {
-            const chats = await withTimeout(cl.getChats(), 10000, 'Timeout retrieving chats');
+            const chats = await withTimeout(cl.getChats(), 30000, 'Timeout retrieving chats');
 
             // Read orders from Database to cross-reference past purchases (With 60s TTL Cache)
             let orders = [];
@@ -325,8 +325,8 @@ module.exports = (clientPool) => {
                 let waMessages = null;
                 if (!isPrefetch) for (let attempt = 1; attempt <= 2; attempt++) {
                     try {
-                        const chat = await withTimeout(cl?.getChatById(chatId), 3000, 'Timeout getting chat history');
-                        waMessages = await withTimeout(chat?.fetchMessages({ limit: 20 }), 5000, 'Timeout fetching history messages');
+                        const chat = await withTimeout(cl?.getChatById(chatId), 10000, 'Timeout getting chat history');
+                        waMessages = await withTimeout(chat?.fetchMessages({ limit: 20 }), 15000, 'Timeout fetching history messages');
                         break;
                     } catch (retryErr) {
                         if (attempt < 2 && retryErr?.message?.includes('waitForChatLoading')) {

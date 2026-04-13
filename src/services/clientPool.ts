@@ -179,6 +179,9 @@ class ClientPool {
                     '--disable-client-side-phishing-detection', '--disable-default-apps',
                     '--disable-hang-monitor', '--disable-prompt-on-repost',
                     '--disable-sync', '--disk-cache-size=0', '--disable-gpu-shader-disk-cache',
+                    // Memory limits per Chromium — prevent one instance from starving others
+                    '--js-flags=--max-old-space-size=256',
+                    '--single-process',
                 ],
                 timeout: 120000
             }
