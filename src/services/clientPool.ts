@@ -106,7 +106,14 @@ class ClientPool {
         // Stagger Chrome launches — starting two at the same instant crashes both.
         // startSeller is fire-and-forget (doesn't await QR scan), so we add a 15s gap.
         const p = this.initQueue = this.initQueue
-            .then(() => this.startSeller(sellerId))
+            .then(() => {
+                // Re-check inside the queue — another queued start may have completed first
+                if (this.instances.has(sellerId)) {
+                    logger.info(`[POOL] Skipping start for ${sellerId} — already running (queued duplicate)`);
+                    return;
+                }
+                return this.startSeller(sellerId);
+            })
             .then(() => new Promise<void>(r => setTimeout(r, 15000)))
             .catch(e => logger.error(`[POOL] Failed to start ${sellerId}:`, e.message))
             .finally(() => this.startingPromises.delete(sellerId));
