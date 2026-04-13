@@ -18,8 +18,7 @@ const SellerSelector = () => {
     }, []);
 
     const select = (id) => {
-        setSelectedSellerId(id);
-        if (socket) socket.emit('switch-seller', id);
+        setSelectedSellerId(id); // SellerContext emits switch-seller automatically
         setOpen(false);
     };
 

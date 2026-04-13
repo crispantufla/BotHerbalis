@@ -60,6 +60,13 @@ export const SellerProvider = ({ children }) => {
         return () => socket.off('sellers_presence', handler);
     }, [socket, isAdmin]);
 
+    // Emit switch-seller on initial load and whenever selection changes,
+    // so the server tracks admin presence for the viewed seller
+    useEffect(() => {
+        if (!socket || !isAdmin || !selectedSellerId) return;
+        socket.emit('switch-seller', selectedSellerId);
+    }, [socket, isAdmin, selectedSellerId]);
+
     // Auto-select a seller for admins: prefer their home sellerId (own seller),
     // then the current selection if still valid, then the first seller in the list.
     useEffect(() => {

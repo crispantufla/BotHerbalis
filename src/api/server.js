@@ -148,7 +148,13 @@ function startServer(clientPool) {
     function broadcastPresence() {
         const sellerIds = [...new Set([...socketPresence.values()].map(p => p.sellerId))];
         const presence = Object.fromEntries(sellerIds.map(id => [id, computeSellerState(id)]));
-        io.to('admin').emit('sellers_presence', presence);
+        // Emit to ALL admin sockets (global + tenant), not just the 'admin' room
+        // which only global admins join. Tenant admins need presence too.
+        for (const [, s] of io.sockets.sockets) {
+            if (s.data.account?.role === 'admin') {
+                s.emit('sellers_presence', presence);
+            }
+        }
     }
 
     function setSocketIdle(socketId) {
