@@ -33,6 +33,7 @@ export interface SellerInstance {
     helpers: any;
     schedulerStarted: boolean;
     reconnectAttempts: number;
+    qrTimer: ReturnType<typeof setTimeout> | null;
     stop: () => Promise<void>;
 }
 
@@ -297,10 +298,13 @@ class ClientPool {
             sellerId, client, sharedState, stateManager,
             queue, worker, pendingMessages, helpers,
             schedulerStarted: false, reconnectAttempts: 0,
+            qrTimer: null,
             stop: async () => this.stopSeller(sellerId)
         };
 
         // --- CLIENT EVENTS ---
+        const QR_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour — stop Chrome if QR is never scanned
+
         client.on('qr', (qr: string) => {
             logger.info(`[POOL][${sellerId}] QR generated`);
             qrcode.generate(qr, { small: true });
@@ -314,6 +318,19 @@ class ClientPool {
                 create: { sellerId, status: 'qr_pending' },
                 update: { status: 'qr_pending' }
             }).catch(() => {});
+
+            // Start QR timeout — if nobody scans within 10 min, stop this Chrome
+            // to free resources for other sellers. It will restart on next web visit.
+            if (!instance.qrTimer) {
+                instance.qrTimer = setTimeout(() => {
+                    if (!sharedState.isConnected && sharedState.qrCodeData) {
+                        logger.warn(`[POOL][${sellerId}] QR not scanned in ${QR_TIMEOUT_MS / 60000} min — stopping Chrome to free resources`);
+                        if (this.io) this.io.to(sellerId).emit('status_change', { status: 'qr_timeout', sellerId });
+                        this.stopSeller(sellerId).catch(() => {});
+                    }
+                    instance.qrTimer = null;
+                }, QR_TIMEOUT_MS);
+            }
         });
 
         client.on('ready', () => {
@@ -322,6 +339,8 @@ class ClientPool {
             sharedState.qrCodeData = null;
             sharedState.connectedAt = Math.floor(Date.now() / 1000);
             instance.reconnectAttempts = 0;
+            // Cancel QR timeout — session is now active
+            if (instance.qrTimer) { clearTimeout(instance.qrTimer); instance.qrTimer = null; }
 
             if (this.io) {
                 this.io.to(sellerId).emit('ready', { info: client.info, sellerId });
@@ -480,6 +499,7 @@ class ClientPool {
         if (!instance) return;
 
         logger.info(`[POOL] Stopping seller: ${sellerId}`);
+        if (instance.qrTimer) { clearTimeout(instance.qrTimer); instance.qrTimer = null; }
         try { await instance.stateManager.flushState(); } catch (e) { /* ignore */ }
         // Remove all listeners before destroy to prevent stale reconnect handlers from firing
         try { instance.client.removeAllListeners(); } catch (e) { /* ignore */ }

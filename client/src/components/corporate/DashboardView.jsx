@@ -244,6 +244,16 @@ const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData 
                 </div>
             )}
 
+            {status === 'qr_timeout' && (
+                <div className="bg-white/6 dark:bg-slate-800/60 backdrop-blur-lg border border-amber-200 dark:border-amber-800/50 rounded-3xl p-8 text-center max-w-lg mx-auto shadow-xl">
+                    <div className="flex flex-col items-center justify-center gap-4">
+                        <span className="text-4xl">⏰</span>
+                        <span className="font-bold text-amber-700 dark:text-amber-400 text-lg">QR expirado</span>
+                        <span className="text-slate-500 dark:text-slate-400 text-sm">El código QR no fue escaneado a tiempo. Presioná "Regenerar QR" para volver a generar uno nuevo.</span>
+                    </div>
+                </div>
+            )}
+
             {/* A. KPI DECK V2 */}
             <StatsPanel stats={stats} loadingStats={loadingStats} alertsCount={alerts.length} />
 

@@ -71,13 +71,41 @@ async function boot() {
     // Wire Socket.IO into clientPool so sellers can emit events
     clientPool.registerIo(io);
 
-    // Register and start all sellers — WhatsApp sessions must always be connected
+    // Register all sellers, but only auto-start those with existing WhatsApp sessions.
+    // Sellers that have never scanned a QR stay lazy — Chrome starts when they visit the dashboard.
     for (const id of sellerIds) {
         clientPool.registerSeller(id);
     }
 
-    // Start all sellers immediately (staggered via ensureStarted's initQueue)
+    // Check which sellers have an existing session (previously connected)
+    let sessionsWithHistory: string[] = [];
+    try {
+        const sessions = await prisma.whatsAppSession.findMany({
+            where: { sellerId: { in: sellerIds }, status: { not: 'disconnected' } },
+            select: { sellerId: true }
+        });
+        sessionsWithHistory = sessions.map((s: any) => s.sellerId);
+    } catch (e: any) {
+        // If table doesn't exist yet, start all
+        sessionsWithHistory = sellerIds;
+    }
+    // Also check for auth directories on disk (session may exist even if DB says disconnected)
+    const path = require('path');
+    const fs = require('fs');
+    const dataRoot = process.env.DATA_DIR || (process.env.NODE_ENV === 'production' ? path.join(__dirname, 'data') : __dirname);
     for (const id of sellerIds) {
+        if (sessionsWithHistory.includes(id)) continue;
+        const sessionDir = path.join(dataRoot, id, '.wwebjs_auth');
+        if (fs.existsSync(sessionDir)) sessionsWithHistory.push(id);
+    }
+
+    const lazyIds = sellerIds.filter(id => !sessionsWithHistory.includes(id));
+    if (lazyIds.length > 0) {
+        logger.info(`[BOOT] ${lazyIds.length} seller(s) have no session — staying lazy: ${lazyIds.join(', ')}`);
+    }
+
+    // Start only sellers with existing sessions (staggered via ensureStarted's initQueue)
+    for (const id of sessionsWithHistory) {
         clientPool.ensureStarted(id).catch(e =>
             logger.error(`[BOOT] Failed to start seller ${id}:`, e.message)
         );

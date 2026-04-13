@@ -41,15 +41,15 @@ const SystemStatusPanel = ({ status, activeConversations = 0, adminNumbers = [],
                             <div className={`w-3 h-3 rounded-full ${status === 'ready' ? 'bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.5)]' : 'bg-rose-500 animate-pulse shadow-[0_0_12px_rgba(244,63,94,0.5)]'}`}></div>
                             <span className="text-sm font-bold text-slate-700 dark:text-slate-200">API WhatsApp</span>
                         </div>
-                        <span className={`text-[10px] font-extrabold font-mono px-3 py-1 rounded-full border ${status === 'ready' ? 'bg-emerald-100/50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50' : 'bg-rose-100/50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800/50'}`}>
-                            {status === 'ready' ? 'CONECTADO' : status === 'scan_qr' ? 'ESPERANDO QR' : 'ERROR'}
+                        <span className={`text-[10px] font-extrabold font-mono px-3 py-1 rounded-full border ${status === 'ready' ? 'bg-emerald-100/50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50' : status === 'qr_timeout' ? 'bg-amber-100/50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/50' : 'bg-rose-100/50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800/50'}`}>
+                            {status === 'ready' ? 'CONECTADO' : status === 'scan_qr' ? 'ESPERANDO QR' : status === 'qr_timeout' ? 'QR EXPIRADO' : 'DESCONECTADO'}
                         </span>
                     </div>
 
                     <div className="pb-4 border-b border-slate-200/50 dark:border-slate-700/50">
                         <button
                             onClick={handleRegenerateQR}
-                            disabled={regenerating || status === 'scan_qr'}
+                            disabled={regenerating || status === 'scan_qr' || status === 'initializing'}
                             className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 text-indigo-700 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/50 rounded-xl px-4 py-3 text-sm font-bold hover:from-blue-100 dark:hover:from-blue-900/40 hover:to-indigo-100 dark:hover:to-indigo-900/40 transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {regenerating ? (
