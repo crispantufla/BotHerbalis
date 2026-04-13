@@ -7,7 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useSeller } from '../../context/SellerContext';
 import { capitalize } from '../../utils/format';
 
-import { RefreshCw as Refresh, Download, Search, Filter, MessageCircle as Chat, Edit2 as Edit, Trash2 as Trash, FileText as Script, Save, X as XIcon } from 'lucide-react';
+import { RefreshCw as Refresh, Download, Search, Filter, MessageCircle as Chat, Edit2 as Edit, Trash2 as Trash, FileText as Script, Save, X as XIcon, Copy, Check } from 'lucide-react';
 
 const SalesView = ({ onGoToChat, initialSearch = '' }) => {
     const { toast, confirm } = useToast();
@@ -199,12 +199,16 @@ const SalesView = ({ onGoToChat, initialSearch = '' }) => {
         const rawPhone = order.cliente ? order.cliente.split('@')[0] : '';
         const phoneDisplay = rawPhone.length > 13 ? `Oculto por Anuncio Meta (${rawPhone})` : rawPhone || 'Desconocido';
 
+        const payLabel = order.paymentMethod === 'mercadopago' ? 'MercadoPago' : order.paymentMethod === 'transferencia' ? 'Transferencia' : 'Contra reembolso';
         const textToCopy = `Nombre: ${order.nombre || 'Cliente'}
-Dirección: ${order.calle}, ${order.ciudad}${order.provincia ? ', ' + order.provincia : ''} (CP: ${order.cp})
+Teléfono: ${phoneDisplay}
 Producto: ${order.producto}
-Plan: ${order.plan} Días
-A pagar: ${order.precio}
-Teléfono: ${phoneDisplay}`;
+Total: $${order.precio}
+Pago: ${payLabel}
+Dirección: ${order.calle || '—'}
+Ciudad: ${order.ciudad || '—'}
+Provincia: ${order.provincia || '—'}
+CP: ${order.cp || '—'}`;
 
         navigator.clipboard.writeText(textToCopy)
             .then(() => toast.success('Venta copiada al portapapeles'))
@@ -659,294 +663,204 @@ Teléfono: ${phoneDisplay}`;
                 document.body
             )}
 
-            {/* V2 PREMIUM TICKET MODAL */}
+            {/* V3 DATA-FIRST TICKET MODAL */}
             {viewingOrder && createPortal(
-                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[100] flex items-center justify-center animate-fade-in p-0 sm:p-4 sm:p-6" onClick={() => { setViewingOrder(null); cancelDetailEdit(); }}>
-                    <div className="bg-white dark:bg-slate-900 rounded-none sm:rounded-[2rem] shadow-2xl w-full h-full sm:h-auto max-w-3xl overflow-hidden flex flex-col sm:max-h-[90vh] relative border border-slate-100 dark:border-slate-700" onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[100] flex items-center justify-center animate-fade-in p-0 sm:p-4" onClick={() => { setViewingOrder(null); cancelDetailEdit(); }}>
+                    <div className="bg-white dark:bg-slate-900 rounded-none sm:rounded-2xl shadow-2xl w-full h-full sm:h-auto max-w-xl overflow-hidden flex flex-col sm:max-h-[90vh] border border-slate-200 dark:border-slate-700" onClick={e => e.stopPropagation()}>
 
-                        {/* Header */}
-                        <div className="bg-gradient-to-r from-slate-50 to-white dark:from-slate-800 dark:to-slate-900 p-6 sm:p-8 flex justify-between items-center relative border-b border-slate-100 dark:border-slate-700 shrink-0">
-                            <div className="flex items-center gap-4 relative z-10">
-                                <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-inner border border-indigo-100/50">
-                                    <Script className="w-4 h-4" />
-                                </div>
-                                <div>
-                                    <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight">Detalles de Venta</h3>
-                                    <p className="text-slate-500 font-bold text-xs uppercase tracking-widest mt-1">
-                                        Ref: {viewingOrder.id ? viewingOrder.id.substring(0, 8) : 'N/A'}
-                                    </p>
-                                </div>
+                        {/* Header — compact */}
+                        <div className="px-5 py-4 flex justify-between items-center border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 shrink-0">
+                            <div className="flex items-center gap-3">
+                                <span className={`px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider border ${statusStyles[viewingOrder.status] || statusStyles['Pendiente']}`}>
+                                    {viewingOrder.status || 'Pendiente'}
+                                </span>
+                                <span className={`px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider border ${
+                                    viewingOrder.paymentMethod === 'mercadopago' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800/50'
+                                    : viewingOrder.paymentMethod === 'transferencia' ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-800/50'
+                                    : 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/50'
+                                }`}>
+                                    {viewingOrder.paymentMethod === 'mercadopago' ? '💳 MP' : viewingOrder.paymentMethod === 'transferencia' ? '🏦 Transf.' : '💵 C/R'}
+                                </span>
+                                {viewingOrder.postdatado && String(viewingOrder.postdatado).trim() !== '' && String(viewingOrder.postdatado).toLowerCase() !== 'no' && String(viewingOrder.postdatado).toLowerCase() !== 'false' && (
+                                    <span className="px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider border bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800/50 flex items-center gap-1">
+                                        <div className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse"></div>
+                                        {viewingOrder.postdatado}
+                                    </span>
+                                )}
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1.5">
                                 {!isDetailEditing ? (
-                                    <button onClick={() => startDetailEdit(viewingOrder)} className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-100 transition-all flex items-center justify-center border border-indigo-200" title="Editar">
-                                        <Edit className="w-4 h-4" />
+                                    <button onClick={() => startDetailEdit(viewingOrder)} className="w-8 h-8 rounded-lg bg-white dark:bg-slate-700 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all flex items-center justify-center border border-slate-200 dark:border-slate-600" title="Editar">
+                                        <Edit className="w-3.5 h-3.5" />
                                     </button>
                                 ) : (
-                                    <button onClick={cancelDetailEdit} className="w-10 h-10 rounded-full bg-rose-50 text-rose-500 hover:text-rose-700 hover:bg-rose-100 transition-all flex items-center justify-center border border-rose-200" title="Cancelar edición">
-                                        <XIcon className="w-4 h-4" />
+                                    <button onClick={cancelDetailEdit} className="w-8 h-8 rounded-lg bg-rose-50 dark:bg-rose-900/30 text-rose-500 hover:text-rose-700 transition-all flex items-center justify-center border border-rose-200 dark:border-rose-800/50" title="Cancelar edición">
+                                        <XIcon className="w-3.5 h-3.5" />
                                     </button>
                                 )}
-                                <button onClick={() => { setViewingOrder(null); cancelDetailEdit(); }} className="w-10 h-10 rounded-full bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all flex items-center justify-center border border-slate-200 dark:border-slate-700">✕</button>
+                                <button onClick={() => { setViewingOrder(null); cancelDetailEdit(); }} className="w-8 h-8 rounded-lg bg-white dark:bg-slate-700 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-all flex items-center justify-center border border-slate-200 dark:border-slate-600">
+                                    <XIcon className="w-3.5 h-3.5" />
+                                </button>
                             </div>
                         </div>
 
-                        {/* Content */}
-                        <div className="p-6 sm:p-8 overflow-y-auto custom-scrollbar flex-1 bg-white dark:bg-slate-900 relative">
-                            {/* Top info grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                                {/* Client Info */}
-                                <div>
-                                    <span className="text-[10px] font-black uppercase text-indigo-500 tracking-widest mb-3 flex items-center gap-2">
-                                        <div className="w-4 h-[2px] bg-indigo-500 rounded-full"></div> Cliente
-                                    </span>
-                                    <div className={`bg-slate-50 dark:bg-slate-800 rounded-2xl p-5 border ${isDetailEditing ? 'border-indigo-200 dark:border-indigo-500/50' : 'border-slate-100 dark:border-slate-700'}`}>
-                                        {isDetailEditing ? (
-                                            <input type="text" value={detailEditData.nombre || ''} onChange={e => handleDetailField('nombre', e.target.value)} className="w-full font-black text-slate-800 dark:text-slate-100 text-lg leading-tight mb-1 bg-white dark:bg-slate-700 rounded-lg px-3 py-2 border border-slate-200 dark:border-slate-600 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900/50 outline-none" placeholder="Nombre completo" />
-                                        ) : (
-                                            <p className="font-black text-slate-800 dark:text-slate-100 text-lg leading-tight mb-1">{viewingOrder.nombre || 'Sin nombre'}</p>
-                                        )}
-                                        <p className="font-mono text-slate-500 dark:text-slate-400 text-sm font-medium">{viewingOrder.cliente ? viewingOrder.cliente.split('@')[0] : '—'}</p>
-                                        <div className="mt-4 pt-4 border-t border-slate-200/60 dark:border-slate-700/60 flex justify-between items-center">
-                                            <span className="text-slate-400 dark:text-slate-500 font-bold text-xs">Fecha:</span>
-                                            <span className="text-slate-700 dark:text-slate-300 font-bold text-sm">{formatDateBA(viewingOrder.createdAt)}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Delivery Info */}
-                                <div>
-                                    <div className="flex justify-between items-center mb-3">
-                                        <span className="text-[10px] font-black uppercase text-indigo-500 tracking-widest flex items-center gap-2">
-                                            <div className="w-4 h-[2px] bg-indigo-500 rounded-full"></div> Envío
-                                        </span>
-                                        {/* Premium Postdatado Badge */}
-                                        {viewingOrder.postdatado && String(viewingOrder.postdatado).trim() !== '' && String(viewingOrder.postdatado).toLowerCase() !== 'no' && String(viewingOrder.postdatado).toLowerCase() !== 'false' ? (
-                                            <span className="text-[10px] font-black bg-amber-100 text-amber-600 px-3 py-1 rounded-full border border-amber-200 uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-                                                <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div>
-                                                Postdatado: {viewingOrder.postdatado}
-                                            </span>
-                                        ) : (
-                                            <span className="text-[10px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-300 px-3 py-1 rounded-full border border-slate-200 dark:border-slate-600 uppercase tracking-widest">
-                                                Postdatado: NO
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div className={`bg-slate-50 dark:bg-slate-800 rounded-2xl p-5 border ${isDetailEditing ? 'border-indigo-200 dark:border-indigo-500/50' : 'border-slate-100 dark:border-slate-700'} h-[calc(100%-28px)] flex flex-col justify-center relative`}>
-                                        {isDetailEditing ? (
-                                            <>
-                                                <input type="text" value={detailEditData.calle || ''} onChange={e => handleDetailField('calle', e.target.value)} className="w-full font-bold text-slate-700 dark:text-slate-200 text-base bg-white dark:bg-slate-700 rounded-lg px-3 py-2 border border-slate-200 dark:border-slate-600 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none mb-2" placeholder="Calle y número" />
-                                                <div className="flex gap-2">
-                                                    <input type="text" value={detailEditData.ciudad || ''} onChange={e => handleDetailField('ciudad', e.target.value)} className="flex-1 font-medium text-slate-600 dark:text-slate-300 text-sm bg-white dark:bg-slate-700 rounded-lg px-3 py-2 border border-slate-200 dark:border-slate-600 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none" placeholder="Ciudad" />
-                                                    <input type="text" value={detailEditData.cp || ''} onChange={e => handleDetailField('cp', e.target.value)} className="w-24 font-medium text-slate-600 dark:text-slate-300 text-sm bg-white dark:bg-slate-700 rounded-lg px-3 py-2 border border-slate-200 dark:border-slate-600 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none" placeholder="CP" />
-                                                </div>
-                                                <input type="text" value={detailEditData.provincia || ''} onChange={e => handleDetailField('provincia', e.target.value)} className="w-full font-medium text-slate-600 dark:text-slate-300 text-sm bg-white dark:bg-slate-700 rounded-lg px-3 py-2 border border-slate-200 dark:border-slate-600 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none mt-2" placeholder="Provincia" />
-                                            </>
-                                        ) : (
-                                            <>
-                                                {/* Toggle button: show original address */}
-                                                {viewingOrder.calleOriginal && viewingOrder.calleOriginal !== viewingOrder.calle && (
-                                                    <button
-                                                        onClick={() => setShowOriginalAddress(!showOriginalAddress)}
-                                                        className={`absolute top-3 right-3 px-2 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all border shadow-sm ${
-                                                            showOriginalAddress
-                                                                ? 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100'
-                                                                : 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'
-                                                        }`}
-                                                        title={showOriginalAddress ? 'Ver dirección corregida por Maps' : 'Ver dirección original del cliente'}
-                                                    >
-                                                        {showOriginalAddress ? '📍 Maps' : '✏️ Original'}
-                                                    </button>
-                                                )}
-                                                {showOriginalAddress && viewingOrder.calleOriginal ? (
-                                                    <>
-                                                        <p className="font-bold text-amber-700 dark:text-amber-400 text-base leading-relaxed pr-20">{viewingOrder.calleOriginal}</p>
-                                                        <p className="font-medium text-amber-600/70 dark:text-amber-500/70 text-[10px] mt-1 uppercase tracking-wider">Dirección original del cliente</p>
-                                                        <p className="font-medium text-slate-600 dark:text-slate-400 text-sm mt-1">{viewingOrder.ciudad || 'Sin ciudad'}{viewingOrder.provincia ? `, ${viewingOrder.provincia}` : ''} <span className="text-slate-400 dark:text-slate-500 ml-1">(CP: {viewingOrder.cp || '—'})</span></p>
-                                                    </>
+                        {/* Content — data rows */}
+                        <div className="overflow-y-auto custom-scrollbar flex-1 bg-white dark:bg-slate-900">
+                            {/* Data field rows — each clickable to copy */}
+                            {(() => {
+                                const CopyRow = ({ label, value, editField, mono }) => {
+                                    const [copied, setCopied] = React.useState(false);
+                                    const handleCopy = () => {
+                                        if (!value || isDetailEditing) return;
+                                        navigator.clipboard.writeText(value).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); });
+                                    };
+                                    return (
+                                        <div
+                                            onClick={handleCopy}
+                                            className={`flex items-center justify-between px-5 py-3 border-b border-slate-100 dark:border-slate-800 ${!isDetailEditing ? 'hover:bg-indigo-50/50 dark:hover:bg-indigo-900/10 cursor-pointer' : ''} transition-colors group`}
+                                        >
+                                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 w-24 sm:w-28 shrink-0">{label}</span>
+                                            <div className="flex-1 min-w-0 ml-3">
+                                                {isDetailEditing && editField ? (
+                                                    editField
                                                 ) : (
-                                                    <>
-                                                        <p className={`font-bold text-slate-700 dark:text-slate-200 text-base leading-relaxed ${viewingOrder.calleOriginal && viewingOrder.calleOriginal !== viewingOrder.calle ? 'pr-20' : ''}`}>{viewingOrder.calle || 'Sin domicilio'}</p>
-                                                        {viewingOrder.calleOriginal && viewingOrder.calleOriginal !== viewingOrder.calle && (
-                                                            <p className="font-medium text-emerald-600/70 dark:text-emerald-500/70 text-[10px] mt-1 uppercase tracking-wider">✓ Verificada por Google Maps</p>
-                                                        )}
-                                                        <p className="font-medium text-slate-600 dark:text-slate-400 text-sm mt-1">{viewingOrder.ciudad || 'Sin ciudad'}{viewingOrder.provincia ? `, ${viewingOrder.provincia}` : ''} <span className="text-slate-400 dark:text-slate-500 ml-1">(CP: {viewingOrder.cp || '—'})</span></p>
-                                                    </>
+                                                    <span className={`text-sm font-semibold text-slate-800 dark:text-slate-100 block truncate ${mono ? 'font-mono' : ''}`}>{value || '—'}</span>
                                                 )}
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Order Summary Ribbon */}
-                            <div className="bg-slate-50 dark:bg-slate-800 rounded-3xl p-6 border border-slate-100 dark:border-slate-700 mb-8">
-                                <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                                    <div className="text-center md:text-left flex-1">
-                                        {isDetailEditing ? (
-                                            <input type="text" value={detailEditData.producto || ''} onChange={e => handleDetailField('producto', e.target.value)} className="font-black text-slate-800 dark:text-slate-100 text-xl bg-white dark:bg-slate-700 rounded-xl px-3 py-2 border border-slate-200 dark:border-slate-600 w-full focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900/50 outline-none" placeholder="Producto" />
-                                        ) : (
-                                            <p className="font-black text-slate-800 dark:text-slate-100 text-xl">{viewingOrder.producto || 'Sin producto'}</p>
-                                        )}
-                                        <span className="inline-block mt-2 px-3 py-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-lg shadow-sm">
-                                            ID: {viewingOrder.id ? viewingOrder.id.substring(8, 16) : 'N/A'}
-                                        </span>
-                                    </div>
-
-                                    <div className="w-full md:w-px h-px md:h-16 bg-slate-200 dark:bg-slate-700"></div>
-
-                                    <div className="flex-1 w-full flex flex-col items-start md:items-center gap-2">
-                                        <div className="flex flex-col items-start md:items-center">
-                                            <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 block">Estado Actual</span>
-                                            <span className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest border shadow-sm ${statusStyles[viewingOrder.status] || statusStyles['Pendiente']}`}>
-                                                {viewingOrder.status || 'Pendiente'}
-                                            </span>
-                                        </div>
-                                        <div className="flex flex-col items-start md:items-center">
-                                            <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 block">Método de Pago</span>
-                                            <span className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest border shadow-sm ${
-                                                viewingOrder.paymentMethod === 'mercadopago' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800/50'
-                                                : viewingOrder.paymentMethod === 'transferencia' ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-800/50'
-                                                : 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/50'
-                                            }`}>
-                                                {viewingOrder.paymentMethod === 'mercadopago' ? '💳 MercadoPago'
-                                                : viewingOrder.paymentMethod === 'transferencia' ? '🏦 Transferencia'
-                                                : '💵 Contra reembolso'}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    <div className="w-full md:w-px h-px md:h-16 bg-slate-200 dark:bg-slate-700"></div>
-
-                                    <div className="text-center md:text-right">
-                                        <p className="text-slate-400 dark:text-slate-500 font-bold text-xs tracking-widest uppercase mb-1">Total a Cobrar</p>
-                                        <div className="flex items-start justify-center md:justify-end">
-                                            <span className="text-emerald-500 font-bold mt-1 mr-1 text-lg">$</span>
-                                            {isDetailEditing ? (
-                                                <input type="text" value={detailEditData.precio || ''} onChange={e => handleDetailField('precio', e.target.value)} className="font-black text-emerald-500 dark:text-emerald-400 text-4xl w-32 md:w-48 text-center md:text-right bg-white dark:bg-slate-700 rounded-xl px-3 py-2 border border-slate-200 dark:border-slate-600 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 dark:focus:ring-emerald-900/50 outline-none" placeholder="0" />
-                                            ) : (
-                                                <h4 className="font-black text-emerald-500 dark:text-emerald-400 text-4xl tabular-nums tracking-tighter">{viewingOrder.precio}</h4>
-                                            )}
-                                        </div>
-                                        <p className="text-slate-400 dark:text-slate-500 font-bold text-xs">
-                                            {viewingOrder.paymentMethod === 'mercadopago' ? 'Pagado por MercadoPago'
-                                            : viewingOrder.paymentMethod === 'transferencia' ? 'Pago por transferencia'
-                                            : 'Pago en efectivo al repartidor'}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Tracking Section */}
-                            <div>
-                                <div className="flex justify-between items-center mb-4">
-                                    <span className="text-[10px] font-black uppercase text-indigo-500 tracking-widest flex items-center gap-2">
-                                        <div className="w-4 h-[2px] bg-indigo-500 rounded-full"></div> Logística
-                                    </span>
-                                    {viewingOrder.tracking && (
-                                        <button onClick={() => handleTrackOrder(viewingOrder.tracking)} disabled={isTracking} className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white font-bold text-xs rounded-xl transition-all shadow-sm border border-blue-100 disabled:opacity-50">
-                                            {isTracking ? 'Consultando...' : '🔍 Rastrear Envío'}
-                                        </button>
-                                    )}
-                                </div>
-
-                                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm">
-                                    {!viewingOrder.tracking ? (
-                                        <div className="text-center py-6">
-                                            <p className="text-slate-400 dark:text-slate-500 font-medium text-sm">Aún no hay número de seguimiento asignado.</p>
-                                        </div>
-                                    ) : (
-                                        <div>
-                                            <div className="flex items-center justify-between mb-6 pb-6 border-b border-slate-100 dark:border-slate-700">
-                                                <div>
-                                                    <span className="text-xs font-bold text-slate-500 block mb-1">Código de Tracking</span>
-                                                    <span className="font-mono text-slate-800 dark:text-slate-200 font-bold text-lg bg-slate-50 dark:bg-slate-700 px-3 py-1 rounded-lg border border-slate-200 dark:border-slate-600 tracking-wider">
-                                                        {viewingOrder.tracking}
-                                                    </span>
-                                                </div>
-                                                <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-500">
-                                                    <Refresh className="w-5 h-5" />
-                                                </div>
                                             </div>
-
-                                            {/* Tracking Data */}
-                                            {trackingData && (
-                                                <div className="animate-fade-in">
-                                                    {trackingData.success ? (
-                                                        trackingData.events && trackingData.events.length > 0 ? (
-                                                            <div className="space-y-4">
-                                                                {trackingData.events.map((ev, i) => (
-                                                                    <div key={i} className="flex gap-4 items-start relative pb-6 border-l-2 border-indigo-100 dark:border-indigo-900/50 last:border-0 last:pb-0 ml-2">
-                                                                        <div className="absolute -left-[5px] top-1 w-2 h-2 rounded-full bg-indigo-400 ring-4 ring-white dark:ring-slate-800"></div>
-                                                                        <div className="pl-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 w-full">
-                                                                            <div className="min-w-[120px]">
-                                                                                <span className="font-bold text-slate-800 dark:text-slate-200 text-xs block">{ev.fecha}</span>
-                                                                                <span className="text-blue-500 font-black uppercase text-[9px] tracking-widest mt-0.5 block">{ev.planta}</span>
-                                                                            </div>
-                                                                            <p className="text-slate-600 dark:text-slate-300 font-medium text-sm flex-1">{ev.historia}</p>
-                                                                        </div>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        ) : (
-                                                            <p className="text-slate-500 dark:text-slate-400 text-sm text-center py-4">El operador no reporta movimientos recientes.</p>
-                                                        )
-                                                    ) : (
-                                                        <div className="bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 font-bold text-sm p-4 rounded-xl text-center border border-rose-100 dark:border-rose-800/50">
-                                                            {trackingData.error || "Tracking sin información disponible."}
-                                                        </div>
-                                                    )}
-                                                </div>
+                                            {!isDetailEditing && (
+                                                <span className="ml-2 shrink-0">
+                                                    {copied
+                                                        ? <Check className="w-3.5 h-3.5 text-emerald-500" />
+                                                        : <Copy className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                    }
+                                                </span>
                                             )}
-                                            {viewingOrder.logs && viewingOrder.logs.length > 0 && (
-                                                <div className="mt-8 pt-8 border-t border-slate-100 dark:border-slate-700">
-                                                    <span className="text-[10px] font-black uppercase text-indigo-500 tracking-widest mb-4 flex items-center gap-2">
-                                                        <div className="w-4 h-[2px] bg-indigo-500 rounded-full"></div> Historial de Estados
-                                                    </span>
-                                                    <div className="space-y-4">
-                                                        {[...viewingOrder.logs].reverse().map((log, idx) => (
-                                                            <div key={idx} className="flex gap-4 items-start relative pb-6 border-l-2 border-indigo-100 dark:border-indigo-900/50 last:border-0 last:pb-0 ml-2">
-                                                                <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-white dark:bg-slate-800 border-4 border-indigo-500 z-10"></div>
-                                                                <div className="pl-6 flex-1 pt-[-2px]">
-                                                                    <div className="flex justify-between items-center mb-1">
-                                                                        <span className="font-bold text-slate-800 dark:text-slate-200 text-xs block">{log.status}</span>
-                                                                        <span className="text-slate-400 dark:text-slate-500 text-[10px] font-bold">{formatDateBA(log.timestamp)}</span>
+                                        </div>
+                                    );
+                                };
+                                const editInput = (field, placeholder, extraClass = '') => (
+                                    <input type="text" value={detailEditData[field] || ''} onChange={e => handleDetailField(field, e.target.value)} className={`w-full text-sm font-semibold text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-700 rounded-lg px-3 py-1.5 border border-slate-200 dark:border-slate-600 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900/50 outline-none ${extraClass}`} placeholder={placeholder} />
+                                );
+                                const rawPhone = viewingOrder.cliente ? viewingOrder.cliente.split('@')[0] : '';
+                                const phoneDisplay = rawPhone.length > 13 ? `Oculto (${rawPhone.slice(-6)})` : rawPhone;
+                                const addressDisplay = showOriginalAddress && viewingOrder.calleOriginal ? viewingOrder.calleOriginal : (viewingOrder.calle || '');
+                                const locationParts = [viewingOrder.ciudad, viewingOrder.provincia].filter(Boolean).join(', ');
+
+                                return (
+                                    <>
+                                        <CopyRow label="Nombre" value={viewingOrder.nombre || 'Sin nombre'} editField={editInput('nombre', 'Nombre completo')} />
+                                        <CopyRow label="Teléfono" value={phoneDisplay} mono />
+                                        <CopyRow label="Producto" value={viewingOrder.producto || 'Sin producto'} editField={editInput('producto', 'Producto')} />
+                                        <CopyRow label="Total" value={`$${viewingOrder.precio}`} editField={editInput('precio', 'Precio')} />
+                                        <CopyRow label="Dirección" value={addressDisplay || 'Sin domicilio'} editField={editInput('calle', 'Calle y número')} />
+                                        <CopyRow label="Ciudad" value={viewingOrder.ciudad || '—'} editField={editInput('ciudad', 'Ciudad')} />
+                                        <CopyRow label="Provincia" value={viewingOrder.provincia || '—'} editField={editInput('provincia', 'Provincia')} />
+                                        <CopyRow label="C.P." value={viewingOrder.cp || '—'} editField={editInput('cp', 'Código postal')} mono />
+                                        <CopyRow label="Fecha" value={formatDateBA(viewingOrder.createdAt)} />
+                                        {viewingOrder.tracking && <CopyRow label="Tracking" value={viewingOrder.tracking} mono />}
+                                    </>
+                                );
+                            })()}
+
+                            {/* Original address toggle */}
+                            {!isDetailEditing && viewingOrder.calleOriginal && viewingOrder.calleOriginal !== viewingOrder.calle && (
+                                <div className="px-5 py-2 border-b border-slate-100 dark:border-slate-800">
+                                    <button
+                                        onClick={() => setShowOriginalAddress(!showOriginalAddress)}
+                                        className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md border transition-all ${
+                                            showOriginalAddress
+                                                ? 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800/50'
+                                                : 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800/50'
+                                        }`}
+                                    >
+                                        {showOriginalAddress ? '📍 Ver Maps' : '✏️ Ver Original'}
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Tracking timeline — only if tracking exists and has been queried */}
+                            {viewingOrder.tracking && (
+                                <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800">
+                                    <div className="flex justify-between items-center mb-3">
+                                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Seguimiento</span>
+                                        <button onClick={() => handleTrackOrder(viewingOrder.tracking)} disabled={isTracking} className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 disabled:opacity-50 transition-colors">
+                                            {isTracking ? 'Consultando...' : 'Rastrear'}
+                                        </button>
+                                    </div>
+                                    {trackingData && (
+                                        <div className="animate-fade-in">
+                                            {trackingData.success ? (
+                                                trackingData.events && trackingData.events.length > 0 ? (
+                                                    <div className="space-y-3">
+                                                        {trackingData.events.map((ev, i) => (
+                                                            <div key={i} className="flex gap-3 items-start relative pb-3 border-l-2 border-indigo-100 dark:border-indigo-900/50 last:border-0 last:pb-0 ml-1.5">
+                                                                <div className="absolute -left-[4px] top-1 w-1.5 h-1.5 rounded-full bg-indigo-400 ring-2 ring-white dark:ring-slate-900"></div>
+                                                                <div className="pl-3 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 w-full">
+                                                                    <div className="min-w-[100px]">
+                                                                        <span className="font-bold text-slate-700 dark:text-slate-200 text-xs">{ev.fecha}</span>
+                                                                        <span className="text-blue-500 font-bold uppercase text-[9px] tracking-wider ml-1">{ev.planta}</span>
                                                                     </div>
-                                                                    <p className="text-slate-600 dark:text-slate-300 font-medium text-sm flex-1">{log.message}</p>
+                                                                    <p className="text-slate-600 dark:text-slate-300 text-xs flex-1">{ev.historia}</p>
                                                                 </div>
                                                             </div>
                                                         ))}
                                                     </div>
-                                                </div>
-                                            )}
-                                            {viewingOrder.status === 'Cancelado' && (
-                                                <div className="bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 font-bold text-sm p-4 rounded-xl text-center border border-rose-100 dark:border-rose-800/50 mt-6">
-                                                    Este pedido fue marcado como Cancelado.
-                                                </div>
+                                                ) : (
+                                                    <p className="text-slate-400 dark:text-slate-500 text-xs">Sin movimientos recientes.</p>
+                                                )
+                                            ) : (
+                                                <p className="text-rose-500 dark:text-rose-400 text-xs font-medium">{trackingData.error || 'Sin información.'}</p>
                                             )}
                                         </div>
                                     )}
                                 </div>
-                            </div>
+                            )}
+
+                            {/* Status history */}
+                            {viewingOrder.logs && viewingOrder.logs.length > 0 && (
+                                <div className="px-5 py-4">
+                                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3 block">Historial</span>
+                                    <div className="space-y-3">
+                                        {[...viewingOrder.logs].reverse().map((log, idx) => (
+                                            <div key={idx} className="flex gap-3 items-start relative pb-3 border-l-2 border-indigo-100 dark:border-indigo-900/50 last:border-0 last:pb-0 ml-1.5">
+                                                <div className="absolute -left-[5px] top-0 w-2.5 h-2.5 rounded-full bg-white dark:bg-slate-900 border-[3px] border-indigo-500 z-10"></div>
+                                                <div className="pl-4 flex-1">
+                                                    <div className="flex justify-between items-center mb-0.5">
+                                                        <span className="font-bold text-slate-700 dark:text-slate-200 text-xs">{log.status}</span>
+                                                        <span className="text-slate-400 dark:text-slate-500 text-[10px] font-medium">{formatDateBA(log.timestamp)}</span>
+                                                    </div>
+                                                    <p className="text-slate-500 dark:text-slate-400 text-xs">{log.message}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {viewingOrder.status === 'Cancelado' && (
+                                <div className="mx-5 mb-4 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 font-bold text-xs p-3 rounded-xl text-center border border-rose-100 dark:border-rose-800/50">
+                                    Pedido cancelado
+                                </div>
+                            )}
                         </div>
 
-                        {/* Footer Options */}
-                        <div className="bg-slate-50 p-6 flex justify-end gap-3 shrink-0 border-t border-slate-200">
+                        {/* Footer — compact */}
+                        <div className="px-5 py-3 flex justify-end gap-2 shrink-0 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
                             {isDetailEditing ? (
                                 <>
-                                    <button onClick={cancelDetailEdit} className="flex items-center gap-2 px-6 py-3 bg-white text-slate-500 hover:text-slate-700 hover:bg-slate-100 border border-slate-200 shadow-sm font-extrabold text-xs uppercase tracking-widest rounded-xl transition-all">
-                                        <XIcon className="w-4 h-4" /> Cancelar
+                                    <button onClick={cancelDetailEdit} className="flex items-center gap-1.5 px-4 py-2 bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-600 font-bold text-xs rounded-lg transition-all">
+                                        Cancelar
                                     </button>
-                                    <button onClick={handleSaveOrderDetails} disabled={savingDetails} className="flex items-center gap-2 px-8 py-3 bg-indigo-600 text-white rounded-xl text-xs uppercase tracking-widest font-extrabold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 active:scale-95 disabled:opacity-50">
-                                        <Save className="w-4 h-4" /> {savingDetails ? 'Guardando...' : 'Guardar'}
+                                    <button onClick={handleSaveOrderDetails} disabled={savingDetails} className="flex items-center gap-1.5 px-5 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50">
+                                        <Save className="w-3.5 h-3.5" /> {savingDetails ? 'Guardando...' : 'Guardar'}
                                     </button>
                                 </>
                             ) : (
                                 <>
-                                    <button onClick={() => handleCopySaleDetails(viewingOrder)} className="flex items-center gap-2 px-6 py-3 bg-white text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 shadow-sm font-extrabold text-xs uppercase tracking-widest rounded-xl transition-all">
-                                        <Script className="w-4 h-4" /> Copiar Info
+                                    <button onClick={() => handleCopySaleDetails(viewingOrder)} className="flex items-center gap-1.5 px-4 py-2 bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 border border-slate-200 dark:border-slate-600 hover:border-indigo-200 dark:hover:border-indigo-800/50 font-bold text-xs rounded-lg transition-all">
+                                        <Copy className="w-3.5 h-3.5" /> Copiar todo
                                     </button>
-                                    <button onClick={() => { setViewingOrder(null); cancelDetailEdit(); }} className="px-8 py-3 bg-slate-800 text-white rounded-xl text-xs uppercase tracking-widest font-extrabold hover:bg-black transition-all shadow-lg shadow-slate-800/20 active:scale-95">
+                                    <button onClick={() => { setViewingOrder(null); cancelDetailEdit(); }} className="px-5 py-2 bg-slate-800 dark:bg-slate-700 text-white rounded-lg text-xs font-bold hover:bg-black dark:hover:bg-slate-600 transition-all active:scale-95">
                                         Cerrar
                                     </button>
                                 </>
