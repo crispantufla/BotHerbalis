@@ -80,12 +80,10 @@ export async function handleWaitingPaymentMethod(
         }
 
         const msg = `¡Perfecto! Para transferir usá el alias *CHILE.TEXTO.CASINO*. Una vez que realicés la transferencia avisanos por acá y coordinamos el envío 😊`;
+        _setStep(currentState, FlowStep.WAITING_TRANSFER_CONFIRMATION);
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
-
-        // Pausar bot — el admin cierra la venta manualmente una vez confirmada la transferencia
-        await _pauseAndAlert(userId, currentState, dependencies, text, 'Cliente eligió pago por transferencia bancaria. Alias enviado, esperando confirmación.');
         return { matched: true };
     }
 

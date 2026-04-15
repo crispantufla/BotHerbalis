@@ -18,6 +18,7 @@ export enum FlowStep {
     WAITING_MAPS_CONFIRMATION = "waiting_maps_confirmation",
     WAITING_PAYMENT_METHOD = "waiting_payment_method",
     WAITING_MP_PAYMENT = "waiting_mp_payment",
+    WAITING_TRANSFER_CONFIRMATION = "waiting_transfer_confirmation",
     REJECTED_MEDICAL = "rejected_medical",
     REJECTED_ABUSIVE = "rejected_abusive",
     REJECTED_GEO = "rejected_geo"

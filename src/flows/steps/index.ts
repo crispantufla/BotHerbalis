@@ -10,6 +10,7 @@ import { handleWaitingFinalConfirmation } from './stepWaitingFinalConfirmation';
 import { handleWaitingMapsConfirmation } from './stepWaitingMapsConfirmation';
 import { handleWaitingPaymentMethod } from './stepWaitingPaymentMethod';
 import { handleWaitingMpPayment } from './stepWaitingMpPayment';
+import { handleWaitingTransferConfirmation } from './stepWaitingTransferConfirmation';
 import { handleAdminSteps } from './stepAdmin';
 import { handleCompleted } from './stepCompleted';
 import logger from '../../utils/logger';
@@ -58,6 +59,9 @@ export async function processStep(
             break;
         case 'waiting_mp_payment':
             result = await handleWaitingMpPayment(userId, text, normalizedText, currentState, knowledge, dependencies);
+            break;
+        case 'waiting_transfer_confirmation':
+            result = await handleWaitingTransferConfirmation(userId, text, normalizedText, currentState, knowledge, dependencies);
             break;
         case 'waiting_admin_ok':
         case 'waiting_admin_validation':
