@@ -1,7 +1,8 @@
 import React, { useRef, useState } from 'react';
-import { Send, Paperclip, Smile, Zap } from 'lucide-react';
+import { Send, Paperclip, Smile, Zap, CreditCard } from 'lucide-react';
 import EmojiPicker from 'emoji-picker-react';
 import QuickRepliesPanel from './QuickRepliesPanel';
+import MpLinkPanel from './MpLinkPanel';
 
 const ChatInputArea = ({
     input,
@@ -10,11 +11,13 @@ const ChatInputArea = ({
     setAttachment,
     handleSend,
     handleSendMedia,
-    sendingMedia
+    sendingMedia,
+    chatId
 }) => {
     const fileInputRef = useRef(null);
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [showQuickReplies, setShowQuickReplies] = useState(false);
+    const [showMpLink, setShowMpLink] = useState(false);
 
     const handleFileSelect = (e) => {
         const file = e.target.files[0];
@@ -45,6 +48,13 @@ const ChatInputArea = ({
                         setShowQuickReplies(false);
                     }}
                     onClose={() => setShowQuickReplies(false)}
+                />
+            )}
+
+            {showMpLink && (
+                <MpLinkPanel
+                    chatId={chatId}
+                    onClose={() => setShowMpLink(false)}
                 />
             )}
 
@@ -79,8 +89,12 @@ const ChatInputArea = ({
                     <Smile className="w-6 h-6" />
                 </button>
 
-                <button type="button" onClick={() => { setShowQuickReplies(prev => !prev); setShowEmojiPicker(false); }} title="Respuestas rápidas" className={`w-11 h-11 sm:w-14 sm:h-14 flex items-center justify-center shrink-0 rounded-xl sm:rounded-2xl border transition-all shadow-sm ${showQuickReplies ? 'bg-indigo-50 dark:bg-slate-600 border-indigo-300 text-indigo-600 dark:text-indigo-400' : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 hover:bg-indigo-50 dark:hover:bg-slate-600'}`}>
+                <button type="button" onClick={() => { setShowQuickReplies(prev => !prev); setShowEmojiPicker(false); setShowMpLink(false); }} title="Respuestas rápidas" className={`w-11 h-11 sm:w-14 sm:h-14 flex items-center justify-center shrink-0 rounded-xl sm:rounded-2xl border transition-all shadow-sm ${showQuickReplies ? 'bg-indigo-50 dark:bg-slate-600 border-indigo-300 text-indigo-600 dark:text-indigo-400' : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 hover:bg-indigo-50 dark:hover:bg-slate-600'}`}>
                     <Zap className="w-5 h-5" />
+                </button>
+
+                <button type="button" onClick={() => { setShowMpLink(prev => !prev); setShowEmojiPicker(false); setShowQuickReplies(false); }} title="Enviar link de MercadoPago" className={`w-11 h-11 sm:w-14 sm:h-14 flex items-center justify-center shrink-0 rounded-xl sm:rounded-2xl border transition-all shadow-sm ${showMpLink ? 'bg-emerald-50 dark:bg-slate-600 border-emerald-300 text-emerald-600 dark:text-emerald-400' : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-300 hover:bg-emerald-50 dark:hover:bg-slate-600'}`}>
+                    <CreditCard className="w-5 h-5" />
                 </button>
 
                 <button type="button" onClick={() => fileInputRef.current?.click()} className="w-11 h-11 sm:w-14 sm:h-14 flex items-center justify-center shrink-0 rounded-xl sm:rounded-2xl bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 hover:bg-indigo-50 dark:hover:bg-slate-600 transition-all shadow-sm">
@@ -91,7 +105,7 @@ const ChatInputArea = ({
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    onFocus={() => { setShowEmojiPicker(false); setShowQuickReplies(false); }}
+                    onFocus={() => { setShowEmojiPicker(false); setShowQuickReplies(false); setShowMpLink(false); }}
                     onKeyDown={(e) => {
                         if (e.key === 'Escape') { setShowEmojiPicker(false); }
                         if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {

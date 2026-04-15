@@ -66,11 +66,14 @@ module.exports = (clientPool) => {
         }
     });
 
-    // POST /mp-link — generate MercadoPago payment link (admin only)
-    router.post('/mp-link', ...withSeller(clientPool), requireAdmin, async (req, res) => {
+    // POST /mp-link — generate MercadoPago payment link. Sellers can use it for their own chats.
+    // If `sendToChat: true` and `userPhone` is provided, the link is also sent via WhatsApp.
+    router.post('/mp-link', ...withSeller(clientPool), async (req, res) => {
         const amount = parseFloat(req.body?.amount);
         const userPhone = req.body?.userPhone || null;
+        const sendToChat = !!req.body?.sendToChat;
         if (!amount || amount <= 0) return res.status(400).json({ error: 'Monto inválido' });
+        if (sendToChat && !userPhone) return res.status(400).json({ error: 'userPhone requerido para enviar al chat' });
 
         const mpToken = process.env.MP_ACCESS_TOKEN;
         if (!mpToken) return res.status(500).json({ error: 'MP_ACCESS_TOKEN no configurado' });
@@ -111,7 +114,31 @@ module.exports = (clientPool) => {
                 if (sellerId) ctx.io.to(sellerId).emit('payment_created', record);
                 ctx.io.to('admin').emit('payment_created', { ...record, sellerId });
             }
-            res.json({ link, amount, paymentId: record.id });
+
+            let sent = false;
+            if (sendToChat) {
+                const client = req.sellerInstance?.client;
+                const chatId = userPhone.includes('@') ? userPhone : `${userPhone.replace(/\D/g, '')}@c.us`;
+                const msg = `💳 *Pago online via MercadoPago*\n\n` +
+                    `Total: *$${amount.toLocaleString('es-AR')}*\n\n` +
+                    `👇 Hacé clic para pagar de forma segura:\n${link}\n\n` +
+                    `Podés pagar con tarjeta, desde la app de MercadoPago o escaneando el QR.\n\n` +
+                    `✅ Cuando completes el pago, avisame por acá y seguimos con el envío.`;
+                try {
+                    if (!client) throw new Error('Cliente WhatsApp no disponible');
+                    await client.sendMessage(chatId, msg);
+                    sent = true;
+                    // Log the outgoing message so it appears in the chat history
+                    if (ctx.sharedState?.logAndEmit) {
+                        ctx.sharedState.logAndEmit(chatId, 'bot', msg, 'mp_link_manual');
+                    }
+                } catch (e) {
+                    logger.error(`[MP] Failed to send link to ${chatId}:`, e.message);
+                    return res.status(200).json({ link, amount, paymentId: record.id, sent: false, sendError: e.message });
+                }
+            }
+
+            res.json({ link, amount, paymentId: record.id, sent });
         } catch (e) {
             logger.error('[MP] Error creating preference:', e);
             res.status(500).json({ error: e?.message || 'Error generando enlace' });

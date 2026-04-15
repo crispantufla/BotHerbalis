@@ -785,6 +785,7 @@ Teléfono: ${phoneDisplay}`;
                             handleSend={handleSend}
                             handleSendMedia={handleSendMedia}
                             sendingMedia={sendingMedia}
+                            chatId={selectedChat?.id}
                         />
                     </>
                 ) : (
