@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, CreditCard, Loader2, Check, Copy } from 'lucide-react';
 import api from '../../../config/axios';
-import toast from 'react-hot-toast';
+import { useToast } from '../../ui/Toast';
 
 const MpLinkPanel = ({ chatId, onClose }) => {
+    const { toast } = useToast();
     const [amount, setAmount] = useState('');
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState(null);
