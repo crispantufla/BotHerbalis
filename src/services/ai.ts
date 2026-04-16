@@ -79,10 +79,6 @@ function _getRelevantRules(userText: string): string[] {
     activeRules.push(RULE_BASE.find(r => r.id === 'no_derivar')!.text);
     activeRules.push(RULE_BASE.find(r => r.id === 'no_vender_ciego')!.text);
     activeRules.push(RULE_BASE.find(r => r.id === 'coherencia')!.text);
-    activeRules.push(RULE_BASE.find(r => r.id === 'saludos_desubicados')!.text);
-    activeRules.push(RULE_BASE.find(r => r.id === 'abuso')!.text);
-    activeRules.push(RULE_BASE.find(r => r.id === 'indecision')!.text);
-    activeRules.push(RULE_BASE.find(r => r.id === 'reventa')!.text);
 
     // Contextually inject specific rules if keywords match
     for (const rule of RULE_BASE) {
@@ -123,10 +119,8 @@ const MODEL = "gpt-4o-mini";
 const MODEL_PREMIUM = "gpt-4o";
 const MAX_RETRIES = 3;
 const MAX_HISTORY_LENGTH = 15;
-// Trigger rolling summary once the active history exceeds this count. Lower
-// than MAX_HISTORY_LENGTH + safety margin so summaries happen earlier and
-// each chunk is small — cheaper per-call and the token budget stays flat.
-const SUMMARIZE_TRIGGER = 30;
+// Trigger rolling summary once the active history exceeds this count.
+const SUMMARIZE_TRIGGER = 20;
 // Don't re-summarize more often than this (in ms). Prevents burning tokens
 // when a user sends many messages in quick succession.
 const SUMMARIZE_COOLDOWN_MS = 10 * 60 * 1000;
@@ -136,9 +130,6 @@ const PREMIUM_STEPS = new Set([
     'waiting_preference',
     'waiting_preference_consultation',
     'waiting_plan_choice',
-    'waiting_price_confirmation',
-    'waiting_ok',
-    'waiting_data',
     'waiting_final_confirmation',
     'closing'
 ]);
@@ -552,62 +543,31 @@ class AIService {
      * Main Chat Function
      */
     async chat(userText: string, context: APIContext): Promise<AIParsedResponse> {
-        // Build dynamic history (last 50 messages for context)
-        let conversationHistory = (context.history || []).slice(-50);
+        // Keep only the recent tail; older turns already live in context.summary
+        // (rolling summary prunes on every SUMMARIZE_TRIGGER hit).
+        const conversationHistory = (context.history || []).slice(-MAX_HISTORY_LENGTH);
         let summaryContext = "";
 
         if (context.summary) {
             summaryContext = `RESUMEN PREVIO: \n"${context.summary}"\n\n`;
         }
-        // Always cap history to keep prompt lean (regardless of summary)
-        if (conversationHistory.length > 50) {
-            conversationHistory = conversationHistory.slice(-50);
-        }
 
+        // Precios, productos, contraindicaciones y reglas de adicional MAX ya
+        // viven en el system prompt (_getModule*). No los dupliques acá.
+        // knowledgeContext queda solo para patología FAQ + recordatorios específicos.
         let knowledgeContext = "";
         if (context.knowledge && context.knowledge.flow) {
-            const f = context.knowledge.flow;
             const faq = context.knowledge.faq || [];
             const step = context.step || 'general';
 
-            const priceData = await _getPrices();
-            const adMax = priceData.adicionalMAX || '6.000';
-            const priceCaps60 = priceData['Cápsulas']?.['60'] || '46.900';
-            const priceCaps120 = priceData['Cápsulas']?.['120'] || '66.900';
-            const priceSem60 = priceData['Semillas']?.['60'] || '36.900';
-            const priceSem120 = priceData['Semillas']?.['120'] || '49.900';
-            const priceGotas60 = priceData['Gotas']?.['60'] || '48.900';
-            const priceGotas120 = priceData['Gotas']?.['120'] || '68.900';
-
-            const priceString = `Cápsulas($${priceCaps60}/60d, $${priceCaps120}/120d) | Semillas($${priceSem60}/60d, $${priceSem120}/120d) | Gotas($${priceGotas60}/60d, $${priceGotas120}/120d)`;
-
-            knowledgeContext = `INFORMACIÓN RELEVANTE PARA ESTE PASO: \n`;
-
             const pathInfo = faq.find((q: any) => q.keywords.includes('diabetes'))?.response || "";
-            if (pathInfo) knowledgeContext += `- SOBRE PATOLOGÍAS: "${pathInfo}"\n`;
+            if (pathInfo) knowledgeContext = `SOBRE PATOLOGÍAS: "${pathInfo}"\n`;
 
-            if (['waiting_weight', 'waiting_preference'].includes(step)) {
-                knowledgeContext += `- Productos principales: Cápsulas(prácticas, MAS EFECTIVAS y recomendadas SIEMPRE) y Semillas(naturales).\n`;
-                knowledgeContext += `- Gotas: SOLO ofrecer a >70 años. Si alguien con pocos kilos pide gotas, decile que "son extremadamente suaves" para persuadirlo a elegir Cápsulas.\n`;
-                knowledgeContext += `- Contraindicaciones: solo embarazo y lactancia.NO menores de edad.\n`;
-                knowledgeContext += `- PRECIOS: Si preguntan "precio" en general, decí "$${priceSem60} a $${priceGotas120}".PERO si preguntan "precio de todos", "lista de precios" o insisten, PASALES TODOS LOS PRECIOS detallados: ${priceString}.\n`;
-                knowledgeContext += `- ENVÍO Y PAGO: Envío gratis por Correo Argentino a todo el país.Solo aceptamos pago en efectivo al recibir(Contra Reembolso).\n`;
-            } else if (step === 'waiting_price_confirmation') {
-                knowledgeContext += `- El usuario todavía NO vio precios.Tu trabajo es convencerlo de que quiera verlos.\n`;
-                knowledgeContext += `- Contraindicaciones: solo embarazo y lactancia.NO menores de edad.\n`;
-                knowledgeContext += `- (NO menciones precios específicos ni formas de pago, solo que son accesibles) \n`;
-            } else if (['waiting_plan_choice', 'closing', 'waiting_ok'].includes(step)) {
-                knowledgeContext += `- PRECIOS: ${priceString} \n`;
-                knowledgeContext += `- Plan 120 días SIN adicional. Plan 60 días con Contra Reembolso MAX (+$${adMax}).\n`;
-                knowledgeContext += `- SOBRE CARGO ADICIONAL: El cargo extra es el costo del servicio de Contra Reembolso (pagar al recibir). Se cobra IGUAL sea envío a domicilio o retiro en sucursal. Para el plan 120 días está BONIFICADO (es gratis). Si eligió 60 días y pide retirar en correo para no pagar envío, explicá esto y ofrecé pasar a 120 días para ahorrarlo.\n`;
-                knowledgeContext += `- Envío gratis por Correo Argentino, pago en efectivo al recibir\n`;
+            if (step === 'waiting_price_confirmation') {
+                knowledgeContext += `- El usuario todavía NO vio precios. Convencelo de que quiera verlos. NO menciones precios específicos ni formas de pago.\n`;
             } else if (step === 'waiting_data') {
-                knowledgeContext += `- Necesitamos: nombre completo, calle y número, ciudad, código postal\n`;
-                knowledgeContext += `- PROHIBIDO PEDIR NÚMERO DE TELÉFONO.Ya estamos hablando por WhatsApp, ¡ya tenemos su número! Nunca pidas este dato.\n`;
-                knowledgeContext += `- (NO ofrezcas ni menciones precios ni productos a menos que el cliente pregunte explícitamente por ellos. Si preguntan, los precios son: ${priceString}) \n`;
+                knowledgeContext += `- NO ofrezcas ni menciones precios ni productos a menos que el cliente pregunte explícitamente.\n`;
             }
-
-            knowledgeContext += `(No inventes datos, usá siempre esta base)`;
         }
 
         // P2 #1: Add user state context (cart, product, address, authoritative total)
@@ -698,6 +658,7 @@ INSTRUCCIONES:
 
             const chatModel = _getModelForStep(step);
             const systemPrompt = await _buildSystemPrompt(step, userText);
+            const maxTokens = COMPLEX_STEPS.has(step) ? 800 : 400;
             const result: any = await this._callQueued(
                 () => this.client.chat.completions.create({
                     model: chatModel,
@@ -723,7 +684,7 @@ INSTRUCCIONES:
                     }],
                     tool_choice: { type: "function", function: { name: "control_dialog_flow" } },
                     temperature: 0.6,
-                    max_tokens: 1500
+                    max_tokens: maxTokens
                 }),
                 `chat_${step}_${userText}` // Caché activo para FAQs y etapas repetitivas
             );
@@ -1087,50 +1048,6 @@ SITUACION: El ADMINISTRADOR del negocio te da una instrucción DIRECTA para envi
             return result.choices[0].message?.content || instruction;
         } catch (e: any) {
             return instruction; // Fallback to raw instruction
-        }
-    }
-
-    /**
-     * Generates a short, highly empathetic or colloquial phrase to bridge the user's input
-     * before sending the hardcoded sales script.
-     * This makes the bot sound more human on the "happy path".
-     */
-    async generateContextualBridge(userMessage: string, context: string): Promise<string> {
-        const prompt = `
-        Actúa como Marta(vendedora / asesora argentina de 50 años).El usuario acaba de decir: "${userMessage}".
-        El contexto actual de la charla es: "${context}".
-        
-        Tu tarea: Genera SOLO UNA frase corta(máximo 8 - 10 palabras) de empatía REAL o reacción natural ante lo que dijo el usuario.
-        Ejemplos de tono esperado: "Uy qué garrón", "Te re entiendo firme", "Olvidate, es un tema", "Ay sí a todas nos pasa", "Mirá vos, bueno tranqui", "Excelente, me re alegro".
-
-    REGLAS:
-1. NO hagas ninguna pregunta.
-        2. NO ofrezcas productos ni soluciones en esta frase.
-        3. NO suenes como bot ni como coach motivacional.Suena como una señora tomando mates.
-        4. Debe ser cortísima.
-        5. Devuelve SOLO el texto, sin comillas ni formato JSON.
-        `;
-
-        try {
-            const result = await this._callQueued(
-                () => this.client.chat.completions.create({
-                    model: "gpt-4o-mini",
-                    messages: [
-                        { role: "system", content: "Sos Marta, una vendedora argentina empática. Respondés cortísimo, orgánico y natural." },
-                        { role: "user", content: prompt }
-                    ],
-                    temperature: 0.8, // Slightly more creative for natural variability
-                    max_tokens: 40
-                }),
-                `bridge_${userMessage} `,
-                60 * 60 // 1 hour cache to avoid unnecessary calls for common phrases
-            );
-
-            const bridge = result.choices[0].message?.content?.trim() || "";
-            return bridge;
-        } catch (e: any) {
-            logger.error("🔴 [AI] Contextual Bridge Error:", e.message);
-            return ""; // Soft fail: if it fails, simply return empty so the main script continues unaffected
         }
     }
 

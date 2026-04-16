@@ -69,7 +69,6 @@ jest.mock('../src/services/ai', () => ({
             }
             return { _error: true };
         }),
-        generateContextualBridge: jest.fn().mockResolvedValue(""), // Should NOT be called anymore
         analyzeImage: jest.fn().mockResolvedValue(null)
     }
 }));
@@ -444,7 +443,6 @@ describe('Step Handlers (Refactored)', () => {
         mockClient.sendMessage.mockClear();
         mockDependencies.sharedState.pausedUsers.clear();
         require('../src/services/ai').aiService.chat.mockResolvedValue({ response: "AI Default Response", goalMet: false });
-        require('../src/services/ai').aiService.generateContextualBridge.mockClear();
     });
 
     // --- GREETING ---
@@ -490,12 +488,6 @@ describe('Step Handlers (Refactored)', () => {
             expect(['waiting_preference', 'waiting_plan_choice']).toContain(userState[userId].step);
         });
 
-        test('does NOT call generateContextualBridge', async () => {
-            const userState = { [userId]: makeState('waiting_weight') };
-            await processSalesFlow(userId, '10 kilos', userState, knowledge, mockDependencies);
-            expect(require('../src/services/ai').aiService.generateContextualBridge).not.toHaveBeenCalled();
-        });
-
         test('detects implicit capsulas preference in weight step', async () => {
             const userState = { [userId]: makeState('waiting_weight') };
             await processSalesFlow(userId, '10 kilos y quiero capsulas', userState, knowledge, mockDependencies);
@@ -536,24 +528,6 @@ describe('Step Handlers (Refactored)', () => {
             const userState = { [userId]: makeState('waiting_preference') };
             await processSalesFlow(userId, text, userState, knowledge, mockDependencies);
             expect(userState[userId].selectedProduct).toBe(expectedProduct);
-        });
-
-        test('does NOT call generateContextualBridge for capsulas', async () => {
-            const userState = { [userId]: makeState('waiting_preference') };
-            await processSalesFlow(userId, 'capsulas', userState, knowledge, mockDependencies);
-            expect(require('../src/services/ai').aiService.generateContextualBridge).not.toHaveBeenCalled();
-        });
-
-        test('does NOT call generateContextualBridge for semillas', async () => {
-            const userState = { [userId]: makeState('waiting_preference') };
-            await processSalesFlow(userId, 'semillas', userState, knowledge, mockDependencies);
-            expect(require('../src/services/ai').aiService.generateContextualBridge).not.toHaveBeenCalled();
-        });
-
-        test('does NOT call generateContextualBridge for gotas', async () => {
-            const userState = { [userId]: makeState('waiting_preference') };
-            await processSalesFlow(userId, 'gotas', userState, knowledge, mockDependencies);
-            expect(require('../src/services/ai').aiService.generateContextualBridge).not.toHaveBeenCalled();
         });
 
         test('advances step after product selection', async () => {
