@@ -369,14 +369,18 @@ Teléfono: ${phoneDisplay}`;
 
     const handleSendMedia = async () => {
         setSendingMedia(true);
+        const isPdf = attachment.mimetype === 'application/pdf';
         try {
             await sendMedia({
                 chatId: selectedChat.id, base64: attachment.base64, mimetype: attachment.mimetype, filename: attachment.file.name, caption: input.trim()
             });
-            setMessages(prev => [...prev, { id: `temp-media-${Date.now()}`, fromMe: true, body: `📷 Imagen enviada: ${input.trim()}`, type: 'chat', timestamp: Date.now(), pending: true }]);
+            const caption = input.trim();
+            const label = isPdf ? `📎 PDF enviado (${attachment.file.name})` : '📷 Imagen enviada';
+            const body = caption ? `${label}: ${caption}` : label;
+            setMessages(prev => [...prev, { id: `temp-media-${Date.now()}`, fromMe: true, body, type: 'chat', timestamp: Date.now(), pending: true }]);
             setAttachment(null);
             setInput('');
-        } catch (e) { toast.error('Error al enviar imagen'); }
+        } catch (e) { toast.error(isPdf ? 'Error al enviar PDF' : 'Error al enviar imagen'); }
         setSendingMedia(false);
     };
 

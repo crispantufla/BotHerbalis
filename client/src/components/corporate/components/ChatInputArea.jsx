@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Send, Paperclip, Smile, Zap, CreditCard } from 'lucide-react';
+import { Send, Paperclip, Smile, Zap, CreditCard, FileText } from 'lucide-react';
 import EmojiPicker from 'emoji-picker-react';
 import QuickRepliesPanel from './QuickRepliesPanel';
 import MpLinkPanel from './MpLinkPanel';
@@ -22,14 +22,27 @@ const ChatInputArea = ({
     const handleFileSelect = (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        if (!file.type.startsWith('image/')) {
-            alert('Solo imágenes');
+        const isImage = file.type.startsWith('image/');
+        const isPdf = file.type === 'application/pdf';
+        if (!isImage && !isPdf) {
+            alert('Solo imágenes o PDFs');
+            return;
+        }
+        const MAX_PDF_MB = 16;
+        if (isPdf && file.size > MAX_PDF_MB * 1024 * 1024) {
+            alert(`El PDF supera el límite de ${MAX_PDF_MB}MB`);
             return;
         }
         const reader = new FileReader();
         reader.onload = () => {
             const base64Full = reader.result;
-            setAttachment({ file, preview: base64Full, base64: base64Full.split(',')[1], mimetype: file.type });
+            setAttachment({
+                file,
+                preview: isImage ? base64Full : null,
+                base64: base64Full.split(',')[1],
+                mimetype: file.type,
+                kind: isPdf ? 'pdf' : 'image',
+            });
         };
         reader.readAsDataURL(file);
         e.target.value = '';
@@ -74,16 +87,24 @@ const ChatInputArea = ({
 
             {attachment && (
                 <div className="mb-2 p-3 sm:p-4 bg-white/8 dark:bg-slate-800/80 rounded-2xl border border-indigo-100 shadow-sm flex items-center gap-4">
-                    <img src={attachment.preview} alt="Preview" className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-xl" />
+                    {attachment.kind === 'pdf' ? (
+                        <div className="w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center rounded-xl bg-rose-50 dark:bg-rose-900/30 text-rose-500 shrink-0">
+                            <FileText className="w-6 h-6 sm:w-8 sm:h-8" />
+                        </div>
+                    ) : (
+                        <img src={attachment.preview} alt="Preview" className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-xl" />
+                    )}
                     <div className="flex-1 min-w-0">
                         <p className="font-bold text-slate-800 dark:text-slate-200 text-sm truncate">{attachment.file.name}</p>
-                        <p className="text-xs text-slate-500">{(attachment.file.size / 1024).toFixed(0)} KB</p>
+                        <p className="text-xs text-slate-500">
+                            {attachment.kind === 'pdf' ? 'PDF · ' : ''}{(attachment.file.size / 1024).toFixed(0)} KB
+                        </p>
                     </div>
                     <button type="button" onClick={() => setAttachment(null)} className="p-2 sm:p-2 bg-slate-100 dark:bg-slate-700 hover:bg-rose-100 dark:hover:bg-rose-900/50 hover:text-rose-600 dark:text-slate-300 rounded-xl transition-colors shrink-0">✕</button>
                 </div>
             )}
             <form onSubmit={attachment ? (e) => { e.preventDefault(); handleSendMedia(); } : handleSend} className="flex gap-1.5 sm:gap-4 items-center w-full">
-                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
+                <input ref={fileInputRef} type="file" accept="image/*,application/pdf" onChange={handleFileSelect} className="hidden" />
 
                 <button type="button" onClick={() => { setShowEmojiPicker(prev => !prev); setShowQuickReplies(false); }} className={`w-11 h-11 sm:w-14 sm:h-14 flex items-center justify-center shrink-0 rounded-xl sm:rounded-2xl border transition-all shadow-sm ${showEmojiPicker ? 'bg-indigo-50 dark:bg-slate-600 border-indigo-300 text-indigo-600 dark:text-indigo-400' : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 hover:bg-indigo-50 dark:hover:bg-slate-600'}`}>
                     <Smile className="w-6 h-6" />

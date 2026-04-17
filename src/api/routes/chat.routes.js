@@ -516,14 +516,19 @@ module.exports = (clientPool) => {
             chatId = await resolveChatId(chatId, cl);
             if (!base64 || !mimetype) return res.status(400).json({ error: 'Missing base64 or mimetype' });
 
-            const allowedMimetypes = ['image/jpeg', 'image/png', 'image/webp', 'audio/ogg', 'audio/mpeg', 'video/mp4'];
+            const allowedMimetypes = ['image/jpeg', 'image/png', 'image/webp', 'audio/ogg', 'audio/mpeg', 'video/mp4', 'application/pdf'];
             if (!allowedMimetypes.includes(mimetype)) {
                 return res.status(400).json({ error: 'Invalid mimetype. Allowed: ' + allowedMimetypes.join(', ') });
             }
-            const media = new MessageMedia(mimetype, base64, filename || 'image.jpg');
-            const sentMsg = await cl?.sendMessage(chatId, media, { caption: caption || '' });
+            const isPdf = mimetype === 'application/pdf';
+            const defaultName = isPdf ? 'documento.pdf' : 'image.jpg';
+            const media = new MessageMedia(mimetype, base64, filename || defaultName);
+            const sendOpts = { caption: caption || '' };
+            if (isPdf) sendOpts.sendMediaAsDocument = true;
+            const sentMsg = await cl?.sendMessage(chatId, media, sendOpts);
 
-            const logText = `📷 Imagen enviada${caption ? ': ' + caption : ''}`;
+            const label = isPdf ? '📎 PDF enviado' : '📷 Imagen enviada';
+            const logText = `${label}${filename ? ` (${filename})` : ''}${caption ? ': ' + caption : ''}`;
             _recordAdminMessage(chatId, logText, ss);
 
             if (!ss?.pausedUsers?.has(chatId)) {
