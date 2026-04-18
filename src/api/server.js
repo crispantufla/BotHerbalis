@@ -163,14 +163,19 @@ function startServer(clientPool) {
             };
             tcp.on('connect', () => logger.info(`[VNC_PROXY] ${sellerId} bridged (port ${port})`));
             ws.on('message', (data) => {
+                if (closed || tcp.destroyed) return;
                 try { tcp.write(data); } catch (e) { cleanup(); }
             });
             tcp.on('data', (data) => {
+                if (closed || ws.readyState !== WebSocket.OPEN) return;
                 try { ws.send(data); } catch (e) { cleanup(); }
             });
             ws.on('close', cleanup);
             tcp.on('close', cleanup);
-            ws.on('error', cleanup);
+            ws.on('error', (err) => {
+                logger.warn(`[VNC_PROXY] ${sellerId} WS error: ${err.message}`);
+                cleanup();
+            });
             tcp.on('error', (err) => {
                 logger.warn(`[VNC_PROXY] ${sellerId} TCP error: ${err.message}`);
                 cleanup();
