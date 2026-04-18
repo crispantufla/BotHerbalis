@@ -96,6 +96,72 @@ function startServer(clientPool) {
     app.use('/api', sellersRoutes(clientPool));
     app.use('/api', quickRepliesRoutes(clientPool));
 
+    // --- VNC viewer tracking ---
+    // State + helpers for the concurrent-headful cap. The upgrade handler
+    // further down consumes these; we set them up here so the status endpoint
+    // (registered right below) can answer before the SPA fallback swallows it.
+    const VNC_MAX_HEADFUL = Math.max(1, parseInt(process.env.VNC_MAX_HEADFUL || '3', 10));
+    const vncViewerCounts = new Map();
+    const vncTeardownTimers = new Map();
+    const vncViewers = new Map();
+    let vncViewerSeq = 0;
+    const VNC_GRACE_MS = 3 * 60 * 1000;
+
+    function buildViewerStatus() {
+        const bySeller = new Map();
+        for (const v of vncViewers.values()) {
+            if (!bySeller.has(v.sellerId)) bySeller.set(v.sellerId, []);
+            bySeller.get(v.sellerId).push({ accountName: v.accountName, since: v.since });
+        }
+        const activeSellers = Array.from(bySeller.entries()).map(([sellerId, viewers]) => ({ sellerId, viewers }));
+        return {
+            max: VNC_MAX_HEADFUL,
+            activeSellers,
+            headfulCount: vncManager.getActiveSellers().length,
+            atCapacity: vncManager.getActiveSellers().length >= VNC_MAX_HEADFUL,
+        };
+    }
+
+    function broadcastViewerStatus() {
+        try { io.emit('wa_viewer:status', buildViewerStatus()); } catch (e) { /* ignore */ }
+    }
+
+    function acquireVncViewer(sellerId, accountName, accountId) {
+        const t = vncTeardownTimers.get(sellerId);
+        if (t) { clearTimeout(t); vncTeardownTimers.delete(sellerId); }
+        const count = (vncViewerCounts.get(sellerId) || 0) + 1;
+        vncViewerCounts.set(sellerId, count);
+        const id = ++vncViewerSeq;
+        vncViewers.set(id, { accountName: accountName || 'anónimo', accountId, sellerId, since: Date.now() });
+        broadcastViewerStatus();
+        return id;
+    }
+
+    function releaseVncViewer(sellerId, viewerId) {
+        if (viewerId) vncViewers.delete(viewerId);
+        const count = Math.max(0, (vncViewerCounts.get(sellerId) || 0) - 1);
+        vncViewerCounts.set(sellerId, count);
+        broadcastViewerStatus();
+        if (count === 0 && !vncTeardownTimers.has(sellerId)) {
+            const timer = setTimeout(() => {
+                vncTeardownTimers.delete(sellerId);
+                if ((vncViewerCounts.get(sellerId) || 0) === 0) {
+                    logger.info(`[VNC_LAZY] No viewers for ${sellerId}, tearing down headful`);
+                    clientPool.disableHeadful(sellerId)
+                        .then(() => broadcastViewerStatus())
+                        .catch(e => logger.error(`[VNC_LAZY] disableHeadful(${sellerId}) failed: ${e.message}`));
+                }
+            }, VNC_GRACE_MS);
+            vncTeardownTimers.set(sellerId, timer);
+        }
+    }
+
+    // Queue-status endpoint: the viewer polls this while waiting for a slot.
+    app.get('/api/wa-viewer/status', jwtAuthMiddleware, (req, res) => {
+        if (!isAuthorizedUser(req.account)) return res.status(403).json({ error: 'forbidden' });
+        res.json(buildViewerStatus());
+    });
+
     // SPA fallback
     app.use((req, res, next) => {
         if (req.method !== 'GET') return next();
@@ -120,34 +186,6 @@ function startServer(clientPool) {
     // connected. When the last viewer disconnects we schedule a teardown after
     // VNC_GRACE_MS to survive reloads without flipping modes constantly.
     const vncWss = new WebSocket.Server({ noServer: true });
-    const VNC_GRACE_MS = 3 * 60 * 1000;
-    const vncViewerCounts = new Map();   // sellerId → active viewer count
-    const vncTeardownTimers = new Map(); // sellerId → pending teardown timer
-
-    function acquireVncViewer(sellerId) {
-        const t = vncTeardownTimers.get(sellerId);
-        if (t) { clearTimeout(t); vncTeardownTimers.delete(sellerId); }
-        const count = (vncViewerCounts.get(sellerId) || 0) + 1;
-        vncViewerCounts.set(sellerId, count);
-        return count;
-    }
-
-    function releaseVncViewer(sellerId) {
-        const count = Math.max(0, (vncViewerCounts.get(sellerId) || 0) - 1);
-        vncViewerCounts.set(sellerId, count);
-        if (count === 0 && !vncTeardownTimers.has(sellerId)) {
-            const timer = setTimeout(() => {
-                vncTeardownTimers.delete(sellerId);
-                if ((vncViewerCounts.get(sellerId) || 0) === 0) {
-                    logger.info(`[VNC_LAZY] No viewers for ${sellerId}, tearing down headful`);
-                    clientPool.disableHeadful(sellerId).catch(e =>
-                        logger.error(`[VNC_LAZY] disableHeadful(${sellerId}) failed: ${e.message}`)
-                    );
-                }
-            }, VNC_GRACE_MS);
-            vncTeardownTimers.set(sellerId, timer);
-        }
-    }
 
     server.on('upgrade', async (req, socket, head) => {
         const url = req.url || '';
@@ -174,6 +212,24 @@ function startServer(clientPool) {
         } catch (e) {
             logger.warn(`[VNC_PROXY] Upgrade rejected for ${sellerId}: ${e.message}`);
             socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+            socket.destroy();
+            return;
+        }
+
+        // Enforce the concurrent-headful cap. Piggy-backing a viewer onto a
+        // seller that is already headful is free (same Chromium), so only
+        // reject when this upgrade would create a new headful session and we
+        // are already at capacity.
+        if (!vncManager.isActive(sellerId) && vncManager.getActiveSellers().length >= VNC_MAX_HEADFUL) {
+            const status = buildViewerStatus();
+            const body = JSON.stringify({ error: 'queue_full', ...status });
+            logger.warn(`[VNC_PROXY] Rejected ${account.name || '?'} for ${sellerId}: at capacity (${status.headfulCount}/${VNC_MAX_HEADFUL})`);
+            socket.write(
+                'HTTP/1.1 503 Service Unavailable\r\n' +
+                'Content-Type: application/json\r\n' +
+                'Content-Length: ' + Buffer.byteLength(body) + '\r\n' +
+                'Connection: close\r\n\r\n' + body
+            );
             socket.destroy();
             return;
         }
@@ -206,7 +262,7 @@ function startServer(clientPool) {
             return;
         }
 
-        acquireVncViewer(sellerId);
+        const viewerId = acquireVncViewer(sellerId, account.name, account.accountId);
 
         vncWss.handleUpgrade(req, socket, head, (ws) => {
             const tcp = net.connect(port, '127.0.0.1');
@@ -214,7 +270,7 @@ function startServer(clientPool) {
             const cleanup = () => {
                 if (closed) return;
                 closed = true;
-                releaseVncViewer(sellerId);
+                releaseVncViewer(sellerId, viewerId);
                 try { tcp.destroy(); } catch (e) { /* ignore */ }
                 try { ws.close(); } catch (e) { /* ignore */ }
             };

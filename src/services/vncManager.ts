@@ -104,6 +104,14 @@ class VncManager {
     getPort(sellerId: string): number | null {
         return this.sessions.get(sellerId)?.vncPort ?? null;
     }
+
+    getActiveSellers(): string[] {
+        return Array.from(this.sessions.keys());
+    }
+
+    isActive(sellerId: string): boolean {
+        return this.sessions.has(sellerId);
+    }
 }
 
 export const vncManager = new VncManager();

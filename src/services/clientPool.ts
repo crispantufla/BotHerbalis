@@ -22,6 +22,7 @@ const { restorePausedUsersFromDB } = require('./pauseService');
 const { handleAdminCommand: handleAdminCommandCtrl } = require('./adminService');
 const { buildConfirmationMessage } = require('../utils/messageTemplates');
 const { vncManager } = require('./vncManager');
+const { attachBotPanel } = require('./botPanel');
 
 export interface SellerInstance {
     sellerId: string;
@@ -381,6 +382,15 @@ class ClientPool {
                     saveOrderToLocal: helpers.saveOrderToLocal
                 });
                 instance.schedulerStarted = true;
+            }
+
+            // Inject the in-WhatsApp-Web control panel (Phase 1: ping bridge).
+            // Only meaningful when this seller is headful/VNC — on headless
+            // Chromium nothing is watching anyway.
+            if (instance.headful) {
+                attachBotPanel(instance).catch((e: any) =>
+                    logger.warn(`[POOL][${sellerId}] attachBotPanel failed: ${e.message}`)
+                );
             }
         });
 
