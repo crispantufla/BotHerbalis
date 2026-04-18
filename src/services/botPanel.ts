@@ -27,6 +27,46 @@ interface PanelCommand {
 
 const VALID_STEPS: Set<string> = new Set(Object.values(FlowStep) as string[]);
 
+// Per-instance cache of @lid → @c.us resolutions so we don't hit
+// Puppeteer.getContactById every poll tick.
+const lidCache: WeakMap<SellerInstance, Map<string, string>> = new WeakMap();
+
+/**
+ * Normalise whatever identifier `window.Store.Chat.getActive()` handed the
+ * panel into a `<phone>@c.us` JID that the rest of the bot uses as the key
+ * for userState, pausedUsers, orders, etc.
+ *
+ * Modern WhatsApp Web returns `<random>@lid` for chats that came through
+ * Meta's LID system; the bot's state is keyed by the real phone. Same
+ * resolution path as `messageHandler.ts` uses when a message arrives from
+ * an @lid — we just hit it lazily here when the panel requests state.
+ */
+async function resolveToCus(instance: SellerInstance, raw: string): Promise<string> {
+    const id = (raw || '').trim();
+    if (!id) return id;
+    if (id.endsWith('@c.us')) return id;
+    if (!id.includes('@')) return `${id.replace(/\D/g, '')}@c.us`;
+    if (!id.includes('@lid')) return id; // leave @g.us / @broadcast as-is; caller will reject
+
+    let cache = lidCache.get(instance);
+    if (!cache) { cache = new Map(); lidCache.set(instance, cache); }
+    const cached = cache.get(id);
+    if (cached) return cached;
+
+    try {
+        const contact = await (instance.client as any)?.getContactById(id);
+        const number = contact?.number || contact?.id?.user;
+        if (number) {
+            const resolved = `${String(number).replace(/\D/g, '')}@c.us`;
+            cache.set(id, resolved);
+            return resolved;
+        }
+    } catch (e: any) {
+        logger.warn(`[BOT_PANEL][${instance.sellerId}] LID resolve failed for ${id}: ${e.message}`);
+    }
+    return id; // fall through — caller will report user_has_no_state which is accurate
+}
+
 // Fields from UserState exposed to the panel. Kept lean to minimise payload
 // over the bridge (it runs every few seconds per connected viewer).
 function summariseUserState(instance: SellerInstance, phone: string): any {
@@ -60,16 +100,18 @@ async function handlePanelCommand(instance: SellerInstance, cmd: PanelCommand): 
                 return { ok: true, sellerId: instance.sellerId };
 
             case 'getState': {
-                const phone = String(cmd.payload?.phone || '').trim();
-                if (!phone) return { ok: false, error: 'missing_phone' };
+                const raw = String(cmd.payload?.phone || '').trim();
+                if (!raw) return { ok: false, error: 'missing_phone' };
+                const phone = await resolveToCus(instance, raw);
                 const paused = instance.sharedState?.pausedUsers?.has(phone) || false;
                 const summary = summariseUserState(instance, phone);
                 return { ok: true, phone, paused, ...summary };
             }
 
             case 'pause': {
-                const phone = String(cmd.payload?.phone || '').trim();
-                if (!phone) return { ok: false, error: 'missing_phone' };
+                const raw = String(cmd.payload?.phone || '').trim();
+                if (!raw) return { ok: false, error: 'missing_phone' };
+                const phone = await resolveToCus(instance, raw);
                 const reason = String(cmd.payload?.reason || 'Pausa manual desde panel').slice(0, 200);
                 await pauseUser(phone, reason, {
                     sharedState: instance.sharedState,
@@ -81,18 +123,20 @@ async function handlePanelCommand(instance: SellerInstance, cmd: PanelCommand): 
             }
 
             case 'resume': {
-                const phone = String(cmd.payload?.phone || '').trim();
-                if (!phone) return { ok: false, error: 'missing_phone' };
+                const raw = String(cmd.payload?.phone || '').trim();
+                if (!raw) return { ok: false, error: 'missing_phone' };
+                const phone = await resolveToCus(instance, raw);
                 await unpauseUser(phone, instance.sharedState, instance.sellerId);
                 logger.info(`[BOT_PANEL][${instance.sellerId}] Resumed ${phone} via panel`);
                 return { ok: true };
             }
 
             case 'setStep': {
-                const phone = String(cmd.payload?.phone || '').trim();
+                const raw = String(cmd.payload?.phone || '').trim();
                 const step = String(cmd.payload?.step || '').trim();
-                if (!phone) return { ok: false, error: 'missing_phone' };
+                if (!raw) return { ok: false, error: 'missing_phone' };
                 if (!VALID_STEPS.has(step)) return { ok: false, error: `invalid_step: ${step}` };
+                const phone = await resolveToCus(instance, raw);
                 const state = instance.stateManager?.userState?.[phone];
                 if (!state) return { ok: false, error: 'user_has_no_state' };
                 _setStep(state, step);
@@ -102,8 +146,9 @@ async function handlePanelCommand(instance: SellerInstance, cmd: PanelCommand): 
             }
 
             case 'resetFlow': {
-                const phone = String(cmd.payload?.phone || '').trim();
-                if (!phone) return { ok: false, error: 'missing_phone' };
+                const raw = String(cmd.payload?.phone || '').trim();
+                if (!raw) return { ok: false, error: 'missing_phone' };
+                const phone = await resolveToCus(instance, raw);
                 const state = instance.stateManager?.userState?.[phone];
                 if (!state) return { ok: false, error: 'user_has_no_state' };
                 delete instance.stateManager.userState[phone];
@@ -125,8 +170,9 @@ async function handlePanelCommand(instance: SellerInstance, cmd: PanelCommand): 
             }
 
             case 'adminApprove': {
-                const phone = String(cmd.payload?.phone || '').trim();
-                if (!phone) return { ok: false, error: 'missing_phone' };
+                const raw = String(cmd.payload?.phone || '').trim();
+                if (!raw) return { ok: false, error: 'missing_phone' };
+                const phone = await resolveToCus(instance, raw);
                 const runner = instance.sharedState?.handleAdminCommand;
                 if (typeof runner !== 'function') return { ok: false, error: 'handler_unavailable' };
                 const reply = await runner(phone, 'ok', true);
@@ -135,10 +181,11 @@ async function handlePanelCommand(instance: SellerInstance, cmd: PanelCommand): 
             }
 
             case 'sendQuickReply': {
-                const phone = String(cmd.payload?.phone || '').trim();
+                const raw = String(cmd.payload?.phone || '').trim();
                 const replyId = String(cmd.payload?.replyId || '').trim();
-                if (!phone) return { ok: false, error: 'missing_phone' };
+                if (!raw) return { ok: false, error: 'missing_phone' };
                 if (!replyId) return { ok: false, error: 'missing_replyId' };
+                const phone = await resolveToCus(instance, raw);
                 const reply = await prisma.quickReply.findUnique({ where: { id: replyId } });
                 if (!reply) return { ok: false, error: 'reply_not_found' };
                 if (reply.instanceId !== instance.sellerId) return { ok: false, error: 'forbidden' };
@@ -679,7 +726,10 @@ const INJECT_SCRIPT = `
         try {
             const data = await window.__botPanelCmd({ action: 'getState', payload: { phone: jid } });
             lastFetched = jid;
-            renderState({ ...data, phone: jid });
+            // Backend returns the resolved @c.us phone in data.phone; prefer
+            // that over the raw @lid jid so userState lookups and action
+            // buttons operate on the canonical identifier.
+            renderState(data && data.phone ? data : { ...data, phone: jid });
         } catch (e) {
             const panel = document.getElementById('__bot-panel');
             if (panel) panel.querySelector('.__bp-state').innerHTML = '<div class="__bp-empty">Error: ' + (e.message || e) + '</div>';

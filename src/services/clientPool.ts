@@ -195,6 +195,10 @@ class ClientPool {
                 headless: vnc ? false : true,
                 ...(vnc && { env: { ...process.env, DISPLAY: vnc.display } }),
                 ...(process.env.PUPPETEER_EXECUTABLE_PATH && { executablePath: process.env.PUPPETEER_EXECUTABLE_PATH }),
+                // Strip Chromium's "controlled by automated test software" infobar
+                // — under VNC the viewer sees it as a ~30px black bar at the top.
+                // Only drop it when we're showing the window (headful/VNC).
+                ...(vnc && { ignoreDefaultArgs: ['--enable-automation'] }),
                 args: [
                     '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
                     '--disable-accelerated-2d-canvas', '--disable-gpu',
@@ -212,9 +216,14 @@ class ClientPool {
                     '--disable-site-isolation-trials',  // don't spawn extra renderer per origin
                     // Memory limits per Chromium — prevent one instance from starving others
                     '--js-flags=--max-old-space-size=512',
-                    // Fixed window size so Chromium fills the Xvfb screen (no WM exists).
-                    // --kiosk hides tabs/address bar so the viewer sees only WA content.
-                    ...(vnc ? ['--window-size=1920,1080', '--window-position=0,0', '--kiosk'] : []),
+                    // Chromium must fill the Xvfb screen exactly — there's no WM to maximise it.
+                    // --kiosk hides tabs/address bar; --disable-infobars kills residual yellow bars.
+                    ...(vnc ? [
+                        '--window-size=1920,1080',
+                        '--window-position=0,0',
+                        '--kiosk',
+                        '--disable-infobars',
+                    ] : []),
                 ],
                 timeout: 120000
             }

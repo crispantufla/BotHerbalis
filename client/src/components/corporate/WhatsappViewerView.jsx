@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import RFB from '@novnc/novnc/lib/rfb.js';
 import { useSeller } from '../../context/SellerContext';
 import { useAuth } from '../../context/AuthContext';
-import { AlertTriangle, Wifi, WifiOff, ExternalLink, Users, Clock } from 'lucide-react';
+import { AlertTriangle, Wifi, WifiOff, ExternalLink, Users, Clock, Maximize2, Minimize2 } from 'lucide-react';
 
 function apiBase() {
     // Dev runs Vite on :3000 and server on :3001; prod serves both from same host.
@@ -31,10 +31,12 @@ export default function WhatsappViewerView({ standalone = false, sellerIdOverrid
 
     const screenRef = useRef(null);
     const rfbRef = useRef(null);
+    const containerRef = useRef(null); // the element we fullscreen
     // queued = we're at capacity, waiting for a slot to free up
     const [status, setStatus] = useState('connecting'); // connecting | connected | disconnected | error | queued
     const [errorMsg, setErrorMsg] = useState(null);
     const [viewerStatus, setViewerStatus] = useState(null); // { max, activeSellers, headfulCount, atCapacity }
+    const [isFullscreen, setIsFullscreen] = useState(false);
     const pollTimerRef = useRef(null);
     const attemptRef = useRef(0);
 
@@ -156,6 +158,50 @@ export default function WhatsappViewerView({ standalone = false, sellerIdOverrid
         window.open(`/wa-web?sellerId=${encodeURIComponent(sellerId)}`, '_blank', 'noopener');
     };
 
+    // Re-nudge noVNC to recompute scaling / remote resize whenever the
+    // container changes size (window resize, sidebar toggle, fullscreen, etc).
+    // Setting scaleViewport again forces noVNC's internal _updateScale() and,
+    // when resizeSession is on, sends a new ExtendedDesktopSize to Xvfb.
+    useEffect(() => {
+        const el = screenRef.current;
+        if (!el) return;
+        let raf = 0;
+        const nudge = () => {
+            const rfb = rfbRef.current;
+            if (!rfb) return;
+            // Toggling + re-setting is the public way to force a re-layout.
+            try {
+                rfb.scaleViewport = false;
+                rfb.scaleViewport = true;
+            } catch (_) { /* ignore */ }
+        };
+        const ro = new ResizeObserver(() => {
+            cancelAnimationFrame(raf);
+            raf = requestAnimationFrame(nudge);
+        });
+        ro.observe(el);
+        return () => { ro.disconnect(); cancelAnimationFrame(raf); };
+    }, []);
+
+    // Keep isFullscreen in sync with document.fullscreenElement (ESC toggles it).
+    useEffect(() => {
+        const onChange = () => setIsFullscreen(!!document.fullscreenElement);
+        document.addEventListener('fullscreenchange', onChange);
+        return () => document.removeEventListener('fullscreenchange', onChange);
+    }, []);
+
+    const toggleFullscreen = useCallback(async () => {
+        const el = containerRef.current;
+        if (!el) return;
+        try {
+            if (!document.fullscreenElement) {
+                await el.requestFullscreen();
+            } else {
+                await document.exitFullscreen();
+            }
+        } catch (_) { /* user denied or unsupported */ }
+    }, []);
+
     if (!user?.canViewWaWeb) {
         return (
             <div className="p-8 flex flex-col items-center justify-center text-slate-500">
@@ -177,8 +223,15 @@ export default function WhatsappViewerView({ standalone = false, sellerIdOverrid
     // shows as a tiny floating chip only while not yet connected.
     if (standalone) {
         return (
-            <div className="w-screen h-screen bg-black relative overflow-hidden">
+            <div ref={containerRef} className="w-screen h-screen bg-black relative overflow-hidden">
                 <div ref={screenRef} className="absolute inset-0" />
+                <button
+                    onClick={toggleFullscreen}
+                    title={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+                    className="absolute top-3 right-3 z-10 inline-flex items-center justify-center w-9 h-9 rounded-full bg-slate-900/80 hover:bg-slate-800 text-slate-200 shadow-lg backdrop-blur"
+                >
+                    {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                </button>
                 {status === 'queued' && (
                     <QueueOverlay sellerId={sellerId} viewerStatus={viewerStatus} fullscreen />
                 )}
@@ -216,13 +269,23 @@ export default function WhatsappViewerView({ standalone = false, sellerIdOverrid
                          status === 'queued' ? 'En cola' : 'Conectando...'}
                     </span>
                 </div>
-                <button
-                    onClick={openInNewTab}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
-                >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    Abrir en pestaña nueva
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={toggleFullscreen}
+                        title={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white shadow-sm"
+                    >
+                        {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                        {isFullscreen ? 'Salir' : 'Pantalla completa'}
+                    </button>
+                    <button
+                        onClick={openInNewTab}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+                    >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Abrir en pestaña nueva
+                    </button>
+                </div>
             </div>
             <div className="mb-3 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
@@ -231,8 +294,8 @@ export default function WhatsappViewerView({ standalone = false, sellerIdOverrid
                     <strong> no pasa por el flujo del bot</strong>. Usalo solo para intervenciones puntuales.
                 </div>
             </div>
-            <div className="flex-1 relative">
-                <div ref={screenRef} className="absolute inset-0 bg-slate-900 rounded-xl overflow-hidden" />
+            <div ref={containerRef} className="flex-1 relative bg-slate-900 rounded-xl overflow-hidden">
+                <div ref={screenRef} className="absolute inset-0" />
                 {status === 'queued' && (
                     <QueueOverlay sellerId={sellerId} viewerStatus={viewerStatus} />
                 )}
