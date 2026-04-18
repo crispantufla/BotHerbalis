@@ -34,26 +34,7 @@ export async function handleWaitingMpPayment(
             const hasAddress = !!(addr.nombre && addr.calle && addr.ciudad);
 
             if (hasAddress) {
-                const { buildConfirmationMessage } = require('../../utils/messageTemplates');
-                const { calculateTotal } = require('../utils/cartHelpers');
-                calculateTotal(currentState);
-                currentState.pendingOrder = {
-                    nombre: addr.nombre,
-                    calle: addr.calle,
-                    ciudad: addr.ciudad,
-                    cp: addr.cp,
-                    provincia: addr.provincia,
-                    calleOriginal: (addr as any).calleOriginal || addr.calle,
-                    cart: currentState.cart
-                };
-                const summaryMsg = buildConfirmationMessage(currentState);
-                _setStep(currentState, FlowStep.WAITING_FINAL_CONFIRMATION);
-                const successMsg = '¡Perfecto, el pago fue confirmado! 🎉';
-                currentState.history.push({ role: 'bot', content: successMsg, timestamp: Date.now() });
-                await sendMessageWithDelay(userId, successMsg);
-                currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
-                saveState(userId);
-                await sendMessageWithDelay(userId, summaryMsg);
+                await _finalizeOrderAndNotifyAdmin(userId, currentState, dependencies);
             } else {
                 const msg = '¡Perfecto, el pago fue confirmado! 🎉\n\nAhora necesito los datos de envío para despachar tu pedido 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:';
                 _setStep(currentState, FlowStep.WAITING_DATA);
@@ -123,6 +104,52 @@ export async function handleWaitingMpPayment(
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
         return { matched: true };
+    }
+
+    // ── Captura de dirección en paralelo ───────────────────────────────────────
+    // El cliente puede mandar los datos de envío junto con (o antes de) confirmar el pago.
+    // Parseamos y guardamos en partialAddress para que, cuando el pago se confirme,
+    // saltemos directo a WAITING_FINAL_CONFIRMATION sin volver a pedir datos.
+    const looksLikeAddress = /\d/.test(text) && text.split(/\s+/).length >= 3;
+    if (looksLikeAddress) {
+        try {
+            const parsed = await aiService.parseAddress(text);
+            if (parsed && !parsed._error && (parsed.nombre || parsed.calle || parsed.ciudad || parsed.cp || parsed.provincia)) {
+                if (!currentState.partialAddress) currentState.partialAddress = {} as any;
+                const pa: any = currentState.partialAddress;
+                if (parsed.nombre && !pa.nombre) { pa.nombre = parsed.nombre; if (!currentState.userName) currentState.userName = parsed.nombre; }
+                if (parsed.calle && !pa.calle) pa.calle = parsed.calle;
+                if (parsed.ciudad && !pa.ciudad) pa.ciudad = parsed.ciudad;
+                if (parsed.cp && !pa.cp) pa.cp = parsed.cp;
+                if (parsed.provincia && !pa.provincia) pa.provincia = parsed.provincia;
+
+                // ¿El pago ya se confirmó (via webhook) mientras mandaban datos?
+                const verified = await _verifyPayment(currentState);
+                const hasAddress = !!(pa.nombre && pa.calle && pa.ciudad);
+
+                if (verified === 'approved' && hasAddress) {
+                    await _finalizeOrderAndNotifyAdmin(userId, currentState, dependencies);
+                    return { matched: true };
+                }
+
+                // Pago todavía no confirmado: guardamos datos y seguimos esperando
+                const missing: string[] = [];
+                if (!pa.nombre) missing.push('Nombre completo');
+                if (!pa.calle) missing.push('Calle y número');
+                if (!pa.ciudad) missing.push('Localidad');
+                if (!pa.cp) missing.push('Código postal');
+
+                const ackMsg = missing.length > 0
+                    ? `¡Gracias! Ya tengo tus datos. Me faltaría:\n\n${missing.map(m => `• ${m}`).join('\n')}\n\nY avisame cuando completes el pago 💳`
+                    : `¡Perfecto! Ya tengo todos los datos de envío anotados 📦\n\nEn cuanto se acredite el pago armo el pedido. Avisame con *"listo"* cuando completes el pago 💳`;
+                currentState.history.push({ role: 'bot', content: ackMsg, timestamp: Date.now() });
+                saveState(userId);
+                await sendMessageWithDelay(userId, ackMsg);
+                return { matched: true };
+            }
+        } catch (e: any) {
+            logger.warn('[MP_PAYMENT] parseAddress falló, cayendo a AI fallback:', e.message);
+        }
     }
 
     // ── AI fallback ────────────────────────────────────────────────────────────
@@ -225,7 +252,8 @@ async function _generateAndSendLink(
             `Total: *$${currentState.totalPrice}*\n\n` +
             `👇 Hacé clic para pagar de forma segura:\n${link}\n\n` +
             `Podés pagar con tarjeta, desde la app de MercadoPago o escaneando el QR.\n\n` +
-            `✅ Cuando completes el pago, escribime *"listo"* y seguimos con el envío.`;
+            `✅ Cuando completes el pago, enviame el comprobante y pasame los datos de envío 👇\n\n` +
+            `Nombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nProvincia:`;
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         await sendMessageWithDelay(userId, msg);
         logger.info(`[MP_PAYMENT] Link creado para ${userId} — $${amount} ARS — ${link}`);
@@ -287,6 +315,67 @@ async function _verifyPayment(currentState: UserState): Promise<'approved' | 'pe
         logger.error('[MP_PAYMENT] Error verificando pago:', e.message);
         return 'pending';
     }
+}
+
+async function _finalizeOrderAndNotifyAdmin(
+    userId: string,
+    currentState: UserState,
+    dependencies: any
+): Promise<void> {
+    const { sendMessageWithDelay, saveState, notifyAdmin, saveOrderToLocal, config, effectiveScript } = dependencies;
+    const addr: any = currentState.partialAddress || {};
+
+    calculateTotal(currentState);
+    currentState.pendingOrder = {
+        nombre: addr.nombre,
+        calle: addr.calle,
+        ciudad: addr.ciudad,
+        cp: addr.cp,
+        provincia: addr.provincia,
+        calleOriginal: addr.calleOriginal || addr.calle,
+        cart: currentState.cart
+    };
+
+    const cart = currentState.cart || [];
+    const phone = userId.split('@')[0];
+    const orderData = {
+        cliente: phone,
+        nombre: addr.nombre,
+        calle: addr.calle,
+        ciudad: addr.ciudad,
+        cp: addr.cp,
+        provincia: addr.provincia,
+        calleOriginal: addr.calleOriginal || null,
+        producto: cart.map((i: any) => i.product).join(' + ') || currentState.selectedProduct || '',
+        plan: cart.map((i: any) => `${i.plan} días`).join(' + ') || `${currentState.selectedPlan || '60'} días`,
+        precio: currentState.totalPrice || '0',
+        postdatado: currentState.postdatado || null,
+        paymentMethod: 'mercadopago'
+    };
+    currentState.hasSoldBefore = true;
+    if (saveOrderToLocal) saveOrderToLocal(orderData);
+
+    const postdataLabel = currentState.postdatado ? `\n📅 POSTDATADO: ${currentState.postdatado}` : '';
+    const payLabel = '\n💳 PAGO: MercadoPago (ya abonado)';
+    if (notifyAdmin) {
+        await notifyAdmin(
+            `⌛ Pedido Requiere Aprobación`,
+            userId,
+            `Datos: ${addr.nombre}, ${addr.calle}\nCiudad: ${addr.ciudad} | CP: ${addr.cp}\nProvincia: ${addr.provincia || '?'}\nItems: ${orderData.producto}\nTotal: $${currentState.totalPrice || '0'}${postdataLabel}${payLabel}`
+        );
+    }
+
+    const _trackScript = effectiveScript || config?.activeScript;
+    if (config && config.scriptStats && _trackScript && _trackScript !== 'rotacion') {
+        if (!config.scriptStats[_trackScript]) config.scriptStats[_trackScript] = { started: 0, completed: 0 };
+        config.scriptStats[_trackScript].completed++;
+    }
+
+    _setStep(currentState, FlowStep.WAITING_ADMIN_VALIDATION);
+    const msg = '¡Perfecto, el pago fue confirmado y ya tengo tus datos! 🎉\n\nAguardame un instante que verificamos todo y te confirmamos el ingreso ⏳';
+    currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+    saveState(userId);
+    await sendMessageWithDelay(userId, msg);
 }
 
 function _getClosingMsg(knowledge: any): string {
