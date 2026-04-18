@@ -153,16 +153,6 @@ class ClientPool {
             logger.warn(`[POOL] Seller ${sellerId} already running`);
             return;
         }
-        // Defensive: if a switch is mid-flight, wait for it. Direct callers of
-        // startSeller (migrations, scripts) shouldn't race the switching path.
-        const switching = this.switchingPromises.get(sellerId);
-        if (switching) {
-            try { await switching; } catch { /* ignore */ }
-            if (this.instances.has(sellerId)) {
-                logger.warn(`[POOL] Seller ${sellerId} already running after switch`);
-                return;
-            }
-        }
 
         const wantHeadful = !!opts?.headful;
         logger.info(`[POOL] Starting seller: ${sellerId}${wantHeadful ? ' (headful/VNC)' : ''}`);
