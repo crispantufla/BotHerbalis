@@ -28,7 +28,9 @@ interface SellerVnc {
 const ENABLED = process.env.ENABLE_VNC === 'true';
 const DISPLAY_BASE = 99;
 const PORT_BASE = 5900;
-const SCREEN_SIZE = process.env.VNC_SCREEN_SIZE || '1280x900x24';
+// 1920x1080 matches common widescreen monitors, so the viewer has less
+// letterboxing. Override with VNC_SCREEN_SIZE if a smaller footprint is preferred.
+const SCREEN_SIZE = process.env.VNC_SCREEN_SIZE || '1920x1080x24';
 
 // Only the sellers in this whitelist get headful Chromium + Xvfb + x11vnc.
 // Everyone else stays headless. Running headful for every seller at once blows
@@ -63,11 +65,14 @@ class VncManager {
         const vncPort = PORT_BASE + slot;
 
         // Xvfb — virtual framebuffer. -ac disables host-based access control.
+        // +extension RANDR lets x11vnc advertise ExtendedDesktopSize so the
+        // noVNC client can request a resize that matches its window.
         const xvfb = spawn('Xvfb', [
             `:${displayNum}`,
             '-screen', '0', SCREEN_SIZE,
             '-nolisten', 'tcp',
             '-ac',
+            '+extension', 'RANDR',
         ], { stdio: 'ignore' });
         xvfb.on('exit', (code) => logger.warn(`[VNC][${sellerId}] Xvfb :${displayNum} exited (${code})`));
         xvfb.on('error', (err) => logger.error(`[VNC][${sellerId}] Xvfb spawn error: ${err.message}`));
@@ -85,6 +90,7 @@ class VncManager {
             '-localhost',      // listen only on 127.0.0.1; external access is via the authenticated WS proxy
             '-quiet',
             '-xkb',
+            '-xrandr', 'resize',  // honour client-initiated resize via RandR
         ], { stdio: 'ignore' });
         x11vnc.on('exit', (code) => logger.warn(`[VNC][${sellerId}] x11vnc exited (${code})`));
         x11vnc.on('error', (err) => logger.error(`[VNC][${sellerId}] x11vnc spawn error: ${err.message}`));

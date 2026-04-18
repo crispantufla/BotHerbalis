@@ -38,8 +38,11 @@ export default function WhatsappViewerView({ standalone = false, sellerIdOverrid
         try {
             rfb = new RFB(screenRef.current, url, { credentials: {} });
             rfb.viewOnly = false;
-            rfb.scaleViewport = true;   // CSS-scale to fit the container
-            rfb.resizeSession = false;  // don't resize the remote (xvfb screen is fixed)
+            // Ask the server to resize its framebuffer to match our container
+            // (requires Xvfb +extension RANDR and x11vnc -xrandr resize on the backend).
+            // scaleViewport is kept as a fallback if resize isn't supported.
+            rfb.resizeSession = true;
+            rfb.scaleViewport = true;
             rfb.background = '#0f172a'; // slate-900 (matches container)
             rfb.qualityLevel = 6;
             rfb.compressionLevel = 2;

@@ -200,8 +200,9 @@ class ClientPool {
                     '--disable-site-isolation-trials',  // don't spawn extra renderer per origin
                     // Memory limits per Chromium — prevent one instance from starving others
                     '--js-flags=--max-old-space-size=512',
-                    // Fixed window size so the Xvfb screen is fully covered when headful
-                    ...(vnc ? ['--window-size=1280,900', '--window-position=0,0', '--start-maximized'] : []),
+                    // Fixed window size so Chromium fills the Xvfb screen (no WM exists).
+                    // --kiosk hides tabs/address bar so the viewer sees only WA content.
+                    ...(vnc ? ['--window-size=1920,1080', '--window-position=0,0', '--kiosk'] : []),
                 ],
                 timeout: 120000
             }
