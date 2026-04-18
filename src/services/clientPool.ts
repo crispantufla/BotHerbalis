@@ -21,6 +21,7 @@ const { startScheduler } = require('./scheduler');
 const { restorePausedUsersFromDB } = require('./pauseService');
 const { handleAdminCommand: handleAdminCommandCtrl } = require('./adminService');
 const { buildConfirmationMessage } = require('../utils/messageTemplates');
+const { vncManager } = require('./vncManager');
 
 export interface SellerInstance {
     sellerId: string;
@@ -164,6 +165,10 @@ class ClientPool {
         // Queue + Worker
         const queue = createQueue(sellerId);
 
+        // Start per-seller Xvfb+x11vnc if VNC viewer is enabled. Returns null
+        // when ENABLE_VNC != 'true' so Chromium falls back to headless mode.
+        const vnc = await vncManager.startForSeller(sellerId);
+
         // WhatsApp client — config aligned with main branch (proven to persist sessions)
         const webCachePath = path.join(dataDir, '.wwebjs_cache');
         const client = new Client({
@@ -175,7 +180,8 @@ class ClientPool {
                 path: webCachePath,
             },
             puppeteer: {
-                headless: true,
+                headless: vnc ? false : true,
+                ...(vnc && { env: { ...process.env, DISPLAY: vnc.display } }),
                 ...(process.env.PUPPETEER_EXECUTABLE_PATH && { executablePath: process.env.PUPPETEER_EXECUTABLE_PATH }),
                 args: [
                     '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
@@ -194,6 +200,8 @@ class ClientPool {
                     '--disable-site-isolation-trials',  // don't spawn extra renderer per origin
                     // Memory limits per Chromium — prevent one instance from starving others
                     '--js-flags=--max-old-space-size=512',
+                    // Fixed window size so the Xvfb screen is fully covered when headful
+                    ...(vnc ? ['--window-size=1280,900', '--window-position=0,0', '--start-maximized'] : []),
                 ],
                 timeout: 120000
             }
@@ -477,6 +485,7 @@ class ClientPool {
             try { client.removeAllListeners(); } catch (e) { /* ignore */ }
             try { await Promise.race([client.destroy(), new Promise(r => setTimeout(r, 5000))]); } catch (e) { /* ignore */ }
             try { await shutdownSellerQueue(queue, worker, sellerId); } catch (e) { /* ignore */ }
+            try { vncManager.stopForSeller(sellerId); } catch (e) { /* ignore */ }
             pool.instances.delete(sellerId);
             // Schedule recovery — don't let seller stay dead forever
             if (pool.knownSellers.has(sellerId)) {
@@ -517,6 +526,8 @@ class ClientPool {
             }
         } catch (e) { /* already dead — fine */ }
         try { await shutdownSellerQueue(instance.queue, instance.worker, sellerId); } catch (e) { /* ignore */ }
+        // Tear down Xvfb + x11vnc for this seller (no-op if VNC is disabled)
+        try { vncManager.stopForSeller(sellerId); } catch (e) { /* ignore */ }
 
         await prisma.whatsAppSession.upsert({
             where: { sellerId },

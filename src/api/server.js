@@ -19,7 +19,10 @@ const quickRepliesRoutes = require('./routes/quickReplies.routes');
 
 const { jwtAuthMiddleware } = require('../middleware/jwtAuth');
 const { verifyToken } = require('../middleware/jwtAuth');
-const { initWaStream, canViewSeller, isAuthorizedUser } = require('../services/waStream');
+const { canViewSeller, isAuthorizedUser } = require('../services/waStream');
+const { vncManager } = require('../services/vncManager');
+const WebSocket = require('ws');
+const net = require('net');
 
 /**
  * startServer(clientPool)
@@ -105,6 +108,74 @@ function startServer(clientPool) {
     app.use((err, req, res, next) => {
         logger.error(`[API ERROR] [${req.requestId}] ${req.method} ${req.url}:`, err.message);
         res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
+    });
+
+    // --- VNC PROXY (WebSocket ↔ TCP) ---
+    // noVNC in the browser opens ws://host/vnc-ws/:sellerId?token=JWT
+    // We authenticate via JWT, resolve the seller's local x11vnc port, and
+    // bridge the WS frames straight to the TCP socket.
+    const vncWss = new WebSocket.Server({ noServer: true });
+    server.on('upgrade', async (req, socket, head) => {
+        const url = req.url || '';
+        const match = url.match(/^\/vnc-ws\/([^/?]+)/);
+        if (!match) return;  // let Socket.IO handle its own /socket.io/* upgrades
+        const sellerId = decodeURIComponent(match[1]);
+
+        let account = null;
+        try {
+            const tokenMatch = url.match(/[?&]token=([^&]+)/);
+            const token = tokenMatch ? decodeURIComponent(tokenMatch[1]) : null;
+            if (!token) throw new Error('no_token');
+            account = verifyToken(token);
+            if (!account.name && account.accountId && account.accountId !== 'legacy' && account.accountId !== 'legacy-admin') {
+                try {
+                    const { prisma } = require('../../db');
+                    const acc = await prisma.account.findUnique({ where: { id: account.accountId }, select: { name: true } });
+                    if (acc?.name) account.name = acc.name;
+                } catch (e) { /* ignore */ }
+            } else if (!account.name && account.accountId === 'legacy-admin') {
+                account.name = process.env.ADMIN_USER || 'admin';
+            }
+            if (!canViewSeller(account, sellerId)) throw new Error('forbidden');
+        } catch (e) {
+            logger.warn(`[VNC_PROXY] Upgrade rejected for ${sellerId}: ${e.message}`);
+            socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+            socket.destroy();
+            return;
+        }
+
+        const port = vncManager.getPort(sellerId);
+        if (!port) {
+            logger.warn(`[VNC_PROXY] No active VNC session for ${sellerId}`);
+            socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
+            socket.destroy();
+            return;
+        }
+
+        vncWss.handleUpgrade(req, socket, head, (ws) => {
+            const tcp = net.connect(port, '127.0.0.1');
+            let closed = false;
+            const cleanup = () => {
+                if (closed) return;
+                closed = true;
+                try { tcp.destroy(); } catch (e) { /* ignore */ }
+                try { ws.close(); } catch (e) { /* ignore */ }
+            };
+            tcp.on('connect', () => logger.info(`[VNC_PROXY] ${sellerId} bridged (port ${port})`));
+            ws.on('message', (data) => {
+                try { tcp.write(data); } catch (e) { cleanup(); }
+            });
+            tcp.on('data', (data) => {
+                try { ws.send(data); } catch (e) { cleanup(); }
+            });
+            ws.on('close', cleanup);
+            tcp.on('close', cleanup);
+            ws.on('error', cleanup);
+            tcp.on('error', (err) => {
+                logger.warn(`[VNC_PROXY] ${sellerId} TCP error: ${err.message}`);
+                cleanup();
+            });
+        });
     });
 
     // --- SOCKET.IO AUTH ---
@@ -280,32 +351,6 @@ function startServer(clientPool) {
             }
         });
 
-        // --- WA WEB VIEWER (CDP screencast) ---
-        // Rate limit: track input events per second
-        let inputWindow = { start: Date.now(), count: 0 };
-        socket.on('wa_view:start', async ({ sellerId: target } = {}) => {
-            if (!target) return socket.emit('wa_view:error', { code: 'missing_sellerId' });
-            if (!canViewSeller(account, target)) return socket.emit('wa_view:error', { code: 'forbidden' });
-            const mgr = initWaStream(clientPool, io);
-            const res = await mgr.start(target, socket.id);
-            if (!res.ok) socket.emit('wa_view:error', { code: res.error || 'start_failed' });
-            else socket.emit('wa_view:started', { sellerId: target });
-        });
-        socket.on('wa_view:stop', () => {
-            const mgr = initWaStream(clientPool, io);
-            mgr.stopForSocket(socket.id);
-        });
-        socket.on('wa_view:input', async ({ sellerId: target, event } = {}) => {
-            if (!target || !event) return;
-            if (!canViewSeller(account, target)) return;
-            // Rate limit ~100/s
-            const now = Date.now();
-            if (now - inputWindow.start > 1000) inputWindow = { start: now, count: 0 };
-            if (++inputWindow.count > 100) return;
-            const mgr = initWaStream(clientPool, io);
-            await mgr.sendInput(target, event);
-        });
-
         socket.on('disconnect', (reason) => {
             logger.debug(`[SOCKET] Client disconnected: ${reason}`);
             const entry = socketPresence.get(socket.id);
@@ -314,8 +359,6 @@ function startServer(clientPool) {
                 socketPresence.delete(socket.id);
                 broadcastPresence();
             }
-            const mgr = initWaStream(clientPool, io);
-            mgr.stopForSocket(socket.id);
         });
     });
 
