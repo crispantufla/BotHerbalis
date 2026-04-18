@@ -112,9 +112,43 @@ function startServer(clientPool) {
 
     // --- VNC PROXY (WebSocket ↔ TCP) ---
     // noVNC in the browser opens ws://host/vnc-ws/:sellerId?token=JWT
-    // We authenticate via JWT, resolve the seller's local x11vnc port, and
-    // bridge the WS frames straight to the TCP socket.
+    // We authenticate via JWT, lazily switch the seller into headful+VNC mode
+    // if nobody is currently viewing, resolve the seller's local x11vnc port,
+    // and bridge the WS frames straight to the TCP socket.
+    //
+    // Reference-counted: the seller stays headful while at least one viewer is
+    // connected. When the last viewer disconnects we schedule a teardown after
+    // VNC_GRACE_MS to survive reloads without flipping modes constantly.
     const vncWss = new WebSocket.Server({ noServer: true });
+    const VNC_GRACE_MS = 3 * 60 * 1000;
+    const vncViewerCounts = new Map();   // sellerId → active viewer count
+    const vncTeardownTimers = new Map(); // sellerId → pending teardown timer
+
+    function acquireVncViewer(sellerId) {
+        const t = vncTeardownTimers.get(sellerId);
+        if (t) { clearTimeout(t); vncTeardownTimers.delete(sellerId); }
+        const count = (vncViewerCounts.get(sellerId) || 0) + 1;
+        vncViewerCounts.set(sellerId, count);
+        return count;
+    }
+
+    function releaseVncViewer(sellerId) {
+        const count = Math.max(0, (vncViewerCounts.get(sellerId) || 0) - 1);
+        vncViewerCounts.set(sellerId, count);
+        if (count === 0 && !vncTeardownTimers.has(sellerId)) {
+            const timer = setTimeout(() => {
+                vncTeardownTimers.delete(sellerId);
+                if ((vncViewerCounts.get(sellerId) || 0) === 0) {
+                    logger.info(`[VNC_LAZY] No viewers for ${sellerId}, tearing down headful`);
+                    clientPool.disableHeadful(sellerId).catch(e =>
+                        logger.error(`[VNC_LAZY] disableHeadful(${sellerId}) failed: ${e.message}`)
+                    );
+                }
+            }, VNC_GRACE_MS);
+            vncTeardownTimers.set(sellerId, timer);
+        }
+    }
+
     server.on('upgrade', async (req, socket, head) => {
         const url = req.url || '';
         const match = url.match(/^\/vnc-ws\/([^/?]+)/);
@@ -144,13 +178,35 @@ function startServer(clientPool) {
             return;
         }
 
+        // Lazy switch: swap seller into headful+VNC if not already. First viewer
+        // pays the reconnect cost (~15-30s while Chromium restarts). Subsequent
+        // viewers reuse the running session via switchingPromises dedup.
+        try {
+            const result = await clientPool.enableHeadful(sellerId);
+            if (!result) {
+                logger.warn(`[VNC_PROXY] VNC disabled globally (ENABLE_VNC!=true)`);
+                socket.write('HTTP/1.1 503 Service Unavailable\r\n\r\n');
+                socket.destroy();
+                return;
+            }
+        } catch (e) {
+            logger.error(`[VNC_PROXY] enableHeadful(${sellerId}) failed: ${e.message}`);
+            socket.write('HTTP/1.1 500 Internal Server Error\r\n\r\n');
+            socket.destroy();
+            return;
+        }
+
+        if (socket.destroyed) return; // client gave up during the switch
+
         const port = vncManager.getPort(sellerId);
         if (!port) {
-            logger.warn(`[VNC_PROXY] No active VNC session for ${sellerId}`);
+            logger.warn(`[VNC_PROXY] No active VNC session for ${sellerId} after enable`);
             socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
             socket.destroy();
             return;
         }
+
+        acquireVncViewer(sellerId);
 
         vncWss.handleUpgrade(req, socket, head, (ws) => {
             const tcp = net.connect(port, '127.0.0.1');
@@ -158,10 +214,11 @@ function startServer(clientPool) {
             const cleanup = () => {
                 if (closed) return;
                 closed = true;
+                releaseVncViewer(sellerId);
                 try { tcp.destroy(); } catch (e) { /* ignore */ }
                 try { ws.close(); } catch (e) { /* ignore */ }
             };
-            tcp.on('connect', () => logger.info(`[VNC_PROXY] ${sellerId} bridged (port ${port})`));
+            tcp.on('connect', () => logger.info(`[VNC_PROXY] ${sellerId} bridged (port ${port}, viewers=${vncViewerCounts.get(sellerId) || 0})`));
             ws.on('message', (data) => {
                 if (closed || tcp.destroyed) return;
                 try { tcp.write(data); } catch (e) { cleanup(); }

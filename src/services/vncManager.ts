@@ -32,18 +32,6 @@ const PORT_BASE = 5900;
 // letterboxing. Override with VNC_SCREEN_SIZE if a smaller footprint is preferred.
 const SCREEN_SIZE = process.env.VNC_SCREEN_SIZE || '1920x1080x24';
 
-// Optional whitelist: only the listed sellers get headful Chromium + Xvfb + x11vnc.
-// If empty (default), ALL sellers run headful when ENABLE_VNC=true. The whitelist
-// exists as an escape hatch for small Railway plans where running every seller
-// headful at once would blow past PID/thread limits (fork EAGAIN). With a plan
-// that has enough resources (32GB RAM+), leave it empty.
-const VNC_SELLERS = new Set(
-    (process.env.VNC_SELLERS || '')
-        .split(',')
-        .map(s => s.trim().toLowerCase())
-        .filter(Boolean)
-);
-
 class VncManager {
     private sessions: Map<string, SellerVnc> = new Map();
     private nextSlot = 0;
@@ -54,9 +42,6 @@ class VncManager {
 
     async startForSeller(sellerId: string): Promise<{ display: string; port: number } | null> {
         if (!ENABLED) return null;
-        if (VNC_SELLERS.size > 0 && !VNC_SELLERS.has(sellerId.toLowerCase())) {
-            return null;  // seller not whitelisted — stay headless
-        }
         const existing = this.sessions.get(sellerId);
         if (existing) {
             return { display: `:${existing.displayNum}`, port: existing.vncPort };

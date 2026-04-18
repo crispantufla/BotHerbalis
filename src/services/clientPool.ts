@@ -35,6 +35,7 @@ export interface SellerInstance {
     schedulerStarted: boolean;
     reconnectAttempts: number;
     qrTimer: ReturnType<typeof setTimeout> | null;
+    headful: boolean;  // true = Xvfb+x11vnc+headful Chromium, false = plain headless
     stop: () => Promise<void>;
 }
 
@@ -71,6 +72,7 @@ class ClientPool {
     private instances: Map<string, SellerInstance> = new Map();
     private knownSellers: Set<string> = new Set();
     private startingPromises: Map<string, Promise<void>> = new Map();
+    private switchingPromises: Map<string, Promise<void>> = new Map(); // headful↔headless mutex
     private initQueue: Promise<void> = Promise.resolve(); // Serialize Chrome startups
     private io: any = null;
     private redlock: any = null;
@@ -138,13 +140,14 @@ class ClientPool {
         );
     }
 
-    async startSeller(sellerId: string): Promise<void> {
+    async startSeller(sellerId: string, opts?: { headful?: boolean }): Promise<void> {
         if (this.instances.has(sellerId)) {
             logger.warn(`[POOL] Seller ${sellerId} already running`);
             return;
         }
 
-        logger.info(`[POOL] Starting seller: ${sellerId}`);
+        const wantHeadful = !!opts?.headful;
+        logger.info(`[POOL] Starting seller: ${sellerId}${wantHeadful ? ' (headful/VNC)' : ''}`);
         const dataDir = getDataDir(sellerId);
         const authPath = path.join(dataDir, '.wwebjs_auth');
         cleanChromeLocks(authPath);
@@ -165,9 +168,10 @@ class ClientPool {
         // Queue + Worker
         const queue = createQueue(sellerId);
 
-        // Start per-seller Xvfb+x11vnc if VNC viewer is enabled. Returns null
+        // Start per-seller Xvfb+x11vnc only when the caller explicitly asks for
+        // headful mode (lazy: only while a viewer is connected). Returns null
         // when ENABLE_VNC != 'true' so Chromium falls back to headless mode.
-        const vnc = await vncManager.startForSeller(sellerId);
+        const vnc = wantHeadful ? await vncManager.startForSeller(sellerId) : null;
 
         // WhatsApp client — config aligned with main branch (proven to persist sessions)
         const webCachePath = path.join(dataDir, '.wwebjs_cache');
@@ -312,6 +316,7 @@ class ClientPool {
             queue, worker, pendingMessages, helpers,
             schedulerStarted: false, reconnectAttempts: 0,
             qrTimer: null,
+            headful: !!vnc,
             stop: async () => this.stopSeller(sellerId)
         };
 
@@ -546,6 +551,63 @@ class ClientPool {
         // Go through initQueue to prevent concurrent Chrome launches
         this.knownSellers.add(sellerId);
         await this.ensureStarted(sellerId);
+    }
+
+    /**
+     * Swap a running seller into headful+VNC mode. Idempotent: if already
+     * headful, returns the existing VNC port. Serialized per-seller via
+     * switchingPromises to prevent concurrent stops/starts from racing.
+     *
+     * Note: returns as soon as Xvfb+x11vnc are up and the new Chromium has been
+     * spawned. WhatsApp Web still needs ~10-20s after that to reconnect via
+     * LocalAuth; the noVNC client will show a blank/grey screen until then.
+     */
+    async enableHeadful(sellerId: string): Promise<{ port: number } | null> {
+        if (!vncManager.isEnabled()) return null;
+
+        const existing = this.switchingPromises.get(sellerId);
+        if (existing) await existing;
+
+        const current = this.instances.get(sellerId);
+        if (current?.headful) {
+            const port = vncManager.getPort(sellerId);
+            return port ? { port } : null;
+        }
+
+        const p = (async () => {
+            if (this.instances.has(sellerId)) {
+                await this.stopSeller(sellerId);
+                await new Promise(r => setTimeout(r, 2000));
+            }
+            this.knownSellers.add(sellerId);
+            await this.startSeller(sellerId, { headful: true });
+        })();
+        this.switchingPromises.set(sellerId, p);
+        try { await p; } finally { this.switchingPromises.delete(sellerId); }
+
+        const port = vncManager.getPort(sellerId);
+        return port ? { port } : null;
+    }
+
+    /**
+     * Tear down headful/VNC for a seller and return it to plain headless.
+     * No-op if the seller is already headless or not running.
+     */
+    async disableHeadful(sellerId: string): Promise<void> {
+        const existing = this.switchingPromises.get(sellerId);
+        if (existing) await existing;
+
+        const current = this.instances.get(sellerId);
+        if (!current || !current.headful) return;
+
+        const p = (async () => {
+            await this.stopSeller(sellerId);
+            await new Promise(r => setTimeout(r, 2000));
+            this.knownSellers.add(sellerId);
+            await this.startSeller(sellerId, { headful: false });
+        })();
+        this.switchingPromises.set(sellerId, p);
+        try { await p; } finally { this.switchingPromises.delete(sellerId); }
     }
 
     /** Wipe session directory and start fresh (forces new QR scan). */
