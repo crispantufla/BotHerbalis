@@ -18,14 +18,16 @@ export interface AccountPayload {
     accountId: string;
     role: 'admin' | 'seller';
     sellerId: string | null;
+    name?: string;
 }
 
 /** Generate a JWT for an authenticated account */
-export function signToken(account: { id: string; role: string; sellerId: string | null }): string {
+export function signToken(account: { id: string; role: string; sellerId: string | null; name?: string | null }): string {
     const payload: AccountPayload = {
         accountId: account.id,
         role: account.role as 'admin' | 'seller',
         sellerId: account.sellerId,
+        name: account.name || undefined,
     };
     return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRY });
 }

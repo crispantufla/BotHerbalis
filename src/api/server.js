@@ -109,7 +109,7 @@ function startServer(clientPool) {
 
     // --- SOCKET.IO AUTH ---
     // Accepts JWT token (new) or API_KEY (legacy)
-    io.use((socket, next) => {
+    io.use(async (socket, next) => {
         const token = socket.handshake.auth?.token;
         const apiKey = socket.handshake.auth?.apiKey || socket.handshake.headers['x-api-key'];
         const SOCKET_API_KEY = process.env.API_KEY;
@@ -117,6 +117,17 @@ function startServer(clientPool) {
         if (token) {
             try {
                 const decoded = verifyToken(token);
+                // Backfill name for older JWTs (pre-name-in-payload) so
+                // authorization checks that need the username still work.
+                if (!decoded.name && decoded.accountId && decoded.accountId !== 'legacy' && decoded.accountId !== 'legacy-admin') {
+                    try {
+                        const { prisma } = require('../../db');
+                        const acc = await prisma.account.findUnique({ where: { id: decoded.accountId }, select: { name: true } });
+                        if (acc?.name) decoded.name = acc.name;
+                    } catch (e) { /* ignore */ }
+                } else if (!decoded.name && decoded.accountId === 'legacy-admin') {
+                    decoded.name = process.env.ADMIN_USER || 'admin';
+                }
                 socket.data.account = decoded;
                 return next();
             } catch (e) {
