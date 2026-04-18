@@ -91,19 +91,30 @@ export default function WhatsappViewerView({ standalone = false, sellerIdOverrid
         );
     }
 
-    const wrapperClass = standalone
-        ? 'w-screen h-screen flex flex-col bg-slate-950'
-        : 'p-4 md:p-6 w-full h-full flex flex-col';
-
-    const screenWrapperClass = standalone
-        ? 'flex-1 bg-slate-900 overflow-hidden'
-        : 'flex-1 bg-slate-900 rounded-xl overflow-hidden';
+    // Standalone mode: no chrome at all — VNC canvas fills the viewport, status
+    // shows as a tiny floating chip only while not yet connected.
+    if (standalone) {
+        return (
+            <div className="w-screen h-screen bg-black relative overflow-hidden">
+                <div ref={screenRef} className="absolute inset-0" />
+                {status !== 'connected' && (
+                    <div className={`absolute top-3 left-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg backdrop-blur ${
+                        status === 'error' ? 'bg-rose-500/90 text-white' : 'bg-amber-500/90 text-white'
+                    }`}>
+                        <WifiOff className="w-3 h-3" />
+                        {status === 'error' ? `Error: ${errorMsg || 'desconocido'}` :
+                         status === 'disconnected' ? 'Desconectado' : 'Conectando (puede tardar ~30s)...'}
+                    </div>
+                )}
+            </div>
+        );
+    }
 
     return (
-        <div className={wrapperClass}>
-            <div className={`flex items-center justify-between ${standalone ? 'px-3 py-2 bg-slate-900 border-b border-slate-800' : 'mb-3'}`}>
+        <div className="p-4 md:p-6 w-full h-full flex flex-col">
+            <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
-                    <h2 className={`font-bold ${standalone ? 'text-sm text-slate-200' : 'text-lg md:text-xl text-slate-800 dark:text-slate-100'}`}>
+                    <h2 className="font-bold text-lg md:text-xl text-slate-800 dark:text-slate-100">
                         WhatsApp Web — <span className="text-indigo-500">{sellerId}</span>
                     </h2>
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
@@ -117,26 +128,22 @@ export default function WhatsappViewerView({ standalone = false, sellerIdOverrid
                          status === 'disconnected' ? 'Desconectado' : 'Conectando...'}
                     </span>
                 </div>
-                {!standalone && (
-                    <button
-                        onClick={openInNewTab}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
-                    >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                        Abrir en pestaña nueva
-                    </button>
-                )}
+                <button
+                    onClick={openInNewTab}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+                >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    Abrir en pestaña nueva
+                </button>
             </div>
-            {!standalone && (
-                <div className="mb-3 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
-                    <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                    <div>
-                        Estás controlando la sesión real del bot. Cualquier mensaje que envíes sale por WhatsApp de este vendedor y
-                        <strong> no pasa por el flujo del bot</strong>. Usalo solo para intervenciones puntuales.
-                    </div>
+            <div className="mb-3 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <div>
+                    Estás controlando la sesión real del bot. Cualquier mensaje que envíes sale por WhatsApp de este vendedor y
+                    <strong> no pasa por el flujo del bot</strong>. Usalo solo para intervenciones puntuales.
                 </div>
-            )}
-            <div ref={screenRef} className={screenWrapperClass} />
+            </div>
+            <div ref={screenRef} className="flex-1 bg-slate-900 rounded-xl overflow-hidden" />
         </div>
     );
 }

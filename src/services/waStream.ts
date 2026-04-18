@@ -24,6 +24,8 @@ interface SellerStream {
     starting: boolean;
 }
 
+// Optional allow-list of Account.name values. Empty = any authenticated account
+// can view WhatsApp Web (per-seller scoping still enforced by canViewSeller).
 const ALLOWED_USERS = (process.env.WA_VIEWER_USERS || '')
     .split(',')
     .map(s => s.trim().toLowerCase())
@@ -31,6 +33,7 @@ const ALLOWED_USERS = (process.env.WA_VIEWER_USERS || '')
 
 export function isAuthorizedUser(account: { name?: string | null; role?: string; sellerId?: string | null } | null | undefined): boolean {
     if (!account || !account.name) return false;
+    if (ALLOWED_USERS.length === 0) return true;  // no whitelist → allow everyone
     return ALLOWED_USERS.includes(account.name.toLowerCase());
 }
 
