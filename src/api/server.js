@@ -19,6 +19,7 @@ const quickRepliesRoutes = require('./routes/quickReplies.routes');
 
 const { jwtAuthMiddleware } = require('../middleware/jwtAuth');
 const { verifyToken } = require('../middleware/jwtAuth');
+const { initWaStream, canViewSeller, isAuthorizedUser } = require('../services/waStream');
 
 /**
  * startServer(clientPool)
@@ -268,6 +269,32 @@ function startServer(clientPool) {
             }
         });
 
+        // --- WA WEB VIEWER (CDP screencast) ---
+        // Rate limit: track input events per second
+        let inputWindow = { start: Date.now(), count: 0 };
+        socket.on('wa_view:start', async ({ sellerId: target } = {}) => {
+            if (!target) return socket.emit('wa_view:error', { code: 'missing_sellerId' });
+            if (!canViewSeller(account, target)) return socket.emit('wa_view:error', { code: 'forbidden' });
+            const mgr = initWaStream(clientPool, io);
+            const res = await mgr.start(target, socket.id);
+            if (!res.ok) socket.emit('wa_view:error', { code: res.error || 'start_failed' });
+            else socket.emit('wa_view:started', { sellerId: target });
+        });
+        socket.on('wa_view:stop', () => {
+            const mgr = initWaStream(clientPool, io);
+            mgr.stopForSocket(socket.id);
+        });
+        socket.on('wa_view:input', async ({ sellerId: target, event } = {}) => {
+            if (!target || !event) return;
+            if (!canViewSeller(account, target)) return;
+            // Rate limit ~100/s
+            const now = Date.now();
+            if (now - inputWindow.start > 1000) inputWindow = { start: now, count: 0 };
+            if (++inputWindow.count > 100) return;
+            const mgr = initWaStream(clientPool, io);
+            await mgr.sendInput(target, event);
+        });
+
         socket.on('disconnect', (reason) => {
             logger.debug(`[SOCKET] Client disconnected: ${reason}`);
             const entry = socketPresence.get(socket.id);
@@ -276,6 +303,8 @@ function startServer(clientPool) {
                 socketPresence.delete(socket.id);
                 broadcastPresence();
             }
+            const mgr = initWaStream(clientPool, io);
+            mgr.stopForSocket(socket.id);
         });
     });
 

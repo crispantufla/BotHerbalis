@@ -72,13 +72,16 @@ module.exports = (client, sharedState) => {
 
     // ─── GET /api/me ────────────────────────────────────────────────
     // Returns current authenticated user info
+    const { isAuthorizedUser } = require('../../services/waStream');
     router.get('/me', jwtAuthMiddleware, async (req, res) => {
         if (req.account.id === 'legacy' || req.account.id === 'legacy-admin') {
+            const legacyName = process.env.ADMIN_USER || 'admin';
             return res.json({
                 id: req.account.id,
-                name: process.env.ADMIN_USER || 'admin',
+                name: legacyName,
                 role: 'admin',
                 sellerId: req.account.sellerId,
+                canViewWaWeb: isAuthorizedUser({ name: legacyName, role: 'admin', sellerId: req.account.sellerId }),
             });
         }
 
@@ -91,7 +94,7 @@ module.exports = (client, sharedState) => {
             return res.status(401).json({ error: 'Account not found or inactive' });
         }
 
-        res.json(account);
+        res.json({ ...account, canViewWaWeb: isAuthorizedUser(account) });
     });
 
     // ─── GET /api/accounts ──────────────────────────────────────────
