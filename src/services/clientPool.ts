@@ -100,6 +100,13 @@ class ClientPool {
 
     /** Start seller if registered but not yet running. Returns immediately if already running. */
     async ensureStarted(sellerId: string): Promise<void> {
+        // If a headful/headless mode switch is mid-flight, wait for it to finish.
+        // Otherwise we'd race on the seller's LocalAuth directory (a second Chromium
+        // refuses to start with "browser is already running").
+        const switching = this.switchingPromises.get(sellerId);
+        if (switching) {
+            try { await switching; } catch { /* ignore */ }
+        }
         if (this.instances.has(sellerId)) return;
         if (!this.knownSellers.has(sellerId)) {
             logger.warn(`[POOL] ensureStarted: ${sellerId} is not a known seller`);
@@ -145,6 +152,16 @@ class ClientPool {
         if (this.instances.has(sellerId)) {
             logger.warn(`[POOL] Seller ${sellerId} already running`);
             return;
+        }
+        // Defensive: if a switch is mid-flight, wait for it. Direct callers of
+        // startSeller (migrations, scripts) shouldn't race the switching path.
+        const switching = this.switchingPromises.get(sellerId);
+        if (switching) {
+            try { await switching; } catch { /* ignore */ }
+            if (this.instances.has(sellerId)) {
+                logger.warn(`[POOL] Seller ${sellerId} already running after switch`);
+                return;
+            }
         }
 
         const wantHeadful = !!opts?.headful;
@@ -575,8 +592,13 @@ class ClientPool {
     async enableHeadful(sellerId: string): Promise<{ port: number } | null> {
         if (!vncManager.isEnabled()) return null;
 
+        // Serialize against both in-flight switches AND in-flight lazy starts
+        // on this seller. A parallel ensureStarted would otherwise spawn a
+        // second Chromium into the same LocalAuth dir and crash-retry.
+        const starting = this.startingPromises.get(sellerId);
+        if (starting) { try { await starting; } catch { /* ignore */ } }
         const existing = this.switchingPromises.get(sellerId);
-        if (existing) await existing;
+        if (existing) { try { await existing; } catch { /* ignore */ } }
 
         const current = this.instances.get(sellerId);
         if (current?.headful) {
@@ -604,8 +626,12 @@ class ClientPool {
      * No-op if the seller is already headless or not running.
      */
     async disableHeadful(sellerId: string): Promise<void> {
+        // Same serialization rule as enableHeadful — don't overlap with a
+        // pending lazy start or another in-flight switch.
+        const starting = this.startingPromises.get(sellerId);
+        if (starting) { try { await starting; } catch { /* ignore */ } }
         const existing = this.switchingPromises.get(sellerId);
-        if (existing) await existing;
+        if (existing) { try { await existing; } catch { /* ignore */ } }
 
         const current = this.instances.get(sellerId);
         if (!current || !current.headful) return;
