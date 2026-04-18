@@ -19,10 +19,25 @@ export const AuthProvider = ({ children }) => {
             try {
                 const parsed = JSON.parse(storedUser);
                 setUser(parsed);
-                // Ensure selectedSellerId is set on restore
                 if (parsed.sellerId && !localStorage.getItem('selectedSellerId')) {
                     localStorage.setItem('selectedSellerId', parsed.sellerId);
                 }
+                // Refresh from /api/me so newly-added server-side flags
+                // (e.g. canViewWaWeb) appear without requiring a re-login
+                api.get('/api/me')
+                    .then(res => {
+                        if (res.data) {
+                            const fresh = { ...parsed, ...res.data };
+                            localStorage.setItem('user', JSON.stringify(fresh));
+                            setUser(fresh);
+                        }
+                    })
+                    .catch(() => {
+                        // /me failed (token expired, etc.) — logout cleanly
+                        localStorage.removeItem('user');
+                        localStorage.removeItem('token');
+                        setUser(null);
+                    });
             } catch (e) {
                 localStorage.removeItem('user');
                 localStorage.removeItem('token');

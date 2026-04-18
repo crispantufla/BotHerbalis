@@ -8,6 +8,7 @@ const {
     requireAdmin,
 } = require('../../middleware/jwtAuth');
 const logger = require('../../utils/logger');
+const { isAuthorizedUser } = require('../../services/waStream');
 
 module.exports = (client, sharedState) => {
     const router = express.Router();
@@ -35,6 +36,7 @@ module.exports = (client, sharedState) => {
                             name: account.name,
                             role: account.role,
                             sellerId: account.sellerId,
+                            canViewWaWeb: isAuthorizedUser(account),
                         },
                     });
                 }
@@ -63,6 +65,7 @@ module.exports = (client, sharedState) => {
                     name: validUser,
                     role: 'admin',
                     sellerId: null,
+                    canViewWaWeb: isAuthorizedUser({ name: validUser, role: 'admin', sellerId: null }),
                 },
             });
         }
@@ -72,7 +75,6 @@ module.exports = (client, sharedState) => {
 
     // ─── GET /api/me ────────────────────────────────────────────────
     // Returns current authenticated user info
-    const { isAuthorizedUser } = require('../../services/waStream');
     router.get('/me', jwtAuthMiddleware, async (req, res) => {
         if (req.account.id === 'legacy' || req.account.id === 'legacy-admin') {
             const legacyName = process.env.ADMIN_USER || 'admin';
