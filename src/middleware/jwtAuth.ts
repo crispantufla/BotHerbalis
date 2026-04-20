@@ -55,7 +55,7 @@ export async function comparePassword(plain: string, hash: string): Promise<bool
 /**
  * Express middleware: authenticates via JWT Bearer token.
  * Falls back to legacy x-api-key for backward compatibility during migration.
- * Sets req.account = { id, role, sellerId } on success.
+ * Sets req.account = { id, role, sellerId, name } on success.
  */
 export function jwtAuthMiddleware(req: any, res: any, next: any) {
     // Skip public routes
@@ -71,6 +71,7 @@ export function jwtAuthMiddleware(req: any, res: any, next: any) {
                 id: payload.accountId,
                 role: payload.role,
                 sellerId: payload.sellerId,
+                name: payload.name,
             };
             return next();
         } catch (err) {
@@ -82,11 +83,14 @@ export function jwtAuthMiddleware(req: any, res: any, next: any) {
     const API_KEY = process.env.API_KEY;
     const apiKey = req.headers['x-api-key'];
     if (API_KEY && apiKey && apiKey === API_KEY) {
-        // Legacy API key auth — treat as admin with no specific seller (sees all)
+        // Legacy API key auth — treat as admin with no specific seller (sees all).
+        // Populate name from ADMIN_USER so wa-viewer authorization helpers that
+        // gate on account.name don't reject legacy admins.
         req.account = {
             id: 'legacy',
             role: 'admin',
             sellerId: null,
+            name: process.env.ADMIN_USER || 'admin',
         };
         return next();
     }

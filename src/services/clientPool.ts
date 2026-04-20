@@ -542,6 +542,10 @@ class ClientPool {
     async stopSeller(sellerId: string): Promise<void> {
         const instance = this.instances.get(sellerId);
         if (!instance) return;
+        // Delete from map up-front so a concurrent stopSeller (e.g. watchdog
+        // racing with enableHeadful) short-circuits instead of double-destroying
+        // the same client / queue.
+        this.instances.delete(sellerId);
 
         logger.info(`[POOL] Stopping seller: ${sellerId}`);
         if (instance.qrTimer) { clearTimeout(instance.qrTimer); instance.qrTimer = null; }
@@ -567,7 +571,6 @@ class ClientPool {
             update: { status: 'disconnected', lastSeen: new Date() }
         }).catch(() => {});
 
-        this.instances.delete(sellerId);
         logger.info(`[POOL] Seller ${sellerId} stopped`);
     }
 

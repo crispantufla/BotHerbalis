@@ -28,7 +28,9 @@ interface PanelCommand {
 const VALID_STEPS: Set<string> = new Set(Object.values(FlowStep) as string[]);
 
 // Per-instance cache of @lid → @c.us resolutions so we don't hit
-// Puppeteer.getContactById every poll tick.
+// Puppeteer.getContactById every poll tick. Only *successful* resolutions are
+// cached; failures are dropped so a transient getContactById hiccup doesn't
+// trap the chat in "user_has_no_state" until the seller restarts.
 const lidCache: WeakMap<SellerInstance, Map<string, string>> = new WeakMap();
 
 /**
@@ -61,10 +63,13 @@ async function resolveToCus(instance: SellerInstance, raw: string): Promise<stri
             cache.set(id, resolved);
             return resolved;
         }
+        logger.debug(`[BOT_PANEL][${instance.sellerId}] getContactById(${id}) returned no number — will retry on next tick`);
     } catch (e: any) {
         logger.warn(`[BOT_PANEL][${instance.sellerId}] LID resolve failed for ${id}: ${e.message}`);
     }
-    return id; // fall through — caller will report user_has_no_state which is accurate
+    // Don't cache the failure — the next tick will retry and eventually
+    // succeed once WA Web finishes populating its contact store.
+    return id;
 }
 
 // Fields from UserState exposed to the panel. Kept lean to minimise payload
