@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import RFB from '@novnc/novnc/lib/rfb.js';
 import { useSeller } from '../../context/SellerContext';
 import { useAuth } from '../../context/AuthContext';
-import { AlertTriangle, Wifi, WifiOff, ExternalLink, Users, Clock, Maximize2, Minimize2, Clipboard } from 'lucide-react';
+import { AlertTriangle, Wifi, WifiOff, ExternalLink, Users, Clock, Maximize2, Minimize2, Clipboard, Copy, Send, X } from 'lucide-react';
 
 function apiBase() {
     // Dev runs Vite on :3000 and server on :3001; prod serves both from same host.
@@ -38,6 +38,9 @@ export default function WhatsappViewerView({ standalone = false, sellerIdOverrid
     const [viewerStatus, setViewerStatus] = useState(null); // { max, activeSellers, headfulCount, atCapacity }
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [clipboardHint, setClipboardHint] = useState(null); // {kind, msg} | null
+    const [outgoingText, setOutgoingText] = useState(''); // "Mandar al chat"
+    const [incomingText, setIncomingText] = useState(''); // "Copiado desde el chat"
+    const [clipPanelOpen, setClipPanelOpen] = useState(false); // standalone drawer
     const pollTimerRef = useRef(null);
     const attemptRef = useRef(0);
     const clipboardHintTimerRef = useRef(null);
@@ -129,9 +132,12 @@ export default function WhatsappViewerView({ standalone = false, sellerIdOverrid
                 rfb.addEventListener('clipboard', async (e) => {
                     const text = e?.detail?.text;
                     if (!text) return;
+                    // Always show it in the panel so the user can manually copy.
+                    setIncomingText(text);
+                    // Best-effort: also write to the OS clipboard.
                     try {
                         await navigator.clipboard.writeText(text);
-                    } catch (_) { /* no permission / not focused — drop silently */ }
+                    } catch (_) { /* no permission / not focused — panel fallback still works */ }
                 });
                 rfbRef.current = rfb;
             } catch (e) {
@@ -221,49 +227,34 @@ export default function WhatsappViewerView({ standalone = false, sellerIdOverrid
         clipboardHintTimerRef.current = setTimeout(() => setClipboardHint(null), 2500);
     }, []);
 
-    // Explicit "Paste" action — also doubles as the permission primer. First
-    // click triggers the browser prompt; after that, the auto-sync effect
-    // below can read the clipboard silently.
-    const pasteFromLocal = useCallback(async () => {
+    // Push the textarea contents to the remote Chromium's clipboard.
+    // The user then focuses a WhatsApp input and presses Ctrl+V.
+    const sendOutgoing = useCallback(() => {
         const rfb = rfbRef.current;
-        if (!rfb) return;
+        if (!rfb) { showClipboardHint('error', 'Viewer no conectado'); return; }
+        const text = outgoingText;
+        if (!text.trim()) { showClipboardHint('info', 'Escribí o pegá algo primero'); return; }
         try {
-            const text = await navigator.clipboard.readText();
-            if (!text) { showClipboardHint('info', 'Clipboard local vacío'); return; }
             rfb.clipboardPasteFrom(text);
-            showClipboardHint('success', 'Portapapeles sincronizado');
+            showClipboardHint('success', 'Listo. En WhatsApp apretá Ctrl+V');
         } catch (_) {
-            showClipboardHint('error', 'Sin permiso de portapapeles');
+            showClipboardHint('error', 'No se pudo copiar al chat');
         }
-    }, [showClipboardHint]);
+    }, [outgoingText, showClipboardHint]);
 
-    // Best-effort auto-sync: push the local clipboard to the remote whenever
-    // the user brings focus back to the viewer. This way Ctrl+V inside
-    // WhatsApp Web pastes the latest local text without a detour through
-    // the "Pegar" button. Silently no-op if the browser hasn't been granted
-    // clipboard-read permission yet (the explicit button triggers that).
-    useEffect(() => {
-        const el = containerRef.current;
-        if (!el) return;
-        let lastPushAt = 0;
-        const push = async () => {
-            const now = Date.now();
-            if (now - lastPushAt < 500) return; // throttle: mouseenter fires often
-            lastPushAt = now;
-            const rfb = rfbRef.current;
-            if (!rfb) return;
-            try {
-                const text = await navigator.clipboard.readText();
-                if (text) rfb.clipboardPasteFrom(text);
-            } catch (_) { /* permission not granted yet — ignore */ }
-        };
-        el.addEventListener('mouseenter', push);
-        window.addEventListener('focus', push);
-        return () => {
-            el.removeEventListener('mouseenter', push);
-            window.removeEventListener('focus', push);
-        };
-    }, []);
+    // Copy the "incoming from chat" textarea to the local OS clipboard.
+    const copyIncoming = useCallback(async () => {
+        if (!incomingText.trim()) { showClipboardHint('info', 'Todavía no copiaste nada en el chat'); return; }
+        try {
+            await navigator.clipboard.writeText(incomingText);
+            showClipboardHint('success', 'Copiado a tu PC');
+        } catch (_) {
+            showClipboardHint('error', 'Seleccioná el texto y apretá Ctrl+C');
+        }
+    }, [incomingText, showClipboardHint]);
+
+    // Clipboard panel is the primary path — no flaky auto-sync. Users paste
+    // into the textarea, click "Copiar al chat", then Ctrl+V in WhatsApp.
 
     useEffect(() => () => {
         if (clipboardHintTimerRef.current) clearTimeout(clipboardHintTimerRef.current);
@@ -294,11 +285,12 @@ export default function WhatsappViewerView({ standalone = false, sellerIdOverrid
                 <div ref={screenRef} className="absolute inset-0" />
                 <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
                     <button
-                        onClick={pasteFromLocal}
-                        title="Pegar desde el portapapeles local"
-                        className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-slate-900/80 hover:bg-slate-800 text-slate-200 shadow-lg backdrop-blur"
+                        onClick={() => setClipPanelOpen(v => !v)}
+                        title="Abrir panel de copiar/pegar"
+                        className="inline-flex items-center gap-2 px-3 h-9 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-lg"
                     >
                         <Clipboard className="w-4 h-4" />
+                        Copiar / Pegar
                     </button>
                     <button
                         onClick={toggleFullscreen}
@@ -308,8 +300,21 @@ export default function WhatsappViewerView({ standalone = false, sellerIdOverrid
                         {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                     </button>
                 </div>
+                {clipPanelOpen && (
+                    <div className="absolute top-16 right-3 z-20 w-96 max-w-[calc(100vw-24px)]">
+                        <ClipboardPanel
+                            outgoing={outgoingText}
+                            setOutgoing={setOutgoingText}
+                            incoming={incomingText}
+                            setIncoming={setIncomingText}
+                            onSend={sendOutgoing}
+                            onCopy={copyIncoming}
+                            onClose={() => setClipPanelOpen(false)}
+                        />
+                    </div>
+                )}
                 {clipboardHint && (
-                    <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 z-10 px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg backdrop-blur ${
+                    <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 z-10 px-4 py-2 rounded-full text-sm font-semibold shadow-lg backdrop-blur ${
                         clipboardHint.kind === 'success' ? 'bg-emerald-500/90 text-white' :
                         clipboardHint.kind === 'error' ? 'bg-rose-500/90 text-white' :
                         'bg-slate-700/90 text-white'
@@ -356,12 +361,16 @@ export default function WhatsappViewerView({ standalone = false, sellerIdOverrid
                 </div>
                 <div className="flex items-center gap-2">
                     <button
-                        onClick={pasteFromLocal}
-                        title="Pegar desde el portapapeles local"
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-white shadow-sm"
+                        onClick={() => setClipPanelOpen(v => !v)}
+                        title="Mostrar u ocultar el panel de copiar y pegar"
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm ${
+                            clipPanelOpen
+                                ? 'bg-indigo-700 hover:bg-indigo-800 text-white'
+                                : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                        }`}
                     >
                         <Clipboard className="w-3.5 h-3.5" />
-                        Pegar
+                        {clipPanelOpen ? 'Cerrar copiar/pegar' : 'Copiar / Pegar'}
                     </button>
                     <button
                         onClick={toggleFullscreen}
@@ -373,10 +382,10 @@ export default function WhatsappViewerView({ standalone = false, sellerIdOverrid
                     </button>
                     <button
                         onClick={openInNewTab}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-600 hover:bg-slate-700 text-white shadow-sm"
                     >
                         <ExternalLink className="w-3.5 h-3.5" />
-                        Abrir en pestaña nueva
+                        Pestaña nueva
                     </button>
                 </div>
             </div>
@@ -392,8 +401,21 @@ export default function WhatsappViewerView({ standalone = false, sellerIdOverrid
                 {status === 'queued' && (
                     <QueueOverlay sellerId={sellerId} viewerStatus={viewerStatus} />
                 )}
+                {clipPanelOpen && (
+                    <div className="absolute top-3 right-3 z-20 w-96 max-w-[calc(100%-24px)]">
+                        <ClipboardPanel
+                            outgoing={outgoingText}
+                            setOutgoing={setOutgoingText}
+                            incoming={incomingText}
+                            setIncoming={setIncomingText}
+                            onSend={sendOutgoing}
+                            onCopy={copyIncoming}
+                            onClose={() => setClipPanelOpen(false)}
+                        />
+                    </div>
+                )}
                 {clipboardHint && (
-                    <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 z-10 px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg backdrop-blur ${
+                    <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 z-10 px-4 py-2 rounded-full text-sm font-semibold shadow-lg backdrop-blur ${
                         clipboardHint.kind === 'success' ? 'bg-emerald-500/90 text-white' :
                         clipboardHint.kind === 'error' ? 'bg-rose-500/90 text-white' :
                         'bg-slate-700/90 text-white'
@@ -401,6 +423,79 @@ export default function WhatsappViewerView({ standalone = false, sellerIdOverrid
                         {clipboardHint.msg}
                     </div>
                 )}
+            </div>
+        </div>
+    );
+}
+
+function ClipboardPanel({
+    outgoing, setOutgoing, incoming, setIncoming,
+    onSend, onCopy, onClose, compact = false,
+}) {
+    return (
+        <div className={`rounded-xl border shadow-lg bg-white dark:bg-slate-800 ${
+            compact
+                ? 'border-slate-300 dark:border-slate-600 p-3'
+                : 'border-indigo-200 dark:border-indigo-700 p-4'
+        }`}>
+            <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                    <Clipboard className="w-5 h-5 text-indigo-600" />
+                    <h3 className="font-bold text-slate-800 dark:text-slate-100">
+                        Copiar y pegar
+                    </h3>
+                </div>
+                {onClose && (
+                    <button
+                        onClick={onClose}
+                        className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500"
+                        title="Cerrar"
+                    >
+                        <X className="w-4 h-4" />
+                    </button>
+                )}
+            </div>
+
+            {/* PC -> WhatsApp */}
+            <div className="mb-3">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    1. Pegá acá el texto que querés mandar al chat
+                </label>
+                <textarea
+                    value={outgoing}
+                    onChange={e => setOutgoing(e.target.value)}
+                    placeholder="Hacé click acá y apretá Ctrl+V (o escribí)"
+                    rows={3}
+                    className="w-full px-3 py-2 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                />
+                <button
+                    onClick={onSend}
+                    className="mt-2 w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow"
+                >
+                    <Send className="w-4 h-4" />
+                    Copiar al chat (después apretá Ctrl+V en WhatsApp)
+                </button>
+            </div>
+
+            {/* WhatsApp -> PC */}
+            <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    2. Lo que copies en el chat aparece acá
+                </label>
+                <textarea
+                    value={incoming}
+                    onChange={e => setIncoming(e.target.value)}
+                    placeholder="Seleccioná texto en WhatsApp y apretá Ctrl+C"
+                    rows={3}
+                    className="w-full px-3 py-2 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                />
+                <button
+                    onClick={onCopy}
+                    className="mt-2 w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm shadow"
+                >
+                    <Copy className="w-4 h-4" />
+                    Copiar a mi PC
+                </button>
             </div>
         </div>
     );
