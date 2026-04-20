@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import RFB from '@novnc/novnc/lib/rfb.js';
 import { useSeller } from '../../context/SellerContext';
 import { useAuth } from '../../context/AuthContext';
-import { AlertTriangle, Wifi, WifiOff, ExternalLink, Users, Clock, Maximize2, Minimize2 } from 'lucide-react';
+import { AlertTriangle, Wifi, WifiOff, ExternalLink, Users, Clock, Maximize2, Minimize2, Clipboard } from 'lucide-react';
 
 function apiBase() {
     // Dev runs Vite on :3000 and server on :3001; prod serves both from same host.
@@ -37,8 +37,10 @@ export default function WhatsappViewerView({ standalone = false, sellerIdOverrid
     const [errorMsg, setErrorMsg] = useState(null);
     const [viewerStatus, setViewerStatus] = useState(null); // { max, activeSellers, headfulCount, atCapacity }
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [clipboardHint, setClipboardHint] = useState(null); // {kind, msg} | null
     const pollTimerRef = useRef(null);
     const attemptRef = useRef(0);
+    const clipboardHintTimerRef = useRef(null);
 
     const fetchViewerStatus = useCallback(async () => {
         const token = localStorage.getItem('token');
@@ -119,6 +121,17 @@ export default function WhatsappViewerView({ standalone = false, sellerIdOverrid
                     if (cancelled) return;
                     setStatus('error');
                     setErrorMsg(e?.detail?.reason || 'Falla de seguridad');
+                });
+                // Remote → local clipboard: when someone copies text inside the
+                // bot's Chromium, x11vnc forwards it and noVNC fires 'clipboard'.
+                // Writing to navigator.clipboard needs a user gesture the first
+                // time; subsequent writes in the same page session succeed.
+                rfb.addEventListener('clipboard', async (e) => {
+                    const text = e?.detail?.text;
+                    if (!text) return;
+                    try {
+                        await navigator.clipboard.writeText(text);
+                    } catch (_) { /* no permission / not focused — drop silently */ }
                 });
                 rfbRef.current = rfb;
             } catch (e) {
@@ -202,6 +215,60 @@ export default function WhatsappViewerView({ standalone = false, sellerIdOverrid
         } catch (_) { /* user denied or unsupported */ }
     }, []);
 
+    const showClipboardHint = useCallback((kind, msg) => {
+        setClipboardHint({ kind, msg });
+        if (clipboardHintTimerRef.current) clearTimeout(clipboardHintTimerRef.current);
+        clipboardHintTimerRef.current = setTimeout(() => setClipboardHint(null), 2500);
+    }, []);
+
+    // Explicit "Paste" action — also doubles as the permission primer. First
+    // click triggers the browser prompt; after that, the auto-sync effect
+    // below can read the clipboard silently.
+    const pasteFromLocal = useCallback(async () => {
+        const rfb = rfbRef.current;
+        if (!rfb) return;
+        try {
+            const text = await navigator.clipboard.readText();
+            if (!text) { showClipboardHint('info', 'Clipboard local vacío'); return; }
+            rfb.clipboardPasteFrom(text);
+            showClipboardHint('success', 'Portapapeles sincronizado');
+        } catch (_) {
+            showClipboardHint('error', 'Sin permiso de portapapeles');
+        }
+    }, [showClipboardHint]);
+
+    // Best-effort auto-sync: push the local clipboard to the remote whenever
+    // the user brings focus back to the viewer. This way Ctrl+V inside
+    // WhatsApp Web pastes the latest local text without a detour through
+    // the "Pegar" button. Silently no-op if the browser hasn't been granted
+    // clipboard-read permission yet (the explicit button triggers that).
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
+        let lastPushAt = 0;
+        const push = async () => {
+            const now = Date.now();
+            if (now - lastPushAt < 500) return; // throttle: mouseenter fires often
+            lastPushAt = now;
+            const rfb = rfbRef.current;
+            if (!rfb) return;
+            try {
+                const text = await navigator.clipboard.readText();
+                if (text) rfb.clipboardPasteFrom(text);
+            } catch (_) { /* permission not granted yet — ignore */ }
+        };
+        el.addEventListener('mouseenter', push);
+        window.addEventListener('focus', push);
+        return () => {
+            el.removeEventListener('mouseenter', push);
+            window.removeEventListener('focus', push);
+        };
+    }, []);
+
+    useEffect(() => () => {
+        if (clipboardHintTimerRef.current) clearTimeout(clipboardHintTimerRef.current);
+    }, []);
+
     if (!user?.canViewWaWeb) {
         return (
             <div className="p-8 flex flex-col items-center justify-center text-slate-500">
@@ -225,13 +292,31 @@ export default function WhatsappViewerView({ standalone = false, sellerIdOverrid
         return (
             <div ref={containerRef} className="w-screen h-screen bg-black relative overflow-hidden">
                 <div ref={screenRef} className="absolute inset-0" />
-                <button
-                    onClick={toggleFullscreen}
-                    title={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
-                    className="absolute top-3 right-3 z-10 inline-flex items-center justify-center w-9 h-9 rounded-full bg-slate-900/80 hover:bg-slate-800 text-slate-200 shadow-lg backdrop-blur"
-                >
-                    {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-                </button>
+                <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
+                    <button
+                        onClick={pasteFromLocal}
+                        title="Pegar desde el portapapeles local"
+                        className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-slate-900/80 hover:bg-slate-800 text-slate-200 shadow-lg backdrop-blur"
+                    >
+                        <Clipboard className="w-4 h-4" />
+                    </button>
+                    <button
+                        onClick={toggleFullscreen}
+                        title={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+                        className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-slate-900/80 hover:bg-slate-800 text-slate-200 shadow-lg backdrop-blur"
+                    >
+                        {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                    </button>
+                </div>
+                {clipboardHint && (
+                    <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 z-10 px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg backdrop-blur ${
+                        clipboardHint.kind === 'success' ? 'bg-emerald-500/90 text-white' :
+                        clipboardHint.kind === 'error' ? 'bg-rose-500/90 text-white' :
+                        'bg-slate-700/90 text-white'
+                    }`}>
+                        {clipboardHint.msg}
+                    </div>
+                )}
                 {status === 'queued' && (
                     <QueueOverlay sellerId={sellerId} viewerStatus={viewerStatus} fullscreen />
                 )}
@@ -271,6 +356,14 @@ export default function WhatsappViewerView({ standalone = false, sellerIdOverrid
                 </div>
                 <div className="flex items-center gap-2">
                     <button
+                        onClick={pasteFromLocal}
+                        title="Pegar desde el portapapeles local"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-white shadow-sm"
+                    >
+                        <Clipboard className="w-3.5 h-3.5" />
+                        Pegar
+                    </button>
+                    <button
                         onClick={toggleFullscreen}
                         title={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white shadow-sm"
@@ -298,6 +391,15 @@ export default function WhatsappViewerView({ standalone = false, sellerIdOverrid
                 <div ref={screenRef} className="absolute inset-0" />
                 {status === 'queued' && (
                     <QueueOverlay sellerId={sellerId} viewerStatus={viewerStatus} />
+                )}
+                {clipboardHint && (
+                    <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 z-10 px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg backdrop-blur ${
+                        clipboardHint.kind === 'success' ? 'bg-emerald-500/90 text-white' :
+                        clipboardHint.kind === 'error' ? 'bg-rose-500/90 text-white' :
+                        'bg-slate-700/90 text-white'
+                    }`}>
+                        {clipboardHint.msg}
+                    </div>
                 )}
             </div>
         </div>
