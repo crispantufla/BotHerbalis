@@ -9,6 +9,19 @@ function apiBase() {
     return import.meta.env?.VITE_API_URL || '';
 }
 
+// Convert a Unicode string into a "binary string" where each char is one
+// UTF-8 byte (0x00-0xFF). noVNC's clipboardPasteFrom fallback sends the
+// raw charCodeAt() of each char; if we pass a plain JS string with "é",
+// it ships a single Latin-1 byte 0xE9, but x11vnc/Chromium read the
+// CLIPBOARD as UTF-8 → invalid sequence → `�`. Pre-encoding to UTF-8
+// bytes makes the wire stream valid UTF-8 end to end.
+function toUtf8BinaryString(str) {
+    const bytes = new TextEncoder().encode(str);
+    let s = '';
+    for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    return s;
+}
+
 function timeAgo(ts) {
     if (!ts) return '—';
     const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
@@ -235,7 +248,7 @@ export default function WhatsappViewerView({ standalone = false, sellerIdOverrid
         try {
             const text = await navigator.clipboard.readText();
             if (!text) { showClipboardHint('info', 'Portapapeles vacío'); return; }
-            rfb.clipboardPasteFrom(text);
+            rfb.clipboardPasteFrom(toUtf8BinaryString(text));
             showClipboardHint('success', 'Portapapeles sincronizado');
         } catch (_) {
             showClipboardHint('error', 'Sin permiso de portapapeles');
@@ -258,16 +271,42 @@ export default function WhatsappViewerView({ standalone = false, sellerIdOverrid
         } catch (_) { return false; }
     }, []);
 
-    // Force Ctrl+C in the remote. User must have text selected in Chromium
-    // first. x11vnc will forward the resulting clipboard change back to us
-    // via the 'clipboard' event, which then writes to navigator.clipboard.
-    const forceCopy = useCallback(() => {
+    // Force Ctrl+C in the remote and wait for x11vnc to forward the new
+    // clipboard back; then write it into the user's OS clipboard.
+    // Explicit wait-for-event (instead of relying on the global handler)
+    // keeps everything inside the button's click promise chain, so Chrome
+    // still considers the document "focused" for navigator.clipboard.writeText.
+    const forceCopy = useCallback(async () => {
         const rfb = rfbRef.current;
         if (!rfb) { showClipboardHint('error', 'Viewer no conectado'); return; }
-        if (sendCtrlCombo(0x0063, 'KeyC')) {
-            showClipboardHint('success', 'Ctrl+C enviado al chat');
-        } else {
+
+        // Register a one-shot clipboard listener BEFORE firing Ctrl+C so we
+        // can't miss a fast reply.
+        let handler;
+        const textPromise = new Promise((resolve) => {
+            handler = (e) => resolve(e?.detail?.text || '');
+            rfb.addEventListener('clipboard', handler);
+        });
+        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 2000));
+
+        if (!sendCtrlCombo(0x0063, 'KeyC')) {
+            rfb.removeEventListener('clipboard', handler);
             showClipboardHint('error', 'No se pudo enviar Ctrl+C');
+            return;
+        }
+
+        const text = await Promise.race([textPromise, timeoutPromise]);
+        rfb.removeEventListener('clipboard', handler);
+
+        if (!text) {
+            showClipboardHint('error', 'Sin texto — ¿seleccionaste algo primero?');
+            return;
+        }
+        try {
+            await navigator.clipboard.writeText(text);
+            showClipboardHint('success', 'Copiado a tu PC');
+        } catch (err) {
+            showClipboardHint('error', `Sin permiso de portapapeles: ${err?.message || ''}`);
         }
     }, [sendCtrlCombo, showClipboardHint]);
 
@@ -279,7 +318,7 @@ export default function WhatsappViewerView({ standalone = false, sellerIdOverrid
         if (!rfb) { showClipboardHint('error', 'Viewer no conectado'); return; }
         try {
             const text = await navigator.clipboard.readText();
-            if (text) rfb.clipboardPasteFrom(text);
+            if (text) rfb.clipboardPasteFrom(toUtf8BinaryString(text));
         } catch (_) { /* permission not granted — paste what remote already has */ }
         // Short delay so x11vnc absorbs the clipboard update before Ctrl+V
         // fires (otherwise Chromium pastes the previous remote clipboard).
