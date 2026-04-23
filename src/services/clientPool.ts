@@ -78,6 +78,10 @@ class ClientPool {
     private io: any = null;
     private redlock: any = null;
     private watchdogInterval: ReturnType<typeof setInterval> | null = null;
+    private nightModeInterval: ReturnType<typeof setInterval> | null = null;
+    // Sellers que fueron detenidos por el night-mode — al salir de la ventana
+    // los re-arrancamos; los que paró un admin a mano NO se tocan.
+    private nightStoppedSellers: Set<string> = new Set();
 
     setIo(io: any) { this.io = io; }
     setRedlock(redlock: any) { this.redlock = redlock; }
@@ -202,8 +206,7 @@ class ClientPool {
                 args: [
                     '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
                     '--disable-accelerated-2d-canvas', '--disable-gpu',
-                    '--disable-features=IsolateOrigins,site-per-process',
-                    '--no-first-run', '--disable-features=NetworkService', '--no-experiments',
+                    '--no-first-run', '--no-experiments',
                     '--ignore-certificate-errors', '--disable-extensions',
                     '--disable-background-networking', '--disable-background-timer-throttling',
                     '--disable-backgrounding-occluded-windows',
@@ -214,12 +217,18 @@ class ClientPool {
                     // Without these, 6 Chrome = ~90 processes → EAGAIN on fork().
                     '--renderer-process-limit=1',      // 1 renderer instead of ~4-6
                     '--disable-site-isolation-trials',  // don't spawn extra renderer per origin
-                    // Memory limits per Chromium — prevent one instance from starving others
-                    '--js-flags=--max-old-space-size=512',
+                    // WA Web rara vez usa >150MB de heap — 256 es holgado y ahorra ~50 MB vs 512.
+                    '--js-flags=--max-old-space-size=256',
+                    // Free cached tiles/images when the tab is idle.
+                    '--aggressive-cache-discard',
+                    // Silenciar subsistemas que WA Web no usa.
+                    '--mute-audio', '--disable-translate', '--disable-speech-api',
+                    // Un único --disable-features consolidado (Chromium solo lee uno).
+                    '--disable-features=IsolateOrigins,site-per-process,NetworkService,TranslateUI,MediaRouter,DialMediaRouteProvider,OptimizationHints,AudioServiceOutOfProcess',
                     // Chromium must fill the Xvfb screen exactly — there's no WM to maximise it.
                     // --kiosk hides tabs/address bar; --disable-infobars kills residual yellow bars.
                     ...(vnc ? [
-                        '--window-size=1920,1080',
+                        '--window-size=1366,768',
                         '--window-position=0,0',
                         '--kiosk',
                         '--disable-infobars',
@@ -666,6 +675,7 @@ class ClientPool {
 
     async stopAll(): Promise<void> {
         if (this.watchdogInterval) clearInterval(this.watchdogInterval);
+        if (this.nightModeInterval) { clearInterval(this.nightModeInterval); this.nightModeInterval = null; }
         await Promise.all(Array.from(this.instances.keys()).map(id => this.stopSeller(id)));
     }
 
@@ -678,6 +688,77 @@ class ClientPool {
         }
         // Start watchdog after IO is ready (all sellers registered by now)
         this.startWatchdog();
+        this.startNightMode();
+    }
+
+    /**
+     * Night-mode: apaga Chromium de 2 a 8 AM hora Argentina.
+     * A esa franja casi no entran mensajes; mantener 8 Chromiums prendidos
+     * cuesta ~4 GB de RAM para nada. Los reiniciamos a las 8 AM.
+     *
+     * No toca sellers en modo headful (alguien podría estar viendo el VNC)
+     * ni sellers que el admin haya detenido manualmente.
+     *
+     * Se puede deshabilitar con DISABLE_NIGHT_MODE=true.
+     */
+    private startNightMode(): void {
+        if (this.nightModeInterval) return;
+        if (process.env.DISABLE_NIGHT_MODE === 'true') {
+            logger.info('[NIGHT] Disabled via DISABLE_NIGHT_MODE=true');
+            return;
+        }
+        const CHECK_MS = 60 * 1000; // 1 min
+
+        const getArHour = (): number => {
+            // Intl es lo más simple y no trae dependencia nueva
+            const parts = new Intl.DateTimeFormat('en-US', {
+                timeZone: 'America/Argentina/Buenos_Aires',
+                hour: 'numeric',
+                hour12: false,
+            }).formatToParts(new Date());
+            const h = parts.find(p => p.type === 'hour')?.value ?? '0';
+            return parseInt(h, 10);
+        };
+
+        const isNightWindow = (): boolean => {
+            const h = getArHour();
+            return h >= 2 && h < 8; // [2:00, 8:00) AR
+        };
+
+        const tick = async () => {
+            try {
+                const night = isNightWindow();
+                if (night) {
+                    for (const [sellerId, instance] of this.instances) {
+                        if (instance.headful) continue; // no matar viewers activos
+                        if (this.nightStoppedSellers.has(sellerId)) continue;
+                        logger.info(`[NIGHT] Stopping ${sellerId} (2-8 AM AR window)`);
+                        this.nightStoppedSellers.add(sellerId);
+                        this.stopSeller(sellerId).catch(e =>
+                            logger.error(`[NIGHT] stopSeller(${sellerId}) failed: ${e.message}`)
+                        );
+                    }
+                } else if (this.nightStoppedSellers.size > 0) {
+                    const toWake = Array.from(this.nightStoppedSellers);
+                    this.nightStoppedSellers.clear();
+                    logger.info(`[NIGHT] Night window ended — waking ${toWake.length} seller(s)`);
+                    for (const sellerId of toWake) {
+                        if (!this.knownSellers.has(sellerId)) continue;
+                        // ensureStarted serializa los launches via initQueue
+                        this.ensureStarted(sellerId).catch(e =>
+                            logger.error(`[NIGHT] ensureStarted(${sellerId}) failed: ${e.message}`)
+                        );
+                    }
+                }
+            } catch (e: any) {
+                logger.error(`[NIGHT] tick error: ${e.message}`);
+            }
+        };
+
+        this.nightModeInterval = setInterval(tick, CHECK_MS);
+        logger.info('[NIGHT] Night-mode scheduler started (sleeps 2-8 AM AR)');
+        // Arranca un tick inmediato por si el proceso bootea dentro de la ventana
+        tick().catch(() => {});
     }
 
     /**

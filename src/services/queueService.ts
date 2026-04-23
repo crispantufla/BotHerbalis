@@ -80,7 +80,9 @@ export function createWorker(sellerId: string, dependencies: any): Worker {
         }
     }, {
         connection: workerConn as any,
-        concurrency: 3,
+        // Concurrency 1 — messageHandler ya debouncea, no hay paralelismo real
+        // que aprovechar. Bajar de 3 a 1 ahorra ~20 MB por seller sin coste.
+        concurrency: 1,
         settings: {
             backoffStrategy: (attemptsMade: number) => {
                 const MAX_BACKOFF_MS = 5 * 60 * 1000;

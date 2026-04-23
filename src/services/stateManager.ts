@@ -39,8 +39,11 @@ export interface SellerStateManager {
 export function createStateManager(sellerId: string, dataDir: string): SellerStateManager {
     const stateFile = path.join(dataDir, `persistence_${sellerId}.json`);
 
-    // Per-seller NodeCache (30-day TTL, no cloning)
-    const userCache = new NodeCache({ stdTTL: 2592000, checkperiod: 3600, useClones: false });
+    // Per-seller NodeCache (7-day TTL, capped size, no cloning).
+    // 30 days × thousands of users × 8 sellers se iba de RAM sin razón —
+    // el cliente que no escribe en una semana no necesita estar hot en memoria,
+    // se rehidrata desde Postgres al próximo mensaje.
+    const userCache = new NodeCache({ stdTTL: 604800, checkperiod: 3600, useClones: false, maxKeys: 5000 });
     userCache.on('expired', (key: string) => {
         logger.info(`[CACHE][${sellerId}] User state expired for ${key}`);
     });

@@ -28,9 +28,10 @@ interface SellerVnc {
 const ENABLED = process.env.ENABLE_VNC === 'true';
 const DISPLAY_BASE = 99;
 const PORT_BASE = 5900;
-// 1920x1080 matches common widescreen monitors, so the viewer has less
-// letterboxing. Override with VNC_SCREEN_SIZE if a smaller footprint is preferred.
-const SCREEN_SIZE = process.env.VNC_SCREEN_SIZE || '1920x1080x24';
+// 1366x768 is half the framebuffer of 1920x1080 (~3 MB vs ~6 MB) and aligns
+// with the typical admin laptop viewport — less letterboxing than it looks.
+// Override with VNC_SCREEN_SIZE if you need the full 1080p surface.
+const SCREEN_SIZE = process.env.VNC_SCREEN_SIZE || '1366x768x24';
 
 class VncManager {
     private sessions: Map<string, SellerVnc> = new Map();
