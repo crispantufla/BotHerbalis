@@ -591,6 +591,79 @@ module.exports = (clientPool) => {
         }
     });
 
+    // GET /analytics/retries — métrica 2 (histograma de retryIndex por step)
+    router.get('/analytics/retries', ...withSeller(clientPool), async (req, res) => {
+        try {
+            const { from, to } = parseDateRange(req);
+            const instanceId = getInstanceId(req);
+            const where = { at: { gte: from, lte: to } };
+            if (instanceId) where.sellerId = instanceId;
+
+            const events = await prisma.messageEvent.findMany({
+                where,
+                select: { step: true, retryIndex: true },
+            });
+
+            // Bucketizar retryIndex: 0 (primer intento), 1 (re-pregunta), 2-3, 4+
+            const byStep = new Map();
+            for (const e of events) {
+                if (!byStep.has(e.step)) {
+                    byStep.set(e.step, { step: e.step, b0: 0, b1: 0, b2_3: 0, b4plus: 0, total: 0 });
+                }
+                const g = byStep.get(e.step);
+                g.total++;
+                if (e.retryIndex === 0) g.b0++;
+                else if (e.retryIndex === 1) g.b1++;
+                else if (e.retryIndex <= 3) g.b2_3++;
+                else g.b4plus++;
+            }
+
+            res.json({
+                from, to,
+                byStep: Array.from(byStep.values()).map(g => ({
+                    ...g,
+                    retryRate: g.total > 0 ? parseFloat((((g.total - g.b0) / g.total) * 100).toFixed(1)) : 0,
+                })).sort((a, b) => b.retryRate - a.retryRate),
+            });
+        } catch (e) {
+            logger.error('🔴 [ANALYTICS] retries:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // GET /analytics/ai-fallback — métrica 4 (aiCallCount / messageCount por step)
+    router.get('/analytics/ai-fallback', ...withSeller(clientPool), async (req, res) => {
+        try {
+            const { from, to } = parseDateRange(req);
+            const instanceId = getInstanceId(req);
+            const where = { enteredAt: { gte: from, lte: to } };
+            if (instanceId) where.sellerId = instanceId;
+
+            const rows = await prisma.funnelEvent.groupBy({
+                by: ['stepTo'],
+                where,
+                _sum: { messageCount: true, aiCallCount: true },
+            });
+
+            res.json({
+                from, to,
+                byStep: rows.map(r => {
+                    const msgs = r._sum.messageCount || 0;
+                    const aiCalls = r._sum.aiCallCount || 0;
+                    return {
+                        step: r.stepTo,
+                        messageCount: msgs,
+                        aiCallCount: aiCalls,
+                        aiFallbackRate: msgs > 0 ? parseFloat(((aiCalls / msgs) * 100).toFixed(1)) : 0,
+                    };
+                }).sort((a, b) => b.aiFallbackRate - a.aiFallbackRate),
+            });
+        } catch (e) {
+            logger.error('🔴 [ANALYTICS] ai-fallback:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     // GET /analytics/reentries — métrica 10
     router.get('/analytics/reentries', ...withSeller(clientPool), async (req, res) => {
         try {

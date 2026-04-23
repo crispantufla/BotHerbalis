@@ -214,10 +214,29 @@ export async function processSalesFlow(
 
     // Stash identity on state so _setStep / _pauseAndAlert pueden loguear
     // transiciones de funnel a DB sin cambiar las 59 firmas que ya existen.
-    (currentState as any)._ctx = {
+    const _ctx = {
         sellerId: dependencies.sellerId || (dependencies.sharedState as any)?.sellerId || process.env.INSTANCE_ID || 'default',
         phone: _cleanPhone(userId),
     };
+    (currentState as any)._ctx = _ctx;
+
+    // Envuelvo aiService.chat para inyectar sellerId/phone en APIContext y que
+    // ai.ts pueda registrar cada llamada a AI contra el FunnelEvent abierto.
+    // Se hace en una copia local de dependencies para NO contaminar al worker.
+    const origAi = dependencies.aiService;
+    if (origAi && typeof origAi.chat === 'function') {
+        const wrappedAi = new Proxy(origAi, {
+            get(target: any, prop: string) {
+                if (prop === 'chat') {
+                    return (text: string, context: any) =>
+                        target.chat(text, { ...context, sellerId: _ctx.sellerId, phone: _ctx.phone });
+                }
+                const v = target[prop];
+                return typeof v === 'function' ? v.bind(target) : v;
+            },
+        });
+        dependencies = { ...dependencies, aiService: wrappedAi };
+    }
 
     // --- NEW REQUIREMENT (Unconditional Post-Sale Stop) ---
     // If the user's step is 'completed', it means they are a past customer.
@@ -333,6 +352,20 @@ export async function processSalesFlow(
         }
         return await processSalesFlow(userId, text, userState, knowledge, dependencies, _recursionDepth + 1);
     }
+
+    // Analytics: registrar mensaje procesado. aiCalled se deja en false acá;
+    // FunnelEvent.aiCallCount ya se incrementó directamente en ai.ts si hubo
+    // llamada. Métrica 4 (caída a IA) se computa en el endpoint como
+    // aiCallCount / messageCount por step.
+    try {
+        const { logMessage } = require('../services/funnelLogger');
+        logMessage({
+            sellerId: _ctx.sellerId,
+            phone: _ctx.phone,
+            step: currentState.step,
+            matched: !!(stepResult && stepResult.matched),
+        }).catch(() => {});
+    } catch (e) { /* best effort */ }
 
     // 4. Safety Net / Fallback
     if (!stepResult || !stepResult.matched) {

@@ -45,7 +45,7 @@ const STEP_ORDER = [
 
 const TABS = [
     { id: 'funnel', label: 'Embudo', icon: TrendingDown },
-    { id: 'friction', label: 'Fricción', icon: AlertTriangle, disabled: true, soon: 'Fase 2' },
+    { id: 'friction', label: 'Fricción', icon: AlertTriangle },
     { id: 'conversion', label: 'Conversión', icon: Timer },
     { id: 'product', label: 'Producto', icon: Package, disabled: true, soon: 'Fase 4' },
     { id: 'tech', label: 'Técnico', icon: Cpu, disabled: true, soon: 'Fase 5' },
@@ -68,21 +68,27 @@ const FunnelAnalyticsView = () => {
     const [pauseAlerts, setPauseAlerts] = useState(null);
     const [ttc, setTtc] = useState(null);
     const [reentries, setReentries] = useState(null);
+    const [retries, setRetries] = useState(null);
+    const [aiFallback, setAiFallback] = useState(null);
 
     const fetchAll = useCallback(async () => {
         setLoading(true);
         try {
             const qs = `?days=${daysBack}`;
-            const [f, p, t, r] = await Promise.all([
+            const [f, p, t, r, ret, aif] = await Promise.all([
                 api.get('/api/analytics/funnel' + qs),
                 api.get('/api/analytics/pause-alerts' + qs),
                 api.get('/api/analytics/time-to-close' + qs),
                 api.get('/api/analytics/reentries' + qs),
+                api.get('/api/analytics/retries' + qs),
+                api.get('/api/analytics/ai-fallback' + qs),
             ]);
             setFunnel(f.data);
             setPauseAlerts(p.data);
             setTtc(t.data);
             setReentries(r.data);
+            setRetries(ret.data);
+            setAiFallback(aif.data);
         } catch (e) {
             toast.error('Error cargando analítica: ' + (e.response?.data?.error || e.message));
         } finally {
@@ -186,6 +192,8 @@ const FunnelAnalyticsView = () => {
                     pauseAlerts={pauseAlerts}
                     reentries={reentries}
                 />
+            ) : tab === 'friction' ? (
+                <FrictionTab retries={retries} aiFallback={aiFallback} pauseAlerts={pauseAlerts} />
             ) : tab === 'conversion' ? (
                 <ConversionTab ttc={ttc} />
             ) : null}
@@ -357,6 +365,102 @@ const ConversionTab = ({ ttc }) => {
                             </div>
                         );
                     })}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ─── TAB: FRICCIÓN ────────────────────────────────────────────
+const FrictionTab = ({ retries, aiFallback, pauseAlerts }) => {
+    // Merge todo por step para una sola tabla de fricción.
+    const merged = useMemo(() => {
+        const map = new Map();
+        const ensure = s => {
+            if (!map.has(s)) map.set(s, { step: s, retryRate: null, b0: 0, b1: 0, b2_3: 0, b4plus: 0, total: 0, pauseCount: 0, msgs: 0, aiCalls: 0, aiRate: null });
+            return map.get(s);
+        };
+        (retries?.byStep || []).forEach(r => {
+            const g = ensure(r.step);
+            g.retryRate = r.retryRate;
+            g.b0 = r.b0; g.b1 = r.b1; g.b2_3 = r.b2_3; g.b4plus = r.b4plus; g.total = r.total;
+        });
+        (aiFallback?.byStep || []).forEach(r => {
+            const g = ensure(r.step);
+            g.msgs = r.messageCount;
+            g.aiCalls = r.aiCallCount;
+            g.aiRate = r.aiFallbackRate;
+        });
+        (pauseAlerts?.byStep || []).forEach(r => {
+            const g = ensure(r.step);
+            g.pauseCount = r.count;
+        });
+        return Array.from(map.values())
+            .sort((a, b) => {
+                const ai = STEP_ORDER.indexOf(a.step);
+                const bi = STEP_ORDER.indexOf(b.step);
+                if (ai === -1 && bi === -1) return 0;
+                if (ai === -1) return 1;
+                if (bi === -1) return -1;
+                return ai - bi;
+            });
+    }, [retries, aiFallback, pauseAlerts]);
+
+    if (!merged.length) {
+        return (
+            <div className="text-center py-20 text-slate-400 dark:text-slate-500">
+                <AlertTriangle className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p className="text-sm">Sin datos de fricción en el rango seleccionado.</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-6">
+            {/* Leyenda */}
+            <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-xl p-4 text-xs text-slate-500 dark:text-slate-400">
+                <span className="font-medium text-slate-600 dark:text-slate-300">Cómo leer:</span>
+                {' '}Retries = mensajes donde el bot tuvo que re-preguntar lo mismo.
+                {' '}AI fallback = porcentaje de respuestas que no matchearon y cayeron a GPT.
+                {' '}Pausas = veces que el bot "se rindió" y alertó al admin.
+                {' '}Valores altos en rojo indican candidatos a mejorar.
+            </div>
+
+            {/* Tabla combinada */}
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400">
+                            <tr>
+                                <th className="text-left px-4 py-3 font-medium">Step</th>
+                                <th className="text-right px-4 py-3 font-medium">Mensajes</th>
+                                <th className="text-right px-4 py-3 font-medium">Retries %</th>
+                                <th className="text-right px-4 py-3 font-medium">Retry 2-3x</th>
+                                <th className="text-right px-4 py-3 font-medium">Retry 4+x</th>
+                                <th className="text-right px-4 py-3 font-medium">AI fallback %</th>
+                                <th className="text-right px-4 py-3 font-medium">Pausas</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                            {merged.map(g => (
+                                <tr key={g.step} className="hover:bg-slate-50 dark:hover:bg-slate-900/30">
+                                    <td className="px-4 py-3 text-slate-700 dark:text-slate-200 font-medium">{STEP_LABELS[g.step] || g.step}</td>
+                                    <td className="text-right px-4 py-3 text-slate-600 dark:text-slate-300">{g.total || g.msgs || 0}</td>
+                                    <td className={`text-right px-4 py-3 font-medium ${g.retryRate > 40 ? 'text-red-500' : g.retryRate > 20 ? 'text-amber-500' : 'text-slate-500'}`}>
+                                        {g.retryRate != null ? `${g.retryRate}%` : '—'}
+                                    </td>
+                                    <td className="text-right px-4 py-3 text-amber-500">{g.b2_3}</td>
+                                    <td className={`text-right px-4 py-3 font-medium ${g.b4plus > 0 ? 'text-red-500' : 'text-slate-400'}`}>{g.b4plus}</td>
+                                    <td className={`text-right px-4 py-3 font-medium ${g.aiRate > 60 ? 'text-red-500' : g.aiRate > 30 ? 'text-amber-500' : 'text-slate-500'}`}>
+                                        {g.aiRate != null ? `${g.aiRate}%` : '—'}
+                                    </td>
+                                    <td className={`text-right px-4 py-3 font-medium ${g.pauseCount > 5 ? 'text-red-500' : g.pauseCount > 0 ? 'text-amber-500' : 'text-slate-400'}`}>
+                                        {g.pauseCount || '—'}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>

@@ -122,6 +122,43 @@ export async function incrementAiCallCount(sellerId: string, phone: string): Pro
 }
 
 /**
+ * Registra un mensaje del usuario: calcula retryIndex como # de mensajes
+ * previos del mismo (seller, phone, step) en los últimos 30 min. Útil para
+ * medir "el bot repreguntó lo mismo N veces".
+ * También incrementa messageCount del FunnelEvent abierto.
+ */
+export async function logMessage(args: {
+    sellerId: string;
+    phone: string;
+    step: string;
+    matched: boolean;
+    aiCalled?: boolean;
+    priceObjection?: boolean;
+}): Promise<void> {
+    const { sellerId, phone, step, matched, aiCalled = false, priceObjection = false } = args;
+    if (!sellerId || !phone || !step) return;
+
+    try {
+        const since = new Date(Date.now() - 30 * 60 * 1000);
+        const retryIndex = await prisma.messageEvent.count({
+            where: { sellerId, phone, step, at: { gte: since } },
+        });
+
+        await prisma.messageEvent.create({
+            data: { sellerId, phone, step, matched, aiCalled, priceObjection, retryIndex },
+        });
+
+        // Incrementar messageCount en el FunnelEvent abierto
+        await prisma.funnelEvent.updateMany({
+            where: { sellerId, phone, exitedAt: null },
+            data: { messageCount: { increment: 1 } },
+        });
+    } catch (e: any) {
+        logger.warn(`[FUNNEL] logMessage failed: ${e.message}`);
+    }
+}
+
+/**
  * Cierra todos los FunnelEvent abiertos más viejos que `olderThanHours` horas
  * marcándolos como 'dropped'. Lo llama el scheduler cada 15 min.
  * Devuelve la cantidad de rows cerrados.

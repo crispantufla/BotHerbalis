@@ -102,6 +102,10 @@ export interface APIContext {
     step?: string;
     goal?: string;
     userState?: UserState;
+    // Analytics: si el caller pasa esto, logueamos una llamada a AI contra el
+    // FunnelEvent abierto del (seller, phone). Fire-and-forget, no bloquea.
+    sellerId?: string;
+    phone?: string;
 }
 
 export interface AIParsedResponse {
@@ -690,6 +694,14 @@ INSTRUCCIONES:
                 } catch (e: any) {
                     logger.warn(`[AI] Semantic cache lookup errored: ${e.message}`);
                 }
+            }
+
+            // Analytics: fire-and-forget — marca que este turn usó AI.
+            if (context.sellerId && context.phone) {
+                try {
+                    const { incrementAiCallCount } = require('./funnelLogger');
+                    incrementAiCallCount(context.sellerId, context.phone).catch(() => {});
+                } catch (e) { /* module not loaded — fine */ }
             }
 
             const chatModel = _getModelForStep(step);
