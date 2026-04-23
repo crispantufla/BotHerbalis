@@ -357,6 +357,13 @@ export async function processSalesFlow(
     // FunnelEvent.aiCallCount ya se incrementó directamente en ai.ts si hubo
     // llamada. Métrica 4 (caída a IA) se computa en el endpoint como
     // aiCallCount / messageCount por step.
+    //
+    // priceObjection: detector barato por regex (palabras frecuentes en ES-AR
+    // para "precio alto" / "no puedo pagar"). Los falsos positivos los lee el
+    // admin en bucket y decide refinar el patrón.
+    const priceObjectionRegex = /\b(caro|car[íi]simo|muy\s+caro|descuento|precio\s+alto|no\s+me\s+alcanza|no\s+tengo\s+plata|no\s+puedo\s+pagar|no\s+puedo\s+(?:comprar|hacer|costear)|costoso|muy\s+costoso|no\s+me\s+entran|no\s+me\s+da|est[aá]\s+dif[ií]cil|imposible\s+pagar|fuera\s+de\s+mi\s+presupuesto)\b/i;
+    const hasPriceObjection = priceObjectionRegex.test(normalizedText);
+
     try {
         const { logMessage } = require('../services/funnelLogger');
         logMessage({
@@ -364,6 +371,7 @@ export async function processSalesFlow(
             phone: _ctx.phone,
             step: currentState.step,
             matched: !!(stepResult && stepResult.matched),
+            priceObjection: hasPriceObjection,
         }).catch(() => {});
     } catch (e) { /* best effort */ }
 

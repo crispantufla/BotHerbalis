@@ -664,6 +664,191 @@ module.exports = (clientPool) => {
         }
     });
 
+    // GET /analytics/price-objections — métrica 6
+    router.get('/analytics/price-objections', ...withSeller(clientPool), async (req, res) => {
+        try {
+            const { from, to } = parseDateRange(req);
+            const instanceId = getInstanceId(req);
+            const where = { priceObjection: true, at: { gte: from, lte: to } };
+            if (instanceId) where.sellerId = instanceId;
+
+            const rows = await prisma.messageEvent.groupBy({
+                by: ['step'],
+                where,
+                _count: { _all: true },
+            });
+
+            // Total de mensajes por step en el mismo rango (para el %)
+            const totalWhere = { at: { gte: from, lte: to } };
+            if (instanceId) totalWhere.sellerId = instanceId;
+            const totalRows = await prisma.messageEvent.groupBy({
+                by: ['step'],
+                where: totalWhere,
+                _count: { _all: true },
+            });
+            const totalMap = Object.fromEntries(totalRows.map(r => [r.step, r._count._all]));
+
+            res.json({
+                from, to,
+                byStep: rows.map(r => {
+                    const total = totalMap[r.step] || 0;
+                    return {
+                        step: r.step,
+                        objectionCount: r._count._all,
+                        totalMessages: total,
+                        rate: total > 0 ? parseFloat(((r._count._all / total) * 100).toFixed(1)) : 0,
+                    };
+                }).sort((a, b) => b.objectionCount - a.objectionCount),
+            });
+        } catch (e) {
+            logger.error('🔴 [ANALYTICS] price-objections:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // GET /analytics/abandonment-by-hour — métrica 7
+    // Por cada FunnelEvent con exitType='dropped', tomar la hora (AR) de
+    // enteredAt y agrupar 24h.
+    router.get('/analytics/abandonment-by-hour', ...withSeller(clientPool), async (req, res) => {
+        try {
+            const { from, to } = parseDateRange(req);
+            const instanceId = getInstanceId(req);
+            const where = { exitType: 'dropped', exitedAt: { gte: from, lte: to } };
+            if (instanceId) where.sellerId = instanceId;
+
+            const events = await prisma.funnelEvent.findMany({
+                where,
+                select: { enteredAt: true },
+            });
+
+            const hourly = Array(24).fill(0);
+            for (const e of events) {
+                // Convertir UTC → AR (UTC-3, Argentina no tiene DST)
+                const arHour = (new Date(e.enteredAt).getUTCHours() - 3 + 24) % 24;
+                hourly[arHour]++;
+            }
+
+            res.json({
+                from, to,
+                total: events.length,
+                byHour: hourly.map((count, hour) => ({ hour, count })),
+            });
+        } catch (e) {
+            logger.error('🔴 [ANALYTICS] abandonment-by-hour:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // GET /analytics/product-mix — métrica 8
+    // Lee Order (no cancelada), parsea producto+plan desde el string "Cápsulas (60 días)".
+    router.get('/analytics/product-mix', ...withSeller(clientPool), async (req, res) => {
+        try {
+            const { from, to } = parseDateRange(req);
+            const instanceId = getInstanceId(req);
+            const where = { createdAt: { gte: from, lte: to }, status: { not: 'Cancelado' } };
+            if (instanceId) where.instanceId = instanceId;
+
+            const orders = await prisma.order.findMany({
+                where,
+                select: { products: true, totalPrice: true, paymentMethod: true },
+            });
+
+            const parseProduct = (s) => {
+                if (!s) return { product: 'Desconocido', plan: '?' };
+                const m = s.match(/^(C[áa]psulas|Gotas|Semillas)\s*\((\d+)\s*d[íi]as?\)/i);
+                if (!m) return { product: s, plan: '?' };
+                return { product: m[1].replace('á', 'á'), plan: `${m[2]}d` };
+            };
+
+            const normPayment = (p) => {
+                if (!p) return 'contrarembolso';
+                if (p === 'efectivo') return 'contrarembolso';
+                return p;
+            };
+
+            const agg = new Map();
+            for (const o of orders) {
+                const { product, plan } = parseProduct(o.products);
+                const pay = normPayment(o.paymentMethod);
+                const key = `${product}|${plan}|${pay}`;
+                if (!agg.has(key)) {
+                    agg.set(key, { product, plan, paymentMethod: pay, count: 0, revenue: 0 });
+                }
+                const g = agg.get(key);
+                g.count++;
+                g.revenue += o.totalPrice || 0;
+            }
+
+            const total = orders.length;
+            res.json({
+                from, to, total,
+                mix: Array.from(agg.values())
+                    .map(g => ({
+                        ...g,
+                        share: total > 0 ? parseFloat(((g.count / total) * 100).toFixed(1)) : 0,
+                        avgTicket: g.count > 0 ? Math.round(g.revenue / g.count) : 0,
+                    }))
+                    .sort((a, b) => b.count - a.count),
+            });
+        } catch (e) {
+            logger.error('🔴 [ANALYTICS] product-mix:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // GET /analytics/cache-hits — métrica 9
+    // Suma hits de AiSemanticCache por step y lo cruza con messageCount
+    // total del mismo step en el rango. El cache es global (no por seller),
+    // así que este endpoint ignora sellerId en la parte de cache.
+    router.get('/analytics/cache-hits', ...withSeller(clientPool), async (req, res) => {
+        try {
+            const { from, to } = parseDateRange(req);
+            const instanceId = getInstanceId(req);
+
+            // Cache hits: nota que `hits` es acumulativo y no tiene timestamp de cada hit,
+            // así que devolvemos el total actual + lastHit para contexto.
+            const cacheRows = await prisma.aiSemanticCache.groupBy({
+                by: ['step'],
+                _sum: { hits: true },
+                _count: { _all: true },
+            });
+
+            const msgWhere = { at: { gte: from, lte: to } };
+            if (instanceId) msgWhere.sellerId = instanceId;
+            const msgRows = await prisma.messageEvent.groupBy({
+                by: ['step'],
+                where: msgWhere,
+                _count: { _all: true },
+            });
+            const msgMap = Object.fromEntries(msgRows.map(r => [r.step, r._count._all]));
+
+            const allSteps = new Set([
+                ...cacheRows.map(r => r.step),
+                ...msgRows.map(r => r.step),
+            ]);
+
+            const byStep = [...allSteps].map(step => {
+                const hits = cacheRows.find(r => r.step === step)?._sum?.hits || 0;
+                const cached = cacheRows.find(r => r.step === step)?._count?._all || 0;
+                const msgs = msgMap[step] || 0;
+                return {
+                    step,
+                    cachedEntries: cached,
+                    totalHits: hits,
+                    messagesInRange: msgs,
+                    // Es un proxy — el `hits` es histórico (todo el tiempo),
+                    // no solo del rango. Se muestra como referencia.
+                    avgHitsPerEntry: cached > 0 ? parseFloat((hits / cached).toFixed(2)) : 0,
+                };
+            }).sort((a, b) => b.totalHits - a.totalHits);
+
+            res.json({ from, to, byStep });
+        } catch (e) {
+            logger.error('🔴 [ANALYTICS] cache-hits:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     // GET /analytics/reentries — métrica 10
     router.get('/analytics/reentries', ...withSeller(clientPool), async (req, res) => {
         try {

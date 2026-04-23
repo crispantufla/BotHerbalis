@@ -47,8 +47,8 @@ const TABS = [
     { id: 'funnel', label: 'Embudo', icon: TrendingDown },
     { id: 'friction', label: 'Fricción', icon: AlertTriangle },
     { id: 'conversion', label: 'Conversión', icon: Timer },
-    { id: 'product', label: 'Producto', icon: Package, disabled: true, soon: 'Fase 4' },
-    { id: 'tech', label: 'Técnico', icon: Cpu, disabled: true, soon: 'Fase 5' },
+    { id: 'product', label: 'Producto', icon: Package },
+    { id: 'tech', label: 'Técnico', icon: Cpu },
 ];
 
 function formatDur(sec) {
@@ -70,18 +70,26 @@ const FunnelAnalyticsView = () => {
     const [reentries, setReentries] = useState(null);
     const [retries, setRetries] = useState(null);
     const [aiFallback, setAiFallback] = useState(null);
+    const [priceObj, setPriceObj] = useState(null);
+    const [abandonment, setAbandonment] = useState(null);
+    const [productMix, setProductMix] = useState(null);
+    const [cacheHits, setCacheHits] = useState(null);
 
     const fetchAll = useCallback(async () => {
         setLoading(true);
         try {
             const qs = `?days=${daysBack}`;
-            const [f, p, t, r, ret, aif] = await Promise.all([
+            const [f, p, t, r, ret, aif, po, ab, pm, ch] = await Promise.all([
                 api.get('/api/analytics/funnel' + qs),
                 api.get('/api/analytics/pause-alerts' + qs),
                 api.get('/api/analytics/time-to-close' + qs),
                 api.get('/api/analytics/reentries' + qs),
                 api.get('/api/analytics/retries' + qs),
                 api.get('/api/analytics/ai-fallback' + qs),
+                api.get('/api/analytics/price-objections' + qs),
+                api.get('/api/analytics/abandonment-by-hour' + qs),
+                api.get('/api/analytics/product-mix' + qs),
+                api.get('/api/analytics/cache-hits' + qs),
             ]);
             setFunnel(f.data);
             setPauseAlerts(p.data);
@@ -89,6 +97,10 @@ const FunnelAnalyticsView = () => {
             setReentries(r.data);
             setRetries(ret.data);
             setAiFallback(aif.data);
+            setPriceObj(po.data);
+            setAbandonment(ab.data);
+            setProductMix(pm.data);
+            setCacheHits(ch.data);
         } catch (e) {
             toast.error('Error cargando analítica: ' + (e.response?.data?.error || e.message));
         } finally {
@@ -195,7 +207,11 @@ const FunnelAnalyticsView = () => {
             ) : tab === 'friction' ? (
                 <FrictionTab retries={retries} aiFallback={aiFallback} pauseAlerts={pauseAlerts} />
             ) : tab === 'conversion' ? (
-                <ConversionTab ttc={ttc} />
+                <ConversionTab ttc={ttc} priceObj={priceObj} abandonment={abandonment} />
+            ) : tab === 'product' ? (
+                <ProductTab mix={productMix} />
+            ) : tab === 'tech' ? (
+                <TechTab cache={cacheHits} aiFallback={aiFallback} />
             ) : null}
         </div>
     );
@@ -324,49 +340,100 @@ const FunnelTab = ({ orderedFunnel, maxEntered, pauseAlerts, reentries }) => {
 };
 
 // ─── TAB: CONVERSIÓN ────────────────────────────────────────────
-const ConversionTab = ({ ttc }) => {
-    if (!ttc || ttc.total === 0) {
-        return (
-            <div className="text-center py-20 text-slate-400 dark:text-slate-500">
-                <Clock className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p className="text-sm">Aún no hay cierres en el rango seleccionado.</p>
-            </div>
-        );
-    }
+const ConversionTab = ({ ttc, priceObj, abandonment }) => {
+    const maxHourCount = useMemo(
+        () => Math.max(1, ...(abandonment?.byHour?.map(h => h.count) || [0])),
+        [abandonment]
+    );
 
     return (
         <div className="space-y-6">
-            {/* KPI cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <KpiCard label="Cierres totales" value={ttc.total} />
-                <KpiCard label="Tiempo mediano (p50)" value={formatDur(ttc.p50)} hint="Mitad cerró antes" />
-                <KpiCard label="p90" value={formatDur(ttc.p90)} hint="90% cerró antes" />
-                <KpiCard label="p99" value={formatDur(ttc.p99)} hint="Casos más largos" />
-            </div>
+            {/* KPI cards de tiempo a cierre */}
+            {ttc && ttc.total > 0 ? (
+                <>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <KpiCard label="Cierres totales" value={ttc.total} />
+                        <KpiCard label="Tiempo mediano (p50)" value={formatDur(ttc.p50)} hint="Mitad cerró antes" />
+                        <KpiCard label="p90" value={formatDur(ttc.p90)} hint="90% cerró antes" />
+                        <KpiCard label="p99" value={formatDur(ttc.p99)} hint="Casos más largos" />
+                    </div>
 
-            {/* Histogram */}
-            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
-                <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-sm mb-4">Distribución del tiempo a cierre</h3>
-                <div className="space-y-2">
-                    {ttc.histogram.map(b => {
-                        const pct = ttc.total > 0 ? (b.count / ttc.total) * 100 : 0;
-                        return (
-                            <div key={b.label} className="flex items-center gap-3">
-                                <div className="w-20 text-xs text-slate-600 dark:text-slate-300">{b.label}</div>
-                                <div className="flex-1 relative h-6 bg-slate-100 dark:bg-slate-900 rounded-md overflow-hidden">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
+                        <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-sm mb-4">Distribución del tiempo a cierre</h3>
+                        <div className="space-y-2">
+                            {ttc.histogram.map(b => {
+                                const pct = ttc.total > 0 ? (b.count / ttc.total) * 100 : 0;
+                                return (
+                                    <div key={b.label} className="flex items-center gap-3">
+                                        <div className="w-20 text-xs text-slate-600 dark:text-slate-300">{b.label}</div>
+                                        <div className="flex-1 relative h-6 bg-slate-100 dark:bg-slate-900 rounded-md overflow-hidden">
+                                            <div
+                                                className="absolute inset-y-0 left-0 bg-gradient-to-r from-emerald-500 to-sky-500"
+                                                style={{ width: `${Math.max(2, pct)}%` }}
+                                            />
+                                        </div>
+                                        <div className="w-24 text-right text-xs text-slate-500 dark:text-slate-400">
+                                            {b.count} ({pct.toFixed(1)}%)
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </>
+            ) : (
+                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-8 shadow-sm text-center text-sm text-slate-400 dark:text-slate-500">
+                    Aún no hay cierres en el rango seleccionado.
+                </div>
+            )}
+
+            {/* Abandonos por hora (AR) */}
+            {abandonment && abandonment.total > 0 && (
+                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
+                    <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-sm mb-1">Abandonos por hora (Argentina)</h3>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mb-4">Hora en que el usuario envió su último mensaje antes de dejar de responder. Total: {abandonment.total}</p>
+                    <div className="flex items-end gap-1 h-32">
+                        {abandonment.byHour.map(h => {
+                            const heightPct = (h.count / maxHourCount) * 100;
+                            return (
+                                <div key={h.hour} className="flex-1 flex flex-col items-center gap-1" title={`${h.hour}:00 — ${h.count} abandonos`}>
+                                    <div className="flex-1 w-full flex items-end">
+                                        <div
+                                            className="w-full bg-gradient-to-t from-rose-500 to-orange-400 rounded-t-md transition-all"
+                                            style={{ height: `${Math.max(2, heightPct)}%` }}
+                                        />
+                                    </div>
+                                    <div className="text-[10px] text-slate-400 dark:text-slate-500">{h.hour}</div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
+            {/* Objeciones de precio por step */}
+            {priceObj && priceObj.byStep?.length > 0 && (
+                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
+                    <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-sm mb-1">Objeciones de precio por step</h3>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mb-4">Mensajes donde el usuario mencionó precio, descuento, o falta de plata</p>
+                    <div className="space-y-2">
+                        {priceObj.byStep.map(s => (
+                            <div key={s.step} className="flex items-center gap-3 text-sm">
+                                <div className="w-40 text-slate-600 dark:text-slate-300 truncate">{STEP_LABELS[s.step] || s.step}</div>
+                                <div className="flex-1 relative h-5 bg-slate-100 dark:bg-slate-900 rounded-md overflow-hidden">
                                     <div
-                                        className="absolute inset-y-0 left-0 bg-gradient-to-r from-emerald-500 to-sky-500"
-                                        style={{ width: `${Math.max(2, pct)}%` }}
+                                        className="absolute inset-y-0 left-0 bg-amber-400"
+                                        style={{ width: `${Math.min(100, s.rate)}%` }}
                                     />
                                 </div>
-                                <div className="w-24 text-right text-xs text-slate-500 dark:text-slate-400">
-                                    {b.count} ({pct.toFixed(1)}%)
+                                <div className="w-32 text-right text-xs text-slate-500 dark:text-slate-400">
+                                    {s.objectionCount} ({s.rate}%)
                                 </div>
                             </div>
-                        );
-                    })}
+                        ))}
+                    </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 };
@@ -457,6 +524,148 @@ const FrictionTab = ({ retries, aiFallback, pauseAlerts }) => {
                                     <td className={`text-right px-4 py-3 font-medium ${g.pauseCount > 5 ? 'text-red-500' : g.pauseCount > 0 ? 'text-amber-500' : 'text-slate-400'}`}>
                                         {g.pauseCount || '—'}
                                     </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ─── TAB: PRODUCTO ──────────────────────────────────────────────
+const ProductTab = ({ mix }) => {
+    if (!mix || mix.total === 0) {
+        return (
+            <div className="text-center py-20 text-slate-400 dark:text-slate-500">
+                <Package className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p className="text-sm">No hay órdenes cerradas en el rango seleccionado.</p>
+            </div>
+        );
+    }
+
+    const paymentLabel = (p) => ({
+        mercadopago: 'MercadoPago',
+        transferencia: 'Transferencia',
+        contrarembolso: 'Contrareembolso',
+    }[p] || p);
+
+    const formatArs = (n) => `$${Math.round(n).toLocaleString('es-AR').replace(/,/g, '.')}`;
+
+    // Totales por producto
+    const byProduct = mix.mix.reduce((acc, r) => {
+        if (!acc[r.product]) acc[r.product] = { count: 0, revenue: 0 };
+        acc[r.product].count += r.count;
+        acc[r.product].revenue += r.revenue;
+        return acc;
+    }, {});
+
+    return (
+        <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <KpiCard label="Órdenes totales" value={mix.total} />
+                {Object.entries(byProduct).slice(0, 3).map(([prod, g]) => (
+                    <KpiCard
+                        key={prod}
+                        label={prod}
+                        value={`${g.count} (${((g.count / mix.total) * 100).toFixed(0)}%)`}
+                        hint={formatArs(g.revenue)}
+                    />
+                ))}
+            </div>
+
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700">
+                    <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-sm">Mix de producto × plan × pago</h3>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400">
+                            <tr>
+                                <th className="text-left px-4 py-3 font-medium">Producto</th>
+                                <th className="text-left px-4 py-3 font-medium">Plan</th>
+                                <th className="text-left px-4 py-3 font-medium">Pago</th>
+                                <th className="text-right px-4 py-3 font-medium">Órdenes</th>
+                                <th className="text-right px-4 py-3 font-medium">Share</th>
+                                <th className="text-right px-4 py-3 font-medium">Ticket prom.</th>
+                                <th className="text-right px-4 py-3 font-medium">Ingreso</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                            {mix.mix.map((r, i) => (
+                                <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-900/30">
+                                    <td className="px-4 py-3 text-slate-700 dark:text-slate-200 font-medium">{r.product}</td>
+                                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{r.plan}</td>
+                                    <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{paymentLabel(r.paymentMethod)}</td>
+                                    <td className="text-right px-4 py-3 text-slate-700 dark:text-slate-200 font-medium">{r.count}</td>
+                                    <td className="text-right px-4 py-3 text-slate-500 dark:text-slate-400">{r.share}%</td>
+                                    <td className="text-right px-4 py-3 text-slate-500 dark:text-slate-400">{formatArs(r.avgTicket)}</td>
+                                    <td className="text-right px-4 py-3 text-emerald-600 dark:text-emerald-400 font-medium">{formatArs(r.revenue)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ─── TAB: TÉCNICO ───────────────────────────────────────────────
+const TechTab = ({ cache, aiFallback }) => {
+    const rows = useMemo(() => {
+        const map = new Map();
+        (cache?.byStep || []).forEach(r => {
+            map.set(r.step, { ...r, aiCalls: 0, messages: r.messagesInRange || 0 });
+        });
+        (aiFallback?.byStep || []).forEach(r => {
+            const existing = map.get(r.step) || { step: r.step, cachedEntries: 0, totalHits: 0, messagesInRange: 0, avgHitsPerEntry: 0 };
+            existing.aiCalls = r.aiCallCount;
+            existing.messages = r.messageCount;
+            map.set(r.step, existing);
+        });
+        return Array.from(map.values()).sort((a, b) => b.totalHits - a.totalHits);
+    }, [cache, aiFallback]);
+
+    if (!rows.length) {
+        return (
+            <div className="text-center py-20 text-slate-400 dark:text-slate-500">
+                <Cpu className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p className="text-sm">Sin datos técnicos en el rango seleccionado.</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-6">
+            <div className="bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 rounded-xl p-4 text-xs text-sky-700 dark:text-sky-300">
+                <strong>Tip:</strong> Steps con <strong>muchos AI calls</strong> y <strong>pocos cache hits</strong> son candidatos a mover FAQs frecuentes a reglas hardcodeadas
+                (o a pre-cachear respuestas). El `hits` del cache es histórico (no filtrado por rango de fechas), se muestra como referencia relativa.
+            </div>
+
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400">
+                            <tr>
+                                <th className="text-left px-4 py-3 font-medium">Step</th>
+                                <th className="text-right px-4 py-3 font-medium">Mensajes</th>
+                                <th className="text-right px-4 py-3 font-medium">AI calls</th>
+                                <th className="text-right px-4 py-3 font-medium">Cache entries</th>
+                                <th className="text-right px-4 py-3 font-medium">Total hits (histórico)</th>
+                                <th className="text-right px-4 py-3 font-medium">Hits / entry</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                            {rows.map(r => (
+                                <tr key={r.step} className="hover:bg-slate-50 dark:hover:bg-slate-900/30">
+                                    <td className="px-4 py-3 text-slate-700 dark:text-slate-200 font-medium">{STEP_LABELS[r.step] || r.step}</td>
+                                    <td className="text-right px-4 py-3 text-slate-600 dark:text-slate-300">{r.messages || 0}</td>
+                                    <td className="text-right px-4 py-3 text-indigo-600 dark:text-indigo-400">{r.aiCalls || 0}</td>
+                                    <td className="text-right px-4 py-3 text-slate-500 dark:text-slate-400">{r.cachedEntries || 0}</td>
+                                    <td className="text-right px-4 py-3 text-emerald-600 dark:text-emerald-400 font-medium">{r.totalHits || 0}</td>
+                                    <td className="text-right px-4 py-3 text-slate-500 dark:text-slate-400">{r.avgHitsPerEntry || 0}</td>
                                 </tr>
                             ))}
                         </tbody>
