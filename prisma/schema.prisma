@@ -139,6 +139,24 @@ model Account {
   @@index([role])
 }
 
+model FunnelEvent {
+  id           String   @id @default(uuid())
+  sellerId     String
+  phone        String
+  stepFrom     String?                       // null = first step (greeting)
+  stepTo       String
+  enteredAt    DateTime @default(now())
+  exitedAt     DateTime?
+  exitType     String?                        // advanced | back | paused | dropped | completed
+  messageCount Int      @default(0)
+  aiCallCount  Int      @default(0)
+
+  @@index([sellerId, enteredAt])
+  @@index([sellerId, stepTo])
+  @@index([phone, sellerId])
+  @@index([sellerId, exitedAt])
+}
+
 model WhatsAppSession {
   sellerId    String   @id              // matches instanceId across all tables
   status      String   @default("disconnected") // disconnected | qr_pending | connected

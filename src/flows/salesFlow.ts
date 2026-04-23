@@ -212,6 +212,13 @@ export async function processSalesFlow(
 
     const currentState = userState[userId];
 
+    // Stash identity on state so _setStep / _pauseAndAlert pueden loguear
+    // transiciones de funnel a DB sin cambiar las 59 firmas que ya existen.
+    (currentState as any)._ctx = {
+        sellerId: dependencies.sellerId || (dependencies.sharedState as any)?.sellerId || process.env.INSTANCE_ID || 'default',
+        phone: _cleanPhone(userId),
+    };
+
     // --- NEW REQUIREMENT (Unconditional Post-Sale Stop) ---
     // If the user's step is 'completed', it means they are a past customer.
     // Pause immediately and alert admin if not already paused.

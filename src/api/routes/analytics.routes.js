@@ -435,5 +435,189 @@ module.exports = (clientPool) => {
         }
     });
 
+    // ════════════════════════════════════════════════════════════════
+    // FUNNEL ANALYTICS — se alimenta de FunnelEvent
+    // ════════════════════════════════════════════════════════════════
+
+    // Helper común: rango [from, to) a partir de query params.
+    // Default: últimos 7 días, AR timezone.
+    function parseDateRange(req) {
+        const now = new Date();
+        const to = req.query.to ? new Date(req.query.to) : now;
+        const daysBack = Math.min(parseInt(req.query.days) || 7, 365);
+        const from = req.query.from
+            ? new Date(req.query.from)
+            : new Date(now.getTime() - daysBack * 24 * 3600 * 1000);
+        return { from, to };
+    }
+
+    // GET /analytics/funnel — métricas 1 (drop-off por step)
+    router.get('/analytics/funnel', ...withSeller(clientPool), async (req, res) => {
+        try {
+            const { from, to } = parseDateRange(req);
+            const instanceId = getInstanceId(req);
+            const where = { enteredAt: { gte: from, lte: to } };
+            if (instanceId) where.sellerId = instanceId;
+
+            const events = await prisma.funnelEvent.findMany({
+                where,
+                select: { stepTo: true, exitType: true, enteredAt: true, exitedAt: true },
+            });
+
+            // Agregar por stepTo
+            const byStep = new Map();
+            for (const e of events) {
+                const s = e.stepTo;
+                if (!byStep.has(s)) {
+                    byStep.set(s, { step: s, entered: 0, advanced: 0, back: 0, paused: 0, dropped: 0, completed: 0, open: 0, durations: [] });
+                }
+                const g = byStep.get(s);
+                g.entered++;
+                if (!e.exitType) g.open++;
+                else g[e.exitType] = (g[e.exitType] || 0) + 1;
+                if (e.exitedAt && e.enteredAt) {
+                    g.durations.push((new Date(e.exitedAt).getTime() - new Date(e.enteredAt).getTime()) / 1000);
+                }
+            }
+
+            const median = (arr) => {
+                if (!arr.length) return 0;
+                const sorted = [...arr].sort((a, b) => a - b);
+                return Math.round(sorted[Math.floor(sorted.length / 2)]);
+            };
+            const avg = (arr) => arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
+
+            const result = Array.from(byStep.values()).map(g => ({
+                step: g.step,
+                entered: g.entered,
+                advanced: g.advanced || 0,
+                back: g.back || 0,
+                paused: g.paused || 0,
+                dropped: g.dropped || 0,
+                completed: g.completed || 0,
+                stillOpen: g.open,
+                dropRate: g.entered ? parseFloat((((g.paused + g.dropped) / g.entered) * 100).toFixed(1)) : 0,
+                medianTimeSec: median(g.durations),
+                avgTimeSec: avg(g.durations),
+            }));
+
+            res.json({ from, to, steps: result });
+        } catch (e) {
+            logger.error('🔴 [ANALYTICS] funnel:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // GET /analytics/pause-alerts — métrica 3
+    router.get('/analytics/pause-alerts', ...withSeller(clientPool), async (req, res) => {
+        try {
+            const { from, to } = parseDateRange(req);
+            const instanceId = getInstanceId(req);
+            const where = { exitType: 'paused', exitedAt: { gte: from, lte: to } };
+            if (instanceId) where.sellerId = instanceId;
+
+            const rows = await prisma.funnelEvent.groupBy({
+                by: ['stepTo'],
+                where,
+                _count: { _all: true },
+            });
+
+            res.json({
+                from, to,
+                byStep: rows.map(r => ({ step: r.stepTo, count: r._count._all })).sort((a, b) => b.count - a.count),
+            });
+        } catch (e) {
+            logger.error('🔴 [ANALYTICS] pause-alerts:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // GET /analytics/time-to-close — métrica 5
+    // Para cada (sellerId, phone) que alcanzó 'completed' en el rango: sum
+    // de duraciones de todos sus FunnelEvents ≤ el de 'completed'.
+    router.get('/analytics/time-to-close', ...withSeller(clientPool), async (req, res) => {
+        try {
+            const { from, to } = parseDateRange(req);
+            const instanceId = getInstanceId(req);
+
+            const completedWhere = { stepTo: 'completed', enteredAt: { gte: from, lte: to } };
+            if (instanceId) completedWhere.sellerId = instanceId;
+            const completions = await prisma.funnelEvent.findMany({
+                where: completedWhere,
+                select: { sellerId: true, phone: true, enteredAt: true },
+            });
+
+            const durations = [];
+            for (const c of completions) {
+                // Buscar el primer FunnelEvent de este (seller, phone) — el greeting.
+                const first = await prisma.funnelEvent.findFirst({
+                    where: { sellerId: c.sellerId, phone: c.phone },
+                    orderBy: { enteredAt: 'asc' },
+                    select: { enteredAt: true },
+                });
+                if (first) {
+                    const sec = (new Date(c.enteredAt).getTime() - new Date(first.enteredAt).getTime()) / 1000;
+                    if (sec > 0) durations.push(sec);
+                }
+            }
+            durations.sort((a, b) => a - b);
+            const pct = (p) => durations.length ? Math.round(durations[Math.floor(durations.length * p)]) : 0;
+
+            // Histograma por bucket (0-5min, 5-15m, 15-60m, 1-4h, 4-24h, >24h)
+            const buckets = [
+                { label: '< 5m', max: 5 * 60, count: 0 },
+                { label: '5-15m', max: 15 * 60, count: 0 },
+                { label: '15-60m', max: 60 * 60, count: 0 },
+                { label: '1-4h', max: 4 * 3600, count: 0 },
+                { label: '4-24h', max: 24 * 3600, count: 0 },
+                { label: '> 24h', max: Infinity, count: 0 },
+            ];
+            for (const d of durations) {
+                const b = buckets.find(x => d <= x.max);
+                if (b) b.count++;
+            }
+
+            res.json({
+                from, to,
+                total: durations.length,
+                p50: pct(0.5),
+                p90: pct(0.9),
+                p99: pct(0.99),
+                histogram: buckets,
+            });
+        } catch (e) {
+            logger.error('🔴 [ANALYTICS] time-to-close:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // GET /analytics/reentries — métrica 10
+    router.get('/analytics/reentries', ...withSeller(clientPool), async (req, res) => {
+        try {
+            const { from, to } = parseDateRange(req);
+            const instanceId = getInstanceId(req);
+            const where = { exitType: 'back', enteredAt: { gte: from, lte: to } };
+            if (instanceId) where.sellerId = instanceId;
+
+            const rows = await prisma.funnelEvent.groupBy({
+                by: ['stepFrom', 'stepTo'],
+                where,
+                _count: { _all: true },
+            });
+            // El stepFrom/stepTo acá representa "vino de" → "fue a"
+            // Pero cerramos con exitType='back' en el row anterior; así que
+            // buscamos eventos cuyo propio exitType fue 'back'.
+            res.json({
+                from, to,
+                transitions: rows
+                    .map(r => ({ from: r.stepFrom, to: r.stepTo, count: r._count._all }))
+                    .sort((a, b) => b.count - a.count),
+            });
+        } catch (e) {
+            logger.error('🔴 [ANALYTICS] reentries:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     return router;
 };

@@ -1,6 +1,7 @@
 import { _getAdminSuggestions } from './messages';
 import { UserState, SharedState } from '../../types/state';
 import logger from '../../utils/logger';
+import { logStepTransition, markExit } from '../../services/funnelLogger';
 
 /**
  * _cleanPhone
@@ -16,7 +17,8 @@ function _cleanPhone(userId: string): string {
  * Resets staleAlerted and reengagementSent flags when step changes.
  */
 function _setStep(state: any, newStep: string) {
-    if (state.step !== newStep) {
+    const prevStep = state.step;
+    if (prevStep !== newStep) {
         // Log funnel transition
         if (!state.funnelLog) state.funnelLog = [];
         if (state.step && state.stepEnteredAt) {
@@ -30,6 +32,12 @@ function _setStep(state: any, newStep: string) {
         // A/B conversion tracking: mark follow-up as converted when user advances
         if (state.followUpData && !state.followUpData.converted) {
             state.followUpData.converted = true;
+        }
+
+        // Fire-and-forget: persistir transición en FunnelEvent para analítica
+        const ctx = state._ctx;
+        if (ctx?.sellerId && ctx?.phone) {
+            logStepTransition(ctx.sellerId, ctx.phone, prevStep || null, newStep).catch(() => {});
         }
     }
     state.step = newStep;
@@ -126,6 +134,14 @@ async function _pauseAndAlert(userId: string, currentState: UserState, dependenc
         const { pauseUser } = require('../../services/pauseService');
         await pauseUser(userId, reason, { sharedState });
         await saveState(userId);
+    }
+
+    // Fire-and-forget: cerrar el FunnelEvent abierto como 'paused' para que la
+    // analítica detecte "aquí el bot se rindió". Si el usuario sigue la charla
+    // y avanza, el próximo _setStep abre uno nuevo.
+    const ctx = (currentState as any)._ctx;
+    if (ctx?.sellerId && ctx?.phone) {
+        markExit(ctx.sellerId, ctx.phone, 'paused').catch(() => {});
     }
 
     // NIGHT MODE: Send polite night message

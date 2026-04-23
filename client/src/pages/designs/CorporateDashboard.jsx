@@ -17,6 +17,7 @@ import ManualsView from '../../components/corporate/ManualsView';
 import PaymentsView from '../../components/corporate/PaymentsView';
 import AiReportsView from '../../components/corporate/AiReportsView';
 import AccountsView from '../../components/admin/AccountsView';
+import FunnelAnalyticsView from '../../components/admin/FunnelAnalyticsView';
 import SellerSelector from '../../components/admin/SellerSelector';
 import WhatsappViewerView from '../../components/corporate/WhatsappViewerView';
 
@@ -236,6 +237,7 @@ const CorporateDashboard = () => {
                 </div>
             );
             case 'accounts': return <AccountsView />;
+            case 'funnel-analytics': return <FunnelAnalyticsView />;
             case 'wa-web': return <WhatsappViewerView />;
             default: return <DashboardView alerts={alerts} config={config} handleQuickAction={handleQuickAction} status={status} qrData={qrData} />;
         }
@@ -330,6 +332,7 @@ const CorporateDashboard = () => {
                         {(!sidebarCollapsed || isMobile) && <p className="text-xs 2xl:text-sm font-semibold text-slate-400 dark:text-slate-300 uppercase tracking-wider mb-4 px-4">Administración</p>}
                         <NavItem tab="settings" icon={Settings} label="Configuración" />
                         {isAdmin && <NavItem tab="accounts" icon={Users} label="Usuarios" />}
+                        {isAdmin && <NavItem tab="funnel-analytics" icon={Activity} label="Analítica Embudo" />}
                     </div>
                 </div>
 

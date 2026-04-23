@@ -616,6 +616,24 @@ function startScheduler(sharedState: SchedulerSharedState, dependencies: Schedul
         logger.info('[SCHEDULER] ✅ refreshPendingPayments → cada 5 min (9-23h ARG)');
     }
 
+    // ── FUNNEL DROP-OUT SWEEP: cada 15 min, registrado UNA vez globalmente ──
+    // Cierra FunnelEvents abiertos hace más de 48h como exitType='dropped'.
+    // Global porque la tabla es compartida entre sellers — correrlo por seller
+    // es redundante (todos los eventos se updatean igual).
+    if (!(global as any).__funnelSweepRegistered) {
+        (global as any).__funnelSweepRegistered = true;
+        cron.schedule('*/15 * * * *', async () => {
+            try {
+                const { markStaleAsDropped } = require('./funnelLogger');
+                const n = await markStaleAsDropped(48);
+                if (n > 0) logger.info(`[FUNNEL] Marked ${n} stale events as dropped`);
+            } catch (e: any) {
+                logger.warn(`[FUNNEL] sweep failed: ${e.message}`);
+            }
+        }, { timezone: TIMEZONE });
+        logger.info('[SCHEDULER] ✅ funnelDropoutSweep → cada 15 min (global)');
+    }
+
     // ── GRACEFUL RESTART: a las 8am Argentina ──
     // Registered ONCE globally (not per seller) to avoid 8 simultaneous process.kill() calls.
     if (!(global as any).__dailyRestartRegistered) {
