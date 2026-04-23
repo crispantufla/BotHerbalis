@@ -116,6 +116,7 @@ async function boot() {
     // Graceful shutdown
     const _shutdown = async (signal: string, exitCode: number = 0): Promise<void> => {
         logger.info(`[SHUTDOWN] ${signal} received. Cleaning up...`);
+        try { await require('./src/services/onlineTracker').flushAll(); } catch (e: any) { logger.error('[SHUTDOWN] onlineTracker.flushAll:', e.message); }
         try { await clientPool.stopAll(); } catch (e: any) { logger.error('[SHUTDOWN] clientPool.stopAll:', e.message); }
         try { await shutdownRedis(); } catch (e: any) { logger.error('[SHUTDOWN] shutdownRedis:', e.message); }
         try { await redisClient.quit(); } catch (e: any) { /* ignore */ }

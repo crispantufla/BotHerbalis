@@ -9,6 +9,7 @@ const {
 } = require('../../middleware/jwtAuth');
 const logger = require('../../utils/logger');
 const { isAuthorizedUser } = require('../../services/waStream');
+const onlineTracker = require('../../services/onlineTracker');
 
 module.exports = (client, sharedState) => {
     const router = express.Router();
@@ -109,11 +110,19 @@ module.exports = (client, sharedState) => {
                 role: true,
                 sellerId: true,
                 isActive: true,
+                totalOnlineSeconds: true,
                 createdAt: true,
             },
             orderBy: { createdAt: 'desc' },
         });
-        res.json(accounts);
+        // Overlay live session data: onlineSinceMs = ts when current dashboard
+        // session started (null if not currently online). Client uses it to
+        // render a live-updating "sesión actual" ticker without polling.
+        const enriched = accounts.map(a => ({
+            ...a,
+            onlineSinceMs: onlineTracker.getSessionStart(a.id),
+        }));
+        res.json(enriched);
     });
 
     // ─── POST /api/accounts ─────────────────────────────────────────

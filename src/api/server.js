@@ -21,6 +21,7 @@ const { jwtAuthMiddleware } = require('../middleware/jwtAuth');
 const { verifyToken } = require('../middleware/jwtAuth');
 const { canViewSeller, isAuthorizedUser } = require('../services/waStream');
 const { vncManager } = require('../services/vncManager');
+const onlineTracker = require('../services/onlineTracker');
 const WebSocket = require('ws');
 const net = require('net');
 
@@ -336,7 +337,7 @@ function startServer(clientPool) {
     // --- PRESENCE TRACKING ---
     // Tracks which sellerId accounts have the web dashboard open
     // presence state per socket: 'online' | 'idle'
-    const socketPresence = new Map(); // socketId → { sellerId, state, idleTimer }
+    const socketPresence = new Map(); // socketId → { sellerId, accountId, state, idleTimer }
     const IDLE_MS = 10 * 60 * 1000; // 10 minutes
 
     function computeSellerState(sellerId) {
@@ -358,11 +359,26 @@ function startServer(clientPool) {
         }
     }
 
+    // Online-time tracking: start/stop the cumulative counter for an account
+    // based on whether it currently has any 'online' (non-idle) socket.
+    function reevaluateAccountOnline(accountId, meta) {
+        if (!accountId) return;
+        const hasOnline = [...socketPresence.values()].some(
+            p => p.accountId === accountId && p.state === 'online'
+        );
+        if (hasOnline) {
+            onlineTracker.startSession(accountId, meta);
+        } else {
+            onlineTracker.endSession(accountId).catch(() => {});
+        }
+    }
+
     function setSocketIdle(socketId) {
         const entry = socketPresence.get(socketId);
         if (!entry) return;
         entry.state = 'idle';
         broadcastPresence();
+        reevaluateAccountOnline(entry.accountId);
     }
 
     function resetIdleTimer(socketId) {
@@ -372,6 +388,7 @@ function startServer(clientPool) {
         entry.state = 'online';
         entry.idleTimer = setTimeout(() => setSocketIdle(socketId), IDLE_MS);
         broadcastPresence();
+        reevaluateAccountOnline(entry.accountId);
     }
 
     // --- SOCKET ROOMS & SYNC ---
@@ -393,7 +410,12 @@ function startServer(clientPool) {
             socket.join(sellerId);
             logger.debug(`[SOCKET] ${role} ${sellerId} joined room "${sellerId}"`);
             // Track presence
-            socketPresence.set(socket.id, { sellerId, state: 'online', idleTimer: null });
+            socketPresence.set(socket.id, { sellerId, accountId: account?.accountId, state: 'online', idleTimer: null });
+            resetIdleTimer(socket.id);
+        } else if (account?.accountId) {
+            // Admin sin sellerId asignado: sigue contando tiempo online aunque
+            // todavía no haya elegido qué seller mirar.
+            socketPresence.set(socket.id, { sellerId: null, accountId: account.accountId, state: 'online', idleTimer: null });
             resetIdleTimer(socket.id);
         }
 
@@ -435,7 +457,11 @@ function startServer(clientPool) {
             const oldEntry = socketPresence.get(socket.id);
             if (oldEntry && oldEntry.idleTimer) clearTimeout(oldEntry.idleTimer);
             if (newSellerId) {
-                socketPresence.set(socket.id, { sellerId: newSellerId, state: 'online', idleTimer: null });
+                socketPresence.set(socket.id, { sellerId: newSellerId, accountId: account?.accountId, state: 'online', idleTimer: null });
+                resetIdleTimer(socket.id);
+            } else if (account?.accountId) {
+                // Admin volvió a "vista agregada" — seguimos contando tiempo online
+                socketPresence.set(socket.id, { sellerId: null, accountId: account.accountId, state: 'online', idleTimer: null });
                 resetIdleTimer(socket.id);
             } else {
                 socketPresence.delete(socket.id);
@@ -476,6 +502,7 @@ function startServer(clientPool) {
                 if (entry.idleTimer) clearTimeout(entry.idleTimer);
                 socketPresence.delete(socket.id);
                 broadcastPresence();
+                reevaluateAccountOnline(entry.accountId);
             }
         });
     });

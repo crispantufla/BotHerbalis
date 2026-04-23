@@ -126,14 +126,15 @@ model DailyStats {
 // --- Multi-tenant: Accounts & Sessions ---
 
 model Account {
-  id        String   @id @default(uuid())
-  name      String   @unique            // "nombre de usuario" — used for login
-  password  String   // bcrypt hash
-  role      String   @default("seller") // "admin" | "seller"
-  sellerId  String?  @unique            // maps to instanceId; null for admin-only accounts
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                 String   @id @default(uuid())
+  name               String   @unique            // "nombre de usuario" — used for login
+  password           String   // bcrypt hash
+  role               String   @default("seller") // "admin" | "seller"
+  sellerId           String?  @unique            // maps to instanceId; null for admin-only accounts
+  isActive           Boolean  @default(true)
+  totalOnlineSeconds Int      @default(0)        // cumulative seconds with the dashboard open
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   @@index([role])
 }

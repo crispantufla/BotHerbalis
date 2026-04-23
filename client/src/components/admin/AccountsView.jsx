@@ -3,11 +3,37 @@ import api from '../../config/axios';
 import { useToast } from '../ui/Toast';
 import { useSeller } from '../../context/SellerContext';
 import {
-    Users, Plus, Trash2, Edit2, X, Check, RefreshCw,
+    Users, Plus, Trash2, Edit2, X, Check, RefreshCw, Clock,
     Play, Square, RotateCcw, Wifi, WifiOff, AlertTriangle, Shield, User, KeyRound, Loader2
 } from 'lucide-react';
 
 const EMPTY_FORM = { name: '', password: '', role: 'seller', sellerId: '' };
+
+// Formats seconds → compact duration like "3h 14m", "2d 5h", "12m" or "45s".
+function formatDuration(totalSeconds) {
+    if (!totalSeconds || totalSeconds <= 0) return '0s';
+    const s = Math.floor(totalSeconds);
+    const days = Math.floor(s / 86400);
+    const hours = Math.floor((s % 86400) / 3600);
+    const minutes = Math.floor((s % 3600) / 60);
+    const secs = s % 60;
+    if (days > 0) return `${days}d ${hours}h`;
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    if (minutes > 0) return `${minutes}m`;
+    return `${secs}s`;
+}
+
+// Ticks every second while any account is currently online — cheap, keeps the
+// "sesión actual" label accurate without hitting the API.
+function useLiveClock(activeMs) {
+    const [now, setNow] = useState(() => Date.now());
+    useEffect(() => {
+        if (!activeMs) return;
+        const t = setInterval(() => setNow(Date.now()), 1000);
+        return () => clearInterval(t);
+    }, [activeMs]);
+    return now;
+}
 
 const AccountsView = () => {
     const { toast } = useToast();
@@ -42,6 +68,18 @@ const AccountsView = () => {
     }, []);
 
     useEffect(() => { fetchData(); }, [fetchData]);
+
+    // Refresh accounts every 30s so the accumulated "tiempo online" stays
+    // current without manual reloads. Current-session ms ticks locally via
+    // useLiveClock — no API call needed for that.
+    useEffect(() => {
+        const t = setInterval(() => { fetchData(); }, 30_000);
+        return () => clearInterval(t);
+    }, [fetchData]);
+
+    // Any account currently online? If so, keep the live ticker alive.
+    const anyOnlineSince = accounts.find(a => a.onlineSinceMs)?.onlineSinceMs || null;
+    const nowMs = useLiveClock(anyOnlineSince);
 
     // Auto-generate sellerId from username when creating a new account with WhatsApp
     useEffect(() => {
@@ -339,6 +377,11 @@ const AccountsView = () => {
                                                     </span>
                                                 </div>
                                             )}
+                                            <OnlineTimeLine
+                                                totalSeconds={acc.totalOnlineSeconds}
+                                                onlineSinceMs={acc.onlineSinceMs}
+                                                nowMs={nowMs}
+                                            />
                                         </div>
                                         {/* WA Controls */}
                                         {acc.sellerId && (
@@ -429,6 +472,11 @@ const AccountsView = () => {
                                             {!acc.sellerId && (
                                                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Sin WhatsApp</p>
                                             )}
+                                            <OnlineTimeLine
+                                                totalSeconds={acc.totalOnlineSeconds}
+                                                onlineSinceMs={acc.onlineSinceMs}
+                                                nowMs={nowMs}
+                                            />
                                         </div>
                                         {/* WA Controls (only for admins with sellerId) */}
                                         {acc.sellerId && (
@@ -482,6 +530,29 @@ const AccountsView = () => {
                         </div>
                     </section>
                 </div>
+            )}
+        </div>
+    );
+};
+
+// Small row shown under each account with total accumulated dashboard time
+// and (when the user is online right now) a live ticker for the current session.
+const OnlineTimeLine = ({ totalSeconds, onlineSinceMs, nowMs }) => {
+    const currentSessionSec = onlineSinceMs ? Math.max(0, Math.floor((nowMs - onlineSinceMs) / 1000)) : 0;
+    const displayTotal = (totalSeconds || 0) + currentSessionSec;
+    return (
+        <div className="flex items-center gap-1.5 mt-1 text-xs text-slate-400 dark:text-slate-500">
+            <Clock className="w-3 h-3 flex-shrink-0" />
+            <span title="Tiempo acumulado con el panel abierto">
+                {formatDuration(displayTotal)} total
+            </span>
+            {onlineSinceMs && (
+                <>
+                    <span className="text-slate-300 dark:text-slate-600">•</span>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-medium" title="Sesión actual">
+                        sesión: {formatDuration(currentSessionSec)}
+                    </span>
+                </>
             )}
         </div>
     );
