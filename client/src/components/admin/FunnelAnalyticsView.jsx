@@ -3,7 +3,8 @@ import api from '../../config/axios';
 import { useToast } from '../ui/Toast';
 import {
     Activity, TrendingDown, Clock, PauseCircle, Repeat, Package, Cpu,
-    RefreshCw, AlertTriangle, Timer, ChevronRight
+    RefreshCw, AlertTriangle, Timer, ChevronRight, HelpCircle, Info, Lightbulb,
+    ChevronDown, ChevronUp
 } from 'lucide-react';
 
 // Map de steps a labels humanos cortos (para gráficos).
@@ -59,10 +60,53 @@ function formatDur(sec) {
     return `${Math.round(sec / 86400 * 10) / 10}d`;
 }
 
+// Descripción humana de qué significa cada step.
+const STEP_EXPLAIN = {
+    greeting: 'Primer contacto. El bot saludó y pregunta de qué se trata.',
+    general: 'Conversación general sin un objetivo de venta asignado.',
+    waiting_weight: 'El bot le pidió al cliente cuántos kilos quiere bajar.',
+    waiting_preference: 'Está preguntando qué producto prefiere (Cápsulas / Semillas / Gotas).',
+    waiting_preference_consultation: 'Consulta técnica sobre el producto antes de elegir.',
+    waiting_plan_choice: 'Mostrando planes 60 o 120 días para que elija.',
+    waiting_price_confirmation: 'El cliente aún no vio el precio. El bot intenta convencerlo de verlo.',
+    waiting_ok: 'El bot ya le pasó toda la info y espera "sí quiero" antes de pedir datos.',
+    waiting_data: 'Pidiendo nombre, dirección, ciudad, código postal.',
+    waiting_maps_confirmation: 'Validando la dirección contra Google Maps.',
+    waiting_payment_method: 'Eligiendo forma de pago (MercadoPago / transferencia / contra reembolso).',
+    waiting_mp_payment: 'Esperando que pague por MercadoPago.',
+    waiting_transfer_confirmation: 'Esperando comprobante de transferencia.',
+    waiting_final_confirmation: 'Confirmación final del pedido ("¿confirmás el envío?").',
+    waiting_admin_ok: 'Admin validando antes de cerrar.',
+    waiting_admin_validation: 'Similar — espera OK manual del admin.',
+    closing: 'Cierre: armando el mensaje final con totales.',
+    completed: 'Venta cerrada. Cliente derivado a post-venta.',
+    post_sale: 'Cliente que ya compró. Preguntas post-entrega.',
+    safety_check: 'Chequeo de seguridad (edad, salud, etc.) antes de vender.',
+    rejected_medical: 'Rechazado por contraindicación médica.',
+    rejected_abusive: 'Rechazado por abuso/insultos.',
+    rejected_geo: 'Fuera de Argentina.',
+};
+
+// Caja de ayuda reutilizable
+const InfoBox = ({ children, variant = 'info' }) => {
+    const Icon = variant === 'tip' ? Lightbulb : Info;
+    const classes = variant === 'tip'
+        ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/50 text-amber-800 dark:text-amber-300'
+        : 'bg-sky-50 dark:bg-sky-900/20 border-sky-200 dark:border-sky-800/50 text-sky-800 dark:text-sky-300';
+    return (
+        <div className={`border rounded-xl p-4 text-sm flex gap-3 ${classes}`}>
+            <Icon className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <div className="flex-1 space-y-1.5">{children}</div>
+        </div>
+    );
+};
+
 const FunnelAnalyticsView = () => {
     const { toast } = useToast();
     const [tab, setTab] = useState('funnel');
     const [daysBack, setDaysBack] = useState(7);
+    const [showHowTo, setShowHowTo] = useState(false);
+    const [showGlossary, setShowGlossary] = useState(false);
     const [loading, setLoading] = useState(false);
     const [funnel, setFunnel] = useState(null);
     const [pauseAlerts, setPauseAlerts] = useState(null);
@@ -165,6 +209,73 @@ const FunnelAnalyticsView = () => {
                 </div>
             </div>
 
+            {/* Paneles de ayuda expandibles */}
+            <div className="mb-6 space-y-3">
+                <button
+                    onClick={() => setShowHowTo(v => !v)}
+                    className="w-full flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                >
+                    <HelpCircle className="w-4 h-4" />
+                    ¿Cómo leer esta página?
+                    {showHowTo ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </button>
+                {showHowTo && (
+                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 text-sm text-slate-600 dark:text-slate-300 space-y-3">
+                        <p>
+                            <strong className="text-slate-800 dark:text-slate-100">Qué es el embudo.</strong>{' '}
+                            Una conversación con el bot pasa por varios <em>steps</em> (pasos) en orden:
+                            saluda → pregunta el peso → elige producto → elige plan → da datos → paga → cierra.
+                            Cada vez que el cliente avanza de un paso al siguiente, lo registramos. También
+                            registramos cuando retrocede, cuando el bot se rinde y lo pausa, o cuando el
+                            cliente deja de responder.
+                        </p>
+                        <p>
+                            <strong className="text-slate-800 dark:text-slate-100">Qué significa "se traba".</strong>{' '}
+                            Si de 100 clientes que llegaron al paso "Datos" solo 60 pasaron al siguiente,
+                            hay 40 que se cayeron ahí. Ese step tiene <strong>40% de drop</strong>. Lo
+                            interesante de esta página es ver <em>qué step</em> tiene más drop — ahí es
+                            donde conviene arreglar el bot o el guión.
+                        </p>
+                        <p>
+                            <strong className="text-slate-800 dark:text-slate-100">De dónde sale la data.</strong>{' '}
+                            No se cuentan chats viejos — solo las conversaciones nuevas desde que esta función
+                            se activó. Los números crecen a medida que los clientes escriben. El rango de
+                            fechas (arriba a la derecha) define qué período mirar.
+                        </p>
+                        <p>
+                            <strong className="text-slate-800 dark:text-slate-100">Tabs.</strong>{' '}
+                            <strong>Embudo</strong> = vista global, drop por paso.{' '}
+                            <strong>Fricción</strong> = dónde el bot sufre (repreguntas, pausas, pedidos a IA).{' '}
+                            <strong>Conversión</strong> = cuánto tarda cerrar, a qué hora se caen, dónde se
+                            quejan del precio.{' '}
+                            <strong>Producto</strong> = qué se está vendiendo.{' '}
+                            <strong>Técnico</strong> = diagnóstico del caché de respuestas del bot.
+                        </p>
+                    </div>
+                )}
+
+                <button
+                    onClick={() => setShowGlossary(v => !v)}
+                    className="w-full flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                >
+                    <HelpCircle className="w-4 h-4" />
+                    ¿Qué significa cada paso del embudo?
+                    {showGlossary ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </button>
+                {showGlossary && (
+                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                            {STEP_ORDER.filter(s => STEP_EXPLAIN[s]).map(s => (
+                                <div key={s} className="flex gap-3">
+                                    <span className="font-semibold text-slate-700 dark:text-slate-200 w-32 flex-shrink-0">{STEP_LABELS[s] || s}</span>
+                                    <span className="text-slate-500 dark:text-slate-400">{STEP_EXPLAIN[s]}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+
             {/* Tabs */}
             <div className="flex border-b border-slate-200 dark:border-slate-700 mb-6 overflow-x-auto">
                 {TABS.map(t => {
@@ -236,9 +347,15 @@ const FunnelTab = ({ orderedFunnel, maxEntered, pauseAlerts, reentries }) => {
 
     return (
         <div className="space-y-6">
+            <InfoBox>
+                <p><strong>Qué estás viendo.</strong> Por cada paso del flujo, cuántos clientes entraron, cuántos avanzaron al siguiente paso, y cuántos se cayeron (dropped) o el bot tuvo que pausar (paused). El <strong>% Drop</strong> suma pausados + caídos sobre entrados.</p>
+                <p><strong>Cómo usarlo.</strong> Los pasos con barras largas y drop alto (&gt;30%, resaltado en rojo) son los cuellos de botella. Clickeá mentalmente: <em>"¿Por qué pierdo tantos clientes justo en este paso?"</em> Eso te dice qué mejorar primero — el guión, la IA, o directamente el orden del flujo.</p>
+            </InfoBox>
+
             {/* Bar chart vertical */}
             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
-                <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-sm mb-4">Drop-off por step</h3>
+                <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-sm mb-1">Volumen y drop por step</h3>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mb-4">Ancho de la barra = cuántos clientes llegaron a ese paso. El badge de la derecha dice qué % se perdió ahí.</p>
                 <div className="space-y-2">
                     {orderedFunnel.map(s => {
                         const widthPct = Math.max(3, (s.entered / maxEntered) * 100);
@@ -287,13 +404,13 @@ const FunnelTab = ({ orderedFunnel, maxEntered, pauseAlerts, reentries }) => {
                         <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400">
                             <tr>
                                 <th className="text-left px-4 py-3 font-medium">Step</th>
-                                <th className="text-right px-4 py-3 font-medium">Entraron</th>
-                                <th className="text-right px-4 py-3 font-medium">Avanzaron</th>
-                                <th className="text-right px-4 py-3 font-medium">Volvieron</th>
-                                <th className="text-right px-4 py-3 font-medium">Pausados</th>
-                                <th className="text-right px-4 py-3 font-medium">Cayeron</th>
-                                <th className="text-right px-4 py-3 font-medium">Drop %</th>
-                                <th className="text-right px-4 py-3 font-medium">Tiempo p50</th>
+                                <th className="text-right px-4 py-3 font-medium" title="Cuántas conversaciones entraron a este paso">Entraron</th>
+                                <th className="text-right px-4 py-3 font-medium" title="Pasaron al siguiente paso del flujo (bueno)">Avanzaron</th>
+                                <th className="text-right px-4 py-3 font-medium" title="Retrocedieron a un paso anterior (ej: cambiaron de plan)">Volvieron</th>
+                                <th className="text-right px-4 py-3 font-medium" title="El bot no supo qué responder y derivó al admin">Pausados</th>
+                                <th className="text-right px-4 py-3 font-medium" title="El cliente dejó de escribir y no volvió (&gt;48h)">Cayeron</th>
+                                <th className="text-right px-4 py-3 font-medium" title="(Pausados + Cayeron) / Entraron. Lo importante de esta columna.">Drop %</th>
+                                <th className="text-right px-4 py-3 font-medium" title="Tiempo mediano que tardó el cliente en salir de este paso (la mitad tardó menos que esto)">Tiempo p50</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
@@ -319,10 +436,13 @@ const FunnelTab = ({ orderedFunnel, maxEntered, pauseAlerts, reentries }) => {
             {/* Reentradas */}
             {reentries?.transitions?.length > 0 && (
                 <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
-                    <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-sm mb-4 flex items-center gap-2">
+                    <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-sm mb-1 flex items-center gap-2">
                         <Repeat className="w-4 h-4 text-amber-500" />
-                        Top retrocesos (el usuario volvió atrás en el flujo)
+                        Top retrocesos (el cliente volvió atrás en el flujo)
                     </h3>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mb-4">
+                        Transiciones donde el cliente se movió a un step anterior — típicamente porque cambió de producto, de plan, o se arrepintió. Si ves muchos retrocesos en la misma pareja de steps, hay algo que confunde en ese punto del guión.
+                    </p>
                     <div className="space-y-2">
                         {reentries.transitions.slice(0, 10).map((t, i) => (
                             <div key={i} className="flex items-center gap-2 text-sm p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-900/30">
@@ -348,18 +468,32 @@ const ConversionTab = ({ ttc, priceObj, abandonment }) => {
 
     return (
         <div className="space-y-6">
+            <InfoBox>
+                <p>
+                    <strong>Qué estás viendo.</strong> Tres ángulos que ayudan a entender por qué la gente compra o no:
+                </p>
+                <ul className="list-disc ml-5 space-y-0.5">
+                    <li><strong>Tiempo a cierre</strong>: de que alguien escribe "hola" hasta que queda como venta cerrada. Ver si está bajando (bueno) o subiendo (el bot está enlenteciendo).</li>
+                    <li><strong>Abandonos por hora</strong>: en qué hora del día la gente más deja de responder. Puede delatar horarios donde el bot no está contestando rápido.</li>
+                    <li><strong>Objeciones de precio</strong>: en qué step suele aparecer "es caro" / "no tengo plata" / "descuento". Si se concentra en un paso específico, es candidato a reforzar el guión antes de llegar ahí.</li>
+                </ul>
+            </InfoBox>
+
             {/* KPI cards de tiempo a cierre */}
             {ttc && ttc.total > 0 ? (
                 <>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <KpiCard label="Cierres totales" value={ttc.total} />
-                        <KpiCard label="Tiempo mediano (p50)" value={formatDur(ttc.p50)} hint="Mitad cerró antes" />
-                        <KpiCard label="p90" value={formatDur(ttc.p90)} hint="90% cerró antes" />
-                        <KpiCard label="p99" value={formatDur(ttc.p99)} hint="Casos más largos" />
+                        <KpiCard label="Cierres totales" value={ttc.total} hint="Ventas completadas en el rango" />
+                        <KpiCard label="Tiempo mediano (p50)" value={formatDur(ttc.p50)} hint="La mitad de los clientes cerró antes de este tiempo" />
+                        <KpiCard label="p90" value={formatDur(ttc.p90)} hint="El 90% cerró antes de este tiempo" />
+                        <KpiCard label="p99" value={formatDur(ttc.p99)} hint="Casos extremos (el 1% que más tardó)" />
                     </div>
 
                     <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
-                        <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-sm mb-4">Distribución del tiempo a cierre</h3>
+                        <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-sm mb-1">Distribución del tiempo a cierre</h3>
+                        <p className="text-xs text-slate-400 dark:text-slate-500 mb-4">
+                            Cuántas ventas cerraron en cada ventana de tiempo. Si muchas caen en "&lt;5m" es mala señal (probablemente son clientes recurrentes). Lo normal es que la mayoría esté entre 15 min y 4 h.
+                        </p>
                         <div className="space-y-2">
                             {ttc.histogram.map(b => {
                                 const pct = ttc.total > 0 ? (b.count / ttc.total) * 100 : 0;
@@ -391,7 +525,9 @@ const ConversionTab = ({ ttc, priceObj, abandonment }) => {
             {abandonment && abandonment.total > 0 && (
                 <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
                     <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-sm mb-1">Abandonos por hora (Argentina)</h3>
-                    <p className="text-xs text-slate-400 dark:text-slate-500 mb-4">Hora en que el usuario envió su último mensaje antes de dejar de responder. Total: {abandonment.total}</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mb-4">
+                        Hora en que el cliente escribió por última vez antes de nunca más responder. Cada barra = una hora del día (0 a 23). Si ves un pico a las 22-23h, mucha gente abandona de noche — puede ser hora de ajustar el mensaje nocturno. Total de abandonos: <strong>{abandonment.total}</strong>
+                    </p>
                     <div className="flex items-end gap-1 h-32">
                         {abandonment.byHour.map(h => {
                             const heightPct = (h.count / maxHourCount) * 100;
@@ -415,7 +551,9 @@ const ConversionTab = ({ ttc, priceObj, abandonment }) => {
             {priceObj && priceObj.byStep?.length > 0 && (
                 <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
                     <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-sm mb-1">Objeciones de precio por step</h3>
-                    <p className="text-xs text-slate-400 dark:text-slate-500 mb-4">Mensajes donde el usuario mencionó precio, descuento, o falta de plata</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mb-4">
+                        Cuántos mensajes contuvieron palabras tipo <em>"caro"</em>, <em>"descuento"</em>, <em>"no tengo plata"</em>, <em>"no puedo pagar"</em>, etc. — agrupado por el step donde aparecieron. Si se concentra en un paso temprano (ej: Plan), el cliente piensa que es caro antes de ver el detalle y conviene adelantar argumentos de valor.
+                    </p>
                     <div className="space-y-2">
                         {priceObj.byStep.map(s => (
                             <div key={s.step} className="flex items-center gap-3 text-sm">
@@ -484,14 +622,23 @@ const FrictionTab = ({ retries, aiFallback, pauseAlerts }) => {
 
     return (
         <div className="space-y-6">
-            {/* Leyenda */}
-            <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-xl p-4 text-xs text-slate-500 dark:text-slate-400">
-                <span className="font-medium text-slate-600 dark:text-slate-300">Cómo leer:</span>
-                {' '}Retries = mensajes donde el bot tuvo que re-preguntar lo mismo.
-                {' '}AI fallback = porcentaje de respuestas que no matchearon y cayeron a GPT.
-                {' '}Pausas = veces que el bot "se rindió" y alertó al admin.
-                {' '}Valores altos en rojo indican candidatos a mejorar.
-            </div>
+            <InfoBox>
+                <p><strong>Qué estás viendo.</strong> Señales de que el bot lo está pasando mal en cierto paso. Tres ángulos:</p>
+                <ul className="list-disc ml-5 space-y-0.5">
+                    <li><strong>Retries</strong>: el cliente escribió varias veces en el mismo step porque el bot le repregunta lo mismo. Signo clásico: pide la dirección 3 veces porque no la entiende.</li>
+                    <li><strong>AI fallback</strong>: cuánto del trabajo del paso terminó cayendo a GPT en lugar de resolverse con reglas. Alto fallback = el código hardcoded no cubre lo que dice la gente.</li>
+                    <li><strong>Pausas</strong>: el bot se rindió, alertó al admin y paró. Es la señal más fuerte de "acá falta lógica".</li>
+                </ul>
+            </InfoBox>
+
+            <InfoBox variant="tip">
+                <p><strong>¿Qué hacer con esto?</strong></p>
+                <ul className="list-disc ml-5 space-y-0.5">
+                    <li>Step con <strong>Retries &gt;40%</strong>: leer algunos chats ahí para ver qué escribe la gente y ajustar el parser o la pregunta.</li>
+                    <li>Step con <strong>AI fallback &gt;60%</strong>: agregar reglas hardcoded para las preguntas más frecuentes (ahorra tokens y acelera respuestas).</li>
+                    <li>Step con <strong>Pausas &gt;5</strong>: bug en el step handler o falta una rama de lógica.</li>
+                </ul>
+            </InfoBox>
 
             {/* Tabla combinada */}
             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
@@ -500,12 +647,12 @@ const FrictionTab = ({ retries, aiFallback, pauseAlerts }) => {
                         <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400">
                             <tr>
                                 <th className="text-left px-4 py-3 font-medium">Step</th>
-                                <th className="text-right px-4 py-3 font-medium">Mensajes</th>
-                                <th className="text-right px-4 py-3 font-medium">Retries %</th>
-                                <th className="text-right px-4 py-3 font-medium">Retry 2-3x</th>
-                                <th className="text-right px-4 py-3 font-medium">Retry 4+x</th>
-                                <th className="text-right px-4 py-3 font-medium">AI fallback %</th>
-                                <th className="text-right px-4 py-3 font-medium">Pausas</th>
+                                <th className="text-right px-4 py-3 font-medium" title="Total de mensajes procesados en este step">Mensajes</th>
+                                <th className="text-right px-4 py-3 font-medium" title="% de mensajes que NO son el primer intento del cliente en ese step (indica que el bot tuvo que repreguntar)">Retries %</th>
+                                <th className="text-right px-4 py-3 font-medium" title="Mensajes donde el cliente iba por el intento 3 o 4 (el bot ya había preguntado 2-3 veces)">Retry 2-3x</th>
+                                <th className="text-right px-4 py-3 font-medium" title="Mensajes donde el cliente iba por el 5º intento o más — el bot está claramente atascado">Retry 4+x</th>
+                                <th className="text-right px-4 py-3 font-medium" title="% de mensajes del step que el bot resolvió pidiéndole a GPT (vs reglas hardcoded)">AI fallback %</th>
+                                <th className="text-right px-4 py-3 font-medium" title="Veces que el bot se rindió en este step y alertó al admin">Pausas</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
@@ -563,14 +710,19 @@ const ProductTab = ({ mix }) => {
 
     return (
         <div className="space-y-6">
+            <InfoBox>
+                <p><strong>Qué estás viendo.</strong> Qué productos, en qué plan (60 o 120 días), y con qué método de pago se están vendiendo de verdad. No incluye ventas canceladas. Útil para decidir qué empujar y detectar si un vendedor tiene un mix raro (puede indicar guión desalineado).</p>
+                <p><strong>Ticket promedio.</strong> Es el precio promedio de una venta en esa combinación. Para la misma "Cápsulas 60d" vas a ver ticket distinto según pago porque el plan 60 con contra reembolso suma adicional MAX.</p>
+            </InfoBox>
+
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <KpiCard label="Órdenes totales" value={mix.total} />
+                <KpiCard label="Órdenes totales" value={mix.total} hint="Ventas cerradas en el rango" />
                 {Object.entries(byProduct).slice(0, 3).map(([prod, g]) => (
                     <KpiCard
                         key={prod}
                         label={prod}
                         value={`${g.count} (${((g.count / mix.total) * 100).toFixed(0)}%)`}
-                        hint={formatArs(g.revenue)}
+                        hint={formatArs(g.revenue) + ' facturado'}
                     />
                 ))}
             </div>
@@ -578,18 +730,19 @@ const ProductTab = ({ mix }) => {
             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
                 <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700">
                     <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-sm">Mix de producto × plan × pago</h3>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Share = qué porcentaje del total representa esa combinación. Ordenado por cantidad de órdenes.</p>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400">
                             <tr>
                                 <th className="text-left px-4 py-3 font-medium">Producto</th>
-                                <th className="text-left px-4 py-3 font-medium">Plan</th>
-                                <th className="text-left px-4 py-3 font-medium">Pago</th>
-                                <th className="text-right px-4 py-3 font-medium">Órdenes</th>
-                                <th className="text-right px-4 py-3 font-medium">Share</th>
-                                <th className="text-right px-4 py-3 font-medium">Ticket prom.</th>
-                                <th className="text-right px-4 py-3 font-medium">Ingreso</th>
+                                <th className="text-left px-4 py-3 font-medium" title="Duración del tratamiento — 60 o 120 días">Plan</th>
+                                <th className="text-left px-4 py-3 font-medium" title="Método que eligió el cliente">Pago</th>
+                                <th className="text-right px-4 py-3 font-medium" title="Cantidad de ventas con esta combinación">Órdenes</th>
+                                <th className="text-right px-4 py-3 font-medium" title="Porcentaje sobre el total de ventas del rango">Share</th>
+                                <th className="text-right px-4 py-3 font-medium" title="Precio promedio por venta (ya incluye adicional MAX si aplica)">Ticket prom.</th>
+                                <th className="text-right px-4 py-3 font-medium" title="Suma de todo lo facturado en esta combinación">Ingreso</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
@@ -639,10 +792,19 @@ const TechTab = ({ cache, aiFallback }) => {
 
     return (
         <div className="space-y-6">
-            <div className="bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 rounded-xl p-4 text-xs text-sky-700 dark:text-sky-300">
-                <strong>Tip:</strong> Steps con <strong>muchos AI calls</strong> y <strong>pocos cache hits</strong> son candidatos a mover FAQs frecuentes a reglas hardcodeadas
-                (o a pre-cachear respuestas). El `hits` del cache es histórico (no filtrado por rango de fechas), se muestra como referencia relativa.
-            </div>
+            <InfoBox>
+                <p><strong>Qué estás viendo.</strong> El bot tiene un <em>caché semántico</em>: cuando un cliente hace una pregunta parecida a otra que ya respondió antes, le sirve la respuesta guardada en lugar de gastar tokens en GPT. Esta vista mide qué tan bien está funcionando ese caché en cada step.</p>
+                <p><strong>Columnas.</strong> <strong>Mensajes</strong> = total de turnos del cliente en el rango. <strong>AI calls</strong> = veces que sí hubo que llamar a GPT. <strong>Cache entries</strong> = cuántas respuestas distintas hay almacenadas para ese step. <strong>Total hits</strong> = cuántas veces se reutilizaron las entradas cacheadas (<em>histórico acumulado</em>, no filtrado al rango).</p>
+            </InfoBox>
+
+            <InfoBox variant="tip">
+                <p><strong>¿Qué hacer con esto?</strong></p>
+                <ul className="list-disc ml-5 space-y-0.5">
+                    <li>Step con <strong>muchos AI calls y pocos cache entries</strong> → la gente pregunta cosas únicas, el caché no ayuda. Ver si se pueden hardcodear las respuestas más comunes en el guión.</li>
+                    <li>Step con <strong>muchos cache entries pero pocos hits</strong> → estamos guardando respuestas que nadie vuelve a pedir. Consume memoria sin ahorrar tokens.</li>
+                    <li>Step con <strong>Hits / entry &gt;5</strong> → excelente, el caché está devolviendo respuestas repetidamente (ahorra plata de OpenAI).</li>
+                </ul>
+            </InfoBox>
 
             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
@@ -650,11 +812,11 @@ const TechTab = ({ cache, aiFallback }) => {
                         <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400">
                             <tr>
                                 <th className="text-left px-4 py-3 font-medium">Step</th>
-                                <th className="text-right px-4 py-3 font-medium">Mensajes</th>
-                                <th className="text-right px-4 py-3 font-medium">AI calls</th>
-                                <th className="text-right px-4 py-3 font-medium">Cache entries</th>
-                                <th className="text-right px-4 py-3 font-medium">Total hits (histórico)</th>
-                                <th className="text-right px-4 py-3 font-medium">Hits / entry</th>
+                                <th className="text-right px-4 py-3 font-medium" title="Turnos del cliente procesados en este step (en el rango)">Mensajes</th>
+                                <th className="text-right px-4 py-3 font-medium" title="Veces que se invocó a GPT (en el rango)">AI calls</th>
+                                <th className="text-right px-4 py-3 font-medium" title="Cuántas respuestas distintas hay almacenadas para este step (acumulado histórico)">Cache entries</th>
+                                <th className="text-right px-4 py-3 font-medium" title="Veces totales que una entrada del caché fue reutilizada. Es histórico — no se puede filtrar por rango porque no guardamos timestamp de cada hit.">Total hits (histórico)</th>
+                                <th className="text-right px-4 py-3 font-medium" title="Hits dividido por entries — cuánto se reutiliza en promedio cada entrada cacheada. Mayor = caché más útil.">Hits / entry</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
