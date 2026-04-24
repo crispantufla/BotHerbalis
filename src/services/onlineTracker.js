@@ -34,12 +34,24 @@ async function endSession(accountId) {
     const start = sessionStarts.get(accountId);
     if (!start) return;
     sessionStarts.delete(accountId);
-    const elapsedSec = Math.floor((Date.now() - start) / 1000);
+    const endedAtMs = Date.now();
+    const elapsedSec = Math.floor((endedAtMs - start) / 1000);
     if (elapsedSec <= 0) return;
     try {
+        // Actualizamos el acumulado Y guardamos un row por sesión para
+        // poder reconstruir series temporales (horas por día, heatmap).
         await prisma.account.update({
             where: { id: accountId },
-            data: { totalOnlineSeconds: { increment: elapsedSec } },
+            data: {
+                totalOnlineSeconds: { increment: elapsedSec },
+                sessions: {
+                    create: {
+                        startedAt: new Date(start),
+                        endedAt: new Date(endedAtMs),
+                        durationSeconds: elapsedSec,
+                    },
+                },
+            },
         });
     } catch (e) {
         // Legacy accounts (accountId === 'legacy') or deleted accounts will 404 — fine.

@@ -136,7 +136,24 @@ model Account {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
+  sessions           AccountSession[]
+
   @@index([role])
+}
+
+// One row per "online span" = from when at least one socket for this account
+// went online until all of them disconnected/went idle. Feeds the stats view
+// (horas por día, mapa de calor, totales).
+model AccountSession {
+  id              String   @id @default(uuid())
+  accountId       String
+  account         Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  startedAt       DateTime
+  endedAt         DateTime
+  durationSeconds Int
+
+  @@index([accountId, startedAt])
+  @@index([startedAt])
 }
 
 model FunnelEvent {
