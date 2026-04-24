@@ -592,6 +592,9 @@ module.exports = (clientPool) => {
     });
 
     // GET /analytics/retries — métrica 2 (histograma de retryIndex por step)
+    // Computa retryIndex al leer (no al escribir) con un scan ordenado y
+    // conteo en memoria. Esto ahorra 1 query por cada mensaje del usuario
+    // que el bot procesa.
     router.get('/analytics/retries', ...withSeller(clientPool), async (req, res) => {
         try {
             const { from, to } = parseDateRange(req);
@@ -601,20 +604,27 @@ module.exports = (clientPool) => {
 
             const events = await prisma.messageEvent.findMany({
                 where,
-                select: { step: true, retryIndex: true },
+                select: { phone: true, step: true },
+                orderBy: { at: 'asc' },
             });
 
-            // Bucketizar retryIndex: 0 (primer intento), 1 (re-pregunta), 2-3, 4+
+            // Para cada (phone, step) en orden temporal, asignar posición:
+            // 0 = primer intento, 1 = re-pregunta, etc.
+            const positions = new Map();
             const byStep = new Map();
             for (const e of events) {
+                const key = `${e.phone}|${e.step}`;
+                const pos = positions.get(key) || 0;
+                positions.set(key, pos + 1);
+
                 if (!byStep.has(e.step)) {
                     byStep.set(e.step, { step: e.step, b0: 0, b1: 0, b2_3: 0, b4plus: 0, total: 0 });
                 }
                 const g = byStep.get(e.step);
                 g.total++;
-                if (e.retryIndex === 0) g.b0++;
-                else if (e.retryIndex === 1) g.b1++;
-                else if (e.retryIndex <= 3) g.b2_3++;
+                if (pos === 0) g.b0++;
+                else if (pos === 1) g.b1++;
+                else if (pos <= 3) g.b2_3++;
                 else g.b4plus++;
             }
 

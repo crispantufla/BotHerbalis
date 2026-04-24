@@ -6,9 +6,16 @@ const connectionString = process.env.DATABASE_URL;
 
 const pool = new Pool({
     connectionString,
-    max: 20,                     // 8 sellers × 3 worker concurrency + API headroom
-    idleTimeoutMillis: 30000,    // Close idle connections after 30s
-    connectionTimeoutMillis: 5000 // Fail fast if DB is unreachable
+    // Techo del pool. Consumidores reales cuando arranca todo:
+    // ~6 workers × 1 concurrency + scheduler crons + analytics tabs cargando
+    // 10 endpoints en paralelo + state saves + funnel writes. 20 se satura
+    // apenas un admin abre la vista de analítica; 40 deja margen sin
+    // acercarnos al tope del plan pago de Railway Postgres.
+    max: 40,
+    idleTimeoutMillis: 30000,
+    // 5s era muy agresivo bajo carga: la query del pool llegaba con delay de
+    // red + contención y fallaba antes de tener una conexión disponible.
+    connectionTimeoutMillis: 15000
 });
 
 pool.on('error', (err) => {

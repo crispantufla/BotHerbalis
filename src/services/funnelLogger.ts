@@ -122,10 +122,14 @@ export async function incrementAiCallCount(sellerId: string, phone: string): Pro
 }
 
 /**
- * Registra un mensaje del usuario: calcula retryIndex como # de mensajes
- * previos del mismo (seller, phone, step) en los últimos 30 min. Útil para
- * medir "el bot repreguntó lo mismo N veces".
- * También incrementa messageCount del FunnelEvent abierto.
+ * Registra un mensaje del usuario. También incrementa messageCount del
+ * FunnelEvent abierto.
+ *
+ * NOTA: retryIndex se deja en 0 al insertar. El COUNT que calculaba el
+ * índice en escritura saturaba el pool bajo carga (1 query extra por
+ * mensaje, con scan parcial por falta de índice compuesto con `phone`).
+ * El endpoint /analytics/retries computa los retries con una agregación
+ * SQL al leer, que es mucho más barato globalmente.
  */
 export async function logMessage(args: {
     sellerId: string;
@@ -139,13 +143,8 @@ export async function logMessage(args: {
     if (!sellerId || !phone || !step) return;
 
     try {
-        const since = new Date(Date.now() - 30 * 60 * 1000);
-        const retryIndex = await prisma.messageEvent.count({
-            where: { sellerId, phone, step, at: { gte: since } },
-        });
-
         await prisma.messageEvent.create({
-            data: { sellerId, phone, step, matched, aiCalled, priceObjection, retryIndex },
+            data: { sellerId, phone, step, matched, aiCalled, priceObjection },
         });
 
         // Incrementar messageCount en el FunnelEvent abierto
