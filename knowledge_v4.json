@@ -92,7 +92,7 @@
                 "bueno",
                 "ok"
             ],
-            "response": "¡Excelente decisión! 🎉\n\nMe acaba de figurar que tengo cupo para meter tu paquete en el camión de las encomiendas que sale temprano mañana 🚚, así te llega lo más rápido posible.\n\nPasame estos datos exactos para armar la etiqueta de envío ya mismo 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(Fijate que la dirección sea exacta 🙏)",
+            "response": "¡Excelente decisión! 🎉\n\nPasame estos datos exactos para armar la etiqueta de envío ya mismo 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(Fijate que la dirección sea exacta 🙏)",
             "nextStep": "waiting_data"
         },
         "confirmation": {

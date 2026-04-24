@@ -226,7 +226,7 @@ module.exports = (clientPool) => {
                 const rawPhone = updatedOrder.userPhone.replace(/\D/g, '');
                 const targetPhone = `${rawPhone}@c.us`;
 
-                const msg = "Tu envío ya está en curso 🚀, dentro de 48 hs podés pedirnos el código de seguimiento\n\n¡Muchas gracias por confiar en Herbalis!";
+                const msg = "Pedido confirmado ✅\n\n¡Muchas gracias por confiar en Herbalis 🌱!\n\nApenas tengamos el código de seguimiento te lo pasamos.";
 
                 // Skip if user already received confirmation (step already 'completed')
                 const ss = req.sellerInstance?.sharedState;
@@ -518,7 +518,7 @@ module.exports = (clientPool) => {
 
             // Send confirmation message unless silent mode
             if (!silent) {
-                const msg = "Tu envío ya está en curso 🚀, dentro de 48 hs podés pedirnos el código de seguimiento\n\n¡Muchas gracias por confiar en Herbalis!";
+                const msg = "Pedido confirmado ✅\n\n¡Muchas gracias por confiar en Herbalis 🌱!\n\nApenas tengamos el código de seguimiento te lo pasamos.";
                 try {
                     const targetPhone = `${phoneNumeric}@c.us`;
                     logger.info(`[MANUAL-COMPLETE] Enviando WhatsApp de confirmación a ${targetPhone}...`);
