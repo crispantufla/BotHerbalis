@@ -60,7 +60,11 @@ module.exports = (clientPool) => {
         // Handle @lid format
         if (id.includes('@lid')) {
             const cached = _cacheGet(sellerId, id);
-            if (cached) return cached.id;
+            // Solo confiamos en cache exitosa (resuelta a @c.us). Una entrada
+            // cacheada con @lid significa que un intento previo falló — no la
+            // pisamos como resultado válido o quedaríamos con el ID sin
+            // resolver para siempre.
+            if (cached && !cached.id.includes('@lid')) return cached.id;
             try {
                 const contact = await _puppeteerLimit(() => client?.getContactById(id));
                 if (contact && contact.number) {
@@ -168,12 +172,17 @@ module.exports = (clientPool) => {
 
                 if (actualId.includes('@lid')) {
                     const cachedContact = _cacheGet(currentSellerId, actualId);
-                    if (cachedContact) {
+                    // Solo confiamos en cache si fue una resolución EXITOSA (id ya
+                    // resuelto a @c.us). Si la cache vieja guardó un fallo
+                    // (@lid → @lid), reintentamos: quedó pegada eternamente y
+                    // generaba chats duplicados (uno @lid + uno @c.us del mismo
+                    // cliente, sin dedup por id).
+                    if (cachedContact && !cachedContact.id.includes('@lid')) {
                         actualId = cachedContact.id;
                         actualName = cachedContact.name;
                     } else {
                         try {
-                            const contact = await withTimeout(_puppeteerLimit(() => cl.getContactById(actualId)), 1500, 'Timeout');
+                            const contact = await withTimeout(_puppeteerLimit(() => cl.getContactById(actualId)), 2500, 'Timeout');
                             if (contact && contact.number) {
                                 actualId = `${contact.number}@c.us`;
                                 if (contact.name || contact.pushname) {
@@ -184,9 +193,10 @@ module.exports = (clientPool) => {
                                 _cacheSet(currentSellerId, c.id._serialized, { id: actualId, name: actualName });
                             }
                         } catch (e) {
-                            // Silenciar el spam: Si Meta hace timeout, guardamos el @lid temporalmente
-                            // para no atorar la red iterando 50 veces por segundo en futuras recargas.
-                            _cacheSet(currentSellerId, c.id._serialized, { id: actualId, name: actualName });
+                            // No cacheamos fallos. Antes guardábamos @lid→@lid lo
+                            // que dejaba el chat duplicado para siempre. pLimit(5)
+                            // limita el costo de reintentar; con timeout de 2.5s
+                            // damos a Meta margen suficiente.
                         }
                     }
                 }
@@ -224,6 +234,51 @@ module.exports = (clientPool) => {
                         originalId: isExistingLid && !isNewLid ? originalId : existing.originalId // keep @c.us originalId if possible
                     });
                 }
+            }
+
+            // 2.5 Segunda pasada: dedup por número de teléfono (últimos 10 dígitos).
+            // Si Meta nunca resuelve un @lid, el chat aparece duplicado: uno con
+            // ID @lid y otro con @c.us del mismo número. Acá los unificamos
+            // matcheando por phone, prefiriendo siempre el @c.us.
+            const byLast10 = new Map();
+            for (const item of resolvedChatsMap.values()) {
+                const last10 = item.resolvedId.replace(/\D/g, '').slice(-10);
+                if (!last10) continue;
+                if (!byLast10.has(last10)) {
+                    byLast10.set(last10, item);
+                    continue;
+                }
+                const prev = byLast10.get(last10);
+                const prevIsLid = prev.resolvedId.includes('@lid');
+                const curIsLid = item.resolvedId.includes('@lid');
+                // Si uno es @c.us y el otro @lid, nos quedamos con el @c.us
+                let winner = prev;
+                if (prevIsLid && !curIsLid) winner = item;
+                else if (!prevIsLid && curIsLid) winner = prev;
+                else {
+                    // Ambos del mismo tipo: nos quedamos con el más reciente
+                    winner = item.chatData.timestamp > prev.chatData.timestamp ? item : prev;
+                }
+                // El nombre lo tomamos del que tenga uno legible
+                const prevName = prev.resolvedName || '';
+                const curName = item.resolvedName || '';
+                const prevHasName = prevName && !prevName.includes('@') && prevName.replace(/\D/g, '').length < 13;
+                const curHasName = curName && !curName.includes('@') && curName.replace(/\D/g, '').length < 13;
+                let mergedName = winner.resolvedName;
+                if (curHasName && !prevHasName) mergedName = curName;
+                else if (prevHasName && !curHasName) mergedName = prevName;
+                // Mensaje más reciente entre los dos
+                const newest = item.chatData.timestamp > prev.chatData.timestamp ? item.chatData : prev.chatData;
+                byLast10.set(last10, {
+                    ...winner,
+                    chatData: newest,
+                    resolvedName: mergedName,
+                });
+            }
+            // Reconstruir el resolvedChatsMap a partir de byLast10
+            resolvedChatsMap.clear();
+            for (const item of byLast10.values()) {
+                resolvedChatsMap.set(item.resolvedId, item);
             }
 
             // OPTIMIZATION: Pre-calculate orders by phone to avoid O(N*M) complexity
