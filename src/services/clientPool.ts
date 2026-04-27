@@ -692,9 +692,9 @@ class ClientPool {
     }
 
     /**
-     * Night-mode: apaga Chromium de 2 a 8 AM hora Argentina.
+     * Night-mode: apaga Chromium de 3 a 7 AM hora Argentina.
      * A esa franja casi no entran mensajes; mantener 8 Chromiums prendidos
-     * cuesta ~4 GB de RAM para nada. Los reiniciamos a las 8 AM.
+     * cuesta ~4 GB de RAM para nada. Los reiniciamos a las 7 AM.
      *
      * No toca sellers en modo headful (alguien podría estar viendo el VNC)
      * ni sellers que el admin haya detenido manualmente.
@@ -722,7 +722,7 @@ class ClientPool {
 
         const isNightWindow = (): boolean => {
             const h = getArHour();
-            return h >= 2 && h < 8; // [2:00, 8:00) AR
+            return h >= 3 && h < 7; // [3:00, 7:00) AR
         };
 
         const tick = async () => {
@@ -732,7 +732,7 @@ class ClientPool {
                     for (const [sellerId, instance] of this.instances) {
                         if (instance.headful) continue; // no matar viewers activos
                         if (this.nightStoppedSellers.has(sellerId)) continue;
-                        logger.info(`[NIGHT] Stopping ${sellerId} (2-8 AM AR window)`);
+                        logger.info(`[NIGHT] Stopping ${sellerId} (3-7 AM AR window)`);
                         this.nightStoppedSellers.add(sellerId);
                         this.stopSeller(sellerId).catch(e =>
                             logger.error(`[NIGHT] stopSeller(${sellerId}) failed: ${e.message}`)
@@ -756,7 +756,7 @@ class ClientPool {
         };
 
         this.nightModeInterval = setInterval(tick, CHECK_MS);
-        logger.info('[NIGHT] Night-mode scheduler started (sleeps 2-8 AM AR)');
+        logger.info('[NIGHT] Night-mode scheduler started (sleeps 3-7 AM AR)');
         // Arranca un tick inmediato por si el proceso bootea dentro de la ventana
         tick().catch(() => {});
     }
