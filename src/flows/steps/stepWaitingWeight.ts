@@ -18,6 +18,18 @@ export async function handleWaitingWeight(
     // If text is super long (like a transcription), force AI to handle it so we don't look robotic
     const isVeryLongMessage = text.split(/\s+/).length > 20;
 
+    // Empty affirmative ("Sii", "si", "ok", "dale") sin contexto previo: re-preguntar el rango
+    // en vez de dejar que el AI invente una recomendación. Solo aplica si AÚN no hay weightGoal
+    // ni producto sugerido y el último mensaje del bot fue la pregunta del rango.
+    const isEmptyAffirmative = /^(s+i+|si+|sip|sii+|dale|ok|okey|okis|listo|bueno|claro|obvio|perfecto|genial)\s*[!.]*\s*$/i.test(text.trim());
+    if (isEmptyAffirmative && !currentState.weightGoal && !(currentState as any).suggestedProduct) {
+        const reaskMsg = '¡Genial! 😊 ¿Cuántos kilos querés bajar? ¿Hasta 10, entre 10 y 20, o más de 20?';
+        currentState.history.push({ role: 'bot', content: reaskMsg, timestamp: Date.now() });
+        saveState(userId);
+        await sendMessageWithDelay(userId, reaskMsg);
+        return { matched: true };
+    }
+
     const tLow = text.toLowerCase();
     let implicitProduct = null;
 
@@ -137,7 +149,7 @@ export async function handleWaitingWeight(
             logger.info(`[AI-FALLBACK] waiting_weight: No number detected for ${userId}`);
             const aiWeight = await aiService.chat(text, {
                 step: FlowStep.WAITING_WEIGHT,
-                goal: 'El usuario NO te ha dicho cuántos kilos quiere bajar. Tu objetivo es explicar brevemente el producto seleccionado y PREGUNTAR SUTÍLMENTE CUÁNTO PESO BUSCAN BAJAR para continuar. RESPONDÉ NATURALMENTE Y COMO HUMANO. 1) Si la persona envía una pregunta fuera de contexto, o una palabra sin sentido, respóndele brevemente intentando volver al tema de la baja de peso. 2) Si dice no saberlo, ofrécele una estimación. 3) TERMINA SIEMPRE con la pregunta "¿Cuántos kilos te gustaría bajar aproximadamente?" al final de tu respuesta de validación.',
+                goal: 'El usuario NO te dijo cuántos kilos quiere bajar. Tu único objetivo: re-preguntar el rango de kilos de forma natural y BREVE. REGLAS DURAS: (a) Máx 1-2 frases cortas, total ~150 caracteres. (b) PROHIBIDO repetir info ya dada (que enviamos a todo el país, que las cápsulas son efectivas, etc). (c) Una sola pregunta al final, NUNCA dos. (d) Si dijo de qué provincia es, una reacción humana corta ("Ay qué lindo [lugar]!" o similar) y directo a la pregunta. (e) Si dijo no saberlo, ofrecé estimación rápida. (f) Terminá con: "¿Cuántos kilos querés bajar?" o variante natural — UNA pregunta sola.',
                 history: currentState.history,
                 summary: currentState.summary,
                 knowledge: knowledge,
