@@ -26,7 +26,7 @@
         },
         "recommendation": {
             "step": "waiting_weight",
-            "response": "Perfecto 👌\n\nEse objetivo es totalmente posible. Pasemos directo a ver qué opción es mejor para vos.\n\nTenemos:\n1️⃣ Cápsulas (Lo más efectivo y práctico)\n2️⃣ Semillas/Infusión (Más natural)\n3️⃣ Gotas (Para >70 años o poquitos kilos)\n\n¿Cuál te gustaría probar?",
+            "response": "Perfecto 👌\n\nEse objetivo es totalmente posible — lo logramos con miles de clientes 🙂\n\n¿Cuál te gustaría probar?\n\n1️⃣ Cápsulas (lo más efectivo y práctico)\n2️⃣ Semillas/Infusión (más natural)\n3️⃣ Gotas (para +70 años o pocos kilos)",
             "nextStep": "waiting_preference"
         },
         "preference_capsulas": {
@@ -39,7 +39,7 @@
                 "practico",
                 "practica"
             ],
-            "response": "Genial 👍 Cápsulas es la mejor opción para vos.\n\n💊 Se toman:\n• 1 cápsula por día\n• 30 min antes del almuerzo o la cena\n\nTenés dos opciones:\n\n🔹 60 días → ${{PRICE_CAPSULAS_60}}\n🔹 120 días → ${{PRICE_CAPSULAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl servicio de pago contra entrega tiene un adicional de $6.000.\nPero con el plan de 120 días, ¡te REGALAMOS ese servicio!\n👉 ¿Avanzamos con 60 o 120 días?",
+            "response": "Genial 👍 Excelente elección.\n\n💊 Se toma 1 cápsula al día, 30 min antes de la comida principal.\n\n🏆 *Plan 120 días — ${{PRICE_CAPSULAS_120}}*\n_Envío gratis + pago a domicilio bonificado_ ✅\n\n🔸 Plan 60 días — ${{PRICE_CAPSULAS_60}}\n_+$6.000 si pagás contra reembolso_\n\n👉 ¿Avanzamos con 120 o 60 días?",
             "nextStep": "waiting_plan_choice"
         },
         "preference_semillas": {
@@ -53,7 +53,7 @@
                 "natural",
                 "tradicional"
             ],
-            "response": "Genial 🌿 La semilla en estado natural es la opción más elegida.\n\nSe consume en forma de infusión cada noche.\n\n🔹 60 días → ${{PRICE_SEMILLAS_60}}\n🔹 120 días → ${{PRICE_SEMILLAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl servicio de pago contra entrega tiene un adicional de $6.000.\nPero con el plan de 120 días, ¡te REGALAMOS ese servicio!\n👉 ¿Avanzamos con 60 o 120 días?",
+            "response": "Genial 🌿 Las semillas son la opción más elegida.\n\n🌿 Se prepara como infusión cada noche.\n\n🏆 *Plan 120 días — ${{PRICE_SEMILLAS_120}}*\n_Envío gratis + pago a domicilio bonificado_ ✅\n\n🔸 Plan 60 días — ${{PRICE_SEMILLAS_60}}\n_+$6.000 si pagás contra reembolso_\n\n👉 ¿Avanzamos con 120 o 60 días?",
             "nextStep": "waiting_plan_choice"
         },
         "preference_gotas": {
@@ -63,7 +63,7 @@
                 "liquido",
                 "gotero"
             ],
-            "response": "Genial 🌿 Las gotas son prácticas y discretas.\n\n🔹 60 días → ${{PRICE_GOTAS_60}}\n🔹 120 días → ${{PRICE_GOTAS_120}}\n\n📦 Envío gratis a todo el país.\n\nImportante 👇\nEl servicio de pago contra entrega tiene un adicional de $6.000.\nPero con el plan de 120 días, ¡te REGALAMOS ese servicio!\n👉 ¿Avanzamos con 60 o 120 días?",
+            "response": "Genial 🌿 Las gotas son prácticas y discretas.\n\n💧 Se absorben rápido, sin preparar nada.\n\n🏆 *Plan 120 días — ${{PRICE_GOTAS_120}}*\n_Envío gratis + pago a domicilio bonificado_ ✅\n\n🔸 Plan 60 días — ${{PRICE_GOTAS_60}}\n_+$6.000 si pagás contra reembolso_\n\n👉 ¿Avanzamos con 120 o 60 días?",
             "nextStep": "waiting_plan_choice"
         },
         "price_capsulas": {
@@ -251,9 +251,13 @@
         {
             "keywords": [
                 "como funciona",
-                "como actua"
+                "como actua",
+                "explicame",
+                "explicar",
+                "que es eso",
+                "como hace efecto"
             ],
-            "response": "Acompaña el proceso natural del cuerpo, ayudando a eliminar excesos de manera progresiva.\n\n¿Buscás algo práctico o más natural?"
+            "response": "La Nuez de la India activa el metabolismo y ayuda al cuerpo a eliminar grasas y toxinas de forma natural y progresiva, sin rebote 🌿\n\nEs 100% natural — trabajamos con este producto hace más de 13 años con miles de clientes.\n\n¿Buscás algo práctico o más natural?"
         },
         {
             "keywords": [

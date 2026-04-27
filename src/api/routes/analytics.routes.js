@@ -887,5 +887,77 @@ module.exports = (clientPool) => {
         }
     });
 
+    // GET /analytics/rescue-queue — leads atascados ordenados por proximidad al cierre.
+    // Toma userState en memoria del seller (live), filtra los que están en mid-funnel sin
+    // actividad reciente y no pausados. Ranking: step más avanzado primero, luego inactividad.
+    router.get('/analytics/rescue-queue', ...withSeller(clientPool), async (req, res) => {
+        try {
+            const sellerInstance = req.sellerInstance;
+            if (!sellerInstance?.sharedState?.userState) {
+                return res.json({ leads: [], total: 0 });
+            }
+            const { userState, pausedUsers } = sellerInstance.sharedState;
+
+            // Step rank: cuanto más cerca de "completed", más alta la prioridad de rescate
+            const STEP_RANK = {
+                'waiting_admin_validation': 100,
+                'waiting_final_confirmation': 90,
+                'waiting_maps_confirmation': 80,
+                'waiting_data': 70,
+                'waiting_transfer_confirmation': 65,
+                'waiting_mp_payment': 60,
+                'waiting_payment_method': 55,
+                'waiting_plan_choice': 40,
+                'waiting_ok': 35,
+                'waiting_preference': 30,
+                'waiting_weight': 20,
+            };
+
+            const minMinutesIdle = parseInt(req.query.minMinutesIdle) || 60;
+            const maxMinutesIdle = parseInt(req.query.maxMinutesIdle) || 60 * 24 * 7; // 7 días
+            const now = Date.now();
+
+            const leads = [];
+            for (const [userId, state] of Object.entries(userState)) {
+                if (!state || !state.step) continue;
+                if (!(state.step in STEP_RANK)) continue;
+                if (pausedUsers && pausedUsers.has(userId)) continue;
+
+                const lastActivity = state.lastActivityAt || state.stepEnteredAt;
+                if (!lastActivity) continue;
+
+                const minsIdle = Math.floor((now - lastActivity) / 60000);
+                if (minsIdle < minMinutesIdle || minsIdle > maxMinutesIdle) continue;
+
+                leads.push({
+                    phone: userId.replace(/@.*/, ''),
+                    name: state.userName || state.partialAddress?.nombre || null,
+                    step: state.step,
+                    stepRank: STEP_RANK[state.step],
+                    minutesIdle: minsIdle,
+                    selectedProduct: state.selectedProduct || null,
+                    selectedPlan: state.selectedPlan || null,
+                    weightGoal: state.weightGoal || null,
+                    paymentMethod: state.paymentMethod || null,
+                    cartTotal: state.totalPrice || null,
+                    reengagementSent: !!state.reengagementSent,
+                    secondFollowUpSent: !!state.secondFollowUpSent,
+                });
+            }
+
+            // Orden: stepRank desc (más cerca del cierre primero), luego menos idle (más fresco primero)
+            leads.sort((a, b) => b.stepRank - a.stepRank || a.minutesIdle - b.minutesIdle);
+
+            res.json({
+                total: leads.length,
+                leads: leads.slice(0, 100),
+                generatedAt: new Date().toISOString(),
+            });
+        } catch (e) {
+            logger.error('🔴 [ANALYTICS] rescue-queue:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     return router;
 };

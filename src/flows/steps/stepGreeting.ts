@@ -110,7 +110,21 @@ export async function handleGreeting(
         logger.error('[GREETING] Failed to send image:', e.message);
     }
 
-    // 3. Send Question Part THIRD
+    // 3. Atajo: si el cliente ya dio el objetivo en el primer mensaje
+    // (ej: "quiero bajar 10 kilos", "tengo 20 kg de más"), evitamos repetir
+    // la pregunta y procesamos su mensaje directo en waiting_weight.
+    const hasExplicitGoal = /\b\d{1,3}\s*(kg|kilos?|kilogramos?)\b|\bbajar\s+\d{1,3}\b|\bperder\s+\d{1,3}\b/i.test(text);
+
+    if (hasExplicitGoal) {
+        logger.info(`[GREETING-SHORTCUT] User ${userId} provided weight goal in first message — skipping kilos question.`);
+        _setStep(currentState, knowledge.flow.greeting.nextStep);
+        saveState(userId);
+        const fakeUserStateMap = { [userId]: currentState };
+        await processSalesFlow(userId, text, fakeUserStateMap, knowledge, dependencies);
+        return { matched: true };
+    }
+
+    // 4. Send Question Part (kilos) — only if we didn't shortcut above
     if (greetingPart2) {
         currentState.history.push({ role: 'bot', content: greetingPart2, timestamp: Date.now() });
         await sendMessageWithDelay(userId, greetingPart2);

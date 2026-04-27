@@ -4,9 +4,9 @@ import { buildConfirmationMessage } from '../../utils/messageTemplates';
 import { calculateTotal, _recalcAdicionalMAX } from '../utils/cartHelpers';
 import logger from '../../utils/logger';
 
-const MP_KEYWORDS = /\b(mercadopago|mercado.?pago|mp|online|digital|qr|transferencia bancaria|tarjeta|debito|debito|credito|2|segundo|pago online|pago digital|pago ahora)\b/i;
-const TRANSFER_KEYWORDS = /\b(transfer[ei]ncia|transf|alias|deposito|banco|3|tercero|tercera)\b/i;
-const CASH_KEYWORDS = /\b(contra.?reembolso|contrarembolso|efectivo|cash|1|primero|primera|al recibir|plata en mano|cuando llega|cartero)\b/i;
+const MP_KEYWORDS = /\b(mercadopago|mercado.?pago|mp|online|digital|qr|tarjeta|d[ée]bito|cr[ée]dito|2|dos|segundo|segunda|opci[óo]n 2|la 2|el 2|n[uú]mero 2|pago online|pago digital|pago ahora|por mp|con mp|por mercadopago|app|aplicaci[óo]n)\b/i;
+const TRANSFER_KEYWORDS = /\b(transfer[ei]ncia|transf|transferir|alias|deposito|dep[óo]sito|banco|bancaria|3|tres|tercero|tercera|opci[óo]n 3|la 3|el 3|n[uú]mero 3|cbu|cvu|por transferencia)\b/i;
+const CASH_KEYWORDS = /\b(contra.?reembolso|contrarembolso|contra entrega|efectivo|cash|1|uno|primero|primera|opci[óo]n 1|la 1|el 1|n[uú]mero 1|al recibir|plata en mano|cuando llega|cartero|al cartero|en mano|al recibirlo|por contra reembolso|cuando me llegue|cuando lo reciba)\b/i;
 
 const PAYMENT_MSG = (adicional: number, plan: string) => {
     const adicionalStr = adicional.toLocaleString('es-AR');

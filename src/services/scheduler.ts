@@ -48,7 +48,9 @@ const RE_ENGAGEABLE_STEPS = new Set([
     'waiting_price_confirmation',
     'waiting_plan_choice',
     'waiting_ok',
-    'waiting_data'
+    'waiting_data',
+    'waiting_mp_payment',
+    'waiting_transfer_confirmation'
 ]);
 
 const STALE_THRESHOLD_MINS = 20;
@@ -616,6 +618,15 @@ function startScheduler(sharedState: SchedulerSharedState, dependencies: Schedul
         logger.info('[SCHEDULER] ✅ refreshPendingPayments → cada 5 min (9-23h ARG)');
     }
 
+    // ── MP PAYMENT REMINDERS: cada 10 minutos de 10-21h Argentina ──
+    // Mensajea al cliente si lleva 30min en waiting_mp_payment sin pagar (recordatorio
+    // amable), o 4h (escalada al vendedor). Distinto de refreshPendingPayments —
+    // ese solo actualiza estado en DB; este sí mensajea al cliente.
+    cron.schedule('*/10 10-21 * * *', () => {
+        checkPendingMpPayments(sharedState, dependencies);
+    }, { timezone: TIMEZONE });
+    logger.info('[SCHEDULER] ✅ checkPendingMpPayments → cada 10 min (10-21h ARG)');
+
     // ── FUNNEL DROP-OUT SWEEP: cada 15 min, registrado UNA vez globalmente ──
     // Cierra FunnelEvents abiertos hace más de 48h como exitType='dropped'.
     // Global porque la tabla es compartida entre sellers — correrlo por seller
@@ -731,6 +742,73 @@ async function snapshotDailyStats(sharedState?: SchedulerSharedState) {
 }
 
 /**
+ * checkPendingMpPayments — recordatorios para clientes que eligieron MP pero no completaron.
+ * 30min: recordatorio amable con link nuevamente.
+ * 4h: último recordatorio + pausar y notificar al vendedor para llamado manual.
+ *
+ * Distinto de refreshPendingPayments (que solo actualiza el estado en DB).
+ * Acá MENSAJEAMOS al cliente.
+ */
+async function checkPendingMpPayments(sharedState: SchedulerSharedState, dependencies: SchedulerDependencies): Promise<void> {
+    const { userState, pausedUsers } = sharedState;
+    const { sendMessageWithDelay, saveState, notifyAdmin } = dependencies;
+    const now = Date.now();
+
+    if (!isBusinessHours()) return;
+
+    for (const [userId, state] of Object.entries(userState)) {
+        if (state.step !== 'waiting_mp_payment') continue;
+        if (pausedUsers && pausedUsers.has(userId)) continue;
+
+        const enteredAt = (state as any).stepEnteredAt || (state as any).lastActivityAt;
+        if (!enteredAt) continue;
+
+        const minsSince = differenceInMinutes(now, enteredAt);
+        const mpReminderStage = (state as any).mpReminderStage || 0;
+
+        // Stage 1: 30 minutos sin pagar — recordatorio amable
+        if (mpReminderStage === 0 && minsSince >= 30 && minsSince < 240) {
+            const linkUrl = (state as any).mpPaymentLinkUrl;
+            const linkLine = linkUrl ? `\n\nAcá te dejo el link de nuevo:\n${linkUrl}` : '';
+            const msg = `¡Hola! 👋 ¿Tuviste algún problema con el pago de MercadoPago? Si necesitás otra forma (transferencia o contra reembolso), avisame y lo cambiamos sin problema 🙂${linkLine}`;
+            try {
+                await sendMessageWithDelay(userId, msg);
+                state.history = state.history || [];
+                state.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+                (state as any).mpReminderStage = 1;
+                (state as any).mpReminderSentAt = Date.now();
+                saveState(userId);
+                logger.info(`[SCHEDULER][${sharedState.sellerId || '?'}] MP reminder #1 sent to ${userId} (${minsSince}min waiting)`);
+            } catch (e: any) {
+                logger.error(`[SCHEDULER] Failed to send MP reminder to ${userId}:`, e.message);
+            }
+            continue;
+        }
+
+        // Stage 2: 4 horas sin pagar — último recordatorio + escalar al vendedor
+        if (mpReminderStage === 1 && minsSince >= 240) {
+            const msg = `¡Hola! Veo que el pago aún no se concretó 🙂 Te paso a un asesor para que te ayude con cualquier inconveniente. ¡Hasta enseguida!`;
+            try {
+                await sendMessageWithDelay(userId, msg);
+                state.history = state.history || [];
+                state.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+                (state as any).mpReminderStage = 2;
+                pausedUsers.add(userId);
+                (state as any).pauseReason = '⏸️ Pausado automáticamente: cliente con MP pendiente >4h. Vendedor por favor contactar.';
+                (state as any).pausedAt = new Date();
+                saveState(userId);
+                if (notifyAdmin) {
+                    await notifyAdmin('MP pendiente >4h', userId, `Cliente eligió MercadoPago pero no completó el pago en 4h. Contactar manualmente.`);
+                }
+                logger.info(`[SCHEDULER][${sharedState.sellerId || '?'}] MP escalated to seller: ${userId} (${minsSince}min waiting)`);
+            } catch (e: any) {
+                logger.error(`[SCHEDULER] Failed to escalate MP timeout for ${userId}:`, e.message);
+            }
+        }
+    }
+}
+
+/**
  * refreshPendingPayments
  * Polls MercadoPago for any PaymentLink still in 'pending' status (created < 48h ago)
  * and updates the DB + emits socket if the status changed.
@@ -806,4 +884,4 @@ async function refreshPendingPayments(sharedState: SchedulerSharedState): Promis
     }
 }
 
-export { startScheduler, checkStaleUsers, checkColdLeads, checkAbandonedCarts, autoApproveOrders, cleanStalePausedUsers, snapshotDailyStats, refreshPendingPayments };
+export { startScheduler, checkStaleUsers, checkColdLeads, checkAbandonedCarts, autoApproveOrders, cleanStalePausedUsers, snapshotDailyStats, refreshPendingPayments, checkPendingMpPayments };

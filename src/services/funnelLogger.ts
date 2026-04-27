@@ -16,6 +16,10 @@ import logger from '../utils/logger';
 const { prisma } = require('../../db');
 
 // Orden canónico del embudo — usado para distinguir "advanced" vs "back".
+// Refleja el flujo real de v4: plan_choice → payment_method → (cash) data →
+// maps_confirmation → final_confirmation. Antes de este fix, waiting_data
+// estaba listado ANTES de waiting_payment_method, lo que generaba falsos
+// positivos de "back" en la métrica cuando el cliente elegía contra reembolso.
 // Steps fuera de este orden (rejected_*, safety_check, post_sale, etc.) se
 // clasifican como "advanced" siempre (no son un retroceso lateral).
 const STEP_ORDER: string[] = [
@@ -27,11 +31,11 @@ const STEP_ORDER: string[] = [
     'waiting_plan_choice',
     'waiting_price_confirmation',
     'waiting_ok',
-    'waiting_data',
-    'waiting_maps_confirmation',
     'waiting_payment_method',
     'waiting_mp_payment',
     'waiting_transfer_confirmation',
+    'waiting_data',
+    'waiting_maps_confirmation',
     'waiting_final_confirmation',
     'waiting_admin_ok',
     'waiting_admin_validation',

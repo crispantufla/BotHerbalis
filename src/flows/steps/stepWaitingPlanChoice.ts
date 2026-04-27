@@ -119,9 +119,20 @@ export async function handleWaitingPlanChoice(
     // for the plan selection (we still want AI to answer the question, but we lock the cart first)
     const strictPlanMatch = normalizedText.match(/\b(el de|plan de|quiero el|opcion de|promo de)\s*(60|120|180|240|300|360|420|480|540|600)\b/i);
     const planMatch = normalizedText.match(/\b(60|120|180|240|300|360|420|480|540|600)\b/);
-    
+
+    // Semantic shortcuts — captura formas naturales sin necesidad de IA.
+    // El plan "recomendado" en los mensajes es siempre el 120 (envío bonificado).
+    // "60" es la opción más corta/barata. Usamos boundaries estrictos para evitar
+    // falsos positivos (ej: "el largo plazo me preocupa" no matchea "el largo" como plan).
+    const semantic120 = /\b(el (de )?(?:120|ciento veinte|cuatro meses|4 meses)|cuatro meses|4 meses|el (m[áa]s )?(largo|grande|completo|recomendado|caro)|el de m[áa]s d[íi]as|el de cuatro|el de 4|recomendado|le metemos|le metemos con (el )?120|dale (al )?(de )?120|el bonificado)\b/i;
+    const semantic60 = /\b(el (de )?(?:60|sesenta|dos meses|2 meses)|dos meses|2 meses|el (m[áa]s )?(corto|chico|barato|inicial|inicio|peque[ñn]o)|el de inicio|el de menos d[íi]as|el de dos|el de 2|arrancamos con (el )?60|empiezo con (el )?60)\b/i;
+
     if (strictPlanMatch && !isVeryLongMessage) {
         selectedPlanId = strictPlanMatch[2];
+    } else if (semantic120.test(normalizedText) && !semantic60.test(normalizedText) && !isVeryLongMessage) {
+        selectedPlanId = '120';
+    } else if (semantic60.test(normalizedText) && !semantic120.test(normalizedText) && !isVeryLongMessage) {
+        selectedPlanId = '60';
     } else if (planMatch && !hasQuestionText && !isVeryLongMessage) {
         selectedPlanId = planMatch[1];
     }
