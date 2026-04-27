@@ -80,19 +80,22 @@ export function jwtAuthMiddleware(req: any, res: any, next: any) {
     }
 
     // --- Legacy fallback: x-api-key ---
-    const API_KEY = process.env.API_KEY;
-    const apiKey = req.headers['x-api-key'];
-    if (API_KEY && apiKey && apiKey === API_KEY) {
-        // Legacy API key auth — treat as admin with no specific seller (sees all).
-        // Populate name from ADMIN_USER so wa-viewer authorization helpers that
-        // gate on account.name don't reject legacy admins.
-        req.account = {
-            id: 'legacy',
-            role: 'admin',
-            sellerId: null,
-            name: process.env.ADMIN_USER || 'admin',
-        };
-        return next();
+    // Solo activado si LEGACY_API_KEY_ENABLED=true. Antes el fallback estaba
+    // siempre activo, lo que daba acceso global-admin permanente a cualquier
+    // holder de API_KEY (sin pasar por bcrypt ni isActive).
+    const legacyEnabled = process.env.LEGACY_API_KEY_ENABLED === 'true';
+    if (legacyEnabled) {
+        const API_KEY = process.env.API_KEY;
+        const apiKey = req.headers['x-api-key'];
+        if (API_KEY && apiKey && apiKey === API_KEY) {
+            req.account = {
+                id: 'legacy',
+                role: 'admin',
+                sellerId: null,
+                name: process.env.ADMIN_USER || 'admin',
+            };
+            return next();
+        }
     }
 
     logger.warn(`[AUTH] Unauthorized access attempt from ${req.ip} to ${req.path}`);

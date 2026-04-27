@@ -326,6 +326,21 @@ function _resolveNewProductPlan(normalizedText: string, currentProduct: string |
     return { newProduct, newPlan };
 }
 
+/**
+ * _pushHistory
+ * Agrega una entrada al history con cap defensivo. Antes este cap solo
+ * estaba en salesFlow.ts:270, así que crons (re-engagement, MP follow-up,
+ * abandoned cart) podían empujar entradas indefinidamente a usuarios que
+ * nunca volvían a entrar al flujo. Centralizar aquí evita drift.
+ */
+function _pushHistory(state: any, entry: { role: 'user' | 'bot' | 'system'; content: string; timestamp?: number }) {
+    if (!state.history) state.history = [];
+    state.history.push({ ...entry, timestamp: entry.timestamp || Date.now() });
+    if (state.history.length > 250) {
+        state.history = state.history.slice(-150);
+    }
+}
+
 export {
     _cleanPhone,
     _setStep,
@@ -335,5 +350,6 @@ export {
     _pauseAndAlert,
     _extractSilentVariables,
     _detectProductPlanChange,
-    _resolveNewProductPlan
+    _resolveNewProductPlan,
+    _pushHistory
 };

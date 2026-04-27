@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const { prisma } = require('../../../db');
 const {
     signToken,
@@ -10,6 +11,18 @@ const {
 const logger = require('../../utils/logger');
 const { isAuthorizedUser } = require('../../services/waStream');
 const onlineTracker = require('../../services/onlineTracker');
+
+// Constant-time string comparison usando crypto.timingSafeEqual.
+// Devuelve false si los strings tienen longitudes distintas (esto leakea
+// el length pero no el contenido — y compararlo de otro modo no aporta
+// seguridad porque la longitud se filtra de muchas otras maneras).
+function _safeEqual(a, b) {
+    if (typeof a !== 'string' || typeof b !== 'string') return false;
+    const aBuf = Buffer.from(a);
+    const bBuf = Buffer.from(b);
+    if (aBuf.length !== bBuf.length) return false;
+    return crypto.timingSafeEqual(aBuf, bBuf);
+}
 
 module.exports = (client, sharedState) => {
     const router = express.Router();
@@ -51,7 +64,7 @@ module.exports = (client, sharedState) => {
         const validUser = process.env.ADMIN_USER;
         const validPass = process.env.ADMIN_PASSWORD;
 
-        if (validUser && validPass && username === validUser && password === validPass) {
+        if (validUser && validPass && _safeEqual(username, validUser) && _safeEqual(password, validPass)) {
             const legacyPayload = {
                 id: 'legacy-admin',
                 role: 'admin',

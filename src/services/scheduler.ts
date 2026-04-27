@@ -17,7 +17,7 @@ import { toZonedTime } from 'date-fns-tz';
 
 import { buildConfirmationMessage } from '../utils/messageTemplates';
 import { UserState } from '../types/state';
-import { _setStep } from '../flows/utils/flowHelpers';
+import { _setStep, _pushHistory } from '../flows/utils/flowHelpers';
 
 // ── Constants ──
 const TIMEZONE = 'America/Argentina/Buenos_Aires';
@@ -232,8 +232,7 @@ async function autoApproveOrders(sharedState: SchedulerSharedState, dependencies
                     logger.error(`[AUTO-APPROVE] Failed to send confirmation to ${userId}:`, e.message);
                     continue;
                 }
-                state.history = state.history || [];
-                state.history.push({ role: 'bot', content: confirmMsg, timestamp: Date.now() });
+                _pushHistory(state, { role: 'bot', content: confirmMsg });
 
                 if (state.pendingOrder) {
                     const o = state.pendingOrder;
@@ -299,8 +298,7 @@ async function checkColdLeads(sharedState: SchedulerSharedState, dependencies: S
 
             try {
                 await sendMessageWithDelay(userId, msg);
-                state.history = state.history || [];
-                state.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+                _pushHistory(state, { role: 'bot', content: msg });
                 state.reengagementSent = true;
                 // A/B tracking
                 state.followUpData = {
@@ -351,8 +349,7 @@ async function checkAbandonedCarts(sharedState: SchedulerSharedState, dependenci
             const msg = _withName(rawMsg, state);
             try {
                 await sendMessageWithDelay(userId, msg);
-                state.history = state.history || [];
-                state.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+                _pushHistory(state, { role: 'bot', content: msg });
                 state.cartRecovered = true;
                 // A/B tracking
                 state.followUpData = {
@@ -396,8 +393,7 @@ async function checkSecondFollowUp(sharedState: SchedulerSharedState, dependenci
             const msg = _withName(rawMsg, state);
             try {
                 await sendMessageWithDelay(userId, msg);
-                state.history = state.history || [];
-                state.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+                _pushHistory(state, { role: 'bot', content: msg });
                 state.secondFollowUpSent = true;
                 saveState(userId);
                 logger.info(`[SCHEDULER] Second follow-up sent to ${userId} (${hours}h inactive on "${state.step}")`);
@@ -760,8 +756,12 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
         if (state.step !== 'waiting_mp_payment') continue;
         if (pausedUsers && pausedUsers.has(userId)) continue;
 
-        const enteredAt = (state as any).stepEnteredAt || (state as any).lastActivityAt;
-        if (!enteredAt) continue;
+        const enteredRaw = (state as any).stepEnteredAt || (state as any).lastActivityAt;
+        if (!enteredRaw) continue;
+        // Normalizar: en memoria son números (Date.now()) pero después de
+        // hidratar desde Postgres pueden venir como ISO strings.
+        const enteredAt = typeof enteredRaw === 'number' ? enteredRaw : new Date(enteredRaw).getTime();
+        if (!Number.isFinite(enteredAt)) continue;
 
         const minsSince = differenceInMinutes(now, enteredAt);
         const mpReminderStage = (state as any).mpReminderStage || 0;
@@ -776,8 +776,7 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
             const msg = `¡Hola! 👋 ¿Tuviste algún problema con el pago de MercadoPago? Si necesitás otra forma (transferencia o contra reembolso), avisame y lo cambiamos sin problema 🙂${linkLine}`;
             try {
                 await sendMessageWithDelay(userId, msg);
-                state.history = state.history || [];
-                state.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+                _pushHistory(state, { role: 'bot', content: msg });
                 (state as any).mpReminderStage = 1;
                 (state as any).mpReminderSentAt = Date.now();
                 saveState(userId);
@@ -793,8 +792,7 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
             const msg = `¡Hola! Veo que el pago aún no se concretó 🙂 Te paso a un asesor para que te ayude con cualquier inconveniente. ¡Hasta enseguida!`;
             try {
                 await sendMessageWithDelay(userId, msg);
-                state.history = state.history || [];
-                state.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+                _pushHistory(state, { role: 'bot', content: msg });
                 (state as any).mpReminderStage = 2;
                 pausedUsers.add(userId);
                 (state as any).pauseReason = '⏸️ Pausado automáticamente: cliente con MP pendiente >4h. Vendedor por favor contactar.';

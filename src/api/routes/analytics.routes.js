@@ -549,16 +549,27 @@ module.exports = (clientPool) => {
                 select: { sellerId: true, phone: true, enteredAt: true },
             });
 
+            // Antes acá había una query por completion (N+1). Ahora hacemos UNA
+            // sola query por todos los (sellerId, phone) involucrados, agrupada
+            // por (seller, phone) con min(enteredAt) — el primer evento del cliente.
+            const phoneKeys = completions.map(c => ({ sellerId: c.sellerId, phone: c.phone }));
+            const firstEvents = phoneKeys.length === 0 ? [] : await prisma.funnelEvent.groupBy({
+                by: ['sellerId', 'phone'],
+                where: {
+                    OR: phoneKeys.map(k => ({ sellerId: k.sellerId, phone: k.phone })),
+                },
+                _min: { enteredAt: true },
+            });
+            const firstByKey = new Map();
+            for (const f of firstEvents) {
+                firstByKey.set(`${f.sellerId}|${f.phone}`, f._min.enteredAt);
+            }
+
             const durations = [];
             for (const c of completions) {
-                // Buscar el primer FunnelEvent de este (seller, phone) — el greeting.
-                const first = await prisma.funnelEvent.findFirst({
-                    where: { sellerId: c.sellerId, phone: c.phone },
-                    orderBy: { enteredAt: 'asc' },
-                    select: { enteredAt: true },
-                });
-                if (first) {
-                    const sec = (new Date(c.enteredAt).getTime() - new Date(first.enteredAt).getTime()) / 1000;
+                const firstAt = firstByKey.get(`${c.sellerId}|${c.phone}`);
+                if (firstAt) {
+                    const sec = (new Date(c.enteredAt).getTime() - new Date(firstAt).getTime()) / 1000;
                     if (sec > 0) durations.push(sec);
                 }
             }
@@ -953,7 +964,11 @@ module.exports = (clientPool) => {
                     g.orders += userOrders.length;
                     g.revenue += userOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
                 }
-                if (lastStep === 'completed' || lastStep === 'waiting_admin_validation') {
+                // Solo contamos clientes con step 'completed' como funnel completado.
+                // Antes incluíamos 'waiting_admin_validation' (transient — el admin
+                // todavía puede rechazar el pedido), inflando la métrica de variantes
+                // que llevaban gente al panel de validación incluso si no cerraban.
+                if (lastStep === 'completed') {
                     g.completedFunnel++;
                 }
             }
@@ -1037,8 +1052,13 @@ module.exports = (clientPool) => {
                 if (!(state.step in STEP_RANK)) continue;
                 if (pausedUsers && pausedUsers.has(userId)) continue;
 
-                const lastActivity = state.lastActivityAt || state.stepEnteredAt;
-                if (!lastActivity) continue;
+                const lastActivityRaw = state.lastActivityAt || state.stepEnteredAt;
+                if (!lastActivityRaw) continue;
+                // Normalizar — puede venir como número (memoria) o ISO string (DB hydrate)
+                const lastActivity = typeof lastActivityRaw === 'number'
+                    ? lastActivityRaw
+                    : new Date(lastActivityRaw).getTime();
+                if (!Number.isFinite(lastActivity)) continue;
 
                 const minsIdle = Math.floor((now - lastActivity) / 60000);
                 if (minsIdle < minMinutesIdle || minsIdle > maxMinutesIdle) continue;

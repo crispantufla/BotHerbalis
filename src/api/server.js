@@ -325,7 +325,9 @@ function startServer(clientPool) {
             }
         }
 
-        if (SOCKET_API_KEY && apiKey === SOCKET_API_KEY) {
+        // Legacy API key fallback — solo activado con LEGACY_API_KEY_ENABLED=true
+        const legacyEnabled = process.env.LEGACY_API_KEY_ENABLED === 'true';
+        if (legacyEnabled && SOCKET_API_KEY && apiKey === SOCKET_API_KEY) {
             socket.data.account = { role: 'admin', sellerId: null, accountId: 'legacy' };
             return next();
         }
@@ -510,6 +512,15 @@ function startServer(clientPool) {
     const PORT = process.env.PORT || 3000;
     server.listen(PORT, () => {
         logger.info(`✅ Server running on http://localhost:${PORT}`);
+
+        // Auth posture warning: si API_KEY existe pero LEGACY_API_KEY_ENABLED
+        // no está activo, el fallback legacy está deshabilitado. Si algún
+        // cliente legacy (mobile app, integraciones) seguía dependiendo de
+        // x-api-key, dejará de autenticar. Esto es intencional — el flag se
+        // agregó como respuesta a una auditoría de seguridad.
+        if (process.env.API_KEY && process.env.LEGACY_API_KEY_ENABLED !== 'true') {
+            logger.warn('⚠️ [AUTH] API_KEY está seteada pero LEGACY_API_KEY_ENABLED!=true. Clientes legacy con x-api-key serán rechazados. Setear LEGACY_API_KEY_ENABLED=true si necesitás restaurar el fallback.');
+        }
     });
 
     return { io, app, server };

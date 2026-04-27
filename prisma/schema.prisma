@@ -22,6 +22,9 @@ model User {
   chats       ChatLog[]
 
   @@id([phone, instanceId])
+  // Analytics endpoints query users por instance + rango de fechas;
+  // sin este índice Postgres tiene que escanear toda la tabla.
+  @@index([instanceId, createdAt])
 }
 
 model Order {

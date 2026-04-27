@@ -16,12 +16,14 @@ import logger from '../utils/logger';
 const { prisma } = require('../../db');
 
 // Orden canónico del embudo — usado para distinguir "advanced" vs "back".
-// Refleja el flujo real de v4: plan_choice → payment_method → (cash) data →
-// maps_confirmation → final_confirmation. Antes de este fix, waiting_data
-// estaba listado ANTES de waiting_payment_method, lo que generaba falsos
-// positivos de "back" en la métrica cuando el cliente elegía contra reembolso.
-// Steps fuera de este orden (rejected_*, safety_check, post_sale, etc.) se
-// clasifican como "advanced" siempre (no son un retroceso lateral).
+// Decisión: waiting_data y waiting_maps_confirmation NO se incluyen en el
+// orden, porque se ejecutan en posiciones distintas según la rama de pago:
+//   - cash: plan_choice → payment_method → data → final_confirmation
+//   - MP:   plan_choice → payment_method → mp_payment → data → final_confirmation
+// Si los listáramos en una posición fija, las transiciones legítimas se
+// clasificarían como "back" en una rama y "advanced" en la otra. Al dejarlos
+// fuera del orden, classifyTransition los trata como "advanced" (regla del
+// fallback en línea 47-48 cuando algún índice es -1).
 const STEP_ORDER: string[] = [
     'greeting',
     'general',
@@ -34,8 +36,6 @@ const STEP_ORDER: string[] = [
     'waiting_payment_method',
     'waiting_mp_payment',
     'waiting_transfer_confirmation',
-    'waiting_data',
-    'waiting_maps_confirmation',
     'waiting_final_confirmation',
     'waiting_admin_ok',
     'waiting_admin_validation',
