@@ -19,11 +19,14 @@ module.exports = (clientPool) => {
 
     // GET /sellers — list all accounts with a sellerId.
     // Any admin needs this to populate the seller selector dropdown.
+    // NOTE: includes archived (isActive=false) accounts so admins can keep
+    // viewing the historic data of ex-vendedores. Frontend differentiates them.
     router.get('/sellers', jwtAuthMiddleware, requireAdmin, async (req, res) => {
         try {
             const accounts = await prisma.account.findMany({
-                where: { isActive: true, sellerId: { not: null } },
-                select: { id: true, name: true, role: true, sellerId: true, isActive: true, createdAt: true }
+                where: { sellerId: { not: null } },
+                select: { id: true, name: true, role: true, sellerId: true, isActive: true, createdAt: true },
+                orderBy: [{ isActive: 'desc' }, { name: 'asc' }] // active first, then archived
             });
 
             const sessions = await prisma.whatsAppSession.findMany();

@@ -53,27 +53,39 @@ const SellerSelector = () => {
 
             {open && (
                 <div className="absolute right-0 top-full mt-1.5 w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
-                    {sellers.map(seller => (
-                        <button
-                            key={seller.sellerId}
-                            onClick={() => select(seller.sellerId)}
-                            className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors
-                                ${selectedSellerId === seller.sellerId ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-slate-700 dark:text-slate-200'}`}
-                        >
-                            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${presenceDot(seller)}`} title={presenceTitle(seller)} />
-                            <div className="flex-1 text-left min-w-0">
-                                <div className="truncate capitalize">{seller.name}</div>
-                                {seller.phoneNumber && (
-                                    <div className="text-xs text-slate-400 dark:text-slate-500 truncate">+{seller.phoneNumber}</div>
+                    {sellers.map(seller => {
+                        const archived = seller.isActive === false;
+                        return (
+                            <button
+                                key={seller.sellerId}
+                                onClick={() => select(seller.sellerId)}
+                                title={archived ? 'Vendedor archivado — sus ventas siguen disponibles para consulta' : undefined}
+                                className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors
+                                    ${selectedSellerId === seller.sellerId ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-slate-700 dark:text-slate-200'}
+                                    ${archived ? 'opacity-60' : ''}`}
+                            >
+                                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${presenceDot(seller)}`} title={presenceTitle(seller)} />
+                                <div className="flex-1 text-left min-w-0">
+                                    <div className="truncate capitalize flex items-center gap-1.5">
+                                        <span>{seller.name}</span>
+                                        {archived && (
+                                            <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 font-normal">
+                                                archivado
+                                            </span>
+                                        )}
+                                    </div>
+                                    {seller.phoneNumber && (
+                                        <div className="text-xs text-slate-400 dark:text-slate-500 truncate">+{seller.phoneNumber}</div>
+                                    )}
+                                </div>
+                                {seller.connected ? (
+                                    <Wifi className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" title="Bot conectado" />
+                                ) : (
+                                    <WifiOff className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 flex-shrink-0" title="Bot desconectado" />
                                 )}
-                            </div>
-                            {seller.connected ? (
-                                <Wifi className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" title="Bot conectado" />
-                            ) : (
-                                <WifiOff className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 flex-shrink-0" title="Bot desconectado" />
-                            )}
-                        </button>
-                    ))}
+                            </button>
+                        );
+                    })}
 
                     {sellers.length === 0 && (
                         <div className="px-4 py-3 text-xs text-slate-400 dark:text-slate-500 text-center">
