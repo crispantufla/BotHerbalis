@@ -95,6 +95,26 @@ export function createWorker(sellerId: string, dependencies: any): Worker {
         if (job) logger.error(`[BULLMQ][${sellerId}] Job ${job.id} failed permanently: ${err.message}`);
     });
 
+    // Throttle "Stream isn't writeable" floods (Redis disconnect → BullMQ tight retry loop).
+    // Without this handler, BullMQ prints each error with full stack trace, saturating logs.
+    let lastNoiseLog = 0;
+    let noiseCount = 0;
+    worker.on('error', (err: Error) => {
+        const msg = err?.message || '';
+        const isRedisStreamErr = msg.includes("Stream isn't writeable") || msg.includes('Connection is closed');
+        if (isRedisStreamErr) {
+            noiseCount++;
+            const now = Date.now();
+            if (now - lastNoiseLog > 60000) {
+                logger.warn(`[BULLMQ][${sellerId}] Redis stream not writeable (${noiseCount}x in last min) — connection recovering`);
+                lastNoiseLog = now;
+                noiseCount = 0;
+            }
+            return;
+        }
+        logger.error(`[BULLMQ][${sellerId}] Worker error:`, msg);
+    });
+
     logger.info(`[BULLMQ][${sellerId}] Worker initialized (dedicated Redis connection).`);
     return worker;
 }
