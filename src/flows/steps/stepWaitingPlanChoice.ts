@@ -7,7 +7,7 @@ import logger from '../../utils/logger';
 
 function _buildPaymentMsg(currentState: UserState): string {
     const plan = currentState.selectedPlan || currentState.cart?.[0]?.plan || '60';
-    const adicional = currentState.adicionalMAX || 6000;
+    const adicional = currentState.adicionalMAX || _getAdicionalMAX();
     const adicionalStr = adicional.toLocaleString('es-AR');
     const planLine = plan === '120'
         ? `   ▸ Plan 120 días: sin adicional ✅`
@@ -122,16 +122,34 @@ export async function handleWaitingPlanChoice(
 
     // Semantic shortcuts — captura formas naturales sin necesidad de IA.
     // El plan "recomendado" en los mensajes es siempre el 120 (envío bonificado).
-    // "60" es la opción más corta/barata. Usamos boundaries estrictos para evitar
-    // falsos positivos (ej: "el largo plazo me preocupa" no matchea "el largo" como plan).
-    const semantic120 = /\b(el (de )?(?:120|ciento veinte|cuatro meses|4 meses)|cuatro meses|4 meses|el (m[áa]s )?(largo|grande|completo|recomendado|caro)|el de m[áa]s d[íi]as|el de cuatro|el de 4|recomendado|le metemos|le metemos con (el )?120|dale (al )?(de )?120|el bonificado)\b/i;
-    const semantic60 = /\b(el (de )?(?:60|sesenta|dos meses|2 meses)|dos meses|2 meses|el (m[áa]s )?(corto|chico|barato|inicial|inicio|peque[ñn]o)|el de inicio|el de menos d[íi]as|el de dos|el de 2|arrancamos con (el )?60|empiezo con (el )?60)\b/i;
+    // Reglas estrictas:
+    // (a) Calificativos solos ("largo", "caro", "barato") deben venir con verbo de
+    //     elección ("quiero", "dame", "elijo", "prefiero", "agarro", "voy con") —
+    //     evita falsos positivos como "el largo plazo me preocupa".
+    // (b) Frases explícitas de plan ("el de 120", "plan 60", "cuatro meses") matchean
+    //     directamente.
+    const planVerbAnchor = /(?:^|\s)(?:quiero|quisiera|dame|me das|elijo|prefiero|prefiero el|agarro|voy con|voy por|me voy con|me llevo|me quedo con|reservame|tomo|tomate|llevo|me sirve|me conviene|me gusta|le metemos|le doy|dale|empiezo)\b/i;
+    const semantic120Strict = /\b(el (de )?(?:120|ciento veinte|cuatro meses|4 meses)|plan (de )?(?:120|cuatro meses|4 meses)|cuatro meses|4 meses|el de cuatro|el de 4|le metemos con (el )?120|dale (al )?(de )?120|tratamiento completo)\b/i;
+    const semantic60Strict = /\b(el (de )?(?:60|sesenta|dos meses|2 meses)|plan (de )?(?:60|dos meses|2 meses)|dos meses|2 meses|el de dos|el de 2|el de inicio|arrancamos con (el )?60|empiezo con (el )?60|el corto)\b/i;
+    const semantic120Weak = /\b(?:el|al)\s+(?:m[áa]s\s+)?(largo|grande|completo|recomendado|caro|bonificado)\b/i;
+    const semantic60Weak = /\b(?:el|al)\s+(?:m[áa]s\s+)?(chico|barato|inicial|peque[ñn]o)\b/i;
+    const has120Strict = semantic120Strict.test(normalizedText);
+    const has60Strict = semantic60Strict.test(normalizedText);
+    // Los "weak" matcheán cuando hay verbo de elección, O cuando el mensaje es
+    // corto (≤4 palabras): "el más barato" solo casi siempre es elección de plan.
+    const hasVerb = planVerbAnchor.test(normalizedText);
+    const wordCount = normalizedText.trim().split(/\s+/).length;
+    const isShortReply = wordCount <= 4;
+    const has120Weak = (hasVerb || isShortReply) && semantic120Weak.test(normalizedText);
+    const has60Weak = (hasVerb || isShortReply) && semantic60Weak.test(normalizedText);
+    const has120 = has120Strict || has120Weak;
+    const has60 = has60Strict || has60Weak;
 
     if (strictPlanMatch && !isVeryLongMessage) {
         selectedPlanId = strictPlanMatch[2];
-    } else if (semantic120.test(normalizedText) && !semantic60.test(normalizedText) && !isVeryLongMessage) {
+    } else if (has120 && !has60 && !isVeryLongMessage) {
         selectedPlanId = '120';
-    } else if (semantic60.test(normalizedText) && !semantic120.test(normalizedText) && !isVeryLongMessage) {
+    } else if (has60 && !has120 && !isVeryLongMessage) {
         selectedPlanId = '60';
     } else if (planMatch && !hasQuestionText && !isVeryLongMessage) {
         selectedPlanId = planMatch[1];

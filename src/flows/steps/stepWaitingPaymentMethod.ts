@@ -2,11 +2,44 @@ import { UserState, FlowStep } from '../../types/state';
 import { _setStep, _pauseAndAlert } from '../utils/flowHelpers';
 import { buildConfirmationMessage } from '../../utils/messageTemplates';
 import { calculateTotal, _recalcAdicionalMAX } from '../utils/cartHelpers';
+import { _getAdicionalMAX } from '../utils/pricing';
 import logger from '../../utils/logger';
 
-const MP_KEYWORDS = /\b(mercadopago|mercado.?pago|mp|online|digital|qr|tarjeta|d[ée]bito|cr[ée]dito|2|dos|segundo|segunda|opci[óo]n 2|la 2|el 2|n[uú]mero 2|pago online|pago digital|pago ahora|por mp|con mp|por mercadopago|app|aplicaci[óo]n)\b/i;
-const TRANSFER_KEYWORDS = /\b(transfer[ei]ncia|transf|transferir|alias|deposito|dep[óo]sito|banco|bancaria|3|tres|tercero|tercera|opci[óo]n 3|la 3|el 3|n[uú]mero 3|cbu|cvu|por transferencia)\b/i;
-const CASH_KEYWORDS = /\b(contra.?reembolso|contrarembolso|contra entrega|efectivo|cash|1|uno|primero|primera|opci[óo]n 1|la 1|el 1|n[uú]mero 1|al recibir|plata en mano|cuando llega|cartero|al cartero|en mano|al recibirlo|por contra reembolso|cuando me llegue|cuando lo reciba)\b/i;
+// Payment method matchers. Los dígitos sueltos (1, 2, 3) y números escritos
+// (uno, dos, tres) solo matchean cuando vienen como mensaje completo o con
+// prefijo de opción ("la 1", "el 2", "opción 3"). Frases como "tengo 1 hijo"
+// o "pesan 2 kilos" NO disparan. Números pegados a sustantivo (e.g. "el 2 de
+// febrero") quedan filtrados porque no matchean ningún anchor de opción.
+const OPTION_PICKER = /(^|\s)(?:opci[óo]n\s+|la\s+|el\s+|n[uú]mero\s+|\#)?(\d)\s*[\.\)]?\s*$/i;
+// Acepta "uno"/"dos"/"tres" o "primero"/"segunda"/"tercera" como mensaje
+// completo, opcionalmente precedidos por "la|el|opcion".
+const STANDALONE_NUM_WORD = /^\s*(?:la\s+|el\s+|opci[óo]n\s+)?(uno|dos|tres|primer[oa]|segund[oa]|tercer[oa])\s*[\.\)]?\s*$/i;
+
+const MP_KEYWORDS = /\b(mercadopago|mercado.?pago|\bmp\b|online|digital|qr|tarjeta|d[ée]bito|cr[ée]dito|pago online|pago digital|pago ahora|por mp|con mp|por mercadopago|aplicaci[óo]n)\b/i;
+const TRANSFER_KEYWORDS = /\b(transfer[ei]ncia|transf\b|transferir|alias|dep[óo]sito|deposito|banco|bancaria|cbu|cvu|por transferencia)\b/i;
+const CASH_KEYWORDS = /\b(contra.?reembolso|contrarembolso|contra entrega|efectivo|cash|al recibir|plata en mano|cuando llega|cartero|al cartero|en mano|al recibirlo|por contra reembolso|cuando me llegue|cuando lo reciba)\b/i;
+
+// Helper: classifica un mensaje como "1", "2" o "3" si está aislado (mensaje
+// corto + opción explícita). Devuelve null si no es claramente una opción.
+function _detectOptionNumber(text: string): '1' | '2' | '3' | null {
+    const trimmed = text.trim();
+    // Mensaje muy corto (≤25 chars) puede ser solo el número
+    if (trimmed.length <= 25) {
+        const m = trimmed.match(OPTION_PICKER);
+        if (m) {
+            const n = m[2];
+            if (n === '1' || n === '2' || n === '3') return n;
+        }
+        const w = trimmed.match(STANDALONE_NUM_WORD);
+        if (w) {
+            const word = w[1].toLowerCase();
+            if (/uno|primer/.test(word)) return '1';
+            if (/dos|segund/.test(word)) return '2';
+            if (/tres|tercer/.test(word)) return '3';
+        }
+    }
+    return null;
+}
 
 const PAYMENT_MSG = (adicional: number, plan: string) => {
     const adicionalStr = adicional.toLocaleString('es-AR');
@@ -35,10 +68,17 @@ export async function handleWaitingPaymentMethod(
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
 
     const plan = currentState.selectedPlan || currentState.cart?.[0]?.plan || '60';
-    const adicionalMAX = currentState.adicionalMAX || 6000;
+    const adicionalMAX = currentState.adicionalMAX || _getAdicionalMAX();
+
+    // Detectar elección por número de opción aislado (ej: "2", "la 2", "opcion 1")
+    const optionNum = _detectOptionNumber(text);
+    const isOptionMP = optionNum === '2';
+    const isOptionTransfer = optionNum === '3';
+    const isOptionCash = optionNum === '1';
 
     // ── Opción 2: MercadoPago ──────────────────────────────────────────────────
-    if (MP_KEYWORDS.test(text) && !TRANSFER_KEYWORDS.test(text)) {
+    // Solo si MP fue elegido (por número o keyword) Y no hay señal de transferencia
+    if ((isOptionMP || MP_KEYWORDS.test(text)) && !TRANSFER_KEYWORDS.test(text) && !isOptionTransfer && !isOptionCash) {
         currentState.paymentMethod = 'mercadopago';
 
         // Waive adicionalMAX (MP paga por adelantado — no hay riesgo de rechazo)
@@ -62,7 +102,7 @@ export async function handleWaitingPaymentMethod(
     }
 
     // ── Opción 3: Transferencia ────────────────────────────────────────────────
-    if (TRANSFER_KEYWORDS.test(normalizedText)) {
+    if (isOptionTransfer || TRANSFER_KEYWORDS.test(normalizedText)) {
         currentState.paymentMethod = 'transferencia';
 
         // Waive adicionalMAX igual que MP
@@ -88,7 +128,7 @@ export async function handleWaitingPaymentMethod(
     }
 
     // ── Opción 1: Contra reembolso ─────────────────────────────────────────────
-    if (CASH_KEYWORDS.test(normalizedText)) {
+    if (isOptionCash || CASH_KEYWORDS.test(normalizedText)) {
         currentState.paymentMethod = 'contrarembolso';
 
         // Restaurar adicionalMAX — puede haber sido waiveado por un intento previo

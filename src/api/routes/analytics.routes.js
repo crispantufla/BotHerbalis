@@ -273,8 +273,10 @@ module.exports = (clientPool) => {
         }
     });
 
-    // GET /analytics/funnel - Step-by-step funnel snapshot from DailyStats
-    router.get('/analytics/funnel', ...withSeller(clientPool), async (req, res) => {
+    // GET /analytics/funnel-snapshot - Step-by-step funnel snapshot from DailyStats.
+    // Renombrado de /analytics/funnel para no colisionar con el endpoint nuevo
+    // basado en FunnelEvent (que es el que consume FunnelAnalyticsView.jsx).
+    router.get('/analytics/funnel-snapshot', ...withSeller(clientPool), async (req, res) => {
         try {
             const days = parseInt(req.query.days) || 7;
             const instanceId = getInstanceId(req);

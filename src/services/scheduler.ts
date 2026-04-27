@@ -17,6 +17,7 @@ import { toZonedTime } from 'date-fns-tz';
 
 import { buildConfirmationMessage } from '../utils/messageTemplates';
 import { UserState } from '../types/state';
+import { _setStep } from '../flows/utils/flowHelpers';
 
 // ── Constants ──
 const TIMEZONE = 'America/Argentina/Buenos_Aires';
@@ -253,8 +254,7 @@ async function autoApproveOrders(sharedState: SchedulerSharedState, dependencies
                     if (saveOrderToLocal) saveOrderToLocal(orderData);
                 }
 
-                state.step = 'waiting_final_confirmation';
-                state.stepEnteredAt = now;
+                _setStep(state, 'waiting_final_confirmation');
                 saveState(userId);
 
                 notifyAdmin(
@@ -766,8 +766,11 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
         const minsSince = differenceInMinutes(now, enteredAt);
         const mpReminderStage = (state as any).mpReminderStage || 0;
 
-        // Stage 1: 30 minutos sin pagar — recordatorio amable
-        if (mpReminderStage === 0 && minsSince >= 30 && minsSince < 240) {
+        // Stage 1: 30 minutos sin pagar — recordatorio amable.
+        // Sin cota superior: si el cron pierde una corrida y el cliente llega
+        // a 250min en stage 0, igual disparamos stage 1 ahora; en el próximo
+        // tick (10min después) stage 2 escalará al vendedor.
+        if (mpReminderStage === 0 && minsSince >= 30) {
             const linkUrl = (state as any).mpPaymentLinkUrl;
             const linkLine = linkUrl ? `\n\nAcá te dejo el link de nuevo:\n${linkUrl}` : '';
             const msg = `¡Hola! 👋 ¿Tuviste algún problema con el pago de MercadoPago? Si necesitás otra forma (transferencia o contra reembolso), avisame y lo cambiamos sin problema 🙂${linkLine}`;

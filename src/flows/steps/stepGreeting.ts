@@ -75,11 +75,19 @@ export async function handleGreeting(
             variantIdx = variants.findIndex(v => v.id === (currentState as any).greetingVariant);
             if (variantIdx === -1) variantIdx = 0;
         } else {
-            // Asignar deterministicamente por phone: hash trivial
+            // Asignar deterministicamente por phone con hash djb2.
+            // El hash trivial (suma de charCodes) sesgaba la distribución para
+            // teléfonos AR con prefijos comunes — djb2 distribuye mejor.
             const phoneDigits = userId.replace(/\D/g, '');
-            const hash = phoneDigits.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+            let hash = 5381;
+            for (let i = 0; i < phoneDigits.length; i++) {
+                hash = ((hash << 5) + hash + phoneDigits.charCodeAt(i)) >>> 0;
+            }
             variantIdx = hash % variants.length;
             (currentState as any).greetingVariant = variants[variantIdx].id;
+            // Persistir inmediatamente para que el cliente no salte de variante
+            // si el bot reinicia antes del próximo save debounced.
+            saveState(userId);
         }
         chosenGreeting = {
             ...knowledge.flow.greeting,
@@ -138,10 +146,19 @@ export async function handleGreeting(
         logger.error('[GREETING] Failed to send image:', e.message);
     }
 
-    // 3. Atajo: si el cliente ya dio el objetivo en el primer mensaje
+    // 3. Atajo: si el cliente ya dio el objetivo de PESO en el primer mensaje
     // (ej: "quiero bajar 10 kilos", "tengo 20 kg de más"), evitamos repetir
     // la pregunta y procesamos su mensaje directo en waiting_weight.
-    const hasExplicitGoal = /\b\d{1,3}\s*(kg|kilos?|kilogramos?)\b|\bbajar\s+\d{1,3}\b|\bperder\s+\d{1,3}\b/i.test(text);
+    // Estricto: el número debe ir pegado a "kg|kilos|peso" para evitar falsos
+    // positivos como "compré 3 kilos de fruta" (si el contexto es producto)
+    // o "bajar 15 escalones".
+    const hasExplicitGoal = (
+        // Patrón A: "10 kg", "10 kilos", "10 kilogramos"
+        /\b\d{1,3}\s*(?:kg|kilos?|kilogramos?)\b/i.test(text) ||
+        // Patrón B: "bajar 10" / "perder 10" SEGUIDO opcionalmente de un sufijo
+        // que confirme que se refiere a peso. Sin sufijo, no asumimos.
+        /\b(?:bajar|perder)\s+\d{1,3}\s*(?:kg|kilos?|kilogramos?|de peso)\b/i.test(text)
+    );
 
     if (hasExplicitGoal) {
         logger.info(`[GREETING-SHORTCUT] User ${userId} provided weight goal in first message — skipping kilos question.`);

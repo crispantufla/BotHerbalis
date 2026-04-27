@@ -93,7 +93,7 @@ export async function processSalesFlow(
 
             if (existingOrder) {
                 logger.info(`[ORDER-CHECK] User ${userId} has existing order (status: ${existingOrder.status}). Routing to post-sale.`);
-                userState[userId].step = 'completed';
+                _setStep(userState[userId], FlowStep.COMPLETED);
                 userState[userId].selectedProduct = existingOrder.products;
                 saveState(userId);
                 // Don't return — let the flow continue into stepCompleted handler below

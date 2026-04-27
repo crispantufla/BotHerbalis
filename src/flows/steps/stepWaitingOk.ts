@@ -1,6 +1,7 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _setStep, _pauseAndAlert } from '../utils/flowHelpers';
 import { _isAffirmative, _isNegative } from '../utils/validation';
+import { _getAdicionalMAX } from '../utils/pricing';
 import logger from '../../utils/logger';
 
 export async function handleWaitingOk(
@@ -41,7 +42,7 @@ export async function handleWaitingOk(
     }
     else if (_isAffirmative(normalizedText)) {
         const plan = currentState.selectedPlan || currentState.cart?.[0]?.plan || '60';
-        const adicional = currentState.adicionalMAX || 6000;
+        const adicional = currentState.adicionalMAX || _getAdicionalMAX();
         const adicionalStr = adicional.toLocaleString('es-AR');
         const planLine = plan === '120'
             ? `   ▸ Plan 120 días: sin adicional ✅`

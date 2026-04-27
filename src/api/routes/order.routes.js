@@ -4,6 +4,7 @@ const path = require('path');
 const { authMiddleware } = require('../../middleware/auth');
 const logger = require('../../utils/logger');
 const { z } = require('zod');
+const { _setStep } = require('../../flows/utils/flowHelpers');
 
 // --- Input validation schemas ---
 const uuidSchema = z.string().uuid('ID de orden inválido');
@@ -513,7 +514,7 @@ module.exports = (clientPool) => {
 
             // Set user state to completed
             if (state) {
-                state.step = 'completed';
+                _setStep(state, 'completed');
             }
 
             // Send confirmation message unless silent mode
