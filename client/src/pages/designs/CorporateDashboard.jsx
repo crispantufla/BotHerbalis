@@ -19,10 +19,11 @@ import AiReportsView from '../../components/corporate/AiReportsView';
 import AccountsView from '../../components/admin/AccountsView';
 import AccountStatsView from '../../components/admin/AccountStatsView';
 import FunnelAnalyticsView from '../../components/admin/FunnelAnalyticsView';
+import RescueQueueView from '../../components/admin/RescueQueueView';
 import SellerSelector from '../../components/admin/SellerSelector';
 import WhatsappViewerView from '../../components/corporate/WhatsappViewerView';
 
-import { Wifi, MessageCircle, Database, Settings, FileText, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Search, Bell, AlertTriangle, BookOpen, MoreHorizontal, CreditCard, Users, Monitor } from 'lucide-react';
+import { Wifi, MessageCircle, Database, Settings, FileText, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Search, Bell, AlertTriangle, BookOpen, MoreHorizontal, CreditCard, Users, Monitor, LifeBuoy } from 'lucide-react';
 
 const CorporateDashboard = () => {
     const { socket } = useSocket();
@@ -240,6 +241,7 @@ const CorporateDashboard = () => {
             case 'accounts': return <AccountsView />;
             case 'account-stats': return <AccountStatsView />;
             case 'funnel-analytics': return <FunnelAnalyticsView />;
+            case 'rescue-queue': return <RescueQueueView onGoToChat={(chatId) => handleQuickAction(chatId, 'chat')} />;
             case 'wa-web': return <WhatsappViewerView />;
             default: return <DashboardView alerts={alerts} config={config} handleQuickAction={handleQuickAction} status={status} qrData={qrData} />;
         }
@@ -321,6 +323,7 @@ const CorporateDashboard = () => {
                 <div className="flex-1 py-6 px-4 space-y-1 overflow-y-auto hide-scrollbar">
                     <NavItem tab="dashboard" icon={Wifi} label="Inicio" />
                     <NavItem tab="comms" icon={MessageCircle} label="Chat & Atención" />
+                    <NavItem tab="rescue-queue" icon={LifeBuoy} label="Cola de rescate" />
                     <NavItem tab="logistics" icon={Database} label="Ventas & Logística" />
                     <NavItem tab="statistics" icon={BarChart2} label="Estadísticas" />
                     <NavItem tab="payments" icon={CreditCard} label="Pagos MP" />

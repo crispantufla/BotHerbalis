@@ -60,8 +60,36 @@ export async function handleGreeting(
         dependencies.config.scriptStats[trackScript].started++;
     }
 
-    // 1. Send Text FIRST (Presentation part)
-    const rawGreetMsg: string = _formatMessage(knowledge.flow.greeting.response, currentState);
+    // 1. A/B variant selection — si knowledge.flow.greeting_variants existe y
+    // tiene entradas, elegimos una variante deterministicamente por phone.
+    // Persistimos la variante en state para que el mismo cliente no salte entre
+    // variantes si reentra (consistencia + permite atribuir conversiones).
+    const variants: Array<{ id: string; response: string }> = Array.isArray(knowledge.flow.greeting_variants)
+        ? knowledge.flow.greeting_variants
+        : [];
+    let chosenGreeting = knowledge.flow.greeting;
+    if (variants.length > 0) {
+        let variantIdx: number;
+        if ((currentState as any).greetingVariant != null) {
+            // Cliente ya tenía variante asignada — buscarla en el array
+            variantIdx = variants.findIndex(v => v.id === (currentState as any).greetingVariant);
+            if (variantIdx === -1) variantIdx = 0;
+        } else {
+            // Asignar deterministicamente por phone: hash trivial
+            const phoneDigits = userId.replace(/\D/g, '');
+            const hash = phoneDigits.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+            variantIdx = hash % variants.length;
+            (currentState as any).greetingVariant = variants[variantIdx].id;
+        }
+        chosenGreeting = {
+            ...knowledge.flow.greeting,
+            response: variants[variantIdx].response,
+        };
+        logger.info(`[GREETING-AB] User ${userId} → variant "${variants[variantIdx].id}" (idx ${variantIdx})`);
+    }
+
+    // 2. Send Text FIRST (Presentation part)
+    const rawGreetMsg: string = _formatMessage(chosenGreeting.response, currentState);
 
     let greetingPart1 = rawGreetMsg;
     let greetingPart2: string | null = null;

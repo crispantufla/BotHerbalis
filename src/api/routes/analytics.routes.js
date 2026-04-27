@@ -887,6 +887,118 @@ module.exports = (clientPool) => {
         }
     });
 
+    // GET /analytics/greeting-ab — compara conversión por variante de greeting.
+    // Lee profileData.greetingVariant de cada User en el rango y cruza con orders.
+    router.get('/analytics/greeting-ab', ...withSeller(clientPool), async (req, res) => {
+        try {
+            const days = Math.min(parseInt(req.query.days) || 14, 90);
+            const instanceId = getInstanceId(req);
+            const since = new Date();
+            since.setDate(since.getDate() - days);
+            since.setHours(0, 0, 0, 0);
+
+            const userWhere = { createdAt: { gte: since } };
+            if (instanceId) userWhere.instanceId = instanceId;
+            const users = await prisma.user.findMany({
+                where: userWhere,
+                select: { phone: true, profileData: true, createdAt: true },
+            });
+
+            const orderWhere = { createdAt: { gte: since }, status: { not: 'Cancelado' } };
+            if (instanceId) orderWhere.instanceId = instanceId;
+            const orders = await prisma.order.findMany({
+                where: orderWhere,
+                select: { userPhone: true, totalPrice: true },
+            });
+            const ordersByPhone = {};
+            orders.forEach(o => {
+                if (!ordersByPhone[o.userPhone]) ordersByPhone[o.userPhone] = [];
+                ordersByPhone[o.userPhone].push(o);
+            });
+
+            // Agregar por variante
+            const byVariant = {};
+            let unassigned = 0;
+            for (const u of users) {
+                let variant = null;
+                let lastStep = null;
+                try {
+                    const pd = JSON.parse(u.profileData || '{}');
+                    variant = pd.greetingVariant || null;
+                    lastStep = pd.step || null;
+                } catch {}
+
+                if (!variant) {
+                    unassigned++;
+                    continue;
+                }
+
+                if (!byVariant[variant]) {
+                    byVariant[variant] = {
+                        variant,
+                        users: 0,
+                        orders: 0,
+                        revenue: 0,
+                        completedFunnel: 0,
+                        avgOrderValue: 0,
+                    };
+                }
+                const g = byVariant[variant];
+                g.users++;
+
+                const userOrders = ordersByPhone[u.phone] || [];
+                if (userOrders.length > 0) {
+                    g.orders += userOrders.length;
+                    g.revenue += userOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
+                }
+                if (lastStep === 'completed' || lastStep === 'waiting_admin_validation') {
+                    g.completedFunnel++;
+                }
+            }
+
+            const result = Object.values(byVariant).map(g => ({
+                ...g,
+                conversionRate: g.users > 0 ? parseFloat(((g.orders / g.users) * 100).toFixed(2)) : 0,
+                funnelCompletionRate: g.users > 0 ? parseFloat(((g.completedFunnel / g.users) * 100).toFixed(2)) : 0,
+                avgOrderValue: g.orders > 0 ? Math.round(g.revenue / g.orders) : 0,
+            })).sort((a, b) => b.conversionRate - a.conversionRate);
+
+            // Significancia estadística básica (test z de proporciones, control = primera variante)
+            // Ojo: requiere n>30 por variante para ser confiable.
+            let significance = null;
+            if (result.length >= 2) {
+                const control = result.find(r => r.variant === 'A') || result[result.length - 1];
+                const challenger = result[0];
+                if (control && challenger && control.variant !== challenger.variant && control.users > 30 && challenger.users > 30) {
+                    const p1 = challenger.orders / challenger.users;
+                    const p2 = control.orders / control.users;
+                    const p = (challenger.orders + control.orders) / (challenger.users + control.users);
+                    const se = Math.sqrt(p * (1 - p) * (1 / challenger.users + 1 / control.users));
+                    const z = se > 0 ? (p1 - p2) / se : 0;
+                    significance = {
+                        challenger: challenger.variant,
+                        control: control.variant,
+                        zScore: parseFloat(z.toFixed(2)),
+                        confidenceLevel: Math.abs(z) >= 1.96 ? '95%' : Math.abs(z) >= 1.645 ? '90%' : 'no significativa',
+                        liftPct: parseFloat((((p1 - p2) / p2) * 100).toFixed(1)),
+                    };
+                }
+            }
+
+            res.json({
+                from: since.toISOString(),
+                days,
+                totalUsers: users.length,
+                unassigned,
+                variants: result,
+                significance,
+            });
+        } catch (e) {
+            logger.error('🔴 [ANALYTICS] greeting-ab:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     // GET /analytics/rescue-queue — leads atascados ordenados por proximidad al cierre.
     // Toma userState en memoria del seller (live), filtra los que están en mid-funnel sin
     // actividad reciente y no pausados. Ranking: step más avanzado primero, luego inactividad.

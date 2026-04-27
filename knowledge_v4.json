@@ -24,6 +24,23 @@
             "response": "¡Hola! 👋 Te cuento, somos *Herbalis*, especialistas en descenso de peso natural hace *13 años*. Ya ayudamos a más de *15.000 personas* a lograr su objetivo.\n\nNuestros tratamientos rondan entre $37.000 y $69.000 (depende de los días que elijas).\n\nPara asesorarte bien sobre qué producto te va a ser más rápido:\n👉 ¿Cuántos kilos buscás bajar en total?",
             "nextStep": "waiting_weight"
         },
+        "greeting_variants": [
+            {
+                "id": "A",
+                "_note": "Control — versión actual con presentación + rango de precios",
+                "response": "¡Hola! 👋 Te cuento, somos *Herbalis*, especialistas en descenso de peso natural hace *13 años*. Ya ayudamos a más de *15.000 personas* a lograr su objetivo.\n\nNuestros tratamientos rondan entre $37.000 y $69.000 (depende de los días que elijas).\n\nPara asesorarte bien sobre qué producto te va a ser más rápido:\n👉 ¿Cuántos kilos buscás bajar en total?"
+            },
+            {
+                "id": "B",
+                "_note": "Variante corta — sin precio inicial, foco en credibilidad",
+                "response": "¡Hola! 👋 Soy de *Herbalis*.\n\nTrabajamos con productos 100% naturales hace 13 años — ya ayudamos a más de 15.000 personas a bajar de peso 🌿\n\n👉 ¿Cuántos kilos buscás bajar?"
+            },
+            {
+                "id": "C",
+                "_note": "Variante pregunta-primero — engagement temprano, info después",
+                "response": "¡Hola! 😊 Bienvenido/a a *Herbalis*.\n\nPara recomendarte la mejor opción según tu caso, contame primero:\n\n👉 ¿Cuántos kilos buscás bajar?\n\n_Después te paso info de precios y cómo funciona_ 🙂"
+            }
+        ],
         "recommendation": {
             "step": "waiting_weight",
             "response": "Genial 👌\n\nEse objetivo es totalmente posible — lo logramos con miles de clientes 🙂\n\n¿Cuál te gustaría probar?\n\n1️⃣ Cápsulas (lo más efectivo y práctico)\n2️⃣ Semillas/Infusión (más natural)\n3️⃣ Gotas (para +70 años o pocos kilos)",
