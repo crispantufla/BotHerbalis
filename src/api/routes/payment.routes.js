@@ -88,38 +88,41 @@ module.exports = (clientPool) => {
     router.post('/mp-webhook', async (req, res) => {
         res.sendStatus(200); // Respond immediately to MP
         try {
-            // --- HMAC Signature Verification ---
+            // --- HMAC Signature Verification (fail-closed) ---
+            // Si el secret no está seteado, RECHAZAMOS el webhook. Antes hacíamos
+            // skip con un warn, lo cual permitía que un atacante con un
+            // externalRef forjara webhooks "approved". Fail-closed por defecto.
             const mpWebhookSecret = process.env.MP_WEBHOOK_SECRET;
-            if (mpWebhookSecret) {
-                const xSignature = req.headers['x-signature'];
-                const xRequestId = req.headers['x-request-id'];
-                if (!xSignature || !xRequestId) {
-                    logger.warn('[MP-WEBHOOK] Missing x-signature or x-request-id headers. Ignoring.');
-                    return;
-                }
-                // Parse ts and hash from header: "ts=...,v1=..."
-                const parts = {};
-                xSignature.split(',').forEach(p => {
-                    const [k, v] = p.trim().split('=', 2);
-                    parts[k] = v;
-                });
-                const ts = parts['ts'];
-                const v1 = parts['v1'];
-                if (!ts || !v1) {
-                    logger.warn('[MP-WEBHOOK] Malformed x-signature header. Ignoring.');
-                    return;
-                }
-                // Build the manifest string as per MP docs
-                const dataId = req.query['data.id'] || req.body?.data?.id || '';
-                const manifest = `id:${dataId};request-id:${xRequestId};ts:${ts};`;
-                const crypto = require('crypto');
-                const hmac = crypto.createHmac('sha256', mpWebhookSecret).update(manifest).digest('hex');
-                if (hmac !== v1) {
-                    logger.warn('[MP-WEBHOOK] HMAC verification failed. Possible spoofed request.');
-                    return;
-                }
-            } else {
-                logger.warn('[MP-WEBHOOK] MP_WEBHOOK_SECRET not set — skipping signature verification');
+            if (!mpWebhookSecret) {
+                logger.error('[MP-WEBHOOK] MP_WEBHOOK_SECRET no seteado — rechazando webhook (fail-closed). Configurar el secret en env vars para habilitar.');
+                return;
+            }
+            const xSignature = req.headers['x-signature'];
+            const xRequestId = req.headers['x-request-id'];
+            if (!xSignature || !xRequestId) {
+                logger.warn('[MP-WEBHOOK] Missing x-signature or x-request-id headers. Ignoring.');
+                return;
+            }
+            // Parse ts and hash from header: "ts=...,v1=..."
+            const parts = {};
+            xSignature.split(',').forEach(p => {
+                const [k, v] = p.trim().split('=', 2);
+                parts[k] = v;
+            });
+            const ts = parts['ts'];
+            const v1 = parts['v1'];
+            if (!ts || !v1) {
+                logger.warn('[MP-WEBHOOK] Malformed x-signature header. Ignoring.');
+                return;
+            }
+            // Build the manifest string as per MP docs
+            const dataId = req.query['data.id'] || req.body?.data?.id || '';
+            const manifest = `id:${dataId};request-id:${xRequestId};ts:${ts};`;
+            const crypto = require('crypto');
+            const hmac = crypto.createHmac('sha256', mpWebhookSecret).update(manifest).digest('hex');
+            if (hmac !== v1) {
+                logger.warn('[MP-WEBHOOK] HMAC verification failed. Possible spoofed request.');
+                return;
             }
 
             const { type, data } = req.body;

@@ -7,6 +7,7 @@ const logger = require('../../utils/logger');
 module.exports = (clientPool) => {
     const router = express.Router();
     const { withSeller } = require('./routeHelpers');
+    const { requireAdmin } = require('../../middleware/jwtAuth');
 
     // DATA_DIR for metadata (persistent on Railway)
     const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../../..');
@@ -45,8 +46,10 @@ module.exports = (clientPool) => {
         res.json(gallery);
     });
 
-    // POST /gallery - Upload new image
-    router.post('/gallery', ...withSeller(clientPool), (req, res) => {
+    // POST /gallery - Upload new image (admin-only).
+    // gallery.json es global (compartido entre tenants). Sin requireAdmin,
+    // cualquier vendedor podía sobreescribir/borrar imágenes de otros.
+    router.post('/gallery', ...withSeller(clientPool), requireAdmin, (req, res) => {
         try {
             const io = req.sellerInstance?.sharedState?.io;
             const { image, filename, tags, category } = req.body; // image is base64
@@ -108,8 +111,8 @@ module.exports = (clientPool) => {
         }
     });
 
-    // DELETE /gallery/:id - Delete image
-    router.delete('/gallery/:id', ...withSeller(clientPool), (req, res) => {
+    // DELETE /gallery/:id - Delete image (admin-only, mismo razonamiento que POST)
+    router.delete('/gallery/:id', ...withSeller(clientPool), requireAdmin, (req, res) => {
         try {
             const io = req.sellerInstance?.sharedState?.io;
             const { id } = req.params;

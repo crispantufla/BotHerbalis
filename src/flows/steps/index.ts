@@ -12,7 +12,6 @@ import { handleWaitingPaymentMethod } from './stepWaitingPaymentMethod';
 import { handleWaitingMpPayment } from './stepWaitingMpPayment';
 import { handleWaitingTransferConfirmation } from './stepWaitingTransferConfirmation';
 import { handleAdminSteps } from './stepAdmin';
-import { handleCompleted } from './stepCompleted';
 import logger from '../../utils/logger';
 
 export async function processStep(
@@ -68,7 +67,12 @@ export async function processStep(
             result = await handleAdminSteps(userId, text, normalizedText, currentState, knowledge, dependencies);
             break;
         case 'completed':
-            result = await handleCompleted(userId, text, normalizedText, currentState, knowledge, dependencies);
+            // Caso muerto: salesFlow.ts intercepta `step === 'completed'` antes
+            // de llegar acá y auto-pausa al cliente (Unconditional Post-Sale Stop).
+            // Si por alguna razón el guard no actuó, mantenemos un no-op silencioso
+            // en lugar de un crash.
+            logger.warn(`[STEP-COMPLETED] Unexpected execution path for ${userId} — should have been intercepted at salesFlow guard.`);
+            result = { matched: true };
             break;
         case 'rejected_medical':
         case 'rejected_abusive':

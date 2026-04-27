@@ -478,8 +478,11 @@ module.exports = (clientPool) => {
         }
     });
 
-    // POST /prices
-    router.post('/prices', ...withSeller(clientPool), validate(pricesSchema), async (req, res) => {
+    // POST /prices — admin-only.
+    // El archivo prices.json es global (compartido entre tenants), así que solo
+    // un admin puede modificarlo. Sin este gate, cualquier vendedor podía
+    // sobreescribir los precios de toda la plataforma.
+    router.post('/prices', ...withSeller(clientPool), requireAdmin, validate(pricesSchema), async (req, res) => {
         try {
             const { io } = getCtx(req);
             const newPrices = req.body;

@@ -52,7 +52,14 @@ export async function handleWaitingMpPayment(
             return { matched: true };
 
         } else {
-            // rejected o error — ofrecer transferencia primero
+            // rejected o error — ofrecer transferencia primero.
+            // Restaurar adicionalMAX: cuando el cliente eligió MP, se waived
+            // el adicional. Si MP rechaza y el cliente luego elige contra
+            // reembolso, el adicional debe volver a aplicarse. _recalcAdicionalMAX
+            // es idempotente y recalcula desde el cart actual.
+            _recalcAdicionalMAX(currentState);
+            calculateTotal(currentState);
+
             const msg = '⚠️ Hubo un problema con el pago de MercadoPago.\n\nNo te preocupes, tenemos otras opciones:\n\n3️⃣ *Transferencia bancaria* — alias *CHILE.TEXTO.CASINO*\n1️⃣ *Contra reembolso* — pagás al cartero cuando llega\n\n¿Cuál preferís?';
             currentState.paymentMethod = null;
             currentState.mpPaymentLinkId = null;
@@ -72,7 +79,10 @@ export async function handleWaitingMpPayment(
         currentState.mpPaymentLinkId = null;
         currentState.mpPaymentLinkUrl = null;
 
-        // Restaurar adicionalMAX ya estaba bonificado por MP — transferencia también lo bonifica
+        // adicionalMAX ya estaba bonificado por MP — transferencia también lo bonifica
+        // Avanzar al step correcto. Antes quedaba en waiting_mp_payment y, si admin
+        // despausaba al cliente, el siguiente mensaje volvía a generar link MP.
+        _setStep(currentState, FlowStep.WAITING_TRANSFER_CONFIRMATION);
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
