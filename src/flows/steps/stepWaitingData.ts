@@ -291,11 +291,22 @@ async function _processAddressData(
         await _pauseAndAlert(userId, currentState, dependencies, text, 'El cliente reportó explícitamente no saber su Código Postal.');
         return { madeProgress: false, earlyReturn: { matched: true } };
     }
+    // Helper: contador independiente por tipo de issue. Antes había un único
+    // `addressIssueTries`/`addressIssueType` compartido, así que un cliente que
+    // ya disparó `conflict` y luego dispara `intersection` escalaba al primer
+    // intento de la segunda issue (tries=1 ya, así que el else dispara).
+    // Ahora cada tipo cuenta solo sus propios intentos.
+    const _bumpIssue = (issueType: string): number => {
+        if (!currentState.addressIssueAttempts) currentState.addressIssueAttempts = {};
+        const attempts = (currentState.addressIssueAttempts[issueType] || 0) + 1;
+        currentState.addressIssueAttempts[issueType] = attempts;
+        currentState.addressIssueType = issueType;
+        return attempts;
+    };
+
     if (data && data.provincia === 'CONFLICT') {
-        const tries = currentState.addressIssueTries || 0;
-        if (tries === 0 && currentState.addressIssueType !== 'conflict') {
-            currentState.addressIssueType = 'conflict';
-            currentState.addressIssueTries = 1;
+        const attempts = _bumpIssue('conflict');
+        if (attempts === 1) {
             currentState.partialAddress.ciudad = null;
             currentState.partialAddress.provincia = null;
             currentState.partialAddress.cp = null;
@@ -371,10 +382,8 @@ async function _processAddressData(
             const endsIn00 = streetNumberMatch && streetNumberMatch[1].endsWith('00') && streetNumberMatch[1] !== '100' && !hasStreetName;
 
             if (isIntersection || endsIn00) {
-                const tries = currentState.addressIssueTries || 0;
-                if (tries === 0 && currentState.addressIssueType !== 'intersection') {
-                    currentState.addressIssueType = 'intersection';
-                    currentState.addressIssueTries = 1;
+                const attempts = _bumpIssue('intersection');
+                if (attempts === 1) {
                     const cornerMsg = `¡Ojo! El Correo Argentino no nos permite enviar a esquinas o intersecciones 📦\n\nNecesito la *calle y el número exacto* donde está tu casa. Ej: "Belgrano 350"\n\n¿Me lo pasás? 🙏`;
                     currentState.history.push({ role: 'bot', content: cornerMsg, timestamp: Date.now() });
                     saveState(userId);
@@ -387,10 +396,8 @@ async function _processAddressData(
             }
 
             if (!hasNumber && !hasSN) {
-                const tries = currentState.addressIssueTries || 0;
-                if (tries === 0 && currentState.addressIssueType !== 'no_number') {
-                    currentState.addressIssueType = 'no_number';
-                    currentState.addressIssueTries = 1;
+                const attempts = _bumpIssue('no_number');
+                if (attempts === 1) {
                     const noNumMsg = `¡Uy! No me llegó el número de la calle 😅\n\nEl Correo Argentino no nos deja enviar sin número. ¿Me lo podés agregar?\n\nEj: "San Martín 1425". Si no tenés número, escribí *S/N* 🙏`;
                     currentState.history.push({ role: 'bot', content: noNumMsg, timestamp: Date.now() });
                     saveState(userId);
@@ -401,8 +408,10 @@ async function _processAddressData(
                     return { madeProgress: false, earlyReturn: { matched: true } };
                 }
             } else {
+                // Address resolved correctly — clear all issue tracking
                 currentState.addressIssueType = null;
-                currentState.addressIssueTries = 0;
+                currentState.addressIssueAttempts = {};
+                currentState.addressIssueTries = 0; // legacy field, conserved for compat
                 currentState.partialAddress.calle = data.calle;
                 madeProgress = true;
             }
@@ -548,7 +557,10 @@ async function _validateAndAssembleOrder(
         const geoMsg = `Lo lamento, solo realizamos envíos dentro de Argentina 😔\n\n¿Tenés una dirección en Argentina? Si es así, pasámela y con gusto seguimos.`;
         currentState.history.push({ role: 'bot', content: geoMsg, timestamp: Date.now() });
         await sendMessageWithDelay(userId, geoMsg);
-        currentState.partialAddress = {};
+        // Preservar el nombre — solo limpiamos los campos de dirección. Si lo
+        // borramos, el cliente tiene que volver a presentarse desde cero.
+        const preservedName = currentState.partialAddress?.nombre || null;
+        currentState.partialAddress = preservedName ? { nombre: preservedName } : {};
         saveState(userId);
         return { matched: true };
     }

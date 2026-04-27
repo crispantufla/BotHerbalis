@@ -435,6 +435,37 @@ function cleanupOldUsers(sharedState: SchedulerSharedState, dependencies: Schedu
 }
 
 /**
+ * cleanupOldChatLogs — Cleanup de DB para evitar inflado de la tabla ChatLog.
+ * Borra rows >90 días old, pero solo de usuarios que NO tienen una orden
+ * (preservamos el contexto de quienes compraron). Se registra global una vez
+ * para no correr N veces en paralelo (la tabla es compartida).
+ */
+async function cleanupOldChatLogs(): Promise<void> {
+    try {
+        const { prisma } = require('../../db');
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - 90);
+
+        // Solo borra ChatLogs cuyo (userPhone, instanceId) NO tiene una Order.
+        // Esto preserva el historial completo de los compradores.
+        const result = await prisma.$executeRaw`
+            DELETE FROM "ChatLog" cl
+            WHERE cl."timestamp" < ${cutoff}
+              AND NOT EXISTS (
+                  SELECT 1 FROM "Order" o
+                  WHERE o."userPhone" = cl."userPhone"
+                    AND o."instanceId" = cl."instanceId"
+              )
+        `;
+        if (typeof result === 'number' && result > 0) {
+            logger.info(`[SCHEDULER] Cleaned up ${result} ChatLog rows >90 days old (no associated order)`);
+        }
+    } catch (e: any) {
+        logger.error('[SCHEDULER] Error in cleanupOldChatLogs:', e?.message || e);
+    }
+}
+
+/**
  * cleanStalePausedUsers — Prevent indefinite pause accumulation
  * Removes users from pausedUsers if they've been inactive for >7 days
  * and are not in an active mid-funnel step. This prevents the "paused forever" bug
@@ -622,6 +653,18 @@ function startScheduler(sharedState: SchedulerSharedState, dependencies: Schedul
         checkPendingMpPayments(sharedState, dependencies);
     }, { timezone: TIMEZONE });
     logger.info('[SCHEDULER] ✅ checkPendingMpPayments → cada 10 min (10-21h ARG)');
+
+    // ── DB CLEANUP: 1° de cada mes a las 3am Argentina ──
+    // Borra ChatLog rows >90 días que NO pertenecen a un comprador. Global
+    // porque la tabla es compartida. Sin esto, las queries de chatLog por
+    // usuario (en cada mensaje de bot) se degradan al crecer la tabla.
+    if (!(global as any).__chatLogCleanupRegistered) {
+        (global as any).__chatLogCleanupRegistered = true;
+        cron.schedule('0 3 1 * *', () => {
+            cleanupOldChatLogs();
+        }, { timezone: TIMEZONE });
+        logger.info('[SCHEDULER] ✅ cleanupOldChatLogs → 03:00 ARG el día 1 de cada mes (global)');
+    }
 
     // ── FUNNEL DROP-OUT SWEEP: cada 15 min, registrado UNA vez globalmente ──
     // Cierra FunnelEvents abiertos hace más de 48h como exitType='dropped'.

@@ -65,8 +65,9 @@ export interface UserState {
     // Variables de iteración y validación de direcciones
     addressAttempts?: number;
     fieldReaskCount?: Record<string, number>;
-    addressIssueType?: string | null;       // 'no_number' | 'intersection' | 'conflict'
-    addressIssueTries?: number;             // 0 = fresh, 1 = already explained once
+    addressIssueType?: string | null;       // 'no_number' | 'intersection' | 'conflict' (last issue seen)
+    addressIssueTries?: number;             // legacy field, replaced by addressIssueAttempts
+    addressIssueAttempts?: Record<string, number>; // per-issue-type counter; reset on resolved address
     mapsFormattedAddress?: string | null;   // Address returned by Google Maps
     pendingCPFromMaps?: string | null;      // CP suggested by Google Maps, awaiting user confirmation
     lastAddressMsg?: string;

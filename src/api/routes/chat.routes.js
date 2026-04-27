@@ -463,10 +463,34 @@ module.exports = (clientPool) => {
         if (ss?.saveState) ss.saveState();
     };
 
+    // Ownership check: el chatId debe ser contacto conocido del seller
+    // (existe en userState en memoria O en la tabla User para este sellerId).
+    // Sin este check, un vendedor podría mandar mensajes a números arbitrarios
+    // usando el WhatsApp de la empresa. Devuelve null si OK, o un objeto con
+    // el error a retornar al cliente.
+    async function _verifyChatOwnership(chatId, ss, instanceId) {
+        if (!chatId || !instanceId) {
+            return { status: 400, body: { error: 'Faltan chatId o sellerId' } };
+        }
+        const phoneStr = chatId.replace(/@.*/, '');
+        if (ss?.userState?.[chatId]) return null;
+        try {
+            const { prisma } = require('../../../db');
+            const known = await prisma.user.findUnique({
+                where: { phone_instanceId: { phone: phoneStr, instanceId } },
+                select: { phone: true },
+            });
+            if (known) return null;
+        } catch (_) { /* fail closed below if DB unreachable */ }
+        logger.warn(`[CHAT-SEND] Rejected send to unknown contact: ${chatId} (seller=${instanceId})`);
+        return { status: 403, body: { error: 'Ese contacto no está asociado a este vendedor' } };
+    }
+
     // POST /send
     router.post('/send', ...withSeller(clientPool), async (req, res) => {
         try {
             const { client: cl, sharedState: ss } = req.sellerInstance || {};
+            const INSTANCE_ID = getInstanceId(req);
             const originalChatId = req.body.chatId;
             let { chatId, message } = req.body;
 
@@ -476,8 +500,14 @@ module.exports = (clientPool) => {
             if (!message || typeof message !== 'string' || message.length === 0 || message.length > 5000) {
                 return res.status(400).json({ error: 'Invalid or missing message (max 5000 chars)' });
             }
+            if (!cl || !ss) {
+                return res.status(400).json({ error: 'Seleccioná un vendedor para enviar mensajes' });
+            }
 
             chatId = await resolveChatId(chatId, cl);
+            const ownErr = await _verifyChatOwnership(chatId, ss, INSTANCE_ID);
+            if (ownErr) return res.status(ownErr.status).json(ownErr.body);
+
             const sentMsg = await cl?.sendMessage(chatId, message);
 
             _recordAdminMessage(chatId, message, ss);
@@ -507,13 +537,19 @@ module.exports = (clientPool) => {
     router.post('/send-media', ...withSeller(clientPool), async (req, res) => {
         try {
             const { client: cl, sharedState: ss } = req.sellerInstance || {};
+            const INSTANCE_ID = getInstanceId(req);
             const originalChatId = req.body.chatId;
             let { chatId, base64, mimetype, filename, caption } = req.body;
 
             if (!chatId || typeof chatId !== 'string' || chatId.length > 100) {
                 return res.status(400).json({ error: 'Invalid or missing chatId' });
             }
+            if (!cl || !ss) {
+                return res.status(400).json({ error: 'Seleccioná un vendedor para enviar mensajes' });
+            }
             chatId = await resolveChatId(chatId, cl);
+            const ownErr = await _verifyChatOwnership(chatId, ss, INSTANCE_ID);
+            if (ownErr) return res.status(ownErr.status).json(ownErr.body);
             if (!base64 || !mimetype) return res.status(400).json({ error: 'Missing base64 or mimetype' });
 
             const allowedMimetypes = ['image/jpeg', 'image/png', 'image/webp', 'audio/ogg', 'audio/mpeg', 'video/mp4', 'application/pdf'];
@@ -557,6 +593,12 @@ module.exports = (clientPool) => {
         try {
             const { client: cl, sharedState: ss } = req.sellerInstance || {};
             const INSTANCE_ID = getInstanceId(req);
+            // Mutación que requiere un seller específico. Para admin global con
+            // sellerId=null, no sabemos qué chat resetear — antes hacía un
+            // silent no-op confuso. Ahora retornamos error explícito.
+            if (!INSTANCE_ID || !ss) {
+                return res.status(400).json({ error: 'Seleccioná un vendedor antes de resetear chat' });
+            }
             let { chatId } = req.body;
             chatId = await resolveChatId(chatId, cl);
 
