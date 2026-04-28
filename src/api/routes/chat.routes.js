@@ -134,6 +134,101 @@ module.exports = (clientPool) => {
         }
     });
 
+    // GET /chats/search?q=<query>&limit=30
+    // Búsqueda full-text sobre ChatLog + User.phone + User.name. A diferencia de
+    // GET /chats, esto NO depende del estado en memoria de whatsapp-web.js — busca
+    // directamente en la DB, así encuentra conversaciones viejas o ya descargadas.
+    router.get('/chats/search', ...withSeller(clientPool), async (req, res) => {
+        try {
+            const q = (req.query.q || '').toString().trim();
+            if (q.length < 2) return res.json([]);
+            const instanceId = getInstanceId(req);
+            const limit = Math.min(parseInt(req.query.limit) || 30, 100);
+            const { prisma } = require('../../../db');
+
+            const digits = q.replace(/\D/g, '');
+            const baseWhere = instanceId ? { instanceId } : {};
+
+            // 1) Match por contenido de mensaje (chatLog)
+            const contentMatches = await prisma.chatLog.findMany({
+                where: { ...baseWhere, content: { contains: q, mode: 'insensitive' } },
+                orderBy: { timestamp: 'desc' },
+                take: limit * 4, // overfetch para deduplicar por usuario
+                select: { userPhone: true, instanceId: true, content: true, timestamp: true, role: true }
+            });
+
+            // 2) Match por número de teléfono (si la query parece numérica)
+            let phoneMatches = [];
+            if (digits.length >= 4) {
+                phoneMatches = await prisma.user.findMany({
+                    where: { ...baseWhere, phone: { contains: digits } },
+                    orderBy: { lastSeen: 'desc' },
+                    take: limit
+                });
+            }
+
+            // 3) Match por nombre
+            const nameMatches = await prisma.user.findMany({
+                where: { ...baseWhere, name: { contains: q, mode: 'insensitive' } },
+                orderBy: { lastSeen: 'desc' },
+                take: limit
+            });
+
+            // Dedup por (userPhone + instanceId), preferir snippet de content match
+            const phoneSet = new Set(phoneMatches.map(u => `${u.phone}:${u.instanceId}`));
+            const map = new Map();
+            for (const m of contentMatches) {
+                if (map.size >= limit) break;
+                const key = `${m.userPhone}:${m.instanceId}`;
+                if (map.has(key)) continue;
+                map.set(key, {
+                    userPhone: m.userPhone, instanceId: m.instanceId,
+                    snippet: m.content, snippetTime: m.timestamp, snippetRole: m.role,
+                    matchedField: 'content'
+                });
+            }
+            for (const u of [...phoneMatches, ...nameMatches]) {
+                if (map.size >= limit) break;
+                const key = `${u.phone}:${u.instanceId}`;
+                if (map.has(key)) continue;
+                map.set(key, {
+                    userPhone: u.phone, instanceId: u.instanceId,
+                    snippet: null, snippetTime: u.lastSeen, snippetRole: null,
+                    matchedField: phoneSet.has(key) ? 'phone' : 'name'
+                });
+            }
+
+            // Hidratar nombre + hasBought en lote
+            const phones = Array.from(map.values()).map(r => r.userPhone);
+            if (phones.length === 0) return res.json([]);
+            const [users, orders] = await Promise.all([
+                prisma.user.findMany({ where: { phone: { in: phones }, ...baseWhere }, select: { phone: true, instanceId: true, name: true } }),
+                prisma.order.findMany({ where: { userPhone: { in: phones }, ...baseWhere, status: { not: 'Cancelado' } }, select: { userPhone: true, instanceId: true } })
+            ]);
+            const userMap = new Map(users.map(u => [`${u.phone}:${u.instanceId}`, u]));
+            const buyers = new Set(orders.map(o => `${o.userPhone}:${o.instanceId}`));
+
+            const out = Array.from(map.values()).map(r => {
+                const user = userMap.get(`${r.userPhone}:${r.instanceId}`);
+                return {
+                    id: `${r.userPhone}@c.us`,
+                    name: user?.name || null,
+                    phone: r.userPhone,
+                    hasBought: buyers.has(`${r.userPhone}:${r.instanceId}`),
+                    snippet: r.snippet,
+                    snippetTime: r.snippetTime,
+                    snippetRole: r.snippetRole,
+                    matchedField: r.matchedField
+                };
+            }).sort((a, b) => new Date(b.snippetTime).getTime() - new Date(a.snippetTime).getTime());
+
+            res.json(out);
+        } catch (e) {
+            logger.error('[CHATS/SEARCH] error:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     // GET /chats
     router.get('/chats', ...withSeller(clientPool), async (req, res) => {
         const { client: cl, sharedState: ss } = req.sellerInstance || {};

@@ -33,6 +33,8 @@ const CommsView = ({ initialChatId, onChatSelected, initialSearch = '', alerts =
 
     const [chatFontSize, setChatFontSize] = useState(() => parseInt(localStorage.getItem('herbalis_chat_font_size') || '14', 10));
     const [showFontSlider, setShowFontSlider] = useState(false);
+    const [searchResults, setSearchResults] = useState(null); // null = no hay query activa, [] = sin resultados
+    const [isSearching, setIsSearching] = useState(false);
 
     const [alertExpanded, setAlertExpanded] = useState(true);
     const [showCorrectionModal, setShowCorrectionModal] = useState(false);
@@ -60,15 +62,65 @@ const CommsView = ({ initialChatId, onChatSelected, initialSearch = '', alerts =
         localStorage.setItem('herbalis_chat_font_size', chatFontSize);
     }, [chatFontSize]);
 
-    const filteredChats = searchTerm
-        ? chats.filter(c => {
+    // Búsqueda debounced contra el backend para encontrar conversaciones por
+    // contenido de mensaje, número o nombre — incluso si el chat no está cargado
+    // en memoria de whatsapp-web.js. Mientras el usuario tipea, mostramos el
+    // filtro client-side (instantáneo) sobre los chats ya cargados; el resultado
+    // del backend reemplaza la lista cuando llega.
+    useEffect(() => {
+        const term = searchTerm.trim();
+        if (term.length < 2) {
+            setSearchResults(null);
+            setIsSearching(false);
+            return;
+        }
+        setIsSearching(true);
+        const t = setTimeout(async () => {
+            try {
+                const res = await api.get('/api/chats/search', { params: { q: term, limit: 50 } });
+                setSearchResults(res.data || []);
+            } catch (e) {
+                console.error('[CHATS/SEARCH] error:', e);
+                setSearchResults([]);
+            } finally {
+                setIsSearching(false);
+            }
+        }, 300);
+        return () => clearTimeout(t);
+    }, [searchTerm]);
+
+    // Lista a mostrar:
+    //   - sin búsqueda activa → chats normales (en memoria)
+    //   - búsqueda con resultados de backend → fusión: backend results primero
+    //     enriquecidos con datos del chat en memoria si los conocemos.
+    //   - mientras espera el backend → filter client-side instantáneo
+    const filteredChats = (() => {
+        if (!searchTerm.trim()) return chats;
+        if (searchResults === null) {
+            // todavía no llegó el backend — filtro instantáneo client-side
             const term = searchTerm.toLowerCase();
-            const nameMatch = c.name?.toLowerCase().includes(term);
-            const phoneMatch = c.id?.replace(/\D/g, '').includes(term);
-            const messageMatch = typeof c.lastMessage?.body === 'string' && c.lastMessage.body.toLowerCase().includes(term);
-            return nameMatch || phoneMatch || messageMatch;
-        })
-        : chats;
+            return chats.filter(c => {
+                const nameMatch = c.name?.toLowerCase().includes(term);
+                const phoneMatch = c.id?.replace(/\D/g, '').includes(term);
+                const messageMatch = typeof c.lastMessage?.body === 'string' && c.lastMessage.body.toLowerCase().includes(term);
+                return nameMatch || phoneMatch || messageMatch;
+            });
+        }
+        // backend devolvió resultados: enriquecer con datos en memoria si están
+        const inMemMap = new Map(chats.map(c => [c.id, c]));
+        return searchResults.map(r => {
+            const inMem = inMemMap.get(r.id);
+            return {
+                ...r,
+                ...(inMem || {}),  // sobreescribe con datos de memoria (lastMessage, isPaused, etc.)
+                // pero conservamos el snippet del backend para UI
+                searchSnippet: r.snippet,
+                searchMatchedField: r.matchedField,
+                searchSnippetRole: r.snippetRole,
+                hasBought: r.hasBought ?? inMem?.hasBought,
+            };
+        });
+    })();
 
     // Computed property: find an active alert for the selected chat
     const chatAlert = selectedChat ? alerts.find(a => a.userPhone === selectedChat.id || a.userPhone === selectedChat.id.split('@')[0]) : null;
@@ -408,6 +460,14 @@ Teléfono: ${phoneDisplay}`;
 
                 {/* Contact List */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
+                    {isSearching && (
+                        <div className="px-4 py-2 text-xs text-slate-400 dark:text-slate-500 italic">Buscando en historial...</div>
+                    )}
+                    {searchTerm.trim().length >= 2 && !isSearching && filteredChats.length === 0 && (
+                        <div className="px-4 py-6 text-center text-xs text-slate-400 dark:text-slate-500">
+                            Sin resultados para <span className="font-semibold text-slate-600 dark:text-slate-300">"{searchTerm}"</span>
+                        </div>
+                    )}
                     {isLoadingChats && chats.length === 0 ? (
                         Array.from({ length: 6 }).map((_, i) => (
                             <div key={i} className="p-4 mb-2 rounded-2xl animate-pulse bg-slate-100 dark:bg-slate-800/50 flex gap-3 h-[72px]">
@@ -462,7 +522,29 @@ Teléfono: ${phoneDisplay}`;
                                     <span className={`text-xs font-bold font-mono mt-0.5 flex-shrink-0 ${selectedChat?.id === chat.id ? 'text-indigo-100' : 'text-slate-500 dark:text-slate-400'}`}>{chat.time}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <p className={`text-[13px] truncate font-medium flex-1 ${selectedChat?.id === chat.id ? 'text-indigo-100' : 'text-slate-500 dark:text-slate-300'}`}>{chat.lastMessage?.body || 'Sin mensajes'}</p>
+                                    {chat.searchSnippet ? (
+                                        <p className={`text-[13px] truncate font-medium flex-1 ${selectedChat?.id === chat.id ? 'text-indigo-100' : 'text-slate-500 dark:text-slate-300'}`} title={chat.searchSnippet}>
+                                            <span className="text-[10px] uppercase font-bold mr-1 opacity-70">{chat.searchSnippetRole === 'user' ? 'cliente' : chat.searchSnippetRole === 'bot' ? 'bot' : ''}</span>
+                                            {(() => {
+                                                const term = searchTerm.trim();
+                                                const text = chat.searchSnippet;
+                                                const i = text.toLowerCase().indexOf(term.toLowerCase());
+                                                if (i < 0) return text;
+                                                const start = Math.max(0, i - 20);
+                                                const end = Math.min(text.length, i + term.length + 40);
+                                                const before = (start > 0 ? '…' : '') + text.slice(start, i);
+                                                const match = text.slice(i, i + term.length);
+                                                const after = text.slice(i + term.length, end) + (end < text.length ? '…' : '');
+                                                return (<>
+                                                    {before}
+                                                    <mark className={selectedChat?.id === chat.id ? 'bg-yellow-300/50 text-white rounded px-0.5' : 'bg-yellow-200 dark:bg-yellow-700/60 text-slate-900 dark:text-yellow-100 rounded px-0.5'}>{match}</mark>
+                                                    {after}
+                                                </>);
+                                            })()}
+                                        </p>
+                                    ) : (
+                                        <p className={`text-[13px] truncate font-medium flex-1 ${selectedChat?.id === chat.id ? 'text-indigo-100' : 'text-slate-500 dark:text-slate-300'}`}>{chat.lastMessage?.body || 'Sin mensajes'}</p>
+                                    )}
                                     {chat.unread > 0 && selectedChat?.id !== chat.id && (
                                         <span className="w-5 h-5 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-md">
                                             {chat.unread}
