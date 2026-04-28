@@ -371,15 +371,40 @@ module.exports = (clientPool) => {
                 calleOriginal: pending.calleOriginal || partial.calleOriginal || null,
             };
 
-            // FALLBACK DATA RESCUE: If admin clicks "Manual Complete" and the bot hasn't extracted the address yet
-            // (e.g. because they paused the bot or the bot failed to parse), we run a quick AI extraction over the last few user messages.
+            // FALLBACK DATA RESCUE: el state se puede haber pausado/limpiado.
+            // Buscamos mensajes del usuario en (a) state.history y (b) ChatLog en DB
+            // como fuente de verdad. Esto es lo que evita que el manual-complete
+            // cree ordenes con nombre/calle/ciudad=null cuando el bot pauso por
+            // "La IA fallo en extraer la calle".
             if (!addr.nombre || !addr.calle || !addr.ciudad) {
-                logger.info(`[MANUAL-COMPLETE] Datos de envío incompletos. Intentando rescatarlos del historial para ${chatId}...`);
-                const history = state.history || [];
-                // Get the last 10 messages from the user only
-                const recentUserMessages = history.filter(m => m.role === 'user').slice(-10);
-                if (recentUserMessages.length > 0) {
-                    const textToAnalyze = recentUserMessages.map(m => m.content).join(" | ");
+                logger.info(`[MANUAL-COMPLETE] Datos de envío incompletos. Intentando rescatarlos para ${chatId}...`);
+
+                // Combinar mensajes del state (memoria) + ChatLog (DB) — el state
+                // se trunca cuando hay summary, ChatLog tiene todo el historial.
+                const stateMsgs = (state.history || []).filter(m => m.role === 'user').map(m => m.content || '');
+                let dbMsgs = [];
+                try {
+                    const dbLogs = await prisma.chatLog.findMany({
+                        where: { userPhone: phoneNumeric, instanceId: INSTANCE_ID, role: 'user' },
+                        orderBy: { timestamp: 'desc' },
+                        take: 20,
+                        select: { content: true }
+                    });
+                    dbMsgs = dbLogs.map(l => l.content || '').reverse();
+                } catch (e) {
+                    logger.warn('[MANUAL-COMPLETE] DB chatLog query failed:', e.message);
+                }
+
+                // Dedup conservando orden cronológico (DB tiene más historial)
+                const seen = new Set();
+                const allMsgs = [...dbMsgs, ...stateMsgs].filter(m => {
+                    if (!m || seen.has(m)) return false;
+                    seen.add(m);
+                    return true;
+                }).slice(-15); // últimos 15 únicos
+
+                if (allMsgs.length > 0) {
+                    const textToAnalyze = allMsgs.join(" | ");
 
                     try {
                         const { aiService } = require('../../services/ai');
@@ -392,7 +417,8 @@ module.exports = (clientPool) => {
                                 calle: extracted.calle || addr.calle,
                                 ciudad: extracted.ciudad || addr.ciudad,
                                 provincia: extracted.provincia || addr.provincia,
-                                cp: extracted.cp || addr.cp
+                                cp: extracted.cp || addr.cp,
+                                calleOriginal: addr.calleOriginal || extracted.calle || null
                             };
 
                             // Save rescued data to state
@@ -402,6 +428,20 @@ module.exports = (clientPool) => {
                         logger.error(`[MANUAL-COMPLETE] Error en extracción AI de rescate:`, extError.message);
                     }
                 }
+            }
+
+            // GATE: si despues de TODOS los rescates seguimos sin nombre Y sin calle,
+            // NO creamos una orden vacia. Devolvemos error al admin para que ingrese
+            // los datos a mano. Mejor exigirle 30s de form que tener una orden con
+            // todos null en la DB.
+            const allowEmpty = req.body?.allowEmpty === true;
+            if (!allowEmpty && !addr.nombre && !addr.calle && !addr.ciudad) {
+                logger.warn(`[MANUAL-COMPLETE] No address data after rescue for ${chatId}. Refusing to create empty order.`);
+                return res.status(422).json({
+                    error: 'No se pudieron extraer datos de envío del cliente.',
+                    detail: 'Ingresá nombre, dirección, ciudad y CP manualmente, o reabrí la conversación con el cliente.',
+                    needsManualEntry: true
+                });
             }
             // FALLBACK PRODUCT/PLAN/PRICE RESCUE: scan bot messages in history for the confirmation template
             // This handles manually-managed conversations where the bot flow never set cart/selectedProduct.

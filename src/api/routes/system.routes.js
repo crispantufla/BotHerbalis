@@ -143,13 +143,26 @@ module.exports = (clientPool) => {
             const INSTANCE_ID = getInstanceId(req);
             const { prisma } = require('../../../db');
 
-            const startOfDay = new Date();
-            startOfDay.setHours(0, 0, 0, 0);
+            // Día en hora Argentina (UTC-3). El server corre en UTC, asi que
+            // setHours(0,0,0) le da UTC midnight — eso desplaza la frontera y
+            // hace que ordenes de la noche AR aparezcan como "ayer" o "hoy"
+            // segun la hora del server. Calculamos el inicio del dia AR.
+            const startOfDay = (() => {
+                const parts = new Intl.DateTimeFormat('en-CA', {
+                    timeZone: 'America/Argentina/Buenos_Aires',
+                    year: 'numeric', month: '2-digit', day: '2-digit',
+                }).formatToParts(new Date());
+                const y = parts.find(p => p.type === 'year').value;
+                const m = parts.find(p => p.type === 'month').value;
+                const d = parts.find(p => p.type === 'day').value;
+                // AR midnight = UTC 03:00 mismo dia (AR es UTC-3 sin DST desde 2009).
+                return new Date(`${y}-${m}-${d}T03:00:00.000Z`);
+            })();
 
             const whereBase = INSTANCE_ID ? { instanceId: INSTANCE_ID } : {};
 
             // Fetch database aggregations in parallel for performance
-            const [totalCount, todayStats, completedStats] = await Promise.all([
+            const [totalCount, todayStats, completedStats, newChatsToday] = await Promise.all([
                 prisma.order.count({ where: whereBase }),
                 prisma.order.aggregate({
                     _count: true,
@@ -162,6 +175,11 @@ module.exports = (clientPool) => {
                         status: { not: 'Cancelado' },
                         ...whereBase
                     }
+                }),
+                // Tráfico de nuevos chats del día — usuarios cuya primera
+                // aparición en DB es hoy (User.createdAt = primer mensaje recibido).
+                prisma.user.count({
+                    where: { createdAt: { gte: startOfDay }, ...whereBase }
                 })
             ]);
 
@@ -176,6 +194,7 @@ module.exports = (clientPool) => {
                 totalOrders: totalCount,
                 activeSessions,
                 activeConversations,
+                newChatsToday,
                 conversionRate: activeSessions > 0 ? Math.round((completedStats / activeSessions) * 100) : 0,
                 pausedUsers: pausedUsers ? pausedUsers.size : 0,
                 globalPause: !!config.globalPause

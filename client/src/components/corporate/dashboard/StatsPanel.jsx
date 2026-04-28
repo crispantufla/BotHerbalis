@@ -52,7 +52,7 @@ const StatsPanel = ({ stats, loadingStats, alertsCount = 0 }) => {
             <StatCard
                 title="Sesiones"
                 value={stats?.activeSessions || 0}
-                subtext={`${stats?.activeConversations || 0} en flujo · ${stats?.pausedUsers || 0} pausados`}
+                subtext={`+${stats?.newChatsToday || 0} chats nuevos hoy · ${stats?.activeConversations || 0} en flujo · ${stats?.pausedUsers || 0} pausados`}
                 icon={Users}
                 colorClass="blue"
                 gradientClass="bg-gradient-to-br from-blue-400 to-indigo-500"
