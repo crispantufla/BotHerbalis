@@ -22,6 +22,7 @@ import FunnelAnalyticsView from '../../components/admin/FunnelAnalyticsView';
 import RescueQueueView from '../../components/admin/RescueQueueView';
 import SellerSelector from '../../components/admin/SellerSelector';
 import WhatsappViewerView from '../../components/corporate/WhatsappViewerView';
+import ManualOrderEntryModal from '../../components/corporate/components/ManualOrderEntryModal';
 
 import { Wifi, MessageCircle, Database, Settings, FileText, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Search, Bell, AlertTriangle, BookOpen, MoreHorizontal, CreditCard, Users, Monitor, LifeBuoy } from 'lucide-react';
 
@@ -212,9 +213,31 @@ const CorporateDashboard = () => {
             setAlerts(prev => prev.filter(a => a.userPhone !== chatId));
             toast.success(`Acción ejecutada: ${action}`);
         } catch (e) {
+            // Si confirmar y backend no extrajo datos: abrimos el modal manual
+            if (action === 'confirmar' && e.response?.status === 422 && e.response?.data?.needsManualEntry) {
+                setManualEntry({ chatId, prefill: e.response.data.extracted || {} });
+                return;
+            }
             toast.error('Error ejecutando acción: ' + (e.response?.data?.error || e.message));
         } finally {
             setProcessingAction(null);
+        }
+    };
+
+    const [manualEntry, setManualEntry] = useState(null);
+    const [submittingManual, setSubmittingManual] = useState(false);
+    const handleManualEntrySubmit = async (manualAddr) => {
+        if (!manualEntry) return;
+        setSubmittingManual(true);
+        try {
+            await api.post('/api/orders/manual-complete', { chatId: manualEntry.chatId, manualAddr });
+            setAlerts(prev => prev.filter(a => a.userPhone !== manualEntry.chatId));
+            toast.success('Pedido registrado con datos manuales ✅');
+            setManualEntry(null);
+        } catch (e) {
+            toast.error('Error: ' + (e.response?.data?.error || e.message));
+        } finally {
+            setSubmittingManual(false);
         }
     };
 
@@ -553,6 +576,16 @@ const CorporateDashboard = () => {
                     })}
                 </nav>
             )}
+
+            {/* Manual Order Entry Modal — abre cuando 422 al confirmar alert */}
+            <ManualOrderEntryModal
+                open={!!manualEntry}
+                chatId={manualEntry?.chatId}
+                prefill={manualEntry?.prefill}
+                onClose={() => !submittingManual && setManualEntry(null)}
+                onSubmit={handleManualEntrySubmit}
+                submitting={submittingManual}
+            />
         </div>
     );
 };

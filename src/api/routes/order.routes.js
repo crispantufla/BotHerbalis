@@ -430,17 +430,34 @@ module.exports = (clientPool) => {
                 }
             }
 
-            // GATE: si despues de TODOS los rescates seguimos sin nombre Y sin calle,
-            // NO creamos una orden vacia. Devolvemos error al admin para que ingrese
-            // los datos a mano. Mejor exigirle 30s de form que tener una orden con
-            // todos null en la DB.
+            // OVERRIDE MANUAL: el admin abrió el modal de entrada manual y nos
+            // mandó los datos a mano. Estos pisan lo que se haya logrado extraer.
+            const manualAddr = req.body?.manualAddr;
+            if (manualAddr && typeof manualAddr === 'object') {
+                addr = {
+                    nombre:        manualAddr.nombre        || addr.nombre        || null,
+                    calle:         manualAddr.calle         || addr.calle         || null,
+                    ciudad:        manualAddr.ciudad        || addr.ciudad        || null,
+                    provincia:     manualAddr.provincia     || addr.provincia     || null,
+                    cp:            manualAddr.cp            || addr.cp            || null,
+                    calleOriginal: manualAddr.calle         || addr.calleOriginal || null,
+                };
+                state.partialAddress = addr;
+                logger.info(`[MANUAL-COMPLETE] Address override from admin form for ${chatId}: ${addr.nombre} / ${addr.calle}`);
+            }
+
+            // GATE: si falta cualquiera de los 3 campos esenciales para el envio
+            // (nombre, calle o ciudad), NO creamos una orden incompleta. Devolvemos
+            // lo que se logro extraer parcialmente y abrimos el modal de entrada
+            // manual del admin con esos campos pre-rellenados.
             const allowEmpty = req.body?.allowEmpty === true;
-            if (!allowEmpty && !addr.nombre && !addr.calle && !addr.ciudad) {
-                logger.warn(`[MANUAL-COMPLETE] No address data after rescue for ${chatId}. Refusing to create empty order.`);
+            if (!allowEmpty && !manualAddr && (!addr.nombre || !addr.calle || !addr.ciudad)) {
+                logger.warn(`[MANUAL-COMPLETE] Datos incompletos para ${chatId}: nombre=${!!addr.nombre} calle=${!!addr.calle} ciudad=${!!addr.ciudad}. Asking admin for manual entry.`);
                 return res.status(422).json({
-                    error: 'No se pudieron extraer datos de envío del cliente.',
-                    detail: 'Ingresá nombre, dirección, ciudad y CP manualmente, o reabrí la conversación con el cliente.',
-                    needsManualEntry: true
+                    error: 'Faltan datos de envío del cliente.',
+                    detail: 'Completá los datos faltantes.',
+                    needsManualEntry: true,
+                    extracted: addr  // pre-rellena el modal con lo que sí pudimos extraer
                 });
             }
             // FALLBACK PRODUCT/PLAN/PRICE RESCUE: scan bot messages in history for the confirmation template

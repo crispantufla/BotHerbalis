@@ -6,6 +6,7 @@ import { useSeller } from '../../context/SellerContext';
 import ChatMessageList from './components/ChatMessageList';
 import ChatInputArea from './components/ChatInputArea';
 import AiCorrectionModal from './components/AiCorrectionModal';
+import ManualOrderEntryModal from './components/ManualOrderEntryModal';
 
 import { Search, Bot, Play, Pause, Trash2 as Trash, FileText as ScriptIcon, ChevronDown, ChevronUp, Send, Paperclip, ShoppingCart, ArrowLeft, Type, X, Zap, AlertTriangle, Package } from 'lucide-react';
 
@@ -35,6 +36,8 @@ const CommsView = ({ initialChatId, onChatSelected, initialSearch = '', alerts =
     const [showFontSlider, setShowFontSlider] = useState(false);
     const [searchResults, setSearchResults] = useState(null); // null = no hay query activa, [] = sin resultados
     const [isSearching, setIsSearching] = useState(false);
+    const [manualEntry, setManualEntry] = useState(null); // { chatId, silent, prefill } o null
+    const [submittingManual, setSubmittingManual] = useState(false);
 
     const [alertExpanded, setAlertExpanded] = useState(true);
     const [showCorrectionModal, setShowCorrectionModal] = useState(false);
@@ -362,7 +365,36 @@ const CommsView = ({ initialChatId, onChatSelected, initialSearch = '', alerts =
             toast.success(silent ? 'Venta registrada sin enviar confirmación ✅' : 'Pedido ingresado y confirmación enviada ✅');
             setInput('');
         } catch (e) {
+            // Si el backend no pudo extraer datos, abrimos el modal de entrada manual
+            if (e.response?.status === 422 && e.response?.data?.needsManualEntry) {
+                setManualEntry({
+                    chatId: selectedChat.id,
+                    silent,
+                    prefill: e.response.data.extracted || {}
+                });
+                return;
+            }
             toast.error('Error al registrar pedido: ' + (e.response?.data?.error || e.message));
+        }
+    };
+
+    // Submit del modal de entrada manual — re-llama a manual-complete con manualAddr.
+    const handleManualEntrySubmit = async (manualAddr) => {
+        if (!manualEntry) return;
+        setSubmittingManual(true);
+        try {
+            await api.post('/api/orders/manual-complete', {
+                chatId: manualEntry.chatId,
+                silent: manualEntry.silent,
+                manualAddr
+            });
+            toast.success(manualEntry.silent ? 'Venta registrada con datos manuales ✅' : 'Pedido ingresado con datos manuales ✅');
+            setManualEntry(null);
+            setInput('');
+        } catch (e) {
+            toast.error('Error al registrar pedido: ' + (e.response?.data?.error || e.message));
+        } finally {
+            setSubmittingManual(false);
         }
     };
 
@@ -1136,6 +1168,16 @@ Teléfono: ${phoneDisplay}`;
                 messages={messages}
                 reportedMsgId={reportedMsgId}
                 selectedChat={selectedChat}
+            />
+
+            {/* Manual Order Entry Modal — abierto cuando el backend devuelve 422 */}
+            <ManualOrderEntryModal
+                open={!!manualEntry}
+                chatId={manualEntry?.chatId}
+                prefill={manualEntry?.prefill}
+                onClose={() => !submittingManual && setManualEntry(null)}
+                onSubmit={handleManualEntrySubmit}
+                submitting={submittingManual}
             />
         </div>
     );
