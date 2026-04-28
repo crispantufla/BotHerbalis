@@ -53,6 +53,24 @@ export async function handleWaitingPreference(
     };
 
     if (isComparison) {
+        // HARDCODED: "lo más efectivo" / "lo mejor" / "lo más rápido" / "cualquiera"
+        // mapea siempre a Cápsulas. Antes dependía 100% del AI; si fallaba (timeout,
+        // circuit breaker), el bot pausaba. Ahora hay un fallback deterministico.
+        const directRecommend = /\b(lo (mas|más) (efectivo|eficaz|mejor|rapido|rápido|potente)|lo mejor|cualquiera|el (mas|más) (efectivo|eficaz|mejor|rapido|rápido|potente)|el que (sea )?mejor|recomienda(me|n)? vos|recomendame|tu eligen?|elegi vos)\b/i;
+        if (directRecommend.test(normalizedText.trim())) {
+            logger.info(`[HARDCODED-PREF] User asked for recommendation ("${text.substring(0, 40)}"), defaulting to Cápsulas.`);
+            currentState.selectedProduct = 'Cápsulas de nuez de la india';
+            const priceNode = knowledge.flow.preference_capsulas;
+            const adapted = adaptResponsePrefix(priceNode.response, normalizedText, 'capsula');
+            const msg = _formatMessage(adapted, currentState);
+            _setStep(currentState, priceNode.nextStep);
+            currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+            saveState(userId);
+            await sendMessageWithDelay(userId, msg);
+            await _maybeUpsell(currentState, sendMessageWithDelay, userId, saveState);
+            return { matched: true };
+        }
+
         if (/^(capsulas? o gotas?|gotas? o capsulas?|capsulas o gotas porfa(?:vor)?)$/i.test(normalizedText.trim())) {
             logger.info(`[HARDCODED-PREF] User asked "capsulas o gotas", sending hardcoded recommendation.`);
             const hardcodedRec1 = "Personalmente te recomiendo las cápsulas, suelen ser más efectivas 💪.";
