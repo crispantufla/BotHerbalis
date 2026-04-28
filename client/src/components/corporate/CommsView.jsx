@@ -91,35 +91,46 @@ const CommsView = ({ initialChatId, onChatSelected, initialSearch = '', alerts =
 
     // Lista a mostrar:
     //   - sin búsqueda activa → chats normales (en memoria)
-    //   - búsqueda con resultados de backend → fusión: backend results primero
-    //     enriquecidos con datos del chat en memoria si los conocemos.
     //   - mientras espera el backend → filter client-side instantáneo
+    //   - cuando llegan resultados → merge: backend + chats en memoria que
+    //     matcheen por número/nombre. Esto cubre clientes manejados manualmente
+    //     por el vendedor (que nunca pasaron por el bot, no tienen User en DB,
+    //     pero sí están en la lista de chats de WhatsApp Web).
     const filteredChats = (() => {
-        if (!searchTerm.trim()) return chats;
-        if (searchResults === null) {
-            // todavía no llegó el backend — filtro instantáneo client-side
-            const term = searchTerm.toLowerCase();
-            return chats.filter(c => {
-                const nameMatch = c.name?.toLowerCase().includes(term);
-                const phoneMatch = c.id?.replace(/\D/g, '').includes(term);
-                const messageMatch = typeof c.lastMessage?.body === 'string' && c.lastMessage.body.toLowerCase().includes(term);
-                return nameMatch || phoneMatch || messageMatch;
-            });
-        }
-        // backend devolvió resultados: enriquecer con datos en memoria si están
+        const term = searchTerm.trim();
+        if (!term) return chats;
+
+        // Filtro instantáneo de chats en memoria (WhatsApp Web), aplica siempre
+        // para que el usuario nunca vea "no hay nada" si en realidad existe el chat.
+        const lower = term.toLowerCase();
+        const digits = term.replace(/\D/g, '');
+        const inMemMatches = chats.filter(c => {
+            const nameMatch = c.name?.toLowerCase().includes(lower);
+            const phoneMatch = digits.length >= 4 && c.id?.replace(/\D/g, '').includes(digits);
+            const messageMatch = typeof c.lastMessage?.body === 'string' && c.lastMessage.body.toLowerCase().includes(lower);
+            return nameMatch || phoneMatch || messageMatch;
+        });
+
+        if (searchResults === null) return inMemMatches;
+
+        // Merge: backend results primero (con snippet), luego chats en memoria
+        // que matchearon pero no aparecieron en el backend (clientes que nunca
+        // pasaron por el bot pero el vendedor les respondió a mano).
         const inMemMap = new Map(chats.map(c => [c.id, c]));
-        return searchResults.map(r => {
+        const backendIds = new Set(searchResults.map(r => r.id));
+        const enrichedBackend = searchResults.map(r => {
             const inMem = inMemMap.get(r.id);
             return {
                 ...r,
-                ...(inMem || {}),  // sobreescribe con datos de memoria (lastMessage, isPaused, etc.)
-                // pero conservamos el snippet del backend para UI
+                ...(inMem || {}),
                 searchSnippet: r.snippet,
                 searchMatchedField: r.matchedField,
                 searchSnippetRole: r.snippetRole,
                 hasBought: r.hasBought ?? inMem?.hasBought,
             };
         });
+        const inMemOnly = inMemMatches.filter(c => !backendIds.has(c.id));
+        return [...enrichedBackend, ...inMemOnly];
     })();
 
     // Computed property: find an active alert for the selected chat
