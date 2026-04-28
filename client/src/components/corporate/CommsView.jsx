@@ -133,6 +133,20 @@ const CommsView = ({ initialChatId, onChatSelected, initialSearch = '', alerts =
         return [...enrichedBackend, ...inMemOnly];
     })();
 
+    // Auto-abrir el chat cuando la búsqueda devuelve exactamente 1 resultado.
+    // Solo dispara después de que el backend respondió (searchResults !== null)
+    // para no saltar prematuramente mientras todavía se está filtrando.
+    const autoSelectId = (searchTerm.trim() && searchResults !== null && filteredChats.length === 1)
+        ? filteredChats[0].id
+        : null;
+    useEffect(() => {
+        if (!autoSelectId) return;
+        if (selectedChat?.id === autoSelectId) return;
+        const target = filteredChats.find(c => c.id === autoSelectId);
+        if (target) setSelectedChat(target);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [autoSelectId]);
+
     // Computed property: find an active alert for the selected chat
     const chatAlert = selectedChat ? alerts.find(a => a.userPhone === selectedChat.id || a.userPhone === selectedChat.id.split('@')[0]) : null;
 
