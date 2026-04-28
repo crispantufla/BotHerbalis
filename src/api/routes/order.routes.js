@@ -356,8 +356,20 @@ module.exports = (clientPool) => {
                 return res.status(404).json({ error: 'No hay estado de conversación para este chat' });
             }
 
-            const cart = state.cart || [];
-            let addr = state.partialAddress || {};
+            const cart = state.cart && state.cart.length ? state.cart : (state.pendingOrder?.cart || []);
+            // Prefer pendingOrder (post Maps-validation, source of truth) over partialAddress.
+            // partialAddress can get cleared by step transitions / globals while pendingOrder survives,
+            // so reading partialAddress alone produced empty orders in production (caso Elvira 27/04/2026).
+            const pending = state.pendingOrder || {};
+            const partial = state.partialAddress || {};
+            let addr = {
+                nombre:        pending.nombre        || partial.nombre        || null,
+                calle:         pending.calle         || partial.calle         || null,
+                ciudad:        pending.ciudad        || partial.ciudad        || null,
+                provincia:     pending.provincia     || partial.provincia     || null,
+                cp:            pending.cp            || partial.cp            || null,
+                calleOriginal: pending.calleOriginal || partial.calleOriginal || null,
+            };
 
             // FALLBACK DATA RESCUE: If admin clicks "Manual Complete" and the bot hasn't extracted the address yet
             // (e.g. because they paused the bot or the bot failed to parse), we run a quick AI extraction over the last few user messages.
@@ -460,6 +472,22 @@ module.exports = (clientPool) => {
                     update: { name: addr.nombre || null },
                     create: { phone: phoneNumeric, instanceId: INSTANCE_ID, name: addr.nombre || null }
                 });
+
+                // Idempotencia: si el admin doble-clickeó "Manual Complete" en pocos segundos,
+                // ya hay un Confirmado fresco para este telefono. Devolvelo sin crear duplicado.
+                const recentConfirmed = await tx.order.findFirst({
+                    where: {
+                        userPhone: phoneNumeric,
+                        status: 'Confirmado',
+                        instanceId: INSTANCE_ID,
+                        createdAt: { gte: new Date(Date.now() - 60 * 1000) }
+                    },
+                    orderBy: { createdAt: 'desc' }
+                });
+                if (recentConfirmed) {
+                    logger.info(`[MANUAL-COMPLETE] Duplicate click detected — returning existing order ${recentConfirmed.id} (created ${Math.round((Date.now() - recentConfirmed.createdAt.getTime()) / 1000)}s ago)`);
+                    return recentConfirmed;
+                }
 
                 const existingOrder = await tx.order.findFirst({
                     where: { userPhone: phoneNumeric, status: 'Pendiente', instanceId: INSTANCE_ID },
