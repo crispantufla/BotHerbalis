@@ -585,14 +585,14 @@ Teléfono: ${phoneDisplay}`;
                                 </button>
 
                                 <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center font-bold text-base sm:text-lg shadow-md shadow-indigo-500/20 flex-shrink-0">
-                                    {selectedChat.name.substring(0, 2).toUpperCase()}
+                                    {(selectedChat.name || selectedChat.id?.split('@')[0] || '??').toString().substring(0, 2).toUpperCase()}
                                 </div>
                                 <div className="min-w-0 pr-2 flex flex-col justify-center">
                                     <span className="font-mono text-[10px] text-slate-400 dark:text-slate-500 tracking-tight leading-none mb-0.5">
                                         +{selectedChat.id?.split('@')[0]}
                                     </span>
                                     <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2 flex-wrap">
-                                        <h2 className="font-extrabold text-slate-800 dark:text-slate-100 text-[14px] sm:text-lg tracking-tight truncate max-w-[130px] sm:max-w-xs">{selectedChat.name}</h2>
+                                        <h2 className="font-extrabold text-slate-800 dark:text-slate-100 text-[14px] sm:text-lg tracking-tight truncate max-w-[130px] sm:max-w-xs">{selectedChat.name || 'Desconocido'}</h2>
                                         {selectedChat.assignedScript && (
                                             <span className="self-start sm:self-auto mt-0.5 sm:mt-0 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full bg-indigo-100 text-[9px] sm:text-[10px] font-bold text-indigo-700 uppercase tracking-widest border border-indigo-200">
                                                 Flow: {selectedChat.assignedScript}
