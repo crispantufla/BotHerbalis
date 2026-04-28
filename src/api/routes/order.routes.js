@@ -473,19 +473,20 @@ module.exports = (clientPool) => {
                     create: { phone: phoneNumeric, instanceId: INSTANCE_ID, name: addr.nombre || null }
                 });
 
-                // Idempotencia: si el admin doble-clickeó "Manual Complete" en pocos segundos,
-                // ya hay un Confirmado fresco para este telefono. Devolvelo sin crear duplicado.
+                // Idempotencia: si el admin doble-clickeo "Manual Complete" en pocos segundos,
+                // ya hay un Confirmado fresco para este telefono. Devolvelo sin crear duplicado
+                // (no se crea otra orden, asi nunca aparece ruido en el panel).
                 const recentConfirmed = await tx.order.findFirst({
                     where: {
                         userPhone: phoneNumeric,
-                        status: 'Confirmado',
+                        status: { in: ['Confirmado', 'Pendiente'] },
                         instanceId: INSTANCE_ID,
                         createdAt: { gte: new Date(Date.now() - 60 * 1000) }
                     },
                     orderBy: { createdAt: 'desc' }
                 });
                 if (recentConfirmed) {
-                    logger.info(`[MANUAL-COMPLETE] Duplicate click detected — returning existing order ${recentConfirmed.id} (created ${Math.round((Date.now() - recentConfirmed.createdAt.getTime()) / 1000)}s ago)`);
+                    logger.info(`[MANUAL-COMPLETE] Duplicate click detected — returning existing order ${recentConfirmed.id} (created ${Math.round((Date.now() - recentConfirmed.createdAt.getTime()) / 1000)}s ago, status=${recentConfirmed.status})`);
                     return recentConfirmed;
                 }
 

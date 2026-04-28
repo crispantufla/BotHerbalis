@@ -29,12 +29,10 @@ const { prisma } = require('../db');
         const key = `${o.userPhone}:${o.instanceId}`;
         const prevWinner = seenWindowKey.get(key);
         if (prevWinner && (o.createdAt.getTime() - prevWinner.createdAt.getTime()) < 60_000) {
-            // Cancel this duplicate, keep the older one as winner
-            await prisma.order.update({
-                where: { id: o.id },
-                data: { status: 'Cancelado' }
-            });
-            console.log(`  [DUP] Cancelled ${o.id.slice(0, 8)} (${o.userPhone}, +${Math.round((o.createdAt - prevWinner.createdAt) / 1000)}s)`);
+            // Hard delete the duplicate — no ruido en el panel. El "ganador" (prevWinner)
+            // queda como la unica orden visible.
+            await prisma.order.delete({ where: { id: o.id } });
+            console.log(`  [DUP] Deleted ${o.id.slice(0, 8)} (${o.userPhone}, +${Math.round((o.createdAt - prevWinner.createdAt) / 1000)}s)`);
             cancelled++;
             continue;
         }
