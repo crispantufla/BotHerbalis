@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import api from '../../config/axios';
 import { useToast } from '../ui/Toast';
+import { useAuth } from '../../context/AuthContext';
 
 import StatsPanel from './dashboard/StatsPanel';
 import AlertsPanel from './dashboard/AlertsPanel';
@@ -9,6 +10,7 @@ import SystemStatusPanel from './dashboard/SystemStatusPanel';
 
 const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData }) => {
     const { toast, confirm } = useToast();
+    const { isAdmin } = useAuth();
     const [stats, setStats] = useState(null);
     const [loadingStats, setLoadingStats] = useState(true);
 
@@ -20,7 +22,10 @@ const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData 
     useEffect(() => {
         const fetchStats = async () => {
             try {
-                const res = await api.get('/api/stats');
+                // Admins: vista agregada de todos los vendedores (header vacío
+                // → backend interpreta como "todos"). Sellers: scoped.
+                const opts = isAdmin ? { headers: { 'x-seller-id': '' } } : {};
+                const res = await api.get('/api/stats', opts);
                 setStats(res.data);
             } catch (e) {
                 console.error('Failed to load stats:', e);
@@ -31,7 +36,7 @@ const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData 
         fetchStats();
         const interval = setInterval(fetchStats, 30000);
         return () => clearInterval(interval);
-    }, []);
+    }, [isAdmin]);
 
     const handleAddPhone = async (phoneInput) => {
         const cleaned = phoneInput.replace(/\D/g, '');

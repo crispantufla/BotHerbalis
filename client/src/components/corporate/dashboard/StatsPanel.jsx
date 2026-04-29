@@ -67,8 +67,8 @@ const StatsPanel = ({ stats, loadingStats, alertsCount = 0 }) => {
             />
             <StatCard
                 title="Conversión"
-                value={`${stats?.conversionRate || 0}%`}
-                subtext="pedidos / sesiones hoy"
+                value={`${stats?.conversionRate ?? 0}%`}
+                subtext="pedidos / chats nuevos hoy"
                 icon={Activity}
                 colorClass="violet"
                 gradientClass="bg-gradient-to-br from-violet-400 to-purple-500"

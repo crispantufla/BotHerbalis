@@ -183,10 +183,45 @@ module.exports = (clientPool) => {
                 })
             ]);
 
-            const activeSessions = Object.keys(userState || {}).length;
-            const activeConversations = Object.values(userState || {}).filter(
-                s => s && s.step && s.step !== 'completed' && s.step !== 'greeting'
-            ).length;
+            // Sesiones / pausas / config: viven en memoria por seller. Para vista
+            // global (admin sin sellerId), agregamos sumando todos los pools activos.
+            // Para vista scoped, usamos directamente el ctx del seller solicitado.
+            let activeSessions, activeConversations, pausedCount, globalPauseFlag;
+            if (!INSTANCE_ID) {
+                let sessions = 0, conversations = 0, paused = 0, globalPaused = false;
+                for (const inst of clientPool.getAllSellers()) {
+                    const ss = inst.sharedState;
+                    if (!ss) continue;
+                    const us = ss.userState || {};
+                    sessions += Object.keys(us).length;
+                    conversations += Object.values(us).filter(
+                        s => s && s.step && s.step !== 'completed' && s.step !== 'greeting'
+                    ).length;
+                    paused += ss.pausedUsers ? ss.pausedUsers.size : 0;
+                    if (ss.config?.globalPause) globalPaused = true;
+                }
+                activeSessions = sessions;
+                activeConversations = conversations;
+                pausedCount = paused;
+                globalPauseFlag = globalPaused;
+            } else {
+                activeSessions = Object.keys(userState || {}).length;
+                activeConversations = Object.values(userState || {}).filter(
+                    s => s && s.step && s.step !== 'completed' && s.step !== 'greeting'
+                ).length;
+                pausedCount = pausedUsers ? pausedUsers.size : 0;
+                globalPauseFlag = !!config.globalPause;
+            }
+
+            // Conversión: pedidos del día / chats nuevos del día. Antes era
+            // pedidos/sesiones-en-memoria, pero esas sesiones acumulan
+            // semanas/meses de chats viejos — el ratio salía siempre <1% y
+            // redondeaba a 0%. "Pedidos hoy / chats nuevos hoy" es el indicador
+            // operativo real, y mostramos un decimal para no perder señal en
+            // valores chicos.
+            const conversionRate = newChatsToday > 0
+                ? Math.round((completedStats / newChatsToday) * 1000) / 10
+                : 0;
 
             res.json({
                 todayRevenue: todayStats._sum.totalPrice || 0,
@@ -195,9 +230,9 @@ module.exports = (clientPool) => {
                 activeSessions,
                 activeConversations,
                 newChatsToday,
-                conversionRate: activeSessions > 0 ? Math.round((completedStats / activeSessions) * 100) : 0,
-                pausedUsers: pausedUsers ? pausedUsers.size : 0,
-                globalPause: !!config.globalPause
+                conversionRate,
+                pausedUsers: pausedCount,
+                globalPause: globalPauseFlag
             });
         } catch (e) {
             logger.error(`🔴 [STATS ERROR]: ${e?.message || String(e)}`);
