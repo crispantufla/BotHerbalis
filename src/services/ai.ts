@@ -9,6 +9,18 @@ import * as crypto from 'crypto';
 import { UserState, HistoryMessage } from '../types/state';
 import { lookupSemanticCache, storeSemanticCache } from './semanticCache';
 
+// WhatsApp usa "*" para negrita, no "**" (markdown estándar). Si la IA devuelve
+// **bold** o ## heading, en WhatsApp se renderiza con los asteriscos literales:
+// queda feo ("- **Cápsulas**: $46.900"). Sanitizamos al borde para no depender
+// de que el modelo recuerde la regla en cada turno.
+function sanitizeForWhatsApp(text: string | null | undefined): string | null {
+    if (!text) return text || null;
+    return text
+        .replace(/\*\*([^*\n]+?)\*\*/g, '*$1*')   // **bold** → *bold*
+        .replace(/__([^_\n]+?)__/g, '*$1*')        // __bold__ → *bold*
+        .replace(/^#{1,6}\s+(.+?)\s*$/gm, '*$1*'); // # heading → *heading*
+}
+
 // --- RAG RULE BASE ---
 const RULE_BASE = [
     { id: 'general', keywords: [], text: 'LONGITUD PROPORCIONAL Y COMPLETITUD DENTRO DE LOS OBJETIVOS: A partir de ahora DEBES explayarte de manera proporcionada a la longitud y al nivel de detalle que proporcione el usuario. Si el usuario envía un mensaje largo, personal y con muchas dudas, RESPONDE CON PÁRRAFOS PROFUNDAMENTE EMPÁTICOS. Si el cliente elabora una inquietud o problema personal, tómate todo el tiempo textual necesario para reconfortarlo. SI EL USUARIO HACE VARIAS PREGUNTAS O PUNTOS, RESPONDELOS TODOS CON LUJO DE DETALLE. Tienes límite de tokens generoso, úsalos para ser una vendedora humana real y empática.' },
@@ -717,7 +729,7 @@ INSTRUCCIONES:
                     const cached = await lookupSemanticCache(this.client, step, userText);
                     if (cached) {
                         this.stats.cached++;
-                        return { response: cached.response, goalMet: false, extractedData: null };
+                        return { response: sanitizeForWhatsApp(cached.response), goalMet: false, extractedData: null };
                     }
                 } catch (e: any) {
                     logger.warn(`[AI] Semantic cache lookup errored: ${e.message}`);
@@ -781,7 +793,7 @@ INSTRUCCIONES:
                         .catch(() => { /* best effort */ });
                 }
                 return {
-                    response: args.response,
+                    response: sanitizeForWhatsApp(args.response),
                     goalMet: args.goalMet,
                     extractedData: args.extractedData || null
                 };

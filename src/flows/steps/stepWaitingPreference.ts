@@ -27,9 +27,26 @@ export async function handleWaitingPreference(
     // SCRIPT FIRST: Check keywords for capsulas or semillas
     const isMatch = (keywords: string[], text: string) => keywords.some((k: string) => new RegExp(`\\b${k}\\b`, 'i').test(text));
 
-    const mentionsCapsulas = isMatch(knowledge.flow.preference_capsulas.match, normalizedText);
-    const mentionsSemillas = isMatch(knowledge.flow.preference_semillas.match, normalizedText);
-    const mentionsGotas = knowledge.flow.preference_gotas ? isMatch(knowledge.flow.preference_gotas.match, normalizedText) : false;
+    // Numeric option matching: el script muestra "1️⃣ Cápsulas, 2️⃣ Semillas, 3️⃣ Gotas".
+    // Sin esto, "1"/"2"/"3" caen al fallback de IA — y si OpenAI responde 429
+    // todos esos clientes terminan pausados (causa raíz del peor día de ventas 28/04).
+    const trimmed = normalizedText.trim();
+    const numericReply =
+        trimmed.match(/^([123])\s*[.)\-:°]?\s*$/) ||           // "1", "1.", "1)", "1-"
+        trimmed.match(/^([123])[️⃣]+/) ||              // "1️⃣"
+        trimmed.match(/^(?:opci[oó]n\s+|la\s+|el\s+|opc\s*)?([123])\b/);  // "opcion 1", "el 1"
+    let numericCapsulas = false, numericSemillas = false, numericGotas = false;
+    if (numericReply && !hasQuestionOrConcern && trimmed.length <= 30) {
+        const choice = numericReply[1];
+        if (choice === '1') numericCapsulas = true;
+        else if (choice === '2') numericSemillas = true;
+        else if (choice === '3') numericGotas = true;
+        logger.info(`[NUMERIC-PREF] User ${userId} replied with option ${choice} ("${text.substring(0, 30)}").`);
+    }
+
+    const mentionsCapsulas = numericCapsulas || isMatch(knowledge.flow.preference_capsulas.match, normalizedText);
+    const mentionsSemillas = numericSemillas || isMatch(knowledge.flow.preference_semillas.match, normalizedText);
+    const mentionsGotas = numericGotas || (knowledge.flow.preference_gotas ? isMatch(knowledge.flow.preference_gotas.match, normalizedText) : false);
 
     const totalMatches = (mentionsCapsulas ? 1 : 0) + (mentionsSemillas ? 1 : 0) + (mentionsGotas ? 1 : 0);
 
