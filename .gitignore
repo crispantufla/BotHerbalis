@@ -71,3 +71,8 @@ v2-*.png
 
 # Claude
 .claude/
+
+# Output personal / analítica que no va al repo
+reports/
+hermano-pack/
+herbalis-analytics-pack.zip

@@ -95,3 +95,17 @@ Máquina de estados lineal con fallbacks a IA. Orden típico:
 - Mezcla CommonJS + ES6 imports en utils (no unificado).
 - TS errors preexistentes: `ioredis` mismatch con `bullmq`, tests sin `@types/jest`.
 - Admins globales (`sellerId=null`) vs tenant admins distinción reciente — verificar scoping cuando se agregan rutas nuevas.
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues en `crispantufla/BotHerbalis` vía CLI `gh`. Ver `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Vocabulario por defecto (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). Ver `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` y `docs/adr/` en la raíz. Ver `docs/agents/domain.md`.
