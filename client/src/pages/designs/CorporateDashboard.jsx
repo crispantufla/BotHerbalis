@@ -24,7 +24,7 @@ import SellerSelector from '../../components/admin/SellerSelector';
 import WhatsappViewerView from '../../components/corporate/WhatsappViewerView';
 import ManualOrderEntryModal from '../../components/corporate/components/ManualOrderEntryModal';
 
-import { Wifi, MessageCircle, Database, Settings, FileText, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Search, Bell, AlertTriangle, BookOpen, MoreHorizontal, CreditCard, Users, Monitor, LifeBuoy } from 'lucide-react';
+import { Wifi, MessageCircle, Database, Settings, FileText, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Bell, AlertTriangle, BookOpen, MoreHorizontal, CreditCard, Users, Monitor, LifeBuoy } from 'lucide-react';
 
 const CorporateDashboard = () => {
     const { socket } = useSocket();
@@ -50,8 +50,6 @@ const CorporateDashboard = () => {
     const [isMobile, setIsMobile] = useState(false);
     const [isPhone, setIsPhone] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-    const [globalSearch, setGlobalSearch] = useState('');
-    const globalSearchRef = useRef(null);
     const [showNotifications, setShowNotifications] = useState(false);
     const notifRef = useRef(null);
 
@@ -78,29 +76,6 @@ const CorporateDashboard = () => {
         window.addEventListener('resize', checkMobile);
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
-
-    // Ctrl+K global shortcut → focus search
-    useEffect(() => {
-        const handler = (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-                e.preventDefault();
-                globalSearchRef.current?.focus();
-                globalSearchRef.current?.select();
-            }
-        };
-        window.addEventListener('keydown', handler);
-        return () => window.removeEventListener('keydown', handler);
-    }, []);
-
-    const handleGlobalSearch = (e) => {
-        e.preventDefault();
-        const q = globalSearch.trim();
-        if (!q) return;
-        // Navigate to chats if looks like a phone number, else sales
-        const looksLikePhone = /^\+?[\d\s\-()]{4,}$/.test(q);
-        setActiveTab(looksLikePhone ? 'comms' : 'logistics');
-        globalSearchRef.current?.blur();
-    };
 
     const fetchConfig = useCallback(async () => {
         try {
@@ -245,8 +220,8 @@ const CorporateDashboard = () => {
         switch (activeTab) {
             case 'dashboard': return <DashboardView alerts={alerts} config={config} handleQuickAction={handleQuickAction} status={status} qrData={qrData} />;
             case 'statistics': return <AdvancedAnalyticsView />;
-            case 'comms': return <CommsView initialChatId={targetChatId} onChatSelected={() => setTargetChatId(null)} initialSearch={globalSearch} alerts={alerts} onAlertAction={handleQuickAction} />;
-            case 'logistics': return <SalesView onGoToChat={(chatId) => handleQuickAction(chatId, 'chat')} initialSearch={globalSearch} />;
+            case 'comms': return <CommsView initialChatId={targetChatId} onChatSelected={() => setTargetChatId(null)} alerts={alerts} onAlertAction={handleQuickAction} />;
+            case 'logistics': return <SalesView onGoToChat={(chatId) => handleQuickAction(chatId, 'chat')} />;
             case 'script': return <ScriptView />;
             case 'gallery': return <GalleryView />;
             case 'manuals': return <ManualsView />;
@@ -430,23 +405,7 @@ const CorporateDashboard = () => {
                         </div>
                     </div>
 
-                    {/* Global Search */}
-                    <form onSubmit={handleGlobalSearch} className="hidden lg:flex items-center flex-1 max-w-sm mx-6">
-                        <div className="relative w-full">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                            <input
-                                ref={globalSearchRef}
-                                type="text"
-                                value={globalSearch}
-                                onChange={(e) => setGlobalSearch(e.target.value)}
-                                placeholder="Buscar cliente, pedido... (Ctrl+K)"
-                                onKeyDown={(e) => { if (e.key === 'Escape') { setGlobalSearch(''); globalSearchRef.current?.blur(); } }}
-                                className="w-full pl-9 pr-4 py-1.5 text-sm bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 dark:focus:border-indigo-600 text-slate-700 dark:text-slate-200 placeholder-slate-400 transition-all"
-                            />
-                        </div>
-                    </form>
-
-                    <div className="flex items-center gap-2 lg:gap-4">
+                    <div className="flex items-center gap-2 lg:gap-4 ml-auto">
                         {/* Seller Selector — any admin, to supervise/intercede in other sellers */}
                         {isAdmin && <div className="hidden md:block"><SellerSelector /></div>}
 
