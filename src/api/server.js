@@ -11,6 +11,7 @@ const orderRoutes = require('./routes/order.routes');
 const adminRoutes = require('./routes/admin.routes');
 const systemRoutes = require('./routes/system.routes');
 const analyticsRoutes = require('./routes/analytics.routes');
+const apiTokensRoutes = require('./routes/apiTokens.routes');
 const authRoutes = require('./routes/auth.routes');
 const galleryRoutes = require('./routes/gallery.routes');
 const paymentRoutes = require('./routes/payment.routes');
@@ -96,6 +97,7 @@ function startServer(clientPool) {
     app.use('/api', paymentRoutes(clientPool));
     app.use('/api', sellersRoutes(clientPool));
     app.use('/api', quickRepliesRoutes(clientPool));
+    app.use('/api', apiTokensRoutes());
 
     // --- VNC viewer tracking ---
     // State + helpers for the concurrent-headful cap. The upgrade handler

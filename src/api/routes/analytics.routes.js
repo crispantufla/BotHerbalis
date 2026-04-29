@@ -8,6 +8,13 @@ const AR_TZ = 'America/Argentina/Buenos_Aires';
 module.exports = (clientPool) => {
     const router = express.Router();
     const { withSeller, getInstanceId } = require('./routeHelpers');
+    const { jwtOrApiToken } = require('../../middleware/apiTokenAuth');
+    const { sellerContext } = require('../../middleware/sellerContext');
+
+    // Analytics endpoints accept either a regular session JWT or an API token
+    // with the "analytics:read" scope. Lets external tools (e.g. another Claude
+    // Code instance) read aggregated metrics without needing a user account.
+    const withAnalyticsAuth = (pool) => [jwtOrApiToken('analytics:read'), sellerContext(pool)];
 
     // Helper: Get date objects for current and previous periods
     const getPeriods = (days) => {
@@ -34,7 +41,7 @@ module.exports = (clientPool) => {
     };
 
     // GET /analytics/overview - High-level financial metrics and performance
-    router.get('/analytics/overview', ...withSeller(clientPool), async (req, res) => {
+    router.get('/analytics/overview', ...withAnalyticsAuth(clientPool), async (req, res) => {
         try {
             const days = parseInt(req.query.days) || 30;
             const instanceId = getInstanceId(req);
@@ -87,7 +94,7 @@ module.exports = (clientPool) => {
     });
 
     // GET /analytics/products - Product Popularity and Duration metrics
-    router.get('/analytics/products', ...withSeller(clientPool), async (req, res) => {
+    router.get('/analytics/products', ...withAnalyticsAuth(clientPool), async (req, res) => {
         try {
             const days = parseInt(req.query.days) || 30;
             const instanceId = getInstanceId(req);
@@ -168,7 +175,7 @@ module.exports = (clientPool) => {
     });
 
     // GET /analytics/demographics - Heatmap/Geography data
-    router.get('/analytics/demographics', ...withSeller(clientPool), async (req, res) => {
+    router.get('/analytics/demographics', ...withAnalyticsAuth(clientPool), async (req, res) => {
         try {
             const days = parseInt(req.query.days) || 30;
             const instanceId = getInstanceId(req);
@@ -276,7 +283,7 @@ module.exports = (clientPool) => {
     // GET /analytics/funnel-snapshot - Step-by-step funnel snapshot from DailyStats.
     // Renombrado de /analytics/funnel para no colisionar con el endpoint nuevo
     // basado en FunnelEvent (que es el que consume FunnelAnalyticsView.jsx).
-    router.get('/analytics/funnel-snapshot', ...withSeller(clientPool), async (req, res) => {
+    router.get('/analytics/funnel-snapshot', ...withAnalyticsAuth(clientPool), async (req, res) => {
         try {
             const days = parseInt(req.query.days) || 7;
             const instanceId = getInstanceId(req);
@@ -328,7 +335,7 @@ module.exports = (clientPool) => {
     });
 
     // GET /analytics/ad-performance - Funnel breakdown by ad source
-    router.get('/analytics/ad-performance', ...withSeller(clientPool), async (req, res) => {
+    router.get('/analytics/ad-performance', ...withAnalyticsAuth(clientPool), async (req, res) => {
         try {
             const days = parseInt(req.query.days) || 30;
             const instanceId = getInstanceId(req);
@@ -454,7 +461,7 @@ module.exports = (clientPool) => {
     }
 
     // GET /analytics/funnel — métricas 1 (drop-off por step)
-    router.get('/analytics/funnel', ...withSeller(clientPool), async (req, res) => {
+    router.get('/analytics/funnel', ...withAnalyticsAuth(clientPool), async (req, res) => {
         try {
             const { from, to } = parseDateRange(req);
             const instanceId = getInstanceId(req);
@@ -511,7 +518,7 @@ module.exports = (clientPool) => {
     });
 
     // GET /analytics/pause-alerts — métrica 3
-    router.get('/analytics/pause-alerts', ...withSeller(clientPool), async (req, res) => {
+    router.get('/analytics/pause-alerts', ...withAnalyticsAuth(clientPool), async (req, res) => {
         try {
             const { from, to } = parseDateRange(req);
             const instanceId = getInstanceId(req);
@@ -537,7 +544,7 @@ module.exports = (clientPool) => {
     // GET /analytics/time-to-close — métrica 5
     // Para cada (sellerId, phone) que alcanzó 'completed' en el rango: sum
     // de duraciones de todos sus FunnelEvents ≤ el de 'completed'.
-    router.get('/analytics/time-to-close', ...withSeller(clientPool), async (req, res) => {
+    router.get('/analytics/time-to-close', ...withAnalyticsAuth(clientPool), async (req, res) => {
         try {
             const { from, to } = parseDateRange(req);
             const instanceId = getInstanceId(req);
@@ -608,7 +615,7 @@ module.exports = (clientPool) => {
     // Computa retryIndex al leer (no al escribir) con un scan ordenado y
     // conteo en memoria. Esto ahorra 1 query por cada mensaje del usuario
     // que el bot procesa.
-    router.get('/analytics/retries', ...withSeller(clientPool), async (req, res) => {
+    router.get('/analytics/retries', ...withAnalyticsAuth(clientPool), async (req, res) => {
         try {
             const { from, to } = parseDateRange(req);
             const instanceId = getInstanceId(req);
@@ -655,7 +662,7 @@ module.exports = (clientPool) => {
     });
 
     // GET /analytics/ai-fallback — métrica 4 (aiCallCount / messageCount por step)
-    router.get('/analytics/ai-fallback', ...withSeller(clientPool), async (req, res) => {
+    router.get('/analytics/ai-fallback', ...withAnalyticsAuth(clientPool), async (req, res) => {
         try {
             const { from, to } = parseDateRange(req);
             const instanceId = getInstanceId(req);
@@ -688,7 +695,7 @@ module.exports = (clientPool) => {
     });
 
     // GET /analytics/price-objections — métrica 6
-    router.get('/analytics/price-objections', ...withSeller(clientPool), async (req, res) => {
+    router.get('/analytics/price-objections', ...withAnalyticsAuth(clientPool), async (req, res) => {
         try {
             const { from, to } = parseDateRange(req);
             const instanceId = getInstanceId(req);
@@ -732,7 +739,7 @@ module.exports = (clientPool) => {
     // GET /analytics/abandonment-by-hour — métrica 7
     // Por cada FunnelEvent con exitType='dropped', tomar la hora (AR) de
     // enteredAt y agrupar 24h.
-    router.get('/analytics/abandonment-by-hour', ...withSeller(clientPool), async (req, res) => {
+    router.get('/analytics/abandonment-by-hour', ...withAnalyticsAuth(clientPool), async (req, res) => {
         try {
             const { from, to } = parseDateRange(req);
             const instanceId = getInstanceId(req);
@@ -764,7 +771,7 @@ module.exports = (clientPool) => {
 
     // GET /analytics/product-mix — métrica 8
     // Lee Order (no cancelada), parsea producto+plan desde el string "Cápsulas (60 días)".
-    router.get('/analytics/product-mix', ...withSeller(clientPool), async (req, res) => {
+    router.get('/analytics/product-mix', ...withAnalyticsAuth(clientPool), async (req, res) => {
         try {
             const { from, to } = parseDateRange(req);
             const instanceId = getInstanceId(req);
@@ -823,7 +830,7 @@ module.exports = (clientPool) => {
     // Suma hits de AiSemanticCache por step y lo cruza con messageCount
     // total del mismo step en el rango. El cache es global (no por seller),
     // así que este endpoint ignora sellerId en la parte de cache.
-    router.get('/analytics/cache-hits', ...withSeller(clientPool), async (req, res) => {
+    router.get('/analytics/cache-hits', ...withAnalyticsAuth(clientPool), async (req, res) => {
         try {
             const { from, to } = parseDateRange(req);
             const instanceId = getInstanceId(req);
@@ -873,7 +880,7 @@ module.exports = (clientPool) => {
     });
 
     // GET /analytics/reentries — métrica 10
-    router.get('/analytics/reentries', ...withSeller(clientPool), async (req, res) => {
+    router.get('/analytics/reentries', ...withAnalyticsAuth(clientPool), async (req, res) => {
         try {
             const { from, to } = parseDateRange(req);
             const instanceId = getInstanceId(req);
@@ -902,7 +909,7 @@ module.exports = (clientPool) => {
 
     // GET /analytics/greeting-ab — compara conversión por variante de greeting.
     // Lee profileData.greetingVariant de cada User en el rango y cruza con orders.
-    router.get('/analytics/greeting-ab', ...withSeller(clientPool), async (req, res) => {
+    router.get('/analytics/greeting-ab', ...withAnalyticsAuth(clientPool), async (req, res) => {
         try {
             const days = Math.min(parseInt(req.query.days) || 14, 90);
             const instanceId = getInstanceId(req);
@@ -1019,7 +1026,7 @@ module.exports = (clientPool) => {
     // GET /analytics/rescue-queue — leads atascados ordenados por proximidad al cierre.
     // Toma userState en memoria del seller (live), filtra los que están en mid-funnel sin
     // actividad reciente y no pausados. Ranking: step más avanzado primero, luego inactividad.
-    router.get('/analytics/rescue-queue', ...withSeller(clientPool), async (req, res) => {
+    router.get('/analytics/rescue-queue', ...withAnalyticsAuth(clientPool), async (req, res) => {
         try {
             const sellerInstance = req.sellerInstance;
             if (!sellerInstance?.sharedState?.userState) {

@@ -212,6 +212,24 @@ model QuickReply {
   @@unique([instanceId, title])
 }
 
+// API tokens for programmatic access (e.g. external Claude Code reading analytics).
+// We store sha256(token) — never plaintext. The full token is shown to the
+// admin once at creation time. `scopes` is a CSV of allowed scopes
+// (currently only "analytics:read"). Revocation is soft via revokedAt.
+model ApiToken {
+  id          String    @id @default(uuid())
+  name        String                       // human description, e.g. "Hermano - meta ads"
+  tokenHash   String    @unique            // sha256 of the raw token
+  prefix      String                       // first 8 chars of the token, for UI display
+  scopes      String                       // csv: "analytics:read"
+  createdById String                       // accountId who created it
+  createdAt   DateTime  @default(now())
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+
+  @@index([revokedAt])
+}
+
 // Semantic cache: stores FAQ-style bot responses keyed by embedding similarity.
 // The embedding is persisted as JSON-serialized Float[] in a Text column so
 // Postgres native vector support isn't required. Cosine similarity is computed

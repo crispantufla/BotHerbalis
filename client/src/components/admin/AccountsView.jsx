@@ -4,7 +4,8 @@ import { useToast } from '../ui/Toast';
 import { useSeller } from '../../context/SellerContext';
 import {
     Users, Plus, Trash2, Edit2, X, Check, RefreshCw, Clock,
-    Play, Square, RotateCcw, Wifi, WifiOff, AlertTriangle, Shield, User, KeyRound, Loader2
+    Play, Square, RotateCcw, Wifi, WifiOff, AlertTriangle, Shield, User, KeyRound, Loader2,
+    Key, Copy
 } from 'lucide-react';
 
 const EMPTY_FORM = { name: '', password: '', role: 'seller', sellerId: '' };
@@ -529,6 +530,8 @@ const AccountsView = () => {
                             })}
                         </div>
                     </section>
+
+                    <ApiTokensSection />
                 </div>
             )}
         </div>
@@ -555,6 +558,209 @@ const OnlineTimeLine = ({ totalSeconds, onlineSinceMs, nowMs }) => {
                 </>
             )}
         </div>
+    );
+};
+
+// API Tokens section: managed below the accounts table. Tokens grant scope
+// "analytics:read" only — used by external Claude Code instances etc.
+// Plaintext is shown ONCE on creation, then only the prefix is visible.
+const ApiTokensSection = () => {
+    const { toast } = useToast();
+    const [tokens, setTokens] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [creating, setCreating] = useState(false);
+    const [showCreateForm, setShowCreateForm] = useState(false);
+    const [newName, setNewName] = useState('');
+    const [justCreated, setJustCreated] = useState(null); // { token, name, prefix }
+    const [copied, setCopied] = useState(false);
+
+    const load = useCallback(async () => {
+        setLoading(true);
+        try {
+            const res = await api.get('/api/admin/api-tokens');
+            setTokens(res.data || []);
+        } catch (e) {
+            toast.error('No se pudieron cargar los tokens');
+        } finally {
+            setLoading(false);
+        }
+    }, [toast]);
+
+    useEffect(() => { load(); }, [load]);
+
+    const handleCreate = async (e) => {
+        e?.preventDefault?.();
+        if (!newName.trim() || newName.trim().length < 3) {
+            toast.warning('El nombre debe tener al menos 3 caracteres');
+            return;
+        }
+        setCreating(true);
+        try {
+            const res = await api.post('/api/admin/api-tokens', {
+                name: newName.trim(),
+                scopes: ['analytics:read'],
+            });
+            setJustCreated({ token: res.data.token, name: res.data.name, prefix: res.data.prefix });
+            setNewName('');
+            setShowCreateForm(false);
+            load();
+        } catch (e) {
+            toast.error(e.response?.data?.error || 'Error creando el token');
+        } finally {
+            setCreating(false);
+        }
+    };
+
+    const handleRevoke = async (id, name) => {
+        if (!confirm(`¿Revocar el token "${name}"? Cualquier app que lo use dejará de funcionar al instante.`)) return;
+        try {
+            await api.delete(`/api/admin/api-tokens/${id}`);
+            toast.success('Token revocado');
+            load();
+        } catch (e) {
+            toast.error('No se pudo revocar');
+        }
+    };
+
+    const copyToClipboard = async (text) => {
+        try {
+            await navigator.clipboard.writeText(text);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch (e) {
+            toast.error('No se pudo copiar');
+        }
+    };
+
+    const fmtDate = (d) => d ? new Date(d).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+
+    return (
+        <section className="mt-8 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 sm:p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                    <Key className="w-5 h-5 text-indigo-500" />
+                    <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">API Tokens</h2>
+                </div>
+                <button
+                    onClick={() => setShowCreateForm(v => !v)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-colors"
+                >
+                    <Plus className="w-4 h-4" /> Nuevo token
+                </button>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+                Tokens para acceso programático a <code>/api/analytics/*</code> (scope <code>analytics:read</code>).
+                Útil para que un Claude Code externo o herramienta de marketing lea métricas sin necesidad de cuenta.
+            </p>
+
+            {showCreateForm && (
+                <form onSubmit={handleCreate} className="mb-4 p-4 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-200 dark:border-slate-700">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Nombre descriptivo</label>
+                    <input
+                        type="text"
+                        value={newName}
+                        onChange={e => setNewName(e.target.value)}
+                        placeholder='Ej: "Hermano - meta ads"'
+                        className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                        autoFocus
+                    />
+                    <div className="flex gap-2 mt-3">
+                        <button type="submit" disabled={creating} className="px-4 py-1.5 text-sm font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50">
+                            {creating ? 'Creando...' : 'Crear'}
+                        </button>
+                        <button type="button" onClick={() => { setShowCreateForm(false); setNewName(''); }} className="px-4 py-1.5 text-sm font-semibold rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200">
+                            Cancelar
+                        </button>
+                    </div>
+                </form>
+            )}
+
+            {justCreated && (
+                <div className="mb-4 p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-300 dark:border-emerald-800 rounded-xl">
+                    <div className="flex items-start gap-2 mb-2">
+                        <Check className="w-5 h-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-emerald-900 dark:text-emerald-200">
+                                Token creado: <span className="font-mono">{justCreated.name}</span>
+                            </p>
+                            <p className="text-xs text-emerald-800 dark:text-emerald-300 mt-1">
+                                Copialo ahora — no vas a poder verlo de nuevo. Si lo perdés, hay que generar uno nuevo.
+                            </p>
+                        </div>
+                        <button onClick={() => setJustCreated(null)} className="text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-800/30 p-1 rounded-md">
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                    <div className="flex items-center gap-2 mt-2 p-3 bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800 rounded-lg">
+                        <code className="flex-1 text-xs sm:text-sm font-mono text-slate-800 dark:text-slate-200 break-all">{justCreated.token}</code>
+                        <button
+                            onClick={() => copyToClipboard(justCreated.token)}
+                            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md bg-emerald-600 hover:bg-emerald-700 text-white"
+                        >
+                            <Copy className="w-3.5 h-3.5" /> {copied ? 'Copiado' : 'Copiar'}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {loading ? (
+                <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 py-4">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Cargando tokens...
+                </div>
+            ) : tokens.length === 0 ? (
+                <div className="text-sm text-slate-500 dark:text-slate-400 py-6 text-center bg-slate-50 dark:bg-slate-900/40 rounded-xl">
+                    Sin tokens creados todavía.
+                </div>
+            ) : (
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="text-left text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
+                                <th className="py-2 pr-3 font-semibold">Nombre</th>
+                                <th className="py-2 pr-3 font-semibold">Token</th>
+                                <th className="py-2 pr-3 font-semibold">Scopes</th>
+                                <th className="py-2 pr-3 font-semibold">Creado</th>
+                                <th className="py-2 pr-3 font-semibold">Último uso</th>
+                                <th className="py-2 pr-3 font-semibold">Estado</th>
+                                <th className="py-2"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {tokens.map(t => {
+                                const revoked = !!t.revokedAt;
+                                return (
+                                    <tr key={t.id} className={`border-b border-slate-100 dark:border-slate-800 ${revoked ? 'opacity-50' : ''}`}>
+                                        <td className="py-3 pr-3 font-medium text-slate-700 dark:text-slate-200">{t.name}</td>
+                                        <td className="py-3 pr-3"><code className="text-xs font-mono text-slate-500 dark:text-slate-400">{t.prefix}…</code></td>
+                                        <td className="py-3 pr-3 text-xs text-slate-500 dark:text-slate-400">{(t.scopes || []).join(', ')}</td>
+                                        <td className="py-3 pr-3 text-xs text-slate-500 dark:text-slate-400">{fmtDate(t.createdAt)}</td>
+                                        <td className="py-3 pr-3 text-xs text-slate-500 dark:text-slate-400">{fmtDate(t.lastUsedAt)}</td>
+                                        <td className="py-3 pr-3">
+                                            {revoked ? (
+                                                <span className="text-xs px-2 py-0.5 rounded bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400">Revocado</span>
+                                            ) : (
+                                                <span className="text-xs px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">Activo</span>
+                                            )}
+                                        </td>
+                                        <td className="py-3 text-right">
+                                            {!revoked && (
+                                                <button
+                                                    onClick={() => handleRevoke(t.id, t.name)}
+                                                    className="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-md"
+                                                    title="Revocar"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </section>
     );
 };
 
