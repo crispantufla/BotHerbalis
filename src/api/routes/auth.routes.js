@@ -114,13 +114,13 @@ module.exports = (client, sharedState) => {
     });
 
     // ─── GET /api/accounts ──────────────────────────────────────────
-    // List accounts. Global admins ven todas; tenant admins solo las del propio
-    // tenant (incluyendo la propia, no las de otros).
+    // List accounts. Cualquier admin (con o sin sellerId) ve todas las cuentas
+    // — consistente con el resto del sistema, donde sellerContext middleware ya
+    // permite a todo admin overridear seller via header/query, y el frontend
+    // muestra el SellerSelector a todos. Para gestionar usuarios necesitan ver
+    // a todos. La vista de "Gestión de Usuarios" es global por naturaleza.
     router.get('/accounts', jwtAuthMiddleware, requireAdmin, async (req, res) => {
-        const isTenantAdmin = req.account.role === 'admin' && req.account.sellerId != null;
-        const where = isTenantAdmin ? { sellerId: req.account.sellerId } : {};
         const accounts = await prisma.account.findMany({
-            where,
             select: {
                 id: true,
                 name: true,
@@ -143,11 +143,8 @@ module.exports = (client, sharedState) => {
     });
 
     // ─── POST /api/accounts ─────────────────────────────────────────
-    // Create a new account.
-    // Global admins (role=admin, sellerId=null) pueden crear cualquier cuenta.
-    // Tenant admins (role=admin, sellerId=X) solo pueden crear cuentas con
-    // sellerId=X y role!='admin' (no pueden generar otro admin global ni saltar
-    // a otro tenant).
+    // Create a new account. Cualquier admin puede crear cualquier tipo de cuenta
+    // (consistente con la vista de "Gestión de Usuarios" siendo global).
     router.post('/accounts', jwtAuthMiddleware, requireAdmin, async (req, res) => {
         const { name, password, role, sellerId } = req.body;
 
@@ -162,18 +159,6 @@ module.exports = (client, sharedState) => {
         const effectiveRole = role || 'seller';
         if (effectiveRole === 'seller' && !sellerId) {
             return res.status(400).json({ error: 'sellerId is required for seller accounts' });
-        }
-
-        // Privilege escalation guard: tenant admins (sellerId != null) no pueden
-        // crear cuentas fuera de su propio tenant ni cuentas con role=admin.
-        const isTenantAdmin = req.account.role === 'admin' && req.account.sellerId != null;
-        if (isTenantAdmin) {
-            if (effectiveRole === 'admin') {
-                return res.status(403).json({ error: 'Solo un admin global puede crear otros admins' });
-            }
-            if (sellerId && sellerId.toLowerCase() !== req.account.sellerId) {
-                return res.status(403).json({ error: 'No podés crear cuentas en otros tenants' });
-            }
         }
 
         try {
@@ -207,34 +192,10 @@ module.exports = (client, sharedState) => {
     });
 
     // ─── PUT /api/accounts/:id ──────────────────────────────────────
-    // Update an account.
-    // Tenant admins solo pueden editar cuentas de su tenant y NO pueden cambiar
-    // role/sellerId a valores que escapen al alcance (i.e., role=admin global,
-    // o sellerId distinto al propio).
+    // Update an account. Cualquier admin puede editar cualquier cuenta.
     router.put('/accounts/:id', jwtAuthMiddleware, requireAdmin, async (req, res) => {
         const { id } = req.params;
         const { name, password, role, sellerId, isActive } = req.body;
-
-        const isTenantAdmin = req.account.role === 'admin' && req.account.sellerId != null;
-
-        // Tenant admins: cargar cuenta target primero para validar ownership y cambios
-        if (isTenantAdmin) {
-            const target = await prisma.account.findUnique({
-                where: { id },
-                select: { sellerId: true, role: true },
-            });
-            if (!target) return res.status(404).json({ error: 'Account not found' });
-
-            if (target.sellerId !== req.account.sellerId) {
-                return res.status(403).json({ error: 'No podés editar cuentas de otro tenant' });
-            }
-            if (role && role !== target.role) {
-                return res.status(403).json({ error: 'Solo un admin global puede cambiar el rol' });
-            }
-            if (sellerId !== undefined && sellerId !== req.account.sellerId) {
-                return res.status(403).json({ error: 'No podés mover una cuenta fuera de tu tenant' });
-            }
-        }
 
         const data = {};
         if (name !== undefined) data.name = name;
@@ -263,23 +224,10 @@ module.exports = (client, sharedState) => {
     });
 
     // ─── DELETE /api/accounts/:id ───────────────────────────────────
-    // Soft-delete (deactivate) an account.
-    // Tenant admins solo pueden desactivar cuentas de su mismo tenant.
+    // Soft-delete (deactivate) an account. Cualquier admin puede desactivar
+    // cualquier cuenta.
     router.delete('/accounts/:id', jwtAuthMiddleware, requireAdmin, async (req, res) => {
         const { id } = req.params;
-        const isTenantAdmin = req.account.role === 'admin' && req.account.sellerId != null;
-
-        if (isTenantAdmin) {
-            const target = await prisma.account.findUnique({
-                where: { id },
-                select: { sellerId: true },
-            });
-            if (!target) return res.status(404).json({ error: 'Account not found' });
-            if (target.sellerId !== req.account.sellerId) {
-                return res.status(403).json({ error: 'No podés desactivar cuentas de otro tenant' });
-            }
-        }
-
         try {
             const account = await prisma.account.update({
                 where: { id },

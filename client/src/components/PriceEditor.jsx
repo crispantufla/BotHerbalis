@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { API_URL } from '../config/api';
+import api from '../config/axios';
 
 const PriceEditor = () => {
     const [prices, setPrices] = useState(null);
@@ -10,24 +10,17 @@ const PriceEditor = () => {
         fetchPrices();
     }, []);
 
-
-
     const fetchPrices = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`${API_URL}/api/prices`, {
-                headers: {
-                    'x-api-key': import.meta.env.VITE_API_KEY
-                }
-            });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data = await res.json();
+            const { data } = await api.get('/api/prices');
 
             // Ensure Config Defaults
             if (!data.adicionalMAX) data.adicionalMAX = '6.000';
             if (!data.costoLogistico) data.costoLogistico = '18.000';
 
             setPrices(data || {});
+            setMessage('');
         } catch (e) {
             console.error(e);
             setMessage('Error cargando precios. Revisa la conexión.');
@@ -50,23 +43,17 @@ const PriceEditor = () => {
     const savePrices = async () => {
         try {
             setMessage('Guardando...');
-            const res = await fetch(`${API_URL}/api/prices`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-api-key': import.meta.env.VITE_API_KEY
-                },
-                body: JSON.stringify(prices)
-            });
-            if (res.ok) {
-                setMessage('✅ Precios actualizados correctamente.');
-                setTimeout(() => setMessage(''), 3000);
+            await api.post('/api/prices', prices);
+            setMessage('✅ Precios actualizados correctamente.');
+            setTimeout(() => setMessage(''), 3000);
+        } catch (e) {
+            console.error(e);
+            const status = e.response?.status;
+            if (status === 403) {
+                setMessage('❌ Solo un admin puede modificar los precios.');
             } else {
                 setMessage('❌ Error al guardar.');
             }
-        } catch (e) {
-            console.error(e);
-            setMessage('❌ Error de red.');
         }
     };
 
