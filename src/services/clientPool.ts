@@ -13,7 +13,7 @@ const qrcode = require('qrcode-terminal');
 const { prisma } = require('../../db');
 const { createStateManager, SellerStateManager } = require('./stateManager');
 const { createBotHelpers } = require('../handlers/botHelpers');
-const { createMessageHandler } = require('../handlers/messageHandler');
+const { createMessageHandler, createOutgoingMessageHandler } = require('../handlers/messageHandler');
 const { createQueue, createWorker, shutdownSellerQueue } = require('./queueService');
 const { processSalesFlow } = require('../flows/salesFlow');
 const { aiService } = require('./ai');
@@ -494,6 +494,19 @@ class ClientPool {
         });
 
         client.on('message', messageHandler);
+
+        // Outgoing handler — capta mensajes que el admin escribe manualmente
+        // desde el WhatsApp del bot. El evento 'message' NO los emite (solo
+        // entrantes); 'message_create' sí emite ambos. Su único trabajo es
+        // pausar chats nuevos iniciados por admin para que el bot no dispare
+        // la bienvenida cuando el cliente responda.
+        const outgoingHandler = createOutgoingMessageHandler({
+            sellerId,
+            userState: stateManager.userState,
+            pausedUsers: stateManager.pausedUsers,
+            sharedState,
+        });
+        client.on('message_create', outgoingHandler);
 
         const pool = this;
         async function safeInit(): Promise<void> {

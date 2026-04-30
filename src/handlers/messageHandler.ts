@@ -287,3 +287,69 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
         }
     };
 }
+
+/**
+ * createOutgoingMessageHandler
+ *
+ * Listener para `client.on('message_create')` — captura mensajes salientes
+ * (fromMe=true) que el `'message'` event NO emite. Su único trabajo es
+ * detectar cuando el admin escribe MANUALMENTE desde el WhatsApp del bot a
+ * un cliente nuevo, y pausar ese chat para que el bot no dispare la
+ * bienvenida cuando el cliente responda.
+ *
+ * Sin esto: admin escribe "Hola Juan" desde la app → cliente responde →
+ * bot ve un userId sin estado → arranca con saludo + catálogo. Mensaje
+ * contradictorio para el cliente.
+ *
+ * Persiste a DB (User.pausedAt + pauseReason) para que sobreviva el
+ * reinicio del bot via restorePausedUsersFromDB.
+ */
+export function createOutgoingMessageHandler(ctx: {
+    sellerId: string;
+    userState: any;
+    pausedUsers: Set<string>;
+    sharedState: any;
+}): (msg: any) => Promise<void> {
+    const { sellerId, userState, pausedUsers, sharedState } = ctx;
+
+    return async function outgoingHandler(msg: any): Promise<void> {
+        try {
+            // Solo nos interesan outgoing messages a chats individuales.
+            if (!msg.fromMe) return;
+            if (!msg.to || typeof msg.to !== 'string') return;
+            if (!msg.to.endsWith('@c.us')) return;
+            if (msg.to.endsWith('@g.us') || msg.to.endsWith('@broadcast')) return;
+
+            // Ignorar mensajes que el bot mismo envió via client.sendMessage
+            // (esos NO son admin escribiendo manualmente). Heurística: si el
+            // bot está activo en este chat (userState[targetId] existe con un
+            // step válido), asumimos que el bot envió este mensaje.
+            const targetId = msg.to;
+            if (userState[targetId]) return;
+            if (pausedUsers.has(targetId)) return;
+
+            // Skip si la conexión recién se inició (mensajes históricos)
+            if (sharedState.connectedAt && msg.timestamp && msg.timestamp < sharedState.connectedAt) return;
+
+            // Marcar el chat como pausado — el cliente puede responder pero
+            // el bot no va a engaging.
+            pausedUsers.add(targetId);
+            try {
+                const { prisma } = require('../../db');
+                const cleanPhone = targetId.replace('@c.us', '').replace(/\D/g, '');
+                await prisma.user.upsert({
+                    where: { phone_instanceId: { phone: cleanPhone, instanceId: sellerId } },
+                    update: { pausedAt: new Date(), pauseReason: 'Conversación iniciada manualmente por admin desde WhatsApp' },
+                    create: { phone: cleanPhone, instanceId: sellerId, pausedAt: new Date(), pauseReason: 'Conversación iniciada manualmente por admin desde WhatsApp' },
+                });
+            } catch (err: any) {
+                if (err?.code !== 'P2002') {
+                    logger.warn(`[MANUAL-CHAT][${sellerId}] Failed to persist pause for ${targetId}: ${err?.message}`);
+                }
+            }
+            logger.info(`[MANUAL-CHAT][${sellerId}] Admin escribió manualmente a ${targetId} — chat pausado para no disparar bienvenida`);
+        } catch (err: any) {
+            logger.error(`[OUTGOING-HANDLER][${sellerId}] Error: ${err?.message}`);
+        }
+    };
+}
