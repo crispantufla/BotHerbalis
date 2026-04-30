@@ -9,6 +9,15 @@ function _formatMessage(text: string | string[], state: any): string {
 
     const prices = _getPrices();
 
+    // Para anclaje de valor en planes: precio por día del 120. Devuelve string
+    // formateado con punto de miles (ej: "1.234"). Vacío si el precio es inválido.
+    const _perDay = (priceStr: string | undefined, days: number): string => {
+        if (!priceStr) return '';
+        const parsed = parseInt(priceStr.replace(/\./g, ''), 10);
+        if (isNaN(parsed) || days <= 0) return '';
+        return _formatPrice(Math.round(parsed / days));
+    };
+
     let formatted = textToFormat;
     // Replace {{PRICE_PRODUCT_PLAN}}
     formatted = formatted.replace(/{{PRICE_CAPSULAS_60}}/g, prices['Cápsulas']?.['60'] || '');
@@ -17,6 +26,10 @@ function _formatMessage(text: string | string[], state: any): string {
     formatted = formatted.replace(/{{PRICE_SEMILLAS_120}}/g, prices['Semillas']?.['120'] || '');
     formatted = formatted.replace(/{{PRICE_GOTAS_60}}/g, prices['Gotas']?.['60'] || '');
     formatted = formatted.replace(/{{PRICE_GOTAS_120}}/g, prices['Gotas']?.['120'] || '');
+    // Anclaje de valor: precio/día para los planes 120 (justifica el ticket vs el de 60).
+    formatted = formatted.replace(/{{PRICE_PER_DAY_CAPSULAS_120}}/g, _perDay(prices['Cápsulas']?.['120'], 120));
+    formatted = formatted.replace(/{{PRICE_PER_DAY_SEMILLAS_120}}/g, _perDay(prices['Semillas']?.['120'], 120));
+    formatted = formatted.replace(/{{PRICE_PER_DAY_GOTAS_120}}/g, _perDay(prices['Gotas']?.['120'], 120));
     formatted = formatted.replace(/{{ADICIONAL_MAX}}/g, prices.adicionalMAX || '6.000');
     formatted = formatted.replace(/{{COSTO_LOGISTICO}}/g, prices.costoLogistico || '18.000');
 

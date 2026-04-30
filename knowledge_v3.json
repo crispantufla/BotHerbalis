@@ -39,7 +39,7 @@
                 "practico",
                 "practica"
             ],
-            "response": "Genial 👍 Excelente elección.\n\n💊 Se toma 1 cápsula al día, 30 min antes de la comida principal.\n\n🏆 *Plan 120 días — ${{PRICE_CAPSULAS_120}}*\n_Envío gratis + pago a domicilio bonificado_ ✅\n\n🔸 Plan 60 días — ${{PRICE_CAPSULAS_60}}\n_+$6.000 si pagás contra reembolso_\n\n👉 ¿Avanzamos con 120 o 60 días?",
+            "response": "Genial 👍 Excelente elección.\n\n💊 Se toma 1 cápsula al día, 30 min antes de la comida principal.\n\n🏆 *Plan 120 días — ${{PRICE_CAPSULAS_120}}*\n_Te sale ${{PRICE_PER_DAY_CAPSULAS_120}} por día — el costo de un café_ ☕\n_Envío gratis + pago a domicilio bonificado_ ✅\n\n🔸 Plan 60 días — ${{PRICE_CAPSULAS_60}}\n_+$6.000 si pagás contra reembolso_\n\n👉 ¿Avanzamos con 120 o 60 días?",
             "nextStep": "waiting_plan_choice"
         },
         "preference_semillas": {
@@ -53,7 +53,7 @@
                 "natural",
                 "tradicional"
             ],
-            "response": "Genial 🌿 Las semillas son la opción más elegida.\n\n🌿 Se prepara como infusión cada noche.\n\n🏆 *Plan 120 días — ${{PRICE_SEMILLAS_120}}*\n_Envío gratis + pago a domicilio bonificado_ ✅\n\n🔸 Plan 60 días — ${{PRICE_SEMILLAS_60}}\n_+$6.000 si pagás contra reembolso_\n\n👉 ¿Avanzamos con 120 o 60 días?",
+            "response": "Genial 🌿 Las semillas son la opción más elegida.\n\n🌿 Se prepara como infusión cada noche.\n\n🏆 *Plan 120 días — ${{PRICE_SEMILLAS_120}}*\n_Te sale ${{PRICE_PER_DAY_SEMILLAS_120}} por día — menos que un café_ ☕\n_Envío gratis + pago a domicilio bonificado_ ✅\n\n🔸 Plan 60 días — ${{PRICE_SEMILLAS_60}}\n_+$6.000 si pagás contra reembolso_\n\n👉 ¿Avanzamos con 120 o 60 días?",
             "nextStep": "waiting_plan_choice"
         },
         "preference_gotas": {
@@ -63,7 +63,7 @@
                 "liquido",
                 "gotero"
             ],
-            "response": "Genial 🌿 Las gotas son prácticas y discretas.\n\n💧 Se absorben rápido, sin preparar nada.\n\n🏆 *Plan 120 días — ${{PRICE_GOTAS_120}}*\n_Envío gratis + pago a domicilio bonificado_ ✅\n\n🔸 Plan 60 días — ${{PRICE_GOTAS_60}}\n_+$6.000 si pagás contra reembolso_\n\n👉 ¿Avanzamos con 120 o 60 días?",
+            "response": "Genial 🌿 Las gotas son prácticas y discretas.\n\n💧 Se absorben rápido, sin preparar nada.\n\n🏆 *Plan 120 días — ${{PRICE_GOTAS_120}}*\n_Te sale ${{PRICE_PER_DAY_GOTAS_120}} por día — el costo de un café_ ☕\n_Envío gratis + pago a domicilio bonificado_ ✅\n\n🔸 Plan 60 días — ${{PRICE_GOTAS_60}}\n_+$6.000 si pagás contra reembolso_\n\n👉 ¿Avanzamos con 120 o 60 días?",
             "nextStep": "waiting_plan_choice"
         },
         "price_capsulas": {
