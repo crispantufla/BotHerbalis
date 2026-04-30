@@ -269,8 +269,9 @@ async function _generateAndSendLink(
             `Pedido: *${productName}* — Plan ${currentState.selectedPlan} días\n` +
             `Total: *$${currentState.totalPrice}*\n\n` +
             `👇 Hacé clic para pagar de forma segura:\n${link}\n\n` +
-            `Podés pagar con tarjeta, desde la app de MercadoPago o escaneando el QR.\n\n` +
-            `✅ Cuando completes el pago, enviame el comprobante y pasame los datos de envío 👇\n\n` +
+            `Podés pagar con tarjeta (incluso en *3, 6 o 9 cuotas sin interés* 🎉), desde la app de MercadoPago o escaneando el QR.\n\n` +
+            `✅ Cuando termines el pago, escribime *"listo"* y verifico que ingresó.\n\n` +
+            `Mientras tanto, pasame los datos de envío para tener todo listo 👇\n\n` +
             `Nombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nProvincia:`;
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         await sendMessageWithDelay(userId, msg);

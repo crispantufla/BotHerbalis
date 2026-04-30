@@ -271,7 +271,7 @@ describe('Pago con MercadoPago — flow completo', () => {
         expect(['waiting_data', 'waiting_final_confirmation']).toContain(state.step);
     });
 
-    test('[3.3] "ya pagué" + pago aprobado con dirección → waiting_final_confirmation', async () => {
+    test('[3.3] "ya pagué" + pago aprobado con dirección → waiting_admin_validation (admin valida pago + datos)', async () => {
         mockPaymentLinkFindUnique.mockResolvedValueOnce({ id: 'pl-1', status: 'pending', externalRef: 'ref-1' });
         mockPaymentSearch.mockResolvedValueOnce({
             results: [{ status: 'approved', date_approved: new Date().toISOString() }],
@@ -283,7 +283,10 @@ describe('Pago con MercadoPago — flow completo', () => {
             partialAddress: { nombre: 'Ana Gomez', calle: 'Rivadavia 500', ciudad: 'CABA' },
         });
         await handleWaitingMpPayment('mp_e3', 'ya pagué', 'ya pague', state, knowledge, deps);
-        expect(state.step).toBe('waiting_final_confirmation');
+        // Comportamiento esperado tras commit 966da6a: cuando hay pago aprobado +
+        // dirección, _finalizeOrderAndNotifyAdmin avanza a WAITING_ADMIN_VALIDATION
+        // para que el admin valide pago + datos antes de confirmar.
+        expect(state.step).toBe('waiting_admin_validation');
     });
 
     test('[3.4] "listo" + pago PENDING → mensaje de espera, no avanza', async () => {
@@ -365,13 +368,18 @@ describe('Pago con MercadoPago — flow completo', () => {
 // ════════════════════════════════════════════════════════════════════════════
 describe('Método de pago → Transferencia', () => {
 
-    test('[4.1] "transferencia" → envía alias y pausa el bot', async () => {
+    test('[4.1] "transferencia" → envía alias y avanza a waiting_transfer_confirmation (NO pausa todavía)', async () => {
         const state = makePaymentState('60');
         await handleWaitingPaymentMethod('tr1', 'transferencia', 'transferencia', state, knowledge, deps);
         expect(state.paymentMethod).toBe('transferencia');
         const sent = mockSend.mock.calls.map(([, m]) => m).join(' ');
         expect(sent).toMatch(/CHILE\.TEXTO\.CASINO/);
-        expect(mockPauseUsers.has('tr1')).toBe(true);
+        // Comportamiento intencional desde commit 682375d: NO pausa al elegir
+        // transferencia para que el cliente pueda cambiar de método sin necesitar
+        // despausa manual. La pausa ocurre en stepWaitingTransferConfirmation
+        // cuando el cliente confirma "ya transferí".
+        expect(mockPauseUsers.has('tr1')).toBe(false);
+        expect(state.step).toBe('waiting_transfer_confirmation');
     });
 
     test('[4.2] "2" → detecta transferencia (Transferencia es opción 2 del menú)', async () => {
@@ -394,14 +402,12 @@ describe('Método de pago → Transferencia', () => {
         expect(state.totalPrice).toBe(totalAntes);
     });
 
-    test('[4.5] notifyAdmin incluye motivo transferencia', async () => {
+    test('[4.5] elegir transferencia NO notifica admin acá — la alerta es en stepWaitingTransferConfirmation cuando el cliente confirma "ya transferí"', async () => {
         const state = makePaymentState('60');
         await handleWaitingPaymentMethod('tr5', 'transferencia', 'transferencia', state, knowledge, deps);
-        expect(mockNotify).toHaveBeenCalledWith(
-            expect.any(String),
-            expect.any(String),
-            expect.stringContaining('transferencia')
-        );
+        // Permitir cambio de método sin ruido al admin (commit 682375d). El admin
+        // se entera cuando el cliente confirma la transferencia.
+        expect(mockNotify).not.toHaveBeenCalled();
     });
 });
 
