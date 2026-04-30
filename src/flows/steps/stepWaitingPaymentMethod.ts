@@ -43,17 +43,18 @@ function _detectOptionNumber(text: string): '1' | '2' | '3' | null {
 
 const PAYMENT_MSG = (adicional: number, plan: string) => {
     const adicionalStr = adicional.toLocaleString('es-AR');
-    const plan120bonus = plan === '120'
-        ? `\n   ▸ Plan 120 días: adicional bonificado ✅`
-        : `\n   ▸ Plan 60 días: adicional de $${adicionalStr}\n   ▸ Plan 120 días: ese adicional está bonificado ✅`;
+    const plan60AdicionalLine = plan === '60'
+        ? `\n   ▸ +$${adicionalStr} de adicional en plan 60 días (bonificado en 120) `
+        : `\n   ▸ Sin adicional (bonificado en plan 120 días) ✅`;
     return `¡Perfecto! 😊 Antes de los datos de envío, te cuento las opciones de pago.\n` +
         `📦 *En todos los casos el envío es SIN COSTO*\n\n` +
-        `1️⃣ *Contra reembolso* — Pagás al cartero cuando te llega.${plan === '120' ? '\n   ▸ Sin adicional (bonificado en plan 120 días) ✅' : plan120bonus}\n` +
-        `   Demora: 7 a 10 días hábiles\n\n` +
-        `2️⃣ *MercadoPago* — Sin adicional ni recargos.\n` +
+        `1️⃣ *MercadoPago* 💳 — Pagás ahora con tarjeta, débito o saldo MP.\n` +
+        `   Podés abonar en *3, 6 o 9 cuotas sin interés* 🎉\n` +
         `   Demora: 4 a 6 días hábiles 🚀\n\n` +
-        `3️⃣ *Transferencia bancaria* — Sin recargos.\n` +
+        `2️⃣ *Transferencia bancaria* — Sin recargos.\n` +
         `   Demora: 4 a 6 días hábiles\n\n` +
+        `3️⃣ *Contra reembolso* — Pagás al cartero cuando te llega.${plan60AdicionalLine}\n` +
+        `   Demora: 7 a 10 días hábiles\n\n` +
         `¿Cuál te resulta más cómoda?`;
 };
 
@@ -70,13 +71,24 @@ export async function handleWaitingPaymentMethod(
     const plan = currentState.selectedPlan || currentState.cart?.[0]?.plan || '60';
     const adicionalMAX = currentState.adicionalMAX || _getAdicionalMAX();
 
-    // Detectar elección por número de opción aislado (ej: "2", "la 2", "opcion 1")
-    const optionNum = _detectOptionNumber(text);
-    const isOptionMP = optionNum === '2';
-    const isOptionTransfer = optionNum === '3';
-    const isOptionCash = optionNum === '1';
+    // Guard defensivo: si llegamos acá con totalPrice undefined/inválido pero
+    // tenemos cart, recalcular antes de los waives (evita "Monto inválido"
+    // downstream en _generateAndSendLink).
+    const hasValidTotal = currentState.totalPrice
+        && parseFloat(String(currentState.totalPrice).replace(/\./g, '').replace(',', '.')) > 0;
+    if (!hasValidTotal && currentState.cart && currentState.cart.length > 0) {
+        logger.warn(`[PAYMENT_METHOD] totalPrice corrupto/vacío para ${userId} — recalculando desde cart`);
+        calculateTotal(currentState);
+    }
 
-    // ── Opción 2: MercadoPago ──────────────────────────────────────────────────
+    // Detectar elección por número de opción aislado (ej: "1", "la 1", "opcion 2").
+    // Orden actual del menú: 1=MP, 2=Transferencia, 3=Contra reembolso.
+    const optionNum = _detectOptionNumber(text);
+    const isOptionMP = optionNum === '1';
+    const isOptionTransfer = optionNum === '2';
+    const isOptionCash = optionNum === '3';
+
+    // ── Opción 1: MercadoPago ──────────────────────────────────────────────────
     // Solo si MP fue elegido (por número o keyword) Y no hay señal de transferencia
     if ((isOptionMP || MP_KEYWORDS.test(text)) && !TRANSFER_KEYWORDS.test(text) && !isOptionTransfer && !isOptionCash) {
         currentState.paymentMethod = 'mercadopago';
@@ -101,7 +113,7 @@ export async function handleWaitingPaymentMethod(
         return { matched: false, staleReprocess: true } as any;
     }
 
-    // ── Opción 3: Transferencia ────────────────────────────────────────────────
+    // ── Opción 2: Transferencia ────────────────────────────────────────────────
     if (isOptionTransfer || TRANSFER_KEYWORDS.test(normalizedText)) {
         currentState.paymentMethod = 'transferencia';
 
@@ -127,7 +139,7 @@ export async function handleWaitingPaymentMethod(
         return { matched: true };
     }
 
-    // ── Opción 1: Contra reembolso ─────────────────────────────────────────────
+    // ── Opción 3: Contra reembolso ─────────────────────────────────────────────
     if (isOptionCash || CASH_KEYWORDS.test(normalizedText)) {
         currentState.paymentMethod = 'contrarembolso';
 
@@ -174,7 +186,7 @@ export async function handleWaitingPaymentMethod(
 
     const aiRes = await aiService.chat(text, {
         step: 'waiting_payment_method',
-        goal: `El cliente debe elegir cómo quiere pagar su pedido. Las opciones son:\n\n1. *Contra reembolso* — paga al cartero cuando llega. ${plan60 ? `Tiene un adicional de $${adicionalFmt} en plan 60 días (bonificado en 120).` : 'Sin adicional (plan 120 días).'}\n\n2. *MercadoPago* — paga ahora online (tarjeta, QR o app). Sin adicional ni recargos. MÁS RÁPIDO.\n\n3. *Transferencia bancaria* — sin recargos, similar velocidad que MP.\n\nPRIORIDAD: intentá siempre que elija MercadoPago primero, explicando que es más rápido y cómodo. Si no puede o no quiere, ofrecé transferencia. Contra reembolso como última opción.\n\nNUNCA avances sin que el cliente elija una opción clara.`,
+        goal: `El cliente debe elegir cómo quiere pagar su pedido. Las opciones son (orden actual del menú):\n\n1. *MercadoPago* — paga ahora online (tarjeta, débito o saldo MP). Sin recargos. *Disponen 3, 6 o 9 cuotas sin interés con tarjeta de crédito*. ENTREGA MÁS RÁPIDA (4-6 días).\n\n2. *Transferencia bancaria* — alias CHILE.TEXTO.CASINO. Sin recargos. Misma velocidad que MP.\n\n3. *Contra reembolso* — paga al cartero cuando llega. ${plan60 ? `Tiene un adicional de $${adicionalFmt} en plan 60 días (bonificado en 120).` : 'Sin adicional (plan 120 días).'} Demora 7-10 días.\n\nPRIORIDAD: intentá siempre que elija MercadoPago primero — destacá las cuotas sin interés y que es la opción más rápida y cómoda. Si no puede o no quiere, ofrecé transferencia. Contra reembolso como última opción (es la que más se cancela).\n\nNUNCA avances sin que el cliente elija una opción clara.`,
         history: currentState.history,
         summary: currentState.summary,
         knowledge,

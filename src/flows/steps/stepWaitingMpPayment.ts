@@ -5,8 +5,9 @@ import { randomUUID } from 'crypto';
 import logger from '../../utils/logger';
 
 const PAID_KEYWORDS = /\b(listo|pague|pagu[eé]|pago hecho|hice el pago|ya pague|ya pagu[eé]|realice|realic[eé]|confirmo|listo el pago|pago listo|lo hice|hecho|ok listo)\b/i;
-const TRANSFER_FALLBACK_KEYWORDS = /\b(transfer[ei]ncia|transf|alias|3|tercero|tercera)\b/i;
-const CASH_FALLBACK_KEYWORDS = /\b(efectivo|contra.?reembolso|contrarembolso|1|cartero|al recibir|no puedo|no tengo|no me sale|error|problema|no funciona|cancelar)\b/i;
+// Numeración del menú actual (1=MP, 2=Transferencia, 3=Contra reembolso).
+const TRANSFER_FALLBACK_KEYWORDS = /\b(transfer[ei]ncia|transf|alias|2|segund[oa]|segunda)\b/i;
+const CASH_FALLBACK_KEYWORDS = /\b(efectivo|contra.?reembolso|contrarembolso|3|cartero|al recibir|no puedo|no tengo|no me sale|error|problema|no funciona|cancelar)\b/i;
 
 export async function handleWaitingMpPayment(
     userId: string,
@@ -52,15 +53,12 @@ export async function handleWaitingMpPayment(
             return { matched: true };
 
         } else {
-            // rejected o error — ofrecer transferencia primero.
-            // Restaurar adicionalMAX: cuando el cliente eligió MP, se waived
-            // el adicional. Si MP rechaza y el cliente luego elige contra
-            // reembolso, el adicional debe volver a aplicarse. _recalcAdicionalMAX
-            // es idempotente y recalcula desde el cart actual.
-            _recalcAdicionalMAX(currentState);
-            calculateTotal(currentState);
-
-            const msg = '⚠️ Hubo un problema con el pago de MercadoPago.\n\nNo te preocupes, tenemos otras opciones:\n\n3️⃣ *Transferencia bancaria* — alias *CHILE.TEXTO.CASINO*\n1️⃣ *Contra reembolso* — pagás al cartero cuando llega\n\n¿Cuál preferís?';
+            // rejected o error — volver a WAITING_PAYMENT_METHOD ofreciendo las 3
+            // opciones (incluyendo reintentar MP con otra tarjeta o las cuotas).
+            // NO restauramos adicionalMAX acá — cada branch de stepWaitingPaymentMethod
+            // recalcula correctamente según la opción elegida (CR llama _recalcAdicionalMAX,
+            // MP/Transferencia lo dejan en 0).
+            const msg = '⚠️ Hubo un problema con el pago de MercadoPago — pudo ser la tarjeta o un rechazo del banco.\n\n¿Cómo querés seguir?\n\n1️⃣ *MercadoPago* — Probá con otra tarjeta o usá las *3, 6 o 9 cuotas sin interés* 💳\n2️⃣ *Transferencia bancaria* — alias *CHILE.TEXTO.CASINO*\n3️⃣ *Contra reembolso* — pagás al cartero cuando llega\n\n¿Cuál preferís?';
             currentState.paymentMethod = null;
             currentState.mpPaymentLinkId = null;
             currentState.mpPaymentLinkUrl = null;
@@ -210,10 +208,20 @@ async function _generateAndSendLink(
     }
 
     try {
-        const totalRaw = currentState.totalPrice;
-        const amount = typeof totalRaw === 'string'
+        let totalRaw = currentState.totalPrice;
+        let amount = typeof totalRaw === 'string'
             ? parseFloat(totalRaw.replace(/\./g, '').replace(',', '.'))
             : Number(totalRaw || 0);
+
+        // Última red: si totalPrice viene corrupto pero cart tiene items, intentar
+        // recalcular antes de fallar. Esto rescató al cliente de un fallback ciego
+        // a contra-reembolso/transferencia cuando había elegido MP.
+        if ((!amount || amount <= 0) && currentState.cart && currentState.cart.length > 0) {
+            logger.warn(`[MP_PAYMENT] totalPrice inválido (${totalRaw}) — recalculando desde cart antes de fallar`);
+            const recalculated = calculateTotal(currentState);
+            totalRaw = recalculated;
+            amount = parseFloat(recalculated.replace(/\./g, '').replace(',', '.'));
+        }
 
         if (!amount || amount <= 0) throw new Error('Monto inválido');
 
@@ -270,15 +278,17 @@ async function _generateAndSendLink(
 
     } catch (e: any) {
         logger.error('[MP_PAYMENT] Error generando link:', e.message);
-        // Fallback: ofrecer transferencia o contra reembolso
-        currentState.paymentMethod = null;
+        // El cliente eligió MP — NO ofrecemos alternativas (CR tiene 9× más cancelación).
+        // Pausamos y alertamos al admin para que genere el link manual desde el panel
+        // y se lo mande al cliente. Mantenemos paymentMethod=mercadopago para que el
+        // admin vea claro qué método quería el cliente.
         currentState.mpPaymentLinkId = null;
         currentState.mpPaymentLinkUrl = null;
-        const msg = '⚠️ Tuve un problema generando el enlace de pago 😓\n\nNo te preocupes, podés pagar de otra forma:\n\n3️⃣ *Transferencia* — alias *CHILE.TEXTO.CASINO*\n1️⃣ *Contra reembolso* — le pagás al cartero\n\n¿Cuál preferís?';
-        _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
+        const msg = 'Permitime un momento, estoy generando tu enlace de pago de MercadoPago 🙂\n\nEn unos minutos te lo paso por acá. ¡Gracias por la paciencia!';
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
+        await _pauseAndAlert(userId, currentState, dependencies, '', 'FALLO AL GENERAR ENLACE DE MP');
     }
 }
 

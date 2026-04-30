@@ -217,9 +217,9 @@ describe('Método de pago → MercadoPago', () => {
         expect(state.step).toBe('waiting_mp_payment');
     });
 
-    test('[2.3] "2" → waiting_mp_payment', async () => {
+    test('[2.3] "1" → waiting_mp_payment (MP es opción 1 del menú)', async () => {
         const state = makePaymentState('60');
-        await handleWaitingPaymentMethod('mp3', '2', '2', state, knowledge, deps);
+        await handleWaitingPaymentMethod('mp3', '1', '1', state, knowledge, deps);
         expect(state.step).toBe('waiting_mp_payment');
     });
 
@@ -329,13 +329,18 @@ describe('Pago con MercadoPago — flow completo', () => {
         process.env.MP_ACCESS_TOKEN = 'TEST_TOKEN';
     });
 
-    test('[3.8] Error al generar link → ofrece transferencia o CR', async () => {
+    test('[3.8] Error al generar link → pausa al cliente y alerta al admin (FALLO AL GENERAR ENLACE DE MP)', async () => {
         mockPreferenceCreate.mockRejectedValueOnce(new Error('MP API error'));
         const state = makeMpState();
         await handleWaitingMpPayment('mp_e8', 'hola', 'hola', state, knowledge, deps);
-        expect(state.step).toBe('waiting_payment_method');
+        // No volvemos a waiting_payment_method ni ofrecemos alternativas — el cliente
+        // eligió MP, mantenemos esa elección y delegamos al admin.
+        expect(mockPauseUsers.has('mp_e8')).toBe(true);
+        const reason = mockNotify.mock.calls[0]?.[2] || '';
+        expect(reason).toMatch(/FALLO AL GENERAR ENLACE DE MP/);
         const sent = mockSend.mock.calls.map(([, m]) => m).join(' ');
-        expect(sent).toMatch(/transferencia/i);
+        expect(sent).toMatch(/momento/i);
+        expect(sent).toMatch(/MercadoPago/i);
     });
 
     test('[3.9] Cliente pide transferencia desde MP → manda alias y pausa', async () => {
@@ -369,9 +374,9 @@ describe('Método de pago → Transferencia', () => {
         expect(mockPauseUsers.has('tr1')).toBe(true);
     });
 
-    test('[4.2] "3" → detecta transferencia', async () => {
+    test('[4.2] "2" → detecta transferencia (Transferencia es opción 2 del menú)', async () => {
         const state = makePaymentState('60');
-        await handleWaitingPaymentMethod('tr2', '3', '3', state, knowledge, deps);
+        await handleWaitingPaymentMethod('tr2', '2', '2', state, knowledge, deps);
         expect(state.paymentMethod).toBe('transferencia');
     });
 
@@ -419,9 +424,9 @@ describe('Método de pago → Contra reembolso', () => {
         expect(state.step).toBe('waiting_data');
     });
 
-    test('[5.3] "1" → waiting_data', async () => {
+    test('[5.3] "3" → waiting_data (Contra reembolso es opción 3 del menú)', async () => {
         const state = makePaymentState('60');
-        await handleWaitingPaymentMethod('cr3', '1', '1', state, knowledge, deps);
+        await handleWaitingPaymentMethod('cr3', '3', '3', state, knowledge, deps);
         expect(state.step).toBe('waiting_data');
     });
 
@@ -468,7 +473,7 @@ describe('Método de pago — AI fallback', () => {
         const call = aiService.chat.mock.calls[0];
         const goal = call[1]?.goal || '';
         expect(goal).toMatch(/MercadoPago/i);
-        // El goal lista las opciones numeradas (1=CR, 2=MP, 3=Transfer) pero la sección
+        // El goal lista las opciones numeradas (1=MP, 2=Transfer, 3=CR) y la sección
         // PRIORIDAD al final indica que se debe empujar MP primero.
         expect(goal).toMatch(/PRIORIDAD.*MercadoPago/is);
     });

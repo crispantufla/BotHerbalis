@@ -610,7 +610,7 @@
                 "debito",
                 "credito"
             ],
-            "response": "¡Sí, tenemos varias opciones de pago! 😊 Podés pagar:\n1️⃣ Contra reembolso — en efectivo cuando te llega o al retirarlo en sucursal.\n2️⃣ MercadoPago — con tarjeta, débito o desde la app. Pagás ahora y llega más rápido (4-6 días).\n3️⃣ Transferencia bancaria.\n\n¿Cuál te resulta más cómoda?"
+            "response": "¡Sí, tenemos varias opciones de pago! 😊 Podés pagar:\n1️⃣ MercadoPago — con tarjeta, débito o saldo MP. Podés abonar en *3, 6 o 9 cuotas sin interés* 💳. Pagás ahora y llega más rápido (4-6 días).\n2️⃣ Transferencia bancaria.\n3️⃣ Contra reembolso — en efectivo cuando te llega o al retirarlo en sucursal.\n\n¿Cuál te resulta más cómoda?"
         },
         {
             "keywords": [
