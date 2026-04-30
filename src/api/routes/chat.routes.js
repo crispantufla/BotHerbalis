@@ -486,14 +486,21 @@ module.exports = (clientPool) => {
 
             try {
                 let waMessages = null;
-                if (!isPrefetch) for (let attempt = 1; attempt <= 2; attempt++) {
+                // Chromium puede estar sincronizando la lista de chats internamente;
+                // en ese caso wwebjs lanza "Cannot read properties of undefined
+                // (reading 'waitForChatLoading')". Retry con backoff suave evita
+                // caer a DB innecesariamente en ese caso.
+                const MAX_ATTEMPTS = 3;
+                if (!isPrefetch) for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
                     try {
                         const chat = await withTimeout(cl?.getChatById(chatId), 10000, 'Timeout getting chat history');
                         waMessages = await withTimeout(chat?.fetchMessages({ limit: 20 }), 15000, 'Timeout fetching history messages');
                         break;
                     } catch (retryErr) {
-                        if (attempt < 2 && retryErr?.message?.includes('waitForChatLoading')) {
-                            await new Promise(r => setTimeout(r, 1500));
+                        const isLoading = retryErr?.message?.includes('waitForChatLoading');
+                        if (attempt < MAX_ATTEMPTS && isLoading) {
+                            // Backoff: 1.5s, 3s
+                            await new Promise(r => setTimeout(r, 1500 * attempt));
                         } else {
                             throw retryErr;
                         }
@@ -548,7 +555,12 @@ module.exports = (clientPool) => {
                     .filter(r => r.status === 'fulfilled')
                     .map(r => r.value);
             } catch (waErr) {
-                logger.warn(`[HISTORY] WA Fetch skipped for ${chatId} (falling back to DB):`, waErr.message);
+                // waitForChatLoading = Chromium todavía sincronizando el chat panel.
+                // Es esperable y benigno: el fallback a DB devuelve el historial real.
+                // Bajamos a INFO para no inundar el canal de WARN con ruido.
+                const isLoadingHiccup = waErr?.message?.includes('waitForChatLoading');
+                const lvl = isLoadingHiccup ? 'info' : 'warn';
+                logger[lvl](`[HISTORY] WA Fetch falling back to DB for ${chatId}: ${waErr.message}`);
             }
 
             const localMessages = await localMessagesPromise;

@@ -135,10 +135,19 @@ export interface AIParsedResponse {
 }
 
 // --- CONFIGURATION ---
-const MODEL = "gpt-4o";
+// MODEL = pasos simples (greeting, waiting_weight, post_sale, completed) →
+//   gpt-4o-mini es ~5× más rápido (2-3s vs 10-15s) y suficiente para detectar
+//   intent básico, hacer un saludo o un acuse.
+// MODEL_PREMIUM = pasos críticos del embudo (preference, plan_choice, data,
+//   final_confirmation, etc.) — ahí sí queremos el razonamiento de gpt-4o
+//   completo porque hay objeciones, empatía, manejo de precios.
+const MODEL = "gpt-4o-mini";
 const MODEL_PREMIUM = "gpt-4o";
 const MAX_RETRIES = 3;
-const MAX_HISTORY_LENGTH = 50;
+// History window: con el summary rolling (SUMMARIZE_TRIGGER=30) el contexto
+// viejo queda condensado, así que 30 mensajes vivos son suficientes. Antes
+// teníamos 50 — eso inflaba el prompt y subía latencia sin aporte real.
+const MAX_HISTORY_LENGTH = 30;
 // Trigger rolling summary once the active history exceeds this count. Lower
 // than MAX_HISTORY_LENGTH + safety margin so summaries happen earlier and
 // each chunk is small — cheaper per-call and the token budget stays flat.
@@ -593,16 +602,13 @@ class AIService {
      * Main Chat Function
      */
     async chat(userText: string, context: APIContext): Promise<AIParsedResponse> {
-        // Build dynamic history (last 50 messages for context)
-        let conversationHistory = (context.history || []).slice(-50);
+        // Build dynamic history. MAX_HISTORY_LENGTH = 30 cubre conversación viva;
+        // el rolling summary cubre lo anterior sin inflar el prompt.
+        let conversationHistory = (context.history || []).slice(-MAX_HISTORY_LENGTH);
         let summaryContext = "";
 
         if (context.summary) {
             summaryContext = `RESUMEN PREVIO: \n"${context.summary}"\n\n`;
-        }
-        // Always cap history to keep prompt lean (regardless of summary)
-        if (conversationHistory.length > 50) {
-            conversationHistory = conversationHistory.slice(-50);
         }
 
         let knowledgeContext = "";
@@ -771,7 +777,10 @@ INSTRUCCIONES:
                     }],
                     tool_choice: { type: "function", function: { name: "control_dialog_flow" } },
                     temperature: 0.6,
-                    max_tokens: 1500
+                    // Cap a 800 — WhatsApp responses son cortas (~3 párrafos max).
+                    // Antes teníamos 1500, deja la puerta abierta a respuestas
+                    // innecesariamente largas que tardan más en generarse.
+                    max_tokens: 800
                 }),
                 `chat_${step}_${userText}` // Caché activo para FAQs y etapas repetitivas
             );
