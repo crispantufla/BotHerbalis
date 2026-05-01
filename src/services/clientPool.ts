@@ -37,6 +37,7 @@ export interface SellerInstance {
     reconnectAttempts: number;
     qrTimer: ReturnType<typeof setTimeout> | null;
     headful: boolean;  // true = Xvfb+x11vnc+headful Chromium, false = plain headless
+    botSentMessageIds: Set<string>;  // IDs of messages sent via client.sendMessage — used to distinguish bot vs manual admin in 'message_create'
     stop: () => Promise<void>;
 }
 
@@ -238,6 +239,22 @@ class ClientPool {
             }
         });
 
+        // Track IDs of messages that the bot itself sends via client.sendMessage.
+        // Used by the 'message_create' handler to skip echoes of bot-sent messages
+        // and only act on messages the admin typed manually from the WhatsApp app.
+        const botSentMessageIds = new Set<string>();
+        const _origSendMessage = client.sendMessage.bind(client);
+        client.sendMessage = async function(...args: any[]) {
+            const result = await _origSendMessage(...args);
+            const id = result?.id?._serialized;
+            if (id) {
+                botSentMessageIds.add(id);
+                // Auto-evict after 30s — the outgoing handler fires within ms, so 30s is generous.
+                setTimeout(() => botSentMessageIds.delete(id), 30000);
+            }
+            return result;
+        };
+
         // SharedState
         const sharedState: any = {
             sellerId,  // seller identity — used by services (pauseService, adminService, etc.)
@@ -343,6 +360,7 @@ class ClientPool {
             schedulerStarted: false, reconnectAttempts: 0,
             qrTimer: null,
             headful: !!vnc,
+            botSentMessageIds,
             stop: async () => this.stopSeller(sellerId)
         };
 
@@ -505,6 +523,7 @@ class ClientPool {
             userState: stateManager.userState,
             pausedUsers: stateManager.pausedUsers,
             sharedState,
+            botSentMessageIds,
         });
         client.on('message_create', outgoingHandler);
 

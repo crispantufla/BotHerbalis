@@ -205,11 +205,17 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
 
             // Empty message
             if (!msgText || msgText.trim() === '') {
-                if (msg.type === 'chat' || msg.type === 'e2e_notification' || msg.type === 'template_button_reply') {
+                // 'e2e_notification' es una system event de WhatsApp (cambio de
+                // clave de encriptación, re-instalación, nuevo dispositivo) que
+                // NO es un mensaje del usuario. Si la trataramos como ad click,
+                // gatillamos el saludo a clientes que nunca escribieron — este
+                // bug causaba cross-talk cuando el cliente rotaba sus claves
+                // mientras el bot tenía su contacto guardado.
+                if (msg.type === 'chat' || msg.type === 'template_button_reply') {
                     msgText = 'Hola! (Vengo de un anuncio)';
-                } else if (msg.type === 'unknown') {
+                } else {
                     return;
-                } else { return; }
+                }
             }
 
             if (msg.type !== 'ptt' && msg.type !== 'audio' && msg.type !== 'image') {
@@ -292,25 +298,26 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
  * createOutgoingMessageHandler
  *
  * Listener para `client.on('message_create')` — captura mensajes salientes
- * (fromMe=true) que el `'message'` event NO emite. Su único trabajo es
- * detectar cuando el admin escribe MANUALMENTE desde el WhatsApp del bot a
- * un cliente nuevo, y pausar ese chat para que el bot no dispare la
- * bienvenida cuando el cliente responda.
+ * (fromMe=true) que el `'message'` event NO emite. Cubre dos escenarios
+ * cuando el admin escribe MANUALMENTE desde el WhatsApp del bot:
+ *   1. Chat nuevo → pausar al cliente para que el bot no dispare la
+ *      bienvenida cuando responda (persistido a DB).
+ *   2. Cualquier chat con alertas pendientes → descartarlas. Si el admin
+ *      contestó, ya vio la notificación; mantenerla en cola es ruido.
  *
- * Sin esto: admin escribe "Hola Juan" desde la app → cliente responde →
- * bot ve un userId sin estado → arranca con saludo + catálogo. Mensaje
- * contradictorio para el cliente.
- *
- * Persiste a DB (User.pausedAt + pauseReason) para que sobreviva el
- * reinicio del bot via restorePausedUsersFromDB.
+ * Distinguir bot vs admin: `botSentMessageIds` registra los IDs que el
+ * bot envió via client.sendMessage (wrappeado en clientPool). Si el ID
+ * del mensaje saliente está en ese set, lo ignoramos.
  */
 export function createOutgoingMessageHandler(ctx: {
     sellerId: string;
     userState: any;
     pausedUsers: Set<string>;
     sharedState: any;
+    botSentMessageIds: Set<string>;
 }): (msg: any) => Promise<void> {
-    const { sellerId, userState, pausedUsers, sharedState } = ctx;
+    const { sellerId, userState, pausedUsers, sharedState, botSentMessageIds } = ctx;
+    const { dismissAlertsForUser } = require('../services/adminService');
 
     return async function outgoingHandler(msg: any): Promise<void> {
         try {
@@ -320,19 +327,41 @@ export function createOutgoingMessageHandler(ctx: {
             if (!msg.to.endsWith('@c.us')) return;
             if (msg.to.endsWith('@g.us') || msg.to.endsWith('@broadcast')) return;
 
-            // Ignorar mensajes que el bot mismo envió via client.sendMessage
-            // (esos NO son admin escribiendo manualmente). Heurística: si el
-            // bot está activo en este chat (userState[targetId] existe con un
-            // step válido), asumimos que el bot envió este mensaje.
+            // Skip si la conexión recién se inició (mensajes históricos).
+            if (sharedState.connectedAt && msg.timestamp && msg.timestamp < sharedState.connectedAt) return;
+
+            // 'message_create' puede dispararse antes de que el wrapper de
+            // client.sendMessage termine el await y agregue el ID al set.
+            // Diferimos el chequeo 100ms para evitar esa race (el wrapper
+            // resuelve y registra el ID dentro de microsegundos del evento).
+            await new Promise(r => setTimeout(r, 100));
+
+            // Si el ID está en botSentMessageIds, este mensaje lo envió el bot
+            // mismo via client.sendMessage. No es manual.
+            const msgId = msg.id?._serialized;
+            if (msgId && botSentMessageIds.has(msgId)) return;
+
             const targetId = msg.to;
+
+            // Admin contestó manualmente → descartar cualquier alerta pendiente
+            // de este usuario. Si tomó acción, ya vio la notificación.
+            try {
+                const hadAlert = (sharedState.sessionAlerts || []).some((a: any) => a.userPhone === targetId);
+                if (hadAlert) {
+                    dismissAlertsForUser(targetId, sharedState);
+                    logger.info(`[MANUAL-CHAT][${sellerId}] Alertas de ${targetId} descartadas — admin respondió manualmente`);
+                }
+            } catch (e: any) {
+                logger.warn(`[MANUAL-CHAT][${sellerId}] Failed to dismiss alerts for ${targetId}: ${e?.message}`);
+            }
+
+            // Si el chat ya tiene estado de bot o ya está pausado, no necesitamos
+            // hacer la pausa de nueva conversación.
             if (userState[targetId]) return;
             if (pausedUsers.has(targetId)) return;
 
-            // Skip si la conexión recién se inició (mensajes históricos)
-            if (sharedState.connectedAt && msg.timestamp && msg.timestamp < sharedState.connectedAt) return;
-
-            // Marcar el chat como pausado — el cliente puede responder pero
-            // el bot no va a engaging.
+            // Chat nuevo iniciado manualmente — pausarlo para que el bot no
+            // dispare la bienvenida cuando el cliente responda.
             pausedUsers.add(targetId);
             try {
                 const { prisma } = require('../../db');

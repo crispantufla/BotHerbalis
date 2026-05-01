@@ -44,6 +44,12 @@ function _dismissAlert(userPhone: string, sharedState: SharedState): void {
     }
 }
 
+// Public wrapper — used by outgoing-message handler to clear notifications
+// when the admin replies manually to a chat (no need to keep the alert queued).
+export function dismissAlertsForUser(userPhone: string, sharedState: SharedState): void {
+    _dismissAlert(userPhone, sharedState);
+}
+
 /**
  * Parse admin input to extract optional alert selector and the actual command.
  *   "1 ok"           → { selector: "1", command: "ok" }
