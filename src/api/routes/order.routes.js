@@ -45,6 +45,25 @@ module.exports = (clientPool) => {
         socket.to('admin').emit(event, sellerId ? { ...payload, sellerId } : payload);
     };
 
+    // GET /orders/sellers — distinct instanceIds present in Order table.
+    // Used by Logística filter to include "ghost" sellers (accounts deleted
+    // but with preserved orders, e.g. denis post-hard-delete).
+    router.get('/orders/sellers', ...withSeller(clientPool), async (req, res) => {
+        try {
+            const { prisma } = require('../../../db');
+            const rows = await prisma.order.findMany({
+                where: { instanceId: { not: 'default' } },
+                select: { instanceId: true },
+                distinct: ['instanceId'],
+            });
+            const ids = rows.map(r => r.instanceId).filter(Boolean).sort();
+            res.json({ instanceIds: ids });
+        } catch (e) {
+            logger.error('[ORDERS] Error listing seller instanceIds:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     // GET /orders (List orders from PostgreSQL with Pagination)
     router.get('/orders', ...withSeller(clientPool), async (req, res) => {
         try {

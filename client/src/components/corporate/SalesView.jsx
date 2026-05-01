@@ -7,7 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useSeller } from '../../context/SellerContext';
 import { capitalize } from '../../utils/format';
 
-import { RefreshCw as Refresh, Download, Search, Filter, MessageCircle as Chat, Edit2 as Edit, Trash2 as Trash, FileText as Script, Save, X as XIcon, Copy, Check } from 'lucide-react';
+import { RefreshCw as Refresh, Download, Search, Filter, ChevronDown, MessageCircle as Chat, Edit2 as Edit, Trash2 as Trash, FileText as Script, Save, X as XIcon, Copy, Check } from 'lucide-react';
 
 const SalesView = ({ onGoToChat, initialSearch = '' }) => {
     const { toast, confirm } = useToast();
@@ -24,6 +24,18 @@ const SalesView = ({ onGoToChat, initialSearch = '' }) => {
     const [searchTerm, setSearchTerm] = useState(initialSearch);
     const [statusFilter, setStatusFilter] = useState('Todos');
     const [sellerFilter, setSellerFilter] = useState('Todos');
+    // Historical instanceIds present in Order table — includes "ghost" sellers
+    // whose Account was hard-deleted but whose ventas se preservaron (denis).
+    const [historicalSellerIds, setHistoricalSellerIds] = useState([]);
+
+    useEffect(() => {
+        if (!isAdmin) return;
+        let cancelled = false;
+        api.get('/api/orders/sellers')
+            .then(({ data }) => { if (!cancelled) setHistoricalSellerIds(data?.instanceIds || []); })
+            .catch(() => { /* fall back to current-page derivation */ });
+        return () => { cancelled = true; };
+    }, [isAdmin]);
 
     // Viewing / Details State
     const [viewingOrder, setViewingOrder] = useState(null);
@@ -228,11 +240,20 @@ CP: ${order.cp || '—'}`;
 
     // Filters logic
     // Admin: filter by seller account (instanceId → name). Seller: filter by phone number (order.seller).
+    // Para que las ventas históricas de cuentas borradas (e.g. denis post-hard-delete)
+    // sigan filtrables, mergeamos sellers actuales + instanceIds presentes en Order.
     const sellerIdToName = Object.fromEntries((sellers || []).map(s => [s.sellerId, capitalize(s.name)]));
 
     const uniqueFilterOptions = isAdmin
-        ? (sellers || []).map(s => s.sellerId)
+        ? (() => {
+            const fromAccounts = (sellers || []).map(s => s.sellerId).filter(Boolean);
+            const merged = new Set([...fromAccounts, ...historicalSellerIds]);
+            return Array.from(merged);
+        })()
         : Array.from(new Set(orders.map(o => o.seller).filter(Boolean)));
+
+    // Label fallback: si el instanceId no tiene Account (ghost), uso el id capitalizado.
+    const labelForSeller = (sid) => sellerIdToName[sid] || capitalize(sid || '');
 
     const filteredOrders = orders.filter(order => {
         const matchesSearch = searchTerm === '' ||
@@ -310,66 +331,39 @@ CP: ${order.cp || '—'}`;
                         <span className="absolute left-3 sm:left-4 top-2 sm:top-3.5 text-slate-400 group-focus-within:text-indigo-500 transition-colors"><Search className="w-4 h-4 sm:w-5 sm:h-5" /></span>
                     </div>
 
-                    {/* Status filter — native select on mobile, pill buttons on tablet+ */}
-                    <div className="sm:hidden flex items-center gap-2">
-                        <Filter className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                    {/* Estado filter — single styled select for all viewports (no overflow) */}
+                    <div className="relative sm:w-56 flex-shrink-0">
+                        <Filter className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-slate-400 pointer-events-none" />
                         <select
                             value={statusFilter}
                             onChange={e => setStatusFilter(e.target.value)}
-                            className="flex-1 bg-white border border-slate-200 dark:bg-slate-800 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 shadow-inner"
+                            className="w-full appearance-none bg-white/8 dark:bg-slate-800/80 border border-white dark:border-slate-700 rounded-xl pl-10 sm:pl-12 pr-9 py-2 sm:py-3.5 text-sm font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all shadow-inner cursor-pointer"
                         >
                             {['Todos', ...statusOptions].map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
-                    </div>
-                    <div className="hidden sm:flex items-center gap-2 bg-white/6 dark:bg-slate-800/60 p-2 rounded-xl border border-white/8 dark:border-slate-700/80 shadow-inner overflow-x-auto custom-scrollbar">
-                        <div className="pl-3 pr-2 text-slate-400"><Filter className="w-5 h-5" /></div>
-                        {['Todos', ...statusOptions].map(status => (
-                            <button
-                                key={status}
-                                onClick={() => setStatusFilter(status)}
-                                className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${statusFilter === status ? 'bg-indigo-600 text-white shadow-md' : 'bg-transparent text-slate-600 hover:bg-white'}`}
-                            >
-                                {status}
-                            </button>
-                        ))}
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                     </div>
 
-                    {/* Vendedor (admin) / Número (seller) filter — always for admin, multi-option for sellers */}
+                    {/* Vendedor (admin) / Número (seller) filter — single styled select */}
                     {(isAdmin || uniqueFilterOptions.length > 1) && (
-                        <>
-                            {/* Mobile: native select */}
-                            <div className="sm:hidden flex items-center gap-2">
-                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap">
-                                    {isAdmin ? 'Vendedor:' : 'Número:'}
-                                </span>
-                                <select
-                                    value={sellerFilter}
-                                    onChange={e => setSellerFilter(e.target.value)}
-                                    className="flex-1 bg-white border border-slate-200 dark:bg-slate-800 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 shadow-inner"
-                                >
-                                    {['Todos', ...uniqueFilterOptions].map(opt => (
-                                        <option key={opt} value={opt}>
-                                            {opt === 'Todos' ? 'Todos' : isAdmin ? (sellerIdToName[opt] || capitalize(opt)) : `+${opt.replace(/\D/g, '')}`}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                            {/* Tablet+: pill buttons */}
-                            <div className="hidden sm:flex items-center gap-2 bg-white/6 dark:bg-slate-800/60 p-2 rounded-xl border border-white/8 dark:border-slate-700/80 shadow-inner overflow-x-auto custom-scrollbar">
-                                <div className="pl-3 pr-2 text-slate-400 text-[10px] font-black uppercase tracking-widest">
-                                    {isAdmin ? 'Vendedor:' : 'Número:'}
-                                </div>
-                                {['Todos', ...uniqueFilterOptions].map(opt => (
-                                    <button
-                                        key={opt}
-                                        onClick={() => setSellerFilter(opt)}
-                                        className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${sellerFilter === opt ? 'bg-blue-600 text-white shadow-md' : 'bg-transparent text-slate-600 hover:bg-white'}`}
-                                    >
-                                        {opt === 'Todos' ? 'Todos' : isAdmin ? (sellerIdToName[opt] || capitalize(opt)) : `+${opt.replace(/\D/g, '')}`}
-                                    </button>
+                        <div className="relative sm:w-56 flex-shrink-0">
+                            <span className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-[10px] font-black uppercase tracking-widest text-slate-400 pointer-events-none">
+                                {isAdmin ? 'Vend.' : 'Núm.'}
+                            </span>
+                            <select
+                                value={sellerFilter}
+                                onChange={e => setSellerFilter(e.target.value)}
+                                className="w-full appearance-none bg-white/8 dark:bg-slate-800/80 border border-white dark:border-slate-700 rounded-xl pl-14 sm:pl-16 pr-9 py-2 sm:py-3.5 text-sm font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-400 transition-all shadow-inner cursor-pointer"
+                            >
+                                <option value="Todos">Todos</option>
+                                {uniqueFilterOptions.map(opt => (
+                                    <option key={opt} value={opt}>
+                                        {isAdmin ? labelForSeller(opt) : `+${opt.replace(/\D/g, '')}`}
+                                    </option>
                                 ))}
-                            </div>
-                        </>
+                            </select>
+                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        </div>
                     )}
                 </div>
             </div>
@@ -452,9 +446,9 @@ CP: ${order.cp || '—'}`;
                                         <td className="px-4 sm:px-8 py-5 text-center">
                                             {order.instanceId || order.seller ? (
                                                 <div className="flex flex-col items-center gap-0.5">
-                                                    {order.instanceId && sellerIdToName[order.instanceId] && (
+                                                    {order.instanceId && (
                                                         <span className="text-[11px] font-extrabold text-slate-700 capitalize">
-                                                            {sellerIdToName[order.instanceId]}
+                                                            {labelForSeller(order.instanceId)}
                                                         </span>
                                                     )}
                                                     {order.seller && (
@@ -529,7 +523,7 @@ CP: ${order.cp || '—'}`;
                                                         <span className="font-extrabold text-[10px] text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">{datePart.trim()}</span>
                                                         {(order.instanceId || order.seller) && (
                                                             <span className="font-bold text-[9px] text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">
-                                                                {sellerIdToName[order.instanceId] || order.instanceId || ''}{order.seller ? ` (+${order.seller.replace(/\D/g, '').slice(-10)})` : ''}
+                                                                {order.instanceId ? labelForSeller(order.instanceId) : ''}{order.seller ? ` (+${order.seller.replace(/\D/g, '').slice(-10)})` : ''}
                                                             </span>
                                                         )}
                                                     </div>;
@@ -538,7 +532,7 @@ CP: ${order.cp || '—'}`;
                                                     <span className="font-extrabold text-[10px] text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">{dt}</span>
                                                     {(order.instanceId || order.seller) && (
                                                         <span className="font-bold text-[9px] text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">
-                                                            {sellerIdToName[order.instanceId] || order.instanceId || ''}{order.seller ? ` (+${order.seller.replace(/\D/g, '').slice(-10)})` : ''}
+                                                            {order.instanceId ? labelForSeller(order.instanceId) : ''}{order.seller ? ` (+${order.seller.replace(/\D/g, '').slice(-10)})` : ''}
                                                         </span>
                                                     )}
                                                 </div>;
