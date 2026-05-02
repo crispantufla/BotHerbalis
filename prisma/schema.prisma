@@ -184,7 +184,6 @@ model MessageEvent {
   step           String
   at             DateTime @default(now())
   matched        Boolean  @default(false)     // el step handler matchó sin IA
-  aiCalled       Boolean  @default(false)     // se invocó aiService.chat
   priceObjection Boolean  @default(false)     // Fase 3
   retryIndex     Int      @default(0)         // repetición # dentro del step
 

@@ -353,10 +353,9 @@ export async function processSalesFlow(
         return await processSalesFlow(userId, text, userState, knowledge, dependencies, _recursionDepth + 1);
     }
 
-    // Analytics: registrar mensaje procesado. aiCalled se deja en false acá;
-    // FunnelEvent.aiCallCount ya se incrementó directamente en ai.ts si hubo
-    // llamada. Métrica 4 (caída a IA) se computa en el endpoint como
-    // aiCallCount / messageCount por step.
+    // Analytics: registrar mensaje procesado. El uso de IA se trackea en
+    // FunnelEvent.aiCallCount, incrementado directo desde ai.ts. Métrica 4
+    // (caída a IA) se computa como aiCallCount / messageCount por step.
     //
     // priceObjection: detector barato por regex (palabras frecuentes en ES-AR
     // para "precio alto" / "no puedo pagar"). Los falsos positivos los lee el

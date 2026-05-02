@@ -140,15 +140,14 @@ export async function logMessage(args: {
     phone: string;
     step: string;
     matched: boolean;
-    aiCalled?: boolean;
     priceObjection?: boolean;
 }): Promise<void> {
-    const { sellerId, phone, step, matched, aiCalled = false, priceObjection = false } = args;
+    const { sellerId, phone, step, matched, priceObjection = false } = args;
     if (!sellerId || !phone || !step) return;
 
     try {
         await prisma.messageEvent.create({
-            data: { sellerId, phone, step, matched, aiCalled, priceObjection },
+            data: { sellerId, phone, step, matched, priceObjection },
         });
 
         // Incrementar messageCount en el FunnelEvent abierto
