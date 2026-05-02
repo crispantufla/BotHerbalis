@@ -993,6 +993,8 @@ CRÍTICO: Usá la "Fecha Actual" provista arriba para calcular el día exacto y 
         7. Las Avenidas o calles a veces están abreviadas(ej: "av belgrano 45D").
         8. Si el usuario da una dirección sumamente vaga que un correo rechazaría(ej: "cerca del kiosco", "al lado de la plaza", "frente al tacho"), IGNORA esa calle cruzada y devuelve calle: null.
         9. Si el usuario da datos geográficamente imposibles o contradictorios(ej: calle en Mendoza pero dice estar en Rosario, Santa Fe), devuelve provincia: "CONFLICT".
+        10. CRÍTICO — FORMATO LISTA: si el texto viene en líneas separadas (respondiendo a un formulario tipo "Calle:\\nNúmero:\\nLocalidad:\\nCP:"), uní las líneas adyacentes que correspondan al mismo campo. En particular: si una línea contiene SOLO un nombre de calle SIN altura, y la línea SIGUIENTE contiene SOLO un número (1-5 dígitos sin texto adicional), interpretá ambas como una sola dirección "<calle> <número>". Ejemplo: "Alumine\\n1101\\nNeuquen\\n8300" → calle: "Alumine 1101", ciudad: "Neuquen", cp: "8300". NUNCA dejes la calle sin altura si la altura aparece en la línea siguiente.
+        11. AMBIGÜEDAD CALLE vs LOCALIDAD: si el nombre de la "calle" coincide con el nombre de una localidad argentina conocida (ej: "Aluminé", "Tigre", "Pilar", "Salta") PERO el usuario también dio una ciudad/localidad distinta en otra línea, asumí que ese nombre es CALLE de la ciudad indicada (no localidad). Solo tratá ese nombre como localidad si NO hay otra ciudad explícita en el texto.
         `;
         try {
             const result: any = await this._callQueued(

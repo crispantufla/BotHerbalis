@@ -356,6 +356,25 @@ async function _processAddressData(
         if (data.cp && !currentState.partialAddress.cp) { currentState.partialAddress.cp = data.cp; madeProgress = true; }
 
         if (data.calle && !currentState.partialAddress.calle) {
+            // Defensa client-side: si la IA devolvió calle sin altura pero en el
+            // texto original (multilínea) la siguiente línea es un número suelto,
+            // unilas. Cubre el caso "Calle:\nAlumine\nNúmero:\n1101..." cuando el
+            // cliente responde el formulario en líneas separadas.
+            if (!/\d/.test(data.calle)) {
+                const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+                const lines = textToAnalyze.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+                const calleN = norm(data.calle);
+                for (let i = 0; i < lines.length - 1; i++) {
+                    if (norm(lines[i]) !== calleN) continue;
+                    const next = lines[i + 1];
+                    if (!/^\d{1,5}$/.test(next)) continue;
+                    if (data.cp && next === data.cp) continue; // no mergeés el CP
+                    logger.info(`[ADDRESS] Defensive merge: "${data.calle}" + "${next}" → "${data.calle} ${next}"`);
+                    data.calle = `${data.calle} ${next}`;
+                    break;
+                }
+            }
+
             // Validate against the AI-parsed street (data.calle), NOT the full message text.
             // The full text may contain references like "entre X y Y" that are not the actual address.
             const calleToCheck = data.calle;
