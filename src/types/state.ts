@@ -90,6 +90,7 @@ export interface UserState {
     reengagementSent?: boolean;
     cartRecovered?: boolean;
     secondFollowUpSent?: boolean;
+    cashRetryShown?: boolean; // last-mile retry mostrado al elegir contra reembolso
     lastInteraction?: number;
     lastActivityAt?: number;
 

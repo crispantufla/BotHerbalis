@@ -1,7 +1,86 @@
 /**
  * messageTemplates.js — Shared message builders to avoid duplication
  */
-import { _getCostoLogistico } from '../flows/utils/pricing';
+import { _getCostoLogistico, _getAdicionalMAX } from '../flows/utils/pricing';
+
+/**
+ * Build the payment-method menu message shown to the client.
+ * Sugerencias 1-4 aplicadas:
+ *   1. Cuota mensual concreta calculada (anclaje de precio bajo)
+ *   2. Ahorro explícito por elegir MP/transferencia en plan 60 (loss aversion)
+ *   3. Línea de protección al comprador MP (aborda objeción de confianza)
+ *   4. Recomendación explícita en lugar de menú neutro
+ */
+function buildPaymentMessage(state: any): string {
+    const plan = state.selectedPlan || state.cart?.[0]?.plan || '60';
+    const adicional = state.adicionalMAX ?? _getAdicionalMAX();
+
+    // Total post-bonificación (lo que pagaría con MP/transferencia, donde el adicional se waivea).
+    const totalRaw = (() => {
+        if (typeof state.totalPrice === 'number') return state.totalPrice;
+        if (!state.totalPrice) return 0;
+        return parseFloat(String(state.totalPrice).replace(/\./g, '').replace(',', '.')) || 0;
+    })();
+    // Si totalPrice ya tiene el adicional sumado (CR), restalo para mostrar el precio MP.
+    const totalMP = state.isContraReembolsoMAX ? totalRaw - adicional : totalRaw;
+    const cuota9 = totalMP > 30000 ? Math.ceil(totalMP / 9) : null;
+    const cuota9Str = cuota9 ? `$${cuota9.toLocaleString('es-AR')}` : null;
+
+    const adicionalStr = adicional.toLocaleString('es-AR');
+    const showAhorro = plan === '60' && adicional > 0;
+    const ahorroPill = showAhorro ? ` _(te ahorrás $${adicionalStr})_ 🎉` : '';
+    const cashAdicionalLine = showAhorro
+        ? `\n   ▸ +$${adicionalStr} de adicional en plan 60 días`
+        : `\n   ▸ Sin adicional (bonificado en plan 120 días) ✅`;
+
+    const recomendacion = cuota9Str
+        ? `*te recomiendo MercadoPago* — desde *${cuota9Str}/mes* en 9 cuotas sin interés y llega 3-4 días antes 👌`
+        : `*te recomiendo MercadoPago* — *3, 6 o 9 cuotas sin interés* y llega 3-4 días antes 👌`;
+
+    const cuotasLine = cuota9Str
+        ? `   Desde *${cuota9Str}/mes* en 9 cuotas sin interés 🎉\n`
+        : `   *3, 6 o 9 cuotas sin interés* 🎉\n`;
+
+    return `¡Perfecto! 😊 Para el pago, ${recomendacion}\n` +
+        `📦 *En todos los casos el envío es SIN COSTO*\n\n` +
+        `1️⃣ *MercadoPago* 💳${ahorroPill} — Tarjeta, débito o saldo MP.\n` +
+        cuotasLine +
+        `   🛡️ Protección al comprador: si no recibís el producto, te devuelven el 100%.\n` +
+        `   Demora: 4 a 6 días hábiles 🚀\n\n` +
+        `2️⃣ *Transferencia bancaria*${ahorroPill} — Sin recargos.\n` +
+        `   Demora: 4 a 6 días hábiles\n\n` +
+        `3️⃣ *Contra reembolso* — Pagás al cartero (solo en efectivo).${cashAdicionalLine}\n` +
+        `   Demora: 7 a 10 días hábiles\n\n` +
+        `¿Avanzamos con MercadoPago o preferís otra forma?`;
+}
+
+/**
+ * Build the last-mile retry message shown when the client picks contra reembolso
+ * on plan 60 (where there's adicional). Sugerencia #5.
+ */
+function buildCashRetryMessage(state: any): string {
+    const adicional = state.adicionalMAX ?? _getAdicionalMAX();
+    const adicionalStr = adicional.toLocaleString('es-AR');
+    const totalRaw = (() => {
+        if (typeof state.totalPrice === 'number') return state.totalPrice;
+        if (!state.totalPrice) return 0;
+        return parseFloat(String(state.totalPrice).replace(/\./g, '').replace(',', '.')) || 0;
+    })();
+    // Total CR ya incluye el adicional → para MP restamos.
+    const totalMP = state.isContraReembolsoMAX ? totalRaw - adicional : totalRaw;
+    const cuota9 = totalMP > 30000 ? Math.ceil(totalMP / 9) : null;
+    const cuotaStr = cuota9
+        ? `son *$${cuota9.toLocaleString('es-AR')}/mes* en 9 cuotas sin interés`
+        : `tenés 3, 6 o 9 cuotas sin interés`;
+
+    const ahorroLine = adicional > 0
+        ? `, te ahorrás los $${adicionalStr} de adicional`
+        : '';
+
+    return `Dale, contra reembolso 👍\n\n` +
+        `Antes de cerrar, capaz te conviene saber: con MercadoPago ${cuotaStr}${ahorroLine} y llega 3-4 días antes.\n\n` +
+        `¿Confirmás contra reembolso o lo cambiamos a MercadoPago?`;
+}
 
 /**
  * Build the order confirmation message sent to the client.
@@ -92,4 +171,4 @@ function buildConfirmationMessage(state: any): string {
         deliveryNote;
 }
 
-export { buildConfirmationMessage };
+export { buildConfirmationMessage, buildPaymentMessage, buildCashRetryMessage };

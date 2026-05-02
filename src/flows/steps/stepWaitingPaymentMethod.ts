@@ -1,6 +1,6 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _setStep, _pauseAndAlert } from '../utils/flowHelpers';
-import { buildConfirmationMessage } from '../../utils/messageTemplates';
+import { buildConfirmationMessage, buildCashRetryMessage } from '../../utils/messageTemplates';
 import { calculateTotal, _recalcAdicionalMAX } from '../utils/cartHelpers';
 import { _getAdicionalMAX } from '../utils/pricing';
 import logger from '../../utils/logger';
@@ -41,23 +41,6 @@ function _detectOptionNumber(text: string): '1' | '2' | '3' | null {
     return null;
 }
 
-const PAYMENT_MSG = (adicional: number, plan: string) => {
-    const adicionalStr = adicional.toLocaleString('es-AR');
-    const plan60AdicionalLine = plan === '60'
-        ? `\n   ▸ +$${adicionalStr} de adicional en plan 60 días (bonificado en 120) `
-        : `\n   ▸ Sin adicional (bonificado en plan 120 días) ✅`;
-    return `¡Perfecto! 😊 Antes de los datos de envío, te cuento las opciones de pago.\n` +
-        `📦 *En todos los casos el envío es SIN COSTO*\n\n` +
-        `1️⃣ *MercadoPago* 💳 — Pagás ahora con tarjeta, débito o saldo MP.\n` +
-        `   Podés abonar en *3, 6 o 9 cuotas sin interés* 🎉\n` +
-        `   Demora: 4 a 6 días hábiles 🚀\n\n` +
-        `2️⃣ *Transferencia bancaria* — Sin recargos.\n` +
-        `   Demora: 4 a 6 días hábiles\n\n` +
-        `3️⃣ *Contra reembolso* — Pagás al cartero cuando te llega.${plan60AdicionalLine}\n` +
-        `   Demora: 7 a 10 días hábiles\n\n` +
-        `¿Cuál te resulta más cómoda?`;
-};
-
 export async function handleWaitingPaymentMethod(
     userId: string,
     text: string,
@@ -87,6 +70,13 @@ export async function handleWaitingPaymentMethod(
     const isOptionMP = optionNum === '1';
     const isOptionTransfer = optionNum === '2';
     const isOptionCash = optionNum === '3';
+
+    // Si ya mostramos el last-mile retry (sugerencia #5), una respuesta corta
+    // afirmativa ("si", "dale", "confirmo") confirma contra reembolso.
+    const CASH_CONFIRM_AFTER_RETRY = /^\s*(si|sí|dale|confirmo|sigamos|sigo|así|asi|claro|esa|seguro)\s*[\.\!]?\s*$/i;
+    const isConfirmingCashRetry = !!currentState.cashRetryShown
+        && !isOptionMP && !isOptionTransfer && !MP_KEYWORDS.test(text)
+        && CASH_CONFIRM_AFTER_RETRY.test(text.trim());
 
     // ── Opción 1: MercadoPago ──────────────────────────────────────────────────
     // Solo si MP fue elegido (por número o keyword) Y no hay señal de transferencia
@@ -140,13 +130,27 @@ export async function handleWaitingPaymentMethod(
     }
 
     // ── Opción 3: Contra reembolso ─────────────────────────────────────────────
-    if (isOptionCash || CASH_KEYWORDS.test(normalizedText)) {
-        currentState.paymentMethod = 'contrarembolso';
-
-        // Restaurar adicionalMAX — puede haber sido waiveado por un intento previo
-        // de MP o transferencia en este mismo flujo. _recalcAdicionalMAX es idempotente.
+    if (isOptionCash || CASH_KEYWORDS.test(normalizedText) || isConfirmingCashRetry) {
+        // Restaurar adicionalMAX antes del retry — el cálculo de la cuota MP
+        // necesita el total ANTES de la bonificación.
         _recalcAdicionalMAX(currentState);
         calculateTotal(currentState);
+
+        // ── Sugerencia #5: Last-mile retry (solo plan 60 con adicional) ────
+        // Una sola vez por conversación: ofrecer cambiar a MP destacando
+        // cuota mensual + ahorro del adicional.
+        const plan60WithAdicional = plan === '60' && (currentState.adicionalMAX || 0) > 0;
+        if (plan60WithAdicional && !currentState.cashRetryShown) {
+            currentState.cashRetryShown = true;
+            const retryMsg = buildCashRetryMessage(currentState);
+            currentState.history.push({ role: 'bot', content: retryMsg, timestamp: Date.now() });
+            saveState(userId);
+            await sendMessageWithDelay(userId, retryMsg);
+            logger.info(`[PAYMENT_METHOD] Cash retry mostrado para ${userId} (plan 60, adicional $${currentState.adicionalMAX})`);
+            return { matched: true };
+        }
+
+        currentState.paymentMethod = 'contrarembolso';
 
         const addr = currentState.partialAddress || {};
         const hasAddress = !!(addr.nombre && addr.calle && addr.ciudad);
