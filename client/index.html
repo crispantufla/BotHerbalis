@@ -1,14 +1,20 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
 
 <head>
   <meta charset="UTF-8" />
   <link rel="icon" type="image/svg+xml" href="/logo.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Bloquea auto-translate de Chrome. Chrome envolvía texto en <font> tags
+       cuando el navegador estaba en inglés y el contenido en español; React
+       reconciliaba contra DOM modificado y crasheaba con
+       'insertBefore: not a child of this node' (pantalla en blanco al
+       reportar IA, eliminar reportes, etc.). -->
+  <meta name="google" content="notranslate" />
   <title>Herbalis Bot</title>
 </head>
 
-<body>
+<body class="notranslate" translate="no">
   <div id="root"></div>
   <script type="module" src="/src/main.jsx"></script>
 </body>
