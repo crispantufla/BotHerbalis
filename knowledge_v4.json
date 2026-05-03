@@ -56,7 +56,7 @@
                 "practico",
                 "practica"
             ],
-            "response": "Dale, excelente elección 👍\n\n💊 Se toma 1 cápsula al día, 30 min antes de la comida principal.\n\n🏆 *Plan 120 días — ${{PRICE_CAPSULAS_120}}*\n_${{PRICE_PER_DAY_CAPSULAS_120}}/día — menos que un café_ ☕\n_O ${{CUOTA9_CAPSULAS_120}}/mes en 9 cuotas sin interés con MercadoPago_ 💳\n_Envío gratis + pago a domicilio bonificado_ ✅\n\n🔸 Plan 60 días — ${{PRICE_CAPSULAS_60}}\n_+${{ADICIONAL_MAX}} si pagás contra reembolso (te lo ahorrás con MP o transferencia)_\n\n👉 ¿Te reservo el de 120 o arrancamos con 60?",
+            "response": "Dale, excelente elección 👍\n\n💊 Se toma 1 cápsula al día, 30 min antes de la comida principal.\n\n🏆 *Plan 120 días — ${{PRICE_CAPSULAS_120}}*\n_${{PRICE_PER_DAY_CAPSULAS_120}}/día — menos que un café_ ☕\n_Envío gratis + pago a domicilio bonificado_ ✅\n\n🔸 Plan 60 días — ${{PRICE_CAPSULAS_60}}\n_+${{ADICIONAL_MAX}} si pagás contra reembolso (te lo ahorrás con MP o transferencia)_\n\n👉 ¿Te reservo el de 120 o arrancamos con 60?",
             "nextStep": "waiting_plan_choice"
         },
         "preference_semillas": {
@@ -70,7 +70,7 @@
                 "natural",
                 "tradicional"
             ],
-            "response": "Dale, excelente elección 🌿\n\n🌿 Se prepara como infusión cada noche, re fácil.\n\n🏆 *Plan 120 días — ${{PRICE_SEMILLAS_120}}*\n_${{PRICE_PER_DAY_SEMILLAS_120}}/día — menos que un café_ ☕\n_O ${{CUOTA9_SEMILLAS_120}}/mes en 9 cuotas sin interés con MercadoPago_ 💳\n_Envío gratis + pago a domicilio bonificado_ ✅\n\n🔸 Plan 60 días — ${{PRICE_SEMILLAS_60}}\n_+${{ADICIONAL_MAX}} si pagás contra reembolso (te lo ahorrás con MP o transferencia)_\n\n💡 _Tip: con 3 unidades tenés 30% OFF._\n\n👉 ¿Le metemos con 120 o arrancamos con 60?",
+            "response": "Dale, excelente elección 🌿\n\n🌿 Se prepara como infusión cada noche, re fácil.\n\n🏆 *Plan 120 días — ${{PRICE_SEMILLAS_120}}*\n_${{PRICE_PER_DAY_SEMILLAS_120}}/día — menos que un café_ ☕\n_Envío gratis + pago a domicilio bonificado_ ✅\n\n🔸 Plan 60 días — ${{PRICE_SEMILLAS_60}}\n_+${{ADICIONAL_MAX}} si pagás contra reembolso (te lo ahorrás con MP o transferencia)_\n\n💡 _Tip: con 3 unidades tenés 30% OFF._\n\n👉 ¿Le metemos con 120 o arrancamos con 60?",
             "nextStep": "waiting_plan_choice"
         },
         "preference_gotas": {
@@ -80,7 +80,7 @@
                 "liquido",
                 "gotero"
             ],
-            "response": "Dale, excelente elección 🌿\n\n💧 Se absorben rápido y son discretas.\n\n🏆 *Plan 120 días — ${{PRICE_GOTAS_120}}*\n_${{PRICE_PER_DAY_GOTAS_120}}/día — menos que un café_ ☕\n_O ${{CUOTA9_GOTAS_120}}/mes en 9 cuotas sin interés con MercadoPago_ 💳\n_Envío gratis + pago a domicilio bonificado_ ✅\n\n🔸 Plan 60 días — ${{PRICE_GOTAS_60}}\n_+${{ADICIONAL_MAX}} si pagás contra reembolso (te lo ahorrás con MP o transferencia)_\n\n👉 ¿Le metemos con 120 o arrancamos con 60?",
+            "response": "Dale, excelente elección 🌿\n\n💧 Se absorben rápido y son discretas.\n\n🏆 *Plan 120 días — ${{PRICE_GOTAS_120}}*\n_${{PRICE_PER_DAY_GOTAS_120}}/día — menos que un café_ ☕\n_Envío gratis + pago a domicilio bonificado_ ✅\n\n🔸 Plan 60 días — ${{PRICE_GOTAS_60}}\n_+${{ADICIONAL_MAX}} si pagás contra reembolso (te lo ahorrás con MP o transferencia)_\n\n👉 ¿Le metemos con 120 o arrancamos con 60?",
             "nextStep": "waiting_plan_choice"
         },
         "price_capsulas": {
