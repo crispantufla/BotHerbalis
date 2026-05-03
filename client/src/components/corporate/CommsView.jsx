@@ -433,16 +433,18 @@ const CommsView = ({ initialChatId, onChatSelected, initialSearch = '', alerts =
         }
     };
 
-    const handleReportMessage = async (msgId) => {
+    const handleReportMessage = (msgId) => {
         if (!selectedChat) return;
+        // Abrir el modal SINCRÓNICAMENTE antes de cualquier await — si abrimos
+        // después del await el reconciler de React rompe con NotFoundError
+        // ('insertBefore' on Node) y deja la pantalla en blanco.
         setReportedMsgId(msgId);
-
-        // Auto-pause bot so human can take over
-        if (!selectedChat.isPaused) {
-            await handleToggleBot();
-        }
-
         setShowCorrectionModal(true);
+
+        // Auto-pause bot en background — si falla no rompe el flujo del modal.
+        if (!selectedChat.isPaused) {
+            handleToggleBot().catch(e => console.warn('Auto-pause failed:', e));
+        }
     };
 
     const handleTrackOrder = async (trackingCode) => {
@@ -1168,6 +1170,15 @@ Teléfono: ${phoneDisplay}`;
                 messages={messages}
                 reportedMsgId={reportedMsgId}
                 selectedChat={selectedChat}
+                onDeleteMessage={async (msgId) => {
+                    try {
+                        setMessages(prev => prev.filter(m => m.id !== msgId));
+                        await deleteMessage({ chatId: selectedChat.id, messageId: msgId });
+                    } catch (e) {
+                        toast.error('Error eliminando mensaje del cliente');
+                        throw e;
+                    }
+                }}
             />
 
             {/* Manual Order Entry Modal — abierto cuando el backend devuelve 422 */}

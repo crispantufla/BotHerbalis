@@ -1,15 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { AlertTriangle, Send, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { AlertTriangle, Send, X, Trash2 } from 'lucide-react';
 import { useToast } from '../../ui/Toast';
 import api from '../../../config/axios';
 
-const AiCorrectionModal = ({ isOpen, onClose, messages = [], reportedMsgId, selectedChat }) => {
+const AiCorrectionModal = ({ isOpen, onClose, messages = [], reportedMsgId, selectedChat, onDeleteMessage }) => {
     const { toast } = useToast();
     const [correctionText, setCorrectionText] = useState('');
+    const [alsoDelete, setAlsoDelete] = useState(false);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        if (!isOpen) setCorrectionText('');
+        if (!isOpen) {
+            setCorrectionText('');
+            setAlsoDelete(false);
+        }
     }, [isOpen]);
 
     if (!isOpen) return null;
@@ -44,7 +49,19 @@ const AiCorrectionModal = ({ isOpen, onClose, messages = [], reportedMsgId, sele
                 correction: correctionText.trim(),
             });
 
-            toast.success('Reporte guardado ✅ Lo podés ver en la sección "Errores de IA".');
+            // Si el admin marcó la opción, también borramos el mensaje del WhatsApp del cliente.
+            if (alsoDelete && reportedMsgId && typeof onDeleteMessage === 'function') {
+                try {
+                    await onDeleteMessage(reportedMsgId);
+                    toast.success('Reporte guardado y mensaje eliminado del chat ✅');
+                } catch (delErr) {
+                    // El error ya se mostró desde onDeleteMessage; el reporte sí se guardó.
+                    toast.success('Reporte guardado, pero falló eliminar el mensaje del cliente.');
+                }
+            } else {
+                toast.success('Reporte guardado ✅ Lo podés ver en la sección "Errores de IA".');
+            }
+
             onClose();
         } catch (e) {
             toast.error('Error al guardar el reporte: ' + (e.response?.data?.error || e.message));
@@ -53,7 +70,7 @@ const AiCorrectionModal = ({ isOpen, onClose, messages = [], reportedMsgId, sele
         }
     };
 
-    return (
+    const modalContent = (
         <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}></div>
 
@@ -101,6 +118,25 @@ const AiCorrectionModal = ({ isOpen, onClose, messages = [], reportedMsgId, sele
                             autoFocus
                         ></textarea>
                     </div>
+
+                    {/* Also delete checkbox */}
+                    <label className="flex items-start gap-3 p-4 rounded-2xl border-2 border-slate-200 dark:border-slate-700 hover:border-rose-400 dark:hover:border-rose-500 transition-colors cursor-pointer bg-slate-50 dark:bg-slate-800/40">
+                        <input
+                            type="checkbox"
+                            checked={alsoDelete}
+                            onChange={(e) => setAlsoDelete(e.target.checked)}
+                            className="mt-0.5 w-5 h-5 rounded text-rose-600 border-slate-300 focus:ring-2 focus:ring-rose-400 cursor-pointer"
+                        />
+                        <div className="flex-1">
+                            <div className="flex items-center gap-2 font-bold text-slate-800 dark:text-slate-100 text-sm">
+                                <Trash2 className="w-4 h-4 text-rose-500" />
+                                Eliminar también el mensaje del WhatsApp del cliente
+                            </div>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-snug">
+                                Borra el mensaje para todos (vos y el cliente). Solo funciona si el mensaje fue enviado hace menos de ~2 horas.
+                            </p>
+                        </div>
+                    </label>
                 </div>
 
                 {/* Footer */}
@@ -118,13 +154,19 @@ const AiCorrectionModal = ({ isOpen, onClose, messages = [], reportedMsgId, sele
                                 ? <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                                 : <Send className="w-4 h-4" />
                             }
-                            {loading ? 'Guardando...' : 'Guardar Reporte'}
+                            {loading ? 'Guardando...' : (alsoDelete ? 'Guardar y eliminar' : 'Guardar reporte')}
                         </button>
                     </div>
                 </div>
             </div>
         </div>
     );
+
+    // Renderizamos en un portal a document.body para aislar el modal del árbol
+    // de CommsView. Antes el modal se montaba como hijo del árbol con muchas
+    // re-renders concurrentes (mensaje seleccionado, sockets, etc.) y el
+    // reconciler de React rompía con "insertBefore on Node".
+    return createPortal(modalContent, document.body);
 };
 
 export default AiCorrectionModal;
