@@ -65,6 +65,21 @@ export async function handleFaq(
 
     if (!bestEntry) return null;
 
+    // Skip FAQs cuyo triggerStep ya fue superado por el cliente — evita
+    // re-preguntar datos ya capturados (caso típico: FAQ de precio que reasea
+    // los kilos cuando el cliente ya está en waiting_preference).
+    const STEPS_PAST_WEIGHT = new Set<string>([
+        'waiting_preference', 'waiting_preference_consultation',
+        'waiting_plan_choice', 'waiting_price_confirmation', 'waiting_ok',
+        'waiting_payment_method', 'waiting_mp_payment',
+        'waiting_transfer_confirmation', 'waiting_data',
+        'waiting_maps_confirmation', 'waiting_final_confirmation',
+    ]);
+    if (bestEntry.triggerStep === 'waiting_weight' && STEPS_PAST_WEIGHT.has(currentState.step as string)) {
+        logger.info(`[FAQ] Skip FAQ con triggerStep=waiting_weight — ${userId} ya está en ${currentState.step}`);
+        return null;
+    }
+
     logger.info(`[FAQ] ${userId} matched (keyword len=${bestLen}) → "${bestEntry.response.substring(0, 60)}..."`);
     currentState.history.push({ role: 'bot', content: bestEntry.response, timestamp: Date.now() });
     saveState(userId);

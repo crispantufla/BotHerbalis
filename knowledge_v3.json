@@ -21,7 +21,7 @@
                 "costo",
                 "gotas"
             ],
-            "response": "¡Hola! 😊\n\nLos tratamientos con Nuez de la India están entre $37.000 y $69.000,\nsegún duración y formato.\n\nTrabajamos hace más de 13 años con:\n✔ Cápsulas\n✔ Gotas\n✔ Semillas\n\n📦 Enviamos a todo el país\n🛍️ Pago al recibir\n\nPara recomendarte bien:\n¿Buscás bajar hasta 10 kg, entre 10 y 20 kg o más de 20 kg?",
+            "response": "¡Hola! 😊\n\nTe ayudo a encontrar la opción justa para vos. Antes de hablar de números, contame:\n\n¿Cuánto te gustaría bajar? ¿Hasta 10 kg, entre 10 y 20, o más de 20?\n\n_Te pregunto eso primero porque el plan que te conviene depende del objetivo — no quiero recomendarte algo de más ni de menos._\n\n🌿 Hace 13 años acompañamos a miles de personas con esto.\n📦 Envío sin costo a todo el país.",
             "nextStep": "waiting_weight"
         },
         "recommendation": {
@@ -39,7 +39,7 @@
                 "practico",
                 "practica"
             ],
-            "response": "Genial 👍 Excelente elección.\n\n💊 Se toma 1 cápsula al día, 30 min antes de la comida principal.\n\n🏆 *Plan 120 días — ${{PRICE_CAPSULAS_120}}*\n_Te sale ${{PRICE_PER_DAY_CAPSULAS_120}} por día — el costo de un café_ ☕\n_Envío gratis + pago a domicilio bonificado_ ✅\n\n🔸 Plan 60 días — ${{PRICE_CAPSULAS_60}}\n_+$6.000 si pagás contra reembolso_\n\n👉 ¿Avanzamos con 120 o 60 días?",
+            "response": "Genial 👍 Excelente elección.\n\n💊 Se toma 1 cápsula al día, 30 min antes de la comida principal.\n\n🏆 *Plan 120 días — ${{PRICE_CAPSULAS_120}}*\n_${{PRICE_PER_DAY_CAPSULAS_120}}/día — el costo de un café_ ☕\n_O ${{CUOTA9_CAPSULAS_120}}/mes en 9 cuotas sin interés con MercadoPago_ 💳\n_Envío gratis + pago a domicilio bonificado_ ✅\n\n🔸 Plan 60 días — ${{PRICE_CAPSULAS_60}}\n_+$6.000 si pagás contra reembolso (te lo ahorrás con MP o transferencia)_\n\n👉 ¿Avanzamos con 120 o 60 días?",
             "nextStep": "waiting_plan_choice"
         },
         "preference_semillas": {
@@ -53,7 +53,7 @@
                 "natural",
                 "tradicional"
             ],
-            "response": "Genial 🌿 Las semillas son la opción más elegida.\n\n🌿 Se prepara como infusión cada noche.\n\n🏆 *Plan 120 días — ${{PRICE_SEMILLAS_120}}*\n_Te sale ${{PRICE_PER_DAY_SEMILLAS_120}} por día — menos que un café_ ☕\n_Envío gratis + pago a domicilio bonificado_ ✅\n\n🔸 Plan 60 días — ${{PRICE_SEMILLAS_60}}\n_+$6.000 si pagás contra reembolso_\n\n👉 ¿Avanzamos con 120 o 60 días?",
+            "response": "Genial 🌿 Las semillas son la opción más elegida.\n\n🌿 Se prepara como infusión cada noche.\n\n🏆 *Plan 120 días — ${{PRICE_SEMILLAS_120}}*\n_${{PRICE_PER_DAY_SEMILLAS_120}}/día — menos que un café_ ☕\n_O ${{CUOTA9_SEMILLAS_120}}/mes en 9 cuotas sin interés con MercadoPago_ 💳\n_Envío gratis + pago a domicilio bonificado_ ✅\n\n🔸 Plan 60 días — ${{PRICE_SEMILLAS_60}}\n_+$6.000 si pagás contra reembolso (te lo ahorrás con MP o transferencia)_\n\n👉 ¿Avanzamos con 120 o 60 días?",
             "nextStep": "waiting_plan_choice"
         },
         "preference_gotas": {
@@ -63,7 +63,7 @@
                 "liquido",
                 "gotero"
             ],
-            "response": "Genial 🌿 Las gotas son prácticas y discretas.\n\n💧 Se absorben rápido, sin preparar nada.\n\n🏆 *Plan 120 días — ${{PRICE_GOTAS_120}}*\n_Te sale ${{PRICE_PER_DAY_GOTAS_120}} por día — el costo de un café_ ☕\n_Envío gratis + pago a domicilio bonificado_ ✅\n\n🔸 Plan 60 días — ${{PRICE_GOTAS_60}}\n_+$6.000 si pagás contra reembolso_\n\n👉 ¿Avanzamos con 120 o 60 días?",
+            "response": "Genial 🌿 Las gotas son prácticas y discretas.\n\n💧 Se absorben rápido, sin preparar nada.\n\n🏆 *Plan 120 días — ${{PRICE_GOTAS_120}}*\n_${{PRICE_PER_DAY_GOTAS_120}}/día — el costo de un café_ ☕\n_O ${{CUOTA9_GOTAS_120}}/mes en 9 cuotas sin interés con MercadoPago_ 💳\n_Envío gratis + pago a domicilio bonificado_ ✅\n\n🔸 Plan 60 días — ${{PRICE_GOTAS_60}}\n_+$6.000 si pagás contra reembolso (te lo ahorrás con MP o transferencia)_\n\n👉 ¿Avanzamos con 120 o 60 días?",
             "nextStep": "waiting_plan_choice"
         },
         "price_capsulas": {
@@ -230,15 +230,6 @@
                 "en 60 dias"
             ],
             "response": "Cada cuerpo tiene su ritmo.\n\nQuienes tienen más kilos para bajar suelen notar cambios más visibles al inicio, y quienes necesitan bajar menos ven descensos más progresivos.\n\nLo importante es que el descenso sea natural y sostenido."
-        },
-        {
-            "keywords": [
-                "cuanto cuesta",
-                "cuanto sale",
-                "que precio"
-            ],
-            "response": "Los tratamientos están entre $37.000 y $69.000,\nsegún duración y formato.\n\n¿Buscás bajar hasta 10 kg, entre 10 y 20 kg o más de 20 kg?",
-            "triggerStep": "waiting_weight"
         },
         {
             "keywords": [

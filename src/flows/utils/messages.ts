@@ -30,6 +30,19 @@ function _formatMessage(text: string | string[], state: any): string {
     formatted = formatted.replace(/{{PRICE_PER_DAY_CAPSULAS_120}}/g, _perDay(prices['Cápsulas']?.['120'], 120));
     formatted = formatted.replace(/{{PRICE_PER_DAY_SEMILLAS_120}}/g, _perDay(prices['Semillas']?.['120'], 120));
     formatted = formatted.replace(/{{PRICE_PER_DAY_GOTAS_120}}/g, _perDay(prices['Gotas']?.['120'], 120));
+    // Cuota mensual MP en 9 cuotas — anclaje de precio bajo cuando el total asusta.
+    const _cuota9 = (priceStr: string | undefined): string => {
+        if (!priceStr) return '';
+        const parsed = parseInt(priceStr.replace(/\./g, ''), 10);
+        if (isNaN(parsed) || parsed <= 30000) return ''; // solo cuando justifica las 9 cuotas
+        return _formatPrice(Math.ceil(parsed / 9));
+    };
+    formatted = formatted.replace(/{{CUOTA9_CAPSULAS_120}}/g, _cuota9(prices['Cápsulas']?.['120']));
+    formatted = formatted.replace(/{{CUOTA9_CAPSULAS_60}}/g, _cuota9(prices['Cápsulas']?.['60']));
+    formatted = formatted.replace(/{{CUOTA9_SEMILLAS_120}}/g, _cuota9(prices['Semillas']?.['120']));
+    formatted = formatted.replace(/{{CUOTA9_SEMILLAS_60}}/g, _cuota9(prices['Semillas']?.['60']));
+    formatted = formatted.replace(/{{CUOTA9_GOTAS_120}}/g, _cuota9(prices['Gotas']?.['120']));
+    formatted = formatted.replace(/{{CUOTA9_GOTAS_60}}/g, _cuota9(prices['Gotas']?.['60']));
     formatted = formatted.replace(/{{ADICIONAL_MAX}}/g, prices.adicionalMAX || '6.000');
     formatted = formatted.replace(/{{COSTO_LOGISTICO}}/g, prices.costoLogistico || '18.000');
 
