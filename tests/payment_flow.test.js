@@ -416,28 +416,33 @@ describe('Método de pago → Transferencia', () => {
 // ════════════════════════════════════════════════════════════════════════════
 describe('Método de pago → Contra reembolso', () => {
 
-    test('[5.1] "contra reembolso" → waiting_data', async () => {
-        const state = makePaymentState('60');
+    // En plan 60 con adicional, el primer "contra reembolso" muestra el retry
+    // de sugerencia #5 (oferta de cambiar a MP) y se queda en waiting_payment_method.
+    // Para testear el flujo CR-avanza, marcamos cashRetryShown=true (simulando
+    // que el cliente ya pasó por el retry y reconfirmó CR).
+
+    test('[5.1] "contra reembolso" → waiting_data (post-retry)', async () => {
+        const state = makePaymentState('60', { cashRetryShown: true });
         await handleWaitingPaymentMethod('cr1', 'contra reembolso', 'contra reembolso', state, knowledge, deps);
         expect(state.paymentMethod).toBe('contrarembolso');
         expect(state.step).toBe('waiting_data');
     });
 
-    test('[5.2] "efectivo" → waiting_data', async () => {
-        const state = makePaymentState('60');
+    test('[5.2] "efectivo" → waiting_data (post-retry)', async () => {
+        const state = makePaymentState('60', { cashRetryShown: true });
         await handleWaitingPaymentMethod('cr2', 'efectivo', 'efectivo', state, knowledge, deps);
         expect(state.paymentMethod).toBe('contrarembolso');
         expect(state.step).toBe('waiting_data');
     });
 
-    test('[5.3] "3" → waiting_data (Contra reembolso es opción 3 del menú)', async () => {
-        const state = makePaymentState('60');
+    test('[5.3] "3" → waiting_data (Contra reembolso es opción 3, post-retry)', async () => {
+        const state = makePaymentState('60', { cashRetryShown: true });
         await handleWaitingPaymentMethod('cr3', '3', '3', state, knowledge, deps);
         expect(state.step).toBe('waiting_data');
     });
 
     test('[5.4] CR conserva el adicionalMAX (plan 60 → sigue teniendo adicional)', async () => {
-        const state = makePaymentState('60'); // adicionalMAX=6000
+        const state = makePaymentState('60', { cashRetryShown: true }); // adicionalMAX=6000
         await handleWaitingPaymentMethod('cr4', 'contrarembolso', 'contrarembolso', state, knowledge, deps);
         expect(state.adicionalMAX).toBe(6000); // NO bonificado
         expect(state.totalPrice).toBe('52.900');
@@ -445,6 +450,7 @@ describe('Método de pago → Contra reembolso', () => {
 
     test('[5.5] CR con dirección ya conocida → waiting_final_confirmation (no pide datos)', async () => {
         const state = makePaymentState('60', {
+            cashRetryShown: true,
             partialAddress: { nombre: 'Luis Perez', calle: 'Corrientes 800', ciudad: 'Rosario' },
         });
         await handleWaitingPaymentMethod('cr5', 'efectivo', 'efectivo', state, knowledge, deps);
@@ -452,8 +458,41 @@ describe('Método de pago → Contra reembolso', () => {
     });
 
     test('[5.6] CR sin dirección → pide datos (waiting_data)', async () => {
-        const state = makePaymentState('60'); // partialAddress vacío
+        const state = makePaymentState('60', { cashRetryShown: true }); // partialAddress vacío
         await handleWaitingPaymentMethod('cr6', 'al recibir', 'al recibir', state, knowledge, deps);
+        expect(state.step).toBe('waiting_data');
+    });
+
+    // ─── Sugerencia #5: Last-mile retry al elegir CR en plan 60 ──────────────
+    test('[5.7] Plan 60 + adicional + primera vez CR → muestra retry, NO avanza', async () => {
+        const state = makePaymentState('60'); // sin cashRetryShown
+        await handleWaitingPaymentMethod('cr7', 'contra reembolso', 'contra reembolso', state, knowledge, deps);
+        expect(state.cashRetryShown).toBe(true);
+        expect(state.step).toBe('waiting_payment_method'); // NO avanzó
+        expect(state.paymentMethod).toBeUndefined();
+        const sent = mockSend.mock.calls.map(([, m]) => m).join(' ');
+        expect(sent).toMatch(/Confirmás contra reembolso o lo cambiamos/i);
+    });
+
+    test('[5.8] Plan 60 + retry ya mostrado + "si" → avanza a CR', async () => {
+        const state = makePaymentState('60', { cashRetryShown: true });
+        await handleWaitingPaymentMethod('cr8', 'si', 'si', state, knowledge, deps);
+        expect(state.paymentMethod).toBe('contrarembolso');
+        expect(state.step).toBe('waiting_data');
+    });
+
+    test('[5.9] Plan 60 + retry ya mostrado + "MP" → cambia a MercadoPago', async () => {
+        const state = makePaymentState('60', { cashRetryShown: true });
+        await handleWaitingPaymentMethod('cr9', 'mercadopago', 'mercadopago', state, knowledge, deps);
+        expect(state.paymentMethod).toBe('mercadopago');
+        expect(state.adicionalMAX).toBe(0); // bonificado al elegir MP
+    });
+
+    test('[5.10] Plan 120 (sin adicional) → CR avanza directo, sin retry', async () => {
+        const state = makePaymentState('120'); // adicionalMAX=0
+        await handleWaitingPaymentMethod('cr10', 'contra reembolso', 'contra reembolso', state, knowledge, deps);
+        expect(state.cashRetryShown).toBeUndefined(); // no se mostró retry
+        expect(state.paymentMethod).toBe('contrarembolso');
         expect(state.step).toBe('waiting_data');
     });
 });

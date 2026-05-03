@@ -2,6 +2,7 @@ import { UserState, FlowStep } from '../../types/state';
 import { _setStep, _pauseAndAlert } from '../utils/flowHelpers';
 import { _isAffirmative, _isNegative } from '../utils/validation';
 import { _getAdicionalMAX } from '../utils/pricing';
+import { buildPaymentMessage } from '../../utils/messageTemplates';
 import logger from '../../utils/logger';
 
 export async function handleWaitingOk(
@@ -41,23 +42,7 @@ export async function handleWaitingOk(
         }
     }
     else if (_isAffirmative(normalizedText)) {
-        const plan = currentState.selectedPlan || currentState.cart?.[0]?.plan || '60';
-        const adicional = currentState.adicionalMAX || _getAdicionalMAX();
-        const adicionalStr = adicional.toLocaleString('es-AR');
-        const plan60AdicionalLine = plan === '60'
-            ? `\n   ▸ +$${adicionalStr} de adicional en plan 60 días (bonificado en 120)`
-            : `\n   ▸ Sin adicional (bonificado en plan 120 días) ✅`;
-
-        const msg = `¡Perfecto! 😊 Antes de los datos de envío, te cuento las opciones de pago.\n` +
-            `📦 *En todos los casos el envío es SIN COSTO*\n\n` +
-            `1️⃣ *MercadoPago* 💳 — Pagás ahora con tarjeta, débito o saldo MP.\n` +
-            `   Podés abonar en *3, 6 o 9 cuotas sin interés* 🎉\n` +
-            `   Demora: 4 a 6 días hábiles 🚀\n\n` +
-            `2️⃣ *Transferencia bancaria* — Sin recargos.\n` +
-            `   Demora: 4 a 6 días hábiles\n\n` +
-            `3️⃣ *Contra reembolso* — Pagás al cartero cuando te llega (solo en efectivo).${plan60AdicionalLine}\n` +
-            `   Demora: 7 a 10 días hábiles\n\n` +
-            `¿Cuál te resulta más cómoda?`;
+        const msg = buildPaymentMessage(currentState);
         _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);

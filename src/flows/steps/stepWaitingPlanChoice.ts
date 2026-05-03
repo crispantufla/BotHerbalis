@@ -3,25 +3,10 @@ import { _getPrice, _getAdicionalMAX } from '../utils/pricing';
 import { _setStep } from '../utils/flowHelpers';
 import { buildCartFromSelection, calculateTotal } from '../utils/cartHelpers';
 import { _isDuplicate } from '../utils/messages';
+import { buildPaymentMessage } from '../../utils/messageTemplates';
 import logger from '../../utils/logger';
 
-function _buildPaymentMsg(currentState: UserState): string {
-    const plan = currentState.selectedPlan || currentState.cart?.[0]?.plan || '60';
-    const adicional = currentState.adicionalMAX || _getAdicionalMAX();
-    const adicionalStr = adicional.toLocaleString('es-AR');
-    const plan60AdicionalLine = plan === '60'
-        ? `\n   ▸ +$${adicionalStr} de adicional en plan 60 días (bonificado en 120)`
-        : `\n   ▸ Sin adicional (bonificado en plan 120 días) ✅`;
-    return `¿Cómo preferís abonar?\n📦 *En todos los casos el envío es SIN COSTO*\n\n` +
-        `1️⃣ *MercadoPago* 💳 — Pagás ahora con tarjeta, débito o saldo MP.\n` +
-        `   Podés abonar en *3, 6 o 9 cuotas sin interés* 🎉\n` +
-        `   Demora: 4 a 6 días hábiles 🚀\n\n` +
-        `2️⃣ *Transferencia bancaria* — Sin recargos.\n` +
-        `   Demora: 4 a 6 días hábiles\n\n` +
-        `3️⃣ *Contra reembolso* — Pagás al cartero cuando te llega (solo en efectivo).${plan60AdicionalLine}\n` +
-        `   Demora: 7 a 10 días hábiles\n\n` +
-        `¿Cuál te resulta más cómoda?`;
-}
+const _buildPaymentMsg = (state: UserState) => buildPaymentMessage(state);
 
 function _handleExtractedData(userId: string, extractedData: string, currentState: UserState) {
     if (!extractedData || extractedData === 'null') return;
