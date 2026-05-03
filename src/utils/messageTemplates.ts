@@ -1,7 +1,82 @@
 /**
  * messageTemplates.js — Shared message builders to avoid duplication
  */
-import { _getCostoLogistico, _getAdicionalMAX } from '../flows/utils/pricing';
+import { _getCostoLogistico, _getAdicionalMAX, _getPrice } from '../flows/utils/pricing';
+
+/**
+ * Detector compartido de "preguntas de precio" — si matchea, el caller debería
+ * usar buildPersonalizedPriceResponse en lugar de delegar a IA.
+ */
+const PRICE_QUESTION_RE = /\b(cu[aá]nto|que precio|qu[eé] precio|cuesta|sale|costo|valor|vale|precio)\b/i;
+function isPriceQuestion(text: string): boolean {
+    return PRICE_QUESTION_RE.test(text || '');
+}
+
+/**
+ * Build a contextualized price response. Sustituye el rango genérico
+ * "$37.000 a $69.000" por una recomendación específica al objetivo del cliente.
+ *
+ * Decisión por kilos: weightGoal >= 15 → recomienda plan 120 (4 meses sostenidos),
+ * <15 → plan 60. Si no hay weightGoal, fallback genérico al producto.
+ *
+ * Producto: usa state.selectedProduct si está, si no acepta override
+ * (extraído del texto del cliente, ej: "que precio las cápsulas").
+ */
+function buildPersonalizedPriceResponse(state: any, productOverride?: string | null): string {
+    const product = productOverride || state.selectedProduct || 'Cápsulas de nuez de la india';
+    const productKey = product.includes('Gota') ? 'Gotas' : product.includes('Semilla') ? 'Semillas' : 'Cápsulas';
+    const productLabel = productKey === 'Cápsulas' ? 'cápsulas' : productKey === 'Gotas' ? 'gotas' : 'semillas';
+
+    const weightGoal = typeof state.weightGoal === 'number' ? state.weightGoal : parseInt(String(state.weightGoal || 0), 10) || 0;
+    const recommendsLong = weightGoal >= 15;
+    const recommendedPlan = recommendsLong ? '120' : '60';
+    const altPlan = recommendsLong ? '60' : '120';
+
+    const priceStr = _getPrice(productKey, recommendedPlan);
+    const priceRaw = parseFloat(String(priceStr).replace(/\./g, '').replace(',', '.')) || 0;
+    const cuota9 = priceRaw > 30000 ? Math.ceil(priceRaw / 9) : null;
+    const cuotaLine = cuota9
+        ? `o *$${cuota9.toLocaleString('es-AR')} al mes* en 9 cuotas sin interés con MercadoPago`
+        : 'con 3, 6 o 9 cuotas sin interés con MercadoPago';
+
+    const adicional = recommendedPlan === '60' ? _getAdicionalMAX() : 0;
+    const savingsLine = adicional > 0
+        ? `\n\n💡 _Pagando con MercadoPago te ahorrás $${adicional.toLocaleString('es-AR')} del adicional de pago a domicilio + llega 4 días antes._`
+        : '\n\n_En plan 120 días el envío y el pago a domicilio van bonificados._';
+
+    // Justificación según objetivo de kilos
+    let justification: string;
+    if (weightGoal >= 20) {
+        justification = `cubren los 4 meses que el cuerpo necesita para un descenso sostenido de +20 kg, sin rebote`;
+    } else if (weightGoal >= 15) {
+        justification = `son las que mejor andan para tu objetivo — el descenso es progresivo y sostenido`;
+    } else if (weightGoal > 0) {
+        justification = `son ideales para empezar y ver cómo te va, antes de extender el tratamiento si lo necesitás`;
+    } else {
+        justification = `son las que más recomiendan nuestros clientes`;
+    }
+
+    const objetivoFrase = weightGoal > 0
+        ? `Para tu objetivo (${weightGoal >= 20 ? '+20 kg' : weightGoal >= 15 ? `~${weightGoal} kg` : `hasta ${weightGoal} kg`})`
+        : 'Para tu caso';
+
+    return `${objetivoFrase}, las ${productLabel} en plan de *${recommendedPlan} días* son las que mejor andan — ${justification}.\n\n` +
+        `Sale *$${priceStr}*, ${cuotaLine}.${savingsLine}\n\n` +
+        `¿Avanzamos con ese, o te cuento del de ${altPlan} días primero?`;
+}
+
+/**
+ * Detecta si el cliente menciona un producto específico en su pregunta de precio.
+ * Útil para responder "que precio cápsulas" con la respuesta personalizada
+ * apuntada a cápsulas, aunque state.selectedProduct todavía no esté seteado.
+ */
+function detectProductInText(text: string): string | null {
+    const t = (text || '').toLowerCase();
+    if (/\bc[aá]psulas?\b|\bpastillas?\b/.test(t)) return 'Cápsulas de nuez de la india';
+    if (/\bgotas?\b/.test(t)) return 'Gotas de nuez de la india';
+    if (/\bsemillas?\b|\binfusi[oó]n\b/.test(t)) return 'Semillas de nuez de la india';
+    return null;
+}
 
 /**
  * Build the payment-method menu message shown to the client.
@@ -171,4 +246,11 @@ function buildConfirmationMessage(state: any): string {
         deliveryNote;
 }
 
-export { buildConfirmationMessage, buildPaymentMessage, buildCashRetryMessage };
+export {
+    buildConfirmationMessage,
+    buildPaymentMessage,
+    buildCashRetryMessage,
+    buildPersonalizedPriceResponse,
+    isPriceQuestion,
+    detectProductInText,
+};
