@@ -1,4 +1,5 @@
 import React, { useState, useCallback, createContext, useContext } from 'react';
+import { createPortal } from 'react-dom';
 
 const ToastContext = createContext();
 
@@ -71,61 +72,69 @@ export const ToastProvider = ({ children }) => {
         });
     }, []);
 
+    // Renderizamos el contenedor de toasts en un portal a document.body en
+    // lugar de como hermano de {children}. Antes, cuando una acción disparaba
+    // simultáneamente (a) un re-render de la app (lista que cambia, modal que
+    // se cierra) y (b) un toast nuevo, el reconciler de React 19 mezclaba el
+    // orden de los hermanos y reventaba con "insertBefore on Node: not a
+    // child of this node", dejando la pantalla en blanco.
+    const toastContainer = (
+        <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 max-w-sm pointer-events-none">
+            {toasts.map(t => (
+                <div
+                    key={t.id}
+                    className={`
+                        relative pointer-events-auto animate-fade-in overflow-hidden
+                        rounded-2xl border p-4 hover:shadow-2xl transition-shadow duration-300
+                        ${t.type === 'confirm' ? 'bg-white/90 backdrop-blur-xl border-white/60 text-slate-800 shadow-[0_8px_30px_rgb(0,0,0,0.12)]' : STYLES[t.type]}
+                    `}
+                >
+                    {t.type === 'confirm' ? (
+                        // Confirm Dialog
+                        <div className="flex flex-col gap-4">
+                            <div className="flex items-start gap-3">
+                                <span className="flex-shrink-0 text-amber-500 bg-amber-50 p-1.5 rounded-xl border border-amber-100 shadow-sm mt-0.5">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                                </span>
+                                <p className="text-[13px] font-extrabold text-slate-800 leading-snug mt-1">{t.message}</p>
+                            </div>
+                            <div className="flex gap-2 justify-end mt-1">
+                                <button
+                                    onClick={t.onCancel}
+                                    className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-200 transition-colors shadow-sm"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={t.onConfirm}
+                                    className="px-4 py-2 bg-gradient-to-r from-rose-500 to-rose-600 text-white rounded-xl text-xs font-extrabold hover:opacity-90 transition-all shadow-md shadow-rose-500/30"
+                                >
+                                    Confirmar
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        // Regular Toast
+                        <div className="flex items-center gap-3">
+                            <span className={`flex-shrink-0 shadow-sm ${ICON_COLORS[t.type]}`}>{ICONS[t.type]()}</span>
+                            <p className="text-[13px] font-extrabold flex-1 leading-snug text-slate-700 tracking-wide pr-2">{t.message}</p>
+                            <button
+                                onClick={() => removeToast(t.id)}
+                                className="text-slate-400 opacity-50 hover:opacity-100 hover:text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition-all flex-shrink-0"
+                            >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+                    )}
+                </div>
+            ))}
+        </div>
+    );
+
     return (
         <ToastContext.Provider value={{ toast, confirm }}>
             {children}
-
-            {/* Toast Container */}
-            <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 max-w-sm pointer-events-none">
-                {toasts.map(t => (
-                    <div
-                        key={t.id}
-                        className={`
-                            relative pointer-events-auto animate-fade-in overflow-hidden
-                            rounded-2xl border p-4 hover:shadow-2xl transition-shadow duration-300
-                            ${t.type === 'confirm' ? 'bg-white/90 backdrop-blur-xl border-white/60 text-slate-800 shadow-[0_8px_30px_rgb(0,0,0,0.12)]' : STYLES[t.type]}
-                        `}
-                    >
-                        {t.type === 'confirm' ? (
-                            // Confirm Dialog
-                            <div className="flex flex-col gap-4">
-                                <div className="flex items-start gap-3">
-                                    <span className="flex-shrink-0 text-amber-500 bg-amber-50 p-1.5 rounded-xl border border-amber-100 shadow-sm mt-0.5">
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                                    </span>
-                                    <p className="text-[13px] font-extrabold text-slate-800 leading-snug mt-1">{t.message}</p>
-                                </div>
-                                <div className="flex gap-2 justify-end mt-1">
-                                    <button
-                                        onClick={t.onCancel}
-                                        className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-200 transition-colors shadow-sm"
-                                    >
-                                        Cancelar
-                                    </button>
-                                    <button
-                                        onClick={t.onConfirm}
-                                        className="px-4 py-2 bg-gradient-to-r from-rose-500 to-rose-600 text-white rounded-xl text-xs font-extrabold hover:opacity-90 transition-all shadow-md shadow-rose-500/30"
-                                    >
-                                        Confirmar
-                                    </button>
-                                </div>
-                            </div>
-                        ) : (
-                            // Regular Toast
-                            <div className="flex items-center gap-3">
-                                <span className={`flex-shrink-0 shadow-sm ${ICON_COLORS[t.type]}`}>{ICONS[t.type]()}</span>
-                                <p className="text-[13px] font-extrabold flex-1 leading-snug text-slate-700 tracking-wide pr-2">{t.message}</p>
-                                <button
-                                    onClick={() => removeToast(t.id)}
-                                    className="text-slate-400 opacity-50 hover:opacity-100 hover:text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition-all flex-shrink-0"
-                                >
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" /></svg>
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                ))}
-            </div>
+            {typeof document !== 'undefined' ? createPortal(toastContainer, document.body) : null}
         </ToastContext.Provider>
     );
 };
