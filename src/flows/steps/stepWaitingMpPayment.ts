@@ -6,8 +6,22 @@ import logger from '../../utils/logger';
 
 const PAID_KEYWORDS = /\b(listo|pague|pagu[eé]|pago hecho|hice el pago|ya pague|ya pagu[eé]|realice|realic[eé]|confirmo|listo el pago|pago listo|lo hice|hecho|ok listo)\b/i;
 // Numeración del menú actual (1=MP, 2=Transferencia, 3=Contra reembolso).
-const TRANSFER_FALLBACK_KEYWORDS = /\b(transfer[ei]ncia|transf|alias|2|segund[oa]|segunda)\b/i;
-const CASH_FALLBACK_KEYWORDS = /\b(efectivo|contra.?reembolso|contrarembolso|3|cartero|al recibir|no puedo|no tengo|no me sale|error|problema|no funciona|cancelar)\b/i;
+// Quitamos "segund[oa]|segunda" porque aparecen en direcciones (calles tipo
+// "Segunda Junta", "entre segundo sombra y corbalán"). El "2" suelto solo se
+// acepta como opción aislada (msj corto), nunca dentro de una dirección.
+const TRANSFER_FALLBACK_KEYWORDS = /\b(transfer[ei]ncia|transf|alias|por transferencia|hacer transferencia)\b/i;
+const CASH_FALLBACK_KEYWORDS = /\b(efectivo|contra.?reembolso|contrarembolso|al recibir|cartero|en mano|al recibirlo|cuando me llegue)\b/i;
+// Detector de elección por número aislado — solo matchea si el mensaje es
+// corto (<25 chars), igual que en stepWaitingPaymentMethod. "2" o "3" sueltos
+// dentro de una dirección larga (ej: "código postal 1742") nunca disparan.
+const OPTION_PICKER_SHORT = /^\s*(?:opci[óo]n\s+|la\s+|el\s+)?(\d)\s*[\.\)]?\s*$/i;
+function _detectShortOption(text: string): '1' | '2' | '3' | null {
+    const trimmed = (text || '').trim();
+    if (trimmed.length > 25) return null;
+    const m = trimmed.match(OPTION_PICKER_SHORT);
+    if (m && (m[1] === '1' || m[1] === '2' || m[1] === '3')) return m[1] as '1' | '2' | '3';
+    return null;
+}
 
 export async function handleWaitingMpPayment(
     userId: string,
@@ -71,7 +85,12 @@ export async function handleWaitingMpPayment(
     }
 
     // ── Cliente pide transferencia ─────────────────────────────────────────────
-    if (TRANSFER_FALLBACK_KEYWORDS.test(normalizedText)) {
+    // Solo aceptamos cambio a transferencia si:
+    //   - El mensaje es corto y dice "2" / "opción 2"
+    //   - O matchea keywords explícitas de transferencia
+    // Direcciones largas que contienen "segundo" o un "2" aislado NO disparan.
+    const shortOption = _detectShortOption(text);
+    if (shortOption === '2' || TRANSFER_FALLBACK_KEYWORDS.test(normalizedText)) {
         const msg = `¡Perfecto! Para transferir usá el alias *CHILE.TEXTO.CASINO*. Una vez que realicés la transferencia avisanos por acá y coordinamos el envío 😊`;
         currentState.paymentMethod = 'transferencia';
         currentState.mpPaymentLinkId = null;
@@ -89,7 +108,9 @@ export async function handleWaitingMpPayment(
     }
 
     // ── Cliente quiere contra reembolso ────────────────────────────────────────
-    if (CASH_FALLBACK_KEYWORDS.test(normalizedText)) {
+    // Mismo criterio que transferencia: opción "3" solo si es msj corto, o
+    // keywords explícitas de contra reembolso/efectivo.
+    if (shortOption === '3' || CASH_FALLBACK_KEYWORDS.test(normalizedText)) {
         // Restaurar adicionalMAX (plan 60 → vuelve a tener adicional) — fue waiveado
         // al elegir MP en el paso anterior.
         currentState.paymentMethod = 'contrarembolso';
