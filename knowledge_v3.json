@@ -167,14 +167,13 @@
         {
             "keywords": [
                 "tarjeta",
-                "cuotas",
                 "mercadopago",
                 "mp",
                 "cbu",
                 "alias",
                 "transferencia"
             ],
-            "response": "Por el momento trabajamos únicamente con pago al recibir.\n\n¿Preferís 60 o 120 días?"
+            "response": "Aceptamos MercadoPago (tarjeta, débito, saldo MP), transferencia bancaria y contra reembolso (efectivo al recibir).\n\n¿Cuál te queda más cómoda?"
         },
         {
             "keywords": [

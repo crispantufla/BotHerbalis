@@ -68,11 +68,11 @@ export async function handleWaitingMpPayment(
 
         } else {
             // rejected o error — volver a WAITING_PAYMENT_METHOD ofreciendo las 3
-            // opciones (incluyendo reintentar MP con otra tarjeta o las cuotas).
+            // opciones (incluyendo reintentar MP con otra tarjeta).
             // NO restauramos adicionalMAX acá — cada branch de stepWaitingPaymentMethod
             // recalcula correctamente según la opción elegida (CR llama _recalcAdicionalMAX,
             // MP/Transferencia lo dejan en 0).
-            const msg = '⚠️ Hubo un problema con el pago de MercadoPago — pudo ser la tarjeta o un rechazo del banco.\n\n¿Cómo querés seguir?\n\n1️⃣ *MercadoPago* — Probá con otra tarjeta o usá las *3, 6 o 9 cuotas sin interés* 💳\n2️⃣ *Transferencia bancaria* — alias *CHILE.TEXTO.CASINO*\n3️⃣ *Contra reembolso* — pagás al cartero cuando llega\n\n¿Cuál preferís?';
+            const msg = '⚠️ Hubo un problema con el pago de MercadoPago — pudo ser la tarjeta o un rechazo del banco.\n\n¿Cómo querés seguir?\n\n1️⃣ *MercadoPago* — Probá con otra tarjeta 💳\n2️⃣ *Transferencia bancaria* — alias *CHILE.TEXTO.CASINO*\n3️⃣ *Contra reembolso* — pagás al cartero cuando llega\n\n¿Cuál preferís?';
             currentState.paymentMethod = null;
             currentState.mpPaymentLinkId = null;
             currentState.mpPaymentLinkUrl = null;
@@ -290,7 +290,7 @@ async function _generateAndSendLink(
             `Pedido: *${productName}* — Plan ${currentState.selectedPlan} días\n` +
             `Total: *$${currentState.totalPrice}*\n\n` +
             `👇 Hacé clic para pagar de forma segura:\n${link}\n\n` +
-            `Podés pagar con tarjeta (incluso en *3, 6 o 9 cuotas sin interés* 🎉), desde la app de MercadoPago o escaneando el QR.\n\n` +
+            `Podés pagar con tarjeta, débito, desde la app de MercadoPago o escaneando el QR.\n\n` +
             `✅ Cuando termines el pago, escribime *"listo"* y verifico que ingresó.\n\n` +
             `Mientras tanto, pasame los datos de envío para tener todo listo 👇\n\n` +
             `Nombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nProvincia:`;

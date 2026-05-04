@@ -131,14 +131,14 @@ export async function handleWaitingPaymentMethod(
 
     // ── Opción 3: Contra reembolso ─────────────────────────────────────────────
     if (isOptionCash || CASH_KEYWORDS.test(normalizedText) || isConfirmingCashRetry) {
-        // Restaurar adicionalMAX antes del retry — el cálculo de la cuota MP
-        // necesita el total ANTES de la bonificación.
+        // Restaurar adicionalMAX antes del retry para que el cálculo del ahorro
+        // sea correcto (necesita el adicional original, no el bonificado).
         _recalcAdicionalMAX(currentState);
         calculateTotal(currentState);
 
         // ── Sugerencia #5: Last-mile retry (solo plan 60 con adicional) ────
-        // Una sola vez por conversación: ofrecer cambiar a MP destacando
-        // cuota mensual + ahorro del adicional.
+        // Una sola vez por conversación: ofrecer cambiar a MP destacando el
+        // ahorro del adicional + velocidad de entrega.
         const plan60WithAdicional = plan === '60' && (currentState.adicionalMAX || 0) > 0;
         if (plan60WithAdicional && !currentState.cashRetryShown) {
             currentState.cashRetryShown = true;
@@ -190,7 +190,7 @@ export async function handleWaitingPaymentMethod(
 
     const aiRes = await aiService.chat(text, {
         step: 'waiting_payment_method',
-        goal: `El cliente debe elegir cómo quiere pagar su pedido. Las opciones son (orden actual del menú):\n\n1. *MercadoPago* — paga ahora online (tarjeta, débito o saldo MP). Sin recargos. *Disponen 3, 6 o 9 cuotas sin interés con tarjeta de crédito*. ENTREGA MÁS RÁPIDA (4-6 días).\n\n2. *Transferencia bancaria* — alias CHILE.TEXTO.CASINO. Sin recargos. Misma velocidad que MP.\n\n3. *Contra reembolso* — paga al cartero cuando llega. ${plan60 ? `Tiene un adicional de $${adicionalFmt} en plan 60 días (bonificado en 120).` : 'Sin adicional (plan 120 días).'} Demora 7-10 días.\n\nPRIORIDAD: intentá siempre que elija MercadoPago primero — destacá las cuotas sin interés y que es la opción más rápida y cómoda. Si no puede o no quiere, ofrecé transferencia. Contra reembolso como última opción (es la que más se cancela).\n\nNUNCA avances sin que el cliente elija una opción clara.`,
+        goal: `El cliente debe elegir cómo quiere pagar su pedido. Las opciones son (orden actual del menú):\n\n1. *MercadoPago* — paga ahora online (tarjeta, débito o saldo MP). Sin recargos. ENTREGA MÁS RÁPIDA (4-6 días).\n\n2. *Transferencia bancaria* — alias CHILE.TEXTO.CASINO. Sin recargos. Misma velocidad que MP.\n\n3. *Contra reembolso* — paga al cartero cuando llega. ${plan60 ? `Tiene un adicional de $${adicionalFmt} en plan 60 días (bonificado en 120).` : 'Sin adicional (plan 120 días).'} Demora 7-10 días.\n\nPRIORIDAD: intentá siempre que elija MercadoPago primero — destacá que es sin recargos, más rápido y queda asegurado con protección al comprador. Si no puede o no quiere, ofrecé transferencia. Contra reembolso como última opción (es la que más se cancela).\n\nNUNCA menciones cuotas, planes en cuotas, ni nada relacionado con pagos en cuotas. Si el cliente pregunta por cuotas, decile que para esa info que se fije al hacer el pago en MercadoPago directamente.\n\nNUNCA avances sin que el cliente elija una opción clara.`,
         history: currentState.history,
         summary: currentState.summary,
         knowledge,

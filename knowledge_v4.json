@@ -186,14 +186,13 @@
         {
             "keywords": [
                 "tarjeta",
-                "cuotas",
                 "mercadopago",
                 "mp",
                 "cbu",
                 "alias",
                 "transferencia"
             ],
-            "response": "Por el momento trabajamos únicamente con pago al recibir.\n\n¿Preferís 60 o 120 días?"
+            "response": "Aceptamos MercadoPago (tarjeta, débito, saldo MP), transferencia bancaria y contra reembolso (efectivo al recibir).\n\n¿Cuál te queda más cómoda?"
         },
         {
             "keywords": [
@@ -601,7 +600,7 @@
                 "debito",
                 "credito"
             ],
-            "response": "¡Sí, tenemos varias opciones de pago! 😊 Podés pagar:\n1️⃣ MercadoPago — con tarjeta, débito o saldo MP. Podés abonar en *3, 6 o 9 cuotas sin interés* 💳. Pagás ahora y llega más rápido (4-6 días).\n2️⃣ Transferencia bancaria.\n3️⃣ Contra reembolso — en efectivo cuando te llega o al retirarlo en sucursal.\n\n¿Cuál te resulta más cómoda?"
+            "response": "¡Sí, tenemos varias opciones de pago! 😊 Podés pagar:\n1️⃣ MercadoPago — con tarjeta, débito o saldo MP. Pagás ahora y llega más rápido (4-6 días).\n2️⃣ Transferencia bancaria.\n3️⃣ Contra reembolso — en efectivo cuando te llega o al retirarlo en sucursal.\n\n¿Cuál te resulta más cómoda?"
         },
         {
             "keywords": [
