@@ -70,13 +70,33 @@ module.exports = (clientPool) => {
             const page = parseInt(req.query.page) || 1;
             const limit = Math.min(parseInt(req.query.limit) || 100, 500);
             const skip = (page - 1) * limit;
-            const instanceId = getInstanceId(req);
+            const instanceIdFromCtx = getInstanceId(req);
             const search = (req.query.search || '').toString().trim();
+            const status = (req.query.status || '').toString().trim();
+            // Admin puede filtrar por un seller específico via query param
+            // (independiente del SellerContext global). Sellers no-admin
+            // ignoran este param — su instanceId siempre viene del JWT.
+            const requestedInstanceId = (req.query.instanceId || '').toString().trim();
+            const isAdmin = req.account?.role === 'admin';
 
             const { prisma } = require('../../../db');
 
-            // Filtro base: instanceId si admin tiene seller seleccionado, sino todos.
-            const where = instanceId ? { instanceId } : {};
+            // Filtro base de instanceId:
+            //   - Sellers (no admin): siempre el del contexto (no overrideable)
+            //   - Admin con seller global seleccionado: el del contexto
+            //   - Admin sin seller global pero con ?instanceId=X: usa X
+            //   - Admin sin nada: ve todos
+            const effectiveInstanceId = isAdmin
+                ? (instanceIdFromCtx || requestedInstanceId || null)
+                : instanceIdFromCtx;
+            const where = effectiveInstanceId ? { instanceId: effectiveInstanceId } : {};
+
+            // Filtro de status server-side. Antes era client-side sobre la página
+            // actual, así que filtrar "Pendiente" mostraba solo los pending de
+            // las 50 órdenes cargadas (3-5 por página) en vez de todos juntos.
+            if (status && status !== 'Todos') {
+                where.status = status;
+            }
 
             // Búsqueda libre contra DB — match case-insensitive en nombre,
             // userPhone (cliente), seller (teléfono del bot), tracking, calle

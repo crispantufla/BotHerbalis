@@ -32,12 +32,19 @@ const SalesView = ({ onGoToChat, initialSearch = '' }) => {
         return () => clearTimeout(t);
     }, [searchTerm]);
 
-    // Reset a página 1 cuando el search cambia — sino el usuario busca algo
-    // y se queda viendo la página N que no tiene resultados.
-    useEffect(() => { setPage(1); }, [debouncedSearch]);
+    // Reset a página 1 cuando cualquier filtro cambia — sino el usuario filtra
+    // algo y se queda viendo la página N que no tiene resultados.
+    useEffect(() => { setPage(1); }, [debouncedSearch, statusFilter, sellerFilter]);
 
-    // Custom Hook Data
-    const { orders, pagination, isLoading, isFetching, updateDetails, updateStatus, deleteOrder, refetch } = useOrders(page, 50, debouncedSearch);
+    // El sellerFilter local solo aplica para admins (sellers ven solo sus
+    // órdenes via JWT). Para sellers, no se manda al hook.
+    const apiInstanceId = isAdmin ? sellerFilter : '';
+
+    // Custom Hook Data — filtros server-side: search + status + instanceId.
+    // Antes status y seller eran client-side sobre 50 órdenes paginadas, lo
+    // que daba el bug de "Pendientes" repartidos en varias páginas (3-5 por
+    // página en vez de juntos).
+    const { orders, pagination, isLoading, isFetching, updateDetails, updateStatus, deleteOrder, refetch } = useOrders(page, 50, debouncedSearch, statusFilter, apiInstanceId);
     // Historical instanceIds present in Order table — includes "ghost" sellers
     // whose Account was hard-deleted but whose ventas se preservaron (denis).
     const [historicalSellerIds, setHistoricalSellerIds] = useState([]);
@@ -269,16 +276,13 @@ CP: ${order.cp || '—'}`;
     // Label fallback: si el instanceId no tiene Account (ghost), uso el id capitalizado.
     const labelForSeller = (sid) => sellerIdToName[sid] || capitalize(sid || '');
 
-    // El search ya se aplicó server-side en /api/orders?search=... — acá solo
-    // filtramos por status y seller (ambos UI puro, no van a la API).
-    const filteredOrders = orders.filter(order => {
-        const matchesStatus = statusFilter === 'Todos' || (order.status || 'Pendiente') === statusFilter;
-
-        const matchesSeller = sellerFilter === 'Todos'
-            || (isAdmin ? order.instanceId === sellerFilter : order.seller === sellerFilter);
-
-        return matchesStatus && matchesSeller;
-    });
+    // Todos los filtros (search + status + instanceId) ya se aplicaron
+    // server-side via /api/orders. Para sellers no-admin que tienen el filtro
+    // local de "VEND.", aplicamos el match client-side por order.seller —
+    // sellers no pueden filtrar por instanceId (no tienen permiso).
+    const filteredOrders = isAdmin
+        ? orders
+        : orders.filter(order => sellerFilter === 'Todos' || order.seller === sellerFilter);
 
     // Timezone & Date Formatter
     const formatDateBA = (dateStr) => {
