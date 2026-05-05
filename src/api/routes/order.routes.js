@@ -71,10 +71,25 @@ module.exports = (clientPool) => {
             const limit = Math.min(parseInt(req.query.limit) || 100, 500);
             const skip = (page - 1) * limit;
             const instanceId = getInstanceId(req);
+            const search = (req.query.search || '').toString().trim();
 
             const { prisma } = require('../../../db');
 
+            // Filtro base: instanceId si admin tiene seller seleccionado, sino todos.
             const where = instanceId ? { instanceId } : {};
+
+            // Búsqueda libre contra DB — match case-insensitive en nombre,
+            // userPhone, tracking, calle y ciudad. Esto evita el bug previo de
+            // que el buscador solo encontraba clientes en la página actual.
+            if (search) {
+                where.OR = [
+                    { nombre: { contains: search, mode: 'insensitive' } },
+                    { userPhone: { contains: search } }, // teléfonos son dígitos, no necesita insensitive
+                    { tracking: { contains: search, mode: 'insensitive' } },
+                    { calle: { contains: search, mode: 'insensitive' } },
+                    { ciudad: { contains: search, mode: 'insensitive' } },
+                ];
+            }
 
             // Run count + findMany in parallel (independent queries)
             const [total, orders] = await Promise.all([

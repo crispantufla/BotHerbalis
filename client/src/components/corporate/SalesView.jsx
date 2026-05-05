@@ -17,13 +17,27 @@ const SalesView = ({ onGoToChat, initialSearch = '' }) => {
     const { sellers } = useSeller();
     const [page, setPage] = useState(1);
 
-    // Custom Hook Data
-    const { orders, pagination, isLoading, isFetching, updateDetails, updateStatus, deleteOrder, refetch } = useOrders(page, 50);
-
     // Advanced Filters V2
     const [searchTerm, setSearchTerm] = useState(initialSearch);
     const [statusFilter, setStatusFilter] = useState('Todos');
     const [sellerFilter, setSellerFilter] = useState('Todos');
+
+    // Debounce search — 350ms para no martillar la API en cada tecla.
+    // El search debounceado se manda al hook useOrders, que lo reenvía a la
+    // API; así "Maria Elina" busca contra TODAS las órdenes históricas, no
+    // solo la página actual.
+    const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
+    useEffect(() => {
+        const t = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 350);
+        return () => clearTimeout(t);
+    }, [searchTerm]);
+
+    // Reset a página 1 cuando el search cambia — sino el usuario busca algo
+    // y se queda viendo la página N que no tiene resultados.
+    useEffect(() => { setPage(1); }, [debouncedSearch]);
+
+    // Custom Hook Data
+    const { orders, pagination, isLoading, isFetching, updateDetails, updateStatus, deleteOrder, refetch } = useOrders(page, 50, debouncedSearch);
     // Historical instanceIds present in Order table — includes "ghost" sellers
     // whose Account was hard-deleted but whose ventas se preservaron (denis).
     const [historicalSellerIds, setHistoricalSellerIds] = useState([]);
@@ -255,18 +269,15 @@ CP: ${order.cp || '—'}`;
     // Label fallback: si el instanceId no tiene Account (ghost), uso el id capitalizado.
     const labelForSeller = (sid) => sellerIdToName[sid] || capitalize(sid || '');
 
+    // El search ya se aplicó server-side en /api/orders?search=... — acá solo
+    // filtramos por status y seller (ambos UI puro, no van a la API).
     const filteredOrders = orders.filter(order => {
-        const matchesSearch = searchTerm === '' ||
-            (order.nombre || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (order.cliente || '').includes(searchTerm) ||
-            (order.tracking || '').toLowerCase().includes(searchTerm.toLowerCase());
-
         const matchesStatus = statusFilter === 'Todos' || (order.status || 'Pendiente') === statusFilter;
 
         const matchesSeller = sellerFilter === 'Todos'
             || (isAdmin ? order.instanceId === sellerFilter : order.seller === sellerFilter);
 
-        return matchesSearch && matchesStatus && matchesSeller;
+        return matchesStatus && matchesSeller;
     });
 
     // Timezone & Date Formatter

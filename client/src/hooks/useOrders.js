@@ -4,7 +4,7 @@ import { useSocket } from '../context/SocketContext';
 import { useAuth } from '../context/AuthContext';
 import { useEffect } from 'react';
 
-export const useOrders = (page = 1, limit = 50) => {
+export const useOrders = (page = 1, limit = 50, search = '') => {
     const queryClient = useQueryClient();
     const { socket } = useSocket();
     // Any admin (with or without a home sellerId) sees all orders across
@@ -12,10 +12,12 @@ export const useOrders = (page = 1, limit = 50) => {
     const { isAdmin } = useAuth();
 
     const query = useQuery({
-        queryKey: ['orders', page, limit],
+        queryKey: ['orders', page, limit, search],
         queryFn: async () => {
             const headers = isAdmin ? { 'x-seller-id': '' } : {};
-            const res = await api.get(`/api/orders?page=${page}&limit=${limit}`, { headers });
+            const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+            if (search) params.set('search', search);
+            const res = await api.get(`/api/orders?${params.toString()}`, { headers });
             if (res.data.data) {
                 return {
                     orders: res.data.data,
