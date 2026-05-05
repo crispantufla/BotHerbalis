@@ -3,6 +3,7 @@ import { handleSystemGlobals } from './globalSystem';
 import { handleSafetyCheck } from './globalSafety';
 import { handleMediaGlobals } from './globalMedia';
 import { handleFaq } from './globalFaq';
+import { handleScheduleRequest } from './globalScheduleRequest';
 
 export async function processGlobals(
     userId: string,
@@ -18,6 +19,12 @@ export async function processGlobals(
     if (result && result.matched) return result;
 
     result = await handleSafetyCheck(userId, text, normalizedText, currentState, knowledge, dependencies);
+    if (result && result.matched) return result;
+
+    // Cliente pide horario específico de entrega (ej: "vengan mañana a las 17:30").
+    // Correo Argentino NO permite agendar horarios — escalamos a admin antes
+    // de que la IA invente una promesa imposible de cumplir.
+    result = await handleScheduleRequest(userId, text, normalizedText, currentState, dependencies);
     if (result && result.matched) return result;
 
     // Media requests (photos) — handled globally for any step
