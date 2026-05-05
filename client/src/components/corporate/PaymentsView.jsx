@@ -222,7 +222,38 @@ const PaymentsView = ({ onGoToChat }) => {
     const handleRefreshAll = async () => {
         const pending = payments.filter(p => p.status === 'pending');
         if (pending.length === 0) { toast.info('No hay pagos pendientes'); return; }
-        for (const p of pending) await handleRefresh(p.id);
+
+        // Refresca todos los pendientes en paralelo y muestra UN solo toast
+        // resumen al final. Antes llamaba a handleRefresh por cada uno y el
+        // toast de error individual se acumulaba (11 errores = 11 toasts).
+        let updated = 0, unchanged = 0, errors = 0;
+        const results = await Promise.allSettled(
+            pending.map(p => api.post(`/api/payments/${p.id}/refresh`).then(res => ({ id: p.id, ...res.data })))
+        );
+
+        const updates = new Map();
+        results.forEach((r, idx) => {
+            if (r.status === 'fulfilled') {
+                if (r.value.changed) updated++; else unchanged++;
+                if (r.value.payment) updates.set(pending[idx].id, r.value.payment);
+            } else {
+                errors++;
+            }
+        });
+
+        if (updates.size > 0) {
+            setPayments(prev => prev.map(x => updates.get(x.id) || x));
+        }
+
+        const parts = [];
+        if (updated > 0) parts.push(`${updated} actualizados`);
+        if (unchanged > 0) parts.push(`${unchanged} sin cambios`);
+        if (errors > 0) parts.push(`${errors} con error`);
+        const msg = `${pending.length} pagos: ${parts.join(' · ')}`;
+
+        if (errors > 0 && updated === 0) toast.error(msg);
+        else if (updated > 0) toast.success(msg);
+        else toast.info(msg);
     };
 
     const handleGenerateLink = async () => {
