@@ -79,12 +79,14 @@ module.exports = (clientPool) => {
             const where = instanceId ? { instanceId } : {};
 
             // Búsqueda libre contra DB — match case-insensitive en nombre,
-            // userPhone, tracking, calle y ciudad. Esto evita el bug previo de
-            // que el buscador solo encontraba clientes en la página actual.
+            // userPhone (cliente), seller (teléfono del bot), tracking, calle
+            // y ciudad. Esto evita el bug previo de que el buscador solo
+            // encontraba clientes en la página actual.
             if (search) {
                 where.OR = [
                     { nombre: { contains: search, mode: 'insensitive' } },
-                    { userPhone: { contains: search } }, // teléfonos son dígitos, no necesita insensitive
+                    { userPhone: { contains: search } },   // teléfono del cliente
+                    { seller: { contains: search } },      // teléfono del bot/vendedor
                     { tracking: { contains: search, mode: 'insensitive' } },
                     { calle: { contains: search, mode: 'insensitive' } },
                     { ciudad: { contains: search, mode: 'insensitive' } },
