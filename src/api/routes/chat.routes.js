@@ -95,11 +95,14 @@ module.exports = (clientPool) => {
 
             let waMessages = [];
             try {
-                const chat = await withTimeout(cl?.getChatById(chatId), 15000, 'Timeout getting chat for summary');
-                const rawMessages = await withTimeout(chat?.fetchMessages({ limit: 50 }), 20000, 'Timeout fetching messages for summary');
+                // Timeouts cortos (5s + 8s) — antes era 15s + 20s, total 35s,
+                // colgaba el endpoint cuando WA estaba sincronizando. La DB
+                // ya tiene los mensajes vía getLocalHistory de arriba.
+                const chat = await withTimeout(cl?.getChatById(chatId), 5000, 'Timeout getting chat for summary');
+                const rawMessages = await withTimeout(chat?.fetchMessages({ limit: 50 }), 8000, 'Timeout fetching messages for summary');
                 waMessages = rawMessages.filter(m => m.timestamp >= resetAt);
             } catch (e) {
-                logger.warn(`[SUMMARIZE] WA Fetch failed for ${chatId}`);
+                logger.info(`[SUMMARIZE] WA Fetch falling back to DB for ${chatId}`);
             }
 
             // Combine and format for AI
@@ -486,24 +489,23 @@ module.exports = (clientPool) => {
 
             try {
                 let waMessages = null;
-                // Chromium puede estar sincronizando la lista de chats internamente;
-                // en ese caso wwebjs lanza "Cannot read properties of undefined
-                // (reading 'waitForChatLoading')". Retry con backoff suave evita
-                // caer a DB innecesariamente en ese caso.
-                const MAX_ATTEMPTS = 3;
-                if (!isPrefetch) for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+                // Antes reintentábamos hasta 3 veces con backoff (1.5s + 3s) y
+                // timeouts de 10s+15s — total worst-case ~80s antes de caer a DB.
+                // El frontend se cansaba de esperar y mostraba la conversación
+                // vacía aunque la DB tenía los mensajes.
+                //
+                // Ahora: 1 solo intento con timeouts cortos (4s + 6s = 10s
+                // worst-case). Si falla con waitForChatLoading u otro error,
+                // caemos directo a la DB que es más rápida y suele tener los
+                // mismos datos. La DB ya se está pidiendo en paralelo via
+                // localMessagesPromise.
+                if (!isPrefetch) {
                     try {
-                        const chat = await withTimeout(cl?.getChatById(chatId), 10000, 'Timeout getting chat history');
-                        waMessages = await withTimeout(chat?.fetchMessages({ limit: 20 }), 15000, 'Timeout fetching history messages');
-                        break;
+                        const chat = await withTimeout(cl?.getChatById(chatId), 4000, 'Timeout getting chat history');
+                        waMessages = await withTimeout(chat?.fetchMessages({ limit: 20 }), 6000, 'Timeout fetching history messages');
                     } catch (retryErr) {
-                        const isLoading = retryErr?.message?.includes('waitForChatLoading');
-                        if (attempt < MAX_ATTEMPTS && isLoading) {
-                            // Backoff: 1.5s, 3s
-                            await new Promise(r => setTimeout(r, 1500 * attempt));
-                        } else {
-                            throw retryErr;
-                        }
+                        // Throw para que el catch externo lo maneje (loguea y cae a DB).
+                        throw retryErr;
                     }
                 }
                 const filtered = (waMessages || []).filter(m => m.timestamp >= resetAt);
