@@ -211,6 +211,29 @@ model QuickReply {
   @@unique([instanceId, title])
 }
 
+// Comentarios sobre los guiones (V3/V4/V5/V6) — los vendedores anotan
+// correcciones, notas o preguntas sobre secciones específicas. Los admins
+// pueden resolverlos o eliminarlos. sectionPath es un identificador estable
+// como "flow.greeting", "flow.recommendation_1" o "faq[2]".
+model GuionComment {
+  id            String   @id @default(uuid())
+  script        String                          // v3 | v4 | v5 | v6
+  sectionPath   String                          // e.g. "flow.greeting", "faq[0]"
+  type          String   @default("note")       // note | correction | question
+  authorId      String                          // accountId del autor
+  authorName    String                          // cached para mostrar
+  content       String                          // texto del comentario
+  suggestedText String?                         // (opcional) texto que sugiere para reemplazar la sección — solo correcciones
+  reactions     String   @default("[]")         // JSON array of {accountId, name, emoji}
+  resolved      Boolean  @default(false)        // marcado como resuelto por admin
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([script])
+  @@index([script, sectionPath])
+  @@index([resolved])
+}
+
 // API tokens for programmatic access (e.g. external Claude Code reading analytics).
 // We store sha256(token) — never plaintext. The full token is shown to the
 // admin once at creation time. `scopes` is a CSV of allowed scopes

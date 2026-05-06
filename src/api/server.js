@@ -17,6 +17,7 @@ const galleryRoutes = require('./routes/gallery.routes');
 const paymentRoutes = require('./routes/payment.routes');
 const sellersRoutes = require('./routes/sellers.routes');
 const quickRepliesRoutes = require('./routes/quickReplies.routes');
+const guionRoutes = require('./routes/guion.routes');
 
 const { jwtAuthMiddleware } = require('../middleware/jwtAuth');
 const { verifyToken } = require('../middleware/jwtAuth');
@@ -97,6 +98,7 @@ function startServer(clientPool) {
     app.use('/api', paymentRoutes(clientPool));
     app.use('/api', sellersRoutes(clientPool));
     app.use('/api', quickRepliesRoutes(clientPool));
+    app.use('/api', guionRoutes(clientPool));
     app.use('/api', apiTokensRoutes());
 
     // --- VNC viewer tracking ---

@@ -16,6 +16,7 @@ import AdvancedAnalyticsView from '../../components/corporate/AdvancedAnalyticsV
 import ManualsView from '../../components/corporate/ManualsView';
 import PaymentsView from '../../components/corporate/PaymentsView';
 import AiReportsView from '../../components/corporate/AiReportsView';
+import GuionView from '../../components/corporate/GuionView';
 import AccountsView from '../../components/admin/AccountsView';
 import AccountStatsView from '../../components/admin/AccountStatsView';
 import FunnelAnalyticsView from '../../components/admin/FunnelAnalyticsView';
@@ -24,7 +25,7 @@ import SellerSelector from '../../components/admin/SellerSelector';
 import WhatsappViewerView from '../../components/corporate/WhatsappViewerView';
 import ManualOrderEntryModal from '../../components/corporate/components/ManualOrderEntryModal';
 
-import { Wifi, MessageCircle, Database, Settings, FileText, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Bell, AlertTriangle, BookOpen, MoreHorizontal, CreditCard, Users, Monitor, LifeBuoy } from 'lucide-react';
+import { Wifi, MessageCircle, Database, Settings, FileText, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Bell, AlertTriangle, BookOpen, MoreHorizontal, CreditCard, Users, Monitor, LifeBuoy, MessagesSquare } from 'lucide-react';
 
 const CorporateDashboard = () => {
     const { socket } = useSocket();
@@ -41,7 +42,16 @@ const CorporateDashboard = () => {
         : user?.sellerId;
     const [status, setStatus] = useState('initializing');
     const [alerts, setAlerts] = useState([]);
-    const [activeTab, setActiveTab] = useState('dashboard');
+    // Lee la URL al montar — si es /guion, abre la tab de guiones directamente.
+    // Permite que mainherbalisbot-production.up.railway.app/guion linkee directo
+    // a esta sección sin tener que pasar por el dashboard primero.
+    const initialTab = (() => {
+        if (typeof window === 'undefined') return 'dashboard';
+        const path = window.location.pathname.replace(/\/+$/, '').toLowerCase();
+        if (path === '/guion' || path === '/guiones') return 'guion';
+        return 'dashboard';
+    })();
+    const [activeTab, setActiveTab] = useState(initialTab);
     const [qrData, setQrData] = useState(null);
     const [config, setConfig] = useState({ alertNumbers: [] });
     const [connectedPhone, setConnectedPhone] = useState(null);
@@ -236,6 +246,7 @@ const CorporateDashboard = () => {
                     <AiReportsView />
                 </div>
             );
+            case 'guion': return <GuionView />;
             case 'accounts': return <AccountsView />;
             case 'account-stats': return <AccountStatsView />;
             case 'funnel-analytics': return <FunnelAnalyticsView />;
@@ -326,6 +337,7 @@ const CorporateDashboard = () => {
                     <NavItem tab="statistics" icon={BarChart2} label="Estadísticas" />
                     <NavItem tab="payments" icon={CreditCard} label="Pagos MP" />
                     {isAdmin && <NavItem tab="script" icon={FileText} label="Guión & Prompts" />}
+                    <NavItem tab="guion" icon={MessagesSquare} label="Guiones (notas)" />
                     <NavItem tab="gallery" icon={ImageIcon} label="Galería de Medios" />
                     <NavItem tab="manuals" icon={BookOpen} label="Manuales" />
                     {isAdmin && <NavItem tab="ai-reports" icon={AlertTriangle} label="Errores de IA" />}
