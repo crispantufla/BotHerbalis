@@ -83,7 +83,7 @@ const ChatMessageList = ({ messages, isLoading, chatFontSize, handleDeleteMessag
                         </div>
                     )}
                     {transcription && transcription !== 'PENDING' && (
-                        <div className="bg-white/4 dark:bg-slate-800/40 p-3 rounded-xl text-xs flex items-start gap-2 text-slate-700 dark:text-slate-300 font-medium">
+                        <div className="bg-slate-50 dark:bg-slate-800/40 p-3 rounded-xl text-xs flex items-start gap-2 text-slate-700 dark:text-slate-300 font-medium border border-slate-200 dark:border-slate-700/50">
                             <span className="text-emerald-600 mt-0.5">📝</span>
                             <span className="italic leading-relaxed flex-1">"{transcription}"</span>
                         </div>

@@ -173,7 +173,7 @@ const GalleryView = () => {
                                         <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-4">
                                             <button
                                                 onClick={() => window.open(`${API_URL}${img.url}`, '_blank')}
-                                                className="w-12 h-12 rounded-full bg-white/2 dark:bg-slate-800/20 hover:bg-white text-white hover:text-indigo-600 backdrop-blur-md flex items-center justify-center shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-all duration-300"
+                                                className="w-12 h-12 rounded-full bg-white/30 hover:bg-white text-white hover:text-indigo-600 backdrop-blur-md flex items-center justify-center shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-all duration-300"
                                                 title="Visualización Completa"
                                             >
                                                 <Maximize className="w-4 h-4" />

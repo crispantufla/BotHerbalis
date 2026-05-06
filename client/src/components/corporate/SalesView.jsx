@@ -602,14 +602,14 @@ CP: ${order.cp || '—'}`;
             {/* V2 GLASSMORPHISM EDIT MODAL */}
             {editingOrder && createPortal(
                 <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[100] flex items-center justify-center animate-fade-in p-4">
-                    <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-2xl rounded-[2rem] shadow-2xl w-full max-w-md p-8 border border-white dark:border-slate-700 relative overflow-hidden">
+                    <div className="bg-white dark:bg-slate-800/95 backdrop-blur-2xl rounded-[2rem] shadow-2xl w-full max-w-md p-5 sm:p-8 border border-slate-200 dark:border-slate-700 relative overflow-hidden">
 
                         <div className="absolute top-0 right-0 w-40 h-40 bg-indigo-500/10 blur-[50px] rounded-full pointer-events-none"></div>
 
-                        <div className="flex justify-between items-center mb-8 relative z-10">
+                        <div className="flex justify-between items-center mb-5 sm:mb-8 relative z-10">
                             <div>
-                                <h3 className="text-2xl font-extrabold text-slate-800 tracking-tight">Editar Estado</h3>
-                                <p className="text-xs font-bold text-indigo-600 uppercase tracking-widest mt-1">Order #{editingOrder.id?.substring(0, 6) || 'N/A'}</p>
+                                <h3 className="text-xl sm:text-2xl font-extrabold text-slate-800 dark:text-slate-100 tracking-tight">Editar Estado</h3>
+                                <p className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest mt-1">Order #{editingOrder.id?.substring(0, 6) || 'N/A'}</p>
                             </div>
                             <button onClick={() => setEditingOrder(null)} className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 hover:text-slate-800 dark:hover:text-white transition-colors flex items-center justify-center">✕</button>
                         </div>
@@ -625,7 +625,7 @@ CP: ${order.cp || '—'}`;
                             </div>
 
                             <div>
-                                <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 ml-1">Estado del Pedido</label>
+                                <label className="block text-xs font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2 ml-1">Estado del Pedido</label>
                                 <div className="relative">
                                     <select
                                         value={editStatus}

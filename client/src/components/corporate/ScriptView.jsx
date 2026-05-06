@@ -181,7 +181,7 @@ const ScriptView = () => {
                     ) : (
                         <>
                             {activeTab === 'map' && (
-                                <div className="bg-white/5 dark:bg-slate-800/50 rounded-2xl p-4 border border-white shadow-inner h-full min-h-[500px]">
+                                <div className="bg-white dark:bg-slate-800/50 rounded-2xl p-4 border border-slate-200 dark:border-slate-700 shadow-inner h-full min-h-[500px]">
                                     <ScriptMapView script={script} onUpdate={handleUpdate} />
                                 </div>
                             )}
@@ -189,7 +189,7 @@ const ScriptView = () => {
                             {activeTab === 'flow' && (
                                 <div className="space-y-6 max-w-5xl 2xl:max-w-7xl mx-auto">
                                     {Object.entries(script.flow || {}).map(([key, step]) => (
-                                        <div key={key} className="bg-white/8 dark:bg-slate-800/80 backdrop-blur-md p-6 rounded-3xl border border-white shadow-sm hover:shadow-md hover:border-indigo-200 transition-all duration-300">
+                                        <div key={key} className="bg-white dark:bg-slate-800/80 backdrop-blur-md p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all duration-300">
                                             <div className="flex justify-between items-center cursor-pointer group" onClick={() => setExpandedCard(expandedCard === key ? null : key)}>
                                                 <h3 className="font-extrabold text-slate-800 dark:text-slate-100 capitalize text-base group-hover:text-indigo-600 transition-colors">{key.replace(/_/g, ' ')}</h3>
                                                 <div className="flex items-center gap-4">
@@ -342,7 +342,7 @@ const ScriptView = () => {
                                                 return item.keywords.some(k => k.toLowerCase().includes(term)) || (item.response && item.response.toLowerCase().includes(term));
                                             })
                                             .map(({ item, originalIndex }) => (
-                                                <div key={originalIndex} className="bg-white/8 dark:bg-slate-800/80 backdrop-blur-md p-6 rounded-3xl border border-white shadow-sm hover:shadow-md transition-all duration-300 relative group">
+                                                <div key={originalIndex} className="bg-white dark:bg-slate-800/80 backdrop-blur-md p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-all duration-300 relative group">
                                                     <button onClick={() => deleteFAQ(originalIndex)} className="absolute top-4 right-4 w-8 h-8 bg-rose-50 text-rose-400 hover:bg-rose-500 hover:text-white rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all" title="Eliminar FAQ">
                                                         <Trash className="w-5 h-5" />
                                                     </button>
@@ -382,13 +382,13 @@ const ScriptView = () => {
             {/* GALLERY MODAL V2 */}
             {showGallery && createPortal(
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-fade-in">
-                    <div className="bg-white/9 dark:bg-slate-800/95 backdrop-blur-2xl rounded-[2rem] shadow-2xl w-full max-w-6xl 2xl:max-w-7xl max-h-[85vh] flex flex-col border border-white relative overflow-hidden">
-                        <div className="p-4 sm:p-8 border-b border-white flex justify-between items-center bg-white/4 dark:bg-slate-800/40 sticky top-0 z-10 backdrop-blur-md">
+                    <div className="bg-white dark:bg-slate-800/95 backdrop-blur-2xl rounded-[2rem] shadow-2xl w-full max-w-6xl 2xl:max-w-7xl max-h-[85vh] flex flex-col border border-slate-200 dark:border-slate-700 relative overflow-hidden">
+                        <div className="p-4 sm:p-8 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50/60 dark:bg-slate-800/40 sticky top-0 z-10 backdrop-blur-md">
                             <div>
-                                <h3 className="text-2xl font-extrabold text-slate-800 tracking-tight">Galería de Medios</h3>
-                                <p className="text-xs font-bold text-indigo-500 uppercase tracking-widest mt-1">Selecciona una imagen para el paso</p>
+                                <h3 className="text-xl sm:text-2xl font-extrabold text-slate-800 dark:text-slate-100 tracking-tight">Galería de Medios</h3>
+                                <p className="text-xs font-bold text-indigo-500 dark:text-indigo-400 uppercase tracking-widest mt-1">Selecciona una imagen para el paso</p>
                             </div>
-                            <button onClick={() => setShowGallery(null)} className="w-12 h-12 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition-colors flex items-center justify-center">
+                            <button onClick={() => setShowGallery(null)} className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 hover:text-slate-800 dark:hover:text-slate-100 transition-colors flex items-center justify-center">
                                 <Close className="w-4 h-4" />
                             </button>
                         </div>

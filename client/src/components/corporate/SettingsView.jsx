@@ -163,7 +163,7 @@ const SettingsView = ({ status }) => {
             <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-indigo-50/50 via-transparent to-purple-50/50 dark:from-transparent dark:to-transparent pointer-events-none z-0"></div>
 
             {/* Header V2 */}
-            <div className="bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl rounded-[1.25rem] sm:rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-4 sm:p-8 mb-4 sm:mb-8 relative z-10">
+            <div className="bg-white dark:bg-slate-800/40 backdrop-blur-xl rounded-[1.25rem] sm:rounded-[2rem] border border-slate-200 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-4 sm:p-8 mb-4 sm:mb-8 relative z-10">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 sm:gap-6">
                     <div>
                         <h1 className="text-xl sm:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-700 to-purple-600 dark:from-indigo-400 dark:to-purple-400 tracking-tight">
@@ -185,7 +185,7 @@ const SettingsView = ({ status }) => {
                     {/* Left Column: Editor & Tools */}
                     <div className="space-y-4 sm:space-y-8">
                         {/* Wrapper for original PriceEditor to adapt it to Glassmorphism */}
-                        <div className="bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl p-4 sm:p-8 rounded-[1.25rem] sm:rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
+                        <div className="bg-white dark:bg-slate-800/40 backdrop-blur-xl p-4 sm:p-8 rounded-[1.25rem] sm:rounded-[2rem] border border-slate-200 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
                             <div className="absolute -top-32 -left-32 w-64 h-64 bg-indigo-400/10 blur-[60px] rounded-full pointer-events-none"></div>
                             <div className="relative z-10">
                                 <PriceEditor />
@@ -196,7 +196,7 @@ const SettingsView = ({ status }) => {
                     {/* Right Column: Scripts & Danger */}
                     <div className="space-y-4 sm:space-y-8">
                         {/* Script Switcher V2 */}
-                        <div className="bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl p-4 sm:p-8 rounded-[1.25rem] sm:rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
+                        <div className="bg-white dark:bg-slate-800/40 backdrop-blur-xl p-4 sm:p-8 rounded-[1.25rem] sm:rounded-[2rem] border border-slate-200 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
                             <div className="absolute -bottom-20 -right-20 w-80 h-80 bg-purple-400/10 blur-[80px] rounded-full pointer-events-none"></div>
                             <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-8 relative z-10">
                                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-fuchsia-600 text-white flex items-center justify-center shadow-lg shadow-purple-500/20">
@@ -253,7 +253,7 @@ const SettingsView = ({ status }) => {
                         </div>
 
                         {/* Cambiar contraseña */}
-                        <div className="bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl p-4 sm:p-8 rounded-[1.25rem] sm:rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
+                        <div className="bg-white dark:bg-slate-800/40 backdrop-blur-xl p-4 sm:p-8 rounded-[1.25rem] sm:rounded-[2rem] border border-slate-200 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
                             <div className="flex items-center gap-3 sm:gap-4 mb-5 relative z-10">
                                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/20">
                                     <KeyRound className="w-6 h-6" />
@@ -320,7 +320,7 @@ const SettingsView = ({ status }) => {
                         </div>
 
                         {/* Herramientas */}
-                        <div className="bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl p-4 sm:p-8 rounded-[1.25rem] sm:rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
+                        <div className="bg-white dark:bg-slate-800/40 backdrop-blur-xl p-4 sm:p-8 rounded-[1.25rem] sm:rounded-[2rem] border border-slate-200 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
                             <div className="absolute top-0 right-0 w-32 h-32 bg-blue-400/10 blur-[50px] rounded-full pointer-events-none"></div>
                             <div className="flex items-center gap-4 mb-6 relative z-10">
                                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/20">
@@ -341,7 +341,7 @@ const SettingsView = ({ status }) => {
 
                     {/* FULL WIDTH: Memory Management Panel */}
                     <div className="xl:col-span-2">
-                        <div className={`bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl p-4 sm:p-8 rounded-[1.25rem] sm:rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden ${memStats ? getMemoryLabel().glow : ''}`}>
+                        <div className={`bg-white dark:bg-slate-800/40 backdrop-blur-xl p-4 sm:p-8 rounded-[1.25rem] sm:rounded-[2rem] border border-slate-200 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden ${memStats ? getMemoryLabel().glow : ''}`}>
                             <div className="absolute -top-20 -right-20 w-80 h-80 bg-indigo-400/10 blur-[80px] rounded-full pointer-events-none"></div>
                             <div className="absolute left-0 top-0 bottom-0 w-2 bg-gradient-to-b from-indigo-400 to-purple-600 rounded-l-[2rem]"></div>
 

@@ -79,7 +79,7 @@ const WaitingCustomersPanel = () => {
     };
 
     return (
-        <div className="bg-white/6 dark:bg-slate-800/60 backdrop-blur-xl rounded-[1.25rem] border border-white/8 dark:border-slate-700/80 shadow-lg overflow-hidden">
+        <div className="bg-white dark:bg-slate-800/60 backdrop-blur-xl rounded-[1.25rem] border border-slate-200 dark:border-slate-700/80 shadow-lg overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200/10 dark:border-slate-700/60">
                 <div className="flex items-center gap-2.5">
