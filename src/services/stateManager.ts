@@ -72,7 +72,12 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
     const config: BotConfig = {
         alertNumbers: [],
         activeScript: 'rotacion',
-        scriptStats: { v3: { started: 0, completed: 0 }, v4: { started: 0, completed: 0 }, v5: { started: 0, completed: 0 } }
+        scriptStats: {
+            v3: { started: 0, completed: 0 },
+            v4: { started: 0, completed: 0 },
+            v5: { started: 0, completed: 0 },
+            v6: { started: 0, completed: 0 }
+        }
     };
 
     // Knowledge files: load from DATA_DIR first, fallback to source root
@@ -80,7 +85,8 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
     const multiKnowledge: Record<string, any> = {
         v3: { flow: {}, faq: [] },
         v4: { flow: {}, faq: [] },
-        v5: { flow: {}, faq: [] }
+        v5: { flow: {}, faq: [] },
+        v6: { flow: {}, faq: [] }
     };
     const knowledgeFiles: Record<string, { save: string; source: string }> = {
         v3: {
@@ -94,6 +100,10 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
         v5: {
             save: path.join(dataDir, `knowledge_v5_${sellerId}.json`),
             source: path.join(sourceRoot, 'knowledge_v5.json')
+        },
+        v6: {
+            save: path.join(dataDir, `knowledge_v6_${sellerId}.json`),
+            source: path.join(sourceRoot, 'knowledge_v6.json')
         }
     };
     const availableScripts = Object.keys(knowledgeFiles);

@@ -93,13 +93,14 @@ export async function handleWaitingWeight(
         const wMatch = text.match(/\d+/);
         if (wMatch) currentState.weightGoal = parseInt(wMatch[0], 10);
 
-        // ── V5: ruta consultiva ────────────────────────────────────────────
-        // En V5 el cliente eligió 1 (hasta 10), 2 (10-20) o 3 (más de 20).
-        // Mapeamos directo a producto + plan + pitch del tier sin pasar por
-        // waiting_preference (no le preguntamos qué producto quiere — el bot
-        // decide según el objetivo). Esto reemplaza la pregunta de producto
-        // del V3/V4.
-        if (currentState.assignedScript === 'v5') {
+        // ── Ruta consultiva (V5/V6/futuros): tier-based routing ────────────
+        // Si el knowledge tiene recommendation_1/2/3, asumimos guión consultivo:
+        // el cliente eligió 1 (hasta 10), 2 (10-20) o 3 (más de 20) y mapeamos
+        // directo a producto + plan + pitch del tier sin pasar por
+        // waiting_preference. Esto reemplaza la pregunta de producto del V3/V4
+        // y aplica a cualquier script futuro que tenga estos textos.
+        const hasTierResponses = !!(knowledge?.flow?.recommendation_1 || knowledge?.flow?.recommendation_2 || knowledge?.flow?.recommendation_3);
+        if (hasTierResponses) {
             const w = currentState.weightGoal || 0;
             // Tier por número de opción (1/2/3) si es corto, o por kilos exactos.
             const trimmed = text.trim();
@@ -150,7 +151,7 @@ export async function handleWaitingWeight(
             currentState.history.push({ role: 'bot', content: tierMsg, timestamp: Date.now() });
             saveState(userId);
             await sendMessageWithDelay(userId, tierMsg);
-            logger.info(`[V5] User ${userId} → tier ${tier}, ${currentState.selectedProduct} ${currentState.selectedPlan}d`);
+            logger.info(`[TIER] User ${userId} (script=${currentState.assignedScript}) → tier ${tier}, ${currentState.selectedProduct} ${currentState.selectedPlan}d`);
             return { matched: true };
         }
 
