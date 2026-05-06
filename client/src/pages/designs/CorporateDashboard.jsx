@@ -322,7 +322,7 @@ const CorporateDashboard = () => {
                     {!isMobile && (
                         <button
                             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                            className={`p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-slate-100 transition-colors ${sidebarCollapsed ? 'hidden' : 'block'}`}
+                            className={`p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ${sidebarCollapsed ? 'hidden' : 'block'}`}
                         >
                             <Menu className="w-5 h-5" />
                         </button>
@@ -371,7 +371,7 @@ const CorporateDashboard = () => {
                     </button>
                     <button
                         onClick={() => { logout(); if (isMobile) setMobileMenuOpen(false); }}
-                        className={`w-full flex items-center ${(sidebarCollapsed && !isMobile) ? 'justify-center p-2' : 'px-4 py-3'} rounded-xl bg-gradient-to-r hover:from-rose-50 hover:to-orange-50 text-rose-600 transition-all duration-300 border border-transparent hover:border-rose-200 group`}
+                        className={`w-full flex items-center ${(sidebarCollapsed && !isMobile) ? 'justify-center p-2' : 'px-4 py-3'} rounded-xl hover:bg-rose-50 dark:hover:bg-rose-900/20 text-rose-600 dark:text-rose-400 transition-all duration-300 border border-transparent hover:border-rose-200 dark:hover:border-rose-800/50 group`}
                         title={(sidebarCollapsed && !isMobile) ? "Cerrar Sesión" : ""}
                     >
                         <div className={`${(sidebarCollapsed && !isMobile) ? '' : 'mr-3'} group-hover:scale-110 transition-transform`}>
@@ -385,18 +385,18 @@ const CorporateDashboard = () => {
             {/* 2. MAIN CONTENT AREA V2 */}
             <div className={`flex-1 flex flex-col overflow-hidden bg-gradient-to-br from-slate-50 dark:from-slate-900 to-blue-50/30 dark:to-indigo-900/10 w-full relative transition-all duration-300 ${!isMobile && !sidebarCollapsed ? '' : ''}`}>
                 {/* Header Superior V2 */}
-                <header className="flex-shrink-0 h-14 bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border-b border-white dark:border-slate-800 flex justify-between items-center px-4 lg:px-8 z-10 shadow-sm shadow-slate-200/20 dark:shadow-black/20">
+                <header className="flex-shrink-0 h-14 bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border-b border-slate-200/60 dark:border-slate-800 flex justify-between items-center px-3 sm:px-4 lg:px-8 z-10 shadow-sm shadow-slate-200/20 dark:shadow-black/20">
                     <div className="flex items-center gap-3 w-full lg:w-auto">
                         <button
                             onClick={() => isMobile ? setMobileMenuOpen(true) : setSidebarCollapsed(false)}
-                            className={`p-2 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-white shadow-sm transition-colors border border-slate-200/50 block lg:hidden`}
+                            className={`p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-800 shadow-sm transition-colors border border-slate-200/50 dark:border-slate-700/50 block lg:hidden`}
                         >
                             <Menu className="w-5 h-5" />
                         </button>
                         {!isMobile && sidebarCollapsed && (
                             <button
                                 onClick={() => setSidebarCollapsed(false)}
-                                className={`p-2 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-white shadow-sm transition-colors border border-slate-200/50 block`}
+                                className={`p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-800 shadow-sm transition-colors border border-slate-200/50 dark:border-slate-700/50 block`}
                             >
                                 <Menu className="w-5 h-5" />
                             </button>
@@ -532,15 +532,15 @@ const CorporateDashboard = () => {
                                         setMobileMenuOpen(false);
                                     }
                                 }}
-                                className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 transition-colors duration-200 ${isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500'}`}
+                                className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 py-2 transition-colors duration-200 ${isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500'}`}
                             >
                                 <Icon className="w-5 h-5" strokeWidth={isActive ? 2.5 : 2} />
                                 <span className="text-[10px] font-bold tracking-wide">{label}</span>
                                 {isActive && tab !== '__more__' && (
-                                    <span className="absolute bottom-1 w-1 h-1 rounded-full bg-indigo-500" />
+                                    <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-indigo-500" />
                                 )}
                                 {tab !== '__more__' && alerts.length > 0 && tab === 'dashboard' && (
-                                    <span className="absolute top-1 mt-1 flex items-center justify-center w-4 h-4 text-[9px] font-bold text-white bg-rose-500 rounded-full">{alerts.length > 9 ? '9+' : alerts.length}</span>
+                                    <span className="absolute top-1 right-1/4 flex items-center justify-center w-4 h-4 text-[9px] font-bold text-white bg-rose-500 rounded-full">{alerts.length > 9 ? '9+' : alerts.length}</span>
                                 )}
                             </button>
                         );

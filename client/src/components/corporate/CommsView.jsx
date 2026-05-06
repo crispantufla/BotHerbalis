@@ -496,7 +496,7 @@ Teléfono: ${phoneDisplay}`;
     };
 
     return (
-        <div className="flex-1 w-full min-h-0 flex flex-col md:flex-row animate-fade-in relative overflow-hidden bg-slate-50 dark:bg-slate-900 rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+        <div className="flex-1 w-full min-h-0 flex flex-col md:flex-row animate-fade-in relative overflow-hidden bg-slate-50 dark:bg-slate-900 rounded-[1.5rem] sm:rounded-[2rem] border border-slate-200 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
             {/* Ambient Background Glow */}
             <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-400/10 blur-[100px] rounded-full pointer-events-none"></div>
             <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-400/10 blur-[100px] rounded-full pointer-events-none"></div>
@@ -504,7 +504,7 @@ Teléfono: ${phoneDisplay}`;
             {/* SIDEBAR: Contacts */}
             <div className={`w-full md:w-72 lg:w-[300px] xl:w-[340px] 2xl:w-[400px] md:flex-shrink-0 border-r border-slate-200 dark:border-slate-800 flex-col bg-white dark:bg-slate-800 z-10 ${selectedChat ? 'hidden md:flex' : 'flex flex-1'} min-h-0 overflow-hidden`}>
                 {/* Search Header */}
-                <div className="p-5 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800">
+                <div className="p-3 sm:p-5 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800">
                     <div className="relative group">
                         <input
                             type="text"
@@ -626,7 +626,7 @@ Teléfono: ${phoneDisplay}`;
                                 {/* Back Button (Mobile Only) */}
                                 <button
                                     onClick={() => setSelectedChat(null)}
-                                    className="md:hidden p-2 -ml-2 bg-white/6 dark:bg-slate-800/60 border border-slate-200 rounded-xl text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 shadow-sm transition-all"
+                                    className="md:hidden p-2 -ml-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 shadow-sm transition-all"
                                     title="Volver a Contactos"
                                 >
                                     <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" /></svg>
@@ -712,24 +712,24 @@ Teléfono: ${phoneDisplay}`;
 
                                 <div className="flex justify-between items-center mb-5 relative z-10">
                                     <div className="flex items-center gap-2">
-                                        <div className="w-8 h-8 rounded-xl bg-indigo-100/80 text-indigo-600 flex items-center justify-center shadow-sm">
+                                        <div className="w-8 h-8 rounded-xl bg-indigo-100/80 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shadow-sm">
                                             <ShoppingCart className="w-4 h-4" />
                                         </div>
-                                        <h3 className="font-extrabold text-slate-800 tracking-tight text-sm">Registro de Pedidos</h3>
-                                        <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-full">{selectedChat.pastOrders?.length || 0}</span>
+                                        <h3 className="font-extrabold text-slate-800 dark:text-slate-100 tracking-tight text-sm">Registro de Pedidos</h3>
+                                        <span className="bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 text-[10px] font-bold px-2 py-0.5 rounded-full">{selectedChat.pastOrders?.length || 0}</span>
                                     </div>
-                                    <button onClick={() => setShowOrdersPanel(false)} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-rose-500 bg-white/5 dark:bg-slate-800/50 hover:bg-rose-50 rounded-xl transition-all border border-transparent shadow-sm hover:border-rose-100">✕</button>
+                                    <button onClick={() => setShowOrdersPanel(false)} className="w-8 h-8 flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-rose-500 bg-slate-50 dark:bg-slate-700/50 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-xl transition-all border border-transparent shadow-sm hover:border-rose-100 dark:hover:border-rose-800/50">✕</button>
                                 </div>
 
                                 <div className="flex flex-col gap-5 max-h-[60vh] overflow-y-auto custom-scrollbar relative z-10 pr-1 pb-4">
                                     {selectedChat.pastOrders?.map((order, i) => (
-                                        <div key={i} className="bg-white border border-slate-200 p-5 rounded-2xl flex flex-col shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+                                        <div key={i} className="bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 p-4 sm:p-5 rounded-2xl flex flex-col shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
 
                                             {/* Header de Tarjeta */}
-                                            <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+                                            <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100 dark:border-slate-700">
                                                 <div className="flex items-center gap-3">
-                                                    <span className="px-3 py-1 bg-indigo-50 text-indigo-700 text-[10px] font-black uppercase tracking-widest rounded-lg border border-indigo-100">{order.status || 'Completado'}</span>
-                                                    <span className="text-[11px] font-bold text-slate-400 font-mono">{order.createdAt || 'Fecha desconocida'}</span>
+                                                    <span className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 text-[10px] font-black uppercase tracking-widest rounded-lg border border-indigo-100 dark:border-indigo-800/50">{order.status || 'Completado'}</span>
+                                                    <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 font-mono">{order.createdAt || 'Fecha desconocida'}</span>
                                                 </div>
                                                 <button onClick={() => handleCopySale(order)} className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors shadow-md shadow-indigo-500/30">
                                                     <ScriptIcon className="w-3 h-3" /> Copiar Venta
@@ -739,50 +739,50 @@ Teléfono: ${phoneDisplay}`;
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                 {/* Columna 1: Destino y Logística */}
                                                 <div>
-                                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Destino de Entrega</h4>
+                                                    <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3">Destino de Entrega</h4>
                                                     <div className="space-y-3">
                                                         <div className="grid grid-cols-2 gap-2 text-[12px]">
                                                             <div>
-                                                                <span className="text-slate-500 font-medium">Ubicación:</span>
-                                                                <p className="font-bold text-slate-800">{order.ciudad}</p>
+                                                                <span className="text-slate-500 dark:text-slate-400 font-medium">Ubicación:</span>
+                                                                <p className="font-bold text-slate-800 dark:text-slate-200">{order.ciudad}</p>
                                                             </div>
                                                             <div>
-                                                                <span className="text-slate-500 font-medium">C. Postal:</span>
-                                                                <p className="font-bold text-slate-800">{order.cp || '-'}</p>
+                                                                <span className="text-slate-500 dark:text-slate-400 font-medium">C. Postal:</span>
+                                                                <p className="font-bold text-slate-800 dark:text-slate-200">{order.cp || '-'}</p>
                                                             </div>
                                                             <div className="col-span-2">
-                                                                <span className="text-slate-500 font-medium">Domicilio:</span>
-                                                                <p className="font-bold text-slate-800">{order.calle || '-'}</p>
+                                                                <span className="text-slate-500 dark:text-slate-400 font-medium">Domicilio:</span>
+                                                                <p className="font-bold text-slate-800 dark:text-slate-200">{order.calle || '-'}</p>
                                                             </div>
                                                         </div>
 
                                                         {order.tracking && (
-                                                            <div className="pt-3 mt-3 border-t border-slate-100 flex flex-col gap-2">
+                                                            <div className="pt-3 mt-3 border-t border-slate-100 dark:border-slate-700 flex flex-col gap-2">
                                                                 <div className="flex items-center justify-between">
                                                                     <div>
-                                                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">Tracking TCA</span>
-                                                                        <span className="font-mono text-xs font-bold text-slate-700">{order.tracking}</span>
+                                                                        <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-0.5">Tracking TCA</span>
+                                                                        <span className="font-mono text-xs font-bold text-slate-700 dark:text-slate-200">{order.tracking}</span>
                                                                     </div>
-                                                                    <button onClick={() => handleTrackOrder(order.tracking)} disabled={isTracking} className="bg-blue-50 hover:bg-blue-100 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors border border-blue-200 flex items-center gap-1.5 disabled:opacity-50">
+                                                                    <button onClick={() => handleTrackOrder(order.tracking)} disabled={isTracking} className="bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-400 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors border border-blue-200 dark:border-blue-800/50 flex items-center gap-1.5 disabled:opacity-50">
                                                                         {isTracking ? 'Consultando...' : '🔍 Rastrear'}
                                                                     </button>
                                                                 </div>
 
                                                                 {/* Historial Tracking */}
                                                                 {trackingData && (
-                                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2 max-h-40 overflow-y-auto custom-scrollbar mt-2 shadow-inner">
+                                                                    <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg p-2 max-h-40 overflow-y-auto custom-scrollbar mt-2 shadow-inner">
                                                                         {trackingData.success ? (
                                                                             trackingData.events && trackingData.events.length > 0 ? (
                                                                                 <div className="space-y-2">
                                                                                     {trackingData.events.map((ev, i) => (
-                                                                                        <div key={i} className="bg-white p-2 rounded flex flex-col shadow-sm text-[10px] border border-slate-100">
-                                                                                            <span className="font-bold text-slate-700">{ev.fecha} - <span className="text-blue-500">{ev.planta}</span></span>
-                                                                                            <span className="text-slate-500 line-clamp-2">{ev.historia}</span>
+                                                                                        <div key={i} className="bg-white dark:bg-slate-800 p-2 rounded flex flex-col shadow-sm text-[10px] border border-slate-100 dark:border-slate-700">
+                                                                                            <span className="font-bold text-slate-700 dark:text-slate-200">{ev.fecha} - <span className="text-blue-500 dark:text-blue-400">{ev.planta}</span></span>
+                                                                                            <span className="text-slate-500 dark:text-slate-400 line-clamp-2">{ev.historia}</span>
                                                                                         </div>
                                                                                     ))}
                                                                                 </div>
-                                                                            ) : <p className="text-xs text-slate-500 italic">Aún no hay movimientos</p>
-                                                                        ) : <p className="text-xs text-rose-500 font-bold">Tracking Inválido</p>}
+                                                                            ) : <p className="text-xs text-slate-500 dark:text-slate-400 italic">Aún no hay movimientos</p>
+                                                                        ) : <p className="text-xs text-rose-500 dark:text-rose-400 font-bold">Tracking Inválido</p>}
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -791,17 +791,17 @@ Teléfono: ${phoneDisplay}`;
                                                 </div>
 
                                                 {/* Columna 2: Mercadería */}
-                                                <div className="md:border-l md:border-slate-100 md:pl-6">
-                                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Mercadería Adquirida</h4>
+                                                <div className="md:border-l md:border-slate-100 dark:md:border-slate-700 md:pl-6">
+                                                    <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3">Mercadería Adquirida</h4>
                                                     <div className="space-y-3">
-                                                        <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                                                            <p className="text-slate-800 font-extrabold text-sm mb-1">{order.producto}</p>
-                                                            <p className="text-indigo-600 font-bold text-[11px]">Tratamiento de {order.plan} días</p>
+                                                        <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-3 border border-slate-100 dark:border-slate-700">
+                                                            <p className="text-slate-800 dark:text-slate-100 font-extrabold text-sm mb-1">{order.producto}</p>
+                                                            <p className="text-indigo-600 dark:text-indigo-400 font-bold text-[11px]">Tratamiento de {order.plan} días</p>
                                                         </div>
 
                                                         <div className="flex justify-between items-end pt-2">
-                                                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">A Pagar</span>
-                                                            <span className="text-emerald-600 font-black text-xl">${order.precio || '0'}</span>
+                                                            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">A Pagar</span>
+                                                            <span className="text-emerald-600 dark:text-emerald-400 font-black text-xl">${order.precio || '0'}</span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -810,8 +810,8 @@ Teléfono: ${phoneDisplay}`;
                                         </div>
                                     ))}
                                     {(!selectedChat.pastOrders || selectedChat.pastOrders.length === 0) && (
-                                        <div className="text-center p-8 bg-slate-50 rounded-2xl border border-slate-100 border-dashed">
-                                            <p className="text-slate-400 font-medium text-sm">No hay registros de compras anteriores.</p>
+                                        <div className="text-center p-8 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-700 border-dashed">
+                                            <p className="text-slate-400 dark:text-slate-500 font-medium text-sm">No hay registros de compras anteriores.</p>
                                         </div>
                                     )}
                                 </div>
@@ -954,7 +954,7 @@ Teléfono: ${phoneDisplay}`;
                         <h3 className="font-extrabold text-slate-800 dark:text-slate-100 text-[15px] flex items-center gap-2">
                             <Bot className="w-5 h-5" /> Asistente IA
                         </h3>
-                        <button onClick={() => setShowScriptPanel(false)} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-white/6 dark:bg-slate-800/60 rounded-xl transition-all">
+                        <button onClick={() => setShowScriptPanel(false)} className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-xl transition-all">
                             ✕
                         </button>
                     </div>

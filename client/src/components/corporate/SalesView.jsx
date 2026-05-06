@@ -313,17 +313,17 @@ CP: ${order.cp || '—'}`;
         <div className="h-full flex flex-col animate-fade-in relative z-10 w-full space-y-2 sm:space-y-6">
 
             {/* V2 Header & Advanced Filters */}
-            <div className="bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl rounded-[1.5rem] sm:rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-2.5 sm:p-5 lg:p-6">
-                <div className="flex flex-row justify-between items-center gap-2 mb-2 sm:mb-5">
+            <div className="bg-white dark:bg-slate-800/40 backdrop-blur-xl rounded-[1.5rem] sm:rounded-[2rem] border border-slate-200 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-3 sm:p-5 lg:p-6">
+                <div className="flex flex-row justify-between items-center gap-2 mb-3 sm:mb-5">
                     <div className="min-w-0">
-                        <h1 className="text-lg sm:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-700 to-purple-600 tracking-tight truncate">
+                        <h1 className="text-lg sm:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-700 to-purple-600 dark:from-indigo-400 dark:to-purple-400 tracking-tight truncate">
                             Logística y Pedidos
                         </h1>
-                        <p className="hidden sm:block text-slate-500 mt-2 text-sm sm:text-base font-medium">Gestión inteligente de estados y envíos en tiempo real.</p>
+                        <p className="hidden sm:block text-slate-500 dark:text-slate-400 mt-2 text-sm sm:text-base font-medium">Gestión inteligente de estados y envíos en tiempo real.</p>
                     </div>
 
                     <div className="flex gap-2 flex-shrink-0">
-                        <button onClick={() => refetch()} className="p-2 sm:p-3 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 transition-all shadow-sm active:scale-95 group">
+                        <button onClick={() => refetch()} className="p-2 sm:p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 dark:hover:border-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all shadow-sm active:scale-95 group">
                             <span className={`group-hover:rotate-180 transition-transform duration-500 block ${isFetching ? 'animate-spin text-indigo-500' : ''}`}><Refresh className="w-4 h-4" /></span>
                         </button>
                         <button onClick={handleExportCSV} disabled={orders.length === 0} className="px-3 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-105 transition-all flex items-center gap-2 disabled:opacity-50 disabled:scale-100">
@@ -341,7 +341,7 @@ CP: ${order.cp || '—'}`;
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             placeholder="Buscar por cliente, teléfono o tracking..."
-                            className="w-full bg-white/8 dark:bg-slate-800/80 border border-white rounded-xl pl-10 sm:pl-12 pr-4 py-2 sm:py-3.5 text-sm font-medium focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all text-slate-700 shadow-inner placeholder:text-slate-400"
+                            className="w-full bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl pl-10 sm:pl-12 pr-4 py-2 sm:py-3.5 text-sm font-medium focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all text-slate-700 dark:text-slate-200 shadow-inner placeholder:text-slate-400 dark:placeholder:text-slate-500"
                         />
                         <span className="absolute left-3 sm:left-4 top-2 sm:top-3.5 text-slate-400 group-focus-within:text-indigo-500 transition-colors"><Search className="w-4 h-4 sm:w-5 sm:h-5" /></span>
                     </div>
@@ -352,7 +352,7 @@ CP: ${order.cp || '—'}`;
                         <select
                             value={statusFilter}
                             onChange={e => setStatusFilter(e.target.value)}
-                            className="w-full appearance-none bg-white/8 dark:bg-slate-800/80 border border-white dark:border-slate-700 rounded-xl pl-10 sm:pl-12 pr-9 py-2 sm:py-3.5 text-sm font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all shadow-inner cursor-pointer"
+                            className="w-full appearance-none bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl pl-10 sm:pl-12 pr-9 py-2 sm:py-3.5 text-sm font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all shadow-inner cursor-pointer"
                         >
                             {['Todos', ...statusOptions].map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
@@ -362,13 +362,13 @@ CP: ${order.cp || '—'}`;
                     {/* Vendedor (admin) / Número (seller) filter — single styled select */}
                     {(isAdmin || uniqueFilterOptions.length > 1) && (
                         <div className="relative sm:w-56 flex-shrink-0">
-                            <span className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-[10px] font-black uppercase tracking-widest text-slate-400 pointer-events-none">
+                            <span className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 pointer-events-none">
                                 {isAdmin ? 'Vend.' : 'Núm.'}
                             </span>
                             <select
                                 value={sellerFilter}
                                 onChange={e => setSellerFilter(e.target.value)}
-                                className="w-full appearance-none bg-white/8 dark:bg-slate-800/80 border border-white dark:border-slate-700 rounded-xl pl-14 sm:pl-16 pr-9 py-2 sm:py-3.5 text-sm font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-400 transition-all shadow-inner cursor-pointer"
+                                className="w-full appearance-none bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl pl-14 sm:pl-16 pr-9 py-2 sm:py-3.5 text-sm font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-400 transition-all shadow-inner cursor-pointer"
                             >
                                 <option value="Todos">Todos</option>
                                 {uniqueFilterOptions.map(opt => (
@@ -384,7 +384,7 @@ CP: ${order.cp || '—'}`;
             </div>
 
             {/* V2 Glassmorphism Table */}
-            <div className="flex-1 bg-white/6 dark:bg-slate-800/60 backdrop-blur-xl rounded-[1.25rem] sm:rounded-[2rem] border border-white/8 dark:border-slate-700/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden flex flex-col relative text-sm">
+            <div className="flex-1 bg-white dark:bg-slate-800/60 backdrop-blur-xl rounded-[1.25rem] sm:rounded-[2rem] border border-slate-200 dark:border-slate-700/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden flex flex-col relative text-sm">
 
                 {/* Background Glow */}
                 <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-purple-400/10 blur-[100px] rounded-full pointer-events-none"></div>
@@ -392,8 +392,8 @@ CP: ${order.cp || '—'}`;
                 <div className="overflow-auto custom-scrollbar flex-1 relative z-10">
                     {/* PC & Tablet Table View */}
                     <table className="w-full text-left border-collapse whitespace-nowrap hidden md:table">
-                        <thead className="bg-white/4 dark:bg-slate-800/40 border-b border-white/6 dark:border-slate-700/60 sticky top-0 z-20 backdrop-blur-md">
-                            <tr className="text-xs uppercase tracking-widest text-slate-500 font-extrabold">
+                        <thead className="bg-slate-50/80 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-700/60 sticky top-0 z-20 backdrop-blur-md">
+                            <tr className="text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400 font-extrabold">
                                 <th className="px-4 sm:px-8 py-5 hidden md:table-cell">Fecha</th>
                                 <th className="px-4 sm:px-8 py-5 w-full">Cliente</th>
                                 <th className="px-4 sm:px-8 py-5 whitespace-nowrap">Teléfono</th>
@@ -402,7 +402,7 @@ CP: ${order.cp || '—'}`;
                                 <th className="px-4 sm:px-8 py-5 text-right w-10">Acciones</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-200/50">
+                        <tbody className="divide-y divide-slate-200/50 dark:divide-slate-700/50">
                             {isLoading ? (
                                 Array.from({ length: 5 }).map((_, i) => (
                                     <tr key={`skel-${i}`} className="animate-pulse">
@@ -416,15 +416,15 @@ CP: ${order.cp || '—'}`;
                                 ))
                             ) : filteredOrders.length === 0 ? (
                                 <tr><td colSpan="5" className="text-center py-20">
-                                    <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-dashed border-slate-300">
+                                    <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-dashed border-slate-300 dark:border-slate-600 text-slate-400 dark:text-slate-500">
                                         <Search className="w-5 h-5" />
                                     </div>
-                                    <p className="text-slate-500 font-bold text-lg">No se encontraron pedidos</p>
-                                    <p className="text-slate-400 text-sm mt-1">Intentá ajustar los filtros de búsqueda.</p>
+                                    <p className="text-slate-500 dark:text-slate-300 font-bold text-lg">No se encontraron pedidos</p>
+                                    <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">Intentá ajustar los filtros de búsqueda.</p>
                                 </td></tr>
                             ) : (
                                 filteredOrders.map(order => (
-                                    <tr key={order.id} className="hover:bg-white/5 dark:bg-slate-800/50 transition-colors group">
+                                    <tr key={order.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
                                         <td className="px-4 py-5 hidden md:table-cell w-32">
                                             {(() => {
                                                 const dt = formatDateBA(order.createdAt);
@@ -432,28 +432,28 @@ CP: ${order.cp || '—'}`;
                                                     const [datePart, timePart] = dt.split(',');
                                                     return (
                                                         <div className="flex flex-col whitespace-nowrap">
-                                                            <span className="font-sans text-[13px] font-extrabold text-slate-700">{datePart.trim()}</span>
-                                                            <span className="font-mono text-xs font-bold text-indigo-400 tracking-wider mt-0.5">{timePart.trim()}</span>
+                                                            <span className="font-sans text-[13px] font-extrabold text-slate-700 dark:text-slate-200">{datePart.trim()}</span>
+                                                            <span className="font-mono text-xs font-bold text-indigo-400 dark:text-indigo-300 tracking-wider mt-0.5">{timePart.trim()}</span>
                                                         </div>
                                                     );
                                                 }
-                                                return <span className="font-sans text-[13px] font-extrabold text-slate-700">{dt}</span>;
+                                                return <span className="font-sans text-[13px] font-extrabold text-slate-700 dark:text-slate-200">{dt}</span>;
                                             })()}
                                         </td>
                                         <td className="px-4 sm:px-8 py-5 w-full min-w-[200px] sm:max-w-md truncate">
                                             <button onClick={() => { setViewingOrder(order); setTrackingData(null); }} className="text-left group/click focus:outline-none flex items-center gap-3 w-full">
-                                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center text-indigo-600 font-extrabold text-[13px] shrink-0 border border-indigo-100/80 shadow-sm hidden sm:flex">
+                                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/40 dark:to-purple-900/40 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-extrabold text-[13px] shrink-0 border border-indigo-100/80 dark:border-indigo-800/50 shadow-sm hidden sm:flex">
                                                     {order.nombre ? order.nombre.substring(0, 2).toUpperCase() : '??'}
                                                 </div>
                                                 <div className="flex flex-col truncate">
-                                                    <p className="font-extrabold text-[14px] text-slate-800 group-hover/click:text-indigo-600 transition-colors truncate">
+                                                    <p className="font-extrabold text-[14px] text-slate-800 dark:text-slate-100 group-hover/click:text-indigo-600 dark:group-hover/click:text-indigo-400 transition-colors truncate">
                                                         {order.nombre || 'Desconocido'}
                                                     </p>
                                                 </div>
                                             </button>
                                         </td>
                                         <td className="px-4 sm:px-8 py-5 whitespace-nowrap">
-                                            <p className="text-[12px] text-slate-500 font-mono flex items-center gap-2 opacity-90 hover:opacity-100 transition-opacity">
+                                            <p className="text-[12px] text-slate-500 dark:text-slate-400 font-mono flex items-center gap-2 opacity-90 hover:opacity-100 transition-opacity">
                                                 <svg className="w-4 h-4 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                                                 {order.cliente ? '+' + order.cliente.split('@')[0].replace(/\D/g, '') : '—'}
                                             </p>
@@ -462,18 +462,18 @@ CP: ${order.cp || '—'}`;
                                             {order.instanceId || order.seller ? (
                                                 <div className="flex flex-col items-center gap-0.5">
                                                     {order.instanceId && (
-                                                        <span className="text-[11px] font-extrabold text-slate-700 capitalize">
+                                                        <span className="text-[11px] font-extrabold text-slate-700 dark:text-slate-200 capitalize">
                                                             {labelForSeller(order.instanceId)}
                                                         </span>
                                                     )}
                                                     {order.seller && (
-                                                        <span className="text-[9px] text-blue-500 font-mono">
+                                                        <span className="text-[9px] text-blue-500 dark:text-blue-400 font-mono">
                                                             (+{order.seller.replace(/\D/g, '').slice(-10)})
                                                         </span>
                                                     )}
                                                 </div>
                                             ) : (
-                                                <span className="text-[10px] text-slate-400 font-medium">—</span>
+                                                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">—</span>
                                             )}
                                         </td>
                                         <td className="px-4 sm:px-8 py-5 text-center">
@@ -483,10 +483,10 @@ CP: ${order.cp || '—'}`;
                                         </td>
                                         <td className="px-4 sm:px-8 py-5 text-right">
                                             <div className="flex justify-end gap-3 transition-opacity">
-                                                <button onClick={(e) => { e.stopPropagation(); handleGoToChat(order.cliente, order.seller); }} className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white transition-all flex items-center justify-center shadow-sm" title="Ir al Chat">
+                                                <button onClick={(e) => { e.stopPropagation(); handleGoToChat(order.cliente, order.seller); }} className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all flex items-center justify-center shadow-sm" title="Ir al Chat">
                                                     <Chat className="w-4 h-4" />
                                                 </button>
-                                                <button onClick={() => openEdit(order)} className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-500 hover:text-white transition-all flex items-center justify-center shadow-sm" title="Editar Pedido">
+                                                <button onClick={() => openEdit(order)} className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500 hover:text-white transition-all flex items-center justify-center shadow-sm" title="Editar Pedido">
                                                     <Edit className="w-4 h-4" />
                                                 </button>
                                             </div>
@@ -505,22 +505,22 @@ CP: ${order.cp || '—'}`;
                             ))
                         ) : filteredOrders.length === 0 ? (
                             <div className="text-center py-10">
-                                <div className="w-16 h-16 bg-white/6 dark:bg-slate-800/60 rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm border border-white">
+                                <div className="w-16 h-16 bg-white dark:bg-slate-800/60 rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500">
                                     <Search className="w-5 h-5" />
                                 </div>
-                                <p className="text-slate-500 font-bold text-[15px]">No se encontraron pedidos</p>
+                                <p className="text-slate-500 dark:text-slate-300 font-bold text-[15px]">No se encontraron pedidos</p>
                             </div>
                         ) : (
                             filteredOrders.map(order => (
-                                <div key={order.id} className="bg-white/8 dark:bg-slate-800/80 backdrop-blur-md border border-white rounded-[1.25rem] shadow-sm p-3 flex flex-col gap-2.5 relative overflow-hidden flex-shrink-0 animate-fade-in transition-all active:scale-[0.98]">
+                                <div key={order.id} className="bg-white dark:bg-slate-800/80 backdrop-blur-md border border-slate-200 dark:border-slate-700 rounded-[1.25rem] shadow-sm p-3 flex flex-col gap-2.5 relative overflow-hidden flex-shrink-0 animate-fade-in transition-all active:scale-[0.98]">
                                     <div className="flex justify-between items-center gap-2 w-full">
                                         <div className="flex items-center gap-2 min-w-0 flex-1">
-                                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-50 to-purple-100 flex items-center justify-center text-indigo-600 font-extrabold text-[13px] shrink-0 border border-white shadow-sm">
+                                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-50 to-purple-100 dark:from-indigo-900/40 dark:to-purple-900/40 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-extrabold text-[13px] shrink-0 border border-white dark:border-slate-700 shadow-sm">
                                                 {order.nombre ? order.nombre.substring(0, 2).toUpperCase() : '??'}
                                             </div>
                                             <div className="flex flex-col min-w-0 truncate">
-                                                <p className="font-black text-[13px] text-slate-800 tracking-tight leading-tight truncate">{order.nombre || 'Desconocido'}</p>
-                                                <p className="text-[11px] text-slate-500 font-mono flex items-center gap-1 opacity-90 truncate">
+                                                <p className="font-black text-[13px] text-slate-800 dark:text-slate-100 tracking-tight leading-tight truncate">{order.nombre || 'Desconocido'}</p>
+                                                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1 opacity-90 truncate">
                                                     <svg className="w-3.5 h-3.5 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                                                     {order.cliente ? '+' + order.cliente.split('@')[0].replace(/\D/g, '') : '—'}
                                                 </p>
@@ -535,18 +535,18 @@ CP: ${order.cp || '—'}`;
                                                 if (typeof dt === 'string' && dt.includes(',')) {
                                                     const [datePart] = dt.split(',');
                                                     return <div className="flex flex-col items-end gap-1">
-                                                        <span className="font-extrabold text-[10px] text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">{datePart.trim()}</span>
+                                                        <span className="font-extrabold text-[10px] text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-900/50 px-2 py-0.5 rounded border border-slate-100 dark:border-slate-700">{datePart.trim()}</span>
                                                         {(order.instanceId || order.seller) && (
-                                                            <span className="font-bold text-[9px] text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">
+                                                            <span className="font-bold text-[9px] text-blue-500 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded border border-blue-100 dark:border-blue-800/50">
                                                                 {order.instanceId ? labelForSeller(order.instanceId) : ''}{order.seller ? ` (+${order.seller.replace(/\D/g, '').slice(-10)})` : ''}
                                                             </span>
                                                         )}
                                                     </div>;
                                                 }
                                                 return <div className="flex flex-col items-end gap-1">
-                                                    <span className="font-extrabold text-[10px] text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">{dt}</span>
+                                                    <span className="font-extrabold text-[10px] text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-900/50 px-2 py-0.5 rounded border border-slate-100 dark:border-slate-700">{dt}</span>
                                                     {(order.instanceId || order.seller) && (
-                                                        <span className="font-bold text-[9px] text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">
+                                                        <span className="font-bold text-[9px] text-blue-500 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded border border-blue-100 dark:border-blue-800/50">
                                                             {order.instanceId ? labelForSeller(order.instanceId) : ''}{order.seller ? ` (+${order.seller.replace(/\D/g, '').slice(-10)})` : ''}
                                                         </span>
                                                     )}
@@ -556,13 +556,13 @@ CP: ${order.cp || '—'}`;
                                     </div>
 
                                     <div className="flex gap-1.5">
-                                        <button onClick={() => { setViewingOrder(order); setTrackingData(null); }} className="flex-1 bg-white border border-slate-200 text-indigo-600 rounded-xl py-2 text-[10px] font-extrabold uppercase tracking-widest flex items-center justify-center gap-1 shadow-sm active:bg-indigo-50 transition-colors">
+                                        <button onClick={() => { setViewingOrder(order); setTrackingData(null); }} className="flex-1 bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 text-indigo-600 dark:text-indigo-400 rounded-xl py-2 text-[10px] font-extrabold uppercase tracking-widest flex items-center justify-center gap-1 shadow-sm active:bg-indigo-50 dark:active:bg-indigo-900/30 transition-colors">
                                             <Script className="w-3 h-3" /> Detalles
                                         </button>
-                                        <button onClick={(e) => { e.stopPropagation(); handleGoToChat(order.cliente, order.seller); }} className="w-10 h-9 bg-emerald-50 border border-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center shadow-sm active:bg-emerald-100 transition-colors">
+                                        <button onClick={(e) => { e.stopPropagation(); handleGoToChat(order.cliente, order.seller); }} className="w-10 h-9 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/50 text-emerald-600 dark:text-emerald-400 rounded-xl flex items-center justify-center shadow-sm active:bg-emerald-100 dark:active:bg-emerald-900/40 transition-colors">
                                             <Chat className="w-3.5 h-3.5" />
                                         </button>
-                                        <button onClick={() => openEdit(order)} className="w-10 h-9 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center shadow-sm active:bg-indigo-100 transition-colors">
+                                        <button onClick={() => openEdit(order)} className="w-10 h-9 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800/50 text-indigo-600 dark:text-indigo-400 rounded-xl flex items-center justify-center shadow-sm active:bg-indigo-100 dark:active:bg-indigo-900/40 transition-colors">
                                             <Edit className="w-3.5 h-3.5" />
                                         </button>
                                     </div>
@@ -574,28 +574,28 @@ CP: ${order.cp || '—'}`;
                 </div>
 
                 {/* V2 Pagination Controls */}
-                <div className="px-3 sm:px-8 py-2 sm:py-4 border-t border-white/6 dark:border-slate-700/60 flex flex-row justify-between items-center bg-white/3 dark:bg-slate-800/30 backdrop-blur-md gap-2">
-                    <span className="text-[10px] sm:text-sm font-bold text-slate-500 uppercase tracking-wider sm:tracking-widest whitespace-nowrap">
-                        <span className="text-indigo-600">{page}</span>/{pagination.totalPages}
+                <div className="px-3 sm:px-8 py-2 sm:py-4 border-t border-slate-200 dark:border-slate-700/60 flex flex-row justify-between items-center bg-slate-50/60 dark:bg-slate-800/30 backdrop-blur-md gap-2">
+                    <span className="text-[10px] sm:text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider sm:tracking-widest whitespace-nowrap">
+                        <span className="text-indigo-600 dark:text-indigo-400">{page}</span>/{pagination.totalPages}
                         <span className="hidden sm:inline"> Página</span>
                     </span>
                     <div className="flex gap-1.5 sm:gap-2">
                         <button
                             disabled={page <= 1 || isFetching}
                             onClick={() => setPage(p => Math.max(1, p - 1))}
-                            className="px-2.5 sm:px-4 py-1.5 sm:py-2 bg-white/8 dark:bg-slate-800/80 rounded-lg sm:rounded-xl border border-white shadow-sm text-[10px] sm:text-xs font-extrabold text-slate-600 disabled:opacity-50 hover:bg-white hover:text-indigo-600 transition-all active:-translate-y-0.5"
+                            className="px-2.5 sm:px-4 py-1.5 sm:py-2 bg-white dark:bg-slate-800/80 rounded-lg sm:rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm text-[10px] sm:text-xs font-extrabold text-slate-600 dark:text-slate-300 disabled:opacity-50 hover:bg-indigo-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all active:-translate-y-0.5"
                         >
                             Ant.
                         </button>
                         <button
                             disabled={page >= pagination.totalPages || isFetching}
                             onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
-                            className="px-2.5 sm:px-4 py-1.5 sm:py-2 bg-white/8 dark:bg-slate-800/80 rounded-lg sm:rounded-xl border border-white shadow-sm text-[10px] sm:text-xs font-extrabold text-slate-600 disabled:opacity-50 hover:bg-white hover:text-indigo-600 transition-all active:-translate-y-0.5"
+                            className="px-2.5 sm:px-4 py-1.5 sm:py-2 bg-white dark:bg-slate-800/80 rounded-lg sm:rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm text-[10px] sm:text-xs font-extrabold text-slate-600 dark:text-slate-300 disabled:opacity-50 hover:bg-indigo-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all active:-translate-y-0.5"
                         >
                             Sig.
                         </button>
                     </div>
-                    <span className="text-[10px] sm:text-sm font-bold text-indigo-500 bg-indigo-50 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full border border-indigo-100 whitespace-nowrap">{pagination.total} <span className="hidden sm:inline">Totales en BD</span><span className="sm:hidden">total</span></span>
+                    <span className="text-[10px] sm:text-sm font-bold text-indigo-500 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full border border-indigo-100 dark:border-indigo-800/50 whitespace-nowrap">{pagination.total} <span className="hidden sm:inline">Totales en BD</span><span className="sm:hidden">total</span></span>
                 </div>
             </div>
 

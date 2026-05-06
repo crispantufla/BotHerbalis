@@ -160,14 +160,14 @@ const ScriptView = () => {
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full max-w-2xl max-h-2xl bg-indigo-400/5 blur-[120px] rounded-full pointer-events-none"></div>
 
                 {/* Glass Tabs */}
-                <div className="border-b border-white/6 dark:border-slate-700/60 flex overflow-x-auto bg-white/3 dark:bg-slate-800/30 backdrop-blur-md sticky top-0 z-20">
-                    <button onClick={() => setActiveTab('flow')} className={`px-4 sm:px-8 py-3 sm:py-5 font-extrabold text-[10px] sm:text-xs uppercase tracking-widest whitespace-nowrap transition-all ${activeTab === 'flow' ? 'border-b-2 border-indigo-600 text-indigo-700 bg-white/50 dark:bg-slate-800/50' : 'text-slate-400 hover:text-indigo-500 hover:bg-white/20 dark:bg-slate-800/20'}`}>
+                <div className="border-b border-slate-200 dark:border-slate-700/60 flex overflow-x-auto bg-white/80 dark:bg-slate-800/30 backdrop-blur-md sticky top-0 z-20">
+                    <button onClick={() => setActiveTab('flow')} className={`px-4 sm:px-8 py-3 sm:py-5 font-extrabold text-[10px] sm:text-xs uppercase tracking-widest whitespace-nowrap transition-all ${activeTab === 'flow' ? 'border-b-2 border-indigo-600 text-indigo-700 dark:text-indigo-400 bg-white dark:bg-slate-800/50' : 'text-slate-400 dark:text-slate-500 hover:text-indigo-500 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}>
                         Pasos del Flujo
                     </button>
-                    <button onClick={() => setActiveTab('map')} className={`px-4 sm:px-8 py-3 sm:py-5 font-extrabold text-[10px] sm:text-xs uppercase tracking-widest whitespace-nowrap transition-all ${activeTab === 'map' ? 'border-b-2 border-indigo-600 text-indigo-700 bg-white/50 dark:bg-slate-800/50' : 'text-slate-400 hover:text-indigo-500 hover:bg-white/20 dark:bg-slate-800/20'}`}>
+                    <button onClick={() => setActiveTab('map')} className={`px-4 sm:px-8 py-3 sm:py-5 font-extrabold text-[10px] sm:text-xs uppercase tracking-widest whitespace-nowrap transition-all ${activeTab === 'map' ? 'border-b-2 border-indigo-600 text-indigo-700 dark:text-indigo-400 bg-white dark:bg-slate-800/50' : 'text-slate-400 dark:text-slate-500 hover:text-indigo-500 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}>
                         Mapa Visual
                     </button>
-                    <button onClick={() => setActiveTab('faq')} className={`px-4 sm:px-8 py-3 sm:py-5 font-extrabold text-[10px] sm:text-xs uppercase tracking-widest whitespace-nowrap transition-all ${activeTab === 'faq' ? 'border-b-2 border-indigo-600 text-indigo-700 bg-white/50 dark:bg-slate-800/50' : 'text-slate-400 hover:text-indigo-500 hover:bg-white/20 dark:bg-slate-800/20'}`}>
+                    <button onClick={() => setActiveTab('faq')} className={`px-4 sm:px-8 py-3 sm:py-5 font-extrabold text-[10px] sm:text-xs uppercase tracking-widest whitespace-nowrap transition-all ${activeTab === 'faq' ? 'border-b-2 border-indigo-600 text-indigo-700 dark:text-indigo-400 bg-white dark:bg-slate-800/50' : 'text-slate-400 dark:text-slate-500 hover:text-indigo-500 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}>
                         Preguntas (FAQ)
                     </button>
                 </div>

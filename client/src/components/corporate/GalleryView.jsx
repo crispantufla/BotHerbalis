@@ -79,21 +79,21 @@ const GalleryView = () => {
         <div className="h-full flex flex-col animate-fade-in relative z-10 w-full space-y-6">
 
             {/* Header V2 & Upload Action */}
-            <div className="bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-5 lg:p-6 relative overflow-hidden">
+            <div className="bg-white dark:bg-slate-800/40 backdrop-blur-xl rounded-[2rem] border border-slate-200 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-4 sm:p-5 lg:p-6 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-fuchsia-400/10 blur-[60px] rounded-full pointer-events-none"></div>
 
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10">
                     <div>
-                        <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-700 to-purple-600 tracking-tight">
+                        <h1 className="text-2xl sm:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-700 to-purple-600 dark:from-indigo-400 dark:to-purple-400 tracking-tight">
                             Recursos y Galería
                         </h1>
-                        <p className="text-slate-500 mt-1 font-medium text-sm">Bóveda de imágenes utilizadas por el Bot de IA y el Guión de Ventas.</p>
+                        <p className="text-slate-500 dark:text-slate-400 mt-1 font-medium text-sm">Bóveda de imágenes utilizadas por el Bot de IA y el Guión de Ventas.</p>
                     </div>
 
-                    <label className={`px-8 py-3 bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-2xl text-sm font-extrabold tracking-widest uppercase shadow-lg shadow-indigo-500/30 transition-all flex items-center gap-3 cursor-pointer group ${uploading ? 'opacity-70 pointer-events-none' : 'hover:shadow-indigo-500/50 hover:-translate-y-1'}`}>
+                    <label className={`px-5 sm:px-8 py-2.5 sm:py-3 bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-2xl text-xs sm:text-sm font-extrabold tracking-widest uppercase shadow-lg shadow-indigo-500/30 transition-all flex items-center gap-2 sm:gap-3 cursor-pointer group w-full md:w-auto justify-center ${uploading ? 'opacity-70 pointer-events-none' : 'hover:shadow-indigo-500/50 hover:-translate-y-1'}`}>
                         {uploading ? (
                             <>
-                                <div className="w-5 h-5 border-2 border-white/3 dark:border-slate-700/30 border-t-white rounded-full animate-spin" />
+                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                 <span>Procesando...</span>
                             </>
                         ) : (
@@ -111,14 +111,14 @@ const GalleryView = () => {
             <div className="flex-1 flex flex-col relative">
 
                 {/* Unified Filters Bar */}
-                <div className="bg-white/6 dark:bg-slate-800/60 backdrop-blur-xl rounded-2xl border border-white/8 dark:border-slate-700/80 shadow-sm p-4 mb-6 flex flex-col md:flex-row gap-4 relative z-20">
+                <div className="bg-white dark:bg-slate-800/60 backdrop-blur-xl rounded-2xl border border-slate-200 dark:border-slate-700/80 shadow-sm p-3 sm:p-4 mb-4 sm:mb-6 flex flex-col md:flex-row gap-3 sm:gap-4 relative z-20">
                     <div className="flex-1 relative group">
                         <input
                             type="text"
                             placeholder="Buscar por nombre de archivo o hashtag..."
                             value={filter}
                             onChange={(e) => setFilter(e.target.value)}
-                            className="w-full bg-white/7 dark:bg-slate-800/70 border border-white rounded-xl pl-12 pr-4 py-3.5 text-sm font-bold text-slate-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 focus:bg-white transition-all shadow-inner placeholder:text-slate-400 placeholder:font-medium hover:shadow-md hover:border-indigo-100"
+                            className="w-full bg-white dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-xl pl-12 pr-4 py-3 sm:py-3.5 text-sm font-bold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all shadow-inner placeholder:text-slate-400 dark:placeholder:text-slate-500 placeholder:font-medium hover:shadow-md hover:border-indigo-200 dark:hover:border-indigo-700"
                         />
                         <span className="absolute left-4 top-3.5 text-slate-400 group-focus-within:text-indigo-500 transition-colors"><Search className="w-5 h-5" /></span>
                     </div>
@@ -127,10 +127,10 @@ const GalleryView = () => {
                         <select
                             value={selectedCategory}
                             onChange={(e) => setSelectedCategory(e.target.value)}
-                            className="appearance-none bg-white/7 dark:bg-slate-800/70 border border-white rounded-xl pl-12 pr-10 py-3.5 text-sm font-extrabold text-slate-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 focus:bg-white transition-all shadow-inner hover:shadow-md hover:border-indigo-100 cursor-pointer min-w-[200px] uppercase tracking-wider"
+                            className="appearance-none w-full md:w-auto bg-white dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-xl pl-12 pr-10 py-3 sm:py-3.5 text-sm font-extrabold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all shadow-inner hover:shadow-md hover:border-indigo-200 dark:hover:border-indigo-700 cursor-pointer md:min-w-[200px] uppercase tracking-wider"
                         >
                             {categories.map(c => (
-                                <option key={c} value={c} className="font-bold text-slate-700">
+                                <option key={c} value={c} className="font-bold text-slate-700 dark:text-slate-200 dark:bg-slate-800">
                                     {c === 'all' ? 'Ver Todas (Cat.)' : c}
                                 </option>
                             ))}
@@ -150,17 +150,17 @@ const GalleryView = () => {
                             <span className="font-bold tracking-widest text-xs uppercase text-slate-400">Escaneando Bóveda</span>
                         </div>
                     ) : filteredImages.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-full min-h-[400px] bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl rounded-[2rem] border border-white/6 dark:border-slate-700/60 border-dashed m-1">
-                            <div className="w-20 h-20 bg-gradient-to-br from-indigo-50 to-purple-50 shadow-sm border border-indigo-100/50 rounded-full flex items-center justify-center mb-6 text-indigo-400">
+                        <div className="flex flex-col items-center justify-center h-full min-h-[400px] bg-white dark:bg-slate-800/40 backdrop-blur-xl rounded-[2rem] border border-slate-200 dark:border-slate-700/60 border-dashed m-1">
+                            <div className="w-20 h-20 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/30 dark:to-purple-900/30 shadow-sm border border-indigo-100/50 dark:border-indigo-800/50 rounded-full flex items-center justify-center mb-6 text-indigo-400 dark:text-indigo-300">
                                 <ImageIcon className="w-6 h-6" />
                             </div>
-                            <p className="text-slate-600 font-extrabold text-lg mb-1 tracking-tight">Galería Vacía</p>
-                            <p className="text-sm font-medium text-slate-500">Utilizá el botón de carga superior para añadir imágenes.</p>
+                            <p className="text-slate-600 dark:text-slate-200 font-extrabold text-lg mb-1 tracking-tight">Galería Vacía</p>
+                            <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Utilizá el botón de carga superior para añadir imágenes.</p>
                         </div>
                     ) : (
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
                             {filteredImages.map(img => (
-                                <div key={img.id} className="group flex flex-col bg-white/6 dark:bg-slate-800/60 backdrop-blur-xl rounded-2xl border border-white/8 dark:border-slate-700/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
+                                <div key={img.id} className="group flex flex-col bg-white dark:bg-slate-800/60 backdrop-blur-xl rounded-2xl border border-slate-200 dark:border-slate-700/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
 
                                     {/* Abstract Image Container */}
                                     <div className="aspect-square relative overflow-hidden bg-slate-100/5 dark:bg-slate-700/50">
@@ -189,22 +189,22 @@ const GalleryView = () => {
                                     </div>
 
                                     {/* Data Metadata */}
-                                    <div className="p-4 flex flex-col flex-1 bg-gradient-to-b from-transparent to-white/50">
+                                    <div className="p-4 flex flex-col flex-1 bg-gradient-to-b from-transparent to-white/50 dark:to-slate-800/40">
                                         <div className="flex justify-between items-start mb-2">
-                                            <p className="text-sm font-extrabold text-slate-800 truncate pr-2 flex-1" title={img.originalName}>{img.originalName}</p>
+                                            <p className="text-sm font-extrabold text-slate-800 dark:text-slate-100 truncate pr-2 flex-1" title={img.originalName}>{img.originalName}</p>
                                         </div>
 
                                         <div className="flex items-center justify-between mb-3">
-                                            <span className="text-[9px] uppercase font-extrabold tracking-widest text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-100 shadow-sm">{img.category}</span>
-                                            <span className="text-[10px] font-mono text-slate-400">{new Date(img.createdAt).toLocaleDateString()}</span>
+                                            <span className="text-[9px] uppercase font-extrabold tracking-widest text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2.5 py-1 rounded-full border border-indigo-100 dark:border-indigo-800/50 shadow-sm">{img.category}</span>
+                                            <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">{new Date(img.createdAt).toLocaleDateString()}</span>
                                         </div>
 
                                         {img.tags && img.tags.length > 0 ? (
-                                            <div className="flex flex-wrap gap-1.5 mt-auto pt-2 border-t border-slate-100/50">
+                                            <div className="flex flex-wrap gap-1.5 mt-auto pt-2 border-t border-slate-100/50 dark:border-slate-700/50">
                                                 {img.tags.slice(0, 3).map(t => (
-                                                    <span key={t} className="text-[10px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-sm">#{t}</span>
+                                                    <span key={t} className="text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900/60 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 shadow-sm">#{t}</span>
                                                 ))}
-                                                {img.tags.length > 3 && <span className="text-[10px] font-bold text-slate-400 pt-0.5">+{img.tags.length - 3}</span>}
+                                                {img.tags.length > 3 && <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 pt-0.5">+{img.tags.length - 3}</span>}
                                             </div>
                                         ) : (
                                             <div className="mt-auto pt-2 border-t border-slate-100/50">
