@@ -19,6 +19,8 @@ import {
     Sparkles,
     Copy,
     ThumbsUp,
+    Plus,
+    ArrowDown,
 } from 'lucide-react';
 
 const SCRIPT_LABELS = {
@@ -43,6 +45,10 @@ const SECTION_LABELS = {
     'flow.closing': 'Cierre — pide datos de envío',
     'flow.confirmation': 'Confirmación final',
 };
+
+// Path estable para comentarios entre dos pasos. Lo dejamos como string
+// para reusar el mismo endpoint sin cambios en el backend.
+const betweenPath = (prev, next) => `between:${prev}|${next}`;
 
 const TYPE_META = {
     note: { label: 'Nota', icon: MessageSquare, color: 'bg-slate-100 text-slate-700' },
@@ -356,35 +362,62 @@ const GuionView = () => {
                 </label>
             </div>
 
-            {/* Secciones */}
+            {/* Secciones — intercaladas con slots "entre pasos" */}
             <div className="space-y-3">
-                {sections.map((section) => {
+                {sections.map((section, idx) => {
                     const sectionComments = commentsBySection[section.path] || [];
                     const isExpanded = expandedSection === section.path;
                     const sectionLabel = SECTION_LABELS[section.path] ||
                         (section.isFaq ? `FAQ — "${(section.keywords || [])[0] || 'pregunta'}"` : section.path);
 
+                    const next = sections[idx + 1];
+                    // Slot entre pasos: solo entre secciones del flow (no entre FAQs ni
+                    // entre flow y FAQ — ahí no tiene sentido sugerir un paso intermedio).
+                    const showBetween = next && !section.isFaq && !next.isFaq;
+                    const slotPath = showBetween ? betweenPath(section.path, next.path) : null;
+                    const slotComments = slotPath ? (commentsBySection[slotPath] || []) : [];
+                    const slotExpanded = slotPath && expandedSection === slotPath;
+
                     return (
-                        <SectionCard
-                            key={section.path}
-                            sectionPath={section.path}
-                            label={sectionLabel}
-                            text={section.text}
-                            note={section.note}
-                            keywords={section.keywords}
-                            isFaq={section.isFaq}
-                            comments={sectionComments}
-                            isExpanded={isExpanded}
-                            onToggle={() => setExpandedSection(isExpanded ? null : section.path)}
-                            onAddComment={handleAddComment}
-                            onResolve={handleResolveComment}
-                            onDelete={handleDeleteComment}
-                            onReact={handleReact}
-                            onCopySuggested={handleCopySuggested}
-                            currentUserId={user?.id}
-                            isAdmin={isAdmin}
-                            lastVisitTs={lastVisitTs}
-                        />
+                        <React.Fragment key={section.path}>
+                            <SectionCard
+                                sectionPath={section.path}
+                                label={sectionLabel}
+                                text={section.text}
+                                note={section.note}
+                                keywords={section.keywords}
+                                isFaq={section.isFaq}
+                                comments={sectionComments}
+                                isExpanded={isExpanded}
+                                onToggle={() => setExpandedSection(isExpanded ? null : section.path)}
+                                onAddComment={handleAddComment}
+                                onResolve={handleResolveComment}
+                                onDelete={handleDeleteComment}
+                                onReact={handleReact}
+                                onCopySuggested={handleCopySuggested}
+                                currentUserId={user?.id}
+                                isAdmin={isAdmin}
+                                lastVisitTs={lastVisitTs}
+                            />
+                            {showBetween && (
+                                <BetweenSlot
+                                    sectionPath={slotPath}
+                                    prevLabel={sectionLabel}
+                                    nextLabel={SECTION_LABELS[next.path] || next.path}
+                                    comments={slotComments}
+                                    isExpanded={slotExpanded}
+                                    onToggle={() => setExpandedSection(slotExpanded ? null : slotPath)}
+                                    onAddComment={handleAddComment}
+                                    onResolve={handleResolveComment}
+                                    onDelete={handleDeleteComment}
+                                    onReact={handleReact}
+                                    onCopySuggested={handleCopySuggested}
+                                    currentUserId={user?.id}
+                                    isAdmin={isAdmin}
+                                    lastVisitTs={lastVisitTs}
+                                />
+                            )}
+                        </React.Fragment>
                     );
                 })}
             </div>
@@ -691,6 +724,186 @@ const CommentItem = ({ comment, currentUserId, isAdmin, onResolve, onDelete, onR
                     </div>
                 )}
             </div>
+        </div>
+    );
+};
+
+// ─── Subcomponente: slot "entre dos pasos" ─────────────────────────────────
+// Permite sugerir un paso intermedio o dejar una nota sobre la transición.
+// Compacto por defecto (línea con +); se expande al click para ver/agregar.
+const BetweenSlot = ({
+    sectionPath, prevLabel, nextLabel,
+    comments, isExpanded, onToggle, onAddComment, onResolve, onDelete,
+    onReact, onCopySuggested,
+    currentUserId, isAdmin, lastVisitTs,
+}) => {
+    const [showForm, setShowForm] = useState(false);
+    const [draft, setDraft] = useState('');
+    const [draftSuggested, setDraftSuggested] = useState('');
+    const [draftType, setDraftType] = useState('note');
+    const [submitting, setSubmitting] = useState(false);
+
+    const submit = async () => {
+        if (!draft.trim()) return;
+        setSubmitting(true);
+        try {
+            await onAddComment({
+                sectionPath,
+                type: draftType,
+                content: draft,
+                suggestedText: draftSuggested.trim() ? draftSuggested : null,
+            });
+            setDraft('');
+            setDraftSuggested('');
+            setDraftType('note');
+            setShowForm(false);
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const unresolvedCount = comments.filter(c => !c.resolved).length;
+    const newCount = comments.filter(c => new Date(c.createdAt).getTime() > lastVisitTs && !c.resolved).length;
+
+    // Compacto: si no hay comentarios y no está expandido, una línea fina con +
+    if (!isExpanded && unresolvedCount === 0) {
+        return (
+            <div className="flex items-center gap-2 px-2 group">
+                <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
+                <button
+                    onClick={onToggle}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all opacity-50 group-hover:opacity-100"
+                    title={`Agregar nota o sugerencia entre "${prevLabel}" y "${nextLabel}"`}
+                >
+                    <Plus className="w-3 h-3" />
+                    Nota entre pasos
+                </button>
+                <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
+            </div>
+        );
+    }
+
+    return (
+        <div className="border border-dashed border-indigo-300 dark:border-indigo-700 rounded-2xl overflow-hidden bg-indigo-50/30 dark:bg-indigo-900/10">
+            {/* Header */}
+            <button
+                onClick={onToggle}
+                className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-indigo-100/50 dark:hover:bg-indigo-900/20 transition-colors text-left"
+            >
+                {isExpanded ? <ChevronDown className="w-4 h-4 text-indigo-400" /> : <ChevronRight className="w-4 h-4 text-indigo-400" />}
+                <ArrowDown className="w-3.5 h-3.5 text-indigo-500" />
+                <div className="flex-1 min-w-0">
+                    <p className="text-[11px] font-bold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider">
+                        Entre pasos
+                    </p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                        <span className="font-semibold">{prevLabel}</span>
+                        <span className="mx-1.5 text-slate-400">→</span>
+                        <span className="font-semibold">{nextLabel}</span>
+                    </p>
+                </div>
+                {newCount > 0 && (
+                    <span className="bg-rose-100 text-rose-800 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" />
+                        {newCount}
+                    </span>
+                )}
+                {unresolvedCount > 0 && (
+                    <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                        {unresolvedCount}
+                    </span>
+                )}
+            </button>
+
+            {isExpanded && (
+                <div className="border-t border-indigo-200 dark:border-indigo-800 p-3 space-y-3">
+                    {comments.length === 0 ? (
+                        <p className="text-center text-xs text-slate-400 dark:text-slate-500 italic py-2">
+                            ¿Falta algún paso intermedio? ¿Una pregunta o aclaración aquí? Dejá la sugerencia.
+                        </p>
+                    ) : (
+                        comments.map(comment => (
+                            <CommentItem
+                                key={comment.id}
+                                comment={comment}
+                                currentUserId={currentUserId}
+                                isAdmin={isAdmin}
+                                onResolve={onResolve}
+                                onDelete={onDelete}
+                                onReact={onReact}
+                                onCopySuggested={onCopySuggested}
+                                isNew={new Date(comment.createdAt).getTime() > lastVisitTs && !comment.resolved}
+                            />
+                        ))
+                    )}
+
+                    {!showForm ? (
+                        <button
+                            onClick={() => setShowForm(true)}
+                            className="w-full py-2 px-4 rounded-xl border-2 border-dashed border-indigo-300 dark:border-indigo-700 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all"
+                        >
+                            + Sugerir paso intermedio o nota
+                        </button>
+                    ) : (
+                        <div className="p-3 rounded-xl bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2">
+                            <div className="flex gap-2 flex-wrap">
+                                {Object.entries(TYPE_META).map(([key, m]) => {
+                                    const Icon = m.icon;
+                                    const isActive = draftType === key;
+                                    return (
+                                        <button
+                                            key={key}
+                                            onClick={() => setDraftType(key)}
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${isActive ? m.color + ' ring-2 ring-offset-1 ring-indigo-300' : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-700'}`}
+                                        >
+                                            <Icon className="w-3 h-3" />
+                                            {m.label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            <textarea
+                                value={draft}
+                                onChange={(e) => setDraft(e.target.value)}
+                                placeholder={`Ej: Acá conviene que el bot pregunte X antes de pasar a "${nextLabel}".`}
+                                className="w-full h-24 p-3 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 resize-none"
+                                autoFocus
+                            />
+                            <div>
+                                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 flex items-center gap-1">
+                                    <Sparkles className="w-3 h-3 text-amber-500" />
+                                    Texto sugerido del paso (opcional)
+                                </label>
+                                <textarea
+                                    value={draftSuggested}
+                                    onChange={(e) => setDraftSuggested(e.target.value)}
+                                    placeholder="Si querés proponer literalmente lo que diría el bot en este paso intermedio, copiálo acá."
+                                    className="w-full h-28 p-3 text-sm rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10 text-slate-800 dark:text-slate-100 focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200 resize-none font-mono"
+                                />
+                            </div>
+                            <div className="flex gap-2 justify-end">
+                                <button
+                                    onClick={() => { setShowForm(false); setDraft(''); setDraftSuggested(''); }}
+                                    className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={submit}
+                                    disabled={!draft.trim() || submitting}
+                                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md shadow-indigo-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {submitting
+                                        ? <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        : <Send className="w-3 h-3" />
+                                    }
+                                    Guardar
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 };
