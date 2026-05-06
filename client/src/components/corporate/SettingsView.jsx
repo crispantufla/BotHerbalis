@@ -158,8 +158,9 @@ const SettingsView = ({ status }) => {
     return (
         <div className="h-full flex flex-col animate-fade-in relative z-10 w-full overflow-hidden">
 
-            {/* Ambient Background */}
-            <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-indigo-50/50 via-transparent to-purple-50/50 pointer-events-none z-0"></div>
+            {/* Ambient Background — el gradiente claro solo en light mode; en
+                dark mode se ve como bandas brillantes bugueadas si no se apaga. */}
+            <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-indigo-50/50 via-transparent to-purple-50/50 dark:from-transparent dark:to-transparent pointer-events-none z-0"></div>
 
             {/* Header V2 */}
             <div className="bg-white/4 dark:bg-slate-800/40 backdrop-blur-xl rounded-[1.25rem] sm:rounded-[2rem] border border-white/6 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-4 sm:p-8 mb-4 sm:mb-8 relative z-10">
