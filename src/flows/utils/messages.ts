@@ -30,6 +30,19 @@ function _formatMessage(text: string | string[], state: any): string {
     formatted = formatted.replace(/{{PRICE_PER_DAY_CAPSULAS_120}}/g, _perDay(prices['Cápsulas']?.['120'], 120));
     formatted = formatted.replace(/{{PRICE_PER_DAY_SEMILLAS_120}}/g, _perDay(prices['Semillas']?.['120'], 120));
     formatted = formatted.replace(/{{PRICE_PER_DAY_GOTAS_120}}/g, _perDay(prices['Gotas']?.['120'], 120));
+    // Precio total con adicional ya incluido — para guiones que muestran el
+    // precio "final" (lo que pagaría con contra reembolso) y dejan el descuento
+    // de $6.000 como incentivo de prepago. Solo aplica a planes de 60 días.
+    const _withAdicional = (priceStr: string | undefined, adicionalStr: string | undefined): string => {
+        if (!priceStr) return '';
+        const base = parseInt(priceStr.replace(/\./g, ''), 10);
+        const adic = parseInt((adicionalStr || '6.000').replace(/\./g, ''), 10);
+        if (isNaN(base) || isNaN(adic)) return priceStr;
+        return _formatPrice(base + adic);
+    };
+    formatted = formatted.replace(/{{PRICE_TOTAL_CAPSULAS_60}}/g, _withAdicional(prices['Cápsulas']?.['60'], prices.adicionalMAX));
+    formatted = formatted.replace(/{{PRICE_TOTAL_SEMILLAS_60}}/g, _withAdicional(prices['Semillas']?.['60'], prices.adicionalMAX));
+    formatted = formatted.replace(/{{PRICE_TOTAL_GOTAS_60}}/g, _withAdicional(prices['Gotas']?.['60'], prices.adicionalMAX));
     formatted = formatted.replace(/{{ADICIONAL_MAX}}/g, prices.adicionalMAX || '6.000');
     formatted = formatted.replace(/{{COSTO_LOGISTICO}}/g, prices.costoLogistico || '18.000');
 

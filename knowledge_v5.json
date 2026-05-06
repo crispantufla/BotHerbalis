@@ -1,0 +1,309 @@
+{
+    "meta": {
+        "name": "Guión V5 — Asesor consultivo (cápsulas + gotas)",
+        "description": "Guión consultivo: arranca preguntando kilos, recomienda producto+plan según objetivo, incentivo de prepago integrado en el pitch. Solo cápsulas y gotas activas — semillas se ofrecen únicamente si el cliente las pide explícitamente.",
+        "version": "5.0"
+    },
+    "flow": {
+        "greeting": {
+            "step": "greeting",
+            "keywords": [
+                "hola",
+                "precio",
+                "info",
+                "buenas",
+                "herbalis",
+                "nuez",
+                "kilos",
+                "bajar",
+                "cuanto",
+                "vale",
+                "costo",
+                "gotas",
+                "capsulas",
+                "capsula"
+            ],
+            "response": "¡Hola! 😊 Soy el asesor de Herbalis. Ayudo a personas como vos a bajar de peso de forma natural, sin dietas estrictas.\n\nContame: ¿cuánto te gustaría bajar?\n\n1️⃣ Pocos kilos (hasta 10)\n2️⃣ Bastante (entre 10 y 20)\n3️⃣ Mucho (más de 20)\n\nMandame el número.",
+            "nextStep": "waiting_weight"
+        },
+        "recommendation": {
+            "step": "waiting_weight",
+            "_note": "Fallback genérico cuando no se puede determinar el tier (no se debería usar en V5; el handler usa recommendation_1/2/3).",
+            "response": "¡Buenísimo! 😊\n\nContame en qué rango estás:\n\n1️⃣ Pocos kilos (hasta 10)\n2️⃣ Bastante (entre 10 y 20)\n3️⃣ Mucho (más de 20)",
+            "nextStep": "waiting_ok"
+        },
+        "recommendation_1": {
+            "step": "waiting_weight",
+            "_note": "Tier 1 — hasta 10 kg → Gotas 60 días. Pitch + price + prepay incentive + cierre",
+            "response": "¡Genial! 👌 Para vos, lo ideal es el *Plan de Gotas para 2 meses*. La mayoría de clientes que querían bajar lo mismo que vos lograron entre 7 y 10 kilos con este plan.\n\nTe explico cómo funciona:\n💧 Tomás 10 gotas 1 vez por día (almuerzo o cena)\n📋 Te mando una guía de consejos alimentarios\n📞 Te acompañamos con asesoramiento nutricional por WhatsApp durante todo el tratamiento\n\nNuestros consejos están respaldados por más de *13 años distribuyendo* nuestros productos y casi *70.000 clientes agradecidos* 🌿\n\n💰 *Plan completo: ${{PRICE_TOTAL_GOTAS_60}}* — todo incluido y enviado a tu casa o a la sucursal del Correo Argentino más cercana.\n\n🎁 *Si pagás ahora* (con MercadoPago o transferencia) tenés un descuento — o te mandamos una unidad extra de regalo.\nSi preferís, también podés *pagar al recibir*.\n\n👉 ¿Te lo envío? ¿O te queda alguna duda?",
+            "nextStep": "waiting_ok"
+        },
+        "recommendation_2": {
+            "step": "waiting_weight",
+            "_note": "Tier 2 — 10 a 20 kg → Cápsulas 60 días (con upsell suave a 120)",
+            "response": "¡Genial! 👌 Para vos, lo ideal es el *Plan de Cápsulas para 2 meses*. La mayoría de clientes que querían bajar lo mismo que vos lograron entre 15 y 20 kilos con este plan.\n\nTe explico cómo funciona:\n💊 Tomás 1 cápsula al día, 30 min antes del almuerzo o cena\n📋 Te mando una guía de consejos alimentarios\n📞 Te acompañamos con asesoramiento nutricional por WhatsApp durante todo el tratamiento\n\nNuestros consejos están respaldados por más de *13 años distribuyendo* nuestros productos y casi *70.000 clientes agradecidos* 🌿\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_CAPSULAS_60}}*\n💰 _Plan 4 meses: ${{PRICE_CAPSULAS_120}}_ (más completo, sin rebote)\n\n🎁 *Si pagás ahora* (con MercadoPago o transferencia) tenés un descuento — o te mandamos una unidad extra de regalo.\nSi preferís, también podés *pagar al recibir*.\n\n👉 ¿Te lo envío? ¿O te queda alguna duda?",
+            "nextStep": "waiting_ok"
+        },
+        "recommendation_3": {
+            "step": "waiting_weight",
+            "_note": "Tier 3 — más de 20 kg → Cápsulas 120 días (también ofrece 60 si presupuesto)",
+            "response": "¡Genial! 👌 Para vos, lo ideal es el *Plan de Cápsulas para 4 meses*. La mayoría de clientes que querían bajar más de 20 kilos lo lograron con este plan, de forma sostenida y sin rebote.\n\nTe explico cómo funciona:\n💊 Tomás 1 cápsula al día, 30 min antes del almuerzo o cena\n📋 Te mando una guía de consejos alimentarios\n📞 Te acompañamos con asesoramiento nutricional por WhatsApp durante todo el tratamiento\n\nNuestros consejos están respaldados por más de *13 años distribuyendo* nuestros productos y casi *70.000 clientes agradecidos* 🌿\n\n💰 *Plan 4 meses (recomendado): ${{PRICE_CAPSULAS_120}}* — envío y pago a domicilio bonificados ✅\n💰 _Plan 2 meses: ${{PRICE_TOTAL_CAPSULAS_60}}_ — opción más corta\n\n🎁 *Si pagás ahora* (con MercadoPago o transferencia) tenés un descuento — o te mandamos una unidad extra de regalo.\nSi preferís, también podés *pagar al recibir*.\n\n👉 ¿Te lo envío? ¿O te queda alguna duda?",
+            "nextStep": "waiting_ok"
+        },
+        "preference_capsulas": {
+            "step": "waiting_preference",
+            "_note": "En v5 el handler v5 ya setea el producto desde el kilos. Esta entrada se mantiene por compat (cliente que escribe 'cápsulas' directo en cualquier momento).",
+            "match": [
+                "capsula",
+                "capsulas",
+                "pastilla",
+                "pastillas",
+                "practico",
+                "practica"
+            ],
+            "response": "¡Dale! 💊 Las cápsulas son lo más práctico — 1 al día, 30 min antes de la comida principal.\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_CAPSULAS_60}}*\n💰 *Plan 4 meses: ${{PRICE_CAPSULAS_120}}* (sin adicional, envío y pago bonificados)\n\n🎁 *Si pagás ahora* tenés un descuento o una unidad extra de regalo.\n\n👉 ¿Avanzamos con 60 o 120 días?",
+            "nextStep": "waiting_plan_choice"
+        },
+        "preference_gotas": {
+            "step": "waiting_preference",
+            "match": [
+                "gotas",
+                "liquido",
+                "gotero"
+            ],
+            "response": "¡Dale! 💧 Las gotas son prácticas y discretas — 10 gotas, 1 vez al día.\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_GOTAS_60}}*\n💰 *Plan 4 meses: ${{PRICE_GOTAS_120}}* (sin adicional, envío y pago bonificados)\n\n🎁 *Si pagás ahora* tenés un descuento o una unidad extra de regalo.\n\n👉 ¿Avanzamos con 60 o 120 días?",
+            "nextStep": "waiting_plan_choice"
+        },
+        "preference_semillas": {
+            "step": "waiting_preference",
+            "_note": "En v5, semillas SOLO se ofrecen cuando el cliente las pide explícitamente. No se incluyen en el flujo principal.",
+            "match": [
+                "semilla",
+                "semillas",
+                "infusion",
+                "yuyos",
+                "te de semilla",
+                "natural"
+            ],
+            "response": "¡Dale! 🌿 Las semillas son la opción más natural — se preparan como infusión cada noche.\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_SEMILLAS_60}}*\n💰 *Plan 4 meses: ${{PRICE_SEMILLAS_120}}* (sin adicional)\n\n🎁 *Si pagás ahora* tenés un descuento o una unidad extra de regalo.\n\n👉 ¿Avanzamos con 60 o 120 días?",
+            "nextStep": "waiting_plan_choice"
+        },
+        "closing": {
+            "step": "waiting_plan_choice",
+            "match": [
+                "si",
+                "sisi",
+                "dale",
+                "bueno",
+                "ok",
+                "envialo",
+                "envíalo",
+                "te lo envio",
+                "te lo envío",
+                "mandalo",
+                "envielo"
+            ],
+            "response": "¡Excelente! 🎉 Tomamos los datos para armar la etiqueta de envío 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(La dirección debe ser exacta, sin esquinas ni \"aprox\")",
+            "nextStep": "waiting_data"
+        },
+        "confirmation": {
+            "step": "waiting_data",
+            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT}}\nPlan: {{PLAN}} días\nTotal a pagar al recibir: {{TOTAL}}\n\n✔ Correo Argentino\n✔ Entrega estimada: 7 a 10 días hábiles\n✔ Pago exclusivo en EFECTIVO al recibir\n\n👉 Importante: si el cartero no te encuentra, el paquete vuelve a sucursal y tenés 72hs para retirarlo gratis.\n\nEl rechazo o no retiro genera un costo logístico de ${{COSTO_LOGISTICO}}.\n\n👉 ¿Confirmás que recibís o retirás de sucursal sin inconvenientes?",
+            "nextStep": "completed"
+        }
+    },
+    "faq": [
+        {
+            "keywords": [
+                "funciona de verdad",
+                "funciona",
+                "sirve",
+                "verdad",
+                "posta",
+                "es real",
+                "duda 1",
+                "opcion 1",
+                "1"
+            ],
+            "_note": "FAQ menu opción 1 — '¿Funciona de verdad?'",
+            "response": "*¡Sí, funciona!* 🌿\n\nLa nuez de la india y sus derivados son la opción natural más efectiva para la pérdida de peso. Trabajamos hace más de *13 años* con casi *70.000 clientes agradecidos*.\n\nEs un producto 100% natural, sin químicos ni agregados que podrían ser perjudiciales.\n\n👉 ¿Te lo envío?"
+        },
+        {
+            "keywords": [
+                "es seguro",
+                "seguro",
+                "duda 2",
+                "opcion 2"
+            ],
+            "_note": "FAQ menu opción 2 — '¿Es seguro?'",
+            "response": "*¡Sí, es seguro!* 🌿\n\nEs un producto 100% natural, sin químicos ni agregados. Llevamos más de *13 años distribuyéndolo* con casi *70.000 clientes* y nunca tuvimos un solo caso de problema asociado.\n\nLas únicas contraindicaciones son embarazo, lactancia, menores de 18 años y mayores de 80 años.\n\n👉 ¿Te lo envío?"
+        },
+        {
+            "keywords": [
+                "contraindicaciones",
+                "contraindicacion",
+                "embarazo",
+                "lactancia",
+                "duda 3",
+                "opcion 3"
+            ],
+            "_note": "FAQ menu opción 3 — '¿Tiene contraindicaciones?'",
+            "response": "Las únicas contraindicaciones son:\n\n🚫 Embarazo\n🚫 Lactancia\n🚫 Menores de 18 años\n🚫 Mayores de 80 años\n\nNo interfiere con tratamientos habituales (presión, tiroides, diabetes, etc.) y muchas personas con esas condiciones lo consumen sin inconvenientes.\n\n👉 ¿Te lo envío?"
+        },
+        {
+            "keywords": [
+                "como lo recibo",
+                "como llega",
+                "cuanto tarda",
+                "tarda",
+                "demora",
+                "tiempo",
+                "envio",
+                "duda 4",
+                "opcion 4"
+            ],
+            "_note": "FAQ menu opción 4 — '¿Cómo lo recibo y cuánto tarda?'",
+            "response": "📦 *Envíos por Correo Argentino* a tu domicilio o a la sucursal más cercana.\n\n⚡ *Si pagás ahora* (MercadoPago o transferencia): demora *4 a 6 días hábiles*\n🛍️ *Si pagás al recibir* (solo efectivo): demora *7 a 10 días hábiles*\n\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs para retirarlo gratis.\n\n👉 ¿Te lo envío?"
+        },
+        {
+            "keywords": [
+                "tarjeta",
+                "mercadopago",
+                "mp",
+                "cbu",
+                "alias",
+                "transferencia"
+            ],
+            "response": "Aceptamos *MercadoPago* (tarjeta, débito, saldo MP), *transferencia bancaria* y *contra reembolso* (efectivo al recibir).\n\nSi pagás ahora con MP o transferencia, el envío llega más rápido (4-6 días) y tenés un descuento o una unidad extra de regalo 🎁\n\n¿Cuál te queda más cómoda?"
+        },
+        {
+            "keywords": [
+                "muy caro",
+                "es mucho",
+                "mucha plata",
+                "sale un monton",
+                "no me alcanza"
+            ],
+            "response": "Te entiendo 😊 La plata hoy cuesta ganarla.\n\nEl tratamiento incluye TODO: producto + envío + acompañamiento nutricional por WhatsApp durante todo el tratamiento.\n\nSi te resulta más cómodo, podemos *programar el envío* para después de la fecha que cobrás.\n\n¿Desde qué día te quedaría cómodo?"
+        },
+        {
+            "keywords": [
+                "no tengo",
+                "cobro",
+                "quincena",
+                "fin de mes"
+            ],
+            "response": "¡Tranqui! 😊 Podemos *programar la entrega* para después de la fecha que cobrás. El precio queda congelado.\n\n¿Desde qué día te queda cómodo recibirlo?"
+        },
+        {
+            "keywords": [
+                "rebote"
+            ],
+            "response": "*No hay rebote.* El rebote suele aparecer con métodos agresivos. La nuez es 100% natural y el descenso es progresivo y sostenido."
+        },
+        {
+            "keywords": [
+                "diabetes",
+                "hipotiroidismo",
+                "tiroides",
+                "presion",
+                "hipertension"
+            ],
+            "response": "Muchas personas con esas condiciones lo consumen sin inconvenientes 🌿\n\nEs natural y no interfiere con tratamientos habituales. Las únicas contraindicaciones son embarazo, lactancia, menores de 18 y mayores de 80."
+        },
+        {
+            "keywords": [
+                "estafa",
+                "trucho",
+                "mentira",
+                "robo",
+                "engaño",
+                "chanta"
+            ],
+            "response": "Es normal desconfiar hoy en día por internet. Justamente por eso ofrecemos *pago contra reembolso*: el cartero te entrega el paquete en mano y recién ahí pagás. Riesgo cero para vos 😊"
+        },
+        {
+            "keywords": [
+                "como se toma",
+                "como tomo",
+                "como se usa",
+                "cuantas capsulas",
+                "cantidad"
+            ],
+            "response": "💊 *Cápsulas:* 1 al día, 30 min antes del almuerzo o cena, con un vaso de agua.\n💧 *Gotas:* 10 gotas 1 vez al día (almuerzo o cena).\n\nCualquier duda durante el tratamiento, te acompañamos por WhatsApp 📞"
+        },
+        {
+            "keywords": [
+                "garantia",
+                "devolucion",
+                "devolver",
+                "no me gusto",
+                "quiero devolver"
+            ],
+            "response": "Si el producto llega dañado lo reenviamos sin costo. No hacemos devolución de dinero ni hay garantía de resultados (cada cuerpo responde distinto), pero llevamos *13 años* y casi *70.000 clientes* avalan el producto 😊"
+        },
+        {
+            "keywords": [
+                "factura",
+                "comprobante",
+                "ticket"
+            ],
+            "response": "El comprobante de tu compra es el que te da el correo al momento de la entrega 😊"
+        },
+        {
+            "keywords": [
+                "tracking",
+                "seguimiento",
+                "rastreo",
+                "donde esta mi pedido"
+            ],
+            "response": "¡Sí! Te damos el código de seguimiento dentro de las 48-72 hs después del despacho 📦"
+        },
+        {
+            "keywords": [
+                "discreto",
+                "paquete discreto",
+                "que dice el paquete",
+                "viene marcado"
+            ],
+            "response": "El envío es totalmente discreto, sin marcas ni indicación del contenido 📦"
+        },
+        {
+            "keywords": [
+                "donde estan",
+                "tienen local",
+                "puedo ir",
+                "punto de venta",
+                "local fisico"
+            ],
+            "response": "No tenemos local de venta al público. Trabajamos 100% online y los envíos son por Correo Argentino a todo el país 📦"
+        }
+    ],
+    "rules": {
+        "alwaysEndWithQuestion": true,
+        "maxFollowUps": 1,
+        "noNegotiatePrice": true,
+        "noDiscounts": false,
+        "noCreditCard": false,
+        "noArgue": true,
+        "keepResponsesShort": true,
+        "contraReembolsoMAX": {
+            "enabled": true,
+            "adicional": 6000,
+            "appliesTo": "60",
+            "description": "Adicional de $6.000 en planes de 60 días con contra reembolso. Bonificado en planes de 120 días, MercadoPago y transferencia."
+        },
+        "costoLogisticoRechazo": 18000,
+        "ageLimits": {
+            "min": 18,
+            "max": 80
+        },
+        "prepayIncentive": {
+            "enabled": true,
+            "discount": 6000,
+            "extraUnit": true,
+            "_note": "Si paga ahora con MP/transferencia: descuento de $6.000 (= adicional bonificado) o una unidad extra del mismo producto de regalo."
+        },
+        "closeIfNotAccepted": "Trabajamos bajo estas modalidades.\n\nSi en algún momento te resulta cómodo avanzar, acá estamos 😊"
+    }
+}

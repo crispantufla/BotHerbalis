@@ -93,6 +93,67 @@ export async function handleWaitingWeight(
         const wMatch = text.match(/\d+/);
         if (wMatch) currentState.weightGoal = parseInt(wMatch[0], 10);
 
+        // ── V5: ruta consultiva ────────────────────────────────────────────
+        // En V5 el cliente eligió 1 (hasta 10), 2 (10-20) o 3 (más de 20).
+        // Mapeamos directo a producto + plan + pitch del tier sin pasar por
+        // waiting_preference (no le preguntamos qué producto quiere — el bot
+        // decide según el objetivo). Esto reemplaza la pregunta de producto
+        // del V3/V4.
+        if (currentState.assignedScript === 'v5') {
+            const w = currentState.weightGoal || 0;
+            // Tier por número de opción (1/2/3) si es corto, o por kilos exactos.
+            const trimmed = text.trim();
+            const isOptionPick = trimmed.length <= 3 && (trimmed === '1' || trimmed === '2' || trimmed === '3');
+            let tier: '1' | '2' | '3';
+            if (isOptionPick) {
+                tier = trimmed as '1' | '2' | '3';
+                // weightGoal aproximado del tier para AI/analytics downstream
+                if (tier === '1') currentState.weightGoal = 8;
+                else if (tier === '2') currentState.weightGoal = 15;
+                else currentState.weightGoal = 25;
+            } else {
+                const wNum = typeof w === 'number' ? w : parseInt(String(w), 10) || 0;
+                if (wNum <= 10) tier = '1';
+                else if (wNum <= 20) tier = '2';
+                else tier = '3';
+            }
+
+            // Asignación producto + plan según tier
+            if (tier === '1') {
+                currentState.selectedProduct = 'Gotas de nuez de la india';
+                currentState.selectedPlan = '60';
+                currentState.cart = [{ product: 'Gotas de nuez de la india', plan: '60', price: knowledge?._prices?.gotas60 || '' }];
+            } else if (tier === '2') {
+                currentState.selectedProduct = 'Cápsulas de nuez de la india';
+                currentState.selectedPlan = '60';
+                currentState.cart = [{ product: 'Cápsulas de nuez de la india', plan: '60', price: knowledge?._prices?.capsulas60 || '' }];
+            } else {
+                currentState.selectedProduct = 'Cápsulas de nuez de la india';
+                currentState.selectedPlan = '120';
+                currentState.cart = [{ product: 'Cápsulas de nuez de la india', plan: '120', price: knowledge?._prices?.capsulas120 || '' }];
+            }
+
+            // adicionalMAX solo aplica al plan 60 con contra reembolso. Lo seteamos
+            // por defecto; los steps de pago (MP/transferencia) lo bonifican luego.
+            const { calculateTotal } = require('../utils/cartHelpers');
+            const { _getAdicionalMAX } = require('../utils/pricing');
+            currentState.adicionalMAX = currentState.selectedPlan === '60' ? _getAdicionalMAX() : 0;
+            currentState.isContraReembolsoMAX = currentState.selectedPlan === '60';
+            calculateTotal(currentState);
+
+            // Mensaje del tier — pitch + price + prepay incentive + cierre
+            const tierKey = `recommendation_${tier}`;
+            const tierNode = knowledge.flow[tierKey] || knowledge.flow.recommendation;
+            const tierMsg = _formatMessage(tierNode.response, currentState);
+
+            _setStep(currentState, tierNode.nextStep || FlowStep.WAITING_OK);
+            currentState.history.push({ role: 'bot', content: tierMsg, timestamp: Date.now() });
+            saveState(userId);
+            await sendMessageWithDelay(userId, tierMsg);
+            logger.info(`[V5] User ${userId} → tier ${tier}, ${currentState.selectedProduct} ${currentState.selectedPlan}d`);
+            return { matched: true };
+        }
+
         if ((currentState as any).suggestedProduct) {
             logger.info(`[LOGIC] User ${userId} already suggested ${(currentState as any).suggestedProduct}, skipping preference question.`);
             currentState.selectedProduct = (currentState as any).suggestedProduct;
