@@ -91,7 +91,11 @@ const CorporateDashboard = () => {
         try {
             const res = await api.get('/api/status');
             if (res.data.config) setConfig(res.data.config);
-            if (res.data.info?.wid?.user) setConnectedPhone(res.data.info.wid.user);
+            // Preferir phoneNumber (DB, refrescado en cada `ready`) sobre
+            // info.wid.user (objeto wwebjs en memoria que puede quedar zombie
+            // si un re-pair se interrumpe). Limpiar siempre si ambos son null.
+            const phone = res.data.phoneNumber || res.data.info?.wid?.user || null;
+            setConnectedPhone(phone);
         } catch (e) { }
     }, []);
 
@@ -105,11 +109,25 @@ const CorporateDashboard = () => {
             };
             const handleReady = (data) => {
                 if (data?.sellerId && viewedSellerId && data.sellerId !== viewedSellerId) return;
-                setStatus('ready'); setQrData(null); fetchConfig();
+                setStatus('ready');
+                setQrData(null);
+                // El backend ya manda phoneNumber en el payload — usarlo
+                // directamente para que el header se actualice sin esperar
+                // al fetchConfig (y sin riesgo de leer DB con upsert pendiente).
+                if (data?.phoneNumber) setConnectedPhone(data.phoneNumber);
+                else if (data?.info?.wid?.user) setConnectedPhone(data.info.wid.user);
+                fetchConfig();
             };
             const handleStatusChange = ({ status: newStatus, sellerId: evtSeller }) => {
                 if (evtSeller && viewedSellerId && evtSeller !== viewedSellerId) return;
-                if (newStatus === 'disconnected') { setStatus('scan_qr'); setQrData(null); }
+                if (newStatus === 'disconnected') {
+                    setStatus('scan_qr');
+                    setQrData(null);
+                    // Limpiar el teléfono mostrado — al reconectar con cuenta
+                    // nueva, el handleReady disparará fetchConfig y traerá el
+                    // nuevo desde DB. Sin esto quedaba el viejo pegado en pantalla.
+                    setConnectedPhone(null);
+                }
                 else setStatus(newStatus);
             };
             socket.on('qr', handleQr);
@@ -137,8 +155,8 @@ const CorporateDashboard = () => {
                 setStatus(statusRes.data.status || 'initializing');
                 setQrData(statusRes.data.qr || null);
                 if (statusRes.data.config) setConfig(statusRes.data.config);
-                if (statusRes.data.info?.wid?.user) setConnectedPhone(statusRes.data.info.wid.user);
-                else setConnectedPhone(null);
+                const phone = statusRes.data.phoneNumber || statusRes.data.info?.wid?.user || null;
+                setConnectedPhone(phone);
             } catch (e) { }
         };
         loadData();

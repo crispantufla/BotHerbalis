@@ -404,12 +404,16 @@ class ClientPool {
             // Cancel QR timeout — session is now active
             if (instance.qrTimer) { clearTimeout(instance.qrTimer); instance.qrTimer = null; }
 
+            const phoneNumber = client.info?.wid?.user || null;
+
+            // Incluir phoneNumber explícito en el payload — el dashboard lo
+            // usa para refrescar el header sin tener que esperar al upsert
+            // de Prisma o a un fetch posterior.
             if (this.io) {
-                this.io.to(sellerId).emit('ready', { info: client.info, sellerId });
-                this.io.to('admin').emit('ready', { info: client.info, sellerId });
+                this.io.to(sellerId).emit('ready', { info: client.info, phoneNumber, sellerId });
+                this.io.to('admin').emit('ready', { info: client.info, phoneNumber, sellerId });
             }
 
-            const phoneNumber = client.info?.wid?.user || null;
             prisma.whatsAppSession.upsert({
                 where: { sellerId },
                 create: { sellerId, status: 'connected', phoneNumber, lastSeen: new Date() },

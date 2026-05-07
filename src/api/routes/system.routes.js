@@ -57,7 +57,14 @@ module.exports = (clientPool) => {
     });
 
     // GET /status
-    router.get('/status', ...withSeller(clientPool), (req, res) => {
+    //
+    // `phoneNumber` se devuelve desde la DB (WhatsAppSession.phoneNumber),
+    // que se actualiza en cada `ready` event en clientPool. Antes el
+    // dashboard leía `cl.info.wid.user` directamente, pero ese objeto
+    // puede quedar zombie si wwebjs no populó `info` en el último ready
+    // (ej: re-pair interrumpido) — el dashboard mostraba el número de la
+    // sesión anterior. La DB es la fuente de verdad post-ready.
+    router.get('/status', ...withSeller(clientPool), async (req, res) => {
         const sellerId = getInstanceId(req);
 
         // Lazy start: if seller not running but registered, start it
@@ -69,6 +76,7 @@ module.exports = (clientPool) => {
                 status: 'initializing',
                 qr: null,
                 info: null,
+                phoneNumber: null,
                 instanceId: sellerId,
                 config: {}
             });
@@ -77,10 +85,26 @@ module.exports = (clientPool) => {
         const { client: cl, ss, config } = getCtx(req);
         const isConnected = ss?.isConnected;
         const qrCodeData = ss?.qrCodeData;
+
+        let phoneNumber = null;
+        if (isConnected && sellerId) {
+            try {
+                const { prisma } = require('../../../db');
+                const session = await prisma.whatsAppSession.findUnique({
+                    where: { sellerId },
+                    select: { phoneNumber: true }
+                });
+                phoneNumber = session?.phoneNumber || null;
+            } catch (e) { /* DB optional — fall through to wwebjs */ }
+            // Fallback to wwebjs if DB miss
+            if (!phoneNumber) phoneNumber = cl?.info?.wid?.user || null;
+        }
+
         res.json({
             status: qrCodeData ? 'scan_qr' : (isConnected ? 'ready' : 'initializing'),
             qr: qrCodeData,
             info: isConnected && cl ? cl.info : null,
+            phoneNumber,
             instanceId: sellerId,
             config
         });
@@ -363,51 +387,42 @@ module.exports = (clientPool) => {
         }
     });
 
-    // POST /whatsapp-logout — Disconnect WhatsApp session or start seller to generate QR
+    // POST /whatsapp-logout — Wipe session & generate fresh QR (always full reset)
+    //
+    // Antes había dos paths:
+    //   - Running:    cl.logout() + cl.initialize() en el MISMO Client
+    //   - Not running: wipeSessionAndRestart (destruye Client + borra LocalAuth)
+    //
+    // El soft path dejaba `client.info` zombie en memoria si el re-pair se
+    // interrumpía (account bloqueado, network glitch, etc) → el dashboard
+    // seguía mostrando el número viejo aunque el operador re-vinculara con
+    // un teléfono nuevo. Caso real: vendedor con número bloqueado por WA,
+    // re-vinculó con número distinto, y el dashboard quedó pegado en el viejo.
+    //
+    // Ahora SIEMPRE wipe completo: destruye Client + borra .wwebjs_auth +
+    // crea Client nuevo. La UX del botón "Regenerar QR" implica esto de
+    // todas formas — el operador quiere empezar de cero, no un soft reset.
     router.post('/whatsapp-logout', ...withSeller(clientPool), async (req, res) => {
         try {
             const sellerId = getInstanceId(req);
             if (!sellerId) return res.status(400).json({ error: 'Seleccioná un vendedor primero' });
-
-            // If seller not running (failed init or never started), wipe session and start fresh
-            if (!req.sellerInstance) {
-                if (clientPool.isKnown(sellerId)) {
-                    logger.info(`[WHATSAPP] Seller ${sellerId} not running — wiping session & starting fresh...`);
-                    clientPool.wipeSessionAndRestart(sellerId).catch(e =>
-                        logger.error(`[WHATSAPP] Failed to wipe+start ${sellerId}:`, e.message)
-                    );
-                    return res.json({ success: true, message: 'Generando QR...' });
-                }
+            if (!clientPool.isKnown(sellerId)) {
                 return res.status(404).json({ error: 'Seller no registrado' });
             }
 
-            const { client: cl, ss, io } = getCtx(req);
-            if (cl && cl.info && ss?.isConnected) {
-                // Active session: disconnect first, then reconnect event will trigger QR
-                logger.info(`[WHATSAPP] Manual logout requested for ${sellerId}...`);
-                ss.manualDisconnect = true;
-                ss.isConnected = false;
-                ss.qrCodeData = null;
-                await cl.logout();
-                if (io) {
-                    io.to(sellerId).emit('status_change', { status: 'disconnected', sellerId });
-                    io.to('admin').emit('status_change', { status: 'disconnected', sellerId });
-                }
-            } else {
-                // No active session: full restart via pool (destroy + new Client)
-                logger.info(`[WHATSAPP] No active session for ${sellerId} — restarting...`);
-                if (io) {
-                    io.to(sellerId).emit('status_change', { status: 'disconnected', sellerId });
-                    io.to('admin').emit('status_change', { status: 'disconnected', sellerId });
-                }
-                clientPool.restartSeller(sellerId).catch(e =>
-                    logger.error(`[WHATSAPP] Restart failed for ${sellerId}:`, e.message)
-                );
+            const { io } = getCtx(req);
+            if (io) {
+                io.to(sellerId).emit('status_change', { status: 'disconnected', sellerId });
+                io.to('admin').emit('status_change', { status: 'disconnected', sellerId });
             }
-            res.json({ success: true });
+
+            logger.info(`[WHATSAPP] Wipe + restart requested for ${sellerId}`);
+            clientPool.wipeSessionAndRestart(sellerId).catch(e =>
+                logger.error(`[WHATSAPP] wipe+restart failed for ${sellerId}:`, e.message)
+            );
+
+            res.json({ success: true, message: 'Sesión borrada, generando nuevo QR...' });
         } catch (e) {
-            const { ss } = getCtx(req);
-            if (ss) ss.manualDisconnect = false;
             res.status(500).json({ error: e.message });
         }
     });
@@ -561,12 +576,26 @@ module.exports = (clientPool) => {
     // --- MEMORY MANAGEMENT ---
 
     // GET /memory-stats — Dashboard memory gauge
+    //
+    // Devolvemos dos métricas independientes:
+    //   1) RSS del proceso (lo que de verdad duele si OOM): warn 4GB, crit 8GB.
+    //      Plan Railway actual = 32GB; con 8 sellers × ~256MB Chromium + Node
+    //      base, el piso operativo es ~3GB. Hitting 8GB ya es anómalo.
+    //   2) Total de filas en User (referencia de tamaño de DB, no de salud
+    //      del proceso). Subido drásticamente: el botón "Limpiar" NO borra
+    //      users — solo ChatLog/profileData de inactivos >48h sin órdenes.
+    //      Antes los thresholds (200/500) hacían que el panel quedara en
+    //      rojo después de limpiar porque la tabla User no se vacía.
+    //
+    // recommendation = el peor de los dos. `reasons` indica cuál disparó.
     router.get('/memory-stats', ...withSeller(clientPool), async (req, res) => {
         try {
             const { userState } = getCtx(req);
             const INSTANCE_ID = getInstanceId(req);
             const { prisma } = require('../../../db');
             const memUsage = process.memoryUsage();
+            const rssMB = Math.round(memUsage.rss / 1024 / 1024);
+            const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
 
             const whereBase = INSTANCE_ID ? { instanceId: INSTANCE_ID } : {};
 
@@ -582,22 +611,40 @@ module.exports = (clientPool) => {
             }).length;
             const staleUsers = ramUsers - activeConvos;
 
-            // Thresholds for recommendations
-            const WARN_THRESHOLD = 200;
-            const DANGER_THRESHOLD = 500;
+            // RSS thresholds (MB). Plan = 32GB; warn al ~12%, crit al ~25%.
+            const RSS_WARN_MB = 4000;
+            const RSS_CRIT_MB = 8000;
+
+            // User-table thresholds. Subidos para reflejar capacidad real
+            // (eran 200/500, infraestimados para 32GB de RAM).
+            const USERS_WARN = 5000;
+            const USERS_CRIT = 15000;
+
             let recommendation = 'healthy';
-            if (totalUsers >= DANGER_THRESHOLD) recommendation = 'critical';
-            else if (totalUsers >= WARN_THRESHOLD) recommendation = 'warning';
+            const reasons = [];
+            if (rssMB >= RSS_CRIT_MB) { recommendation = 'critical'; reasons.push('rss'); }
+            else if (rssMB >= RSS_WARN_MB) { recommendation = 'warning'; reasons.push('rss'); }
+
+            if (totalUsers >= USERS_CRIT) { recommendation = 'critical'; if (!reasons.includes('users')) reasons.push('users'); }
+            else if (totalUsers >= USERS_WARN && recommendation !== 'critical') { recommendation = 'warning'; if (!reasons.includes('users')) reasons.push('users'); }
 
             res.json({
                 totalUsersDB: totalUsers,
                 ramUsers,
                 activeConversations: activeConvos,
                 staleUsers,
-                heapUsedMB: Math.round(memUsage.heapUsed / 1024 / 1024),
-                rssMB: Math.round(memUsage.rss / 1024 / 1024),
+                heapUsedMB,
+                rssMB,
                 recommendation,
-                thresholds: { warn: WARN_THRESHOLD, danger: DANGER_THRESHOLD }
+                reasons,
+                thresholds: {
+                    // Mantengo `warn`/`danger` por compat con código
+                    // existente; ahora apuntan a thresholds de USUARIOS.
+                    warn: USERS_WARN,
+                    danger: USERS_CRIT,
+                    rssWarnMB: RSS_WARN_MB,
+                    rssCritMB: RSS_CRIT_MB,
+                }
             });
         } catch (e) {
             logger.error('[MEMORY-STATS] Error:', e);
