@@ -64,14 +64,17 @@ const SettingsView = ({ status }) => {
     };
 
     const handleResetMemory = async () => {
-        const ok = await confirm("⚠️ ¿Estás seguro?\n\nEsto borrará TODOS los estados de conversación de los clientes. El bot olvidará en qué paso estaba cada uno.\n\n✅ Las ventas y pedidos NO se borran nunca.");
+        const ok = await confirm("¿Limpiar historial de usuarios inactivos?\n\nBorra mensajes y datos extraídos por IA de quienes:\n• No compraron\n• No interactuaron en las últimas 48h\n\nLos usuarios siguen en la base, las ventas no se tocan, y los activos quedan intactos.");
         if (!ok) return;
         setResetting(true);
         try {
             const res = await api.post('/api/reset-memory');
-            toast.success(`Memoria limpiada. ${res.data.deletedUsers} estados eliminados.`);
+            const msg = res.data.deletedChats > 0
+                ? `${res.data.deletedChats} mensajes archivados · ${res.data.protected48h} usuarios activos protegidos`
+                : `Sin nada para limpiar · ${res.data.protected48h} usuarios activos`;
+            toast.success(msg);
             fetchMemoryStats();
-        } catch (e) { toast.error('Error al limpiar la memoria'); }
+        } catch (e) { toast.error('Error al limpiar el historial'); }
         setResetting(false);
     };
 
@@ -136,23 +139,52 @@ const SettingsView = ({ status }) => {
     };
 
     // Memory gauge helpers
-    const getMemoryPercent = () => {
+    //
+    // El backend devuelve dos métricas independientes: RSS del proceso y
+    // total de filas en User. Mostramos las dos como barras separadas para
+    // que el operador vea cuál de las dos disparó el alerta — antes era
+    // una sola barra basada solo en users que quedaba en rojo después de
+    // limpiar (el botón limpia ChatLogs, no users).
+    const getRssPercent = () => {
+        if (!memStats?.thresholds?.rssCritMB) return 0;
+        return Math.min(100, Math.round((memStats.rssMB / memStats.thresholds.rssCritMB) * 100));
+    };
+    const getUsersPercent = () => {
         if (!memStats) return 0;
         return Math.min(100, Math.round((memStats.totalUsersDB / memStats.thresholds.danger) * 100));
     };
 
-    const getMemoryGradient = () => {
-        if (!memStats) return 'from-slate-300 to-slate-400';
-        if (memStats.recommendation === 'critical') return 'from-rose-500 to-red-600';
-        if (memStats.recommendation === 'warning') return 'from-amber-400 to-orange-500';
+    const getGradient = (level) => {
+        if (level === 'critical') return 'from-rose-500 to-red-600';
+        if (level === 'warning') return 'from-amber-400 to-orange-500';
         return 'from-emerald-400 to-teal-500';
     };
 
+    const getRssLevel = () => {
+        if (!memStats) return 'unknown';
+        if (memStats.rssMB >= memStats.thresholds.rssCritMB) return 'critical';
+        if (memStats.rssMB >= memStats.thresholds.rssWarnMB) return 'warning';
+        return 'healthy';
+    };
+    const getUsersLevel = () => {
+        if (!memStats) return 'unknown';
+        if (memStats.totalUsersDB >= memStats.thresholds.danger) return 'critical';
+        if (memStats.totalUsersDB >= memStats.thresholds.warn) return 'warning';
+        return 'healthy';
+    };
+
     const getMemoryLabel = () => {
-        if (!memStats) return { text: 'Cargando...', color: 'text-slate-400', glow: '' };
-        if (memStats.recommendation === 'critical') return { text: '🔴 Limpieza Recomendada', color: 'text-rose-600', glow: 'shadow-[0_0_20px_rgba(244,63,94,0.15)]' };
-        if (memStats.recommendation === 'warning') return { text: '🟡 Memoria Moderada', color: 'text-amber-600', glow: 'shadow-[0_0_20px_rgba(245,158,11,0.15)]' };
-        return { text: '🟢 Memoria Saludable', color: 'text-emerald-600', glow: 'shadow-[0_0_20px_rgba(16,185,129,0.15)]' };
+        if (!memStats) return { text: 'Cargando...', color: 'text-slate-400 dark:text-slate-500', glow: '' };
+        const reasons = memStats.reasons || [];
+        if (memStats.recommendation === 'critical') {
+            const why = reasons.includes('rss') ? 'RAM del proceso alta' : 'Base de datos llena';
+            return { text: `🔴 ${why}`, color: 'text-rose-600 dark:text-rose-400', glow: 'shadow-[0_0_20px_rgba(244,63,94,0.15)]' };
+        }
+        if (memStats.recommendation === 'warning') {
+            const why = reasons.includes('rss') ? 'RAM del proceso moderada' : 'Base de datos creciendo';
+            return { text: `🟡 ${why}`, color: 'text-amber-600 dark:text-amber-400', glow: 'shadow-[0_0_20px_rgba(245,158,11,0.15)]' };
+        }
+        return { text: '🟢 Sistema saludable', color: 'text-emerald-600 dark:text-emerald-400', glow: 'shadow-[0_0_20px_rgba(16,185,129,0.15)]' };
     };
 
     return (
@@ -374,51 +406,85 @@ const SettingsView = ({ status }) => {
                                             return (
                                                 <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl ${label.color} bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-sm`}>
                                                     <span className="font-extrabold text-sm tracking-wide">{label.text}</span>
-                                                    <span className="text-xs text-slate-400 font-medium">{memStats.totalUsersDB} / {memStats.thresholds.danger}</span>
                                                 </div>
                                             );
                                         })()}
 
-                                        {/* Progress Bar */}
+                                        {/* RSS bar — RAM real del proceso (lo que de verdad cuenta) */}
                                         <div>
-                                            <div className="flex justify-between text-xs text-slate-500 mb-2 font-bold">
-                                                <span>Ocupación</span>
-                                                <span className="font-mono">{getMemoryPercent()}%</span>
+                                            <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mb-2 font-bold">
+                                                <span className="flex items-center gap-1.5">
+                                                    RAM del proceso
+                                                    {getRssLevel() === 'critical' && <span className="text-rose-500">●</span>}
+                                                    {getRssLevel() === 'warning' && <span className="text-amber-500">●</span>}
+                                                </span>
+                                                <span className="font-mono text-slate-700 dark:text-slate-300">{(memStats.rssMB / 1024).toFixed(1)} GB / 32 GB</span>
                                             </div>
-                                            <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-4 overflow-hidden backdrop-blur-sm">
+                                            <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-3 overflow-hidden">
                                                 <div
-                                                    className={`h-full rounded-full transition-all duration-1000 ease-out bg-gradient-to-r ${getMemoryGradient()}`}
-                                                    style={{ width: `${Math.max(3, getMemoryPercent())}%` }}
+                                                    className={`h-full rounded-full transition-all duration-1000 ease-out bg-gradient-to-r ${getGradient(getRssLevel())}`}
+                                                    style={{ width: `${Math.max(3, getRssPercent())}%` }}
                                                 ></div>
                                             </div>
-                                            <div className="flex justify-between text-[10px] text-slate-400 mt-1.5 font-bold">
+                                            <div className="flex justify-between text-[10px] text-slate-400 dark:text-slate-500 mt-1 font-bold">
                                                 <span>0</span>
-                                                <span className="text-amber-500">⚠ {memStats.thresholds.warn}</span>
-                                                <span className="text-rose-500">🔴 {memStats.thresholds.danger}</span>
+                                                <span className="text-amber-500">⚠ {(memStats.thresholds.rssWarnMB / 1024).toFixed(0)} GB</span>
+                                                <span className="text-rose-500">🔴 {(memStats.thresholds.rssCritMB / 1024).toFixed(0)} GB</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Users in DB bar — referencia, no de salud */}
+                                        <div>
+                                            <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mb-2 font-bold">
+                                                <span className="flex items-center gap-1.5">
+                                                    Usuarios en base de datos
+                                                    {getUsersLevel() === 'critical' && <span className="text-rose-500">●</span>}
+                                                    {getUsersLevel() === 'warning' && <span className="text-amber-500">●</span>}
+                                                </span>
+                                                <span className="font-mono text-slate-700 dark:text-slate-300">{memStats.totalUsersDB.toLocaleString()}</span>
+                                            </div>
+                                            <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-3 overflow-hidden">
+                                                <div
+                                                    className={`h-full rounded-full transition-all duration-1000 ease-out bg-gradient-to-r ${getGradient(getUsersLevel())}`}
+                                                    style={{ width: `${Math.max(3, getUsersPercent())}%` }}
+                                                ></div>
+                                            </div>
+                                            <div className="flex justify-between text-[10px] text-slate-400 dark:text-slate-500 mt-1 font-bold">
+                                                <span>0</span>
+                                                <span className="text-amber-500">⚠ {memStats.thresholds.warn.toLocaleString()}</span>
+                                                <span className="text-rose-500">🔴 {memStats.thresholds.danger.toLocaleString()}</span>
                                             </div>
                                         </div>
 
                                         {/* Stats Grid */}
                                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                             {[
-                                                { value: memStats.totalUsersDB, label: 'Base de Datos', color: 'from-slate-500 to-slate-600' },
+                                                { value: memStats.totalUsersDB.toLocaleString(), label: 'Base de Datos', color: 'from-slate-500 to-slate-600' },
                                                 { value: memStats.ramUsers, label: 'En RAM', color: 'from-blue-500 to-indigo-600' },
                                                 { value: memStats.activeConversations, label: 'Activos Ahora', color: 'from-emerald-500 to-teal-600' },
-                                                { value: `${memStats.heapUsedMB} MB`, label: 'Heap Usada', color: 'from-amber-500 to-orange-600' }
+                                                { value: `${memStats.heapUsedMB} MB`, label: 'Heap V8', color: 'from-amber-500 to-orange-600' }
                                             ].map((stat, i) => (
                                                 <div key={i} className="bg-slate-50 dark:bg-slate-900/50 rounded-2xl p-4 text-center border border-slate-200 dark:border-slate-700 shadow-sm">
                                                     <div className={`text-xl font-black text-transparent bg-clip-text bg-gradient-to-r ${stat.color}`}>{stat.value}</div>
-                                                    <div className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest mt-1">{stat.label}</div>
+                                                    <div className="text-[9px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">{stat.label}</div>
                                                 </div>
                                             ))}
                                         </div>
 
-                                        {/* Info */}
-                                        <p className="text-xs text-slate-400 leading-relaxed font-medium">
-                                            💡 <strong>¿Cuándo limpiar?</strong> Cuando el indicador pase a 🟡 amarillo (+{memStats.thresholds.warn} usuarios).
-                                            Esto borra los estados de conversación acumulados.
-                                            <strong> Las ventas y pedidos NUNCA se borran.</strong>
-                                        </p>
+                                        {/* Info — clarifica qué hace el botón realmente */}
+                                        <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-xl p-3 space-y-1.5">
+                                            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+                                                💡 <strong>Qué hace este botón:</strong> borra el historial de chat
+                                                (<code className="text-[10px] bg-slate-200 dark:bg-slate-800 px-1 rounded">ChatLog</code>)
+                                                y los datos extraídos por IA (<code className="text-[10px] bg-slate-200 dark:bg-slate-800 px-1 rounded">profileData</code>)
+                                                de usuarios <strong>inactivos &gt;48h y sin pedidos</strong>.
+                                            </p>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
+                                                ⚠️ <strong>NO borra usuarios</strong> de la tabla <code className="text-[10px] bg-slate-200 dark:bg-slate-800 px-1 rounded">User</code>:
+                                                el contador de "Base de Datos" se mantendrá igual después de limpiar.
+                                                Las ventas y pedidos <strong>nunca</strong> se tocan.
+                                            </p>
+                                        </div>
 
                                         {/* Reset Button */}
                                         <button
@@ -429,12 +495,12 @@ const SettingsView = ({ status }) => {
                                             {resetting ? (
                                                 <>
                                                     <RefreshCw className="w-5 h-5 animate-spin" />
-                                                    Limpiando Memoria...
+                                                    Limpiando historial...
                                                 </>
                                             ) : (
                                                 <>
                                                     <Trash2 className="w-5 h-5" />
-                                                    Limpiar Memoria de Usuarios
+                                                    Limpiar historial inactivo (&gt;48h)
                                                 </>
                                             )}
                                         </button>
