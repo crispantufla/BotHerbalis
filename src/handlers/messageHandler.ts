@@ -229,7 +229,7 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
                     await chat2.sendStateRecording();
                 } catch (e) { /* ignore */ }
                 try {
-                    const audioText = '¡Hola! Acá Marta del equipo de Herbalis. Contame, ¿en qué te puedo ayudar hoy?';
+                    const audioText = '¡Hola! Acá Elena del equipo de Herbalis. Contame, ¿en qué te puedo ayudar hoy?';
                     const base64Audio = await aiService.generateAudio(audioText);
                     if (base64Audio) {
                         const mediaMp3 = new MessageMedia('audio/mp3', base64Audio, 'audio.mp3');

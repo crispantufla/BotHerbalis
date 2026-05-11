@@ -27,7 +27,7 @@ const SCRIPT_LABELS = {
     v3: { name: 'V3 — Profesional + CR MAX', tone: 'Estructurado, contra reembolso first', color: '#0f5132' },
     v4: { name: 'V4 — Psicología de Ventas', tone: 'Persuasivo, autoridad, escasez', color: '#d97706' },
     v5: { name: 'V5 — Asesor consultivo', tone: 'Pregunta kilos primero, recomienda según objetivo', color: '#0284c7' },
-    v6: { name: 'V6 — Marta charla', tone: 'Cálido, conversacional, argentino', color: '#9333ea' },
+    v6: { name: 'V6 — Elena charla', tone: 'Cálido, conversacional, argentino', color: '#9333ea' },
 };
 
 const SECTION_LABELS = {

@@ -1,7 +1,7 @@
 {
     "meta": {
-        "name": "Guión V6 — Marta charla (humano + argentino)",
-        "description": "Variante consultiva de V5 con tono más cálido, conversacional y argentino. Menos lista de bullets, más historia. Persona explícita: Marta. Para cuando el bot suena 'demasiado bot'.",
+        "name": "Guión V6 — Elena charla (humano + argentino)",
+        "description": "Variante consultiva de V5 con tono más cálido, conversacional y argentino. Menos lista de bullets, más historia. Persona explícita: Elena. Para cuando el bot suena 'demasiado bot'.",
         "version": "6.0"
     },
     "flow": {
@@ -23,7 +23,7 @@
                 "capsulas",
                 "capsula"
             ],
-            "response": "¡Holaa! 😊 Acá Marta, de Herbalis. Te acompaño a bajar de peso con productos 100% naturales — sin dietas locas ni promesas raras 🙂\n\nAntes de tirarte un número, contame algo: ¿cuántos kilos tenés ganas de bajar? Más o menos un estimado:\n\n👉 Pocos (hasta 10)\n👉 Bastante (entre 10 y 20)\n👉 Mucho (más de 20)\n\nMandame el número o contame en tus palabras, lo que te quede más cómodo.",
+            "response": "¡Holaa! 😊 Acá Elena, de Herbalis. Te acompaño a bajar de peso con productos 100% naturales — sin dietas locas ni promesas raras 🙂\n\nAntes de tirarte un número, contame algo: ¿cuántos kilos tenés ganas de bajar? Más o menos un estimado:\n\n👉 Pocos (hasta 10)\n👉 Bastante (entre 10 y 20)\n👉 Mucho (más de 20)\n\nMandame el número o contame en tus palabras, lo que te quede más cómodo.",
             "nextStep": "waiting_weight"
         },
         "recommendation": {
@@ -34,20 +34,20 @@
         },
         "recommendation_1": {
             "step": "waiting_weight",
-            "_note": "Tier 1 — hasta 10 kg → Gotas 60 días. Tono Marta: cálido, anécdota, sin bullets.",
-            "response": "Buenísimo, ya tengo una idea de cómo ayudarte 👌\n\nMirá, para ese objetivo te recomiendo las *gotas* — son lo más suave y práctico que tenemos. Una clienta el mes pasado arrancaba con un objetivo parecido al tuyo y bajó 8 kilos en los dos meses sin esfuerzo, tomándolas todos los días.\n\n¿Cómo se toman? Súper simple: 10 gotas una vez al día, antes del almuerzo o de la cena. No tienen gusto raro, no hay que preparar nada — las tomás y listo.\n\nLo que te llega es:\n👉 El frasco para los dos meses\n👉 Una guía de comidas que armamos acá (no es dieta estricta, son consejitos para acompañar)\n👉 Y yo a tu disposición por WhatsApp durante los dos meses, cualquier duda o consulta me escribís y vamos viendo juntas/os 😊\n\nLlevamos *13 años* trabajando con esto y pasaron casi *70.000 personas* — la verdad es que funciona, sin vueltas 🌿\n\n💰 *Te queda en ${{PRICE_TOTAL_GOTAS_60}}*, todo incluido. El envío te lo mandamos sin costo a tu casa o a la sucursal del Correo Argentino que te quede más cómoda.\n\nAhora, una manito 🎁: si pagás ahora (MercadoPago o transferencia) te bajo $6.000 o te mando una unidad extra de regalo — vos elegís. Y si preferís *pagarlo al recibir*, también podés, no hay drama.\n\n¿Te lo despacho? Si tenés alguna duda contame y charlamos 😊",
+            "_note": "Tier 1 — hasta 10 kg → Gotas 60 días. Tono Elena: cálido, sin anécdotas que prometan resultados específicos.",
+            "response": "Buenísimo, ya tengo una idea de cómo ayudarte 👌\n\nMirá, para ese objetivo te recomiendo las *gotas* — son lo más suave y práctico que tenemos. Te permiten regular la dosis de acuerdo a cómo vas viendo los resultados, ese es uno de los puntos fuertes 🙂\n\n¿Cómo se toman? Súper simple: 10 gotas una vez al día, antes del almuerzo o de la cena. No tienen gusto raro, no hay que preparar nada — las tomás y listo.\n\nLo que te llega es:\n👉 El frasco para los dos meses\n👉 Una guía de comidas que armamos acá (no es una dieta, son consejitos para acompañar)\n👉 Y yo a tu disposición por WhatsApp durante los dos meses, cualquier duda o consulta me escribís y vamos viendo juntas/os 😊\n\nHace más de *13 años* que distribuimos nuestros productos y más de *50.000 personas* lograron excelentes resultados 🌿\n\n💰 *Te queda en ${{PRICE_TOTAL_GOTAS_60}}*, todo incluido. El envío te lo mandamos sin costo a tu casa o a la sucursal del Correo Argentino que te quede más cómoda.\n\nAhora, una manito 🎁: si pagás ahora (MercadoPago o transferencia) te bajo $6.000 o te mando una unidad extra de regalo — vos elegís. Y si preferís *pagarlo al recibir*, no hay problema, el correo solo recibe efectivo.\n\n¿Qué opción de pago preferís? Si tenés alguna duda contame y charlamos 😊",
             "nextStep": "waiting_ok"
         },
         "recommendation_2": {
             "step": "waiting_weight",
-            "_note": "Tier 2 — 10 a 20 kg → Cápsulas 60 días. Tono Marta + upsell suave a 120.",
-            "response": "Bárbaro, ya sé qué te conviene 💪\n\nPara ese objetivo lo que mejor anda son las *cápsulas* — son lo más efectivo que tenemos y al mismo tiempo súper prácticas. La mayoría de gente que arranca queriendo bajar 10 a 20 kilos lo logra con este plan.\n\n¿Cómo se toma? Una sola cápsula al día, 30 minutos antes del almuerzo o cena, con un vasito de agua. Y listo, eso es todo.\n\nLo que te llega es:\n👉 Las cápsulas para los dos meses (60 cápsulas)\n👉 Una guía de comidas con consejitos para acompañar (no es dieta estricta)\n👉 Y yo por WhatsApp durante los dos meses por si surge cualquier duda — me escribís y vamos viendo juntas/os 😊\n\nLlevamos *13 años* haciendo esto, pasaron casi *70.000 personas* — funciona, te lo digo sin vueltas 🌿\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_CAPSULAS_60}}*\n💰 _Plan 4 meses: ${{PRICE_CAPSULAS_120}}_ — si querés ir al tratamiento completo y asegurarte que el peso no rebote, este es el ideal\n\nUna manito 🎁: si pagás ahora (MercadoPago o transferencia) te bajo $6.000 o te mando una unidad extra de regalo. Si preferís *pagarlo al recibir*, también podés.\n\n¿Cómo te queda mejor? Si tenés alguna duda contame, no hay apuro 😊",
+            "_note": "Tier 2 — 10 a 20 kg → Cápsulas 60 días. Tono Elena + upsell suave a 120 (sin hablar de rebote).",
+            "response": "Bárbaro, ya sé qué te conviene 💪\n\nPara ese objetivo lo que mejor anda son las *cápsulas* — son lo más efectivo que tenemos y al mismo tiempo súper prácticas. La mayoría de gente que arranca queriendo bajar 10 a 20 kilos lo logra con este plan.\n\n¿Cómo se toma? Una sola cápsula al día, 30 minutos antes del almuerzo o cena, con un vasito de agua. Y listo, eso es todo.\n\nLo que te llega es:\n👉 Las cápsulas para los dos meses (60 cápsulas)\n👉 Una guía de comidas con consejitos para acompañar (no es una dieta)\n👉 Y yo por WhatsApp durante los dos meses por si surge cualquier duda — me escribís y vamos viendo juntas/os 😊\n\nHace más de *13 años* que distribuimos nuestros productos y más de *50.000 personas* lograron excelentes resultados 🌿\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_CAPSULAS_60}}*\n💰 _Plan 4 meses: ${{PRICE_CAPSULAS_120}}_ — es el más conveniente por el precio, y seguramente te van a sobrar cápsulas: muchas clientas, cuando llegan al peso, consumen una o dos veces a la semana como mantenimiento.\n\nUna manito 🎁: si pagás ahora (MercadoPago o transferencia) te bajo $6.000 o te mando una unidad extra de regalo. Si preferís *pagarlo al recibir*, no hay problema, el correo solo recibe efectivo.\n\n¿Qué opción de pago preferís? Si tenés alguna duda contame, no hay apuro 😊",
             "nextStep": "waiting_ok"
         },
         "recommendation_3": {
             "step": "waiting_weight",
-            "_note": "Tier 3 — +20 kg → Cápsulas 120 días. Tono Marta + 60 como alternativa.",
-            "response": "Genial, te cuento qué te conviene 💪\n\nPara más de 20 kilos lo que más recomiendo son las *cápsulas en plan de 4 meses*. ¿Por qué los 4 meses y no 2? Porque es el tiempo que el cuerpo necesita para bajar de forma sostenida, sin que después rebote. La gente que arranca queriendo bajar tantos kilos y va al plan de 2 meses muchas veces vuelve a comprar el segundo igual — así que te conviene de una.\n\n¿Cómo se toma? Una cápsula al día, 30 min antes del almuerzo o cena, con un vasito de agua. Súper fácil.\n\nLo que te llega es:\n👉 Las cápsulas para los 4 meses (120 cápsulas)\n👉 Una guía de comidas con consejitos para acompañar\n👉 Y yo por WhatsApp durante todo el tratamiento — cualquier duda me escribís 😊\n\nLlevamos *13 años* trabajando con esto, casi *70.000 personas* lo lograron 🌿\n\n💰 *Plan 4 meses (recomendado): ${{PRICE_CAPSULAS_120}}* — envío y pago a domicilio bonificados\n💰 _Plan 2 meses: ${{PRICE_TOTAL_CAPSULAS_60}}_ — si querés probar primero, después podés extender\n\nUna manito 🎁: si pagás ahora (MercadoPago o transferencia) te bajo $6.000 o te mando una unidad extra de regalo. Si preferís *pagarlo al recibir*, también se puede.\n\n¿Te lo despacho? Cualquier duda contame, charlamos lo que haga falta 😊",
+            "_note": "Tier 3 — +20 kg → Cápsulas 120 días. Tono Elena + 60 como alternativa (sin hablar de rebote).",
+            "response": "Genial, te cuento qué te conviene 💪\n\nPara más de 20 kilos lo que más recomiendo son las *cápsulas en plan de 4 meses*. ¿Por qué los 4 meses y no 2? Porque es el tiempo que el cuerpo necesita para bajar de forma sostenida y completar el tratamiento. La gente que arranca queriendo bajar tantos kilos y va al plan de 2 meses muchas veces vuelve a comprar el segundo igual — así que te conviene de una.\n\n¿Cómo se toma? Una cápsula al día, 30 min antes del almuerzo o cena, con un vasito de agua. Súper fácil.\n\nLo que te llega es:\n👉 Las cápsulas para los 4 meses (120 cápsulas)\n👉 Una guía de comidas con consejitos para acompañar (no es una dieta)\n👉 Y yo por WhatsApp durante todo el tratamiento — cualquier duda me escribís 😊\n\nHace más de *13 años* que distribuimos nuestros productos y más de *50.000 personas* lograron excelentes resultados 🌿\n\n💰 *Plan 4 meses (recomendado): ${{PRICE_CAPSULAS_120}}* — envío y pago a domicilio bonificados\n💰 _Plan 2 meses: ${{PRICE_TOTAL_CAPSULAS_60}}_ — si querés probar primero, después podés extender\n\nUna manito 🎁: si pagás ahora (MercadoPago o transferencia) te bajo $6.000 o te mando una unidad extra de regalo. Si preferís *pagarlo al recibir*, no hay problema, el correo solo recibe efectivo.\n\n¿Qué opción de pago preferís? Cualquier duda contame, charlamos lo que haga falta 😊",
             "nextStep": "waiting_ok"
         },
         "preference_capsulas": {
@@ -61,7 +61,7 @@
                 "practico",
                 "practica"
             ],
-            "response": "¡Dale, las cápsulas son lo más práctico que tenemos! 💊\n\nUna por día, 30 min antes de la comida principal, y listo.\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_CAPSULAS_60}}*\n💰 *Plan 4 meses: ${{PRICE_CAPSULAS_120}}* (sin adicional, envío y pago bonificados)\n\nSi pagás ahora te bajo $6.000 o te mando una unidad extra 🎁\n\n¿Cuál te conviene, 60 o 120 días?",
+            "response": "¡Dale, las cápsulas son lo más práctico que tenemos! 💊\n\nUna por día, 30 min antes de la comida principal, y listo.\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_CAPSULAS_60}}*\n💰 *Plan 4 meses: ${{PRICE_CAPSULAS_120}}*\n_(sin gastos de envío)_\n\nSi pagás ahora con tarjeta o transferencia te bajo $6.000 o te mando una unidad extra 🎁\n\n¿Cuál de las opciones te envío y cómo preferís hacer el pago — ahora o al recibir?",
             "nextStep": "waiting_plan_choice"
         },
         "preference_gotas": {
@@ -71,7 +71,7 @@
                 "liquido",
                 "gotero"
             ],
-            "response": "¡Dale! Las gotas son lo más suave y discreto 💧\n\n10 gotas una vez al día, sin preparar nada.\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_GOTAS_60}}*\n💰 *Plan 4 meses: ${{PRICE_GOTAS_120}}* (sin adicional)\n\nSi pagás ahora te bajo $6.000 o te mando una unidad extra 🎁\n\n¿Cuál te conviene, 60 o 120 días?",
+            "response": "¡Dale! Las gotas son lo más suave y discreto 💧\n\n10 gotas una vez al día, sin preparar nada.\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_GOTAS_60}}*\n💰 *Plan 4 meses: ${{PRICE_GOTAS_120}}*\n_(sin gastos de envío)_\n\nSi pagás ahora con tarjeta o transferencia te descuento $6.000 o te mando 60 días de regalo 🎁\n\n¿Qué forma de pago preferís, y para 60 o 120 días?",
             "nextStep": "waiting_plan_choice"
         },
         "preference_semillas": {
@@ -84,7 +84,7 @@
                 "yuyos",
                 "te de semilla"
             ],
-            "response": "¡Ah, ya conocés las semillas! 🌿 La opción más natural de todas.\n\nSe prepara como una infusioncita cada noche, antes de dormir.\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_SEMILLAS_60}}*\n💰 *Plan 4 meses: ${{PRICE_SEMILLAS_120}}*\n\nSi pagás ahora te bajo $6.000 o te mando una unidad extra 🎁\n\n¿60 o 120 días?",
+            "response": "¡Ah, ya conocés las semillas! 🌿 La opción más natural de todas.\n\nSe prepara como una infusioncita cada noche, antes de dormir.\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_SEMILLAS_60}}*\n💰 *Plan 4 meses: ${{PRICE_SEMILLAS_120}}*\n\nSi pagás ahora con tarjeta o transferencia te descuento $6.000 o te mando 60 días de regalo 🎁\n\n¿60 o 120 días?",
             "nextStep": "waiting_plan_choice"
         },
         "closing": {
@@ -107,7 +107,8 @@
         },
         "confirmation": {
             "step": "waiting_data",
-            "response": "📦 Te confirmo todo:\n\nProducto: {{PRODUCT}}\nPlan: {{PLAN}} días\nTotal a pagar al recibir: {{TOTAL}}\n\n✔ Va por Correo Argentino\n✔ Llega entre 7 y 10 días hábiles\n✔ Pago en EFECTIVO al recibir\n\nUna cosa importante: si el cartero no te encuentra, el paquete queda en sucursal del correo y tenés 72 hs para retirarlo gratis. Si no lo retirás, ahí sí tiene un costo logístico de ${{COSTO_LOGISTICO}}.\n\n¿Confirmás que podés recibirlo o, si no estás, retirarlo de sucursal? 😊",
+            "_note": "El método de pago se inyecta dinámicamente desde el flow (no hardcodear EFECTIVO).",
+            "response": "📦 Te confirmo todo:\n\nProducto: {{PRODUCT}}\nPlan: {{PLAN}} días\nTotal: {{TOTAL}}\n\n✔ Va por Correo Argentino\n✔ Llega entre 7 y 10 días hábiles\n\nUna cosa importante: si el cartero no te encuentra, o por cualquier otra razón el correo determina que lo tenés que retirar en la sucursal, tenés 72 hs desde que te avisemos. Si no lo retirás, ahí sí tiene un costo logístico de ${{COSTO_LOGISTICO}}.\n\n¿Me asegurás que vas a poder retirarlo dentro de las 72 hs si llegara a quedar en sucursal? 😊",
             "nextStep": "completed"
         }
     },
@@ -123,7 +124,7 @@
                 "duda 1",
                 "opcion 1"
             ],
-            "_note": "FAQ menu opción 1 — '¿Funciona de verdad?' (tono Marta)",
+            "_note": "FAQ menu opción 1 — '¿Funciona de verdad?' (tono Elena)",
             "response": "Te cuento — sí, funciona, pero te aclaro algo importante: cada cuerpo responde a su ritmo 😊\n\nLo que SÍ te puedo asegurar es que llevamos *13 años* con este producto, pasaron casi *70.000 personas* y la mayoría logra el objetivo. Son resultados reales, sin vueltas.\n\n¿Te lo despacho? 🌿"
         },
         {
@@ -133,7 +134,7 @@
                 "duda 2",
                 "opcion 2"
             ],
-            "_note": "FAQ menu opción 2 — '¿Es seguro?' (tono Marta)",
+            "_note": "FAQ menu opción 2 — '¿Es seguro?' (tono Elena)",
             "response": "Es seguro, sí — *100% natural*, sin químicos ni agregados raros 🌿\n\nLo único que te pido tener en cuenta: no se recomienda en embarazo, lactancia, menores de 18 ni personas de más de 80 años. Para todo lo demás (presión, tiroides, diabetes, etc.) no hay problema.\n\n¿Te lo despacho? 😊"
         },
         {
@@ -145,7 +146,7 @@
                 "duda 3",
                 "opcion 3"
             ],
-            "_note": "FAQ menu opción 3 — '¿Tiene contraindicaciones?' (tono Marta)",
+            "_note": "FAQ menu opción 3 — '¿Tiene contraindicaciones?' (tono Elena)",
             "response": "Te cuento las únicas situaciones donde NO lo recomendamos:\n\n- Embarazo o lactancia\n- Menores de 18 años\n- Personas de más de 80 años\n\nPara cualquier otra cosa (presión, tiroides, diabetes, etc.) no hay drama — muchas personas con esas condiciones lo toman sin problema. Si tenés algo puntual contame y vemos juntas/os 😊\n\n¿Te lo despacho?"
         },
         {
@@ -160,8 +161,8 @@
                 "duda 4",
                 "opcion 4"
             ],
-            "_note": "FAQ menu opción 4 — '¿Cómo lo recibo y cuánto tarda?' (tono Marta)",
-            "response": "Te cuento cómo es 📦\n\nMandamos por Correo Argentino a tu casa o a la sucursal que te quede cómoda.\n\n⚡ Si pagás ahora (MP o transferencia): tarda 4 a 6 días hábiles\n🛍️ Si pagás al recibir: tarda 7 a 10 días hábiles (es un poco más lento porque va por paquetería común)\n\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs para que pases a buscarlo gratis.\n\n¿Te lo despacho? 😊"
+            "_note": "FAQ menu opción 4 — '¿Cómo lo recibo y cuánto tarda?' (tono Elena). El retiro en sucursal NO es solo por carteros que no encuentran — el correo puede mandarlo a sucursal por otras razones.",
+            "response": "Te cuento cómo es 📦\n\nMandamos por Correo Argentino a tu casa o a la sucursal que te quede cómoda.\n\n⚡ Si pagás ahora (MP o transferencia): tarda 4 a 6 días hábiles\n🛍️ Si pagás al recibir: tarda 7 a 10 días hábiles (es un poco más lento porque va por paquetería común)\n\nSi el cartero no te encuentra, o por cualquier otra razón que el correo disponga que retires en sucursal, nosotros te avisamos y tenés 72 hs para retirarlo.\n\n¿Te lo despacho? 😊"
         },
         {
             "keywords": [
@@ -172,7 +173,7 @@
                 "alias",
                 "transferencia"
             ],
-            "response": "Tenés varias formas, fijate cuál te conviene:\n\n👉 *MercadoPago* (tarjeta, débito o saldo)\n👉 *Transferencia bancaria*\n👉 *Contra reembolso* (efectivo al recibir)\n\nSi pagás ahora con MP o transferencia llega más rápido (4-6 días) y además te hacemos un descuento o te mandamos una unidad extra de regalo 🎁\n\n¿Cuál preferís?"
+            "response": "Tenés varias formas, fijate cuál te conviene:\n\n👉 *MercadoPago* (tarjeta, débito o saldo)\n👉 *Transferencia bancaria*\n👉 *Contra reembolso* (efectivo al recibir)\n\nSi pagás ahora con MP o transferencia llega más rápido (4-6 días) y además te hacemos un descuento de $6.000 o te mandamos una unidad extra de regalo 🎁\n\n¿Qué opción preferís?"
         },
         {
             "keywords": [
@@ -197,7 +198,7 @@
             "keywords": [
                 "rebote"
             ],
-            "response": "*No hay rebote* — ese problema viene con métodos agresivos. Esto es 100% natural y el descenso es progresivo, así que el cuerpo no se acostumbra mal."
+            "response": "*No hay rebote* — ese problema viene con métodos agresivos, dietas muy restrictivas o consumo de químicos. Esto es 100% natural y el descenso es progresivo, así que el cuerpo no se acostumbra mal."
         },
         {
             "keywords": [
@@ -218,7 +219,7 @@
                 "engaño",
                 "chanta"
             ],
-            "response": "Te entiendo, hoy en día se ven cosas raras por internet 😊\n\nJustamente por eso te ofrecemos *pagar al recibir*: el cartero te entrega el paquete en mano, lo abrís, ves que está todo bien, y recién ahí pagás. Riesgo cero para vos."
+            "response": "Te entiendo, hoy en día se ven cosas raras por internet 😊\n\nJustamente por eso te ofrecemos *pagar al recibir*: el cartero te entrega el paquete en mano y recién ahí pagás. Riesgo cero para vos."
         },
         {
             "keywords": [
@@ -238,7 +239,7 @@
                 "no me gusto",
                 "quiero devolver"
             ],
-            "response": "Mirá, si el producto te llega dañado lo reenviamos sin costo, eso te lo aseguro.\n\nAhora, devolución de plata no hacemos — porque cada cuerpo responde distinto y no podemos garantizar resultados. Lo que sí te puedo decir es que llevamos *13 años* y casi *70.000 personas* — el producto funciona 😊"
+            "response": "Mirá, si el producto te llega dañado lo reenviamos sin costo, eso te lo aseguro.\n\nAhora, devolución de plata no hacemos — porque cada cuerpo responde distinto y no podemos garantizar resultados. Lo que sí te puedo decir es que llevamos *13 años* y casi *70.000 clientes satisfechos* — el producto funciona 😊"
         },
         {
             "keywords": [
@@ -255,7 +256,7 @@
                 "rastreo",
                 "donde esta mi pedido"
             ],
-            "response": "Te paso el código de seguimiento dentro de las 48-72 hs después de despacharlo 📦"
+            "response": "A partir de las 48 hs podés pedirnos el código de seguimiento 📦\n\nDe todos modos nosotros hacemos el seguimiento por vos y si surge algo te avisamos en el día."
         },
         {
             "keywords": [
@@ -285,7 +286,7 @@
         "noCreditCard": false,
         "noArgue": true,
         "keepResponsesShort": false,
-        "_note_responseLength": "V6 prefiere respuestas más extensas y conversacionales que V5 — el tono de 'Marta' justifica el largo extra.",
+        "_note_responseLength": "V6 prefiere respuestas más extensas y conversacionales que V5 — el tono de 'Elena' justifica el largo extra.",
         "contraReembolsoMAX": {
             "enabled": true,
             "adicional": 6000,
