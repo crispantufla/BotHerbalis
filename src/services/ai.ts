@@ -309,6 +309,9 @@ REGLAS DE ESTE PASO:
 
 function _getModulePlanChoice(prices: Record<string, any>): string {
     return `
+🛑 ESTE PASO USA RESPUESTA EXPANDIDA POR DEFECTO (MÚLTIPLES PÁRRAFOS, DETALLADO).
+El cliente está eligiendo el plan — momento crítico de la venta donde la persuasión convierte. NO seas conciso aunque la regla general pida brevedad: acá necesitás ANCLAR VALOR (el plan 120 es $X por día = costo de un café), DERRIBAR la objeción de precio si aparece, y EXPLICAR el porqué de los 120 vs 60 con confianza. Apoyate en el argumento de "no solo te ahorrás los $X del adicional, es tratamiento completo y la grasa no vuelve". Si compara productos, comparalos a fondo. Mínimo 2 párrafos cuando hay objeción o duda.
+
 PRECIOS EXACTOS:
 - Cápsulas: $${prices['Cápsulas']['60']} (60d) / $${prices['Cápsulas']['120']} (120d)
 - Semillas: $${prices['Semillas']['60']} (60d) / $${prices['Semillas']['120']} (120d)
@@ -341,6 +344,9 @@ REGLAS CRÍTICAS DE ESTE PASO (¡LEER BIEN!):
 
 function _getModuleDataCollection(): string {
     return `
+🛑 ESTE PASO USA RESPUESTA EXPANDIDA cuando hay hesitación o postergación.
+Para pedir los datos básicos: corto está bien ("¿Te tomo los datos? Necesito nombre, calle, ciudad y CP"). PERO si el cliente duda, posterga ("cuando cobre", "mañana te aviso", "no estoy seguro"), o pregunta algo lateral (envío, retiro, terceros): EXPANDÍ con empatía + explicación + alternativa concreta (congelar precio, retiro en sucursal, postdatar). Acá se nos cae mucha gente que ya estaba lista para comprar; una respuesta tibia los pierde. Mínimo 2 párrafos ante cualquier resistencia.
+
 DATOS NECESARIOS: nombre completo, calle y número, ciudad, código postal.
 🔴🔴[REGLA ABSOLUTA] PROHIBIDO PEDIR NÚMERO DE TELÉFONO. 🔴🔴
 🔴🔴[REGLA CÓDIGO POSTAL] Si el usuario dice explícitamente que NO SABE su código postal, qué es, o no lo entiende, extraé cp: "UNKNOWN". 🔴🔴
