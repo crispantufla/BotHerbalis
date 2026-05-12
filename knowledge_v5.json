@@ -35,19 +35,19 @@
         "recommendation_1": {
             "step": "waiting_weight",
             "_note": "Tier 1 — hasta 10 kg → Gotas 60 días. Pitch + price + prepay incentive + cierre",
-            "response": "¡Genial! 👌 Para vos, lo ideal es el *Plan de Gotas para 2 meses*. La mayoría de clientes que querían bajar lo mismo que vos lograron entre 7 y 10 kilos con este plan.\n\nTe explico cómo funciona:\n💧 Tomás 10 gotas 1 vez por día (almuerzo o cena)\n📋 Te mando una guía de consejos alimentarios\n📞 Te acompañamos con asesoramiento nutricional por WhatsApp durante todo el tratamiento\n\nNuestros consejos están respaldados por más de *13 años distribuyendo* nuestros productos y casi *70.000 clientes agradecidos* 🌿\n\n💰 *Plan completo: ${{PRICE_TOTAL_GOTAS_60}}* — todo incluido y enviado a tu casa o a la sucursal del Correo Argentino más cercana.\n\n🎁 *Si pagás ahora* (con MercadoPago o transferencia) tenés un descuento — o te mandamos una unidad extra de regalo.\nSi preferís, también podés *pagar al recibir*.\n\n👉 ¿Te lo envío? ¿O te queda alguna duda?",
+            "response": "¡Genial! 👌 Para vos, lo ideal es el *Plan de Gotas para 2 meses*. La mayoría de clientes que querían bajar lo mismo que vos lograron entre 7 y 10 kilos con este plan.\n\nTe explico cómo funciona:\n💧 Tomás 10 gotas 1 vez por día (almuerzo o cena) — se puede regular la dosis según resultados\n📋 Te mando una guía de consejos alimentarios\n📞 Te acompañamos por WhatsApp durante todo el tratamiento\n\nMás de *13 años distribuyendo* nuestros productos y casi *50.000 clientes satisfechos* 🌿\n\n💰 *Plan completo: ${{PRICE_TOTAL_GOTAS_60}}* — todo incluido y enviado a tu casa o a la sucursal del Correo Argentino más cercana.\n\n🎁 *Si pagás ahora* (MercadoPago o transferencia) te bajo $6.000 o te mando una unidad extra de regalo.\nSi preferís, también podés *pagar al recibir*.\n\n👉 ¿Qué opción de pago preferís? ¿O te queda alguna duda?",
             "nextStep": "waiting_ok"
         },
         "recommendation_2": {
             "step": "waiting_weight",
             "_note": "Tier 2 — 10 a 20 kg → Cápsulas 60 días (con upsell suave a 120)",
-            "response": "¡Genial! 👌 Para vos, lo ideal es el *Plan de Cápsulas para 2 meses*. La mayoría de clientes que querían bajar lo mismo que vos lograron entre 15 y 20 kilos con este plan.\n\nTe explico cómo funciona:\n💊 Tomás 1 cápsula al día, 30 min antes del almuerzo o cena\n📋 Te mando una guía de consejos alimentarios\n📞 Te acompañamos con asesoramiento nutricional por WhatsApp durante todo el tratamiento\n\nNuestros consejos están respaldados por más de *13 años distribuyendo* nuestros productos y casi *70.000 clientes agradecidos* 🌿\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_CAPSULAS_60}}*\n💰 _Plan 4 meses: ${{PRICE_CAPSULAS_120}}_ (más completo, sin rebote)\n\n🎁 *Si pagás ahora* (con MercadoPago o transferencia) tenés un descuento — o te mandamos una unidad extra de regalo.\nSi preferís, también podés *pagar al recibir*.\n\n👉 ¿Te lo envío? ¿O te queda alguna duda?",
+            "response": "¡Genial! 👌 Para vos, lo ideal es el *Plan de Cápsulas para 2 meses*. La mayoría de clientes que querían bajar lo mismo que vos lograron entre 15 y 20 kilos con este plan.\n\nTe explico cómo funciona:\n💊 Tomás 1 cápsula al día, 30 min antes del almuerzo o cena\n📋 Te mando una guía de consejos alimentarios\n📞 Te acompañamos por WhatsApp durante todo el tratamiento\n\nMás de *13 años distribuyendo* nuestros productos y casi *50.000 clientes satisfechos* 🌿\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_CAPSULAS_60}}*\n💰 _Plan 4 meses: ${{PRICE_CAPSULAS_120}}_ — el más conveniente; muchas clientas, al llegar al peso, lo usan 1-2 veces por semana como mantenimiento.\n\n🎁 *Si pagás ahora* (MercadoPago o transferencia) te bajo $6.000 o te mando una unidad extra de regalo.\nSi preferís, también podés *pagar al recibir*.\n\n👉 ¿Qué opción de pago preferís? ¿O te queda alguna duda?",
             "nextStep": "waiting_ok"
         },
         "recommendation_3": {
             "step": "waiting_weight",
             "_note": "Tier 3 — más de 20 kg → Cápsulas 120 días (también ofrece 60 si presupuesto)",
-            "response": "¡Genial! 👌 Para vos, lo ideal es el *Plan de Cápsulas para 4 meses*. La mayoría de clientes que querían bajar más de 20 kilos lo lograron con este plan, de forma sostenida y sin rebote.\n\nTe explico cómo funciona:\n💊 Tomás 1 cápsula al día, 30 min antes del almuerzo o cena\n📋 Te mando una guía de consejos alimentarios\n📞 Te acompañamos con asesoramiento nutricional por WhatsApp durante todo el tratamiento\n\nNuestros consejos están respaldados por más de *13 años distribuyendo* nuestros productos y casi *70.000 clientes agradecidos* 🌿\n\n💰 *Plan 4 meses (recomendado): ${{PRICE_CAPSULAS_120}}* — envío y pago a domicilio bonificados ✅\n💰 _Plan 2 meses: ${{PRICE_TOTAL_CAPSULAS_60}}_ — opción más corta\n\n🎁 *Si pagás ahora* (con MercadoPago o transferencia) tenés un descuento — o te mandamos una unidad extra de regalo.\nSi preferís, también podés *pagar al recibir*.\n\n👉 ¿Te lo envío? ¿O te queda alguna duda?",
+            "response": "¡Genial! 👌 Para vos, lo ideal es el *Plan de Cápsulas para 4 meses*. La mayoría de clientes que querían bajar más de 20 kilos lo lograron con este plan, de forma progresiva y sostenida.\n\nTe explico cómo funciona:\n💊 Tomás 1 cápsula al día, 30 min antes del almuerzo o cena\n📋 Te mando una guía de consejos alimentarios\n📞 Te acompañamos por WhatsApp durante todo el tratamiento\n\nMás de *13 años distribuyendo* nuestros productos y casi *50.000 clientes satisfechos* 🌿\n\n💰 *Plan 4 meses (recomendado): ${{PRICE_CAPSULAS_120}}* — envío y pago a domicilio bonificados ✅\n💰 _Plan 2 meses: ${{PRICE_TOTAL_CAPSULAS_60}}_ — opción más corta si querés probar primero\n\n🎁 *Si pagás ahora* (MercadoPago o transferencia) te bajo $6.000 o te mando una unidad extra de regalo.\nSi preferís, también podés *pagar al recibir*.\n\n👉 ¿Qué opción de pago preferís? ¿O te queda alguna duda?",
             "nextStep": "waiting_ok"
         },
         "preference_capsulas": {
@@ -61,7 +61,7 @@
                 "practico",
                 "practica"
             ],
-            "response": "¡Dale! 💊 Las cápsulas son lo más práctico — 1 al día, 30 min antes de la comida principal.\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_CAPSULAS_60}}*\n💰 *Plan 4 meses: ${{PRICE_CAPSULAS_120}}* (sin adicional, envío y pago bonificados)\n\n🎁 *Si pagás ahora* tenés un descuento o una unidad extra de regalo.\n\n👉 ¿Avanzamos con 60 o 120 días?",
+            "response": "¡Dale! 💊 Las cápsulas son lo más práctico — 1 al día, 30 min antes de la comida principal.\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_CAPSULAS_60}}*\n💰 *Plan 4 meses: ${{PRICE_CAPSULAS_120}}*\n_(sin gastos de envío)_\n\n🎁 *Si pagás ahora* con MercadoPago o transferencia te bajo $6.000 o te mando una unidad extra de regalo.\n\n👉 ¿Avanzamos con 60 o 120 días? ¿Cómo preferís hacer el pago?",
             "nextStep": "waiting_plan_choice"
         },
         "preference_gotas": {
@@ -71,7 +71,7 @@
                 "liquido",
                 "gotero"
             ],
-            "response": "¡Dale! 💧 Las gotas son prácticas y discretas — 10 gotas, 1 vez al día.\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_GOTAS_60}}*\n💰 *Plan 4 meses: ${{PRICE_GOTAS_120}}* (sin adicional, envío y pago bonificados)\n\n🎁 *Si pagás ahora* tenés un descuento o una unidad extra de regalo.\n\n👉 ¿Avanzamos con 60 o 120 días?",
+            "response": "¡Dale! 💧 Las gotas son prácticas y discretas — 10 gotas, 1 vez al día.\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_GOTAS_60}}*\n💰 *Plan 4 meses: ${{PRICE_GOTAS_120}}*\n_(sin gastos de envío)_\n\n🎁 *Si pagás ahora* con MercadoPago o transferencia te bajo $6.000 o te mando una unidad extra de regalo.\n\n👉 ¿Avanzamos con 60 o 120 días? ¿Cómo preferís hacer el pago?",
             "nextStep": "waiting_plan_choice"
         },
         "preference_semillas": {
@@ -108,7 +108,8 @@
         },
         "confirmation": {
             "step": "waiting_data",
-            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT}}\nPlan: {{PLAN}} días\nTotal a pagar al recibir: {{TOTAL}}\n\n✔ Correo Argentino\n✔ Entrega estimada: 7 a 10 días hábiles\n✔ Pago exclusivo en EFECTIVO al recibir\n\n👉 Importante: si el cartero no te encuentra, el paquete vuelve a sucursal y tenés 72hs para retirarlo gratis.\n\nEl rechazo o no retiro genera un costo logístico de ${{COSTO_LOGISTICO}}.\n\n👉 ¿Confirmás que recibís o retirás de sucursal sin inconvenientes?",
+            "_note": "El método de pago se inyecta dinámicamente desde el flow (no hardcodear EFECTIVO). Retiro en sucursal NO es solo por cartero — el correo puede mandarlo a sucursal por otras razones.",
+            "response": "📦 Te confirmo el pedido:\n\nProducto: {{PRODUCT}}\nPlan: {{PLAN}} días\nTotal: {{TOTAL}}\n\n✔ Correo Argentino\n✔ Entrega estimada: 7 a 10 días hábiles\n\nUna cosa importante: si el cartero no te encuentra, o por cualquier otra razón el correo determina que lo tenés que retirar en la sucursal, tenés 72 hs desde que te avisemos. Si no lo retirás, ahí sí tiene un costo logístico de ${{COSTO_LOGISTICO}}.\n\n👉 ¿Me asegurás que vas a poder retirarlo dentro de las 72 hs si llegara a quedar en sucursal? 😊",
             "nextStep": "completed"
         }
     },
@@ -162,8 +163,8 @@
                 "duda 4",
                 "opcion 4"
             ],
-            "_note": "FAQ menu opción 4 — '¿Cómo lo recibo y cuánto tarda?'",
-            "response": "📦 *Envíos por Correo Argentino* a tu domicilio o a la sucursal más cercana.\n\n⚡ *Si pagás ahora* (MercadoPago o transferencia): demora *4 a 6 días hábiles*\n🛍️ *Si pagás al recibir* (solo efectivo): demora *7 a 10 días hábiles*\n\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs para retirarlo gratis.\n\n👉 ¿Te lo envío?"
+            "_note": "FAQ menu opción 4 — '¿Cómo lo recibo y cuánto tarda?'. El retiro en sucursal NO es solo por cartero — el correo puede mandarlo a sucursal por otras razones.",
+            "response": "📦 *Envíos por Correo Argentino* a tu domicilio o a la sucursal más cercana.\n\n⚡ *Si pagás ahora* (MercadoPago o transferencia): demora *4 a 6 días hábiles*\n🛍️ *Si pagás al recibir* (solo efectivo): demora *7 a 10 días hábiles*\n\nSi el cartero no te encuentra, o por cualquier otra razón que el correo disponga que retires en sucursal, te avisamos y tenés 72 hs para retirarlo.\n\n👉 ¿Te lo envío?"
         },
         {
             "keywords": [
@@ -174,7 +175,7 @@
                 "alias",
                 "transferencia"
             ],
-            "response": "Aceptamos *MercadoPago* (tarjeta, débito, saldo MP), *transferencia bancaria* y *contra reembolso* (efectivo al recibir).\n\nSi pagás ahora con MP o transferencia, el envío llega más rápido (4-6 días) y tenés un descuento o una unidad extra de regalo 🎁\n\n¿Cuál te queda más cómoda?"
+            "response": "Aceptamos *MercadoPago* (tarjeta, débito, saldo MP), *transferencia bancaria* y *contra reembolso* (efectivo al recibir).\n\nSi pagás ahora con MP o transferencia llega más rápido (4-6 días) y además te hacemos un descuento de $6.000 o te mandamos una unidad extra de regalo 🎁\n\n¿Qué opción preferís?"
         },
         {
             "keywords": [
@@ -199,7 +200,7 @@
             "keywords": [
                 "rebote"
             ],
-            "response": "*No hay rebote.* El rebote suele aparecer con métodos agresivos. La nuez es 100% natural y el descenso es progresivo y sostenido."
+            "response": "*No hay rebote* — ese problema viene con métodos agresivos, dietas muy restrictivas o consumo de químicos. Esto es 100% natural y el descenso es progresivo, así que el cuerpo no se acostumbra mal."
         },
         {
             "keywords": [
@@ -257,7 +258,7 @@
                 "rastreo",
                 "donde esta mi pedido"
             ],
-            "response": "¡Sí! Te damos el código de seguimiento dentro de las 48-72 hs después del despacho 📦"
+            "response": "A partir de las 48 hs podés pedirnos el código de seguimiento 📦\n\nDe todos modos nosotros hacemos el seguimiento por vos y si surge algo te avisamos en el día."
         },
         {
             "keywords": [
