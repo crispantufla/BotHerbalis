@@ -1,18 +1,17 @@
 /**
- * Payment method flow tests — LEGACY (política vieja).
+ * Payment method flow tests — política nueva (mayo 2026).
  *
- * ⚠️ MAYO 2026: Estos tests testean la política VIEJA de pagos:
- *  - 3 opciones (MP, Transferencia, Contra reembolso) — ahora solo MP
- *  - Adicional $6.000 en plan 60 — eliminado
- *  - Cash retry con argumento de ahorro — reemplazado por seña $10k
+ * Cobertura:
+ *  - stepWaitingOk → transición a waiting_payment_method
+ *  - stepWaitingPaymentMethod → MP-first, seña $10k para COD, transferencia opcional
+ *  - stepWaitingMpPayment — link normal vs link de seña ($10k), confirmación seña
+ *  - _finalizeOrderAndNotifyAdmin distingue MP completo vs seña + alerta breakdown
  *
- * Política nueva (cubierta en tests/sena_flow_smoke.test.js):
- *  - Solo se ofrece MP espontáneamente
- *  - COD requiere seña de $10.000 vía MP + saldo al cartero
- *  - Sin descuentos de prepago
- *
- * TODO: reescribir este archivo para testear el flujo nuevo.
- * Por ahora todos los describes están con `.skip` para no bloquear CI.
+ * Política nueva:
+ *  - Solo MP se ofrece espontáneamente
+ *  - Contra reembolso requiere seña $10k vía MP + saldo al cartero
+ *  - Sin adicional de $6.000, sin descuento de prepago
+ *  - Aplica a TODOS los planes y a TODOS los clientes
  */
 
 jest.mock('../safeWrite', () => ({ atomicWriteFile: jest.fn() }));
@@ -97,6 +96,8 @@ const knowledge = {
 };
 
 // ─── State factories ─────────────────────────────────────────────────────────
+// Política mayo 2026: el total NO incluye adicional $6k (eliminado).
+// totalPrice = base del producto.
 function makeOkState(overrides = {}) {
     return {
         step: 'waiting_ok',
@@ -104,9 +105,9 @@ function makeOkState(overrides = {}) {
         cart: [{ product: 'Cápsulas', plan: '60', price: '46.900' }],
         selectedProduct: 'Cápsulas',
         selectedPlan: '60',
-        totalPrice: '52.900',
-        isContraReembolsoMAX: true,
-        adicionalMAX: 6000,
+        totalPrice: '46.900',
+        adicionalMAX: 0,
+        isContraReembolsoMAX: false,
         partialAddress: {},
         summary: '',
         stepEnteredAt: Date.now(),
@@ -115,16 +116,15 @@ function makeOkState(overrides = {}) {
 }
 
 function makePaymentState(plan = '60', overrides = {}) {
-    const is60 = plan === '60';
     return {
         step: 'waiting_payment_method',
         history: [],
-        cart: [{ product: 'Cápsulas', plan, price: is60 ? '46.900' : '66.900' }],
+        cart: [{ product: 'Cápsulas', plan, price: plan === '60' ? '46.900' : '66.900' }],
         selectedProduct: 'Cápsulas',
         selectedPlan: plan,
-        totalPrice: is60 ? '52.900' : '66.900',
-        isContraReembolsoMAX: is60,
-        adicionalMAX: is60 ? 6000 : 0,
+        totalPrice: plan === '60' ? '46.900' : '66.900',
+        adicionalMAX: 0,
+        isContraReembolsoMAX: false,
         partialAddress: {},
         summary: '',
         stepEnteredAt: Date.now(),
@@ -150,6 +150,26 @@ function makeMpState(overrides = {}) {
     };
 }
 
+function makeSenaState(overrides = {}) {
+    return {
+        step: 'waiting_mp_payment',
+        history: [],
+        cart: [{ product: 'Cápsulas', plan: '60', price: '46.900' }],
+        selectedProduct: 'Cápsulas',
+        selectedPlan: '60',
+        totalPrice: '46.900',
+        paymentMethod: 'contrarembolso',
+        senaAmount: 10000,
+        senaPaid: false,
+        adicionalMAX: 0,
+        isContraReembolsoMAX: false,
+        partialAddress: {},
+        summary: '',
+        stepEnteredAt: Date.now(),
+        ...overrides,
+    };
+}
+
 beforeEach(() => {
     jest.clearAllMocks();
     mockPauseUsers.clear();
@@ -159,9 +179,9 @@ beforeEach(() => {
 afterAll(() => { delete process.env.MP_ACCESS_TOKEN; });
 
 // ════════════════════════════════════════════════════════════════════════════
-// BLOQUE 1: stepWaitingOk → transition to waiting_payment_method
+// BLOQUE 1: stepWaitingOk — transición a waiting_payment_method
 // ════════════════════════════════════════════════════════════════════════════
-describe.skip('stepWaitingOk → pregunta método de pago', () => {
+describe('stepWaitingOk → pasa a waiting_payment_method', () => {
 
     test('[1.1] "si" → pasa a waiting_payment_method', async () => {
         const state = makeOkState();
@@ -175,27 +195,31 @@ describe.skip('stepWaitingOk → pregunta método de pago', () => {
         expect(state.step).toBe('waiting_payment_method');
     });
 
-    test('[1.3] "ok" → envía mensaje con las 3 opciones de pago', async () => {
+    test('[1.3] mensaje del menú pushea Mercado Pago (sin "Contra reembolso" en menú)', async () => {
         const state = makeOkState();
-        await handleWaitingOk('u3', 'ok', 'ok', state, knowledge, deps);
+        await handleWaitingOk('u3', 'si', 'si', state, knowledge, deps);
         const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
-        expect(sent).toMatch(/MercadoPago/i);
-        expect(sent).toMatch(/Transferencia/i);
-        expect(sent).toMatch(/Contra reembolso/i);
+        expect(sent).toMatch(/Mercado Pago/i);
+        // Política nueva: el menú NO ofrece COD ni Transferencia espontáneamente.
+        expect(sent).not.toMatch(/Contra reembolso/i);
+        expect(sent).not.toMatch(/Transferencia bancaria/i);
     });
 
-    test('[1.4] Plan 60: mensaje incluye el adicional de $6.000', async () => {
-        const state = makeOkState({ selectedPlan: '60', adicionalMAX: 6000 });
+    test('[1.4] mensaje del menú menciona Pago Fácil/Rapipago + cuotas', async () => {
+        const state = makeOkState();
         await handleWaitingOk('u4', 'si', 'si', state, knowledge, deps);
         const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
-        expect(sent).toMatch(/6\.000/);
+        expect(sent).toMatch(/Pago Fácil/i);
+        expect(sent).toMatch(/Rapipago/i);
+        expect(sent).toMatch(/cuotas/i);
     });
 
-    test('[1.5] Plan 120: mensaje indica que no hay adicional', async () => {
-        const state = makeOkState({ selectedPlan: '120', adicionalMAX: 0, isContraReembolsoMAX: false });
+    test('[1.5] mensaje del menú NO menciona adicional de $6.000', async () => {
+        const state = makeOkState({ selectedPlan: '60' });
         await handleWaitingOk('u5', 'si', 'si', state, knowledge, deps);
         const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
-        expect(sent).toMatch(/sin adicional/i);
+        expect(sent).not.toMatch(/\$\s*6\.000/);
+        expect(sent).not.toMatch(/adicional/i);
     });
 
     test('[1.6] Negativa → NO va a waiting_payment_method', async () => {
@@ -206,9 +230,9 @@ describe.skip('stepWaitingOk → pregunta método de pago', () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-// BLOQUE 2: stepWaitingPaymentMethod — Opción 2: MercadoPago
+// BLOQUE 2: stepWaitingPaymentMethod — MercadoPago
 // ════════════════════════════════════════════════════════════════════════════
-describe.skip('Método de pago → MercadoPago', () => {
+describe('Método de pago → MercadoPago', () => {
 
     test('[2.1] "mercadopago" → paymentMethod=mercadopago, step=waiting_mp_payment', async () => {
         const state = makePaymentState('60');
@@ -229,319 +253,214 @@ describe.skip('Método de pago → MercadoPago', () => {
         expect(state.step).toBe('waiting_mp_payment');
     });
 
-    test('[2.4] Plan 60: MP waivea el adicionalMAX ($6000)', async () => {
-        const state = makePaymentState('60'); // totalPrice 52.900, adicionalMAX 6000
+    test('[2.4] MP NO setea senaAmount (es pago completo)', async () => {
+        const state = makePaymentState('60');
         await handleWaitingPaymentMethod('mp4', 'mercadopago', 'mercadopago', state, knowledge, deps);
-        expect(state.adicionalMAX).toBe(0);
-        // 52900 - 6000 = 46900
-        expect(state.totalPrice).toBe('46.900');
-        expect(state.isContraReembolsoMAX).toBe(false);
+        expect(state.senaAmount).toBeFalsy();
     });
 
-    test('[2.5] Plan 120: MP no modifica el total (ya sin adicional)', async () => {
-        const state = makePaymentState('120'); // adicionalMAX=0
-        const totalAntes = state.totalPrice;
+    test('[2.5] Plan 60: totalPrice queda como base (sin adicional, política mayo 2026)', async () => {
+        const state = makePaymentState('60'); // totalPrice 46.900 (base)
         await handleWaitingPaymentMethod('mp5', 'mercadopago', 'mercadopago', state, knowledge, deps);
-        expect(state.totalPrice).toBe(totalAntes);
-        expect(state.adicionalMAX).toBe(0);
+        expect(state.totalPrice).toBe('46.900');
     });
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-// BLOQUE 3: stepWaitingMpPayment — link, pago aprobado, pending, fallbacks
+// BLOQUE 3: stepWaitingPaymentMethod — Transferencia (solo si la pide)
 // ════════════════════════════════════════════════════════════════════════════
-describe.skip('Pago con MercadoPago — flow completo', () => {
+describe('Método de pago → Transferencia (solo si la pide)', () => {
 
-    test('[3.1] Entry sin link → genera preferencia MP y envía enlace', async () => {
-        const state = makeMpState(); // sin mpPaymentLinkUrl
-        await handleWaitingMpPayment('mp_e1', 'hola', 'hola', state, knowledge, deps);
-        expect(mockPreferenceCreate).toHaveBeenCalledTimes(1);
-        expect(state.mpPaymentLinkUrl).toBe('https://mp.com/checkout/pref_test');
-        const sent = mockSend.mock.calls.map(([, m]) => m).join(' ');
-        expect(sent).toMatch(/mercadopago/i);
-        expect(sent).toMatch(/listo/i);
-    });
-
-    test('[3.2] "listo" + pago aprobado → avanza al flow de datos', async () => {
-        mockPaymentLinkFindUnique.mockResolvedValueOnce({ id: 'pl-1', status: 'pending', externalRef: 'ref-1' });
-        mockPaymentSearch.mockResolvedValueOnce({
-            results: [{ status: 'approved', date_approved: new Date().toISOString() }],
-        });
-
-        const state = makeMpState({ mpPaymentLinkUrl: 'https://mp.com/link', mpPaymentLinkId: 'pl-1' });
-        await handleWaitingMpPayment('mp_e2', 'listo', 'listo', state, knowledge, deps);
-
-        // Debe guardar el pago y avanzar
-        expect(mockPaymentLinkUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'approved' }) }));
-        // Paso avanza (a waiting_data o waiting_final_confirmation)
-        expect(['waiting_data', 'waiting_final_confirmation']).toContain(state.step);
-    });
-
-    test('[3.3] "ya pagué" + pago aprobado con dirección → waiting_admin_validation (admin valida pago + datos)', async () => {
-        mockPaymentLinkFindUnique.mockResolvedValueOnce({ id: 'pl-1', status: 'pending', externalRef: 'ref-1' });
-        mockPaymentSearch.mockResolvedValueOnce({
-            results: [{ status: 'approved', date_approved: new Date().toISOString() }],
-        });
-
-        const state = makeMpState({
-            mpPaymentLinkUrl: 'https://mp.com/link',
-            mpPaymentLinkId: 'pl-1',
-            partialAddress: { nombre: 'Ana Gomez', calle: 'Rivadavia 500', ciudad: 'CABA' },
-        });
-        await handleWaitingMpPayment('mp_e3', 'ya pagué', 'ya pague', state, knowledge, deps);
-        // Comportamiento esperado tras commit 966da6a: cuando hay pago aprobado +
-        // dirección, _finalizeOrderAndNotifyAdmin avanza a WAITING_ADMIN_VALIDATION
-        // para que el admin valide pago + datos antes de confirmar.
-        expect(state.step).toBe('waiting_admin_validation');
-    });
-
-    test('[3.4] "listo" + pago PENDING → mensaje de espera, no avanza', async () => {
-        mockPaymentLinkFindUnique.mockResolvedValueOnce({ id: 'pl-1', status: 'pending', externalRef: 'ref-1' });
-        mockPaymentSearch.mockResolvedValueOnce({ results: [] }); // sin resultados = pending
-
-        const state = makeMpState({ mpPaymentLinkUrl: 'https://mp.com/link', mpPaymentLinkId: 'pl-1' });
-        await handleWaitingMpPayment('mp_e4', 'listo', 'listo', state, knowledge, deps);
-
-        expect(state.step).toBe('waiting_mp_payment'); // no avanzó
-        const sent = mockSend.mock.calls.map(([, m]) => m).join(' ');
-        expect(sent).toMatch(/todav[ií]a/i);
-    });
-
-    test('[3.5] "listo" + pago RECHAZADO → ofrece transferencia/CR y vuelve a waiting_payment_method', async () => {
-        mockPaymentLinkFindUnique.mockResolvedValueOnce({ id: 'pl-1', status: 'pending', externalRef: 'ref-1' });
-        mockPaymentSearch.mockResolvedValueOnce({
-            results: [{ status: 'rejected' }],
-        });
-
-        const state = makeMpState({ mpPaymentLinkUrl: 'https://mp.com/link', mpPaymentLinkId: 'pl-1' });
-        await handleWaitingMpPayment('mp_e5', 'listo', 'listo', state, knowledge, deps);
-
-        expect(state.step).toBe('waiting_payment_method');
-        const sent = mockSend.mock.calls.map(([, m]) => m).join(' ');
-        expect(sent).toMatch(/transferencia/i);
-    });
-
-    test('[3.6] Cliente pide el link de nuevo → lo reenvía', async () => {
-        const state = makeMpState({ mpPaymentLinkUrl: 'https://mp.com/el-link', mpPaymentLinkId: 'pl-1' });
-        await handleWaitingMpPayment('mp_e6', 'mandame el link de nuevo', 'mandame el link de nuevo', state, knowledge, deps);
-        const sent = mockSend.mock.calls.map(([, m]) => m).join(' ');
-        expect(sent).toContain('https://mp.com/el-link');
-    });
-
-    test('[3.7] MP_ACCESS_TOKEN no configurado → fallback a contra reembolso', async () => {
-        delete process.env.MP_ACCESS_TOKEN;
-        const state = makeMpState(); // sin link, entra a generar
-        await handleWaitingMpPayment('mp_e7', 'hola', 'hola', state, knowledge, deps);
-        expect(mockPreferenceCreate).not.toHaveBeenCalled();
-        expect(state.paymentMethod).toBe('contrarembolso');
-        expect(state.step).toBe('waiting_data');
-        process.env.MP_ACCESS_TOKEN = 'TEST_TOKEN';
-    });
-
-    test('[3.8] Error al generar link → pausa al cliente y alerta al admin (FALLO AL GENERAR ENLACE DE MP)', async () => {
-        mockPreferenceCreate.mockRejectedValueOnce(new Error('MP API error'));
-        const state = makeMpState();
-        await handleWaitingMpPayment('mp_e8', 'hola', 'hola', state, knowledge, deps);
-        // No volvemos a waiting_payment_method ni ofrecemos alternativas — el cliente
-        // eligió MP, mantenemos esa elección y delegamos al admin.
-        expect(mockPauseUsers.has('mp_e8')).toBe(true);
-        const reason = mockNotify.mock.calls[0]?.[2] || '';
-        expect(reason).toMatch(/FALLO AL GENERAR ENLACE DE MP/);
-        const sent = mockSend.mock.calls.map(([, m]) => m).join(' ');
-        expect(sent).toMatch(/momento/i);
-        expect(sent).toMatch(/MercadoPago/i);
-    });
-
-    test('[3.9] Cliente pide transferencia desde MP → manda alias y pausa', async () => {
-        const state = makeMpState({ mpPaymentLinkUrl: 'https://mp.com/link', mpPaymentLinkId: 'pl-1' });
-        await handleWaitingMpPayment('mp_e9', 'transferencia', 'transferencia', state, knowledge, deps);
-        expect(state.paymentMethod).toBe('transferencia');
-        const sent = mockSend.mock.calls.map(([, m]) => m).join(' ');
-        expect(sent).toMatch(/CHILE\.TEXTO\.CASINO/);
-        expect(mockPauseUsers.has('mp_e9')).toBe(true);
-    });
-
-    test('[3.10] Cliente pide contra reembolso desde MP → waiting_data', async () => {
-        const state = makeMpState({ mpPaymentLinkUrl: 'https://mp.com/link', mpPaymentLinkId: 'pl-1' });
-        await handleWaitingMpPayment('mp_e10', 'efectivo', 'efectivo', state, knowledge, deps);
-        expect(state.paymentMethod).toBe('contrarembolso');
-        expect(state.step).toBe('waiting_data');
-    });
-});
-
-// ════════════════════════════════════════════════════════════════════════════
-// BLOQUE 4: stepWaitingPaymentMethod — Opción 3: Transferencia
-// ════════════════════════════════════════════════════════════════════════════
-describe.skip('Método de pago → Transferencia', () => {
-
-    test('[4.1] "transferencia" → envía alias y avanza a waiting_transfer_confirmation (NO pausa todavía)', async () => {
+    test('[3.1] "transferencia" → paymentMethod=transferencia, step=waiting_transfer_confirmation', async () => {
         const state = makePaymentState('60');
         await handleWaitingPaymentMethod('tr1', 'transferencia', 'transferencia', state, knowledge, deps);
         expect(state.paymentMethod).toBe('transferencia');
-        const sent = mockSend.mock.calls.map(([, m]) => m).join(' ');
-        expect(sent).toMatch(/CHILE\.TEXTO\.CASINO/);
-        // Comportamiento intencional desde commit 682375d: NO pausa al elegir
-        // transferencia para que el cliente pueda cambiar de método sin necesitar
-        // despausa manual. La pausa ocurre en stepWaitingTransferConfirmation
-        // cuando el cliente confirma "ya transferí".
-        expect(mockPauseUsers.has('tr1')).toBe(false);
         expect(state.step).toBe('waiting_transfer_confirmation');
     });
 
-    test('[4.2] "2" → detecta transferencia (Transferencia es opción 2 del menú)', async () => {
+    test('[3.2] "alias" → waiting_transfer_confirmation', async () => {
         const state = makePaymentState('60');
-        await handleWaitingPaymentMethod('tr2', '2', '2', state, knowledge, deps);
+        await handleWaitingPaymentMethod('tr2', 'alias', 'alias', state, knowledge, deps);
+        expect(state.step).toBe('waiting_transfer_confirmation');
+    });
+
+    test('[3.3] "2" (opción 2 del menú) → transferencia', async () => {
+        const state = makePaymentState('60');
+        await handleWaitingPaymentMethod('tr3', '2', '2', state, knowledge, deps);
         expect(state.paymentMethod).toBe('transferencia');
     });
 
-    test('[4.3] Plan 60: transferencia waivea el adicionalMAX', async () => {
-        const state = makePaymentState('60'); // total 52900, adicional 6000
-        await handleWaitingPaymentMethod('tr3', 'transferencia', 'transferencia', state, knowledge, deps);
-        expect(state.adicionalMAX).toBe(0);
-        expect(state.totalPrice).toBe('46.900');
-    });
-
-    test('[4.4] Plan 120: transferencia no modifica total', async () => {
-        const state = makePaymentState('120');
-        const totalAntes = state.totalPrice;
+    test('[3.4] mensaje de transferencia envía el alias CHILE.TEXTO.CASINO', async () => {
+        const state = makePaymentState('60');
         await handleWaitingPaymentMethod('tr4', 'transferencia', 'transferencia', state, knowledge, deps);
-        expect(state.totalPrice).toBe(totalAntes);
-    });
-
-    test('[4.5] elegir transferencia NO notifica admin acá — la alerta es en stepWaitingTransferConfirmation cuando el cliente confirma "ya transferí"', async () => {
-        const state = makePaymentState('60');
-        await handleWaitingPaymentMethod('tr5', 'transferencia', 'transferencia', state, knowledge, deps);
-        // Permitir cambio de método sin ruido al admin (commit 682375d). El admin
-        // se entera cuando el cliente confirma la transferencia.
-        expect(mockNotify).not.toHaveBeenCalled();
+        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
+        expect(sent).toMatch(/CHILE\.TEXTO\.CASINO/i);
     });
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-// BLOQUE 5: stepWaitingPaymentMethod — Opción 1: Contra reembolso
+// BLOQUE 4: stepWaitingPaymentMethod — Contra reembolso (flujo seña $10k)
 // ════════════════════════════════════════════════════════════════════════════
-describe.skip('Método de pago → Contra reembolso', () => {
+describe('Método de pago → Contra reembolso (flujo seña $10k)', () => {
 
-    // En plan 60 con adicional, el primer "contra reembolso" muestra el retry
-    // de sugerencia #5 (oferta de cambiar a MP) y se queda en waiting_payment_method.
-    // Para testear el flujo CR-avanza, marcamos cashRetryShown=true (simulando
-    // que el cliente ya pasó por el retry y reconfirmó CR).
-
-    test('[5.1] "contra reembolso" → waiting_data (post-retry)', async () => {
-        const state = makePaymentState('60', { cashRetryShown: true });
+    test('[4.1] Primera vez "contra reembolso" → explica seña, NO avanza todavía', async () => {
+        const state = makePaymentState('60');
         await handleWaitingPaymentMethod('cr1', 'contra reembolso', 'contra reembolso', state, knowledge, deps);
-        expect(state.paymentMethod).toBe('contrarembolso');
-        expect(state.step).toBe('waiting_data');
-    });
-
-    test('[5.2] "efectivo" → waiting_data (post-retry)', async () => {
-        const state = makePaymentState('60', { cashRetryShown: true });
-        await handleWaitingPaymentMethod('cr2', 'efectivo', 'efectivo', state, knowledge, deps);
-        expect(state.paymentMethod).toBe('contrarembolso');
-        expect(state.step).toBe('waiting_data');
-    });
-
-    test('[5.3] "3" → waiting_data (Contra reembolso es opción 3, post-retry)', async () => {
-        const state = makePaymentState('60', { cashRetryShown: true });
-        await handleWaitingPaymentMethod('cr3', '3', '3', state, knowledge, deps);
-        expect(state.step).toBe('waiting_data');
-    });
-
-    test('[5.4] CR conserva el adicionalMAX (plan 60 → sigue teniendo adicional)', async () => {
-        const state = makePaymentState('60', { cashRetryShown: true }); // adicionalMAX=6000
-        await handleWaitingPaymentMethod('cr4', 'contrarembolso', 'contrarembolso', state, knowledge, deps);
-        expect(state.adicionalMAX).toBe(6000); // NO bonificado
-        expect(state.totalPrice).toBe('52.900');
-    });
-
-    test('[5.5] CR con dirección ya conocida → waiting_final_confirmation (no pide datos)', async () => {
-        const state = makePaymentState('60', {
-            cashRetryShown: true,
-            partialAddress: { nombre: 'Luis Perez', calle: 'Corrientes 800', ciudad: 'Rosario' },
-        });
-        await handleWaitingPaymentMethod('cr5', 'efectivo', 'efectivo', state, knowledge, deps);
-        expect(state.step).toBe('waiting_final_confirmation');
-    });
-
-    test('[5.6] CR sin dirección → pide datos (waiting_data)', async () => {
-        const state = makePaymentState('60', { cashRetryShown: true }); // partialAddress vacío
-        await handleWaitingPaymentMethod('cr6', 'al recibir', 'al recibir', state, knowledge, deps);
-        expect(state.step).toBe('waiting_data');
-    });
-
-    // ─── Sugerencia #5: Last-mile retry al elegir CR en plan 60 ──────────────
-    test('[5.7] Plan 60 + adicional + primera vez CR → muestra retry, NO avanza', async () => {
-        const state = makePaymentState('60'); // sin cashRetryShown
-        await handleWaitingPaymentMethod('cr7', 'contra reembolso', 'contra reembolso', state, knowledge, deps);
+        // Primer paso: mostrar mensaje explicando seña.
+        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
+        expect(sent).toMatch(/seña/i);
+        expect(sent).toMatch(/10\.000/);
         expect(state.cashRetryShown).toBe(true);
-        expect(state.step).toBe('waiting_payment_method'); // NO avanzó
-        expect(state.paymentMethod).toBeUndefined();
-        const sent = mockSend.mock.calls.map(([, m]) => m).join(' ');
-        expect(sent).toMatch(/Confirmás contra reembolso o lo cambiamos/i);
-    });
-
-    test('[5.8] Plan 60 + retry ya mostrado + "si" → avanza a CR', async () => {
-        const state = makePaymentState('60', { cashRetryShown: true });
-        await handleWaitingPaymentMethod('cr8', 'si', 'si', state, knowledge, deps);
-        expect(state.paymentMethod).toBe('contrarembolso');
-        expect(state.step).toBe('waiting_data');
-    });
-
-    test('[5.9] Plan 60 + retry ya mostrado + "MP" → cambia a MercadoPago', async () => {
-        const state = makePaymentState('60', { cashRetryShown: true });
-        await handleWaitingPaymentMethod('cr9', 'mercadopago', 'mercadopago', state, knowledge, deps);
-        expect(state.paymentMethod).toBe('mercadopago');
-        expect(state.adicionalMAX).toBe(0); // bonificado al elegir MP
-    });
-
-    test('[5.10] Plan 120 (sin adicional) → CR avanza directo, sin retry', async () => {
-        const state = makePaymentState('120'); // adicionalMAX=0
-        await handleWaitingPaymentMethod('cr10', 'contra reembolso', 'contra reembolso', state, knowledge, deps);
-        expect(state.cashRetryShown).toBeUndefined(); // no se mostró retry
-        expect(state.paymentMethod).toBe('contrarembolso');
-        expect(state.step).toBe('waiting_data');
-    });
-});
-
-// ════════════════════════════════════════════════════════════════════════════
-// BLOQUE 6: AI fallback — respuesta ambigua
-// ════════════════════════════════════════════════════════════════════════════
-describe.skip('Método de pago — AI fallback', () => {
-
-    test('[6.1] Mensaje ambiguo → AI responde y no cambia el step', async () => {
-        aiService.chat.mockResolvedValueOnce({ response: 'No entendí bien, ¿MP o efectivo?', goalMet: false });
-        const state = makePaymentState('60');
-        await handleWaitingPaymentMethod('ai1', 'no sé cual me conviene', 'no se cual me conviene', state, knowledge, deps);
+        // Todavía no se setea paymentMethod ni se transita.
         expect(state.step).toBe('waiting_payment_method');
-        const sent = mockSend.mock.calls.map(([, m]) => m).join(' ');
-        expect(sent).toMatch(/MP|efectivo/i);
+        expect(state.senaAmount).toBeFalsy();
     });
 
-    test('[6.2] AI goal empuja MP como prioridad en el prompt', async () => {
-        aiService.chat.mockResolvedValueOnce({ response: 'Te recomiendo MercadoPago', goalMet: false });
+    test('[4.2] Segunda vez (post-retry) "si" → setea senaAmount=10000 y transita a WAITING_MP_PAYMENT', async () => {
+        const state = makePaymentState('60', { cashRetryShown: true });
+        const r = await handleWaitingPaymentMethod('cr2', 'si', 'si', state, knowledge, deps);
+        expect(state.paymentMethod).toBe('contrarembolso');
+        expect(state.senaAmount).toBe(10000);
+        expect(state.senaPaid).toBe(false);
+        expect(state.step).toBe('waiting_mp_payment');
+        // staleReprocess hace que salesFlow reentre — el handler devuelve {matched:false, staleReprocess:true}.
+        expect(r.matched).toBe(false);
+        expect(r.staleReprocess).toBe(true);
+    });
+
+    test('[4.3] "efectivo" + cashRetryShown=true → flujo seña', async () => {
+        const state = makePaymentState('60', { cashRetryShown: true });
+        await handleWaitingPaymentMethod('cr3', 'efectivo', 'efectivo', state, knowledge, deps);
+        expect(state.paymentMethod).toBe('contrarembolso');
+        expect(state.senaAmount).toBe(10000);
+        expect(state.step).toBe('waiting_mp_payment');
+    });
+
+    test('[4.4] COD aplica seña a plan 120 también (política mayo 2026: aplica a TODOS los planes)', async () => {
+        const state = makePaymentState('120', { cashRetryShown: true });
+        await handleWaitingPaymentMethod('cr4', 'contra reembolso', 'contra reembolso', state, knowledge, deps);
+        expect(state.paymentMethod).toBe('contrarembolso');
+        expect(state.senaAmount).toBe(10000);
+    });
+
+    test('[4.5] mensaje de retry menciona efectivo al cartero', async () => {
         const state = makePaymentState('60');
-        await handleWaitingPaymentMethod('ai2', 'no sé', 'no se', state, knowledge, deps);
-        const call = aiService.chat.mock.calls[0];
-        const goal = call[1]?.goal || '';
-        expect(goal).toMatch(/MercadoPago/i);
-        // El goal lista las opciones numeradas (1=MP, 2=Transfer, 3=CR) y la sección
-        // PRIORIDAD al final indica que se debe empujar MP primero.
-        expect(goal).toMatch(/PRIORIDAD.*MercadoPago/is);
+        await handleWaitingPaymentMethod('cr5', 'contra reembolso', 'contra reembolso', state, knowledge, deps);
+        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
+        expect(sent).toMatch(/efectivo al cartero/i);
     });
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-// BLOQUE 7: Registro de método en PaymentLink (instanceId del seller)
+// BLOQUE 5: stepWaitingMpPayment — link normal (MP por el total)
 // ════════════════════════════════════════════════════════════════════════════
-describe.skip('PaymentLink — instanceId del seller', () => {
+describe('stepWaitingMpPayment — link MP por el total', () => {
 
-    test('[7.1] Link creado incluye instanceId del seller', async () => {
+    test('[5.1] Entry sin link → genera preferencia MP por totalPrice', async () => {
+        const state = makeMpState(); // sin mpPaymentLinkUrl, totalPrice=46.900
+        await handleWaitingMpPayment('mppy1', 'hola', 'hola', state, knowledge, deps);
+        expect(mockPreferenceCreate).toHaveBeenCalledTimes(1);
+        // unit_price debe ser el total, no la seña.
+        const call = mockPreferenceCreate.mock.calls[0][0];
+        expect(call.body.items[0].unit_price).toBe(46900);
+        expect(call.body.items[0].title).toBe('Pago Herbalis');
+        expect(state.mpPaymentLinkUrl).toBe('https://mp.com/checkout/pref_test');
+    });
+
+    test('[5.2] mensaje al cliente del link normal dice "Total" (no "Seña")', async () => {
         const state = makeMpState();
-        await handleWaitingMpPayment('pl1', 'hola', 'hola', state, knowledge, { ...deps, sellerId: 'horacio' });
-        expect(mockPaymentLinkCreate).toHaveBeenCalledWith(
-            expect.objectContaining({
-                data: expect.objectContaining({ instanceId: 'horacio' }),
-            })
-        );
+        await handleWaitingMpPayment('mppy2', 'hola', 'hola', state, knowledge, deps);
+        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
+        expect(sent).toMatch(/Pago online via MercadoPago/i);
+        expect(sent).toMatch(/Total/);
+        expect(sent).not.toMatch(/Seña por Mercado Pago/i);
+    });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// BLOQUE 6: stepWaitingMpPayment — link de SEÑA ($10k para COD)
+// ════════════════════════════════════════════════════════════════════════════
+describe('stepWaitingMpPayment — link de SEÑA $10.000', () => {
+
+    test('[6.1] Entry con senaAmount=10000 → genera preferencia MP por $10.000', async () => {
+        const state = makeSenaState();
+        await handleWaitingMpPayment('sena1', 'hola', 'hola', state, knowledge, deps);
+        expect(mockPreferenceCreate).toHaveBeenCalledTimes(1);
+        const call = mockPreferenceCreate.mock.calls[0][0];
+        expect(call.body.items[0].unit_price).toBe(10000);
+        expect(call.body.items[0].title).toMatch(/Seña/i);
+    });
+
+    test('[6.2] mensaje al cliente explica seña + saldo al cartero', async () => {
+        const state = makeSenaState();
+        await handleWaitingMpPayment('sena2', 'hola', 'hola', state, knowledge, deps);
+        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
+        expect(sent).toMatch(/Seña por Mercado Pago/i);
+        expect(sent).toMatch(/10\.000/);
+        expect(sent).toMatch(/Saldo al cartero/i);
+        // 46.900 - 10.000 = 36.900
+        expect(sent).toMatch(/36\.900/);
+    });
+
+    test('[6.3] PaymentLink en DB se persiste con source="bot_flow_sena"', async () => {
+        const state = makeSenaState();
+        await handleWaitingMpPayment('sena3', 'hola', 'hola', state, knowledge, deps);
+        expect(mockPaymentLinkCreate).toHaveBeenCalledTimes(1);
+        const arg = mockPaymentLinkCreate.mock.calls[0][0].data;
+        expect(arg.source).toBe('bot_flow_sena');
+        expect(arg.amount).toBe(10000);
+    });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// BLOQUE 7: stepWaitingMpPayment — confirmación de pago (MP completo vs seña)
+// ════════════════════════════════════════════════════════════════════════════
+describe('Confirmación de pago — MP completo', () => {
+
+    test('[7.1] "listo" + MP approved + sin dirección → pide datos sin marcar senaPaid', async () => {
+        mockPaymentLinkFindUnique.mockResolvedValueOnce({ id: 'pl-1', status: 'approved' });
+        const state = makeMpState({
+            mpPaymentLinkId: 'pl-1',
+            mpPaymentLinkUrl: 'https://mp.com/x',
+        });
+        await handleWaitingMpPayment('done1', 'listo', 'listo', state, knowledge, deps);
+        expect(state.senaPaid).toBeFalsy();
+        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
+        expect(sent).toMatch(/pago fue confirmado/i);
+        expect(sent).not.toMatch(/seña fue confirmada/i);
+    });
+});
+
+describe('Confirmación de pago — flujo SEÑA', () => {
+
+    test('[7.2] "listo" + seña approved + sin dirección → marca senaPaid=true + mensaje específico', async () => {
+        mockPaymentLinkFindUnique.mockResolvedValueOnce({ id: 'pl-1', status: 'approved' });
+        const state = makeSenaState({
+            mpPaymentLinkId: 'pl-1',
+            mpPaymentLinkUrl: 'https://mp.com/x',
+        });
+        await handleWaitingMpPayment('done2', 'listo', 'listo', state, knowledge, deps);
+        expect(state.senaPaid).toBe(true);
+        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
+        expect(sent).toMatch(/seña fue confirmada/i);
+    });
+
+    test('[7.3] "listo" + seña approved + dirección presente → admin notificado con breakdown', async () => {
+        mockPaymentLinkFindUnique.mockResolvedValueOnce({ id: 'pl-1', status: 'approved' });
+        const state = makeSenaState({
+            mpPaymentLinkId: 'pl-1',
+            mpPaymentLinkUrl: 'https://mp.com/x',
+            partialAddress: { nombre: 'Juan Pérez', calle: 'Belgrano 123', ciudad: 'Rosario', cp: '2000' },
+        });
+        await handleWaitingMpPayment('done3', 'listo', 'listo', state, knowledge, deps);
+        expect(state.senaPaid).toBe(true);
+        expect(state.paymentMethod).toBe('contrarembolso');
+        expect(mockNotify).toHaveBeenCalledTimes(1);
+        const adminMsg = mockNotify.mock.calls[0][2]; // detalles del notify
+        expect(adminMsg).toMatch(/SEÑA/i);
+        expect(adminMsg).toMatch(/10\.000/);
+        expect(adminMsg).toMatch(/cartero/i);
+        // Saldo cartero = 46.900 - 10.000 = 36.900
+        expect(adminMsg).toMatch(/36\.900/);
     });
 });

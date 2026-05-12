@@ -33,9 +33,10 @@ export async function handleWaitingFinalConfirmation(
             // The previous isContraReembolsoMAX flag reflects the OLD plan, so it can't
             // be trusted after a plan change (e.g. plan 120 → 60 needs the adicional
             // added back). MP/transferencia payments keep the adicional waived.
+            // 'contrarembolso' es el único valor "cash" del union (paymentMethod).
+            // Política mayo 2026: no hay adicional aunque sea contrarembolso (seña vía MP cubre envío).
             const isCashPayment = !currentState.paymentMethod
-                || currentState.paymentMethod === 'contrarembolso'
-                || currentState.paymentMethod === 'efectivo';
+                || currentState.paymentMethod === 'contrarembolso';
             const shouldApplyAdicional = isCashPayment && newPlan === '60';
             const finalAdicional = shouldApplyAdicional ? _getAdicionalMAX() : 0;
             currentState.adicionalMAX = finalAdicional;
@@ -195,7 +196,7 @@ export async function handleWaitingFinalConfirmation(
                         const priceStr = _getPrice(resolved.newProduct, resolved.newPlan);
                         let basePrice = parseInt(priceStr.replace(/\./g, ''));
                         currentState.cart = [{ product: resolved.newProduct, plan: resolved.newPlan, price: priceStr }];
-                        const isCashPayment = !currentState.paymentMethod || currentState.paymentMethod === 'contrarembolso' || currentState.paymentMethod === 'efectivo';
+                        const isCashPayment = !currentState.paymentMethod || currentState.paymentMethod === 'contrarembolso';
                         const shouldApplyAdicional = isCashPayment && resolved.newPlan === '60';
                         const finalAdicional = shouldApplyAdicional ? _getAdicionalMAX() : 0;
                         currentState.adicionalMAX = finalAdicional;

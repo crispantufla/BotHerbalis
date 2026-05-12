@@ -179,6 +179,7 @@ export interface SharedState {
     multiKnowledge: Record<string, any>;
     isConnected: boolean;
     qrCodeData: string | null;
+    sellerId?: string;       // tenant/seller identity (also lives on each seller instance) — used when scoping DB queries from shared services
     lastAlertUser?: string; // @deprecated — kept for backward compat; prefer alert queue selector
     saveState: (userId?: string | null) => void;
     saveKnowledge: (scriptName?: string | null) => void;
