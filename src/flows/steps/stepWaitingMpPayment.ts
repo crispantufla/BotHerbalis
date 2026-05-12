@@ -1,6 +1,6 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _setStep, _pauseAndAlert, _cleanPhone } from '../utils/flowHelpers';
-import { calculateTotal, _recalcAdicionalMAX } from '../utils/cartHelpers';
+import { calculateTotal } from '../utils/cartHelpers';
 import { buildCashRetryMessage } from '../../utils/messageTemplates';
 import { randomUUID } from 'crypto';
 import logger from '../../utils/logger';
@@ -115,7 +115,6 @@ export async function handleWaitingMpPayment(
         currentState.mpPaymentLinkId = null;
         currentState.mpPaymentLinkUrl = null;
 
-        // adicionalMAX ya estaba bonificado por MP — transferencia también lo bonifica
         // Avanzar al step correcto. Antes quedaba en waiting_mp_payment y, si admin
         // despausaba al cliente, el siguiente mensaje volvía a generar link MP.
         _setStep(currentState, FlowStep.WAITING_TRANSFER_CONFIRMATION);
@@ -136,7 +135,6 @@ export async function handleWaitingMpPayment(
         currentState.mpPaymentLinkUrl = null;
         currentState.senaAmount = 10000;
         currentState.senaPaid = false;
-        // Ya no aplica adicionalMAX (política mayo 2026 — eliminado el adicional).
         const explainMsg = buildCashRetryMessage(currentState);
         currentState.history.push({ role: 'bot', content: explainMsg, timestamp: Date.now() });
         await sendMessageWithDelay(userId, explainMsg);
@@ -292,8 +290,6 @@ async function _generateAndSendLink(
     if (!mpToken) {
         logger.warn('[MP_PAYMENT] MP_ACCESS_TOKEN no configurado — fallback a contra reembolso');
         currentState.paymentMethod = 'contrarembolso';
-        // adicionalMAX fue waiveado al elegir MP — restaurarlo ahora que volvemos a CR
-        _recalcAdicionalMAX(currentState);
         calculateTotal(currentState);
         const msg = _getClosingMsg(knowledge);
         _setStep(currentState, FlowStep.WAITING_DATA);

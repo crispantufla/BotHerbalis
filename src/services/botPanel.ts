@@ -86,7 +86,6 @@ function summariseUserState(instance: SellerInstance, phone: string): any {
         selectedPlan: state.selectedPlan ?? null,
         totalPrice: state.totalPrice ?? state.price ?? null,
         paymentMethod: state.paymentMethod ?? null,
-        isContraReembolsoMAX: !!state.isContraReembolsoMAX,
         address: {
             nombre: address.nombre || null,
             calle: address.calle || null,

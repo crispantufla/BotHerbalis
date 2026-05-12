@@ -137,18 +137,21 @@ describe('cartHelpers', () => {
             expect(state.selectedProduct).toBe(product);
         });
 
-        test('60-day plan enables ContraReembolso MAX', () => {
+        // Política mayo 2026: el adicional por contra reembolso fue eliminado.
+        // buildCartFromSelection ya no setea isContraReembolsoMAX/adicionalMAX.
+        // Verificamos que NO los setea (campos quedan undefined).
+        test('60-day plan: no setea flags de adicional', () => {
             const state = makeState('waiting_plan_choice');
             buildCartFromSelection('Cápsulas de nuez de la india', '60', state);
-            expect(state.isContraReembolsoMAX).toBe(true);
-            expect(state.adicionalMAX).toBeGreaterThan(0);
+            expect(state.isContraReembolsoMAX).toBeUndefined();
+            expect(state.adicionalMAX).toBeUndefined();
         });
 
-        test('120-day plan disables ContraReembolso MAX', () => {
+        test('120-day plan: no setea flags de adicional', () => {
             const state = makeState('waiting_plan_choice');
             buildCartFromSelection('Cápsulas de nuez de la india', '120', state);
-            expect(state.isContraReembolsoMAX).toBe(false);
-            expect(state.adicionalMAX).toBe(0);
+            expect(state.isContraReembolsoMAX).toBeUndefined();
+            expect(state.adicionalMAX).toBeUndefined();
         });
 
         test.each(['180', '240', '300', '360'])('extended plan %s calculates correctly with 3+ unit discount', (plan) => {
@@ -182,23 +185,23 @@ describe('cartHelpers', () => {
     });
 
     describe('calculateTotal', () => {
-        test('calculates total without adicional', () => {
+        test('calculates total from cart subtotal', () => {
             const state = makeState('waiting_plan_choice', {
-                cart: [{ product: 'Test', plan: '120', price: '66.900' }],
-                adicionalMAX: 0
+                cart: [{ product: 'Test', plan: '120', price: '66.900' }]
             });
             const total = calculateTotal(state);
             expect(total).toBe('66.900');
             expect(state.totalPrice).toBe('66.900');
         });
 
-        test('calculates total with adicional MAX', () => {
+        // Política mayo 2026: el adicional fue eliminado. calculateTotal devuelve
+        // siempre el subtotal del cart, sin sumar nada extra.
+        test('calculates total = subtotal (sin adicional)', () => {
             const state = makeState('waiting_plan_choice', {
-                cart: [{ product: 'Test', plan: '60', price: '46.900' }],
-                adicionalMAX: 6000
+                cart: [{ product: 'Test', plan: '60', price: '46.900' }]
             });
             const total = calculateTotal(state);
-            expect(parseInt(total.replace(/\./g, ''))).toBe(52900);
+            expect(parseInt(total.replace(/\./g, ''))).toBe(46900);
         });
 
         test('handles multi-item cart', () => {
@@ -206,8 +209,7 @@ describe('cartHelpers', () => {
                 cart: [
                     { product: 'Cápsulas', plan: '60', price: '46.900' },
                     { product: 'Gotas', plan: '60', price: '48.900' }
-                ],
-                adicionalMAX: 0
+                ]
             });
             const total = calculateTotal(state);
             expect(parseInt(total.replace(/\./g, ''))).toBe(95800);
@@ -580,18 +582,20 @@ describe('Step Handlers (Refactored)', () => {
             expect(userState[userId].selectedPlan).toBe(expectedPlan);
         });
 
-        test('60-day plan sets MAX correctly', async () => {
+        // Política mayo 2026: el adicional por contra reembolso fue eliminado.
+        // stepWaitingPlanChoice ya no toca isContraReembolsoMAX/adicionalMAX.
+        test('60-day plan: no setea flags de adicional', async () => {
             const userState = { [userId]: makeState('waiting_plan_choice', basePlanState) };
             await processSalesFlow(userId, '60', userState, knowledge, mockDependencies);
-            expect(userState[userId].isContraReembolsoMAX).toBe(true);
-            expect(userState[userId].adicionalMAX).toBeGreaterThan(0);
+            expect(userState[userId].isContraReembolsoMAX).toBeUndefined();
+            expect(userState[userId].adicionalMAX).toBeUndefined();
         });
 
-        test('120-day plan disables MAX', async () => {
+        test('120-day plan: no setea flags de adicional', async () => {
             const userState = { [userId]: makeState('waiting_plan_choice', basePlanState) };
             await processSalesFlow(userId, '120', userState, knowledge, mockDependencies);
-            expect(userState[userId].isContraReembolsoMAX).toBe(false);
-            expect(userState[userId].adicionalMAX).toBe(0);
+            expect(userState[userId].isContraReembolsoMAX).toBeUndefined();
+            expect(userState[userId].adicionalMAX).toBeUndefined();
         });
 
         test('advances to waiting_data after plan selection', async () => {

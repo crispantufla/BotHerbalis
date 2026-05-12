@@ -105,7 +105,9 @@ describe('V3 Script — Contra Reembolso MAX', () => {
         mockNotifyAdmin.mockClear();
     });
 
-    test('Plan 60 should set isContraReembolsoMAX = true and adicionalMAX = 6000', async () => {
+    // Política mayo 2026: el adicional por contra reembolso fue eliminado.
+    // stepWaitingPlanChoice ya no toca isContraReembolsoMAX/adicionalMAX.
+    test('Plan 60: no setea flags de adicional', async () => {
         userState[userId] = {
             step: 'waiting_plan_choice',
             history: [],
@@ -115,11 +117,11 @@ describe('V3 Script — Contra Reembolso MAX', () => {
 
         await processSalesFlow(userId, "60", userState, knowledge, mockDependencies);
 
-        expect(userState[userId].isContraReembolsoMAX).toBe(true);
-        expect(userState[userId].adicionalMAX).toBe(6000);
+        expect(userState[userId].isContraReembolsoMAX).toBeUndefined();
+        expect(userState[userId].adicionalMAX).toBeUndefined();
     });
 
-    test('Plan 120 should set isContraReembolsoMAX = false and adicionalMAX = 0', async () => {
+    test('Plan 120: no setea flags de adicional', async () => {
         userState[userId] = {
             step: 'waiting_plan_choice',
             history: [],
@@ -129,8 +131,8 @@ describe('V3 Script — Contra Reembolso MAX', () => {
 
         await processSalesFlow(userId, "120", userState, knowledge, mockDependencies);
 
-        expect(userState[userId].isContraReembolsoMAX).toBe(false);
-        expect(userState[userId].adicionalMAX).toBe(0);
+        expect(userState[userId].isContraReembolsoMAX).toBeUndefined();
+        expect(userState[userId].adicionalMAX).toBeUndefined();
     });
 
 

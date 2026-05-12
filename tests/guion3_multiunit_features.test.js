@@ -123,7 +123,7 @@ describe('Group A: Multi-unit ordering (6 tests)', () => {
         expect(getBotMessages().some(m => /3 unidades|180 d[ií]as|descuento/i.test(m))).toBe(true);
     });
 
-    test('2. "2 cajas" → plan 120, no discount (only 2 units), no adicionalMAX', async () => {
+    test('2. "2 cajas" → plan 120, no discount (only 2 units)', async () => {
         userState['u2'] = makeDataState();
         await run('u2', 'Mejor quiero 2 cajas');
 
@@ -132,9 +132,6 @@ describe('Group A: Multi-unit ordering (6 tests)', () => {
         // 2 units: 1 pair * base120 = 66900, no discount
         const cartPrice = parseInt(state.cart[0].price.replace(/\./g, ''), 10);
         expect(cartPrice).toBe(66900);
-        // 2 units (120 days total) → no adicionalMAX
-        expect(state.isContraReembolsoMAX).toBe(false);
-        expect(state.adicionalMAX).toBe(0);
     });
 
     test('3. "4 cajas de capsulas" → plan 240, discount on 1 cheapest unit', async () => {
@@ -147,7 +144,6 @@ describe('Group A: Multi-unit ordering (6 tests)', () => {
         // 4 units: 2 pairs * 66900 = 133800, discount = 46900 * 0.5 = 23450
         // = 133800 - 23450 = 110350
         expect(cartPrice).toBe(110350);
-        expect(state.isContraReembolsoMAX).toBe(false);
     });
 
     test('4. "tres cajas" (word number) → plan 180', async () => {
@@ -168,60 +164,53 @@ describe('Group A: Multi-unit ordering (6 tests)', () => {
         expect(cartPrice).toBe(90350);
     });
 
-    test('6. Single "60 días" → plan stays 60, adicionalMAX still applies', async () => {
+    test('6. Single "60 días" → plan stays 60', async () => {
         userState['u6'] = makeDataState();
         await run('u6', 'En realidad me quedo con el de 60 días nomás');
 
         const state = userState['u6'];
         expect(state.selectedPlan).toBe('60');
-        expect(state.isContraReembolsoMAX).toBe(true);
-        expect(state.adicionalMAX).toBeGreaterThan(0);
     });
 });
 
-// ─── Group B: buildCartFromSelection discount and adicionalMAX unit tests ─────
+// ─── Group B: buildCartFromSelection discount unit tests ──────────────────────
 
-describe('Group B: Cart helpers — discount and adicionalMAX unit tests (5 tests)', () => {
-    const { buildCartFromSelection, buildMultiProductCart, calculateTotal, _recalcAdicionalMAX } = require('../src/flows/utils/cartHelpers');
+describe('Group B: Cart helpers — discount unit tests (5 tests)', () => {
+    const { buildCartFromSelection, buildMultiProductCart, calculateTotal } = require('../src/flows/utils/cartHelpers');
 
     function makeEmptyState() {
-        return { cart: [], selectedProduct: null, selectedPlan: null, isContraReembolsoMAX: false, adicionalMAX: 0, totalPrice: null };
+        return { cart: [], selectedProduct: null, selectedPlan: null, totalPrice: null };
     }
 
-    test('7. plan=60 → adicionalMAX applies (total 60 days < 120)', () => {
+    test('7. plan=60 → cart con 1 unidad de 60', () => {
         const state = makeEmptyState();
         buildCartFromSelection('Cápsulas de nuez de la india', '60', state);
-        expect(state.isContraReembolsoMAX).toBe(true);
-        expect(state.adicionalMAX).toBeGreaterThan(0);
+        expect(state.cart).toHaveLength(1);
+        expect(state.selectedPlan).toBe('60');
     });
 
-    test('8. plan=120 → no adicionalMAX (total 120 days = 120)', () => {
+    test('8. plan=120 → cart con 1 unidad de 120', () => {
         const state = makeEmptyState();
         buildCartFromSelection('Cápsulas de nuez de la india', '120', state);
-        expect(state.isContraReembolsoMAX).toBe(false);
-        expect(state.adicionalMAX).toBe(0);
+        expect(state.cart).toHaveLength(1);
+        expect(state.selectedPlan).toBe('120');
     });
 
-    test('9. plan=180 → no adicionalMAX, price has 50% discount applied', () => {
+    test('9. plan=180 → price has 50% discount applied', () => {
         const state = makeEmptyState();
         buildCartFromSelection('Cápsulas de nuez de la india', '180', state);
-        expect(state.isContraReembolsoMAX).toBe(false);
-        expect(state.adicionalMAX).toBe(0);
         const price = parseInt(state.cart[0].price.replace(/\./g, ''), 10);
         // 66900 + 46900 - 23450 = 90350
         expect(price).toBe(90350);
     });
 
-    test('10. buildMultiProductCart: 1 capsulas + 1 gotas → total 120 days → no adicionalMAX', () => {
+    test('10. buildMultiProductCart: 1 capsulas + 1 gotas → 2 items en cart', () => {
         const state = makeEmptyState();
         buildMultiProductCart([
             { product: 'Cápsulas de nuez de la india', units: 1 },
             { product: 'Gotas de nuez de la india', units: 1 },
         ], state);
         expect(state.cart.length).toBe(2);
-        // Total plan days = 60 + 60 = 120 → no adicionalMAX
-        expect(state.isContraReembolsoMAX).toBe(false);
-        expect(state.adicionalMAX).toBe(0);
     });
 
     test('11. buildMultiProductCart: 2 capsulas + 1 gotas → 3 units → 50% discount on cheapest', () => {
@@ -243,7 +232,6 @@ describe('Group B: Cart helpers — discount and adicionalMAX unit tests (5 test
         // Verify the discount was applied (total should be less than without discount)
         // Without discount: 66900 + 48900 = 115800
         expect(totalCart).toBeLessThan(115800);
-        expect(state.isContraReembolsoMAX).toBe(false);
     });
 });
 
@@ -490,6 +478,5 @@ describe('Group E: Multi-unit ordering integration (3 tests)', () => {
         await run('e3', 'Mejor quiero dos unidades');
 
         expect(userState['e3'].selectedPlan).toBe('120');
-        expect(userState['e3'].isContraReembolsoMAX).toBe(false);
     });
 });

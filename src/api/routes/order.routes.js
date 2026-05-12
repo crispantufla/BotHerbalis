@@ -537,7 +537,7 @@ module.exports = (clientPool) => {
             }
 
             const plan = state.selectedPlan || cart[0]?.plan || rescuedPlan || '60';
-            // Prefer state.totalPrice (already includes adicionalMAX and reflects latest plan change)
+            // Prefer state.totalPrice (refleja el último cambio de plan).
             // Fall back to recalculating from cart only if totalPrice is missing.
             let total;
             if (state.totalPrice) {
@@ -545,9 +545,7 @@ module.exports = (clientPool) => {
             } else if (rescuedTotal) {
                 total = rescuedTotal;
             } else {
-                const subtotal = cart.reduce((sum, i) => sum + parseInt((i.price || '0').toString().replace(/\D/g, '')), 0);
-                const adicional = state.adicionalMAX || 0;
-                total = subtotal + adicional;
+                total = cart.reduce((sum, i) => sum + parseInt((i.price || '0').toString().replace(/\D/g, '')), 0);
             }
 
             // Normalize product name to standard format: "Cápsulas (120 días)"

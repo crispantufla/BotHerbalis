@@ -2,7 +2,7 @@ import { UserState, FlowStep } from '../../types/state';
 import { validateAddress, suggestCPByCity, lookupCPFromMaps } from '../../services/addressValidator';
 import { buildConfirmationMessage } from '../../utils/messageTemplates';
 import { _setStep, _pauseAndAlert, _detectProductPlanChange, _resolveNewProductPlan, _detectPostdatado } from '../utils/flowHelpers';
-import { _getPrice, _getAdicionalMAX } from '../utils/pricing';
+import { _getPrice } from '../utils/pricing';
 import { _formatPrice, buildCartFromSelection, calculateTotal } from '../utils/cartHelpers';
 import { _isDuplicate } from '../utils/messages';
 import logger from '../../utils/logger';
@@ -652,9 +652,7 @@ async function _validateAndAssembleOrder(
     currentState.pendingOrder = { ...addr, calleOriginal, cart: currentState.cart };
     currentState.partialAddress = {} as any;
 
-    const subtotal = currentState.cart.reduce((sum: number, i: any) => sum + parseInt(i.price.toString().replace(/\./g, '')), 0);
-    const adicional = currentState.adicionalMAX || 0;
-    const total = subtotal + adicional;
+    const total = currentState.cart.reduce((sum: number, i: any) => sum + parseInt(i.price.toString().replace(/\./g, '')), 0);
     currentState.totalPrice = _formatPrice(total);
 
     const summaryMsg = buildConfirmationMessage(currentState);

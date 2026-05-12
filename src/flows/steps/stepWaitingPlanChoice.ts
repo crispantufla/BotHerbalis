@@ -1,5 +1,5 @@
 import { UserState, FlowStep } from '../../types/state';
-import { _getPrice, _getAdicionalMAX } from '../utils/pricing';
+import { _getPrice } from '../utils/pricing';
 import { _setStep } from '../utils/flowHelpers';
 import { buildCartFromSelection, calculateTotal } from '../utils/cartHelpers';
 import { _isDuplicate } from '../utils/messages';
@@ -72,13 +72,6 @@ export async function handleWaitingPlanChoice(
     }
 
     if (foundItems.length > 0) {
-        let applyMax = false;
-        if (foundItems.length === 1 && foundItems[0].plan === '60') {
-            applyMax = true;
-        }
-
-        currentState.isContraReembolsoMAX = applyMax;
-        currentState.adicionalMAX = applyMax ? _getAdicionalMAX() : 0;
         currentState.cart = foundItems;
         // Setear selectedProduct/Plan + recalcular totalPrice. Sin esta línea
         // el state quedaba con `totalPrice` undefined y al elegir MP el bot

@@ -1,6 +1,6 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _setStep, _detectProductPlanChange, _resolveNewProductPlan } from '../utils/flowHelpers';
-import { _getPrice, _getAdicionalMAX, _getPrices } from '../utils/pricing';
+import { _getPrice, _getPrices } from '../utils/pricing';
 import { _isAffirmative } from '../utils/validation';
 import logger from '../../utils/logger';
 
@@ -26,23 +26,9 @@ export async function handleWaitingFinalConfirmation(
             currentState.selectedPlan = newPlan;
 
             const priceStr = _getPrice(newProduct, newPlan);
-            let basePrice = parseInt(priceStr.replace(/\./g, ''));
+            const basePrice = parseInt(priceStr.replace(/\./g, ''));
             currentState.cart = [{ product: newProduct, plan: newPlan, price: priceStr }];
-
-            // Recompute adicional based on the NEW plan and current payment method.
-            // The previous isContraReembolsoMAX flag reflects the OLD plan, so it can't
-            // be trusted after a plan change (e.g. plan 120 → 60 needs the adicional
-            // added back). MP/transferencia payments keep the adicional waived.
-            // 'contrarembolso' es el único valor "cash" del union (paymentMethod).
-            // Política mayo 2026: no hay adicional aunque sea contrarembolso (seña vía MP cubre envío).
-            const isCashPayment = !currentState.paymentMethod
-                || currentState.paymentMethod === 'contrarembolso';
-            const shouldApplyAdicional = isCashPayment && newPlan === '60';
-            const finalAdicional = shouldApplyAdicional ? _getAdicionalMAX() : 0;
-            currentState.adicionalMAX = finalAdicional;
-            currentState.isContraReembolsoMAX = shouldApplyAdicional;
-            const finalPrice = basePrice + finalAdicional;
-            currentState.totalPrice = finalPrice.toLocaleString('es-AR').replace(/,/g, '.');
+            currentState.totalPrice = basePrice.toLocaleString('es-AR').replace(/,/g, '.');
 
             const planText = newPlan === "120" ? "120 días" : "60 días";
             const changeMsg = `¡Dale, sin problema! 😊 Cambiamos el pedido a ${newProduct.split(' de ')[0].toLowerCase()} por ${planText}.`;
@@ -147,7 +133,7 @@ export async function handleWaitingFinalConfirmation(
         // Build pricing context so the AI never invents prices
         const allPrices = _getPrices();
         const pricingContext = Object.entries(allPrices)
-            .filter(([k]) => !['adicionalMAX', 'costoLogistico'].includes(k))
+            .filter(([k]) => !['costoLogistico'].includes(k))
             .map(([product, plans]: [string, any]) => `${product}: 60 días $${plans['60']}, 120 días $${plans['120']}`)
             .join(' | ');
         const currentProductLabel = currentState.selectedProduct || 'No definido';
@@ -208,14 +194,9 @@ export async function handleWaitingFinalConfirmation(
                         currentState.selectedProduct = resolved.newProduct;
                         currentState.selectedPlan = resolved.newPlan;
                         const priceStr = _getPrice(resolved.newProduct, resolved.newPlan);
-                        let basePrice = parseInt(priceStr.replace(/\./g, ''));
+                        const basePrice = parseInt(priceStr.replace(/\./g, ''));
                         currentState.cart = [{ product: resolved.newProduct, plan: resolved.newPlan, price: priceStr }];
-                        const isCashPayment = !currentState.paymentMethod || currentState.paymentMethod === 'contrarembolso';
-                        const shouldApplyAdicional = isCashPayment && resolved.newPlan === '60';
-                        const finalAdicional = shouldApplyAdicional ? _getAdicionalMAX() : 0;
-                        currentState.adicionalMAX = finalAdicional;
-                        currentState.isContraReembolsoMAX = shouldApplyAdicional;
-                        currentState.totalPrice = (basePrice + finalAdicional).toLocaleString('es-AR').replace(/,/g, '.');
+                        currentState.totalPrice = basePrice.toLocaleString('es-AR').replace(/,/g, '.');
                         logger.info(`[FINAL_CONFIRM] AI detected product change for ${userId}: ${resolved.newProduct} plan ${resolved.newPlan} -> $${currentState.totalPrice}`);
                     }
                 }

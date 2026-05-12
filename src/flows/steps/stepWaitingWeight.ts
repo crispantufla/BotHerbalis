@@ -134,12 +134,7 @@ export async function handleWaitingWeight(
                 currentState.cart = [{ product: 'Cápsulas de nuez de la india', plan: '120', price: knowledge?._prices?.capsulas120 || '' }];
             }
 
-            // adicionalMAX solo aplica al plan 60 con contra reembolso. Lo seteamos
-            // por defecto; los steps de pago (MP/transferencia) lo bonifican luego.
             const { calculateTotal } = require('../utils/cartHelpers');
-            const { _getAdicionalMAX } = require('../utils/pricing');
-            currentState.adicionalMAX = currentState.selectedPlan === '60' ? _getAdicionalMAX() : 0;
-            currentState.isContraReembolsoMAX = currentState.selectedPlan === '60';
             calculateTotal(currentState);
 
             // Mensaje del tier — pitch + price + prepay incentive + cierre

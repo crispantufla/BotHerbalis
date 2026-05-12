@@ -1,6 +1,6 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _setStep, _pauseAndAlert } from '../utils/flowHelpers';
-import { calculateTotal, _recalcAdicionalMAX } from '../utils/cartHelpers';
+import { calculateTotal } from '../utils/cartHelpers';
 import logger from '../../utils/logger';
 
 const PAID_KEYWORDS = /\b(listo|pague|pagu[eé]|transferi|transferido|transfer[ií]|ya transferi|ya transfer[ií]|realice|realic[eé]|hice la transferencia|hecho|ok listo|lo hice|envi[eé] la transferencia|ya la hice)\b/i;
@@ -42,8 +42,6 @@ export async function handleWaitingTransferConfirmation(
     if (CASH_KEYWORDS.test(normalizedText)) {
         logger.info(`[TRANSFER_CONFIRM] Cliente ${userId} cambió de transferencia a contra reembolso`);
         currentState.paymentMethod = 'contrarembolso';
-        // Transferencia había bonificado el adicional — restaurarlo para contra reembolso
-        _recalcAdicionalMAX(currentState);
         calculateTotal(currentState);
 
         const addr = currentState.partialAddress || {};

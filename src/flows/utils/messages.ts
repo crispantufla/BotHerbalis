@@ -30,20 +30,13 @@ function _formatMessage(text: string | string[], state: any): string {
     formatted = formatted.replace(/{{PRICE_PER_DAY_CAPSULAS_120}}/g, _perDay(prices['Cápsulas']?.['120'], 120));
     formatted = formatted.replace(/{{PRICE_PER_DAY_SEMILLAS_120}}/g, _perDay(prices['Semillas']?.['120'], 120));
     formatted = formatted.replace(/{{PRICE_PER_DAY_GOTAS_120}}/g, _perDay(prices['Gotas']?.['120'], 120));
-    // Precio total con adicional ya incluido. Política mayo 2026: adicional = 0,
-    // por lo que {{PRICE_TOTAL_*_60}} hoy equivale a {{PRICE_*_60}}. Se mantiene
-    // por compatibilidad con plantillas legacy si vuelven a usarlo.
-    const _withAdicional = (priceStr: string | undefined, adicionalStr: string | undefined): string => {
-        if (!priceStr) return '';
-        const base = parseInt(priceStr.replace(/\./g, ''), 10);
-        const adic = parseInt((adicionalStr || '0').replace(/\./g, ''), 10);
-        if (isNaN(base) || isNaN(adic)) return priceStr;
-        return _formatPrice(base + adic);
-    };
-    formatted = formatted.replace(/{{PRICE_TOTAL_CAPSULAS_60}}/g, _withAdicional(prices['Cápsulas']?.['60'], prices.adicionalMAX));
-    formatted = formatted.replace(/{{PRICE_TOTAL_SEMILLAS_60}}/g, _withAdicional(prices['Semillas']?.['60'], prices.adicionalMAX));
-    formatted = formatted.replace(/{{PRICE_TOTAL_GOTAS_60}}/g, _withAdicional(prices['Gotas']?.['60'], prices.adicionalMAX));
-    formatted = formatted.replace(/{{ADICIONAL_MAX}}/g, prices.adicionalMAX || '0');
+    // Política mayo 2026: el adicional por contra reembolso fue eliminado, por lo
+    // que {{PRICE_TOTAL_*_60}} ahora es idéntico a {{PRICE_*_60}}. Se mantienen
+    // los placeholders sólo por compatibilidad con plantillas legacy.
+    formatted = formatted.replace(/{{PRICE_TOTAL_CAPSULAS_60}}/g, prices['Cápsulas']?.['60'] || '');
+    formatted = formatted.replace(/{{PRICE_TOTAL_SEMILLAS_60}}/g, prices['Semillas']?.['60'] || '');
+    formatted = formatted.replace(/{{PRICE_TOTAL_GOTAS_60}}/g, prices['Gotas']?.['60'] || '');
+    formatted = formatted.replace(/{{ADICIONAL_MAX}}/g, '0');
     formatted = formatted.replace(/{{COSTO_LOGISTICO}}/g, prices.costoLogistico || '18.000');
 
     // Replace dynamic order placeholders if state is provided
@@ -55,15 +48,7 @@ function _formatMessage(text: string | string[], state: any): string {
             formatted = formatted.replace(/{{PLAN}}/g, state.selectedPlan);
         }
         if (state.totalPrice) {
-            let displayPrice = state.totalPrice;
-            // If Contra Reembolso MAX, show breakdown
-            if (state.isContraReembolsoMAX && state.adicionalMAX > 0) {
-                const basePriceInt = Math.max(0, parseInt(String(state.totalPrice).replace(/\./g, '')) - state.adicionalMAX);
-                const basePrice = _formatPrice(basePriceInt);
-                const adicional = _formatPrice(state.adicionalMAX);
-                displayPrice = `$${basePrice} + $${adicional}`;
-            }
-            formatted = formatted.replace(/{{TOTAL}}/g, displayPrice);
+            formatted = formatted.replace(/{{TOTAL}}/g, state.totalPrice);
         }
     }
 

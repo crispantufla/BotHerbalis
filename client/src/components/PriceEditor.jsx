@@ -15,8 +15,7 @@ const PriceEditor = () => {
         try {
             const { data } = await api.get('/api/prices');
 
-            // Ensure Config Defaults (política mayo 2026: adicional = 0)
-            if (!data.adicionalMAX) data.adicionalMAX = '0';
+            // Ensure Config Defaults
             if (!data.costoLogistico) data.costoLogistico = '18.000';
 
             setPrices(data || {});
@@ -105,25 +104,7 @@ const PriceEditor = () => {
                             <h3 className="text-slate-800 dark:text-slate-100 font-bold mb-4 flex items-center gap-2">
                                 <span className="text-emerald-500">⚙️</span> Configuración Adicional
                             </h3>
-                            <div className="grid grid-cols-2 gap-4">
-                                {/* Adicional MAX */}
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-wide">
-                                        Servicio Contra Reembolso MAX
-                                    </label>
-                                    <div className="relative">
-                                        <span className="absolute left-3 top-2 text-slate-400 dark:text-slate-500">$</span>
-                                        <input
-                                            type="text"
-                                            className="w-full pl-7 pr-3 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
-                                            value={prices.adicionalMAX || ''}
-                                            onChange={(e) => setPrices(prev => ({ ...prev, adicionalMAX: e.target.value }))}
-                                            placeholder="6.000"
-                                        />
-                                    </div>
-                                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Se cobra en planes de 60 días. (Gratis en 120)</p>
-                                </div>
-
+                            <div className="grid grid-cols-1 gap-4">
                                 {/* Costo Logístico */}
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-wide">

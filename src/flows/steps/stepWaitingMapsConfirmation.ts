@@ -46,9 +46,7 @@ export async function handleWaitingMapsConfirmation(
 
         currentState.pendingOrder = { ...addr, calleOriginal: addr.calleOriginal || addr.calle, cart: currentState.cart };
 
-        const subtotal = currentState.cart.reduce((sum: number, i: any) => sum + parseInt(i.price.toString().replace(/\./g, '')), 0);
-        const adicional = currentState.adicionalMAX || 0;
-        const total = subtotal + adicional;
+        const total = currentState.cart.reduce((sum: number, i: any) => sum + parseInt(i.price.toString().replace(/\./g, '')), 0);
         currentState.totalPrice = total.toLocaleString('es-AR').replace(/,/g, '.');
 
         await _pauseAndAlert(userId, currentState, dependencies, text,
@@ -112,9 +110,7 @@ export async function handleWaitingMapsConfirmation(
                 currentState.pendingOrder = { ...addr, calleOriginal: addr.calleOriginal || addr.calle, cart: currentState.cart };
                 currentState.partialAddress = {} as any;
 
-                const subtotal = currentState.cart.reduce((sum: number, i: any) => sum + parseInt(i.price.toString().replace(/\./g, '')), 0);
-                const adicional = currentState.adicionalMAX || 0;
-                const total = subtotal + adicional;
+                const total = currentState.cart.reduce((sum: number, i: any) => sum + parseInt(i.price.toString().replace(/\./g, '')), 0);
                 currentState.totalPrice = total.toLocaleString('es-AR').replace(/,/g, '.');
 
                 const summaryMsg = buildConfirmationMessage(currentState);

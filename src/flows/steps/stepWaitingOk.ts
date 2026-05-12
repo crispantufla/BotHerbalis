@@ -1,7 +1,6 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _setStep, _pauseAndAlert } from '../utils/flowHelpers';
 import { _isAffirmative, _isNegative } from '../utils/validation';
-import { _getAdicionalMAX } from '../utils/pricing';
 import { buildPaymentMessage } from '../../utils/messageTemplates';
 import logger from '../../utils/logger';
 

@@ -78,21 +78,6 @@ export async function handleWaitingPaymentMethod(
     // Solo si MP fue elegido (por número o keyword) Y no hay señal de transferencia
     if ((isOptionMP || MP_KEYWORDS.test(text)) && !TRANSFER_KEYWORDS.test(text) && !isOptionTransfer && !isOptionCash) {
         currentState.paymentMethod = 'mercadopago';
-
-        // Waive adicionalMAX (MP paga por adelantado — no hay riesgo de rechazo)
-        if (currentState.adicionalMAX && currentState.adicionalMAX > 0) {
-            const totalRaw = typeof currentState.totalPrice === 'string'
-                ? parseFloat(currentState.totalPrice.replace(/\./g, '').replace(',', '.'))
-                : Number(currentState.totalPrice || 0);
-            if (totalRaw > 0) {
-                const newTotal = totalRaw - currentState.adicionalMAX;
-                currentState.totalPrice = newTotal.toLocaleString('es-AR').replace(/,/g, '.');
-            }
-            currentState.adicionalMAX = 0;
-            currentState.isContraReembolsoMAX = false;
-            logger.info(`[PAYMENT_METHOD] MP seleccionado — adicionalMAX bonificado. Nuevo total: $${currentState.totalPrice}`);
-        }
-
         _setStep(currentState, FlowStep.WAITING_MP_PAYMENT);
         saveState(userId);
         // stepWaitingMpPayment maneja el primer mensaje al entrar
@@ -102,21 +87,6 @@ export async function handleWaitingPaymentMethod(
     // ── Opción 2: Transferencia ────────────────────────────────────────────────
     if (isOptionTransfer || TRANSFER_KEYWORDS.test(normalizedText)) {
         currentState.paymentMethod = 'transferencia';
-
-        // Waive adicionalMAX igual que MP
-        if (currentState.adicionalMAX && currentState.adicionalMAX > 0) {
-            const totalRaw = typeof currentState.totalPrice === 'string'
-                ? parseFloat(currentState.totalPrice.replace(/\./g, '').replace(',', '.'))
-                : Number(currentState.totalPrice || 0);
-            if (totalRaw > 0) {
-                const newTotal = totalRaw - currentState.adicionalMAX;
-                currentState.totalPrice = newTotal.toLocaleString('es-AR').replace(/,/g, '.');
-            }
-            currentState.adicionalMAX = 0;
-            currentState.isContraReembolsoMAX = false;
-            logger.info(`[PAYMENT_METHOD] Transferencia seleccionada — adicionalMAX bonificado. Nuevo total: $${currentState.totalPrice}`);
-        }
-
         const msg = `¡Perfecto! Para transferir usá el alias *CHILE.TEXTO.CASINO*. Una vez que realicés la transferencia avisanos por acá y coordinamos el envío 😊`;
         _setStep(currentState, FlowStep.WAITING_TRANSFER_CONFIRMATION);
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });

@@ -59,8 +59,6 @@ export interface UserState {
     totalPrice?: string | number | null;
     price?: string | number | null;
     weightGoal?: string | number | null;
-    isContraReembolsoMAX?: boolean;
-    adicionalMAX?: number;
 
     // Variables de iteración y validación de direcciones
     addressAttempts?: number;

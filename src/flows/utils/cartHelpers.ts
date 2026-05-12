@@ -1,5 +1,5 @@
 import { UserState } from '../../types/state';
-import { _getPrice, _getAdicionalMAX } from './pricing';
+import { _getPrice } from './pricing';
 
 /**
  * _formatPrice
@@ -8,25 +8,6 @@ import { _getPrice, _getAdicionalMAX } from './pricing';
  */
 function _formatPrice(n: number): string {
     return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-}
-
-/**
- * _recalcAdicionalMAX
- * Recomputes the ContraReembolso MAX surcharge based on total plan days across all
- * cart items. Only applies when total plan days < 120 (single 60-day unit only).
- * Two products × 60 days each = 120 total → no surcharge.
- */
-function _recalcAdicionalMAX(state: UserState): void {
-    const totalDays = state.cart.reduce((sum: number, item: any) => {
-        return sum + parseInt(item.plan || '0', 10);
-    }, 0);
-    if (totalDays < 120) {
-        state.isContraReembolsoMAX = true;
-        state.adicionalMAX = _getAdicionalMAX();
-    } else {
-        state.isContraReembolsoMAX = false;
-        state.adicionalMAX = 0;
-    }
 }
 
 /**
@@ -73,7 +54,6 @@ function buildCartFromSelection(product: string, plan: string, state: UserState)
     state.selectedPlan = plan;
     state.selectedProduct = product;
 
-    _recalcAdicionalMAX(state);
     calculateTotal(state);
 }
 
@@ -81,7 +61,6 @@ function buildCartFromSelection(product: string, plan: string, state: UserState)
  * buildMultiProductCart
  * Builds a cart from multiple products (e.g. "1 caja de cápsulas y 2 de gotas").
  * Applies 50% discount on the cheapest unit when there are 3+ total units.
- * Sets adicionalMAX based on total plan days across all items.
  *
  * @param items - Array of {product, units} where units is the number of 60-day units
  * @param state - UserState to update
@@ -129,14 +108,13 @@ function buildMultiProductCart(items: Array<{product: string; units: number}>, s
     // selectedProduct/Plan = first item (for backward compat with single-product flows)
     state.selectedProduct = items[0].product;
     state.selectedPlan = (items[0].units * 60).toString();
-
-    _recalcAdicionalMAX(state);
 }
 
 /**
  * calculateTotal
- * Calculates the total price from cart items + adicional MAX surcharge.
- * Updates state.totalPrice with the formatted string.
+ * Calculates the total price from cart items. Updates state.totalPrice with the
+ * formatted string. (Política mayo 2026: el adicional por contra reembolso fue
+ * eliminado, así que el total = subtotal del cart.)
  */
 function calculateTotal(state: UserState): string {
     const subtotal = state.cart.reduce((sum: number, i: any) => {
@@ -148,16 +126,13 @@ function calculateTotal(state: UserState): string {
         }
         return sum + parsed;
     }, 0);
-    const adicional = state.adicionalMAX || 0;
-    const total = subtotal + adicional;
-    const formatted = _formatPrice(total);
+    const formatted = _formatPrice(subtotal);
     state.totalPrice = formatted;
     return formatted;
 }
 
 export {
     _formatPrice,
-    _recalcAdicionalMAX,
     buildCartFromSelection,
     buildMultiProductCart,
     calculateTotal
