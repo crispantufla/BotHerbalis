@@ -782,8 +782,15 @@ async function snapshotDailyStats(sharedState?: SchedulerSharedState) {
 
 /**
  * checkPendingMpPayments — recordatorios para clientes que eligieron MP pero no completaron.
- * 30min: recordatorio amable con link nuevamente.
- * 4h: último recordatorio + pausar y notificar al vendedor para llamado manual.
+ * Stages:
+ *   1) 30min  — recordatorio amable con link de nuevo
+ *   2) 4h     — escalada al vendedor (alert + pausa)
+ *   3) 24h    — incentivo: aviso de plazo + opción de postdatar
+ *   4) 72h    — última oportunidad: reservar precio o liberar carrito
+ *
+ * Stages 3 y 4 corren sobre clientes que el bot pausó en stage 2 — el
+ * `pauseReason` los marca como pausa MP-inducida. Si el admin destrabó al
+ * cliente con otra pauseReason, también seguimos nudgeando hasta 72h.
  *
  * Distinto de refreshPendingPayments (que solo actualiza el estado en DB).
  * Acá MENSAJEAMOS al cliente.
@@ -797,7 +804,18 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
 
     for (const [userId, state] of Object.entries(userState)) {
         if (state.step !== 'waiting_mp_payment') continue;
-        if (pausedUsers && pausedUsers.has(userId)) continue;
+
+        const mpReminderStage = (state as any).mpReminderStage || 0;
+
+        // Permitir que los stages 3 y 4 sigan mensajeando aunque el usuario
+        // esté pausado, pero SOLO si la pausa la disparó este mismo flujo MP.
+        // Si el admin pausó manualmente con otra razón, respetamos.
+        if (pausedUsers && pausedUsers.has(userId)) {
+            const pauseReason = (state as any).pauseReason || '';
+            const isMpInducedPause = pauseReason.includes('MP pendiente');
+            const isFollowupStage = mpReminderStage >= 2;  // 2 ya fue el que pausó
+            if (!isMpInducedPause || !isFollowupStage) continue;
+        }
 
         const enteredRaw = (state as any).stepEnteredAt || (state as any).lastActivityAt;
         if (!enteredRaw) continue;
@@ -807,12 +825,8 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
         if (!Number.isFinite(enteredAt)) continue;
 
         const minsSince = differenceInMinutes(now, enteredAt);
-        const mpReminderStage = (state as any).mpReminderStage || 0;
 
         // Stage 1: 30 minutos sin pagar — recordatorio amable.
-        // Sin cota superior: si el cron pierde una corrida y el cliente llega
-        // a 250min en stage 0, igual disparamos stage 1 ahora; en el próximo
-        // tick (10min después) stage 2 escalará al vendedor.
         if (mpReminderStage === 0 && minsSince >= 30) {
             const linkUrl = (state as any).mpPaymentLinkUrl;
             const linkLine = linkUrl ? `\n\nAcá te dejo el link de nuevo:\n${linkUrl}` : '';
@@ -847,6 +861,42 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
                 logger.info(`[SCHEDULER][${sharedState.sellerId || '?'}] MP escalated to seller: ${userId} (${minsSince}min waiting)`);
             } catch (e: any) {
                 logger.error(`[SCHEDULER] Failed to escalate MP timeout for ${userId}:`, e.message);
+            }
+            continue;
+        }
+
+        // Stage 3: 24 horas sin pagar — incentivo + opción de postdatar.
+        // Solo dispara si el admin no destrabó al cliente con otra pausa.
+        if (mpReminderStage === 2 && minsSince >= 1440) {
+            const linkUrl = (state as any).mpPaymentLinkUrl;
+            const linkLine = linkUrl ? `\n\nAcá te dejo el link otra vez:\n${linkUrl}` : '';
+            const msg = `¡Hola! ¿Cómo va? 😊\n\nVi que el pago de MercadoPago quedó pendiente. Te recuerdo que esta semana los pedidos llegan en *4 días hábiles* desde la confirmación del pago.\n\nSi preferís, te lo puedo programar para una fecha más adelante (cuando cobres) y te congelo el precio de hoy. Avisame qué te conviene.${linkLine}`;
+            try {
+                await sendMessageWithDelay(userId, msg);
+                _pushHistory(state, { role: 'bot', content: msg });
+                (state as any).mpReminderStage = 3;
+                saveState(userId);
+                logger.info(`[SCHEDULER][${sharedState.sellerId || '?'}] MP reminder #3 (24h) sent to ${userId}`);
+            } catch (e: any) {
+                logger.error(`[SCHEDULER] Failed to send MP reminder #3 to ${userId}:`, e.message);
+            }
+            continue;
+        }
+
+        // Stage 4: 72 horas sin pagar — última oportunidad.
+        if (mpReminderStage === 3 && minsSince >= 4320) {
+            const msg = `¡Hola! 🙂 Ya es el último mensaje que te mando por este pedido.\n\nSi querés podemos:\n\n📅 *Programarlo postdatado* — me decís la fecha y te congelo el precio\n💳 *Retomar el pago de MP* hoy mismo\n\nSi no querés avanzar, ningún drama — me decís y lo cerramos. Te dejo elegir 😊`;
+            try {
+                await sendMessageWithDelay(userId, msg);
+                _pushHistory(state, { role: 'bot', content: msg });
+                (state as any).mpReminderStage = 4;
+                saveState(userId);
+                if (notifyAdmin) {
+                    await notifyAdmin('MP pendiente >72h', userId, 'Cliente con MP pendiente 72h. Última nudge enviada — si no responde en 24h considerar carrito abandonado.');
+                }
+                logger.info(`[SCHEDULER][${sharedState.sellerId || '?'}] MP reminder #4 (72h) sent to ${userId}`);
+            } catch (e: any) {
+                logger.error(`[SCHEDULER] Failed to send MP reminder #4 to ${userId}:`, e.message);
             }
         }
     }

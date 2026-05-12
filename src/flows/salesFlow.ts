@@ -327,16 +327,26 @@ export async function processSalesFlow(
 
     // 2.5. Centralized objection detector — intercepts common rebuttable
     // objections ("caro", "tengo que consultar", "lo pienso", etc.) with
-    // a pre-calibrated response. Skips AI entirely on match, which avoids
-    // long generic fallbacks and saves a completion call per objection.
+    // una respuesta calibrada por tier:
+    //   standard  → rebuttal genérico (1ra vez)
+    //   escalated → rebuttal + oferta concreta (2da vez, misma categoría)
+    //   pause     → cierre suave + pausa al admin (3ra vez — bot se rinde)
     const objection = detectObjection(currentState.step, normalizedText, currentState);
     if (objection) {
-        logger.info(`[OBJECTION] Intercepted "${objection.type}" for ${userId} at step ${currentState.step}`);
+        logger.info(`[OBJECTION] Intercepted "${objection.type}" for ${userId} at step ${currentState.step} (tier=${objection.tier})`);
         currentState.history.push({ role: 'bot', content: objection.response, timestamp: Date.now() });
         if (dependencies.sendMessageWithDelay) {
             await dependencies.sendMessageWithDelay(userId, objection.response);
         }
         saveState(userId);
+        if (objection.pauseAfter) {
+            // 3ra aparición de la misma objeción → pausamos y alertamos al admin
+            // con quickReplies contextuales (los maneja _getQuickReplies en messages.ts).
+            await _pauseAndAlert(
+                userId, currentState, dependencies, normalizedText,
+                `Objeción recurrente "${objection.type}" — 3ra vez. Bot agotó los rebuttals, requiere intervención humana.`
+            );
+        }
         return { matched: true };
     }
 
