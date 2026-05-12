@@ -18,7 +18,7 @@ const mockDependencies: any = {
 };
 
 // LOAD KNOWLEDGE (Using V4 for the latest standard)
-const knowledgeV4 = JSON.parse(fs.readFileSync(path.join(__dirname, '../knowledge_v4.json'), 'utf8'));
+const knowledgeV4 = JSON.parse(fs.readFileSync(path.join(__dirname, '../archive/knowledge_v4.json'), 'utf8'));
 
 // SMART AI MOCK
 // This mock analyzes the "goal" or the "step" to determine what the AI should theoretically respond.

@@ -59,12 +59,22 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
 
         try {
             const isRotacion = config.activeScript === 'rotacion';
+            const legacyScripts = ['v1', 'v2', 'v3', 'v4'];
             let effectiveScript = userState[userId]?.assignedScript;
+            // Si el usuario tiene assignedScript de un guion archivado, migrar a v5
+            // (no podemos cargarle el guion archivado).
+            if (effectiveScript && legacyScripts.includes(effectiveScript)) {
+                effectiveScript = 'v5';
+                if (userState[userId]) {
+                    userState[userId].assignedScript = effectiveScript;
+                    saveState(userId);
+                }
+            }
             if (!effectiveScript) {
                 if (isRotacion) {
-                    effectiveScript = Math.random() < 0.5 ? 'v3' : 'v4';
+                    effectiveScript = Math.random() < 0.5 ? 'v5' : 'v6';
                 } else {
-                    effectiveScript = config.activeScript || 'v3';
+                    effectiveScript = config.activeScript || 'v5';
                 }
                 // Persist the assignment if the user already has state; otherwise
                 // salesFlow will freeze it when it creates the state on first message.

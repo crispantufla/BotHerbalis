@@ -443,7 +443,7 @@ module.exports = (clientPool) => {
                     timestamp: c.timestamp,
                     isPaused: ss?.pausedUsers?.has(resolvedId) || ss?.pausedUsers?.has(c.id._serialized),
                     step: ss?.userState?.[resolvedId]?.step || ss?.userState?.[c.id._serialized]?.step || 'new',
-                    assignedScript: (ss?.userState?.[resolvedId] || ss?.userState?.[c.id._serialized])?.assignedScript || (ss?.config?.activeScript === 'rotacion' ? 'v3' : ss?.config?.activeScript || 'v3'),
+                    assignedScript: (ss?.userState?.[resolvedId] || ss?.userState?.[c.id._serialized])?.assignedScript || (ss?.config?.activeScript === 'rotacion' ? 'v5' : ss?.config?.activeScript || 'v5'),
                     selectedProduct: (ss?.userState?.[resolvedId] || ss?.userState?.[c.id._serialized])?.selectedProduct || null,
                     selectedPlan: (ss?.userState?.[resolvedId] || ss?.userState?.[c.id._serialized])?.selectedPlan || null,
                     cart: (ss?.userState?.[resolvedId] || ss?.userState?.[c.id._serialized])?.cart || null,
@@ -613,7 +613,7 @@ module.exports = (clientPool) => {
         const userState = ss?.userState;
         if (!userState) return;
         if (!userState[chatId]) {
-            const autoScript = 'v3';
+            const autoScript = ss?.config?.activeScript === 'rotacion' || !ss?.config?.activeScript ? 'v5' : ss.config.activeScript;
             userState[chatId] = {
                 step: 'waiting_weight',
                 lastMessage: null, addressAttempts: 0, partialAddress: {}, cart: [],

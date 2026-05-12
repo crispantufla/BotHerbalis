@@ -31,7 +31,7 @@ jest.mock('fs', () => {
                 });
             }
             if (typeof p === 'string' && p.endsWith('knowledge_v3.json')) {
-                return actualFs.readFileSync(path.join(__dirname, '../knowledge_v3.json'), opts);
+                return actualFs.readFileSync(path.join(__dirname, '../archive/knowledge_v3.json'), opts);
             }
             return actualFs.readFileSync(p, opts);
         })
@@ -70,7 +70,7 @@ const mockDependencies = {
 };
 
 // Load knowledge
-const knowledge = JSON.parse(fs.readFileSync(path.join(__dirname, '../knowledge_v3.json'), 'utf8'));
+const knowledge = JSON.parse(fs.readFileSync(path.join(__dirname, '../archive/knowledge_v3.json'), 'utf8'));
 
 describe('Strategic Improvements', () => {
     let userState = {};

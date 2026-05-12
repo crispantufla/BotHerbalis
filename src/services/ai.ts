@@ -310,25 +310,28 @@ REGLAS DE ESTE PASO:
 function _getModulePlanChoice(prices: Record<string, any>): string {
     return `
 🛑 ESTE PASO USA RESPUESTA EXPANDIDA POR DEFECTO (MÚLTIPLES PÁRRAFOS, DETALLADO).
-El cliente está eligiendo el plan — momento crítico de la venta donde la persuasión convierte. NO seas conciso aunque la regla general pida brevedad: acá necesitás ANCLAR VALOR (el plan 120 es $X por día = costo de un café), DERRIBAR la objeción de precio si aparece, y EXPLICAR el porqué de los 120 vs 60 con confianza. Apoyate en el argumento de "no solo te ahorrás los $X del adicional, es tratamiento completo y la grasa no vuelve". Si compara productos, comparalos a fondo. Mínimo 2 párrafos cuando hay objeción o duda.
+El cliente está eligiendo el plan — momento crítico de la venta donde la persuasión convierte. NO seas conciso aunque la regla general pida brevedad: acá necesitás ANCLAR VALOR (el plan 120 es $X por día = costo de un café), DERRIBAR la objeción de precio si aparece, y EXPLICAR el porqué de los 120 vs 60 con confianza. Si compara productos, comparalos a fondo. Mínimo 2 párrafos cuando hay objeción o duda.
 
 PRECIOS EXACTOS:
 - Cápsulas: $${prices['Cápsulas']['60']} (60d) / $${prices['Cápsulas']['120']} (120d)
 - Semillas: $${prices['Semillas']['60']} (60d) / $${prices['Semillas']['120']} (120d)
 - Gotas: $${prices['Gotas']['60']} (60d) / $${prices['Gotas']['120']} (120d)
-- Plan 60: adicional $${prices.adicionalMAX || '6.000'} (Contra Reembolso MAX)
-- Plan 120: SIN adicional (bonificado)
 - Costo logístico por rechazo/no retiro: $${prices.costoLogistico || '18.000'}
 
-ARGUMENTO 120 vs 60: "El de 120 está buenísimo porque no solo te ahorrás los $${prices.adicionalMAX || '6.000'} del servicio, sino que es el tratamiento completo — el cuerpo tiene tiempo de acostumbrarse y la grasa no vuelve. El de 60 lo eligen los que ya lo hicieron antes."
+ARGUMENTO 120 vs 60: "El de 120 está buenísimo porque es el tratamiento completo — el cuerpo tiene tiempo de acostumbrarse y la grasa no vuelve. Muchas clientas, cuando llegan al peso, usan una o dos cápsulas por semana como mantenimiento. El de 60 lo eligen los que ya lo hicieron antes o quieren probar primero."
 
 DESCUENTOS POR VOLUMEN (SOLO si preguntan por varias unidades):
 - 3ra unidad: 30% OFF | 4ta: 40% OFF | 5ta: 50% OFF
 - NO ofrezcas descuentos si no preguntaron.
 
-ENVÍO: Gratis por Correo Argentino. Demora: 7 a 10 días hábiles con contra reembolso (NUNCA digas otro plazo). Con MercadoPago o transferencia el envío tarda 4 a 6 días hábiles.
-MEDIOS DE PAGO: Aceptamos 3 métodos: 1) Contra reembolso (efectivo al recibir o retirar en sucursal), 2) MercadoPago (tarjeta, débito o app — se paga ahora, llega más rápido), 3) Transferencia bancaria. NUNCA digas que solo aceptamos efectivo.
-CARGO ADICIONAL: El cargo extra es el costo del servicio de "Contra Reembolso" (pagar al recibir) y SE COBRA IGUAL sea a domicilio o en sucursal del correo. Este costo está BONIFICADO (es GRATIS) para el plan de 120 días. Para el de 60 días tiene un costo de $${prices.adicionalMAX || '6.000'}. Si el cliente elige 60 días y pregunta por retirar en correo para evitar el cargo, explicá muy amablemente esto y ofrecé cambiar al de 120 días para que se lo ahorre. Si elige el de 120 días, confirmale que NO tiene ningún cargo adicional.
+ENVÍO: Gratis por Correo Argentino. Demora: 4 a 6 días hábiles desde la confirmación del pago.
+
+MEDIOS DE PAGO (POLÍTICA MAYO 2026):
+- POR DEFECTO se ofrece SOLO el link de Mercado Pago — cubre tarjeta de crédito (en cuotas), débito, saldo MP y efectivo en Pago Fácil/Rapipago.
+- NO ofrecer transferencia ni contra reembolso espontáneamente. Solo si el cliente las pide.
+- Si pide contra reembolso: requiere seña de $10.000 por MP (cubre envío) + saldo en efectivo al cartero. Aplica a TODOS los planes y a TODOS los clientes.
+- NO mencionar "adicional de $6.000" — esa política ya no existe.
+- NO decir "el envío es gratis si elegís plan 120 días" — el envío siempre es gratis.
 
 EFECTOS: Solo efecto laxante/diurético leve los primeros días. Normal y transitorio. Se va en la primera semana tomando agua.
 
@@ -634,7 +637,8 @@ class AIService {
             const step = context.step || 'general';
 
             const priceData = await _getPrices();
-            const adMax = priceData.adicionalMAX || '6.000';
+            // Política mayo 2026: ya no hay adicional $6.000 — eliminado.
+            // El COD ahora requiere seña $10.000 vía MP (manejado en stepWaitingPaymentMethod / stepWaitingMpPayment).
             const priceCaps60 = priceData['Cápsulas']?.['60'] || '46.900';
             const priceCaps120 = priceData['Cápsulas']?.['120'] || '66.900';
             const priceSem60 = priceData['Semillas']?.['60'] || '36.900';
@@ -654,16 +658,16 @@ class AIService {
                 knowledgeContext += `- Gotas: SOLO ofrecer a >70 años. Si alguien con pocos kilos pide gotas, decile que "son extremadamente suaves" para persuadirlo a elegir Cápsulas.\n`;
                 knowledgeContext += `- Contraindicaciones: solo embarazo y lactancia.NO menores de edad.\n`;
                 knowledgeContext += `- PRECIOS: Si preguntan "precio" en general, decí "$${priceSem60} a $${priceGotas120}".PERO si preguntan "precio de todos", "lista de precios" o insisten, PASALES TODOS LOS PRECIOS detallados: ${priceString}.\n`;
-                knowledgeContext += `- ENVÍO Y PAGO: Envío gratis por Correo Argentino a todo el país.Solo aceptamos pago en efectivo al recibir(Contra Reembolso).\n`;
+                knowledgeContext += `- ENVÍO Y PAGO: Envío gratis por Correo Argentino. Por defecto se ofrece Mercado Pago (tarjeta en cuotas, débito, saldo MP, efectivo en Pago Fácil/Rapipago).\n`;
             } else if (step === 'waiting_price_confirmation') {
                 knowledgeContext += `- El usuario todavía NO vio precios.Tu trabajo es convencerlo de que quiera verlos.\n`;
                 knowledgeContext += `- Contraindicaciones: solo embarazo y lactancia.NO menores de edad.\n`;
                 knowledgeContext += `- (NO menciones precios específicos ni formas de pago, solo que son accesibles) \n`;
             } else if (['waiting_plan_choice', 'closing', 'waiting_ok'].includes(step)) {
                 knowledgeContext += `- PRECIOS: ${priceString} \n`;
-                knowledgeContext += `- Plan 120 días SIN adicional. Plan 60 días con Contra Reembolso MAX (+$${adMax}).\n`;
-                knowledgeContext += `- SOBRE CARGO ADICIONAL: El cargo extra es el costo del servicio de Contra Reembolso (pagar al recibir). Se cobra IGUAL sea envío a domicilio o retiro en sucursal. Para el plan 120 días está BONIFICADO (es gratis). Si eligió 60 días y pide retirar en correo para no pagar envío, explicá esto y ofrecé pasar a 120 días para ahorrarlo.\n`;
-                knowledgeContext += `- Envío gratis por Correo Argentino, pago en efectivo al recibir\n`;
+                knowledgeContext += `- POLÍTICA DE PAGO (mayo 2026): por defecto SOLO se ofrece el link de Mercado Pago (cubre tarjeta en cuotas, débito, saldo MP, efectivo en Pago Fácil/Rapipago). Transferencia y contra reembolso NO se ofrecen espontáneamente — solo si el cliente las pide. Contra reembolso requiere seña de $10.000 por MP + saldo en efectivo al cartero. Aplica a TODOS los planes.\n`;
+                knowledgeContext += `- NO mencionar 'adicional de $6.000' (esa política ya no existe). NO decir 'envío gratis solo en plan 120'.\n`;
+                knowledgeContext += `- Envío gratis por Correo Argentino, demora 4-6 días hábiles desde la confirmación del pago.\n`;
             } else if (step === 'waiting_data') {
                 knowledgeContext += `- Necesitamos: nombre completo, calle y número, ciudad, código postal\n`;
                 knowledgeContext += `- PROHIBIDO PEDIR NÚMERO DE TELÉFONO.Ya estamos hablando por WhatsApp, ¡ya tenemos su número! Nunca pidas este dato.\n`;
@@ -689,14 +693,14 @@ class AIService {
             if (s.paymentMethod) {
                 const pmLabel = s.paymentMethod === 'mercadopago' ? 'MercadoPago (ya pagó online)'
                     : s.paymentMethod === 'transferencia' ? 'Transferencia bancaria'
-                    : s.paymentMethod === 'contrarembolso' || s.paymentMethod === 'efectivo' ? 'Contra reembolso (paga al recibir)'
+                    : s.paymentMethod === 'contrarembolso' || s.paymentMethod === 'efectivo'
+                        ? (s.senaPaid
+                            ? `Contra reembolso con SEÑA pagada ($${(s.senaAmount || 0).toLocaleString('es-AR').replace(/,/g, '.')} por MP, saldo al cartero)`
+                            : (s.senaAmount
+                                ? `Contra reembolso (esperando seña de $${s.senaAmount.toLocaleString('es-AR').replace(/,/g, '.')} por MP)`
+                                : 'Contra reembolso (paga al recibir)'))
                     : s.paymentMethod;
                 stateContext += `- Método de pago elegido: ${pmLabel}\n`;
-            }
-            if (s.adicionalMAX && s.adicionalMAX > 0) {
-                stateContext += `- El total ya incluye $${s.adicionalMAX.toLocaleString('es-AR').replace(/,/g,'.')} de adicional por Contra Reembolso MAX (plan 60 con pago al recibir)\n`;
-            } else if (s.isContraReembolsoMAX === false && (s.paymentMethod === 'mercadopago' || s.paymentMethod === 'transferencia')) {
-                stateContext += `- Adicional MAX BONIFICADO (por pago anticipado)\n`;
             }
             if (s.partialAddress && Object.keys(s.partialAddress).length > 0) {
                 const a = s.partialAddress;

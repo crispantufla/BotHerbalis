@@ -451,11 +451,12 @@ module.exports = (clientPool) => {
     router.get('/script/active', ...withSeller(clientPool), requireAdmin, (req, res) => {
         const { config, ss } = getCtx(req);
         res.json({
-            active: config.activeScript || 'v3',
-            available: ss?.availableScripts || ['v3'],
+            active: config.activeScript || 'v5',
+            available: ss?.availableScripts || ['v5', 'v6'],
             stats: config.scriptStats || {},
             labels: {
-                'v3': 'Guión Profesional + CRM MAX'
+                'v5': 'V5 — Asesor consultivo',
+                'v6': 'V6 — Elena charla'
             }
         });
     });
@@ -467,7 +468,7 @@ module.exports = (clientPool) => {
             const { script } = req.body;
             if (!script) return res.status(400).json({ error: 'Falta el campo "script"' });
 
-            const available = ss?.availableScripts || ['v3', 'v4'];
+            const available = ss?.availableScripts || ['v5', 'v6'];
             if (!available.includes(script) && script !== 'rotacion') {
                 return res.status(400).json({ error: `Script "${script}" no existe. Disponibles: ${available.join(', ')} y rotacion` });
             }
@@ -488,24 +489,28 @@ module.exports = (clientPool) => {
     });
 
     // GET /script/:version — readable by all authenticated users (sellers need it for the Guión panel)
+    // v1/v2/v3/v4 fueron archivados — esta ruta legacy sirve para descargar versiones archivadas.
     router.get('/script/:version', ...withSeller(clientPool), async (req, res) => {
         try {
             const { version } = req.params;
-            const available = ['v1', 'v2', 'v3', 'v4'];
+            const archived = ['v1', 'v2', 'v3', 'v4'];
+            const active = ['v5', 'v6'];
 
-            if (!available.includes(version)) {
+            if (![...archived, ...active].includes(version)) {
                 return res.status(404).json({ error: 'Script no encontrado' });
             }
 
             // Map version to filename
-            let filename = 'knowledge.json'; // Default v1
-            if (version === 'v2') filename = 'knowledge_v2.json';
-            if (version === 'v3') filename = 'knowledge_v3.json';
-            if (version === 'v4') filename = 'knowledge_v4.json';
+            let filename;
+            let archiveSubdir = '';
+            if (version === 'v1') filename = 'knowledge.json';
+            else filename = `knowledge_${version}.json`;
+            // Los archivados viven en archive/
+            if (archived.includes(version)) archiveSubdir = 'archive';
 
-            // Check DATA_DIR (persistent edits) first, then source code
+            // Check DATA_DIR (persistent edits) first, then source code, then archive/
             const persistPath = path.join(DATA_DIR, filename);
-            const sourcePath = path.join(__dirname, '../../../', filename);
+            const sourcePath = path.join(__dirname, '../../../', archiveSubdir, filename);
             const filePath = fs.existsSync(persistPath) ? persistPath : sourcePath;
 
             if (fs.existsSync(filePath)) {

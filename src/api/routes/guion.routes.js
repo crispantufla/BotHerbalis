@@ -5,7 +5,9 @@ const { prisma } = require('../../../db');
 const logger = require('../../utils/logger');
 
 const SCRIPTS_DIR = path.join(__dirname, '../../..');
-const AVAILABLE_SCRIPTS = ['v3', 'v4', 'v5', 'v6'];
+// v3 y v4 fueron archivados (archive/knowledge_v3.json, archive/knowledge_v4.json).
+// El panel de guiones solo muestra v5 y v6.
+const AVAILABLE_SCRIPTS = ['v5', 'v6'];
 
 function _loadScript(name) {
     if (!AVAILABLE_SCRIPTS.includes(name)) return null;

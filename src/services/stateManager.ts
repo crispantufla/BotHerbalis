@@ -73,8 +73,6 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
         alertNumbers: [],
         activeScript: 'rotacion',
         scriptStats: {
-            v3: { started: 0, completed: 0 },
-            v4: { started: 0, completed: 0 },
             v5: { started: 0, completed: 0 },
             v6: { started: 0, completed: 0 }
         }
@@ -82,21 +80,14 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
 
     // Knowledge files: load from DATA_DIR first, fallback to source root
     const sourceRoot = path.join(__dirname, '../..');
+    // v3/v4 fueron archivados (archive/knowledge_v3.json, archive/knowledge_v4.json).
+    // Solo v5 y v6 están activos. Si la DB todavía tiene config.activeScript='v3'/'v4',
+    // se hace migración defensiva más abajo (ver loadKnowledge).
     const multiKnowledge: Record<string, any> = {
-        v3: { flow: {}, faq: [] },
-        v4: { flow: {}, faq: [] },
         v5: { flow: {}, faq: [] },
         v6: { flow: {}, faq: [] }
     };
     const knowledgeFiles: Record<string, { save: string; source: string }> = {
-        v3: {
-            save: path.join(dataDir, `knowledge_v3_${sellerId}.json`),
-            source: path.join(sourceRoot, 'knowledge_v3.json')
-        },
-        v4: {
-            save: path.join(dataDir, `knowledge_v4_${sellerId}.json`),
-            source: path.join(sourceRoot, 'knowledge_v4.json')
-        },
         v5: {
             save: path.join(dataDir, `knowledge_v5_${sellerId}.json`),
             source: path.join(sourceRoot, 'knowledge_v5.json')
@@ -125,7 +116,7 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
 
     async function saveKnowledge(scriptName: string | null = null) {
         try {
-            const name = scriptName || config.activeScript || 'v3';
+            const name = scriptName || config.activeScript || 'v5';
             const paths = knowledgeFiles[name];
             if (paths && multiKnowledge[name]) {
                 await atomicWriteFile(paths.save, JSON.stringify(multiKnowledge[name], null, 2));
@@ -254,6 +245,17 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
                 delete config.alertNumber;
             }
             if (!config.alertNumbers) config.alertNumbers = [];
+
+            // Migrate legacy activeScript values (v1/v2/v3/v4 fueron archivados).
+            // Si la DB todavía tiene un guion archivado seleccionado, lo migramos a v5
+            // (default elegido al archivar). 'rotacion' se mantiene.
+            const legacyScripts = ['v1', 'v2', 'v3', 'v4'];
+            if (config.activeScript && legacyScripts.includes(config.activeScript)) {
+                logger.warn(`[STATE][${sellerId}] activeScript="${config.activeScript}" archivado → migrando a "v5"`);
+                config.activeScript = 'v5';
+            }
+            // scriptStats puede tener entradas de v1/v2/v3/v4 — las dejamos como histórico,
+            // pero no se incrementan más ya que el rotador y handler solo usan v5/v6.
 
             logger.info(`[STATE][${sellerId}] Loaded ${dbUsers.length} users, config synced`);
         } catch (e: any) {

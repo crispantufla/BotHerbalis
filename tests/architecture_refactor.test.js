@@ -39,7 +39,7 @@ const mockDependencies = {
 };
 
 // LOAD KNOWLEDGE
-const knowledge = JSON.parse(fs.readFileSync(path.join(__dirname, '../knowledge_v3.json'), 'utf8'));
+const knowledge = JSON.parse(fs.readFileSync(path.join(__dirname, '../archive/knowledge_v3.json'), 'utf8'));
 
 // AI SERVICE MOCK
 jest.mock('../src/services/ai', () => ({

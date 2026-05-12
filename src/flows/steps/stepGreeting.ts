@@ -52,7 +52,7 @@ export async function handleGreeting(
     }
 
     // --- METRICS TRACKING ---
-    const trackScript = dependencies.effectiveScript || dependencies.config?.activeScript || 'v3';
+    const trackScript = dependencies.effectiveScript || dependencies.config?.activeScript || 'v5';
     if (dependencies.config && dependencies.config.scriptStats && trackScript !== 'rotacion') {
         if (!dependencies.config.scriptStats[trackScript]) {
             dependencies.config.scriptStats[trackScript] = { started: 0, completed: 0 };

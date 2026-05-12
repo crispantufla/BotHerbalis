@@ -129,68 +129,40 @@ export async function handleWaitingPaymentMethod(
         return { matched: true };
     }
 
-    // ── Opción 3: Contra reembolso ─────────────────────────────────────────────
+    // ── Opción 3: Contra reembolso (pago al recibir) ───────────────────────────
+    // Política mayo 2026: COD requiere SEÑA de $10.000 por MP + saldo en efectivo
+    // al cartero. La seña se cobra a través del flujo MP normal (WAITING_MP_PAYMENT)
+    // pero con state.senaAmount seteado → el link es por $10k, no por totalPrice.
     if (isOptionCash || CASH_KEYWORDS.test(normalizedText) || isConfirmingCashRetry) {
-        // Restaurar adicionalMAX antes del retry para que el cálculo del ahorro
-        // sea correcto (necesita el adicional original, no el bonificado).
-        _recalcAdicionalMAX(currentState);
-        calculateTotal(currentState);
-
-        // ── Sugerencia #5: Last-mile retry (solo plan 60 con adicional) ────
-        // Una sola vez por conversación: ofrecer cambiar a MP destacando el
-        // ahorro del adicional + velocidad de entrega.
-        const plan60WithAdicional = plan === '60' && (currentState.adicionalMAX || 0) > 0;
-        if (plan60WithAdicional && !currentState.cashRetryShown) {
+        // Ya no hay adicional $6.000 — política eliminada. La seña la maneja MP.
+        // Mensaje explicando la modalidad antes de generar el link.
+        if (!currentState.cashRetryShown) {
             currentState.cashRetryShown = true;
             const retryMsg = buildCashRetryMessage(currentState);
             currentState.history.push({ role: 'bot', content: retryMsg, timestamp: Date.now() });
             saveState(userId);
             await sendMessageWithDelay(userId, retryMsg);
-            logger.info(`[PAYMENT_METHOD] Cash retry mostrado para ${userId} (plan 60, adicional $${currentState.adicionalMAX})`);
+            logger.info(`[PAYMENT_METHOD] COD seña $10k presentado a ${userId}`);
             return { matched: true };
         }
 
+        // Cliente ya vio el mensaje de la modalidad y eligió seguir → marcamos
+        // COD final, seteamos seña y vamos al flujo MP por $10k.
         currentState.paymentMethod = 'contrarembolso';
-
-        const addr = currentState.partialAddress || {};
-        const hasAddress = !!(addr.nombre && addr.calle && addr.ciudad);
-
-        if (hasAddress) {
-            // Dirección ya conocida — ir directo a confirmación
-            calculateTotal(currentState);
-            currentState.pendingOrder = {
-                nombre: addr.nombre,
-                calle: addr.calle,
-                ciudad: addr.ciudad,
-                cp: addr.cp,
-                provincia: addr.provincia,
-                calleOriginal: (addr as any).calleOriginal || addr.calle,
-                cart: currentState.cart
-            };
-            const summaryMsg = buildConfirmationMessage(currentState);
-            _setStep(currentState, FlowStep.WAITING_FINAL_CONFIRMATION);
-            currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
-            saveState(userId);
-            await sendMessageWithDelay(userId, summaryMsg);
-            return { matched: true };
-        }
-
-        // Sin dirección — pedir datos
-        const closingMsg = knowledge?.flow?.closing?.response || '¡Genial! Pasame los datos de envío 👇\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:';
-        _setStep(currentState, FlowStep.WAITING_DATA);
-        currentState.history.push({ role: 'bot', content: closingMsg, timestamp: Date.now() });
+        currentState.senaAmount = 10000;
+        currentState.senaPaid = false;
+        _setStep(currentState, FlowStep.WAITING_MP_PAYMENT);
         saveState(userId);
-        await sendMessageWithDelay(userId, closingMsg);
-        return { matched: true };
+        // stepWaitingMpPayment leerá state.senaAmount y generará el link por $10k.
+        return { matched: false, staleReprocess: true } as any;
     }
 
     // ── AI fallback — respuesta ambigua ────────────────────────────────────────
-    const plan60 = plan === '60';
-    const adicionalFmt = adicionalMAX.toLocaleString('es-AR');
-
+    // Política mayo 2026: MP es la ÚNICA opción ofrecida espontáneamente.
+    // Transferencia y contra reembolso solo se mencionan si el cliente las pide.
     const aiRes = await aiService.chat(text, {
         step: 'waiting_payment_method',
-        goal: `El cliente debe elegir cómo quiere pagar su pedido. Las opciones son (orden actual del menú):\n\n1. *MercadoPago* — paga ahora online (tarjeta, débito o saldo MP). Sin recargos. ENTREGA MÁS RÁPIDA (4-6 días).\n\n2. *Transferencia bancaria* — alias CHILE.TEXTO.CASINO. Sin recargos. Misma velocidad que MP.\n\n3. *Contra reembolso* — paga al cartero cuando llega. ${plan60 ? `Tiene un adicional de $${adicionalFmt} en plan 60 días (bonificado en 120).` : 'Sin adicional (plan 120 días).'} Demora 7-10 días.\n\nPRIORIDAD: intentá siempre que elija MercadoPago primero — destacá que es sin recargos, más rápido y queda asegurado con protección al comprador. Si no puede o no quiere, ofrecé transferencia. Contra reembolso como última opción (es la que más se cancela).\n\nNUNCA menciones cuotas, planes en cuotas, ni nada relacionado con pagos en cuotas. Si el cliente pregunta por cuotas, decile que para esa info que se fije al hacer el pago en MercadoPago directamente.\n\nNUNCA avances sin que el cliente elija una opción clara.`,
+        goal: `El cliente debe avanzar con el pago. POLÍTICA NUEVA (mayo 2026):\n\nMÉTODO POR DEFECTO: link de *Mercado Pago* — es la única opción que ofrecemos espontáneamente. Cubre:\n  ✅ Tarjeta de crédito (en cuotas)\n  ✅ Tarjeta de débito\n  ✅ Saldo Mercado Pago\n  ✅ Efectivo en Pago Fácil / Rapipago\n\nSI EL CLIENTE PIDE *TRANSFERENCIA BANCARIA*: ofrecela como alternativa. Le pasás el alias cuando confirme el pedido. Misma velocidad (4-6 días).\n\nSI EL CLIENTE PIDE *CONTRA REEMBOLSO / PAGO AL RECIBIR*: la modalidad es seña de $10.000 por Mercado Pago (cubre el envío) + saldo en efectivo al cartero. Aplica a TODOS los planes y a TODOS los clientes (nuevos y recurrentes). Es una decisión interna por la cantidad de paquetes que vuelven sin retirar. Es exactamente la misma plata, solo cambia el momento. Si no quiere adelantar los $10k, reofrecé MP por el total.\n\nPROHIBICIONES ESTRICTAS:\n- NO mencionar adicional de $6.000 (esa política ya no existe)\n- NO decir "contra reembolso es lo más cómodo/seguro"\n- NO decir "el envío es gratis si elegís plan 120 días"\n- NO ofrecer COD ni transferencia espontáneamente — solo si el cliente las pide\n- NO mencionar cuotas (si pregunta, decile que vea las opciones al abrir el link de MP)\n\nNUNCA avances sin que el cliente confirme con qué opción quiere avanzar.`,
         history: currentState.history,
         summary: currentState.summary,
         knowledge,

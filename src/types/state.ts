@@ -124,6 +124,12 @@ export interface UserState {
     mpPaymentLinkId?: string | null;  // ID del registro PaymentLink en DB
     mpPaymentLinkUrl?: string | null; // URL init_point enviada al cliente
 
+    // Seña por Mercado Pago para pago al recibir (política mayo 2026).
+    // Si está seteado, el link MP que se genera es por este monto (no por totalPrice).
+    // El saldo (totalPrice - senaAmount) lo cobra el cartero en efectivo.
+    senaAmount?: number | null;
+    senaPaid?: boolean;
+
     // Objection detector: tracks which objection types already got a
     // pre-calibrated rebuttal so we don't repeat the same canned line.
     objectionsHandled?: Record<string, number>;

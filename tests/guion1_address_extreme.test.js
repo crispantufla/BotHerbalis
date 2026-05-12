@@ -39,7 +39,7 @@ jest.mock('../sheets_sync', () => ({ appendOrderToSheet: jest.fn() }), { virtual
 jest.mock('google-spreadsheet', () => ({}), { virtual: true });
 jest.mock('@google/generative-ai', () => ({}), { virtual: true });
 
-const knowledge = JSON.parse(fs.readFileSync(path.join(__dirname, '../knowledge_v3.json'), 'utf8'));
+const knowledge = JSON.parse(fs.readFileSync(path.join(__dirname, '../archive/knowledge_v3.json'), 'utf8'));
 
 const mockDependencies = {
     client: {},

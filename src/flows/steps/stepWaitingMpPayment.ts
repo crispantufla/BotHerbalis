@@ -1,6 +1,7 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _setStep, _pauseAndAlert, _cleanPhone } from '../utils/flowHelpers';
 import { calculateTotal, _recalcAdicionalMAX } from '../utils/cartHelpers';
+import { buildCashRetryMessage } from '../../utils/messageTemplates';
 import { randomUUID } from 'crypto';
 import logger from '../../utils/logger';
 
@@ -51,7 +52,14 @@ export async function handleWaitingMpPayment(
             if (hasAddress) {
                 await _finalizeOrderAndNotifyAdmin(userId, currentState, dependencies);
             } else {
-                const msg = '¡Perfecto, el pago fue confirmado! 🎉\n\nAhora necesito los datos de envío para despachar tu pedido 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:';
+                // Política mayo 2026: si es flujo seña, marcamos senaPaid acá también.
+                if (currentState.senaAmount && currentState.senaAmount > 0) {
+                    currentState.senaPaid = true;
+                }
+                const isSenaFlow = !!(currentState.senaAmount && currentState.senaAmount > 0);
+                const msg = isSenaFlow
+                    ? '¡Perfecto, la seña fue confirmada! 🎉\n\nAhora necesito los datos de envío para despachar 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:'
+                    : '¡Perfecto, el pago fue confirmado! 🎉\n\nAhora necesito los datos de envío para despachar tu pedido 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:';
                 _setStep(currentState, FlowStep.WAITING_DATA);
                 currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
                 saveState(userId);
@@ -67,16 +75,19 @@ export async function handleWaitingMpPayment(
             return { matched: true };
 
         } else {
-            // rejected o error — volver a WAITING_PAYMENT_METHOD ofreciendo las 3
-            // opciones (incluyendo reintentar MP con otra tarjeta).
-            // NO restauramos adicionalMAX acá — cada branch de stepWaitingPaymentMethod
-            // recalcula correctamente según la opción elegida (CR llama _recalcAdicionalMAX,
-            // MP/Transferencia lo dejan en 0).
-            const msg = '⚠️ Hubo un problema con el pago de MercadoPago — pudo ser la tarjeta o un rechazo del banco.\n\n¿Cómo querés seguir?\n\n1️⃣ *MercadoPago* — Probá con otra tarjeta 💳\n2️⃣ *Transferencia bancaria* — alias *CHILE.TEXTO.CASINO*\n3️⃣ *Contra reembolso* — pagás al cartero cuando llega\n\n¿Cuál preferís?';
-            currentState.paymentMethod = null;
+            // rejected o error — re-presentar el flujo MP con un mensaje empático.
+            // Política mayo 2026: NO ofrecemos COD espontáneamente como alternativa.
+            // Si la tarjeta falla, pueden reintentar con otra forma de pago dentro
+            // del mismo link MP (efectivo en Pago Fácil/Rapipago, etc.).
+            const wasSena = !!(currentState.senaAmount && currentState.senaAmount > 0);
+            const msg = wasSena
+                ? '⚠️ Hubo un problema con el pago de la seña — pudo ser la tarjeta o un rechazo del banco.\n\nProbá de nuevo con otra forma:\n✅ Tarjeta (en cuotas)\n✅ Débito\n✅ Saldo Mercado Pago\n✅ Efectivo en Pago Fácil / Rapipago\n\nTe genero un nuevo link para volver a intentarlo, decime cuando esté listo 😊'
+                : '⚠️ Hubo un problema con el pago de MercadoPago — pudo ser la tarjeta o un rechazo del banco.\n\nProbá de nuevo con otra forma:\n✅ Tarjeta (en cuotas)\n✅ Débito\n✅ Saldo Mercado Pago\n✅ Efectivo en Pago Fácil / Rapipago\n\nTe genero un nuevo link para volver a intentarlo, decime cuando esté listo 😊';
+            // Mantenemos senaAmount si era flujo seña — para regenerar link por $10k.
             currentState.mpPaymentLinkId = null;
             currentState.mpPaymentLinkUrl = null;
-            _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
+            // Seguimos en WAITING_MP_PAYMENT — el próximo mensaje del cliente
+            // generará un link nuevo automáticamente (entry sin link).
             currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
             saveState(userId);
             await sendMessageWithDelay(userId, msg);
@@ -108,21 +119,22 @@ export async function handleWaitingMpPayment(
     }
 
     // ── Cliente quiere contra reembolso ────────────────────────────────────────
-    // Mismo criterio que transferencia: opción "3" solo si es msj corto, o
-    // keywords explícitas de contra reembolso/efectivo.
+    // Política mayo 2026: COD requiere SEÑA de $10k por MP. Si el cliente ya tenía
+    // un link de MP por el total y quiere cambiar a COD, regeneramos el link por
+    // $10k de seña (el flujo seña no permite saltearse la seña).
     if (shortOption === '3' || CASH_FALLBACK_KEYWORDS.test(normalizedText)) {
-        // Restaurar adicionalMAX (plan 60 → vuelve a tener adicional) — fue waiveado
-        // al elegir MP en el paso anterior.
         currentState.paymentMethod = 'contrarembolso';
         currentState.mpPaymentLinkId = null;
         currentState.mpPaymentLinkUrl = null;
-        _recalcAdicionalMAX(currentState);
-        calculateTotal(currentState);
-        const msg = _getClosingMsg(knowledge);
-        _setStep(currentState, FlowStep.WAITING_DATA);
-        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        currentState.senaAmount = 10000;
+        currentState.senaPaid = false;
+        // Ya no aplica adicionalMAX (política mayo 2026 — eliminado el adicional).
+        const explainMsg = buildCashRetryMessage(currentState);
+        currentState.history.push({ role: 'bot', content: explainMsg, timestamp: Date.now() });
+        await sendMessageWithDelay(userId, explainMsg);
+        // Generar el link de seña ($10k) y enviarlo.
+        await _generateAndSendLink(userId, currentState, knowledge, dependencies);
         saveState(userId);
-        await sendMessageWithDelay(userId, msg);
         return { matched: true };
     }
 
@@ -229,19 +241,28 @@ async function _generateAndSendLink(
     }
 
     try {
+        // Política mayo 2026: si state.senaAmount está seteado, el link es por la SEÑA
+        // (típicamente $10.000 para COD) — no por el total. El saldo lo cobra el cartero.
+        const isSena = !!(currentState.senaAmount && currentState.senaAmount > 0);
         let totalRaw = currentState.totalPrice;
-        let amount = typeof totalRaw === 'string'
-            ? parseFloat(totalRaw.replace(/\./g, '').replace(',', '.'))
-            : Number(totalRaw || 0);
+        let amount: number;
 
-        // Última red: si totalPrice viene corrupto pero cart tiene items, intentar
-        // recalcular antes de fallar. Esto rescató al cliente de un fallback ciego
-        // a contra-reembolso/transferencia cuando había elegido MP.
-        if ((!amount || amount <= 0) && currentState.cart && currentState.cart.length > 0) {
-            logger.warn(`[MP_PAYMENT] totalPrice inválido (${totalRaw}) — recalculando desde cart antes de fallar`);
-            const recalculated = calculateTotal(currentState);
-            totalRaw = recalculated;
-            amount = parseFloat(recalculated.replace(/\./g, '').replace(',', '.'));
+        if (isSena) {
+            amount = currentState.senaAmount as number;
+        } else {
+            amount = typeof totalRaw === 'string'
+                ? parseFloat(totalRaw.replace(/\./g, '').replace(',', '.'))
+                : Number(totalRaw || 0);
+
+            // Última red: si totalPrice viene corrupto pero cart tiene items, intentar
+            // recalcular antes de fallar. Esto rescató al cliente de un fallback ciego
+            // a contra-reembolso/transferencia cuando había elegido MP.
+            if ((!amount || amount <= 0) && currentState.cart && currentState.cart.length > 0) {
+                logger.warn(`[MP_PAYMENT] totalPrice inválido (${totalRaw}) — recalculando desde cart antes de fallar`);
+                const recalculated = calculateTotal(currentState);
+                totalRaw = recalculated;
+                amount = parseFloat(recalculated.replace(/\./g, '').replace(',', '.'));
+            }
         }
 
         if (!amount || amount <= 0) throw new Error('Monto inválido');
@@ -251,8 +272,9 @@ async function _generateAndSendLink(
         const webhookUrl = process.env.MP_WEBHOOK_URL;
         const mpClient = new MercadoPagoConfig({ accessToken: mpToken });
         const preference = new Preference(mpClient);
+        const itemTitle = isSena ? 'Seña Herbalis (pago al recibir)' : 'Pago Herbalis';
         const body: any = {
-            items: [{ title: 'Pago Herbalis', quantity: 1, unit_price: amount, currency_id: 'ARS' }],
+            items: [{ title: itemTitle, quantity: 1, unit_price: amount, currency_id: 'ARS' }],
             back_urls: { success: 'https://herbalis.com.ar', failure: 'https://herbalis.com.ar', pending: 'https://herbalis.com.ar' },
             auto_return: 'approved',
             external_reference: externalRef,
@@ -272,7 +294,7 @@ async function _generateAndSendLink(
                 amount,
                 link,
                 userPhone: cleanPhone,
-                source: 'bot_flow',
+                source: isSena ? 'bot_flow_sena' : 'bot_flow',
                 status: 'pending',
                 instanceId,
             }
@@ -286,17 +308,26 @@ async function _generateAndSendLink(
             || currentState.selectedProduct?.split(' de ')[0]
             || 'Herbalis';
 
-        const msg = `💳 *Pago online via MercadoPago*\n\n` +
-            `Pedido: *${productName}* — Plan ${currentState.selectedPlan} días\n` +
-            `Total: *$${currentState.totalPrice}*\n\n` +
-            `👇 Hacé clic para pagar de forma segura:\n${link}\n\n` +
-            `Podés pagar con tarjeta, débito, desde la app de MercadoPago o escaneando el QR.\n\n` +
-            `✅ Cuando termines el pago, escribime *"listo"* y verifico que ingresó.\n\n` +
-            `Mientras tanto, pasame los datos de envío para tener todo listo 👇\n\n` +
-            `Nombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nProvincia:`;
+        const msg = isSena
+            ? `💳 *Pago al recibir — link de seña*\n\n` +
+                `Pedido: *${productName}* — Plan ${currentState.selectedPlan} días\n` +
+                `Total del pedido: *$${currentState.totalPrice}*\n` +
+                `Seña por Mercado Pago: *$${amount.toLocaleString('es-AR').replace(/,/g, '.')}*\n` +
+                `Saldo al cartero (efectivo): *$${(parseInt(String(currentState.totalPrice).replace(/\./g, ''), 10) - amount).toLocaleString('es-AR').replace(/,/g, '.')}*\n\n` +
+                `👇 Pagá la seña acá:\n${link}\n\n` +
+                `Podés usar tarjeta (en cuotas), débito, saldo MP o efectivo en Pago Fácil / Rapipago.\n\n` +
+                `✅ Cuando termines, escribime *"listo"* y verifico el pago.\n\n` +
+                `Mientras tanto, pasame los datos de envío 👇\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nProvincia:`
+            : `💳 *Pago online via MercadoPago*\n\n` +
+                `Pedido: *${productName}* — Plan ${currentState.selectedPlan} días\n` +
+                `Total: *$${currentState.totalPrice}*\n\n` +
+                `👇 Hacé clic para pagar de forma segura:\n${link}\n\n` +
+                `Podés pagar con tarjeta (en cuotas), débito, saldo MP o efectivo en Pago Fácil / Rapipago.\n\n` +
+                `✅ Cuando termines el pago, escribime *"listo"* y verifico que ingresó.\n\n` +
+                `Mientras tanto, pasame los datos de envío para tener todo listo 👇\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nProvincia:`;
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         await sendMessageWithDelay(userId, msg);
-        logger.info(`[MP_PAYMENT] Link creado para ${userId} — $${amount} ARS — ${link}`);
+        logger.info(`[MP_PAYMENT] Link ${isSena ? 'SEÑA' : ''} creado para ${userId} — $${amount} ARS — ${link}`);
 
     } catch (e: any) {
         logger.error('[MP_PAYMENT] Error generando link:', e.message);
@@ -378,8 +409,21 @@ async function _finalizeOrderAndNotifyAdmin(
         cart: currentState.cart
     };
 
+    // Política mayo 2026: si state.senaAmount está seteado, el pago confirmado
+    // es una SEÑA de COD ($10k típico) — no el total. El método de pago final
+    // sigue siendo 'contrarembolso' (el cartero cobra el saldo en efectivo).
+    const isSenaFlow = !!(currentState.senaAmount && currentState.senaAmount > 0);
+    if (isSenaFlow) {
+        currentState.senaPaid = true;
+        // paymentMethod ya estaba seteado a 'contrarembolso' en stepWaitingPaymentMethod
+    }
+
     const cart = currentState.cart || [];
     const phone = userId.split('@')[0];
+    const totalInt = parseInt(String(currentState.totalPrice || '0').replace(/\./g, ''), 10) || 0;
+    const senaInt = currentState.senaAmount || 0;
+    const cashRemainder = isSenaFlow ? Math.max(0, totalInt - senaInt) : 0;
+
     const orderData = {
         cliente: phone,
         nombre: addr.nombre,
@@ -392,13 +436,18 @@ async function _finalizeOrderAndNotifyAdmin(
         plan: cart.map((i: any) => `${i.plan} días`).join(' + ') || `${currentState.selectedPlan || '60'} días`,
         precio: currentState.totalPrice || '0',
         postdatado: currentState.postdatado || null,
-        paymentMethod: 'mercadopago'
+        paymentMethod: isSenaFlow ? 'contrarembolso' : 'mercadopago',
+        ...(isSenaFlow ? { senaAmount: senaInt, senaPaid: true, cashRemainder } : {})
     };
     currentState.hasSoldBefore = true;
     if (saveOrderToLocal) saveOrderToLocal(orderData);
 
     const postdataLabel = currentState.postdatado ? `\n📅 POSTDATADO: ${currentState.postdatado}` : '';
-    const payLabel = '\n💳 PAGO: MercadoPago (ya abonado)';
+    const senaFmt = senaInt.toLocaleString('es-AR').replace(/,/g, '.');
+    const cashFmt = cashRemainder.toLocaleString('es-AR').replace(/,/g, '.');
+    const payLabel = isSenaFlow
+        ? `\n💳 PAGO: Contra reembolso con SEÑA — $${senaFmt} pagados por MP, cartero cobra $${cashFmt} en efectivo`
+        : '\n💳 PAGO: MercadoPago (ya abonado)';
     if (notifyAdmin) {
         await notifyAdmin(
             `⌛ Pedido Requiere Aprobación`,
@@ -414,7 +463,9 @@ async function _finalizeOrderAndNotifyAdmin(
     }
 
     _setStep(currentState, FlowStep.WAITING_ADMIN_VALIDATION);
-    const msg = '¡Perfecto, el pago fue confirmado y ya tengo tus datos! 🎉\n\nAguardame un instante que verificamos todo y te confirmamos el ingreso ⏳';
+    const msg = isSenaFlow
+        ? `¡Perfecto, la seña fue confirmada y ya tengo tus datos! 🎉\n\nDespachamos en breve. El cartero te va a cobrar el saldo de *$${cashFmt}* en efectivo cuando reciba el paquete.\n\nAguardame un instante que verificamos todo ⏳`
+        : '¡Perfecto, el pago fue confirmado y ya tengo tus datos! 🎉\n\nAguardame un instante que verificamos todo y te confirmamos el ingreso ⏳';
     currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
     saveState(userId);
     await sendMessageWithDelay(userId, msg);

@@ -1,7 +1,7 @@
 {
     "meta": {
         "name": "Guión V5 — Asesor consultivo (cápsulas + gotas)",
-        "description": "Guión consultivo: arranca preguntando kilos, recomienda producto+plan según objetivo, incentivo de prepago integrado en el pitch. Solo cápsulas y gotas activas — semillas se ofrecen únicamente si el cliente las pide explícitamente.",
+        "description": "Guión consultivo: arranca preguntando kilos, recomienda producto+plan según objetivo, cierra con link de Mercado Pago como única opción ofrecida. Contra reembolso y transferencia solo si el cliente las pide. Solo cápsulas y gotas activas — semillas se ofrecen únicamente si el cliente las pide explícitamente.",
         "version": "5.0"
     },
     "flow": {
@@ -34,20 +34,20 @@
         },
         "recommendation_1": {
             "step": "waiting_weight",
-            "_note": "Tier 1 — hasta 10 kg → Gotas 60 días. Pitch + price + prepay incentive + cierre",
-            "response": "¡Genial! 👌 Para vos, lo ideal es el *Plan de Gotas para 2 meses*. La mayoría de clientes que querían bajar lo mismo que vos lograron entre 7 y 10 kilos con este plan.\n\nTe explico cómo funciona:\n💧 Tomás 10 gotas 1 vez por día (almuerzo o cena) — se puede regular la dosis según resultados\n📋 Te mando una guía de consejos alimentarios\n📞 Te acompañamos por WhatsApp durante todo el tratamiento\n\nMás de *13 años distribuyendo* nuestros productos y casi *50.000 clientes satisfechos* 🌿\n\n💰 *Plan completo: ${{PRICE_TOTAL_GOTAS_60}}* — todo incluido y enviado a tu casa o a la sucursal del Correo Argentino más cercana.\n\n🎁 *Si pagás ahora* (MercadoPago o transferencia) te bajo $6.000 o te mando una unidad extra de regalo.\nSi preferís, también podés *pagar al recibir*.\n\n👉 ¿Qué opción de pago preferís? ¿O te queda alguna duda?",
+            "_note": "Tier 1 — hasta 10 kg → Gotas 60 días. Cierre con MP único. NO mencionar contra reembolso ni descuentos.",
+            "response": "¡Genial! 👌 Para vos, lo ideal es el *Plan de Gotas para 2 meses*. La mayoría de clientes que querían bajar lo mismo que vos lograron entre 7 y 10 kilos con este plan.\n\nTe explico cómo funciona:\n💧 Tomás 10 gotas 1 vez por día (almuerzo o cena) — se puede regular la dosis según resultados\n📋 Te mando una guía de consejos alimentarios\n📞 Te acompañamos por WhatsApp durante todo el tratamiento\n\nMás de *13 años distribuyendo* nuestros productos y casi *50.000 clientes satisfechos* 🌿\n\n💰 *Plan completo: ${{PRICE_TOTAL_GOTAS_60}}* — todo incluido y enviado a tu casa o a la sucursal del Correo Argentino más cercana.\n\nPara avanzar te paso el link de *Mercado Pago* 💳\n✅ Tarjeta de crédito (en cuotas)\n✅ Tarjeta de débito\n✅ Saldo Mercado Pago\n✅ Efectivo en Pago Fácil / Rapipago\n\nApenas confirmamos el pago, despachamos.\n\n👉 ¿Te paso el link así avanzamos? 😊",
             "nextStep": "waiting_ok"
         },
         "recommendation_2": {
             "step": "waiting_weight",
-            "_note": "Tier 2 — 10 a 20 kg → Cápsulas 60 días (con upsell suave a 120)",
-            "response": "¡Genial! 👌 Para vos, lo ideal es el *Plan de Cápsulas para 2 meses*. La mayoría de clientes que querían bajar lo mismo que vos lograron entre 15 y 20 kilos con este plan.\n\nTe explico cómo funciona:\n💊 Tomás 1 cápsula al día, 30 min antes del almuerzo o cena\n📋 Te mando una guía de consejos alimentarios\n📞 Te acompañamos por WhatsApp durante todo el tratamiento\n\nMás de *13 años distribuyendo* nuestros productos y casi *50.000 clientes satisfechos* 🌿\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_CAPSULAS_60}}*\n💰 _Plan 4 meses: ${{PRICE_CAPSULAS_120}}_ — el más conveniente; muchas clientas, al llegar al peso, lo usan 1-2 veces por semana como mantenimiento.\n\n🎁 *Si pagás ahora* (MercadoPago o transferencia) te bajo $6.000 o te mando una unidad extra de regalo.\nSi preferís, también podés *pagar al recibir*.\n\n👉 ¿Qué opción de pago preferís? ¿O te queda alguna duda?",
+            "_note": "Tier 2 — 10 a 20 kg → Cápsulas 60 días (con upsell suave a 120). Cierre con MP único. NO mencionar contra reembolso ni descuentos.",
+            "response": "¡Genial! 👌 Para vos, lo ideal es el *Plan de Cápsulas para 2 meses*. La mayoría de clientes que querían bajar lo mismo que vos lograron entre 15 y 20 kilos con este plan.\n\nTe explico cómo funciona:\n💊 Tomás 1 cápsula al día, 30 min antes del almuerzo o cena\n📋 Te mando una guía de consejos alimentarios\n📞 Te acompañamos por WhatsApp durante todo el tratamiento\n\nMás de *13 años distribuyendo* nuestros productos y casi *50.000 clientes satisfechos* 🌿\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_CAPSULAS_60}}*\n💰 _Plan 4 meses: ${{PRICE_CAPSULAS_120}}_ — el más conveniente; muchas clientas, al llegar al peso, lo usan 1-2 veces por semana como mantenimiento.\n\nPara avanzar te paso el link de *Mercado Pago* 💳\n✅ Tarjeta de crédito (en cuotas)\n✅ Tarjeta de débito\n✅ Saldo Mercado Pago\n✅ Efectivo en Pago Fácil / Rapipago\n\nApenas confirmamos el pago, despachamos.\n\n👉 ¿Avanzamos con 60 o 120 días? Te paso el link 😊",
             "nextStep": "waiting_ok"
         },
         "recommendation_3": {
             "step": "waiting_weight",
-            "_note": "Tier 3 — más de 20 kg → Cápsulas 120 días (también ofrece 60 si presupuesto)",
-            "response": "¡Genial! 👌 Para vos, lo ideal es el *Plan de Cápsulas para 4 meses*. La mayoría de clientes que querían bajar más de 20 kilos lo lograron con este plan, de forma progresiva y sostenida.\n\nTe explico cómo funciona:\n💊 Tomás 1 cápsula al día, 30 min antes del almuerzo o cena\n📋 Te mando una guía de consejos alimentarios\n📞 Te acompañamos por WhatsApp durante todo el tratamiento\n\nMás de *13 años distribuyendo* nuestros productos y casi *50.000 clientes satisfechos* 🌿\n\n💰 *Plan 4 meses (recomendado): ${{PRICE_CAPSULAS_120}}* — envío y pago a domicilio bonificados ✅\n💰 _Plan 2 meses: ${{PRICE_TOTAL_CAPSULAS_60}}_ — opción más corta si querés probar primero\n\n🎁 *Si pagás ahora* (MercadoPago o transferencia) te bajo $6.000 o te mando una unidad extra de regalo.\nSi preferís, también podés *pagar al recibir*.\n\n👉 ¿Qué opción de pago preferís? ¿O te queda alguna duda?",
+            "_note": "Tier 3 — más de 20 kg → Cápsulas 120 días (también ofrece 60 si presupuesto). Cierre con MP único. NO mencionar contra reembolso ni descuentos.",
+            "response": "¡Genial! 👌 Para vos, lo ideal es el *Plan de Cápsulas para 4 meses*. La mayoría de clientes que querían bajar más de 20 kilos lo lograron con este plan, de forma progresiva y sostenida.\n\nTe explico cómo funciona:\n💊 Tomás 1 cápsula al día, 30 min antes del almuerzo o cena\n📋 Te mando una guía de consejos alimentarios\n📞 Te acompañamos por WhatsApp durante todo el tratamiento\n\nMás de *13 años distribuyendo* nuestros productos y casi *50.000 clientes satisfechos* 🌿\n\n💰 *Plan 4 meses (recomendado): ${{PRICE_CAPSULAS_120}}*\n💰 _Plan 2 meses: ${{PRICE_TOTAL_CAPSULAS_60}}_ — opción más corta si querés probar primero\n\nPara avanzar te paso el link de *Mercado Pago* 💳\n✅ Tarjeta de crédito (en cuotas)\n✅ Tarjeta de débito\n✅ Saldo Mercado Pago\n✅ Efectivo en Pago Fácil / Rapipago\n\nApenas confirmamos el pago, despachamos.\n\n👉 ¿Avanzamos con 60 o 120 días? Te paso el link 😊",
             "nextStep": "waiting_ok"
         },
         "preference_capsulas": {
@@ -61,7 +61,7 @@
                 "practico",
                 "practica"
             ],
-            "response": "¡Dale! 💊 Las cápsulas son lo más práctico — 1 al día, 30 min antes de la comida principal.\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_CAPSULAS_60}}*\n💰 *Plan 4 meses: ${{PRICE_CAPSULAS_120}}*\n_(sin gastos de envío)_\n\n🎁 *Si pagás ahora* con MercadoPago o transferencia te bajo $6.000 o te mando una unidad extra de regalo.\n\n👉 ¿Avanzamos con 60 o 120 días? ¿Cómo preferís hacer el pago?",
+            "response": "¡Dale! 💊 Las cápsulas son lo más práctico — 1 al día, 30 min antes de la comida principal.\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_CAPSULAS_60}}*\n💰 *Plan 4 meses: ${{PRICE_CAPSULAS_120}}*\n\nPara avanzar te paso el link de *Mercado Pago* — podés pagar con tarjeta (en cuotas), débito, saldo MP o efectivo en Pago Fácil / Rapipago.\n\n👉 ¿Avanzamos con 60 o 120 días?",
             "nextStep": "waiting_plan_choice"
         },
         "preference_gotas": {
@@ -71,7 +71,7 @@
                 "liquido",
                 "gotero"
             ],
-            "response": "¡Dale! 💧 Las gotas son prácticas y discretas — 10 gotas, 1 vez al día.\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_GOTAS_60}}*\n💰 *Plan 4 meses: ${{PRICE_GOTAS_120}}*\n_(sin gastos de envío)_\n\n🎁 *Si pagás ahora* con MercadoPago o transferencia te bajo $6.000 o te mando una unidad extra de regalo.\n\n👉 ¿Avanzamos con 60 o 120 días? ¿Cómo preferís hacer el pago?",
+            "response": "¡Dale! 💧 Las gotas son prácticas y discretas — 10 gotas, 1 vez al día.\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_GOTAS_60}}*\n💰 *Plan 4 meses: ${{PRICE_GOTAS_120}}*\n\nPara avanzar te paso el link de *Mercado Pago* — podés pagar con tarjeta (en cuotas), débito, saldo MP o efectivo en Pago Fácil / Rapipago.\n\n👉 ¿Avanzamos con 60 o 120 días?",
             "nextStep": "waiting_plan_choice"
         },
         "preference_semillas": {
@@ -85,7 +85,7 @@
                 "te de semilla",
                 "natural"
             ],
-            "response": "¡Dale! 🌿 Las semillas son la opción más natural — se preparan como infusión cada noche.\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_SEMILLAS_60}}*\n💰 *Plan 4 meses: ${{PRICE_SEMILLAS_120}}* (sin adicional)\n\n🎁 *Si pagás ahora* tenés un descuento o una unidad extra de regalo.\n\n👉 ¿Avanzamos con 60 o 120 días?",
+            "response": "¡Dale! 🌿 Las semillas son la opción más natural — se preparan como infusión cada noche.\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_SEMILLAS_60}}*\n💰 *Plan 4 meses: ${{PRICE_SEMILLAS_120}}*\n\nPara avanzar te paso el link de *Mercado Pago* — podés pagar con tarjeta (en cuotas), débito, saldo MP o efectivo en Pago Fácil / Rapipago 💳\n\n👉 ¿Avanzamos con 60 o 120 días?",
             "nextStep": "waiting_plan_choice"
         },
         "closing": {
@@ -109,7 +109,7 @@
         "confirmation": {
             "step": "waiting_data",
             "_note": "El método de pago se inyecta dinámicamente desde el flow (no hardcodear EFECTIVO). Retiro en sucursal NO es solo por cartero — el correo puede mandarlo a sucursal por otras razones.",
-            "response": "📦 Te confirmo el pedido:\n\nProducto: {{PRODUCT}}\nPlan: {{PLAN}} días\nTotal: {{TOTAL}}\n\n✔ Correo Argentino\n✔ Entrega estimada: 7 a 10 días hábiles\n\nUna cosa importante: si el cartero no te encuentra, o por cualquier otra razón el correo determina que lo tenés que retirar en la sucursal, tenés 72 hs desde que te avisemos. Si no lo retirás, ahí sí tiene un costo logístico de ${{COSTO_LOGISTICO}}.\n\n👉 ¿Me asegurás que vas a poder retirarlo dentro de las 72 hs si llegara a quedar en sucursal? 😊",
+            "response": "📦 Te confirmo el pedido:\n\nProducto: {{PRODUCT}}\nPlan: {{PLAN}} días\nTotal: {{TOTAL}}\n\n✔ Correo Argentino\n✔ Entrega estimada: 4 a 6 días hábiles desde la confirmación del pago\n\nUna cosa importante: si el cartero no te encuentra, o por cualquier otra razón el correo determina que lo tenés que retirar en la sucursal, tenés 72 hs desde que te avisemos. Si no lo retirás, ahí sí tiene un costo logístico de ${{COSTO_LOGISTICO}}.\n\n👉 ¿Me asegurás que vas a poder retirarlo dentro de las 72 hs si llegara a quedar en sucursal? 😊",
             "nextStep": "completed"
         }
     },
@@ -164,18 +164,45 @@
                 "opcion 4"
             ],
             "_note": "FAQ menu opción 4 — '¿Cómo lo recibo y cuánto tarda?'. El retiro en sucursal NO es solo por cartero — el correo puede mandarlo a sucursal por otras razones.",
-            "response": "📦 *Envíos por Correo Argentino* a tu domicilio o a la sucursal más cercana.\n\n⚡ *Si pagás ahora* (MercadoPago o transferencia): demora *4 a 6 días hábiles*\n🛍️ *Si pagás al recibir* (solo efectivo): demora *7 a 10 días hábiles*\n\nSi el cartero no te encuentra, o por cualquier otra razón que el correo disponga que retires en sucursal, te avisamos y tenés 72 hs para retirarlo.\n\n👉 ¿Te lo envío?"
+            "response": "📦 *Envíos por Correo Argentino* a tu domicilio o a la sucursal más cercana.\n\nDemora *4 a 6 días hábiles* desde que confirmamos el pago.\n\nSi el cartero no te encuentra, o por cualquier otra razón que el correo disponga que retires en sucursal, te avisamos y tenés 72 hs para retirarlo.\n\n👉 ¿Te paso el link de Mercado Pago para avanzar?"
         },
         {
             "keywords": [
                 "tarjeta",
                 "mercadopago",
                 "mp",
+                "como pago",
+                "forma de pago",
+                "metodo de pago",
+                "cuotas"
+            ],
+            "_note": "Pago default = link de Mercado Pago. NO ofrecer transferencia ni contra reembolso espontáneamente.",
+            "response": "Te paso el link de *Mercado Pago* 💳 — es la forma más rápida y segura.\n\nPodés pagar con:\n✅ Tarjeta de crédito (en cuotas)\n✅ Tarjeta de débito\n✅ Saldo Mercado Pago\n✅ Efectivo en Pago Fácil / Rapipago\n\nApenas confirmamos el pago, despachamos.\n\n¿Te paso el link así avanzamos? 😊"
+        },
+        {
+            "keywords": [
+                "transferencia",
+                "transferir",
                 "cbu",
                 "alias",
-                "transferencia"
+                "banco"
             ],
-            "response": "Aceptamos *MercadoPago* (tarjeta, débito, saldo MP), *transferencia bancaria* y *contra reembolso* (efectivo al recibir).\n\nSi pagás ahora con MP o transferencia llega más rápido (4-6 días) y además te hacemos un descuento de $6.000 o te mandamos una unidad extra de regalo 🎁\n\n¿Qué opción preferís?"
+            "_note": "Transferencia solo se ofrece si el cliente la pide explícitamente.",
+            "response": "Sí, también podemos por *transferencia bancaria* 🏦\n\nCuando me confirmes el pedido te paso el alias.\n\nSi preferís, también te puedo pasar el link de *Mercado Pago* — ahí pagás con tarjeta (en cuotas), débito, saldo MP o efectivo en Pago Fácil / Rapipago.\n\n¿Cómo te queda más cómodo?"
+        },
+        {
+            "keywords": [
+                "contra reembolso",
+                "contrarembolso",
+                "contra rembolso",
+                "pago al recibir",
+                "al recibir",
+                "pagar al recibir",
+                "efectivo al cartero",
+                "cuando llega"
+            ],
+            "_note": "Contra reembolso solo se ofrece si el cliente lo pide. Requiere SEÑA de $10.000 por MP + saldo en efectivo al cartero. Aplica a TODOS los planes y a TODOS los clientes (nuevos y recurrentes). NO es 'adicional' — es seña.",
+            "response": "Sí, podemos coordinar pago al recibir 😊\n\nLa modalidad es: adelantás una *seña de $10.000* por Mercado Pago (cubre el envío), y el resto lo pagás en *efectivo al cartero* cuando llega el paquete.\n\nEs una decisión interna por la cantidad de paquetes que vuelven sin retirar — aplica a todos los pedidos. Es exactamente la misma plata, solo cambia el momento.\n\nSi te queda más cómodo, también te puedo pasar el link de Mercado Pago por el total. ¿Cómo querés avanzar?"
         },
         {
             "keywords": [
@@ -221,7 +248,8 @@
                 "engaño",
                 "chanta"
             ],
-            "response": "Es normal desconfiar hoy en día por internet. Justamente por eso ofrecemos *pago contra reembolso*: el cartero te entrega el paquete en mano y recién ahí pagás. Riesgo cero para vos 😊"
+            "_note": "NO promocionar contra reembolso como solución de confianza. Liderar con trust signals. Si insiste, mencionar COD con seña $10k.",
+            "response": "Te entiendo, hoy en día se ven cosas raras por internet 😊\n\nMirá, llevamos *13 años* distribuyendo este producto y casi *50.000 clientes satisfechos* — es serio, no somos un kiosco que abrió ayer.\n\nSi te queda más tranqui también podemos coordinar pago al recibir: adelantás una *seña de $10.000* por Mercado Pago (cubre el envío) y el resto en efectivo al cartero. ¿Cómo querés avanzar?"
         },
         {
             "keywords": [
@@ -284,15 +312,19 @@
         "alwaysEndWithQuestion": true,
         "maxFollowUps": 1,
         "noNegotiatePrice": true,
-        "noDiscounts": false,
+        "noDiscounts": true,
         "noCreditCard": false,
         "noArgue": true,
         "keepResponsesShort": true,
+        "defaultPaymentMethod": "mercadopago_link",
+        "_note_defaultPayment": "Por defecto SOLO se ofrece el link de Mercado Pago (cubre tarjeta, débito, saldo MP, efectivo en Pago Fácil/Rapipago). Transferencia y contra reembolso NO se ofrecen espontáneamente — solo si el cliente las pide explícitamente.",
         "contraReembolsoMAX": {
             "enabled": true,
-            "adicional": 6000,
-            "appliesTo": "60",
-            "description": "Adicional de $6.000 en planes de 60 días con contra reembolso. Bonificado en planes de 120 días, MercadoPago y transferencia."
+            "spontaneous": false,
+            "senaMP": 10000,
+            "adicional": 0,
+            "appliesTo": "all",
+            "description": "Pago al recibir: SOLO se ofrece si el cliente lo pide. Requiere seña de $10.000 por Mercado Pago (cubre envío); el saldo se paga en efectivo al cartero. Aplica a TODOS los planes (60d y 120d) y a TODOS los clientes (nuevos y recurrentes). NO es un 'adicional' — es seña."
         },
         "costoLogisticoRechazo": 18000,
         "ageLimits": {
@@ -300,10 +332,8 @@
             "max": 80
         },
         "prepayIncentive": {
-            "enabled": true,
-            "discount": 6000,
-            "extraUnit": true,
-            "_note": "Si paga ahora con MP/transferencia: descuento de $6.000 (= adicional bonificado) o una unidad extra del mismo producto de regalo."
+            "enabled": false,
+            "_note": "DESACTIVADO. Ya no hay descuento ni regalo por prepagar — Mercado Pago es la modalidad por defecto, no una alternativa premiada. NO mencionar 'descuento de $6.000' ni 'unidad extra de regalo' en ningún momento."
         },
         "closeIfNotAccepted": "Trabajamos bajo estas modalidades.\n\nSi en algún momento te resulta cómodo avanzar, acá estamos 😊"
     }

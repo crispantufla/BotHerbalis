@@ -50,7 +50,7 @@ module.exports = (clientPool) => {
         try {
             const { sharedState, config, knowledge, saveKnowledge } = getCtx(req);
             const { version } = req.body;
-            const targetVersion = version || config.activeScript || 'v3';
+            const targetVersion = version || config.activeScript || 'v5';
 
             if (sharedState?.multiKnowledge && sharedState.multiKnowledge[targetVersion]) {
                 Object.assign(sharedState.multiKnowledge[targetVersion], req.body);

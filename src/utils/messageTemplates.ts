@@ -34,10 +34,9 @@ function buildPersonalizedPriceResponse(state: any, productOverride?: string | n
 
     const priceStr = _getPrice(productKey, recommendedPlan);
 
-    const adicional = recommendedPlan === '60' ? _getAdicionalMAX() : 0;
-    const savingsLine = adicional > 0
-        ? `\n\n💡 _Pagando con MercadoPago te ahorrás $${adicional.toLocaleString('es-AR')} del adicional de pago a domicilio + llega 4 días antes._`
-        : '\n\n_En plan 120 días el envío y el pago a domicilio van bonificados._';
+    // Política nueva (mayo 2026): MP es la forma default; ya no hay adicional $6.000 por COD.
+    // El COD solo se ofrece si el cliente lo pide y requiere seña de $10k vía MP.
+    const savingsLine = '\n\n💳 _Pagás con Mercado Pago: tarjeta (en cuotas), débito, saldo MP o efectivo en Pago Fácil/Rapipago._';
 
     // Justificación según objetivo de kilos
     let justification: string;
@@ -74,50 +73,35 @@ function detectProductInText(text: string): string | null {
 }
 
 /**
- * Build the payment-method menu message shown to the client.
- * Sugerencias 1-4 aplicadas:
- *   1. Ahorro explícito por elegir MP/transferencia en plan 60 (loss aversion)
- *   2. Línea de protección al comprador MP (aborda objeción de confianza)
- *   3. Recomendación explícita en lugar de menú neutro
+ * Build the payment menu message shown to the client.
+ * Política mayo 2026: MP-first como ÚNICA opción ofrecida espontáneamente.
+ * Transferencia y contra reembolso solo se ofrecen si el cliente las pide
+ * explícitamente (el AI fallback de stepWaitingPaymentMethod las maneja).
  */
-function buildPaymentMessage(state: any): string {
-    const plan = state.selectedPlan || state.cart?.[0]?.plan || '60';
-    const adicional = state.adicionalMAX ?? _getAdicionalMAX();
-
-    const adicionalStr = adicional.toLocaleString('es-AR');
-    const showAhorro = plan === '60' && adicional > 0;
-    const ahorroPill = showAhorro ? ` _(te ahorrás $${adicionalStr})_ 🎉` : '';
-    const cashAdicionalLine = showAhorro
-        ? `\n   ▸ +$${adicionalStr} de adicional en plan 60 días`
-        : `\n   ▸ Sin adicional (bonificado en plan 120 días) ✅`;
-
-    return `¡Perfecto! 😊 Para el pago, *te recomiendo MercadoPago* — sin recargos y llega 3-4 días antes 👌\n` +
-        `📦 *En todos los casos el envío es SIN COSTO*\n\n` +
-        `1️⃣ *MercadoPago* 💳${ahorroPill} — Tarjeta, débito o saldo MP.\n` +
-        `   🛡️ Protección al comprador: si no recibís el producto, te devuelven el 100%.\n` +
-        `   Demora: 4 a 6 días hábiles 🚀\n\n` +
-        `2️⃣ *Transferencia bancaria*${ahorroPill} — Sin recargos.\n` +
-        `   Demora: 4 a 6 días hábiles\n\n` +
-        `3️⃣ *Contra reembolso* — Pagás al cartero (solo en efectivo).${cashAdicionalLine}\n` +
-        `   Demora: 7 a 10 días hábiles\n\n` +
-        `¿Avanzamos con MercadoPago o preferís otra forma?`;
+function buildPaymentMessage(_state: any): string {
+    return `¡Buenísimo! Para avanzar con tu pedido te voy a pasar el link de *Mercado Pago* 💳\n\n` +
+        `Es la forma más rápida y segura:\n` +
+        `✅ Tarjeta de crédito (en cuotas)\n` +
+        `✅ Tarjeta de débito\n` +
+        `✅ Saldo Mercado Pago\n` +
+        `✅ Efectivo en Pago Fácil / Rapipago\n\n` +
+        `🛡️ Protección al comprador — si no recibís el producto, te devuelven el 100%.\n` +
+        `📦 Apenas confirmamos el pago, despachamos (llega en 4-6 días hábiles).\n\n` +
+        `¿Te paso el link así dejamos tu pedido confirmado? 😊`;
 }
 
 /**
- * Build the last-mile retry message shown when the client picks contra reembolso
- * on plan 60 (where there's adicional). Sugerencia #5.
+ * Build the message shown when the client explicitly asks for contra reembolso.
+ * Política mayo 2026: COD requiere seña de $10k vía MP + saldo en efectivo al cartero.
+ * NO se promociona como "más cómodo/seguro" — se presenta como decisión interna.
  */
-function buildCashRetryMessage(state: any): string {
-    const adicional = state.adicionalMAX ?? _getAdicionalMAX();
-    const adicionalStr = adicional.toLocaleString('es-AR');
-
-    const ahorroLine = adicional > 0
-        ? `te ahorrás los $${adicionalStr} de adicional y `
-        : '';
-
-    return `Dale, contra reembolso 👍\n\n` +
-        `Antes de cerrar, capaz te conviene saber: con MercadoPago ${ahorroLine}llega 3-4 días antes.\n\n` +
-        `¿Confirmás contra reembolso o lo cambiamos a MercadoPago?`;
+function buildCashRetryMessage(_state: any): string {
+    return `Dale, podemos coordinar pago al recibir 👍\n\n` +
+        `La modalidad es: adelantás una *seña de $10.000* por Mercado Pago (cubre el envío), ` +
+        `y el resto lo pagás en *efectivo al cartero* cuando llega el paquete.\n\n` +
+        `Es una decisión interna por la cantidad de paquetes que vuelven sin retirar — aplica a todos los pedidos. ` +
+        `Es exactamente la misma plata, solo cambia el momento.\n\n` +
+        `Si te queda más cómodo, también te puedo pasar el link de Mercado Pago por el total. ¿Cómo querés avanzar?`;
 }
 
 /**
@@ -171,27 +155,50 @@ function buildConfirmationMessage(state: any): string {
     // If 120 days, service is usually free, we can optionally explicitly say "$0" or just hide it.
     // User requested: "en el total pon el valor del producto + lo que paga por el servicio max + el total"
 
+    // Política mayo 2026: la entrega va 4-6 días hábiles desde la confirmación del
+    // pago (MP completo o seña). 7-10 días era del modelo viejo de COD sin pago.
     const postdatadoLine = state.postdatado
         ? `📅 Envío programado: ${state.postdatado}\n`
-        : `✔ Entrega estimada: 7 a 10 días hábiles\n`;
+        : `✔ Entrega estimada: 4 a 6 días hábiles desde la confirmación del pago\n`;
 
     // MercadoPago — pago ya acreditado, sin aviso de costo de rechazo
     if (state.paymentMethod === 'mercadopago') {
-        const postdatadoLineMp = state.postdatado
-            ? `📅 Envío programado: ${state.postdatado}\n`
-            : `✔ Entrega estimada: 4 a 6 días hábiles\n`;
         return `📦 CONFIRMACIÓN DE ENVÍO\n\n` +
             `Producto: ${productStr}\n` +
             `Plan: ${planStr}\n` +
             breakdown +
             `✅ Pago recibido via MercadoPago\n\n` +
-            `✔ Correo Argentino\n` + postdatadoLineMp +
+            `✔ Correo Argentino\n` + postdatadoLine +
             `Importante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs para retirar.\n\n` +
             `👉 ¿Me confirmás que podés retirarlo en sucursal dentro de las 72 hs si fuera necesario?`;
     }
 
     const costoLog = _getCostoLogistico();
     const isSucursal = state.pendingOrder?.calle?.toLowerCase() === 'a sucursal';
+
+    // Política mayo 2026: COD ahora se cobra con seña $10k via MP + saldo al cartero.
+    // Si senaPaid → confirmación con breakdown de seña.
+    if (state.paymentMethod === 'contrarembolso' && state.senaPaid && state.senaAmount) {
+        const senaFmt = state.senaAmount.toLocaleString('es-AR').replace(/,/g, '.');
+        const remainder = Math.max(0, totalInt - state.senaAmount);
+        const remainderFmt = remainder.toLocaleString('es-AR').replace(/,/g, '.');
+        const cartoLine = isSucursal
+            ? `✔ Retiro en sucursal — pagás el saldo *$${remainderFmt}* en efectivo al retirar`
+            : `✔ Saldo al cartero: *$${remainderFmt}* en efectivo al recibir`;
+
+        return `📦 CONFIRMACIÓN DE ENVÍO\n\n` +
+            `Producto: ${productStr}\n` +
+            `Plan: ${planStr}\n` +
+            `Total: $${totalPriceStr}\n\n` +
+            `✅ Seña recibida via MercadoPago: $${senaFmt}\n` +
+            cartoLine + `\n\n` +
+            `✔ Correo Argentino\n` + postdatadoLine +
+            `Importante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs.\nEl no retiro genera un costo logístico de $${costoLog}.\n\n` +
+            `👉 ¿Me confirmás que podés retirar en sucursal dentro de las 72 hs si fuera necesario?`;
+    }
+
+    // Caso legacy/edge: paymentMethod='contrarembolso' SIN seña (no debería ocurrir
+    // en el flujo nuevo, pero queda como fallback defensivo).
     const deliveryNote = isSucursal
         ? `✔ Retiro en sucursal de Correo Argentino\n` + postdatadoLine + `✔ Pago en efectivo al retirar\n\n` +
           `Importante:\nEl paquete permanece en sucursal 72 hs.\nEl no retiro genera un costo logístico de $${costoLog}.\n\n` +

@@ -266,7 +266,7 @@ export async function handleAdminCommand(
         const globalPause = sharedState.config?.globalPause ? '⏸️ SI' : '▶️ NO';
         const connected = sharedState.isConnected ? '🟢 Conectado' : '🔴 Desconectado';
 
-        return `📊 *Estado del Bot*\n\n*WhatsApp:* ${connected}\n*Uptime:* ${uptimeStr}\n*Memoria:* ${heapMB} MB\n*Sesiones activas:* ${activeSessions}\n*Clientes pausados:* ${pausedCount}\n*Alertas activas:* ${alertCount}\n*Pausa global:* ${globalPause}\n*Script activo:* ${sharedState.config?.activeScript || 'v3'}`;
+        return `📊 *Estado del Bot*\n\n*WhatsApp:* ${connected}\n*Uptime:* ${uptimeStr}\n*Memoria:* ${heapMB} MB\n*Sesiones activas:* ${activeSessions}\n*Clientes pausados:* ${pausedCount}\n*Alertas activas:* ${alertCount}\n*Pausa global:* ${globalPause}\n*Script activo:* ${sharedState.config?.activeScript || 'v5'}`;
     }
 
     // ── !stats — Quick sales stats ──────────────────────────────
@@ -637,12 +637,12 @@ export async function handleAdminCommand(
         const version = parts[1];
 
         if (!version) {
-            const active = sharedState.config?.activeScript || 'v3';
-            const available = sharedState.availableScripts || ['v3'];
+            const active = sharedState.config?.activeScript || 'v5';
+            const available = sharedState.availableScripts || ['v5', 'v6'];
             return `📋 *Script activo:* ${active}\n*Disponibles:* ${available.join(', ')}`;
         }
 
-        const available = sharedState.availableScripts || ['v3', 'v4'];
+        const available = sharedState.availableScripts || ['v5', 'v6'];
         if (!available.includes(version) && version !== 'rotacion') {
             return `⚠️ Script "${version}" no existe. Disponibles: ${available.join(', ')} y rotacion`;
         }
