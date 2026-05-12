@@ -28,6 +28,11 @@ function _setStep(state: any, newStep: string) {
         state.reengagementSent = false;
         state.secondFollowUpSent = false;
         state.cartRecovered = false;
+        // Si re-entramos a la selección de método de pago, hay que volver a mostrar
+        // el mensaje explicativo de la seña $10k si el cliente vuelve a pedir COD.
+        if (newStep === 'waiting_payment_method') {
+            state.cashRetryShown = false;
+        }
 
         // A/B conversion tracking: mark follow-up as converted when user advances
         if (state.followUpData && !state.followUpData.converted) {

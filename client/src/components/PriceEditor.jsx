@@ -15,8 +15,8 @@ const PriceEditor = () => {
         try {
             const { data } = await api.get('/api/prices');
 
-            // Ensure Config Defaults
-            if (!data.adicionalMAX) data.adicionalMAX = '6.000';
+            // Ensure Config Defaults (política mayo 2026: adicional = 0)
+            if (!data.adicionalMAX) data.adicionalMAX = '0';
             if (!data.costoLogistico) data.costoLogistico = '18.000';
 
             setPrices(data || {});

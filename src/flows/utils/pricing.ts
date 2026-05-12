@@ -50,11 +50,13 @@ function _loadPricesCache(): Record<string, any> {
     }
 }
 
+// Política mayo 2026: el adicional por contra reembolso fue eliminado.
+// Defaults a 0 para evitar que un fallo de prices.json reactive el cargo.
 const FALLBACK_PRICES: Record<string, any> = {
     'Cápsulas': { '60': '46.900', '120': '66.900' },
     'Semillas': { '60': '36.900', '120': '49.900' },
     'Gotas': { '60': '48.900', '120': '68.900' },
-    'adicionalMAX': '6.000',
+    'adicionalMAX': '0',
     'costoLogistico': '18.000'
 };
 
@@ -62,8 +64,8 @@ const FALLBACK_PRICES: Record<string, any> = {
 function _getAdicionalMAX(): number {
     try {
         const prices = _loadPricesCache();
-        return parseInt((prices.adicionalMAX || '6.000').replace(/\./g, ''), 10);
-    } catch (e) { return 6000; }
+        return parseInt((prices.adicionalMAX || '0').replace(/\./g, ''), 10);
+    } catch (e) { return 0; }
 }
 
 function _getCostoLogistico(): string {

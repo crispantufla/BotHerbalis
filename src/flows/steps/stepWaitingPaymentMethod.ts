@@ -1,8 +1,7 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _setStep, _pauseAndAlert } from '../utils/flowHelpers';
-import { buildConfirmationMessage, buildCashRetryMessage } from '../../utils/messageTemplates';
-import { calculateTotal, _recalcAdicionalMAX } from '../utils/cartHelpers';
-import { _getAdicionalMAX } from '../utils/pricing';
+import { buildCashRetryMessage } from '../../utils/messageTemplates';
+import { calculateTotal } from '../utils/cartHelpers';
 import logger from '../../utils/logger';
 
 // Payment method matchers. Los dígitos sueltos (1, 2, 3) y números escritos
@@ -50,9 +49,6 @@ export async function handleWaitingPaymentMethod(
     dependencies: any
 ): Promise<{ matched: boolean }> {
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
-
-    const plan = currentState.selectedPlan || currentState.cart?.[0]?.plan || '60';
-    const adicionalMAX = currentState.adicionalMAX || _getAdicionalMAX();
 
     // Guard defensivo: si llegamos acá con totalPrice undefined/inválido pero
     // tenemos cart, recalcular antes de los waives (evita "Monto inválido"

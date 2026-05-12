@@ -30,20 +30,20 @@ function _formatMessage(text: string | string[], state: any): string {
     formatted = formatted.replace(/{{PRICE_PER_DAY_CAPSULAS_120}}/g, _perDay(prices['Cápsulas']?.['120'], 120));
     formatted = formatted.replace(/{{PRICE_PER_DAY_SEMILLAS_120}}/g, _perDay(prices['Semillas']?.['120'], 120));
     formatted = formatted.replace(/{{PRICE_PER_DAY_GOTAS_120}}/g, _perDay(prices['Gotas']?.['120'], 120));
-    // Precio total con adicional ya incluido — para guiones que muestran el
-    // precio "final" (lo que pagaría con contra reembolso) y dejan el descuento
-    // de $6.000 como incentivo de prepago. Solo aplica a planes de 60 días.
+    // Precio total con adicional ya incluido. Política mayo 2026: adicional = 0,
+    // por lo que {{PRICE_TOTAL_*_60}} hoy equivale a {{PRICE_*_60}}. Se mantiene
+    // por compatibilidad con plantillas legacy si vuelven a usarlo.
     const _withAdicional = (priceStr: string | undefined, adicionalStr: string | undefined): string => {
         if (!priceStr) return '';
         const base = parseInt(priceStr.replace(/\./g, ''), 10);
-        const adic = parseInt((adicionalStr || '6.000').replace(/\./g, ''), 10);
+        const adic = parseInt((adicionalStr || '0').replace(/\./g, ''), 10);
         if (isNaN(base) || isNaN(adic)) return priceStr;
         return _formatPrice(base + adic);
     };
     formatted = formatted.replace(/{{PRICE_TOTAL_CAPSULAS_60}}/g, _withAdicional(prices['Cápsulas']?.['60'], prices.adicionalMAX));
     formatted = formatted.replace(/{{PRICE_TOTAL_SEMILLAS_60}}/g, _withAdicional(prices['Semillas']?.['60'], prices.adicionalMAX));
     formatted = formatted.replace(/{{PRICE_TOTAL_GOTAS_60}}/g, _withAdicional(prices['Gotas']?.['60'], prices.adicionalMAX));
-    formatted = formatted.replace(/{{ADICIONAL_MAX}}/g, prices.adicionalMAX || '6.000');
+    formatted = formatted.replace(/{{ADICIONAL_MAX}}/g, prices.adicionalMAX || '0');
     formatted = formatted.replace(/{{COSTO_LOGISTICO}}/g, prices.costoLogistico || '18.000');
 
     // Replace dynamic order placeholders if state is provided
@@ -127,8 +127,8 @@ function _getQuickReplies(step: string, userMessage: string): QuickReplyItem[] {
     // Trust / scam concerns
     if (/estafa|trucho|mentira|robo|engaño|chanta|falso|fraude/i.test(normalized)) {
         return [
-            { label: 'Aclarar pago', message: 'Entiendo tu preocupación. Solo cobramos en efectivo al recibir el producto, no pedimos datos bancarios ni pagos por adelantado.' },
-            { label: 'Mostrar trayectoria', message: 'Llevamos 13 años con más de 15.000 clientes satisfechos. ¿Querés que te pase testimonios?' },
+            { label: 'Mostrar trayectoria', message: 'Llevamos 13 años con más de 50.000 clientes satisfechos. ¿Querés que te pase testimonios?' },
+            { label: 'Aclarar pago MP', message: 'Entiendo tu preocupación. Trabajamos con Mercado Pago — tiene protección al comprador: si no recibís el producto te devuelven el 100%.' },
             { label: 'Dejar abierto', message: 'Respeto tu decisión. Si querés verificar, podés buscarnos en Google o Instagram. Acá estamos cuando quieras.' },
         ];
     }
@@ -163,9 +163,9 @@ function _getQuickReplies(step: string, userMessage: string): QuickReplyItem[] {
     // Waiting for plan choice
     if (step === 'waiting_plan_choice') {
         return [
-            { label: 'Recomendar plan', message: 'Te recomiendo el plan de 60 días, es el que mejor resultados da y tiene mejor precio por día.' },
-            { label: 'Explicar diferencias', message: '¿Querés que te explique las diferencias entre los planes?' },
-            { label: 'Plan corto', message: 'Si querés probar, el plan de 30 días es buena opción para arrancar.' },
+            { label: 'Recomendar 120', message: 'Te recomiendo el plan de 120 días: es el tratamiento completo y el resultado se sostiene sin rebote.' },
+            { label: 'Explicar diferencias', message: '¿Querés que te explique las diferencias entre el plan de 60 y el de 120 días?' },
+            { label: 'Probar con 60', message: 'Si preferís arrancar más liviano, el plan de 60 días es una buena opción para probar.' },
         ];
     }
 

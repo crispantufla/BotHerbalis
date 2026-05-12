@@ -816,7 +816,7 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
         if (mpReminderStage === 0 && minsSince >= 30) {
             const linkUrl = (state as any).mpPaymentLinkUrl;
             const linkLine = linkUrl ? `\n\nAcá te dejo el link de nuevo:\n${linkUrl}` : '';
-            const msg = `¡Hola! 👋 ¿Tuviste algún problema con el pago de MercadoPago? Si necesitás otra forma (transferencia o contra reembolso), avisame y lo cambiamos sin problema 🙂${linkLine}`;
+            const msg = `¡Hola! 👋 ¿Tuviste algún problema con el pago de MercadoPago? Si te quedó alguna duda, decime y lo resolvemos 🙂${linkLine}`;
             try {
                 await sendMessageWithDelay(userId, msg);
                 _pushHistory(state, { role: 'bot', content: msg });

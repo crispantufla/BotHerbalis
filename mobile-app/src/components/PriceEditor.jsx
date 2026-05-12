@@ -24,7 +24,7 @@ const PriceEditor = () => {
             const data = await res.json();
 
             // Ensure Config Defaults
-            if (!data.adicionalMAX) data.adicionalMAX = '6.000';
+            if (!data.adicionalMAX) data.adicionalMAX = '0';
             if (!data.costoLogistico) data.costoLogistico = '18.000';
 
             setPrices(data || {});
@@ -131,10 +131,10 @@ const PriceEditor = () => {
                                             className="w-full pl-7 pr-3 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
                                             value={prices.adicionalMAX || ''}
                                             onChange={(e) => setPrices(prev => ({ ...prev, adicionalMAX: e.target.value }))}
-                                            placeholder="6.000"
+                                            placeholder="0"
                                         />
                                     </div>
-                                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Se cobra en planes de 60 días. (Gratis en 120)</p>
+                                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Eliminado por política mayo 2026 (dejar en 0).</p>
                                 </div>
 
                                 {/* Costo Logístico */}

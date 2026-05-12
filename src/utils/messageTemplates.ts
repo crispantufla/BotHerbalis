@@ -1,7 +1,8 @@
 /**
  * messageTemplates.js — Shared message builders to avoid duplication
  */
-import { _getCostoLogistico, _getAdicionalMAX, _getPrice } from '../flows/utils/pricing';
+import { _getCostoLogistico, _getPrice } from '../flows/utils/pricing';
+import logger from './logger';
 
 /**
  * Detector compartido de "preguntas de precio" — si matchea, el caller debería
@@ -118,42 +119,7 @@ function buildConfirmationMessage(state: any): string {
         ? `${state.selectedPlan} días`
         : (cart.length > 0 ? cart.map((i: any) => `${i.plan} días`).join(' + ') : '60 días');
     const totalPriceStr = state.totalPrice || '0';
-
-    // Calculate Breakdown
-    // If state.isContraReembolsoMAX is true OR (single item plan 60 and no logic says otherwise), assume service fee.
-    // However, salesFlow logic sets isContraReembolsoMAX. We rely on that or fallback to plan checking.
-
-    let serviceFee = 0;
-    let productVal = 0;
-
     const totalInt = parseInt(totalPriceStr.replace(/\./g, ''), 10) || 0;
-
-    // Logic: If 60 days AND ContrareembolsoMAX implies +6000.
-    // Safest way: check if total match known price + 6000? 
-    // Or rely on state.adicionalMAX which should be set in salesFlow.
-
-    if (state.isContraReembolsoMAX && state.adicionalMAX) {
-        serviceFee = state.adicionalMAX;
-    } else if (!state.isContraReembolsoMAX && state.selectedPlan === '60' && !state.cart?.length) {
-        // Fallback if flag missing but it is a simple 60 day order (usually implies max)
-        // But let's trust state first. If state.adicionalMAX is undefined, we might check total.
-        // Let's assume salesFlow sets it correctly. 
-        // If total > 40000 and plan 60... hard to guess without config. 
-        // Let's stick to state.adicionalMAX if present.
-        if (state.adicionalMAX) serviceFee = state.adicionalMAX;
-    }
-
-    productVal = totalInt - serviceFee;
-
-    const productValStr = productVal.toLocaleString('es-AR').replace(/,/g, '.');
-    const serviceFeeStr = serviceFee.toLocaleString('es-AR').replace(/,/g, '.');
-
-    let breakdown = `Valor del producto: $${productValStr}\n`;
-    if (serviceFee > 0) {
-        breakdown += `Servicio de pago en destino: $${serviceFeeStr}\n`;
-    }
-    // If 120 days, service is usually free, we can optionally explicitly say "$0" or just hide it.
-    // User requested: "en el total pon el valor del producto + lo que paga por el servicio max + el total"
 
     // Política mayo 2026: la entrega va 4-6 días hábiles desde la confirmación del
     // pago (MP completo o seña). 7-10 días era del modelo viejo de COD sin pago.
@@ -161,12 +127,12 @@ function buildConfirmationMessage(state: any): string {
         ? `📅 Envío programado: ${state.postdatado}\n`
         : `✔ Entrega estimada: 4 a 6 días hábiles desde la confirmación del pago\n`;
 
-    // MercadoPago — pago ya acreditado, sin aviso de costo de rechazo
+    // MercadoPago — pago ya acreditado.
     if (state.paymentMethod === 'mercadopago') {
         return `📦 CONFIRMACIÓN DE ENVÍO\n\n` +
             `Producto: ${productStr}\n` +
             `Plan: ${planStr}\n` +
-            breakdown +
+            `Total: $${totalPriceStr}\n\n` +
             `✅ Pago recibido via MercadoPago\n\n` +
             `✔ Correo Argentino\n` + postdatadoLine +
             `Importante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs para retirar.\n\n` +
@@ -176,8 +142,7 @@ function buildConfirmationMessage(state: any): string {
     const costoLog = _getCostoLogistico();
     const isSucursal = state.pendingOrder?.calle?.toLowerCase() === 'a sucursal';
 
-    // Política mayo 2026: COD ahora se cobra con seña $10k via MP + saldo al cartero.
-    // Si senaPaid → confirmación con breakdown de seña.
+    // Contra reembolso con seña pagada — única vía COD válida (política mayo 2026).
     if (state.paymentMethod === 'contrarembolso' && state.senaPaid && state.senaAmount) {
         const senaFmt = state.senaAmount.toLocaleString('es-AR').replace(/,/g, '.');
         const remainder = Math.max(0, totalInt - state.senaAmount);
@@ -197,23 +162,30 @@ function buildConfirmationMessage(state: any): string {
             `👉 ¿Me confirmás que podés retirar en sucursal dentro de las 72 hs si fuera necesario?`;
     }
 
-    // Caso legacy/edge: paymentMethod='contrarembolso' SIN seña (no debería ocurrir
-    // en el flujo nuevo, pero queda como fallback defensivo).
-    const deliveryNote = isSucursal
-        ? `✔ Retiro en sucursal de Correo Argentino\n` + postdatadoLine + `✔ Pago en efectivo al retirar\n\n` +
-          `Importante:\nEl paquete permanece en sucursal 72 hs.\nEl no retiro genera un costo logístico de $${costoLog}.\n\n` +
-          `👉 ¿Me confirmás que podés retirarlo en sucursal dentro de las 72 hs?`
-        : `✔ Correo Argentino\n` + postdatadoLine + `✔ Pago en efectivo al recibir\n\n` +
-          `Importante:\nSi el cartero no encuentra a nadie,\nel correo puede solicitar retiro en sucursal.\nPlazo: 72 hs.\n\n` +
-          `El rechazo o no retiro genera un costo logístico de $${costoLog}.\n\n` +
-          `👉 El envío va a tu domicilio, pero necesito que me confirmes que en caso de que el correo lo determine, podrás retirarlo en la sucursal dentro de las 72 hs.`;
+    // Transferencia — sin breakdown adicional, total ya acreditado al confirmar.
+    if (state.paymentMethod === 'transferencia') {
+        return `📦 CONFIRMACIÓN DE ENVÍO\n\n` +
+            `Producto: ${productStr}\n` +
+            `Plan: ${planStr}\n` +
+            `Total: $${totalPriceStr}\n\n` +
+            `✅ Pago recibido via Transferencia\n\n` +
+            `✔ Correo Argentino\n` + postdatadoLine +
+            `Importante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs para retirar.\n\n` +
+            `👉 ¿Me confirmás que podés retirarlo en sucursal dentro de las 72 hs si fuera necesario?`;
+    }
+
+    // No debería ocurrir bajo la política mayo 2026: COD requiere seña paga,
+    // y el resto de los métodos están cubiertos arriba. Logueamos para visibilidad
+    // y devolvemos un mensaje genérico válido.
+    logger.warn(`[CONFIRMATION] paymentMethod inesperado en buildConfirmationMessage: "${state.paymentMethod}" (senaPaid=${state.senaPaid}, senaAmount=${state.senaAmount}) — usando fallback`);
 
     return `📦 CONFIRMACIÓN DE ENVÍO\n\n` +
         `Producto: ${productStr}\n` +
         `Plan: ${planStr}\n` +
-        breakdown +
-        `Total a pagar al recibir:\n$${totalPriceStr}\n\n` +
-        deliveryNote;
+        `Total: $${totalPriceStr}\n\n` +
+        `✔ Correo Argentino\n` + postdatadoLine +
+        `Importante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs.\n\n` +
+        `👉 ¿Me confirmás que podés retirarlo en sucursal dentro de las 72 hs si fuera necesario?`;
 }
 
 export {

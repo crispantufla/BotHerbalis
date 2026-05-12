@@ -540,7 +540,8 @@ module.exports = (clientPool) => {
                         'Cápsulas': { '60': '46.900', '120': '66.900' },
                         'Semillas': { '60': '36.900', '120': '49.900' },
                         'Gotas': { '60': '48.900', '120': '68.900' },
-                        'adicionalMAX': '6.000',
+                        // Política mayo 2026: adicional eliminado.
+                        'adicionalMAX': '0',
                         'costoLogistico': '18.000'
                     });
                 } else {

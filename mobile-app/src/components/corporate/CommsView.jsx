@@ -120,7 +120,7 @@ const CommsView = ({ initialChatId, onChatSelected, initialSearch = '', alerts =
                 .replace(/{{PRICE_SEMILLAS_120}}/g, p['Semillas']?.['120'] || '49.900')
                 .replace(/{{PRICE_GOTAS_60}}/g, p['Gotas']?.['60'] || '48.900')
                 .replace(/{{PRICE_GOTAS_120}}/g, p['Gotas']?.['120'] || '68.900')
-                .replace(/{{ADICIONAL_MAX}}/g, p.adicionalMAX || '6.000')
+                .replace(/{{ADICIONAL_MAX}}/g, p.adicionalMAX || '0')
                 .replace(/{{COSTO_LOGISTICO}}/g, p.costoLogistico || '18.000');
         }
         // Resolve order-specific placeholders from the user's sales state

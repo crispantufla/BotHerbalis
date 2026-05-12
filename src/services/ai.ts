@@ -61,9 +61,9 @@ const RULE_BASE = [
     { id: 'tracking', keywords: ['tracking', 'seguimiento', 'codigo', 'donde esta mi pedido'], text: 'TRACKING: Sí, damos código de seguimiento y avisamos cuando el pedido llega al correo de su zona.' },
     { id: 'anmat', keywords: ['anmat', 'registro', 'aprobado por', 'ministerio de salud'], text: 'ANMAT: El producto no requiere aprobación de ANMAT, es un fruto natural. Trabajamos hace más de 13 años con más de 70 mil clientes.' },
     { id: 'discreto', keywords: ['discreto', 'paquete', 'envuelto', 'que dice la caja', 'se ve que es'], text: 'PAQUETE DISCRETO: Sí, el envío es totalmente discreto, sin marcas ni indicación del contenido.' },
-    { id: 'medios_pago', keywords: ['qr', 'mercadopago', 'mercadolibre', 'transferencia', 'debito', 'credito', 'cbu', 'alias', 'tarjeta'], text: 'MEDIOS DE PAGO ALTERNATIVOS: Si preguntan por tarjeta, débito, crédito, QR, MercadoPago, transferencia o CBU: ¡SÍ ACEPTAMOS! Explicá que tenemos 3 opciones: 1) Contra reembolso (efectivo al recibir), 2) MercadoPago (tarjeta, débito o app — se paga ahora online, llega más rápido en 4-6 días), 3) Transferencia bancaria. Empujá MercadoPago como primera opción porque es más rápido y cómodo.' },
+    { id: 'medios_pago', keywords: ['qr', 'mercadopago', 'mercadolibre', 'transferencia', 'debito', 'credito', 'cbu', 'alias', 'tarjeta'], text: 'MEDIOS DE PAGO (POLÍTICA MAYO 2026): Por defecto SOLO se ofrece el link de Mercado Pago — cubre tarjeta de crédito (en cuotas), débito, saldo MP y efectivo en Pago Fácil/Rapipago. Si el cliente pregunta por transferencia: existe (alias CHILE.TEXTO.CASINO) pero solo se la ofrecés si lo pide explícitamente. Si pide contra reembolso: requiere seña de $10.000 por MP (cubre envío) + saldo en efectivo al cartero. NO ofrezcas las 3 opciones — empujá Mercado Pago como única opción salvo que el cliente pida otra.' },
     { id: 'sucursal', keywords: ['retirar en sucursal', 'buscar en correo', 'ir al correo', 'sucursal correo'], text: 'RETIRO EN SUCURSAL: Si preguntan si pueden retirar en persona o en sucursal: "¡Sí! Podés retirar en la sucursal del Correo Argentino. Decime cuál te queda cómoda o lo enviamos a la de tu código postal". En este caso, anotá como domicilio "Retiro en sucursal".' },
-    { id: 'repetido', keywords: ['ya compre', 'volvi a escribir', 'soy cliente', 'otra vez'], text: 'CLIENTE REPETIDO: Si dicen que ya compraron antes, son clientes anteriores o quieren volver a comprar: NO pagan el adicional por contra reembolso. Decíselo como beneficio.' },
+    { id: 'repetido', keywords: ['ya compre', 'volvi a escribir', 'soy cliente', 'otra vez'], text: 'CLIENTE REPETIDO: Si dicen que ya compraron antes o quieren volver a comprar: reconocé que ya son parte de Herbalis y avanzá rápido con la elección de producto y plan. Mismo flujo de pago que cualquier cliente (MP por defecto).' },
     { id: 'muestra', keywords: ['muestra gratis', 'probar', 'regalan'], text: 'MUESTRAS GRATIS: No hay muestras gratis. Recordales que llevamos más de 13 años distribuyendo con más de 70 mil clientes satisfechos.' },
     { id: 'amamantando', keywords: ['amamantando', 'dando la teta', 'lactancia', 'bebe', 'amamantar'], text: 'AMAMANTANDO ESTRICTO: Si la persona está amamantando, NO vendemos. Sin importar la edad del bebé (ni aunque tenga 2 o 3 años). Priorizamos la salud del bebé.' },
     { id: 'pocos_kilos', keywords: ['pocos kilos', 'bajar 2', 'bajar 3', 'bajar 4', 'bajar 5', 'un par de kilos'], text: 'BAJAR POCOS KILOS: Si quieren bajar pocos kilos (3, 5, etc.), SIEMPRE recomendá CÁPSULAS como primera opción. NUNCA recomiendes gotas para poco peso. Cápsulas son lo más efectivo y práctico.' },
@@ -204,7 +204,8 @@ async function _getPrices(): Promise<Record<string, any>> {
         'Cápsulas': { '60': '46.900', '120': '66.900' },
         'Semillas': { '60': '36.900', '120': '49.900' },
         'Gotas': { '60': '48.900', '120': '68.900' },
-        'adicionalMAX': '6.000',
+        // Política mayo 2026: adicional eliminado.
+        'adicionalMAX': '0',
         'costoLogistico': '18.000'
     };
     try {
