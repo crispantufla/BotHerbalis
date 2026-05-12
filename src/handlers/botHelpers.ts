@@ -134,6 +134,7 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
                 tracking: null,
                 postdated: order.postdatado || null,
                 nombre: order.nombre || null,
+                email: order.email || null,
                 calle: order.calle || null,
                 calleOriginal: order.calleOriginal || null,
                 ciudad: order.ciudad || null,

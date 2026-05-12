@@ -124,6 +124,15 @@ export interface UserState {
     mpPaymentLinkId?: string | null;  // ID del registro PaymentLink en DB
     mpPaymentLinkUrl?: string | null; // URL init_point enviada al cliente
 
+    // Email opcional. Se solicita al entrar al flujo MP (también seña vía MP)
+    // para pre-llenarlo en el checkout y que Mercado Pago mande comprobante.
+    // Si el cliente no lo da, queda vacío y seguimos sin email.
+    //   undefined  → todavía no preguntamos
+    //   ''         → preguntamos y el cliente lo omitió
+    //   'foo@bar'  → cliente lo proporcionó
+    email?: string;
+    emailAskedAt?: number;
+
     // Seña por Mercado Pago para pago al recibir (política mayo 2026).
     // Si está seteado, el link MP que se genera es por este monto (no por totalPrice).
     // El saldo (totalPrice - senaAmount) lo cobra el cartero en efectivo.

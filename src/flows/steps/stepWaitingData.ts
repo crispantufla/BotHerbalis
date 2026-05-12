@@ -279,12 +279,28 @@ async function _handleAiFallback(
 }
 
 // --- Helper: Process parsed address data (hard-pause, intersection, missing number, merge fields) ---
+// Captura silenciosa de email: si el cliente lo mete en el mismo mensaje que
+// los datos de envío, lo guardamos para usarlo más adelante en el flujo MP y
+// no volver a preguntárselo.
+const _DATA_EMAIL_RE = /([A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,})/;
+
 async function _processAddressData(
     userId: string, text: string, textToAnalyze: string, data: any,
     currentState: UserState, dependencies: any
 ): Promise<{ madeProgress: boolean; earlyReturn: { matched: boolean } | null }> {
     const { sendMessageWithDelay, saveState } = dependencies;
     let madeProgress = false;
+
+    // Captura silenciosa de email — si el cliente lo dejó caer mientras nos
+    // pasaba sus datos, lo guardamos. En stepWaitingMpPayment se usa para
+    // pre-llenar el formulario de MP y mandar el comprobante.
+    if (!currentState.email) {
+        const emailInText = textToAnalyze.match(_DATA_EMAIL_RE);
+        if (emailInText) {
+            currentState.email = emailInText[1].toLowerCase();
+            logger.info(`[ADDRESS] Email capturado silenciosamente para ${userId}: ${currentState.email}`);
+        }
+    }
 
     // Hard-pause conditions
     if (data && data.cp === 'UNKNOWN') {

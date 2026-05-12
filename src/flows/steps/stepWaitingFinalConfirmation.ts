@@ -69,6 +69,7 @@ export async function handleWaitingFinalConfirmation(
         return {
             cliente: phone, nombre: o.nombre, calle: o.calle, ciudad: o.ciudad, cp: o.cp, provincia: o.provincia,
             calleOriginal: o.calleOriginal || null,
+            email: currentState.email || null,
             producto: cart.map(i => i.product).join(' + ') || currentState.selectedProduct || '',
             plan: cart.map(i => `${i.plan} días`).join(' + ') || `${currentState.selectedPlan || '60'} días`,
             precio: currentState.totalPrice || '0',

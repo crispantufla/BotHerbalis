@@ -146,6 +146,11 @@ function makeMpState(overrides = {}) {
         partialAddress: {},
         summary: '',
         stepEnteredAt: Date.now(),
+        // Por defecto los tests "saltean" el subflow de email para probar la
+        // generación del link directamente. Tests específicos del subflow setean
+        // email=undefined + emailAskedAt=undefined explícitamente.
+        email: '',
+        emailAskedAt: Date.now(),
         ...overrides,
     };
 }
@@ -166,6 +171,8 @@ function makeSenaState(overrides = {}) {
         partialAddress: {},
         summary: '',
         stepEnteredAt: Date.now(),
+        email: '',
+        emailAskedAt: Date.now(),
         ...overrides,
     };
 }
@@ -409,6 +416,57 @@ describe('stepWaitingMpPayment — link de SEÑA $10.000', () => {
         const arg = mockPaymentLinkCreate.mock.calls[0][0].data;
         expect(arg.source).toBe('bot_flow_sena');
         expect(arg.amount).toBe(10000);
+    });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// BLOQUE 6b: Subflow de email antes de generar el link MP
+// ════════════════════════════════════════════════════════════════════════════
+describe('stepWaitingMpPayment — subflow email', () => {
+
+    test('[6b.1] Entry sin email → pregunta y NO genera link todavía', async () => {
+        const state = makeMpState({ email: undefined, emailAskedAt: undefined });
+        await handleWaitingMpPayment('em1', 'hola', 'hola', state, knowledge, deps);
+        // No se llamó a MP — todavía estamos en el ask del email
+        expect(mockPreferenceCreate).not.toHaveBeenCalled();
+        expect(state.emailAskedAt).toBeTruthy();
+        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
+        expect(sent).toMatch(/email/i);
+        expect(sent).toMatch(/sin email/i);
+    });
+
+    test('[6b.2] Cliente responde con email válido → se guarda y genera link con payer.email', async () => {
+        const state = makeMpState({ email: undefined, emailAskedAt: Date.now() });
+        await handleWaitingMpPayment('em2', 'mi mail es Juan.Perez@gmail.com', 'mi mail es juan.perez@gmail.com', state, knowledge, deps);
+        expect(state.email).toBe('juan.perez@gmail.com');
+        expect(mockPreferenceCreate).toHaveBeenCalledTimes(1);
+        const call = mockPreferenceCreate.mock.calls[0][0];
+        expect(call.body.payer).toEqual({ email: 'juan.perez@gmail.com' });
+    });
+
+    test('[6b.3] Cliente dice "sin email" → genera link sin payer.email', async () => {
+        const state = makeMpState({ email: undefined, emailAskedAt: Date.now() });
+        await handleWaitingMpPayment('em3', 'sin email', 'sin email', state, knowledge, deps);
+        expect(state.email).toBe('');  // marcado como skipped
+        expect(mockPreferenceCreate).toHaveBeenCalledTimes(1);
+        const call = mockPreferenceCreate.mock.calls[0][0];
+        expect(call.body.payer).toBeUndefined();
+    });
+
+    test('[6b.4] Cliente responde con texto random → omite email y genera link', async () => {
+        const state = makeMpState({ email: undefined, emailAskedAt: Date.now() });
+        await handleWaitingMpPayment('em4', 'ok dale', 'ok dale', state, knowledge, deps);
+        expect(state.email).toBe('');
+        expect(mockPreferenceCreate).toHaveBeenCalledTimes(1);
+    });
+
+    test('[6b.5] Flujo seña también pregunta email', async () => {
+        const state = makeSenaState({ email: undefined, emailAskedAt: undefined });
+        await handleWaitingMpPayment('em5', 'hola', 'hola', state, knowledge, deps);
+        expect(mockPreferenceCreate).not.toHaveBeenCalled();
+        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
+        expect(sent).toMatch(/seña/i);
+        expect(sent).toMatch(/email/i);
     });
 });
 

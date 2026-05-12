@@ -6,6 +6,11 @@ import { randomUUID } from 'crypto';
 import logger from '../../utils/logger';
 
 const PAID_KEYWORDS = /\b(listo|pague|pagu[eé]|pago hecho|hice el pago|ya pague|ya pagu[eé]|realice|realic[eé]|confirmo|listo el pago|pago listo|lo hice|hecho|ok listo)\b/i;
+// Regex permisivo para extraer email — válido en mayoría de proveedores comunes.
+// Aceptamos espacios alrededor; en la práctica los clientes pegan el email así.
+const EMAIL_RE = /([A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,})/;
+// Palabras con las que el cliente puede explícitamente saltear el email.
+const SKIP_EMAIL_RE = /\b(no tengo|no s[eé]|no recuerdo|no me acuerdo|sin (mail|email|correo)|sin\s*$|omiti[r]?|salt[ea]r?|skip|despu[eé]s|mas tarde|m[aá]s tarde|no quiero|paso|no\.?)\b/i;
 // Numeración del menú actual (1=MP, 2=Transferencia, 3=Contra reembolso).
 // Quitamos "segund[oa]|segunda" porque aparecen en direcciones (calles tipo
 // "Segunda Junta", "entre segundo sombra y corbalán"). El "2" suelto solo se
@@ -34,8 +39,11 @@ export async function handleWaitingMpPayment(
 ): Promise<{ matched: boolean }> {
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
 
-    // ── ENTRY: Sin link todavía — generar y enviar ─────────────────────────────
+    // ── ENTRY: Sin link todavía — pedir email primero (opcional) y generar ────
     if (!currentState.mpPaymentLinkUrl) {
+        const emailSubflow = await _handleEmailSubflow(userId, text, currentState, dependencies);
+        if (emailSubflow === 'asked') return { matched: true };  // esperamos respuesta del cliente
+        // emailSubflow === 'ready' (capturamos o salteamos) → seguimos a generar el link
         await _generateAndSendLink(userId, currentState, knowledge, dependencies);
         return { matched: true };
     }
@@ -216,6 +224,61 @@ export async function handleWaitingMpPayment(
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
+/**
+ * Pide el email al cliente UNA VEZ al entrar al flujo MP. Si lo provee, lo
+ * guarda en state.email. Si no lo recuerda o lo omite, queda en '' (string
+ * vacío = "preguntamos y el cliente eligió omitir") y seguimos sin email.
+ *
+ * Returns:
+ *   'asked' → acabamos de mandar el pedido, hay que esperar la respuesta.
+ *   'ready' → ya tenemos email (o el cliente lo omitió) — listo para generar link.
+ */
+async function _handleEmailSubflow(
+    userId: string,
+    text: string,
+    currentState: UserState,
+    dependencies: any
+): Promise<'asked' | 'ready'> {
+    const { sendMessageWithDelay, saveState } = dependencies;
+
+    // Ya tenemos un email (capturado antes en waiting_data o en una llamada previa).
+    if (typeof currentState.email === 'string' && currentState.email.length > 0) {
+        return 'ready';
+    }
+    // Ya preguntamos y el cliente eligió omitir.
+    if (currentState.email === '') {
+        return 'ready';
+    }
+
+    // Si todavía no preguntamos → preguntar.
+    if (!currentState.emailAskedAt) {
+        const isSenaFlow = !!(currentState.senaAmount && currentState.senaAmount > 0);
+        const askMsg = isSenaFlow
+            ? `Antes de generarte el link de la seña, ¿me pasás tu *email*? 📧\n\nAsí Mercado Pago te manda el comprobante y te pre-llena el formulario. Si no lo recordás o preferís omitirlo, decime *"sin email"* y seguimos igual 😊`
+            : `Antes de generarte el link, ¿me pasás tu *email*? 📧\n\nAsí Mercado Pago te manda el comprobante y te pre-llena el formulario. Si no lo recordás o preferís omitirlo, decime *"sin email"* y seguimos igual 😊`;
+        currentState.emailAskedAt = Date.now();
+        currentState.history.push({ role: 'bot', content: askMsg, timestamp: Date.now() });
+        saveState(userId);
+        await sendMessageWithDelay(userId, askMsg);
+        return 'asked';
+    }
+
+    // Ya preguntamos en una corrida previa, este mensaje es la respuesta del cliente.
+    const emailMatch = text.match(EMAIL_RE);
+    if (emailMatch) {
+        currentState.email = emailMatch[1].toLowerCase();
+        logger.info(`[MP_PAYMENT] Email capturado para ${userId}: ${currentState.email}`);
+    } else {
+        // Cualquier otra respuesta (skip explícito o mensaje no relacionado) → omitimos.
+        // Política mayo 2026: "si no lo saben, no pasa nada lo omitimos".
+        currentState.email = '';
+        const wasExplicitSkip = SKIP_EMAIL_RE.test(text);
+        logger.info(`[MP_PAYMENT] Email omitido para ${userId} (${wasExplicitSkip ? 'skip explícito' : 'sin email en respuesta'})`);
+    }
+    saveState(userId);
+    return 'ready';
+}
+
 async function _generateAndSendLink(
     userId: string,
     currentState: UserState,
@@ -280,6 +343,11 @@ async function _generateAndSendLink(
             external_reference: externalRef,
         };
         if (webhookUrl) body.notification_url = webhookUrl;
+        // Pre-llenar email del pagador si lo capturamos. MP usa esto para mandar
+        // el comprobante automático + pre-llenar el formulario de checkout.
+        if (currentState.email) {
+            body.payer = { email: currentState.email };
+        }
 
         const response = await preference.create({ body });
         const link = response.init_point;
@@ -427,6 +495,7 @@ async function _finalizeOrderAndNotifyAdmin(
     const orderData = {
         cliente: phone,
         nombre: addr.nombre,
+        email: currentState.email || null,
         calle: addr.calle,
         ciudad: addr.ciudad,
         cp: addr.cp,
@@ -448,11 +517,12 @@ async function _finalizeOrderAndNotifyAdmin(
     const payLabel = isSenaFlow
         ? `\n💳 PAGO: Contra reembolso con SEÑA — $${senaFmt} pagados por MP, cartero cobra $${cashFmt} en efectivo`
         : '\n💳 PAGO: MercadoPago (ya abonado)';
+    const emailLabel = currentState.email ? `\n📧 Email: ${currentState.email}` : '';
     if (notifyAdmin) {
         await notifyAdmin(
             `⌛ Pedido Requiere Aprobación`,
             userId,
-            `Datos: ${addr.nombre}, ${addr.calle}\nCiudad: ${addr.ciudad} | CP: ${addr.cp}\nProvincia: ${addr.provincia || '?'}\nItems: ${orderData.producto}\nTotal: $${currentState.totalPrice || '0'}${postdataLabel}${payLabel}`
+            `Datos: ${addr.nombre}, ${addr.calle}\nCiudad: ${addr.ciudad} | CP: ${addr.cp}\nProvincia: ${addr.provincia || '?'}${emailLabel}\nItems: ${orderData.producto}\nTotal: $${currentState.totalPrice || '0'}${postdataLabel}${payLabel}`
         );
     }
 
