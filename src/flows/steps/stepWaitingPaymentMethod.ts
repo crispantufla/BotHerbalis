@@ -1,7 +1,8 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _setStep, _pauseAndAlert } from '../utils/flowHelpers';
-import { buildCashRetryMessage } from '../../utils/messageTemplates';
+import { buildCashRetryMessage, getFlowTemplate } from '../../utils/messageTemplates';
 import { calculateTotal } from '../utils/cartHelpers';
+import { _formatMessage } from '../utils/messages';
 import logger from '../../utils/logger';
 
 // Payment method matchers. Los dígitos sueltos (1, 2, 3) y números escritos
@@ -87,7 +88,9 @@ export async function handleWaitingPaymentMethod(
     // ── Opción 2: Transferencia ────────────────────────────────────────────────
     if (isOptionTransfer || TRANSFER_KEYWORDS.test(normalizedText)) {
         currentState.paymentMethod = 'transferencia';
-        const msg = `¡Perfecto! Para transferir usá el alias *ERRONEA.HABLAME.LUZ* a nombre de *Bio Origen SAS* 🏦\n\nMonto: $${currentState.totalPrice || '0'}\n\nUna vez que realices la transferencia, escribime *"listo"* y coordinamos el envío 😊`;
+        const tpl = getFlowTemplate('payment_transfer_alias', knowledge) ||
+            `¡Perfecto! Para transferir usá el alias *{{ALIAS}}* a nombre de *{{TITULAR}}* 🏦\n\nMonto: ${'$'}{{TOTAL}}\n\nUna vez que realices la transferencia, escribime *"listo"* y coordinamos el envío 😊`;
+        const msg = _formatMessage(tpl, currentState);
         _setStep(currentState, FlowStep.WAITING_TRANSFER_CONFIRMATION);
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);
@@ -103,7 +106,7 @@ export async function handleWaitingPaymentMethod(
     if (isOptionCash || CASH_KEYWORDS.test(normalizedText) || isConfirmingCashRetry) {
         if (!currentState.cashRetryShown) {
             currentState.cashRetryShown = true;
-            const retryMsg = buildCashRetryMessage(currentState);
+            const retryMsg = buildCashRetryMessage(currentState, knowledge);
             currentState.history.push({ role: 'bot', content: retryMsg, timestamp: Date.now() });
             saveState(userId);
             await sendMessageWithDelay(userId, retryMsg);
@@ -114,10 +117,9 @@ export async function handleWaitingPaymentMethod(
         currentState.paymentMethod = 'contrarembolso';
         currentState.senaAmount = 10000;
         currentState.senaPaid = false;
-        const totalInt = parseInt(String(currentState.totalPrice || '0').replace(/\./g, ''), 10) || 0;
-        const remainder = Math.max(0, totalInt - 10000);
-        const remainderFmt = remainder.toLocaleString('es-AR').replace(/,/g, '.');
-        const msg = `¡Perfecto! Para el *anticipo de $10.000* usá el alias *ERRONEA.HABLAME.LUZ* a nombre de *Bio Origen SAS* 🏦\n\nUna vez que realices el anticipo, escribime *"listo"* y despachamos. Cuando te llegue el paquete, pagás el saldo *$${remainderFmt}* en efectivo al cartero 📦`;
+        const tpl = getFlowTemplate('payment_cod_anticipo', knowledge) ||
+            `¡Perfecto! Para el *anticipo de $10.000* usá el alias *{{ALIAS}}* a nombre de *{{TITULAR}}* 🏦\n\nUna vez que realices el anticipo, escribime *"listo"* y despachamos. Cuando te llegue el paquete, pagás el saldo *${'$'}{{SALDO}}* en efectivo al cartero 📦`;
+        const msg = _formatMessage(tpl, currentState);
         _setStep(currentState, FlowStep.WAITING_TRANSFER_CONFIRMATION);
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);

@@ -110,6 +110,93 @@
             "_note": "El método de pago se inyecta dinámicamente desde el flow (no hardcodear EFECTIVO). Tiempos de envío 4-6 días hábiles desde la confirmación del pago (MP es el default).",
             "response": "📦 Te confirmo todo:\n\nProducto: {{PRODUCT}}\nPlan: {{PLAN}} días\nTotal: {{TOTAL}}\n\n✔ Va por Correo Argentino\n✔ Llega entre 4 y 6 días hábiles desde que confirmamos el pago\n\nUna cosa importante: si el cartero no te encuentra, o por cualquier otra razón el correo determina que lo tenés que retirar en la sucursal, tenés 72 hs desde que te avisemos. Si no lo retirás, ahí sí tiene un costo logístico de ${{COSTO_LOGISTICO}}.\n\n¿Me asegurás que vas a poder retirarlo dentro de las 72 hs si llegara a quedar en sucursal? 😊",
             "nextStep": "completed"
+        },
+        "prices": {
+            "step": "waiting_ok",
+            "_note": "TEXTO 3 — Tras la recomendación, cliente dijo 'sí, pasame los precios'. Mostramos los 2 planes del producto seleccionado y pedimos elección. Disparado desde stepWaitingOk._buildPricesMessage. Placeholders: {{PRICE_60}}, {{PRICE_120}} se sustituyen con _getPrice(producto, plan).",
+            "response": "💰 *Plan 2 meses: ${{PRICE_60}}*\n💰 *Plan 4 meses: ${{PRICE_120}}* — el más conveniente; muchas clientas, al llegar al peso, lo usan 1-2 veces por semana como mantenimiento.\n\n¿Qué plan preferís? 😊",
+            "nextStep": "waiting_plan_choice"
+        },
+        "payment_menu": {
+            "step": "waiting_payment_method",
+            "_note": "TEXTO 4 — Menú con las 3 opciones espontáneas de pago. Disparado por buildPaymentMessage.",
+            "response": "¡Perfecto! ¿Cómo preferís realizar el pago? 💳\n\n1️⃣ *Tarjeta de crédito o débito* — te paso el link de Mercado Pago\n2️⃣ *Transferencia bancaria* — te paso el alias\n3️⃣ *Contra reembolso* — anticipo de $10.000 y el resto al recibir\n\n¿Cuál te queda más cómoda?",
+            "nextStep": "waiting_payment_method"
+        },
+        "payment_transfer_alias": {
+            "step": "waiting_transfer_confirmation",
+            "_note": "TEXTO 5b — Cliente eligió transferencia bancaria. Le pasamos alias + titular + monto total. Placeholders: {{ALIAS}}, {{TITULAR}}, {{TOTAL}}.",
+            "response": "¡Perfecto! Para transferir usá el alias *{{ALIAS}}* a nombre de *{{TITULAR}}* 🏦\n\nMonto: ${{TOTAL}}\n\nUna vez que realices la transferencia, escribime *\"listo\"* y coordinamos el envío 😊",
+            "nextStep": "waiting_transfer_confirmation"
+        },
+        "payment_cod_retry": {
+            "step": "waiting_payment_method",
+            "_note": "TEXTO 5c — Primera vez que el cliente elige 'contra reembolso'. Explica la modalidad antes de pedir confirmación. NO promociona como 'lo más cómodo'. Disparado por buildCashRetryMessage.",
+            "response": "Dale, podemos coordinar pago al recibir 👍\n\nLa modalidad es: adelantás un *anticipo de $10.000* por transferencia (alias *{{ALIAS}}*, a nombre de *{{TITULAR}}* — cubre el envío), y el resto lo pagás en *efectivo al cartero* cuando llega el paquete.\n\nEs una decisión interna por la cantidad de paquetes que vuelven sin retirar — aplica a todos los pedidos. Es exactamente la misma plata, solo cambia el momento.\n\n¿Te queda cómodo así o preferís el link de Mercado Pago por el total?",
+            "nextStep": "waiting_payment_method"
+        },
+        "payment_cod_anticipo": {
+            "step": "waiting_transfer_confirmation",
+            "_note": "TEXTO 5d — Cliente confirmó la modalidad COD ('si' tras retry). Le pasamos alias para el anticipo + recordamos el saldo en efectivo. Placeholders: {{ALIAS}}, {{TITULAR}}, {{SALDO}} (totalPrice - 10000).",
+            "response": "¡Perfecto! Para el *anticipo de $10.000* usá el alias *{{ALIAS}}* a nombre de *{{TITULAR}}* 🏦\n\nUna vez que realices el anticipo, escribime *\"listo\"* y despachamos. Cuando te llegue el paquete, pagás el saldo *${{SALDO}}* en efectivo al cartero 📦",
+            "nextStep": "waiting_transfer_confirmation"
+        },
+        "payment_mp_link": {
+            "step": "waiting_mp_payment",
+            "_note": "TEXTO 5a — Cliente eligió Mercado Pago. Le mandamos el link + detalle del pedido + pedido de datos en paralelo. Placeholders: {{PRODUCT}}, {{PLAN}}, {{TOTAL}}, {{LINK}}.",
+            "response": "💳 *Pago online via MercadoPago*\n\nPedido: *{{PRODUCT}}* — Plan {{PLAN}} días\nTotal: *${{TOTAL}}*\n\n👇 Hacé clic para pagar de forma segura:\n{{LINK}}\n\nPodés pagar con tarjeta de crédito, débito o saldo MP.\n\n✅ Cuando termines el pago, escribime *\"listo\"* y verifico que ingresó.\n\nMientras tanto, pasame los datos de envío para tener todo listo 👇\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nProvincia:",
+            "nextStep": "waiting_mp_payment"
+        },
+        "payment_mp_link_sena": {
+            "step": "waiting_mp_payment",
+            "_note": "Variante LEGACY del link MP cuando hay senaAmount > 0 (path desactivado en el flujo principal — COD ahora va por transferencia al alias). Se mantiene por compatibilidad con state construido manualmente o flujos viejos. Placeholders: {{PRODUCT}}, {{PLAN}}, {{TOTAL}}, {{SENA_AMOUNT}}, {{SENA_REMAINDER}}, {{LINK}}.",
+            "response": "💳 *Seña por Mercado Pago*\n\nPedido: *{{PRODUCT}}* — Plan {{PLAN}} días\nTotal del pedido: *${{TOTAL}}*\nSeña por Mercado Pago: *${{SENA_AMOUNT}}*\nSaldo al cartero (efectivo): *${{SENA_REMAINDER}}*\n\n👇 Pagá la seña acá:\n{{LINK}}\n\nPodés usar tarjeta de crédito, débito o saldo MP.\n\n✅ Cuando termines, escribime *\"listo\"* y verifico el pago.\n\nMientras tanto, pasame los datos de envío 👇\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nProvincia:",
+            "nextStep": "waiting_mp_payment"
+        },
+        "payment_mp_failed": {
+            "step": "waiting_mp_payment",
+            "_note": "Mensaje al cliente cuando fallaron 2 intentos consecutivos de generar el link MP. Se pausa al cliente y se notifica admin (con e.message en el alert).",
+            "response": "Tuve un problema técnico generando el link de pago 😕\n\nEn un momento te contacta un asesor para resolverlo. Disculpá la molestia 🙏"
+        },
+        "payment_mp_retry": {
+            "step": "waiting_mp_payment",
+            "_note": "Mensaje cuando MP devuelve el pago como rejected/error tras un intento del cliente. Se ofrece reintento con otras formas dentro de MP.",
+            "response": "⚠️ Hubo un problema con el pago de MercadoPago — pudo ser la tarjeta o un rechazo del banco.\n\nProbá de nuevo con otra forma:\n✅ Tarjeta de crédito\n✅ Débito\n✅ Saldo Mercado Pago\n\nTe genero un nuevo link para volver a intentarlo, decime cuando esté listo 😊"
+        },
+        "payment_mp_retry_sena": {
+            "step": "waiting_mp_payment",
+            "_note": "Variante del retry MP cuando el flujo era seña (legacy). Mismo texto que payment_mp_retry pero menciona 'pago de la seña'.",
+            "response": "⚠️ Hubo un problema con el pago de la seña — pudo ser la tarjeta o un rechazo del banco.\n\nProbá de nuevo con otra forma:\n✅ Tarjeta de crédito\n✅ Débito\n✅ Saldo Mercado Pago\n\nTe genero un nuevo link para volver a intentarlo, decime cuando esté listo 😊"
+        },
+        "transfer_received": {
+            "step": "waiting_transfer_confirmation",
+            "_note": "Cliente confirmó que ya hizo la transferencia ('listo'). Pausamos al cliente y avisamos admin para verificar el comprobante.",
+            "response": "¡Perfecto! Recibimos tu aviso. Verificamos la transferencia y te confirmamos el envío en breve ⏳"
+        },
+        "cod_received": {
+            "step": "waiting_transfer_confirmation",
+            "_note": "Cliente confirmó que ya hizo el anticipo COD ($10k al alias). Pausamos y avisamos admin. Aclara que el saldo lo paga al cartero.",
+            "response": "¡Perfecto! Recibimos tu aviso del anticipo. Verificamos la transferencia y te confirmamos el envío en breve. El saldo lo pagás en efectivo al cartero cuando llega 📦"
+        },
+        "order_confirmation_mp": {
+            "step": "waiting_admin_validation",
+            "_note": "Confirmación de pedido enviada tras pago completo por MP. Placeholders: {{PRODUCT_DETAIL}} (cart.map producto), {{PLAN_DETAIL}}, {{TOTAL}}, {{POSTDATADO_LINE}} (línea condicional: 'Envío programado: X' vs 'Entrega estimada: 4-6 días').",
+            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✅ Pago recibido via MercadoPago\n\n✔ Correo Argentino\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs para retirar.\n\n👉 ¿Me confirmás que podés retirarlo en sucursal dentro de las 72 hs si fuera necesario?"
+        },
+        "order_confirmation_transfer": {
+            "step": "waiting_admin_validation",
+            "_note": "Confirmación de pedido tras pago por transferencia bancaria. Mismas variables que MP — el total ya está acreditado al confirmar.",
+            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✅ Pago recibido via Transferencia\n\n✔ Correo Argentino\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs para retirar.\n\n👉 ¿Me confirmás que podés retirarlo en sucursal dentro de las 72 hs si fuera necesario?"
+        },
+        "order_confirmation_cod": {
+            "step": "waiting_admin_validation",
+            "_note": "Confirmación de pedido tras seña pagada (modalidad contra reembolso). Placeholders extra: {{SENA_AMOUNT_FMT}} (la seña recibida formateada), {{CARTO_LINE}} (línea distinta si es retiro en sucursal vs entrega a domicilio: incluye saldo).",
+            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✅ Seña recibida via MercadoPago: ${{SENA_AMOUNT_FMT}}\n{{CARTO_LINE}}\n\n✔ Correo Argentino\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs.\nEl no retiro genera un costo logístico de ${{COSTO_LOGISTICO}}.\n\n👉 ¿Me confirmás que podés retirar en sucursal dentro de las 72 hs si fuera necesario?"
+        },
+        "order_confirmation_fallback": {
+            "step": "waiting_admin_validation",
+            "_note": "Fallback de confirmación si el paymentMethod del state no matchea con ninguno de los conocidos. Logueamos warn en código.",
+            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✔ Correo Argentino\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs.\n\n👉 ¿Me confirmás que podés retirarlo en sucursal dentro de las 72 hs si fuera necesario?"
         }
     },
     "faq": [

@@ -21,9 +21,14 @@ export async function handleWaitingTransferConfirmation(
     const normalizedForPaid = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     const isCodAnticipo = currentState.paymentMethod === 'contrarembolso' && currentState.senaAmount === 10000;
     if (PAID_KEYWORDS.test(text) || PAID_KEYWORDS.test(normalizedForPaid)) {
-        const msg = isCodAnticipo
-            ? '¡Perfecto! Recibimos tu aviso del anticipo. Verificamos la transferencia y te confirmamos el envío en breve. El saldo lo pagás en efectivo al cartero cuando llega 📦'
-            : '¡Perfecto! Recibimos tu aviso. Verificamos la transferencia y te confirmamos el envío en breve ⏳';
+        const { _formatMessage: _fmt } = require('../utils/messages');
+        const { getFlowTemplate: _gft } = require('../../utils/messageTemplates');
+        const paidTpl = _gft(isCodAnticipo ? 'cod_received' : 'transfer_received', knowledge);
+        const msg = paidTpl
+            ? _fmt(paidTpl, currentState)
+            : (isCodAnticipo
+                ? '¡Perfecto! Recibimos tu aviso del anticipo. Verificamos la transferencia y te confirmamos el envío en breve. El saldo lo pagás en efectivo al cartero cuando llega 📦'
+                : '¡Perfecto! Recibimos tu aviso. Verificamos la transferencia y te confirmamos el envío en breve ⏳');
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
@@ -64,7 +69,7 @@ export async function handleWaitingTransferConfirmation(
                 calleOriginal: (addr as any).calleOriginal || addr.calle,
                 cart: currentState.cart
             };
-            const summaryMsg = buildConfirmationMessage(currentState);
+            const summaryMsg = buildConfirmationMessage(currentState, knowledge);
             _setStep(currentState, FlowStep.WAITING_FINAL_CONFIRMATION);
             currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
             saveState(userId);

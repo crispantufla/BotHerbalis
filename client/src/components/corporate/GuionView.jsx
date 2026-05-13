@@ -34,6 +34,7 @@ const SECTION_LABELS = {
     'flow.recommendation_1': 'Recomendación tier 1 (hasta 10 kg)',
     'flow.recommendation_2': 'Recomendación tier 2 (10 a 20 kg)',
     'flow.recommendation_3': 'Recomendación tier 3 (más de 20 kg)',
+    'flow.prices': 'TEXTO 3 — Precios del plan (60 vs 120)',
     'flow.preference_capsulas': 'Cliente elige cápsulas',
     'flow.preference_gotas': 'Cliente elige gotas',
     'flow.preference_semillas': 'Cliente elige semillas',
@@ -41,7 +42,22 @@ const SECTION_LABELS = {
     'flow.price_gotas': 'Precio gotas',
     'flow.price_semillas': 'Precio semillas',
     'flow.closing': 'Cierre — pide datos de envío',
-    'flow.confirmation': 'Confirmación final',
+    'flow.confirmation': 'Confirmación final (pre-pago)',
+    'flow.payment_menu': 'TEXTO 4 — Menú de pago (3 opciones)',
+    'flow.payment_transfer_alias': 'TEXTO 5b — Cliente elige Transferencia (alias)',
+    'flow.payment_cod_retry': 'TEXTO 5c — Cliente elige Contra reembolso (explica modalidad)',
+    'flow.payment_cod_anticipo': 'TEXTO 5d — Cliente confirma COD (alias para anticipo)',
+    'flow.payment_mp_link': 'TEXTO 5a — Cliente elige Mercado Pago (link)',
+    'flow.payment_mp_link_sena': 'Variante MP — link de seña (legacy)',
+    'flow.payment_mp_failed': 'Mensaje cuando MP falla 2 veces',
+    'flow.payment_mp_retry': 'Mensaje tras pago rechazado en MP',
+    'flow.payment_mp_retry_sena': 'Variante retry MP (legacy seña)',
+    'flow.transfer_received': 'Cliente avisó "listo" tras transferencia',
+    'flow.cod_received': 'Cliente avisó "listo" tras anticipo COD',
+    'flow.order_confirmation_mp': 'Confirmación final — pago MP completo',
+    'flow.order_confirmation_transfer': 'Confirmación final — transferencia',
+    'flow.order_confirmation_cod': 'Confirmación final — contra reembolso',
+    'flow.order_confirmation_fallback': 'Confirmación final — fallback genérico',
 };
 
 // Path estable para comentarios entre dos pasos. Lo dejamos como string
@@ -265,19 +281,27 @@ const GuionView = () => {
     }
 
     const sections = [];
-    // Greeting
-    if (activeGuion.flow?.greeting) sections.push({ path: 'flow.greeting', text: activeGuion.flow.greeting.response });
-    // Recommendations
-    ['recommendation', 'recommendation_1', 'recommendation_2', 'recommendation_3'].forEach(k => {
+    // Orden del flujo: greeting → recommendations → prices (TEXTO 3) → preference
+    // → closing (pide datos) → confirmation pre-pago → menú de pago (TEXTO 4)
+    // → ramas de pago (TEXTO 5: MP / transferencia / COD) → confirmaciones finales.
+    const ORDERED_FLOW_KEYS = [
+        'greeting',
+        'recommendation', 'recommendation_1', 'recommendation_2', 'recommendation_3',
+        'prices',
+        'preference_capsulas', 'preference_gotas', 'preference_semillas',
+        'closing',
+        'confirmation',
+        'payment_menu',
+        'payment_mp_link', 'payment_mp_link_sena',
+        'payment_transfer_alias',
+        'payment_cod_retry', 'payment_cod_anticipo',
+        'payment_mp_failed', 'payment_mp_retry', 'payment_mp_retry_sena',
+        'transfer_received', 'cod_received',
+        'order_confirmation_mp', 'order_confirmation_transfer', 'order_confirmation_cod', 'order_confirmation_fallback',
+    ];
+    ORDERED_FLOW_KEYS.forEach(k => {
         if (activeGuion.flow?.[k]?.response) sections.push({ path: `flow.${k}`, text: activeGuion.flow[k].response });
     });
-    // Preference (productos)
-    ['preference_capsulas', 'preference_gotas', 'preference_semillas'].forEach(k => {
-        if (activeGuion.flow?.[k]?.response) sections.push({ path: `flow.${k}`, text: activeGuion.flow[k].response });
-    });
-    // Closing + confirmation
-    if (activeGuion.flow?.closing) sections.push({ path: 'flow.closing', text: activeGuion.flow.closing.response });
-    if (activeGuion.flow?.confirmation) sections.push({ path: 'flow.confirmation', text: activeGuion.flow.confirmation.response });
     // FAQ
     (activeGuion.faq || []).forEach((faq, idx) => {
         sections.push({

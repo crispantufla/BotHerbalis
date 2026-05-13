@@ -1,8 +1,17 @@
 /**
- * messageTemplates.js — Shared message builders to avoid duplication
+ * messageTemplates.ts — Shared message builders. Las plantillas viven en los
+ * knowledge JSONs (`knowledge_v5.json` / `knowledge_v6.json`) bajo `flow.*` para
+ * que el panel Guiones del dashboard las muestre. Estos builders leen el JSON
+ * vía _loadDefaultKnowledge() (cacheado) y sustituyen placeholders con _formatMessage.
+ *
+ * Si el caller tiene `knowledge` en mano (los step handlers la reciben como
+ * parámetro), debería pasarla en el 2° argumento para evitar el load.
  */
-import { _getCostoLogistico, _getPrice } from '../flows/utils/pricing';
+import { _getPrice } from '../flows/utils/pricing';
+import { _formatMessage } from '../flows/utils/messages';
 import logger from './logger';
+import * as fs from 'fs';
+import * as path from 'path';
 
 /**
  * Detector compartido de "preguntas de precio" — si matchea, el caller debería
@@ -11,6 +20,43 @@ import logger from './logger';
 const PRICE_QUESTION_RE = /\b(cu[aá]nto|que precio|qu[eé] precio|cuesta|sale|costo|valor|vale|precio)\b/i;
 function isPriceQuestion(text: string): boolean {
     return PRICE_QUESTION_RE.test(text || '');
+}
+
+/**
+ * Cache del knowledge default (v6) leído del disco. mtime check para invalidar
+ * cuando el archivo se edita en runtime (panel Guiones). Solo se usa cuando el
+ * caller NO pasa knowledge (típicamente scheduler/auto-approve).
+ */
+let _knowledgeCache: { mtime: number; data: any } | null = null;
+const _DEFAULT_KNOWLEDGE_PATH = path.join(__dirname, '..', '..', 'knowledge_v6.json');
+
+function _loadDefaultKnowledge(): any {
+    try {
+        const stat = fs.statSync(_DEFAULT_KNOWLEDGE_PATH);
+        const mtime = stat.mtimeMs;
+        if (_knowledgeCache && _knowledgeCache.mtime === mtime) {
+            return _knowledgeCache.data;
+        }
+        const data = JSON.parse(fs.readFileSync(_DEFAULT_KNOWLEDGE_PATH, 'utf8'));
+        _knowledgeCache = { mtime, data };
+        return data;
+    } catch (e: any) {
+        logger.error(`[messageTemplates] Failed to load default knowledge: ${e.message}`);
+        return null;
+    }
+}
+
+/**
+ * Lee `flow[key].response`. Si la knowledge provista no tiene la entrada,
+ * recurre al knowledge default cacheado (knowledge_v6.json del disco). Esto
+ * permite que callers con knowledge mock parcial (e.g. tests unitarios) sigan
+ * obteniendo el copy correcto sin tener que duplicar todo el JSON.
+ */
+function _getFlowResponse(knowledge: any, key: string): string | null {
+    const direct = knowledge?.flow?.[key]?.response;
+    if (direct) return direct;
+    const fallback = _loadDefaultKnowledge();
+    return fallback?.flow?.[key]?.response || null;
 }
 
 /**
@@ -35,11 +81,8 @@ function buildPersonalizedPriceResponse(state: any, productOverride?: string | n
 
     const priceStr = _getPrice(productKey, recommendedPlan);
 
-    // Política nueva (mayo 2026): MP es la forma default; ya no hay adicional $6.000 por COD.
-    // El COD solo se ofrece si el cliente lo pide y requiere seña de $10k vía MP.
     const savingsLine = '\n\n💳 _Pagás con Mercado Pago: tarjeta de crédito, débito o saldo MP._';
 
-    // Justificación según objetivo de kilos
     let justification: string;
     if (weightGoal >= 20) {
         justification = `cubren los 4 meses que el cuerpo necesita para un descenso sostenido de +20 kg, sin rebote`;
@@ -62,8 +105,6 @@ function buildPersonalizedPriceResponse(state: any, productOverride?: string | n
 
 /**
  * Detecta si el cliente menciona un producto específico en su pregunta de precio.
- * Útil para responder "que precio cápsulas" con la respuesta personalizada
- * apuntada a cápsulas, aunque state.selectedProduct todavía no esté seteado.
  */
 function detectProductInText(text: string): string | null {
     const t = (text || '').toLowerCase();
@@ -74,115 +115,67 @@ function detectProductInText(text: string): string | null {
 }
 
 /**
- * Build the payment menu message (TEXTO 4) — las 3 opciones se ofrecen espontáneamente.
- *  (1) Tarjeta de crédito o débito (Mercado Pago link)
- *  (2) Transferencia bancaria (alias ERRONEA.HABLAME.LUZ — Bio Origen SAS)
- *  (3) Contra reembolso: anticipo de $10.000 al mismo alias + saldo en efectivo al cartero
+ * TEXTO 4 — Menú de las 3 opciones de pago. Plantilla: knowledge.flow.payment_menu.response.
  */
-function buildPaymentMessage(_state: any): string {
-    return `¡Perfecto! ¿Cómo preferís realizar el pago? 💳\n\n` +
-        `1️⃣ *Tarjeta de crédito o débito* — te paso el link de Mercado Pago\n` +
-        `2️⃣ *Transferencia bancaria* — te paso el alias\n` +
-        `3️⃣ *Contra reembolso* — anticipo de $10.000 y el resto al recibir\n\n` +
-        `¿Cuál te queda más cómoda?`;
+function buildPaymentMessage(state: any, knowledge?: any): string {
+    const k = knowledge || _loadDefaultKnowledge();
+    const tpl = _getFlowResponse(k, 'payment_menu');
+    if (!tpl) {
+        logger.error('[messageTemplates] flow.payment_menu missing in knowledge — using empty fallback');
+        return '¿Cómo preferís realizar el pago?';
+    }
+    return _formatMessage(tpl, state);
 }
 
 /**
- * Build the message shown when the client elige contra reembolso (o lo pregunta).
- * Modalidad: anticipo de $10.000 por transferencia al alias + saldo en efectivo al cartero.
- * NO se promociona como "más cómodo/seguro" — se presenta como decisión interna.
+ * TEXTO 5c — Cliente eligió contra reembolso por 1ª vez. Explica modalidad
+ * (anticipo $10k al alias + saldo al cartero) y pide confirmación.
+ * Plantilla: knowledge.flow.payment_cod_retry.response.
  */
-function buildCashRetryMessage(_state: any): string {
-    return `Dale, podemos coordinar pago al recibir 👍\n\n` +
-        `La modalidad es: adelantás un *anticipo de $10.000* por transferencia ` +
-        `(alias *ERRONEA.HABLAME.LUZ*, a nombre de *Bio Origen SAS* — cubre el envío), ` +
-        `y el resto lo pagás en *efectivo al cartero* cuando llega el paquete.\n\n` +
-        `Es una decisión interna por la cantidad de paquetes que vuelven sin retirar — aplica a todos los pedidos. ` +
-        `Es exactamente la misma plata, solo cambia el momento.\n\n` +
-        `¿Te queda cómodo así o preferís el link de Mercado Pago por el total?`;
+function buildCashRetryMessage(state: any, knowledge?: any): string {
+    const k = knowledge || _loadDefaultKnowledge();
+    const tpl = _getFlowResponse(k, 'payment_cod_retry');
+    if (!tpl) {
+        logger.error('[messageTemplates] flow.payment_cod_retry missing in knowledge');
+        return 'Podemos coordinar pago al recibir.';
+    }
+    return _formatMessage(tpl, state);
 }
 
 /**
  * Build the order confirmation message sent to the client.
+ * Plantilla: knowledge.flow.order_confirmation_{mp|transfer|cod|fallback}.response.
  * Used by both handleAdminCommand (manual approval) and autoApproveOrders (scheduler).
- *
- * @param {Object} state - The user's state object
- * @returns {string} The formatted confirmation message
  */
-function buildConfirmationMessage(state: any): string {
-    const cart = state.cart || [];
-    const productStr = cart.map((i: any) => i.product).join(' + ') || state.selectedProduct || 'Nuez de la India';
-    const planStr = state.selectedPlan
-        ? `${state.selectedPlan} días`
-        : (cart.length > 0 ? cart.map((i: any) => `${i.plan} días`).join(' + ') : '60 días');
-    const totalPriceStr = state.totalPrice || '0';
-    const totalInt = parseInt(totalPriceStr.replace(/\./g, ''), 10) || 0;
+function buildConfirmationMessage(state: any, knowledge?: any): string {
+    const k = knowledge || _loadDefaultKnowledge();
 
-    // Política mayo 2026: la entrega va 4-6 días hábiles desde la confirmación del
-    // pago (MP completo o seña). 7-10 días era del modelo viejo de COD sin pago.
-    const postdatadoLine = state.postdatado
-        ? `📅 Envío programado: ${state.postdatado}\n`
-        : `✔ Entrega estimada: 4 a 6 días hábiles desde la confirmación del pago\n`;
-
-    // MercadoPago — pago ya acreditado.
+    let key: string;
     if (state.paymentMethod === 'mercadopago') {
-        return `📦 CONFIRMACIÓN DE ENVÍO\n\n` +
-            `Producto: ${productStr}\n` +
-            `Plan: ${planStr}\n` +
-            `Total: $${totalPriceStr}\n\n` +
-            `✅ Pago recibido via MercadoPago\n\n` +
-            `✔ Correo Argentino\n` + postdatadoLine +
-            `Importante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs para retirar.\n\n` +
-            `👉 ¿Me confirmás que podés retirarlo en sucursal dentro de las 72 hs si fuera necesario?`;
+        key = 'order_confirmation_mp';
+    } else if (state.paymentMethod === 'transferencia') {
+        key = 'order_confirmation_transfer';
+    } else if (state.paymentMethod === 'contrarembolso' && state.senaPaid && state.senaAmount) {
+        key = 'order_confirmation_cod';
+    } else {
+        logger.warn(`[CONFIRMATION] paymentMethod inesperado: "${state.paymentMethod}" (senaPaid=${state.senaPaid}, senaAmount=${state.senaAmount}) — usando fallback`);
+        key = 'order_confirmation_fallback';
     }
 
-    const costoLog = _getCostoLogistico();
-    const isSucursal = state.pendingOrder?.calle?.toLowerCase() === 'a sucursal';
-
-    // Contra reembolso con seña pagada — única vía COD válida (política mayo 2026).
-    if (state.paymentMethod === 'contrarembolso' && state.senaPaid && state.senaAmount) {
-        const senaFmt = state.senaAmount.toLocaleString('es-AR').replace(/,/g, '.');
-        const remainder = Math.max(0, totalInt - state.senaAmount);
-        const remainderFmt = remainder.toLocaleString('es-AR').replace(/,/g, '.');
-        const cartoLine = isSucursal
-            ? `✔ Retiro en sucursal — pagás el saldo *$${remainderFmt}* en efectivo al retirar`
-            : `✔ Saldo al cartero: *$${remainderFmt}* en efectivo al recibir`;
-
-        return `📦 CONFIRMACIÓN DE ENVÍO\n\n` +
-            `Producto: ${productStr}\n` +
-            `Plan: ${planStr}\n` +
-            `Total: $${totalPriceStr}\n\n` +
-            `✅ Seña recibida via MercadoPago: $${senaFmt}\n` +
-            cartoLine + `\n\n` +
-            `✔ Correo Argentino\n` + postdatadoLine +
-            `Importante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs.\nEl no retiro genera un costo logístico de $${costoLog}.\n\n` +
-            `👉 ¿Me confirmás que podés retirar en sucursal dentro de las 72 hs si fuera necesario?`;
+    const tpl = _getFlowResponse(k, key);
+    if (!tpl) {
+        logger.error(`[messageTemplates] flow.${key} missing in knowledge — usando fallback hardcoded`);
+        return `📦 CONFIRMACIÓN DE ENVÍO\n\nTotal: $${state.totalPrice || '0'}\n\n¿Me confirmás que podés retirar en sucursal si fuera necesario?`;
     }
+    return _formatMessage(tpl, state);
+}
 
-    // Transferencia — sin breakdown adicional, total ya acreditado al confirmar.
-    if (state.paymentMethod === 'transferencia') {
-        return `📦 CONFIRMACIÓN DE ENVÍO\n\n` +
-            `Producto: ${productStr}\n` +
-            `Plan: ${planStr}\n` +
-            `Total: $${totalPriceStr}\n\n` +
-            `✅ Pago recibido via Transferencia\n\n` +
-            `✔ Correo Argentino\n` + postdatadoLine +
-            `Importante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs para retirar.\n\n` +
-            `👉 ¿Me confirmás que podés retirarlo en sucursal dentro de las 72 hs si fuera necesario?`;
-    }
-
-    // No debería ocurrir bajo la política mayo 2026: COD requiere seña paga,
-    // y el resto de los métodos están cubiertos arriba. Logueamos para visibilidad
-    // y devolvemos un mensaje genérico válido.
-    logger.warn(`[CONFIRMATION] paymentMethod inesperado en buildConfirmationMessage: "${state.paymentMethod}" (senaPaid=${state.senaPaid}, senaAmount=${state.senaAmount}) — usando fallback`);
-
-    return `📦 CONFIRMACIÓN DE ENVÍO\n\n` +
-        `Producto: ${productStr}\n` +
-        `Plan: ${planStr}\n` +
-        `Total: $${totalPriceStr}\n\n` +
-        `✔ Correo Argentino\n` + postdatadoLine +
-        `Importante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs.\n\n` +
-        `👉 ¿Me confirmás que podés retirarlo en sucursal dentro de las 72 hs si fuera necesario?`;
+/**
+ * Resuelve un template del JSON conociendo `knowledge` o cayendo al default
+ * cacheado. Export pública para que los step handlers también lean copy del JSON.
+ */
+function getFlowTemplate(key: string, knowledge?: any): string | null {
+    return _getFlowResponse(knowledge, key);
 }
 
 export {
@@ -192,4 +185,5 @@ export {
     buildPersonalizedPriceResponse,
     isPriceQuestion,
     detectProductInText,
+    getFlowTemplate,
 };

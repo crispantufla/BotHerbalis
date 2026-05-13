@@ -1,7 +1,8 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _setStep, _pauseAndAlert, _cleanPhone } from '../utils/flowHelpers';
 import { calculateTotal } from '../utils/cartHelpers';
-import { buildCashRetryMessage } from '../../utils/messageTemplates';
+import { buildCashRetryMessage, getFlowTemplate } from '../../utils/messageTemplates';
+import { _formatMessage } from '../utils/messages';
 import { randomUUID } from 'crypto';
 import logger from '../../utils/logger';
 
@@ -88,9 +89,10 @@ export async function handleWaitingMpPayment(
             // Si la tarjeta falla, pueden reintentar con otra forma de pago dentro
             // del mismo link MP (tarjeta de crédito, débito, saldo MP, etc.).
             const wasSena = !!(currentState.senaAmount && currentState.senaAmount > 0);
-            const msg = wasSena
-                ? '⚠️ Hubo un problema con el pago de la seña — pudo ser la tarjeta o un rechazo del banco.\n\nProbá de nuevo con otra forma:\n✅ Tarjeta de crédito\n✅ Débito\n✅ Saldo Mercado Pago\n\nTe genero un nuevo link para volver a intentarlo, decime cuando esté listo 😊'
-                : '⚠️ Hubo un problema con el pago de MercadoPago — pudo ser la tarjeta o un rechazo del banco.\n\nProbá de nuevo con otra forma:\n✅ Tarjeta de crédito\n✅ Débito\n✅ Saldo Mercado Pago\n\nTe genero un nuevo link para volver a intentarlo, decime cuando esté listo 😊';
+            const tpl = getFlowTemplate(wasSena ? 'payment_mp_retry_sena' : 'payment_mp_retry', knowledge);
+            const msg = tpl
+                ? _formatMessage(tpl, currentState)
+                : '⚠️ Hubo un problema con el pago — probá de nuevo con otra forma (tarjeta, débito, saldo MP).';
             // Mantenemos senaAmount si era flujo seña — para regenerar link por $10k.
             currentState.mpPaymentLinkId = null;
             currentState.mpPaymentLinkUrl = null;
@@ -110,7 +112,9 @@ export async function handleWaitingMpPayment(
     // Direcciones largas que contienen "segundo" o un "2" aislado NO disparan.
     const shortOption = _detectShortOption(text);
     if (shortOption === '2' || TRANSFER_FALLBACK_KEYWORDS.test(normalizedText)) {
-        const msg = `¡Perfecto! Para transferir usá el alias *ERRONEA.HABLAME.LUZ* a nombre de *Bio Origen SAS* 🏦\n\nMonto: $${currentState.totalPrice || '0'}\n\nUna vez que realices la transferencia, escribime *"listo"* y coordinamos el envío 😊`;
+        const transferTpl = getFlowTemplate('payment_transfer_alias', knowledge) ||
+            `¡Perfecto! Para transferir usá el alias *{{ALIAS}}* a nombre de *{{TITULAR}}* 🏦\n\nMonto: ${'$'}{{TOTAL}}\n\nUna vez que realices la transferencia, escribime *"listo"* y coordinamos el envío 😊`;
+        const msg = _formatMessage(transferTpl, currentState);
         currentState.paymentMethod = 'transferencia';
         currentState.mpPaymentLinkId = null;
         currentState.mpPaymentLinkUrl = null;
@@ -135,7 +139,7 @@ export async function handleWaitingMpPayment(
         currentState.mpPaymentLinkUrl = null;
         currentState.senaAmount = 10000;
         currentState.senaPaid = false;
-        const explainMsg = buildCashRetryMessage(currentState);
+        const explainMsg = buildCashRetryMessage(currentState, knowledge);
         currentState.history.push({ role: 'bot', content: explainMsg, timestamp: Date.now() });
         await sendMessageWithDelay(userId, explainMsg);
         // Generar el link de seña ($10k) y enviarlo.
@@ -310,7 +314,7 @@ async function _generateAndSendLink(
     let lastError: any = null;
     for (let attempt = 1; attempt <= MP_LINK_MAX_ATTEMPTS; attempt++) {
         try {
-            await _tryCreateAndSendMpLink(userId, currentState, dependencies);
+            await _tryCreateAndSendMpLink(userId, currentState, knowledge, dependencies);
             return; // éxito
         } catch (e: any) {
             lastError = e;
@@ -326,7 +330,9 @@ async function _generateAndSendLink(
     currentState.mpPaymentLinkId = null;
     currentState.mpPaymentLinkUrl = null;
     const errMsg = (lastError?.message || 'desconocido').slice(0, 200);
-    const msg = `Tuve un problema técnico generando el link de pago 😕\n\nEn un momento te contacta un asesor para resolverlo. Disculpá la molestia 🙏`;
+    const failedTpl = getFlowTemplate('payment_mp_failed', knowledge) ||
+        `Tuve un problema técnico generando el link de pago 😕\n\nEn un momento te contacta un asesor para resolverlo. Disculpá la molestia 🙏`;
+    const msg = _formatMessage(failedTpl, currentState);
     currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
     saveState(userId);
     await sendMessageWithDelay(userId, msg);
@@ -343,6 +349,7 @@ async function _generateAndSendLink(
 async function _tryCreateAndSendMpLink(
     userId: string,
     currentState: UserState,
+    knowledge: any,
     dependencies: any
 ): Promise<void> {
     const { sendMessageWithDelay, saveState } = dependencies;
@@ -419,23 +426,15 @@ async function _tryCreateAndSendMpLink(
         || currentState.selectedProduct?.split(' de ')[0]
         || 'Herbalis';
 
-    const msg = isSena
-        ? `💳 *Pago al recibir — link de seña*\n\n` +
-            `Pedido: *${productName}* — Plan ${currentState.selectedPlan} días\n` +
-            `Total del pedido: *$${currentState.totalPrice}*\n` +
-            `Seña por Mercado Pago: *$${amount.toLocaleString('es-AR').replace(/,/g, '.')}*\n` +
-            `Saldo al cartero (efectivo): *$${(parseInt(String(currentState.totalPrice).replace(/\./g, ''), 10) - amount).toLocaleString('es-AR').replace(/,/g, '.')}*\n\n` +
-            `👇 Pagá la seña acá:\n${link}\n\n` +
-            `Podés usar tarjeta de crédito, débito o saldo MP.\n\n` +
-            `✅ Cuando termines, escribime *"listo"* y verifico el pago.\n\n` +
-            `Mientras tanto, pasame los datos de envío 👇\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nProvincia:`
-        : `💳 *Pago online via MercadoPago*\n\n` +
-            `Pedido: *${productName}* — Plan ${currentState.selectedPlan} días\n` +
-            `Total: *$${currentState.totalPrice}*\n\n` +
-            `👇 Hacé clic para pagar de forma segura:\n${link}\n\n` +
-            `Podés pagar con tarjeta de crédito, débito o saldo MP.\n\n` +
-            `✅ Cuando termines el pago, escribime *"listo"* y verifico que ingresó.\n\n` +
-            `Mientras tanto, pasame los datos de envío para tener todo listo 👇\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nProvincia:`;
+    // El _formatMessage usa cart para PRODUCT, pero también permitimos override con
+    // el productName ya computado (multi-item ya viene unificado en cart map).
+    const linkTpl = getFlowTemplate(isSena ? 'payment_mp_link_sena' : 'payment_mp_link', knowledge) ||
+        (isSena
+            ? `💳 *Seña por Mercado Pago*\n\nPedido: *{{PRODUCT}}* — Plan {{PLAN}} días\nTotal del pedido: *${'$'}{{TOTAL}}*\nSeña: *${'$'}{{SENA_AMOUNT}}*\nSaldo al cartero: *${'$'}{{SENA_REMAINDER}}*\n\n{{LINK}}\n\nEscribime *"listo"* cuando termines.`
+            : `💳 *Pago online via MercadoPago*\n\nPedido: *{{PRODUCT}}* — Plan {{PLAN}} días\nTotal: *${'$'}{{TOTAL}}*\n\n{{LINK}}\n\nEscribime *"listo"* cuando termines.`);
+    // Inyectamos productName en state efímero para que {{PRODUCT}} muestre el cart concatenado.
+    const stateForFmt = { ...currentState, selectedProduct: productName };
+    const msg = _formatMessage(linkTpl, stateForFmt);
     currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
     await sendMessageWithDelay(userId, msg);
     logger.info(`[MP_PAYMENT] Link ${isSena ? 'SEÑA' : ''} creado para ${userId} — $${amount} ARS — ${link}`);

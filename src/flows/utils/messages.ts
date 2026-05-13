@@ -50,7 +50,65 @@ function _formatMessage(text: string | string[], state: any): string {
         if (state.totalPrice) {
             formatted = formatted.replace(/{{TOTAL}}/g, state.totalPrice);
         }
+        // Precios del producto seleccionado (para TEXTO 3: muestra plan 60 vs 120).
+        if (state.selectedProduct) {
+            const productKey: 'Cápsulas' | 'Gotas' | 'Semillas' =
+                state.selectedProduct.includes('Gota') ? 'Gotas' :
+                state.selectedProduct.includes('Semilla') ? 'Semillas' : 'Cápsulas';
+            formatted = formatted.replace(/{{PRICE_60}}/g, prices[productKey]?.['60'] || '');
+            formatted = formatted.replace(/{{PRICE_120}}/g, prices[productKey]?.['120'] || '');
+        }
+        // Mercado Pago link.
+        formatted = formatted.replace(/{{LINK}}/g, state.mpPaymentLinkUrl || '');
+        // Seña / anticipo para flujos contra reembolso.
+        const totalInt = parseInt(String(state.totalPrice || '0').replace(/\./g, ''), 10) || 0;
+        const fmtNum = (n: number) => n.toLocaleString('es-AR').replace(/,/g, '.');
+        if (state.senaAmount && state.senaAmount > 0) {
+            const sena = state.senaAmount;
+            const remainder = Math.max(0, totalInt - sena);
+            formatted = formatted.replace(/{{SENA_AMOUNT}}/g, fmtNum(sena));
+            formatted = formatted.replace(/{{SENA_AMOUNT_FMT}}/g, fmtNum(sena));
+            formatted = formatted.replace(/{{SENA_REMAINDER}}/g, fmtNum(remainder));
+            formatted = formatted.replace(/{{SALDO}}/g, fmtNum(remainder));
+        } else {
+            // Anticipo fijo $10k para el flujo COD "anticipo al alias" cuando aún no se setea senaAmount.
+            const remainder10k = Math.max(0, totalInt - 10000);
+            formatted = formatted.replace(/{{SALDO}}/g, fmtNum(remainder10k));
+        }
+        // Cart-aware: producto + plan combinados cuando hay multi-item.
+        const cart = Array.isArray(state.cart) ? state.cart : [];
+        if (cart.length > 0) {
+            const productDetail = cart.map((i: any) => i.product).join(' + ') || state.selectedProduct || 'Nuez de la India';
+            const planDetail = cart.map((i: any) => `${i.plan} días`).join(' + ') || (state.selectedPlan ? `${state.selectedPlan} días` : '60 días');
+            formatted = formatted.replace(/{{PRODUCT_DETAIL}}/g, productDetail);
+            formatted = formatted.replace(/{{PLAN_DETAIL}}/g, planDetail);
+        } else {
+            formatted = formatted.replace(/{{PRODUCT_DETAIL}}/g, state.selectedProduct || 'Nuez de la India');
+            formatted = formatted.replace(/{{PLAN_DETAIL}}/g, state.selectedPlan ? `${state.selectedPlan} días` : '60 días');
+        }
+        // Línea condicional postdatado vs entrega estándar (confirmación final).
+        const postdatadoLine = state.postdatado
+            ? `📅 Envío programado: ${state.postdatado}\n`
+            : `✔ Entrega estimada: 4 a 6 días hábiles desde la confirmación del pago\n`;
+        formatted = formatted.replace(/{{POSTDATADO_LINE}}/g, postdatadoLine);
+        // Línea condicional saldo al cartero vs retiro en sucursal (confirmación COD).
+        const isSucursal = state.pendingOrder?.calle?.toLowerCase() === 'a sucursal';
+        if (state.senaAmount && state.senaAmount > 0) {
+            const remainder = Math.max(0, totalInt - state.senaAmount);
+            const remainderFmt = fmtNum(remainder);
+            const cartoLine = isSucursal
+                ? `✔ Retiro en sucursal — pagás el saldo *$${remainderFmt}* en efectivo al retirar`
+                : `✔ Saldo al cartero: *$${remainderFmt}* en efectivo al recibir`;
+            formatted = formatted.replace(/{{CARTO_LINE}}/g, cartoLine);
+        } else {
+            formatted = formatted.replace(/{{CARTO_LINE}}/g, '');
+        }
     }
+
+    // Alias bancario + titular oficiales (constantes).
+    formatted = formatted.replace(/{{ALIAS}}/g, 'ERRONEA.HABLAME.LUZ');
+    formatted = formatted.replace(/{{TITULAR}}/g, 'Bio Origen SAS');
+    formatted = formatted.replace(/{{ANTICIPO}}/g, '10.000');
 
     return formatted;
 }

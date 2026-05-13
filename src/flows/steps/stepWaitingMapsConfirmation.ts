@@ -113,7 +113,7 @@ export async function handleWaitingMapsConfirmation(
                 const total = currentState.cart.reduce((sum: number, i: any) => sum + parseInt(i.price.toString().replace(/\./g, '')), 0);
                 currentState.totalPrice = total.toLocaleString('es-AR').replace(/,/g, '.');
 
-                const summaryMsg = buildConfirmationMessage(currentState);
+                const summaryMsg = buildConfirmationMessage(currentState, knowledge);
                 currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
                 currentState.fieldReaskCount = {};
                 currentState.addressIssueType = null;

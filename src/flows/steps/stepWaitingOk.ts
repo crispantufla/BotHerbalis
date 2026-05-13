@@ -1,22 +1,22 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _setStep, _pauseAndAlert } from '../utils/flowHelpers';
 import { _isAffirmative, _isNegative } from '../utils/validation';
-import { _getPrice } from '../utils/pricing';
+import { _formatMessage } from '../utils/messages';
+import { getFlowTemplate } from '../../utils/messageTemplates';
 import logger from '../../utils/logger';
 
 /**
  * TEXTO 3 — Tras la recomendación ("¿te paso precios?"), cliente dice "sí".
- * Mostramos los 2 planes del producto seleccionado y le pedimos que elija.
+ * Plantilla en knowledge.flow.prices.response (visible en panel Guiones).
+ * Placeholders: {{PRICE_60}}, {{PRICE_120}} se sustituyen por _getPrice según el producto.
  */
-function _buildPricesMessage(state: UserState): string {
-    const product = state.selectedProduct || 'Cápsulas de nuez de la india';
-    const productKey = product.includes('Gota') ? 'Gotas' : product.includes('Semilla') ? 'Semillas' : 'Cápsulas';
-    const price60 = _getPrice(productKey, '60');
-    const price120 = _getPrice(productKey, '120');
-
-    return `💰 *Plan 2 meses: $${price60}*\n` +
-        `💰 *Plan 4 meses: $${price120}* — el más conveniente; muchas clientas, al llegar al peso, lo usan 1-2 veces por semana como mantenimiento.\n\n` +
-        `¿Qué plan preferís? 😊`;
+function _buildPricesMessage(state: UserState, knowledge: any): string {
+    const tpl = getFlowTemplate('prices', knowledge);
+    if (!tpl) {
+        logger.error('[stepWaitingOk] flow.prices missing in knowledge — fallback genérico');
+        return '¿Qué plan preferís: 60 o 120 días?';
+    }
+    return _formatMessage(tpl, state);
 }
 
 export async function handleWaitingOk(
@@ -57,7 +57,7 @@ export async function handleWaitingOk(
     }
     else if (_isAffirmative(normalizedText)) {
         // TEXTO 3 — Mostramos precios y pedimos plan choice.
-        const msg = _buildPricesMessage(currentState);
+        const msg = _buildPricesMessage(currentState, knowledge);
         _setStep(currentState, FlowStep.WAITING_PLAN_CHOICE);
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);

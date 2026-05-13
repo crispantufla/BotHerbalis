@@ -505,7 +505,7 @@ async function _handleSafetyNet(
 
 // --- Helper: Validate address, Maps check, assemble order ---
 async function _validateAndAssembleOrder(
-    userId: string, text: string, currentState: UserState, dependencies: any,
+    userId: string, text: string, currentState: UserState, knowledge: any, dependencies: any,
     isDataQuestionOrEmotion: boolean
 ): Promise<{ matched: boolean } | null> {
     const { sendMessageWithDelay, saveState } = dependencies;
@@ -655,7 +655,7 @@ async function _validateAndAssembleOrder(
     const total = currentState.cart.reduce((sum: number, i: any) => sum + parseInt(i.price.toString().replace(/\./g, '')), 0);
     currentState.totalPrice = _formatPrice(total);
 
-    const summaryMsg = buildConfirmationMessage(currentState);
+    const summaryMsg = buildConfirmationMessage(currentState, knowledge);
     currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
     await sendMessageWithDelay(userId, summaryMsg);
 
@@ -774,7 +774,7 @@ export async function handleWaitingData(
             currentState.pendingCPFromMaps = null;
             saveState(userId);
             // Continue to validate and assemble order
-            const orderResult = await _validateAndAssembleOrder(userId, text, currentState, dependencies, false);
+            const orderResult = await _validateAndAssembleOrder(userId, text, currentState, knowledge, dependencies, false);
             if (orderResult) return orderResult;
             return await _askMissingFields(userId, currentState, dependencies, true);
         } else if (cpFromMessage) {
@@ -783,7 +783,7 @@ export async function handleWaitingData(
             logger.info(`[ADDRESS] User corrected CP to ${cpFromMessage[1]} (was suggested ${currentState.pendingCPFromMaps}) (user ${userId})`);
             currentState.pendingCPFromMaps = null;
             saveState(userId);
-            const orderResult = await _validateAndAssembleOrder(userId, text, currentState, dependencies, false);
+            const orderResult = await _validateAndAssembleOrder(userId, text, currentState, knowledge, dependencies, false);
             if (orderResult) return orderResult;
             return await _askMissingFields(userId, currentState, dependencies, true);
         } else if (isNo) {
@@ -852,14 +852,14 @@ export async function handleWaitingData(
             const fallbackResult = await _handleAiFallback(userId, text, normalizedText, currentState, knowledge, dependencies, classification);
             if (fallbackResult) {
                 // Check if order is now complete after saving data
-                const orderResult = await _validateAndAssembleOrder(userId, text, currentState, dependencies, classification.isDataQuestionOrEmotion);
+                const orderResult = await _validateAndAssembleOrder(userId, text, currentState, knowledge, dependencies, classification.isDataQuestionOrEmotion);
                 if (orderResult) return orderResult;
                 return fallbackResult;
             }
         }
 
         // Skip re-processing in step 8 since we already processed
-        const orderResult = await _validateAndAssembleOrder(userId, text, currentState, dependencies, classification.isDataQuestionOrEmotion);
+        const orderResult = await _validateAndAssembleOrder(userId, text, currentState, knowledge, dependencies, classification.isDataQuestionOrEmotion);
         if (orderResult) return orderResult;
         return await _askMissingFields(userId, currentState, dependencies, dataProgress);
     }
@@ -891,7 +891,7 @@ export async function handleWaitingData(
     }
 
     // 11. Validate and assemble order (if address complete)
-    const orderResult = await _validateAndAssembleOrder(userId, text, currentState, dependencies, classification.isDataQuestionOrEmotion);
+    const orderResult = await _validateAndAssembleOrder(userId, text, currentState, knowledge, dependencies, classification.isDataQuestionOrEmotion);
     if (orderResult) return orderResult;
 
     // 12. Ask for missing fields
