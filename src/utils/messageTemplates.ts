@@ -37,7 +37,7 @@ function buildPersonalizedPriceResponse(state: any, productOverride?: string | n
 
     // Política nueva (mayo 2026): MP es la forma default; ya no hay adicional $6.000 por COD.
     // El COD solo se ofrece si el cliente lo pide y requiere seña de $10k vía MP.
-    const savingsLine = '\n\n💳 _Pagás con Mercado Pago: tarjeta (en cuotas), débito, saldo MP o efectivo en Pago Fácil/Rapipago._';
+    const savingsLine = '\n\n💳 _Pagás con Mercado Pago: tarjeta (en cuotas), débito o saldo MP._';
 
     // Justificación según objetivo de kilos
     let justification: string;
@@ -84,8 +84,7 @@ function buildPaymentMessage(_state: any): string {
         `Es la forma más rápida y segura:\n` +
         `✅ Tarjeta de crédito (en cuotas)\n` +
         `✅ Tarjeta de débito\n` +
-        `✅ Saldo Mercado Pago\n` +
-        `✅ Efectivo en Pago Fácil / Rapipago\n\n` +
+        `✅ Saldo Mercado Pago\n\n` +
         `🛡️ Protección al comprador — si no recibís el producto, te devuelven el 100%.\n` +
         `📦 Apenas confirmamos el pago, despachamos (llega en 4-6 días hábiles).\n\n` +
         `¿Te paso el link así dejamos tu pedido confirmado? 😊`;

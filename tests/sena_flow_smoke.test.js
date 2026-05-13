@@ -31,12 +31,16 @@ describe('Política nueva de pago — buildPaymentMessage (MP-only)', () => {
         expect(pm).not.toMatch(/\$\s*6\.000/);
         expect(pm).not.toMatch(/adicional/i);
     });
-    test('Menciona efectivo en Pago Fácil / Rapipago como sub-opción de MP', () => {
-        expect(pm).toMatch(/Pago Fácil/i);
-        expect(pm).toMatch(/Rapipago/i);
+    test('NO menciona Pago Fácil / Rapipago (eliminado de la oferta)', () => {
+        expect(pm).not.toMatch(/Pago Fácil/i);
+        expect(pm).not.toMatch(/Rapipago/i);
     });
     test('Menciona cuotas (sub-opción tarjeta crédito en MP)', () => {
         expect(pm).toMatch(/cuotas/i);
+    });
+    test('Menciona débito y saldo MP', () => {
+        expect(pm).toMatch(/débito/i);
+        expect(pm).toMatch(/Saldo Mercado Pago/i);
     });
 });
 

@@ -61,7 +61,7 @@ const RULE_BASE = [
     { id: 'tracking', keywords: ['tracking', 'seguimiento', 'codigo', 'donde esta mi pedido'], text: 'TRACKING: Sí, damos código de seguimiento y avisamos cuando el pedido llega al correo de su zona.' },
     { id: 'anmat', keywords: ['anmat', 'registro', 'aprobado por', 'ministerio de salud'], text: 'ANMAT: El producto no requiere aprobación de ANMAT, es un fruto natural. Trabajamos hace más de 13 años con más de 70 mil clientes.' },
     { id: 'discreto', keywords: ['discreto', 'paquete', 'envuelto', 'que dice la caja', 'se ve que es'], text: 'PAQUETE DISCRETO: Sí, el envío es totalmente discreto, sin marcas ni indicación del contenido.' },
-    { id: 'medios_pago', keywords: ['qr', 'mercadopago', 'mercadolibre', 'transferencia', 'debito', 'credito', 'cbu', 'alias', 'tarjeta'], text: 'MEDIOS DE PAGO (POLÍTICA MAYO 2026): Por defecto SOLO se ofrece el link de Mercado Pago — cubre tarjeta de crédito (en cuotas), débito, saldo MP y efectivo en Pago Fácil/Rapipago. Si el cliente pregunta por transferencia: existe (alias CHILE.TEXTO.CASINO) pero solo se la ofrecés si lo pide explícitamente. Si pide contra reembolso: requiere seña de $10.000 por MP (cubre envío) + saldo en efectivo al cartero. NO ofrezcas las 3 opciones — empujá Mercado Pago como única opción salvo que el cliente pida otra.' },
+    { id: 'medios_pago', keywords: ['qr', 'mercadopago', 'mercadolibre', 'transferencia', 'debito', 'credito', 'cbu', 'alias', 'tarjeta'], text: 'MEDIOS DE PAGO (POLÍTICA MAYO 2026): Por defecto SOLO se ofrece el link de Mercado Pago — cubre tarjeta de crédito (en cuotas), débito y saldo MP. Si el cliente pregunta por transferencia: existe (alias CHILE.TEXTO.CASINO) pero solo se la ofrecés si lo pide explícitamente. Si pide contra reembolso: requiere seña de $10.000 por MP (cubre envío) + saldo en efectivo al cartero. NO ofrezcas las 3 opciones — empujá Mercado Pago como única opción salvo que el cliente pida otra. NO menciones "efectivo en Pago Fácil/Rapipago".' },
     { id: 'sucursal', keywords: ['retirar en sucursal', 'buscar en correo', 'ir al correo', 'sucursal correo'], text: 'RETIRO EN SUCURSAL: Si preguntan si pueden retirar en persona o en sucursal: "¡Sí! Podés retirar en la sucursal del Correo Argentino. Decime cuál te queda cómoda o lo enviamos a la de tu código postal". En este caso, anotá como domicilio "Retiro en sucursal".' },
     { id: 'repetido', keywords: ['ya compre', 'volvi a escribir', 'soy cliente', 'otra vez'], text: 'CLIENTE REPETIDO: Si dicen que ya compraron antes o quieren volver a comprar: reconocé que ya son parte de Herbalis y avanzá rápido con la elección de producto y plan. Mismo flujo de pago que cualquier cliente (MP por defecto).' },
     { id: 'muestra', keywords: ['muestra gratis', 'probar', 'regalan'], text: 'MUESTRAS GRATIS: No hay muestras gratis. Recordales que llevamos más de 13 años distribuyendo con más de 70 mil clientes satisfechos.' },
@@ -326,7 +326,7 @@ DESCUENTOS POR VOLUMEN (SOLO si preguntan por varias unidades):
 ENVÍO: Gratis por Correo Argentino. Demora: 4 a 6 días hábiles desde la confirmación del pago.
 
 MEDIOS DE PAGO (POLÍTICA MAYO 2026):
-- POR DEFECTO se ofrece SOLO el link de Mercado Pago — cubre tarjeta de crédito (en cuotas), débito, saldo MP y efectivo en Pago Fácil/Rapipago.
+- POR DEFECTO se ofrece SOLO el link de Mercado Pago — cubre tarjeta de crédito (en cuotas), débito y saldo MP.
 - NO ofrecer transferencia ni contra reembolso espontáneamente. Solo si el cliente las pide.
 - Si pide contra reembolso: requiere seña de $10.000 por MP (cubre envío) + saldo en efectivo al cartero. Aplica a TODOS los planes y a TODOS los clientes.
 - NO mencionar "adicional de $6.000" — esa política ya no existe.
@@ -657,14 +657,14 @@ class AIService {
                 knowledgeContext += `- Gotas: SOLO ofrecer a >70 años. Si alguien con pocos kilos pide gotas, decile que "son extremadamente suaves" para persuadirlo a elegir Cápsulas.\n`;
                 knowledgeContext += `- Contraindicaciones: solo embarazo y lactancia.NO menores de edad.\n`;
                 knowledgeContext += `- PRECIOS: Si preguntan "precio" en general, decí "$${priceSem60} a $${priceGotas120}".PERO si preguntan "precio de todos", "lista de precios" o insisten, PASALES TODOS LOS PRECIOS detallados: ${priceString}.\n`;
-                knowledgeContext += `- ENVÍO Y PAGO: Envío gratis por Correo Argentino. Por defecto se ofrece Mercado Pago (tarjeta en cuotas, débito, saldo MP, efectivo en Pago Fácil/Rapipago).\n`;
+                knowledgeContext += `- ENVÍO Y PAGO: Envío gratis por Correo Argentino. Por defecto se ofrece Mercado Pago (tarjeta en cuotas, débito, saldo MP).\n`;
             } else if (step === 'waiting_price_confirmation') {
                 knowledgeContext += `- El usuario todavía NO vio precios.Tu trabajo es convencerlo de que quiera verlos.\n`;
                 knowledgeContext += `- Contraindicaciones: solo embarazo y lactancia.NO menores de edad.\n`;
                 knowledgeContext += `- (NO menciones precios específicos ni formas de pago, solo que son accesibles) \n`;
             } else if (['waiting_plan_choice', 'closing', 'waiting_ok'].includes(step)) {
                 knowledgeContext += `- PRECIOS: ${priceString} \n`;
-                knowledgeContext += `- POLÍTICA DE PAGO (mayo 2026): por defecto SOLO se ofrece el link de Mercado Pago (cubre tarjeta en cuotas, débito, saldo MP, efectivo en Pago Fácil/Rapipago). Transferencia y contra reembolso NO se ofrecen espontáneamente — solo si el cliente las pide. Contra reembolso requiere seña de $10.000 por MP + saldo en efectivo al cartero. Aplica a TODOS los planes.\n`;
+                knowledgeContext += `- POLÍTICA DE PAGO (mayo 2026): por defecto SOLO se ofrece el link de Mercado Pago (cubre tarjeta en cuotas, débito, saldo MP). Transferencia y contra reembolso NO se ofrecen espontáneamente — solo si el cliente las pide. Contra reembolso requiere seña de $10.000 por MP + saldo en efectivo al cartero. Aplica a TODOS los planes.\n`;
                 knowledgeContext += `- NO mencionar 'adicional de $6.000' (esa política ya no existe). NO decir 'envío gratis solo en plan 120'.\n`;
                 knowledgeContext += `- Envío gratis por Correo Argentino, demora 4-6 días hábiles desde la confirmación del pago.\n`;
             } else if (step === 'waiting_data') {

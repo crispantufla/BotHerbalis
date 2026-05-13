@@ -94,7 +94,7 @@ const PATTERNS: { type: ObjectionMatch['type']; regex: RegExp }[] = [
 const REBUTTALS: Record<ObjectionMatch['type'], string[]> = {
     caro: [
         '¡Entiendo! 😊 Pensalo así: es menos que un café por día durante el tratamiento. Además podés pagarlo con Mercado Pago en cuotas con tarjeta. Y el plan de 120 días es el tratamiento completo para que no vuelvas a subir. ¿Te tiro los datos del de 120?',
-        'Te re entiendo 🙌 Lo bueno es que con Mercado Pago tenés tarjeta en cuotas, débito, saldo MP o efectivo en Pago Fácil. Es una inversión en vos, con más de 13 años de aval. ¿Te paso los datos para reservarlo?',
+        'Te re entiendo 🙌 Lo bueno es que con Mercado Pago tenés tarjeta en cuotas, débito o saldo MP. Es una inversión en vos, con más de 13 años de aval. ¿Te paso los datos para reservarlo?',
         'Dale, escuchame bien: con MP podés pagar en cuotas con tarjeta si te queda más cómodo. Y el de 120 días sale más conveniente por cápsula que el de 60. ¿Avanzamos con ese? 😊',
     ],
     consultar: [
@@ -110,7 +110,7 @@ const REBUTTALS: Record<ObjectionMatch['type'], string[]> = {
         'Dale, es un miedo súper válido 🙌 Mercado Pago es la plataforma de pago más usada del país y tiene protección al comprador integrada. Si querés podés buscarnos en Google o Instagram. ¿Seguimos con los datos?',
     ],
     postergar: [
-        '¡No hay drama! 😊 Importante: con Mercado Pago tenés tarjeta en cuotas o podés pagar en efectivo en Pago Fácil/Rapipago. No tenés que tener todo el monto disponible hoy. ¿Te cargo el pedido?',
+        '¡No hay drama! 😊 Importante: con Mercado Pago tenés tarjeta en cuotas — podés dividir el pago sin tener que tener todo el monto disponible hoy. ¿Te cargo el pedido?',
         '¡Tranqui! 🙌 Si preferís, podemos dejar el pedido cargado HOY para congelarte el precio actual, y te lo enviamos para la fecha que vos me digas que cobrás. ¿Te parece así? 😊',
     ],
     pensar: [

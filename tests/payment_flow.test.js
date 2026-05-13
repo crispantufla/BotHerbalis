@@ -212,13 +212,15 @@ describe('stepWaitingOk → pasa a waiting_payment_method', () => {
         expect(sent).not.toMatch(/Transferencia bancaria/i);
     });
 
-    test('[1.4] mensaje del menú menciona Pago Fácil/Rapipago + cuotas', async () => {
+    test('[1.4] mensaje del menú menciona cuotas + débito + saldo MP (sin Pago Fácil/Rapipago)', async () => {
         const state = makeOkState();
         await handleWaitingOk('u4', 'si', 'si', state, knowledge, deps);
         const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
-        expect(sent).toMatch(/Pago Fácil/i);
-        expect(sent).toMatch(/Rapipago/i);
         expect(sent).toMatch(/cuotas/i);
+        expect(sent).toMatch(/débito/i);
+        expect(sent).toMatch(/Saldo Mercado Pago/i);
+        expect(sent).not.toMatch(/Pago Fácil/i);
+        expect(sent).not.toMatch(/Rapipago/i);
     });
 
     test('[1.5] mensaje del menú NO menciona adicional de $6.000', async () => {
