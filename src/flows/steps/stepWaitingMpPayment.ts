@@ -277,6 +277,13 @@ async function _handleEmailSubflow(
     return 'ready';
 }
 
+// Cuántos intentos hacemos al MP API antes de pausar. Cubre blips transitorios
+// (5xx, network glitches, rate limits cortos). El backoff entre intentos lo
+// blockea a este worker en particular, no a otros clientes — cada usuario tiene
+// su propia cola de procesamiento en BullMQ.
+const MP_LINK_MAX_ATTEMPTS = 2;
+const MP_LINK_RETRY_DELAY_MS = 3000;
+
 async function _generateAndSendLink(
     userId: string,
     currentState: UserState,
@@ -284,7 +291,6 @@ async function _generateAndSendLink(
     dependencies: any
 ): Promise<void> {
     const { sendMessageWithDelay, saveState } = dependencies;
-    const instanceId = dependencies.sellerId || 'default';
 
     const mpToken = process.env.MP_ACCESS_TOKEN;
     if (!mpToken) {
@@ -299,114 +305,140 @@ async function _generateAndSendLink(
         return;
     }
 
-    try {
-        // Política mayo 2026: si state.senaAmount está seteado, el link es por la SEÑA
-        // (típicamente $10.000 para COD) — no por el total. El saldo lo cobra el cartero.
-        const isSena = !!(currentState.senaAmount && currentState.senaAmount > 0);
-        let totalRaw = currentState.totalPrice;
-        let amount: number;
-
-        if (isSena) {
-            amount = currentState.senaAmount as number;
-        } else {
-            amount = typeof totalRaw === 'string'
-                ? parseFloat(totalRaw.replace(/\./g, '').replace(',', '.'))
-                : Number(totalRaw || 0);
-
-            // Última red: si totalPrice viene corrupto pero cart tiene items, intentar
-            // recalcular antes de fallar. Esto rescató al cliente de un fallback ciego
-            // a contra-reembolso/transferencia cuando había elegido MP.
-            if ((!amount || amount <= 0) && currentState.cart && currentState.cart.length > 0) {
-                logger.warn(`[MP_PAYMENT] totalPrice inválido (${totalRaw}) — recalculando desde cart antes de fallar`);
-                const recalculated = calculateTotal(currentState);
-                totalRaw = recalculated;
-                amount = parseFloat(recalculated.replace(/\./g, '').replace(',', '.'));
+    // Loop de reintentos: si MP falla por un blip transitorio, esperamos 3s y
+    // probamos una vez más antes de rendirnos y pausar al cliente.
+    let lastError: any = null;
+    for (let attempt = 1; attempt <= MP_LINK_MAX_ATTEMPTS; attempt++) {
+        try {
+            await _tryCreateAndSendMpLink(userId, currentState, dependencies);
+            return; // éxito
+        } catch (e: any) {
+            lastError = e;
+            logger.error(`[MP_PAYMENT] Error generando link (intento ${attempt}/${MP_LINK_MAX_ATTEMPTS}) para ${userId}: ${e.message}`);
+            if (attempt < MP_LINK_MAX_ATTEMPTS) {
+                await new Promise(r => setTimeout(r, MP_LINK_RETRY_DELAY_MS));
             }
         }
-
-        if (!amount || amount <= 0) throw new Error('Monto inválido');
-
-        const { MercadoPagoConfig, Preference } = require('mercadopago');
-        const externalRef = randomUUID();
-        const webhookUrl = process.env.MP_WEBHOOK_URL;
-        const mpClient = new MercadoPagoConfig({ accessToken: mpToken });
-        const preference = new Preference(mpClient);
-        const itemTitle = isSena ? 'Seña Herbalis (pago al recibir)' : 'Pago Herbalis';
-        const body: any = {
-            items: [{ title: itemTitle, quantity: 1, unit_price: amount, currency_id: 'ARS' }],
-            back_urls: { success: 'https://herbalis.com.ar', failure: 'https://herbalis.com.ar', pending: 'https://herbalis.com.ar' },
-            auto_return: 'approved',
-            external_reference: externalRef,
-        };
-        if (webhookUrl) body.notification_url = webhookUrl;
-        // Pre-llenar email del pagador si lo capturamos. MP usa esto para mandar
-        // el comprobante automático + pre-llenar el formulario de checkout.
-        if (currentState.email) {
-            body.payer = { email: currentState.email };
-        }
-
-        const response = await preference.create({ body });
-        const link = response.init_point;
-
-        // Persistir en DB
-        const { prisma } = require('../../../db');
-        const cleanPhone = _cleanPhone(userId);
-        const record = await prisma.paymentLink.create({
-            data: {
-                preferenceId: response.id,
-                externalRef,
-                amount,
-                link,
-                userPhone: cleanPhone,
-                source: isSena ? 'bot_flow_sena' : 'bot_flow',
-                status: 'pending',
-                instanceId,
-            }
-        });
-
-        currentState.mpPaymentLinkId = record.id;
-        currentState.mpPaymentLinkUrl = link;
-        saveState(userId);
-
-        const productName = currentState.cart?.map((i: any) => i.product).join(' + ')
-            || currentState.selectedProduct?.split(' de ')[0]
-            || 'Herbalis';
-
-        const msg = isSena
-            ? `💳 *Pago al recibir — link de seña*\n\n` +
-                `Pedido: *${productName}* — Plan ${currentState.selectedPlan} días\n` +
-                `Total del pedido: *$${currentState.totalPrice}*\n` +
-                `Seña por Mercado Pago: *$${amount.toLocaleString('es-AR').replace(/,/g, '.')}*\n` +
-                `Saldo al cartero (efectivo): *$${(parseInt(String(currentState.totalPrice).replace(/\./g, ''), 10) - amount).toLocaleString('es-AR').replace(/,/g, '.')}*\n\n` +
-                `👇 Pagá la seña acá:\n${link}\n\n` +
-                `Podés usar tarjeta (en cuotas), débito o saldo MP.\n\n` +
-                `✅ Cuando termines, escribime *"listo"* y verifico el pago.\n\n` +
-                `Mientras tanto, pasame los datos de envío 👇\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nProvincia:`
-            : `💳 *Pago online via MercadoPago*\n\n` +
-                `Pedido: *${productName}* — Plan ${currentState.selectedPlan} días\n` +
-                `Total: *$${currentState.totalPrice}*\n\n` +
-                `👇 Hacé clic para pagar de forma segura:\n${link}\n\n` +
-                `Podés pagar con tarjeta (en cuotas), débito o saldo MP.\n\n` +
-                `✅ Cuando termines el pago, escribime *"listo"* y verifico que ingresó.\n\n` +
-                `Mientras tanto, pasame los datos de envío para tener todo listo 👇\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nProvincia:`;
-        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
-        await sendMessageWithDelay(userId, msg);
-        logger.info(`[MP_PAYMENT] Link ${isSena ? 'SEÑA' : ''} creado para ${userId} — $${amount} ARS — ${link}`);
-
-    } catch (e: any) {
-        logger.error('[MP_PAYMENT] Error generando link:', e.message);
-        // El cliente eligió MP — NO ofrecemos alternativas (CR tiene 9× más cancelación).
-        // Pausamos y alertamos al admin para que genere el link manual desde el panel
-        // y se lo mande al cliente. Mantenemos paymentMethod=mercadopago para que el
-        // admin vea claro qué método quería el cliente.
-        currentState.mpPaymentLinkId = null;
-        currentState.mpPaymentLinkUrl = null;
-        const msg = 'Permitime un momento, estoy generando tu enlace de pago de MercadoPago 🙂\n\nEn unos minutos te lo paso por acá. ¡Gracias por la paciencia!';
-        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
-        saveState(userId);
-        await sendMessageWithDelay(userId, msg);
-        await _pauseAndAlert(userId, currentState, dependencies, '', 'FALLO AL GENERAR ENLACE DE MP');
     }
+
+    // Todos los intentos fallaron — pausamos al cliente con el error específico
+    // para que el admin pueda diagnosticar (token vencido, monto inválido, MP 5xx, etc.).
+    currentState.mpPaymentLinkId = null;
+    currentState.mpPaymentLinkUrl = null;
+    const errMsg = (lastError?.message || 'desconocido').slice(0, 200);
+    const msg = `Tuve un problema técnico generando el link de pago 😕\n\nEn un momento te contacta un asesor para resolverlo. Disculpá la molestia 🙏`;
+    currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+    saveState(userId);
+    await sendMessageWithDelay(userId, msg);
+    await _pauseAndAlert(
+        userId, currentState, dependencies, '',
+        `FALLO AL GENERAR ENLACE DE MP (${MP_LINK_MAX_ATTEMPTS} intentos). Error: ${errMsg}`
+    );
+}
+
+/**
+ * Una única tentativa de crear y enviar el link MP. Lanza si MP API o el
+ * upsert en DB falla — el caller decide si reintentar.
+ */
+async function _tryCreateAndSendMpLink(
+    userId: string,
+    currentState: UserState,
+    dependencies: any
+): Promise<void> {
+    const { sendMessageWithDelay, saveState } = dependencies;
+    const instanceId = dependencies.sellerId || 'default';
+
+    // Política mayo 2026: si state.senaAmount está seteado, el link es por la SEÑA
+    // (típicamente $10.000 para COD) — no por el total. El saldo lo cobra el cartero.
+    const isSena = !!(currentState.senaAmount && currentState.senaAmount > 0);
+    let totalRaw = currentState.totalPrice;
+    let amount: number;
+
+    if (isSena) {
+        amount = currentState.senaAmount as number;
+    } else {
+        amount = typeof totalRaw === 'string'
+            ? parseFloat(totalRaw.replace(/\./g, '').replace(',', '.'))
+            : Number(totalRaw || 0);
+
+        // Última red: si totalPrice viene corrupto pero cart tiene items, intentar
+        // recalcular antes de fallar.
+        if ((!amount || amount <= 0) && currentState.cart && currentState.cart.length > 0) {
+            logger.warn(`[MP_PAYMENT] totalPrice inválido (${totalRaw}) — recalculando desde cart antes de fallar`);
+            const recalculated = calculateTotal(currentState);
+            totalRaw = recalculated;
+            amount = parseFloat(recalculated.replace(/\./g, '').replace(',', '.'));
+        }
+    }
+
+    if (!amount || amount <= 0) throw new Error('Monto inválido');
+
+    const { MercadoPagoConfig, Preference } = require('mercadopago');
+    const externalRef = randomUUID();
+    const webhookUrl = process.env.MP_WEBHOOK_URL;
+    const mpClient = new MercadoPagoConfig({ accessToken: process.env.MP_ACCESS_TOKEN });
+    const preference = new Preference(mpClient);
+    const itemTitle = isSena ? 'Seña Herbalis (pago al recibir)' : 'Pago Herbalis';
+    const body: any = {
+        items: [{ title: itemTitle, quantity: 1, unit_price: amount, currency_id: 'ARS' }],
+        back_urls: { success: 'https://herbalis.com.ar', failure: 'https://herbalis.com.ar', pending: 'https://herbalis.com.ar' },
+        auto_return: 'approved',
+        external_reference: externalRef,
+    };
+    if (webhookUrl) body.notification_url = webhookUrl;
+    // Pre-llenar email del pagador si lo capturamos. MP usa esto para mandar
+    // el comprobante automático + pre-llenar el formulario de checkout.
+    if (currentState.email) {
+        body.payer = { email: currentState.email };
+    }
+
+    const response = await preference.create({ body });
+    const link = response.init_point;
+
+    // Persistir en DB
+    const { prisma } = require('../../../db');
+    const cleanPhone = _cleanPhone(userId);
+    const record = await prisma.paymentLink.create({
+        data: {
+            preferenceId: response.id,
+            externalRef,
+            amount,
+            link,
+            userPhone: cleanPhone,
+            source: isSena ? 'bot_flow_sena' : 'bot_flow',
+            status: 'pending',
+            instanceId,
+        }
+    });
+
+    currentState.mpPaymentLinkId = record.id;
+    currentState.mpPaymentLinkUrl = link;
+    saveState(userId);
+
+    const productName = currentState.cart?.map((i: any) => i.product).join(' + ')
+        || currentState.selectedProduct?.split(' de ')[0]
+        || 'Herbalis';
+
+    const msg = isSena
+        ? `💳 *Pago al recibir — link de seña*\n\n` +
+            `Pedido: *${productName}* — Plan ${currentState.selectedPlan} días\n` +
+            `Total del pedido: *$${currentState.totalPrice}*\n` +
+            `Seña por Mercado Pago: *$${amount.toLocaleString('es-AR').replace(/,/g, '.')}*\n` +
+            `Saldo al cartero (efectivo): *$${(parseInt(String(currentState.totalPrice).replace(/\./g, ''), 10) - amount).toLocaleString('es-AR').replace(/,/g, '.')}*\n\n` +
+            `👇 Pagá la seña acá:\n${link}\n\n` +
+            `Podés usar tarjeta (en cuotas), débito o saldo MP.\n\n` +
+            `✅ Cuando termines, escribime *"listo"* y verifico el pago.\n\n` +
+            `Mientras tanto, pasame los datos de envío 👇\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nProvincia:`
+        : `💳 *Pago online via MercadoPago*\n\n` +
+            `Pedido: *${productName}* — Plan ${currentState.selectedPlan} días\n` +
+            `Total: *$${currentState.totalPrice}*\n\n` +
+            `👇 Hacé clic para pagar de forma segura:\n${link}\n\n` +
+            `Podés pagar con tarjeta (en cuotas), débito o saldo MP.\n\n` +
+            `✅ Cuando termines el pago, escribime *"listo"* y verifico que ingresó.\n\n` +
+            `Mientras tanto, pasame los datos de envío para tener todo listo 👇\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nProvincia:`;
+    currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+    await sendMessageWithDelay(userId, msg);
+    logger.info(`[MP_PAYMENT] Link ${isSena ? 'SEÑA' : ''} creado para ${userId} — $${amount} ARS — ${link}`);
 }
 
 async function _verifyPayment(currentState: UserState): Promise<'approved' | 'pending' | 'rejected'> {

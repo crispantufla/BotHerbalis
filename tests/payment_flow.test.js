@@ -473,6 +473,40 @@ describe('stepWaitingMpPayment — subflow email', () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
+// BLOQUE 6c: Retry + error handling al crear el link MP
+// ════════════════════════════════════════════════════════════════════════════
+describe('stepWaitingMpPayment — retry/error handling', () => {
+
+    test('[6c.1] MP falla 1 vez y luego anda → 2 intentos, link entregado, sin pause', async () => {
+        const state = makeMpState({ email: undefined, emailAskedAt: Date.now() });
+        mockPreferenceCreate.mockRejectedValueOnce(new Error('Network blip'));
+        await handleWaitingMpPayment('retry1', 'sin email', 'sin email', state, knowledge, deps);
+        expect(mockPreferenceCreate).toHaveBeenCalledTimes(2);
+        expect(state.mpPaymentLinkUrl).toBe('https://mp.com/checkout/pref_test');
+        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
+        expect(sent).not.toMatch(/problema técnico/i);
+    }, 15000);
+
+    test('[6c.2] MP falla siempre → pause + alert con e.message + mensaje honesto al cliente', async () => {
+        const state = makeMpState({ email: undefined, emailAskedAt: Date.now() });
+        mockPreferenceCreate.mockRejectedValue(new Error('invalid payer email'));
+        await handleWaitingMpPayment('retry2', 'sin email', 'sin email', state, knowledge, deps);
+        expect(mockPreferenceCreate).toHaveBeenCalledTimes(2);
+        // Mensaje al cliente: nuevo wording (no más "Permitime un momento")
+        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
+        expect(sent).toMatch(/problema técnico/i);
+        expect(sent).not.toMatch(/Permitime un momento/i);
+        // Admin notify recibió el e.message en el detalle
+        expect(mockNotify).toHaveBeenCalled();
+        const adminArgs = mockNotify.mock.calls.map(args => args.join(' ')).join(' ');
+        expect(adminArgs).toMatch(/FALLO AL GENERAR ENLACE DE MP/i);
+        expect(adminArgs).toMatch(/invalid payer email/i);
+        // Cliente quedó pausado
+        expect(deps.sharedState.pausedUsers.has('retry2')).toBe(true);
+    }, 15000);
+});
+
+// ════════════════════════════════════════════════════════════════════════════
 // BLOQUE 7: stepWaitingMpPayment — confirmación de pago (MP completo vs seña)
 // ════════════════════════════════════════════════════════════════════════════
 describe('Confirmación de pago — MP completo', () => {
