@@ -28,31 +28,31 @@
         },
         "recommendation": {
             "step": "waiting_weight",
-            "_note": "Fallback genérico cuando no se puede determinar tier. Re-pregunta con tono cálido.",
-            "response": "¡Buenísimo! 😊\n\nSolo para asegurarme de recomendarte algo que te sirva: ¿en qué rango estás más o menos?\n\n- Pocos, hasta 10 kg\n- Bastante, entre 10 y 20\n- Mucho, más de 20",
+            "_note": "Fallback genérico cuando no se puede determinar tier (handler usa recommendation_1/2/3). NO re-pregunta el rango — el saludo ya lo pidió. Solo acusamos recibo y esperamos a que el handler matchee con keywords o caiga en IA.",
+            "response": "¡Buenísimo! 😊 Dame un segundo y te recomiendo lo que mejor te sirva.",
             "nextStep": "waiting_ok"
         },
         "recommendation_1": {
             "step": "waiting_weight",
             "_note": "Tier 1 — hasta 10 kg → Gotas 60 días. Tono Elena. TEXTO 1+2 (recomendación + cómo funciona). Termina pidiendo aceptación para mostrar precios.",
-            "response": "Buenísimo, ya tengo una idea de cómo ayudarte 👌\n\nPara vos lo ideal es el *Plan de Gotas para 2 meses*. La mayoría de quienes querían bajar lo mismo que vos lograron entre 7 y 10 kilos con este plan.\n\nTe cuento cómo funciona:\n💧 Tomás 10 gotas una vez por día, antes del almuerzo o de la cena — se puede regular la dosis según los resultados\n📋 Te mando una guía de comidas con consejitos para acompañar (no es una dieta)\n📞 Yo te acompaño por WhatsApp durante todo el tratamiento — cualquier duda me escribís y vamos viendo juntas/os 😊\n\n¿Te paso los precios?",
+            "response": "Buenísimo, ya tengo una idea de cómo ayudarte 👌\n\nPara vos lo ideal es el *Plan de Gotas para 2 meses*. La mayoría de quienes querían bajar lo mismo que vos lograron entre 7 y 10 kilos con este plan.\n\nTe cuento cómo funciona:\n💧 Tomás 10 gotas una vez por día, antes del almuerzo o de la cena, con un vaso de agua — se puede regular la dosis según los resultados\n📋 Te mando una guía de comidas con consejitos para acompañar (no es una dieta)\n📞 Yo te acompaño por WhatsApp durante todo el tratamiento — cualquier duda me escribís y vamos viendo juntas/os 😊\n\n¿Te paso los precios?",
             "nextStep": "waiting_ok"
         },
         "recommendation_2": {
             "step": "waiting_weight",
             "_note": "Tier 2 — 10 a 20 kg → Cápsulas 60 días. Tono Elena. TEXTO 1+2 (recomendación + cómo funciona). Termina pidiendo aceptación para mostrar precios.",
-            "response": "Bárbaro, ya sé qué te conviene 💪\n\nPara vos lo ideal es el *Plan de Cápsulas para 2 meses*. La mayoría de quienes querían bajar entre 10 y 20 kilos lo lograron con este plan.\n\nTe cuento cómo funciona:\n💊 Una sola cápsula al día, 30 minutos antes del almuerzo o cena, con un vasito de agua\n📋 Te mando una guía de comidas con consejitos para acompañar (no es una dieta)\n📞 Yo te acompaño por WhatsApp durante todo el tratamiento — cualquier duda me escribís y vamos viendo juntas/os 😊\n\n¿Te paso los precios?",
+            "response": "Bárbaro, ya sé qué te conviene 💪\n\nPara vos lo ideal es el *Plan de Cápsulas para 2 meses*. La mayoría de quienes querían bajar entre 10 y 20 kilos lo lograron con este plan.\n\nTe cuento cómo funciona:\n💊 Una sola cápsula al día, 30 minutos antes del almuerzo o cena, con un vaso de agua\n📋 Te mando una guía de comidas con consejitos para acompañar (no es una dieta)\n📞 Yo te acompaño por WhatsApp durante todo el tratamiento — cualquier duda me escribís y vamos viendo juntas/os 😊\n\n¿Te paso los precios?",
             "nextStep": "waiting_ok"
         },
         "recommendation_3": {
             "step": "waiting_weight",
             "_note": "Tier 3 — +20 kg → Cápsulas 120 días. Tono Elena. TEXTO 1+2 (recomendación + cómo funciona). Termina pidiendo aceptación para mostrar precios.",
-            "response": "Genial, te cuento qué te conviene 💪\n\nPara más de 20 kilos lo que más recomiendo son las *cápsulas en plan de 4 meses* — es el tiempo que el cuerpo necesita para bajar de forma sostenida y completar el tratamiento.\n\nTe cuento cómo funciona:\n💊 Una cápsula al día, 30 minutos antes del almuerzo o cena, con un vasito de agua\n📋 Te mando una guía de comidas con consejitos para acompañar (no es una dieta)\n📞 Yo te acompaño por WhatsApp durante todo el tratamiento — cualquier duda me escribís 😊\n\n¿Te paso los precios?",
+            "response": "Genial, te cuento qué te conviene 💪\n\nPara más de 20 kilos lo que más recomiendo son las *cápsulas en plan de 4 meses* — es el tiempo que el cuerpo necesita para bajar de forma sostenida y completar el tratamiento.\n\nTe cuento cómo funciona:\n💊 Una cápsula al día, 30 minutos antes del almuerzo o cena, con un vaso de agua\n📋 Te mando una guía de comidas con consejitos para acompañar (no es una dieta)\n📞 Yo te acompaño por WhatsApp durante todo el tratamiento — cualquier duda me escribís 😊\n\n¿Te paso los precios?",
             "nextStep": "waiting_ok"
         },
         "preference_capsulas": {
             "step": "waiting_preference",
-            "_note": "Cliente que pide cápsulas directo (sin pasar por el flujo de tiers).",
+            "_note": "Cliente que pide cápsulas directo (sin pasar por el flujo de tiers). NO duplica los precios — el TEXTO 3 (entry 'prices') los muestra después del OK.",
             "match": [
                 "capsula",
                 "capsulas",
@@ -61,22 +61,23 @@
                 "practico",
                 "practica"
             ],
-            "response": "¡Dale, las cápsulas son lo más práctico que tenemos! 💊\n\nUna por día, 30 min antes de la comida principal, y listo.\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_CAPSULAS_60}}*\n💰 *Plan 4 meses: ${{PRICE_CAPSULAS_120}}*\n\n¿Avanzamos con 60 o 120 días?",
-            "nextStep": "waiting_plan_choice"
+            "response": "¡Dale, las cápsulas son lo más práctico que tenemos! 💊\n\nUna por día, 30 min antes de la comida principal, y listo.\n\n¿Te paso los precios? 😊",
+            "nextStep": "waiting_ok"
         },
         "preference_gotas": {
             "step": "waiting_preference",
+            "_note": "NO duplica los precios — el TEXTO 3 (entry 'prices') los muestra después del OK.",
             "match": [
                 "gotas",
                 "liquido",
                 "gotero"
             ],
-            "response": "¡Dale! Las gotas son lo más suave y discreto 💧\n\n10 gotas una vez al día, sin preparar nada.\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_GOTAS_60}}*\n💰 *Plan 4 meses: ${{PRICE_GOTAS_120}}*\n\n¿Avanzamos con 60 o 120 días?",
-            "nextStep": "waiting_plan_choice"
+            "response": "¡Dale! Las gotas son lo más suave y discreto 💧\n\n10 gotas una vez al día, sin preparar nada.\n\n¿Te paso los precios? 😊",
+            "nextStep": "waiting_ok"
         },
         "preference_semillas": {
             "step": "waiting_preference",
-            "_note": "Solo para clientes que conocen y piden semillas explícitamente.",
+            "_note": "Solo para clientes que conocen y piden semillas explícitamente. NO duplica los precios — el TEXTO 3 los muestra después del OK.",
             "match": [
                 "semilla",
                 "semillas",
@@ -84,8 +85,8 @@
                 "yuyos",
                 "te de semilla"
             ],
-            "response": "¡Ah, ya conocés las semillas! 🌿 La opción más natural de todas.\n\nSe prepara como una infusioncita cada noche, antes de dormir.\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_SEMILLAS_60}}*\n💰 *Plan 4 meses: ${{PRICE_SEMILLAS_120}}*\n\n¿60 o 120 días?",
-            "nextStep": "waiting_plan_choice"
+            "response": "¡Ah, ya conocés las semillas! 🌿 La opción más natural de todas.\n\nSe prepara como una infusioncita cada noche, antes de dormir.\n\n¿Te paso los precios? 😊",
+            "nextStep": "waiting_ok"
         },
         "closing": {
             "step": "waiting_plan_choice",
@@ -102,14 +103,8 @@
                 "mandalo",
                 "envielo"
             ],
-            "response": "¡Genial! 🎉 Anotame los datos para armar la etiqueta 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(Importante: la dirección tiene que ser exacta, sin esquinas ni \"aprox\". Si no, el correo no entrega.)",
+            "response": "¡Genial! 🎉 Anotame los datos para armar la etiqueta 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(Importante: la dirección tiene que ser exacta, sin esquinas ni \"aprox\" ni S/N. Si no, el correo no entrega.)",
             "nextStep": "waiting_data"
-        },
-        "confirmation": {
-            "step": "waiting_data",
-            "_note": "El método de pago se inyecta dinámicamente desde el flow (no hardcodear EFECTIVO). Tiempos de envío 4-6 días hábiles desde la confirmación del pago (MP es el default).",
-            "response": "📦 Te confirmo todo:\n\nProducto: {{PRODUCT}}\nPlan: {{PLAN}} días\nTotal: {{TOTAL}}\n\n✔ Va por Correo Argentino\n✔ Llega entre 4 y 6 días hábiles desde que confirmamos el pago\n\nUna cosa importante: si el cartero no te encuentra, o por cualquier otra razón el correo determina que lo tenés que retirar en la sucursal, tenés 72 hs desde que te avisemos. Si no lo retirás, ahí sí tiene un costo logístico de ${{COSTO_LOGISTICO}}.\n\n¿Me asegurás que vas a poder retirarlo dentro de las 72 hs si llegara a quedar en sucursal? 😊",
-            "nextStep": "completed"
         },
         "prices": {
             "step": "waiting_ok",
@@ -165,18 +160,18 @@
         },
         "payment_mp_retry_sena": {
             "step": "waiting_mp_payment",
-            "_note": "Variante del retry MP cuando el flujo era seña (legacy). Mismo texto que payment_mp_retry pero menciona 'pago de la seña'.",
-            "response": "⚠️ Hubo un problema con el pago de la seña — pudo ser la tarjeta o un rechazo del banco.\n\nProbá de nuevo con otra forma:\n✅ Tarjeta de crédito\n✅ Débito\n✅ Saldo Mercado Pago\n\nTe genero un nuevo link para volver a intentarlo, decime cuando esté listo 😊"
+            "_note": "Variante del retry MP cuando el flujo era seña (legacy). El bot pide al cliente el comprobante (screenshot o número de operación) para que el admin pueda verificar — no asumimos que la verificación automática de MP alcanza cuando ya hubo un rechazo.",
+            "response": "⚠️ Hubo un problema con el pago de la seña — pudo ser la tarjeta o un rechazo del banco.\n\nProbá de nuevo con otra forma:\n✅ Tarjeta de crédito\n✅ Débito\n✅ Saldo Mercado Pago\n\nTe genero un nuevo link para volver a intentarlo. Cuando termines, mandame *el comprobante* o el *número de operación* y verifico el pago 📸"
         },
         "transfer_received": {
             "step": "waiting_transfer_confirmation",
-            "_note": "Cliente confirmó que ya hizo la transferencia ('listo'). Pausamos al cliente y avisamos admin para verificar el comprobante.",
-            "response": "¡Perfecto! Recibimos tu aviso. Verificamos la transferencia y te confirmamos el envío en breve ⏳"
+            "_note": "Cliente confirmó que ya hizo la transferencia ('listo'). Pausamos al cliente y avisamos admin para verificar el comprobante. Pedimos comprobante o número de operación porque la cuenta emisora puede estar a nombre de un tercero y no se puede asumir match por nombre.",
+            "response": "¡Perfecto! Para verificarla más rápido, mandame *el comprobante* o el *número de operación* 📸\n\nApenas la cruzo, te confirmo el envío ⏳"
         },
         "cod_received": {
             "step": "waiting_transfer_confirmation",
-            "_note": "Cliente confirmó que ya hizo el anticipo COD ($10k al alias). Pausamos y avisamos admin. Aclara que el saldo lo paga al cartero.",
-            "response": "¡Perfecto! Recibimos tu aviso del anticipo. Verificamos la transferencia y te confirmamos el envío en breve. El saldo lo pagás en efectivo al cartero cuando llega 📦"
+            "_note": "Cliente confirmó que ya hizo el anticipo COD ($10k al alias). Pausamos y avisamos admin. Aclara que el saldo lo paga al cartero. Pedimos comprobante porque la cuenta emisora puede estar a nombre de un tercero y no se puede asumir match por nombre.",
+            "response": "¡Perfecto! Para verificar el anticipo, mandame *el comprobante* o el *número de operación* 📸\n\nApenas lo cruzo, despachamos. El saldo lo pagás en efectivo al cartero cuando llega 📦"
         },
         "order_confirmation_mp": {
             "step": "waiting_admin_validation",
@@ -190,13 +185,13 @@
         },
         "order_confirmation_cod": {
             "step": "waiting_admin_validation",
-            "_note": "Confirmación de pedido tras seña pagada (modalidad contra reembolso). Placeholders extra: {{SENA_AMOUNT_FMT}} (la seña recibida formateada), {{CARTO_LINE}} (línea distinta si es retiro en sucursal vs entrega a domicilio: incluye saldo).",
-            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✅ Seña recibida via MercadoPago: ${{SENA_AMOUNT_FMT}}\n{{CARTO_LINE}}\n\n✔ Correo Argentino\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs.\nEl no retiro genera un costo logístico de ${{COSTO_LOGISTICO}}.\n\n👉 ¿Me confirmás que podés retirar en sucursal dentro de las 72 hs si fuera necesario?"
+            "_note": "Confirmación de pedido tras seña pagada (modalidad contra reembolso). Placeholders extra: {{SENA_AMOUNT_FMT}} (la seña recibida formateada), {{CARTO_LINE}} (línea distinta si es retiro en sucursal vs entrega a domicilio: incluye saldo). NO repetimos la pregunta de retiro en 72hs — el cliente ya pagó el anticipo, está comprometido a recibir; sólo informamos la condición.",
+            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✅ Seña recibida via MercadoPago: ${{SENA_AMOUNT_FMT}}\n{{CARTO_LINE}}\n\n✔ Correo Argentino\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs. El no retiro genera un costo logístico de ${{COSTO_LOGISTICO}}."
         },
         "order_confirmation_fallback": {
             "step": "waiting_admin_validation",
-            "_note": "Fallback de confirmación si el paymentMethod del state no matchea con ninguno de los conocidos. Logueamos warn en código.",
-            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✔ Correo Argentino\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs.\n\n👉 ¿Me confirmás que podés retirarlo en sucursal dentro de las 72 hs si fuera necesario?"
+            "_note": "Fallback de confirmación si el paymentMethod del state no matchea con ninguno de los conocidos. Logueamos warn en código. NO incluye la pregunta de retiro en 72hs — el cliente ya pagó (sea anticipo o total) y está comprometido; sólo informamos la condición.",
+            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✔ Correo Argentino\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs."
         }
     },
     "faq": [

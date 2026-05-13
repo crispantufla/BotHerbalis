@@ -38,7 +38,6 @@ const SECTION_LABELS = {
     'flow.preference_gotas': 'Cliente elige gotas',
     'flow.preference_semillas': 'Cliente elige semillas',
     'flow.closing': 'Cierre — pide datos de envío',
-    'flow.confirmation': 'Confirmación final (pre-pago)',
     'flow.payment_menu': 'TEXTO 4 — Menú de pago (3 opciones)',
     'flow.payment_transfer_alias': 'TEXTO 5b — Cliente elige Transferencia (alias)',
     'flow.payment_cod_retry': 'TEXTO 5c — Cliente elige Contra reembolso (explica modalidad)',
@@ -301,15 +300,15 @@ const GuionView = () => {
 
     const sections = [];
     // Orden del flujo: greeting → recommendations → prices (TEXTO 3) → preference
-    // → closing (pide datos) → confirmation pre-pago → menú de pago (TEXTO 4)
-    // → ramas de pago (TEXTO 5: MP / transferencia / COD) → confirmaciones finales.
+    // → closing (pide datos) → menú de pago (TEXTO 4) → ramas de pago
+    // (TEXTO 5: MP / transferencia / COD) → confirmaciones finales.
+    // `flow.confirmation` (pre-pago, no usado en código) fue removido del JSON.
     const ORDERED_FLOW_KEYS = [
         'greeting',
         'recommendation', 'recommendation_1', 'recommendation_2', 'recommendation_3',
         'prices',
         'preference_capsulas', 'preference_gotas', 'preference_semillas',
         'closing',
-        'confirmation',
         'payment_menu',
         'payment_mp_link', 'payment_mp_link_sena',
         'payment_transfer_alias',

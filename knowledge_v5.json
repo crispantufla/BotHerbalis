@@ -28,8 +28,8 @@
         },
         "recommendation": {
             "step": "waiting_weight",
-            "_note": "Fallback genérico cuando no se puede determinar el tier (no se debería usar en V5; el handler usa recommendation_1/2/3).",
-            "response": "¡Buenísimo! 😊\n\nContame en qué rango estás:\n\n1️⃣ Pocos kilos (hasta 10)\n2️⃣ Bastante (entre 10 y 20)\n3️⃣ Mucho (más de 20)",
+            "_note": "Fallback genérico cuando no se puede determinar el tier (no se debería usar en V5; el handler usa recommendation_1/2/3). NO re-pregunta el rango — el saludo ya lo pidió. Solo acusamos recibo y esperamos a que el handler matchee con keywords o caiga en IA.",
+            "response": "¡Buenísimo! 😊 Dame un segundo y te recomiendo el plan que mejor te sirve.",
             "nextStep": "waiting_ok"
         },
         "recommendation_1": {
@@ -52,7 +52,7 @@
         },
         "preference_capsulas": {
             "step": "waiting_preference",
-            "_note": "En v5 el handler v5 ya setea el producto desde el kilos. Esta entrada se mantiene por compat (cliente que escribe 'cápsulas' directo en cualquier momento).",
+            "_note": "En v5 el handler v5 ya setea el producto desde el kilos. Esta entrada se mantiene por compat (cliente que escribe 'cápsulas' directo en cualquier momento). NO duplica los precios — el TEXTO 3 (entry 'prices') ya los muestra y pregunta el plan.",
             "match": [
                 "capsula",
                 "capsulas",
@@ -61,22 +61,23 @@
                 "practico",
                 "practica"
             ],
-            "response": "¡Dale! 💊 Las cápsulas son lo más práctico — 1 al día, 30 min antes de la comida principal.\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_CAPSULAS_60}}*\n💰 *Plan 4 meses: ${{PRICE_CAPSULAS_120}}*\n\n👉 ¿Avanzamos con 60 o 120 días?",
-            "nextStep": "waiting_plan_choice"
+            "response": "¡Dale! 💊 Las cápsulas son lo más práctico — 1 al día, 30 min antes de la comida principal.\n\n¿Te paso los precios? 😊",
+            "nextStep": "waiting_ok"
         },
         "preference_gotas": {
             "step": "waiting_preference",
+            "_note": "NO duplica los precios — el TEXTO 3 (entry 'prices') ya los muestra y pregunta el plan. Sólo acusamos recibo y pedimos OK.",
             "match": [
                 "gotas",
                 "liquido",
                 "gotero"
             ],
-            "response": "¡Dale! 💧 Las gotas son prácticas y discretas — 10 gotas, 1 vez al día.\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_GOTAS_60}}*\n💰 *Plan 4 meses: ${{PRICE_GOTAS_120}}*\n\n👉 ¿Avanzamos con 60 o 120 días?",
-            "nextStep": "waiting_plan_choice"
+            "response": "¡Dale! 💧 Las gotas son prácticas y discretas — 10 gotas, 1 vez al día.\n\n¿Te paso los precios? 😊",
+            "nextStep": "waiting_ok"
         },
         "preference_semillas": {
             "step": "waiting_preference",
-            "_note": "En v5, semillas SOLO se ofrecen cuando el cliente las pide explícitamente. No se incluyen en el flujo principal.",
+            "_note": "En v5, semillas SOLO se ofrecen cuando el cliente las pide explícitamente. No se incluyen en el flujo principal. NO duplica precios — el TEXTO 3 los muestra después del OK.",
             "match": [
                 "semilla",
                 "semillas",
@@ -85,8 +86,8 @@
                 "te de semilla",
                 "natural"
             ],
-            "response": "¡Dale! 🌿 Las semillas son la opción más natural — se preparan como infusión cada noche.\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_SEMILLAS_60}}*\n💰 *Plan 4 meses: ${{PRICE_SEMILLAS_120}}*\n\n👉 ¿Avanzamos con 60 o 120 días?",
-            "nextStep": "waiting_plan_choice"
+            "response": "¡Dale! 🌿 Las semillas son la opción más natural — se preparan como infusión cada noche.\n\n¿Te paso los precios? 😊",
+            "nextStep": "waiting_ok"
         },
         "closing": {
             "step": "waiting_plan_choice",
@@ -103,14 +104,8 @@
                 "mandalo",
                 "envielo"
             ],
-            "response": "¡Excelente! 🎉 Tomamos los datos para armar la etiqueta de envío 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(La dirección debe ser exacta, sin esquinas ni \"aprox\")",
+            "response": "¡Excelente! 🎉 Tomamos los datos para armar la etiqueta de envío 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(La dirección debe ser exacta, sin esquinas ni \"aprox\" ni S/N)",
             "nextStep": "waiting_data"
-        },
-        "confirmation": {
-            "step": "waiting_data",
-            "_note": "El método de pago se inyecta dinámicamente desde el flow (no hardcodear EFECTIVO). Retiro en sucursal NO es solo por cartero — el correo puede mandarlo a sucursal por otras razones.",
-            "response": "📦 Te confirmo el pedido:\n\nProducto: {{PRODUCT}}\nPlan: {{PLAN}} días\nTotal: {{TOTAL}}\n\n✔ Correo Argentino\n✔ Entrega estimada: 4 a 6 días hábiles desde la confirmación del pago\n\nUna cosa importante: si el cartero no te encuentra, o por cualquier otra razón el correo determina que lo tenés que retirar en la sucursal, tenés 72 hs desde que te avisemos. Si no lo retirás, ahí sí tiene un costo logístico de ${{COSTO_LOGISTICO}}.\n\n👉 ¿Me asegurás que vas a poder retirarlo dentro de las 72 hs si llegara a quedar en sucursal? 😊",
-            "nextStep": "completed"
         },
         "prices": {
             "step": "waiting_ok",
@@ -166,18 +161,18 @@
         },
         "payment_mp_retry_sena": {
             "step": "waiting_mp_payment",
-            "_note": "Variante del retry MP cuando el flujo era seña (legacy). Mismo texto que payment_mp_retry pero menciona 'pago de la seña'.",
-            "response": "⚠️ Hubo un problema con el pago de la seña — pudo ser la tarjeta o un rechazo del banco.\n\nProbá de nuevo con otra forma:\n✅ Tarjeta de crédito\n✅ Débito\n✅ Saldo Mercado Pago\n\nTe genero un nuevo link para volver a intentarlo, decime cuando esté listo 😊"
+            "_note": "Variante del retry MP cuando el flujo era seña (legacy). El bot pide al cliente que mande el comprobante (screenshot o número de operación) para que el admin pueda verificar — no asumimos que la verificación automática de MP sea suficiente cuando ya hubo un rechazo.",
+            "response": "⚠️ Hubo un problema con el pago de la seña — pudo ser la tarjeta o un rechazo del banco.\n\nProbá de nuevo con otra forma:\n✅ Tarjeta de crédito\n✅ Débito\n✅ Saldo Mercado Pago\n\nTe genero un nuevo link para volver a intentarlo. Cuando termines, mandame *el comprobante* o el *número de operación* y verifico el pago 📸"
         },
         "transfer_received": {
             "step": "waiting_transfer_confirmation",
-            "_note": "Cliente confirmó que ya hizo la transferencia ('listo'). Pausamos al cliente y avisamos admin para verificar el comprobante.",
-            "response": "¡Perfecto! Recibimos tu aviso. Verificamos la transferencia y te confirmamos el envío en breve ⏳"
+            "_note": "Cliente confirmó que ya hizo la transferencia ('listo'). Pausamos al cliente y avisamos admin para verificar el comprobante. Pedimos comprobante o número de operación porque la cuenta emisora puede estar a nombre de un tercero y no se puede asumir match por nombre.",
+            "response": "¡Perfecto! Para verificarla más rápido, mandame *el comprobante* o el *número de operación* 📸\n\nApenas la cruzo, te confirmo el envío ⏳"
         },
         "cod_received": {
             "step": "waiting_transfer_confirmation",
-            "_note": "Cliente confirmó que ya hizo el anticipo COD ($10k al alias). Pausamos y avisamos admin. Aclara que el saldo lo paga al cartero.",
-            "response": "¡Perfecto! Recibimos tu aviso del anticipo. Verificamos la transferencia y te confirmamos el envío en breve. El saldo lo pagás en efectivo al cartero cuando llega 📦"
+            "_note": "Cliente confirmó que ya hizo el anticipo COD ($10k al alias). Pausamos y avisamos admin. Aclara que el saldo lo paga al cartero. Pedimos comprobante porque la cuenta emisora puede estar a nombre de un tercero y no se puede asumir match por nombre.",
+            "response": "¡Perfecto! Para verificar el anticipo, mandame *el comprobante* o el *número de operación* 📸\n\nApenas lo cruzo, despachamos. El saldo lo pagás en efectivo al cartero cuando llega 📦"
         },
         "order_confirmation_mp": {
             "step": "waiting_admin_validation",
@@ -191,13 +186,13 @@
         },
         "order_confirmation_cod": {
             "step": "waiting_admin_validation",
-            "_note": "Confirmación de pedido tras seña pagada (modalidad contra reembolso). Placeholders extra: {{SENA_AMOUNT_FMT}} (la seña recibida formateada), {{CARTO_LINE}} (línea distinta si es retiro en sucursal vs entrega a domicilio: incluye saldo).",
-            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✅ Seña recibida via MercadoPago: ${{SENA_AMOUNT_FMT}}\n{{CARTO_LINE}}\n\n✔ Correo Argentino\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs.\nEl no retiro genera un costo logístico de ${{COSTO_LOGISTICO}}.\n\n👉 ¿Me confirmás que podés retirar en sucursal dentro de las 72 hs si fuera necesario?"
+            "_note": "Confirmación de pedido tras seña pagada (modalidad contra reembolso). Placeholders extra: {{SENA_AMOUNT_FMT}} (la seña recibida formateada), {{CARTO_LINE}} (línea distinta si es retiro en sucursal vs entrega a domicilio: incluye saldo). NO repetimos la pregunta de retiro en 72hs — el cliente ya pagó el anticipo, está comprometido a recibir; sólo informamos la condición.",
+            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✅ Seña recibida via MercadoPago: ${{SENA_AMOUNT_FMT}}\n{{CARTO_LINE}}\n\n✔ Correo Argentino\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs. El no retiro genera un costo logístico de ${{COSTO_LOGISTICO}}."
         },
         "order_confirmation_fallback": {
             "step": "waiting_admin_validation",
-            "_note": "Fallback de confirmación si el paymentMethod del state no matchea con ninguno de los conocidos. Logueamos warn en código.",
-            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✔ Correo Argentino\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs.\n\n👉 ¿Me confirmás que podés retirarlo en sucursal dentro de las 72 hs si fuera necesario?"
+            "_note": "Fallback de confirmación si el paymentMethod del state no matchea con ninguno de los conocidos. Logueamos warn en código. NO incluye la pregunta de retiro en 72hs — el cliente ya pagó (sea anticipo o total) y está comprometido; sólo informamos la condición.",
+            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✔ Correo Argentino\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs."
         }
     },
     "faq": [
