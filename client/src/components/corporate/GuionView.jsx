@@ -24,8 +24,6 @@ import {
 } from 'lucide-react';
 
 const SCRIPT_LABELS = {
-    v3: { name: 'V3 — Profesional + CR MAX', tone: 'Estructurado, contra reembolso first', color: '#0f5132' },
-    v4: { name: 'V4 — Psicología de Ventas', tone: 'Persuasivo, autoridad, escasez', color: '#d97706' },
     v5: { name: 'V5 — Asesor consultivo', tone: 'Pregunta kilos primero, recomienda según objetivo', color: '#0284c7' },
     v6: { name: 'V6 — Elena charla', tone: 'Cálido, conversacional, argentino', color: '#9333ea' },
 };
@@ -104,7 +102,7 @@ const GuionView = () => {
     const [activeScript, setActiveScript] = useState('v6');
     const [guiones, setGuiones] = useState([]);
     const [comments, setComments] = useState([]);
-    const [counts, setCounts] = useState({ v3: 0, v4: 0, v5: 0, v6: 0 });
+    const [counts, setCounts] = useState({ v5: 0, v6: 0 });
     const [loading, setLoading] = useState(true);
     const [expandedSection, setExpandedSection] = useState(null);
     const [showResolved, setShowResolved] = useState(false);
@@ -144,7 +142,7 @@ const GuionView = () => {
     const fetchCounts = useCallback(async () => {
         try {
             const res = await api.get('/api/guion-comments/counts');
-            setCounts(res.data.counts || { v3: 0, v4: 0, v5: 0, v6: 0 });
+            setCounts(res.data.counts || { v5: 0, v6: 0 });
         } catch (e) { /* silencioso, no es crítico */ }
     }, []);
 
