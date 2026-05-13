@@ -35,8 +35,8 @@ describe('Política nueva de pago — buildPaymentMessage (3 opciones espontáne
         expect(pm).not.toMatch(/Pago Fácil/i);
         expect(pm).not.toMatch(/Rapipago/i);
     });
-    test('Menciona cuotas (sub-opción tarjeta crédito por MP)', () => {
-        expect(pm).toMatch(/cuotas/i);
+    test('NO menciona cuotas (el bot no las promete; el cliente las ve al abrir MP)', () => {
+        expect(pm).not.toMatch(/cuotas/i);
     });
 });
 

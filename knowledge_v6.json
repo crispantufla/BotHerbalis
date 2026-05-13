@@ -61,7 +61,7 @@
                 "practico",
                 "practica"
             ],
-            "response": "¡Dale, las cápsulas son lo más práctico que tenemos! 💊\n\nUna por día, 30 min antes de la comida principal, y listo.\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_CAPSULAS_60}}*\n💰 *Plan 4 meses: ${{PRICE_CAPSULAS_120}}*\n\nPara avanzar te paso el link de *Mercado Pago* — podés pagar con tarjeta (en cuotas), débito o saldo MP 💳\n\n¿Avanzamos con 60 o 120 días?",
+            "response": "¡Dale, las cápsulas son lo más práctico que tenemos! 💊\n\nUna por día, 30 min antes de la comida principal, y listo.\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_CAPSULAS_60}}*\n💰 *Plan 4 meses: ${{PRICE_CAPSULAS_120}}*\n\n¿Avanzamos con 60 o 120 días?",
             "nextStep": "waiting_plan_choice"
         },
         "preference_gotas": {
@@ -71,7 +71,7 @@
                 "liquido",
                 "gotero"
             ],
-            "response": "¡Dale! Las gotas son lo más suave y discreto 💧\n\n10 gotas una vez al día, sin preparar nada.\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_GOTAS_60}}*\n💰 *Plan 4 meses: ${{PRICE_GOTAS_120}}*\n\nPara avanzar te paso el link de *Mercado Pago* — podés pagar con tarjeta (en cuotas), débito o saldo MP 💳\n\n¿Avanzamos con 60 o 120 días?",
+            "response": "¡Dale! Las gotas son lo más suave y discreto 💧\n\n10 gotas una vez al día, sin preparar nada.\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_GOTAS_60}}*\n💰 *Plan 4 meses: ${{PRICE_GOTAS_120}}*\n\n¿Avanzamos con 60 o 120 días?",
             "nextStep": "waiting_plan_choice"
         },
         "preference_semillas": {
@@ -84,7 +84,7 @@
                 "yuyos",
                 "te de semilla"
             ],
-            "response": "¡Ah, ya conocés las semillas! 🌿 La opción más natural de todas.\n\nSe prepara como una infusioncita cada noche, antes de dormir.\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_SEMILLAS_60}}*\n💰 *Plan 4 meses: ${{PRICE_SEMILLAS_120}}*\n\nPara avanzar te paso el link de *Mercado Pago* — podés pagar con tarjeta (en cuotas), débito o saldo MP 💳\n\n¿60 o 120 días?",
+            "response": "¡Ah, ya conocés las semillas! 🌿 La opción más natural de todas.\n\nSe prepara como una infusioncita cada noche, antes de dormir.\n\n💰 *Plan 2 meses: ${{PRICE_TOTAL_SEMILLAS_60}}*\n💰 *Plan 4 meses: ${{PRICE_SEMILLAS_120}}*\n\n¿60 o 120 días?",
             "nextStep": "waiting_plan_choice"
         },
         "closing": {
@@ -175,7 +175,7 @@
                 "cuotas"
             ],
             "_note": "Resumen de las 3 opciones disponibles cuando el cliente pregunta cómo se paga (tono Elena).",
-            "response": "Tenemos 3 formas de pagar 💳\n\n1️⃣ *Tarjeta de crédito (en cuotas)* — te paso el link de Mercado Pago\n2️⃣ *Transferencia bancaria* — te paso el alias\n3️⃣ *Contra reembolso* — adelantás $10.000 y el resto al recibir\n\n¿Cuál te queda más cómoda?"
+            "response": "Tenemos 3 formas de pagar 💳\n\n1️⃣ *Tarjeta de crédito o débito* — te paso el link de Mercado Pago\n2️⃣ *Transferencia bancaria* — te paso el alias\n3️⃣ *Contra reembolso* — adelantás $10.000 y el resto al recibir\n\n¿Cuál te queda más cómoda?"
         },
         {
             "keywords": [
@@ -316,7 +316,7 @@
         "keepResponsesShort": false,
         "_note_responseLength": "V6 prefiere respuestas más extensas y conversacionales que V5 — el tono de 'Elena' justifica el largo extra.",
         "defaultPaymentMethod": "three_options",
-        "_note_defaultPayment": "Ofrecemos 3 opciones espontáneamente al pedir el método de pago: (1) Tarjeta de crédito en cuotas (Mercado Pago link), (2) Transferencia bancaria (alias ERRONEA.HABLAME.LUZ — Bio Origen SAS), (3) Contra reembolso (anticipo $10.000 al mismo alias + saldo en efectivo al cartero).",
+        "_note_defaultPayment": "Ofrecemos 3 opciones espontáneamente al pedir el método de pago: (1) Tarjeta de crédito o débito (Mercado Pago link), (2) Transferencia bancaria (alias ERRONEA.HABLAME.LUZ — Bio Origen SAS), (3) Contra reembolso (anticipo $10.000 al mismo alias + saldo en efectivo al cartero). El bot NUNCA menciona cuotas — quien quiera dividir el pago verá las opciones que su tarjeta permita al abrir el link de MP.",
         "bankAlias": {
             "alias": "ERRONEA.HABLAME.LUZ",
             "titular": "Bio Origen SAS"

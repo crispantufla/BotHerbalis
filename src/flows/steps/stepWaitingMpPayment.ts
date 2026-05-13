@@ -86,11 +86,11 @@ export async function handleWaitingMpPayment(
             // rejected o error — re-presentar el flujo MP con un mensaje empático.
             // Política mayo 2026: NO ofrecemos COD espontáneamente como alternativa.
             // Si la tarjeta falla, pueden reintentar con otra forma de pago dentro
-            // del mismo link MP (tarjeta en cuotas, débito, saldo MP, etc.).
+            // del mismo link MP (tarjeta de crédito, débito, saldo MP, etc.).
             const wasSena = !!(currentState.senaAmount && currentState.senaAmount > 0);
             const msg = wasSena
-                ? '⚠️ Hubo un problema con el pago de la seña — pudo ser la tarjeta o un rechazo del banco.\n\nProbá de nuevo con otra forma:\n✅ Tarjeta (en cuotas)\n✅ Débito\n✅ Saldo Mercado Pago\n\nTe genero un nuevo link para volver a intentarlo, decime cuando esté listo 😊'
-                : '⚠️ Hubo un problema con el pago de MercadoPago — pudo ser la tarjeta o un rechazo del banco.\n\nProbá de nuevo con otra forma:\n✅ Tarjeta (en cuotas)\n✅ Débito\n✅ Saldo Mercado Pago\n\nTe genero un nuevo link para volver a intentarlo, decime cuando esté listo 😊';
+                ? '⚠️ Hubo un problema con el pago de la seña — pudo ser la tarjeta o un rechazo del banco.\n\nProbá de nuevo con otra forma:\n✅ Tarjeta de crédito\n✅ Débito\n✅ Saldo Mercado Pago\n\nTe genero un nuevo link para volver a intentarlo, decime cuando esté listo 😊'
+                : '⚠️ Hubo un problema con el pago de MercadoPago — pudo ser la tarjeta o un rechazo del banco.\n\nProbá de nuevo con otra forma:\n✅ Tarjeta de crédito\n✅ Débito\n✅ Saldo Mercado Pago\n\nTe genero un nuevo link para volver a intentarlo, decime cuando esté listo 😊';
             // Mantenemos senaAmount si era flujo seña — para regenerar link por $10k.
             currentState.mpPaymentLinkId = null;
             currentState.mpPaymentLinkUrl = null;
@@ -426,14 +426,14 @@ async function _tryCreateAndSendMpLink(
             `Seña por Mercado Pago: *$${amount.toLocaleString('es-AR').replace(/,/g, '.')}*\n` +
             `Saldo al cartero (efectivo): *$${(parseInt(String(currentState.totalPrice).replace(/\./g, ''), 10) - amount).toLocaleString('es-AR').replace(/,/g, '.')}*\n\n` +
             `👇 Pagá la seña acá:\n${link}\n\n` +
-            `Podés usar tarjeta (en cuotas), débito o saldo MP.\n\n` +
+            `Podés usar tarjeta de crédito, débito o saldo MP.\n\n` +
             `✅ Cuando termines, escribime *"listo"* y verifico el pago.\n\n` +
             `Mientras tanto, pasame los datos de envío 👇\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nProvincia:`
         : `💳 *Pago online via MercadoPago*\n\n` +
             `Pedido: *${productName}* — Plan ${currentState.selectedPlan} días\n` +
             `Total: *$${currentState.totalPrice}*\n\n` +
             `👇 Hacé clic para pagar de forma segura:\n${link}\n\n` +
-            `Podés pagar con tarjeta (en cuotas), débito o saldo MP.\n\n` +
+            `Podés pagar con tarjeta de crédito, débito o saldo MP.\n\n` +
             `✅ Cuando termines el pago, escribime *"listo"* y verifico que ingresó.\n\n` +
             `Mientras tanto, pasame los datos de envío para tener todo listo 👇\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nProvincia:`;
     currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });

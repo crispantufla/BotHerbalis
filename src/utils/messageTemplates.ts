@@ -37,7 +37,7 @@ function buildPersonalizedPriceResponse(state: any, productOverride?: string | n
 
     // Política nueva (mayo 2026): MP es la forma default; ya no hay adicional $6.000 por COD.
     // El COD solo se ofrece si el cliente lo pide y requiere seña de $10k vía MP.
-    const savingsLine = '\n\n💳 _Pagás con Mercado Pago: tarjeta (en cuotas), débito o saldo MP._';
+    const savingsLine = '\n\n💳 _Pagás con Mercado Pago: tarjeta de crédito, débito o saldo MP._';
 
     // Justificación según objetivo de kilos
     let justification: string;
@@ -75,13 +75,13 @@ function detectProductInText(text: string): string | null {
 
 /**
  * Build the payment menu message (TEXTO 4) — las 3 opciones se ofrecen espontáneamente.
- *  (1) Tarjeta de crédito en cuotas (Mercado Pago link)
+ *  (1) Tarjeta de crédito o débito (Mercado Pago link)
  *  (2) Transferencia bancaria (alias ERRONEA.HABLAME.LUZ — Bio Origen SAS)
  *  (3) Contra reembolso: anticipo de $10.000 al mismo alias + saldo en efectivo al cartero
  */
 function buildPaymentMessage(_state: any): string {
     return `¡Perfecto! ¿Cómo preferís realizar el pago? 💳\n\n` +
-        `1️⃣ *Tarjeta de crédito (en cuotas)* — te paso el link de Mercado Pago\n` +
+        `1️⃣ *Tarjeta de crédito o débito* — te paso el link de Mercado Pago\n` +
         `2️⃣ *Transferencia bancaria* — te paso el alias\n` +
         `3️⃣ *Contra reembolso* — anticipo de $10.000 y el resto al recibir\n\n` +
         `¿Cuál te queda más cómoda?`;
