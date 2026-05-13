@@ -85,9 +85,11 @@ export async function handleWaitingMpPayment(
 
         } else {
             // rejected o error — re-presentar el flujo MP con un mensaje empático.
-            // Política mayo 2026: NO ofrecemos COD espontáneamente como alternativa.
-            // Si la tarjeta falla, pueden reintentar con otra forma de pago dentro
-            // del mismo link MP (tarjeta de crédito, débito, saldo MP, etc.).
+            // Acá NO ofrecemos cambiar a COD: si la tarjeta falla, pueden reintentar
+            // con otra forma dentro del mismo link MP (tarjeta de crédito, débito,
+            // saldo MP, etc.). Si quieren cambiar a COD o transferencia, lo deben
+            // pedir explícitamente y el handler de arriba (CASH_FALLBACK_KEYWORDS /
+            // TRANSFER_FALLBACK_KEYWORDS) los enruta correctamente.
             const wasSena = !!(currentState.senaAmount && currentState.senaAmount > 0);
             const tpl = getFlowTemplate(wasSena ? 'payment_mp_retry_sena' : 'payment_mp_retry', knowledge);
             const msg = tpl
@@ -130,20 +132,31 @@ export async function handleWaitingMpPayment(
     }
 
     // ── Cliente quiere contra reembolso ────────────────────────────────────────
-    // Política mayo 2026: COD requiere SEÑA de $10k por MP. Si el cliente ya tenía
-    // un link de MP por el total y quiere cambiar a COD, regeneramos el link por
-    // $10k de seña (el flujo seña no permite saltearse la seña).
+    // Política nueva: COD ahora va por TRANSFERENCIA al alias (no por MP). Si el
+    // cliente estaba en flujo MP y pide cambiar a COD, le explicamos la modalidad
+    // (cash retry) + le mandamos el alias para el anticipo + transicionamos a
+    // WAITING_TRANSFER_CONFIRMATION (mismo flow que en stepWaitingPaymentMethod
+    // cuando cashRetryShown=true y el cliente confirma).
     if (shortOption === '3' || CASH_FALLBACK_KEYWORDS.test(normalizedText)) {
         currentState.paymentMethod = 'contrarembolso';
         currentState.mpPaymentLinkId = null;
         currentState.mpPaymentLinkUrl = null;
         currentState.senaAmount = 10000;
         currentState.senaPaid = false;
+
+        // 1) Explicación de la modalidad (alias + saldo al cartero).
         const explainMsg = buildCashRetryMessage(currentState, knowledge);
         currentState.history.push({ role: 'bot', content: explainMsg, timestamp: Date.now() });
         await sendMessageWithDelay(userId, explainMsg);
-        // Generar el link de seña ($10k) y enviarlo.
-        await _generateAndSendLink(userId, currentState, knowledge, dependencies);
+
+        // 2) Alias para el anticipo (TEXTO 5d) + recordatorio del saldo.
+        const anticipoTpl = getFlowTemplate('payment_cod_anticipo', knowledge) ||
+            `¡Perfecto! Para el *anticipo de $10.000* usá el alias *{{ALIAS}}* a nombre de *{{TITULAR}}* 🏦\n\nUna vez que realices el anticipo, escribime *"listo"* y despachamos. Cuando te llegue el paquete, pagás el saldo *${'$'}{{SALDO}}* en efectivo al cartero 📦`;
+        const anticipoMsg = _formatMessage(anticipoTpl, currentState);
+        currentState.history.push({ role: 'bot', content: anticipoMsg, timestamp: Date.now() });
+        await sendMessageWithDelay(userId, anticipoMsg);
+
+        _setStep(currentState, FlowStep.WAITING_TRANSFER_CONFIRMATION);
         saveState(userId);
         return { matched: true };
     }

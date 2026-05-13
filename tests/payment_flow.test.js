@@ -513,6 +513,41 @@ describe('stepWaitingMpPayment — retry/error handling', () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
+// BLOQUE 6d: Cliente en flujo MP cambia a Contra reembolso
+// Regresión: antes el bot enviaba msg "anticipo al alias" + link MP por $10k
+// (contradictorio). Ahora envía cash retry + msg con alias + va a transfer confirm.
+// ════════════════════════════════════════════════════════════════════════════
+describe('stepWaitingMpPayment — cliente cambia a Contra reembolso', () => {
+
+    test('[6d.1] "3" en MP → cash retry + alias anticipo + WAITING_TRANSFER_CONFIRMATION (sin MP link)', async () => {
+        const state = makeMpState({
+            mpPaymentLinkId: 'pl-1',
+            mpPaymentLinkUrl: 'https://mp.com/x',
+        });
+        mockPreferenceCreate.mockClear();
+        await handleWaitingMpPayment('cod_switch', '3', '3', state, knowledge, deps);
+
+        // Estado actualizado a COD anticipo
+        expect(state.paymentMethod).toBe('contrarembolso');
+        expect(state.senaAmount).toBe(10000);
+        expect(state.senaPaid).toBe(false);
+        expect(state.step).toBe('waiting_transfer_confirmation');
+        expect(state.mpPaymentLinkUrl).toBeNull();
+
+        // Bot envió al menos 2 mensajes: explicación + alias
+        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
+        expect(sent).toMatch(/anticipo/i);
+        expect(sent).toMatch(/10\.000/);
+        expect(sent).toMatch(/ERRONEA\.HABLAME\.LUZ/);
+        expect(sent).toMatch(/Bio Origen SAS/);
+        expect(sent).toMatch(/efectivo al cartero/i);
+
+        // Y NO regeneró un link MP (el bug viejo lo hacía)
+        expect(mockPreferenceCreate).not.toHaveBeenCalled();
+    });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
 // BLOQUE 7: stepWaitingMpPayment — confirmación de pago (MP completo vs seña)
 // ════════════════════════════════════════════════════════════════════════════
 describe('Confirmación de pago — MP completo', () => {

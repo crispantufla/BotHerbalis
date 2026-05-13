@@ -25,7 +25,6 @@ import {
 
 const SCRIPT_LABELS = {
     v5: { name: 'V5 — Asesor consultivo', tone: 'Pregunta kilos primero, recomienda según objetivo', color: '#0284c7' },
-    v6: { name: 'V6 — Elena charla', tone: 'Cálido, conversacional, argentino', color: '#9333ea' },
 };
 
 const SECTION_LABELS = {
@@ -38,9 +37,6 @@ const SECTION_LABELS = {
     'flow.preference_capsulas': 'Cliente elige cápsulas',
     'flow.preference_gotas': 'Cliente elige gotas',
     'flow.preference_semillas': 'Cliente elige semillas',
-    'flow.price_capsulas': 'Precio cápsulas',
-    'flow.price_gotas': 'Precio gotas',
-    'flow.price_semillas': 'Precio semillas',
     'flow.closing': 'Cierre — pide datos de envío',
     'flow.confirmation': 'Confirmación final (pre-pago)',
     'flow.payment_menu': 'TEXTO 4 — Menú de pago (3 opciones)',
@@ -71,7 +67,10 @@ const TYPE_META = {
 };
 
 // Reemplaza placeholders {{X}} con valores ejemplo para que se vea como en producción.
+// El runtime los sustituye dinámicamente en `_formatMessage` (src/flows/utils/messages.ts);
+// acá usamos valores de ejemplo plausibles para que admins vean cómo queda el mensaje.
 const PLACEHOLDER_VALUES = {
+    // Precios por producto + plan
     PRICE_CAPSULAS_60: '46.900',
     PRICE_CAPSULAS_120: '66.900',
     PRICE_SEMILLAS_60: '36.900',
@@ -84,11 +83,31 @@ const PLACEHOLDER_VALUES = {
     PRICE_PER_DAY_CAPSULAS_120: '558',
     PRICE_PER_DAY_SEMILLAS_120: '416',
     PRICE_PER_DAY_GOTAS_120: '574',
+    // Variantes según producto recomendado (PRICE_60/PRICE_120 resueltos en runtime
+    // contra state.selectedProduct; en el panel asumimos cápsulas como ejemplo)
+    PRICE_60: '46.900',
+    PRICE_120: '66.900',
+    // Constantes de negocio
+    ALIAS: 'ERRONEA.HABLAME.LUZ',
+    TITULAR: 'Bio Origen SAS',
+    ANTICIPO: '10.000',
     ADICIONAL_MAX: '0',
     COSTO_LOGISTICO: '18.000',
+    // Pedido (ejemplo cápsulas 120)
     PRODUCT: 'Cápsulas',
+    PRODUCT_DETAIL: 'Cápsulas',
     PLAN: '120',
-    TOTAL: '$66.900',
+    PLAN_DETAIL: '120 días',
+    TOTAL: '66.900',
+    // Flujos de pago
+    LINK: 'https://mpago.la/example',
+    SALDO: '56.900',
+    SENA_AMOUNT: '10.000',
+    SENA_AMOUNT_FMT: '10.000',
+    SENA_REMAINDER: '56.900',
+    // Líneas condicionales (en runtime _formatMessage las arma según state.postdatado / sucursal)
+    POSTDATADO_LINE: '✔ Entrega estimada: 4 a 6 días hábiles desde la confirmación del pago\n',
+    CARTO_LINE: '✔ Saldo al cartero: *$56.900* en efectivo al recibir',
 };
 
 function renderText(text) {
@@ -115,10 +134,10 @@ const GuionView = () => {
     const { socket } = useSocket();
     const isAdmin = user?.role === 'admin';
 
-    const [activeScript, setActiveScript] = useState('v6');
+    const [activeScript, setActiveScript] = useState('v5');
     const [guiones, setGuiones] = useState([]);
     const [comments, setComments] = useState([]);
-    const [counts, setCounts] = useState({ v5: 0, v6: 0 });
+    const [counts, setCounts] = useState({ v5: 0 });
     const [loading, setLoading] = useState(true);
     const [expandedSection, setExpandedSection] = useState(null);
     const [showResolved, setShowResolved] = useState(false);
@@ -158,7 +177,7 @@ const GuionView = () => {
     const fetchCounts = useCallback(async () => {
         try {
             const res = await api.get('/api/guion-comments/counts');
-            setCounts(res.data.counts || { v5: 0, v6: 0 });
+            setCounts(res.data.counts || { v5: 0 });
         } catch (e) { /* silencioso, no es crítico */ }
     }, []);
 
