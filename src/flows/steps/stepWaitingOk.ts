@@ -1,8 +1,23 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _setStep, _pauseAndAlert } from '../utils/flowHelpers';
 import { _isAffirmative, _isNegative } from '../utils/validation';
-import { buildPaymentMessage } from '../../utils/messageTemplates';
+import { _getPrice } from '../utils/pricing';
 import logger from '../../utils/logger';
+
+/**
+ * TEXTO 3 — Tras la recomendación ("¿te paso precios?"), cliente dice "sí".
+ * Mostramos los 2 planes del producto seleccionado y le pedimos que elija.
+ */
+function _buildPricesMessage(state: UserState): string {
+    const product = state.selectedProduct || 'Cápsulas de nuez de la india';
+    const productKey = product.includes('Gota') ? 'Gotas' : product.includes('Semilla') ? 'Semillas' : 'Cápsulas';
+    const price60 = _getPrice(productKey, '60');
+    const price120 = _getPrice(productKey, '120');
+
+    return `💰 *Plan 2 meses: $${price60}*\n` +
+        `💰 *Plan 4 meses: $${price120}* — el más conveniente; muchas clientas, al llegar al peso, lo usan 1-2 veces por semana como mantenimiento.\n\n` +
+        `¿Qué plan preferís? 😊`;
+}
 
 export async function handleWaitingOk(
     userId: string,
@@ -27,7 +42,7 @@ export async function handleWaitingOk(
         logger.info(`[AI-FALLBACK] waiting_ok: Detected QUESTION from ${userId}`);
         const aiOk = await aiService.chat(text, {
             step: FlowStep.WAITING_OK,
-            goal: 'El usuario tiene una duda sobre el envío. Respondé de manera detallada, humana y empática, resolviendo sus ansiedades sobre el envío de forma cálida y extensa. Tómate tu tiempo en conversar antes de preguntar: ¿Te resulta posible retirar en sucursal si fuera necesario? SÍ o NO.',
+            goal: 'El usuario tiene una duda tras la recomendación del plan. Respondé de manera detallada, humana y empática. Cuando termines, retomá la propuesta preguntando: ¿Te paso los precios?',
             history: currentState.history,
             summary: currentState.summary,
             knowledge: knowledge,
@@ -41,21 +56,22 @@ export async function handleWaitingOk(
         }
     }
     else if (_isAffirmative(normalizedText)) {
-        const msg = buildPaymentMessage(currentState);
-        _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
+        // TEXTO 3 — Mostramos precios y pedimos plan choice.
+        const msg = _buildPricesMessage(currentState);
+        _setStep(currentState, FlowStep.WAITING_PLAN_CHOICE);
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
         return { matched: true };
     } else if (_isNegative(normalizedText)) {
-        logger.info(`[PAUSE] waiting_ok: User ${userId} declined delivery conditions.`);
-        await _pauseAndAlert(userId, currentState, dependencies, text, 'El cliente rechazó las condiciones de envío.');
+        logger.info(`[PAUSE] waiting_ok: User ${userId} declined seeing prices/plan info.`);
+        await _pauseAndAlert(userId, currentState, dependencies, text, 'El cliente rechazó ver los precios o avanzar tras la recomendación.');
         return { matched: true };
     } else {
         logger.info(`[AI-FALLBACK] waiting_ok: No match for ${userId}`);
         const aiOk = await aiService.chat(text, {
             step: FlowStep.WAITING_OK,
-            goal: 'El usuario debe confirmar que puede retirar en sucursal si es necesario. Respondé de manera muy amable, calmando cualquier duda de forma detallada y preguntándole de vuelta con mucha calidez: SÍ o NO.',
+            goal: 'El usuario aún no confirmó si quiere ver los precios del plan recomendado. Respondé con calidez resolviendo cualquier duda y retomá: ¿Te paso los precios? SÍ o NO.',
             history: currentState.history,
             summary: currentState.summary,
             knowledge: knowledge,

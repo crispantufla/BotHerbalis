@@ -74,34 +74,32 @@ function detectProductInText(text: string): string | null {
 }
 
 /**
- * Build the payment menu message shown to the client.
- * Política mayo 2026: MP-first como ÚNICA opción ofrecida espontáneamente.
- * Transferencia y contra reembolso solo se ofrecen si el cliente las pide
- * explícitamente (el AI fallback de stepWaitingPaymentMethod las maneja).
+ * Build the payment menu message (TEXTO 4) — las 3 opciones se ofrecen espontáneamente.
+ *  (1) Tarjeta de crédito en cuotas (Mercado Pago link)
+ *  (2) Transferencia bancaria (alias ERRONEA.HABLAME.LUZ — Bio Origen SAS)
+ *  (3) Contra reembolso: anticipo de $10.000 al mismo alias + saldo en efectivo al cartero
  */
 function buildPaymentMessage(_state: any): string {
-    return `¡Buenísimo! Para avanzar con tu pedido te voy a pasar el link de *Mercado Pago* 💳\n\n` +
-        `Es la forma más rápida y segura:\n` +
-        `✅ Tarjeta de crédito (en cuotas)\n` +
-        `✅ Tarjeta de débito\n` +
-        `✅ Saldo Mercado Pago\n\n` +
-        `🛡️ Protección al comprador — si no recibís el producto, te devuelven el 100%.\n` +
-        `📦 Apenas confirmamos el pago, despachamos (llega en 4-6 días hábiles).\n\n` +
-        `¿Te paso el link así dejamos tu pedido confirmado? 😊`;
+    return `¡Perfecto! ¿Cómo preferís realizar el pago? 💳\n\n` +
+        `1️⃣ *Tarjeta de crédito (en cuotas)* — te paso el link de Mercado Pago\n` +
+        `2️⃣ *Transferencia bancaria* — te paso el alias\n` +
+        `3️⃣ *Contra reembolso* — anticipo de $10.000 y el resto al recibir\n\n` +
+        `¿Cuál te queda más cómoda?`;
 }
 
 /**
- * Build the message shown when the client explicitly asks for contra reembolso.
- * Política mayo 2026: COD requiere seña de $10k vía MP + saldo en efectivo al cartero.
+ * Build the message shown when the client elige contra reembolso (o lo pregunta).
+ * Modalidad: anticipo de $10.000 por transferencia al alias + saldo en efectivo al cartero.
  * NO se promociona como "más cómodo/seguro" — se presenta como decisión interna.
  */
 function buildCashRetryMessage(_state: any): string {
     return `Dale, podemos coordinar pago al recibir 👍\n\n` +
-        `La modalidad es: adelantás una *seña de $10.000* por Mercado Pago (cubre el envío), ` +
+        `La modalidad es: adelantás un *anticipo de $10.000* por transferencia ` +
+        `(alias *ERRONEA.HABLAME.LUZ*, a nombre de *Bio Origen SAS* — cubre el envío), ` +
         `y el resto lo pagás en *efectivo al cartero* cuando llega el paquete.\n\n` +
         `Es una decisión interna por la cantidad de paquetes que vuelven sin retirar — aplica a todos los pedidos. ` +
         `Es exactamente la misma plata, solo cambia el momento.\n\n` +
-        `Si te queda más cómodo, también te puedo pasar el link de Mercado Pago por el total. ¿Cómo querés avanzar?`;
+        `¿Te queda cómodo así o preferís el link de Mercado Pago por el total?`;
 }
 
 /**

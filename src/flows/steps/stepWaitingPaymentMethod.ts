@@ -87,7 +87,7 @@ export async function handleWaitingPaymentMethod(
     // ── Opción 2: Transferencia ────────────────────────────────────────────────
     if (isOptionTransfer || TRANSFER_KEYWORDS.test(normalizedText)) {
         currentState.paymentMethod = 'transferencia';
-        const msg = `¡Perfecto! Para transferir usá el alias *CHILE.TEXTO.CASINO*. Una vez que realicés la transferencia avisanos por acá y coordinamos el envío 😊`;
+        const msg = `¡Perfecto! Para transferir usá el alias *ERRONEA.HABLAME.LUZ* a nombre de *Bio Origen SAS* 🏦\n\nMonto: $${currentState.totalPrice || '0'}\n\nUna vez que realices la transferencia, escribime *"listo"* y coordinamos el envío 😊`;
         _setStep(currentState, FlowStep.WAITING_TRANSFER_CONFIRMATION);
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);
@@ -96,39 +96,41 @@ export async function handleWaitingPaymentMethod(
     }
 
     // ── Opción 3: Contra reembolso (pago al recibir) ───────────────────────────
-    // Política mayo 2026: COD requiere SEÑA de $10.000 por MP + saldo en efectivo
-    // al cartero. La seña se cobra a través del flujo MP normal (WAITING_MP_PAYMENT)
-    // pero con state.senaAmount seteado → el link es por $10k, no por totalPrice.
+    // Anticipo de $10.000 por transferencia al alias (cubre envío) + saldo en
+    // efectivo al cartero. Reutiliza WAITING_TRANSFER_CONFIRMATION con
+    // paymentMethod='contrarembolso' y senaAmount=10000 para que la confirmación
+    // ajuste el mensaje al recibir "listo".
     if (isOptionCash || CASH_KEYWORDS.test(normalizedText) || isConfirmingCashRetry) {
-        // Ya no hay adicional $6.000 — política eliminada. La seña la maneja MP.
-        // Mensaje explicando la modalidad antes de generar el link.
         if (!currentState.cashRetryShown) {
             currentState.cashRetryShown = true;
             const retryMsg = buildCashRetryMessage(currentState);
             currentState.history.push({ role: 'bot', content: retryMsg, timestamp: Date.now() });
             saveState(userId);
             await sendMessageWithDelay(userId, retryMsg);
-            logger.info(`[PAYMENT_METHOD] COD seña $10k presentado a ${userId}`);
+            logger.info(`[PAYMENT_METHOD] COD anticipo $10k presentado a ${userId}`);
             return { matched: true };
         }
 
-        // Cliente ya vio el mensaje de la modalidad y eligió seguir → marcamos
-        // COD final, seteamos seña y vamos al flujo MP por $10k.
         currentState.paymentMethod = 'contrarembolso';
         currentState.senaAmount = 10000;
         currentState.senaPaid = false;
-        _setStep(currentState, FlowStep.WAITING_MP_PAYMENT);
+        const totalInt = parseInt(String(currentState.totalPrice || '0').replace(/\./g, ''), 10) || 0;
+        const remainder = Math.max(0, totalInt - 10000);
+        const remainderFmt = remainder.toLocaleString('es-AR').replace(/,/g, '.');
+        const msg = `¡Perfecto! Para el *anticipo de $10.000* usá el alias *ERRONEA.HABLAME.LUZ* a nombre de *Bio Origen SAS* 🏦\n\nUna vez que realices el anticipo, escribime *"listo"* y despachamos. Cuando te llegue el paquete, pagás el saldo *$${remainderFmt}* en efectivo al cartero 📦`;
+        _setStep(currentState, FlowStep.WAITING_TRANSFER_CONFIRMATION);
+        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);
-        // stepWaitingMpPayment leerá state.senaAmount y generará el link por $10k.
-        return { matched: false, staleReprocess: true } as any;
+        await sendMessageWithDelay(userId, msg);
+        return { matched: true };
     }
 
     // ── AI fallback — respuesta ambigua ────────────────────────────────────────
-    // Política mayo 2026: MP es la ÚNICA opción ofrecida espontáneamente.
-    // Transferencia y contra reembolso solo se mencionan si el cliente las pide.
+    // Política nueva: las 3 opciones (MP, Transferencia, Contra reembolso con
+    // anticipo $10k) se ofrecen espontáneamente. El cliente elige una.
     const aiRes = await aiService.chat(text, {
         step: 'waiting_payment_method',
-        goal: `El cliente debe avanzar con el pago. POLÍTICA NUEVA (mayo 2026):\n\nMÉTODO POR DEFECTO: link de *Mercado Pago* — es la única opción que ofrecemos espontáneamente. Cubre:\n  ✅ Tarjeta de crédito (en cuotas)\n  ✅ Tarjeta de débito\n  ✅ Saldo Mercado Pago\n\nSI EL CLIENTE PIDE *TRANSFERENCIA BANCARIA*: ofrecela como alternativa. Le pasás el alias cuando confirme el pedido. Misma velocidad (4-6 días).\n\nSI EL CLIENTE PIDE *CONTRA REEMBOLSO / PAGO AL RECIBIR*: la modalidad es seña de $10.000 por Mercado Pago (cubre el envío) + saldo en efectivo al cartero. Aplica a TODOS los planes y a TODOS los clientes (nuevos y recurrentes). Es una decisión interna por la cantidad de paquetes que vuelven sin retirar. Es exactamente la misma plata, solo cambia el momento. Si no quiere adelantar los $10k, reofrecé MP por el total.\n\nPROHIBICIONES ESTRICTAS:\n- NO mencionar adicional de $6.000 (esa política ya no existe)\n- NO mencionar "efectivo en Pago Fácil/Rapipago" como medio de pago\n- NO decir "contra reembolso es lo más cómodo/seguro"\n- NO decir "el envío es gratis si elegís plan 120 días"\n- NO ofrecer COD ni transferencia espontáneamente — solo si el cliente las pide\n- NO mencionar cuotas (si pregunta, decile que vea las opciones al abrir el link de MP)\n\nNUNCA avances sin que el cliente confirme con qué opción quiere avanzar.`,
+        goal: `El cliente debe elegir cómo paga. Las 3 opciones disponibles son:\n\n1️⃣ *Tarjeta de crédito (en cuotas)* — por Mercado Pago. Link inmediato. Cubre crédito (en cuotas), débito y saldo MP.\n\n2️⃣ *Transferencia bancaria* — alias *ERRONEA.HABLAME.LUZ* a nombre de *Bio Origen SAS*. Le pasamos el alias y avisa cuando transfirió.\n\n3️⃣ *Contra reembolso / pago al recibir* — anticipo de *$10.000* por transferencia al mismo alias (*ERRONEA.HABLAME.LUZ*, *Bio Origen SAS*) que cubre el envío + saldo en efectivo al cartero cuando llega. Aplica a TODOS los planes y clientes (nuevos y recurrentes). Es una decisión interna por la cantidad de paquetes que vuelven sin retirar. Es exactamente la misma plata, solo cambia el momento.\n\nPROHIBICIONES ESTRICTAS:\n- NO mencionar adicional de $6.000 (esa política ya no existe)\n- NO mencionar "efectivo en Pago Fácil/Rapipago" como medio de pago\n- NO decir "contra reembolso es lo más cómodo/seguro"\n- NO decir "el envío es gratis si elegís plan 120 días"\n- NO inventar cuentas, CBUs o aliases distintos al oficial\n\nNUNCA avances sin que el cliente confirme con cuál de las 3 opciones quiere avanzar.`,
         history: currentState.history,
         summary: currentState.summary,
         knowledge,

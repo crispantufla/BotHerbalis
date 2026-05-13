@@ -1,15 +1,12 @@
 /**
- * Payment method flow tests — política nueva (mayo 2026).
+ * Payment method flow tests — política vigente.
  *
  * Cobertura:
- *  - stepWaitingOk → transición a waiting_payment_method
- *  - stepWaitingPaymentMethod → MP-first, seña $10k para COD, transferencia opcional
- *  - stepWaitingMpPayment — link normal vs link de seña ($10k), confirmación seña
- *  - _finalizeOrderAndNotifyAdmin distingue MP completo vs seña + alerta breakdown
- *
- * Política nueva:
- *  - Solo MP se ofrece espontáneamente
- *  - Contra reembolso requiere seña $10k vía MP + saldo al cartero
+ *  - stepWaitingOk → "si/dale" tras recomendación dispara mensaje de precios + PLAN_CHOICE
+ *  - stepWaitingPaymentMethod → MP / Transferencia / Contra reembolso (3 opciones espontáneas)
+ *  - stepWaitingMpPayment — link normal por el total (legacy: link de seña $10k aún soportado en código)
+ *  - Contra reembolso: anticipo $10.000 por transferencia al alias ERRONEA.HABLAME.LUZ
+ *  - Transferencia bancaria: alias ERRONEA.HABLAME.LUZ a nombre de Bio Origen SAS
  *  - Sin adicional de $6.000, sin descuento de prepago
  *  - Aplica a TODOS los planes y a TODOS los clientes
  */
@@ -186,44 +183,41 @@ beforeEach(() => {
 afterAll(() => { delete process.env.MP_ACCESS_TOKEN; });
 
 // ════════════════════════════════════════════════════════════════════════════
-// BLOQUE 1: stepWaitingOk — transición a waiting_payment_method
+// BLOQUE 1: stepWaitingOk — "si/dale" tras la recomendación dispara TEXTO 3 (precios)
 // ════════════════════════════════════════════════════════════════════════════
-describe('stepWaitingOk → pasa a waiting_payment_method', () => {
+describe('stepWaitingOk → muestra precios y va a waiting_plan_choice', () => {
 
-    test('[1.1] "si" → pasa a waiting_payment_method', async () => {
+    test('[1.1] "si" → pasa a waiting_plan_choice (no payment todavía)', async () => {
         const state = makeOkState();
         await handleWaitingOk('u1', 'si', 'si', state, knowledge, deps);
-        expect(state.step).toBe('waiting_payment_method');
+        expect(state.step).toBe('waiting_plan_choice');
     });
 
-    test('[1.2] "dale" → pasa a waiting_payment_method', async () => {
+    test('[1.2] "dale" → pasa a waiting_plan_choice', async () => {
         const state = makeOkState();
         await handleWaitingOk('u2', 'dale', 'dale', state, knowledge, deps);
-        expect(state.step).toBe('waiting_payment_method');
+        expect(state.step).toBe('waiting_plan_choice');
     });
 
-    test('[1.3] mensaje del menú pushea Mercado Pago (sin "Contra reembolso" en menú)', async () => {
+    test('[1.3] mensaje muestra los 2 planes (60 y 120) y pide elección', async () => {
         const state = makeOkState();
         await handleWaitingOk('u3', 'si', 'si', state, knowledge, deps);
         const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
-        expect(sent).toMatch(/Mercado Pago/i);
-        // Política nueva: el menú NO ofrece COD ni Transferencia espontáneamente.
-        expect(sent).not.toMatch(/Contra reembolso/i);
-        expect(sent).not.toMatch(/Transferencia bancaria/i);
+        expect(sent).toMatch(/Plan 2 meses/i);
+        expect(sent).toMatch(/Plan 4 meses/i);
+        expect(sent).toMatch(/qué plan preferís/i);
     });
 
-    test('[1.4] mensaje del menú menciona cuotas + débito + saldo MP (sin Pago Fácil/Rapipago)', async () => {
+    test('[1.4] mensaje de precios NO menciona métodos de pago (eso es TEXTO 4)', async () => {
         const state = makeOkState();
         await handleWaitingOk('u4', 'si', 'si', state, knowledge, deps);
         const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
-        expect(sent).toMatch(/cuotas/i);
-        expect(sent).toMatch(/débito/i);
-        expect(sent).toMatch(/Saldo Mercado Pago/i);
-        expect(sent).not.toMatch(/Pago Fácil/i);
-        expect(sent).not.toMatch(/Rapipago/i);
+        expect(sent).not.toMatch(/Mercado Pago/i);
+        expect(sent).not.toMatch(/Transferencia/i);
+        expect(sent).not.toMatch(/Contra reembolso/i);
     });
 
-    test('[1.5] mensaje del menú NO menciona adicional de $6.000', async () => {
+    test('[1.5] mensaje de precios NO menciona adicional de $6.000', async () => {
         const state = makeOkState({ selectedPlan: '60' });
         await handleWaitingOk('u5', 'si', 'si', state, knowledge, deps);
         const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
@@ -231,10 +225,10 @@ describe('stepWaitingOk → pasa a waiting_payment_method', () => {
         expect(sent).not.toMatch(/adicional/i);
     });
 
-    test('[1.6] Negativa → NO va a waiting_payment_method', async () => {
+    test('[1.6] Negativa → NO va a waiting_plan_choice', async () => {
         const state = makeOkState();
-        await handleWaitingOk('u6', 'no no puedo', 'no no puedo', state, knowledge, deps);
-        expect(state.step).not.toBe('waiting_payment_method');
+        await handleWaitingOk('u6', 'no no quiero', 'no no quiero', state, knowledge, deps);
+        expect(state.step).not.toBe('waiting_plan_choice');
     });
 });
 
@@ -299,25 +293,25 @@ describe('Método de pago → Transferencia (solo si la pide)', () => {
         expect(state.paymentMethod).toBe('transferencia');
     });
 
-    test('[3.4] mensaje de transferencia envía el alias CHILE.TEXTO.CASINO', async () => {
+    test('[3.4] mensaje de transferencia envía el alias ERRONEA.HABLAME.LUZ + Bio Origen SAS', async () => {
         const state = makePaymentState('60');
         await handleWaitingPaymentMethod('tr4', 'transferencia', 'transferencia', state, knowledge, deps);
         const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
-        expect(sent).toMatch(/CHILE\.TEXTO\.CASINO/i);
+        expect(sent).toMatch(/ERRONEA\.HABLAME\.LUZ/);
+        expect(sent).toMatch(/Bio Origen SAS/);
     });
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-// BLOQUE 4: stepWaitingPaymentMethod — Contra reembolso (flujo seña $10k)
+// BLOQUE 4: stepWaitingPaymentMethod — Contra reembolso (anticipo $10k al alias)
 // ════════════════════════════════════════════════════════════════════════════
-describe('Método de pago → Contra reembolso (flujo seña $10k)', () => {
+describe('Método de pago → Contra reembolso (anticipo $10k al alias, saldo al cartero)', () => {
 
-    test('[4.1] Primera vez "contra reembolso" → explica seña, NO avanza todavía', async () => {
+    test('[4.1] Primera vez "contra reembolso" → explica modalidad, NO avanza todavía', async () => {
         const state = makePaymentState('60');
         await handleWaitingPaymentMethod('cr1', 'contra reembolso', 'contra reembolso', state, knowledge, deps);
-        // Primer paso: mostrar mensaje explicando seña.
         const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
-        expect(sent).toMatch(/seña/i);
+        expect(sent).toMatch(/anticipo/i);
         expect(sent).toMatch(/10\.000/);
         expect(state.cashRetryShown).toBe(true);
         // Todavía no se setea paymentMethod ni se transita.
@@ -325,37 +319,49 @@ describe('Método de pago → Contra reembolso (flujo seña $10k)', () => {
         expect(state.senaAmount).toBeFalsy();
     });
 
-    test('[4.2] Segunda vez (post-retry) "si" → setea senaAmount=10000 y transita a WAITING_MP_PAYMENT', async () => {
+    test('[4.2] Segunda vez (post-retry) "si" → setea senaAmount=10000 y transita a WAITING_TRANSFER_CONFIRMATION', async () => {
         const state = makePaymentState('60', { cashRetryShown: true });
         const r = await handleWaitingPaymentMethod('cr2', 'si', 'si', state, knowledge, deps);
         expect(state.paymentMethod).toBe('contrarembolso');
         expect(state.senaAmount).toBe(10000);
         expect(state.senaPaid).toBe(false);
-        expect(state.step).toBe('waiting_mp_payment');
-        // staleReprocess hace que salesFlow reentre — el handler devuelve {matched:false, staleReprocess:true}.
-        expect(r.matched).toBe(false);
-        expect(r.staleReprocess).toBe(true);
+        expect(state.step).toBe('waiting_transfer_confirmation');
+        // Ahora el handler completa el ciclo (envía alias) y no necesita reproceso.
+        expect(r.matched).toBe(true);
     });
 
-    test('[4.3] "efectivo" + cashRetryShown=true → flujo seña', async () => {
+    test('[4.3] "efectivo" + cashRetryShown=true → flujo anticipo al alias', async () => {
         const state = makePaymentState('60', { cashRetryShown: true });
         await handleWaitingPaymentMethod('cr3', 'efectivo', 'efectivo', state, knowledge, deps);
         expect(state.paymentMethod).toBe('contrarembolso');
         expect(state.senaAmount).toBe(10000);
-        expect(state.step).toBe('waiting_mp_payment');
+        expect(state.step).toBe('waiting_transfer_confirmation');
     });
 
-    test('[4.4] COD aplica seña a plan 120 también (política mayo 2026: aplica a TODOS los planes)', async () => {
+    test('[4.4] COD aplica a plan 120 también (anticipo $10k para TODOS los planes)', async () => {
         const state = makePaymentState('120', { cashRetryShown: true });
         await handleWaitingPaymentMethod('cr4', 'contra reembolso', 'contra reembolso', state, knowledge, deps);
         expect(state.paymentMethod).toBe('contrarembolso');
         expect(state.senaAmount).toBe(10000);
     });
 
-    test('[4.5] mensaje de retry menciona efectivo al cartero', async () => {
+    test('[4.5] mensaje del retry menciona efectivo al cartero + alias', async () => {
         const state = makePaymentState('60');
         await handleWaitingPaymentMethod('cr5', 'contra reembolso', 'contra reembolso', state, knowledge, deps);
         const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
+        expect(sent).toMatch(/efectivo al cartero/i);
+        expect(sent).toMatch(/ERRONEA\.HABLAME\.LUZ/);
+    });
+
+    test('[4.6] confirmación tras retry envía alias + monto del anticipo ($10.000) + saldo al cartero', async () => {
+        const state = makePaymentState('60', { cashRetryShown: true }); // 46.900 total → 36.900 saldo
+        await handleWaitingPaymentMethod('cr6', 'si', 'si', state, knowledge, deps);
+        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
+        expect(sent).toMatch(/ERRONEA\.HABLAME\.LUZ/);
+        expect(sent).toMatch(/Bio Origen SAS/);
+        expect(sent).toMatch(/\$10\.000/);
+        // Saldo restante = 46.900 - 10.000 = 36.900
+        expect(sent).toMatch(/36\.900/);
         expect(sent).toMatch(/efectivo al cartero/i);
     });
 });

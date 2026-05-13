@@ -110,7 +110,7 @@ export async function handleWaitingMpPayment(
     // Direcciones largas que contienen "segundo" o un "2" aislado NO disparan.
     const shortOption = _detectShortOption(text);
     if (shortOption === '2' || TRANSFER_FALLBACK_KEYWORDS.test(normalizedText)) {
-        const msg = `¡Perfecto! Para transferir usá el alias *CHILE.TEXTO.CASINO*. Una vez que realicés la transferencia avisanos por acá y coordinamos el envío 😊`;
+        const msg = `¡Perfecto! Para transferir usá el alias *ERRONEA.HABLAME.LUZ* a nombre de *Bio Origen SAS* 🏦\n\nMonto: $${currentState.totalPrice || '0'}\n\nUna vez que realices la transferencia, escribime *"listo"* y coordinamos el envío 😊`;
         currentState.paymentMethod = 'transferencia';
         currentState.mpPaymentLinkId = null;
         currentState.mpPaymentLinkUrl = null;
@@ -202,7 +202,7 @@ export async function handleWaitingMpPayment(
     // ── AI fallback ────────────────────────────────────────────────────────────
     const aiRes = await aiService.chat(text, {
         step: 'waiting_mp_payment',
-        goal: `El cliente tiene un enlace de pago de MercadoPago y debe completarlo. Enlace ya enviado: ${currentState.mpPaymentLinkUrl}\n\nSi tiene dudas, explicale cómo pagar (tarjeta, app MP, QR). Si quiere cambiar a transferencia, decile que el alias es CHILE.TEXTO.CASINO. Si quiere contra reembolso, aclará que se paga al cartero. NUNCA reenvíes el link a menos que lo pida. Esperá que confirme con "listo" o "ya pagué".`,
+        goal: `El cliente tiene un enlace de pago de MercadoPago y debe completarlo. Enlace ya enviado: ${currentState.mpPaymentLinkUrl}\n\nSi tiene dudas, explicale cómo pagar (tarjeta, app MP, QR). Si quiere cambiar a transferencia, decile que el alias es *ERRONEA.HABLAME.LUZ* a nombre de *Bio Origen SAS*. Si quiere contra reembolso, aclará que se hace anticipo de $10.000 al mismo alias + saldo en efectivo al cartero. NUNCA reenvíes el link a menos que lo pida. Esperá que confirme con "listo" o "ya pagué".`,
         history: currentState.history,
         summary: currentState.summary,
         knowledge,
