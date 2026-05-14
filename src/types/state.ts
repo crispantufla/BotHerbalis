@@ -89,6 +89,7 @@ export interface UserState {
     cartRecovered?: boolean;
     secondFollowUpSent?: boolean;
     cashRetryShown?: boolean; // last-mile retry mostrado al elegir contra reembolso
+    codAnticipoMethodAsked?: boolean; // ya preguntamos "anticipo por transferencia o por MP?"
     lastInteraction?: number;
     lastActivityAt?: number;
 

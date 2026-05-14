@@ -40,7 +40,7 @@ describe('Política nueva de pago — buildPaymentMessage (3 opciones espontáne
     });
 });
 
-describe('Política nueva — buildCashRetryMessage (anticipo $10k al alias)', () => {
+describe('Política nueva — buildCashRetryMessage (modalidad COD neutral, sin pre-anunciar método)', () => {
     const cr = tpl.buildCashRetryMessage({});
 
     test('Explica la modalidad de anticipo por $10.000', () => {
@@ -50,17 +50,32 @@ describe('Política nueva — buildCashRetryMessage (anticipo $10k al alias)', (
     test('Menciona que el saldo se paga en efectivo al cartero', () => {
         expect(cr).toMatch(/efectivo al cartero/i);
     });
-    test('Menciona el alias oficial ERRONEA.HABLAME.LUZ y titular Bio Origen SAS', () => {
-        expect(cr).toMatch(/ERRONEA\.HABLAME\.LUZ/);
-        expect(cr).toMatch(/Bio Origen SAS/);
+    test('NO pre-anuncia el método del anticipo (lo elige el cliente en payment_cod_method_choice)', () => {
+        // El método del anticipo ahora lo elige el cliente — el cash retry es neutral
+        // y no menciona alias ni link MP. Eso vive en payment_cod_method_choice.
+        expect(cr).not.toMatch(/ERRONEA\.HABLAME\.LUZ/);
+        expect(cr).not.toMatch(/Bio Origen SAS/);
     });
     test('NO promociona COD como "lo más cómodo/seguro"', () => {
         expect(cr).not.toMatch(/cómoda?\s+y\s+segura/i);
         expect(cr).not.toMatch(/lo más cómodo/i);
     });
-    test('NO menciona Mercado Pago como vehículo del anticipo (ahora va por alias)', () => {
-        // El mensaje sí ofrece MP como alternativa por el total, pero el anticipo va por transferencia.
-        expect(cr).toMatch(/transferencia/i);
+});
+
+describe('Política nueva — payment_cod_method_choice (elección transferencia/MP)', () => {
+    const knowledge = require('../knowledge_v5.json');
+    const choice = knowledge.flow.payment_cod_method_choice;
+
+    test('Existe la entry en V5 y V6', () => {
+        expect(choice).toBeDefined();
+        expect(require('../knowledge_v6.json').flow.payment_cod_method_choice).toBeDefined();
+    });
+    test('Ofrece transferencia y Mercado Pago como opciones', () => {
+        expect(choice.response).toMatch(/Transferencia bancaria/i);
+        expect(choice.response).toMatch(/Mercado Pago/i);
+    });
+    test('Menciona el monto del anticipo ($10.000)', () => {
+        expect(choice.response).toMatch(/10\.000/);
     });
 });
 
@@ -111,13 +126,16 @@ describe('Política nueva — FAQ en V5 y V6', () => {
     test.each([
         ['V5', v5],
         ['V6', v6],
-    ])('%s: FAQ "contra reembolso" explica anticipo $10k por transferencia al alias', (_n, guion) => {
+    ])('%s: FAQ "contra reembolso" explica anticipo $10k (transferencia O MP, lo elige el cliente)', (_n, guion) => {
         const codFaq = guion.faq.find(f => f.keywords.some(k => k === 'contra reembolso'));
         expect(codFaq).toBeDefined();
         expect(codFaq.response).toMatch(/anticipo/i);
         expect(codFaq.response).toMatch(/10\.000/);
-        expect(codFaq.response).toMatch(/ERRONEA\.HABLAME\.LUZ/);
-        expect(codFaq.response).toMatch(/Bio Origen SAS/);
+        // Política nueva: el FAQ ya no enuncia el método específico del anticipo —
+        // lo decide el cliente cuando confirme la modalidad (payment_cod_method_choice).
+        // El FAQ menciona ambas opciones disponibles.
+        expect(codFaq.response).toMatch(/transferencia/i);
+        expect(codFaq.response).toMatch(/Mercado Pago/i);
     });
 
     test.each([

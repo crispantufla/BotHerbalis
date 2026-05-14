@@ -324,9 +324,10 @@ describe('Método de pago → Transferencia (solo si la pide)', () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-// BLOQUE 4: stepWaitingPaymentMethod — Contra reembolso (anticipo $10k al alias)
+// BLOQUE 4: stepWaitingPaymentMethod — Contra reembolso (anticipo $10k,
+// método del anticipo elegido por el cliente: transferencia o MP)
 // ════════════════════════════════════════════════════════════════════════════
-describe('Método de pago → Contra reembolso (anticipo $10k al alias, saldo al cartero)', () => {
+describe('Método de pago → Contra reembolso (anticipo $10k, método a elegir)', () => {
 
     test('[4.1] Primera vez "contra reembolso" → explica modalidad, NO avanza todavía', async () => {
         const state = makePaymentState('60');
@@ -335,55 +336,87 @@ describe('Método de pago → Contra reembolso (anticipo $10k al alias, saldo al
         expect(sent).toMatch(/anticipo/i);
         expect(sent).toMatch(/10\.000/);
         expect(state.cashRetryShown).toBe(true);
-        // Todavía no se setea paymentMethod ni se transita.
+        expect(state.codAnticipoMethodAsked).toBeFalsy();
         expect(state.step).toBe('waiting_payment_method');
         expect(state.senaAmount).toBeFalsy();
     });
 
-    test('[4.2] Segunda vez (post-retry) "si" → setea senaAmount=10000 y transita a WAITING_TRANSFER_CONFIRMATION', async () => {
+    test('[4.2] Cliente confirma COD post-retry → pregunta método del anticipo (transferencia o MP)', async () => {
         const state = makePaymentState('60', { cashRetryShown: true });
         const r = await handleWaitingPaymentMethod('cr2', 'si', 'si', state, knowledge, deps);
+        expect(state.step).toBe('waiting_payment_method');
+        expect(state.codAnticipoMethodAsked).toBe(true);
+        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
+        expect(sent).toMatch(/Transferencia bancaria/i);
+        expect(sent).toMatch(/Mercado Pago/i);
+        expect(r.matched).toBe(true);
+    });
+
+    test('[4.3] Cliente elige "1"/"transferencia" en submenú → alias + WAITING_TRANSFER_CONFIRMATION', async () => {
+        const state = makePaymentState('60', { cashRetryShown: true, codAnticipoMethodAsked: true });
+        await handleWaitingPaymentMethod('cr3', '1', '1', state, knowledge, deps);
         expect(state.paymentMethod).toBe('contrarembolso');
         expect(state.senaAmount).toBe(10000);
         expect(state.senaPaid).toBe(false);
         expect(state.step).toBe('waiting_transfer_confirmation');
-        // Ahora el handler completa el ciclo (envía alias) y no necesita reproceso.
-        expect(r.matched).toBe(true);
-    });
-
-    test('[4.3] "efectivo" + cashRetryShown=true → flujo anticipo al alias', async () => {
-        const state = makePaymentState('60', { cashRetryShown: true });
-        await handleWaitingPaymentMethod('cr3', 'efectivo', 'efectivo', state, knowledge, deps);
-        expect(state.paymentMethod).toBe('contrarembolso');
-        expect(state.senaAmount).toBe(10000);
-        expect(state.step).toBe('waiting_transfer_confirmation');
-    });
-
-    test('[4.4] COD aplica a plan 120 también (anticipo $10k para TODOS los planes)', async () => {
-        const state = makePaymentState('120', { cashRetryShown: true });
-        await handleWaitingPaymentMethod('cr4', 'contra reembolso', 'contra reembolso', state, knowledge, deps);
-        expect(state.paymentMethod).toBe('contrarembolso');
-        expect(state.senaAmount).toBe(10000);
-    });
-
-    test('[4.5] mensaje del retry menciona efectivo al cartero + alias', async () => {
-        const state = makePaymentState('60');
-        await handleWaitingPaymentMethod('cr5', 'contra reembolso', 'contra reembolso', state, knowledge, deps);
-        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
-        expect(sent).toMatch(/efectivo al cartero/i);
-        expect(sent).toMatch(/ERRONEA\.HABLAME\.LUZ/);
-    });
-
-    test('[4.6] confirmación tras retry envía alias + monto del anticipo ($10.000) + saldo al cartero', async () => {
-        const state = makePaymentState('60', { cashRetryShown: true }); // 46.900 total → 36.900 saldo
-        await handleWaitingPaymentMethod('cr6', 'si', 'si', state, knowledge, deps);
         const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
         expect(sent).toMatch(/ERRONEA\.HABLAME\.LUZ/);
         expect(sent).toMatch(/Bio Origen SAS/);
-        expect(sent).toMatch(/\$10\.000/);
-        // Saldo restante = 46.900 - 10.000 = 36.900
+        // saldo = 46.900 - 10.000 = 36.900
         expect(sent).toMatch(/36\.900/);
         expect(sent).toMatch(/efectivo al cartero/i);
+    });
+
+    test('[4.4] Cliente dice "transferencia" en submenú → mismo flujo que "1"', async () => {
+        const state = makePaymentState('60', { cashRetryShown: true, codAnticipoMethodAsked: true });
+        await handleWaitingPaymentMethod('cr4', 'transferencia', 'transferencia', state, knowledge, deps);
+        expect(state.step).toBe('waiting_transfer_confirmation');
+        expect(state.paymentMethod).toBe('contrarembolso');
+    });
+
+    test('[4.5] Cliente elige "2"/"MP" en submenú → transita a WAITING_MP_PAYMENT con seña $10k', async () => {
+        const state = makePaymentState('60', { cashRetryShown: true, codAnticipoMethodAsked: true });
+        const r = await handleWaitingPaymentMethod('cr5', '2', '2', state, knowledge, deps);
+        expect(state.paymentMethod).toBe('contrarembolso');
+        expect(state.senaAmount).toBe(10000);
+        expect(state.step).toBe('waiting_mp_payment');
+        // El submenú pasa la pelota al handler de MP (staleReprocess) para que
+        // ese arme el link por $10k; acá no se envía mensaje propio.
+        expect(r.staleReprocess).toBe(true);
+    });
+
+    test('[4.6] Cliente dice "mercadopago" en submenú → MP', async () => {
+        const state = makePaymentState('60', { cashRetryShown: true, codAnticipoMethodAsked: true });
+        await handleWaitingPaymentMethod('cr6', 'mercadopago', 'mercadopago', state, knowledge, deps);
+        expect(state.step).toBe('waiting_mp_payment');
+    });
+
+    test('[4.7] Cliente responde algo ambiguo en submenú → re-pregunta', async () => {
+        const state = makePaymentState('60', { cashRetryShown: true, codAnticipoMethodAsked: true });
+        await handleWaitingPaymentMethod('cr7', 'no se', 'no se', state, knowledge, deps);
+        // Sigue esperando elección — no transitó ni a transfer ni a mp.
+        expect(state.step).toBe('waiting_payment_method');
+        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
+        expect(sent).toMatch(/Transferencia/i);
+        expect(sent).toMatch(/Mercado Pago/i);
+    });
+
+    test('[4.8] COD aplica a plan 120 también (anticipo $10k para TODOS los planes)', async () => {
+        const state = makePaymentState('120', { cashRetryShown: true });
+        await handleWaitingPaymentMethod('cr8', 'contra reembolso', 'contra reembolso', state, knowledge, deps);
+        expect(state.codAnticipoMethodAsked).toBe(true);
+    });
+
+    test('[4.9] mensaje del retry NO promete método de pago para el anticipo', async () => {
+        // payment_cod_retry ahora es neutral — el método lo elige el cliente en
+        // payment_cod_method_choice. Antes el retry decía "por transferencia (alias)".
+        const state = makePaymentState('60');
+        await handleWaitingPaymentMethod('cr9', 'contra reembolso', 'contra reembolso', state, knowledge, deps);
+        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
+        expect(sent).toMatch(/efectivo al cartero/i);
+        // El retry NO debe pre-anunciar transferencia ni alias (el cliente todavía
+        // no eligió el método del anticipo).
+        expect(sent).not.toMatch(/ERRONEA\.HABLAME\.LUZ/);
     });
 });
 
@@ -535,12 +568,13 @@ describe('stepWaitingMpPayment — retry/error handling', () => {
 
 // ════════════════════════════════════════════════════════════════════════════
 // BLOQUE 6d: Cliente en flujo MP cambia a Contra reembolso
-// Regresión: antes el bot enviaba msg "anticipo al alias" + link MP por $10k
-// (contradictorio). Ahora envía cash retry + msg con alias + va a transfer confirm.
+// Regresión histórica: antes el bot enviaba alias + link MP $10k (contradictorio).
+// Política mayo 2026: explica modalidad COD + pregunta método del anticipo
+// (transferencia o MP) + vuelve a WAITING_PAYMENT_METHOD para resolver el submenú.
 // ════════════════════════════════════════════════════════════════════════════
 describe('stepWaitingMpPayment — cliente cambia a Contra reembolso', () => {
 
-    test('[6d.1] "3" en MP → cash retry + alias anticipo + WAITING_TRANSFER_CONFIRMATION (sin MP link)', async () => {
+    test('[6d.1] "3" en MP → cash retry + pregunta método anticipo + WAITING_PAYMENT_METHOD (sin MP link)', async () => {
         const state = makeMpState({
             mpPaymentLinkId: 'pl-1',
             mpPaymentLinkUrl: 'https://mp.com/x',
@@ -548,22 +582,25 @@ describe('stepWaitingMpPayment — cliente cambia a Contra reembolso', () => {
         mockPreferenceCreate.mockClear();
         await handleWaitingMpPayment('cod_switch', '3', '3', state, knowledge, deps);
 
-        // Estado actualizado a COD anticipo
+        // Estado actualizado a COD anticipo, pero el método del anticipo está pendiente
         expect(state.paymentMethod).toBe('contrarembolso');
         expect(state.senaAmount).toBe(10000);
         expect(state.senaPaid).toBe(false);
-        expect(state.step).toBe('waiting_transfer_confirmation');
+        expect(state.cashRetryShown).toBe(true);
+        expect(state.codAnticipoMethodAsked).toBe(true);
+        expect(state.step).toBe('waiting_payment_method');
         expect(state.mpPaymentLinkUrl).toBeNull();
 
-        // Bot envió al menos 2 mensajes: explicación + alias
+        // Bot envió al menos 2 mensajes: explicación + pregunta método
         const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
         expect(sent).toMatch(/anticipo/i);
         expect(sent).toMatch(/10\.000/);
-        expect(sent).toMatch(/ERRONEA\.HABLAME\.LUZ/);
-        expect(sent).toMatch(/Bio Origen SAS/);
         expect(sent).toMatch(/efectivo al cartero/i);
+        expect(sent).toMatch(/Transferencia bancaria/i);
+        expect(sent).toMatch(/Mercado Pago/i);
 
-        // Y NO regeneró un link MP (el bug viejo lo hacía)
+        // NO regeneró un link MP automáticamente (el cliente recién tiene que
+        // elegir transferencia o MP en el submenú).
         expect(mockPreferenceCreate).not.toHaveBeenCalled();
     });
 });

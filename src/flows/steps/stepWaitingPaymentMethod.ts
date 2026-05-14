@@ -70,10 +70,51 @@ export async function handleWaitingPaymentMethod(
 
     // Si ya mostramos el last-mile retry (sugerencia #5), una respuesta corta
     // afirmativa ("si", "dale", "confirmo") confirma contra reembolso.
-    const CASH_CONFIRM_AFTER_RETRY = /^\s*(si|sí|dale|confirmo|sigamos|sigo|así|asi|claro|esa|seguro)\s*[\.\!]?\s*$/i;
+    const CASH_CONFIRM_AFTER_RETRY = /^\s*(si|sí|dale|confirmo|sigamos|sigo|así|asi|claro|esa|seguro|ok|bueno|avanzamos)\s*[\.\!]?\s*$/i;
     const isConfirmingCashRetry = !!currentState.cashRetryShown
+        && !currentState.codAnticipoMethodAsked
         && !isOptionMP && !isOptionTransfer && !MP_KEYWORDS.test(text)
         && CASH_CONFIRM_AFTER_RETRY.test(text.trim());
+
+    // ── Cliente ya confirmó COD y ahora elige cómo hacer el anticipo ───────────
+    // Después de payment_cod_method_choice, esperamos transferencia o MP.
+    // Submenú: 1 = Transferencia, 2 = Mercado Pago. NO usamos el mapping del
+    // menú principal (donde 1=MP, 2=Transferencia, 3=COD) — sería contradictorio
+    // dentro del submenú.
+    if (currentState.codAnticipoMethodAsked) {
+        currentState.paymentMethod = 'contrarembolso';
+        currentState.senaAmount = 10000;
+        currentState.senaPaid = false;
+
+        const choseTransfer = (optionNum === '1') || TRANSFER_KEYWORDS.test(normalizedText);
+        const choseMp = (optionNum === '2') || MP_KEYWORDS.test(text);
+
+        if (choseTransfer && !choseMp) {
+            const tpl = getFlowTemplate('payment_cod_anticipo', knowledge) ||
+                `¡Perfecto! Para el *anticipo de $10.000* por transferencia usá el alias *{{ALIAS}}* a nombre de *{{TITULAR}}* 🏦\n\nCuando termines, mandame *el comprobante* o el *número de operación* 📸\n\nCuando te llegue el paquete, pagás el saldo *${'$'}{{SALDO}}* en efectivo al cartero 📦`;
+            const msg = _formatMessage(tpl, currentState);
+            _setStep(currentState, FlowStep.WAITING_TRANSFER_CONFIRMATION);
+            currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+            saveState(userId);
+            await sendMessageWithDelay(userId, msg);
+            return { matched: true };
+        }
+        if (choseMp && !choseTransfer) {
+            // Genera link MP por $10k (la senaAmount ya está seteada). El handler
+            // de WAITING_MP_PAYMENT detecta entrada sin link y arma el flujo seña.
+            _setStep(currentState, FlowStep.WAITING_MP_PAYMENT);
+            saveState(userId);
+            return { matched: false, staleReprocess: true } as any;
+        }
+        // Ambigüedad: re-preguntar con la misma plantilla.
+        const tpl = getFlowTemplate('payment_cod_method_choice', knowledge) ||
+            `¿El anticipo de $10.000 lo querés hacer por:\n\n1️⃣ Transferencia bancaria\n2️⃣ Mercado Pago\n\n¿Cuál preferís?`;
+        const msg = _formatMessage(tpl, currentState);
+        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        saveState(userId);
+        await sendMessageWithDelay(userId, msg);
+        return { matched: true };
+    }
 
     // ── Opción 1: MercadoPago ──────────────────────────────────────────────────
     // Solo si MP fue elegido (por número o keyword) Y no hay señal de transferencia
@@ -99,10 +140,14 @@ export async function handleWaitingPaymentMethod(
     }
 
     // ── Opción 3: Contra reembolso (pago al recibir) ───────────────────────────
-    // Anticipo de $10.000 por transferencia al alias (cubre envío) + saldo en
-    // efectivo al cartero. Reutiliza WAITING_TRANSFER_CONFIRMATION con
-    // paymentMethod='contrarembolso' y senaAmount=10000 para que la confirmación
-    // ajuste el mensaje al recibir "listo".
+    // Flujo nuevo (mayo 2026): el anticipo de $10.000 puede ser por TRANSFERENCIA
+    // o por MERCADO PAGO — el cliente elige.
+    //   1. Primera vez: cashRetryShown=false → explicamos modalidad (payment_cod_retry).
+    //   2. Cliente confirma: codAnticipoMethodAsked=true → preguntamos método
+    //      (payment_cod_method_choice). Quedamos en waiting_payment_method.
+    //   3. Cliente elige: lo maneja el branch de arriba (codAnticipoMethodAsked).
+    //      Transferencia → alias + WAITING_TRANSFER_CONFIRMATION.
+    //      MP            → genera link $10k + WAITING_MP_PAYMENT (vía staleReprocess).
     if (isOptionCash || CASH_KEYWORDS.test(normalizedText) || isConfirmingCashRetry) {
         if (!currentState.cashRetryShown) {
             currentState.cashRetryShown = true;
@@ -114,16 +159,15 @@ export async function handleWaitingPaymentMethod(
             return { matched: true };
         }
 
-        currentState.paymentMethod = 'contrarembolso';
-        currentState.senaAmount = 10000;
-        currentState.senaPaid = false;
-        const tpl = getFlowTemplate('payment_cod_anticipo', knowledge) ||
-            `¡Perfecto! Para el *anticipo de $10.000* usá el alias *{{ALIAS}}* a nombre de *{{TITULAR}}* 🏦\n\nUna vez que realices el anticipo, escribime *"listo"* y despachamos. Cuando te llegue el paquete, pagás el saldo *${'$'}{{SALDO}}* en efectivo al cartero 📦`;
+        // Cliente confirmó la modalidad COD. Preguntamos cómo quiere hacer el anticipo.
+        currentState.codAnticipoMethodAsked = true;
+        const tpl = getFlowTemplate('payment_cod_method_choice', knowledge) ||
+            `¡Perfecto! ¿El anticipo de $10.000 lo querés hacer por:\n\n1️⃣ *Transferencia bancaria* — te paso el alias y mandás el comprobante\n2️⃣ *Mercado Pago* — te paso el link y se acredita al instante\n\n¿Cuál preferís?`;
         const msg = _formatMessage(tpl, currentState);
-        _setStep(currentState, FlowStep.WAITING_TRANSFER_CONFIRMATION);
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
+        logger.info(`[PAYMENT_METHOD] COD anticipo method choice presentado a ${userId}`);
         return { matched: true };
     }
 

@@ -126,14 +126,20 @@
         },
         "payment_cod_retry": {
             "step": "waiting_payment_method",
-            "_note": "TEXTO 5c — Primera vez que el cliente elige 'contra reembolso'. Explica la modalidad antes de pedir confirmación. NO promociona como 'lo más cómodo'. Disparado por buildCashRetryMessage.",
-            "response": "Dale, podemos coordinar pago al recibir 👍\n\nLa modalidad es: adelantás un *anticipo de $10.000* por transferencia (alias *{{ALIAS}}*, a nombre de *{{TITULAR}}* — cubre el envío), y el resto lo pagás en *efectivo al cartero* cuando llega el paquete.\n\nEs una decisión interna por la cantidad de paquetes que vuelven sin retirar — aplica a todos los pedidos. Es exactamente la misma plata, solo cambia el momento.\n\n¿Te queda cómodo así o preferís el link de Mercado Pago por el total?",
+            "_note": "TEXTO 5c — Primera vez que el cliente elige 'contra reembolso'. Explica la modalidad antes de pedir confirmación. NO promociona como 'lo más cómodo'. NO menciona si el anticipo es por transferencia o por MP — eso lo decide el cliente en el siguiente paso (payment_cod_method_choice). Disparado por buildCashRetryMessage.",
+            "response": "Dale, podemos coordinar pago al recibir 👍\n\nLa modalidad es: adelantás un *anticipo de $10.000* (cubre el envío), y el resto lo pagás en *efectivo al cartero* cuando llega el paquete.\n\nEs una decisión interna por la cantidad de paquetes que vuelven sin retirar — aplica a todos los pedidos. Es exactamente la misma plata, solo cambia el momento.\n\n¿Avanzamos así o preferís otra opción?",
+            "nextStep": "waiting_payment_method"
+        },
+        "payment_cod_method_choice": {
+            "step": "waiting_payment_method",
+            "_note": "TEXTO 5c-bis — Cliente confirmó la modalidad COD ('si' tras retry). Le preguntamos cómo quiere hacer el anticipo de $10.000: por transferencia (alias) o por Mercado Pago (link). Disparado desde stepWaitingPaymentMethod cuando cashRetryShown=true y el cliente confirma.",
+            "response": "¡Dale! ¿El anticipo de $10.000 lo querés hacer por...\n\n1️⃣ *Transferencia bancaria* — te paso el alias y me mandás el comprobante\n2️⃣ *Mercado Pago* — te paso el link y se acredita al toque\n\n¿Cuál te queda más cómoda?",
             "nextStep": "waiting_payment_method"
         },
         "payment_cod_anticipo": {
             "step": "waiting_transfer_confirmation",
-            "_note": "TEXTO 5d — Cliente confirmó la modalidad COD ('si' tras retry). Le pasamos alias para el anticipo + recordamos el saldo en efectivo. Placeholders: {{ALIAS}}, {{TITULAR}}, {{SALDO}} (totalPrice - 10000).",
-            "response": "¡Perfecto! Para el *anticipo de $10.000* usá el alias *{{ALIAS}}* a nombre de *{{TITULAR}}* 🏦\n\nUna vez que realices el anticipo, escribime *\"listo\"* y despachamos. Cuando te llegue el paquete, pagás el saldo *${{SALDO}}* en efectivo al cartero 📦",
+            "_note": "TEXTO 5d — Cliente eligió hacer el anticipo COD POR TRANSFERENCIA. Le pasamos alias + recordamos el saldo en efectivo al cartero. Placeholders: {{ALIAS}}, {{TITULAR}}, {{SALDO}} (totalPrice - 10000). Si elige MP, se usa payment_mp_link_sena en su lugar.",
+            "response": "¡Perfecto! Para el *anticipo de $10.000* por transferencia usá el alias *{{ALIAS}}* a nombre de *{{TITULAR}}* 🏦\n\nCuando termines, mandame *el comprobante* o el *número de operación* 📸\n\nCuando te llegue el paquete, pagás el saldo *${{SALDO}}* en efectivo al cartero 📦",
             "nextStep": "waiting_transfer_confirmation"
         },
         "payment_mp_link": {
@@ -281,8 +287,8 @@
                 "efectivo al cartero",
                 "cuando llega"
             ],
-            "_note": "Contra reembolso es una de las 3 opciones espontáneas. Anticipo de $10.000 por transferencia al alias ERRONEA.HABLAME.LUZ + saldo en efectivo al cartero. Aplica a TODOS los planes y clientes (tono Elena).",
-            "response": "Dale, podemos coordinar pago al recibir 😊\n\nLa modalidad es así: adelantás un *anticipo de $10.000* por transferencia (alias *ERRONEA.HABLAME.LUZ*, a nombre de *Bio Origen SAS* — cubre el envío), y el resto lo pagás en *efectivo al cartero* cuando llega el paquete.\n\nEs una decisión interna por la cantidad de paquetes que vuelven sin retirar — aplica a todos los pedidos. Es exactamente la misma plata, solo cambia el momento.\n\n¿Avanzamos así o preferís otra opción?"
+            "_note": "Contra reembolso es una de las 3 opciones espontáneas. Anticipo de $10.000 por TRANSFERENCIA al alias ERRONEA.HABLAME.LUZ O por MercadoPago (lo elige el cliente cuando confirme la modalidad) + saldo en efectivo al cartero. Aplica a TODOS los planes y clientes (tono Elena).",
+            "response": "Dale, podemos coordinar pago al recibir 😊\n\nLa modalidad es así: adelantás un *anticipo de $10.000* (cubre el envío), y el resto lo pagás en *efectivo al cartero* cuando llega el paquete. El anticipo lo podés hacer por transferencia bancaria o por Mercado Pago, lo que te quede más cómodo.\n\nEs una decisión interna por la cantidad de paquetes que vuelven sin retirar — aplica a todos los pedidos. Es exactamente la misma plata, solo cambia el momento.\n\n¿Avanzamos así o preferís otra opción?"
         },
         {
             "keywords": [
@@ -328,8 +334,8 @@
                 "engaño",
                 "chanta"
             ],
-            "_note": "NO promocionar contra reembolso como solución de confianza. Liderar con trust signals. Si insiste, mencionar COD con anticipo $10k al alias (tono Elena).",
-            "response": "Te entiendo, hoy en día se ven cosas raras por internet 😊\n\nMirá, llevamos *13 años* con este producto y casi *50.000 clientes satisfechos* — es serio, no somos un kiosco que abrió ayer.\n\nSi te queda más tranqui también podemos coordinar pago al recibir: adelantás un *anticipo de $10.000* por transferencia (alias *ERRONEA.HABLAME.LUZ*, a nombre de *Bio Origen SAS*) y el resto en efectivo al cartero. ¿Cómo querés avanzar?"
+            "_note": "NO promocionar contra reembolso como solución de confianza. Liderar con trust signals. Si insiste, mencionar COD con anticipo $10k (puede ser por transferencia al alias o por MP — el cliente elige después).",
+            "response": "Te entiendo, hoy en día se ven cosas raras por internet 😊\n\nMirá, llevamos *13 años* con este producto y casi *50.000 clientes satisfechos* — es serio, no somos un kiosco que abrió ayer.\n\nSi te queda más tranqui también podemos coordinar pago al recibir: adelantás un *anticipo de $10.000* (por transferencia o por Mercado Pago, vos elegís) y el resto en efectivo al cartero. ¿Cómo querés avanzar?"
         },
         {
             "keywords": [
