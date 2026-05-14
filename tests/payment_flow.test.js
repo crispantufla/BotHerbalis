@@ -5,8 +5,8 @@
  *  - stepWaitingOk → "si/dale" tras recomendación dispara mensaje de precios + PLAN_CHOICE
  *  - stepWaitingPaymentMethod → MP / Transferencia / Contra reembolso (3 opciones espontáneas)
  *  - stepWaitingMpPayment — link normal por el total (legacy: link de seña $10k aún soportado en código)
- *  - Contra reembolso: anticipo $10.000 por transferencia al alias ERRONEA.HABLAME.LUZ
- *  - Transferencia bancaria: alias ERRONEA.HABLAME.LUZ a nombre de Bio Origen SAS
+ *  - Contra reembolso: anticipo $10.000 por transferencia al alias HERBALIS.TIENDA
+ *  - Transferencia bancaria: alias HERBALIS.TIENDA a nombre de Bio Origen SAS
  *  - Sin adicional de $6.000, sin descuento de prepago
  *  - Aplica a TODOS los planes y a TODOS los clientes
  */
@@ -314,11 +314,11 @@ describe('Método de pago → Transferencia (solo si la pide)', () => {
         expect(state.paymentMethod).toBe('transferencia');
     });
 
-    test('[3.4] mensaje de transferencia envía el alias ERRONEA.HABLAME.LUZ + Bio Origen SAS', async () => {
+    test('[3.4] mensaje de transferencia envía el alias HERBALIS.TIENDA + Bio Origen SAS', async () => {
         const state = makePaymentState('60');
         await handleWaitingPaymentMethod('tr4', 'transferencia', 'transferencia', state, knowledge, deps);
         const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
-        expect(sent).toMatch(/ERRONEA\.HABLAME\.LUZ/);
+        expect(sent).toMatch(/HERBALIS\.TIENDA/);
         expect(sent).toMatch(/Bio Origen SAS/);
     });
 });
@@ -360,7 +360,7 @@ describe('Método de pago → Contra reembolso (anticipo $10k, método a elegir)
         expect(state.senaPaid).toBe(false);
         expect(state.step).toBe('waiting_transfer_confirmation');
         const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
-        expect(sent).toMatch(/ERRONEA\.HABLAME\.LUZ/);
+        expect(sent).toMatch(/HERBALIS\.TIENDA/);
         expect(sent).toMatch(/Bio Origen SAS/);
         // saldo = 46.900 - 10.000 = 36.900
         expect(sent).toMatch(/36\.900/);
@@ -416,7 +416,7 @@ describe('Método de pago → Contra reembolso (anticipo $10k, método a elegir)
         expect(sent).toMatch(/efectivo al cartero/i);
         // El retry NO debe pre-anunciar transferencia ni alias (el cliente todavía
         // no eligió el método del anticipo).
-        expect(sent).not.toMatch(/ERRONEA\.HABLAME\.LUZ/);
+        expect(sent).not.toMatch(/HERBALIS\.TIENDA/);
     });
 });
 

@@ -87,7 +87,7 @@ const PLACEHOLDER_VALUES = {
     PRICE_60: '46.900',
     PRICE_120: '66.900',
     // Constantes de negocio
-    ALIAS: 'ERRONEA.HABLAME.LUZ',
+    ALIAS: 'HERBALIS.TIENDA',
     TITULAR: 'Bio Origen SAS',
     ANTICIPO: '10.000',
     ADICIONAL_MAX: '0',

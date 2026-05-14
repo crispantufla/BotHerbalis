@@ -273,8 +273,8 @@
                 "alias",
                 "banco"
             ],
-            "_note": "Transferencia es una de las 3 opciones espontáneas. Alias oficial: ERRONEA.HABLAME.LUZ a nombre de Bio Origen SAS (tono Elena).",
-            "response": "¡Dale, podemos por *transferencia bancaria* 🏦\n\nAlias: *ERRONEA.HABLAME.LUZ*\nTitular: *Bio Origen SAS*\n\nCuando confirmes el pedido te recuerdo el monto. ¿Avanzamos así?"
+            "_note": "Transferencia es una de las 3 opciones espontáneas. Alias oficial: HERBALIS.TIENDA a nombre de Bio Origen SAS (tono Elena).",
+            "response": "¡Dale, podemos por *transferencia bancaria* 🏦\n\nAlias: *HERBALIS.TIENDA*\nTitular: *Bio Origen SAS*\n\nCuando confirmes el pedido te recuerdo el monto. ¿Avanzamos así?"
         },
         {
             "keywords": [
@@ -287,7 +287,7 @@
                 "efectivo al cartero",
                 "cuando llega"
             ],
-            "_note": "Contra reembolso es una de las 3 opciones espontáneas. Anticipo de $10.000 por TRANSFERENCIA al alias ERRONEA.HABLAME.LUZ O por MercadoPago (lo elige el cliente cuando confirme la modalidad) + saldo en efectivo al cartero. Aplica a TODOS los planes y clientes (tono Elena).",
+            "_note": "Contra reembolso es una de las 3 opciones espontáneas. Anticipo de $10.000 por TRANSFERENCIA al alias HERBALIS.TIENDA O por MercadoPago (lo elige el cliente cuando confirme la modalidad) + saldo en efectivo al cartero. Aplica a TODOS los planes y clientes (tono Elena).",
             "response": "Dale, podemos coordinar pago al recibir 😊\n\nLa modalidad es así: adelantás un *anticipo de $10.000* (cubre el envío), y el resto lo pagás en *efectivo al cartero* cuando llega el paquete. El anticipo lo podés hacer por transferencia bancaria o por Mercado Pago, lo que te quede más cómodo.\n\nEs una decisión interna por la cantidad de paquetes que vuelven sin retirar — aplica a todos los pedidos. Es exactamente la misma plata, solo cambia el momento.\n\n¿Avanzamos así o preferís otra opción?"
         },
         {
@@ -404,9 +404,9 @@
         "keepResponsesShort": false,
         "_note_responseLength": "V6 prefiere respuestas más extensas y conversacionales que V5 — el tono de 'Elena' justifica el largo extra.",
         "defaultPaymentMethod": "three_options",
-        "_note_defaultPayment": "Ofrecemos 3 opciones espontáneamente al pedir el método de pago: (1) Tarjeta de crédito o débito (Mercado Pago link), (2) Transferencia bancaria (alias ERRONEA.HABLAME.LUZ — Bio Origen SAS), (3) Contra reembolso (anticipo $10.000 al mismo alias + saldo en efectivo al cartero). El bot NUNCA menciona cuotas — quien quiera dividir el pago verá las opciones que su tarjeta permita al abrir el link de MP.",
+        "_note_defaultPayment": "Ofrecemos 3 opciones espontáneamente al pedir el método de pago: (1) Tarjeta de crédito o débito (Mercado Pago link), (2) Transferencia bancaria (alias HERBALIS.TIENDA — Bio Origen SAS), (3) Contra reembolso (anticipo $10.000 al mismo alias + saldo en efectivo al cartero). El bot NUNCA menciona cuotas — quien quiera dividir el pago verá las opciones que su tarjeta permita al abrir el link de MP.",
         "bankAlias": {
-            "alias": "ERRONEA.HABLAME.LUZ",
+            "alias": "HERBALIS.TIENDA",
             "titular": "Bio Origen SAS"
         },
         "contraReembolsoMAX": {
@@ -415,7 +415,7 @@
             "senaTransfer": 10000,
             "adicional": 0,
             "appliesTo": "all",
-            "description": "Pago al recibir: ofrecido espontáneamente como opción 3. Requiere anticipo de $10.000 por transferencia al alias ERRONEA.HABLAME.LUZ (Bio Origen SAS) que cubre el envío; el saldo se paga en efectivo al cartero. Aplica a TODOS los planes (60d y 120d) y a TODOS los clientes (nuevos y recurrentes)."
+            "description": "Pago al recibir: ofrecido espontáneamente como opción 3. Requiere anticipo de $10.000 por transferencia al alias HERBALIS.TIENDA (Bio Origen SAS) que cubre el envío; el saldo se paga en efectivo al cartero. Aplica a TODOS los planes (60d y 120d) y a TODOS los clientes (nuevos y recurrentes)."
         },
         "costoLogisticoRechazo": 18000,
         "ageLimits": {

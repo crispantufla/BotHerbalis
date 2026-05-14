@@ -1,7 +1,7 @@
 /**
  * Smoke test para la política de pago vigente (mayo 2026):
  * - Se ofrecen 3 opciones espontáneamente: MP, Transferencia, Contra reembolso
- * - Alias oficial: ERRONEA.HABLAME.LUZ a nombre de Bio Origen SAS
+ * - Alias oficial: HERBALIS.TIENDA a nombre de Bio Origen SAS
  * - Contra reembolso: anticipo $10.000 por transferencia al alias + saldo en efectivo al cartero
  * - Ya no hay adicional de $6.000 ni descuento de prepago
  */
@@ -53,7 +53,7 @@ describe('Política nueva — buildCashRetryMessage (modalidad COD neutral, sin 
     test('NO pre-anuncia el método del anticipo (lo elige el cliente en payment_cod_method_choice)', () => {
         // El método del anticipo ahora lo elige el cliente — el cash retry es neutral
         // y no menciona alias ni link MP. Eso vive en payment_cod_method_choice.
-        expect(cr).not.toMatch(/ERRONEA\.HABLAME\.LUZ/);
+        expect(cr).not.toMatch(/HERBALIS\.TIENDA/);
         expect(cr).not.toMatch(/Bio Origen SAS/);
     });
     test('NO promociona COD como "lo más cómodo/seguro"', () => {
@@ -102,7 +102,7 @@ describe('Política nueva — rules en V5 y V6', () => {
         ['V6', v6],
     ])('%s: defaultPaymentMethod = three_options + bankAlias oficial', (_n, guion) => {
         expect(guion.rules.defaultPaymentMethod).toBe('three_options');
-        expect(guion.rules.bankAlias.alias).toBe('ERRONEA.HABLAME.LUZ');
+        expect(guion.rules.bankAlias.alias).toBe('HERBALIS.TIENDA');
         expect(guion.rules.bankAlias.titular).toBe('Bio Origen SAS');
     });
 });
@@ -144,7 +144,7 @@ describe('Política nueva — FAQ en V5 y V6', () => {
     ])('%s: FAQ "transferencia" expone el alias oficial', (_n, guion) => {
         const trfFaq = guion.faq.find(f => f.keywords.some(k => k === 'transferencia'));
         expect(trfFaq).toBeDefined();
-        expect(trfFaq.response).toMatch(/ERRONEA\.HABLAME\.LUZ/);
+        expect(trfFaq.response).toMatch(/HERBALIS\.TIENDA/);
         expect(trfFaq.response).toMatch(/Bio Origen SAS/);
     });
 
