@@ -177,3 +177,30 @@ describe('Política nueva — recommendations (TEXTO 1+2 → "¿Te paso los prec
         });
     });
 });
+
+describe('_formatMessage — defensa contra placeholder leak (regresión Silvina 14/05)', () => {
+    const { _formatMessage } = require('../src/flows/utils/messages');
+
+    test('Sin selectedProduct, sustituye {{PRICE_60}}/{{PRICE_120}} con default Cápsulas', () => {
+        const txt = 'Plan 2 meses: ${{PRICE_60}} — Plan 4 meses: ${{PRICE_120}}';
+        const out = _formatMessage(txt, { /* sin selectedProduct */ });
+        expect(out).not.toMatch(/\{\{PRICE_60\}\}/);
+        expect(out).not.toMatch(/\{\{PRICE_120\}\}/);
+        // Esperamos que tenga algún valor numérico (no string vacío).
+        expect(out).toMatch(/\$\d+\.\d{3}/);
+    });
+
+    test('Sweep final: si queda un placeholder desconocido, se elimina (no se manda al cliente)', () => {
+        const txt = 'Hola {{UNKNOWN_PLACEHOLDER}} mundo';
+        const out = _formatMessage(txt, {});
+        expect(out).not.toMatch(/\{\{/);
+        expect(out).toBe('Hola  mundo');
+    });
+
+    test('{{ALIAS}} y {{TITULAR}} siempre se sustituyen con constantes', () => {
+        const txt = 'alias {{ALIAS}} titular {{TITULAR}}';
+        const out = _formatMessage(txt, null);
+        expect(out).toMatch(/HERBALIS\.TIENDA/);
+        expect(out).toMatch(/BIO ORIGEN S\.A\.S\./);
+    });
+});

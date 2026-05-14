@@ -1,5 +1,6 @@
 import { _getPrices } from './pricing';
 import { _formatPrice } from './cartHelpers';
+import logger from '../../utils/logger';
 
 function _formatMessage(text: string | string[], state: any): string {
     if (!text) return "";
@@ -51,10 +52,16 @@ function _formatMessage(text: string | string[], state: any): string {
             formatted = formatted.replace(/{{TOTAL}}/g, state.totalPrice);
         }
         // Precios del producto seleccionado (para TEXTO 3: muestra plan 60 vs 120).
-        if (state.selectedProduct) {
+        // Si no hay selectedProduct (state inconsistente), default a Cápsulas — es
+        // el producto más recomendado y evita que el placeholder salga literal al
+        // cliente. Caso real: conversación de Silvina 14/05 10:39 — bot recomendó
+        // cápsulas, cliente cambió a gotas via AI, state.selectedProduct quedó
+        // null y el bot mandó "${{PRICE_60}}" textual.
+        {
+            const sp = state.selectedProduct || '';
             const productKey: 'Cápsulas' | 'Gotas' | 'Semillas' =
-                state.selectedProduct.includes('Gota') ? 'Gotas' :
-                state.selectedProduct.includes('Semilla') ? 'Semillas' : 'Cápsulas';
+                sp.includes('Gota') ? 'Gotas' :
+                sp.includes('Semilla') ? 'Semillas' : 'Cápsulas';
             formatted = formatted.replace(/{{PRICE_60}}/g, prices[productKey]?.['60'] || '');
             formatted = formatted.replace(/{{PRICE_120}}/g, prices[productKey]?.['120'] || '');
         }
@@ -109,6 +116,17 @@ function _formatMessage(text: string | string[], state: any): string {
     formatted = formatted.replace(/{{ALIAS}}/g, 'HERBALIS.TIENDA');
     formatted = formatted.replace(/{{TITULAR}}/g, 'BIO ORIGEN S.A.S.');
     formatted = formatted.replace(/{{ANTICIPO}}/g, '10.000');
+
+    // Sweep defensivo final: si quedó algún placeholder {{X}} sin resolver
+    // (state corrupto, key nueva sin handler, etc.), NO lo enviamos literal
+    // al cliente. Logueamos warning con el placeholder específico y lo
+    // borramos del texto. Es preferible un mensaje incompleto que un
+    // "${{PRICE_60}}" mostrado al cliente.
+    const leakedPlaceholders = formatted.match(/\{\{\s*[A-Z_][A-Z0-9_]*\s*\}\}/g);
+    if (leakedPlaceholders) {
+        logger.warn(`[FORMAT_MESSAGE] Placeholders sin resolver detectados — borrando antes de enviar: ${leakedPlaceholders.join(', ')}`);
+        formatted = formatted.replace(/\{\{\s*[A-Z_][A-Z0-9_]*\s*\}\}/g, '');
+    }
 
     return formatted;
 }
