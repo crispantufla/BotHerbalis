@@ -12,15 +12,6 @@ const configSchema = z.object({
     message: "Faltan parámetros requeridos: 'action' + 'number' o 'alertNumber'"
 });
 
-// Validador para POST /script
-const scriptSchema = z.object({
-    version: z.string().optional(),
-    // Un poco permisivos con flow y faq porque son dinámicos, pero requerimos que sean objetos/arrays
-    flow: z.record(z.string(), z.any()).optional(),
-    faq: z.array(z.any()).optional()
-}).passthrough(); // Permitir cualquier otro campo por si acaso para no romper compatibilidad
-
 module.exports = {
-    configSchema,
-    scriptSchema
+    configSchema
 };

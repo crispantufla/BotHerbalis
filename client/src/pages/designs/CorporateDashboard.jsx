@@ -10,7 +10,6 @@ import DashboardView from '../../components/corporate/DashboardView';
 import CommsView from '../../components/corporate/CommsView';
 import SalesView from '../../components/corporate/SalesView';
 import SettingsView from '../../components/corporate/SettingsView';
-import ScriptView from '../../components/corporate/ScriptView';
 import GalleryView from '../../components/corporate/GalleryView';
 import AdvancedAnalyticsView from '../../components/corporate/AdvancedAnalyticsView';
 import ManualsView from '../../components/corporate/ManualsView';
@@ -25,7 +24,7 @@ import SellerSelector from '../../components/admin/SellerSelector';
 import WhatsappViewerView from '../../components/corporate/WhatsappViewerView';
 import ManualOrderEntryModal from '../../components/corporate/components/ManualOrderEntryModal';
 
-import { Wifi, MessageCircle, Database, Settings, FileText, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Bell, AlertTriangle, BookOpen, MoreHorizontal, CreditCard, Users, Monitor, LifeBuoy, MessagesSquare } from 'lucide-react';
+import { Wifi, MessageCircle, Database, Settings, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Bell, AlertTriangle, BookOpen, MoreHorizontal, CreditCard, Users, Monitor, LifeBuoy, MessagesSquare } from 'lucide-react';
 
 const CorporateDashboard = () => {
     const { socket } = useSocket();
@@ -250,7 +249,6 @@ const CorporateDashboard = () => {
             case 'statistics': return <AdvancedAnalyticsView />;
             case 'comms': return <CommsView initialChatId={targetChatId} onChatSelected={() => setTargetChatId(null)} alerts={alerts} onAlertAction={handleQuickAction} />;
             case 'logistics': return <SalesView onGoToChat={(chatId) => handleQuickAction(chatId, 'chat')} />;
-            case 'script': return <ScriptView />;
             case 'gallery': return <GalleryView />;
             case 'manuals': return <ManualsView />;
             case 'settings': return <SettingsView status={status} />;
@@ -354,7 +352,6 @@ const CorporateDashboard = () => {
                     <NavItem tab="logistics" icon={Database} label="Ventas & Logística" />
                     <NavItem tab="statistics" icon={BarChart2} label="Estadísticas" />
                     <NavItem tab="payments" icon={CreditCard} label="Pagos MP" />
-                    {isAdmin && <NavItem tab="script" icon={FileText} label="Guión & Prompts" />}
                     <NavItem tab="guion" icon={MessagesSquare} label="Guiones (notas)" />
                     <NavItem tab="gallery" icon={ImageIcon} label="Galería de Medios" />
                     <NavItem tab="manuals" icon={BookOpen} label="Manuales" />

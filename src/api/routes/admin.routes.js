@@ -4,7 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const { prisma } = require('../../../db');
 const { authMiddleware } = require('../../middleware/auth');
 const validate = require('../../middleware/validate');
-const { configSchema, scriptSchema } = require('../../schemas/admin.schema');
+const { configSchema } = require('../../schemas/admin.schema');
 const { adminCommandSchema } = require('../../schemas/system.schema');
 
 module.exports = (clientPool) => {
@@ -36,30 +36,6 @@ module.exports = (clientPool) => {
                 res.json({ success: true, message: result });
             } else {
                 res.status(501).json({ error: 'Handler not attached' });
-            }
-        } catch (e) {
-            res.status(500).json({ error: e.message });
-        }
-    });
-
-    // GET /script (admin only)
-    router.get('/script', ...withSeller(clientPool), requireAdmin, (req, res) => res.json(getCtx(req).knowledge));
-
-    // POST /script (admin only)
-    router.post('/script', ...withSeller(clientPool), requireAdmin, validate(scriptSchema), (req, res) => {
-        try {
-            const { sharedState, config, knowledge, saveKnowledge } = getCtx(req);
-            const { version } = req.body;
-            const targetVersion = version || config.activeScript || 'v5';
-
-            if (sharedState?.multiKnowledge && sharedState.multiKnowledge[targetVersion]) {
-                Object.assign(sharedState.multiKnowledge[targetVersion], req.body);
-                saveKnowledge(targetVersion);
-                res.json({ success: true, message: `Script ${targetVersion} updated successfully` });
-            } else {
-                Object.assign(knowledge, req.body);
-                saveKnowledge();
-                res.json({ success: true, message: 'Script updated successfully (fallback)' });
             }
         } catch (e) {
             res.status(500).json({ error: e.message });
