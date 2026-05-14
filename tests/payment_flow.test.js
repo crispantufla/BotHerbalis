@@ -230,6 +230,27 @@ describe('stepWaitingOk → muestra precios y va a waiting_plan_choice', () => {
         await handleWaitingOk('u6', 'no no quiero', 'no no quiero', state, knowledge, deps);
         expect(state.step).not.toBe('waiting_plan_choice');
     });
+
+    test('[1.7] "precio" → muestra los 2 planes (no AI fallback que mostraba solo 60)', async () => {
+        // Regression: conversación de Nora 13/05 20:08 — cliente respondió "Precio"
+        // tras la recomendación y el bot improvisó "Las gotas por 60 días salen
+        // $48.900" omitiendo el plan 120. Ahora se intercepta antes del AI.
+        const state = makeOkState();
+        await handleWaitingOk('u7', 'precio', 'precio', state, knowledge, deps);
+        expect(state.step).toBe('waiting_plan_choice');
+        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
+        expect(sent).toMatch(/Plan 2 meses/i);
+        expect(sent).toMatch(/Plan 4 meses/i);
+    });
+
+    test('[1.8] "cuanto sale" → muestra los 2 planes', async () => {
+        const state = makeOkState();
+        await handleWaitingOk('u8', 'cuanto sale', 'cuanto sale', state, knowledge, deps);
+        expect(state.step).toBe('waiting_plan_choice');
+        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
+        expect(sent).toMatch(/Plan 2 meses/i);
+        expect(sent).toMatch(/Plan 4 meses/i);
+    });
 });
 
 // ════════════════════════════════════════════════════════════════════════════

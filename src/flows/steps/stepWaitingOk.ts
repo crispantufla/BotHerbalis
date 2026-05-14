@@ -29,7 +29,13 @@ export async function handleWaitingOk(
 ): Promise<{ matched: boolean }> {
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
 
-    const isQuestion = (text.includes('?') || /\b(puedo|puede|como|donde|cuando|que pasa)\b/.test(normalizedText)) && !/\b(si|dale|ok|listo|bueno|claro|vamos|joya)\b/.test(normalizedText);
+    // Si el cliente pide precios directamente ("precio", "cuánto sale", "valor"),
+    // lo tratamos igual que un "sí, pasame los precios" — es la misma intención.
+    // Sin este branch caía en el AI fallback y la IA improvisaba un texto que
+    // solo mostraba el plan 60 (caso real: conversación de Nora 13/05 20:08).
+    const askingForPrices = /\b(precio|precios|cu[áa]nto|cuanto|cuesta|cuestan|sale|salen|vale|valen|valor|costo)\b/i.test(normalizedText);
+
+    const isQuestion = (text.includes('?') || /\b(puedo|puede|como|donde|cuando|que pasa)\b/.test(normalizedText)) && !/\b(si|dale|ok|listo|bueno|claro|vamos|joya)\b/.test(normalizedText) && !askingForPrices;
 
     if (/\b(buscar|recoger|ir yo|ir a buscar|retirar yo|retiro yo|paso a buscar)\b/.test(normalizedText)) {
         const msg = 'No tenemos local de venta al público. Los envíos se hacen exclusivamente por Correo Argentino 📦. Pero tranqui, si el cartero no te encuentra, podés retirarlo en la sucursal más cercana.\n\n👉 ¿Te resulta posible recibirlo así? SÍ o NO';
@@ -55,8 +61,10 @@ export async function handleWaitingOk(
             return { matched: true };
         }
     }
-    else if (_isAffirmative(normalizedText)) {
-        // TEXTO 3 — Mostramos precios y pedimos plan choice.
+    else if (_isAffirmative(normalizedText) || askingForPrices) {
+        // TEXTO 3 — Mostramos precios (60 Y 120) y pedimos plan choice.
+        // askingForPrices: cliente pidió precios sin haber dicho "sí" explícito;
+        // misma intención, evitamos AI fallback que solo mostraba 60.
         const msg = _buildPricesMessage(currentState, knowledge);
         _setStep(currentState, FlowStep.WAITING_PLAN_CHOICE);
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
