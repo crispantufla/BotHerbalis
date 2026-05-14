@@ -107,7 +107,7 @@ function _formatMessage(text: string | string[], state: any): string {
 
     // Alias bancario + titular oficiales (constantes).
     formatted = formatted.replace(/{{ALIAS}}/g, 'HERBALIS.TIENDA');
-    formatted = formatted.replace(/{{TITULAR}}/g, 'Bio Origen SAS');
+    formatted = formatted.replace(/{{TITULAR}}/g, 'BIO ORIGEN S.A.S.');
     formatted = formatted.replace(/{{ANTICIPO}}/g, '10.000');
 
     return formatted;

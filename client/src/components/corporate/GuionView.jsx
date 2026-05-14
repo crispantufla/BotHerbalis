@@ -88,7 +88,7 @@ const PLACEHOLDER_VALUES = {
     PRICE_120: '66.900',
     // Constantes de negocio
     ALIAS: 'HERBALIS.TIENDA',
-    TITULAR: 'Bio Origen SAS',
+    TITULAR: 'BIO ORIGEN S.A.S.',
     ANTICIPO: '10.000',
     ADICIONAL_MAX: '0',
     COSTO_LOGISTICO: '18.000',
