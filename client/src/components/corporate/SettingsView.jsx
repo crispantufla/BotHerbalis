@@ -11,7 +11,7 @@ const SettingsView = ({ status }) => {
     const { socket } = useSocket();
     const { toast, confirm } = useToast();
     const [config, setConfig] = useState({ alertNumber: '' });
-    const [activeScript, setActiveScript] = useState('v1');
+    const [activeScript, setActiveScript] = useState('v5');
     const [scriptStats, setScriptStats] = useState({});
     const [switchingScript, setSwitchingScript] = useState(false);
 
@@ -242,9 +242,9 @@ const SettingsView = ({ status }) => {
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 relative z-10">
                                 {[
-                                    { id: 'v3', name: 'Flujo V3 Estándar', desc: 'Directo y profesional.', color: 'blue', stats: scriptStats.v3 },
-                                    { id: 'v4', name: 'Flujo V4 Psicológico', desc: 'Escasez y Urgencia.', color: 'purple', stats: scriptStats.v4 },
-                                    { id: 'rotacion', name: 'A/B Testing (50/50)', desc: 'Distribuye equitativamente.', color: 'orange', stats: null }
+                                    { id: 'v5', name: 'Flujo V5 Asesor consultivo', desc: 'Pregunta kilos, recomienda según objetivo.', color: 'blue', stats: scriptStats.v5 },
+                                    { id: 'v6', name: 'Flujo V6 Elena charla', desc: 'Tono cálido, conversacional, argentino.', color: 'purple', stats: scriptStats.v6 },
+                                    { id: 'rotacion', name: 'A/B Testing V5 vs V6', desc: 'Distribuye 50/50 entre V5 y V6.', color: 'orange', stats: null }
                                 ].map((script) => (
                                     <div
                                         key={script.id}
