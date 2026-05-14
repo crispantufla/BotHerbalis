@@ -20,15 +20,8 @@ import {
     RefreshCw,
     MapPin,
     Clock,
-    Megaphone,
-    StickyNote,
-    X
+    Megaphone
 } from 'lucide-react';
-
-// Recordatorio fijo: comparar conversión del prompt viejo (19-25/04) vs el nuevo
-// (29/04 en adelante). Aparece en el header de analytics hasta que el usuario
-// lo descarte. Se conserva en localStorage para no reaparecer en cada refresh.
-const PROMPT_AB_REMINDER_KEY = 'dismissedReminder_promptAB_2026-04-29';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
 
@@ -47,14 +40,6 @@ const AdvancedAnalyticsView = () => {
         charts: { chartData: [], pieData: [] }, // From original basic stats
         adPerformance: [] // Ad source breakdown
     });
-    const [showAbReminder, setShowAbReminder] = useState(() =>
-        !localStorage.getItem(PROMPT_AB_REMINDER_KEY)
-    );
-    const dismissAbReminder = () => {
-        localStorage.setItem(PROMPT_AB_REMINDER_KEY, '1');
-        setShowAbReminder(false);
-    };
-
     const fetchAllData = async () => {
         try {
             setLoading(true);
@@ -217,34 +202,6 @@ const AdvancedAnalyticsView = () => {
                         </button>
                     </div>
                 </div>
-
-                {/* Recordatorio: A/B prompt — comparar conversión 19-25/04 (viejo) vs 29/04-05/05 (nuevo) */}
-                {showAbReminder && (
-                    <div className={`mb-4 sm:mb-6 rounded-2xl border p-4 sm:p-5 flex items-start gap-3 ${isDark ? 'bg-amber-500/10 border-amber-500/30' : 'bg-amber-50 border-amber-200'}`}>
-                        <div className={`flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center ${isDark ? 'bg-amber-500/20' : 'bg-amber-100'}`}>
-                            <StickyNote className={`w-4 h-4 ${isDark ? 'text-amber-300' : 'text-amber-700'}`} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className={`text-sm font-bold ${isDark ? 'text-amber-200' : 'text-amber-900'}`}>
-                                Recordatorio · Comparación pre/post del prompt nuevo
-                            </p>
-                            <p className={`text-xs mt-1 leading-relaxed ${isDark ? 'text-amber-200/80' : 'text-amber-800'}`}>
-                                A partir del <b>06/05/2026</b> revisar y comparar:
-                                <br />· <b>Semana 19-25/04</b> (prompt viejo, IA con créditos parciales)
-                                <br />· <b>Semana 29/04-05/05</b> (prompt nuevo, IA al 100%)
-                                <br />Métricas a mirar: conversión total, % pausas en <i>waiting_preference</i>/<i>waiting_weight</i>, avance step→step, y largo medio de respuestas.
-                                Si la conversión sube → el split corta/expandida funciona. Si baja → revertir commit <code>80bdd82</code>.
-                            </p>
-                        </div>
-                        <button
-                            onClick={dismissAbReminder}
-                            className={`flex-shrink-0 p-1.5 rounded-lg transition-colors ${isDark ? 'hover:bg-amber-500/20 text-amber-300' : 'hover:bg-amber-100 text-amber-700'}`}
-                            title="Descartar recordatorio"
-                        >
-                            <X className="w-4 h-4" />
-                        </button>
-                    </div>
-                )}
 
                 {/* Empty state: no data for the selected period */}
                 {!loading && (!data.overview || (data.overview.orders?.value === 0 && data.overview.revenue?.value === 0)) && (
