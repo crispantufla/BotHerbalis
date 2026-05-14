@@ -1,8 +1,8 @@
 {
     "meta": {
-        "name": "Guión V6 — Elena charla (humano + argentino)",
-        "description": "Variante consultiva de V5 con tono más cálido, conversacional y argentino. Menos lista de bullets, más historia. Persona explícita: Elena. Para cuando el bot suena 'demasiado bot'.",
-        "version": "6.0"
+        "name": "Guión V6 — Elena charla (sales-tuned)",
+        "description": "Variante consultiva con tono cálido + persona Elena, ahora con persuasión calibrada: anclaje de valor (precio/día), marcos temporales en recomendaciones, visualización de resultado, FAQs reforzadas (rebote, caro, estafa) con risk reversal. Mantiene la honestidad — sin scarcity falsa, sin promesas garantizadas, sin presión.",
+        "version": "6.1"
     },
     "flow": {
         "greeting": {
@@ -23,7 +23,7 @@
                 "capsulas",
                 "capsula"
             ],
-            "response": "¡Holaa! 😊 Acá Elena, de Herbalis. Te acompaño a bajar de peso con productos 100% naturales — sin dietas locas ni promesas raras 🙂\n\nAntes de tirarte un número, contame algo: ¿cuántos kilos tenés ganas de bajar? Más o menos un estimado:\n\n👉 Pocos (hasta 10)\n👉 Bastante (entre 10 y 20)\n👉 Mucho (más de 20)\n\nMandame el número o contame en tus palabras, lo que te quede más cómodo.",
+            "response": "¡Holaa! 😊 Acá Elena, de Herbalis. Te acompaño a bajar de peso con productos 100% naturales — sin dietas locas, sin pasar hambre, sin promesas raras 🙂\n\nAntes de decirte qué te conviene, contame algo: ¿cuántos kilos tenés ganas de bajar? Más o menos un estimado:\n\n👉 Pocos (hasta 10)\n👉 Bastante (entre 10 y 20)\n👉 Mucho (más de 20)\n\nMandame el número o contame en tus palabras, lo que te quede más cómodo.",
             "nextStep": "waiting_weight"
         },
         "recommendation": {
@@ -34,25 +34,25 @@
         },
         "recommendation_1": {
             "step": "waiting_weight",
-            "_note": "Tier 1 — hasta 10 kg → Gotas 60 días. Tono Elena. TEXTO 1+2 (recomendación + cómo funciona). Termina pidiendo aceptación para mostrar precios.",
-            "response": "Buenísimo, ya tengo una idea de cómo ayudarte 👌\n\nPara vos lo ideal es el *Plan de Gotas para 2 meses*. La mayoría de quienes querían bajar lo mismo que vos lograron entre 7 y 10 kilos con este plan.\n\nTe cuento cómo funciona:\n💧 Tomás 10 gotas una vez por día, antes del almuerzo o de la cena, con un vaso de agua — se puede regular la dosis según los resultados\n📋 Te mando una guía de comidas con consejitos para acompañar (no es una dieta)\n📞 Yo te acompaño por WhatsApp durante todo el tratamiento — cualquier duda me escribís y vamos viendo juntas/os 😊\n\n¿Te paso los precios?",
+            "_note": "Tier 1 — hasta 10 kg → Gotas 60 días. Sales-tuned: marco temporal (2 meses), gradiente realista (1-1.5kg/sem), visualización del resultado, bonus framing (guía + acompañamiento).",
+            "response": "Buenísimo, ya tengo claro qué te conviene 👌\n\nPara vos lo ideal es el *Plan de Gotas para 2 meses*. La mayoría de quienes querían bajar lo mismo que vos lograron *entre 7 y 10 kilos en esos 2 meses* — algo así como 1 a 1,5 kilos por semana, que es un ritmo sostenible y sin rebote.\n\nTe cuento cómo es:\n💧 Tomás 10 gotas una vez por día, antes del almuerzo o de la cena, con un vaso de agua — la dosis se puede regular según cómo vayas respondiendo\n📋 Te llevás una guía de comidas con consejitos para acompañar (no es una dieta, es para sumar)\n📞 Y yo te acompaño por WhatsApp durante todo el tratamiento — cualquier duda me escribís y vamos viendo juntas/os 😊\n\n¿Te paso los precios para que veas cómo es?",
             "nextStep": "waiting_ok"
         },
         "recommendation_2": {
             "step": "waiting_weight",
-            "_note": "Tier 2 — 10 a 20 kg → Cápsulas 60 días. Tono Elena. TEXTO 1+2 (recomendación + cómo funciona). Termina pidiendo aceptación para mostrar precios.",
-            "response": "Bárbaro, ya sé qué te conviene 💪\n\nPara vos lo ideal es el *Plan de Cápsulas para 2 meses*. La mayoría de quienes querían bajar entre 10 y 20 kilos lo lograron con este plan.\n\nTe cuento cómo funciona:\n💊 Una sola cápsula al día, 30 minutos antes del almuerzo o cena, con un vaso de agua\n📋 Te mando una guía de comidas con consejitos para acompañar (no es una dieta)\n📞 Yo te acompaño por WhatsApp durante todo el tratamiento — cualquier duda me escribís y vamos viendo juntas/os 😊\n\n¿Te paso los precios?",
+            "_note": "Tier 2 — 10 a 20 kg → Cápsulas 60 días. Sales-tuned: marco temporal, gradiente, visualización ('en la balanza desde la 1ra semana'), bonus framing.",
+            "response": "Bárbaro, ya sé qué te conviene 💪\n\nPara vos lo ideal son las *Cápsulas en plan de 2 meses*. La mayoría de las personas que querían bajar entre 10 y 20 kilos lo lograron en esos 2 meses — y en general ya se nota la diferencia en la balanza desde la primera semana.\n\nTe cuento cómo es:\n💊 Una sola cápsula al día, 30 minutos antes del almuerzo o cena, con un vaso de agua — fácil de incorporar a la rutina\n📋 Te llevás una guía de comidas con consejitos para acompañar (no es una dieta)\n📞 Y yo te acompaño por WhatsApp todo el tratamiento — cualquier duda me escribís y vamos viendo juntas/os 😊\n\n¿Te paso los precios para que veas cómo es?",
             "nextStep": "waiting_ok"
         },
         "recommendation_3": {
             "step": "waiting_weight",
-            "_note": "Tier 3 — +20 kg → Cápsulas 120 días. Tono Elena. TEXTO 1+2 (recomendación + cómo funciona). Termina pidiendo aceptación para mostrar precios.",
-            "response": "Genial, te cuento qué te conviene 💪\n\nPara más de 20 kilos lo que más recomiendo son las *cápsulas en plan de 4 meses* — es el tiempo que el cuerpo necesita para bajar de forma sostenida y completar el tratamiento.\n\nTe cuento cómo funciona:\n💊 Una cápsula al día, 30 minutos antes del almuerzo o cena, con un vaso de agua\n📋 Te mando una guía de comidas con consejitos para acompañar (no es una dieta)\n📞 Yo te acompaño por WhatsApp durante todo el tratamiento — cualquier duda me escribís 😊\n\n¿Te paso los precios?",
+            "_note": "Tier 3 — +20 kg → Cápsulas 120 días. Sales-tuned: reframe del compromiso largo como ventaja (cuerpo se acostumbra, sin rebote), mantención implícita (1-2/sem post tratamiento), visualización.",
+            "response": "Genial, te cuento qué te conviene 💪\n\nPara más de 20 kilos lo que más recomiendo son las *cápsulas en plan de 4 meses* — y te explico por qué: el cuerpo necesita tiempo para bajar de forma sostenida sin estresarse, y los 4 meses cubren el tratamiento completo. Muchas clientas que terminan los 4 meses siguen tomando 1 o 2 cápsulas por semana como mantenimiento, así no vuelven los kilos.\n\nCómo se toma:\n💊 Una cápsula al día, 30 minutos antes del almuerzo o cena, con un vaso de agua\n📋 Te llevás una guía de comidas con consejitos (no es una dieta)\n📞 Yo te acompaño por WhatsApp durante todo el tratamiento, escribime cuando quieras 😊\n\n¿Te paso los precios?",
             "nextStep": "waiting_ok"
         },
         "preference_capsulas": {
             "step": "waiting_preference",
-            "_note": "Cliente que pide cápsulas directo (sin pasar por el flujo de tiers). NO duplica los precios — el TEXTO 3 (entry 'prices') los muestra después del OK.",
+            "_note": "Cliente que pide cápsulas directo (sin pasar por el flujo de tiers). NO duplica los precios — el TEXTO 3 (entry 'prices') los muestra después del OK. Sales: refuerza la elección + anchor de facilidad.",
             "match": [
                 "capsula",
                 "capsulas",
@@ -61,18 +61,18 @@
                 "practico",
                 "practica"
             ],
-            "response": "¡Dale, las cápsulas son lo más práctico que tenemos! 💊\n\nUna por día, 30 min antes de la comida principal, y listo.\n\n¿Te paso los precios? 😊",
+            "response": "¡Excelente elección! 💊 Las cápsulas son lo más práctico que tenemos: una por día, 30 minutos antes de la comida principal, y listo — ni te das cuenta que la estás tomando.\n\n¿Te paso los precios para que veas cómo es? 😊",
             "nextStep": "waiting_ok"
         },
         "preference_gotas": {
             "step": "waiting_preference",
-            "_note": "NO duplica los precios — el TEXTO 3 (entry 'prices') los muestra después del OK.",
+            "_note": "NO duplica los precios — el TEXTO 3 (entry 'prices') los muestra después del OK. Sales: anchor 'suave + flexible' (regulable).",
             "match": [
                 "gotas",
                 "liquido",
                 "gotero"
             ],
-            "response": "¡Dale! Las gotas son lo más suave y discreto 💧\n\n10 gotas una vez al día, sin preparar nada.\n\n¿Te paso los precios? 😊",
+            "response": "¡Dale! Las gotas son lo más suave y discreto 💧 — 10 gotitas una vez al día, sin preparar nada. Y otra ventaja: si querés ir más despacio, podés ajustar la dosis vos misma.\n\n¿Te paso los precios? 😊",
             "nextStep": "waiting_ok"
         },
         "preference_semillas": {
@@ -85,11 +85,12 @@
                 "yuyos",
                 "te de semilla"
             ],
-            "response": "¡Ah, ya conocés las semillas! 🌿 La opción más natural de todas.\n\nSe prepara como una infusioncita cada noche, antes de dormir.\n\n¿Te paso los precios? 😊",
+            "response": "¡Ah, ya las conocés! 🌿 Las semillas son la opción más natural de todas — se prepara como una infusioncita cada noche, antes de dormir, y muchas clientas dicen que las relaja al final del día.\n\n¿Te paso los precios? 😊",
             "nextStep": "waiting_ok"
         },
         "closing": {
             "step": "waiting_plan_choice",
+            "_note": "Sales: reduce friction al pedir datos — frame de 'ya casi salimos' + comprime los campos visualmente.",
             "match": [
                 "si",
                 "sisi",
@@ -103,13 +104,13 @@
                 "mandalo",
                 "envielo"
             ],
-            "response": "¡Genial! 🎉 Anotame los datos para armar la etiqueta 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(Importante: la dirección tiene que ser exacta, sin esquinas ni \"aprox\" ni S/N. Si no, el correo no entrega.)",
+            "response": "¡Genial, buenísima decisión! 🎉\n\nÚltimo paso — pasame los datos así te armo la etiqueta 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(Importante: la dirección tiene que ser exacta, sin esquinas, sin \"aprox\" y sin S/N — si no, el correo no entrega.)",
             "nextStep": "waiting_data"
         },
         "prices": {
             "step": "waiting_ok",
-            "_note": "TEXTO 3 — Tras la recomendación, cliente dijo 'sí, pasame los precios'. Mostramos los 2 planes del producto seleccionado y pedimos elección. Disparado desde stepWaitingOk._buildPricesMessage. Placeholders: {{PRICE_60}}, {{PRICE_120}} se sustituyen con _getPrice(producto, plan).",
-            "response": "💰 *Plan 2 meses: ${{PRICE_60}}*\n💰 *Plan 4 meses: ${{PRICE_120}}* — el más conveniente; muchas clientas, al llegar al peso, lo usan 1-2 veces por semana como mantenimiento.\n\n¿Qué plan preferís? 😊",
+            "_note": "TEXTO 3 — Tras la recomendación, cliente dijo 'sí, pasame los precios'. Mostramos los 2 planes del producto seleccionado y pedimos elección. Sales-tuned: anchor de valor con precio/día en el plan 120 + mantenimiento como ventaja extra. Placeholders: {{PRICE_60}}, {{PRICE_120}}, {{PRICE_PER_DAY_120}} se resuelven según producto.",
+            "response": "💰 *Plan 2 meses: ${{PRICE_60}}*\n💰 *Plan 4 meses: ${{PRICE_120}}* ⭐ — el más elegido\n\nEl de 4 meses te sale *${{PRICE_PER_DAY_120}} por día* — menos que un café ☕. Y la mayoría de las clientas, al llegar al peso, siguen tomando 1 o 2 por semana como mantenimiento, así no vuelven los kilos.\n\n¿Con cuál arrancamos? 😊",
             "nextStep": "waiting_plan_choice"
         },
         "payment_menu": {
@@ -298,7 +299,8 @@
                 "sale un monton",
                 "no me alcanza"
             ],
-            "response": "Te entiendo, la plata cuesta ganarla 😊\n\nPensá que ahí va incluido todo: el producto, el envío, y yo acompañándote por WhatsApp por si surge cualquier cosa durante los meses del tratamiento.\n\nSi te queda más cómodo, podemos *programar el envío* para después de que cobres — el precio te lo dejo congelado. ¿Desde qué día te quedaría bien?"
+            "_note": "Sales: reencuadre de valor (precio/día) + qué incluye + alternativa concreta (postdatar). Sin presionar.",
+            "response": "Te entiendo, la plata cuesta ganarla 😊\n\nPero pensalo así: el plan 4 meses te sale *${{PRICE_PER_DAY_120}} por día* — menos que un café. Y ahí va todo: el producto para los 4 meses, el envío a tu casa, la guía de comidas y yo acompañándote por WhatsApp si necesitás cualquier cosa.\n\nY si justo ahora no te queda cómodo, te ofrezco algo: *programamos el envío* para después de que cobres, y te dejo el precio congelado de hoy. Así no te lo perdés por una cuestión de timing. ¿Desde qué día te quedaría bien?"
         },
         {
             "keywords": [
@@ -307,13 +309,15 @@
                 "quincena",
                 "fin de mes"
             ],
-            "response": "¡Tranqui! 😊 Lo programamos para después de que cobres y te dejo el precio congelado.\n\n¿Desde qué día te queda cómodo recibirlo?"
+            "_note": "Sales: salvar la venta con postdatado + price-lock como incentivo (Argentina = inflación).",
+            "response": "¡Tranqui, eso lo resolvemos! 😊 Te dejo el pedido cargado a tu nombre con el *precio congelado de hoy*, y te lo envío recién la fecha que vos me digas que ya cobraste. Así no perdés el precio actual.\n\n¿Desde qué día te queda cómodo recibirlo?"
         },
         {
             "keywords": [
                 "rebote"
             ],
-            "response": "*No hay rebote* — ese problema viene con métodos agresivos, dietas muy restrictivas o consumo de químicos. Esto es 100% natural y el descenso es progresivo, así que el cuerpo no se acostumbra mal."
+            "_note": "Sales: miedo top del nicho. Explicar POR QUÉ no hay rebote (descenso lento + natural + mantenimiento) y mostrar que pensamos en eso.",
+            "response": "*No tenés rebote*, te explico por qué 😊\n\nEl rebote aparece con métodos agresivos: dietas muy restrictivas, químicos, batidos extremos. Acá es al revés — el descenso es *progresivo* (1 a 2 kilos por semana), el producto es 100% natural y el cuerpo nunca entra en modo \"hambruna\". Por eso no recupera lo perdido apenas dejás.\n\nY otra cosa: la mayoría de las clientas, al llegar al peso, siguen tomando 1 o 2 cápsulas por semana como mantenimiento. Eso ayuda muchísimo a que se mantenga. 🌿"
         },
         {
             "keywords": [
@@ -334,8 +338,8 @@
                 "engaño",
                 "chanta"
             ],
-            "_note": "NO promocionar contra reembolso como solución de confianza. Liderar con trust signals. Si insiste, mencionar COD con anticipo $10k (puede ser por transferencia al alias o por MP — el cliente elige después).",
-            "response": "Te entiendo, hoy en día se ven cosas raras por internet 😊\n\nMirá, llevamos *13 años* con este producto y casi *50.000 clientes satisfechos* — es serio, no somos un kiosco que abrió ayer.\n\nSi te queda más tranqui también podemos coordinar pago al recibir: adelantás un *anticipo de $10.000* (por transferencia o por Mercado Pago, vos elegís) y el resto en efectivo al cartero. ¿Cómo querés avanzar?"
+            "_note": "Sales: NO promocionar contra reembolso como solución de confianza (eso es trampa). Liderar con trust signals + offer risk reversal CONCRETA (COD con anticipo bajo). Cierra con call to action.",
+            "response": "Te entiendo perfectamente — hoy se ven cosas raras por internet y la duda es totalmente válida 😊\n\nMirá, te paso datos concretos: llevamos *13 años* distribuyendo este producto, pasaron casi *50.000 clientes* y el producto tiene presencia en redes — no somos un kiosco que abrió la semana pasada.\n\nY si igual te queda la dudita, te ofrezco *bajarla a casi cero*: hacemos *pago al recibir* con un anticipo de $10.000 (por transferencia o Mercado Pago, lo que prefieras), y el resto lo pagás *en efectivo al cartero cuando te llegue el paquete*. O sea: si nunca te llega, no perdiste el total. ¿Te suma así para arrancar?"
         },
         {
             "keywords": [
@@ -345,7 +349,8 @@
                 "cuantas capsulas",
                 "cantidad"
             ],
-            "response": "Súper fácil:\n\n💊 *Cápsulas:* una al día, 30 min antes del almuerzo o cena, con agua.\n💧 *Gotas:* 10 gotas una vez al día, en el almuerzo o cena.\n\nCualquier duda durante el tratamiento, me escribís por acá y vamos viendo juntas/os 😊"
+            "_note": "Sales: anchor de adherencia — facilidad de incorporación. Bajar el miedo a 'me voy a olvidar'.",
+            "response": "Súper fácil de incorporar a la rutina, te cuento 😊\n\n💊 *Cápsulas:* una sola al día, 30 minutos antes del almuerzo (o de la cena, la que más te quede cómoda), con un vaso de agua. La mayoría la asocia a una comida fija así no se olvida.\n\n💧 *Gotas:* 10 gotitas una vez por día, antes del almuerzo o la cena.\n\nY si tenés alguna duda durante el tratamiento, me escribís por acá y vamos viendo juntas/os — eso te lo dejo siempre disponible 📞"
         },
         {
             "keywords": [

@@ -31,6 +31,15 @@ function _formatMessage(text: string | string[], state: any): string {
     formatted = formatted.replace(/{{PRICE_PER_DAY_CAPSULAS_120}}/g, _perDay(prices['Cápsulas']?.['120'], 120));
     formatted = formatted.replace(/{{PRICE_PER_DAY_SEMILLAS_120}}/g, _perDay(prices['Semillas']?.['120'], 120));
     formatted = formatted.replace(/{{PRICE_PER_DAY_GOTAS_120}}/g, _perDay(prices['Gotas']?.['120'], 120));
+    // Placeholder genérico — resuelve segun selectedProduct (default Cápsulas).
+    // Útil para FAQ/copy de venta donde no se sabe de antemano el producto.
+    {
+        const sp = state?.selectedProduct || '';
+        const pkey: 'Cápsulas' | 'Gotas' | 'Semillas' =
+            sp.includes('Gota') ? 'Gotas' :
+            sp.includes('Semilla') ? 'Semillas' : 'Cápsulas';
+        formatted = formatted.replace(/{{PRICE_PER_DAY_120}}/g, _perDay(prices[pkey]?.['120'], 120));
+    }
     // Política mayo 2026: el adicional por contra reembolso fue eliminado, por lo
     // que {{PRICE_TOTAL_*_60}} ahora es idéntico a {{PRICE_*_60}}. Se mantienen
     // los placeholders sólo por compatibilidad con plantillas legacy.

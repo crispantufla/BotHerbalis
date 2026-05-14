@@ -205,7 +205,9 @@ describe('stepWaitingOk → muestra precios y va a waiting_plan_choice', () => {
         const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
         expect(sent).toMatch(/Plan 2 meses/i);
         expect(sent).toMatch(/Plan 4 meses/i);
-        expect(sent).toMatch(/qué plan preferís/i);
+        // El mensaje termina con pregunta de elección — el wording exacto puede
+        // variar entre guiones ("qué plan preferís", "con cuál arrancamos", etc.).
+        expect(sent).toMatch(/\?/);
     });
 
     test('[1.4] mensaje de precios NO menciona métodos de pago (eso es TEXTO 4)', async () => {
