@@ -5,7 +5,7 @@ import { useSocket } from '../../context/SocketContext';
 import PriceEditor from '../PriceEditor';
 import { useToast } from '../ui/Toast';
 
-import { Settings, Download, FileText, Power, Trash2, HardDrive, RefreshCw, KeyRound } from 'lucide-react';
+import { Settings, Download, FileText, Power, Trash2, HardDrive, RefreshCw, KeyRound, RotateCcw } from 'lucide-react';
 
 const SettingsView = ({ status }) => {
     const { socket } = useSocket();
@@ -14,6 +14,7 @@ const SettingsView = ({ status }) => {
     const [activeScript, setActiveScript] = useState('v5');
     const [scriptStats, setScriptStats] = useState({});
     const [switchingScript, setSwitchingScript] = useState(false);
+    const [resettingStats, setResettingStats] = useState(false);
 
     // Memory stats
     const [memStats, setMemStats] = useState(null);
@@ -51,7 +52,13 @@ const SettingsView = ({ status }) => {
         socket.on('script_changed', handler);
         const memHandler = () => fetchMemoryStats();
         socket.on('memory_reset', memHandler);
-        return () => { socket.off('script_changed', handler); socket.off('memory_reset', memHandler); };
+        const statsResetHandler = (data) => { if (data?.stats) setScriptStats(data.stats); };
+        socket.on('script_stats_reset', statsResetHandler);
+        return () => {
+            socket.off('script_changed', handler);
+            socket.off('memory_reset', memHandler);
+            socket.off('script_stats_reset', statsResetHandler);
+        };
     }, [socket]);
 
     const handleLogout = async () => {
@@ -103,6 +110,20 @@ const SettingsView = ({ status }) => {
 
             toast.success('Reporte PDF descargado');
         } catch (e) { toast.error('Error generando el reporte PDF'); }
+    };
+
+    const handleResetScriptStats = async () => {
+        const ok = await confirm("¿Reiniciar los contadores de conversión de V5 y V6?\n\nVas a empezar de cero. Útil cuando cambiaste los guiones y los números viejos ya no son comparables.\n\nNo afecta las ventas ni los pedidos — solo el conteo started/completed de cada modelo.");
+        if (!ok) return;
+        setResettingStats(true);
+        try {
+            const res = await api.post('/api/script/stats/reset');
+            setScriptStats(res.data.stats || {});
+            toast.success('Contadores reiniciados — empezamos a medir de cero.');
+        } catch (e) {
+            toast.error(e.response?.data?.error || 'Error al reiniciar contadores');
+        }
+        setResettingStats(false);
     };
 
     const handleSwitchScript = async (scriptKey) => {
@@ -230,14 +251,27 @@ const SettingsView = ({ status }) => {
                         {/* Script Switcher V2 */}
                         <div className="bg-white dark:bg-slate-800/40 backdrop-blur-xl p-4 sm:p-8 rounded-[1.25rem] sm:rounded-[2rem] border border-slate-200 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
                             <div className="absolute -bottom-20 -right-20 w-80 h-80 bg-purple-400/10 blur-[80px] rounded-full pointer-events-none"></div>
-                            <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-8 relative z-10">
-                                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-fuchsia-600 text-white flex items-center justify-center shadow-lg shadow-purple-500/20">
-                                    <FileText className="w-6 h-6" />
+                            <div className="flex items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-8 relative z-10">
+                                <div className="flex items-center gap-3 sm:gap-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-fuchsia-600 text-white flex items-center justify-center shadow-lg shadow-purple-500/20">
+                                        <FileText className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-extrabold text-slate-800 dark:text-slate-100 text-lg">Modelos de Venta (A/B)</h3>
+                                        <p className="text-xs font-bold text-slate-500 dark:text-slate-300 uppercase tracking-widest">Rotación & Asignación</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h3 className="font-extrabold text-slate-800 dark:text-slate-100 text-lg">Modelos de Venta (A/B)</h3>
-                                    <p className="text-xs font-bold text-slate-500 dark:text-slate-300 uppercase tracking-widest">Rotación & Asignación</p>
-                                </div>
+                                <button
+                                    onClick={handleResetScriptStats}
+                                    disabled={resettingStats}
+                                    title="Reiniciar contadores de conversión (V5 y V6)"
+                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-widest text-slate-500 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-300 border border-slate-200/70 dark:border-slate-700/60 hover:border-purple-300 hover:bg-purple-50/50 dark:hover:bg-purple-500/10 transition-all disabled:opacity-50"
+                                >
+                                    {resettingStats
+                                        ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                        : <RotateCcw className="w-3.5 h-3.5" />}
+                                    <span className="hidden sm:inline">Reiniciar conteo</span>
+                                </button>
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 relative z-10">

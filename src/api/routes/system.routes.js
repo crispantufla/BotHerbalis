@@ -461,6 +461,25 @@ module.exports = (clientPool) => {
         });
     });
 
+    // POST /script/stats/reset — reset conversion counters for V5/V6 (admin only).
+    // Útil después de cambios sustanciales en los guiones para empezar a medir de cero.
+    router.post('/script/stats/reset', ...withSeller(clientPool), requireAdmin, (req, res) => {
+        try {
+            const { config, ss } = getCtx(req);
+            config.scriptStats = {
+                v5: { started: 0, completed: 0 },
+                v6: { started: 0, completed: 0 }
+            };
+            if (ss?.saveState) ss.saveState();
+            emitScoped(req, 'script_stats_reset', { stats: config.scriptStats });
+            logger.info(`[SCRIPT] Stats reset by admin (seller=${req.sellerId})`);
+            res.json({ success: true, stats: config.scriptStats });
+        } catch (e) {
+            logger.error('Error resetting script stats:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     // POST /script/switch — switch to a different script (admin only)
     router.post('/script/switch', ...withSeller(clientPool), requireAdmin, validate(scriptSwitchSchema), (req, res) => {
         try {
