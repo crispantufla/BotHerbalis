@@ -664,6 +664,15 @@ module.exports = (clientPool) => {
             if (!message || typeof message !== 'string' || message.length === 0 || message.length > 5000) {
                 return res.status(400).json({ error: 'Invalid or missing message (max 5000 chars)' });
             }
+            // Bloqueá placeholders sin resolver tipo {{PRICE_PER_DAY_CAPSULAS_120}}. Pasaba que
+            // admins pegaban plantillas viejas del guión V3/V4 desde sus notas — los placeholders
+            // salían literales al cliente porque el envío manual no pasa por _formatMessage().
+            const placeholderMatch = message.match(/\{\{\s*[A-Z_][A-Z0-9_]*\s*\}\}/);
+            if (placeholderMatch) {
+                return res.status(400).json({
+                    error: `Tu mensaje contiene el placeholder ${placeholderMatch[0]} sin resolver. Borralo o reemplazalo por el valor real antes de enviar.`
+                });
+            }
             if (!cl || !ss) {
                 return res.status(400).json({ error: 'Seleccioná un vendedor para enviar mensajes' });
             }
@@ -715,6 +724,15 @@ module.exports = (clientPool) => {
             const ownErr = await _verifyChatOwnership(chatId, ss, INSTANCE_ID);
             if (ownErr) return res.status(ownErr.status).json(ownErr.body);
             if (!base64 || !mimetype) return res.status(400).json({ error: 'Missing base64 or mimetype' });
+            // Mismo guard que /send para el caption.
+            if (caption && typeof caption === 'string') {
+                const captionPh = caption.match(/\{\{\s*[A-Z_][A-Z0-9_]*\s*\}\}/);
+                if (captionPh) {
+                    return res.status(400).json({
+                        error: `El caption contiene el placeholder ${captionPh[0]} sin resolver. Borralo o reemplazalo por el valor real antes de enviar.`
+                    });
+                }
+            }
 
             const allowedMimetypes = ['image/jpeg', 'image/png', 'image/webp', 'audio/ogg', 'audio/mpeg', 'video/mp4', 'application/pdf'];
             if (!allowedMimetypes.includes(mimetype)) {
