@@ -451,7 +451,7 @@ module.exports = (clientPool) => {
     router.get('/script/active', ...withSeller(clientPool), requireAdmin, (req, res) => {
         const { config, ss } = getCtx(req);
         res.json({
-            active: config.activeScript || 'v5',
+            active: config.activeScript || 'v6',
             available: ss?.availableScripts || ['v5', 'v6'],
             stats: config.scriptStats || {},
             labels: {

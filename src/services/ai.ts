@@ -320,7 +320,7 @@ PRECIOS EXACTOS:
 ARGUMENTO 120 vs 60: "El de 120 está buenísimo porque es el tratamiento completo — el cuerpo tiene tiempo de acostumbrarse y la grasa no vuelve. Muchas clientas, cuando llegan al peso, usan una o dos cápsulas por semana como mantenimiento. El de 60 lo eligen los que ya lo hicieron antes o quieren probar primero."
 
 DESCUENTOS POR VOLUMEN (SOLO si preguntan por varias unidades):
-- 3ra unidad: 30% OFF | 4ta: 40% OFF | 5ta: 50% OFF
+- 3er producto al 50% OFF (puede ser combinado, ej: 60 gotas + 60 cápsulas + 1 extra). NO hay escalada para 4ta/5ta — siempre el 3ro más barato al 50%.
 - NO ofrezcas descuentos si no preguntaron.
 
 ENVÍO: Gratis por Correo Argentino. Demora: 4 a 6 días hábiles desde la confirmación del pago.

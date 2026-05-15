@@ -64,7 +64,7 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
             // Si el usuario tiene assignedScript de un guion archivado, migrar a v5
             // (no podemos cargarle el guion archivado).
             if (effectiveScript && legacyScripts.includes(effectiveScript)) {
-                effectiveScript = 'v5';
+                effectiveScript = 'v6';
                 if (userState[userId]) {
                     userState[userId].assignedScript = effectiveScript;
                     saveState(userId);
@@ -74,7 +74,7 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
                 if (isRotacion) {
                     effectiveScript = Math.random() < 0.5 ? 'v5' : 'v6';
                 } else {
-                    effectiveScript = config.activeScript || 'v5';
+                    effectiveScript = config.activeScript || 'v6';
                 }
                 // Persist the assignment if the user already has state; otherwise
                 // salesFlow will freeze it when it creates the state on first message.

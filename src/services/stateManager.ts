@@ -71,7 +71,7 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
     const pausedUsers = new Set<string>();
     const config: BotConfig = {
         alertNumbers: [],
-        activeScript: 'v5',
+        activeScript: 'v6',
         scriptStats: {
             v5: { started: 0, completed: 0 },
             v6: { started: 0, completed: 0 }
@@ -116,7 +116,7 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
 
     async function saveKnowledge(scriptName: string | null = null) {
         try {
-            const name = scriptName || config.activeScript || 'v5';
+            const name = scriptName || config.activeScript || 'v6';
             const paths = knowledgeFiles[name];
             if (paths && multiKnowledge[name]) {
                 await atomicWriteFile(paths.save, JSON.stringify(multiKnowledge[name], null, 2));
@@ -247,12 +247,13 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
             if (!config.alertNumbers) config.alertNumbers = [];
 
             // Migrate legacy activeScript values (v1/v2/v3/v4 fueron archivados).
-            // Si la DB todavía tiene un guion archivado seleccionado, lo migramos a v5
-            // (default elegido al archivar). 'rotacion' se mantiene.
+            // Si la DB todavía tiene un guion archivado seleccionado, lo migramos a v6
+            // (default elegido al fijar V6 como guion principal el 15-may-2026).
+            // 'rotacion' se mantiene como opción seleccionable manualmente.
             const legacyScripts = ['v1', 'v2', 'v3', 'v4'];
             if (config.activeScript && legacyScripts.includes(config.activeScript)) {
-                logger.warn(`[STATE][${sellerId}] activeScript="${config.activeScript}" archivado → migrando a "v5"`);
-                config.activeScript = 'v5';
+                logger.warn(`[STATE][${sellerId}] activeScript="${config.activeScript}" archivado → migrando a "v6"`);
+                config.activeScript = 'v6';
             }
             // scriptStats puede tener entradas de v1/v2/v3/v4 — las dejamos como histórico,
             // pero no se incrementan más ya que el rotador y handler solo usan v5/v6.

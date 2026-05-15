@@ -443,7 +443,7 @@ module.exports = (clientPool) => {
                     timestamp: c.timestamp,
                     isPaused: ss?.pausedUsers?.has(resolvedId) || ss?.pausedUsers?.has(c.id._serialized),
                     step: ss?.userState?.[resolvedId]?.step || ss?.userState?.[c.id._serialized]?.step || 'new',
-                    assignedScript: (ss?.userState?.[resolvedId] || ss?.userState?.[c.id._serialized])?.assignedScript || (ss?.config?.activeScript === 'rotacion' ? 'v5' : ss?.config?.activeScript || 'v5'),
+                    assignedScript: (ss?.userState?.[resolvedId] || ss?.userState?.[c.id._serialized])?.assignedScript || (ss?.config?.activeScript === 'rotacion' ? 'v6' : ss?.config?.activeScript || 'v6'),
                     selectedProduct: (ss?.userState?.[resolvedId] || ss?.userState?.[c.id._serialized])?.selectedProduct || null,
                     selectedPlan: (ss?.userState?.[resolvedId] || ss?.userState?.[c.id._serialized])?.selectedPlan || null,
                     cart: (ss?.userState?.[resolvedId] || ss?.userState?.[c.id._serialized])?.cart || null,
