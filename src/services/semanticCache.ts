@@ -27,7 +27,12 @@ import NodeCache from 'node-cache';
 import logger from '../utils/logger';
 
 const EMBEDDING_MODEL = 'text-embedding-3-small';
-const SIM_THRESHOLD = 0.92; // empirically: 0.92 catches paraphrases, rejects unrelated
+// 0.92 era demasiado laxo: en el audit del 15-may-2026 encontramos rows con
+// respuestas específicas del cliente original (mencionan "tu objetivo de bajar
+// 20 kilos", "tenés 44 años") que podrían matchear con otros clientes y
+// devolverles esa misma respuesta contaminada. Subido a 0.94 para reducir el
+// riesgo de mismatch contextual entre clientes.
+const SIM_THRESHOLD = 0.94;
 const CANDIDATE_WINDOW = 50; // rows per step to score in-memory
 const MEMORY_TTL_SECONDS = 10 * 60; // in-memory LRU for candidate rows
 const WRITE_MIN_USER_CHARS = 6; // don't cache ultra-short noise like "ok", "??"
