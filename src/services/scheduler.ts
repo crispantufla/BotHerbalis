@@ -844,6 +844,24 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
             continue;
         }
 
+        // Stage 1.5: 90 minutos sin pagar — ofrecer alternativas (transferencia/COD)
+        // antes de escalar a vendedor a las 4h. Idea: rescatar la venta de quien
+        // no completó MP por razones técnicas (no tiene tarjeta a mano, problema
+        // con el link, etc.). Una sola vez vía flag mpAlternativeOffered.
+        if (mpReminderStage === 1 && !(state as any).mpAlternativeOffered && minsSince >= 90) {
+            const msg = `¡Hola! 👋 Si tuviste alguna dificultad con el link de Mercado Pago, no hay drama 😊\n\nTenemos dos alternativas:\n\n💸 *Transferencia bancaria* — al alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*\n📦 *Contra reembolso* — adelantás $10.000 y el resto en efectivo al cartero cuando te llega\n\n¿Te queda más cómoda alguna de estas, o seguimos con Mercado Pago?`;
+            try {
+                await sendMessageWithDelay(userId, msg);
+                _pushHistory(state, { role: 'bot', content: msg });
+                (state as any).mpAlternativeOffered = true;
+                saveState(userId);
+                logger.info(`[SCHEDULER][${sharedState.sellerId || '?'}] MP alternative offer sent to ${userId} (${minsSince}min waiting)`);
+            } catch (e: any) {
+                logger.error(`[SCHEDULER] Failed to send MP alternative to ${userId}:`, e.message);
+            }
+            continue;
+        }
+
         // Stage 2: 4 horas sin pagar — último recordatorio + escalar al vendedor
         if (mpReminderStage === 1 && minsSince >= 240) {
             const msg = `¡Hola! Veo que el pago aún no se concretó 🙂 Te paso a un asesor para que te ayude con cualquier inconveniente. ¡Hasta enseguida!`;

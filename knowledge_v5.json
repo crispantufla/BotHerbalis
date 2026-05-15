@@ -110,13 +110,13 @@
         "prices": {
             "step": "waiting_ok",
             "_note": "TEXTO 3 — Tras la recomendación, cliente dijo 'sí, pasame los precios'. Mostramos los 2 planes del producto seleccionado y pedimos elección. Disparado desde stepWaitingOk._buildPricesMessage. Placeholders: {{PRICE_60}}, {{PRICE_120}} se sustituyen con _getPrice(producto, plan).",
-            "response": "💰 *Plan 2 meses: ${{PRICE_60}}*\n💰 *Plan 4 meses: ${{PRICE_120}}* — el más conveniente; muchas clientas, al llegar al peso, lo usan 1-2 veces por semana como mantenimiento.\n\n¿Qué plan preferís? 😊",
+            "response": "💰 *Plan 2 meses: ${{PRICE_60}}*\n💰 *Plan 4 meses: ${{PRICE_120}}* — el más conveniente; muchas clientas, al llegar al peso, lo usan 1-2 veces por semana como mantenimiento.\n\n💡 _Tip: si llevás para alguien más en casa (pareja, mamá, hermana), el 3° producto va al 50% off._\n\n¿Qué plan preferís? 😊",
             "nextStep": "waiting_plan_choice"
         },
         "payment_menu": {
             "step": "waiting_payment_method",
             "_note": "TEXTO 4 — Menú con las 3 opciones espontáneas de pago. Disparado por buildPaymentMessage.",
-            "response": "¡Perfecto! ¿Cómo preferís realizar el pago? 💳\n\n1️⃣ *Tarjeta de crédito o débito* — te paso el link de Mercado Pago\n2️⃣ *Transferencia bancaria* — te paso el alias\n3️⃣ *Contra reembolso* — anticipo de $10.000 y el resto al recibir\n\n¿Cuál te queda más cómoda?",
+            "response": "¡Perfecto! Te genero el link de *Mercado Pago* ya — es el más cómodo: pagás con tarjeta, débito, app MP, o llevás el código y pagás en efectivo en cualquier Pago Fácil/Rapipago 💳\n\n_Si preferís_ podemos hacerlo por *transferencia bancaria* o *contra reembolso* (anticipo de $10.000 y el resto al cartero) — avisame y te paso los datos.\n\n¿Avanzamos con Mercado Pago? 😊",
             "nextStep": "waiting_payment_method"
         },
         "payment_transfer_alias": {
@@ -265,7 +265,7 @@
                 "cuotas"
             ],
             "_note": "Resumen de las 3 opciones disponibles. Si el cliente ya eligió método, no responder esto.",
-            "response": "Tenemos 3 formas de pagar 💳\n\n1️⃣ *Tarjeta de crédito o débito* — por Mercado Pago, te paso el link\n2️⃣ *Transferencia bancaria* — te paso el alias\n3️⃣ *Contra reembolso* — anticipo de $10.000 y el resto en efectivo al cartero\n\n¿Cuál te queda más cómoda?"
+            "response": "Tenemos 3 formas de pagar 💳\n\n1️⃣ ⭐ *Mercado Pago* (el más elegido) — tarjeta, débito, app MP, o efectivo en Pago Fácil/Rapipago\n2️⃣ *Transferencia bancaria* — te paso el alias\n3️⃣ *Contra reembolso* — anticipo de $10.000 y el resto en efectivo al cartero\n\n¿Cuál te queda más cómoda?"
         },
         {
             "keywords": [

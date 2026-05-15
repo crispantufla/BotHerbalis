@@ -81,7 +81,7 @@ function buildPersonalizedPriceResponse(state: any, productOverride?: string | n
 
     const priceStr = _getPrice(productKey, recommendedPlan);
 
-    const savingsLine = '\n\n💳 _Pagás con Mercado Pago: tarjeta de crédito, débito o saldo MP._';
+    const savingsLine = '\n\n💳 _Pagás con Mercado Pago: tarjeta, débito, app MP o efectivo en Pago Fácil/Rapipago._';
 
     let justification: string;
     if (weightGoal >= 20) {

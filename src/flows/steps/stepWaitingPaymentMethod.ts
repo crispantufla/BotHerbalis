@@ -117,11 +117,17 @@ export async function handleWaitingPaymentMethod(
     }
 
     // ── Opción 1: MercadoPago ──────────────────────────────────────────────────
-    // Solo si MP fue elegido (por número o keyword) Y no hay señal de transferencia
-    if ((isOptionMP || MP_KEYWORDS.test(text)) && !TRANSFER_KEYWORDS.test(text) && !isOptionTransfer && !isOptionCash) {
+    // Match explícito por número/keyword, O afirmativa genérica.
+    // El nuevo menú pregunta "¿avanzamos con Mercado Pago?" — si el cliente dice
+    // "dale/sí/vamos/ok" sin elegir otra opción, default a MP. Reduce un turno
+    // de conversación y aumenta la conversión MP-first.
+    const PAYMENT_AFFIRMATIVE = /^\s*(?:s[ií]+|dale|ok|okay|okey|listo|vamos|vamo|avancemos|avanzá|avanza|sigamos|sigo|claro|por\s+supuesto|obvio|joya|genial|perfecto|bueno|sí\s+claro|dale\s+vamos|sí\s+dale|metele)\s*[\.\!]*\s*$/i;
+    const isGenericAffirmative = PAYMENT_AFFIRMATIVE.test(text) && !isOptionTransfer && !isOptionCash && !TRANSFER_KEYWORDS.test(text) && !CASH_KEYWORDS.test(text);
+    if ((isOptionMP || MP_KEYWORDS.test(text) || isGenericAffirmative) && !TRANSFER_KEYWORDS.test(text) && !isOptionTransfer && !isOptionCash) {
         currentState.paymentMethod = 'mercadopago';
         _setStep(currentState, FlowStep.WAITING_MP_PAYMENT);
         saveState(userId);
+        logger.info(`[PAYMENT_METHOD] ${userId} → MP (${isGenericAffirmative ? 'afirmativa genérica → default MP' : 'elección explícita'})`);
         // stepWaitingMpPayment maneja el primer mensaje al entrar
         return { matched: false, staleReprocess: true } as any;
     }
@@ -176,7 +182,7 @@ export async function handleWaitingPaymentMethod(
     // anticipo $10k) se ofrecen espontáneamente. El cliente elige una.
     const aiRes = await aiService.chat(text, {
         step: 'waiting_payment_method',
-        goal: `El cliente debe elegir cómo paga. Las 3 opciones disponibles son:\n\n1️⃣ *Tarjeta de crédito o débito* — por Mercado Pago. Link inmediato. Cubre crédito, débito y saldo MP.\n\n2️⃣ *Transferencia bancaria* — alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*. Le pasamos el alias y avisa cuando transfirió.\n\n3️⃣ *Contra reembolso / pago al recibir* — anticipo de *$10.000* por transferencia al mismo alias (*HERBALIS.TIENDA*, *BIO ORIGEN S.A.S.*) que cubre el envío + saldo en efectivo al cartero cuando llega. Aplica a TODOS los planes y clientes (nuevos y recurrentes). Es una decisión interna por la cantidad de paquetes que vuelven sin retirar. Es exactamente la misma plata, solo cambia el momento.\n\nPROHIBICIONES ESTRICTAS:\n- NO mencionar adicional de $6.000 (esa política ya no existe)\n- NO mencionar "efectivo en Pago Fácil/Rapipago" como medio de pago\n- NO mencionar cuotas — no se ofrecen cuotas; quien quiera dividir el pago verá lo que su tarjeta permita al abrir el link de MP, pero NUNCA se promete ni menciona cuotas\n- NO decir "contra reembolso es lo más cómodo/seguro"\n- NO decir "el envío es gratis si elegís plan 120 días"\n- NO inventar cuentas, CBUs o aliases distintos al oficial\n\nNUNCA avances sin que el cliente confirme con cuál de las 3 opciones quiere avanzar.`,
+        goal: `El cliente debe elegir cómo paga. Las 3 opciones disponibles son:\n\n1️⃣ ⭐ *Mercado Pago* (recomendado, el más usado) — link único que cubre tarjeta de crédito, débito, app MP, o efectivo en cualquier Pago Fácil o Rapipago (el cliente lleva el código y paga en efectivo en la sucursal). Acreditación inmediata.\n\n2️⃣ *Transferencia bancaria* — alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*. Le pasamos el alias y avisa cuando transfirió.\n\n3️⃣ *Contra reembolso / pago al recibir* — anticipo de *$10.000* por transferencia al mismo alias (*HERBALIS.TIENDA*, *BIO ORIGEN S.A.S.*) que cubre el envío + saldo en efectivo al cartero cuando llega. Aplica a TODOS los planes y clientes (nuevos y recurrentes). Es una decisión interna por la cantidad de paquetes que vuelven sin retirar. Es exactamente la misma plata, solo cambia el momento.\n\nARGUMENTOS DE VENTA SI EL CLIENTE DUDA:\n- "Mercado Pago protege al comprador — si hay problema con el envío, MP devuelve la plata. Es la forma más segura."\n- Si dice no tener tarjeta: "El link de MP no necesita tarjeta — llevás el código y pagás en efectivo en cualquier Pago Fácil o Rapipago del barrio."\n\nPROHIBICIONES ESTRICTAS:\n- NO mencionar adicional de $6.000 (esa política ya no existe)\n- NO mencionar cuotas — no se ofrecen cuotas; quien quiera dividir el pago verá lo que su tarjeta permita al abrir el link de MP, pero NUNCA se promete ni menciona cuotas\n- NO decir "contra reembolso es lo más cómodo/seguro" — empujá MP como primera opción\n- NO decir "el envío es gratis si elegís plan 120 días"\n- NO inventar cuentas, CBUs o aliases distintos al oficial\n\nSi el cliente responde con afirmativa genérica ("dale", "sí", "vamos") sin elegir explícitamente, asumí MERCADO PAGO (el handler ya hace esto). NUNCA avances sin que el cliente confirme con cuál de las 3 opciones quiere avanzar.`,
         history: currentState.history,
         summary: currentState.summary,
         knowledge,

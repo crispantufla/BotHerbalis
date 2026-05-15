@@ -268,12 +268,12 @@ async function _handleEmailSubflow(
         return 'ready';
     }
 
-    // Si todavía no preguntamos → preguntar.
+    // Si todavía no preguntamos → preguntar (mensaje enfático sobre importancia).
     if (!currentState.emailAskedAt) {
         const isSenaFlow = !!(currentState.senaAmount && currentState.senaAmount > 0);
         const askMsg = isSenaFlow
-            ? `Antes de generarte el link de la seña, ¿me pasás tu *email*? 📧\n\nAsí Mercado Pago te manda el comprobante y te pre-llena el formulario. Si no lo recordás o preferís omitirlo, decime *"sin email"* y seguimos igual 😊`
-            : `Antes de generarte el link, ¿me pasás tu *email*? 📧\n\nAsí Mercado Pago te manda el comprobante y te pre-llena el formulario. Si no lo recordás o preferís omitirlo, decime *"sin email"* y seguimos igual 😊`;
+            ? `Antes de generarte el link de la seña, necesito tu *email* 📧\n\nEs importante para que Mercado Pago te mande el comprobante de la operación y para hacer seguimiento del pago. ¿Me lo pasás?`
+            : `Antes de generarte el link, necesito tu *email* 📧\n\nEs importante para que Mercado Pago te mande el comprobante de la operación y para hacer seguimiento del pago. ¿Me lo pasás?`;
         currentState.emailAskedAt = Date.now();
         currentState.history.push({ role: 'bot', content: askMsg, timestamp: Date.now() });
         saveState(userId);
@@ -286,13 +286,26 @@ async function _handleEmailSubflow(
     if (emailMatch) {
         currentState.email = emailMatch[1].toLowerCase();
         logger.info(`[MP_PAYMENT] Email capturado para ${userId}: ${currentState.email}`);
-    } else {
-        // Cualquier otra respuesta (skip explícito o mensaje no relacionado) → omitimos.
-        // Política mayo 2026: "si no lo saben, no pasa nada lo omitimos".
-        currentState.email = '';
-        const wasExplicitSkip = SKIP_EMAIL_RE.test(text);
-        logger.info(`[MP_PAYMENT] Email omitido para ${userId} (${wasExplicitSkip ? 'skip explícito' : 'sin email en respuesta'})`);
+        saveState(userId);
+        return 'ready';
     }
+
+    // Si el cliente intenta omitir/no proveer email, INSISTIMOS una sola vez
+    // antes de aceptar omitir. Sube significativamente la tasa de captura.
+    if (!(currentState as any).emailReask && SKIP_EMAIL_RE.test(text)) {
+        (currentState as any).emailReask = true;
+        const reaskMsg = `Tranqui, te entiendo 😊 Pero si podés, mejor que me lo pases — sin email Mercado Pago no te puede enviar el comprobante de la operación, y después es más difícil hacer seguimiento del pago.\n\n¿Tenés alguno aunque sea viejo? Si realmente no usás email, decime *"no tengo"* y seguimos igual.`;
+        currentState.history.push({ role: 'bot', content: reaskMsg, timestamp: Date.now() });
+        saveState(userId);
+        await sendMessageWithDelay(userId, reaskMsg);
+        return 'asked';
+    }
+
+    // Insistimos una vez y aún así el cliente no provee email — omitimos sin
+    // bloquear la venta. Política: "preferimos venta sin email vs sin venta".
+    currentState.email = '';
+    const wasExplicitSkip = SKIP_EMAIL_RE.test(text);
+    logger.info(`[MP_PAYMENT] Email omitido para ${userId} tras re-ask (${wasExplicitSkip ? 'skip explícito' : 'sin email en respuesta'})`);
     saveState(userId);
     return 'ready';
 }
