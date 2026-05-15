@@ -72,7 +72,7 @@
                 "liquido",
                 "gotero"
             ],
-            "response": "¡Dale! Las gotas son lo más suave y discreto 💧 — 10 gotitas una vez al día, sin preparar nada. Y otra ventaja: si querés ir más despacio, podés ajustar la dosis vos misma.\n\n¿Te paso los precios? 😊",
+            "response": "Las gotas son lo más suave y discreto 💧 — 10 gotitas una vez al día, sin preparar nada. Y otra ventaja: si querés ir más despacio, podés ajustar la dosis vos misma.\n\nPero te cuento, así tenés el panorama completo: la mayoría de clientas terminan eligiendo *cápsulas* — suelen ser más efectivas para bajar de peso y son re prácticas (una al día y listo). Las gotas las dejamos más para gente mayor o que les cuesta tragar pastillas.\n\n¿Avanzamos con las gotas, che, o preferís probar las cápsulas? 😊",
             "nextStep": "waiting_ok"
         },
         "preference_semillas": {
@@ -85,7 +85,7 @@
                 "yuyos",
                 "te de semilla"
             ],
-            "response": "¡Ah, ya las conocés! 🌿 Las semillas son la opción más natural de todas — se prepara como una infusioncita cada noche, antes de dormir, y muchas clientas dicen que las relaja al final del día.\n\n¿Te paso los precios? 😊",
+            "response": "Las semillas son la opción más natural de todas 🌿 — se prepara como una infusioncita cada noche, antes de dormir, y muchas clientas dicen que las relaja al final del día.\n\nIgual te cuento, para que tengas todo: la mayoría termina yendo con las *cápsulas* — suelen dar resultados más rápido y no hay que preparar nada (una al día y listo). Las semillas son geniales si te gusta el ritual y querés algo bien gradual.\n\n¿Avanzamos con las semillas, o querés probar las cápsulas? 😊",
             "nextStep": "waiting_ok"
         },
         "closing": {

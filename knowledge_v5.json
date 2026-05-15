@@ -66,13 +66,13 @@
         },
         "preference_gotas": {
             "step": "waiting_preference",
-            "_note": "NO duplica los precios — el TEXTO 3 (entry 'prices') ya los muestra y pregunta el plan. Sólo acusamos recibo y pedimos OK.",
+            "_note": "Soft-push de cápsulas (regla ai.ts:286 — 'Cápsulas SIEMPRE opción principal'). Mencionamos que las cápsulas son lo que más eligen + ofrecemos cambio sin presión. Si el cliente insiste en gotas, avanza normal a waiting_ok.",
             "match": [
                 "gotas",
                 "liquido",
                 "gotero"
             ],
-            "response": "¡Dale! 💧 Las gotas son prácticas y discretas — 10 gotas, 1 vez al día.\n\n¿Te paso los precios? 😊",
+            "response": "💧 Las gotas son una opción suave y discreta — 10 gotas, 1 vez al día.\n\n_Igual te cuento: la mayoría de clientes elige las *cápsulas* porque suelen ser más efectivas y prácticas (una al día, sin medir nada). Las gotas las recomendamos especialmente para personas mayores o con dificultad para tragar pastillas._\n\n¿Avanzamos con gotas, o preferís probar las cápsulas? 😊",
             "nextStep": "waiting_ok"
         },
         "preference_semillas": {
@@ -86,7 +86,7 @@
                 "te de semilla",
                 "natural"
             ],
-            "response": "¡Dale! 🌿 Las semillas son la opción más natural — se preparan como infusión cada noche.\n\n¿Te paso los precios? 😊",
+            "response": "🌿 Las semillas son la opción más natural — se preparan como infusión cada noche.\n\n_Te comento: la mayoría de clientes elige las *cápsulas* porque suelen dar resultados más rápido y son más prácticas (no hay que preparar nada). Las semillas son ideales si te gusta el ritual de la infusión y querés algo bien gradual._\n\n¿Avanzamos con semillas, o preferís probar las cápsulas? 😊",
             "nextStep": "waiting_ok"
         },
         "closing": {

@@ -29,11 +29,36 @@ export async function handleWaitingOk(
 ): Promise<{ matched: boolean }> {
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
 
+    // CAMBIO DE PRODUCTO: tras el soft-push de cápsulas en preference_gotas /
+    // preference_semillas, el cliente puede responder "cápsulas" para cambiar
+    // de opinión. Sin este branch caería en el AI fallback y la IA podría
+    // ignorar el cambio (mostraría precios del producto viejo). Detectamos
+    // cualquier mención EXPLÍCITA del producto alternativo y re-seteamos
+    // selectedProduct antes de mostrar precios.
+    const wantsCapsulas = /\b(c[aá]psulas?|pastillas?)\b/i.test(normalizedText);
+    const wantsGotas = /\b(gotas?|gotero|l[ií]quido)\b/i.test(normalizedText);
+    const wantsSemillas = /\b(semillas?|infusi[oó]n)\b/i.test(normalizedText);
+    const currentProduct = currentState.selectedProduct || '';
+    const productSwitches: Array<[string, boolean]> = [
+        ['Cápsulas de nuez de la india', wantsCapsulas && !currentProduct.includes('Cápsulas')],
+        ['Gotas de nuez de la india', wantsGotas && !currentProduct.includes('Gotas')],
+        ['Semillas de nuez de la india', wantsSemillas && !currentProduct.includes('Semillas')],
+    ];
+    const switchTo = productSwitches.find(([_, should]) => should)?.[0];
+    if (switchTo) {
+        logger.info(`[PRODUCT-SWITCH] User ${userId} en waiting_ok cambió ${currentProduct} → ${switchTo}`);
+        currentState.selectedProduct = switchTo;
+        // Reset plan/cart — el cart se recalculará en waiting_plan_choice
+        currentState.selectedPlan = undefined as any;
+        currentState.cart = undefined as any;
+    }
+
     // Si el cliente pide precios directamente ("precio", "cuánto sale", "valor"),
     // lo tratamos igual que un "sí, pasame los precios" — es la misma intención.
     // Sin este branch caía en el AI fallback y la IA improvisaba un texto que
     // solo mostraba el plan 60 (caso real: conversación de Nora 13/05 20:08).
-    const askingForPrices = /\b(precio|precios|cu[áa]nto|cuanto|cuesta|cuestan|sale|salen|vale|valen|valor|costo)\b/i.test(normalizedText);
+    // El cambio de producto explícito (cápsulas/gotas) también dispara precios.
+    const askingForPrices = !!switchTo || /\b(precio|precios|cu[áa]nto|cuanto|cuesta|cuestan|sale|salen|vale|valen|valor|costo)\b/i.test(normalizedText);
 
     const isQuestion = (text.includes('?') || /\b(puedo|puede|como|donde|cuando|que pasa)\b/.test(normalizedText)) && !/\b(si|dale|ok|listo|bueno|claro|vamos|joya)\b/.test(normalizedText) && !askingForPrices;
 
