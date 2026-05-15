@@ -34,8 +34,8 @@
         },
         "recommendation_1": {
             "step": "waiting_weight",
-            "_note": "Tier 1 — hasta 10 kg → Gotas 60 días. TEXTO 1+2 (recomendación + cómo funciona). Termina pidiendo aceptación para mostrar precios (manejado en stepWaitingOk).",
-            "response": "¡Genial! 👌 Para vos, lo ideal es el *Plan de Gotas para 2 meses*. La mayoría de clientes que querían bajar lo mismo que vos lograron entre 7 y 10 kilos con este plan.\n\nTe explico cómo funciona:\n💧 Tomás 10 gotas 1 vez por día (almuerzo o cena) — se puede regular la dosis según los resultados\n📋 Te mando una guía de consejos alimentarios\n📞 Te acompañamos por WhatsApp durante todo el tratamiento\n\n¿Te paso los precios? 😊",
+            "_note": "Tier 1 — hasta 10 kg → Cápsulas 60 días. Cambio mayo 2026: cápsulas era el 75% de las ventas en marzo (mes de mejor conversión, 10.7%). Las gotas quedan reservadas para >70 años o pedido explícito del cliente.",
+            "response": "¡Genial! 👌 Para vos, lo ideal es el *Plan de Cápsulas para 2 meses*. La mayoría de clientes que querían bajar lo mismo que vos lograron entre 7 y 10 kilos con este plan, de forma cómoda y sin pasar hambre.\n\nTe explico cómo funciona:\n💊 Tomás 1 cápsula al día, 30 min antes del almuerzo o cena — súper práctico\n📋 Te mando una guía de consejos alimentarios para acompañar\n📞 Te acompañamos por WhatsApp durante todo el tratamiento\n\n¿Te paso los precios? 😊",
             "nextStep": "waiting_ok"
         },
         "recommendation_2": {

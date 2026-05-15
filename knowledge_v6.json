@@ -34,8 +34,8 @@
         },
         "recommendation_1": {
             "step": "waiting_weight",
-            "_note": "Tier 1 — hasta 10 kg → Gotas 60 días. Sales-tuned: marco temporal (2 meses), gradiente realista (1-1.5kg/sem), visualización del resultado, bonus framing (guía + acompañamiento).",
-            "response": "Buenísimo, ya tengo claro qué te conviene 👌\n\nPara vos lo ideal es el *Plan de Gotas para 2 meses*. La mayoría de quienes querían bajar lo mismo que vos lograron *entre 7 y 10 kilos en esos 2 meses* — algo así como 1 a 1,5 kilos por semana, que es un ritmo sostenible y sin rebote.\n\nTe cuento cómo es:\n💧 Tomás 10 gotas una vez por día, antes del almuerzo o de la cena, con un vaso de agua — la dosis se puede regular según cómo vayas respondiendo\n📋 Te llevás una guía de comidas con consejitos para acompañar (no es una dieta, es para sumar)\n📞 Y yo te acompaño por WhatsApp durante todo el tratamiento — cualquier duda me escribís y vamos viendo juntas/os 😊\n\n¿Te paso los precios para que veas cómo es?",
+            "_note": "Tier 1 — hasta 10 kg → Cápsulas 60 días. Cambio mayo 2026: cápsulas era el 75% de las ventas en marzo. Sales-tuned: marco temporal (2 meses), gradiente realista (1-1.5kg/sem), visualización del resultado, bonus framing (guía + acompañamiento). Las gotas quedan reservadas para >70 años o pedido explícito.",
+            "response": "Buenísimo, ya tengo claro qué te conviene 👌\n\nPara vos lo ideal son las *Cápsulas en plan de 2 meses*. La mayoría de quienes querían bajar lo mismo que vos lograron *entre 7 y 10 kilos en esos 2 meses* — algo así como 1 a 1,5 kilos por semana, que es un ritmo sostenible y sin rebote.\n\nTe cuento cómo es:\n💊 Tomás una sola cápsula al día, 30 minutos antes del almuerzo o de la cena, con un vaso de agua — fácil de incorporar a la rutina\n📋 Te llevás una guía de comidas con consejitos para acompañar (no es una dieta, es para sumar)\n📞 Y yo te acompaño por WhatsApp durante todo el tratamiento — cualquier duda me escribís y vamos viendo juntas/os 😊\n\n¿Te paso los precios para que veas cómo es?",
             "nextStep": "waiting_ok"
         },
         "recommendation_2": {

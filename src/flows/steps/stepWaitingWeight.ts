@@ -120,10 +120,14 @@ export async function handleWaitingWeight(
             }
 
             // Asignación producto + plan según tier
+            // Tier 1 cambió de Gotas → Cápsulas 60d: cápsulas era el 75% de las
+            // ventas del marzo glorioso, y el prompt de IA ya dice "NUNCA
+            // recomiendes gotas para poco peso" (ai.ts:69). Dejamos las gotas
+            // sólo para mayores de 70 años / preferencia explícita.
             if (tier === '1') {
-                currentState.selectedProduct = 'Gotas de nuez de la india';
+                currentState.selectedProduct = 'Cápsulas de nuez de la india';
                 currentState.selectedPlan = '60';
-                currentState.cart = [{ product: 'Gotas de nuez de la india', plan: '60', price: knowledge?._prices?.gotas60 || '' }];
+                currentState.cart = [{ product: 'Cápsulas de nuez de la india', plan: '60', price: knowledge?._prices?.capsulas60 || '' }];
             } else if (tier === '2') {
                 currentState.selectedProduct = 'Cápsulas de nuez de la india';
                 currentState.selectedPlan = '60';
