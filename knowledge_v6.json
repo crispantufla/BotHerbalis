@@ -104,7 +104,7 @@
                 "mandalo",
                 "envielo"
             ],
-            "response": "¡Genial, buenísima decisión! 🎉\n\nÚltimo paso — pasame los datos así te armo la etiqueta 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(Importante: la dirección tiene que ser exacta, sin esquinas, sin \"aprox\" y sin S/N — si no, el correo no entrega.)",
+            "response": "¡Genial, buenísima decisión! 🎉 Y tranqui, estoy con vos todo el tratamiento por acá — cualquier duda que te aparezca durante estos meses, me escribís y vamos viendo juntas/os.\n\nÚltimo paso — pasame los datos así te armo la etiqueta 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(Importante: la dirección tiene que ser exacta, sin esquinas, sin \"aprox\" y sin S/N — si no, el correo no entrega.)",
             "nextStep": "waiting_data"
         },
         "prices": {

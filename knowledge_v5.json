@@ -23,7 +23,7 @@
                 "capsulas",
                 "capsula"
             ],
-            "response": "¡Hola! 😊 Soy el asesor de Herbalis. Ayudo a personas como vos a bajar de peso de forma natural, sin dietas estrictas.\n\nContame: ¿cuánto te gustaría bajar?\n\n1️⃣ Pocos kilos (hasta 10)\n2️⃣ Bastante (entre 10 y 20)\n3️⃣ Mucho (más de 20)\n\nMandame el número.",
+            "response": "¡Hola! 😊 Soy el asesor de Herbalis. Te ayudo a encontrar la opción justa para vos — de forma natural, sin dietas estrictas.\n\nAntes de hablar de números, contame: ¿cuánto te gustaría bajar?\n\n1️⃣ Pocos kilos (hasta 10)\n2️⃣ Bastante (entre 10 y 20)\n3️⃣ Mucho (más de 20)\n\n_Te pregunto eso primero porque el plan que te conviene depende del objetivo — no quiero recomendarte algo de más ni de menos._\n\n🌿 Hace 13 años acompañamos a casi 70.000 personas con esto\n📦 Envío sin costo a todo el país",
             "nextStep": "waiting_weight"
         },
         "recommendation": {
@@ -104,7 +104,7 @@
                 "mandalo",
                 "envielo"
             ],
-            "response": "¡Excelente! 🎉 Tomamos los datos para armar la etiqueta de envío 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(La dirección debe ser exacta, sin esquinas ni \"aprox\" ni S/N)",
+            "response": "¡Excelente decisión! 🎉 No estás sola/o en esto — te acompañamos por WhatsApp todo el tratamiento, cualquier duda me escribís.\n\nTomamos los datos para armar la etiqueta de envío 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(La dirección debe ser exacta, sin esquinas ni \"aprox\" ni S/N)",
             "nextStep": "waiting_data"
         },
         "prices": {
