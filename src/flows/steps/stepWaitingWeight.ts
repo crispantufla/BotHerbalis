@@ -199,7 +199,7 @@ export async function handleWaitingWeight(
 
         if (isRefusal || (currentState as any).weightRefusals > 2) {
             logger.info(`[LOGIC] User ${userId} refused/failed weight question too many times (${(currentState as any).weightRefusals}). Skipping to preference.`);
-            const skipMsg = "¡Entiendo, no hay problema! 👌 Pasemos directo a ver qué opción es mejor para vos.\n\nTenemos:\n1️⃣ Cápsulas (Lo más efectivo y práctico)\n2️⃣ Semillas/Infusión (Más natural)\n3️⃣ Gotas (Para >70 años o poquitos kilos)\n\n¿Cuál te gustaría probar?";
+            const skipMsg = "¡Entiendo, no hay problema! 👌 Pasemos directo a ver qué opción es mejor para vos.\n\nTenemos:\n1️⃣ Cápsulas (Lo más efectivo y práctico — opción recomendada)\n2️⃣ Semillas/Infusión (Más natural, en formato infusión)\n3️⃣ Gotas (Para personas mayores de 70 o con dificultad para tragar pastillas)\n\n¿Cuál te gustaría probar?";
 
             _setStep(currentState, FlowStep.WAITING_PREFERENCE);
             currentState.history.push({ role: 'bot', content: skipMsg, timestamp: Date.now() });
