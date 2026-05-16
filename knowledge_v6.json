@@ -23,7 +23,7 @@
                 "capsulas",
                 "capsula"
             ],
-            "response": "¡Holaa! 😊 Acá Elena, de Herbalis. Te acompaño a bajar de peso con productos 100% naturales — sin dietas locas, sin pasar hambre, sin promesas raras 🙂\n\nAntes de decirte qué te conviene, contame algo: ¿cuántos kilos tenés ganas de bajar? Más o menos un estimado:\n\n👉 Pocos (hasta 10)\n👉 Bastante (entre 10 y 20)\n👉 Mucho (más de 20)\n\nMandame el número o contame en tus palabras, lo que te quede más cómodo.",
+            "response": "Hola, soy Elena de Herbalis 🙂\n\nPara saber qué te conviene, contame más o menos cuántos kilos querés bajar:\n\nPocos (hasta 10)\nBastante (10 a 20)\nMucho (más de 20)",
             "nextStep": "waiting_weight"
         },
         "recommendation": {
@@ -35,19 +35,19 @@
         "recommendation_1": {
             "step": "waiting_weight",
             "_note": "Tier 1 — hasta 10 kg → Cápsulas 60 días. Cambio mayo 2026: cápsulas era el 75% de las ventas en marzo. Sales-tuned: marco temporal (2 meses), gradiente realista (1-1.5kg/sem), visualización del resultado, bonus framing (guía + acompañamiento). Las gotas quedan reservadas para >70 años o pedido explícito.",
-            "response": "Buenísimo, ya tengo claro qué te conviene 👌\n\nPara vos lo ideal son las *Cápsulas en plan de 2 meses*. La mayoría de quienes querían bajar lo mismo que vos lograron *entre 7 y 10 kilos en esos 2 meses* — algo así como 1 a 1,5 kilos por semana, que es un ritmo sostenible y sin rebote.\n\nTe cuento cómo es:\n💊 Tomás una sola cápsula al día, 30 minutos antes del almuerzo o de la cena, con un vaso de agua — fácil de incorporar a la rutina\n📋 Te llevás una guía de comidas con consejitos para acompañar (no es una dieta, es para sumar)\n📞 Y yo te acompaño por WhatsApp durante todo el tratamiento — cualquier duda me escribís y vamos viendo juntas/os 😊\n\n¿Te paso los precios para que veas cómo es?",
+            "response": "Para vos lo ideal son las cápsulas, plan de 2 meses 🙂\n\nLa mayoría con ese rango baja entre 7 y 10 kilos. Una cápsula al día antes del almuerzo o cena.\n\nTe mando una guía de comidas para acompañar y te sigo por acá todo el tratamiento.\n\n¿Te paso los precios?",
             "nextStep": "waiting_ok"
         },
         "recommendation_2": {
             "step": "waiting_weight",
             "_note": "Tier 2 — 10 a 20 kg → Cápsulas 120 días (cambio mayo 2026: antes era 60d). El plan 4 meses cubre el tratamiento completo para este rango. Sales-tuned: marco temporal extendido + sostenibilidad + bonus framing.",
-            "response": "Bárbaro, ya sé qué te conviene 💪\n\nPara vos lo ideal son las *Cápsulas en plan de 4 meses*. La mayoría de las personas que querían bajar entre 10 y 20 kilos lo lograron en esos 4 meses — y lo bueno es que el cuerpo tiene tiempo de acostumbrarse al nuevo peso, así no vuelven los kilos. En general ya se nota la diferencia en la balanza desde la primera semana 😊\n\nTe cuento cómo es:\n💊 Una sola cápsula al día, 30 minutos antes del almuerzo o cena, con un vaso de agua — fácil de incorporar a la rutina\n📋 Te llevás una guía de comidas con consejitos para acompañar (no es una dieta)\n📞 Y yo te acompaño por WhatsApp todo el tratamiento — cualquier duda me escribís y vamos viendo juntas/os 😊\n\n¿Te paso los precios para que veas cómo es?",
+            "response": "Para vos lo ideal son las cápsulas, plan de 4 meses 💪\n\nLa mayoría con ese rango baja entre 15 y 20 kilos. Los 4 meses le dan tiempo al cuerpo a acostumbrarse, sin rebote.\n\nUna cápsula al día antes del almuerzo o cena. Te mando guía de comidas y te acompaño por acá todo el tratamiento.\n\n¿Te paso los precios?",
             "nextStep": "waiting_ok"
         },
         "recommendation_3": {
             "step": "waiting_weight",
             "_note": "Tier 3 — +20 kg → Cápsulas 120 días. Sales-tuned: reframe del compromiso largo como ventaja (cuerpo se acostumbra, sin rebote), mantención implícita (1-2/sem post tratamiento), visualización.",
-            "response": "Genial, te cuento qué te conviene 💪\n\nPara más de 20 kilos lo que más recomiendo son las *cápsulas en plan de 4 meses* — y te explico por qué: el cuerpo necesita tiempo para bajar de forma sostenida sin estresarse, y los 4 meses cubren el tratamiento completo. Muchas clientas que terminan los 4 meses siguen tomando 1 o 2 cápsulas por semana como mantenimiento, así no vuelven los kilos.\n\nCómo se toma:\n💊 Una cápsula al día, 30 minutos antes del almuerzo o cena, con un vaso de agua\n📋 Te llevás una guía de comidas con consejitos (no es una dieta)\n📞 Yo te acompaño por WhatsApp durante todo el tratamiento, escribime cuando quieras 😊\n\n¿Te paso los precios?",
+            "response": "Para más de 20 kilos lo ideal es el plan de cápsulas de 4 meses 💪\n\nEl cuerpo necesita ese tiempo para bajar de forma sostenida y sin rebote. Muchas clientas siguen después con 1 o 2 por semana como mantenimiento.\n\nUna cápsula al día antes del almuerzo o cena. Te mando guía de comidas y te acompaño todo el tratamiento.\n\n¿Te paso los precios?",
             "nextStep": "waiting_ok"
         },
         "preference_capsulas": {
@@ -61,7 +61,7 @@
                 "practico",
                 "practica"
             ],
-            "response": "¡Excelente elección! 💊 Las cápsulas son lo más práctico que tenemos: una por día, 30 minutos antes de la comida principal, y listo — ni te das cuenta que la estás tomando.\n\n¿Te paso los precios para que veas cómo es? 😊",
+            "response": "¡Buena elección! 💊 Una por día antes de la comida principal y listo.\n\n¿Te paso los precios?",
             "nextStep": "waiting_ok"
         },
         "preference_gotas": {
@@ -72,7 +72,7 @@
                 "liquido",
                 "gotero"
             ],
-            "response": "Las gotas son lo más suave y discreto 💧 — 10 gotitas una vez al día, sin preparar nada. Y otra ventaja: si querés ir más despacio, podés ajustar la dosis vos misma.\n\nPero te cuento, así tenés el panorama completo: la mayoría de clientas terminan eligiendo *cápsulas* — suelen ser más efectivas para bajar de peso y son re prácticas (una al día y listo). Las gotas las dejamos más para gente mayor o que les cuesta tragar pastillas.\n\n¿Avanzamos con las gotas, che, o preferís probar las cápsulas? 😊",
+            "response": "Las gotas son suaves y discretas 💧 — 10 gotitas una vez al día.\n\nTe cuento igual: la mayoría termina con cápsulas porque suelen ser más efectivas y son una al día. Las gotas las dejamos para gente mayor o que les cuesta tragar pastillas.\n\n¿Vamos con gotas o probás cápsulas?",
             "nextStep": "waiting_ok"
         },
         "preference_semillas": {
@@ -85,7 +85,7 @@
                 "yuyos",
                 "te de semilla"
             ],
-            "response": "Las semillas son la opción más natural de todas 🌿 — se prepara como una infusioncita cada noche, antes de dormir, y muchas clientas dicen que las relaja al final del día.\n\nIgual te cuento, para que tengas todo: la mayoría termina yendo con las *cápsulas* — suelen dar resultados más rápido y no hay que preparar nada (una al día y listo). Las semillas son geniales si te gusta el ritual y querés algo bien gradual.\n\n¿Avanzamos con las semillas, o querés probar las cápsulas? 😊",
+            "response": "Las semillas son lo más natural 🌿 — se prepara como infusión cada noche.\n\nLa mayoría igual va con cápsulas — suelen dar resultados más rápido y no hay que preparar nada. Las semillas son geniales si te gusta el ritual.\n\n¿Vamos con semillas o probás cápsulas?",
             "nextStep": "waiting_ok"
         },
         "closing": {
@@ -104,19 +104,19 @@
                 "mandalo",
                 "envielo"
             ],
-            "response": "¡Genial, buenísima decisión! 🎉 Y tranqui, estoy con vos todo el tratamiento por acá — cualquier duda que te aparezca durante estos meses, me escribís y vamos viendo juntas/os.\n\nÚltimo paso — pasame los datos así te armo la etiqueta 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\n\n(Importante: la dirección tiene que ser exacta, sin esquinas, sin \"aprox\" y sin S/N — si no, el correo no entrega.)",
+            "response": "¡Bárbaro! 🎉 Estoy con vos todo el tratamiento por acá.\n\nPasame los datos para armar la etiqueta:\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\n\n(Que la dirección sea exacta, sin \"aprox\" ni S/N)",
             "nextStep": "waiting_data"
         },
         "prices": {
             "step": "waiting_ok",
             "_note": "TEXTO 3 — Tras la recomendación, cliente dijo 'sí, pasame los precios'. Mostramos los 2 planes del producto seleccionado y pedimos elección. Sales-tuned: anchor de valor con precio/día en el plan 120 + mantenimiento como ventaja extra. Placeholders: {{PRICE_60}}, {{PRICE_120}}, {{PRICE_PER_DAY_120}} se resuelven según producto.",
-            "response": "💰 *Plan 2 meses: ${{PRICE_60}}*\n💰 *Plan 4 meses: ${{PRICE_120}}* ⭐ — el más elegido\n\nEl de 4 meses te sale *${{PRICE_PER_DAY_120}} por día* — menos que un café ☕. Y la mayoría de las clientas, al llegar al peso, siguen tomando 1 o 2 por semana como mantenimiento, así no vuelven los kilos.\n\n💡 _Dato extra: si te animás a llevar para alguien más en casa (pareja, mamá, una amiga), el 3° producto va al 50% off — un combo que muchas clientas aprovechan._\n\n¿Con cuál arrancamos? 😊",
+            "response": "Plan 2 meses: ${{PRICE_60}}\nPlan 4 meses: ${{PRICE_120}} ⭐\n\nEl de 4 meses te sale ${{PRICE_PER_DAY_120}} por día. Muchas clientas siguen después con 1 o 2 por semana como mantenimiento.\n\n_Si llevás para alguien más en casa, el 3° producto va al 50% off._\n\n¿Con cuál arrancamos?",
             "nextStep": "waiting_plan_choice"
         },
         "payment_menu": {
             "step": "waiting_payment_method",
             "_note": "TEXTO 4 — Menú con las 3 opciones espontáneas de pago. Disparado por buildPaymentMessage.",
-            "response": "¡Genial! Te genero el link de *Mercado Pago* ya 💳 — es el más cómodo: pagás con tarjeta, débito, app MP, o llevás el código y pagás en efectivo en cualquier Pago Fácil o Rapipago del barrio.\n\nSi te queda más cómodo, también podemos por *transferencia bancaria* o *contra reembolso* (adelantás $10.000 y el resto al cartero) — me decís y te paso los datos.\n\n¿Vamos con Mercado Pago? 😊",
+            "response": "¿Vamos con Mercado Pago? 💳\n\nEs lo más cómodo — pagás con tarjeta, débito, o llevás el código y pagás en efectivo en Pago Fácil o Rapipago.\n\nSi preferís transferencia o contra reembolso, avisame y armamos eso.",
             "nextStep": "waiting_payment_method"
         },
         "payment_transfer_alias": {
@@ -128,7 +128,7 @@
         "payment_cod_retry": {
             "step": "waiting_payment_method",
             "_note": "TEXTO 5c — Primera vez que el cliente elige 'contra reembolso'. Explica la modalidad antes de pedir confirmación. NO promociona como 'lo más cómodo'. NO menciona si el anticipo es por transferencia o por MP — eso lo decide el cliente en el siguiente paso (payment_cod_method_choice). Disparado por buildCashRetryMessage.",
-            "response": "Dale, podemos coordinar pago al recibir 👍\n\nLa modalidad es: adelantás un *anticipo de $10.000* (cubre el envío), y el resto lo pagás en *efectivo al cartero* cuando llega el paquete.\n\nEs una decisión interna por la cantidad de paquetes que vuelven sin retirar — aplica a todos los pedidos. Es exactamente la misma plata, solo cambia el momento.\n\n¿Avanzamos así o preferís otra opción?",
+            "response": "Dale 👍\n\nLa modalidad es: adelantás $10.000 (cubre el envío) y el resto lo pagás en efectivo al cartero cuando te llega.\n\nEs la misma plata, solo cambia el momento. ¿Avanzamos así?",
             "nextStep": "waiting_payment_method"
         },
         "payment_cod_method_choice": {
@@ -146,13 +146,13 @@
         "payment_mp_link": {
             "step": "waiting_mp_payment",
             "_note": "TEXTO 5a — Cliente eligió Mercado Pago. Le mandamos el link + detalle del pedido + pedido de datos en paralelo. Placeholders: {{PRODUCT}}, {{PLAN}}, {{TOTAL}}, {{LINK}}.",
-            "response": "💳 *Pago online via MercadoPago*\n\nPedido: *{{PRODUCT}}* — Plan {{PLAN}} días\nTotal: *${{TOTAL}}*\n\n👇 Hacé clic para pagar de forma segura:\n{{LINK}}\n\nPodés pagar con tarjeta de crédito, débito o saldo MP.\n\n✅ Cuando termines el pago, escribime *\"listo\"* y verifico que ingresó.\n\nMientras tanto, pasame los datos de envío para tener todo listo 👇\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nProvincia:",
+            "response": "💳 Acá va tu link de Mercado Pago:\n\n{{LINK}}\n\nTotal: ${{TOTAL}} — {{PRODUCT}} {{PLAN}} días\n\nCuando pagues, mandame \"listo\" y verifico.\n\nMientras, pasame los datos de envío:\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:",
             "nextStep": "waiting_mp_payment"
         },
         "payment_mp_link_sena": {
             "step": "waiting_mp_payment",
             "_note": "Variante LEGACY del link MP cuando hay senaAmount > 0 (path desactivado en el flujo principal — COD ahora va por transferencia al alias). Se mantiene por compatibilidad con state construido manualmente o flujos viejos. Placeholders: {{PRODUCT}}, {{PLAN}}, {{TOTAL}}, {{SENA_AMOUNT}}, {{SENA_REMAINDER}}, {{LINK}}.",
-            "response": "💳 *Seña por Mercado Pago*\n\nPedido: *{{PRODUCT}}* — Plan {{PLAN}} días\nTotal del pedido: *${{TOTAL}}*\nSeña por Mercado Pago: *${{SENA_AMOUNT}}*\nSaldo al cartero (efectivo): *${{SENA_REMAINDER}}*\n\n👇 Pagá la seña acá:\n{{LINK}}\n\nPodés usar tarjeta de crédito, débito o saldo MP.\n\n✅ Cuando termines, escribime *\"listo\"* y verifico el pago.\n\nMientras tanto, pasame los datos de envío 👇\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nProvincia:",
+            "response": "💳 Link para la seña de Mercado Pago:\n\n{{LINK}}\n\nSeña: ${{SENA_AMOUNT}}\nSaldo al cartero: ${{SENA_REMAINDER}}\n\nCuando termines, mandame \"listo\" y verifico.\n\nMientras, pasame los datos de envío:\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:",
             "nextStep": "waiting_mp_payment"
         },
         "payment_mp_failed": {
