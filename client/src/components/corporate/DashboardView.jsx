@@ -11,9 +11,14 @@ import SystemStatusPanel from './dashboard/SystemStatusPanel';
 const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData }) => {
     const { toast, confirm } = useToast();
     const { isAdmin, user } = useAuth();
-    // Admin global = sin sellerId asignado, ve y opera sobre todos los vendedores.
-    // Sólo este rol puede pausar TODOS los bots a la vez.
-    const isGlobalAdmin = isAdmin && !user?.sellerId;
+    // "Pausar todos" lo puede usar:
+    //   - Admin global (sin sellerId), Y/O
+    //   - El dueño explícito Horacio (tenant admin con sellerId='horacio')
+    // Acordado con el cliente: Horacio es el único tenant admin con poder
+    // sobre toda la flota.
+    const userName = (user?.name || '').toLowerCase();
+    const userSellerId = (user?.sellerId || '').toLowerCase();
+    const canPauseAll = isAdmin && (!user?.sellerId || userName === 'horacio' || userSellerId === 'horacio');
     const [stats, setStats] = useState(null);
     const [loadingStats, setLoadingStats] = useState(true);
     const [pausingAll, setPausingAll] = useState(false);
@@ -230,8 +235,8 @@ const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData 
                         )}
                     </button>
 
-                    {/* Pausar TODOS — solo admin global (sellerId=null) */}
-                    {isGlobalAdmin && (
+                    {/* Pausar TODOS — admin global o Horacio */}
+                    {canPauseAll && (
                         <button
                             onClick={handlePauseAll}
                             disabled={pausingAll}

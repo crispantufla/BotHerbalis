@@ -129,15 +129,25 @@ const CorporateDashboard = () => {
                 }
                 else setStatus(newStatus);
             };
+            // Mantener config.globalPause sincronizado en vivo — sin esto, el
+            // indicador "PAUSADO" en el header no se actualizaba cuando se
+            // togglea desde otro panel o vía Pausar TODOS.
+            const handleGlobalPauseChanged = (data) => {
+                const evtSeller = data?.sellerId;
+                if (evtSeller && viewedSellerId && evtSeller !== viewedSellerId) return;
+                setConfig(prev => ({ ...prev, globalPause: !!data?.globalPause }));
+            };
             socket.on('qr', handleQr);
             socket.on('ready', handleReady);
             socket.on('status_change', handleStatusChange);
+            socket.on('global_pause_changed', handleGlobalPauseChanged);
             socket.on('new_alert', (newAlert) => setAlerts(prev => [newAlert, ...prev]));
             socket.on('alerts_updated', (updated) => setAlerts(updated));
             return () => {
                 socket.off('qr', handleQr);
                 socket.off('ready', handleReady);
                 socket.off('status_change', handleStatusChange);
+                socket.off('global_pause_changed', handleGlobalPauseChanged);
             };
         }
     }, [socket, fetchConfig, viewedSellerId]);
@@ -417,19 +427,34 @@ const CorporateDashboard = () => {
                             </button>
                         )}
 
-                        <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border transition-all ${status === 'ready'
-                            ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50'
-                            : 'bg-rose-50 dark:bg-rose-900/30 border-rose-300 dark:border-rose-700 shadow-md shadow-rose-500/20 animate-pulse'}`}>
-                            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${status === 'ready' ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_10px_rgba(239,68,68,0.6)]'}`}></div>
-                            <span className={`text-[10px] sm:text-xs lg:text-sm font-bold tracking-wide whitespace-nowrap ${status === 'ready' ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-300'}`}>
-                                {status === 'ready' ? 'ONLINE' : 'OFFLINE'}
-                            </span>
-                            {status === 'ready' && connectedPhone && (
-                                <span className="hidden sm:inline text-xs font-semibold text-slate-500 dark:text-slate-400 tracking-wider bg-slate-100 dark:bg-slate-800/80 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 ml-1">
-                                    +{connectedPhone}
-                                </span>
-                            )}
-                        </div>
+                        {/* Indicador de estado: ONLINE / PAUSADO / OFFLINE.
+                            - ONLINE  → conectado y NO pausado
+                            - PAUSADO → conectado pero globalPause activo (no atiende)
+                            - OFFLINE → desconectado de WhatsApp
+                            El estado PAUSADO tiene precedencia visual sobre ONLINE
+                            cuando ambos aplican. */}
+                        {(() => {
+                            const isReady = status === 'ready';
+                            const isPaused = isReady && !!config?.globalPause;
+                            const tone = isPaused
+                                ? { bg: 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700/60 shadow-sm shadow-amber-500/10', dot: 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.55)] animate-pulse', text: 'text-amber-700 dark:text-amber-400', label: 'PAUSADO' }
+                                : isReady
+                                ? { bg: 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50', dot: 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]', text: 'text-emerald-700 dark:text-emerald-400', label: 'ONLINE' }
+                                : { bg: 'bg-rose-50 dark:bg-rose-900/30 border-rose-300 dark:border-rose-700 shadow-md shadow-rose-500/20 animate-pulse', dot: 'bg-rose-500 shadow-[0_0_10px_rgba(239,68,68,0.6)]', text: 'text-rose-700 dark:text-rose-300', label: 'OFFLINE' };
+                            return (
+                                <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border transition-all ${tone.bg}`}>
+                                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${tone.dot}`}></div>
+                                    <span className={`text-[10px] sm:text-xs lg:text-sm font-bold tracking-wide whitespace-nowrap ${tone.text}`}>
+                                        {tone.label}
+                                    </span>
+                                    {isReady && connectedPhone && (
+                                        <span className="hidden sm:inline text-xs font-semibold text-slate-500 dark:text-slate-400 tracking-wider bg-slate-100 dark:bg-slate-800/80 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 ml-1">
+                                            +{connectedPhone}
+                                        </span>
+                                    )}
+                                </div>
+                            );
+                        })()}
                     </div>
 
                     <div className="flex items-center gap-2 lg:gap-4 ml-auto">

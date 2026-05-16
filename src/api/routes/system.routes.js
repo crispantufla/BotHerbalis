@@ -392,14 +392,16 @@ module.exports = (clientPool) => {
     });
 
     // POST /global-pause-all - Pausa/reactiva TODOS los sellers a la vez.
-    // Solo admin global (sellerId=null). Body: { pause: true|false }.
+    // Permitido a: (a) admin global (sellerId=null), (b) Horacio (dueño
+    // del proyecto — tenant admin con sellerId='horacio'). Body: { pause: true|false }.
     router.post('/global-pause-all', requireAdmin, (req, res) => {
         try {
-            // Solo admin global tiene autoridad para pausar/reactivar a todos.
-            // Un tenant admin (admin con sellerId) podría modificar el bot de
-            // otros si dejáramos pasar — bloqueamos explícitamente.
-            if (req.account?.sellerId) {
-                return res.status(403).json({ error: 'Solo el admin global puede pausar/reactivar a todos los vendedores.' });
+            const accSellerId = (req.account?.sellerId || '').toLowerCase();
+            const accName = (req.account?.name || '').toLowerCase();
+            const isGlobalAdmin = !req.account?.sellerId;
+            const isHoracio = accSellerId === 'horacio' || accName === 'horacio';
+            if (!isGlobalAdmin && !isHoracio) {
+                return res.status(403).json({ error: 'Solo el admin global o Horacio pueden pausar/reactivar a todos los vendedores.' });
             }
 
             const shouldPause = req.body?.pause === true;
