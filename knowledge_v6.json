@@ -40,8 +40,8 @@
         },
         "recommendation_2": {
             "step": "waiting_weight",
-            "_note": "Tier 2 — 10 a 20 kg → Cápsulas 60 días. Sales-tuned: marco temporal, gradiente, visualización ('en la balanza desde la 1ra semana'), bonus framing.",
-            "response": "Bárbaro, ya sé qué te conviene 💪\n\nPara vos lo ideal son las *Cápsulas en plan de 2 meses*. La mayoría de las personas que querían bajar entre 10 y 20 kilos lo lograron en esos 2 meses — y en general ya se nota la diferencia en la balanza desde la primera semana.\n\nTe cuento cómo es:\n💊 Una sola cápsula al día, 30 minutos antes del almuerzo o cena, con un vaso de agua — fácil de incorporar a la rutina\n📋 Te llevás una guía de comidas con consejitos para acompañar (no es una dieta)\n📞 Y yo te acompaño por WhatsApp todo el tratamiento — cualquier duda me escribís y vamos viendo juntas/os 😊\n\n¿Te paso los precios para que veas cómo es?",
+            "_note": "Tier 2 — 10 a 20 kg → Cápsulas 120 días (cambio mayo 2026: antes era 60d). El plan 4 meses cubre el tratamiento completo para este rango. Sales-tuned: marco temporal extendido + sostenibilidad + bonus framing.",
+            "response": "Bárbaro, ya sé qué te conviene 💪\n\nPara vos lo ideal son las *Cápsulas en plan de 4 meses*. La mayoría de las personas que querían bajar entre 10 y 20 kilos lo lograron en esos 4 meses — y lo bueno es que el cuerpo tiene tiempo de acostumbrarse al nuevo peso, así no vuelven los kilos. En general ya se nota la diferencia en la balanza desde la primera semana 😊\n\nTe cuento cómo es:\n💊 Una sola cápsula al día, 30 minutos antes del almuerzo o cena, con un vaso de agua — fácil de incorporar a la rutina\n📋 Te llevás una guía de comidas con consejitos para acompañar (no es una dieta)\n📞 Y yo te acompaño por WhatsApp todo el tratamiento — cualquier duda me escribís y vamos viendo juntas/os 😊\n\n¿Te paso los precios para que veas cómo es?",
             "nextStep": "waiting_ok"
         },
         "recommendation_3": {

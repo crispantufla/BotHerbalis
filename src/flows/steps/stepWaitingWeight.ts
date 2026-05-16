@@ -169,9 +169,13 @@ export async function handleWaitingWeight(
                 currentState.selectedPlan = '60';
                 currentState.cart = [{ product: 'Cápsulas de nuez de la india', plan: '60', price: knowledge?._prices?.capsulas60 || '' }];
             } else if (tier === '2') {
+                // Tier 2 (10-20 kg) cambió de Cápsulas 60d → 120d (decisión
+                // mayo 2026): el plan 120 cubre el tratamiento completo para
+                // este rango con mejor adherencia y AOV más alto. Tier 1 se
+                // mantiene en 60d porque para pocos kilos 60d alcanza.
                 currentState.selectedProduct = 'Cápsulas de nuez de la india';
-                currentState.selectedPlan = '60';
-                currentState.cart = [{ product: 'Cápsulas de nuez de la india', plan: '60', price: knowledge?._prices?.capsulas60 || '' }];
+                currentState.selectedPlan = '120';
+                currentState.cart = [{ product: 'Cápsulas de nuez de la india', plan: '120', price: knowledge?._prices?.capsulas120 || '' }];
             } else {
                 currentState.selectedProduct = 'Cápsulas de nuez de la india';
                 currentState.selectedPlan = '120';
