@@ -88,8 +88,10 @@ function _detectPostdatado(normalizedText: string): string | null {
         return null;
     }
 
-    // Must have delivery/payment action context
-    const hasActionContext = /\b(recibir|recibirlo|llega|llegue|enviar|enviame|envialo|enviamela|enviamelo|mandalo|mandame|mandamela|mandamelo|entregar|cobro|depositan|sueldo|pago|puedo|pueden|venir|mandar|comprar|no tengo|para el|a partir|no puedo ahora|no puedo comprar)\b/i.test(normalizedText);
+    // Must have delivery/payment action context. Incluye keywords de "juntar"
+    // y "conseguir" plata/efectivo — son objeciones económicas claras donde el
+    // cliente quiere postponer el pago hasta tener el dinero.
+    const hasActionContext = /\b(recibir|recibirlo|llega|llegue|enviar|enviame|envialo|enviamela|enviamelo|mandalo|mandame|mandamela|mandamelo|entregar|cobro|depositan|sueldo|pago|puedo|pueden|venir|mandar|comprar|no tengo|para el|a partir|no puedo ahora|no puedo comprar|juntar|junte|junto|consigo|consiga|conseguir|ahorre|ahorrar|cuente con|me alcance|me alcance la plata|mucho inter[eé]s|cuotas|me comunico|aviso cuando|cuando tenga)\b/i.test(normalizedText);
     if (!hasActionContext) return null;
 
     // "cobro el viernes" = worried about money, NOT a postdatado request.
@@ -103,14 +105,19 @@ function _detectPostdatado(normalizedText: string): string | null {
     const patterns: RegExp[] = [
         /\d{1,2}\s+(?:de\s+)?(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i,
         /(?:principio|fin|final|fines|mediados)\s+de\s+mes/i,
-        /cuando\s+(?:cobre|cobr[eo]|me\s+deposit[ae]n|me\s+pagu?en)/i,
+        /cuando\s+(?:cobre|cobr[eo]|me\s+deposit[ae]n|me\s+pagu?en|tenga\s+(?:la\s+)?plata|tenga\s+(?:el\s+)?(?:dinero|efectivo)|junte\s+(?:la\s+)?plata|junte\s+(?:el\s+)?efectivo|consiga\s+(?:la\s+)?plata|me\s+alcance)/i,
         /(?:cobro|depositan|pagan)\s+(?:el\s+\d{1,2}|a\s+principio|la\s+quincena)/i,
+        /(?:apenas|en\s+cuanto|cuando)\s+(?:cuente\s+con|tenga|junte|consiga|cobre)/i,
         /el\s+\d{1,2}(?=[\s,.]|$)/i,
         /(?:la\s+)?(?:quincena|semana\s+que\s+viene|mes\s+que\s+viene|pr[oó]ximo\s+mes)/i,
         // Skip day-of-week when user is only talking about when they get paid —
-        // delivery takes 7-10 business days so they'll have the money by then.
+        // delivery takes 4-6 business days so they'll have the money by then.
         ...(onlyPaymentContext ? [] : [/(?:el\s+)?(?:lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo)(?:\s+que\s+viene)?/i]),
         /pasado\s+mañana/i,
+        // Vaguidad económica como "cuando tenga plata" sin fecha específica:
+        // marcamos como postdatado "indefinido" para que el flow ofrezca
+        // congelar el precio.
+        /cuando\s+(?:la\s+)?(?:plata|efectivo|dinero)/i,
     ];
 
     for (const pattern of patterns) {

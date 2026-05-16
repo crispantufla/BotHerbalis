@@ -18,6 +18,19 @@ export async function handleWaitingWeight(
     // If text is super long (like a transcription), force AI to handle it so we don't look robotic
     const isVeryLongMessage = text.split(/\s+/).length > 20;
 
+    // Extraemos un objetivo de bajar EXPLÍCITO incluso en mensajes largos —
+    // si el cliente dijo claramente "bajar X kilos" / "perder X kilos" / "X de
+    // menos", ignoramos isVeryLongMessage y aplicamos el tier routing.
+    // Sin esto, audios transcritos largos con peso claro caían al AI fallback
+    // y el bot respondía "dame un segundo y te recomiendo" sin nunca recomendar.
+    const explicitGoalMatch = text.match(/\b(?:bajar|perder|sacarme|adelgazar)\s+(?:unos?\s+)?(\d{1,3})\s*(?:kg|kilos?|kilogramos?)?\b/i)
+        || text.match(/\b(\d{1,3})\s*(?:kg|kilos?|kilogramos?)\s+(?:de\s+)?(?:menos|m[áa]s|aproximadamente|m[áa]s\s+o\s+menos)\b/i)
+        || text.match(/\b(?:quiero|quisiera|necesito|me\s+gustar[ií]a)\s+bajar\s+(?:unos?\s+)?(\d{1,3})/i);
+    const hasExplicitGoal = !!explicitGoalMatch;
+    // El mensaje largo "se trata como largo" SOLO si NO encontramos goal explícito.
+    // Con goal explícito, aplicamos tier routing igual.
+    const treatAsLong = isVeryLongMessage && !hasExplicitGoal;
+
     // Empty affirmative ("Sii", "si", "ok", "dale") sin contexto previo: re-preguntar el rango
     // en vez de dejar que el AI invente una recomendación. Solo aplica si AÚN no hay weightGoal
     // ni producto sugerido y el último mensaje del bot fue la pregunta del rango.
@@ -55,10 +68,37 @@ export async function handleWaitingWeight(
     // Soft refusal = doesn't want to answer weight specifically → skip to preference
     const isRefusal = !isHardRejection && /\b(no (voy|puedo)|prefiero no|que tenes|mostrame)\b/i.test(normalizedText);
 
-    if (hasNumber && hasQuestion && !isVeryLongMessage) {
+    // Extracción robusta del objetivo de bajar: si tenemos goal explícito
+    // (regex que matchea "bajar X kilos"), lo usamos. Sino, buscamos el primer
+    // número en rango razonable (3-50 kg para "kilos a bajar").
+    //
+    // CASO RANGOS: si el cliente dice "10 a 20" / "entre 10 y 20" / "10-20",
+    // usamos el MÁXIMO del rango. El cliente está expresando un objetivo
+    // máximo, no un mínimo. Sin esto, "10 a 20" extraía 10 → tier 1 (gotas)
+    // cuando claramente debe ser tier 2 (cápsulas).
+    function _extractWeightGoal(): number | null {
+        const rangeMatch = text.match(/\b(\d{1,3})\s*(?:a|-|hasta|y)\s*(\d{1,3})\s*(?:kg|kilos?)?\b/i)
+            || text.match(/\bentre\s+(\d{1,3})\s+(?:a|y|-)\s+(\d{1,3})/i);
+        if (rangeMatch) {
+            const lo = parseInt(rangeMatch[1], 10);
+            const hi = parseInt(rangeMatch[2], 10);
+            if (hi > lo && hi >= 3 && hi <= 50) return hi;
+            if (lo >= 3 && lo <= 50) return lo;
+        }
+        if (explicitGoalMatch) {
+            const n = parseInt(explicitGoalMatch[1], 10);
+            if (n >= 3 && n <= 50) return n;
+        }
+        const allNums = (text.match(/\d{1,3}/g) || []).map(s => parseInt(s, 10));
+        const inRange = allNums.find(n => n >= 3 && n <= 50);
+        if (inRange != null) return inRange;
+        return allNums[0] ?? null;
+    }
+
+    if (hasNumber && hasQuestion && !treatAsLong) {
         // User gave weight AND asked a health/product question — extract weight but respond to the concern
-        const wMatch = text.match(/\d+/);
-        if (wMatch) currentState.weightGoal = parseInt(wMatch[0], 10);
+        const extracted = _extractWeightGoal();
+        if (extracted != null) currentState.weightGoal = extracted;
         logger.info(`[LOGIC] User ${userId} gave weight (${currentState.weightGoal}kg) AND asked a question. Responding to both.`);
         const dualGoal = `El usuario dijo cuántos kilos quiere bajar (${currentState.weightGoal} kg) PERO TAMBIÉN hizo una pregunta sobre salud, contraindicaciones o el producto. DEBES responder su pregunta con MUCHA empatía y detalle PRIMERO. Si pregunta si es dañino/seguro para alguna condición de salud (riñón, presión, diabetes, etc.): "No hay ninguna contraindicación para tu condición. Es un producto 100% natural, las únicas contraindicaciones son embarazo y lactancia." Después confirmá su objetivo de peso y preguntá qué formato prefiere: "Perfecto, ${currentState.weightGoal} kg es un objetivo totalmente alcanzable 👌 ¿Preferís algo súper práctico (cápsulas o gotas) o más natural (semillas)?"."`;
         const aiDual = await aiService.chat(text, {
@@ -89,9 +129,9 @@ export async function handleWaitingWeight(
         return { matched: true };
     }
 
-    if (hasNumber && !hasQuestion && !isVeryLongMessage) {
-        const wMatch = text.match(/\d+/);
-        if (wMatch) currentState.weightGoal = parseInt(wMatch[0], 10);
+    if (hasNumber && !hasQuestion && !treatAsLong) {
+        const extracted = _extractWeightGoal();
+        if (extracted != null) currentState.weightGoal = extracted;
 
         // ── Ruta consultiva (V5/V6/futuros): tier-based routing ────────────
         // Si el knowledge tiene recommendation_1/2/3, asumimos guión consultivo:

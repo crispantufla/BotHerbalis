@@ -1,10 +1,38 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _getPrice } from '../utils/pricing';
-import { _setStep } from '../utils/flowHelpers';
+import { _setStep, _pauseAndAlert } from '../utils/flowHelpers';
 import { buildCartFromSelection, calculateTotal } from '../utils/cartHelpers';
 import { _isDuplicate } from '../utils/messages';
 import { buildPaymentMessage } from '../../utils/messageTemplates';
 import logger from '../../utils/logger';
+
+// Detector de intención de retiro en persona / cliente de Rosario.
+// La empresa NO tiene local público abierto — los envíos son SIEMPRE por
+// Correo Argentino. Si el cliente quiere "ir al local" o menciona que es de
+// Rosario y quiere retirar, pausamos para que el admin coordine retiro en
+// sucursal o aclare. EXCEPCIÓN: si ya pagó por Mercado Pago, no pausamos
+// (el pago ya entró, sólo es tema logístico).
+const PICKUP_INTENT = /\b(voy\s+(?:yo|al?\s+local|a\s+(?:buscar|retirar))|paso\s+(?:a\s+)?(?:buscar|retirar)|retir(?:ar|o)\s+(?:yo|en\s+persona|directamente|allá|allí|ahí)|ir\s+al?\s+local|ir\s+a\s+buscar|busco\s+yo|llevárselo|llev[aá]rmelo\s+yo)\b/i;
+const ROSARIO_INTENT = /\b(soy\s+de\s+rosario|estoy\s+en\s+rosario|vivo\s+en\s+rosario|de\s+rosario(?:\s+(?:capital|provincia|centro))?|en\s+rosario\s+(?:capital|centro|provincia))\b/i;
+
+function _isPickupOrRosarioIntent(text: string): boolean {
+    return PICKUP_INTENT.test(text) || ROSARIO_INTENT.test(text);
+}
+
+async function _handlePickupIntent(userId: string, text: string, currentState: UserState, dependencies: any): Promise<boolean> {
+    // Si el cliente ya pagó por MP, no pausamos — el tema es solo logístico
+    // y el admin manual puede coordinar mejor con el pago ya hecho.
+    const alreadyPaidMp = currentState.paymentMethod === 'mercadopago' && (currentState as any).mpStatus === 'approved';
+    if (alreadyPaidMp) return false;
+
+    const { sendMessageWithDelay, saveState } = dependencies;
+    const reply = 'Te aviso: no tenemos local de venta al público — todos los pedidos van por Correo Argentino con envío gratis 📦\n\nUn asesor te va a contactar enseguida para coordinar la mejor opción (sucursal cerca tuyo o entrega a domicilio) 😊';
+    currentState.history.push({ role: 'bot', content: reply, timestamp: Date.now() });
+    saveState(userId);
+    await sendMessageWithDelay(userId, reply);
+    await _pauseAndAlert(userId, currentState, dependencies, text, 'Cliente quiere retirar en persona / es de Rosario. No tenemos local público — admin debe coordinar logística (sucursal Correo o domicilio).');
+    return true;
+}
 
 const _buildPaymentMsg = (state: UserState, knowledge?: any) => buildPaymentMessage(state, knowledge);
 
@@ -38,6 +66,12 @@ export async function handleWaitingPlanChoice(
     dependencies: any
 ): Promise<{ matched: boolean }> {
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
+
+    // ── Check temprano: cliente quiere ir al local / es de Rosario ──────
+    if (_isPickupOrRosarioIntent(text)) {
+        const handled = await _handlePickupIntent(userId, text, currentState, dependencies);
+        if (handled) return { matched: true };
+    }
 
     const products = [
         { match: /c[áa]psula|pastilla/i, name: 'Cápsulas' },

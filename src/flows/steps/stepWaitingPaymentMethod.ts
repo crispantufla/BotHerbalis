@@ -5,6 +5,10 @@ import { calculateTotal } from '../utils/cartHelpers';
 import { _formatMessage } from '../utils/messages';
 import logger from '../../utils/logger';
 
+// Detector de retiro en persona / Rosario. La empresa no tiene local público.
+const PICKUP_INTENT_PAY = /\b(voy\s+(?:yo|al?\s+local|a\s+(?:buscar|retirar))|paso\s+(?:a\s+)?(?:buscar|retirar)|retir(?:ar|o)\s+(?:yo|en\s+persona|directamente|allá|allí|ahí)|ir\s+al?\s+local|ir\s+a\s+buscar|busco\s+yo)\b/i;
+const ROSARIO_INTENT_PAY = /\b(soy\s+de\s+rosario|estoy\s+en\s+rosario|vivo\s+en\s+rosario|de\s+rosario(?:\s+(?:capital|provincia|centro))?)\b/i;
+
 // Payment method matchers. Los dígitos sueltos (1, 2, 3) y números escritos
 // (uno, dos, tres) solo matchean cuando vienen como mensaje completo o con
 // prefijo de opción ("la 1", "el 2", "opción 3"). Frases como "tengo 1 hijo"
@@ -50,6 +54,20 @@ export async function handleWaitingPaymentMethod(
     dependencies: any
 ): Promise<{ matched: boolean }> {
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
+
+    // ── Check temprano: cliente quiere ir al local / es de Rosario ──────
+    // No tenemos local público — pausamos y avisamos al admin para coordinar
+    // logística. Excepción: si ya pagó MP, dejamos seguir (es solo tema de
+    // entrega que el admin manual coordina mejor).
+    const alreadyPaidMp = currentState.paymentMethod === 'mercadopago' && (currentState as any).mpStatus === 'approved';
+    if (!alreadyPaidMp && (PICKUP_INTENT_PAY.test(text) || ROSARIO_INTENT_PAY.test(text))) {
+        const reply = 'Te aviso: no tenemos local de venta al público — todos los pedidos van por Correo Argentino con envío gratis 📦\n\nUn asesor te va a contactar enseguida para coordinar la mejor opción (sucursal cerca tuyo o entrega a domicilio) 😊';
+        currentState.history.push({ role: 'bot', content: reply, timestamp: Date.now() });
+        saveState(userId);
+        await sendMessageWithDelay(userId, reply);
+        await _pauseAndAlert(userId, currentState, dependencies, text, 'Cliente quiere retirar en persona / es de Rosario en waiting_payment_method. Admin coordinar logística.');
+        return { matched: true };
+    }
 
     // Guard defensivo: si llegamos acá con totalPrice undefined/inválido pero
     // tenemos cart, recalcular antes de los waives (evita "Monto inválido"
