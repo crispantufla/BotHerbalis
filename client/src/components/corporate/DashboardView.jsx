@@ -10,9 +10,13 @@ import SystemStatusPanel from './dashboard/SystemStatusPanel';
 
 const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData }) => {
     const { toast, confirm } = useToast();
-    const { isAdmin } = useAuth();
+    const { isAdmin, user } = useAuth();
+    // Admin global = sin sellerId asignado, ve y opera sobre todos los vendedores.
+    // Sólo este rol puede pausar TODOS los bots a la vez.
+    const isGlobalAdmin = isAdmin && !user?.sellerId;
     const [stats, setStats] = useState(null);
     const [loadingStats, setLoadingStats] = useState(true);
+    const [pausingAll, setPausingAll] = useState(false);
 
     // Pairing code states
     const [pairingPhone, setPairingPhone] = useState('');
@@ -139,13 +143,51 @@ const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData 
 
     const isGlobalPause = !!stats?.globalPause;
 
-    const handleToggleGlobalPause = async () => {
+    // Pausa SOLO el bot del vendedor seleccionado (o del usuario logueado si es
+    // un seller). El endpoint /api/global-pause respeta el x-seller-id del header.
+    const handleToggleThisBot = async () => {
         try {
             const res = await api.post('/api/global-pause');
             setStats(prev => ({ ...prev, globalPause: res.data.globalPause }));
-            toast.success(`Bot ${res.data.globalPause ? 'pausado' : 'reactivado'} globalmente`);
+            toast.success(`Bot ${res.data.globalPause ? 'pausado' : 'reactivado'}`);
         } catch (e) {
-            toast.error('Error cambiando el estado global del bot');
+            toast.error('Error cambiando el estado del bot');
+        }
+    };
+
+    // Pausa TODOS los bots (todos los sellers activos). Solo admin global.
+    const handlePauseAll = async () => {
+        const ok = await confirm('¿Pausar el bot de TODOS los vendedores?\n\nEsta acción afecta a todos los sellers activos. Para reactivar, repetí la operación o destrabá cada uno individualmente.');
+        if (!ok) return;
+        setPausingAll(true);
+        try {
+            const res = await api.post('/api/global-pause-all', { pause: true });
+            toast.success(`${res.data.affected || 0} bots pausados`);
+            // Recargamos stats para reflejar el nuevo estado global.
+            const opts = isAdmin ? { headers: { 'x-seller-id': '' } } : {};
+            const fresh = await api.get('/api/stats', opts);
+            setStats(fresh.data);
+        } catch (e) {
+            toast.error(e.response?.data?.error || 'Error pausando todos los bots');
+        } finally {
+            setPausingAll(false);
+        }
+    };
+
+    const handleReactivateAll = async () => {
+        const ok = await confirm('¿Reactivar el bot de TODOS los vendedores?');
+        if (!ok) return;
+        setPausingAll(true);
+        try {
+            const res = await api.post('/api/global-pause-all', { pause: false });
+            toast.success(`${res.data.affected || 0} bots reactivados`);
+            const opts = isAdmin ? { headers: { 'x-seller-id': '' } } : {};
+            const fresh = await api.get('/api/stats', opts);
+            setStats(fresh.data);
+        } catch (e) {
+            toast.error(e.response?.data?.error || 'Error reactivando todos los bots');
+        } finally {
+            setPausingAll(false);
         }
     };
 
@@ -160,30 +202,51 @@ const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData 
                     <p className="text-slate-500 dark:text-slate-400 text-sm font-medium 2xl:text-lg m-0 leading-none">Resumen del sistema y métricas en tiempo real</p>
                 </div>
 
-                {/* Global Pause Button */}
-                <button
-                    onClick={handleToggleGlobalPause}
-                    className={`flex items-center justify-center gap-3 sm:gap-4 px-4 sm:px-6 py-3 sm:py-0 rounded-[1.25rem] font-bold transition-all shadow-sm w-full sm:w-72 sm:h-full ${isGlobalPause
-                        ? 'bg-amber-100/90 dark:bg-amber-900/30 text-amber-800 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-800/50 border-2 border-amber-200 dark:border-amber-800/50 shadow-amber-500/20'
-                        : 'bg-white dark:bg-slate-800/80 border-2 border-slate-100/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-100 dark:hover:border-indigo-800/50 hover:shadow-indigo-500/10'
-                        }`}
-                >
-                    {isGlobalPause ? (
-                        <>
-                            <div className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-2xl bg-amber-500 text-white shadow-md shadow-amber-500/40 flex-shrink-0">
-                                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                {/* Botones de pausa: "Este bot" (siempre) + "Todos" (solo admin global) */}
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
+                    {/* Pausar / Reactivar ESTE bot (el del seller seleccionado) */}
+                    <button
+                        onClick={handleToggleThisBot}
+                        title={isGlobalPause ? 'Reactivar el bot de este vendedor' : 'Pausar el bot de este vendedor'}
+                        className={`flex items-center justify-center gap-3 px-4 sm:px-5 py-3 sm:py-0 rounded-[1.25rem] font-bold transition-all shadow-sm w-full sm:w-56 sm:h-full ${isGlobalPause
+                            ? 'bg-amber-100/90 dark:bg-amber-900/30 text-amber-800 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-800/50 border-2 border-amber-200 dark:border-amber-800/50 shadow-amber-500/20'
+                            : 'bg-white dark:bg-slate-800/80 border-2 border-slate-100/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-100 dark:hover:border-indigo-800/50 hover:shadow-indigo-500/10'
+                            }`}
+                    >
+                        {isGlobalPause ? (
+                            <>
+                                <div className="w-10 h-10 flex items-center justify-center rounded-2xl bg-amber-500 text-white shadow-md shadow-amber-500/40 flex-shrink-0">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                </div>
+                                <span className="text-left leading-tight text-[13px] sm:text-[14px] tracking-wide font-extrabold">Reactivar<br />este bot</span>
+                            </>
+                        ) : (
+                            <>
+                                <div className="w-10 h-10 flex items-center justify-center rounded-2xl bg-amber-50 dark:bg-amber-900/40 text-amber-500 shadow-inner border border-amber-100 dark:border-amber-800/50 flex-shrink-0">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                </div>
+                                <span className="text-left leading-tight text-[13px] sm:text-[14px] tracking-wide font-extrabold">Pausar<br />este bot</span>
+                            </>
+                        )}
+                    </button>
+
+                    {/* Pausar TODOS — solo admin global (sellerId=null) */}
+                    {isGlobalAdmin && (
+                        <button
+                            onClick={handlePauseAll}
+                            disabled={pausingAll}
+                            title="Pausar el bot de todos los vendedores"
+                            className="flex items-center justify-center gap-3 px-4 sm:px-5 py-3 sm:py-0 rounded-[1.25rem] font-bold transition-all shadow-sm w-full sm:w-56 sm:h-full bg-white dark:bg-slate-800/80 border-2 border-rose-100/80 dark:border-rose-800/50 text-rose-700 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-900/30 hover:border-rose-200 dark:hover:border-rose-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <div className="w-10 h-10 flex items-center justify-center rounded-2xl bg-rose-50 dark:bg-rose-900/40 text-rose-500 shadow-inner border border-rose-100 dark:border-rose-800/50 flex-shrink-0">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                             </div>
-                            <span className="text-left leading-tight text-[13px] sm:text-[15px] tracking-wide font-extrabold">Reactivar Bot<br />Global</span>
-                        </>
-                    ) : (
-                        <>
-                            <div className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-2xl bg-amber-50 dark:bg-amber-900/40 text-amber-500 shadow-inner border border-amber-100 dark:border-amber-800/50 flex-shrink-0">
-                                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            </div>
-                            <span className="text-left leading-tight text-[13px] sm:text-[15px] tracking-wide font-extrabold">Pausar Bot<br />Global</span>
-                        </>
+                            <span className="text-left leading-tight text-[13px] sm:text-[14px] tracking-wide font-extrabold">
+                                {pausingAll ? 'Procesando...' : <>Pausar<br />TODOS</>}
+                            </span>
+                        </button>
                     )}
-                </button>
+                </div>
             </div>
 
             {/* QR CODE OVERLAY - Glassmorphism style */}

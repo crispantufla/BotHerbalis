@@ -370,7 +370,11 @@ module.exports = (clientPool) => {
         }
     });
 
-    // POST /global-pause - Toggle bot global pause state
+    // POST /global-pause - Toggle bot pause state for THIS seller only.
+    // Nombre legacy "global-pause" se mantiene para no romper el front-end —
+    // el alcance siempre fue por seller (`config.globalPause` vive en sharedState
+    // del seller). Para pausar/reactivar a TODOS los sellers a la vez, usar
+    // /global-pause-all (solo admin global).
     router.post('/global-pause', ...withSeller(clientPool), (req, res) => {
         try {
             const { config, ss, io } = getCtx(req);
@@ -379,10 +383,50 @@ module.exports = (clientPool) => {
 
             emitScoped(req, 'global_pause_changed', { globalPause: config.globalPause });
 
-            logger.info(`[SYSTEM] Global Pause toggled to: ${config.globalPause}`);
+            logger.info(`[SYSTEM] Bot toggled to: ${config.globalPause} (seller=${req.sellerId})`);
             res.json({ success: true, globalPause: config.globalPause });
         } catch (e) {
-            logger.error("Error toggling global pause:", e);
+            logger.error("Error toggling bot pause:", e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // POST /global-pause-all - Pausa/reactiva TODOS los sellers a la vez.
+    // Solo admin global (sellerId=null). Body: { pause: true|false }.
+    router.post('/global-pause-all', requireAdmin, (req, res) => {
+        try {
+            // Solo admin global tiene autoridad para pausar/reactivar a todos.
+            // Un tenant admin (admin con sellerId) podría modificar el bot de
+            // otros si dejáramos pasar — bloqueamos explícitamente.
+            if (req.account?.sellerId) {
+                return res.status(403).json({ error: 'Solo el admin global puede pausar/reactivar a todos los vendedores.' });
+            }
+
+            const shouldPause = req.body?.pause === true;
+            const sellers = clientPool.getAllSellers ? clientPool.getAllSellers() : [];
+            let affected = 0;
+            for (const inst of sellers) {
+                const ss = inst.sharedState;
+                if (!ss?.config) continue;
+                if (ss.config.globalPause !== shouldPause) {
+                    ss.config.globalPause = shouldPause;
+                    if (ss.saveState) {
+                        try { ss.saveState(); } catch (_) { /* keep going */ }
+                    }
+                    if (ss._io) {
+                        try {
+                            const sellerRoom = inst.sellerId;
+                            if (sellerRoom) ss._io.to(sellerRoom).emit('global_pause_changed', { globalPause: shouldPause });
+                            ss._io.to('admin').emit('global_pause_changed', { sellerId: sellerRoom, globalPause: shouldPause });
+                        } catch (_) { /* ignore socket errors */ }
+                    }
+                    affected++;
+                }
+            }
+            logger.info(`[SYSTEM] BULK ${shouldPause ? 'pause' : 'resume'} aplicado a ${affected} seller(s) por admin global ${req.account?.name || '?'}`);
+            res.json({ success: true, pause: shouldPause, affected, totalSellers: sellers.length });
+        } catch (e) {
+            logger.error("Error en global-pause-all:", e);
             res.status(500).json({ error: e.message });
         }
     });
