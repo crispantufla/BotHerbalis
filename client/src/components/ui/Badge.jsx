@@ -11,6 +11,9 @@ const TONES = {
     warning: 'bg-warning-50 dark:bg-warning-900/20 text-warning-700 dark:text-warning-500 border-warning-100 dark:border-warning-900/50',
     danger:  'bg-danger-50 dark:bg-danger-900/20 text-danger-700 dark:text-danger-500 border-danger-100 dark:border-danger-900/50',
     info:    'bg-info-50 dark:bg-info-900/30 text-info-700 dark:text-info-500 border-info-100 dark:border-info-900/50',
+    // `purple` no es tan común — lo agregamos porque en SalesView hay 6 estados
+    // de orden y 5 tonos no alcanzan a distinguirlos bien.
+    purple:  'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-100 dark:border-purple-900/50',
 };
 
 const SIZES = {
@@ -40,6 +43,7 @@ export default function Badge({ tone = 'neutral', size = 'md', dot = false, clas
                             warning: 'bg-warning-500',
                             danger:  'bg-danger-500',
                             info:    'bg-info-500',
+                            purple:  'bg-purple-500',
                         }[tone]
                     )}
                 />
