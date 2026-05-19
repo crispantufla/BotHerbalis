@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import api from '../../config/axios';
-import { useToast } from '../ui/Toast';
-import { useSeller } from '../../context/SellerContext';
 import {
-    Users, Plus, Trash2, Edit2, X, Check, RefreshCw, Clock,
-    Play, Square, RotateCcw, Wifi, WifiOff, AlertTriangle, Shield, User, KeyRound, Loader2,
+    Users, Plus, Trash2, Edit2, Check, RefreshCw, Clock,
+    Play, Square, RotateCcw, Shield, User, KeyRound, Loader2,
     Key, Copy
 } from 'lucide-react';
+import api from '../../config/axios';
+import { useSeller } from '../../context/SellerContext';
+import {
+    Card, Button, IconButton, Badge, Input, Select, Modal, EmptyState, useToast, cn
+} from '../ui';
 
 const EMPTY_FORM = { name: '', password: '', role: 'seller', sellerId: '' };
 
-// Formats seconds → compact duration like "3h 14m", "2d 5h", "12m" or "45s".
 function formatDuration(totalSeconds) {
     if (!totalSeconds || totalSeconds <= 0) return '0s';
     const s = Math.floor(totalSeconds);
@@ -24,8 +25,8 @@ function formatDuration(totalSeconds) {
     return `${secs}s`;
 }
 
-// Ticks every second while any account is currently online — cheap, keeps the
-// "sesión actual" label accurate without hitting the API.
+// Tick cada segundo mientras haya cuentas online — barato, mantiene la
+// "sesión actual" precisa sin hits a la API.
 function useLiveClock(activeMs) {
     const [now, setNow] = useState(() => Date.now());
     useEffect(() => {
@@ -48,7 +49,7 @@ const AccountsView = () => {
     const [saving, setSaving] = useState(false);
     const [actionLoading, setActionLoading] = useState({});
     const [sellerIdManuallyEdited, setSellerIdManuallyEdited] = useState(false);
-    const [pwModal, setPwModal] = useState(null); // { id, name }
+    const [pwModal, setPwModal] = useState(null);
     const [newPw, setNewPw] = useState('');
     const [pwSaving, setPwSaving] = useState(false);
 
@@ -70,19 +71,17 @@ const AccountsView = () => {
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
-    // Refresh accounts every 30s so the accumulated "tiempo online" stays
-    // current without manual reloads. Current-session ms ticks locally via
-    // useLiveClock — no API call needed for that.
+    // Auto-refresh cada 30s para que el "tiempo online" acumulado se mantenga
+    // actualizado sin recargas manuales. La sesión actual ticks vía useLiveClock.
     useEffect(() => {
         const t = setInterval(() => { fetchData(); }, 30_000);
         return () => clearInterval(t);
     }, [fetchData]);
 
-    // Any account currently online? If so, keep the live ticker alive.
     const anyOnlineSince = accounts.find(a => a.onlineSinceMs)?.onlineSinceMs || null;
     const nowMs = useLiveClock(anyOnlineSince);
 
-    // Auto-generate sellerId from username when creating a new account with WhatsApp
+    // Auto-generar sellerId desde el username cuando se crea una cuenta nueva.
     useEffect(() => {
         if (editingId || form.role === 'admin' || sellerIdManuallyEdited) return;
         if (!form.name) { setForm(f => ({ ...f, sellerId: '' })); return; }
@@ -102,7 +101,7 @@ const AccountsView = () => {
     };
     const openEdit = (acc) => {
         setEditingId(acc.id);
-        setSellerIdManuallyEdited(true); // Don't auto-overwrite on edit
+        setSellerIdManuallyEdited(true);
         setForm({ name: acc.name, password: '', role: acc.role, sellerId: acc.sellerId || '' });
         setShowForm(true);
     };
@@ -118,7 +117,7 @@ const AccountsView = () => {
         setSaving(true);
         try {
             const payload = { ...form };
-            if (!payload.password) delete payload.password; // Don't send empty password on edit
+            if (!payload.password) delete payload.password;
             if (!payload.sellerId) delete payload.sellerId;
 
             if (editingId) {
@@ -130,7 +129,7 @@ const AccountsView = () => {
             }
             closeForm();
             fetchData();
-            loadSellers(); // Refresh seller list in SellerSelector too
+            loadSellers();
         } catch (e) {
             toast.error(e.response?.data?.error || 'Error guardando cuenta');
         } finally {
@@ -179,399 +178,335 @@ const AccountsView = () => {
         }
     };
 
-    // Map sellerId → seller runtime info
     const sellerMap = Object.fromEntries(sellers.map(s => [s.sellerId, s]));
-
     const sellerAccounts = accounts.filter(a => a.role === 'seller');
     const adminAccounts = accounts.filter(a => a.role === 'admin');
 
     return (
-        <div className="p-6 md:p-8 w-full max-w-5xl mx-auto">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-8">
-                <div>
-                    <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center">
-                            <Users className="w-5 h-5 text-white" />
-                        </div>
-                        Gestión de Usuarios
-                    </h2>
-                    <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Vendedores y administradores de la plataforma</p>
+        <div className="w-full max-w-5xl mx-auto space-y-5">
+            <header className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-11 h-11 rounded-card bg-accent-50 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400 flex items-center justify-center flex-shrink-0">
+                        <Users className="w-5 h-5" aria-hidden="true" />
+                    </div>
+                    <div>
+                        <h1 className="text-h2 text-slate-900 dark:text-slate-100">Gestión de usuarios</h1>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                            Vendedores y administradores de la plataforma.
+                        </p>
+                    </div>
                 </div>
                 <div className="flex gap-2">
-                    <button onClick={fetchData} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors" title="Recargar">
-                        <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                    </button>
-                    <button
-                        onClick={openCreate}
-                        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-sm font-semibold rounded-xl shadow hover:shadow-md transition-all hover:-translate-y-0.5"
-                    >
-                        <Plus className="w-4 h-4" />
+                    <IconButton
+                        label="Recargar"
+                        icon={RefreshCw}
+                        variant="ghost"
+                        onClick={fetchData}
+                        className={loading ? '[&_svg]:animate-spin' : ''}
+                    />
+                    <Button leftIcon={Plus} onClick={openCreate}>
                         Nueva cuenta
-                    </button>
+                    </Button>
                 </div>
-            </div>
-
-            {/* Create/Edit Form Modal */}
-            {showForm && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 dark:border-slate-700">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-700">
-                            <h3 className="font-bold text-slate-800 dark:text-slate-100">
-                                {editingId ? 'Editar cuenta' : 'Nueva cuenta'}
-                            </h3>
-                            <button onClick={closeForm} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1">
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-                        <form onSubmit={handleSave} className="p-6 space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nombre de usuario</label>
-                                <input
-                                    type="text"
-                                    value={form.name}
-                                    onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-slate-700 dark:text-slate-200"
-                                    placeholder="ej: alejandra"
-                                    required
-                                    autoComplete="off"
-                                />
-                                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Se usa para iniciar sesión</p>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                    {editingId ? 'Nueva contraseña (dejar vacío para no cambiar)' : 'Contraseña'}
-                                </label>
-                                <input
-                                    type="password"
-                                    value={form.password}
-                                    onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-                                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-slate-700 dark:text-slate-200"
-                                    placeholder="••••••••"
-                                    required={!editingId}
-                                    minLength={8}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Rol</label>
-                                <select
-                                    value={form.role}
-                                    onChange={e => {
-                                        setSellerIdManuallyEdited(false);
-                                        setForm(f => ({ ...f, role: e.target.value }));
-                                    }}
-                                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-slate-700 dark:text-slate-200"
-                                >
-                                    <option value="seller">Vendedor</option>
-                                    <option value="admin">Administrador</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                    ID de Instancia {form.role === 'admin' && <span className="text-slate-400 font-normal">(opcional — sin ID no tendrá WhatsApp)</span>}
-                                </label>
-                                <input
-                                    type="text"
-                                    value={form.sellerId}
-                                    onChange={e => {
-                                        setSellerIdManuallyEdited(true);
-                                        setForm(f => ({ ...f, sellerId: e.target.value }));
-                                    }}
-                                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-slate-700 dark:text-slate-200 font-mono"
-                                    placeholder={form.role === 'admin' ? 'ej: denise_bot (vacío = sin WhatsApp)' : 'ej: alejandra_bot'}
-                                    required={form.role === 'seller'}
-                                />
-                                {form.role === 'seller' && <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Auto-generado — podés editarlo si querés</p>}
-                            </div>
-                            <div className="flex gap-3 pt-2">
-                                <button type="button" onClick={closeForm} className="flex-1 px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
-                                    Cancelar
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={saving}
-                                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-sm font-semibold rounded-xl shadow hover:shadow-md transition-all disabled:opacity-50"
-                                >
-                                    {saving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Check className="w-4 h-4" />}
-                                    {editingId ? 'Guardar cambios' : 'Crear cuenta'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* Reset Password Modal */}
-            {pwModal && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-sm border border-slate-200 dark:border-slate-700">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-700">
-                            <h3 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                                <KeyRound className="w-4 h-4 text-indigo-500" />
-                                Resetear contraseña
-                            </h3>
-                            <button onClick={() => { setPwModal(null); setNewPw(''); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1">
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-                        <form onSubmit={handleResetPassword} className="p-6 space-y-4">
-                            <p className="text-sm text-slate-500 dark:text-slate-400">
-                                Nueva contraseña para <strong className="text-slate-700 dark:text-slate-200">{pwModal.name}</strong>
-                            </p>
-                            <input
-                                type="password"
-                                placeholder="Nueva contraseña (mín. 8 caracteres)"
-                                value={newPw}
-                                onChange={e => setNewPw(e.target.value)}
-                                required
-                                minLength={8}
-                                autoFocus
-                                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-slate-700 dark:text-slate-200 placeholder:text-slate-400"
-                            />
-                            <div className="flex gap-3">
-                                <button type="button" onClick={() => { setPwModal(null); setNewPw(''); }} className="flex-1 px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
-                                    Cancelar
-                                </button>
-                                <button type="submit" disabled={pwSaving} className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-sm font-semibold rounded-xl shadow hover:shadow-md transition-all disabled:opacity-50">
-                                    {pwSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                                    Guardar
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
+            </header>
 
             {loading ? (
-                <div className="flex items-center justify-center py-20">
-                    <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                </div>
+                <Card padding="lg" className="flex items-center justify-center min-h-[200px]">
+                    <div className="w-8 h-8 border-[3px] border-accent-200 dark:border-accent-900 border-t-accent-600 dark:border-t-accent-500 rounded-full animate-spin" />
+                </Card>
             ) : (
-                <div className="space-y-8">
-                    {/* Sellers section */}
+                <div className="space-y-6">
+                    {/* Vendedores */}
                     <section>
-                        <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                            <User className="w-4 h-4" /> Vendedores ({sellerAccounts.length})
-                        </h3>
-                        <div className="space-y-3">
-                            {sellerAccounts.map(acc => {
-                                const rt = acc.sellerId ? sellerMap[acc.sellerId] : null;
-                                const isRunning = rt?.running;
-                                const isConnected = rt?.connected;
-                                return (
-                                    <div key={acc.id} className="flex items-center gap-4 p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                                        {/* Avatar */}
-                                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
-                                            {acc.name.charAt(0).toUpperCase()}
-                                        </div>
-                                        {/* Info */}
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-semibold text-slate-800 dark:text-slate-100 text-sm truncate capitalize">{acc.name}</span>
-                                                {!acc.isActive && <span className="text-xs bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full">Inactivo</span>}
-                                            </div>
-                                            {acc.sellerId && (
-                                                <div className="flex items-center gap-1.5 mt-1">
-                                                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isConnected ? 'bg-emerald-500' : isRunning ? 'bg-amber-400' : 'bg-slate-300 dark:bg-slate-600'}`} />
-                                                    <span className="text-xs text-slate-400 dark:text-slate-500">
-                                                        {isConnected ? `Conectado${rt?.phoneNumber ? ` • +${rt.phoneNumber}` : ''}` : isRunning ? 'Iniciando...' : 'Sin sesión activa'}
-                                                    </span>
-                                                </div>
-                                            )}
-                                            <OnlineTimeLine
-                                                totalSeconds={acc.totalOnlineSeconds}
-                                                onlineSinceMs={acc.onlineSinceMs}
-                                                nowMs={nowMs}
-                                            />
-                                        </div>
-                                        {/* WA Controls */}
-                                        {acc.sellerId && (
-                                            <div className="flex items-center gap-1.5">
-                                                {!isRunning ? (
-                                                    <button
-                                                        onClick={() => sellerAction(acc.sellerId, 'start')}
-                                                        disabled={!!actionLoading[`${acc.sellerId}_start`]}
-                                                        className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 transition-colors disabled:opacity-50"
-                                                        title="Iniciar"
-                                                    >
-                                                        {actionLoading[`${acc.sellerId}_start`] ? <div className="w-3.5 h-3.5 border-2 border-emerald-600/30 border-t-emerald-600 rounded-full animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-                                                    </button>
-                                                ) : (
-                                                    <>
-                                                        <button
-                                                            onClick={() => sellerAction(acc.sellerId, 'restart')}
-                                                            disabled={!!actionLoading[`${acc.sellerId}_restart`]}
-                                                            className="p-1.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-600 dark:text-amber-400 transition-colors disabled:opacity-50"
-                                                            title="Reiniciar"
-                                                        >
-                                                            {actionLoading[`${acc.sellerId}_restart`] ? <div className="w-3.5 h-3.5 border-2 border-amber-600/30 border-t-amber-600 rounded-full animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
-                                                        </button>
-                                                        <button
-                                                            onClick={() => sellerAction(acc.sellerId, 'stop')}
-                                                            disabled={!!actionLoading[`${acc.sellerId}_stop`]}
-                                                            className="p-1.5 rounded-lg bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-500 dark:text-red-400 transition-colors disabled:opacity-50"
-                                                            title="Detener"
-                                                        >
-                                                            {actionLoading[`${acc.sellerId}_stop`] ? <div className="w-3.5 h-3.5 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin" /> : <Square className="w-3.5 h-3.5" />}
-                                                        </button>
-                                                    </>
-                                                )}
-                                            </div>
-                                        )}
-                                        {/* Account Controls */}
-                                        <div className="flex items-center gap-1.5">
-                                            <button onClick={() => { setPwModal({ id: acc.id, name: acc.name }); setNewPw(''); }} className="p-1.5 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/20 text-slate-400 hover:text-indigo-500 transition-colors" title="Cambiar contraseña">
-                                                <KeyRound className="w-4 h-4" />
-                                            </button>
-                                            <button onClick={() => openEdit(acc)} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-indigo-500 transition-colors" title="Editar">
-                                                <Edit2 className="w-4 h-4" />
-                                            </button>
-                                            <button onClick={() => handleDelete(acc.id, acc.name)} className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors" title="Desactivar">
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                        <h2 className="text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-1.5">
+                            <User className="w-3.5 h-3.5" aria-hidden="true" />
+                            Vendedores ({sellerAccounts.length})
+                        </h2>
+                        <div className="space-y-2">
+                            {sellerAccounts.map(acc => (
+                                <AccountRow
+                                    key={acc.id}
+                                    acc={acc}
+                                    rt={acc.sellerId ? sellerMap[acc.sellerId] : null}
+                                    onEdit={openEdit}
+                                    onDelete={() => handleDelete(acc.id, acc.name)}
+                                    onResetPw={() => { setPwModal({ id: acc.id, name: acc.name }); setNewPw(''); }}
+                                    onSellerAction={sellerAction}
+                                    actionLoading={actionLoading}
+                                    nowMs={nowMs}
+                                />
+                            ))}
                             {sellerAccounts.length === 0 && (
-                                <div className="text-center py-8 text-slate-400 dark:text-slate-500 text-sm border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
-                                    No hay vendedores. Crea uno con el botón "Nueva cuenta".
-                                </div>
+                                <Card padding="md" className="border-dashed">
+                                    <p className="text-center text-sm text-slate-500 dark:text-slate-400">
+                                        No hay vendedores. Creá uno con "Nueva cuenta".
+                                    </p>
+                                </Card>
                             )}
                         </div>
                     </section>
 
-                    {/* Admins section */}
+                    {/* Administradores */}
                     <section>
-                        <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                            <Shield className="w-4 h-4" /> Administradores ({adminAccounts.length})
-                        </h3>
-                        <div className="space-y-3">
-                            {adminAccounts.map(acc => {
-                                const rt = acc.sellerId ? sellerMap[acc.sellerId] : null;
-                                const isRunning = rt?.running;
-                                const isConnected = rt?.connected;
-                                return (
-                                    <div key={acc.id} className="flex items-center gap-4 p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-amber-400 to-orange-500 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
-                                            {acc.name.charAt(0).toUpperCase()}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-semibold text-slate-800 dark:text-slate-100 text-sm truncate capitalize">{acc.name}</span>
-                                                <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium">Admin</span>
-                                                {!acc.isActive && <span className="text-xs bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full">Inactivo</span>}
-                                            </div>
-                                            {acc.sellerId && (
-                                                <div className="flex items-center gap-1.5 mt-1">
-                                                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isConnected ? 'bg-emerald-500' : isRunning ? 'bg-amber-400' : 'bg-slate-300 dark:bg-slate-600'}`} />
-                                                    <span className="text-xs text-slate-400 dark:text-slate-500">
-                                                        {isConnected ? `Conectado${rt?.phoneNumber ? ` • +${rt.phoneNumber}` : ''}` : isRunning ? 'Iniciando...' : 'Sin sesión activa'}
-                                                    </span>
-                                                </div>
-                                            )}
-                                            {!acc.sellerId && (
-                                                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Sin WhatsApp</p>
-                                            )}
-                                            <OnlineTimeLine
-                                                totalSeconds={acc.totalOnlineSeconds}
-                                                onlineSinceMs={acc.onlineSinceMs}
-                                                nowMs={nowMs}
-                                            />
-                                        </div>
-                                        {/* WA Controls (only for admins with sellerId) */}
-                                        {acc.sellerId && (
-                                            <div className="flex items-center gap-1.5">
-                                                {!isRunning ? (
-                                                    <button
-                                                        onClick={() => sellerAction(acc.sellerId, 'start')}
-                                                        disabled={!!actionLoading[`${acc.sellerId}_start`]}
-                                                        className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 transition-colors disabled:opacity-50"
-                                                        title="Iniciar"
-                                                    >
-                                                        {actionLoading[`${acc.sellerId}_start`] ? <div className="w-3.5 h-3.5 border-2 border-emerald-600/30 border-t-emerald-600 rounded-full animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-                                                    </button>
-                                                ) : (
-                                                    <>
-                                                        <button
-                                                            onClick={() => sellerAction(acc.sellerId, 'restart')}
-                                                            disabled={!!actionLoading[`${acc.sellerId}_restart`]}
-                                                            className="p-1.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-600 dark:text-amber-400 transition-colors disabled:opacity-50"
-                                                            title="Reiniciar"
-                                                        >
-                                                            {actionLoading[`${acc.sellerId}_restart`] ? <div className="w-3.5 h-3.5 border-2 border-amber-600/30 border-t-amber-600 rounded-full animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
-                                                        </button>
-                                                        <button
-                                                            onClick={() => sellerAction(acc.sellerId, 'stop')}
-                                                            disabled={!!actionLoading[`${acc.sellerId}_stop`]}
-                                                            className="p-1.5 rounded-lg bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-500 dark:text-red-400 transition-colors disabled:opacity-50"
-                                                            title="Detener"
-                                                        >
-                                                            {actionLoading[`${acc.sellerId}_stop`] ? <div className="w-3.5 h-3.5 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin" /> : <Square className="w-3.5 h-3.5" />}
-                                                        </button>
-                                                    </>
-                                                )}
-                                            </div>
-                                        )}
-                                        {/* Account Controls */}
-                                        <div className="flex items-center gap-1.5">
-                                            <button onClick={() => { setPwModal({ id: acc.id, name: acc.name }); setNewPw(''); }} className="p-1.5 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/20 text-slate-400 hover:text-indigo-500 transition-colors" title="Cambiar contraseña">
-                                                <KeyRound className="w-4 h-4" />
-                                            </button>
-                                            <button onClick={() => openEdit(acc)} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-indigo-500 transition-colors" title="Editar">
-                                                <Edit2 className="w-4 h-4" />
-                                            </button>
-                                            <button onClick={() => handleDelete(acc.id, acc.name)} className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors" title="Desactivar">
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                        <h2 className="text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-1.5">
+                            <Shield className="w-3.5 h-3.5" aria-hidden="true" />
+                            Administradores ({adminAccounts.length})
+                        </h2>
+                        <div className="space-y-2">
+                            {adminAccounts.map(acc => (
+                                <AccountRow
+                                    key={acc.id}
+                                    acc={acc}
+                                    rt={acc.sellerId ? sellerMap[acc.sellerId] : null}
+                                    isAdmin
+                                    onEdit={openEdit}
+                                    onDelete={() => handleDelete(acc.id, acc.name)}
+                                    onResetPw={() => { setPwModal({ id: acc.id, name: acc.name }); setNewPw(''); }}
+                                    onSellerAction={sellerAction}
+                                    actionLoading={actionLoading}
+                                    nowMs={nowMs}
+                                />
+                            ))}
                         </div>
                     </section>
 
                     <ApiTokensSection />
                 </div>
             )}
+
+            {/* Modal: crear/editar cuenta */}
+            <Modal
+                open={showForm}
+                onClose={closeForm}
+                title={editingId ? 'Editar cuenta' : 'Nueva cuenta'}
+                size="md"
+            >
+                <form onSubmit={handleSave}>
+                    <Modal.Body>
+                        <div className="space-y-3">
+                            <Input
+                                label="Nombre de usuario"
+                                type="text"
+                                value={form.name}
+                                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                                placeholder="ej: alejandra"
+                                required
+                                autoComplete="off"
+                                helperText="Se usa para iniciar sesión."
+                            />
+                            <Input
+                                label={editingId ? 'Nueva contraseña (vacío = no cambiar)' : 'Contraseña'}
+                                type="password"
+                                value={form.password}
+                                onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                                placeholder="••••••••"
+                                required={!editingId}
+                                minLength={8}
+                            />
+                            <Select
+                                label="Rol"
+                                value={form.role}
+                                onChange={e => {
+                                    setSellerIdManuallyEdited(false);
+                                    setForm(f => ({ ...f, role: e.target.value }));
+                                }}
+                            >
+                                <option value="seller">Vendedor</option>
+                                <option value="admin">Administrador</option>
+                            </Select>
+                            <Input
+                                label={`ID de instancia${form.role === 'admin' ? ' (opcional)' : ''}`}
+                                type="text"
+                                value={form.sellerId}
+                                onChange={e => {
+                                    setSellerIdManuallyEdited(true);
+                                    setForm(f => ({ ...f, sellerId: e.target.value }));
+                                }}
+                                placeholder={form.role === 'admin' ? 'ej: denise_bot (vacío = sin WhatsApp)' : 'ej: alejandra_bot'}
+                                required={form.role === 'seller'}
+                                className="font-mono"
+                                helperText={form.role === 'seller' ? 'Auto-generado — podés editarlo.' : 'Sin ID el admin no tendrá WhatsApp.'}
+                            />
+                        </div>
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button variant="secondary" type="button" onClick={closeForm}>
+                            Cancelar
+                        </Button>
+                        <Button type="submit" loading={saving} leftIcon={Check}>
+                            {editingId ? 'Guardar cambios' : 'Crear cuenta'}
+                        </Button>
+                    </Modal.Footer>
+                </form>
+            </Modal>
+
+            {/* Modal: reset password */}
+            <Modal
+                open={!!pwModal}
+                onClose={() => { setPwModal(null); setNewPw(''); }}
+                title="Resetear contraseña"
+                size="sm"
+            >
+                <form onSubmit={handleResetPassword}>
+                    <Modal.Body>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
+                            Nueva contraseña para <strong className="text-slate-700 dark:text-slate-200 capitalize">{pwModal?.name}</strong>
+                        </p>
+                        <Input
+                            type="password"
+                            placeholder="Nueva contraseña (mín. 8 caracteres)"
+                            value={newPw}
+                            onChange={e => setNewPw(e.target.value)}
+                            required
+                            minLength={8}
+                            autoFocus
+                            leftIcon={KeyRound}
+                            aria-label="Nueva contraseña"
+                        />
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button variant="secondary" type="button" onClick={() => { setPwModal(null); setNewPw(''); }}>
+                            Cancelar
+                        </Button>
+                        <Button type="submit" loading={pwSaving} leftIcon={Check}>
+                            Guardar
+                        </Button>
+                    </Modal.Footer>
+                </form>
+            </Modal>
         </div>
     );
 };
 
-// Small row shown under each account with total accumulated dashboard time
-// and (when the user is online right now) a live ticker for the current session.
-const OnlineTimeLine = ({ totalSeconds, onlineSinceMs, nowMs }) => {
+// ─── Sub-componentes ───────────────────────────────────────────
+
+function AccountRow({ acc, rt, isAdmin, onEdit, onDelete, onResetPw, onSellerAction, actionLoading, nowMs }) {
+    const isRunning = rt?.running;
+    const isConnected = rt?.connected;
+
+    return (
+        <Card padding="md" className="flex items-center gap-3">
+            {/* Avatar */}
+            <div className={cn(
+                'w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-base flex-shrink-0',
+                isAdmin ? 'bg-warning-500' : 'bg-accent-600'
+            )}>
+                {acc.name.charAt(0).toUpperCase()}
+            </div>
+
+            <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-semibold text-slate-900 dark:text-slate-100 text-sm capitalize truncate">{acc.name}</span>
+                    {isAdmin && <Badge tone="warning" size="sm">Admin</Badge>}
+                    {!acc.isActive && <Badge tone="danger" size="sm">Inactivo</Badge>}
+                </div>
+                {acc.sellerId && (
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5">
+                        <span className={cn(
+                            'w-1.5 h-1.5 rounded-full flex-shrink-0',
+                            isConnected ? 'bg-success-500' : isRunning ? 'bg-warning-500 animate-pulse' : 'bg-slate-300 dark:bg-slate-600'
+                        )} />
+                        {isConnected ? `Conectado${rt?.phoneNumber ? ` · +${rt.phoneNumber}` : ''}` : isRunning ? 'Iniciando…' : 'Sin sesión activa'}
+                    </p>
+                )}
+                {!acc.sellerId && isAdmin && (
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Sin WhatsApp</p>
+                )}
+                <OnlineTimeLine
+                    totalSeconds={acc.totalOnlineSeconds}
+                    onlineSinceMs={acc.onlineSinceMs}
+                    nowMs={nowMs}
+                />
+            </div>
+
+            {/* Controles WA */}
+            {acc.sellerId && (
+                <div className="flex items-center gap-1">
+                    {!isRunning ? (
+                        <IconButton
+                            label="Iniciar seller"
+                            icon={Play}
+                            variant="subtle"
+                            size="sm"
+                            onClick={() => onSellerAction(acc.sellerId, 'start')}
+                            disabled={!!actionLoading[`${acc.sellerId}_start`]}
+                            className={cn(
+                                '!bg-success-50 dark:!bg-success-900/30 !text-success-600 dark:!text-success-500 hover:!bg-success-100',
+                                actionLoading[`${acc.sellerId}_start`] && '[&_svg]:animate-spin'
+                            )}
+                        />
+                    ) : (
+                        <>
+                            <IconButton
+                                label="Reiniciar seller"
+                                icon={RotateCcw}
+                                variant="subtle"
+                                size="sm"
+                                onClick={() => onSellerAction(acc.sellerId, 'restart')}
+                                disabled={!!actionLoading[`${acc.sellerId}_restart`]}
+                                className={cn(
+                                    '!bg-warning-50 dark:!bg-warning-900/30 !text-warning-600 dark:!text-warning-500 hover:!bg-warning-100',
+                                    actionLoading[`${acc.sellerId}_restart`] && '[&_svg]:animate-spin'
+                                )}
+                            />
+                            <IconButton
+                                label="Detener seller"
+                                icon={Square}
+                                variant="subtle"
+                                size="sm"
+                                onClick={() => onSellerAction(acc.sellerId, 'stop')}
+                                disabled={!!actionLoading[`${acc.sellerId}_stop`]}
+                                className={cn(
+                                    '!bg-danger-50 dark:!bg-danger-900/30 !text-danger-600 dark:!text-danger-500 hover:!bg-danger-100',
+                                    actionLoading[`${acc.sellerId}_stop`] && '[&_svg]:animate-spin'
+                                )}
+                            />
+                        </>
+                    )}
+                </div>
+            )}
+
+            {/* Controles cuenta */}
+            <div className="flex items-center gap-1">
+                <IconButton label="Cambiar contraseña" icon={KeyRound} variant="ghost" size="sm" onClick={onResetPw} />
+                <IconButton label="Editar cuenta" icon={Edit2} variant="ghost" size="sm" onClick={() => onEdit(acc)} />
+                <IconButton label="Desactivar cuenta" icon={Trash2} variant="danger" size="sm" onClick={onDelete} />
+            </div>
+        </Card>
+    );
+}
+
+function OnlineTimeLine({ totalSeconds, onlineSinceMs, nowMs }) {
     const currentSessionSec = onlineSinceMs ? Math.max(0, Math.floor((nowMs - onlineSinceMs) / 1000)) : 0;
     const displayTotal = (totalSeconds || 0) + currentSessionSec;
     return (
-        <div className="flex items-center gap-1.5 mt-1 text-xs text-slate-400 dark:text-slate-500">
-            <Clock className="w-3 h-3 flex-shrink-0" />
-            <span title="Tiempo acumulado con el panel abierto">
+        <div className="flex items-center gap-1.5 mt-1 text-xs text-slate-500 dark:text-slate-400">
+            <Clock className="w-3 h-3 flex-shrink-0" aria-hidden="true" />
+            <span title="Tiempo acumulado con el panel abierto" className="tabular-nums">
                 {formatDuration(displayTotal)} total
             </span>
             {onlineSinceMs && (
                 <>
-                    <span className="text-slate-300 dark:text-slate-600">•</span>
-                    <span className="text-emerald-600 dark:text-emerald-400 font-medium" title="Sesión actual">
+                    <span className="text-slate-300 dark:text-slate-600">·</span>
+                    <span className="text-success-600 dark:text-success-500 font-medium tabular-nums" title="Sesión actual">
                         sesión: {formatDuration(currentSessionSec)}
                     </span>
                 </>
             )}
         </div>
     );
-};
+}
 
-// API Tokens section: managed below the accounts table. Tokens grant scope
-// "analytics:read" only — used by external Claude Code instances etc.
-// Plaintext is shown ONCE on creation, then only the prefix is visible.
-const ApiTokensSection = () => {
+// ─── API Tokens ────────────────────────────────────────────────
+
+function ApiTokensSection() {
     const { toast } = useToast();
     const [tokens, setTokens] = useState([]);
     const [loading, setLoading] = useState(true);
     const [creating, setCreating] = useState(false);
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [newName, setNewName] = useState('');
-    const [justCreated, setJustCreated] = useState(null); // { token, name, prefix }
+    const [justCreated, setJustCreated] = useState(null);
     const [copied, setCopied] = useState(false);
 
     const load = useCallback(async () => {
@@ -579,7 +514,7 @@ const ApiTokensSection = () => {
         try {
             const res = await api.get('/api/admin/api-tokens');
             setTokens(res.data || []);
-        } catch (e) {
+        } catch {
             toast.error('No se pudieron cargar los tokens');
         } finally {
             setLoading(false);
@@ -617,9 +552,7 @@ const ApiTokensSection = () => {
             await api.delete(`/api/admin/api-tokens/${id}`);
             toast.success('Token revocado');
             load();
-        } catch (e) {
-            toast.error('No se pudo revocar');
-        }
+        } catch { toast.error('No se pudo revocar'); }
     };
 
     const copyToClipboard = async (text) => {
@@ -627,130 +560,141 @@ const ApiTokensSection = () => {
             await navigator.clipboard.writeText(text);
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
-        } catch (e) {
-            toast.error('No se pudo copiar');
-        }
+        } catch { toast.error('No se pudo copiar'); }
     };
 
-    const fmtDate = (d) => d ? new Date(d).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+    const fmtDate = (d) => d
+        ? new Date(d).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })
+        : '—';
 
     return (
-        <section className="mt-8 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 sm:p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                    <Key className="w-5 h-5 text-indigo-500" />
-                    <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">API Tokens</h2>
-                </div>
-                <button
-                    onClick={() => setShowCreateForm(v => !v)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-colors"
-                >
-                    <Plus className="w-4 h-4" /> Nuevo token
-                </button>
+        <Card padding="md" as="section">
+            <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                    <Key className="w-4 h-4 text-accent-600 dark:text-accent-400" aria-hidden="true" />
+                    API Tokens
+                </h2>
+                <Button size="sm" leftIcon={Plus} onClick={() => setShowCreateForm(v => !v)}>
+                    Nuevo token
+                </Button>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-                Tokens para acceso programático a <code>/api/analytics/*</code> (scope <code>analytics:read</code>).
-                Útil para que un Claude Code externo o herramienta de marketing lea métricas sin necesidad de cuenta.
+                Tokens para acceso programático a <code className="text-[11px] bg-slate-100 dark:bg-slate-800 px-1 rounded">/api/analytics/*</code> (scope <code className="text-[11px] bg-slate-100 dark:bg-slate-800 px-1 rounded">analytics:read</code>).
+                Útil para que herramientas externas lean métricas sin necesidad de cuenta.
             </p>
 
             {showCreateForm && (
-                <form onSubmit={handleCreate} className="mb-4 p-4 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-200 dark:border-slate-700">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Nombre descriptivo</label>
-                    <input
+                <form onSubmit={handleCreate} className="mb-4 p-3 bg-slate-50 dark:bg-slate-900/40 rounded-control border border-slate-200/70 dark:border-slate-700/70">
+                    <Input
+                        label="Nombre descriptivo"
                         type="text"
                         value={newName}
                         onChange={e => setNewName(e.target.value)}
-                        placeholder='Ej: "Hermano - meta ads"'
-                        className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                        placeholder='Ej: "Hermano · meta ads"'
                         autoFocus
                     />
                     <div className="flex gap-2 mt-3">
-                        <button type="submit" disabled={creating} className="px-4 py-1.5 text-sm font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50">
-                            {creating ? 'Creando...' : 'Crear'}
-                        </button>
-                        <button type="button" onClick={() => { setShowCreateForm(false); setNewName(''); }} className="px-4 py-1.5 text-sm font-semibold rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200">
+                        <Button size="sm" type="submit" loading={creating}>
+                            Crear
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            type="button"
+                            onClick={() => { setShowCreateForm(false); setNewName(''); }}
+                        >
                             Cancelar
-                        </button>
+                        </Button>
                     </div>
                 </form>
             )}
 
             {justCreated && (
-                <div className="mb-4 p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-300 dark:border-emerald-800 rounded-xl">
+                <div className="mb-4 p-3 rounded-control bg-success-50 dark:bg-success-900/20 border border-success-200 dark:border-success-900/40">
                     <div className="flex items-start gap-2 mb-2">
-                        <Check className="w-5 h-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" />
+                        <Check className="w-4 h-4 text-success-600 dark:text-success-500 flex-shrink-0 mt-0.5" aria-hidden="true" />
                         <div className="flex-1 min-w-0">
-                            <p className="text-sm font-bold text-emerald-900 dark:text-emerald-200">
+                            <p className="text-sm font-semibold text-success-700 dark:text-success-500">
                                 Token creado: <span className="font-mono">{justCreated.name}</span>
                             </p>
-                            <p className="text-xs text-emerald-800 dark:text-emerald-300 mt-1">
+                            <p className="text-xs text-success-700/80 dark:text-success-500/80 mt-1">
                                 Copialo ahora — no vas a poder verlo de nuevo. Si lo perdés, hay que generar uno nuevo.
                             </p>
                         </div>
-                        <button onClick={() => setJustCreated(null)} className="text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-800/30 p-1 rounded-md">
-                            <X className="w-4 h-4" />
-                        </button>
-                    </div>
-                    <div className="flex items-center gap-2 mt-2 p-3 bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800 rounded-lg">
-                        <code className="flex-1 text-xs sm:text-sm font-mono text-slate-800 dark:text-slate-200 break-all">{justCreated.token}</code>
-                        <button
-                            onClick={() => copyToClipboard(justCreated.token)}
-                            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md bg-emerald-600 hover:bg-emerald-700 text-white"
+                        <IconButton
+                            label="Cerrar aviso"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setJustCreated(null)}
                         >
-                            <Copy className="w-3.5 h-3.5" /> {copied ? 'Copiado' : 'Copiar'}
-                        </button>
+                            <span aria-hidden="true">✕</span>
+                        </IconButton>
+                    </div>
+                    <div className="flex items-center gap-2 mt-2 p-2.5 bg-white dark:bg-slate-900 border border-success-200 dark:border-success-900/40 rounded-control">
+                        <code className="flex-1 text-xs sm:text-sm font-mono text-slate-700 dark:text-slate-200 break-all">
+                            {justCreated.token}
+                        </code>
+                        <Button
+                            size="sm"
+                            leftIcon={Copy}
+                            onClick={() => copyToClipboard(justCreated.token)}
+                            className="!bg-success-600 hover:!bg-success-700 flex-shrink-0"
+                        >
+                            {copied ? 'Copiado' : 'Copiar'}
+                        </Button>
                     </div>
                 </div>
             )}
 
             {loading ? (
                 <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 py-4">
-                    <Loader2 className="w-4 h-4 animate-spin" /> Cargando tokens...
+                    <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                    Cargando tokens…
                 </div>
             ) : tokens.length === 0 ? (
-                <div className="text-sm text-slate-500 dark:text-slate-400 py-6 text-center bg-slate-50 dark:bg-slate-900/40 rounded-xl">
+                <p className="text-sm text-slate-500 dark:text-slate-400 py-6 text-center bg-slate-50 dark:bg-slate-900/40 rounded-control">
                     Sin tokens creados todavía.
-                </div>
+                </p>
             ) : (
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead>
-                            <tr className="text-left text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
-                                <th className="py-2 pr-3 font-semibold">Nombre</th>
-                                <th className="py-2 pr-3 font-semibold">Token</th>
-                                <th className="py-2 pr-3 font-semibold">Scopes</th>
-                                <th className="py-2 pr-3 font-semibold">Creado</th>
-                                <th className="py-2 pr-3 font-semibold">Último uso</th>
-                                <th className="py-2 pr-3 font-semibold">Estado</th>
-                                <th className="py-2"></th>
+                            <tr className="text-left text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 font-medium">
+                                <th className="py-2 pr-3">Nombre</th>
+                                <th className="py-2 pr-3">Token</th>
+                                <th className="py-2 pr-3">Scopes</th>
+                                <th className="py-2 pr-3">Creado</th>
+                                <th className="py-2 pr-3">Último uso</th>
+                                <th className="py-2 pr-3">Estado</th>
+                                <th className="py-2 text-right" aria-label="Acciones" />
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                             {tokens.map(t => {
                                 const revoked = !!t.revokedAt;
                                 return (
-                                    <tr key={t.id} className={`border-b border-slate-100 dark:border-slate-800 ${revoked ? 'opacity-50' : ''}`}>
-                                        <td className="py-3 pr-3 font-medium text-slate-700 dark:text-slate-200">{t.name}</td>
-                                        <td className="py-3 pr-3"><code className="text-xs font-mono text-slate-500 dark:text-slate-400">{t.prefix}…</code></td>
-                                        <td className="py-3 pr-3 text-xs text-slate-500 dark:text-slate-400">{(t.scopes || []).join(', ')}</td>
-                                        <td className="py-3 pr-3 text-xs text-slate-500 dark:text-slate-400">{fmtDate(t.createdAt)}</td>
-                                        <td className="py-3 pr-3 text-xs text-slate-500 dark:text-slate-400">{fmtDate(t.lastUsedAt)}</td>
-                                        <td className="py-3 pr-3">
-                                            {revoked ? (
-                                                <span className="text-xs px-2 py-0.5 rounded bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400">Revocado</span>
-                                            ) : (
-                                                <span className="text-xs px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">Activo</span>
-                                            )}
+                                    <tr key={t.id} className={cn(revoked && 'opacity-50')}>
+                                        <td className="py-2.5 pr-3 font-medium text-sm text-slate-700 dark:text-slate-200">{t.name}</td>
+                                        <td className="py-2.5 pr-3">
+                                            <code className="text-xs font-mono text-slate-500 dark:text-slate-400">{t.prefix}…</code>
                                         </td>
-                                        <td className="py-3 text-right">
+                                        <td className="py-2.5 pr-3 text-xs text-slate-500 dark:text-slate-400">{(t.scopes || []).join(', ')}</td>
+                                        <td className="py-2.5 pr-3 text-xs text-slate-500 dark:text-slate-400 tabular-nums">{fmtDate(t.createdAt)}</td>
+                                        <td className="py-2.5 pr-3 text-xs text-slate-500 dark:text-slate-400 tabular-nums">{fmtDate(t.lastUsedAt)}</td>
+                                        <td className="py-2.5 pr-3">
+                                            <Badge tone={revoked ? 'danger' : 'success'} size="sm">
+                                                {revoked ? 'Revocado' : 'Activo'}
+                                            </Badge>
+                                        </td>
+                                        <td className="py-2.5 text-right">
                                             {!revoked && (
-                                                <button
+                                                <IconButton
+                                                    label="Revocar token"
+                                                    icon={Trash2}
+                                                    variant="danger"
+                                                    size="sm"
                                                     onClick={() => handleRevoke(t.id, t.name)}
-                                                    className="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-md"
-                                                    title="Revocar"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
+                                                />
                                             )}
                                         </td>
                                     </tr>
@@ -760,8 +704,8 @@ const ApiTokensSection = () => {
                     </table>
                 </div>
             )}
-        </section>
+        </Card>
     );
-};
+}
 
 export default AccountsView;
