@@ -606,6 +606,18 @@ module.exports = (clientPool) => {
                     orderBy: { createdAt: 'desc' }
                 });
 
+                // Campos de seña (flujo COD con anticipo): si el state los tiene,
+                // los persistimos. Sin esto, la confirmación manual desde panel
+                // perdía la info de seña ya cobrada (caso real Romina 19-may:
+                // pagó $10k MP pero la orden quedó con totalPrice=$46.900 COD).
+                const stateSena = state && state.senaAmount && state.senaAmount > 0
+                    ? {
+                        senaAmount: state.senaAmount,
+                        senaPaid: !!state.senaPaid,
+                        cashRemainder: Math.max(0, (total || 0) - state.senaAmount),
+                    }
+                    : {};
+
                 if (existingOrder) {
                     logger.info(`[MANUAL-COMPLETE] Found existing Pendiente order ${existingOrder.id}, updating to Confirmado...`);
                     // Also patch products/totalPrice if the existing order has placeholder values
@@ -625,6 +637,7 @@ module.exports = (clientPool) => {
                             ...(needsProductPatch && { products: product }),
                             ...(needsPricePatch && { totalPrice: total }),
                             paymentMethod: state.paymentMethod || existingOrder.paymentMethod || null,
+                            ...stateSena,
                         }
                     });
                 } else {
@@ -645,6 +658,7 @@ module.exports = (clientPool) => {
                             cp: addr.cp || null,
                             seller: seller,
                             paymentMethod: state.paymentMethod || null,
+                            ...stateSena,
                         }
                     });
                 }

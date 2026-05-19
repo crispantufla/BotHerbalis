@@ -55,16 +55,19 @@ export async function handleWaitingMpPayment(
         const verified = await _verifyPayment(currentState);
 
         if (verified === 'approved') {
+            // Marcamos senaPaid=true APENAS verificamos approved (sin importar
+            // si hay dirección o no). Antes solo se seteaba en el branch
+            // !hasAddress; si llegaba el address junto con el pago, el flag
+            // quedaba en false y la orden no reflejaba que la seña fue cobrada.
+            if (currentState.senaAmount && currentState.senaAmount > 0) {
+                currentState.senaPaid = true;
+            }
             const addr = currentState.partialAddress || {};
             const hasAddress = !!(addr.nombre && addr.calle && addr.ciudad);
 
             if (hasAddress) {
                 await _finalizeOrderAndNotifyAdmin(userId, currentState, dependencies);
             } else {
-                // Política mayo 2026: si es flujo seña, marcamos senaPaid acá también.
-                if (currentState.senaAmount && currentState.senaAmount > 0) {
-                    currentState.senaPaid = true;
-                }
                 const isSenaFlow = !!(currentState.senaAmount && currentState.senaAmount > 0);
                 const msg = isSenaFlow
                     ? '¡Perfecto, la seña fue confirmada! 🎉\n\nAhora necesito los datos de envío para despachar 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:'

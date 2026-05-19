@@ -125,6 +125,17 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
 
             const normalizedProduct = normalizeProductName(order.producto || '', order.plan || '', priceNum);
 
+            // Campos de seña (flujo COD con anticipo MP/transferencia):
+            //   senaAmount       = monto del anticipo ya pagado ($10k típico)
+            //   senaPaid         = true si la seña ya está confirmada
+            //   cashRemainder    = saldo que el cartero cobra en efectivo
+            // Sin esto, la orden quedaba con totalPrice=$46.900 y
+            // paymentMethod=contrarembolso, perdiendo la info de que $10k ya
+            // se cobraron (caso real Romina 19-may).
+            const senaAmount = (typeof order.senaAmount === 'number' && order.senaAmount > 0) ? order.senaAmount : null;
+            const senaPaid = !!order.senaPaid;
+            const cashRemainder = (typeof order.cashRemainder === 'number' && order.cashRemainder > 0) ? order.cashRemainder : null;
+
             const newOrderData = {
                 id: crypto.randomUUID(),
                 userPhone: cleanPhone || 'desconocido',
@@ -141,6 +152,9 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
                 provincia: order.provincia || null,
                 cp: order.cp || null,
                 paymentMethod: order.paymentMethod || null,
+                senaAmount,
+                senaPaid,
+                cashRemainder,
                 seller: client?.info?.wid?.user || null,
                 instanceId: sellerId
             };

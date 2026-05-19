@@ -41,6 +41,17 @@ model Order {
   seller      String?  // Phone number of the WhatsApp session that created the order
   paymentMethod String? // mercadopago | contrarembolso | transferencia
 
+  // Seña / anticipo para flujo COD (mayo 2026):
+  //   senaAmount       = monto del anticipo ya pagado (típicamente $10.000)
+  //   senaPaid         = true si la seña fue confirmada (MP approved o transfer)
+  //   cashRemainder    = saldo en efectivo que el cartero debe cobrar
+  // Si paymentMethod = 'mercadopago' o 'transferencia' con pago completo,
+  // estos quedan null/false/null. Si 'contrarembolso' sin seña pagada
+  // (situación legacy/manual), también null.
+  senaAmount    Int?
+  senaPaid      Boolean  @default(false)
+  cashRemainder Int?
+
   nombre      String?
   email       String?  // Optional, captured during MP flow for receipt + payer pre-fill
   calle       String?
