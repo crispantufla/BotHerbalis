@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import { Pause, Play, CreditCard, Copy, Check, Smartphone, Clock } from 'lucide-react';
 import api from '../../config/axios';
 import { useToast } from '../ui/Toast';
 import { useAuth } from '../../context/AuthContext';
+import { Button, Card, Input, IconButton } from '../ui';
 
 import StatsPanel from './dashboard/StatsPanel';
 import AlertsPanel from './dashboard/AlertsPanel';
@@ -197,197 +199,195 @@ const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData 
     };
 
     return (
-        <div className="space-y-4 sm:space-y-8 animate-fade-in relative z-10 w-full">
+        <div className="space-y-5 sm:space-y-7 animate-fade-in relative z-10 w-full">
             {/* Header de la vista */}
-            <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:justify-between sm:items-stretch gap-3 sm:gap-6 sm:h-[5.5rem]">
-                <div className="flex flex-col justify-center">
-                    <h1 className="text-xl sm:text-3xl 2xl:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-700 to-purple-600 dark:from-indigo-400 dark:to-purple-400 leading-none mb-1 sm:mb-2">
-                        Dashboard Overview
-                    </h1>
-                    <p className="text-slate-500 dark:text-slate-400 text-sm font-medium 2xl:text-lg m-0 leading-none">Resumen del sistema y métricas en tiempo real</p>
+            <header className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4">
+                <div className="min-w-0">
+                    <h1 className="text-display text-slate-900 dark:text-slate-100">Dashboard</h1>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                        Resumen del sistema y métricas en tiempo real.
+                    </p>
                 </div>
 
                 {/* Botones de pausa: "Este bot" (siempre) + "Todos" (solo admin global) */}
-                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
-                    {/* Pausar / Reactivar ESTE bot (el del seller seleccionado) */}
-                    <button
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                    <Button
+                        variant={isGlobalPause ? 'subtle' : 'secondary'}
+                        leftIcon={isGlobalPause ? Play : Pause}
                         onClick={handleToggleThisBot}
-                        title={isGlobalPause ? 'Reactivar el bot de este vendedor' : 'Pausar el bot de este vendedor'}
-                        className={`flex items-center justify-center gap-3 px-4 sm:px-5 py-3 sm:py-0 rounded-[1.25rem] font-bold transition-all shadow-sm w-full sm:w-56 sm:h-full ${isGlobalPause
-                            ? 'bg-amber-100/90 dark:bg-amber-900/30 text-amber-800 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-800/50 border-2 border-amber-200 dark:border-amber-800/50 shadow-amber-500/20'
-                            : 'bg-white dark:bg-slate-800/80 border-2 border-slate-100/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-100 dark:hover:border-indigo-800/50 hover:shadow-indigo-500/10'
-                            }`}
+                        className={isGlobalPause ? '!bg-warning-50 dark:!bg-warning-900/20 !text-warning-700 dark:!text-warning-500 !border-warning-100 dark:!border-warning-900/50 hover:!bg-warning-100 dark:hover:!bg-warning-900/40' : ''}
                     >
-                        {isGlobalPause ? (
-                            <>
-                                <div className="w-10 h-10 flex items-center justify-center rounded-2xl bg-amber-500 text-white shadow-md shadow-amber-500/40 flex-shrink-0">
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                </div>
-                                <span className="text-left leading-tight text-[13px] sm:text-[14px] tracking-wide font-extrabold">Reactivar<br />este bot</span>
-                            </>
-                        ) : (
-                            <>
-                                <div className="w-10 h-10 flex items-center justify-center rounded-2xl bg-amber-50 dark:bg-amber-900/40 text-amber-500 shadow-inner border border-amber-100 dark:border-amber-800/50 flex-shrink-0">
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                </div>
-                                <span className="text-left leading-tight text-[13px] sm:text-[14px] tracking-wide font-extrabold">Pausar<br />este bot</span>
-                            </>
-                        )}
-                    </button>
+                        {isGlobalPause ? 'Reactivar este bot' : 'Pausar este bot'}
+                    </Button>
 
-                    {/* Pausar TODOS — admin global o Horacio */}
                     {canPauseAll && (
-                        <button
+                        <Button
+                            variant="secondary"
+                            leftIcon={Pause}
                             onClick={handlePauseAll}
-                            disabled={pausingAll}
-                            title="Pausar el bot de todos los vendedores"
-                            className="flex items-center justify-center gap-3 px-4 sm:px-5 py-3 sm:py-0 rounded-[1.25rem] font-bold transition-all shadow-sm w-full sm:w-56 sm:h-full bg-white dark:bg-slate-800/80 border-2 border-rose-100/80 dark:border-rose-800/50 text-rose-700 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-900/30 hover:border-rose-200 dark:hover:border-rose-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            loading={pausingAll}
+                            className="!text-danger-700 dark:!text-danger-500 !border-danger-100 dark:!border-danger-900/50 hover:!bg-danger-50 dark:hover:!bg-danger-900/20"
                         >
-                            <div className="w-10 h-10 flex items-center justify-center rounded-2xl bg-rose-50 dark:bg-rose-900/40 text-rose-500 shadow-inner border border-rose-100 dark:border-rose-800/50 flex-shrink-0">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            </div>
-                            <span className="text-left leading-tight text-[13px] sm:text-[14px] tracking-wide font-extrabold">
-                                {pausingAll ? 'Procesando...' : <>Pausar<br />TODOS</>}
-                            </span>
-                        </button>
+                            Pausar TODOS
+                        </Button>
                     )}
                 </div>
-            </div>
+            </header>
 
-            {/* QR CODE OVERLAY - Glassmorphism style */}
+            {/* QR / Loading / Timeout */}
             {status === 'scan_qr' && qrData && (
-                <div className="bg-white dark:bg-slate-800/80 backdrop-blur-xl border border-slate-200/60 dark:border-slate-700/40 shadow-2xl rounded-3xl p-6 sm:p-10 text-center max-w-lg mx-auto transform transition-all hover:scale-[1.02]">
-                    <div className="w-16 h-16 bg-gradient-to-tr from-blue-500 to-indigo-500 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-blue-500/30">
-                        <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                <Card padding="lg" className="max-w-lg mx-auto text-center">
+                    <div className="w-12 h-12 rounded-card bg-accent-50 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400 flex items-center justify-center mx-auto mb-4">
+                        <Smartphone className="w-6 h-6" aria-hidden="true" />
                     </div>
-                    <h3 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-700 to-purple-600 dark:from-indigo-400 dark:to-purple-400 mb-3">Vincular Dispositivo</h3>
-                    <p className="text-slate-500 dark:text-slate-400 mb-4 font-medium">Abrí WhatsApp → Dispositivos vinculados</p>
+                    <h2 className="text-h2 text-slate-900 dark:text-slate-100 mb-1">Vincular dispositivo</h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">
+                        Abrí WhatsApp → Dispositivos vinculados
+                    </p>
 
                     {pairingCode ? (
-                        <div className="mb-8">
-                            <p className="text-sm font-bold text-indigo-600 dark:text-indigo-400 mb-2 uppercase tracking-wide">Código de Vinculación</p>
-                            <div className="bg-slate-100 dark:bg-slate-900 rounded-xl p-6 text-4xl font-mono font-black tracking-[0.2em] text-slate-800 dark:text-slate-200 border-2 border-indigo-200 dark:border-indigo-800">
+                        <div>
+                            <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">
+                                Código de vinculación
+                            </p>
+                            <div className="bg-slate-100 dark:bg-slate-900/60 rounded-card px-6 py-5 text-3xl font-mono font-semibold tracking-[0.2em] text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700">
                                 {pairingCode}
                             </div>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-4">Ingresa este código en tu celular principal de WhatsApp cuando te llegue la notificación.</p>
-                            <button
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-3">
+                                Ingresá este código en tu celular cuando llegue la notificación.
+                            </p>
+                            <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => setPairingCode('')}
-                                className="mt-4 text-indigo-600 dark:text-indigo-400 text-sm font-semibold hover:underline"
+                                className="mt-3"
                             >
                                 ← Volver al código QR
-                            </button>
+                            </Button>
                         </div>
                     ) : (
                         <>
-                            <div className="inline-block p-4 bg-white dark:bg-white rounded-2xl border border-slate-100 dark:border-slate-700 shadow-inner mb-6">
-                                <QRCodeSVG value={qrData} size={256} level="M" />
+                            <div className="inline-block p-4 bg-white rounded-card border border-slate-200 mb-5">
+                                <QRCodeSVG value={qrData} size={224} level="M" />
                             </div>
-
-                            <div className="border-t border-slate-200 dark:border-slate-700/50 pt-6 mt-2">
-                                <p className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-3">¿No podés escanear el QR?</p>
+                            <div className="pt-5 border-t border-slate-200 dark:border-slate-700/70">
+                                <p className="text-sm text-slate-600 dark:text-slate-300 mb-3 font-medium">
+                                    ¿No podés escanear el QR?
+                                </p>
                                 <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        placeholder="Ej: 5493415555555"
+                                    <Input
                                         value={pairingPhone}
                                         onChange={(e) => setPairingPhone(e.target.value)}
-                                        className="flex-1 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder-slate-400 dark:placeholder-slate-500 text-slate-800 dark:text-slate-100"
+                                        placeholder="Ej: 5493415555555"
+                                        aria-label="Teléfono para código de vinculación"
                                     />
-                                    <button
+                                    <Button
                                         onClick={handleRequestPairingCode}
-                                        disabled={loadingPairing || !pairingPhone}
-                                        className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 text-white px-6 py-2 rounded-xl font-bold transition-all shadow-md shadow-indigo-500/30"
+                                        loading={loadingPairing}
+                                        disabled={!pairingPhone}
+                                        className="flex-shrink-0"
                                     >
-                                        {loadingPairing ? '...' : 'Generar Código'}
-                                    </button>
+                                        Generar código
+                                    </Button>
                                 </div>
                             </div>
                         </>
                     )}
-                </div>
+                </Card>
             )}
 
             {((status === 'scan_qr' && !qrData) || status === 'initializing') && (
-                <div className="bg-white dark:bg-slate-800/60 backdrop-blur-lg border border-slate-200/60 dark:border-slate-700/50 rounded-3xl p-6 sm:p-8 text-center max-w-lg mx-auto shadow-xl">
-                    <div className="flex flex-col items-center justify-center gap-4">
-                        <div className="w-12 h-12 border-4 border-indigo-200 dark:border-indigo-900 border-t-indigo-600 dark:border-t-indigo-500 rounded-full animate-spin"></div>
-                        <span className="font-bold text-indigo-800 dark:text-indigo-400 text-lg">Preparando WhatsApp...</span>
-                        <span className="text-slate-500 dark:text-slate-400 text-sm">El código QR aparecerá en unos segundos</span>
+                <Card padding="lg" className="max-w-lg mx-auto text-center">
+                    <div className="flex flex-col items-center justify-center gap-3">
+                        <div className="w-10 h-10 border-[3px] border-accent-200 dark:border-accent-900 border-t-accent-600 dark:border-t-accent-500 rounded-full animate-spin" />
+                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Preparando WhatsApp…</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">El código QR aparecerá en unos segundos</p>
                     </div>
-                </div>
+                </Card>
             )}
 
             {status === 'qr_timeout' && (
-                <div className="bg-white dark:bg-slate-800/60 backdrop-blur-lg border border-amber-200 dark:border-amber-800/50 rounded-3xl p-6 sm:p-8 text-center max-w-lg mx-auto shadow-xl">
-                    <div className="flex flex-col items-center justify-center gap-4">
-                        <span className="text-4xl">⏰</span>
-                        <span className="font-bold text-amber-700 dark:text-amber-400 text-lg">QR expirado</span>
-                        <span className="text-slate-500 dark:text-slate-400 text-sm">El código QR no fue escaneado a tiempo. Presioná "Regenerar QR" para volver a generar uno nuevo.</span>
+                <Card padding="lg" className="max-w-lg mx-auto text-center border-warning-200 dark:border-warning-900/50">
+                    <div className="w-12 h-12 rounded-card bg-warning-50 dark:bg-warning-900/30 text-warning-600 dark:text-warning-500 flex items-center justify-center mx-auto mb-3">
+                        <Clock className="w-6 h-6" aria-hidden="true" />
                     </div>
-                </div>
+                    <p className="text-sm font-semibold text-warning-700 dark:text-warning-500">QR expirado</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 max-w-sm mx-auto">
+                        El código no fue escaneado a tiempo. Presioná "Regenerar QR" para volver a generar uno nuevo.
+                    </p>
+                </Card>
             )}
 
-            {/* A. KPI DECK V2 */}
+            {/* KPI deck */}
             <StatsPanel stats={stats} loadingStats={loadingStats} alertsCount={alerts.length} />
 
-            {/* B. MAIN GRID V2 */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 2xl:grid-cols-5 gap-4 sm:gap-8">
-                {/* B1. ALERTS V2 — takes 2/3 on lg, 3/5 on 2xl */}
+            {/* Main grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 2xl:grid-cols-5 gap-4 sm:gap-6">
                 <div className="lg:col-span-2 2xl:col-span-3">
                     <AlertsPanel alerts={alerts} onCommand={handleAdminCommand} onQuickAction={handleQuickAction} />
                 </div>
 
-                {/* B2. SYSTEM STATUS + MP WIDGET — takes 1/3 on lg, 2/5 on 2xl */}
-                <div className="lg:col-span-1 2xl:col-span-2 flex flex-col gap-4 sm:gap-8">
-                    <SystemStatusPanel status={status} activeConversations={stats?.activeConversations} adminNumbers={adminNumbers} onAddPhone={handleAddPhone} onRemovePhone={handleRemovePhone} onRegenerateQR={handleRegenerateQR} />
+                <div className="lg:col-span-1 2xl:col-span-2 flex flex-col gap-4 sm:gap-6">
+                    <SystemStatusPanel
+                        status={status}
+                        activeConversations={stats?.activeConversations}
+                        adminNumbers={adminNumbers}
+                        onAddPhone={handleAddPhone}
+                        onRemovePhone={handleRemovePhone}
+                        onRegenerateQR={handleRegenerateQR}
+                    />
 
-                    {/* C. MERCADOPAGO LINK GENERATOR */}
-                    <div className="bg-white dark:bg-slate-800/80 border border-slate-100/80 dark:border-slate-700/80 rounded-2xl p-4 shadow-sm">
+                    {/* MercadoPago Link Generator */}
+                    <Card padding="md">
                         <div className="flex items-center gap-2 mb-3">
-                            <div className="w-7 h-7 flex items-center justify-center rounded-lg bg-sky-50 dark:bg-sky-900/30 text-sky-500 border border-sky-100 dark:border-sky-800/50 flex-shrink-0">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                            <div className="w-8 h-8 rounded-control bg-info-50 dark:bg-info-900/30 text-info-600 dark:text-info-500 flex items-center justify-center flex-shrink-0">
+                                <CreditCard className="w-4 h-4" aria-hidden="true" />
                             </div>
-                            <span className="font-bold text-slate-700 dark:text-slate-200 text-xs uppercase tracking-wide">Enlace de Pago · MP</span>
+                            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                Enlace de pago — MP
+                            </h3>
                         </div>
                         <div className="flex gap-2">
-                            <div className="relative flex-1">
-                                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-semibold text-xs">$</span>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    placeholder="Monto"
-                                    value={mpAmount}
-                                    onChange={e => { setMpAmount(e.target.value); setMpLink(''); }}
-                                    onKeyDown={e => e.key === 'Enter' && handleGenerateMpLink()}
-                                    className="w-full pl-6 pr-2 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all text-xs"
-                                />
-                            </div>
-                            <button
+                            <Input
+                                type="number"
+                                min="1"
+                                placeholder="Monto"
+                                value={mpAmount}
+                                onChange={e => { setMpAmount(e.target.value); setMpLink(''); }}
+                                onKeyDown={e => e.key === 'Enter' && handleGenerateMpLink()}
+                                aria-label="Monto en pesos"
+                                leftIcon={() => <span className="text-slate-400 font-medium">$</span>}
+                            />
+                            <Button
                                 onClick={handleGenerateMpLink}
-                                disabled={mpLoading || !mpAmount}
-                                className="px-3 py-2 rounded-lg bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white font-bold text-xs transition-all shadow-sm shadow-sky-500/30 flex-shrink-0"
+                                loading={mpLoading}
+                                disabled={!mpAmount}
+                                className="flex-shrink-0"
                             >
-                                {mpLoading ? (
-                                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
-                                ) : 'Generar'}
-                            </button>
+                                Generar
+                            </Button>
                         </div>
                         {mpLink && (
-                            <div className="mt-2 flex items-center gap-2 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5">
-                                <a href={mpLink} target="_blank" rel="noopener noreferrer" className="flex-1 text-sky-600 dark:text-sky-400 text-xs truncate hover:underline">{mpLink}</a>
-                                <button
-                                    onClick={handleCopyMpLink}
-                                    className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold transition-all flex-shrink-0 ${mpCopied ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-sky-100 dark:hover:bg-sky-900/30 hover:text-sky-600'}`}
+                            <div className="mt-3 flex items-center gap-2 bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700/70 rounded-control px-3 py-2">
+                                <a
+                                    href={mpLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex-1 text-info-600 dark:text-info-500 text-xs font-medium truncate hover:underline"
                                 >
-                                    {mpCopied ? (
-                                        <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"/></svg>OK</>
-                                    ) : (
-                                        <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3"/></svg>Copiar</>
-                                    )}
-                                </button>
+                                    {mpLink}
+                                </a>
+                                <IconButton
+                                    label={mpCopied ? 'Copiado' : 'Copiar enlace'}
+                                    icon={mpCopied ? Check : Copy}
+                                    variant={mpCopied ? 'subtle' : 'ghost'}
+                                    size="sm"
+                                    onClick={handleCopyMpLink}
+                                    className={mpCopied ? '!bg-success-50 dark:!bg-success-900/30 !text-success-600 dark:!text-success-500' : ''}
+                                />
                             </div>
                         )}
-                    </div>
+                    </Card>
                 </div>
             </div>
         </div>
