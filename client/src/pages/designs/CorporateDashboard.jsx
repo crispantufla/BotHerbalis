@@ -540,9 +540,9 @@ const CorporateDashboard = () => {
 
                 {/* Área de Contenido Principal */}
                 <main className="flex-1 relative flex flex-col min-h-0 overflow-hidden" onClick={() => { if (isMobile && mobileMenuOpen) setMobileMenuOpen(false); }}>
-                    {/* Elementos decorativos de fondo (Blur Orbs) */}
-                    <div className="absolute top-[-10%] right-[-5%] w-[60%] lg:w-[40%] h-[60%] lg:h-[40%] rounded-full bg-purple-300/20 dark:bg-purple-900/20 blur-[80px] lg:blur-[100px] pointer-events-none hidden sm:block"></div>
-                    <div className="absolute bottom-[-10%] left-[-10%] w-[70%] lg:w-[50%] h-[70%] lg:h-[50%] rounded-full bg-blue-300/20 dark:bg-indigo-900/20 blur-[100px] lg:blur-[120px] pointer-events-none hidden sm:block"></div>
+                    {/* Antes había 2 blur-orbs decorativos absolute aquí (purple/indigo)
+                        que pintaban en cada vista. Los sacamos: aportaban ruido
+                        visual y costaban GPU en mobile sin agregar jerarquía. */}
 
                     <div className={`flex-1 relative z-0 w-full flex flex-col min-h-0 overflow-hidden ${['comms', 'logistics', 'statistics'].includes(activeTab) ? '' : 'overflow-y-auto custom-scrollbar'} p-3 sm:p-6 lg:p-8 ${isPhone ? 'pb-20' : ''}`}>
                         {renderContent()}
@@ -572,15 +572,15 @@ const CorporateDashboard = () => {
                                         setMobileMenuOpen(false);
                                     }
                                 }}
-                                className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 py-2 transition-colors duration-200 ${isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500'}`}
+                                className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 py-2 transition-colors duration-200 ${isActive ? 'text-accent-600 dark:text-accent-400' : 'text-slate-500 dark:text-slate-400'}`}
                             >
                                 <Icon className="w-5 h-5" strokeWidth={isActive ? 2.5 : 2} />
-                                <span className="text-[10px] font-bold tracking-wide">{label}</span>
+                                <span className="text-[10px] font-medium tracking-wide">{label}</span>
                                 {isActive && tab !== '__more__' && (
-                                    <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-indigo-500" />
+                                    <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-accent-500" />
                                 )}
                                 {tab !== '__more__' && alerts.length > 0 && tab === 'dashboard' && (
-                                    <span className="absolute top-1 right-1/4 flex items-center justify-center w-4 h-4 text-[9px] font-bold text-white bg-rose-500 rounded-full">{alerts.length > 9 ? '9+' : alerts.length}</span>
+                                    <span className="absolute top-1 right-1/4 flex items-center justify-center w-4 h-4 text-[9px] font-bold text-white bg-danger-500 rounded-full tabular-nums">{alerts.length > 9 ? '9+' : alerts.length}</span>
                                 )}
                             </button>
                         );
