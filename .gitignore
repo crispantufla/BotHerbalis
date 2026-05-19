@@ -76,3 +76,23 @@ v2-*.png
 reports/
 hermano-pack/
 herbalis-analytics-pack.zip
+
+# Documentos / presentaciones (uso interno)
+*.pdf
+recursos/
+
+# Archivos temporales / debugging
+tmp_*.*
+tmp/
+.railway_*_help.txt
+.playwright-mcp/
+*.csv
+
+# User-specific logs accidentalmente committeados
+user_*_logs.txt
+
+# Otros repos / packages anidados
+test_yamilezequiel/
+test_correoAPI/
+test_gmuro/
+bot/
