@@ -1,6 +1,7 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _formatMessage } from '../utils/messages';
 import { _setStep, _maybeUpsell, _pauseAndAlert } from '../utils/flowHelpers';
+import { _getPrice } from '../utils/pricing';
 import logger from '../../utils/logger';
 
 export async function handleWaitingWeight(
@@ -164,22 +165,29 @@ export async function handleWaitingWeight(
             // ventas del marzo glorioso, y el prompt de IA ya dice "NUNCA
             // recomiendes gotas para poco peso" (ai.ts:69). Dejamos las gotas
             // sólo para mayores de 70 años / preferencia explícita.
+            //
+            // Precio leído de _getPrice (= prices.json). Antes leíamos
+            // knowledge?._prices?.capsulas60 — esa clave NO existe en los
+            // knowledge JSON, así que el price quedaba vacío y calculateTotal
+            // emitía el warning "invalid price value" hasta que el cliente
+            // elegía plan y se rebuildaba el cart.
+            const product = 'Cápsulas de nuez de la india';
             if (tier === '1') {
-                currentState.selectedProduct = 'Cápsulas de nuez de la india';
+                currentState.selectedProduct = product;
                 currentState.selectedPlan = '60';
-                currentState.cart = [{ product: 'Cápsulas de nuez de la india', plan: '60', price: knowledge?._prices?.capsulas60 || '' }];
+                currentState.cart = [{ product, plan: '60', price: _getPrice(product, '60') }];
             } else if (tier === '2') {
                 // Tier 2 (10-20 kg) cambió de Cápsulas 60d → 120d (decisión
                 // mayo 2026): el plan 120 cubre el tratamiento completo para
                 // este rango con mejor adherencia y AOV más alto. Tier 1 se
                 // mantiene en 60d porque para pocos kilos 60d alcanza.
-                currentState.selectedProduct = 'Cápsulas de nuez de la india';
+                currentState.selectedProduct = product;
                 currentState.selectedPlan = '120';
-                currentState.cart = [{ product: 'Cápsulas de nuez de la india', plan: '120', price: knowledge?._prices?.capsulas120 || '' }];
+                currentState.cart = [{ product, plan: '120', price: _getPrice(product, '120') }];
             } else {
-                currentState.selectedProduct = 'Cápsulas de nuez de la india';
+                currentState.selectedProduct = product;
                 currentState.selectedPlan = '120';
-                currentState.cart = [{ product: 'Cápsulas de nuez de la india', plan: '120', price: knowledge?._prices?.capsulas120 || '' }];
+                currentState.cart = [{ product, plan: '120', price: _getPrice(product, '120') }];
             }
 
             const { calculateTotal } = require('../utils/cartHelpers');

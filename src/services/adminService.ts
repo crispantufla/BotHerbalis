@@ -5,6 +5,7 @@ import { randomUUID } from 'crypto';
 import { UserState, SharedState, AlertEntry, AlertOrderData, BotConfig, QuickReply } from '../types/state';
 import { aiService } from './ai';
 import { _getQuickReplies } from '../flows/utils/messages';
+import { _setStep } from '../flows/utils/flowHelpers';
 import logger from '../utils/logger';
 
 const { prisma } = require('../../db');
@@ -772,7 +773,8 @@ export async function handleAdminCommand(
             const summary = buildAdminApprovalMessage(clientState);
             await client.sendMessage(actualTarget, summary);
             if (sharedState.logAndEmit) sharedState.logAndEmit(actualTarget, 'bot', summary, 'waiting_final_confirmation');
-            clientState.step = 'waiting_final_confirmation';
+            // _setStep para mantener tracking de funnel + reset de flags (cashRetryShown, etc.)
+            _setStep(clientState, 'waiting_final_confirmation');
             clientState.history = clientState.history || [];
             clientState.history.push({ role: 'bot', content: summary, timestamp: Date.now() });
             if (sharedState.saveState) sharedState.saveState();
@@ -801,7 +803,7 @@ export async function handleAdminCommand(
                 await client.sendMessage(actualTarget, msg);
 
                 if (sharedState.userState[actualTarget]) {
-                    sharedState.userState[actualTarget].step = 'completed';
+                    _setStep(sharedState.userState[actualTarget], 'completed');
                     sharedState.userState[actualTarget].hasSoldBefore = true;
                     sharedState.userState[actualTarget].history = sharedState.userState[actualTarget].history || [];
                     sharedState.userState[actualTarget].history.push({ role: 'bot', content: msg, timestamp: Date.now() });

@@ -158,12 +158,20 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
                     const parts = msgText.split(' ');
                     const targetNumber = parts[1];
                     const targetChatId = targetNumber.includes('@') ? targetNumber : `${targetNumber.replace(/\D/g, '')}@c.us`;
-                    if (!userState[targetChatId]) userState[targetChatId] = { step: 'greeting', partialAddress: {} };
-                    userState[targetChatId].step = 'waiting_data';
+                    if (!userState[targetChatId]) userState[targetChatId] = { step: 'greeting', partialAddress: {}, history: [] };
+                    // Usamos _setStep para mantener tracking de funnel + reset de flags.
+                    // V3/V4 tenían knowledge.flow.data_request; V5/V6 lo renombraron a
+                    // flow.closing (que también pide datos para la etiqueta). Si ninguno
+                    // existe, fallback a un mensaje fijo equivalente.
+                    const { _setStep } = require('../flows/utils/flowHelpers');
+                    _setStep(userState[targetChatId], 'waiting_data');
                     saveState();
                     const knowledge = sharedState.knowledge;
-                    await client.sendMessage(targetChatId, knowledge.flow.data_request.response);
-                    await client.sendMessage(msg.from, `✅ Usuario ${targetNumber} forzado.`);
+                    const dataMsg = knowledge?.flow?.closing?.response
+                        || knowledge?.flow?.data_request?.response
+                        || '¡Dale! Pasame los datos para la etiqueta:\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:';
+                    await client.sendMessage(targetChatId, dataMsg);
+                    await client.sendMessage(msg.from, `✅ Usuario ${targetNumber} forzado a waiting_data.`);
                     return;
                 }
 
