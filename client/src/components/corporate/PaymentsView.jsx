@@ -1,25 +1,37 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { CreditCard, RefreshCw, Copy, Check, ExternalLink, MessageCircle, AlertCircle, User } from 'lucide-react';
+import {
+    CreditCard, RefreshCw, Copy, Check, ExternalLink, MessageCircle, AlertCircle, User, Smartphone
+} from 'lucide-react';
 import api from '../../config/axios';
 import { useSocket } from '../../context/SocketContext';
-import { useToast } from '../ui/Toast';
 import { useAuth } from '../../context/AuthContext';
 import { useSeller } from '../../context/SellerContext';
 import { capitalize } from '../../utils/format';
+import {
+    Card, Button, IconButton, Badge, Input, EmptyState, useToast, cn
+} from '../ui';
 
-const STATUS_CONFIG = {
-    pending:  { label: 'Pendiente',  bg: 'bg-amber-100 dark:bg-amber-900/30',  text: 'text-amber-700 dark:text-amber-400',  dot: 'bg-amber-500' },
-    approved: { label: 'Aprobado',   bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-700 dark:text-emerald-400', dot: 'bg-emerald-500' },
-    rejected: { label: 'Rechazado',  bg: 'bg-rose-100 dark:bg-rose-900/30',    text: 'text-rose-700 dark:text-rose-400',    dot: 'bg-rose-500' },
-    expired:  { label: 'Expirado',   bg: 'bg-slate-100 dark:bg-slate-700/50',  text: 'text-slate-500 dark:text-slate-400',  dot: 'bg-slate-400' },
+const STATUS_TONE = {
+    pending:  { tone: 'warning', label: 'Pendiente' },
+    approved: { tone: 'success', label: 'Aprobado' },
+    rejected: { tone: 'danger',  label: 'Rechazado' },
+    expired:  { tone: 'neutral', label: 'Expirado' },
 };
 
-const SOURCE_CONFIG = {
-    dashboard: { label: 'Dashboard', bg: 'bg-indigo-100 dark:bg-indigo-900/30', text: 'text-indigo-700 dark:text-indigo-400' },
-    whatsapp:  { label: 'WhatsApp',  bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-700 dark:text-emerald-400' },
+const SOURCE_TONE = {
+    dashboard: { tone: 'accent',  label: 'Dashboard' },
+    whatsapp:  { tone: 'success', label: 'WhatsApp' },
 };
 
-function timeAgo(dateStr) {
+const FILTERS = [
+    { key: 'all',      label: 'Todos' },
+    { key: 'pending',  label: 'Pendientes' },
+    { key: 'approved', label: 'Aprobados' },
+    { key: 'rejected', label: 'Rechazados' },
+    { key: 'expired',  label: 'Expirados' },
+];
+
+const timeAgo = (dateStr) => {
     const diff = Date.now() - new Date(dateStr).getTime();
     const m = Math.floor(diff / 60000);
     if (m < 1) return 'ahora';
@@ -27,21 +39,18 @@ function timeAgo(dateStr) {
     const h = Math.floor(m / 60);
     if (h < 24) return `hace ${h}h`;
     return `hace ${Math.floor(h / 24)}d`;
-}
+};
 
-function formatArs(amount) {
-    return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(amount);
-}
+const formatArs = (amount) =>
+    new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(amount);
 
-function formatPhone(phone) {
-    if (!phone) return null;
-    return phone.replace('@c.us', '').replace('@s.whatsapp.net', '');
-}
+const formatPhone = (phone) =>
+    phone ? phone.replace('@c.us', '').replace('@s.whatsapp.net', '') : null;
 
-const PaymentRow = ({ payment, onRefresh, onGoToChat, refreshing, sellerName }) => {
+function PaymentRow({ payment, onRefresh, onGoToChat, refreshing, sellerName }) {
     const [copied, setCopied] = useState(false);
-    const st = STATUS_CONFIG[payment.status] || STATUS_CONFIG.pending;
-    const src = SOURCE_CONFIG[payment.source] || SOURCE_CONFIG.dashboard;
+    const st = STATUS_TONE[payment.status] || STATUS_TONE.pending;
+    const src = SOURCE_TONE[payment.source] || SOURCE_TONE.dashboard;
     const clientPhone = formatPhone(payment.userPhone);
     const sellerPhone = formatPhone(payment.sellerPhone);
 
@@ -52,112 +61,96 @@ const PaymentRow = ({ payment, onRefresh, onGoToChat, refreshing, sellerName }) 
     };
 
     return (
-        <div className="bg-white dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700/80 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-3 hover:shadow-md transition-all">
-            {/* Amount + status */}
+        <Card padding="md" interactive className="flex flex-col sm:flex-row sm:items-center gap-3">
+            {/* Amount + tiempo */}
             <div className="flex items-center gap-3 min-w-[140px]">
-                <div className="w-10 h-10 rounded-xl bg-sky-50 dark:bg-sky-900/30 text-sky-500 flex items-center justify-center flex-shrink-0">
-                    <CreditCard className="w-5 h-5" />
+                <div className="w-10 h-10 rounded-control bg-info-50 dark:bg-info-900/30 text-info-600 dark:text-info-500 flex items-center justify-center flex-shrink-0">
+                    <CreditCard className="w-5 h-5" aria-hidden="true" />
                 </div>
                 <div>
-                    <p className="font-extrabold text-slate-800 dark:text-slate-100 text-sm leading-none">{formatArs(payment.amount)}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">{timeAgo(payment.createdAt)}</p>
+                    <p className="font-semibold text-slate-900 dark:text-slate-100 text-sm leading-none tabular-nums">
+                        {formatArs(payment.amount)}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{timeAgo(payment.createdAt)}</p>
                 </div>
             </div>
 
-            {/* Badges */}
+            {/* Badges informativos */}
             <div className="flex flex-wrap gap-1.5 flex-1">
-                {/* Status */}
-                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ${st.bg} ${st.text}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`}></span>
-                    {st.label}
-                </span>
-                {/* Source */}
-                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${src.bg} ${src.text}`}>{src.label}</span>
-                {/* Seller name (admin only) */}
+                <Badge tone={st.tone} dot size="md">{st.label}</Badge>
+                <Badge tone={src.tone} size="md">{src.label}</Badge>
                 {sellerName && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
-                        <User className="w-3 h-3" /> {sellerName}
-                    </span>
+                    <Badge tone="info" size="md">
+                        <User className="w-3 h-3" />
+                        {sellerName}
+                    </Badge>
                 )}
-                {/* Seller phone */}
                 {sellerPhone && (
-                    <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300">
-                        📱 {sellerPhone}
-                    </span>
+                    <Badge tone="neutral" size="md">
+                        <Smartphone className="w-3 h-3" />
+                        {sellerPhone}
+                    </Badge>
                 )}
-                {/* Client */}
                 {clientPhone && (
-                    <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400">
-                        👤 {clientPhone}
-                    </span>
+                    <Badge tone="purple" size="md">
+                        <User className="w-3 h-3" />
+                        {clientPhone}
+                    </Badge>
                 )}
-                {/* Paid at */}
                 {payment.paidAt && (
-                    <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400">
-                        ✓ {new Date(payment.paidAt).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                    </span>
+                    <Badge tone="success" size="md">
+                        <Check className="w-3 h-3" />
+                        {new Date(payment.paidAt).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                    </Badge>
                 )}
             </div>
 
-            {/* Actions */}
-            <div className="flex items-center gap-2 flex-shrink-0">
-                {/* Copy link */}
-                <button
+            {/* Acciones */}
+            <div className="flex items-center gap-1 flex-shrink-0">
+                <IconButton
+                    label="Copiar enlace"
+                    icon={copied ? Check : Copy}
+                    variant="ghost"
+                    size="sm"
                     onClick={handleCopy}
-                    title="Copiar enlace"
-                    className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all text-xs font-bold ${copied ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 hover:bg-sky-100 dark:hover:bg-sky-900/30 hover:text-sky-600'}`}
-                >
-                    {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                </button>
-
-                {/* Open link */}
+                    className={copied ? '!bg-success-50 dark:!bg-success-900/30 !text-success-600 dark:!text-success-500' : ''}
+                />
                 <a
                     href={payment.link}
                     target="_blank"
                     rel="noopener noreferrer"
+                    aria-label="Abrir en MercadoPago"
                     title="Abrir en MercadoPago"
-                    className="w-8 h-8 rounded-lg flex items-center justify-center bg-slate-100 dark:bg-slate-700 text-slate-500 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 hover:text-indigo-600 transition-all"
+                    className="inline-flex items-center justify-center w-8 h-8 rounded-control text-slate-500 dark:text-slate-400 hover:bg-accent-50 dark:hover:bg-accent-900/30 hover:text-accent-600 dark:hover:text-accent-400 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500"
                 >
                     <ExternalLink className="w-4 h-4" />
                 </a>
-
-                {/* Go to chat */}
                 {clientPhone && (
-                    <button
+                    <IconButton
+                        label="Ir al chat del cliente"
+                        icon={MessageCircle}
+                        variant="ghost"
+                        size="sm"
                         onClick={() => onGoToChat(payment.userPhone)}
-                        title="Ir al chat del cliente"
-                        className="w-8 h-8 rounded-lg flex items-center justify-center bg-slate-100 dark:bg-slate-700 text-slate-500 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-600 transition-all"
-                    >
-                        <MessageCircle className="w-4 h-4" />
-                    </button>
+                    />
                 )}
-
-                {/* Refresh status */}
-                <button
+                <IconButton
+                    label="Actualizar estado desde MercadoPago"
+                    icon={RefreshCw}
+                    variant="ghost"
+                    size="sm"
                     onClick={() => onRefresh(payment.id)}
                     disabled={refreshing === payment.id}
-                    title="Actualizar estado desde MercadoPago"
-                    className="w-8 h-8 rounded-lg flex items-center justify-center bg-slate-100 dark:bg-slate-700 text-slate-500 hover:bg-amber-100 dark:hover:bg-amber-900/30 hover:text-amber-600 disabled:opacity-50 transition-all"
-                >
-                    <RefreshCw className={`w-4 h-4 ${refreshing === payment.id ? 'animate-spin' : ''}`} />
-                </button>
+                    className={refreshing === payment.id ? '[&_svg]:animate-spin' : ''}
+                />
             </div>
-        </div>
+        </Card>
     );
-};
-
-const FILTERS = [
-    { key: 'all', label: 'Todos' },
-    { key: 'pending', label: 'Pendientes' },
-    { key: 'approved', label: 'Aprobados' },
-    { key: 'rejected', label: 'Rechazados' },
-    { key: 'expired', label: 'Expirados' },
-];
+}
 
 const PaymentsView = ({ onGoToChat }) => {
     const { toast } = useToast();
     const { socket } = useSocket();
-    // Any admin (with or without home sellerId) sees cross-seller payments.
     const { isAdmin } = useAuth();
     const { sellers } = useSeller();
     const [payments, setPayments] = useState([]);
@@ -165,10 +158,9 @@ const PaymentsView = ({ onGoToChat }) => {
     const [refreshing, setRefreshing] = useState(null);
     const [filter, setFilter] = useState('all');
 
-    // Map instanceId → seller account name (for admin badge)
+    // Map instanceId → seller name (admin badge)
     const sellerIdToName = Object.fromEntries((sellers || []).map(s => [s.sellerId, capitalize(s.name)]));
 
-    // Generate link state
     const [mpAmount, setMpAmount] = useState('');
     const [mpUserPhone, setMpUserPhone] = useState('');
     const [mpLoading, setMpLoading] = useState(false);
@@ -176,11 +168,10 @@ const PaymentsView = ({ onGoToChat }) => {
     const fetchPayments = useCallback(async (f = filter) => {
         try {
             const params = f !== 'all' ? `?status=${f}` : '';
-            // Admin sees ALL payments regardless of selected seller
             const headers = isAdmin ? { 'x-seller-id': '' } : {};
             const res = await api.get(`/api/payments${params}`, { headers });
             setPayments(res.data.payments || []);
-        } catch (e) {
+        } catch {
             toast.error('Error cargando pagos');
         } finally {
             setLoading(false);
@@ -189,7 +180,7 @@ const PaymentsView = ({ onGoToChat }) => {
 
     useEffect(() => { fetchPayments(); }, []);
 
-    // Real-time updates via Socket.IO
+    // Real-time updates
     useEffect(() => {
         if (!socket) return;
         const onCreated = (p) => setPayments(prev => [p, ...prev]);
@@ -212,20 +203,17 @@ const PaymentsView = ({ onGoToChat }) => {
             setPayments(prev => prev.map(x => x.id === id ? res.data.payment : x));
             if (res.data.changed) toast.success('Estado actualizado');
             else toast.info(res.data.message || 'Sin cambios');
-        } catch (e) {
-            toast.error('Error consultando estado en MP');
-        } finally {
-            setRefreshing(null);
-        }
+        } catch { toast.error('Error consultando estado en MP'); }
+        finally { setRefreshing(null); }
     };
 
+    // Refresca todos los pendientes en paralelo y muestra UN solo toast resumen.
+    // Antes llamaba a handleRefresh por cada uno y el toast de error individual
+    // se acumulaba (11 errores = 11 toasts).
     const handleRefreshAll = async () => {
         const pending = payments.filter(p => p.status === 'pending');
         if (pending.length === 0) { toast.info('No hay pagos pendientes'); return; }
 
-        // Refresca todos los pendientes en paralelo y muestra UN solo toast
-        // resumen al final. Antes llamaba a handleRefresh por cada uno y el
-        // toast de error individual se acumulaba (11 errores = 11 toasts).
         let updated = 0, unchanged = 0, errors = 0;
         const results = await Promise.allSettled(
             pending.map(p => api.post(`/api/payments/${p.id}/refresh`).then(res => ({ id: p.id, ...res.data })))
@@ -281,106 +269,123 @@ const PaymentsView = ({ onGoToChat }) => {
     const totalApproved = payments.filter(p => p.status === 'approved').reduce((s, p) => s + p.amount, 0);
 
     return (
-        <div className="space-y-6 animate-fade-in">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="space-y-4 animate-fade-in">
+            <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                    <h1 className="text-2xl sm:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-700 to-purple-600 dark:from-indigo-400 dark:to-purple-400 leading-none mb-1">
-                        Administrador de Pagos
-                    </h1>
-                    <p className="text-slate-500 dark:text-slate-400 text-sm">MercadoPago · Enlace de pago con estado en tiempo real</p>
+                    <h1 className="text-display text-slate-900 dark:text-slate-100">Administrador de pagos</h1>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                        MercadoPago · enlaces de pago con estado en tiempo real.
+                    </p>
                 </div>
-                <button
-                    onClick={handleRefreshAll}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-indigo-300 hover:text-indigo-600 dark:hover:text-indigo-400 text-sm font-bold transition-all shadow-sm"
-                >
-                    <RefreshCw className="w-4 h-4" />
+                <Button variant="secondary" leftIcon={RefreshCw} onClick={handleRefreshAll}>
                     Refrescar pendientes
-                </button>
-            </div>
+                </Button>
+            </header>
 
             {/* Stats row */}
             <div className="grid grid-cols-3 gap-3">
-                {[
-                    { label: 'Pendientes', value: pendingCount, color: 'text-amber-600 dark:text-amber-400' },
-                    { label: 'Aprobados', value: approvedCount, color: 'text-emerald-600 dark:text-emerald-400' },
-                    { label: 'Cobrado', value: formatArs(totalApproved), color: 'text-sky-600 dark:text-sky-400' },
-                ].map(s => (
-                    <div key={s.label} className="bg-white dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700/80 rounded-2xl p-4 text-center shadow-sm">
-                        <p className={`text-xl font-extrabold ${s.color}`}>{s.value}</p>
-                        <p className="text-xs text-slate-400 mt-0.5 font-medium">{s.label}</p>
-                    </div>
-                ))}
+                <Card padding="md" className="text-center">
+                    <p className="text-xl font-semibold tabular-nums text-warning-600 dark:text-warning-500">{pendingCount}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Pendientes</p>
+                </Card>
+                <Card padding="md" className="text-center">
+                    <p className="text-xl font-semibold tabular-nums text-success-600 dark:text-success-500">{approvedCount}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Aprobados</p>
+                </Card>
+                <Card padding="md" className="text-center">
+                    <p className="text-xl font-semibold tabular-nums text-info-600 dark:text-info-500">{formatArs(totalApproved)}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Cobrado</p>
+                </Card>
             </div>
 
-            {/* Generate link panel */}
-            <div className="bg-white dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700/80 rounded-2xl p-5 shadow-sm">
-                <div className="flex items-center gap-2 mb-4">
-                    <div className="w-8 h-8 rounded-xl bg-sky-50 dark:bg-sky-900/30 text-sky-500 flex items-center justify-center border border-sky-100 dark:border-sky-800/50">
-                        <CreditCard className="w-4 h-4" />
+            {/* Generate link */}
+            <Card padding="md">
+                <div className="flex items-center gap-2 mb-3">
+                    <div className="w-8 h-8 rounded-control bg-info-50 dark:bg-info-900/30 text-info-600 dark:text-info-500 flex items-center justify-center flex-shrink-0">
+                        <CreditCard className="w-4 h-4" aria-hidden="true" />
                     </div>
-                    <span className="font-bold text-slate-700 dark:text-slate-200 text-sm">Generar nuevo enlace de pago</span>
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        Generar nuevo enlace de pago
+                    </h3>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2">
-                    <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-semibold text-sm">$</span>
-                        <input
-                            type="number" min="1" placeholder="Monto"
+                    <div className="sm:w-40">
+                        <Input
+                            type="number"
+                            min="1"
+                            placeholder="Monto"
                             value={mpAmount}
                             onChange={e => setMpAmount(e.target.value)}
                             onKeyDown={e => e.key === 'Enter' && handleGenerateLink()}
-                            className="pl-7 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all text-sm w-full sm:w-36"
+                            aria-label="Monto en pesos"
+                            leftIcon={() => <span className="text-slate-400 font-medium">$</span>}
                         />
                     </div>
-                    <input
-                        type="text" placeholder="Teléfono cliente (opcional)"
-                        value={mpUserPhone}
-                        onChange={e => setMpUserPhone(e.target.value)}
-                        className="flex-1 px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all text-sm"
-                    />
-                    <button
+                    <div className="flex-1">
+                        <Input
+                            type="text"
+                            placeholder="Teléfono cliente (opcional)"
+                            value={mpUserPhone}
+                            onChange={e => setMpUserPhone(e.target.value)}
+                            aria-label="Teléfono del cliente"
+                        />
+                    </div>
+                    <Button
                         onClick={handleGenerateLink}
-                        disabled={mpLoading || !mpAmount}
-                        className="px-5 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white font-bold text-sm transition-all shadow-sm shadow-sky-500/30 flex-shrink-0 flex items-center gap-2"
+                        loading={mpLoading}
+                        disabled={!mpAmount}
+                        leftIcon={CreditCard}
+                        className="flex-shrink-0"
                     >
-                        {mpLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
                         Generar y copiar
-                    </button>
+                    </Button>
                 </div>
-            </div>
+            </Card>
 
             {/* Filter tabs */}
             <div className="flex gap-1.5 flex-wrap">
                 {FILTERS.map(f => (
                     <button
                         key={f.key}
+                        type="button"
                         onClick={() => handleFilter(f.key)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${filter === f.key
-                            ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/30'
-                            : 'bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-indigo-300 hover:text-indigo-600'}`}
+                        className={cn(
+                            'inline-flex items-center gap-1.5 px-3 h-8 rounded-control text-xs font-semibold transition-colors',
+                            'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500',
+                            filter === f.key
+                                ? 'bg-accent-600 text-white'
+                                : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50'
+                        )}
                     >
                         {f.label}
                         {f.key === 'pending' && pendingCount > 0 && (
-                            <span className="ml-1.5 bg-amber-500 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full">{pendingCount}</span>
+                            <span className={cn(
+                                'inline-flex items-center justify-center rounded-full text-[10px] font-semibold tabular-nums px-1.5 min-w-[1.25rem] h-4',
+                                filter === f.key ? 'bg-white/25 text-white' : 'bg-warning-500 text-white'
+                            )}>
+                                {pendingCount}
+                            </span>
                         )}
                     </button>
                 ))}
             </div>
 
-            {/* List */}
+            {/* Lista */}
             {loading ? (
-                <div className="flex items-center justify-center py-16 gap-3">
-                    <RefreshCw className="w-5 h-5 animate-spin text-indigo-500" />
-                    <span className="text-slate-500 font-medium">Cargando pagos...</span>
-                </div>
+                <Card padding="lg" className="flex items-center justify-center gap-3">
+                    <RefreshCw className="w-5 h-5 animate-spin text-accent-600 dark:text-accent-400" aria-hidden="true" />
+                    <span className="text-sm text-slate-500 dark:text-slate-400">Cargando pagos…</span>
+                </Card>
             ) : payments.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
-                    <AlertCircle className="w-10 h-10 text-slate-300 dark:text-slate-600" />
-                    <p className="text-slate-500 dark:text-slate-400 font-medium">No hay pagos{filter !== 'all' ? ` con estado "${FILTERS.find(f=>f.key===filter)?.label}"` : ''}</p>
-                    <p className="text-slate-400 dark:text-slate-500 text-sm">Los enlaces generados aparecerán acá automáticamente</p>
-                </div>
+                <Card padding="lg">
+                    <EmptyState
+                        icon={AlertCircle}
+                        title={`No hay pagos${filter !== 'all' ? ` "${FILTERS.find(f => f.key === filter)?.label}"` : ''}`}
+                        description="Los enlaces generados aparecerán acá automáticamente."
+                    />
+                </Card>
             ) : (
-                <div className="space-y-3">
+                <div className="space-y-2">
                     {payments.map(p => (
                         <PaymentRow
                             key={p.id}
