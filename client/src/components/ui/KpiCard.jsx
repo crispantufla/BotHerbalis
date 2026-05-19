@@ -11,6 +11,7 @@ const TONES = {
     warning: { bg: 'bg-warning-50 dark:bg-warning-900/30', fg: 'text-warning-600 dark:text-warning-500' },
     danger:  { bg: 'bg-danger-50 dark:bg-danger-900/30',   fg: 'text-danger-600 dark:text-danger-500' },
     info:    { bg: 'bg-info-50 dark:bg-info-900/30',       fg: 'text-info-600 dark:text-info-500' },
+    purple:  { bg: 'bg-purple-50 dark:bg-purple-900/30',   fg: 'text-purple-600 dark:text-purple-400' },
     neutral: { bg: 'bg-slate-100 dark:bg-slate-800',       fg: 'text-slate-600 dark:text-slate-300' },
 };
 
@@ -28,7 +29,11 @@ export default function KpiCard({ label, value, subtext, icon: Icon, tone = 'acc
         );
     }
 
-    const t = TONES[tone];
+    // Fallback a `neutral` si llega un tono no definido — antes esto crasheaba
+    // toda la vista con "Cannot read properties of undefined (reading 'bg')"
+    // si alguien pasaba un tono no soportado (ej: tone="purple" cuando aún no
+    // estaba en TONES).
+    const t = TONES[tone] || TONES.neutral;
 
     return (
         <div className={cn('rounded-card bg-white dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/70 shadow-card p-4 sm:p-5 transition-shadow hover:shadow-card-hover', className)}>
