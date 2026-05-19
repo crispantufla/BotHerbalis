@@ -1,39 +1,48 @@
 import React, { useState, useEffect } from 'react';
+import { jsPDF } from 'jspdf';
+import {
+    Download, FileText, Power, Trash2, HardDrive, RefreshCw, KeyRound, RotateCcw,
+    Wrench, Lock
+} from 'lucide-react';
 import api from '../../config/axios';
-import { jsPDF } from "jspdf";
 import { useSocket } from '../../context/SocketContext';
 import PriceEditor from '../PriceEditor';
-import { useToast } from '../ui/Toast';
+import {
+    Button, IconButton, Card, Badge, Input, useToast, cn
+} from '../ui';
 
-import { Settings, Download, FileText, Power, Trash2, HardDrive, RefreshCw, KeyRound, RotateCcw } from 'lucide-react';
+// 3 modelos posibles. `rotacion` no tiene stats individuales — distribuye
+// 50/50 entre v5 y v6.
+const SCRIPTS = [
+    { id: 'v5',       name: 'V5 · Asesor consultivo',  desc: 'Pregunta kilos, recomienda según objetivo.',  tone: 'info'    },
+    { id: 'v6',       name: 'V6 · Elena charla',        desc: 'Tono cálido, conversacional, argentino.',     tone: 'purple'  },
+    { id: 'rotacion', name: 'A/B testing V5 vs V6',     desc: 'Distribuye 50/50 entre V5 y V6.',             tone: 'warning' },
+];
 
 const SettingsView = ({ status }) => {
     const { socket } = useSocket();
     const { toast, confirm } = useToast();
-    const [config, setConfig] = useState({ alertNumber: '' });
+
     const [activeScript, setActiveScript] = useState('v5');
     const [scriptStats, setScriptStats] = useState({});
     const [switchingScript, setSwitchingScript] = useState(false);
     const [resettingStats, setResettingStats] = useState(false);
 
-    // Memory stats
     const [memStats, setMemStats] = useState(null);
     const [loadingMem, setLoadingMem] = useState(false);
     const [resetting, setResetting] = useState(false);
 
+    const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
+    const [pwSaving, setPwSaving] = useState(false);
+
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const confRes = await api.get('/api/status');
-                if (confRes.data.config) setConfig(confRes.data.config);
-            } catch (e) { console.error("Error loading settings:", e); }
+        (async () => {
             try {
                 const scriptRes = await api.get('/api/script/active');
                 if (scriptRes.data.active) setActiveScript(scriptRes.data.active);
                 if (scriptRes.data.stats) setScriptStats(scriptRes.data.stats);
-            } catch (e) { console.error("Error loading script info:", e); }
-        };
-        fetchData();
+            } catch (e) { console.error('Error loading script info:', e); }
+        })();
         fetchMemoryStats();
     }, []);
 
@@ -42,36 +51,36 @@ const SettingsView = ({ status }) => {
         try {
             const res = await api.get('/api/memory-stats');
             setMemStats(res.data);
-        } catch (e) { console.error("Error loading memory stats:", e); }
+        } catch (e) { console.error('Error loading memory stats:', e); }
         setLoadingMem(false);
     };
 
     useEffect(() => {
         if (!socket) return;
-        const handler = (data) => { if (data.active) setActiveScript(data.active); };
-        socket.on('script_changed', handler);
-        const memHandler = () => fetchMemoryStats();
-        socket.on('memory_reset', memHandler);
-        const statsResetHandler = (data) => { if (data?.stats) setScriptStats(data.stats); };
-        socket.on('script_stats_reset', statsResetHandler);
+        const onScriptChanged = (data) => { if (data.active) setActiveScript(data.active); };
+        const onMemoryReset = () => fetchMemoryStats();
+        const onStatsReset = (data) => { if (data?.stats) setScriptStats(data.stats); };
+        socket.on('script_changed', onScriptChanged);
+        socket.on('memory_reset', onMemoryReset);
+        socket.on('script_stats_reset', onStatsReset);
         return () => {
-            socket.off('script_changed', handler);
-            socket.off('memory_reset', memHandler);
-            socket.off('script_stats_reset', statsResetHandler);
+            socket.off('script_changed', onScriptChanged);
+            socket.off('memory_reset', onMemoryReset);
+            socket.off('script_stats_reset', onStatsReset);
         };
     }, [socket]);
 
     const handleLogout = async () => {
-        const ok = await confirm("ATENCIÓN: Esto desconectará el bot de WhatsApp.\n\nEl sistema dejará de responder mensajes automáticamente y deberás escanear el QR nuevamente desde la vista de Dashboard para reconectar.\n\n¿Estás seguro?");
+        const ok = await confirm('ATENCIÓN: Esto desconectará el bot de WhatsApp.\n\nEl sistema dejará de responder mensajes automáticamente y deberás escanear el QR nuevamente.\n\n¿Estás seguro?');
         if (!ok) return;
         try {
             await api.post('/api/whatsapp-logout');
-            toast.success('Sesión cerrada. Debes escanear el QR para reconectar.');
-        } catch (e) { toast.error('Error al intentar cerrar sesión'); }
+            toast.success('Sesión cerrada. Escaneá el QR para reconectar.');
+        } catch { toast.error('Error al cerrar sesión'); }
     };
 
     const handleResetMemory = async () => {
-        const ok = await confirm("¿Limpiar historial de usuarios inactivos?\n\nBorra mensajes y datos extraídos por IA de quienes:\n• No compraron\n• No interactuaron en las últimas 48h\n\nLos usuarios siguen en la base, las ventas no se tocan, y los activos quedan intactos.");
+        const ok = await confirm('¿Limpiar historial de usuarios inactivos?\n\nBorra mensajes y datos extraídos por IA de quienes no compraron y no interactuaron en las últimas 48h. Los usuarios siguen en la base, las ventas no se tocan.');
         if (!ok) return;
         setResetting(true);
         try {
@@ -81,45 +90,40 @@ const SettingsView = ({ status }) => {
                 : `Sin nada para limpiar · ${res.data.protected48h} usuarios activos`;
             toast.success(msg);
             fetchMemoryStats();
-        } catch (e) { toast.error('Error al limpiar el historial'); }
+        } catch { toast.error('Error al limpiar el historial'); }
         setResetting(false);
     };
 
     const handleTestReport = async () => {
         try {
-            toast.info('Generando informe con IA...');
-            const response = await api.post('/api/admin-command', { chatId: "API_TEST", command: '!resumen' });
+            toast.info('Generando informe con IA…');
+            const response = await api.post('/api/admin-command', { chatId: 'API_TEST', command: '!resumen' });
             const reportText = response.data.message;
-
-            if (!reportText || reportText.includes("No hay logs")) {
+            if (!reportText || reportText.includes('No hay logs')) {
                 toast.warning('Datos insuficientes para generar el reporte de hoy.');
                 return;
             }
-
             const doc = new jsPDF();
             doc.setFontSize(22);
-            doc.text("Reporte Diario V2", 20, 20);
+            doc.text('Reporte diario', 20, 20);
             doc.setFontSize(10);
             doc.text(`Generado: ${new Date().toLocaleString()}`, 20, 28);
             doc.line(20, 32, 190, 32);
-
             doc.setFontSize(11);
-            const splitText = doc.splitTextToSize(reportText, 170);
-            doc.text(splitText, 20, 45);
-            doc.save(`reporte_v2_${new Date().toISOString().split('T')[0]}.pdf`);
-
+            doc.text(doc.splitTextToSize(reportText, 170), 20, 45);
+            doc.save(`reporte_${new Date().toISOString().split('T')[0]}.pdf`);
             toast.success('Reporte PDF descargado');
-        } catch (e) { toast.error('Error generando el reporte PDF'); }
+        } catch { toast.error('Error generando el reporte PDF'); }
     };
 
     const handleResetScriptStats = async () => {
-        const ok = await confirm("¿Reiniciar los contadores de conversión de V5 y V6?\n\nVas a empezar de cero. Útil cuando cambiaste los guiones y los números viejos ya no son comparables.\n\nNo afecta las ventas ni los pedidos — solo el conteo started/completed de cada modelo.");
+        const ok = await confirm('¿Reiniciar contadores de conversión de V5 y V6?\n\nEmpiezan de cero. Útil cuando los guiones cambiaron y los números viejos ya no son comparables. No afecta ventas ni pedidos.');
         if (!ok) return;
         setResettingStats(true);
         try {
             const res = await api.post('/api/script/stats/reset');
             setScriptStats(res.data.stats || {});
-            toast.success('Contadores reiniciados — empezamos a medir de cero.');
+            toast.success('Contadores reiniciados.');
         } catch (e) {
             toast.error(e.response?.data?.error || 'Error al reiniciar contadores');
         }
@@ -132,25 +136,19 @@ const SettingsView = ({ status }) => {
         try {
             await api.post('/api/script/switch', { script: scriptKey });
             setActiveScript(scriptKey);
-            toast.success(`Modelo de IA cambiado exitosamente.`);
-        } catch (e) { toast.error('Error al cambiar el guión'); }
+            toast.success('Modelo cambiado correctamente.');
+        } catch { toast.error('Error al cambiar el guión'); }
         setSwitchingScript(false);
     };
 
-    // Change password state
-    const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
-    const [pwSaving, setPwSaving] = useState(false);
-
     const handleChangePassword = async (e) => {
         e.preventDefault();
-        if (pwForm.next !== pwForm.confirm)
-            return toast.error('Las contraseñas nuevas no coinciden');
-        if (pwForm.next.length < 8)
-            return toast.error('La nueva contraseña debe tener al menos 8 caracteres');
+        if (pwForm.next !== pwForm.confirm) return toast.error('Las contraseñas nuevas no coinciden');
+        if (pwForm.next.length < 8)         return toast.error('La nueva contraseña debe tener al menos 8 caracteres');
         setPwSaving(true);
         try {
             await api.post('/api/change-password', { currentPassword: pwForm.current, newPassword: pwForm.next });
-            toast.success('Contraseña cambiada exitosamente');
+            toast.success('Contraseña cambiada correctamente');
             setPwForm({ current: '', next: '', confirm: '' });
         } catch (e) {
             toast.error(e.response?.data?.error || 'Error al cambiar contraseña');
@@ -159,396 +157,346 @@ const SettingsView = ({ status }) => {
         }
     };
 
-    // Memory gauge helpers
-    //
-    // El backend devuelve dos métricas independientes: RSS del proceso y
-    // total de filas en User. Mostramos las dos como barras separadas para
-    // que el operador vea cuál de las dos disparó el alerta — antes era
-    // una sola barra basada solo en users que quedaba en rojo después de
-    // limpiar (el botón limpia ChatLogs, no users).
-    const getRssPercent = () => {
-        if (!memStats?.thresholds?.rssCritMB) return 0;
-        return Math.min(100, Math.round((memStats.rssMB / memStats.thresholds.rssCritMB) * 100));
-    };
-    const getUsersPercent = () => {
-        if (!memStats) return 0;
-        return Math.min(100, Math.round((memStats.totalUsersDB / memStats.thresholds.danger) * 100));
-    };
+    // El backend devuelve dos métricas independientes: RSS del proceso y total
+    // de filas en User. Mostramos las dos como barras separadas para que el
+    // operador vea cuál de las dos disparó el alerta — antes una sola barra
+    // basada en users quedaba en rojo después de limpiar (el botón limpia
+    // ChatLogs, no users).
+    const rssLevel = !memStats ? 'unknown'
+        : memStats.rssMB >= memStats.thresholds.rssCritMB ? 'critical'
+        : memStats.rssMB >= memStats.thresholds.rssWarnMB ? 'warning'
+        : 'healthy';
+    const usersLevel = !memStats ? 'unknown'
+        : memStats.totalUsersDB >= memStats.thresholds.danger ? 'critical'
+        : memStats.totalUsersDB >= memStats.thresholds.warn ? 'warning'
+        : 'healthy';
 
-    const getGradient = (level) => {
-        if (level === 'critical') return 'from-rose-500 to-red-600';
-        if (level === 'warning') return 'from-amber-400 to-orange-500';
-        return 'from-emerald-400 to-teal-500';
-    };
+    const levelColor = (lvl) => ({
+        critical: 'bg-danger-500',
+        warning:  'bg-warning-500',
+        healthy:  'bg-success-500',
+        unknown:  'bg-slate-400',
+    }[lvl]);
 
-    const getRssLevel = () => {
-        if (!memStats) return 'unknown';
-        if (memStats.rssMB >= memStats.thresholds.rssCritMB) return 'critical';
-        if (memStats.rssMB >= memStats.thresholds.rssWarnMB) return 'warning';
-        return 'healthy';
-    };
-    const getUsersLevel = () => {
-        if (!memStats) return 'unknown';
-        if (memStats.totalUsersDB >= memStats.thresholds.danger) return 'critical';
-        if (memStats.totalUsersDB >= memStats.thresholds.warn) return 'warning';
-        return 'healthy';
-    };
+    const rssPercent = !memStats?.thresholds?.rssCritMB
+        ? 0 : Math.min(100, Math.round((memStats.rssMB / memStats.thresholds.rssCritMB) * 100));
+    const usersPercent = !memStats
+        ? 0 : Math.min(100, Math.round((memStats.totalUsersDB / memStats.thresholds.danger) * 100));
 
-    const getMemoryLabel = () => {
-        if (!memStats) return { text: 'Cargando...', color: 'text-slate-400 dark:text-slate-500', glow: '' };
+    const memoryStatus = (() => {
+        if (!memStats) return { tone: 'neutral', label: 'Cargando…' };
         const reasons = memStats.reasons || [];
         if (memStats.recommendation === 'critical') {
-            const why = reasons.includes('rss') ? 'RAM del proceso alta' : 'Base de datos llena';
-            return { text: `🔴 ${why}`, color: 'text-rose-600 dark:text-rose-400', glow: 'shadow-[0_0_20px_rgba(244,63,94,0.15)]' };
+            return {
+                tone: 'danger',
+                label: reasons.includes('rss') ? 'RAM del proceso alta' : 'Base de datos llena',
+            };
         }
         if (memStats.recommendation === 'warning') {
-            const why = reasons.includes('rss') ? 'RAM del proceso moderada' : 'Base de datos creciendo';
-            return { text: `🟡 ${why}`, color: 'text-amber-600 dark:text-amber-400', glow: 'shadow-[0_0_20px_rgba(245,158,11,0.15)]' };
+            return {
+                tone: 'warning',
+                label: reasons.includes('rss') ? 'RAM del proceso moderada' : 'Base de datos creciendo',
+            };
         }
-        return { text: '🟢 Sistema saludable', color: 'text-emerald-600 dark:text-emerald-400', glow: 'shadow-[0_0_20px_rgba(16,185,129,0.15)]' };
-    };
+        return { tone: 'success', label: 'Sistema saludable' };
+    })();
 
     return (
-        <div className="h-full flex flex-col animate-fade-in relative z-10 w-full overflow-hidden">
-
-            {/* Ambient Background — el gradiente claro solo en light mode; en
-                dark mode se ve como bandas brillantes bugueadas si no se apaga. */}
-            <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-indigo-50/50 via-transparent to-purple-50/50 dark:from-transparent dark:to-transparent pointer-events-none z-0"></div>
-
-            {/* Header V2 */}
-            <div className="bg-white dark:bg-slate-800/40 backdrop-blur-xl rounded-[1.25rem] sm:rounded-[2rem] border border-slate-200 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-4 sm:p-8 mb-4 sm:mb-8 relative z-10">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 sm:gap-6">
-                    <div>
-                        <h1 className="text-xl sm:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-700 to-purple-600 dark:from-indigo-400 dark:to-purple-400 tracking-tight">
-                            Configuración Base
-                        </h1>
-                        <p className="text-slate-500 dark:text-slate-400 mt-1 sm:mt-2 text-sm sm:text-base font-medium">Parámetros del sistema, precios y modelos AI operando.</p>
-                    </div>
-
-                    <div className={`px-5 py-2.5 rounded-xl border flex items-center gap-3 backdrop-blur-md shadow-sm ${status === 'ready' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-700' : 'bg-rose-500/10 border-rose-500/20 text-rose-700'}`}>
-                        <div className={`w-2.5 h-2.5 rounded-full ${status === 'ready' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] animate-pulse' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'}`}></div>
-                        <span className="font-extrabold text-xs tracking-widest uppercase">{status === 'ready' ? 'System Online' : 'System Offline / Error'}</span>
-                    </div>
+        <div className="space-y-4 sm:space-y-6 animate-fade-in pb-12">
+            {/* Header */}
+            <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                <div>
+                    <h1 className="text-display text-slate-900 dark:text-slate-100">Configuración base</h1>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                        Parámetros del sistema, precios y modelos de IA.
+                    </p>
                 </div>
-            </div>
+                <Badge tone={status === 'ready' ? 'success' : 'danger'} dot size="lg">
+                    {status === 'ready' ? 'Sistema online' : 'Sistema offline'}
+                </Badge>
+            </header>
 
-            {/* Content Display */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar pb-20 px-1 relative z-10">
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-8">
-                    {/* Left Column: Editor & Tools */}
-                    <div className="space-y-4 sm:space-y-8">
-                        {/* Wrapper for original PriceEditor to adapt it to Glassmorphism */}
-                        <div className="bg-white dark:bg-slate-800/40 backdrop-blur-xl p-4 sm:p-8 rounded-[1.25rem] sm:rounded-[2rem] border border-slate-200 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
-                            <div className="absolute -top-32 -left-32 w-64 h-64 bg-indigo-400/10 blur-[60px] rounded-full pointer-events-none"></div>
-                            <div className="relative z-10">
-                                <PriceEditor />
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
+                {/* Precios — PriceEditor preexistente, lo envolvemos en Card */}
+                <Card padding="md">
+                    <PriceEditor />
+                </Card>
+
+                {/* Modelos de venta */}
+                <Card padding="md">
+                    <div className="flex items-center justify-between gap-3 mb-4">
+                        <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-10 h-10 rounded-control bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center flex-shrink-0">
+                                <FileText className="w-5 h-5" aria-hidden="true" />
+                            </div>
+                            <div className="min-w-0">
+                                <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Modelos de venta (A/B)</h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">Rotación y asignación</p>
                             </div>
                         </div>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            leftIcon={resettingStats ? RefreshCw : RotateCcw}
+                            onClick={handleResetScriptStats}
+                            disabled={resettingStats}
+                            className={resettingStats ? '[&_svg]:animate-spin' : ''}
+                        >
+                            <span className="hidden sm:inline">Reiniciar conteo</span>
+                        </Button>
                     </div>
 
-                    {/* Right Column: Scripts & Danger */}
-                    <div className="space-y-4 sm:space-y-8">
-                        {/* Script Switcher V2 */}
-                        <div className="bg-white dark:bg-slate-800/40 backdrop-blur-xl p-4 sm:p-8 rounded-[1.25rem] sm:rounded-[2rem] border border-slate-200 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
-                            <div className="absolute -bottom-20 -right-20 w-80 h-80 bg-purple-400/10 blur-[80px] rounded-full pointer-events-none"></div>
-                            <div className="flex items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-8 relative z-10">
-                                <div className="flex items-center gap-3 sm:gap-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-fuchsia-600 text-white flex items-center justify-center shadow-lg shadow-purple-500/20">
-                                        <FileText className="w-6 h-6" />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-extrabold text-slate-800 dark:text-slate-100 text-lg">Modelos de Venta (A/B)</h3>
-                                        <p className="text-xs font-bold text-slate-500 dark:text-slate-300 uppercase tracking-widest">Rotación & Asignación</p>
-                                    </div>
-                                </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {SCRIPTS.map(script => {
+                            const stats = scriptStats[script.id];
+                            const isActive = activeScript === script.id;
+                            return (
                                 <button
-                                    onClick={handleResetScriptStats}
-                                    disabled={resettingStats}
-                                    title="Reiniciar contadores de conversión (V5 y V6)"
-                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-widest text-slate-500 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-300 border border-slate-200/70 dark:border-slate-700/60 hover:border-purple-300 hover:bg-purple-50/50 dark:hover:bg-purple-500/10 transition-all disabled:opacity-50"
+                                    key={script.id}
+                                    type="button"
+                                    onClick={() => handleSwitchScript(script.id)}
+                                    className={cn(
+                                        'p-3 rounded-control border text-left transition-all',
+                                        'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500',
+                                        isActive
+                                            ? 'border-accent-500 bg-accent-50/50 dark:bg-accent-900/15 shadow-card-hover'
+                                            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 hover:border-accent-300 dark:hover:border-accent-700',
+                                        script.id === 'rotacion' && 'sm:col-span-2'
+                                    )}
                                 >
-                                    {resettingStats
-                                        ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                                        : <RotateCcw className="w-3.5 h-3.5" />}
-                                    <span className="hidden sm:inline">Reiniciar conteo</span>
+                                    <div className="flex items-start gap-2 mb-2">
+                                        <span className={cn(
+                                            'w-2 h-2 rounded-full mt-1.5 flex-shrink-0',
+                                            isActive ? `${levelColor('healthy')} animate-pulse` : 'bg-slate-300 dark:bg-slate-600'
+                                        )} />
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-semibold text-sm text-slate-900 dark:text-slate-100">{script.name}</p>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">{script.desc}</p>
+                                        </div>
+                                        {isActive && <Badge tone="accent" size="sm">Activo</Badge>}
+                                    </div>
+                                    {stats && (
+                                        <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-700/60 rounded-control px-2 py-1.5 flex items-center justify-between">
+                                            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Conversión</span>
+                                            <span className={cn(
+                                                'text-xs font-mono font-semibold tabular-nums',
+                                                isActive ? 'text-accent-600 dark:text-accent-400' : 'text-slate-700 dark:text-slate-300'
+                                            )}>
+                                                {stats.started > 0 ? Math.round((stats.completed / stats.started) * 100) : 0}%
+                                                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-normal ml-1">
+                                                    ({stats.completed}/{stats.started})
+                                                </span>
+                                            </span>
+                                        </div>
+                                    )}
                                 </button>
+                            );
+                        })}
+                    </div>
+                </Card>
+
+                {/* Cambiar contraseña */}
+                <Card padding="md">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="w-10 h-10 rounded-control bg-accent-50 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400 flex items-center justify-center flex-shrink-0">
+                            <KeyRound className="w-5 h-5" aria-hidden="true" />
+                        </div>
+                        <div>
+                            <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Cambiar contraseña</h3>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">Tu cuenta</p>
+                        </div>
+                    </div>
+                    <form onSubmit={handleChangePassword} className="space-y-2.5">
+                        <Input
+                            type="password"
+                            placeholder="Contraseña actual"
+                            value={pwForm.current}
+                            onChange={e => setPwForm(f => ({ ...f, current: e.target.value }))}
+                            required
+                            leftIcon={Lock}
+                            aria-label="Contraseña actual"
+                        />
+                        <Input
+                            type="password"
+                            placeholder="Nueva contraseña (mín. 8 caracteres)"
+                            value={pwForm.next}
+                            onChange={e => setPwForm(f => ({ ...f, next: e.target.value }))}
+                            required
+                            minLength={8}
+                            leftIcon={KeyRound}
+                            aria-label="Nueva contraseña"
+                        />
+                        <Input
+                            type="password"
+                            placeholder="Repetir nueva contraseña"
+                            value={pwForm.confirm}
+                            onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))}
+                            required
+                            leftIcon={KeyRound}
+                            aria-label="Repetir nueva contraseña"
+                        />
+                        <Button type="submit" loading={pwSaving} leftIcon={KeyRound} fullWidth>
+                            Cambiar contraseña
+                        </Button>
+                    </form>
+                </Card>
+
+                {/* Herramientas */}
+                <Card padding="md">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="w-10 h-10 rounded-control bg-info-50 dark:bg-info-900/30 text-info-600 dark:text-info-500 flex items-center justify-center flex-shrink-0">
+                            <Wrench className="w-5 h-5" aria-hidden="true" />
+                        </div>
+                        <div>
+                            <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Herramientas</h3>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">Reportes IA</p>
+                        </div>
+                    </div>
+                    <Button variant="secondary" leftIcon={Download} onClick={handleTestReport} fullWidth>
+                        Generar y descargar reporte PDF
+                    </Button>
+                </Card>
+
+                {/* Danger zone */}
+                <Card padding="md" className="border-danger-200/70 dark:border-danger-900/40 xl:col-span-2">
+                    <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-control bg-danger-50 dark:bg-danger-900/30 text-danger-600 dark:text-danger-500 flex items-center justify-center flex-shrink-0">
+                            <Power className="w-5 h-5" aria-hidden="true" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-danger-700 dark:text-danger-500 text-sm mb-1">
+                                Interrupción fuerte
+                            </h3>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed mb-4 max-w-md">
+                                Cerrar la sesión desconecta inmediatamente el dispositivo vinculado de WhatsApp.
+                                Ningún mensaje será respondido luego de esta acción.
+                            </p>
+                            <Button variant="danger" leftIcon={Power} onClick={handleLogout}>
+                                Forzar desconexión
+                            </Button>
+                        </div>
+                    </div>
+                </Card>
+
+                {/* Memory panel (full width) */}
+                <Card padding="md" className="xl:col-span-2">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-control bg-accent-50 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400 flex items-center justify-center flex-shrink-0">
+                                <HardDrive className="w-5 h-5" aria-hidden="true" />
+                            </div>
+                            <div>
+                                <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Gestión de memoria</h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">Estados de conversación</p>
+                            </div>
+                        </div>
+                        <IconButton
+                            label="Actualizar estadísticas"
+                            icon={RefreshCw}
+                            variant="ghost"
+                            size="sm"
+                            onClick={fetchMemoryStats}
+                            className={loadingMem ? '[&_svg]:animate-spin' : ''}
+                        />
+                    </div>
+
+                    {memStats ? (
+                        <div className="space-y-4">
+                            <Badge tone={memoryStatus.tone} dot size="md">{memoryStatus.label}</Badge>
+
+                            {/* RSS bar */}
+                            <div>
+                                <div className="flex justify-between text-xs mb-2">
+                                    <span className="font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                                        RAM del proceso
+                                        <span className={cn('w-1.5 h-1.5 rounded-full', levelColor(rssLevel))} />
+                                    </span>
+                                    <span className="font-mono text-slate-600 dark:text-slate-400 tabular-nums">
+                                        {(memStats.rssMB / 1024).toFixed(1)} GB / 32 GB
+                                    </span>
+                                </div>
+                                <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden">
+                                    <div
+                                        className={cn('h-full rounded-full transition-all duration-700', levelColor(rssLevel))}
+                                        style={{ width: `${Math.max(3, rssPercent)}%` }}
+                                    />
+                                </div>
+                                <div className="flex justify-between text-[11px] text-slate-500 dark:text-slate-400 mt-1 tabular-nums">
+                                    <span>0</span>
+                                    <span className="text-warning-600 dark:text-warning-500">⚠ {(memStats.thresholds.rssWarnMB / 1024).toFixed(0)} GB</span>
+                                    <span className="text-danger-600 dark:text-danger-500">{(memStats.thresholds.rssCritMB / 1024).toFixed(0)} GB</span>
+                                </div>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 relative z-10">
-                                {[
-                                    { id: 'v5', name: 'Flujo V5 Asesor consultivo', desc: 'Pregunta kilos, recomienda según objetivo.', color: 'blue', stats: scriptStats.v5 },
-                                    { id: 'v6', name: 'Flujo V6 Elena charla', desc: 'Tono cálido, conversacional, argentino.', color: 'purple', stats: scriptStats.v6 },
-                                    { id: 'rotacion', name: 'A/B Testing V5 vs V6', desc: 'Distribuye 50/50 entre V5 y V6.', color: 'orange', stats: null }
-                                ].map((script) => (
+                            {/* Users bar */}
+                            <div>
+                                <div className="flex justify-between text-xs mb-2">
+                                    <span className="font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                                        Usuarios en base de datos
+                                        <span className={cn('w-1.5 h-1.5 rounded-full', levelColor(usersLevel))} />
+                                    </span>
+                                    <span className="font-mono text-slate-600 dark:text-slate-400 tabular-nums">
+                                        {memStats.totalUsersDB.toLocaleString()}
+                                    </span>
+                                </div>
+                                <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden">
                                     <div
-                                        key={script.id}
-                                        onClick={() => handleSwitchScript(script.id)}
-                                        className={`p-5 rounded-2xl border-2 cursor-pointer transition-all duration-300 flex flex-col items-start relative overflow-hidden ${activeScript === script.id
-                                            ? `bg-white/10 dark:bg-slate-800/80 border-${script.color}-500 shadow-lg shadow-${script.color}-500/20 transform scale-105 z-10`
-                                            : `bg-white/5 dark:bg-slate-800/40 border-slate-200/50 dark:border-slate-700/50 hover:border-${script.color}-300 hover:bg-white/10 dark:hover:bg-slate-800/60`
-                                            } ${script.id === 'rotacion' ? 'sm:col-span-2 sm:flex-row sm:items-center sm:justify-between' : ''}`}
-                                    >
-                                        <div className="flex items-start gap-4 flex-1">
-                                            <div className={`w-3 h-3 rounded-full mt-1.5 flex-shrink-0 ${activeScript === script.id ? `bg-${script.color}-500 shadow-[0_0_8px_currentColor] animate-pulse` : 'bg-slate-300'}`}></div>
-                                            <div>
-                                                <h4 className={`font-extrabold text-sm ${activeScript === script.id ? `text-${script.color}-700 dark:text-${script.color}-400` : 'text-slate-700 dark:text-slate-200'}`}>{script.name}</h4>
-                                                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-1 leading-relaxed pr-2">{script.desc}</p>
-                                            </div>
-                                        </div>
+                                        className={cn('h-full rounded-full transition-all duration-700', levelColor(usersLevel))}
+                                        style={{ width: `${Math.max(3, usersPercent)}%` }}
+                                    />
+                                </div>
+                                <div className="flex justify-between text-[11px] text-slate-500 dark:text-slate-400 mt-1 tabular-nums">
+                                    <span>0</span>
+                                    <span className="text-warning-600 dark:text-warning-500">⚠ {memStats.thresholds.warn.toLocaleString()}</span>
+                                    <span className="text-danger-600 dark:text-danger-500">{memStats.thresholds.danger.toLocaleString()}</span>
+                                </div>
+                            </div>
 
-                                        {/* Status Tag */}
-                                        {activeScript === script.id && (
-                                            <div className={`absolute top-0 right-0 px-3 py-1 bg-${script.color}-500 text-white text-[9px] font-extrabold uppercase tracking-widest rounded-bl-xl`}>
-                                                En Uso
-                                            </div>
-                                        )}
-
-                                        {/* Stats Display */}
-                                        {script.stats && (
-                                            <div className="mt-4 w-full bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50 p-2.5 rounded-xl flex items-center justify-between">
-                                                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Conversión</span>
-                                                <span className={`text-xs font-mono font-extrabold ${activeScript === script.id ? `text-${script.color}-600 dark:text-${script.color}-400` : 'text-slate-700 dark:text-slate-300'}`}>
-                                                    {script.stats.started > 0 ? Math.round((script.stats.completed / script.stats.started) * 100) : 0}%
-                                                    <span className="text-[10px] text-slate-400 font-medium ml-1">({script.stats.completed}/{script.stats.started})</span>
-                                                </span>
-                                            </div>
-                                        )}
+                            {/* Stats grid */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                {[
+                                    { value: memStats.totalUsersDB.toLocaleString(), label: 'Base de datos' },
+                                    { value: memStats.ramUsers,                       label: 'En RAM' },
+                                    { value: memStats.activeConversations,            label: 'Activos ahora' },
+                                    { value: `${memStats.heapUsedMB} MB`,             label: 'Heap V8' },
+                                ].map((stat, i) => (
+                                    <div key={i} className="bg-slate-50 dark:bg-slate-900/40 rounded-control p-3 text-center border border-slate-200/70 dark:border-slate-700/70">
+                                        <p className="text-base font-semibold tabular-nums text-slate-900 dark:text-slate-100">{stat.value}</p>
+                                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-snug">{stat.label}</p>
                                     </div>
                                 ))}
                             </div>
-                        </div>
 
-                        {/* Cambiar contraseña */}
-                        <div className="bg-white dark:bg-slate-800/40 backdrop-blur-xl p-4 sm:p-8 rounded-[1.25rem] sm:rounded-[2rem] border border-slate-200 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
-                            <div className="flex items-center gap-3 sm:gap-4 mb-5 relative z-10">
-                                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                                    <KeyRound className="w-6 h-6" />
-                                </div>
-                                <div>
-                                    <h3 className="font-extrabold text-slate-800 dark:text-slate-100 text-lg">Cambiar contraseña</h3>
-                                    <p className="text-xs font-bold text-slate-500 dark:text-slate-300 uppercase tracking-widest">Tu cuenta</p>
-                                </div>
-                            </div>
-                            <form onSubmit={handleChangePassword} className="space-y-3 relative z-10">
-                                <input
-                                    type="password"
-                                    placeholder="Contraseña actual"
-                                    value={pwForm.current}
-                                    onChange={e => setPwForm(f => ({ ...f, current: e.target.value }))}
-                                    required
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 placeholder:text-slate-400"
-                                />
-                                <input
-                                    type="password"
-                                    placeholder="Nueva contraseña (mín. 8 caracteres)"
-                                    value={pwForm.next}
-                                    onChange={e => setPwForm(f => ({ ...f, next: e.target.value }))}
-                                    required
-                                    minLength={8}
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 placeholder:text-slate-400"
-                                />
-                                <input
-                                    type="password"
-                                    placeholder="Repetir nueva contraseña"
-                                    value={pwForm.confirm}
-                                    onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))}
-                                    required
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 placeholder:text-slate-400"
-                                />
-                                <button
-                                    type="submit"
-                                    disabled={pwSaving}
-                                    className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 text-white text-sm font-extrabold uppercase tracking-widest shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:scale-[1.01] active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                                >
-                                    {pwSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
-                                    {pwSaving ? 'Guardando...' : 'Cambiar contraseña'}
-                                </button>
-                            </form>
-                        </div>
-
-                        {/* Danger Zone */}
-                        <div className="bg-rose-50/50 dark:bg-slate-800/40 backdrop-blur-xl p-4 sm:p-8 rounded-[1.25rem] sm:rounded-[2rem] border border-rose-200/50 dark:border-rose-900/50 shadow-[0_8px_30px_rgba(244,63,94,0.04)] relative overflow-hidden group">
-                            <div className="absolute -left-20 top-1/2 -translate-y-1/2 w-40 h-40 bg-rose-500/10 blur-[40px] rounded-full group-hover:bg-rose-500/20 transition-colors pointer-events-none"></div>
-                            <div className="absolute left-0 top-0 bottom-0 w-2 bg-gradient-to-b from-rose-400 to-rose-600 rounded-l-[2rem]"></div>
-
-                            <div className="pl-6 relative z-10">
-                                <h3 className="font-extrabold text-rose-700 dark:text-rose-500 text-lg mb-2 flex items-center gap-2">
-                                    <Power className="w-6 h-6" /> Interrupción Fuerte
-                                </h3>
-                                <p className="text-sm font-medium text-slate-600 dark:text-slate-400 leading-relaxed max-w-sm mb-6">
-                                    Cerrar la sesión desconecta inmediatamente el dispositivo vinculado de WhatsApp. Ningún mensaje será respondido luego de esta acción.
+                            {/* Info — qué hace el botón */}
+                            <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-200/70 dark:border-slate-700/70 rounded-control p-3 space-y-1.5">
+                                <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+                                    <strong>Qué hace este botón:</strong> borra el historial de chat
+                                    (<code className="text-[11px] bg-slate-200 dark:bg-slate-800 px-1 rounded">ChatLog</code>)
+                                    y los datos extraídos por IA (<code className="text-[11px] bg-slate-200 dark:bg-slate-800 px-1 rounded">profileData</code>)
+                                    de usuarios <strong>inactivos &gt;48h y sin pedidos</strong>.
                                 </p>
-
-                                <button onClick={handleLogout} className="bg-gradient-to-r from-rose-500 to-red-600 text-white px-8 py-4 rounded-xl text-xs font-extrabold uppercase tracking-widest shadow-lg shadow-rose-500/30 hover:shadow-rose-500/50 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-3">
-                                    Forzar Desconexión (Logout)
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Herramientas */}
-                        <div className="bg-white dark:bg-slate-800/40 backdrop-blur-xl p-4 sm:p-8 rounded-[1.25rem] sm:rounded-[2rem] border border-slate-200 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-400/10 blur-[50px] rounded-full pointer-events-none"></div>
-                            <div className="flex items-center gap-4 mb-6 relative z-10">
-                                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/20">
-                                    <Settings className="w-6 h-6" />
-                                </div>
-                                <div>
-                                    <h3 className="font-extrabold text-slate-800 dark:text-slate-100 text-lg">Herramientas</h3>
-                                    <p className="text-xs font-bold text-slate-500 dark:text-slate-300 uppercase tracking-widest">Reportes IA</p>
-                                </div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                                    <strong>NO borra usuarios</strong> de la tabla <code className="text-[11px] bg-slate-200 dark:bg-slate-800 px-1 rounded">User</code>:
+                                    el contador "Base de datos" se mantendrá igual. Las ventas y pedidos <strong>nunca</strong> se tocan.
+                                </p>
                             </div>
 
-                            <button onClick={handleTestReport} className="w-full bg-white/50 dark:bg-slate-800/80 border border-slate-200/50 dark:border-slate-700 text-slate-700 dark:text-slate-200 px-6 py-4 rounded-xl text-sm font-extrabold hover:border-indigo-300 dark:hover:border-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-sm flex items-center justify-center gap-3 group relative z-10 hover:shadow-md">
-                                <span className="text-indigo-400 group-hover:text-indigo-600 transition-colors"><Download className="w-5 h-5" /></span>
-                                Generar & Descargar Reporte PDF
-                            </button>
+                            <Button
+                                onClick={handleResetMemory}
+                                loading={resetting}
+                                leftIcon={Trash2}
+                                fullWidth
+                            >
+                                Limpiar historial inactivo (&gt;48h)
+                            </Button>
                         </div>
-                    </div>
-
-                    {/* FULL WIDTH: Memory Management Panel */}
-                    <div className="xl:col-span-2">
-                        <div className={`bg-white dark:bg-slate-800/40 backdrop-blur-xl p-4 sm:p-8 rounded-[1.25rem] sm:rounded-[2rem] border border-slate-200 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden ${memStats ? getMemoryLabel().glow : ''}`}>
-                            <div className="absolute -top-20 -right-20 w-80 h-80 bg-indigo-400/10 blur-[80px] rounded-full pointer-events-none"></div>
-                            <div className="absolute left-0 top-0 bottom-0 w-2 bg-gradient-to-b from-indigo-400 to-purple-600 rounded-l-[2rem]"></div>
-
-                            <div className="pl-6 relative z-10">
-                                {/* Header */}
-                                <div className="flex items-center justify-between mb-6">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                                            <HardDrive className="w-6 h-6" />
-                                        </div>
-                                        <div>
-                                            <h3 className="font-extrabold text-slate-800 dark:text-slate-100 text-lg">Gestión de Memoria</h3>
-                                            <p className="text-xs font-bold text-slate-500 dark:text-slate-300 uppercase tracking-widest">Estados de Conversación</p>
-                                        </div>
-                                    </div>
-                                    <button
-                                        onClick={fetchMemoryStats}
-                                        className="text-indigo-500 hover:text-indigo-700 transition-colors p-2 rounded-xl hover:bg-indigo-50"
-                                        title="Actualizar"
-                                    >
-                                        <RefreshCw className={`w-5 h-5 ${loadingMem ? 'animate-spin' : ''}`} />
-                                    </button>
-                                </div>
-
-                                {memStats ? (
-                                    <div className="space-y-6">
-                                        {/* Status Badge */}
-                                        {(() => {
-                                            const label = getMemoryLabel();
-                                            return (
-                                                <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl ${label.color} bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-sm`}>
-                                                    <span className="font-extrabold text-sm tracking-wide">{label.text}</span>
-                                                </div>
-                                            );
-                                        })()}
-
-                                        {/* RSS bar — RAM real del proceso (lo que de verdad cuenta) */}
-                                        <div>
-                                            <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mb-2 font-bold">
-                                                <span className="flex items-center gap-1.5">
-                                                    RAM del proceso
-                                                    {getRssLevel() === 'critical' && <span className="text-rose-500">●</span>}
-                                                    {getRssLevel() === 'warning' && <span className="text-amber-500">●</span>}
-                                                </span>
-                                                <span className="font-mono text-slate-700 dark:text-slate-300">{(memStats.rssMB / 1024).toFixed(1)} GB / 32 GB</span>
-                                            </div>
-                                            <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-3 overflow-hidden">
-                                                <div
-                                                    className={`h-full rounded-full transition-all duration-1000 ease-out bg-gradient-to-r ${getGradient(getRssLevel())}`}
-                                                    style={{ width: `${Math.max(3, getRssPercent())}%` }}
-                                                ></div>
-                                            </div>
-                                            <div className="flex justify-between text-[10px] text-slate-400 dark:text-slate-500 mt-1 font-bold">
-                                                <span>0</span>
-                                                <span className="text-amber-500">⚠ {(memStats.thresholds.rssWarnMB / 1024).toFixed(0)} GB</span>
-                                                <span className="text-rose-500">🔴 {(memStats.thresholds.rssCritMB / 1024).toFixed(0)} GB</span>
-                                            </div>
-                                        </div>
-
-                                        {/* Users in DB bar — referencia, no de salud */}
-                                        <div>
-                                            <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mb-2 font-bold">
-                                                <span className="flex items-center gap-1.5">
-                                                    Usuarios en base de datos
-                                                    {getUsersLevel() === 'critical' && <span className="text-rose-500">●</span>}
-                                                    {getUsersLevel() === 'warning' && <span className="text-amber-500">●</span>}
-                                                </span>
-                                                <span className="font-mono text-slate-700 dark:text-slate-300">{memStats.totalUsersDB.toLocaleString()}</span>
-                                            </div>
-                                            <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-3 overflow-hidden">
-                                                <div
-                                                    className={`h-full rounded-full transition-all duration-1000 ease-out bg-gradient-to-r ${getGradient(getUsersLevel())}`}
-                                                    style={{ width: `${Math.max(3, getUsersPercent())}%` }}
-                                                ></div>
-                                            </div>
-                                            <div className="flex justify-between text-[10px] text-slate-400 dark:text-slate-500 mt-1 font-bold">
-                                                <span>0</span>
-                                                <span className="text-amber-500">⚠ {memStats.thresholds.warn.toLocaleString()}</span>
-                                                <span className="text-rose-500">🔴 {memStats.thresholds.danger.toLocaleString()}</span>
-                                            </div>
-                                        </div>
-
-                                        {/* Stats Grid */}
-                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                            {[
-                                                { value: memStats.totalUsersDB.toLocaleString(), label: 'Base de Datos', color: 'from-slate-500 to-slate-600' },
-                                                { value: memStats.ramUsers, label: 'En RAM', color: 'from-blue-500 to-indigo-600' },
-                                                { value: memStats.activeConversations, label: 'Activos Ahora', color: 'from-emerald-500 to-teal-600' },
-                                                { value: `${memStats.heapUsedMB} MB`, label: 'Heap V8', color: 'from-amber-500 to-orange-600' }
-                                            ].map((stat, i) => (
-                                                <div key={i} className="bg-slate-50 dark:bg-slate-900/50 rounded-2xl p-4 text-center border border-slate-200 dark:border-slate-700 shadow-sm">
-                                                    <div className={`text-xl font-black text-transparent bg-clip-text bg-gradient-to-r ${stat.color}`}>{stat.value}</div>
-                                                    <div className="text-[9px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">{stat.label}</div>
-                                                </div>
-                                            ))}
-                                        </div>
-
-                                        {/* Info — clarifica qué hace el botón realmente */}
-                                        <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-xl p-3 space-y-1.5">
-                                            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
-                                                💡 <strong>Qué hace este botón:</strong> borra el historial de chat
-                                                (<code className="text-[10px] bg-slate-200 dark:bg-slate-800 px-1 rounded">ChatLog</code>)
-                                                y los datos extraídos por IA (<code className="text-[10px] bg-slate-200 dark:bg-slate-800 px-1 rounded">profileData</code>)
-                                                de usuarios <strong>inactivos &gt;48h y sin pedidos</strong>.
-                                            </p>
-                                            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
-                                                ⚠️ <strong>NO borra usuarios</strong> de la tabla <code className="text-[10px] bg-slate-200 dark:bg-slate-800 px-1 rounded">User</code>:
-                                                el contador de "Base de Datos" se mantendrá igual después de limpiar.
-                                                Las ventas y pedidos <strong>nunca</strong> se tocan.
-                                            </p>
-                                        </div>
-
-                                        {/* Reset Button */}
-                                        <button
-                                            onClick={handleResetMemory}
-                                            disabled={resetting}
-                                            className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-8 py-4 rounded-xl text-xs font-extrabold uppercase tracking-widest shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-[1.01] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            {resetting ? (
-                                                <>
-                                                    <RefreshCw className="w-5 h-5 animate-spin" />
-                                                    Limpiando historial...
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Trash2 className="w-5 h-5" />
-                                                    Limpiar historial inactivo (&gt;48h)
-                                                </>
-                                            )}
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div className="flex items-center justify-center py-12 text-slate-400">
-                                        <RefreshCw className="w-5 h-5 animate-spin mr-3" />
-                                        <span className="font-bold text-sm">Cargando estadísticas de memoria...</span>
-                                    </div>
-                                )}
-                            </div>
+                    ) : (
+                        <div className="flex items-center justify-center py-10 gap-2">
+                            <RefreshCw className="w-4 h-4 animate-spin text-slate-400 dark:text-slate-500" aria-hidden="true" />
+                            <span className="text-sm text-slate-500 dark:text-slate-400">Cargando estadísticas…</span>
                         </div>
-                    </div>
-                </div>
+                    )}
+                </Card>
             </div>
         </div>
     );
