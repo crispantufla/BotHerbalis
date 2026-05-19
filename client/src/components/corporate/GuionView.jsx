@@ -105,6 +105,7 @@ const PLACEHOLDER_VALUES = {
     SENA_AMOUNT_FMT: '10.000',
     SENA_REMAINDER: '56.900',
     // Líneas condicionales (en runtime _formatMessage las arma según state.postdatado / sucursal)
+    // Mock preview asume MP (4-6d). En runtime real es 7-10d si transferencia/contra reembolso.
     POSTDATADO_LINE: '✔ Entrega estimada: 4 a 6 días hábiles desde la confirmación del pago\n',
     CARTO_LINE: '✔ Saldo al cartero: *$56.900* en efectivo al recibir',
 };

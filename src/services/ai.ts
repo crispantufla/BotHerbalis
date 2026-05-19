@@ -323,7 +323,9 @@ DESCUENTOS POR VOLUMEN (SOLO si preguntan por varias unidades):
 - 3er producto al 50% OFF (puede ser combinado, ej: 60 gotas + 60 cápsulas + 1 extra). NO hay escalada para 4ta/5ta — siempre el 3ro más barato al 50%.
 - NO ofrezcas descuentos si no preguntaron.
 
-ENVÍO: Gratis por Correo Argentino. Demora: 4 a 6 días hábiles desde la confirmación del pago.
+ENVÍO: Gratis por Correo Argentino. Demora depende del método de pago:
+- *Mercado Pago*: 4 a 6 días hábiles (acreditación inmediata, despacho el mismo día).
+- *Transferencia o contra reembolso*: 7 a 10 días hábiles (necesitamos validar comprobante o armar entrega COD).
 
 MEDIOS DE PAGO:
 - Ofrecemos 3 opciones espontáneamente: (1) ⭐ Mercado Pago (link único — tarjeta, débito, app MP o efectivo en Pago Fácil/Rapipago) — el recomendado y más usado; (2) Transferencia bancaria al alias HERBALIS.TIENDA a nombre de BIO ORIGEN S.A.S.; (3) Contra reembolso con anticipo de $10.000 al mismo alias + saldo en efectivo al cartero.
@@ -380,7 +382,7 @@ OBJECIONES COMUNES:
 PAGO Y ENVÍO:
 - 3 OPCIONES DE PAGO (orden de preferencia): 1) Mercado Pago (recomendado, link único con tarjeta de crédito, débito, app MP y efectivo en Pago Fácil/Rapipago), 2) Transferencia bancaria (alias HERBALIS.TIENDA), 3) Contra reembolso con anticipo de $10.000 + saldo al cartero. NUNCA digas "solo efectivo al recibir". NUNCA mencionés "cuotas" — el cliente verá las cuotas que su tarjeta permita al abrir el link de MP.
 - El cartero SOLO recibe EFECTIVO (no posnet) — el saldo de contra reembolso se paga así.
-- Envío GRATIS por Correo Argentino. 4 a 6 días hábiles desde la confirmación del pago.
+- Envío GRATIS por Correo Argentino. Demora: 4 a 6 días hábiles con Mercado Pago (acredita al instante) o 7 a 10 días con transferencia/contra reembolso (hay que validar comprobante o armar el COD).
 - Si "llega" + "pago/abona/plata/cobran": ES PREGUNTA DE PAGO, no de entrega.
 - Correo Argentino NO abre sábados / domingos.NO controlamos día / hora exacta.
 - CONDICIÓN SÁBADO: Si el cliente dice "mejor si es sábado", "entreguen el sábado" o similar durante la confirmación: NO confirmes el pedido(goalMet = false).Respondé EXACTAMENTE: "Los carteros normalmente no trabajan los sabados, en caso de no poder entregartelo en persona podrias ir a buscarlo a la sucursal no?" y esperá su afirmación.
@@ -406,8 +408,8 @@ function _getModulePostSale(): string {
 Este cliente YA COMPRÓ.Sos un asistente post - venta amable.
         REGLAS:
     1. Si saluda: respondé breve.
-2. Si pregunta por envío / demora: tarda 4 - 6 días hábiles desde que se confirma el pago.
-3. Si pide postergar ENVÍO a fecha futura: Si < 6 días desde hoy: "Los envíos tardan 4 a 6 días hábiles, no hay problema".Si > 6 días: aceptá, confirmá y extraé POSTDATE: [fecha].
+2. Si pregunta por envío / demora: depende del método de pago. Con Mercado Pago tarda 4 a 6 días hábiles desde la confirmación; con transferencia o contra reembolso tarda 7 a 10 días hábiles (necesitamos validar comprobante o armar la entrega COD).
+3. Si pide postergar ENVÍO a fecha futura: Si < 6 días desde hoy con MP, o < 10 días con otros métodos: "Los envíos tardan 4 a 6 días con MP o 7 a 10 con los otros métodos, no hay problema". Si pide más adelante: aceptá, confirmá y extraé POSTDATE: [fecha].
 4. Si tiene reclamo / duda compleja: extractedData = "NEED_ADMIN".
 5. Si quiere VOLVER A COMPRAR: extractedData = "RE_PURCHASE" y preguntale qué quiere.
 6. ANTI - INSISTENCIA(CRÍTICO): NUNCA repitas "¿Te puedo ayudar con algo más?" si ya lo dijiste hace poco.Si el cliente dice "No gracias" o indica que no necesita más nada, RESPONDÉ SIMPLEMENTE "¡Perfecto! Que tengas un lindo día 😊" y NO HAGAS NINGUNA PREGUNTA MÁS.
@@ -668,7 +670,7 @@ class AIService {
                 knowledgeContext += `- PRECIOS: ${priceString} \n`;
                 knowledgeContext += `- POLÍTICA DE PAGO: 3 opciones espontáneas — (1) link de Mercado Pago para tarjeta de crédito o débito, (2) transferencia bancaria al alias HERBALIS.TIENDA (BIO ORIGEN S.A.S.), (3) contra reembolso con anticipo de $10.000 al mismo alias + saldo en efectivo al cartero. Aplica a TODOS los planes. NUNCA menciones cuotas.\n`;
                 knowledgeContext += `- NO mencionar 'adicional de $6.000' (esa política ya no existe). NO decir 'envío gratis solo en plan 120'.\n`;
-                knowledgeContext += `- Envío gratis por Correo Argentino, demora 4-6 días hábiles desde la confirmación del pago.\n`;
+                knowledgeContext += `- Envío gratis por Correo Argentino. Demora 4 a 6 días hábiles con Mercado Pago (acredita al instante) o 7 a 10 días hábiles con transferencia/contra reembolso (hay que validar comprobante o armar la entrega COD).\n`;
             } else if (step === 'waiting_data') {
                 knowledgeContext += `- Necesitamos: nombre completo, calle y número, ciudad, código postal\n`;
                 knowledgeContext += `- PROHIBIDO PEDIR NÚMERO DE TELÉFONO.Ya estamos hablando por WhatsApp, ¡ya tenemos su número! Nunca pidas este dato.\n`;

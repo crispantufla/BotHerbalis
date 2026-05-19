@@ -103,9 +103,14 @@ function _formatMessage(text: string | string[], state: any): string {
             formatted = formatted.replace(/{{PLAN_DETAIL}}/g, state.selectedPlan ? `${state.selectedPlan} días` : '60 días');
         }
         // Línea condicional postdatado vs entrega estándar (confirmación final).
+        // Mercado Pago acredita al instante y el despacho sale ese mismo día =>
+        // 4-6 días. Transferencia y contra reembolso necesitan validación
+        // manual del comprobante / armar la entrega COD => 7-10 días.
+        const isMp = state.paymentMethod === 'mercadopago';
+        const etaLabel = isMp ? '4 a 6 días hábiles' : '7 a 10 días hábiles';
         const postdatadoLine = state.postdatado
             ? `📅 Envío programado: ${state.postdatado}\n`
-            : `✔ Entrega estimada: 4 a 6 días hábiles desde la confirmación del pago\n`;
+            : `✔ Entrega estimada: ${etaLabel} desde la confirmación del pago\n`;
         formatted = formatted.replace(/{{POSTDATADO_LINE}}/g, postdatadoLine);
         // Línea condicional saldo al cartero vs retiro en sucursal (confirmación COD).
         const isSucursal = state.pendingOrder?.calle?.toLowerCase() === 'a sucursal';

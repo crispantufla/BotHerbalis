@@ -98,7 +98,7 @@ const ABANDON_REASON_MESSAGES: Record<string, string[]> = {
         'Hola 👋 Recordá que el pago es al recibir, no necesitás tener la plata ahora. Podés pedir hoy y pagar recién cuando llegue. ¿Te tomamos los datos? 📦',
     ],
     hesitation: [
-        '¡Hola! 😊 Sin apuro. El envío tarda 4-6 días hábiles desde la confirmación del pago. ¿Avanzamos cuando quieras?',
+        '¡Hola! 😊 Sin apuro. Con Mercado Pago el envío tarda 4-6 días hábiles, con transferencia o contra reembolso 7-10 días. ¿Avanzamos cuando quieras?',
         'Hola 👋 Si querés te dejo el pedido reservado con el precio de hoy así no pierde la promo. ¿Te parece?',
     ],
     objection: [
