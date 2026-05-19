@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { BookOpen, ChevronRight, AlertTriangle, CheckCircle, Hand, List, Sparkles, Terminal, HelpCircle, Zap, Users, Package, BarChart3, Settings, Send, Shield, Eye, Trash2, MousePointerClick, MessageCircle, ShoppingCart, CreditCard, FileText, ImageIcon, Bell, PauseCircle, PlayCircle, RotateCcw, TrendingUp, Filter, Edit2 } from 'lucide-react';
+import { BookOpen, ChevronRight, AlertTriangle, CheckCircle, Hand, List, Sparkles, Terminal, HelpCircle, Zap, Users, Package, BarChart3, Settings, Send, Shield, Eye, Trash2, MousePointerClick, MessageCircle, ShoppingCart, CreditCard, FileText, ImageIcon, Bell, PauseCircle, PlayCircle, RotateCcw, TrendingUp, Filter, Edit2, ChevronLeft } from 'lucide-react';
+import { Card, Button, Badge, cn } from '../ui';
 
 // ─── Manual data ────────────────────────────────────────────────
 const MANUALS = [
@@ -770,52 +771,69 @@ const MANUALS = [
 
 // ─── Sub-components ─────────────────────────────────────────────
 
-const Bold = ({ text }) => {
+// Renderiza texto con **negrita** inline (preservamos el formato del array
+// MANUALS que ya usaba markdown-style emphasis).
+function Bold({ text }) {
     if (!text) return null;
     const parts = text.split(/\*\*(.*?)\*\*/g);
-    return parts.map((part, i) => i % 2 === 1 ? <strong key={i} className="font-semibold text-slate-800 dark:text-white">{part}</strong> : part);
-};
+    return parts.map((part, i) =>
+        i % 2 === 1
+            ? <strong key={i} className="font-semibold text-slate-900 dark:text-slate-100">{part}</strong>
+            : part
+    );
+}
 
-const SectionCard = ({ section, index }) => {
+function SectionCard({ section }) {
     const Icon = section.icon;
     return (
-        <div className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm rounded-2xl border border-slate-200/60 dark:border-slate-700/50 p-6 transition-all duration-200 hover:shadow-md hover:border-indigo-200 dark:hover:border-indigo-800/50">
-            <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center">
-                    <Icon className="w-4 h-4 text-indigo-500" />
+        <Card padding="md" interactive>
+            <div className="flex items-center gap-2.5 mb-3">
+                <div className="w-8 h-8 rounded-control bg-accent-50 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400 flex items-center justify-center">
+                    <Icon className="w-4 h-4" aria-hidden="true" />
                 </div>
-                <h3 className="text-lg font-bold text-slate-800 dark:text-white">{section.title}</h3>
+                <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">{section.title}</h3>
             </div>
 
             {section.content && (
-                <p className="text-sm text-slate-600 dark:text-slate-300 mb-4 leading-relaxed whitespace-pre-line">
+                <p className="text-sm text-slate-600 dark:text-slate-300 mb-3 leading-relaxed whitespace-pre-line">
                     <Bold text={section.content} />
                 </p>
             )}
 
             {section.codeBlock && (
-                <pre className="bg-slate-900 text-green-400 text-xs rounded-xl p-4 mb-4 overflow-x-auto font-mono leading-relaxed">
+                <pre className="bg-slate-900 text-emerald-400 text-xs rounded-control p-3 mb-3 overflow-x-auto font-mono leading-relaxed">
                     {section.codeBlock}
                 </pre>
             )}
 
             {section.table && (
-                <div className="overflow-x-auto mb-4">
+                <div className="overflow-x-auto mb-3 rounded-control border border-slate-200 dark:border-slate-700">
                     <table className="w-full text-sm">
-                        <thead>
-                            <tr className="border-b border-slate-200 dark:border-slate-700">
+                        <thead className="bg-slate-50 dark:bg-slate-800/40">
+                            <tr>
                                 {section.table.headers.map((h, i) => (
-                                    <th key={i} className="text-left py-2 px-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{h}</th>
+                                    <th key={i} className="text-left py-2 px-3 text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                                        {h}
+                                    </th>
                                 ))}
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                             {section.table.rows.map((row, ri) => (
-                                <tr key={ri} className="border-b border-slate-100 dark:border-slate-700/50 last:border-0">
-                                    <td className="py-2.5 px-3">
-                                        <code className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded text-xs font-mono">{row[0]}</code>
+                                <tr key={ri}>
+                                    <td className="py-2 px-3">
+                                        <code className="bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 px-1.5 py-0.5 rounded text-xs font-mono">
+                                            {row[0]}
+                                        </code>
                                     </td>
-                                    <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300">{row[1]}</td>
+                                    <td className="py-2 px-3 text-slate-600 dark:text-slate-300 text-xs">
+                                        {row[1]}
+                                    </td>
+                                    {row[2] && (
+                                        <td className="py-2 px-3 text-slate-600 dark:text-slate-300 text-xs">
+                                            {row[2]}
+                                        </td>
+                                    )}
                                 </tr>
                             ))}
                         </tbody>
@@ -823,41 +841,41 @@ const SectionCard = ({ section, index }) => {
                 </div>
             )}
 
-            {section.extra && (
-                <p className="text-sm text-slate-500 dark:text-slate-400 italic mt-2">
-                    <Bold text={section.extra} />
-                </p>
-            )}
-
             {section.steps && (
-                <div className="space-y-3">
+                <ol className="space-y-2">
                     {section.steps.map((step, si) => (
-                        <div key={si} className="flex gap-3">
-                            <div className="flex-shrink-0 w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center">
-                                <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">{si + 1}</span>
+                        <li key={si} className="flex gap-3">
+                            <span className="flex-shrink-0 w-6 h-6 rounded-full bg-accent-100 dark:bg-accent-900/40 text-accent-600 dark:text-accent-400 flex items-center justify-center text-xs font-semibold tabular-nums">
+                                {si + 1}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{step.label}</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">{step.detail}</p>
                             </div>
-                            <div>
-                                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{step.label}</p>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{step.detail}</p>
-                            </div>
-                        </div>
+                        </li>
                     ))}
-                </div>
+                </ol>
             )}
 
             {section.bullets && (
-                <ul className="space-y-2">
+                <ul className="space-y-1.5">
                     {section.bullets.map((b, bi) => (
                         <li key={bi} className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
-                            <ChevronRight className="w-4 h-4 text-indigo-400 flex-shrink-0 mt-0.5" />
+                            <ChevronRight className="w-4 h-4 text-accent-500 dark:text-accent-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
                             <span>{b}</span>
                         </li>
                     ))}
                 </ul>
             )}
-        </div>
+
+            {section.extra && (
+                <p className="text-xs text-slate-500 dark:text-slate-400 italic mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                    <Bold text={section.extra} />
+                </p>
+            )}
+        </Card>
     );
-};
+}
 
 // ─── Main Component ─────────────────────────────────────────────
 
@@ -870,76 +888,83 @@ const ManualsView = () => {
         const Icon = manual.icon;
 
         return (
-            <div className="p-6 md:p-8 max-w-5xl mx-auto w-full">
-                {/* Back button */}
-                <button
+            <div className="max-w-5xl mx-auto w-full space-y-5">
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    leftIcon={ChevronLeft}
                     onClick={() => setActiveManual(null)}
-                    className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors mb-6"
                 >
-                    <ChevronRight className="w-4 h-4 rotate-180" />
-                    Volver a Manuales
-                </button>
+                    Volver a manuales
+                </Button>
 
-                {/* Header */}
-                <div className="flex items-center gap-4 mb-8">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                        <Icon className="w-6 h-6 text-white" />
+                <header className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-card bg-accent-50 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400 flex items-center justify-center flex-shrink-0">
+                        <Icon className="w-5 h-5" aria-hidden="true" />
                     </div>
-                    <div>
-                        <h1 className="text-2xl font-extrabold text-slate-800 dark:text-white tracking-tight">{manual.title}</h1>
-                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">{manual.description}</p>
+                    <div className="min-w-0">
+                        <h1 className="text-h2 text-slate-900 dark:text-slate-100">{manual.title}</h1>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{manual.description}</p>
                     </div>
-                </div>
+                </header>
 
-                {/* Quick reference card */}
                 {manual.quickRef && (
-                    <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-6 mb-8 text-white shadow-lg shadow-indigo-500/20">
-                        <h2 className="text-sm font-bold uppercase tracking-wider mb-4 opacity-80">Referencia rapida</h2>
+                    <Card padding="md">
+                        <h2 className="text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-3">
+                            Referencia rápida
+                        </h2>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                             {manual.quickRef.map((ref, i) => (
-                                <div key={i} className="flex items-center gap-2">
-                                    <code className="bg-white/20 backdrop-blur-sm px-2 py-0.5 rounded text-xs font-mono flex-shrink-0">{ref.cmd}</code>
-                                    <span className="text-xs opacity-80">{ref.desc}</span>
+                                <div key={i} className="flex items-center gap-2 min-w-0">
+                                    <code className="bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 px-1.5 py-0.5 rounded text-[11px] font-mono flex-shrink-0">
+                                        {ref.cmd}
+                                    </code>
+                                    <span className="text-xs text-slate-600 dark:text-slate-400 truncate">{ref.desc}</span>
                                 </div>
                             ))}
                         </div>
-                    </div>
+                    </Card>
                 )}
 
-                {/* Sections */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                     {manual.sections.map((section, i) => (
-                        <SectionCard key={i} section={section} index={i} />
+                        <SectionCard key={i} section={section} />
                     ))}
                 </div>
             </div>
         );
     }
 
-    // ─── Manual list view ───────────────────────────────────────
     return (
-        <div className="p-6 md:p-8 max-w-5xl mx-auto w-full">
-            <div className="mb-8">
-                <h1 className="text-2xl font-extrabold text-slate-800 dark:text-white tracking-tight">Manuales</h1>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Guias de uso del sistema para el equipo de ventas.</p>
-            </div>
+        <div className="max-w-5xl mx-auto w-full space-y-4">
+            <header>
+                <h1 className="text-display text-slate-900 dark:text-slate-100">Manuales</h1>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                    Guías de uso del sistema para el equipo de ventas.
+                </p>
+            </header>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {MANUALS.map((manual) => {
                     const Icon = manual.icon;
                     return (
                         <button
                             key={manual.id}
+                            type="button"
                             onClick={() => setActiveManual(manual.id)}
-                            className="group text-left bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm rounded-2xl border border-slate-200/60 dark:border-slate-700/50 p-6 transition-all duration-300 hover:shadow-lg hover:border-indigo-300 dark:hover:border-indigo-700 hover:-translate-y-0.5"
+                            className={cn(
+                                'group text-left rounded-card bg-white dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/70',
+                                'shadow-card p-5 transition-all duration-200 hover:shadow-card-hover hover:border-accent-300 dark:hover:border-accent-700',
+                                'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500'
+                            )}
                         >
-                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center mb-4 shadow-md shadow-indigo-500/20 group-hover:scale-105 transition-transform">
-                                <Icon className="w-6 h-6 text-white" />
+                            <div className="w-11 h-11 rounded-card bg-accent-50 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400 flex items-center justify-center mb-3 transition-transform group-hover:scale-[1.05]">
+                                <Icon className="w-5 h-5" aria-hidden="true" />
                             </div>
-                            <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-1">{manual.title}</h3>
-                            <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">{manual.description}</p>
-                            <div className="flex items-center gap-1 text-indigo-500 text-sm font-medium mt-4 group-hover:gap-2 transition-all">
-                                Ver manual <ChevronRight className="w-4 h-4" />
+                            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-1">{manual.title}</h3>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{manual.description}</p>
+                            <div className="flex items-center gap-1 text-accent-600 dark:text-accent-400 text-xs font-medium mt-3 group-hover:gap-1.5 transition-all">
+                                Ver manual <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
                             </div>
                         </button>
                     );
