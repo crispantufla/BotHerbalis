@@ -251,7 +251,7 @@
                 "opcion 4"
             ],
             "_note": "FAQ menu opción 4 — '¿Cómo lo recibo y cuánto tarda?' (tono Elena). MP-first: la demora se cuenta desde la confirmación del pago. El retiro en sucursal NO es solo por carteros que no encuentran.",
-            "response": "Te cuento cómo es 📦\n\nMandamos por Correo Argentino a tu casa o a la sucursal que te quede cómoda. Demora *4 a 6 días hábiles* desde que confirmamos el pago.\n\nSi el cartero no te encuentra, o por cualquier otra razón que el correo disponga que retires en sucursal, nosotros te avisamos y tenés 72 hs para retirarlo.\n\n¿Te paso el link de Mercado Pago para avanzar? 😊"
+            "response": "Te cuento cómo es 📦\n\nMandamos por Correo Argentino a tu casa o a la sucursal que te quede cómoda. Demora *4 a 6 días hábiles* desde que confirmamos el pago.\n\nSi el cartero no te encuentra, o por cualquier otra razón que el correo disponga que retires en sucursal, nosotros te avisamos y tenés 72 hs para retirarlo.\n\n¿Avanzamos? 😊"
         },
         {
             "keywords": [
@@ -290,6 +290,19 @@
             ],
             "_note": "Contra reembolso es una de las 3 opciones espontáneas. Anticipo de $10.000 por TRANSFERENCIA al alias HERBALIS.TIENDA O por MercadoPago (lo elige el cliente cuando confirme la modalidad) + saldo en efectivo al cartero. Aplica a TODOS los planes y clientes (tono Elena).",
             "response": "Dale, podemos coordinar pago al recibir 😊\n\nLa modalidad es así: adelantás un *anticipo de $10.000* (cubre el envío), y el resto lo pagás en *efectivo al cartero* cuando llega el paquete. El anticipo lo podés hacer por transferencia bancaria o por Mercado Pago, lo que te quede más cómodo.\n\nEs una decisión interna por la cantidad de paquetes que vuelven sin retirar — aplica a todos los pedidos. Es exactamente la misma plata, solo cambia el momento.\n\n¿Avanzamos así o preferís otra opción?"
+        },
+        {
+            "keywords": [
+                "se descuentan",
+                "se descuenta",
+                "abono el total",
+                "abono $46",
+                "pago todo",
+                "pago el total",
+                "el resto cuanto"
+            ],
+            "_note": "FAQ específica caso real (Romina 19-may): cliente eligió COD y duda si paga $10k + total entero, o si los $10k se descuentan. Aclara desglose.",
+            "response": "Tranqui, te explico 😊\n\nLos $10.000 del anticipo *se descuentan* del total — no pagás todo al cartero.\n\n👉 Adelantás $10.000 (por MP o transferencia)\n👉 Al cartero le pagás el resto en efectivo cuando llega\n\nLa suma es exacta al precio del plan que elegiste, solo cambia el momento. ¿Avanzamos?"
         },
         {
             "keywords": [

@@ -143,17 +143,20 @@ export async function handleWaitingMpPayment(
         currentState.senaAmount = 10000;
         currentState.senaPaid = false;
 
-        // 1) Explicación de la modalidad COD (anticipo + saldo al cartero).
-        const explainMsg = buildCashRetryMessage(currentState, knowledge);
-        currentState.history.push({ role: 'bot', content: explainMsg, timestamp: Date.now() });
-        await sendMessageWithDelay(userId, explainMsg);
-
-        // 2) Pregunta del método para el anticipo (transferencia o MP).
-        const choiceTpl = getFlowTemplate('payment_cod_method_choice', knowledge) ||
-            `¿El anticipo de $10.000 lo querés hacer por:\n\n1️⃣ *Transferencia bancaria* — te paso el alias y mandás el comprobante\n2️⃣ *Mercado Pago* — te paso el link y se acredita al instante\n\n¿Cuál preferís?`;
-        const choiceMsg = _formatMessage(choiceTpl, currentState);
-        currentState.history.push({ role: 'bot', content: choiceMsg, timestamp: Date.now() });
-        await sendMessageWithDelay(userId, choiceMsg);
+        // FIX (caso real Romina 19-may-2026): antes mandábamos DOS mensajes
+        // separados (explicación COD + pregunta de método) que llegaban en el
+        // mismo segundo y confundían al cliente. Ahora combinamos en uno solo
+        // con la explicación + opciones inline.
+        const totalRaw = currentState.totalPrice || '';
+        const totalNum = typeof totalRaw === 'string'
+            ? parseFloat(String(totalRaw).replace(/\./g, '').replace(',', '.'))
+            : Number(totalRaw || 0);
+        const saldoFmt = totalNum > 10000
+            ? (totalNum - 10000).toLocaleString('es-AR')
+            : '(saldo)';
+        const combinedMsg = `Dale 👍\n\nLa modalidad es: adelantás $10.000 (cubre el envío) y el resto ($${saldoFmt}) en efectivo al cartero cuando llega.\n\n¿El anticipo de $10.000 lo querés hacer por:\n\n1️⃣ *Transferencia bancaria*\n2️⃣ *Mercado Pago* (se acredita al instante)\n\n¿Cuál preferís?`;
+        currentState.history.push({ role: 'bot', content: combinedMsg, timestamp: Date.now() });
+        await sendMessageWithDelay(userId, combinedMsg);
 
         // Step transition primero, después seteamos los flags (porque _setStep
         // resetea cashRetryShown al entrar a waiting_payment_method).

@@ -120,6 +120,18 @@ export async function handleWaitingPaymentMethod(
         if (choseMp && !choseTransfer) {
             // Genera link MP por $10k (la senaAmount ya está seteada). El handler
             // de WAITING_MP_PAYMENT detecta entrada sin link y arma el flujo seña.
+            //
+            // FIX (caso Romina 19-may-2026): si el cliente venía del flujo MP por
+            // el TOTAL (link previo en mpPaymentLinkUrl), había que limpiar el
+            // link viejo para que WAITING_MP_PAYMENT genere uno nuevo por la
+            // seña. Sin esta limpieza, el _verifyPayment seguía consultando el
+            // link viejo ($46.900 pending) en lugar del nuevo ($10.000 que el
+            // cliente terminaba pagando), y el bot decía "no veo el pago".
+            currentState.mpPaymentLinkId = null;
+            currentState.mpPaymentLinkUrl = null;
+            // Reset también el email-asked para que el subflow de email se
+            // pueda re-disparar si el cliente quería usar otro email para la seña.
+            // (Si ya capturamos email, _handleEmailSubflow lo reusa sin re-preguntar.)
             _setStep(currentState, FlowStep.WAITING_MP_PAYMENT);
             saveState(userId);
             return { matched: false, staleReprocess: true } as any;
