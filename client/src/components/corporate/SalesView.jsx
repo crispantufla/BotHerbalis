@@ -761,6 +761,19 @@ CP: ${order.cp || '—'}`;
                                         <CopyRow label="Teléfono" value={phoneDisplay} mono />
                                         <CopyRow label="Producto" value={viewingOrder.producto || 'Sin producto'} editField={editInput('producto', 'Producto')} />
                                         <CopyRow label="Total" value={`$${viewingOrder.precio}`} editField={editInput('precio', 'Precio')} />
+                                        {/* Pedido con seña — el cartero NO cobra el total, solo el saldo restante. */}
+                                        {viewingOrder.senaPaid && viewingOrder.senaAmount > 0 && (
+                                            <div className="px-5 py-3 border-b border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-900/20">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">⚠️ Seña pagada</span>
+                                                    <span className="text-xs font-bold text-amber-700 dark:text-amber-400">${Number(viewingOrder.senaAmount).toLocaleString('es-AR')} por MP</span>
+                                                </div>
+                                                <div className="flex items-center justify-between gap-2 mt-1">
+                                                    <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">💵 Cobrar cartero</span>
+                                                    <span className="text-base font-black text-emerald-700 dark:text-emerald-400">${Number(viewingOrder.cashRemainder || 0).toLocaleString('es-AR')}</span>
+                                                </div>
+                                            </div>
+                                        )}
                                         <CopyRow label="Dirección" value={addressDisplay || 'Sin domicilio'} editField={editInput('calle', 'Calle y número')} />
                                         <CopyRow label="Ciudad" value={viewingOrder.ciudad || '—'} editField={editInput('ciudad', 'Ciudad')} />
                                         <CopyRow label="Provincia" value={viewingOrder.provincia || '—'} editField={editInput('provincia', 'Provincia')} />

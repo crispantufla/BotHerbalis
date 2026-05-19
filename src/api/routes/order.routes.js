@@ -143,7 +143,9 @@ module.exports = (clientPool) => {
             const userMap = new Map();
             users.forEach(u => userMap.set(`${u.phone}_${u.instanceId}`, u));
 
-            // Map to legacy format expected by dashboard to avoid breaking frontend fields
+            // Map to legacy format expected by dashboard to avoid breaking frontend fields.
+            // Campos de seña expuestos al frontend para que el cartero vea el saldo
+            // a cobrar en efectivo en lugar del totalPrice (caso COD con anticipo).
             const legacyOrders = orders.map(o => {
                 const user = userMap.get(`${o.userPhone}_${o.instanceId}`);
                 return {
@@ -163,6 +165,9 @@ module.exports = (clientPool) => {
                     cp: o.cp || '',
                     paymentMethod: o.paymentMethod || null,
                     seller: o.seller || '',
+                    senaAmount: o.senaAmount || null,
+                    senaPaid: !!o.senaPaid,
+                    cashRemainder: o.cashRemainder || null,
                     createdAt: o.createdAt.toISOString()
                 };
             });
@@ -236,6 +241,9 @@ module.exports = (clientPool) => {
                 cp: updatedOrder.cp || '',
                 paymentMethod: updatedOrder.paymentMethod || null,
                 seller: updatedOrder.seller || '',
+                senaAmount: updatedOrder.senaAmount || null,
+                senaPaid: !!updatedOrder.senaPaid,
+                cashRemainder: updatedOrder.cashRemainder || null,
                 createdAt: updatedOrder.createdAt.toISOString()
             };
 
@@ -297,7 +305,7 @@ module.exports = (clientPool) => {
                     logger.info(`[ORDER-STATUS] WhatsApp enviado exitosamente a ${targetPhone}`);
 
                     if (ss?.userState && ss.userState[targetPhone]) {
-                        ss.userState[targetPhone].step = 'completed';
+                        _setStep(ss.userState[targetPhone], 'completed');
                         ss.userState[targetPhone].history = ss.userState[targetPhone].history || [];
                         ss.userState[targetPhone].history.push({ role: 'bot', content: msg, timestamp: Date.now() });
                         if (ss.saveState) { try { ss.saveState(targetPhone); } catch (e) { ss.saveState(); } }
@@ -325,6 +333,9 @@ module.exports = (clientPool) => {
                 cp: updatedOrder.cp || '',
                 paymentMethod: updatedOrder.paymentMethod || null,
                 seller: updatedOrder.seller || '',
+                senaAmount: updatedOrder.senaAmount || null,
+                senaPaid: !!updatedOrder.senaPaid,
+                cashRemainder: updatedOrder.cashRemainder || null,
                 createdAt: updatedOrder.createdAt.toISOString()
             };
 
@@ -710,6 +721,9 @@ module.exports = (clientPool) => {
                 provincia: order.provincia || '',
                 cp: order.cp || '',
                 paymentMethod: order.paymentMethod || null,
+                senaAmount: order.senaAmount || null,
+                senaPaid: !!order.senaPaid,
+                cashRemainder: order.cashRemainder || null,
                 createdAt: order.createdAt.toISOString()
             };
 

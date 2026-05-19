@@ -770,16 +770,29 @@ Teléfono: ${phoneDisplay}`;
                                     <div className="w-full md:w-px h-px md:h-16 bg-slate-200 dark:bg-slate-700"></div>
 
                                     <div className="text-center md:text-right">
-                                        <p className="text-slate-400 dark:text-slate-500 font-bold text-xs tracking-widest uppercase mb-1">Total a Cobrar</p>
-                                        <div className="flex items-start justify-center md:justify-end">
-                                            <span className="text-emerald-500 font-bold mt-1 mr-1 text-lg">$</span>
-                                            {isDetailEditing ? (
-                                                <input type="text" value={detailEditData.precio || ''} onChange={e => handleDetailField('precio', e.target.value)} className="font-black text-emerald-500 dark:text-emerald-400 text-4xl w-32 md:w-48 text-center md:text-right bg-white dark:bg-slate-700 rounded-xl px-3 py-2 border border-slate-200 dark:border-slate-600 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 dark:focus:ring-emerald-900/50 outline-none" placeholder="0" />
-                                            ) : (
-                                                <h4 className="font-black text-emerald-500 dark:text-emerald-400 text-4xl tabular-nums tracking-tighter">{viewingOrder.precio}</h4>
-                                            )}
-                                        </div>
-                                        <p className="text-slate-400 dark:text-slate-500 font-bold text-xs">Pago en efectivo al repartidor</p>
+                                        {viewingOrder.senaPaid && viewingOrder.senaAmount > 0 ? (
+                                            <>
+                                                <p className="text-amber-500 dark:text-amber-400 font-bold text-xs tracking-widest uppercase mb-1">⚠️ Cobrar al cartero</p>
+                                                <div className="flex items-start justify-center md:justify-end">
+                                                    <span className="text-emerald-500 font-bold mt-1 mr-1 text-lg">$</span>
+                                                    <h4 className="font-black text-emerald-500 dark:text-emerald-400 text-4xl tabular-nums tracking-tighter">{Number(viewingOrder.cashRemainder || 0).toLocaleString('es-AR')}</h4>
+                                                </div>
+                                                <p className="text-slate-400 dark:text-slate-500 font-bold text-xs">Seña ${Number(viewingOrder.senaAmount).toLocaleString('es-AR')} pagada por MP — total pedido ${viewingOrder.precio}</p>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <p className="text-slate-400 dark:text-slate-500 font-bold text-xs tracking-widest uppercase mb-1">Total a Cobrar</p>
+                                                <div className="flex items-start justify-center md:justify-end">
+                                                    <span className="text-emerald-500 font-bold mt-1 mr-1 text-lg">$</span>
+                                                    {isDetailEditing ? (
+                                                        <input type="text" value={detailEditData.precio || ''} onChange={e => handleDetailField('precio', e.target.value)} className="font-black text-emerald-500 dark:text-emerald-400 text-4xl w-32 md:w-48 text-center md:text-right bg-white dark:bg-slate-700 rounded-xl px-3 py-2 border border-slate-200 dark:border-slate-600 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 dark:focus:ring-emerald-900/50 outline-none" placeholder="0" />
+                                                    ) : (
+                                                        <h4 className="font-black text-emerald-500 dark:text-emerald-400 text-4xl tabular-nums tracking-tighter">{viewingOrder.precio}</h4>
+                                                    )}
+                                                </div>
+                                                <p className="text-slate-400 dark:text-slate-500 font-bold text-xs">Pago en efectivo al repartidor</p>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             </div>
