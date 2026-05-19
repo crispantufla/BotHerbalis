@@ -181,22 +181,9 @@ const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData 
         }
     };
 
-    const handleReactivateAll = async () => {
-        const ok = await confirm('¿Reactivar el bot de TODOS los vendedores?');
-        if (!ok) return;
-        setPausingAll(true);
-        try {
-            const res = await api.post('/api/global-pause-all', { pause: false });
-            toast.success(`${res.data.affected || 0} bots reactivados`);
-            const opts = isAdmin ? { headers: { 'x-seller-id': '' } } : {};
-            const fresh = await api.get('/api/stats', opts);
-            setStats(fresh.data);
-        } catch (e) {
-            toast.error(e.response?.data?.error || 'Error reactivando todos los bots');
-        } finally {
-            setPausingAll(false);
-        }
-    };
+    // handleReactivateAll fue eliminado: era código muerto (declarado pero
+    // nunca invocado desde el JSX). Para reactivar todos los bots, el usuario
+    // ahora hace toggle individual desde "Pausar este bot" en cada seller.
 
     return (
         <div className="space-y-5 sm:space-y-7 animate-fade-in relative z-10 w-full">
@@ -330,7 +317,6 @@ const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData 
                 <div className="lg:col-span-1 2xl:col-span-2 flex flex-col gap-4 sm:gap-6">
                     <SystemStatusPanel
                         status={status}
-                        activeConversations={stats?.activeConversations}
                         adminNumbers={adminNumbers}
                         onAddPhone={handleAddPhone}
                         onRemovePhone={handleRemovePhone}

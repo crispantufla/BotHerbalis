@@ -66,7 +66,7 @@ const CommsView = ({ initialChatId, onChatSelected, initialSearch = '', alerts =
     const {
         chats, messages, setMessages,
         isLoadingChats, isLoadingMessages,
-        globalPause, instanceId,
+        globalPause,
         sendMessage, sendMedia, deleteMessage, toggleBot, clearChat
     } = useChat(selectedChat?.id);
 

@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import api from '../../config/axios';
 import {
-    Card, Button, IconButton, Badge, Select, EmptyState, useToast, cn
+    Card, Button, IconButton, Badge, Select, EmptyState, useToast
 } from '../ui';
 
 const WEEKDAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
