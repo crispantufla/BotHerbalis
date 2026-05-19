@@ -1,106 +1,175 @@
 import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import api from '../../config/axios';
-import { useToast } from '../ui/Toast';
 import { useOrders } from '../../hooks/useOrders';
 import { useAuth } from '../../context/AuthContext';
 import { useSeller } from '../../context/SellerContext';
 import { capitalize } from '../../utils/format';
+import {
+    Button, IconButton, Card, Badge, Modal, Input, Select, EmptyState, useToast
+} from '../ui';
 
-import { RefreshCw as Refresh, Download, Search, Filter, ChevronDown, MessageCircle as Chat, Edit2 as Edit, Trash2 as Trash, FileText as Script, Save, X as XIcon, Copy, Check } from 'lucide-react';
+import {
+    RefreshCw, Download, Search, Filter, ChevronLeft, ChevronRight, MessageCircle,
+    Edit2, Trash2, Save, Copy, Check, Package, Phone, MapPin, Inbox
+} from 'lucide-react';
+
+// Mapeo único de status → tono semántico + dot. Antes había 6 strings con
+// `shadow-[0_0_10px_rgba(...)]` hardcoded — ahora una sola fuente de verdad.
+const STATUS_TONE = {
+    'Pendiente':  { tone: 'warning', dot: true,  label: 'Pendiente' },
+    'Confirmado': { tone: 'info',    dot: true,  label: 'Confirmado' },
+    'En sistema': { tone: 'accent',  dot: true,  label: 'En sistema' },
+    'Enviado':    { tone: 'purple',  dot: false, label: 'Enviado' },
+    'Entregado':  { tone: 'success', dot: true,  label: 'Entregado' },
+    'Cancelado':  { tone: 'danger',  dot: false, label: 'Cancelado' },
+};
+
+const PAYMENT_TONE = {
+    'mercadopago':   { tone: 'info',    label: 'MercadoPago' },
+    'transferencia': { tone: 'purple',  label: 'Transferencia' },
+};
+const paymentMeta = (m) => PAYMENT_TONE[m] || { tone: 'warning', label: 'Contra reembolso' };
+
+const STATUS_OPTIONS = ['Pendiente', 'Confirmado', 'En sistema', 'Enviado', 'Entregado', 'Cancelado'];
+
+// Date formatter — manejo legacy strings y ISO. Ojo: el calendario "DD/MM/YYYY
+// HH:mm" sin coma rompe la pieza original (`dt.includes(',')`); por eso se
+// fuerza `dateStyle/timeStyle` que siempre incluye coma en es-AR.
+const formatDateBA = (dateStr) => {
+    if (!dateStr) return '—';
+    try {
+        let d = new Date(dateStr);
+        if (isNaN(d.getTime()) && typeof dateStr === 'string' && dateStr.includes('/')) {
+            const parts = dateStr.split(/[^\d]/);
+            if (parts.length >= 3) {
+                d = new Date(parts[2], parts[1] - 1, parts[0], parts[3] || 0, parts[4] || 0, parts[5] || 0);
+            }
+        }
+        if (isNaN(d.getTime())) return 'Invalid Date';
+        return d.toLocaleString('es-AR', {
+            timeZone: 'America/Argentina/Buenos_Aires',
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit'
+        });
+    } catch {
+        return dateStr;
+    }
+};
+
+// Sub-componente — fila clickeable que copia su valor al portapapeles.
+// Vivía inline dentro del JSX, lo extraigo para que no se re-cree en cada render.
+function CopyRow({ label, value, editField, mono, editing }) {
+    const [copied, setCopied] = useState(false);
+    const handleCopy = () => {
+        if (!value || editing) return;
+        navigator.clipboard.writeText(value).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+        });
+    };
+    return (
+        <div
+            onClick={handleCopy}
+            className={`flex items-center justify-between px-5 py-2.5 border-b border-slate-100 dark:border-slate-800 group transition-colors ${
+                !editing ? 'hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer' : ''
+            }`}
+        >
+            <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400 w-24 sm:w-28 flex-shrink-0">
+                {label}
+            </span>
+            <div className="flex-1 min-w-0 ml-3">
+                {editing && editField ? editField : (
+                    <span className={`text-sm text-slate-900 dark:text-slate-100 block truncate ${mono ? 'font-mono' : 'font-medium'}`}>
+                        {value || '—'}
+                    </span>
+                )}
+            </div>
+            {!editing && value && (
+                <span className="ml-2 flex-shrink-0 w-4 h-4 flex items-center justify-center">
+                    {copied
+                        ? <Check className="w-3.5 h-3.5 text-success-500" />
+                        : <Copy className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    }
+                </span>
+            )}
+        </div>
+    );
+}
 
 const SalesView = ({ onGoToChat, initialSearch = '' }) => {
     const { toast, confirm } = useToast();
-    // Any admin (with or without home sellerId) sees the cross-seller filter
-    // and can view orders from all sellers to supervise.
     const { isAdmin } = useAuth();
     const { sellers } = useSeller();
     const [page, setPage] = useState(1);
 
-    // Advanced Filters V2
     const [searchTerm, setSearchTerm] = useState(initialSearch);
     const [statusFilter, setStatusFilter] = useState('Todos');
     const [sellerFilter, setSellerFilter] = useState('Todos');
 
-    // Debounce search — 350ms para no martillar la API en cada tecla.
-    // El search debounceado se manda al hook useOrders, que lo reenvía a la
-    // API; así "Maria Elina" busca contra TODAS las órdenes históricas, no
-    // solo la página actual.
+    // Debounce search — 350ms para no martillar la API en cada tecla. El valor
+    // debounceado se manda al hook → API; así "Maria Elina" busca contra TODAS
+    // las órdenes históricas, no solo la página actual.
     const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
     useEffect(() => {
         const t = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 350);
         return () => clearTimeout(t);
     }, [searchTerm]);
 
-    // Reset a página 1 cuando cualquier filtro cambia — sino el usuario filtra
-    // algo y se queda viendo la página N que no tiene resultados.
     useEffect(() => { setPage(1); }, [debouncedSearch, statusFilter, sellerFilter]);
 
-    // El sellerFilter local solo aplica para admins (sellers ven solo sus
-    // órdenes via JWT). Para sellers, no se manda al hook.
     const apiInstanceId = isAdmin ? sellerFilter : '';
 
-    // Custom Hook Data — filtros server-side: search + status + instanceId.
-    // Antes status y seller eran client-side sobre 50 órdenes paginadas, lo
-    // que daba el bug de "Pendientes" repartidos en varias páginas (3-5 por
-    // página en vez de juntos).
-    const { orders, pagination, isLoading, isFetching, updateDetails, updateStatus, deleteOrder, refetch } = useOrders(page, 50, debouncedSearch, statusFilter, apiInstanceId);
-    // Historical instanceIds present in Order table — includes "ghost" sellers
-    // whose Account was hard-deleted but whose ventas se preservaron (denis).
-    const [historicalSellerIds, setHistoricalSellerIds] = useState([]);
+    const {
+        orders, pagination, isLoading, isFetching,
+        updateDetails, updateStatus, deleteOrder, refetch
+    } = useOrders(page, 50, debouncedSearch, statusFilter, apiInstanceId);
 
+    // instanceIds históricos — incluye sellers borrados como `denis` cuyas
+    // ventas se preservaron pero la Account ya no existe.
+    const [historicalSellerIds, setHistoricalSellerIds] = useState([]);
     useEffect(() => {
         if (!isAdmin) return;
         let cancelled = false;
         api.get('/api/orders/sellers')
             .then(({ data }) => { if (!cancelled) setHistoricalSellerIds(data?.instanceIds || []); })
-            .catch(() => { /* fall back to current-page derivation */ });
+            .catch(() => {});
         return () => { cancelled = true; };
     }, [isAdmin]);
 
-    // Viewing / Details State
+    // Viewing/details state
     const [viewingOrder, setViewingOrder] = useState(null);
     const [isDetailEditing, setIsDetailEditing] = useState(false);
     const [detailEditData, setDetailEditData] = useState({});
     const [savingDetails, setSavingDetails] = useState(false);
 
-    // Editing State
+    // Edit-status state
     const [editingOrder, setEditingOrder] = useState(null);
     const [editStatus, setEditStatus] = useState('');
     const [editTracking, setEditTracking] = useState('');
     const [savingOrder, setSavingOrder] = useState(false);
 
-    // Tracking State
+    // Tracking state
     const [isTracking, setIsTracking] = useState(false);
     const [trackingData, setTrackingData] = useState(null);
     const [showOriginalAddress, setShowOriginalAddress] = useState(false);
 
     const startDetailEdit = (order) => {
         setDetailEditData({
-            nombre: order.nombre || '',
-            calle: order.calle || '',
-            ciudad: order.ciudad || '',
-            cp: order.cp || '',
-            provincia: order.provincia || '',
-            producto: order.producto || '',
-            precio: order.precio || '0',
-            tracking: order.tracking || '',
-            postdatado: order.postdatado || ''
+            nombre: order.nombre || '', calle: order.calle || '', ciudad: order.ciudad || '',
+            cp: order.cp || '', provincia: order.provincia || '', producto: order.producto || '',
+            precio: order.precio || '0', tracking: order.tracking || '', postdatado: order.postdatado || ''
         });
         setIsDetailEditing(true);
     };
 
-    const cancelDetailEdit = () => {
-        setIsDetailEditing(false);
-        setDetailEditData({});
-    };
+    const cancelDetailEdit = () => { setIsDetailEditing(false); setDetailEditData({}); };
 
     const handleSaveOrderDetails = async () => {
         if (!viewingOrder) return;
         setSavingDetails(true);
         try {
             await updateDetails({ id: viewingOrder.id, data: detailEditData });
-            setViewingOrder((prev) => ({ ...prev, ...detailEditData }));
+            setViewingOrder(prev => ({ ...prev, ...detailEditData }));
             setIsDetailEditing(false);
             toast.success('Orden actualizada');
         } catch (err) {
@@ -114,7 +183,6 @@ const SalesView = ({ onGoToChat, initialSearch = '' }) => {
         setDetailEditData(prev => ({ ...prev, [field]: value }));
     };
 
-    // Tracking Request
     const handleTrackOrder = async (trackingCode) => {
         if (!trackingCode) return;
         setIsTracking(true);
@@ -122,14 +190,13 @@ const SalesView = ({ onGoToChat, initialSearch = '' }) => {
         try {
             const res = await api.get(`/api/orders/tracking/${trackingCode}`);
             setTrackingData(res.data);
-        } catch (e) {
-            toast.error("Error al consultar seguimiento.");
+        } catch {
+            toast.error('Error al consultar seguimiento.');
         } finally {
             setIsTracking(false);
         }
     };
 
-    // Export CSV
     const handleExportCSV = () => {
         if (orders.length === 0) return;
         const headers = ['Fecha', 'Cliente', 'Nombre', 'Producto', 'Plan', 'Precio', 'Postdatado', 'Estado', 'Tracking', 'Ciudad', 'Calle', 'CP'];
@@ -138,7 +205,7 @@ const SalesView = ({ onGoToChat, initialSearch = '' }) => {
             o.cliente || '', o.nombre || '', o.producto || '', o.plan || '', o.precio || '',
             o.postdatado || '', o.status || '', o.tracking || '', o.ciudad || '', o.calle || '', o.cp || ''
         ]);
-        const csvContent = [headers.join(','), ...rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))].join('\n');
+        const csvContent = [headers.join(','), ...rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','))].join('\n');
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -146,7 +213,6 @@ const SalesView = ({ onGoToChat, initialSearch = '' }) => {
         URL.revokeObjectURL(url);
     };
 
-    // Edit logic
     const openEdit = (order) => {
         setEditingOrder(order);
         setEditStatus(order.status || 'Pendiente');
@@ -158,9 +224,11 @@ const SalesView = ({ onGoToChat, initialSearch = '' }) => {
         setSavingOrder(true);
         try {
             await updateStatus({ id: editingOrder.id, status: editStatus, tracking: editTracking });
-            toast.success("Pedido actualizado");
+            toast.success('Pedido actualizado');
             setEditingOrder(null);
-        } catch (e) { toast.error('Error al guardar'); }
+        } catch {
+            toast.error('Error al guardar');
+        }
         setSavingOrder(false);
     };
 
@@ -172,57 +240,43 @@ const SalesView = ({ onGoToChat, initialSearch = '' }) => {
             await deleteOrder(editingOrder.id);
             setEditingOrder(null);
             toast.success('Pedido eliminado');
-        } catch (e) { toast.error('Error eliminando pedido'); }
+        } catch {
+            toast.error('Error eliminando pedido');
+        }
     };
 
     const handleGoToChat = async (clienteStr, sellerPhone) => {
-        if (!clienteStr) {
-            toast.warning('El pedido no tiene un teléfono asociado.');
-            return;
-        }
-
+        if (!clienteStr) { toast.warning('El pedido no tiene un teléfono asociado.'); return; }
         const toastId = toast.info('Buscando chat...');
         try {
-            // Check connected number
             const statusRes = await api.get('/api/status');
             const connectedPhoneInfo = statusRes.data?.info?.wid?.user;
-            // Best effort fallback
-            const connectedPhone = connectedPhoneInfo || (statusRes.data?.config?.alertNumber) || (statusRes.data?.config?.alertNumbers?.[0]);
+            const connectedPhone = connectedPhoneInfo || statusRes.data?.config?.alertNumber || statusRes.data?.config?.alertNumbers?.[0];
 
             if (sellerPhone && connectedPhone) {
                 const cleanedSeller = sellerPhone.replace(/\D/g, '');
                 const cleanedConnected = connectedPhone.replace(/\D/g, '');
-                // Allow matches if one ends with the other (e.g. 549341... vs 341...)
                 if (!cleanedSeller.endsWith(cleanedConnected) && !cleanedConnected.endsWith(cleanedSeller)) {
                     toast.dismiss(toastId);
-                    toast.warning('Esta venta se hizo desde otro \u00fanumero.');
+                    toast.warning('Esta venta se hizo desde otro número.');
                     return;
                 }
             }
 
             const res = await api.get('/api/chats');
             const chats = res.data;
-            const cleaned = clienteStr.replace(/\D/g, ''); // phone numbers only mode
-
+            const cleaned = clienteStr.replace(/\D/g, '');
             const chatExists = chats.find(c => {
                 const cCleaned = String(c.id).replace(/\D/g, '');
-                return c.id === clienteStr ||
-                    c.id === `${clienteStr}@c.us` ||
-                    c.id.includes(cleaned) ||
-                    cCleaned.endsWith(cleaned) ||
-                    cleaned.endsWith(cCleaned) ||
+                return c.id === clienteStr || c.id === `${clienteStr}@c.us` ||
+                    c.id.includes(cleaned) || cCleaned.endsWith(cleaned) || cleaned.endsWith(cCleaned) ||
                     (c.name && c.name.includes(clienteStr));
             });
 
-            if (chatExists) {
-                if (onGoToChat) onGoToChat(chatExists.id);
-                toast.dismiss(toastId);
-            } else {
-                // If it doesn't exist in recent chats, but we know it belongs to us, we can force-go to the ID
-                if (onGoToChat) onGoToChat(`${cleaned}@c.us`);
-                toast.dismiss(toastId);
-            }
-        } catch (e) {
+            if (chatExists && onGoToChat) onGoToChat(chatExists.id);
+            else if (onGoToChat) onGoToChat(`${cleaned}@c.us`);
+            toast.dismiss(toastId);
+        } catch {
             toast.dismiss(toastId);
             toast.error('Error de conexión al verificar chats activos.');
         }
@@ -230,608 +284,559 @@ const SalesView = ({ onGoToChat, initialSearch = '' }) => {
 
     const handleCopySaleDetails = (order) => {
         const rawPhone = order.cliente ? order.cliente.split('@')[0] : '';
-        const phoneDisplay = rawPhone.length > 13 ? `Oculto por Anuncio Meta (${rawPhone})` : rawPhone || 'Desconocido';
-
-        const payLabel = order.paymentMethod === 'mercadopago' ? 'MercadoPago' : order.paymentMethod === 'transferencia' ? 'Transferencia' : 'Contra reembolso';
-        const textToCopy = `Nombre: ${order.nombre || 'Cliente'}
+        const phoneDisplay = rawPhone.length > 13 ? `Oculto por Anuncio Meta (${rawPhone})` : (rawPhone || 'Desconocido');
+        const pm = paymentMeta(order.paymentMethod);
+        const text = `Nombre: ${order.nombre || 'Cliente'}
 Teléfono: ${phoneDisplay}
 Producto: ${order.producto}
 Total: $${order.precio}
-Pago: ${payLabel}
+Pago: ${pm.label}
 Dirección: ${order.calle || '—'}
 Ciudad: ${order.ciudad || '—'}
 Provincia: ${order.provincia || '—'}
 CP: ${order.cp || '—'}`;
 
-        navigator.clipboard.writeText(textToCopy)
+        navigator.clipboard.writeText(text)
             .then(() => toast.success('Venta copiada al portapapeles'))
             .catch(() => toast.error('Error al copiar venta'));
     };
 
-    // Styling Maps
-    const statusOptions = ['Pendiente', 'Confirmado', 'En sistema', 'Enviado', 'Entregado', 'Cancelado'];
-    const statusStyles = {
-        'Pendiente': 'bg-amber-100/80 text-amber-700 border-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.2)]',
-        'Confirmado': 'bg-sky-100/80 text-sky-700 border-sky-300 shadow-[0_0_10px_rgba(14,165,233,0.2)]',
-        'En sistema': 'bg-fuchsia-100/80 text-fuchsia-700 border-fuchsia-300 shadow-[0_0_10px_rgba(217,70,239,0.2)]',
-        'Enviado': 'bg-purple-100/80 text-purple-700 border-purple-300 shadow-[0_0_10px_rgba(168,85,247,0.2)]',
-        'Entregado': 'bg-emerald-100/80 text-emerald-700 border-emerald-300 shadow-[0_0_10px_rgba(16,185,129,0.2)]',
-        'Cancelado': 'bg-rose-100/80 text-rose-700 border-rose-300 shadow-[0_0_10px_rgba(244,63,94,0.2)]'
-    };
-
-    // Filters logic
-    // Admin: filter by seller account (instanceId → name). Seller: filter by phone number (order.seller).
-    // Para que las ventas históricas de cuentas borradas (e.g. denis post-hard-delete)
-    // sigan filtrables, mergeamos sellers actuales + instanceIds presentes en Order.
+    // Sellers para filtro — admin ve todos, seller solo su número.
     const sellerIdToName = Object.fromEntries((sellers || []).map(s => [s.sellerId, capitalize(s.name)]));
-
     const uniqueFilterOptions = isAdmin
-        ? (() => {
-            const fromAccounts = (sellers || []).map(s => s.sellerId).filter(Boolean);
-            const merged = new Set([...fromAccounts, ...historicalSellerIds]);
-            return Array.from(merged);
-        })()
+        ? Array.from(new Set([
+            ...(sellers || []).map(s => s.sellerId).filter(Boolean),
+            ...historicalSellerIds,
+        ]))
         : Array.from(new Set(orders.map(o => o.seller).filter(Boolean)));
-
-    // Label fallback: si el instanceId no tiene Account (ghost), uso el id capitalizado.
     const labelForSeller = (sid) => sellerIdToName[sid] || capitalize(sid || '');
 
-    // Todos los filtros (search + status + instanceId) ya se aplicaron
-    // server-side via /api/orders. Para sellers no-admin que tienen el filtro
-    // local de "VEND.", aplicamos el match client-side por order.seller —
-    // sellers no pueden filtrar por instanceId (no tienen permiso).
     const filteredOrders = isAdmin
         ? orders
-        : orders.filter(order => sellerFilter === 'Todos' || order.seller === sellerFilter);
-
-    // Timezone & Date Formatter
-    const formatDateBA = (dateStr) => {
-        if (!dateStr) return '—';
-        try {
-            // Handle DB legacy strings like "22/02/2026, 17:30" or ISO
-            let d = new Date(dateStr);
-            if (isNaN(d.getTime()) && dateStr.includes('/')) {
-                // Try strictly parsing DD/MM/YYYY
-                const parts = dateStr.split(/[^\d]/);
-                if (parts.length >= 3) {
-                    d = new Date(parts[2], parts[1] - 1, parts[0], parts[3] || 0, parts[4] || 0, parts[5] || 0);
-                }
-            }
-            if (isNaN(d.getTime())) return 'Invalid Date';
-
-            return d.toLocaleString('es-AR', {
-                timeZone: 'America/Argentina/Buenos_Aires',
-                year: 'numeric', month: '2-digit', day: '2-digit',
-                hour: '2-digit', minute: '2-digit'
-            });
-        } catch (e) {
-            return dateStr;
-        }
-    };
+        : orders.filter(o => sellerFilter === 'Todos' || o.seller === sellerFilter);
 
     return (
-        <div className="h-full flex flex-col animate-fade-in relative z-10 w-full space-y-2 sm:space-y-6">
+        <div className="h-full flex flex-col animate-fade-in relative z-10 w-full gap-4">
 
-            {/* V2 Header & Advanced Filters */}
-            <div className="bg-white dark:bg-slate-800/40 backdrop-blur-xl rounded-[1.5rem] sm:rounded-[2rem] border border-slate-200 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-3 sm:p-5 lg:p-6">
-                <div className="flex flex-row justify-between items-center gap-2 mb-3 sm:mb-5">
+            {/* Header + Filters */}
+            <Card padding="md">
+                <div className="flex flex-row justify-between items-center gap-2 mb-4">
                     <div className="min-w-0">
-                        <h1 className="text-lg sm:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-700 to-purple-600 dark:from-indigo-400 dark:to-purple-400 tracking-tight truncate">
-                            Logística y Pedidos
-                        </h1>
-                        <p className="hidden sm:block text-slate-500 dark:text-slate-400 mt-2 text-sm sm:text-base font-medium">Gestión inteligente de estados y envíos en tiempo real.</p>
+                        <h1 className="text-display text-slate-900 dark:text-slate-100">Logística y pedidos</h1>
+                        <p className="hidden sm:block text-sm text-slate-500 dark:text-slate-400 mt-1">
+                            Gestión de estados y envíos en tiempo real.
+                        </p>
                     </div>
-
                     <div className="flex gap-2 flex-shrink-0">
-                        <button onClick={() => refetch()} className="p-2 sm:p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 dark:hover:border-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all shadow-sm active:scale-95 group">
-                            <span className={`group-hover:rotate-180 transition-transform duration-500 block ${isFetching ? 'animate-spin text-indigo-500' : ''}`}><Refresh className="w-4 h-4" /></span>
-                        </button>
-                        <button onClick={handleExportCSV} disabled={orders.length === 0} className="px-3 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-105 transition-all flex items-center gap-2 disabled:opacity-50 disabled:scale-100">
-                            <Download className="w-4 h-4" />
+                        <IconButton
+                            label="Refrescar"
+                            icon={RefreshCw}
+                            variant="subtle"
+                            onClick={() => refetch()}
+                            className={isFetching ? '[&_svg]:animate-spin' : ''}
+                        />
+                        <Button
+                            onClick={handleExportCSV}
+                            disabled={orders.length === 0}
+                            leftIcon={Download}
+                        >
                             <span className="hidden sm:inline">Exportar CSV</span>
-                        </button>
+                            <span className="sm:hidden">CSV</span>
+                        </Button>
                     </div>
                 </div>
 
-                {/* Filters Bar V2 */}
-                <div className="flex flex-col lg:flex-row gap-2 sm:gap-4">
-                    <div className="flex-1 relative group">
-                        <input
-                            type="text"
+                {/* Filtros */}
+                <div className="flex flex-col lg:flex-row gap-2">
+                    <div className="flex-1">
+                        <Input
+                            leftIcon={Search}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            placeholder="Buscar por cliente, teléfono o tracking..."
-                            className="w-full bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl pl-10 sm:pl-12 pr-4 py-2 sm:py-3.5 text-sm font-medium focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all text-slate-700 dark:text-slate-200 shadow-inner placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                            placeholder="Buscar por cliente, teléfono o tracking…"
+                            aria-label="Buscar pedidos"
                         />
-                        <span className="absolute left-3 sm:left-4 top-2 sm:top-3.5 text-slate-400 group-focus-within:text-indigo-500 transition-colors"><Search className="w-4 h-4 sm:w-5 sm:h-5" /></span>
                     </div>
-
-                    {/* Estado filter — single styled select for all viewports (no overflow) */}
-                    <div className="relative sm:w-56 flex-shrink-0">
-                        <Filter className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-slate-400 pointer-events-none" />
-                        <select
+                    <div className="sm:w-56 flex-shrink-0">
+                        <Select
+                            leftIcon={Filter}
                             value={statusFilter}
                             onChange={e => setStatusFilter(e.target.value)}
-                            className="w-full appearance-none bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl pl-10 sm:pl-12 pr-9 py-2 sm:py-3.5 text-sm font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all shadow-inner cursor-pointer"
+                            aria-label="Filtro de estado"
                         >
-                            {['Todos', ...statusOptions].map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                            {['Todos', ...STATUS_OPTIONS].map(s => <option key={s} value={s}>{s}</option>)}
+                        </Select>
                     </div>
-
-                    {/* Vendedor (admin) / Número (seller) filter — single styled select */}
                     {(isAdmin || uniqueFilterOptions.length > 1) && (
-                        <div className="relative sm:w-56 flex-shrink-0">
-                            <span className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 pointer-events-none">
-                                {isAdmin ? 'Vend.' : 'Núm.'}
-                            </span>
-                            <select
+                        <div className="sm:w-56 flex-shrink-0">
+                            <Select
                                 value={sellerFilter}
                                 onChange={e => setSellerFilter(e.target.value)}
-                                className="w-full appearance-none bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl pl-14 sm:pl-16 pr-9 py-2 sm:py-3.5 text-sm font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-400 transition-all shadow-inner cursor-pointer"
+                                aria-label={isAdmin ? 'Filtro de vendedor' : 'Filtro de número'}
                             >
-                                <option value="Todos">Todos</option>
+                                <option value="Todos">{isAdmin ? 'Todos los vendedores' : 'Todos los números'}</option>
                                 {uniqueFilterOptions.map(opt => (
                                     <option key={opt} value={opt}>
                                         {isAdmin ? labelForSeller(opt) : `+${opt.replace(/\D/g, '')}`}
                                     </option>
                                 ))}
-                            </select>
-                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                            </Select>
                         </div>
                     )}
                 </div>
-            </div>
+            </Card>
 
-            {/* V2 Glassmorphism Table */}
-            <div className="flex-1 bg-white dark:bg-slate-800/60 backdrop-blur-xl rounded-[1.25rem] sm:rounded-[2rem] border border-slate-200 dark:border-slate-700/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden flex flex-col relative text-sm">
-
-                {/* Background Glow */}
-                <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-purple-400/10 blur-[100px] rounded-full pointer-events-none"></div>
-
-                <div className="overflow-auto custom-scrollbar flex-1 relative z-10">
-                    {/* PC & Tablet Table View */}
+            {/* Tabla / Mobile cards */}
+            <Card padding="none" className="flex-1 flex flex-col overflow-hidden">
+                <div className="overflow-auto custom-scrollbar flex-1">
+                    {/* Desktop table */}
                     <table className="w-full text-left border-collapse whitespace-nowrap hidden md:table">
-                        <thead className="bg-slate-50/80 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-700/60 sticky top-0 z-20 backdrop-blur-md">
-                            <tr className="text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400 font-extrabold">
-                                <th className="px-4 sm:px-8 py-5 hidden md:table-cell">Fecha</th>
-                                <th className="px-4 sm:px-8 py-5 w-full">Cliente</th>
-                                <th className="px-4 sm:px-8 py-5 whitespace-nowrap">Teléfono</th>
-                                <th className="px-4 sm:px-8 py-5 text-center">Vendedor</th>
-                                <th className="px-4 sm:px-8 py-5 text-center">Estado</th>
-                                <th className="px-4 sm:px-8 py-5 text-right w-10">Acciones</th>
+                        <thead className="bg-slate-50/80 dark:bg-slate-800/40 border-b border-slate-200/70 dark:border-slate-700/70 sticky top-0 z-10 backdrop-blur-sm">
+                            <tr className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400 font-medium">
+                                <th className="px-4 py-3 hidden md:table-cell">Fecha</th>
+                                <th className="px-4 py-3 w-full">Cliente</th>
+                                <th className="px-4 py-3">Teléfono</th>
+                                <th className="px-4 py-3 text-center">Vendedor</th>
+                                <th className="px-4 py-3 text-center">Estado</th>
+                                <th className="px-4 py-3 text-right">Acciones</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-200/50 dark:divide-slate-700/50">
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                             {isLoading ? (
-                                Array.from({ length: 5 }).map((_, i) => (
+                                Array.from({ length: 8 }).map((_, i) => (
                                     <tr key={`skel-${i}`} className="animate-pulse">
-                                        <td className="px-4 py-5 hidden md:table-cell"><div className="h-4 bg-slate-200 dark:bg-slate-700/50 rounded w-16"></div></td>
-                                        <td className="px-4 py-5"><div className="flex gap-3 items-center"><div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700/50"></div><div className="h-4 bg-slate-200 dark:bg-slate-700/50 rounded w-24"></div></div></td>
-                                        <td className="px-4 py-5 text-center"><div className="h-4 bg-slate-200 dark:bg-slate-700/50 rounded w-20"></div></td>
-                                        <td className="px-4 py-5 text-center"><div className="h-4 bg-slate-200 dark:bg-slate-700/50 rounded w-16 mx-auto"></div></td>
-                                        <td className="px-4 py-5 text-center"><div className="h-6 bg-slate-200 dark:bg-slate-700/50 rounded-full w-20 mx-auto"></div></td>
-                                        <td className="px-4 py-5"><div className="flex gap-2 justify-end"><div className="w-10 h-10 rounded-xl bg-slate-200 dark:bg-slate-700/50"></div></div></td>
+                                        <td className="px-4 py-3 hidden md:table-cell"><div className="h-3 bg-slate-200 dark:bg-slate-700/50 rounded w-20" /></td>
+                                        <td className="px-4 py-3"><div className="h-3 bg-slate-200 dark:bg-slate-700/50 rounded w-32" /></td>
+                                        <td className="px-4 py-3"><div className="h-3 bg-slate-200 dark:bg-slate-700/50 rounded w-24" /></td>
+                                        <td className="px-4 py-3 text-center"><div className="h-3 bg-slate-200 dark:bg-slate-700/50 rounded w-16 mx-auto" /></td>
+                                        <td className="px-4 py-3 text-center"><div className="h-5 bg-slate-200 dark:bg-slate-700/50 rounded-full w-20 mx-auto" /></td>
+                                        <td className="px-4 py-3"><div className="flex gap-2 justify-end"><div className="w-8 h-8 rounded bg-slate-200 dark:bg-slate-700/50" /><div className="w-8 h-8 rounded bg-slate-200 dark:bg-slate-700/50" /></div></td>
                                     </tr>
                                 ))
                             ) : filteredOrders.length === 0 ? (
-                                <tr><td colSpan="5" className="text-center py-20">
-                                    <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-dashed border-slate-300 dark:border-slate-600 text-slate-400 dark:text-slate-500">
-                                        <Search className="w-5 h-5" />
-                                    </div>
-                                    <p className="text-slate-500 dark:text-slate-300 font-bold text-lg">No se encontraron pedidos</p>
-                                    <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">Intentá ajustar los filtros de búsqueda.</p>
+                                <tr><td colSpan="6">
+                                    <EmptyState
+                                        icon={Inbox}
+                                        title="No se encontraron pedidos"
+                                        description="Intentá ajustar los filtros de búsqueda."
+                                    />
                                 </td></tr>
                             ) : (
-                                filteredOrders.map(order => (
-                                    <tr key={order.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
-                                        <td className="px-4 py-5 hidden md:table-cell w-32">
-                                            {(() => {
-                                                const dt = formatDateBA(order.createdAt);
-                                                if (typeof dt === 'string' && dt.includes(',')) {
-                                                    const [datePart, timePart] = dt.split(',');
-                                                    return (
-                                                        <div className="flex flex-col whitespace-nowrap">
-                                                            <span className="font-sans text-[13px] font-extrabold text-slate-700 dark:text-slate-200">{datePart.trim()}</span>
-                                                            <span className="font-mono text-xs font-bold text-indigo-400 dark:text-indigo-300 tracking-wider mt-0.5">{timePart.trim()}</span>
-                                                        </div>
-                                                    );
-                                                }
-                                                return <span className="font-sans text-[13px] font-extrabold text-slate-700 dark:text-slate-200">{dt}</span>;
-                                            })()}
-                                        </td>
-                                        <td className="px-4 sm:px-8 py-5 w-full min-w-[200px] sm:max-w-md truncate">
-                                            <button onClick={() => { setViewingOrder(order); setTrackingData(null); }} className="text-left group/click focus:outline-none flex items-center gap-3 w-full">
-                                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/40 dark:to-purple-900/40 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-extrabold text-[13px] shrink-0 border border-indigo-100/80 dark:border-indigo-800/50 shadow-sm hidden sm:flex">
-                                                    {order.nombre ? order.nombre.substring(0, 2).toUpperCase() : '??'}
+                                filteredOrders.map(order => {
+                                    const statusMeta = STATUS_TONE[order.status] || STATUS_TONE['Pendiente'];
+                                    const dt = formatDateBA(order.createdAt);
+                                    const [datePart, timePart] = typeof dt === 'string' && dt.includes(',')
+                                        ? dt.split(',').map(s => s.trim())
+                                        : [dt, ''];
+                                    return (
+                                        <tr key={order.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors group">
+                                            <td className="px-4 py-2.5 hidden md:table-cell">
+                                                <div className="flex flex-col whitespace-nowrap leading-tight">
+                                                    <span className="text-xs font-medium text-slate-700 dark:text-slate-200 tabular-nums">{datePart}</span>
+                                                    {timePart && (
+                                                        <span className="text-[11px] font-mono text-slate-400 dark:text-slate-500 tabular-nums mt-0.5">{timePart}</span>
+                                                    )}
                                                 </div>
-                                                <div className="flex flex-col truncate">
-                                                    <p className="font-extrabold text-[14px] text-slate-800 dark:text-slate-100 group-hover/click:text-indigo-600 dark:group-hover/click:text-indigo-400 transition-colors truncate">
-                                                        {order.nombre || 'Desconocido'}
+                                            </td>
+                                            <td className="px-4 py-2.5 max-w-md">
+                                                <button
+                                                    onClick={() => { setViewingOrder(order); setTrackingData(null); }}
+                                                    className="text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:rounded text-sm font-semibold text-slate-900 dark:text-slate-100 hover:text-accent-600 dark:hover:text-accent-400 transition-colors truncate block w-full"
+                                                >
+                                                    {order.nombre || 'Desconocido'}
+                                                </button>
+                                                {order.producto && (
+                                                    <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                                                        {order.producto}
                                                     </p>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-2.5">
+                                                <span className="text-xs font-mono text-slate-600 dark:text-slate-400">
+                                                    {order.cliente ? '+' + order.cliente.split('@')[0].replace(/\D/g, '') : '—'}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-2.5 text-center">
+                                                {order.instanceId || order.seller ? (
+                                                    <div className="flex flex-col items-center gap-0.5">
+                                                        {order.instanceId && (
+                                                            <span className="text-xs font-medium text-slate-700 dark:text-slate-200 capitalize">
+                                                                {labelForSeller(order.instanceId)}
+                                                            </span>
+                                                        )}
+                                                        {order.seller && (
+                                                            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">
+                                                                +{order.seller.replace(/\D/g, '').slice(-10)}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                ) : <span className="text-xs text-slate-400">—</span>}
+                                            </td>
+                                            <td className="px-4 py-2.5 text-center">
+                                                <Badge tone={statusMeta.tone} dot={statusMeta.dot} size="md">
+                                                    {statusMeta.label}
+                                                </Badge>
+                                            </td>
+                                            <td className="px-4 py-2.5 text-right">
+                                                <div className="flex justify-end gap-1.5">
+                                                    <IconButton
+                                                        label="Ir al chat"
+                                                        icon={MessageCircle}
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={(e) => { e.stopPropagation(); handleGoToChat(order.cliente, order.seller); }}
+                                                    />
+                                                    <IconButton
+                                                        label="Editar pedido"
+                                                        icon={Edit2}
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => openEdit(order)}
+                                                    />
                                                 </div>
-                                            </button>
-                                        </td>
-                                        <td className="px-4 sm:px-8 py-5 whitespace-nowrap">
-                                            <p className="text-[12px] text-slate-500 dark:text-slate-400 font-mono flex items-center gap-2 opacity-90 hover:opacity-100 transition-opacity">
-                                                <svg className="w-4 h-4 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
-                                                {order.cliente ? '+' + order.cliente.split('@')[0].replace(/\D/g, '') : '—'}
-                                            </p>
-                                        </td>
-                                        <td className="px-4 sm:px-8 py-5 text-center">
-                                            {order.instanceId || order.seller ? (
-                                                <div className="flex flex-col items-center gap-0.5">
-                                                    {order.instanceId && (
-                                                        <span className="text-[11px] font-extrabold text-slate-700 dark:text-slate-200 capitalize">
-                                                            {labelForSeller(order.instanceId)}
-                                                        </span>
-                                                    )}
-                                                    {order.seller && (
-                                                        <span className="text-[9px] text-blue-500 dark:text-blue-400 font-mono">
-                                                            (+{order.seller.replace(/\D/g, '').slice(-10)})
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">—</span>
-                                            )}
-                                        </td>
-                                        <td className="px-4 sm:px-8 py-5 text-center">
-                                            <span className={`px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-widest border ${statusStyles[order.status] || statusStyles['Pendiente']}`}>
-                                                {order.status || 'Pendiente'}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 sm:px-8 py-5 text-right">
-                                            <div className="flex justify-end gap-3 transition-opacity">
-                                                <button onClick={(e) => { e.stopPropagation(); handleGoToChat(order.cliente, order.seller); }} className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all flex items-center justify-center shadow-sm" title="Ir al Chat">
-                                                    <Chat className="w-4 h-4" />
-                                                </button>
-                                                <button onClick={() => openEdit(order)} className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500 hover:text-white transition-all flex items-center justify-center shadow-sm" title="Editar Pedido">
-                                                    <Edit className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
+                                            </td>
+                                        </tr>
+                                    );
+                                })
                             )}
                         </tbody>
                     </table>
 
-                    {/* Mobile Cards View (sm and below) */}
+                    {/* Mobile cards */}
                     <div className="md:hidden flex flex-col gap-2 p-3">
                         {isLoading ? (
-                            Array.from({ length: 3 }).map((_, i) => (
-                                <div key={`skel-m-${i}`} className="p-5 rounded-[1.5rem] bg-slate-100/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 animate-pulse h-32"></div>
+                            Array.from({ length: 4 }).map((_, i) => (
+                                <div key={`skel-m-${i}`} className="p-4 rounded-card bg-slate-100/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 animate-pulse h-24" />
                             ))
                         ) : filteredOrders.length === 0 ? (
-                            <div className="text-center py-10">
-                                <div className="w-16 h-16 bg-white dark:bg-slate-800/60 rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500">
-                                    <Search className="w-5 h-5" />
-                                </div>
-                                <p className="text-slate-500 dark:text-slate-300 font-bold text-[15px]">No se encontraron pedidos</p>
-                            </div>
+                            <EmptyState
+                                icon={Inbox}
+                                title="No se encontraron pedidos"
+                                description="Intentá ajustar los filtros de búsqueda."
+                            />
                         ) : (
-                            filteredOrders.map(order => (
-                                <div key={order.id} className="bg-white dark:bg-slate-800/80 backdrop-blur-md border border-slate-200 dark:border-slate-700 rounded-[1.25rem] shadow-sm p-3 flex flex-col gap-2.5 relative overflow-hidden flex-shrink-0 animate-fade-in transition-all active:scale-[0.98]">
-                                    <div className="flex justify-between items-center gap-2 w-full">
-                                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-50 to-purple-100 dark:from-indigo-900/40 dark:to-purple-900/40 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-extrabold text-[13px] shrink-0 border border-white dark:border-slate-700 shadow-sm">
-                                                {order.nombre ? order.nombre.substring(0, 2).toUpperCase() : '??'}
-                                            </div>
-                                            <div className="flex flex-col min-w-0 truncate">
-                                                <p className="font-black text-[13px] text-slate-800 dark:text-slate-100 tracking-tight leading-tight truncate">{order.nombre || 'Desconocido'}</p>
-                                                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1 opacity-90 truncate">
-                                                    <svg className="w-3.5 h-3.5 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                            filteredOrders.map(order => {
+                                const statusMeta = STATUS_TONE[order.status] || STATUS_TONE['Pendiente'];
+                                const dt = formatDateBA(order.createdAt);
+                                const [datePart] = typeof dt === 'string' && dt.includes(',')
+                                    ? dt.split(',').map(s => s.trim())
+                                    : [dt, ''];
+                                return (
+                                    <div key={order.id} className="bg-white dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/70 rounded-card shadow-card p-3 flex flex-col gap-2">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="min-w-0 flex-1">
+                                                <p className="font-semibold text-sm text-slate-900 dark:text-slate-100 truncate">
+                                                    {order.nombre || 'Desconocido'}
+                                                </p>
+                                                <p className="text-xs font-mono text-slate-500 dark:text-slate-400 truncate mt-0.5">
                                                     {order.cliente ? '+' + order.cliente.split('@')[0].replace(/\D/g, '') : '—'}
                                                 </p>
                                             </div>
+                                            <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                                                <Badge tone={statusMeta.tone} dot={statusMeta.dot} size="sm">
+                                                    {statusMeta.label}
+                                                </Badge>
+                                                <span className="text-[10px] text-slate-400 dark:text-slate-500 tabular-nums">
+                                                    {datePart}
+                                                </span>
+                                            </div>
                                         </div>
-                                        <div className="flex flex-col items-end gap-1 shrink-0">
-                                            <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest border shadow-sm ${statusStyles[order.status] || statusStyles['Pendiente']}`}>
-                                                {order.status || 'Pendiente'}
-                                            </span>
-                                            {(() => {
-                                                const dt = formatDateBA(order.createdAt);
-                                                if (typeof dt === 'string' && dt.includes(',')) {
-                                                    const [datePart] = dt.split(',');
-                                                    return <div className="flex flex-col items-end gap-1">
-                                                        <span className="font-extrabold text-[10px] text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-900/50 px-2 py-0.5 rounded border border-slate-100 dark:border-slate-700">{datePart.trim()}</span>
-                                                        {(order.instanceId || order.seller) && (
-                                                            <span className="font-bold text-[9px] text-blue-500 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded border border-blue-100 dark:border-blue-800/50">
-                                                                {order.instanceId ? labelForSeller(order.instanceId) : ''}{order.seller ? ` (+${order.seller.replace(/\D/g, '').slice(-10)})` : ''}
-                                                            </span>
-                                                        )}
-                                                    </div>;
-                                                }
-                                                return <div className="flex flex-col items-end gap-1">
-                                                    <span className="font-extrabold text-[10px] text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-900/50 px-2 py-0.5 rounded border border-slate-100 dark:border-slate-700">{dt}</span>
-                                                    {(order.instanceId || order.seller) && (
-                                                        <span className="font-bold text-[9px] text-blue-500 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded border border-blue-100 dark:border-blue-800/50">
-                                                            {order.instanceId ? labelForSeller(order.instanceId) : ''}{order.seller ? ` (+${order.seller.replace(/\D/g, '').slice(-10)})` : ''}
-                                                        </span>
-                                                    )}
-                                                </div>;
-                                            })()}
+                                        {(order.instanceId || order.seller) && (
+                                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                                {order.instanceId && <span className="capitalize">{labelForSeller(order.instanceId)}</span>}
+                                                {order.seller && <span className="font-mono ml-1">(+{order.seller.replace(/\D/g, '').slice(-10)})</span>}
+                                            </p>
+                                        )}
+                                        <div className="flex gap-1.5 mt-1">
+                                            <Button
+                                                size="sm"
+                                                variant="secondary"
+                                                fullWidth
+                                                onClick={() => { setViewingOrder(order); setTrackingData(null); }}
+                                            >
+                                                Detalles
+                                            </Button>
+                                            <IconButton
+                                                label="Ir al chat"
+                                                icon={MessageCircle}
+                                                variant="subtle"
+                                                size="sm"
+                                                onClick={() => handleGoToChat(order.cliente, order.seller)}
+                                            />
+                                            <IconButton
+                                                label="Editar"
+                                                icon={Edit2}
+                                                variant="subtle"
+                                                size="sm"
+                                                onClick={() => openEdit(order)}
+                                            />
                                         </div>
                                     </div>
-
-                                    <div className="flex gap-1.5">
-                                        <button onClick={() => { setViewingOrder(order); setTrackingData(null); }} className="flex-1 bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 text-indigo-600 dark:text-indigo-400 rounded-xl py-2 text-[10px] font-extrabold uppercase tracking-widest flex items-center justify-center gap-1 shadow-sm active:bg-indigo-50 dark:active:bg-indigo-900/30 transition-colors">
-                                            <Script className="w-3 h-3" /> Detalles
-                                        </button>
-                                        <button onClick={(e) => { e.stopPropagation(); handleGoToChat(order.cliente, order.seller); }} className="w-10 h-9 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/50 text-emerald-600 dark:text-emerald-400 rounded-xl flex items-center justify-center shadow-sm active:bg-emerald-100 dark:active:bg-emerald-900/40 transition-colors">
-                                            <Chat className="w-3.5 h-3.5" />
-                                        </button>
-                                        <button onClick={() => openEdit(order)} className="w-10 h-9 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800/50 text-indigo-600 dark:text-indigo-400 rounded-xl flex items-center justify-center shadow-sm active:bg-indigo-100 dark:active:bg-indigo-900/40 transition-colors">
-                                            <Edit className="w-3.5 h-3.5" />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))
+                                );
+                            })
                         )}
                     </div>
-
                 </div>
 
-                {/* V2 Pagination Controls */}
-                <div className="px-3 sm:px-8 py-2 sm:py-4 border-t border-slate-200 dark:border-slate-700/60 flex flex-row justify-between items-center bg-slate-50/60 dark:bg-slate-800/30 backdrop-blur-md gap-2">
-                    <span className="text-[10px] sm:text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider sm:tracking-widest whitespace-nowrap">
-                        <span className="text-indigo-600 dark:text-indigo-400">{page}</span>/{pagination.totalPages}
-                        <span className="hidden sm:inline"> Página</span>
+                {/* Pagination */}
+                <div className="px-4 py-2.5 border-t border-slate-200/70 dark:border-slate-700/70 flex items-center justify-between gap-2 bg-slate-50/50 dark:bg-slate-800/30 flex-shrink-0">
+                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                        <span className="text-slate-900 dark:text-slate-100 font-semibold">{page}</span>
+                        <span className="mx-1">/</span>
+                        {pagination.totalPages}
                     </span>
-                    <div className="flex gap-1.5 sm:gap-2">
-                        <button
+                    <div className="flex gap-1.5">
+                        <IconButton
+                            label="Página anterior"
+                            icon={ChevronLeft}
+                            variant="ghost"
+                            size="sm"
                             disabled={page <= 1 || isFetching}
                             onClick={() => setPage(p => Math.max(1, p - 1))}
-                            className="px-2.5 sm:px-4 py-1.5 sm:py-2 bg-white dark:bg-slate-800/80 rounded-lg sm:rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm text-[10px] sm:text-xs font-extrabold text-slate-600 dark:text-slate-300 disabled:opacity-50 hover:bg-indigo-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all active:-translate-y-0.5"
-                        >
-                            Ant.
-                        </button>
-                        <button
+                        />
+                        <IconButton
+                            label="Página siguiente"
+                            icon={ChevronRight}
+                            variant="ghost"
+                            size="sm"
                             disabled={page >= pagination.totalPages || isFetching}
                             onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
-                            className="px-2.5 sm:px-4 py-1.5 sm:py-2 bg-white dark:bg-slate-800/80 rounded-lg sm:rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm text-[10px] sm:text-xs font-extrabold text-slate-600 dark:text-slate-300 disabled:opacity-50 hover:bg-indigo-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all active:-translate-y-0.5"
-                        >
-                            Sig.
-                        </button>
+                        />
                     </div>
-                    <span className="text-[10px] sm:text-sm font-bold text-indigo-500 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full border border-indigo-100 dark:border-indigo-800/50 whitespace-nowrap">{pagination.total} <span className="hidden sm:inline">Totales en BD</span><span className="sm:hidden">total</span></span>
+                    <Badge tone="neutral" size="sm">
+                        <span className="tabular-nums">{pagination.total}</span> totales
+                    </Badge>
                 </div>
-            </div>
+            </Card>
 
-            {/* V2 GLASSMORPHISM EDIT MODAL */}
-            {editingOrder && createPortal(
-                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[100] flex items-center justify-center animate-fade-in p-4">
-                    <div className="bg-white dark:bg-slate-800/95 backdrop-blur-2xl rounded-[2rem] shadow-2xl w-full max-w-md p-5 sm:p-8 border border-slate-200 dark:border-slate-700 relative overflow-hidden">
-
-                        <div className="absolute top-0 right-0 w-40 h-40 bg-indigo-500/10 blur-[50px] rounded-full pointer-events-none"></div>
-
-                        <div className="flex justify-between items-center mb-5 sm:mb-8 relative z-10">
-                            <div>
-                                <h3 className="text-xl sm:text-2xl font-extrabold text-slate-800 dark:text-slate-100 tracking-tight">Editar Estado</h3>
-                                <p className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest mt-1">Order #{editingOrder.id?.substring(0, 6) || 'N/A'}</p>
-                            </div>
-                            <button onClick={() => setEditingOrder(null)} className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 hover:text-slate-800 dark:hover:text-white transition-colors flex items-center justify-center">✕</button>
-                        </div>
-
-                        <div className="space-y-6 relative z-10">
-                            <div className="bg-gradient-to-br from-slate-50 to-blue-50/50 dark:from-slate-700/50 dark:to-slate-700/30 rounded-2xl p-5 border border-slate-200/60 dark:border-slate-600/50 shadow-inner">
-                                <p className="text-lg font-extrabold text-slate-800 dark:text-slate-100 mb-1">{editingOrder.nombre || 'Sin nombre'}</p>
-                                <p className="text-sm font-mono text-slate-500 dark:text-slate-400 mb-3">{editingOrder.cliente}</p>
-                                <div className="flex items-center gap-2">
-                                    <span className="px-2.5 py-1 rounded-lg bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 text-xs font-bold">{editingOrder.producto}</span>
-                                    <span className="text-sm font-extrabold text-slate-800 dark:text-slate-100 ml-auto">${editingOrder.precio}</span>
+            {/* Edit-status modal */}
+            <Modal
+                open={!!editingOrder}
+                onClose={() => setEditingOrder(null)}
+                title="Editar estado"
+                subtitle={editingOrder ? `Order #${editingOrder.id?.substring(0, 6) || 'N/A'}` : ''}
+                size="md"
+            >
+                {editingOrder && (
+                    <>
+                        <Modal.Body>
+                            <div className="bg-slate-50 dark:bg-slate-800/40 rounded-control p-4 border border-slate-200/70 dark:border-slate-700/70 mb-4">
+                                <p className="font-semibold text-slate-900 dark:text-slate-100 text-sm mb-0.5">
+                                    {editingOrder.nombre || 'Sin nombre'}
+                                </p>
+                                <p className="text-xs font-mono text-slate-500 dark:text-slate-400 mb-2">
+                                    {editingOrder.cliente}
+                                </p>
+                                <div className="flex items-center justify-between gap-2">
+                                    <Badge tone="accent" size="md">{editingOrder.producto}</Badge>
+                                    <span className="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+                                        ${editingOrder.precio}
+                                    </span>
                                 </div>
                             </div>
 
-                            <div>
-                                <label className="block text-xs font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2 ml-1">Estado del Pedido</label>
-                                <div className="relative">
-                                    <select
-                                        value={editStatus}
-                                        onChange={(e) => setEditStatus(e.target.value)}
-                                        className="w-full appearance-none bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-5 py-4 text-sm font-bold text-slate-700 dark:text-slate-200 focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all shadow-sm cursor-pointer"
-                                    >
-                                        {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
-                                    </select>
-                                    <div className="absolute inset-y-0 right-0 flex items-center px-5 pointer-events-none text-slate-400">
-                                        <Filter className="w-5 h-5" />
-                                    </div>
-                                </div>
-                            </div>
+                            <div className="space-y-3">
+                                <Select
+                                    label="Estado del pedido"
+                                    leftIcon={Filter}
+                                    value={editStatus}
+                                    onChange={(e) => setEditStatus(e.target.value)}
+                                >
+                                    {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                                </Select>
 
-                            <div>
-                                <label className="block text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2 ml-1">Código de Seguimiento</label>
-                                <input
+                                <Input
+                                    label="Código de seguimiento"
                                     type="text"
                                     value={editTracking}
                                     onChange={(e) => setEditTracking(e.target.value)}
                                     placeholder="Ej: CP123456789AR"
-                                    className="w-full bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-5 py-4 text-sm font-mono font-bold text-slate-700 dark:text-slate-200 focus:ring-4 focus:ring-blue-500/20 focus:border-blue-400 outline-none transition-all shadow-sm placeholder:text-slate-300 dark:placeholder:text-slate-500"
+                                    className="font-mono"
                                 />
                             </div>
-                        </div>
+                        </Modal.Body>
 
-                        <div className="mt-8 space-y-3 relative z-10">
-                            <div className="flex gap-3">
-                                <button onClick={() => setEditingOrder(null)} className="flex-1 py-4 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors shadow-sm">
-                                    Cancelar
-                                </button>
-                                <button onClick={handleSaveEdit} disabled={savingOrder} className="flex-1 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-[1.02] transition-all disabled:opacity-50 disabled:scale-100">
-                                    {savingOrder ? 'Guardando...' : 'Aplicar Cambios'}
-                                </button>
-                            </div>
+                        <Modal.Footer className="flex-col sm:flex-row gap-2">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleDeleteOrder}
+                                leftIcon={Trash2}
+                                className="!text-danger-600 hover:!bg-danger-50 dark:hover:!bg-danger-900/20 mr-auto"
+                            >
+                                Eliminar
+                            </Button>
+                            <Button variant="secondary" onClick={() => setEditingOrder(null)}>
+                                Cancelar
+                            </Button>
+                            <Button
+                                onClick={handleSaveEdit}
+                                loading={savingOrder}
+                            >
+                                Aplicar cambios
+                            </Button>
+                        </Modal.Footer>
+                    </>
+                )}
+            </Modal>
 
-                            <button onClick={handleDeleteOrder} className="w-full py-4 bg-transparent border-2 border-rose-100 text-rose-500 rounded-xl text-xs font-extrabold uppercase tracking-widest hover:bg-rose-50 hover:border-rose-200 transition-all flex items-center justify-center gap-2 mt-4">
-                                <Trash className="w-4 h-4" />
-                                Eliminar Registro
-                            </button>
-                        </div>
+            {/* Detail modal */}
+            <Modal
+                open={!!viewingOrder}
+                onClose={() => { setViewingOrder(null); cancelDetailEdit(); }}
+                size="fullscreen-mobile"
+                statusSlot={viewingOrder && (
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                        {(() => {
+                            const s = STATUS_TONE[viewingOrder.status] || STATUS_TONE['Pendiente'];
+                            const p = paymentMeta(viewingOrder.paymentMethod);
+                            return (
+                                <>
+                                    <Badge tone={s.tone} dot={s.dot} size="md">{s.label}</Badge>
+                                    <Badge tone={p.tone} size="md">{p.label}</Badge>
+                                    {viewingOrder.postdatado &&
+                                        String(viewingOrder.postdatado).trim() !== '' &&
+                                        !['no', 'false'].includes(String(viewingOrder.postdatado).toLowerCase()) && (
+                                        <Badge tone="warning" dot size="md">{viewingOrder.postdatado}</Badge>
+                                    )}
+                                </>
+                            );
+                        })()}
                     </div>
-                </div>,
-                document.body
-            )}
-
-            {/* V3 DATA-FIRST TICKET MODAL */}
-            {viewingOrder && createPortal(
-                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[100] flex items-center justify-center animate-fade-in p-0 sm:p-4" onClick={() => { setViewingOrder(null); cancelDetailEdit(); }}>
-                    <div className="bg-white dark:bg-slate-900 rounded-none sm:rounded-2xl shadow-2xl w-full h-full sm:h-auto max-w-xl overflow-hidden flex flex-col sm:max-h-[90vh] border border-slate-200 dark:border-slate-700" onClick={e => e.stopPropagation()}>
-
-                        {/* Header — compact */}
-                        <div className="px-5 py-4 flex justify-between items-center border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 shrink-0">
-                            <div className="flex items-center gap-3">
-                                <span className={`px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider border ${statusStyles[viewingOrder.status] || statusStyles['Pendiente']}`}>
-                                    {viewingOrder.status || 'Pendiente'}
-                                </span>
-                                <span className={`px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider border ${
-                                    viewingOrder.paymentMethod === 'mercadopago' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800/50'
-                                    : viewingOrder.paymentMethod === 'transferencia' ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-800/50'
-                                    : 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/50'
-                                }`}>
-                                    {viewingOrder.paymentMethod === 'mercadopago' ? '💳 MP' : viewingOrder.paymentMethod === 'transferencia' ? '🏦 Transf.' : '💵 C/R'}
-                                </span>
-                                {viewingOrder.postdatado && String(viewingOrder.postdatado).trim() !== '' && String(viewingOrder.postdatado).toLowerCase() !== 'no' && String(viewingOrder.postdatado).toLowerCase() !== 'false' && (
-                                    <span className="px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider border bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800/50 flex items-center gap-1">
-                                        <div className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse"></div>
-                                        {viewingOrder.postdatado}
-                                    </span>
-                                )}
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                                {!isDetailEditing ? (
-                                    <button onClick={() => startDetailEdit(viewingOrder)} className="w-8 h-8 rounded-lg bg-white dark:bg-slate-700 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all flex items-center justify-center border border-slate-200 dark:border-slate-600" title="Editar">
-                                        <Edit className="w-3.5 h-3.5" />
-                                    </button>
-                                ) : (
-                                    <button onClick={cancelDetailEdit} className="w-8 h-8 rounded-lg bg-rose-50 dark:bg-rose-900/30 text-rose-500 hover:text-rose-700 transition-all flex items-center justify-center border border-rose-200 dark:border-rose-800/50" title="Cancelar edición">
-                                        <XIcon className="w-3.5 h-3.5" />
-                                    </button>
-                                )}
-                                <button onClick={() => { setViewingOrder(null); cancelDetailEdit(); }} className="w-8 h-8 rounded-lg bg-white dark:bg-slate-700 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-all flex items-center justify-center border border-slate-200 dark:border-slate-600">
-                                    <XIcon className="w-3.5 h-3.5" />
-                                </button>
-                            </div>
+                )}
+            >
+                {viewingOrder && (
+                    <>
+                        {/* Action bar — edit toggle */}
+                        <div className="px-5 py-2 border-b border-slate-200 dark:border-slate-700 flex justify-end gap-1.5 flex-shrink-0">
+                            {!isDetailEditing ? (
+                                <IconButton
+                                    label="Editar"
+                                    icon={Edit2}
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => startDetailEdit(viewingOrder)}
+                                />
+                            ) : (
+                                <Button variant="ghost" size="sm" onClick={cancelDetailEdit}>
+                                    Cancelar edición
+                                </Button>
+                            )}
                         </div>
 
-                        {/* Content — data rows */}
-                        <div className="overflow-y-auto custom-scrollbar flex-1 bg-white dark:bg-slate-900">
-                            {/* Data field rows — each clickable to copy */}
+                        <Modal.Body padded={false}>
                             {(() => {
-                                const CopyRow = ({ label, value, editField, mono }) => {
-                                    const [copied, setCopied] = React.useState(false);
-                                    const handleCopy = () => {
-                                        if (!value || isDetailEditing) return;
-                                        navigator.clipboard.writeText(value).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); });
-                                    };
-                                    return (
-                                        <div
-                                            onClick={handleCopy}
-                                            className={`flex items-center justify-between px-5 py-3 border-b border-slate-100 dark:border-slate-800 ${!isDetailEditing ? 'hover:bg-indigo-50/50 dark:hover:bg-indigo-900/10 cursor-pointer' : ''} transition-colors group`}
-                                        >
-                                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 w-24 sm:w-28 shrink-0">{label}</span>
-                                            <div className="flex-1 min-w-0 ml-3">
-                                                {isDetailEditing && editField ? (
-                                                    editField
-                                                ) : (
-                                                    <span className={`text-sm font-semibold text-slate-800 dark:text-slate-100 block truncate ${mono ? 'font-mono' : ''}`}>{value || '—'}</span>
-                                                )}
-                                            </div>
-                                            {!isDetailEditing && (
-                                                <span className="ml-2 shrink-0">
-                                                    {copied
-                                                        ? <Check className="w-3.5 h-3.5 text-emerald-500" />
-                                                        : <Copy className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                    }
-                                                </span>
-                                            )}
-                                        </div>
-                                    );
-                                };
-                                const editInput = (field, placeholder, extraClass = '') => (
-                                    <input type="text" value={detailEditData[field] || ''} onChange={e => handleDetailField(field, e.target.value)} className={`w-full text-sm font-semibold text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-700 rounded-lg px-3 py-1.5 border border-slate-200 dark:border-slate-600 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900/50 outline-none ${extraClass}`} placeholder={placeholder} />
+                                const editInput = (field, placeholder) => (
+                                    <input
+                                        type="text"
+                                        value={detailEditData[field] || ''}
+                                        onChange={e => handleDetailField(field, e.target.value)}
+                                        className="w-full text-sm font-medium text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800 rounded-control px-3 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20 outline-none"
+                                        placeholder={placeholder}
+                                    />
                                 );
                                 const rawPhone = viewingOrder.cliente ? viewingOrder.cliente.split('@')[0] : '';
                                 const phoneDisplay = rawPhone.length > 13 ? `Oculto (${rawPhone.slice(-6)})` : rawPhone;
-                                const addressDisplay = showOriginalAddress && viewingOrder.calleOriginal ? viewingOrder.calleOriginal : (viewingOrder.calle || '');
-                                const locationParts = [viewingOrder.ciudad, viewingOrder.provincia].filter(Boolean).join(', ');
+                                const addressDisplay = showOriginalAddress && viewingOrder.calleOriginal
+                                    ? viewingOrder.calleOriginal
+                                    : (viewingOrder.calle || '');
 
                                 return (
                                     <>
-                                        <CopyRow label="Nombre" value={viewingOrder.nombre || 'Sin nombre'} editField={editInput('nombre', 'Nombre completo')} />
-                                        <CopyRow label="Teléfono" value={phoneDisplay} mono />
-                                        <CopyRow label="Producto" value={viewingOrder.producto || 'Sin producto'} editField={editInput('producto', 'Producto')} />
-                                        <CopyRow label="Total" value={`$${viewingOrder.precio}`} editField={editInput('precio', 'Precio')} />
-                                        {/* Pedido con seña — el cartero NO cobra el total, solo el saldo restante. */}
+                                        <CopyRow editing={isDetailEditing} label="Nombre" value={viewingOrder.nombre || 'Sin nombre'} editField={editInput('nombre', 'Nombre completo')} />
+                                        <CopyRow editing={isDetailEditing} label="Teléfono" value={phoneDisplay} mono />
+                                        <CopyRow editing={isDetailEditing} label="Producto" value={viewingOrder.producto || 'Sin producto'} editField={editInput('producto', 'Producto')} />
+                                        <CopyRow editing={isDetailEditing} label="Total" value={`$${viewingOrder.precio}`} editField={editInput('precio', 'Precio')} />
+
+                                        {/* Seña pagada — el cartero NO cobra el total, solo el saldo restante */}
                                         {viewingOrder.senaPaid && viewingOrder.senaAmount > 0 && (
-                                            <div className="px-5 py-3 border-b border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-900/20">
+                                            <div className="px-5 py-3 border-b border-warning-100 dark:border-warning-900/40 bg-warning-50 dark:bg-warning-900/20">
                                                 <div className="flex items-center justify-between gap-2">
-                                                    <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">⚠️ Seña pagada</span>
-                                                    <span className="text-xs font-bold text-amber-700 dark:text-amber-400">${Number(viewingOrder.senaAmount).toLocaleString('es-AR')} por MP</span>
+                                                    <span className="text-[11px] font-medium uppercase tracking-wide text-warning-700 dark:text-warning-500">
+                                                        Seña pagada
+                                                    </span>
+                                                    <span className="text-sm font-semibold tabular-nums text-warning-700 dark:text-warning-500">
+                                                        ${Number(viewingOrder.senaAmount).toLocaleString('es-AR')} por MP
+                                                    </span>
                                                 </div>
-                                                <div className="flex items-center justify-between gap-2 mt-1">
-                                                    <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">💵 Cobrar cartero</span>
-                                                    <span className="text-base font-black text-emerald-700 dark:text-emerald-400">${Number(viewingOrder.cashRemainder || 0).toLocaleString('es-AR')}</span>
+                                                <div className="flex items-center justify-between gap-2 mt-1.5">
+                                                    <span className="text-[11px] font-medium uppercase tracking-wide text-success-700 dark:text-success-500">
+                                                        Cobrar al cartero
+                                                    </span>
+                                                    <span className="text-base font-semibold tabular-nums text-success-700 dark:text-success-500">
+                                                        ${Number(viewingOrder.cashRemainder || 0).toLocaleString('es-AR')}
+                                                    </span>
                                                 </div>
                                             </div>
                                         )}
-                                        <CopyRow label="Dirección" value={addressDisplay || 'Sin domicilio'} editField={editInput('calle', 'Calle y número')} />
-                                        <CopyRow label="Ciudad" value={viewingOrder.ciudad || '—'} editField={editInput('ciudad', 'Ciudad')} />
-                                        <CopyRow label="Provincia" value={viewingOrder.provincia || '—'} editField={editInput('provincia', 'Provincia')} />
-                                        <CopyRow label="C.P." value={viewingOrder.cp || '—'} editField={editInput('cp', 'Código postal')} mono />
-                                        <CopyRow label="Fecha" value={formatDateBA(viewingOrder.createdAt)} />
-                                        {viewingOrder.tracking && <CopyRow label="Tracking" value={viewingOrder.tracking} mono />}
+
+                                        <CopyRow editing={isDetailEditing} label="Dirección" value={addressDisplay || 'Sin domicilio'} editField={editInput('calle', 'Calle y número')} />
+                                        <CopyRow editing={isDetailEditing} label="Ciudad" value={viewingOrder.ciudad || '—'} editField={editInput('ciudad', 'Ciudad')} />
+                                        <CopyRow editing={isDetailEditing} label="Provincia" value={viewingOrder.provincia || '—'} editField={editInput('provincia', 'Provincia')} />
+                                        <CopyRow editing={isDetailEditing} label="C.P." value={viewingOrder.cp || '—'} editField={editInput('cp', 'Código postal')} mono />
+                                        <CopyRow editing={isDetailEditing} label="Fecha" value={formatDateBA(viewingOrder.createdAt)} />
+                                        {viewingOrder.tracking && (
+                                            <CopyRow editing={isDetailEditing} label="Tracking" value={viewingOrder.tracking} mono />
+                                        )}
                                     </>
                                 );
                             })()}
 
                             {/* Original address toggle */}
                             {!isDetailEditing && viewingOrder.calleOriginal && viewingOrder.calleOriginal !== viewingOrder.calle && (
-                                <div className="px-5 py-2 border-b border-slate-100 dark:border-slate-800">
-                                    <button
+                                <div className="px-5 py-2.5 border-b border-slate-100 dark:border-slate-800">
+                                    <Button
+                                        size="sm"
+                                        variant="subtle"
+                                        leftIcon={MapPin}
                                         onClick={() => setShowOriginalAddress(!showOriginalAddress)}
-                                        className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md border transition-all ${
-                                            showOriginalAddress
-                                                ? 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800/50'
-                                                : 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800/50'
-                                        }`}
                                     >
-                                        {showOriginalAddress ? '📍 Ver Maps' : '✏️ Ver Original'}
-                                    </button>
+                                        {showOriginalAddress ? 'Ver dirección de Maps' : 'Ver dirección original'}
+                                    </Button>
                                 </div>
                             )}
 
-                            {/* Tracking timeline — only if tracking exists and has been queried */}
+                            {/* Tracking timeline */}
                             {viewingOrder.tracking && (
                                 <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800">
                                     <div className="flex justify-between items-center mb-3">
-                                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Seguimiento</span>
-                                        <button onClick={() => handleTrackOrder(viewingOrder.tracking)} disabled={isTracking} className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 disabled:opacity-50 transition-colors">
-                                            {isTracking ? 'Consultando...' : 'Rastrear'}
-                                        </button>
+                                        <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                            Seguimiento
+                                        </span>
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => handleTrackOrder(viewingOrder.tracking)}
+                                            loading={isTracking}
+                                        >
+                                            Rastrear
+                                        </Button>
                                     </div>
                                     {trackingData && (
                                         <div className="animate-fade-in">
                                             {trackingData.success ? (
                                                 trackingData.events && trackingData.events.length > 0 ? (
-                                                    <div className="space-y-3">
+                                                    <ul className="space-y-2.5 ml-1.5 border-l-2 border-accent-100 dark:border-accent-900/50 pl-4">
                                                         {trackingData.events.map((ev, i) => (
-                                                            <div key={i} className="flex gap-3 items-start relative pb-3 border-l-2 border-indigo-100 dark:border-indigo-900/50 last:border-0 last:pb-0 ml-1.5">
-                                                                <div className="absolute -left-[4px] top-1 w-1.5 h-1.5 rounded-full bg-indigo-400 ring-2 ring-white dark:ring-slate-900"></div>
-                                                                <div className="pl-3 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 w-full">
-                                                                    <div className="min-w-[100px]">
-                                                                        <span className="font-bold text-slate-700 dark:text-slate-200 text-xs">{ev.fecha}</span>
-                                                                        <span className="text-blue-500 font-bold uppercase text-[9px] tracking-wider ml-1">{ev.planta}</span>
-                                                                    </div>
-                                                                    <p className="text-slate-600 dark:text-slate-300 text-xs flex-1">{ev.historia}</p>
+                                                            <li key={i} className="relative">
+                                                                <span className="absolute -left-[18px] top-1.5 w-2 h-2 rounded-full bg-accent-500 ring-2 ring-white dark:ring-slate-900" />
+                                                                <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3">
+                                                                    <span className="text-xs font-medium text-slate-700 dark:text-slate-200 min-w-[100px]">
+                                                                        {ev.fecha}
+                                                                        {ev.planta && <span className="text-[10px] text-info-500 font-medium uppercase tracking-wide ml-1.5">{ev.planta}</span>}
+                                                                    </span>
+                                                                    <p className="text-xs text-slate-600 dark:text-slate-400 flex-1">{ev.historia}</p>
                                                                 </div>
-                                                            </div>
+                                                            </li>
                                                         ))}
-                                                    </div>
+                                                    </ul>
                                                 ) : (
-                                                    <p className="text-slate-400 dark:text-slate-500 text-xs">Sin movimientos recientes.</p>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400">Sin movimientos recientes.</p>
                                                 )
                                             ) : (
-                                                <p className="text-rose-500 dark:text-rose-400 text-xs font-medium">{trackingData.error || 'Sin información.'}</p>
+                                                <p className="text-xs text-danger-600 dark:text-danger-500 font-medium">
+                                                    {trackingData.error || 'Sin información.'}
+                                                </p>
                                             )}
                                         </div>
                                     )}
@@ -841,57 +846,63 @@ CP: ${order.cp || '—'}`;
                             {/* Status history */}
                             {viewingOrder.logs && viewingOrder.logs.length > 0 && (
                                 <div className="px-5 py-4">
-                                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3 block">Historial</span>
-                                    <div className="space-y-3">
+                                    <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-3 block">
+                                        Historial
+                                    </span>
+                                    <ul className="space-y-2.5 ml-1.5 border-l-2 border-accent-100 dark:border-accent-900/50 pl-4">
                                         {[...viewingOrder.logs].reverse().map((log, idx) => (
-                                            <div key={idx} className="flex gap-3 items-start relative pb-3 border-l-2 border-indigo-100 dark:border-indigo-900/50 last:border-0 last:pb-0 ml-1.5">
-                                                <div className="absolute -left-[5px] top-0 w-2.5 h-2.5 rounded-full bg-white dark:bg-slate-900 border-[3px] border-indigo-500 z-10"></div>
-                                                <div className="pl-4 flex-1">
-                                                    <div className="flex justify-between items-center mb-0.5">
-                                                        <span className="font-bold text-slate-700 dark:text-slate-200 text-xs">{log.status}</span>
-                                                        <span className="text-slate-400 dark:text-slate-500 text-[10px] font-medium">{formatDateBA(log.timestamp)}</span>
-                                                    </div>
-                                                    <p className="text-slate-500 dark:text-slate-400 text-xs">{log.message}</p>
+                                            <li key={idx} className="relative">
+                                                <span className="absolute -left-[19px] top-1 w-2.5 h-2.5 rounded-full bg-white dark:bg-slate-900 border-2 border-accent-500" />
+                                                <div className="flex justify-between items-baseline mb-0.5">
+                                                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">{log.status}</span>
+                                                    <span className="text-[10px] text-slate-400 dark:text-slate-500 tabular-nums">{formatDateBA(log.timestamp)}</span>
                                                 </div>
-                                            </div>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400">{log.message}</p>
+                                            </li>
                                         ))}
-                                    </div>
+                                    </ul>
                                 </div>
                             )}
 
                             {viewingOrder.status === 'Cancelado' && (
-                                <div className="mx-5 mb-4 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 font-bold text-xs p-3 rounded-xl text-center border border-rose-100 dark:border-rose-800/50">
+                                <div className="mx-5 my-4 bg-danger-50 dark:bg-danger-900/20 text-danger-700 dark:text-danger-500 text-sm font-medium p-3 rounded-control text-center border border-danger-100 dark:border-danger-900/40">
                                     Pedido cancelado
                                 </div>
                             )}
-                        </div>
+                        </Modal.Body>
 
-                        {/* Footer — compact */}
-                        <div className="px-5 py-3 flex justify-end gap-2 shrink-0 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                        <Modal.Footer>
                             {isDetailEditing ? (
                                 <>
-                                    <button onClick={cancelDetailEdit} className="flex items-center gap-1.5 px-4 py-2 bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-600 font-bold text-xs rounded-lg transition-all">
+                                    <Button variant="secondary" onClick={cancelDetailEdit}>
                                         Cancelar
-                                    </button>
-                                    <button onClick={handleSaveOrderDetails} disabled={savingDetails} className="flex items-center gap-1.5 px-5 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50">
-                                        <Save className="w-3.5 h-3.5" /> {savingDetails ? 'Guardando...' : 'Guardar'}
-                                    </button>
+                                    </Button>
+                                    <Button
+                                        onClick={handleSaveOrderDetails}
+                                        loading={savingDetails}
+                                        leftIcon={Save}
+                                    >
+                                        Guardar
+                                    </Button>
                                 </>
                             ) : (
                                 <>
-                                    <button onClick={() => handleCopySaleDetails(viewingOrder)} className="flex items-center gap-1.5 px-4 py-2 bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 border border-slate-200 dark:border-slate-600 hover:border-indigo-200 dark:hover:border-indigo-800/50 font-bold text-xs rounded-lg transition-all">
-                                        <Copy className="w-3.5 h-3.5" /> Copiar todo
-                                    </button>
-                                    <button onClick={() => { setViewingOrder(null); cancelDetailEdit(); }} className="px-5 py-2 bg-slate-800 dark:bg-slate-700 text-white rounded-lg text-xs font-bold hover:bg-black dark:hover:bg-slate-600 transition-all active:scale-95">
+                                    <Button
+                                        variant="secondary"
+                                        onClick={() => handleCopySaleDetails(viewingOrder)}
+                                        leftIcon={Copy}
+                                    >
+                                        Copiar todo
+                                    </Button>
+                                    <Button onClick={() => { setViewingOrder(null); cancelDetailEdit(); }}>
                                         Cerrar
-                                    </button>
+                                    </Button>
                                 </>
                             )}
-                        </div>
-                    </div>
-                </div>,
-                document.body
-            )}
+                        </Modal.Footer>
+                    </>
+                )}
+            </Modal>
         </div>
     );
 };
