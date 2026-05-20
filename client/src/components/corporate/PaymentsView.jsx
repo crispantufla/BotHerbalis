@@ -157,6 +157,8 @@ const PaymentsView = ({ onGoToChat }) => {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(null);
     const [filter, setFilter] = useState('all');
+    // Filtro por vendedor (solo admin global). 'all' = agregado.
+    const [sellerFilter, setSellerFilter] = useState('all');
 
     // Map instanceId → seller name (admin badge)
     const sellerIdToName = Object.fromEntries((sellers || []).map(s => [s.sellerId, capitalize(s.name)]));
@@ -165,10 +167,15 @@ const PaymentsView = ({ onGoToChat }) => {
     const [mpUserPhone, setMpUserPhone] = useState('');
     const [mpLoading, setMpLoading] = useState(false);
 
-    const fetchPayments = useCallback(async (f = filter) => {
+    const fetchPayments = useCallback(async (f = filter, sf = sellerFilter) => {
         try {
             const params = f !== 'all' ? `?status=${f}` : '';
-            const headers = isAdmin ? { 'x-seller-id': '' } : {};
+            // Admin con filtro 'all' ve todos los pagos (header vacío); con un
+            // seller específico, manda ese instanceId. Sellers no-admin van
+            // scoped server-side por su JWT.
+            const headers = isAdmin
+                ? { 'x-seller-id': sf === 'all' ? '' : sf }
+                : {};
             const res = await api.get(`/api/payments${params}`, { headers });
             setPayments(res.data.payments || []);
         } catch {
@@ -176,9 +183,16 @@ const PaymentsView = ({ onGoToChat }) => {
         } finally {
             setLoading(false);
         }
-    }, [filter, isAdmin]);
+    }, [filter, sellerFilter, isAdmin]);
 
     useEffect(() => { fetchPayments(); }, []);
+    // Recargar al cambiar filtro de vendedor.
+    useEffect(() => {
+        if (!isAdmin) return;
+        setLoading(true);
+        fetchPayments(filter, sellerFilter);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sellerFilter]);
 
     // Real-time updates
     useEffect(() => {
@@ -193,7 +207,7 @@ const PaymentsView = ({ onGoToChat }) => {
     const handleFilter = (f) => {
         setFilter(f);
         setLoading(true);
-        fetchPayments(f);
+        fetchPayments(f, sellerFilter);
     };
 
     const handleRefresh = async (id) => {
@@ -282,19 +296,54 @@ const PaymentsView = ({ onGoToChat }) => {
                 </Button>
             </header>
 
-            {/* Stats row */}
+            {/* Filtro por vendedor (admin global) */}
+            {isAdmin && sellers.length > 0 && (
+                <div className="flex p-1 rounded-control bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 overflow-x-auto">
+                    <button
+                        type="button"
+                        onClick={() => setSellerFilter('all')}
+                        className={cn(
+                            'flex-shrink-0 px-3 py-1.5 rounded-[0.5rem] text-sm font-medium transition-colors',
+                            sellerFilter === 'all'
+                                ? 'bg-accent-100 text-accent-700 dark:bg-accent-900/40 dark:text-accent-300'
+                                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+                        )}
+                    >
+                        Todos
+                    </button>
+                    {sellers.map(s => (
+                        <button
+                            key={s.sellerId}
+                            type="button"
+                            onClick={() => setSellerFilter(s.sellerId)}
+                            className={cn(
+                                'flex-shrink-0 px-3 py-1.5 rounded-[0.5rem] text-sm font-medium transition-colors whitespace-nowrap',
+                                sellerFilter === s.sellerId
+                                    ? 'bg-accent-100 text-accent-700 dark:bg-accent-900/40 dark:text-accent-300'
+                                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+                            )}
+                        >
+                            {capitalize(s.name)}
+                        </button>
+                    ))}
+                </div>
+            )}
+
+            {/* Stats row — tipografía agrandada (3xl-4xl) y padding lg para que las
+                tarjetas se sientan presentes en pantalla. Antes con text-xl + p-md
+                quedaban como "captions". */}
             <div className="grid grid-cols-3 gap-3">
-                <Card padding="md" className="text-center">
-                    <p className="text-xl font-semibold tabular-nums text-warning-600 dark:text-warning-500">{pendingCount}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Pendientes</p>
+                <Card padding="lg" className="text-center">
+                    <p className="text-3xl sm:text-4xl font-semibold tabular-nums text-warning-600 dark:text-warning-500 leading-none">{pendingCount}</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 font-medium">Pendientes</p>
                 </Card>
-                <Card padding="md" className="text-center">
-                    <p className="text-xl font-semibold tabular-nums text-success-600 dark:text-success-500">{approvedCount}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Aprobados</p>
+                <Card padding="lg" className="text-center">
+                    <p className="text-3xl sm:text-4xl font-semibold tabular-nums text-success-600 dark:text-success-500 leading-none">{approvedCount}</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 font-medium">Aprobados</p>
                 </Card>
-                <Card padding="md" className="text-center">
-                    <p className="text-xl font-semibold tabular-nums text-info-600 dark:text-info-500">{formatArs(totalApproved)}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Cobrado</p>
+                <Card padding="lg" className="text-center">
+                    <p className="text-2xl sm:text-3xl font-semibold tabular-nums text-info-600 dark:text-info-500 leading-none">{formatArs(totalApproved)}</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 font-medium">Cobrado</p>
                 </Card>
             </div>
 

@@ -22,7 +22,7 @@ import AlertBanner from './comms/AlertBanner';
 import OrdersDrawer from './comms/OrdersDrawer';
 import ScriptPanel from './comms/ScriptPanel';
 
-const CommsView = ({ initialChatId, onChatSelected, initialSearch = '', alerts = [], onAlertAction }) => {
+const CommsView = ({ initialChatId, onChatSelected, onChatOpened, initialSearch = '', alerts = [], onAlertAction }) => {
     const { toast } = useToast();
     const { selectedSellerId } = useSeller();
 
@@ -72,6 +72,13 @@ const CommsView = ({ initialChatId, onChatSelected, initialSearch = '', alerts =
 
     // Reset selected chat cuando un admin cambia de seller.
     useEffect(() => { setSelectedChat(null); }, [selectedSellerId]);
+
+    // Wrapper que dispara `onChatOpened` (típicamente colapsa el sidebar
+    // principal) sólo cuando un chat se selecciona — no al limpiar (null).
+    const selectChat = (chat) => {
+        setSelectedChat(chat);
+        if (chat && onChatOpened) onChatOpened();
+    };
 
     useEffect(() => {
         localStorage.setItem('herbalis_chat_font_size', chatFontSize);
@@ -481,7 +488,7 @@ Teléfono: ${phoneDisplay}`;
 
             {/* SIDEBAR: contactos */}
             <aside className={cn(
-                'w-full md:w-72 lg:w-[300px] xl:w-[340px] md:flex-shrink-0',
+                'w-full md:w-60 lg:w-64 xl:w-72 md:flex-shrink-0',
                 'border-r border-slate-200 dark:border-slate-800 flex-col bg-white dark:bg-slate-800 z-10',
                 'min-h-0 overflow-hidden',
                 selectedChat ? 'hidden md:flex' : 'flex flex-1'
@@ -523,7 +530,7 @@ Teléfono: ${phoneDisplay}`;
                             isSelected={selectedChat?.id === chat.id}
                             hasAlert={alerts.some(a => a.userPhone === chat.id || a.userPhone === chat.id.split('@')[0])}
                             searchTerm={searchTerm}
-                            onSelect={setSelectedChat}
+                            onSelect={selectChat}
                         />
                     ))}
                 </div>

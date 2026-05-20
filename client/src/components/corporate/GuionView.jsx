@@ -12,6 +12,7 @@ import {
 
 const SCRIPT_LABELS = {
     v5: { name: 'V5 · Asesor consultivo', tone: 'Pregunta kilos primero, recomienda según objetivo' },
+    v6: { name: 'V6 · Elena charla',      tone: 'Tono cálido, conversacional, argentino' },
 };
 
 const SECTION_LABELS = {
@@ -288,16 +289,14 @@ const GuionView = () => {
 
     return (
         <div className="max-w-5xl mx-auto w-full space-y-4">
-            <header className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-control bg-accent-50 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400 flex items-center justify-center flex-shrink-0">
-                    <FileText className="w-5 h-5" aria-hidden="true" />
-                </div>
-                <div>
-                    <h1 className="text-h2 text-slate-900 dark:text-slate-100">Guiones del bot</h1>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                        Revisá los guiones y dejá correcciones o notas. Los admins ven todo y pueden marcar como resueltas.
-                    </p>
-                </div>
+            {/* Header alineado con el resto del dashboard (SalesView, PaymentsView…):
+                text-display + subtítulo, sin avatar/ícono. El icono FileText queda
+                disponible si en el futuro quisiéramos retomar el patrón con avatar. */}
+            <header>
+                <h1 className="text-display text-slate-900 dark:text-slate-100">Guiones del bot</h1>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                    Revisá los guiones y dejá correcciones o notas. Los admins ven todo y pueden marcar como resueltas.
+                </p>
             </header>
 
             {/* Tabs por guión */}

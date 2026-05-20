@@ -143,19 +143,18 @@ const AdvancedAnalyticsView = () => {
 
     return (
         <div className="h-full flex flex-col overflow-y-auto custom-scrollbar pb-12 space-y-4">
-            {/* Header + filters */}
-            <header className="flex flex-col md:flex-row md:items-end justify-between gap-3">
-                <div>
-                    <h1 className="text-display text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                        <Activity className="w-6 h-6 text-accent-600 dark:text-accent-400 hidden sm:block" aria-hidden="true" />
-                        Business Intelligence
-                    </h1>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 hidden sm:block">
-                        Análisis de rendimiento, conversión y ventas del bot.
-                    </p>
-                </div>
+            {/* Header: título arriba, filtros en su propia fila debajo. Antes
+                viajaban en flex-row con justify-between, lo que colapsaba el
+                título a 2 líneas cuando había muchos vendedores. */}
+            <header>
+                <h1 className="text-display text-slate-900 dark:text-slate-100">Business Intelligence</h1>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                    Análisis de rendimiento, conversión y ventas del bot.
+                </p>
+            </header>
 
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full flex-wrap">
+                <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
                     {/* Day-range tabs */}
                     <div className="flex p-1 rounded-control bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 w-full sm:w-auto">
                         {DAY_RANGES.map(({ days, label, short }) => (
@@ -217,7 +216,7 @@ const AdvancedAnalyticsView = () => {
                         className={cn('self-end sm:self-auto', loading && '[&_svg]:animate-spin')}
                     />
                 </div>
-            </header>
+            </div>
 
             {/* Empty state cuando no hay datos */}
             {!loading && !hasData && (

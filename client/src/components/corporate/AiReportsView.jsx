@@ -46,16 +46,11 @@ const AiReportsView = () => {
     return (
         <div className="w-full max-w-4xl mx-auto space-y-4">
             <header className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-card bg-warning-50 dark:bg-warning-900/30 text-warning-600 dark:text-warning-500 flex items-center justify-center flex-shrink-0">
-                        <AlertTriangle className="w-5 h-5" aria-hidden="true" />
-                    </div>
-                    <div>
-                        <h1 className="text-h2 text-slate-900 dark:text-slate-100">Errores de IA</h1>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                            {reports.length} reporte{reports.length !== 1 ? 's' : ''} guardado{reports.length !== 1 ? 's' : ''}
-                        </p>
-                    </div>
+                <div className="min-w-0">
+                    <h1 className="text-display text-slate-900 dark:text-slate-100">Errores de IA</h1>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                        {reports.length} reporte{reports.length !== 1 ? 's' : ''} guardado{reports.length !== 1 ? 's' : ''}.
+                    </p>
                 </div>
                 <Button
                     variant="secondary"

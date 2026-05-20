@@ -157,16 +157,11 @@ const FunnelAnalyticsView = () => {
     return (
         <div className="w-full max-w-7xl mx-auto space-y-4">
             <header className="flex items-center justify-between flex-wrap gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-11 h-11 rounded-card bg-info-50 dark:bg-info-900/30 text-info-600 dark:text-info-500 flex items-center justify-center flex-shrink-0">
-                        <Activity className="w-5 h-5" aria-hidden="true" />
-                    </div>
-                    <div>
-                        <h1 className="text-h2 text-slate-900 dark:text-slate-100">Analítica de embudo</h1>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                            Dónde se traban las conversaciones y cómo mejorar la conversión.
-                        </p>
-                    </div>
+                <div className="min-w-0">
+                    <h1 className="text-display text-slate-900 dark:text-slate-100">Analítica de embudo</h1>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                        Dónde se traban las conversaciones y cómo mejorar la conversión.
+                    </p>
                 </div>
                 <div className="flex items-center gap-2">
                     <Select

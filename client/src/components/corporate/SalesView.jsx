@@ -389,16 +389,18 @@ CP: ${order.cp || '—'}`;
             {/* Tabla / Mobile cards */}
             <Card padding="none" className="flex-1 flex flex-col overflow-hidden">
                 <div className="overflow-auto custom-scrollbar flex-1">
-                    {/* Desktop table */}
+                    {/* Desktop table — tipografía agrandada para usuarios 50+ años.
+                        Lo más chico (hora, producto, teléfono del vendedor) sube a
+                        text-xs (12px); lo principal (nombre cliente) a text-base. */}
                     <table className="w-full text-left border-collapse whitespace-nowrap hidden md:table">
                         <thead className="bg-slate-50/80 dark:bg-slate-800/40 border-b border-slate-200/70 dark:border-slate-700/70 sticky top-0 z-10 backdrop-blur-sm">
-                            <tr className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400 font-medium">
-                                <th className="px-4 py-3 hidden md:table-cell">Fecha</th>
-                                <th className="px-4 py-3 w-full">Cliente</th>
-                                <th className="px-4 py-3">Teléfono</th>
-                                <th className="px-4 py-3 text-center">Vendedor</th>
-                                <th className="px-4 py-3 text-center">Estado</th>
-                                <th className="px-4 py-3 text-right">Acciones</th>
+                            <tr className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 font-medium">
+                                <th className="px-4 py-3.5 hidden md:table-cell">Fecha</th>
+                                <th className="px-4 py-3.5 w-full">Cliente</th>
+                                <th className="px-4 py-3.5">Teléfono</th>
+                                <th className="px-4 py-3.5 text-center">Vendedor</th>
+                                <th className="px-4 py-3.5 text-center">Estado</th>
+                                <th className="px-4 py-3.5 text-right">Acciones</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -430,67 +432,67 @@ CP: ${order.cp || '—'}`;
                                         : [dt, ''];
                                     return (
                                         <tr key={order.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors group">
-                                            <td className="px-4 py-2.5 hidden md:table-cell">
+                                            <td className="px-4 py-3.5 hidden md:table-cell">
                                                 <div className="flex flex-col whitespace-nowrap leading-tight">
-                                                    <span className="text-xs font-medium text-slate-700 dark:text-slate-200 tabular-nums">{datePart}</span>
+                                                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-100 tabular-nums">{datePart}</span>
                                                     {timePart && (
-                                                        <span className="text-[11px] font-mono text-slate-400 dark:text-slate-500 tabular-nums mt-0.5">{timePart}</span>
+                                                        <span className="text-xs font-mono text-slate-500 dark:text-slate-400 tabular-nums mt-0.5">{timePart}</span>
                                                     )}
                                                 </div>
                                             </td>
-                                            <td className="px-4 py-2.5 max-w-md">
+                                            <td className="px-4 py-3.5 max-w-md">
                                                 <button
                                                     onClick={() => { setViewingOrder(order); setTrackingData(null); }}
-                                                    className="text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:rounded text-sm font-semibold text-slate-900 dark:text-slate-100 hover:text-accent-600 dark:hover:text-accent-400 transition-colors truncate block w-full"
+                                                    className="text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:rounded text-base font-semibold text-slate-900 dark:text-slate-100 hover:text-accent-600 dark:hover:text-accent-400 transition-colors truncate block w-full"
                                                 >
                                                     {order.nombre || 'Desconocido'}
                                                 </button>
                                                 {order.producto && (
-                                                    <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
                                                         {order.producto}
                                                     </p>
                                                 )}
                                             </td>
-                                            <td className="px-4 py-2.5">
-                                                <span className="text-xs font-mono text-slate-600 dark:text-slate-400">
+                                            <td className="px-4 py-3.5">
+                                                <span className="text-sm font-mono text-slate-700 dark:text-slate-300 tabular-nums">
                                                     {order.cliente ? '+' + order.cliente.split('@')[0].replace(/\D/g, '') : '—'}
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-2.5 text-center">
+                                            <td className="px-4 py-3.5 text-center">
                                                 {order.instanceId || order.seller ? (
                                                     <div className="flex flex-col items-center gap-0.5">
                                                         {order.instanceId && (
-                                                            <span className="text-xs font-medium text-slate-700 dark:text-slate-200 capitalize">
+                                                            <span className="text-sm font-medium text-slate-700 dark:text-slate-200 capitalize">
                                                                 {labelForSeller(order.instanceId)}
                                                             </span>
                                                         )}
                                                         {order.seller && (
-                                                            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">
+                                                            <span className="text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
                                                                 +{order.seller.replace(/\D/g, '').slice(-10)}
                                                             </span>
                                                         )}
                                                     </div>
-                                                ) : <span className="text-xs text-slate-400">—</span>}
+                                                ) : <span className="text-sm text-slate-400">—</span>}
                                             </td>
-                                            <td className="px-4 py-2.5 text-center">
-                                                <Badge tone={statusMeta.tone} dot={statusMeta.dot} size="md">
+                                            <td className="px-4 py-3.5 text-center">
+                                                <Badge tone={statusMeta.tone} dot={statusMeta.dot} size="lg">
                                                     {statusMeta.label}
                                                 </Badge>
                                             </td>
-                                            <td className="px-4 py-2.5 text-right">
+                                            <td className="px-4 py-3.5 text-right">
                                                 <div className="flex justify-end gap-1.5">
                                                     <IconButton
                                                         label="Ir al chat"
                                                         icon={MessageCircle}
                                                         variant="ghost"
-                                                        size="sm"
+                                                        size="md"
                                                         onClick={(e) => { e.stopPropagation(); handleGoToChat(order.cliente, order.seller); }}
                                                     />
                                                     <IconButton
                                                         label="Editar pedido"
                                                         icon={Edit2}
                                                         variant="ghost"
-                                                        size="sm"
+                                                        size="md"
                                                         onClick={() => openEdit(order)}
                                                     />
                                                 </div>
@@ -525,26 +527,26 @@ CP: ${order.cp || '—'}`;
                                     <div key={order.id} className="bg-white dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/70 rounded-card shadow-card p-3 flex flex-col gap-2">
                                         <div className="flex items-start justify-between gap-2">
                                             <div className="min-w-0 flex-1">
-                                                <p className="font-semibold text-sm text-slate-900 dark:text-slate-100 truncate">
+                                                <p className="font-semibold text-base text-slate-900 dark:text-slate-100 truncate">
                                                     {order.nombre || 'Desconocido'}
                                                 </p>
-                                                <p className="text-xs font-mono text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                                                <p className="text-sm font-mono text-slate-500 dark:text-slate-400 truncate mt-0.5 tabular-nums">
                                                     {order.cliente ? '+' + order.cliente.split('@')[0].replace(/\D/g, '') : '—'}
                                                 </p>
                                             </div>
                                             <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                                                <Badge tone={statusMeta.tone} dot={statusMeta.dot} size="sm">
+                                                <Badge tone={statusMeta.tone} dot={statusMeta.dot} size="md">
                                                     {statusMeta.label}
                                                 </Badge>
-                                                <span className="text-[10px] text-slate-400 dark:text-slate-500 tabular-nums">
+                                                <span className="text-xs text-slate-500 dark:text-slate-400 tabular-nums">
                                                     {datePart}
                                                 </span>
                                             </div>
                                         </div>
                                         {(order.instanceId || order.seller) && (
-                                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                                                {order.instanceId && <span className="capitalize">{labelForSeller(order.instanceId)}</span>}
-                                                {order.seller && <span className="font-mono ml-1">(+{order.seller.replace(/\D/g, '').slice(-10)})</span>}
+                                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                                                {order.instanceId && <span className="capitalize font-medium">{labelForSeller(order.instanceId)}</span>}
+                                                {order.seller && <span className="font-mono ml-1 tabular-nums">(+{order.seller.replace(/\D/g, '').slice(-10)})</span>}
                                             </p>
                                         )}
                                         <div className="flex gap-1.5 mt-1">
@@ -579,8 +581,8 @@ CP: ${order.cp || '—'}`;
                 </div>
 
                 {/* Pagination */}
-                <div className="px-4 py-2.5 border-t border-slate-200/70 dark:border-slate-700/70 flex items-center justify-between gap-2 bg-slate-50/50 dark:bg-slate-800/30 flex-shrink-0">
-                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                <div className="px-4 py-3 border-t border-slate-200/70 dark:border-slate-700/70 flex items-center justify-between gap-2 bg-slate-50/50 dark:bg-slate-800/30 flex-shrink-0">
+                    <span className="text-sm font-medium text-slate-500 dark:text-slate-400 whitespace-nowrap tabular-nums">
                         <span className="text-slate-900 dark:text-slate-100 font-semibold">{page}</span>
                         <span className="mx-1">/</span>
                         {pagination.totalPages}

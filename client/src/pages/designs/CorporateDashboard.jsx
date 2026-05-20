@@ -257,7 +257,7 @@ const CorporateDashboard = () => {
         switch (activeTab) {
             case 'dashboard': return <DashboardView alerts={alerts} config={config} handleQuickAction={handleQuickAction} status={status} qrData={qrData} />;
             case 'statistics': return <AdvancedAnalyticsView />;
-            case 'comms': return <CommsView initialChatId={targetChatId} onChatSelected={() => setTargetChatId(null)} alerts={alerts} onAlertAction={handleQuickAction} />;
+            case 'comms': return <CommsView initialChatId={targetChatId} onChatSelected={() => setTargetChatId(null)} onChatOpened={() => { if (!isMobile) setSidebarCollapsed(true); }} alerts={alerts} onAlertAction={handleQuickAction} />;
             case 'logistics': return <SalesView onGoToChat={(chatId) => handleQuickAction(chatId, 'chat')} />;
             case 'gallery': return <GalleryView />;
             case 'manuals': return <ManualsView />;
@@ -544,7 +544,7 @@ const CorporateDashboard = () => {
                         que pintaban en cada vista. Los sacamos: aportaban ruido
                         visual y costaban GPU en mobile sin agregar jerarquía. */}
 
-                    <div className={`flex-1 relative z-0 w-full flex flex-col min-h-0 overflow-hidden ${['comms', 'logistics', 'statistics'].includes(activeTab) ? '' : 'overflow-y-auto custom-scrollbar'} p-3 sm:p-6 lg:p-8 ${isPhone ? 'pb-20' : ''}`}>
+                    <div className={`flex-1 relative z-0 w-full flex flex-col min-h-0 overflow-hidden ${['comms', 'logistics', 'statistics'].includes(activeTab) ? '' : 'overflow-y-auto custom-scrollbar'} p-3 sm:p-4 lg:p-5 ${isPhone ? 'pb-20' : ''}`}>
                         {renderContent()}
                     </div>
                 </main>

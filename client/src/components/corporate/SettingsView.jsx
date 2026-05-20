@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { jsPDF } from 'jspdf';
 import {
-    Download, FileText, Power, Trash2, HardDrive, RefreshCw, KeyRound, RotateCcw,
-    Wrench, Lock
+    FileText, Power, Trash2, HardDrive, RefreshCw, KeyRound, RotateCcw, Lock
 } from 'lucide-react';
 import api from '../../config/axios';
 import { useSocket } from '../../context/SocketContext';
@@ -94,27 +92,9 @@ const SettingsView = ({ status }) => {
         setResetting(false);
     };
 
-    const handleTestReport = async () => {
-        try {
-            toast.info('Generando informe con IA…');
-            const response = await api.post('/api/admin-command', { chatId: 'API_TEST', command: '!resumen' });
-            const reportText = response.data.message;
-            if (!reportText || reportText.includes('No hay logs')) {
-                toast.warning('Datos insuficientes para generar el reporte de hoy.');
-                return;
-            }
-            const doc = new jsPDF();
-            doc.setFontSize(22);
-            doc.text('Reporte diario', 20, 20);
-            doc.setFontSize(10);
-            doc.text(`Generado: ${new Date().toLocaleString()}`, 20, 28);
-            doc.line(20, 32, 190, 32);
-            doc.setFontSize(11);
-            doc.text(doc.splitTextToSize(reportText, 170), 20, 45);
-            doc.save(`reporte_${new Date().toISOString().split('T')[0]}.pdf`);
-            toast.success('Reporte PDF descargado');
-        } catch { toast.error('Error generando el reporte PDF'); }
-    };
+    // handleTestReport y jsPDF eliminados con el card "Generar PDF". Si se
+    // necesita reportes en el futuro hay que volver a importar jsPDF y agregar
+    // el handler — está en el historial git.
 
     const handleResetScriptStats = async () => {
         const ok = await confirm('¿Reiniciar contadores de conversión de V5 y V6?\n\nEmpiezan de cero. Útil cuando los guiones cambiaron y los números viejos ya no son comparables. No afecta ventas ni pedidos.');
@@ -216,13 +196,18 @@ const SettingsView = ({ status }) => {
                 </Badge>
             </header>
 
+            {/* Layout: Editor de Precios (col izq, alto) + stack Modelos+Password
+                (col der, apilados a la misma altura total). Antes col2 quedaba
+                con mucho whitespace porque cada card era altura natural y el
+                grid no las balanceaba. */}
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
-                {/* Precios — PriceEditor preexistente, lo envolvemos en Card */}
+                {/* Col 1: Precios */}
                 <Card padding="md">
                     <PriceEditor />
                 </Card>
 
-                {/* Modelos de venta */}
+                {/* Col 2: stack vertical (Modelos + Password) */}
+                <div className="flex flex-col gap-4 sm:gap-6">
                 <Card padding="md">
                     <div className="flex items-center justify-between gap-3 mb-4">
                         <div className="flex items-center gap-3 min-w-0">
@@ -340,22 +325,10 @@ const SettingsView = ({ status }) => {
                         </Button>
                     </form>
                 </Card>
+                </div>
+                {/* /Col 2 stack */}
 
-                {/* Herramientas */}
-                <Card padding="md">
-                    <div className="flex items-center gap-3 mb-4">
-                        <div className="w-10 h-10 rounded-control bg-info-50 dark:bg-info-900/30 text-info-600 dark:text-info-500 flex items-center justify-center flex-shrink-0">
-                            <Wrench className="w-5 h-5" aria-hidden="true" />
-                        </div>
-                        <div>
-                            <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Herramientas</h3>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">Reportes IA</p>
-                        </div>
-                    </div>
-                    <Button variant="secondary" leftIcon={Download} onClick={handleTestReport} fullWidth>
-                        Generar y descargar reporte PDF
-                    </Button>
-                </Card>
+                {/* Card "Herramientas / Generar PDF" eliminado a pedido. */}
 
                 {/* Danger zone */}
                 <Card padding="md" className="border-danger-200/70 dark:border-danger-900/40 xl:col-span-2">

@@ -113,16 +113,11 @@ const RescueQueueView = ({ onGoToChat }) => {
     return (
         <div className="w-full space-y-4">
             <header className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-11 h-11 rounded-card bg-warning-50 dark:bg-warning-900/30 text-warning-600 dark:text-warning-500 flex items-center justify-center flex-shrink-0">
-                        <LifeBuoy className="w-5 h-5" aria-hidden="true" />
-                    </div>
-                    <div>
-                        <h1 className="text-h2 text-slate-900 dark:text-slate-100">Cola de rescate</h1>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                            {total} leads detenidos en el embudo · ordenados por proximidad al cierre
-                        </p>
-                    </div>
+                <div className="min-w-0">
+                    <h1 className="text-display text-slate-900 dark:text-slate-100">Cola de rescate</h1>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                        {total} leads detenidos en el embudo · ordenados por proximidad al cierre.
+                    </p>
                 </div>
                 <div className="flex items-center gap-2">
                     <Button
