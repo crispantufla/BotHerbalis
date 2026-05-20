@@ -6,10 +6,9 @@ const logger = require('../../utils/logger');
 
 const SCRIPTS_DIR = path.join(__dirname, '../../..');
 // v3 y v4 fueron archivados (archive/knowledge_v3.json, archive/knowledge_v4.json).
-// El panel de guiones solo permite revisar/comentar v5 — el equipo se enfoca en ese
-// único guión. v6 sigue en el repo para sellers que aún lo tengan asignado, pero
-// no se muestra ni se comenta desde la UI.
-const AVAILABLE_SCRIPTS = ['v5'];
+// v5 (Asesor consultivo) y v6 (Elena charla) son los guiones activos que el equipo
+// usa para A/B testing y revisión. El UI permite comentar/anotar ambos.
+const AVAILABLE_SCRIPTS = ['v5', 'v6'];
 
 function _loadScript(name) {
     if (!AVAILABLE_SCRIPTS.includes(name)) return null;

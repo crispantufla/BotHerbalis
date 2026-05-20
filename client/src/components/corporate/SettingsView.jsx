@@ -300,6 +300,7 @@ const SettingsView = ({ status }) => {
                             required
                             leftIcon={Lock}
                             aria-label="Contraseña actual"
+                            autoComplete="current-password"
                         />
                         <Input
                             type="password"
@@ -310,6 +311,7 @@ const SettingsView = ({ status }) => {
                             minLength={8}
                             leftIcon={KeyRound}
                             aria-label="Nueva contraseña"
+                            autoComplete="new-password"
                         />
                         <Input
                             type="password"
@@ -319,6 +321,7 @@ const SettingsView = ({ status }) => {
                             required
                             leftIcon={KeyRound}
                             aria-label="Repetir nueva contraseña"
+                            autoComplete="new-password"
                         />
                         <Button type="submit" loading={pwSaving} leftIcon={KeyRound} fullWidth>
                             Cambiar contraseña

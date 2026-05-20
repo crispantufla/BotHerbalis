@@ -434,16 +434,16 @@ CP: ${order.cp || '—'}`;
                                         <tr key={order.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors group">
                                             <td className="px-4 py-3.5 hidden md:table-cell">
                                                 <div className="flex flex-col whitespace-nowrap leading-tight">
-                                                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-100 tabular-nums">{datePart}</span>
+                                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200 tabular-nums">{datePart}</span>
                                                     {timePart && (
-                                                        <span className="text-xs font-mono text-slate-500 dark:text-slate-400 tabular-nums mt-0.5">{timePart}</span>
+                                                        <span className="text-xs font-mono text-slate-400 dark:text-slate-500 tabular-nums mt-0.5">{timePart}</span>
                                                     )}
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3.5 max-w-md">
                                                 <button
                                                     onClick={() => { setViewingOrder(order); setTrackingData(null); }}
-                                                    className="text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:rounded text-base font-semibold text-slate-900 dark:text-slate-100 hover:text-accent-600 dark:hover:text-accent-400 transition-colors truncate block w-full"
+                                                    className="text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:rounded text-base font-medium text-slate-800 dark:text-slate-100 hover:text-accent-600 dark:hover:text-accent-400 transition-colors truncate block w-full"
                                                 >
                                                     {order.nombre || 'Desconocido'}
                                                 </button>
@@ -454,7 +454,7 @@ CP: ${order.cp || '—'}`;
                                                 )}
                                             </td>
                                             <td className="px-4 py-3.5">
-                                                <span className="text-sm font-mono text-slate-700 dark:text-slate-300 tabular-nums">
+                                                <span className="text-sm font-mono text-slate-500 dark:text-slate-400 tabular-nums">
                                                     {order.cliente ? '+' + order.cliente.split('@')[0].replace(/\D/g, '') : '—'}
                                                 </span>
                                             </td>
@@ -462,12 +462,12 @@ CP: ${order.cp || '—'}`;
                                                 {order.instanceId || order.seller ? (
                                                     <div className="flex flex-col items-center gap-0.5">
                                                         {order.instanceId && (
-                                                            <span className="text-sm font-medium text-slate-700 dark:text-slate-200 capitalize">
+                                                            <span className="text-sm font-medium text-slate-600 dark:text-slate-300 capitalize">
                                                                 {labelForSeller(order.instanceId)}
                                                             </span>
                                                         )}
                                                         {order.seller && (
-                                                            <span className="text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
+                                                            <span className="text-xs text-slate-400 dark:text-slate-500 font-mono tabular-nums">
                                                                 +{order.seller.replace(/\D/g, '').slice(-10)}
                                                             </span>
                                                         )}
