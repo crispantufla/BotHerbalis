@@ -18,22 +18,24 @@ export async function handleWaitingTransferConfirmation(
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
 
     // ── Cliente confirma que ya transfirió ─────────────────────────────────────
+    // Modelo nuevo (may-2026): transferencia siempre por el TOTAL (envío a
+    // domicilio prepago). El branch anticipo $10k es legacy (compat).
     const normalizedForPaid = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    const isCodAnticipo = currentState.paymentMethod === 'contrarembolso' && currentState.senaAmount === 10000;
+    const isLegacyCodAnticipo = currentState.paymentMethod === 'contrarembolso' && currentState.senaAmount === 10000;
     if (PAID_KEYWORDS.test(text) || PAID_KEYWORDS.test(normalizedForPaid)) {
         const { _formatMessage: _fmt } = require('../utils/messages');
         const { getFlowTemplate: _gft } = require('../../utils/messageTemplates');
-        const paidTpl = _gft(isCodAnticipo ? 'cod_received' : 'transfer_received', knowledge);
+        const paidTpl = _gft(isLegacyCodAnticipo ? 'cod_received' : 'transfer_received', knowledge);
         const msg = paidTpl
             ? _fmt(paidTpl, currentState)
-            : (isCodAnticipo
+            : (isLegacyCodAnticipo
                 ? '¡Perfecto! Recibimos tu aviso del anticipo. Verificamos la transferencia y te confirmamos el envío en breve. El saldo lo pagás en efectivo al cartero cuando llega 📦'
                 : '¡Perfecto! Recibimos tu aviso. Verificamos la transferencia y te confirmamos el envío en breve ⏳');
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
-        const adminMsg = isCodAnticipo
-            ? 'Cliente avisó que hizo el ANTICIPO de $10.000 (modalidad contra reembolso) — verificar comprobante y confirmar envío.'
+        const adminMsg = isLegacyCodAnticipo
+            ? '[LEGACY] Cliente avisó haber hecho el ANTICIPO de $10.000 (flujo pre-may-2026) — verificar comprobante.'
             : 'Cliente avisó que hizo la transferencia — verificar comprobante y confirmar envío.';
         await _pauseAndAlert(userId, currentState, dependencies, text, adminMsg);
         return { matched: true };
@@ -88,7 +90,7 @@ export async function handleWaitingTransferConfirmation(
     // ── AI fallback ────────────────────────────────────────────────────────────
     const aiRes = await aiService.chat(text, {
         step: 'waiting_transfer_confirmation',
-        goal: `El cliente ${isCodAnticipo ? 'eligió pagar contra reembolso y debe enviar el *anticipo de $10.000* por transferencia' : 'eligió pagar por transferencia bancaria'} al alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*. Estás esperando que confirme que ${isCodAnticipo ? 'envió el anticipo' : 'realizó la transferencia'}.\n\nREGLAS:\n1. Si pregunta el alias, titular o monto de nuevo, recordáselo: alias *HERBALIS.TIENDA*, a nombre de *BIO ORIGEN S.A.S.*, monto ${isCodAnticipo ? '*$10.000* (anticipo — el resto en efectivo al cartero)' : `$${currentState.totalPrice || '0'}`}.\n2. Si dice que ya transfirió ("listo", "hecho", "ya hice la transferencia"), confirmá que verificás el pago.\n3. Si quiere cambiar a otro método, ofrecele las otras opciones.\n4. Si tiene dudas sobre cómo transferir, explicale que puede hacerlo desde su home banking o app del banco usando el alias.\n\nNUNCA inventes datos bancarios más allá del alias y titular oficiales. Hablá siempre en primera persona como Elena, con calidez.`,
+        goal: `El cliente ${isLegacyCodAnticipo ? '[LEGACY pre-may-2026] eligió pagar contra reembolso y debe enviar el *anticipo de $10.000* por transferencia' : 'eligió pagar por transferencia bancaria (envío a domicilio, prepago por el TOTAL)'} al alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*. Estás esperando que confirme que ${isLegacyCodAnticipo ? 'envió el anticipo' : 'realizó la transferencia'}.\n\nREGLAS:\n1. Si pregunta el alias, titular o monto de nuevo, recordáselo: alias *HERBALIS.TIENDA*, a nombre de *BIO ORIGEN S.A.S.*, monto ${isLegacyCodAnticipo ? '*$10.000* (anticipo — el resto en efectivo al cartero)' : `$${currentState.totalPrice || '0'}`}.\n2. Si dice que ya transfirió ("listo", "hecho", "ya hice la transferencia"), confirmá que verificás el pago.\n3. Si quiere cambiar a otro método, ofrecele las otras opciones del modelo nuevo (Mercado Pago para domicilio, o retiro en sucursal para pagar al retirar).\n4. Si tiene dudas sobre cómo transferir, explicale que puede hacerlo desde su home banking o app del banco usando el alias.\n\nNUNCA inventes datos bancarios más allá del alias y titular oficiales. NUNCA menciones anticipo de $10.000 a clientes nuevos (modalidad eliminada en may-2026). Hablá siempre en primera persona como Elena, con calidez.`,
         history: currentState.history,
         summary: currentState.summary,
         knowledge,

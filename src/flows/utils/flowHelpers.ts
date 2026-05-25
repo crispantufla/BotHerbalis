@@ -95,7 +95,7 @@ function _detectPostdatado(normalizedText: string): string | null {
     if (!hasActionContext) return null;
 
     // "cobro el viernes" = worried about money, NOT a postdatado request.
-    // A bare day of the week is always ≤7 days away, which is within the 7-10 day delivery window.
+    // A bare day of the week is always ≤7 days away, which is within the 5-7 day delivery window.
     // If the ONLY action context is payment-related (cobro/depositan/sueldo/pago) and no delivery
     // verbs are present, a day-of-week date is not postdatado — they'll have money by delivery time.
     const hasDeliveryContext = /\b(recibir|recibirlo|llega|llegue|enviar|enviame|envialo|enviamela|enviamelo|mandalo|mandame|mandamela|mandamelo|entregar|mandar|comprar)\b/i.test(normalizedText);
@@ -111,7 +111,7 @@ function _detectPostdatado(normalizedText: string): string | null {
         /el\s+\d{1,2}(?=[\s,.]|$)/i,
         /(?:la\s+)?(?:quincena|semana\s+que\s+viene|mes\s+que\s+viene|pr[oó]ximo\s+mes)/i,
         // Skip day-of-week when user is only talking about when they get paid —
-        // delivery takes 4-6 business days so they'll have the money by then.
+        // delivery takes 5-7 business days so they'll have the money by then.
         ...(onlyPaymentContext ? [] : [/(?:el\s+)?(?:lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo)(?:\s+que\s+viene)?/i]),
         /pasado\s+mañana/i,
         // Vaguidad económica como "cuando tenga plata" sin fecha específica:

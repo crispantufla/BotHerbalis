@@ -1,7 +1,7 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _setStep, _pauseAndAlert, _cleanPhone } from '../utils/flowHelpers';
 import { calculateTotal } from '../utils/cartHelpers';
-import { buildCashRetryMessage, getFlowTemplate } from '../../utils/messageTemplates';
+import { getFlowTemplate } from '../../utils/messageTemplates';
 import { _formatMessage } from '../utils/messages';
 import { randomUUID } from 'crypto';
 import logger from '../../utils/logger';
@@ -134,39 +134,30 @@ export async function handleWaitingMpPayment(
         return { matched: true };
     }
 
-    // ── Cliente quiere contra reembolso ────────────────────────────────────────
-    // Si el cliente está en flujo MP y pide cambiar a COD: limpiamos el link MP,
-    // explicamos la modalidad COD (cash retry), y preguntamos cómo quiere hacer
-    // el anticipo de $10k (transferencia o MP). El submenú se maneja en
-    // stepWaitingPaymentMethod, así que volvemos a ese step con codAnticipoMethodAsked.
+    // ── Cliente quiere contra reembolso / retiro en sucursal ──────────────────
+    // Modelo nuevo (may-2026): contrarrembolso = retiro en sucursal, paga total
+    // al retirar (sin anticipo). Limpiamos el link MP y mandamos directo al
+    // payment_retiro_confirm + pausa para coordinación admin.
     if (shortOption === '3' || CASH_FALLBACK_KEYWORDS.test(normalizedText)) {
         currentState.paymentMethod = 'contrarembolso';
         currentState.mpPaymentLinkId = null;
         currentState.mpPaymentLinkUrl = null;
-        currentState.senaAmount = 10000;
+        currentState.senaAmount = 0;
         currentState.senaPaid = false;
+        currentState.shippingChoice = 'retiro';
 
-        // FIX (caso real Romina 19-may-2026): antes mandábamos DOS mensajes
-        // separados (explicación COD + pregunta de método) que llegaban en el
-        // mismo segundo y confundían al cliente. Ahora combinamos en uno solo
-        // con la explicación + opciones inline.
-        const totalRaw = currentState.totalPrice || '';
-        const totalNum = typeof totalRaw === 'string'
-            ? parseFloat(String(totalRaw).replace(/\./g, '').replace(',', '.'))
-            : Number(totalRaw || 0);
-        const saldoFmt = totalNum > 10000
-            ? (totalNum - 10000).toLocaleString('es-AR')
-            : '(saldo)';
-        const combinedMsg = `Dale 👍\n\nLa modalidad es: adelantás $10.000 (cubre el envío) y el resto ($${saldoFmt}) en efectivo al cartero cuando llega.\n\n¿El anticipo de $10.000 lo querés hacer por:\n\n1️⃣ *Transferencia bancaria*\n2️⃣ *Mercado Pago* (se acredita al instante)\n\n¿Cuál preferís?`;
-        currentState.history.push({ role: 'bot', content: combinedMsg, timestamp: Date.now() });
-        await sendMessageWithDelay(userId, combinedMsg);
+        const tpl = getFlowTemplate('payment_retiro_confirm', knowledge) ||
+            `¡Perfecto! Lo dejamos para retiro en sucursal 📦\n\nVas a pagar el total *${'$'}{{TOTAL}}* en efectivo cuando lo retirés.\n\nUn asesor te contacta enseguida para coordinar la sucursal más cercana 😊`;
+        const msg = _formatMessage(tpl, currentState);
+        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        await sendMessageWithDelay(userId, msg);
 
-        // Step transition primero, después seteamos los flags (porque _setStep
-        // resetea cashRetryShown al entrar a waiting_payment_method).
-        _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
-        currentState.cashRetryShown = true;
-        currentState.codAnticipoMethodAsked = true;
-        saveState(userId);
+        const addr: any = currentState.partialAddress || {};
+        const addrSummary = [addr.calle, addr.ciudad, addr.cp].filter(Boolean).join(', ') || 'sin dirección';
+        await _pauseAndAlert(
+            userId, currentState, dependencies, text,
+            `Cliente cambió de MP a RETIRO EN SUCURSAL. Coordinar sucursal de Correo Argentino más cercana a: ${addrSummary}. Paga el total $${currentState.totalPrice || '?'} en efectivo al retirar.`
+        );
         return { matched: true };
     }
 
@@ -228,7 +219,7 @@ export async function handleWaitingMpPayment(
     // ── AI fallback ────────────────────────────────────────────────────────────
     const aiRes = await aiService.chat(text, {
         step: 'waiting_mp_payment',
-        goal: `El cliente tiene un enlace de pago de MercadoPago y debe completarlo. Enlace ya enviado: ${currentState.mpPaymentLinkUrl}\n\nSi tiene dudas, explicale cómo pagar (tarjeta, débito, app MP, código en Pago Fácil/Rapipago).\n\nALTERNATIVAS si quiere cambiar de método:\n- Transferencia: alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*\n- Contra reembolso: anticipo de $10.000 al mismo alias + saldo en efectivo al cartero\n\n🔴 OBJECIÓN ECONÓMICA / POSTERGAR PAGO (CRÍTICO):\nSi el cliente dice cosas como "veo después de juntar el efectivo", "cuando cobre", "cuando tenga plata", "cuando consiga el dinero", "es mucho interés", "ahora no puedo", "apenas tenga me comunico", "me alcance la plata", NO INTERPRETES eso como confirmación. Es una OBJECIÓN ECONÓMICA y debés ofrecer POSTDATADO:\n  → "¡Tranqui! Te ofrezco congelar el precio actual y dejarte el pedido reservado. Cuando puedas pagar, me avisás y lo despacho. ¿Te parece?"\n  → Si dice SÍ → goalMet=false, extractedData="POSTDATADO: [fecha o 'indefinido']", quedate en este step esperando el aviso.\n  → Si dice NO → goalMet=false, dejá el chat abierto sin presión.\n\nNUNCA reenvíes el link a menos que lo pida. NUNCA respondas con "Excelente decisión!" o frases de cierre cuando el cliente claramente está posponiendo. Esperá que confirme el pago con "listo" o "ya pagué".`,
+        goal: `El cliente tiene un enlace de pago de MercadoPago y debe completarlo. Enlace ya enviado: ${currentState.mpPaymentLinkUrl}\n\nSi tiene dudas, explicale cómo pagar (tarjeta, débito, app MP, código en Pago Fácil/Rapipago).\n\nALTERNATIVAS si quiere cambiar de método (modelo nuevo may-2026):\n- Transferencia (envío a domicilio prepago): alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*\n- Retiro en sucursal (contrarrembolso): paga el TOTAL en efectivo al retirar en una sucursal de Correo Argentino. Sin anticipo previo.\n- NUNCA menciones anticipo de $10.000 (modalidad eliminada).\n\n🔴 OBJECIÓN ECONÓMICA / POSTERGAR PAGO (CRÍTICO):\nSi el cliente dice cosas como "veo después de juntar el efectivo", "cuando cobre", "cuando tenga plata", "cuando consiga el dinero", "es mucho interés", "ahora no puedo", "apenas tenga me comunico", "me alcance la plata", NO INTERPRETES eso como confirmación. Es una OBJECIÓN ECONÓMICA y debés ofrecer POSTDATADO:\n  → "¡Tranqui! Te ofrezco congelar el precio actual y dejarte el pedido reservado. Cuando puedas pagar, me avisás y lo despacho. ¿Te parece?"\n  → Si dice SÍ → goalMet=false, extractedData="POSTDATADO: [fecha o 'indefinido']", quedate en este step esperando el aviso.\n  → Si dice NO → goalMet=false, dejá el chat abierto sin presión.\n\nNUNCA reenvíes el link a menos que lo pida. NUNCA respondas con "Excelente decisión!" o frases de cierre cuando el cliente claramente está posponiendo. Esperá que confirme el pago con "listo" o "ya pagué".`,
         history: currentState.history,
         summary: currentState.summary,
         knowledge,

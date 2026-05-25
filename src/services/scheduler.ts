@@ -94,11 +94,11 @@ function _withName(msg: string, state: UserState): string {
 /** Contextual messages by abandon reason (for abandoned cart + cold lead recovery) */
 const ABANDON_REASON_MESSAGES: Record<string, string[]> = {
     payment_timing: [
-        '¡Hola! 😊 Una cosa importante: no pagás nada por adelantado. El efectivo lo abonás cuando el correo te entrega el paquete en tu puerta. ¿Seguimos?',
-        'Hola 👋 Recordá que el pago es al recibir, no necesitás tener la plata ahora. Podés pedir hoy y pagar recién cuando llegue. ¿Te tomamos los datos? 📦',
+        '¡Hola! 😊 Una cosa importante: tenemos retiro en sucursal — dejás el paquete en una sucursal de Correo Argentino cerca tuyo y pagás el total *en efectivo cuando lo retirás*. No pagás nada por adelantado. ¿Seguimos?',
+        'Hola 👋 Si te queda más cómodo, podés elegir *retiro en sucursal*: pagás recién cuando vas a buscarlo. ¿Te tomamos los datos? 📦',
     ],
     hesitation: [
-        '¡Hola! 😊 Sin apuro. Con Mercado Pago el envío tarda 4-6 días hábiles, con transferencia o contra reembolso 7-10 días. ¿Avanzamos cuando quieras?',
+        '¡Hola! 😊 Sin apuro. El envío tarda *5 a 7 días hábiles* por Correo Argentino. ¿Avanzamos cuando quieras?',
         'Hola 👋 Si querés te dejo el pedido reservado con el precio de hoy así no pierde la promo. ¿Te parece?',
     ],
     objection: [

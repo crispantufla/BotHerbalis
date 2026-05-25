@@ -1,9 +1,12 @@
 /**
- * Smoke test para la política de pago vigente (mayo 2026):
- * - Se ofrecen 3 opciones espontáneamente: MP, Transferencia, Contra reembolso
- * - Alias oficial: HERBALIS.TIENDA a nombre de BIO ORIGEN S.A.S.
- * - Contra reembolso: anticipo $10.000 por transferencia al alias + saldo en efectivo al cartero
- * - Ya no hay adicional de $6.000 ni descuento de prepago
+ * Smoke test para el modelo de pago vigente (may-2026 rev 2):
+ * - Menú de envío 2-opciones: retiro en sucursal vs envío a domicilio
+ * - Retiro en sucursal → contrarrembolso, paga total en efectivo al retirar (sin anticipo)
+ * - Envío a domicilio → prepago por Mercado Pago o transferencia (alias HERBALIS.TIENDA)
+ * - 5 a 7 días hábiles uniforme
+ * - Sin adicional $6.000, sin anticipo $10.000, sin cuotas
+ *
+ * Nombre del archivo conservado por historia git (originalmente testeaba el flujo seña).
  */
 
 const path = require('path');
@@ -14,72 +17,70 @@ const tpl = require('../src/utils/messageTemplates');
 const v5 = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'knowledge_v5.json'), 'utf8'));
 const v6 = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'knowledge_v6.json'), 'utf8'));
 
-describe('Política nueva de pago — buildPaymentMessage (3 opciones espontáneas)', () => {
+describe('Modelo nuevo de pago — buildPaymentMessage (envío primero, sin anticipo)', () => {
     const pm = tpl.buildPaymentMessage({ selectedPlan: '60', totalPrice: '46.900' });
 
-    test('Menciona Mercado Pago (opción 1)', () => {
-        expect(pm).toMatch(/Mercado Pago/);
+    test('Pregunta tipo de envío: retiro en sucursal vs envío a domicilio', () => {
+        expect(pm).toMatch(/Retiro en sucursal/i);
+        expect(pm).toMatch(/Env[íi]o a domicilio/i);
     });
-    test('Menciona Transferencia bancaria (opción 2)', () => {
-        expect(pm).toMatch(/Transferencia bancaria/i);
+    test('Menciona contrarreembolso vinculado al retiro', () => {
+        expect(pm).toMatch(/contrarre?embolso/i);
     });
-    test('Menciona Contra reembolso con anticipo de $10.000 (opción 3)', () => {
-        expect(pm).toMatch(/Contra reembolso/i);
-        expect(pm).toMatch(/10\.000/);
+    test('Lista medios de pago para domicilio (MercadoPago, Transferencia)', () => {
+        expect(pm).toMatch(/MercadoPago/i);
+        expect(pm).toMatch(/Transferencia/i);
+    });
+    test('Menciona canales de MP (Rapipago, PagoFácil, Tarjeta)', () => {
+        expect(pm).toMatch(/Rapipago/i);
+        expect(pm).toMatch(/PagoF[áa]cil/i);
+        expect(pm).toMatch(/Tarjeta/i);
+    });
+    test('Promete envío gratis y 5 a 7 días hábiles', () => {
+        expect(pm).toMatch(/GRATIS/i);
+        expect(pm).toMatch(/5 y 7 d[íi]as/i);
+    });
+    test('NO menciona anticipo de $10.000 (modalidad eliminada)', () => {
+        expect(pm).not.toMatch(/10\.000/);
+        expect(pm).not.toMatch(/anticipo/i);
     });
     test('NO menciona adicional de $6.000', () => {
         expect(pm).not.toMatch(/\$\s*6\.000/);
         expect(pm).not.toMatch(/adicional/i);
     });
-    test('NO menciona Pago Fácil / Rapipago', () => {
-        expect(pm).not.toMatch(/Pago Fácil/i);
-        expect(pm).not.toMatch(/Rapipago/i);
-    });
-    test('NO menciona cuotas (el bot no las promete; el cliente las ve al abrir MP)', () => {
+    test('NO menciona cuotas', () => {
         expect(pm).not.toMatch(/cuotas/i);
     });
 });
 
-describe('Política nueva — buildCashRetryMessage (modalidad COD neutral, sin pre-anunciar método)', () => {
-    const cr = tpl.buildCashRetryMessage({});
-
-    test('Explica la modalidad de anticipo por $10.000', () => {
-        expect(cr).toMatch(/anticipo/i);
-        expect(cr).toMatch(/10\.000/);
-    });
-    test('Menciona que el saldo se paga en efectivo al cartero', () => {
-        expect(cr).toMatch(/efectivo al cartero/i);
-    });
-    test('NO pre-anuncia el método del anticipo (lo elige el cliente en payment_cod_method_choice)', () => {
-        // El método del anticipo ahora lo elige el cliente — el cash retry es neutral
-        // y no menciona alias ni link MP. Eso vive en payment_cod_method_choice.
-        expect(cr).not.toMatch(/HERBALIS\.TIENDA/);
-        expect(cr).not.toMatch(/BIO ORIGEN S.A.S./);
-    });
-    test('NO promociona COD como "lo más cómodo/seguro"', () => {
-        expect(cr).not.toMatch(/cómoda?\s+y\s+segura/i);
-        expect(cr).not.toMatch(/lo más cómodo/i);
-    });
-});
-
-describe('Política nueva — payment_cod_method_choice (elección transferencia/MP)', () => {
-    const knowledge = require('../knowledge_v5.json');
-    const choice = knowledge.flow.payment_cod_method_choice;
-
-    test('Existe la entry en V5 y V6', () => {
+describe('Modelo nuevo — payment_domicilio_choice (submenú prepago tras elegir domicilio)', () => {
+    test.each([
+        ['V5', v5],
+        ['V6', v6],
+    ])('%s: existe la entry y ofrece MP + Transferencia', (_n, guion) => {
+        const choice = guion.flow.payment_domicilio_choice;
         expect(choice).toBeDefined();
-        expect(require('../knowledge_v6.json').flow.payment_cod_method_choice).toBeDefined();
-    });
-    test('Ofrece transferencia y Mercado Pago como opciones', () => {
-        expect(choice.response).toMatch(/Transferencia bancaria/i);
         expect(choice.response).toMatch(/Mercado Pago/i);
-    });
-    test('Menciona el monto del anticipo ($10.000)', () => {
-        expect(choice.response).toMatch(/10\.000/);
+        expect(choice.response).toMatch(/Transferencia bancaria/i);
     });
 });
 
-describe('Política nueva — rules en V5 y V6', () => {
+describe('Modelo nuevo — payment_retiro_confirm (confirmación tras elegir retiro)', () => {
+    test.each([
+        ['V5', v5],
+        ['V6', v6],
+    ])('%s: existe la entry y aclara "total en efectivo al retirar"', (_n, guion) => {
+        const confirm = guion.flow.payment_retiro_confirm;
+        expect(confirm).toBeDefined();
+        expect(confirm.response).toMatch(/sucursal/i);
+        expect(confirm.response).toMatch(/efectivo/i);
+        // No menciona anticipo
+        expect(confirm.response).not.toMatch(/anticipo/i);
+        expect(confirm.response).not.toMatch(/10\.000/);
+    });
+});
+
+describe('Modelo nuevo — rules en V5 y V6', () => {
     test.each([
         ['V5', v5],
         ['V6', v6],
@@ -90,8 +91,8 @@ describe('Política nueva — rules en V5 y V6', () => {
     test.each([
         ['V5', v5],
         ['V6', v6],
-    ])('%s: contraReembolsoMAX anticipo $10.000 espontáneo + aplica a todos', (_n, guion) => {
-        expect(guion.rules.contraReembolsoMAX.senaTransfer).toBe(10000);
+    ])('%s: contraReembolsoMAX senaTransfer=0 (sin anticipo) + spontaneous + appliesTo=all', (_n, guion) => {
+        expect(guion.rules.contraReembolsoMAX.senaTransfer).toBe(0);
         expect(guion.rules.contraReembolsoMAX.spontaneous).toBe(true);
         expect(guion.rules.contraReembolsoMAX.appliesTo).toBe('all');
         expect(guion.rules.contraReembolsoMAX.adicional).toBe(0);
@@ -100,42 +101,38 @@ describe('Política nueva — rules en V5 y V6', () => {
     test.each([
         ['V5', v5],
         ['V6', v6],
-    ])('%s: defaultPaymentMethod = three_options + bankAlias oficial', (_n, guion) => {
-        expect(guion.rules.defaultPaymentMethod).toBe('three_options');
+    ])('%s: defaultPaymentMethod = shipping_first + bankAlias oficial', (_n, guion) => {
+        expect(guion.rules.defaultPaymentMethod).toBe('shipping_first');
         expect(guion.rules.bankAlias.alias).toBe('HERBALIS.TIENDA');
         expect(guion.rules.bankAlias.titular).toBe('BIO ORIGEN S.A.S.');
     });
 });
 
-describe('Política nueva — FAQ en V5 y V6', () => {
+describe('Modelo nuevo — FAQ en V5 y V6', () => {
     test.each([
         ['V5', v5],
         ['V6', v6],
-    ])('%s: FAQ "estafa" sigue liderando con trust signals', (_n, guion) => {
+    ])('%s: FAQ "estafa" sigue liderando con trust signals + ofrece retiro como risk reversal', (_n, guion) => {
         const estafaFaq = guion.faq.find(f => f.keywords.some(k => k === 'estafa'));
         expect(estafaFaq).toBeDefined();
         expect(estafaFaq.response).toMatch(/13 años/i);
         expect(estafaFaq.response).toMatch(/50\.000/);
         expect(estafaFaq.response).not.toMatch(/riesgo cero/i);
-        // Si menciona COD, debe ser con el anticipo $10k
-        if (/pago al recibir|contra.?reembolso/i.test(estafaFaq.response)) {
-            expect(estafaFaq.response).toMatch(/10\.000/);
-        }
+        // No menciona anticipo
+        expect(estafaFaq.response).not.toMatch(/anticipo\s+de\s+\$?10/i);
     });
 
     test.each([
         ['V5', v5],
         ['V6', v6],
-    ])('%s: FAQ "contra reembolso" explica anticipo $10k (transferencia O MP, lo elige el cliente)', (_n, guion) => {
+    ])('%s: FAQ "contra reembolso" describe retiro en sucursal (sin anticipo)', (_n, guion) => {
         const codFaq = guion.faq.find(f => f.keywords.some(k => k === 'contra reembolso'));
         expect(codFaq).toBeDefined();
-        expect(codFaq.response).toMatch(/anticipo/i);
-        expect(codFaq.response).toMatch(/10\.000/);
-        // Política nueva: el FAQ ya no enuncia el método específico del anticipo —
-        // lo decide el cliente cuando confirme la modalidad (payment_cod_method_choice).
-        // El FAQ menciona ambas opciones disponibles.
-        expect(codFaq.response).toMatch(/transferencia/i);
-        expect(codFaq.response).toMatch(/Mercado Pago/i);
+        expect(codFaq.response).toMatch(/sucursal/i);
+        expect(codFaq.response).toMatch(/efectivo/i);
+        // No menciona anticipo ni $10.000
+        expect(codFaq.response).not.toMatch(/anticipo/i);
+        expect(codFaq.response).not.toMatch(/10\.000/);
     });
 
     test.each([
@@ -151,6 +148,20 @@ describe('Política nueva — FAQ en V5 y V6', () => {
     test.each([
         ['V5', v5],
         ['V6', v6],
+    ])('%s: FAQ "shipping" unifica 5 a 7 días hábiles + menciona ambas opciones de envío', (_n, guion) => {
+        const shipFaq = guion.faq.find(f => f.keywords.some(k => k === 'como lo recibo' || k === 'envio'));
+        expect(shipFaq).toBeDefined();
+        expect(shipFaq.response).toMatch(/5 a 7 d[íi]as/i);
+        expect(shipFaq.response).toMatch(/Retiro en sucursal/i);
+        expect(shipFaq.response).toMatch(/Env[íi]o a domicilio/i);
+        // No menciona el viejo split 4-6 / 7-10
+        expect(shipFaq.response).not.toMatch(/4 a 6/);
+        expect(shipFaq.response).not.toMatch(/7 a 10/);
+    });
+
+    test.each([
+        ['V5', v5],
+        ['V6', v6],
     ])('%s: ningún mensaje en flow/faq promete descuento de $6.000', (_n, guion) => {
         const allText = JSON.stringify(guion.flow) + JSON.stringify(guion.faq);
         expect(allText).not.toMatch(/descuento de \$\s*6\.000/i);
@@ -159,19 +170,16 @@ describe('Política nueva — FAQ en V5 y V6', () => {
     });
 });
 
-describe('Política nueva — recommendations (TEXTO 1+2 → "¿Te paso los precios?")', () => {
+describe('Modelo nuevo — recommendations (TEXTO 1+2 → "¿Te paso los precios?")', () => {
     test.each([
         ['V5', v5],
         ['V6', v6],
     ])('%s: recommendation_1/2/3 terminan pidiendo aceptación para mostrar precios', (_n, guion) => {
         ['recommendation_1', 'recommendation_2', 'recommendation_3'].forEach(key => {
             const resp = guion.flow[key].response;
-            // No incluyen el precio ni el menú de pago (eso ahora vive en TEXTO 3/4)
             expect(resp).not.toMatch(/\{\{PRICE_/);
             expect(resp).not.toMatch(/\$\s*\d{2,}\.\d{3}/);
-            // Termina invitando a ver precios
             expect(resp).toMatch(/precios/i);
-            // No promete incentivos viejos
             expect(resp).not.toMatch(/te bajo \$\s*6\.000/i);
             expect(resp).not.toMatch(/unidad extra de regalo/i);
         });
@@ -186,7 +194,6 @@ describe('_formatMessage — defensa contra placeholder leak (regresión Silvina
         const out = _formatMessage(txt, { /* sin selectedProduct */ });
         expect(out).not.toMatch(/\{\{PRICE_60\}\}/);
         expect(out).not.toMatch(/\{\{PRICE_120\}\}/);
-        // Esperamos que tenga algún valor numérico (no string vacío).
         expect(out).toMatch(/\$\d+\.\d{3}/);
     });
 
