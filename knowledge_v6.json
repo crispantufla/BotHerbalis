@@ -35,19 +35,19 @@
         "recommendation_1": {
             "step": "waiting_weight",
             "_note": "Tier 1 — hasta 10 kg → Cápsulas 60 días. Cambio mayo 2026: cápsulas era el 75% de las ventas en marzo. Sales-tuned: marco temporal (2 meses), gradiente realista (1-1.5kg/sem), visualización del resultado, bonus framing (guía + acompañamiento). Las gotas quedan reservadas para >70 años o pedido explícito.",
-            "response": "Para vos lo ideal son las cápsulas, plan de 2 meses 🙂\n\nLa mayoría con ese rango baja entre 7 y 10 kilos. Una cápsula al día antes del almuerzo o cena.\n\nTe mando una guía de comidas para acompañar y te sigo por acá todo el tratamiento.\n\n¿Te paso los precios?",
+            "response": "Para vos te recomiendo cápsulas, plan de 2 meses 🙂\n\nLa mayoría con ese rango baja entre 7 y 10 kilos. Es una al día antes del almuerzo o de la cena.\n\nTe paso una guía de comidas para acompañar y te sigo por acá durante el tratamiento.\n\n¿Te paso los precios?",
             "nextStep": "waiting_ok"
         },
         "recommendation_2": {
             "step": "waiting_weight",
             "_note": "Tier 2 — 10 a 20 kg → Cápsulas 120 días (cambio mayo 2026: antes era 60d). El plan 4 meses cubre el tratamiento completo para este rango. Sales-tuned: marco temporal extendido + sostenibilidad + bonus framing.",
-            "response": "Para vos lo ideal son las cápsulas, plan de 4 meses 💪\n\nLa mayoría con ese rango baja entre 15 y 20 kilos. Los 4 meses le dan tiempo al cuerpo a acostumbrarse, sin rebote.\n\nUna cápsula al día antes del almuerzo o cena. Te mando guía de comidas y te acompaño por acá todo el tratamiento.\n\n¿Te paso los precios?",
+            "response": "Para vos te recomiendo cápsulas, plan de 4 meses 💪\n\nLa mayoría con ese rango baja entre 15 y 20 kilos. Los 4 meses son clave para que el cuerpo se acostumbre tranqui, sin rebote.\n\nUna al día antes del almuerzo o cena. Te paso la guía de comidas y te sigo durante todo el tratamiento.\n\n¿Te paso los precios?",
             "nextStep": "waiting_ok"
         },
         "recommendation_3": {
             "step": "waiting_weight",
             "_note": "Tier 3 — +20 kg → Cápsulas 120 días. Sales-tuned: reframe del compromiso largo como ventaja (cuerpo se acostumbra, sin rebote), mantención implícita (1-2/sem post tratamiento), visualización.",
-            "response": "Para más de 20 kilos lo ideal es el plan de cápsulas de 4 meses 💪\n\nEl cuerpo necesita ese tiempo para bajar de forma sostenida y sin rebote. Muchas clientas siguen después con 1 o 2 por semana como mantenimiento.\n\nUna cápsula al día antes del almuerzo o cena. Te mando guía de comidas y te acompaño todo el tratamiento.\n\n¿Te paso los precios?",
+            "response": "Para más de 20 kilos te conviene cápsulas plan 4 meses 💪\n\nEs el tiempo que el cuerpo necesita para bajar tranqui, sin rebote. Un montón de clientas siguen después con 1 o 2 cápsulas por semana como mantenimiento.\n\nUna al día antes del almuerzo o cena. Te paso la guía y te acompaño todo el tratamiento.\n\n¿Te paso los precios?",
             "nextStep": "waiting_ok"
         },
         "preference_capsulas": {
@@ -72,7 +72,7 @@
                 "liquido",
                 "gotero"
             ],
-            "response": "Las gotas son suaves y discretas 💧 — 10 gotitas una vez al día.\n\nTe cuento igual: la mayoría termina con cápsulas porque suelen ser más efectivas y son una al día. Las gotas las dejamos para gente mayor o que les cuesta tragar pastillas.\n\n¿Vamos con gotas o probás cápsulas?",
+            "response": "Las gotas son suaves y discretas 💧, 10 gotitas una vez al día.\n\nTe cuento igual: la mayoría termina yendo con cápsulas porque dan mejor resultado y es una por día. Las gotas las dejamos para gente más grande o que les cuesta tragar pastillas.\n\n¿Vas con gotas o probás cápsulas?",
             "nextStep": "waiting_ok"
         },
         "preference_semillas": {
@@ -85,7 +85,7 @@
                 "yuyos",
                 "te de semilla"
             ],
-            "response": "Las semillas son lo más natural 🌿 — se prepara como infusión cada noche.\n\nLa mayoría igual va con cápsulas — suelen dar resultados más rápido y no hay que preparar nada. Las semillas son geniales si te gusta el ritual.\n\n¿Vamos con semillas o probás cápsulas?",
+            "response": "Las semillas son lo más natural 🌿, se preparan como infusión cada noche.\n\nLa mayoría igual termina yendo con cápsulas porque dan mejor resultado y no hay que preparar nada. Las semillas son geniales si te copa el ritual.\n\n¿Vas con semillas o probás cápsulas?",
             "nextStep": "waiting_ok"
         },
         "closing": {
@@ -174,7 +174,7 @@
         "payment_mp_retry": {
             "step": "waiting_mp_payment",
             "_note": "Mensaje cuando MP devuelve el pago como rejected/error tras un intento del cliente. Se ofrece reintento con otras formas dentro de MP.",
-            "response": "⚠️ Hubo un problema con el pago de MercadoPago — pudo ser la tarjeta o un rechazo del banco.\n\nProbá de nuevo con otra forma:\n✅ Tarjeta de crédito\n✅ Débito\n✅ Saldo Mercado Pago\n\nTe genero un nuevo link para volver a intentarlo, decime cuando esté listo 😊"
+            "response": "⚠️ Hubo un problema con el pago de MercadoPago, pudo ser la tarjeta o un rechazo del banco.\n\nProbá de nuevo con otra forma:\n✅ Tarjeta de crédito\n✅ Débito\n✅ Saldo Mercado Pago\n\nTe genero un nuevo link para volver a intentarlo, decime cuando esté listo 😊"
         },
         "payment_mp_retry_sena": {
             "step": "waiting_mp_payment",
@@ -225,7 +225,7 @@
                 "opcion 1"
             ],
             "_note": "FAQ menu opción 1 — '¿Funciona de verdad?' (tono Elena)",
-            "response": "Te cuento — sí, funciona, pero te aclaro algo importante: cada cuerpo responde a su ritmo 😊\n\nLo que SÍ te puedo asegurar es que llevamos *13 años* con este producto, pasaron casi *70.000 personas* y la mayoría logra el objetivo. Son resultados reales, sin vueltas.\n\n¿Te lo despacho? 🌿"
+            "response": "Sí, funciona, pero te aclaro: cada cuerpo responde a su ritmo 😊\n\nLo que sí te puedo asegurar es que llevamos *13 años* con este producto. Pasaron casi *70 mil personas* y la mayoría logra el objetivo. Resultados reales, sin vueltas.\n\n¿Te lo despacho? 🌿"
         },
         {
             "keywords": [
@@ -235,7 +235,7 @@
                 "opcion 2"
             ],
             "_note": "FAQ menu opción 2 — '¿Es seguro?' (tono Elena)",
-            "response": "Es seguro, sí — *100% natural*, sin químicos ni agregados raros 🌿\n\nLo único que te pido tener en cuenta: no se recomienda en embarazo, lactancia, menores de 18 ni personas de más de 80 años. Para todo lo demás (presión, tiroides, diabetes, etc.) no hay problema.\n\n¿Te lo despacho? 😊"
+            "response": "Es seguro, sí: *100% natural*, sin químicos ni cosas agregadas raras 🌿\n\nLo único que tengamos en cuenta: no se recomienda en embarazo, lactancia, menores de 18 ni mayores de 80 años. Para el resto (presión, tiroides, diabetes, etc.) no hay drama.\n\n¿Te lo despacho? 😊"
         },
         {
             "keywords": [
@@ -247,7 +247,7 @@
                 "opcion 3"
             ],
             "_note": "FAQ menu opción 3 — '¿Tiene contraindicaciones?' (tono Elena)",
-            "response": "Te cuento las únicas situaciones donde NO lo recomendamos:\n\n- Embarazo o lactancia\n- Menores de 18 años\n- Personas de más de 80 años\n\nPara cualquier otra cosa (presión, tiroides, diabetes, etc.) no hay drama — muchas personas con esas condiciones lo toman sin problema. Si tenés algo puntual contame y vemos juntas/os 😊\n\n¿Te lo despacho?"
+            "response": "Te cuento las únicas situaciones donde NO lo recomendamos:\n\n- Embarazo o lactancia\n- Menores de 18 años\n- Personas de más de 80 años\n\nPara cualquier otra cosa (presión, tiroides, diabetes, etc.) no hay drama. Un montón de gente con esas condiciones lo toma sin problema. Si tenés algo puntual contame y lo vemos 😊\n\n¿Te lo despacho?"
         },
         {
             "keywords": [
@@ -324,7 +324,7 @@
                 "no me alcanza"
             ],
             "_note": "Sales: reencuadre de valor (precio/día) + qué incluye + alternativa concreta (postdatar). Sin presionar.",
-            "response": "Te entiendo, la plata cuesta ganarla 😊\n\nPero pensalo así: el plan 4 meses te sale *${{PRICE_PER_DAY_120}} por día* — menos que un café. Y ahí va todo: el producto para los 4 meses, el envío a tu casa, la guía de comidas y yo acompañándote por WhatsApp si necesitás cualquier cosa.\n\nY si justo ahora no te queda cómodo, te ofrezco algo: *programamos el envío* para después de que cobres, y te dejo el precio congelado de hoy. Así no te lo perdés por una cuestión de timing. ¿Desde qué día te quedaría bien?"
+            "response": "Te entiendo, la plata cuesta ganarla 😊\n\nPero pensalo así: el plan 4 meses te sale *${{PRICE_PER_DAY_120}} por día*, menos que un café. Y ahí va todo: el producto para los 4 meses, el envío a tu casa, la guía de comidas y yo siguiéndote por acá si necesitás cualquier cosa.\n\nY si justo no te queda cómodo ahora, te ofrezco esto: *programamos el envío* para después de cobrar y te dejo el precio congelado de hoy. Así no se te escapa. ¿Desde qué día te quedaría bien?"
         },
         {
             "keywords": [
@@ -341,7 +341,7 @@
                 "rebote"
             ],
             "_note": "Sales: miedo top del nicho. Explicar POR QUÉ no hay rebote (descenso lento + natural + mantenimiento) y mostrar que pensamos en eso.",
-            "response": "*No tenés rebote*, te explico por qué 😊\n\nEl rebote aparece con métodos agresivos: dietas muy restrictivas, químicos, batidos extremos. Acá es al revés — el descenso es *progresivo* (1 a 2 kilos por semana), el producto es 100% natural y el cuerpo nunca entra en modo \"hambruna\". Por eso no recupera lo perdido apenas dejás.\n\nY otra cosa: la mayoría de las clientas, al llegar al peso, siguen tomando 1 o 2 cápsulas por semana como mantenimiento. Eso ayuda muchísimo a que se mantenga. 🌿"
+            "response": "*No tenés rebote*, te explico por qué 😊\n\nEl rebote aparece con métodos agresivos: dietas re restrictivas, químicos, batidos extremos. Acá es al revés: el descenso es *progresivo* (1 a 2 kilos por semana), el producto es 100% natural y el cuerpo nunca entra en modo \"hambruna\". Por eso no recupera lo perdido apenas dejás.\n\nY otra cosa: la mayoría de las clientas, al llegar al peso, siguen con 1 o 2 cápsulas por semana como mantenimiento. Ayuda un montón a que se mantenga. 🌿"
         },
         {
             "keywords": [
@@ -363,7 +363,7 @@
                 "chanta"
             ],
             "_note": "Sales: NO promocionar contra reembolso como solución de confianza (eso es trampa). Liderar con trust signals + offer risk reversal (retiro en sucursal sin anticipo). Tono Elena.",
-            "response": "Te entiendo perfectamente — hoy se ven cosas raras por internet y la duda es totalmente válida 😊\n\nMirá, te paso datos concretos: llevamos *13 años* distribuyendo este producto, pasaron casi *50.000 clientes* y el producto tiene presencia en redes — no somos un kiosco que abrió la semana pasada.\n\nY si igual te queda la dudita, te ofrezco *bajarla a casi cero*: hacemos *retiro en sucursal* — te dejamos el paquete en una sucursal de Correo Argentino cerca tuyo y pagás el *total en efectivo al retirar*. O sea: si nunca te llega, no pagás nada. ¿Te suma así para arrancar?"
+            "response": "Te entiendo perfectamente, hoy se ven cosas raras por internet 😊\n\nMirá, te paso datos concretos: llevamos *13 años* distribuyendo este producto, pasaron casi *50 mil clientes* y el producto tiene presencia en redes. No somos un kiosco que abrió la semana pasada.\n\nY si igual te queda la dudita, te ofrezco *bajarla a casi cero*: hacemos *retiro en sucursal*. Te dejamos el paquete en una sucursal de Correo Argentino cerca tuyo y pagás el *total en efectivo al retirar*. Si nunca te llega, no pagás nada. ¿Te suma así para arrancar?"
         },
         {
             "keywords": [
@@ -374,7 +374,7 @@
                 "cantidad"
             ],
             "_note": "Sales: anchor de adherencia — facilidad de incorporación. Bajar el miedo a 'me voy a olvidar'.",
-            "response": "Súper fácil de incorporar a la rutina, te cuento 😊\n\n💊 *Cápsulas:* una sola al día, 30 minutos antes del almuerzo (o de la cena, la que más te quede cómoda), con un vaso de agua. La mayoría la asocia a una comida fija así no se olvida.\n\n💧 *Gotas:* 10 gotitas una vez por día, antes del almuerzo o la cena.\n\nY si tenés alguna duda durante el tratamiento, me escribís por acá y vamos viendo juntas/os — eso te lo dejo siempre disponible 📞"
+            "response": "Re fácil de meter en la rutina 😊\n\n💊 *Cápsulas:* una al día, 30 min antes del almuerzo (o de la cena, la que más te quede cómoda), con un vaso de agua. La mayoría la asocia a una comida fija así no se olvida.\n\n💧 *Gotas:* 10 gotitas una vez por día, antes del almuerzo o la cena.\n\nSi tenés cualquier duda en el tratamiento, escribime por acá. Estoy siempre 📞"
         },
         {
             "keywords": [

@@ -116,7 +116,8 @@ describe('Modelo nuevo — FAQ en V5 y V6', () => {
         const estafaFaq = guion.faq.find(f => f.keywords.some(k => k === 'estafa'));
         expect(estafaFaq).toBeDefined();
         expect(estafaFaq.response).toMatch(/13 años/i);
-        expect(estafaFaq.response).toMatch(/50\.000/);
+        // Acepta "50.000" o "50 mil" — la forma conversacional es más humana.
+        expect(estafaFaq.response).toMatch(/50\.000|50 mil/);
         expect(estafaFaq.response).not.toMatch(/riesgo cero/i);
         // No menciona anticipo
         expect(estafaFaq.response).not.toMatch(/anticipo\s+de\s+\$?10/i);

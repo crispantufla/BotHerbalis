@@ -35,19 +35,19 @@
         "recommendation_1": {
             "step": "waiting_weight",
             "_note": "Tier 1 — hasta 10 kg → Cápsulas 60 días. Cambio mayo 2026: cápsulas era el 75% de las ventas en marzo (mes de mejor conversión, 10.7%). Las gotas quedan reservadas para >70 años o pedido explícito del cliente.",
-            "response": "Para vos lo ideal son las cápsulas, plan 2 meses.\n\nLa mayoría con ese rango baja entre 7 y 10 kilos. Una cápsula al día antes del almuerzo o cena.\n\nIncluye guía de consejos y acompañamiento por WhatsApp.\n\n¿Te paso los precios?",
+            "response": "Para vos te recomiendo cápsulas, plan 2 meses 💊\n\nCon ese rango baja la mayoría entre 7 y 10 kilos. Una al día antes del almuerzo o la cena.\n\nVa con guía y te sigo por acá durante todo el tratamiento.\n\n¿Te paso los precios?",
             "nextStep": "waiting_ok"
         },
         "recommendation_2": {
             "step": "waiting_weight",
             "_note": "Tier 2 — 10 a 20 kg → Cápsulas 120 días (cambio mayo 2026: antes era 60d). El plan 4 meses cubre el tratamiento completo para este rango con mejor adherencia y sin rebote.",
-            "response": "Para vos lo ideal son las cápsulas, plan 4 meses.\n\nLa mayoría con ese rango baja entre 15 y 20 kilos. Los 4 meses le dan tiempo al cuerpo para no rebotar.\n\nUna cápsula al día antes del almuerzo o cena. Incluye guía y seguimiento por WhatsApp.\n\n¿Te paso los precios?",
+            "response": "Para vos te recomiendo cápsulas, plan 4 meses 💪\n\nCon ese rango baja la mayoría entre 15 y 20 kilos. Los 4 meses son clave para que el cuerpo se acostumbre tranqui, sin rebote.\n\nUna al día antes del almuerzo o cena, con guía y acompañamiento por acá.\n\n¿Te paso los precios?",
             "nextStep": "waiting_ok"
         },
         "recommendation_3": {
             "step": "waiting_weight",
             "_note": "Tier 3 — más de 20 kg → Cápsulas 120 días. TEXTO 1+2 (recomendación + cómo funciona). Termina pidiendo aceptación para mostrar precios.",
-            "response": "Para más de 20 kilos lo ideal es el plan de cápsulas de 4 meses.\n\nEs el tiempo justo para bajar de forma sostenida y sin rebote.\n\nUna cápsula al día antes del almuerzo o cena. Incluye guía y seguimiento por WhatsApp.\n\n¿Te paso los precios?",
+            "response": "Para más de 20 kilos te conviene cápsulas plan 4 meses 💪\n\nEs el tiempo que el cuerpo necesita para bajar tranqui, sin rebote.\n\nUna al día antes del almuerzo o cena, con guía y acompañamiento por acá.\n\n¿Te paso los precios?",
             "nextStep": "waiting_ok"
         },
         "preference_capsulas": {
@@ -61,7 +61,7 @@
                 "practico",
                 "practica"
             ],
-            "response": "¡Dale! 💊 Las cápsulas son lo más práctico — 1 al día, 30 min antes de la comida principal.\n\n¿Te paso los precios? 😊",
+            "response": "¡Dale! 💊 Las cápsulas son lo más práctico: una al día, 30 min antes de la comida principal.\n\n¿Te paso los precios? 😊",
             "nextStep": "waiting_ok"
         },
         "preference_gotas": {
@@ -72,7 +72,7 @@
                 "liquido",
                 "gotero"
             ],
-            "response": "Las gotas son suaves — 10 gotas 1 vez al día.\n\nLa mayoría termina con cápsulas porque suelen ser más efectivas. Las gotas las dejamos para mayores de 70 o con dificultad para tragar.\n\n¿Vamos con gotas o probás cápsulas?",
+            "response": "Las gotas son re suaves 💧: 10 gotitas una vez al día.\n\nIgual, la mayoría termina yendo con cápsulas porque dan mejor resultado. Las gotas las dejamos para gente más grande o con dificultad para tragar.\n\n¿Vas con gotas o probás cápsulas?",
             "nextStep": "waiting_ok"
         },
         "preference_semillas": {
@@ -86,7 +86,7 @@
                 "te de semilla",
                 "natural"
             ],
-            "response": "Las semillas son lo más natural — se preparan como infusión cada noche.\n\nLa mayoría igual va con cápsulas porque dan resultados más rápido. Las semillas son geniales si te gusta el ritual.\n\n¿Vamos con semillas o probás cápsulas?",
+            "response": "Las semillas son lo más natural 🌿, se preparan como infusión cada noche.\n\nLa mayoría termina yendo igual con cápsulas porque dan resultados más rápido. Las semillas son geniales si te copa el ritual.\n\n¿Te copa probar con semillas o vamos con cápsulas?",
             "nextStep": "waiting_ok"
         },
         "closing": {
@@ -104,13 +104,13 @@
                 "mandalo",
                 "envielo"
             ],
-            "response": "¡Genial! 🎉 Te acompaño por WhatsApp todo el tratamiento.\n\nPasame los datos para la etiqueta:\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\n\n(Que la dirección sea exacta, sin \"aprox\" ni S/N)",
+            "response": "¡Buenísimo! 🎉 Te sigo por acá durante todo el tratamiento.\n\nPasame los datos para la etiqueta:\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\n\n(Que la dirección sea exacta, sin \"aprox\" ni S/N)",
             "nextStep": "waiting_data"
         },
         "prices": {
             "step": "waiting_ok",
             "_note": "TEXTO 3 — Tras la recomendación, cliente dijo 'sí, pasame los precios'. Mostramos los 2 planes del producto seleccionado y pedimos elección. Disparado desde stepWaitingOk._buildPricesMessage. Placeholders: {{PRICE_60}}, {{PRICE_120}} se sustituyen con _getPrice(producto, plan).",
-            "response": "Plan 2 meses: ${{PRICE_60}}\nPlan 4 meses: ${{PRICE_120}} ⭐\n\nEl de 4 meses es el más elegido — muchas clientas siguen después con 1 o 2 por semana como mantenimiento.\n\n_Si llevás para alguien más en casa, el 3° producto va al 50% off._\n\n¿Cuál preferís?",
+            "response": "Plan 2 meses: ${{PRICE_60}}\nPlan 4 meses: ${{PRICE_120}} ⭐\n\nEl de 4 meses es el más elegido. Un montón de clientas siguen después con 1 o 2 cápsulas por semana como mantenimiento.\n\n_Si llevás para alguien más en casa, el 3° producto te queda 50% off._\n\n¿Con cuál vas?",
             "nextStep": "waiting_plan_choice"
         },
         "payment_menu": {
@@ -128,7 +128,7 @@
         "payment_retiro_confirm": {
             "step": "waiting_admin_validation",
             "_note": "Cliente eligió retiro en sucursal. NO hay anticipo — paga el total en efectivo cuando retira. Se pausa al cliente y se avisa al admin para coordinar la sucursal de Correo Argentino más cercana.",
-            "response": "¡Perfecto! Lo dejamos para retiro en sucursal 📦\n\nVas a pagar el total *${{TOTAL}}* en efectivo cuando lo retires.\n\nUn asesor te contacta enseguida para coordinar la sucursal de Correo Argentino más cercana a tu domicilio 😊"
+            "response": "¡Listo! Lo dejamos para retiro en sucursal 📦\n\nVas a pagar el total *${{TOTAL}}* en efectivo cuando lo retires.\n\nYa te contacto para coordinar la sucursal de Correo Argentino más cercana a tu casa 😊"
         },
         "payment_transfer_alias": {
             "step": "waiting_transfer_confirmation",
@@ -174,7 +174,7 @@
         "payment_mp_retry": {
             "step": "waiting_mp_payment",
             "_note": "Mensaje cuando MP devuelve el pago como rejected/error tras un intento del cliente. Se ofrece reintento con otras formas dentro de MP.",
-            "response": "⚠️ Hubo un problema con el pago de MercadoPago — pudo ser la tarjeta o un rechazo del banco.\n\nProbá de nuevo con otra forma:\n✅ Tarjeta de crédito\n✅ Débito\n✅ Saldo Mercado Pago\n\nTe genero un nuevo link para volver a intentarlo, decime cuando esté listo 😊"
+            "response": "⚠️ Hubo un problema con el pago de MercadoPago, pudo ser la tarjeta o un rechazo del banco.\n\nProbá de nuevo con otra forma:\n✅ Tarjeta de crédito\n✅ Débito\n✅ Saldo Mercado Pago\n\nTe genero un nuevo link para volver a intentarlo, decime cuando esté listo 😊"
         },
         "payment_mp_retry_sena": {
             "step": "waiting_mp_payment",
@@ -226,7 +226,7 @@
                 "1"
             ],
             "_note": "FAQ menu opción 1 — '¿Funciona de verdad?'",
-            "response": "*¡Sí, funciona!* 🌿\n\nLa nuez de la india y sus derivados son la opción natural más efectiva para la pérdida de peso. Trabajamos hace más de *13 años* con casi *70.000 clientes agradecidos*.\n\nEs un producto 100% natural, sin químicos ni agregados que podrían ser perjudiciales.\n\n👉 ¿Te lo envío?"
+            "response": "Sí, funciona y posta 🌿\n\nLa nuez de la india viene andando hace una banda para bajar de peso de forma natural. Llevamos *13 años* y pasaron casi *70 mil clientes* por el tratamiento.\n\nEs 100% natural, sin químicos raros ni cosas agregadas.\n\n¿Te lo envío?"
         },
         {
             "keywords": [
@@ -236,7 +236,7 @@
                 "opcion 2"
             ],
             "_note": "FAQ menu opción 2 — '¿Es seguro?'",
-            "response": "*¡Sí, es seguro!* 🌿\n\nEs un producto 100% natural, sin químicos ni agregados. Llevamos más de *13 años distribuyéndolo* con casi *70.000 clientes* y nunca tuvimos un solo caso de problema asociado.\n\nLas únicas contraindicaciones son embarazo, lactancia, menores de 18 años y mayores de 80 años.\n\n👉 ¿Te lo envío?"
+            "response": "Sí, es seguro 🌿\n\nEs 100% natural, sin químicos ni cosas agregadas. Llevamos *13 años* y casi *70 mil clientes*, nunca tuvimos un problema asociado.\n\nLas únicas contraindicaciones son embarazo, lactancia, menores de 18 y mayores de 80 años.\n\n¿Te lo envío?"
         },
         {
             "keywords": [
@@ -248,7 +248,7 @@
                 "opcion 3"
             ],
             "_note": "FAQ menu opción 3 — '¿Tiene contraindicaciones?'",
-            "response": "Las únicas contraindicaciones son:\n\n🚫 Embarazo\n🚫 Lactancia\n🚫 Menores de 18 años\n🚫 Mayores de 80 años\n\nNo interfiere con tratamientos habituales (presión, tiroides, diabetes, etc.) y muchas personas con esas condiciones lo consumen sin inconvenientes.\n\n👉 ¿Te lo envío?"
+            "response": "Las únicas contraindicaciones son:\n\n🚫 Embarazo\n🚫 Lactancia\n🚫 Menores de 18 años\n🚫 Mayores de 80 años\n\nNo se cruza con tratamientos habituales (presión, tiroides, diabetes, etc.). Un montón de gente con esas condiciones lo toma sin drama.\n\n¿Te lo envío?"
         },
         {
             "keywords": [
@@ -324,7 +324,7 @@
                 "sale un monton",
                 "no me alcanza"
             ],
-            "response": "Te entiendo 😊 La plata hoy cuesta ganarla.\n\nEl tratamiento incluye TODO: producto + envío + acompañamiento nutricional por WhatsApp durante todo el tratamiento.\n\nSi te resulta más cómodo, podemos *programar el envío* para después de la fecha que cobrás.\n\n¿Desde qué día te quedaría cómodo?"
+            "response": "Te entiendo 😊 La plata cuesta ganarla.\n\nFijate que en el tratamiento va todo: el producto, el envío gratis y que te sigo por acá durante toda la cursada.\n\nSi te conviene, podemos *programar el envío* para después de cobrar.\n\n¿Desde qué día te queda cómodo?"
         },
         {
             "keywords": [
@@ -339,7 +339,7 @@
             "keywords": [
                 "rebote"
             ],
-            "response": "*No hay rebote* — ese problema viene con métodos agresivos, dietas muy restrictivas o consumo de químicos. Esto es 100% natural y el descenso es progresivo, así que el cuerpo no se acostumbra mal."
+            "response": "*No hay rebote*. Ese problema viene con métodos agresivos: dietas re restrictivas o químicos. Esto es 100% natural y el descenso es gradual, así que el cuerpo no se acostumbra mal."
         },
         {
             "keywords": [
@@ -349,7 +349,7 @@
                 "presion",
                 "hipertension"
             ],
-            "response": "Muchas personas con esas condiciones lo consumen sin inconvenientes 🌿\n\nEs natural y no interfiere con tratamientos habituales. Las únicas contraindicaciones son embarazo, lactancia, menores de 18 y mayores de 80."
+            "response": "Un montón de gente con esas condiciones lo toma sin drama 🌿\n\nEs natural y no se cruza con tratamientos habituales. Las únicas contraindicaciones son embarazo, lactancia, menores de 18 y mayores de 80."
         },
         {
             "keywords": [
@@ -361,7 +361,7 @@
                 "chanta"
             ],
             "_note": "NO promocionar contra reembolso como solución de confianza. Liderar con trust signals. Si insiste, ofrecer retiro en sucursal: paga el total en efectivo cuando lo retira.",
-            "response": "Te entiendo, hoy en día se ven cosas raras por internet 😊\n\nMirá, llevamos *13 años* distribuyendo este producto y casi *50.000 clientes satisfechos* — es serio, no somos un kiosco que abrió ayer.\n\nSi te queda más tranqui podemos coordinar *retiro en sucursal*: te dejamos el paquete en una sucursal de Correo Argentino cerca tuyo y pagás el total *en efectivo al retirar*. ¿Cómo querés avanzar?"
+            "response": "Te entiendo, hoy se ven cosas raras por internet 😊\n\nMirá, llevamos *13 años* distribuyendo este producto y pasaron casi *50 mil clientes*. Es serio, no somos un kiosco que abrió ayer.\n\nSi te queda más tranqui, podemos coordinar *retiro en sucursal*: te dejamos el paquete en una sucursal de Correo Argentino cerca tuyo y pagás el total *en efectivo al retirar*. ¿Cómo querés avanzar?"
         },
         {
             "keywords": [
@@ -371,7 +371,7 @@
                 "cuantas capsulas",
                 "cantidad"
             ],
-            "response": "💊 *Cápsulas:* 1 al día, 30 min antes del almuerzo o cena, con un vaso de agua.\n💧 *Gotas:* 10 gotas 1 vez al día (almuerzo o cena).\n\nCualquier duda durante el tratamiento, te acompañamos por WhatsApp 📞"
+            "response": "💊 *Cápsulas:* una al día, 30 min antes del almuerzo o cena, con un vaso de agua.\n💧 *Gotas:* 10 gotitas una vez al día (almuerzo o cena).\n\nSi tenés dudas en el tratamiento, escribime por acá 📞"
         },
         {
             "keywords": [
@@ -381,7 +381,7 @@
                 "no me gusto",
                 "quiero devolver"
             ],
-            "response": "Si el producto llega dañado lo reenviamos sin costo. No hacemos devolución de dinero ni hay garantía de resultados (cada cuerpo responde distinto), pero llevamos *13 años* y casi *70.000 clientes* avalan el producto 😊"
+            "response": "Si te llega dañado lo reenviamos sin costo. No hacemos devolución de plata ni damos garantía de resultados (cada cuerpo responde distinto), pero llevamos *13 años* y casi *70 mil clientes* avalan el producto 😊"
         },
         {
             "keywords": [
