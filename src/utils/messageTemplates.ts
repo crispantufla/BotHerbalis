@@ -155,7 +155,12 @@ function buildConfirmationMessage(state: any, knowledge?: any): string {
         key = 'order_confirmation_mp';
     } else if (state.paymentMethod === 'transferencia') {
         key = 'order_confirmation_transfer';
-    } else if (state.paymentMethod === 'contrarembolso' && state.senaPaid && state.senaAmount) {
+    } else if (state.paymentMethod === 'contrarembolso') {
+        // Modelo nuevo (may-2026): contrarrembolso = retiro en sucursal, paga total al retirar.
+        // Modelo legacy (pre-may-2026): contrarrembolso = seña $10k + saldo al cartero.
+        // En ambos casos se usa la misma plantilla 'order_confirmation_cod' (el texto fue
+        // reescrito para el modelo nuevo; senaAmount=0 en retiro hace que {{CARTO_LINE}}
+        // quede vacío).
         key = 'order_confirmation_cod';
     } else {
         logger.warn(`[CONFIRMATION] paymentMethod inesperado: "${state.paymentMethod}" (senaPaid=${state.senaPaid}, senaAmount=${state.senaAmount}) — usando fallback`);

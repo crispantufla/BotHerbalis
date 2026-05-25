@@ -1,45 +1,45 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _setStep, _pauseAndAlert } from '../utils/flowHelpers';
-import { buildCashRetryMessage, getFlowTemplate } from '../../utils/messageTemplates';
+import { getFlowTemplate } from '../../utils/messageTemplates';
 import { calculateTotal } from '../utils/cartHelpers';
 import { _formatMessage } from '../utils/messages';
 import logger from '../../utils/logger';
 
-// Detector de retiro en persona / Rosario. La empresa no tiene local público.
-const PICKUP_INTENT_PAY = /\b(voy\s+(?:yo|al?\s+local|a\s+(?:buscar|retirar))|paso\s+(?:a\s+)?(?:buscar|retirar)|retir(?:ar|o)\s+(?:yo|en\s+persona|directamente|allá|allí|ahí)|ir\s+al?\s+local|ir\s+a\s+buscar|busco\s+yo)\b/i;
+// Modelo nuevo de pago (may-2026): el menú pregunta primero TIPO DE ENVÍO.
+//   1️⃣ Retiro en sucursal → contrarreembolso, paga total en efectivo al retirar
+//   2️⃣ Envío a domicilio  → se abona previamente (MP o transferencia)
+//
+// Cliente quiere ir al local físico (que no tenemos) — distinto de "retiro en
+// sucursal" del Correo. Pausamos para que el admin coordine.
+const PICKUP_INTENT_PAY = /\b(voy\s+(?:yo|al?\s+local|a\s+(?:buscar|retirar))|paso\s+(?:a\s+)?(?:buscar|retirar)|ir\s+al?\s+local|ir\s+a\s+buscar|busco\s+yo)\b/i;
 const ROSARIO_INTENT_PAY = /\b(soy\s+de\s+rosario|estoy\s+en\s+rosario|vivo\s+en\s+rosario|de\s+rosario(?:\s+(?:capital|provincia|centro))?)\b/i;
 
-// Payment method matchers. Los dígitos sueltos (1, 2, 3) y números escritos
-// (uno, dos, tres) solo matchean cuando vienen como mensaje completo o con
-// prefijo de opción ("la 1", "el 2", "opción 3"). Frases como "tengo 1 hijo"
-// o "pesan 2 kilos" NO disparan. Números pegados a sustantivo (e.g. "el 2 de
-// febrero") quedan filtrados porque no matchean ningún anchor de opción.
-const OPTION_PICKER = /(^|\s)(?:opci[óo]n\s+|la\s+|el\s+|n[uú]mero\s+|\#)?(\d)\s*[\.\)]?\s*$/i;
-// Acepta "uno"/"dos"/"tres" o "primero"/"segunda"/"tercera" como mensaje
-// completo, opcionalmente precedidos por "la|el|opcion".
-const STANDALONE_NUM_WORD = /^\s*(?:la\s+|el\s+|opci[óo]n\s+)?(uno|dos|tres|primer[oa]|segund[oa]|tercer[oa])\s*[\.\)]?\s*$/i;
+// Shipping choice keywords.
+const RETIRO_KEYWORDS = /\b(retiro|retir(?:ar|o)\s+en\s+sucursal|en\s+sucursal|a\s+sucursal|en\s+la\s+sucursal|sucursal\s+(?:de\s+)?correo|contra.?reembolso|contrarembolso)\b/i;
+const DOMICILIO_KEYWORDS = /\b(domicilio|a\s+(?:mi\s+)?casa|a\s+mi\s+domicilio|env[ií]o\s+a\s+(?:mi\s+)?domicilio|env[ií]o\s+a\s+casa|envialo|envíalo|mandalo|que\s+lo\s+manden|me\s+lo\s+mand[aá]n|me\s+lo\s+mandan|a\s+mi\s+direcci[óo]n|en\s+mi\s+casa|directo\s+a\s+casa)\b/i;
 
-const MP_KEYWORDS = /\b(mercadopago|mercado.?pago|\bmp\b|online|digital|qr|tarjeta|d[ée]bito|cr[ée]dito|pago online|pago digital|pago ahora|por mp|con mp|por mercadopago|aplicaci[óo]n)\b/i;
+// Payment method matchers (submenú tras elegir domicilio + atajos).
+// Rapipago/PagoFácil/Tarjeta se canalizan dentro del link MP, así que matchean MP.
+const MP_KEYWORDS = /\b(mercadopago|mercado.?pago|\bmp\b|online|digital|qr|tarjeta|d[ée]bito|cr[ée]dito|pago online|pago digital|pago ahora|por mp|con mp|por mercadopago|aplicaci[óo]n|rapipago|pago\s*f[áa]cil|pagof[áa]cil)\b/i;
 const TRANSFER_KEYWORDS = /\b(transfer[ei]ncia|transf\b|transferir|alias|dep[óo]sito|deposito|banco|bancaria|cbu|cvu|por transferencia)\b/i;
-const CASH_KEYWORDS = /\b(contra.?reembolso|contrarembolso|contra entrega|efectivo|cash|al recibir|plata en mano|cuando llega|cartero|al cartero|en mano|al recibirlo|por contra reembolso|cuando me llegue|cuando lo reciba)\b/i;
 
-// Helper: classifica un mensaje como "1", "2" o "3" si está aislado (mensaje
-// corto + opción explícita). Devuelve null si no es claramente una opción.
-function _detectOptionNumber(text: string): '1' | '2' | '3' | null {
+// Option-number picker para mensajes cortos ("1", "la 1", "opcion 2", "uno"/"dos").
+const OPTION_PICKER = /(^|\s)(?:opci[óo]n\s+|la\s+|el\s+|n[uú]mero\s+|\#)?(\d)\s*[\.\)]?\s*$/i;
+const STANDALONE_NUM_WORD = /^\s*(?:la\s+|el\s+|opci[óo]n\s+)?(uno|dos|primer[oa]|segund[oa])\s*[\.\)]?\s*$/i;
+
+function _detectOptionNumber(text: string): '1' | '2' | null {
     const trimmed = text.trim();
-    // Mensaje muy corto (≤25 chars) puede ser solo el número
     if (trimmed.length <= 25) {
         const m = trimmed.match(OPTION_PICKER);
         if (m) {
             const n = m[2];
-            if (n === '1' || n === '2' || n === '3') return n;
+            if (n === '1' || n === '2') return n;
         }
         const w = trimmed.match(STANDALONE_NUM_WORD);
         if (w) {
             const word = w[1].toLowerCase();
             if (/uno|primer/.test(word)) return '1';
             if (/dos|segund/.test(word)) return '2';
-            if (/tres|tercer/.test(word)) return '3';
         }
     }
     return null;
@@ -55,13 +55,11 @@ export async function handleWaitingPaymentMethod(
 ): Promise<{ matched: boolean }> {
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
 
-    // ── Check temprano: cliente quiere ir al local / es de Rosario ──────
-    // No tenemos local público — pausamos y avisamos al admin para coordinar
-    // logística. Excepción: si ya pagó MP, dejamos seguir (es solo tema de
-    // entrega que el admin manual coordina mejor).
+    // ── Cliente quiere ir al local físico ──────────────────────────────────────
+    // Distinto de "retiro en sucursal" del Correo. Pausamos.
     const alreadyPaidMp = currentState.paymentMethod === 'mercadopago' && (currentState as any).mpStatus === 'approved';
     if (!alreadyPaidMp && (PICKUP_INTENT_PAY.test(text) || ROSARIO_INTENT_PAY.test(text))) {
-        const reply = 'Te aviso: no tenemos local de venta al público — todos los pedidos van por Correo Argentino con envío gratis 📦\n\nUn asesor te va a contactar enseguida para coordinar la mejor opción (sucursal cerca tuyo o entrega a domicilio) 😊';
+        const reply = 'Te aviso: no tenemos local de venta al público — todos los pedidos van por Correo Argentino con envío gratis 📦\n\nUn asesor te va a contactar enseguida para coordinar la mejor opción (retiro en sucursal cerca tuyo o entrega a domicilio) 😊';
         currentState.history.push({ role: 'bot', content: reply, timestamp: Date.now() });
         saveState(userId);
         await sendMessageWithDelay(userId, reply);
@@ -69,9 +67,7 @@ export async function handleWaitingPaymentMethod(
         return { matched: true };
     }
 
-    // Guard defensivo: si llegamos acá con totalPrice undefined/inválido pero
-    // tenemos cart, recalcular antes de los waives (evita "Monto inválido"
-    // downstream en _generateAndSendLink).
+    // Guard defensivo: recalcular totalPrice si está corrupto.
     const hasValidTotal = currentState.totalPrice
         && parseFloat(String(currentState.totalPrice).replace(/\./g, '').replace(',', '.')) > 0;
     if (!hasValidTotal && currentState.cart && currentState.cart.length > 0) {
@@ -79,66 +75,40 @@ export async function handleWaitingPaymentMethod(
         calculateTotal(currentState);
     }
 
-    // Detectar elección por número de opción aislado (ej: "1", "la 1", "opcion 2").
-    // Orden actual del menú: 1=MP, 2=Transferencia, 3=Contra reembolso.
     const optionNum = _detectOptionNumber(text);
-    const isOptionMP = optionNum === '1';
-    const isOptionTransfer = optionNum === '2';
-    const isOptionCash = optionNum === '3';
 
-    // Si ya mostramos el last-mile retry (sugerencia #5), una respuesta corta
-    // afirmativa ("si", "dale", "confirmo") confirma contra reembolso.
-    const CASH_CONFIRM_AFTER_RETRY = /^\s*(si|sí|dale|confirmo|sigamos|sigo|así|asi|claro|esa|seguro|ok|bueno|avanzamos)\s*[\.\!]?\s*$/i;
-    const isConfirmingCashRetry = !!currentState.cashRetryShown
-        && !currentState.codAnticipoMethodAsked
-        && !isOptionMP && !isOptionTransfer && !MP_KEYWORDS.test(text)
-        && CASH_CONFIRM_AFTER_RETRY.test(text.trim());
+    // ── Sub-menú: el cliente ya eligió domicilio, ahora elige MP o Transferencia
+    if (currentState.paymentSubChoiceAsked) {
+        const choseMp = (optionNum === '1') || MP_KEYWORDS.test(text);
+        const choseTransfer = (optionNum === '2') || TRANSFER_KEYWORDS.test(normalizedText);
 
-    // ── Cliente ya confirmó COD y ahora elige cómo hacer el anticipo ───────────
-    // Después de payment_cod_method_choice, esperamos transferencia o MP.
-    // Submenú: 1 = Transferencia, 2 = Mercado Pago. NO usamos el mapping del
-    // menú principal (donde 1=MP, 2=Transferencia, 3=COD) — sería contradictorio
-    // dentro del submenú.
-    if (currentState.codAnticipoMethodAsked) {
-        currentState.paymentMethod = 'contrarembolso';
-        currentState.senaAmount = 10000;
-        currentState.senaPaid = false;
-
-        const choseTransfer = (optionNum === '1') || TRANSFER_KEYWORDS.test(normalizedText);
-        const choseMp = (optionNum === '2') || MP_KEYWORDS.test(text);
-
+        if (choseMp && !choseTransfer) {
+            currentState.paymentMethod = 'mercadopago';
+            currentState.senaAmount = null;
+            currentState.senaPaid = false;
+            _setStep(currentState, FlowStep.WAITING_MP_PAYMENT);
+            saveState(userId);
+            logger.info(`[PAYMENT_METHOD] ${userId} → DOMICILIO + MP`);
+            return { matched: false, staleReprocess: true } as any;
+        }
         if (choseTransfer && !choseMp) {
-            const tpl = getFlowTemplate('payment_cod_anticipo', knowledge) ||
-                `¡Perfecto! Para el *anticipo de $10.000* por transferencia usá el alias *{{ALIAS}}* a nombre de *{{TITULAR}}* 🏦\n\nCuando termines, mandame *el comprobante* o el *número de operación* 📸\n\nCuando te llegue el paquete, pagás el saldo *${'$'}{{SALDO}}* en efectivo al cartero 📦`;
+            currentState.paymentMethod = 'transferencia';
+            currentState.senaAmount = null;
+            currentState.senaPaid = false;
+            const tpl = getFlowTemplate('payment_transfer_alias', knowledge) ||
+                `¡Perfecto! Para transferir usá el alias *{{ALIAS}}* a nombre de *{{TITULAR}}* 🏦\n\nMonto: ${'$'}{{TOTAL}}\n\nUna vez que realices la transferencia, escribime *"listo"* y coordinamos el envío 😊`;
             const msg = _formatMessage(tpl, currentState);
             _setStep(currentState, FlowStep.WAITING_TRANSFER_CONFIRMATION);
             currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
             saveState(userId);
             await sendMessageWithDelay(userId, msg);
+            logger.info(`[PAYMENT_METHOD] ${userId} → DOMICILIO + Transferencia`);
             return { matched: true };
         }
-        if (choseMp && !choseTransfer) {
-            // Genera link MP por $10k (la senaAmount ya está seteada). El handler
-            // de WAITING_MP_PAYMENT detecta entrada sin link y arma el flujo seña.
-            //
-            // FIX (caso Romina 19-may-2026): si el cliente venía del flujo MP por
-            // el TOTAL (link previo en mpPaymentLinkUrl), había que limpiar el
-            // link viejo para que WAITING_MP_PAYMENT genere uno nuevo por la
-            // seña. Sin esta limpieza, el _verifyPayment seguía consultando el
-            // link viejo ($46.900 pending) en lugar del nuevo ($10.000 que el
-            // cliente terminaba pagando), y el bot decía "no veo el pago".
-            currentState.mpPaymentLinkId = null;
-            currentState.mpPaymentLinkUrl = null;
-            // Reset también el email-asked para que el subflow de email se
-            // pueda re-disparar si el cliente quería usar otro email para la seña.
-            // (Si ya capturamos email, _handleEmailSubflow lo reusa sin re-preguntar.)
-            _setStep(currentState, FlowStep.WAITING_MP_PAYMENT);
-            saveState(userId);
-            return { matched: false, staleReprocess: true } as any;
-        }
-        // Ambigüedad: re-preguntar con la misma plantilla.
-        const tpl = getFlowTemplate('payment_cod_method_choice', knowledge) ||
-            `¿El anticipo de $10.000 lo querés hacer por:\n\n1️⃣ Transferencia bancaria\n2️⃣ Mercado Pago\n\n¿Cuál preferís?`;
+
+        // Ambigüedad: re-preguntar el submenú.
+        const tpl = getFlowTemplate('payment_domicilio_choice', knowledge) ||
+            `¿Cómo querés abonar?\n\n1️⃣ *Mercado Pago*\n2️⃣ *Transferencia bancaria*`;
         const msg = _formatMessage(tpl, currentState);
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);
@@ -146,25 +116,61 @@ export async function handleWaitingPaymentMethod(
         return { matched: true };
     }
 
-    // ── Opción 1: MercadoPago ──────────────────────────────────────────────────
-    // Match explícito por número/keyword, O afirmativa genérica.
-    // El nuevo menú pregunta "¿avanzamos con Mercado Pago?" — si el cliente dice
-    // "dale/sí/vamos/ok" sin elegir otra opción, default a MP. Reduce un turno
-    // de conversación y aumenta la conversión MP-first.
-    const PAYMENT_AFFIRMATIVE = /^\s*(?:s[ií]+|dale|ok|okay|okey|listo|vamos|vamo|avancemos|avanzá|avanza|sigamos|sigo|claro|por\s+supuesto|obvio|joya|genial|perfecto|bueno|sí\s+claro|dale\s+vamos|sí\s+dale|metele)\s*[\.\!]*\s*$/i;
-    const isGenericAffirmative = PAYMENT_AFFIRMATIVE.test(text) && !isOptionTransfer && !isOptionCash && !TRANSFER_KEYWORDS.test(text) && !CASH_KEYWORDS.test(text);
-    if ((isOptionMP || MP_KEYWORDS.test(text) || isGenericAffirmative) && !TRANSFER_KEYWORDS.test(text) && !isOptionTransfer && !isOptionCash) {
-        currentState.paymentMethod = 'mercadopago';
-        _setStep(currentState, FlowStep.WAITING_MP_PAYMENT);
+    // ── Elección 1: Retiro en sucursal (contrarreembolso, 100% al retirar) ────
+    if (optionNum === '1' || RETIRO_KEYWORDS.test(text)) {
+        currentState.paymentMethod = 'contrarembolso';
+        currentState.senaAmount = 0;
+        currentState.senaPaid = false;
+        currentState.shippingChoice = 'retiro';
+
+        const tpl = getFlowTemplate('payment_retiro_confirm', knowledge) ||
+            `¡Perfecto! Lo dejamos para retiro en sucursal 📦\n\nVas a pagar el total *${'$'}{{TOTAL}}* en efectivo cuando lo retirés.\n\nUn asesor te contacta enseguida para coordinar la sucursal más cercana 😊`;
+        const msg = _formatMessage(tpl, currentState);
+        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);
-        logger.info(`[PAYMENT_METHOD] ${userId} → MP (${isGenericAffirmative ? 'afirmativa genérica → default MP' : 'elección explícita'})`);
-        // stepWaitingMpPayment maneja el primer mensaje al entrar
-        return { matched: false, staleReprocess: true } as any;
+        await sendMessageWithDelay(userId, msg);
+
+        const addr: any = currentState.partialAddress || {};
+        const addrSummary = [addr.calle, addr.ciudad, addr.cp].filter(Boolean).join(', ') || 'sin dirección';
+        await _pauseAndAlert(
+            userId, currentState, dependencies, text,
+            `Cliente eligió RETIRO EN SUCURSAL. Coordinar sucursal de Correo Argentino más cercana a: ${addrSummary}. Paga el total $${currentState.totalPrice || '?'} en efectivo al retirar.`
+        );
+        logger.info(`[PAYMENT_METHOD] ${userId} → RETIRO EN SUCURSAL — pausado para coordinación admin`);
+        return { matched: true };
     }
 
-    // ── Opción 2: Transferencia ────────────────────────────────────────────────
-    if (isOptionTransfer || TRANSFER_KEYWORDS.test(normalizedText)) {
+    // ── Elección 2: Envío a domicilio (prepago) → sub-menú MP/Transfer ─────────
+    if (optionNum === '2' || DOMICILIO_KEYWORDS.test(text)) {
+        currentState.shippingChoice = 'domicilio';
+        currentState.paymentSubChoiceAsked = true;
+        const tpl = getFlowTemplate('payment_domicilio_choice', knowledge) ||
+            `Perfecto, lo mandamos a tu domicilio 🏠\n\n¿Cómo querés abonar?\n\n1️⃣ *Mercado Pago*\n2️⃣ *Transferencia bancaria*`;
+        const msg = _formatMessage(tpl, currentState);
+        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        saveState(userId);
+        await sendMessageWithDelay(userId, msg);
+        logger.info(`[PAYMENT_METHOD] ${userId} → DOMICILIO — submenú prepago presentado`);
+        return { matched: true };
+    }
+
+    // ── Atajo: cliente menciona medio de pago directo sin elegir envío ─────────
+    // Asumimos DOMICILIO (es la única opción que admite estos medios). Si quería
+    // retiro debería decirlo explícitamente; el modelo nuevo no usa anticipo.
+    if (MP_KEYWORDS.test(text) || TRANSFER_KEYWORDS.test(normalizedText)) {
+        currentState.shippingChoice = 'domicilio';
+        if (MP_KEYWORDS.test(text)) {
+            currentState.paymentMethod = 'mercadopago';
+            currentState.senaAmount = null;
+            currentState.senaPaid = false;
+            _setStep(currentState, FlowStep.WAITING_MP_PAYMENT);
+            saveState(userId);
+            logger.info(`[PAYMENT_METHOD] ${userId} → DOMICILIO + MP (atajo)`);
+            return { matched: false, staleReprocess: true } as any;
+        }
         currentState.paymentMethod = 'transferencia';
+        currentState.senaAmount = null;
+        currentState.senaPaid = false;
         const tpl = getFlowTemplate('payment_transfer_alias', knowledge) ||
             `¡Perfecto! Para transferir usá el alias *{{ALIAS}}* a nombre de *{{TITULAR}}* 🏦\n\nMonto: ${'$'}{{TOTAL}}\n\nUna vez que realices la transferencia, escribime *"listo"* y coordinamos el envío 😊`;
         const msg = _formatMessage(tpl, currentState);
@@ -172,47 +178,14 @@ export async function handleWaitingPaymentMethod(
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
+        logger.info(`[PAYMENT_METHOD] ${userId} → DOMICILIO + Transferencia (atajo)`);
         return { matched: true };
     }
 
-    // ── Opción 3: Contra reembolso (pago al recibir) ───────────────────────────
-    // Flujo nuevo (mayo 2026): el anticipo de $10.000 puede ser por TRANSFERENCIA
-    // o por MERCADO PAGO — el cliente elige.
-    //   1. Primera vez: cashRetryShown=false → explicamos modalidad (payment_cod_retry).
-    //   2. Cliente confirma: codAnticipoMethodAsked=true → preguntamos método
-    //      (payment_cod_method_choice). Quedamos en waiting_payment_method.
-    //   3. Cliente elige: lo maneja el branch de arriba (codAnticipoMethodAsked).
-    //      Transferencia → alias + WAITING_TRANSFER_CONFIRMATION.
-    //      MP            → genera link $10k + WAITING_MP_PAYMENT (vía staleReprocess).
-    if (isOptionCash || CASH_KEYWORDS.test(normalizedText) || isConfirmingCashRetry) {
-        if (!currentState.cashRetryShown) {
-            currentState.cashRetryShown = true;
-            const retryMsg = buildCashRetryMessage(currentState, knowledge);
-            currentState.history.push({ role: 'bot', content: retryMsg, timestamp: Date.now() });
-            saveState(userId);
-            await sendMessageWithDelay(userId, retryMsg);
-            logger.info(`[PAYMENT_METHOD] COD anticipo $10k presentado a ${userId}`);
-            return { matched: true };
-        }
-
-        // Cliente confirmó la modalidad COD. Preguntamos cómo quiere hacer el anticipo.
-        currentState.codAnticipoMethodAsked = true;
-        const tpl = getFlowTemplate('payment_cod_method_choice', knowledge) ||
-            `¡Perfecto! ¿El anticipo de $10.000 lo querés hacer por:\n\n1️⃣ *Transferencia bancaria* — te paso el alias y mandás el comprobante\n2️⃣ *Mercado Pago* — te paso el link y se acredita al instante\n\n¿Cuál preferís?`;
-        const msg = _formatMessage(tpl, currentState);
-        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
-        saveState(userId);
-        await sendMessageWithDelay(userId, msg);
-        logger.info(`[PAYMENT_METHOD] COD anticipo method choice presentado a ${userId}`);
-        return { matched: true };
-    }
-
-    // ── AI fallback — respuesta ambigua ────────────────────────────────────────
-    // Política nueva: las 3 opciones (MP, Transferencia, Contra reembolso con
-    // anticipo $10k) se ofrecen espontáneamente. El cliente elige una.
+    // ── AI fallback ───────────────────────────────────────────────────────────
     const aiRes = await aiService.chat(text, {
         step: 'waiting_payment_method',
-        goal: `El cliente debe elegir cómo paga. Las 3 opciones disponibles son:\n\n1️⃣ ⭐ *Mercado Pago* (recomendado, el más usado) — link único que cubre tarjeta de crédito, débito, app MP, o efectivo en cualquier Pago Fácil o Rapipago (el cliente lleva el código y paga en efectivo en la sucursal). Acreditación inmediata.\n\n2️⃣ *Transferencia bancaria* — alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*. Le pasamos el alias y avisa cuando transfirió.\n\n3️⃣ *Contra reembolso / pago al recibir* — anticipo de *$10.000* por transferencia al mismo alias (*HERBALIS.TIENDA*, *BIO ORIGEN S.A.S.*) que cubre el envío + saldo en efectivo al cartero cuando llega. Aplica a TODOS los planes y clientes (nuevos y recurrentes). Es una decisión interna por la cantidad de paquetes que vuelven sin retirar. Es exactamente la misma plata, solo cambia el momento.\n\nARGUMENTOS DE VENTA SI EL CLIENTE DUDA:\n- "Mercado Pago protege al comprador — si hay problema con el envío, MP devuelve la plata. Es la forma más segura."\n- Si dice no tener tarjeta: "El link de MP no necesita tarjeta — llevás el código y pagás en efectivo en cualquier Pago Fácil o Rapipago del barrio."\n\nPROHIBICIONES ESTRICTAS:\n- NO mencionar adicional de $6.000 (esa política ya no existe)\n- NO mencionar cuotas — no se ofrecen cuotas; quien quiera dividir el pago verá lo que su tarjeta permita al abrir el link de MP, pero NUNCA se promete ni menciona cuotas\n- NO decir "contra reembolso es lo más cómodo/seguro" — empujá MP como primera opción\n- NO decir "el envío es gratis si elegís plan 120 días"\n- NO inventar cuentas, CBUs o aliases distintos al oficial\n\nSi el cliente responde con afirmativa genérica ("dale", "sí", "vamos") sin elegir explícitamente, asumí MERCADO PAGO (el handler ya hace esto). NUNCA avances sin que el cliente confirme con cuál de las 3 opciones quiere avanzar.`,
+        goal: `El cliente debe elegir TIPO DE ENVÍO antes que método de pago. Las 2 opciones son:\n\n1️⃣ *Retiro en sucursal* → paga el TOTAL en efectivo al retirar en una sucursal de Correo Argentino (contrarreembolso, sin anticipo previo). Un asesor coordina la sucursal más cercana al cliente.\n\n2️⃣ *Envío a domicilio* → se abona previamente. Después se elige el medio: Mercado Pago (cubre tarjeta de crédito, débito, app MP, o efectivo en Pago Fácil/Rapipago) o transferencia bancaria al alias *HERBALIS.TIENDA* (BIO ORIGEN S.A.S.).\n\nAmbos envíos son GRATIS (5 a 7 días hábiles por Correo Argentino).\n\nPROHIBICIONES ESTRICTAS:\n- NO mencionar anticipo de $10.000 (esa modalidad fue eliminada en mayo 2026)\n- NO ofrecer pago en efectivo al cartero a domicilio — el contrarreembolso ahora es solo en sucursal\n- NO mencionar cuotas\n- NO inventar aliases distintos al oficial\n\nSi el cliente responde con afirmativa genérica ("dale", "sí") sin aclarar, pedile que elija retiro o domicilio. NUNCA avances sin que confirme cuál de las 2 opciones de ENVÍO eligió.`,
         history: currentState.history,
         summary: currentState.summary,
         knowledge,
@@ -226,6 +199,6 @@ export async function handleWaitingPaymentMethod(
         return { matched: true };
     }
 
-    await _pauseAndAlert(userId, currentState, dependencies, text, 'No se pudo determinar el método de pago del cliente.');
+    await _pauseAndAlert(userId, currentState, dependencies, text, 'No se pudo determinar la elección de envío del cliente.');
     return { matched: true };
 }

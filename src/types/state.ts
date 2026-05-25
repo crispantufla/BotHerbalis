@@ -88,8 +88,14 @@ export interface UserState {
     reengagementSent?: boolean;
     cartRecovered?: boolean;
     secondFollowUpSent?: boolean;
-    cashRetryShown?: boolean; // last-mile retry mostrado al elegir contra reembolso
-    codAnticipoMethodAsked?: boolean; // ya preguntamos "anticipo por transferencia o por MP?"
+    cashRetryShown?: boolean; // [LEGACY] flujo anticipo $10k (deprecated may-2026)
+    codAnticipoMethodAsked?: boolean; // [LEGACY] flujo anticipo $10k (deprecated may-2026)
+    // Modelo nuevo de envío (may-2026): el menú pregunta primero el tipo de envío.
+    // 'retiro' = sucursal Correo Argentino, paga total en efectivo al retirar.
+    // 'domicilio' = se abona previamente por MP o transferencia.
+    shippingChoice?: 'retiro' | 'domicilio' | null;
+    // True cuando ya mostramos el submenú MP/Transferencia tras elegir domicilio.
+    paymentSubChoiceAsked?: boolean;
     lastInteraction?: number;
     lastActivityAt?: number;
 
