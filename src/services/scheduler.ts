@@ -849,7 +849,7 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
         // no completó MP por razones técnicas (no tiene tarjeta a mano, problema
         // con el link, etc.). Una sola vez vía flag mpAlternativeOffered.
         if (mpReminderStage === 1 && !(state as any).mpAlternativeOffered && minsSince >= 90) {
-            const msg = `¡Hola! 👋 Si tuviste alguna dificultad con el link de Mercado Pago, no hay drama 😊\n\nTenemos dos alternativas:\n\n💸 *Transferencia bancaria* — al alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*\n📦 *Contra reembolso* — adelantás $10.000 y el resto en efectivo al cartero cuando te llega\n\n¿Te queda más cómoda alguna de estas, o seguimos con Mercado Pago?`;
+            const msg = `¡Hola! 👋 Si tuviste alguna dificultad con el link de Mercado Pago, no hay drama 😊\n\nTenés dos alternativas:\n\n💸 *Transferencia bancaria* — al alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*\n🏪 *Retiro en sucursal* — lo retirás en una sucursal de Correo Argentino cerca tuyo y pagás el total en efectivo al retirar (sin anticipo previo)\n\n¿Te queda más cómoda alguna de estas, o seguimos con Mercado Pago?`;
             try {
                 await sendMessageWithDelay(userId, msg);
                 _pushHistory(state, { role: 'bot', content: msg });
@@ -888,7 +888,7 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
         if (mpReminderStage === 2 && minsSince >= 1440) {
             const linkUrl = (state as any).mpPaymentLinkUrl;
             const linkLine = linkUrl ? `\n\nAcá te dejo el link otra vez:\n${linkUrl}` : '';
-            const msg = `¡Hola! ¿Cómo va? 😊\n\nVi que el pago de MercadoPago quedó pendiente. Te recuerdo que esta semana los pedidos llegan en *4 días hábiles* desde la confirmación del pago.\n\nSi preferís, te lo puedo programar para una fecha más adelante (cuando cobres) y te congelo el precio de hoy. Avisame qué te conviene.${linkLine}`;
+            const msg = `¡Hola! ¿Cómo va? 😊\n\nVi que el pago de MercadoPago quedó pendiente. Te recuerdo que los pedidos llegan en *5 a 7 días hábiles* desde la confirmación del pago.\n\nSi preferís, te lo puedo programar para una fecha más adelante (cuando cobres) y te congelo el precio de hoy. Avisame qué te conviene.${linkLine}`;
             try {
                 await sendMessageWithDelay(userId, msg);
                 _pushHistory(state, { role: 'bot', content: msg });
