@@ -115,9 +115,20 @@
         },
         "payment_menu": {
             "step": "waiting_payment_method",
-            "_note": "TEXTO 4 — Menú con las 3 opciones espontáneas de pago. Disparado por buildPaymentMessage.",
-            "response": "¿Vamos con Mercado Pago? 💳\n\nEs lo más cómodo — tarjeta, débito, o pagás en efectivo en Pago Fácil/Rapipago con el código.\n\nSi preferís transferencia o contra reembolso, avisame y te paso los datos.",
+            "_note": "TEXTO 4 — Menú envío + medios de pago. Disparado por buildPaymentMessage. Modelo nuevo (may-2026): primero elige tipo de envío, después método. Retiro=contrarreembolso al retirar (sin anticipo). Domicilio=prepago (MP/Transfer).",
+            "response": "📦 El envío se realiza por Correo Argentino y demora entre 5 y 7 días hábiles.\n\nOpciones de envío:\n1️⃣ Retiro en sucursal → se paga al retirar (contrarreembolso)\n2️⃣ Envío a domicilio → se abona previamente\n\n💳 Medios de pago:\nMercadoPago – Transferencia – Rapipago – PagoFácil\n💳 Tarjeta de crédito\n\n👉 Por favor, decime:\n* Si preferís retiro en sucursal o envío a domicilio\n\n‼️ Ambos envíos son GRATIS ‼️",
             "nextStep": "waiting_payment_method"
+        },
+        "payment_domicilio_choice": {
+            "step": "waiting_payment_method",
+            "_note": "Cliente eligió envío a domicilio. Submenú de medio de pago (prepago). Rapipago/PagoFácil/Tarjeta se canalizan dentro del link de Mercado Pago.",
+            "response": "Perfecto, lo mandamos a tu domicilio 🏠\n\n¿Cómo querés abonar?\n\n1️⃣ *Mercado Pago* — tarjeta, débito, app MP, o llevás el código y pagás en efectivo en Pago Fácil o Rapipago\n2️⃣ *Transferencia bancaria* — te paso el alias",
+            "nextStep": "waiting_payment_method"
+        },
+        "payment_retiro_confirm": {
+            "step": "waiting_admin_validation",
+            "_note": "Cliente eligió retiro en sucursal. NO hay anticipo — paga el total en efectivo cuando retira. Se pausa al cliente y se avisa al admin para coordinar la sucursal de Correo Argentino más cercana.",
+            "response": "¡Perfecto! Lo dejamos para retiro en sucursal 📦\n\nVas a pagar el total *${{TOTAL}}* en efectivo cuando lo retires.\n\nUn asesor te contacta enseguida para coordinar la sucursal de Correo Argentino más cercana a tu domicilio 😊"
         },
         "payment_transfer_alias": {
             "step": "waiting_transfer_confirmation",
@@ -127,19 +138,19 @@
         },
         "payment_cod_retry": {
             "step": "waiting_payment_method",
-            "_note": "TEXTO 5c — Primera vez que el cliente elige 'contra reembolso'. Explica la modalidad antes de pedir confirmación. NO promociona como 'lo más cómodo'. NO menciona si el anticipo es por transferencia o por MP — eso lo decide el cliente en el siguiente paso (payment_cod_method_choice). Disparado por buildCashRetryMessage.",
+            "_note": "LEGACY (deprecated may-2026). Mensaje del flujo anticipo $10k + saldo al cartero. Reemplazado por payment_retiro_confirm (modelo nuevo: 100% al retirar en sucursal). Se conserva por si rollback rápido.",
             "response": "Dale 👍\n\nLa modalidad es: adelantás $10.000 (cubre el envío) y el resto en efectivo al cartero cuando te llega.\n\nMisma plata, solo cambia el momento. ¿Avanzamos?",
             "nextStep": "waiting_payment_method"
         },
         "payment_cod_method_choice": {
             "step": "waiting_payment_method",
-            "_note": "TEXTO 5c-bis — Cliente confirmó la modalidad COD ('si' tras retry). Le preguntamos cómo quiere hacer el anticipo de $10.000: por transferencia (alias) o por Mercado Pago (link). Disparado desde stepWaitingPaymentMethod cuando cashRetryShown=true y el cliente confirma.",
+            "_note": "LEGACY (deprecated may-2026). Submenú anticipo $10k por transferencia o MP. Ya no se dispara — el nuevo modelo no tiene anticipo.",
             "response": "¡Perfecto! ¿El anticipo de $10.000 lo querés hacer por...\n\n1️⃣ *Transferencia bancaria* — te paso el alias y mandás el comprobante\n2️⃣ *Mercado Pago* — te paso el link y se acredita al instante\n\n¿Cuál preferís?",
             "nextStep": "waiting_payment_method"
         },
         "payment_cod_anticipo": {
             "step": "waiting_transfer_confirmation",
-            "_note": "TEXTO 5d — Cliente eligió hacer el anticipo COD POR TRANSFERENCIA. Le pasamos alias + recordamos el saldo en efectivo al cartero. Placeholders: {{ALIAS}}, {{TITULAR}}, {{SALDO}} (totalPrice - 10000). Si elige MP, se usa payment_mp_link_sena en su lugar.",
+            "_note": "LEGACY (deprecated may-2026). Anticipo por transferencia. Ya no se dispara — el nuevo modelo no tiene anticipo.",
             "response": "¡Perfecto! Para el *anticipo de $10.000* por transferencia usá el alias *{{ALIAS}}* a nombre de *{{TITULAR}}* 🏦\n\nCuando termines, mandame *el comprobante* o el *número de operación* 📸\n\nCuando te llegue el paquete, pagás el saldo *${{SALDO}}* en efectivo al cartero 📦",
             "nextStep": "waiting_transfer_confirmation"
         },
@@ -151,7 +162,7 @@
         },
         "payment_mp_link_sena": {
             "step": "waiting_mp_payment",
-            "_note": "Variante LEGACY del link MP cuando hay senaAmount > 0 (path desactivado en el flujo principal — COD ahora va por transferencia al alias). Se mantiene por compatibilidad con state construido manualmente o flujos viejos. Placeholders: {{PRODUCT}}, {{PLAN}}, {{TOTAL}}, {{SENA_AMOUNT}}, {{SENA_REMAINDER}}, {{LINK}}.",
+            "_note": "LEGACY (deprecated may-2026). Link MP por seña $10k. Ya no se dispara — el modelo nuevo elimina seña/anticipo. Se conserva por si rollback.",
             "response": "💳 Link para la seña de Mercado Pago:\n\n{{LINK}}\n\nSeña: ${{SENA_AMOUNT}}\nSaldo al cartero: ${{SENA_REMAINDER}}\n\nCuando termines, mandame \"listo\" y verifico.\n\nMientras, pasame los datos de envío:\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:",
             "nextStep": "waiting_mp_payment"
         },
@@ -167,7 +178,7 @@
         },
         "payment_mp_retry_sena": {
             "step": "waiting_mp_payment",
-            "_note": "Variante del retry MP cuando el flujo era seña (legacy). El bot pide al cliente que mande el comprobante (screenshot o número de operación) para que el admin pueda verificar — no asumimos que la verificación automática de MP sea suficiente cuando ya hubo un rechazo.",
+            "_note": "LEGACY (deprecated may-2026). Retry MP del flujo seña. Ya no se dispara — el modelo nuevo elimina seña.",
             "response": "⚠️ Hubo un problema con el pago de la seña — pudo ser la tarjeta o un rechazo del banco.\n\nProbá de nuevo con otra forma:\n✅ Tarjeta de crédito\n✅ Débito\n✅ Saldo Mercado Pago\n\nTe genero un nuevo link para volver a intentarlo. Cuando termines, mandame *el comprobante* o el *número de operación* y verifico el pago 📸"
         },
         "transfer_received": {
@@ -177,27 +188,27 @@
         },
         "cod_received": {
             "step": "waiting_transfer_confirmation",
-            "_note": "Cliente confirmó que ya hizo el anticipo COD ($10k al alias). Pausamos y avisamos admin. Aclara que el saldo lo paga al cartero. Pedimos comprobante porque la cuenta emisora puede estar a nombre de un tercero y no se puede asumir match por nombre.",
+            "_note": "LEGACY (deprecated may-2026). Mensaje cuando el cliente confirma haber enviado el anticipo $10k. Reemplazado por payment_retiro_confirm (modelo nuevo sin anticipo).",
             "response": "¡Perfecto! Para verificar el anticipo, mandame *el comprobante* o el *número de operación* 📸\n\nApenas lo cruzo, despachamos. El saldo lo pagás en efectivo al cartero cuando llega 📦"
         },
         "order_confirmation_mp": {
             "step": "waiting_admin_validation",
-            "_note": "Confirmación de pedido enviada tras pago completo por MP. Placeholders: {{PRODUCT_DETAIL}} (cart.map producto), {{PLAN_DETAIL}}, {{TOTAL}}, {{POSTDATADO_LINE}} (línea condicional: 'Envío programado: X' vs 'Entrega estimada: 4-6 días' si paymentMethod=mercadopago, '7-10 días' si transferencia/contrarembolso).",
-            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✅ Pago recibido via MercadoPago\n\n✔ Correo Argentino\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs para retirar.\n\n👉 ¿Me confirmás que podés retirarlo en sucursal dentro de las 72 hs si fuera necesario?"
+            "_note": "Confirmación tras pago completo por MP (envío a domicilio). Placeholders: {{PRODUCT_DETAIL}}, {{PLAN_DETAIL}}, {{TOTAL}}, {{POSTDATADO_LINE}} (5 a 7 días hábiles uniforme).",
+            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✅ Pago recibido via MercadoPago\n\n✔ Correo Argentino — envío a domicilio\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs para retirar.\n\n👉 ¿Me confirmás que podés retirarlo en sucursal dentro de las 72 hs si fuera necesario?"
         },
         "order_confirmation_transfer": {
             "step": "waiting_admin_validation",
-            "_note": "Confirmación de pedido tras pago por transferencia bancaria. Mismas variables que MP — el total ya está acreditado al confirmar.",
-            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✅ Pago recibido via Transferencia\n\n✔ Correo Argentino\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs para retirar.\n\n👉 ¿Me confirmás que podés retirarlo en sucursal dentro de las 72 hs si fuera necesario?"
+            "_note": "Confirmación tras pago por transferencia bancaria (envío a domicilio).",
+            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✅ Pago recibido via Transferencia\n\n✔ Correo Argentino — envío a domicilio\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs para retirar.\n\n👉 ¿Me confirmás que podés retirarlo en sucursal dentro de las 72 hs si fuera necesario?"
         },
         "order_confirmation_cod": {
             "step": "waiting_admin_validation",
-            "_note": "Confirmación de pedido tras seña pagada (modalidad contra reembolso). Placeholders extra: {{SENA_AMOUNT_FMT}} (la seña recibida formateada), {{CARTO_LINE}} (línea distinta si es retiro en sucursal vs entrega a domicilio: incluye saldo). NO repetimos la pregunta de retiro en 72hs — el cliente ya pagó el anticipo, está comprometido a recibir; sólo informamos la condición.",
-            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✅ Seña recibida via MercadoPago: ${{SENA_AMOUNT_FMT}}\n{{CARTO_LINE}}\n\n✔ Correo Argentino\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs. El no retiro genera un costo logístico de ${{COSTO_LOGISTICO}}."
+            "_note": "Confirmación de retiro en sucursal (modelo nuevo may-2026): cliente paga el TOTAL en efectivo al retirar. Sin anticipo. Un asesor coordina la sucursal de Correo Argentino con el cliente.",
+            "response": "📦 CONFIRMACIÓN DE PEDIDO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal a pagar al retirar: *${{TOTAL}}*\n\n✔ Retiro en sucursal de Correo Argentino\n{{POSTDATADO_LINE}}\nUn asesor te contacta enseguida para coordinar la sucursal más cercana.\n\nImportante:\nTenés 72 hs para retirar desde que llega a la sucursal. Pasado ese plazo, el paquete vuelve y se genera un costo logístico de ${{COSTO_LOGISTICO}}."
         },
         "order_confirmation_fallback": {
             "step": "waiting_admin_validation",
-            "_note": "Fallback de confirmación si el paymentMethod del state no matchea con ninguno de los conocidos. Logueamos warn en código. NO incluye la pregunta de retiro en 72hs — el cliente ya pagó (sea anticipo o total) y está comprometido; sólo informamos la condición.",
+            "_note": "Fallback si el paymentMethod del state no matchea con ninguno conocido. Logueamos warn en código.",
             "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✔ Correo Argentino\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs."
         }
     },
@@ -251,8 +262,8 @@
                 "duda 4",
                 "opcion 4"
             ],
-            "_note": "FAQ menu opción 4 — '¿Cómo lo recibo y cuánto tarda?'. La demora depende del método de pago: MP acredita al instante (4-6 días); transferencia y contra reembolso requieren validación manual del comprobante o armado del envío COD (7-10 días). Cerramos con '¿Avanzamos?' neutral.",
-            "response": "📦 *Envíos por Correo Argentino* a tu domicilio o a la sucursal más cercana.\n\n⏱️ *4 a 6 días hábiles* con Mercado Pago.\n⏱️ *7 a 10 días hábiles* con transferencia o contra reembolso.\n\nLa diferencia es que MP acredita al instante, así despachamos enseguida.\n\nSi el cartero no te encuentra, o por cualquier otra razón que el correo disponga que retires en sucursal, te avisamos y tenés 72 hs para retirarlo.\n\n👉 ¿Avanzamos?"
+            "_note": "FAQ menu opción 4 — '¿Cómo lo recibo y cuánto tarda?'. Modelo unificado may-2026: 5 a 7 días hábiles para todo. Dos opciones de envío: retiro en sucursal o entrega a domicilio. Ambos son gratis.",
+            "response": "📦 *Envíos por Correo Argentino* — *5 a 7 días hábiles*.\n\nTenés 2 opciones:\n1️⃣ *Retiro en sucursal* — pagás al retirar (contrarreembolso)\n2️⃣ *Envío a domicilio* — se abona previamente\n\n‼️ Ambos envíos son *GRATIS* ‼️\n\nSi el cartero no te encuentra, te avisamos y tenés 72 hs para retirarlo en sucursal.\n\n👉 ¿Avanzamos?"
         },
         {
             "keywords": [
@@ -264,8 +275,8 @@
                 "metodo de pago",
                 "cuotas"
             ],
-            "_note": "Resumen de las 3 opciones disponibles. Si el cliente ya eligió método, no responder esto.",
-            "response": "Tenemos 3 formas de pagar 💳\n\n1️⃣ ⭐ *Mercado Pago* (el más elegido) — tarjeta, débito, app MP, o efectivo en Pago Fácil/Rapipago\n2️⃣ *Transferencia bancaria* — te paso el alias\n3️⃣ *Contra reembolso* — anticipo de $10.000 y el resto en efectivo al cartero\n\n¿Cuál te queda más cómoda?"
+            "_note": "Resumen del modelo nuevo (may-2026): 2 tipos de envío con sus medios asociados. Si el cliente ya eligió, no responder esto.",
+            "response": "Tenemos 2 opciones de envío 📦\n\n1️⃣ *Retiro en sucursal* → pagás el total *en efectivo al retirar* (contrarreembolso)\n2️⃣ *Envío a domicilio* → se abona previamente por *Mercado Pago* (tarjeta, débito, app MP, o efectivo en Pago Fácil/Rapipago) o *transferencia bancaria*\n\n‼️ Ambos envíos son GRATIS ‼️\n\n¿Cuál te queda más cómoda?"
         },
         {
             "keywords": [
@@ -289,8 +300,8 @@
                 "efectivo al cartero",
                 "cuando llega"
             ],
-            "_note": "Contra reembolso es una de las 3 opciones espontáneas. Anticipo de $10.000 por TRANSFERENCIA al alias HERBALIS.TIENDA O por MercadoPago (lo elige el cliente cuando confirme la modalidad) + saldo en efectivo al cartero. Aplica a TODOS los planes y clientes.",
-            "response": "Dale, podemos coordinar pago al recibir 😊\n\nLa modalidad es: adelantás un *anticipo de $10.000* (cubre el envío), y el resto lo pagás en *efectivo al cartero* cuando llega el paquete. El anticipo lo podés hacer por transferencia bancaria o por Mercado Pago, lo que te quede más cómodo.\n\nEs una decisión interna por la cantidad de paquetes que vuelven sin retirar — aplica a todos los pedidos. Es exactamente la misma plata, solo cambia el momento.\n\n¿Avanzamos así o preferís otra opción?"
+            "_note": "Contrarreembolso modelo nuevo (may-2026): retiro en sucursal de Correo Argentino, paga el TOTAL en efectivo al retirar. Sin anticipo previo. Si el cliente prefiere entrega a domicilio, debe abonar previamente (MP o transferencia).",
+            "response": "Dale, podemos coordinar pago al recibir 😊\n\nLa modalidad es: te dejamos el paquete en una *sucursal de Correo Argentino* cerca tuyo, y pagás el *total en efectivo al retirar*. El envío sale gratis.\n\nUn asesor te contacta para coordinar la sucursal más cómoda. ¿Avanzamos así?"
         },
         {
             "keywords": [
@@ -302,8 +313,8 @@
                 "pago el total",
                 "el resto cuanto"
             ],
-            "_note": "FAQ específica para el caso (real, Romina 19-may): el cliente eligió COD y duda si paga $10k + $46.900 enteros, o si los $10k se descuentan del total. Aclara el desglose.",
-            "response": "Tranqui, te aclaro 😊\n\nLos $10.000 del anticipo se *descuentan* del total. NO pagás el total entero al cartero.\n\n👉 Adelantás $10.000 (vía MP o transferencia)\n👉 Al cartero le pagás el resto en efectivo cuando llega\n\nLa suma es exactamente el precio del plan que elegiste — solo cambia el momento. ¿Avanzamos?"
+            "_note": "FAQ ya no aplica al modelo nuevo (sin anticipo). Se conserva por compat con conversaciones que vienen del flujo viejo y dudan del desglose. Cierra reencaminando al modelo nuevo.",
+            "response": "Tranqui, te aclaro 😊\n\nEn la modalidad nueva no hay anticipo. Si elegís *retiro en sucursal*, pagás el *total en efectivo al retirar*. Si elegís *envío a domicilio*, abonás antes (por Mercado Pago o transferencia) y te lo mandamos.\n\n¿Cuál te queda más cómoda?"
         },
         {
             "keywords": [
@@ -349,8 +360,8 @@
                 "engaño",
                 "chanta"
             ],
-            "_note": "NO promocionar contra reembolso como solución de confianza. Liderar con trust signals. Si insiste, mencionar COD con anticipo $10k (puede ser por transferencia al alias o por MP — el cliente elige después).",
-            "response": "Te entiendo, hoy en día se ven cosas raras por internet 😊\n\nMirá, llevamos *13 años* distribuyendo este producto y casi *50.000 clientes satisfechos* — es serio, no somos un kiosco que abrió ayer.\n\nSi te queda más tranqui también podemos coordinar pago al recibir: adelantás un *anticipo de $10.000* (por transferencia o por Mercado Pago, vos elegís) y el resto en efectivo al cartero. ¿Cómo querés avanzar?"
+            "_note": "NO promocionar contra reembolso como solución de confianza. Liderar con trust signals. Si insiste, ofrecer retiro en sucursal: paga el total en efectivo cuando lo retira.",
+            "response": "Te entiendo, hoy en día se ven cosas raras por internet 😊\n\nMirá, llevamos *13 años* distribuyendo este producto y casi *50.000 clientes satisfechos* — es serio, no somos un kiosco que abrió ayer.\n\nSi te queda más tranqui podemos coordinar *retiro en sucursal*: te dejamos el paquete en una sucursal de Correo Argentino cerca tuyo y pagás el total *en efectivo al retirar*. ¿Cómo querés avanzar?"
         },
         {
             "keywords": [
@@ -417,8 +428,8 @@
         "noCreditCard": false,
         "noArgue": true,
         "keepResponsesShort": true,
-        "defaultPaymentMethod": "three_options",
-        "_note_defaultPayment": "Ofrecemos 3 opciones espontáneamente al pedir el método de pago: (1) Tarjeta de crédito o débito (Mercado Pago link), (2) Transferencia bancaria (alias HERBALIS.TIENDA — BIO ORIGEN S.A.S.), (3) Contra reembolso (anticipo $10.000 al mismo alias + saldo en efectivo al cartero). El bot NUNCA menciona cuotas — quien quiera dividir el pago verá las opciones que su tarjeta permita al abrir el link de MP.",
+        "defaultPaymentMethod": "shipping_first",
+        "_note_defaultPayment": "Modelo nuevo (may-2026): el menú pregunta primero por TIPO DE ENVÍO. (1) Retiro en sucursal = contrarreembolso 100% al retirar, sin anticipo. (2) Envío a domicilio = prepago por Mercado Pago (alias HERBALIS.TIENDA — BIO ORIGEN S.A.S. para transferencia). Rapipago/PagoFácil/Tarjeta se canalizan dentro del link de MP. El bot NUNCA menciona cuotas.",
         "bankAlias": {
             "alias": "HERBALIS.TIENDA",
             "titular": "BIO ORIGEN S.A.S."
@@ -426,10 +437,10 @@
         "contraReembolsoMAX": {
             "enabled": true,
             "spontaneous": true,
-            "senaTransfer": 10000,
+            "senaTransfer": 0,
             "adicional": 0,
             "appliesTo": "all",
-            "description": "Pago al recibir: ofrecido espontáneamente como opción 3. Requiere anticipo de $10.000 por transferencia al alias HERBALIS.TIENDA (BIO ORIGEN S.A.S.) que cubre el envío; el saldo se paga en efectivo al cartero. Aplica a TODOS los planes (60d y 120d) y a TODOS los clientes (nuevos y recurrentes)."
+            "description": "Contrarreembolso (modelo nuevo may-2026): retiro en sucursal de Correo Argentino. El cliente paga el TOTAL en efectivo al retirar. Sin anticipo. Aplica a TODOS los planes (60d y 120d) y a TODOS los clientes."
         },
         "costoLogisticoRechazo": 18000,
         "ageLimits": {
