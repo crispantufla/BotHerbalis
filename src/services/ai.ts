@@ -308,8 +308,8 @@ REGLAS DE ESTE PASO:
 
 function _getModulePlanChoice(prices: Record<string, any>): string {
     return `
-🛑 ESTE PASO USA RESPUESTA EXPANDIDA POR DEFECTO (MÚLTIPLES PÁRRAFOS, DETALLADO).
-El cliente está eligiendo el plan — momento crítico de la venta donde la persuasión convierte. NO seas conciso aunque la regla general pida brevedad: acá necesitás ANCLAR VALOR (el plan 120 es $X por día = costo de un café), DERRIBAR la objeción de precio si aparece, y EXPLICAR el porqué de los 120 vs 60 con confianza. Si compara productos, comparalos a fondo. Mínimo 2 párrafos cuando hay objeción o duda.
+🛑 ESTE PASO USA RESPUESTA CORTA POR DEFECTO (2-3 frases). EXPANDÍ SOLO ANTE OBJECIÓN DURA.
+El cliente está eligiendo el plan, no leyendo un folleto. La clienta tipo lee mensajes cortos en el celu — un párrafo de 5 líneas la espanta. Acá conviertás CORTO + PREGUNTA DE CIERRE. Reservá la expansión para cuando aparece una objeción fuerte (caro, no confío, no funciona) o el cliente pide explícitamente "explicame", "no entiendo", "qué diferencia hay". Sin objeción: anclar valor con UNA frase ("el de 120 te sale $X por día — un café") + pregunta directa. La regla de "MÚLTIPLES PÁRRAFOS" del general1 NO aplica acá — el admin reportó 2 veces en mayo que los mensajes son "demasiado largos para clientas que tienen problemas de interpretación de textos". Hazle caso al admin.
 
 PRECIOS EXACTOS:
 - Cápsulas: $${prices['Cápsulas']['60']} (60d) / $${prices['Cápsulas']['120']} (120d)
@@ -391,7 +391,16 @@ PAGO Y ENVÍO (modelo nuevo may-2026):
 
     INDECISIÓN:
     - Dudan sobre PRODUCTO: "No te preocupes, te ayudo 😊" + breve info opciones + "¿Querés saber más de alguna?"
-        - Dudan sobre COMPRAR AHORA: Ofrecé programar envío para congelar precio.Comportate como vendedor con alternativas.`;
+        - Dudan sobre COMPRAR AHORA: Ofrecé programar envío para congelar precio.Comportate como vendedor con alternativas.
+
+🛑 ANTI-LOOP DE VENTA FANTASMA (CRÍTICO) 🛑
+Si el cliente dice cosas como "esperando confirmación", "esperando aún", "ya solicitaste el pedido", "todavía no me llegó nada", "no comprendo qué me preguntás", "¿de qué pedido hablás?" o transmite cualquier confusión sobre el estado de su compra, NO contestes con frases vacías de relleno como "no te preocupes, está en marcha", "ya está procesándose", "aguardame un instante", "todo perfecto". Esas respuestas generan loops donde el cliente repite la pregunta 3-5 veces y el bot devuelve lo mismo. En su lugar:
+1. Revisá el historial: si NO hay confirmación de venta + datos de envío + método de pago elegido → el cliente está confundido, NO hay pedido en marcha. RESPONDÉ con honestidad: "Disculpá la confusión, dejame revisar bien tu caso y te respondo en un ratito 🙏" + extractedData="NEED_ADMIN", goalMet=false. Esto pausa y avisa al admin.
+2. NO inventes que hay un pedido en marcha cuando no lo hay.
+3. NO repitas "ya tenés todo claro" o "todo está en marcha" si el cliente está pidiendo claridad — eso es exactamente lo opuesto a lo que necesita.
+
+🛑 POSTERGACIÓN EXPLÍCITA DE PAGO MP (no insistir) 🛑
+Si el cliente con link de MP pendiente escribe textualmente "te aviso cuando cobre", "yo te aviso cuando tenga la plata", "todavía no cobré", "no me han pagado todavía", "cuando me paguen te aviso" — extractedData="POSTPONE_INDEFINITE". Eso desactiva los recordatorios automáticos del scheduler. Confirmá una sola vez ("¡Tranqui! Cuando puedas, me escribís y retomamos 😊") y nada más. NO mandes recordatorios ni links cada media hora.`;
 }
 
 function _getModuleConsumption(): string {
@@ -1025,9 +1034,13 @@ CRÍTICO: Usá la "Fecha Actual" provista arriba para calcular el día exacto y 
         11. AMBIGÜEDAD CALLE vs LOCALIDAD: si el nombre de la "calle" coincide con el nombre de una localidad argentina conocida (ej: "Aluminé", "Tigre", "Pilar", "Salta") PERO el usuario también dio una ciudad/localidad distinta en otra línea, asumí que ese nombre es CALLE de la ciudad indicada (no localidad). Solo tratá ese nombre como localidad si NO hay otra ciudad explícita en el texto.
         `;
         try {
+            // Parser de dirección — usamos GPT-4o full porque mini falla con
+            // direcciones desordenadas tipo "San Martín 865, Comte. Luis Piedra
+            // Buena, Sta. Cruz, CP 9303" (caso real may-2026). Los 6 pause-by-
+            // parser-fail vistos en producción venían todos de mini.
             const result: any = await this._callQueued(
                 () => this.client.chat.completions.create({
-                    model: this.model,
+                    model: MODEL_PREMIUM,
                     messages: [
                         { role: "system", content: "Sos un parser de datos de envío experto en geografía argentina." },
                         { role: "user", content: prompt }

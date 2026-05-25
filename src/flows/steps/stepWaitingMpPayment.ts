@@ -230,6 +230,21 @@ export async function handleWaitingMpPayment(
         currentState.history.push({ role: 'bot', content: aiRes.response, timestamp: Date.now() });
         await sendMessageWithDelay(userId, aiRes.response);
         saveState(userId);
+
+        // Manejo de flags semánticos del AI (modelo viejo no los procesaba).
+        const ed = String(aiRes.extractedData || '');
+        if (ed.includes('POSTPONE_INDEFINITE')) {
+            // El cliente avisó explícitamente que va a cobrar/avisar — apagamos
+            // los recordatorios automáticos del scheduler (Stage 4+ no dispara).
+            (currentState as any).mpReminderStage = 99;
+            (currentState as any).mpPostponedAt = Date.now();
+            saveState(userId);
+            logger.info(`[MP_PAYMENT] User ${userId} marked POSTPONE_INDEFINITE — disabling nudges.`);
+        }
+        if (ed.includes('NEED_ADMIN')) {
+            await _pauseAndAlert(userId, currentState, dependencies, text, 'IA detectó confusión / venta fantasma en waiting_mp_payment. El cliente cree que hay pedido cargado y no lo hay, o está esperando algo sin acción posible del bot. Revisar y aclarar manualmente.');
+        }
+
         return { matched: true };
     }
 
