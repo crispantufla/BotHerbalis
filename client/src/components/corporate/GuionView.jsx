@@ -221,7 +221,17 @@ const GuionView = () => {
             await api.delete(`/api/guion-comments/${id}`);
             setComments(prev => prev.filter(c => c.id !== id));
             toast.success('Eliminado');
-        } catch { toast.error('Error al eliminar'); }
+        } catch (e) {
+            // Loguea + muestra el motivo real (401, 403, 404, 500) en vez del
+            // "Error al eliminar" genérico que ocultaba la causa.
+            const status = e?.response?.status;
+            const backendMsg = e?.response?.data?.error;
+            console.error('[GUION] delete fallo:', { id, status, backendMsg, raw: e });
+            const msg = backendMsg
+                ? `No se pudo eliminar: ${backendMsg}`
+                : (status ? `Error al eliminar (${status})` : 'Error al eliminar (sin red?)');
+            toast.error(msg);
+        }
     };
 
     const handleCopySuggested = (text) => {
