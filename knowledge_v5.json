@@ -28,26 +28,26 @@
         },
         "recommendation": {
             "step": "waiting_weight",
-            "_note": "Fallback genérico (rev. 2026-05-26 corrección de horacio). NO recomienda un producto — ofrece las 3 opciones con su modo de consumo. La dosis en días se asigna en waiting_preference según los kilos del cliente.",
-            "response": "¡Buenísimo! Te ofrezco la Nuez de la India en 3 opciones 🌿\n\n1️⃣ *Cápsulas* — 1 al día, 30 min antes del almuerzo o cena.\n2️⃣ *Gotas* — 10 gotas al día, 30 min antes del almuerzo o cena.\n3️⃣ *Semillas* — infusión nocturna. Primera semana partís la nuez en 8 y hervís un pedacito 5 min cada noche; después en 4. Tomás el agua + el trocito, lo más alejado de la cena posible.\n\n¿Con cuál vas?",
+            "_note": "Fallback genérico (rev. 2026-05-26 corrección de horacio + warning colon irritable en semillas). NO recomienda un producto — ofrece las 3 opciones con su modo de consumo. La dosis en días se asigna en waiting_preference según los kilos del cliente.",
+            "response": "¡Buenísimo! Te ofrezco la Nuez de la India en 3 opciones 🌿\n\n1️⃣ *Cápsulas* — 1 al día, 30 min antes del almuerzo o cena.\n2️⃣ *Gotas* — 10 gotas al día, 30 min antes del almuerzo o cena.\n3️⃣ *Semillas* — infusión nocturna. Primera semana partís la nuez en 8 y hervís un pedacito 5 min cada noche; después en 4. Tomás el agua + el trocito, lo más alejado de la cena posible. _No apta para síndrome de colon irritable._\n\n¿Con cuál vas?",
             "nextStep": "waiting_preference"
         },
         "recommendation_1": {
             "step": "waiting_weight",
-            "_note": "Tier 1 — hasta 10 kg (rev. 2026-05-26 corrección de horacio: NO recomendamos producto, ofrecemos las 3 opciones. La dosis -plan 60d- se asigna en waiting_preference cuando elige producto).",
-            "response": "Para hasta 10 kg te ofrezco 3 opciones 🌿\n\n1️⃣ *Cápsulas* — 1 al día, 30 min antes del almuerzo o cena.\n2️⃣ *Gotas* — 10 gotas al día, 30 min antes del almuerzo o cena.\n3️⃣ *Semillas* — infusión nocturna (te paso el ritual si elegís ésta).\n\nVa con guía y te sigo por acá durante todo el tratamiento.\n\n¿Con cuál vas?",
+            "_note": "Tier 1 — hasta 10 kg (rev. 2026-05-26 corrección de horacio + warning colon irritable. La dosis -plan 60d- se asigna en waiting_preference cuando elige producto).",
+            "response": "Para hasta 10 kg el plan que te corresponde es de *60 días* 🌿\n\nLo podés tomar en 3 formas:\n\n1️⃣ *Cápsulas* — 1 al día, 30 min antes del almuerzo o cena.\n2️⃣ *Gotas* — 10 gotas al día, 30 min antes del almuerzo o cena.\n3️⃣ *Semillas* — infusión nocturna (te paso el ritual si elegís ésta). _No apta para síndrome de colon irritable._\n\nVa con guía y te sigo por acá durante todo el tratamiento.\n\n¿Con cuál vas?",
             "nextStep": "waiting_preference"
         },
         "recommendation_2": {
             "step": "waiting_weight",
-            "_note": "Tier 2 — 10 a 20 kg (rev. 2026-05-26 corrección de horacio: NO recomendamos producto, ofrecemos las 3 opciones. Dosis -plan 120d- se asigna en waiting_preference).",
-            "response": "Para bajar entre 10 y 20 kg te ofrezco 3 opciones 🌿\n\n1️⃣ *Cápsulas* — 1 al día, 30 min antes del almuerzo o cena.\n2️⃣ *Gotas* — 10 gotas al día, 30 min antes del almuerzo o cena.\n3️⃣ *Semillas* — infusión nocturna (te paso el ritual si elegís ésta).\n\nVa con guía y acompañamiento por acá durante todo el tratamiento.\n\n¿Con cuál vas?",
+            "_note": "Tier 2 — 10 a 20 kg (rev. 2026-05-26 2da corrección de horacio: mencionar plan 120 días explícito + advertencia colon irritable en semillas).",
+            "response": "Para bajar entre 10 y 20 kg el plan que te corresponde es de *120 días* 🌿\n\nLo podés tomar en 3 formas:\n\n1️⃣ *Cápsulas* — 1 al día, 30 min antes del almuerzo o cena.\n2️⃣ *Gotas* — 10 gotas al día, 30 min antes del almuerzo o cena.\n3️⃣ *Semillas* — infusión nocturna (te paso el ritual si elegís ésta). _No apta para síndrome de colon irritable._\n\nVa con guía y acompañamiento por acá durante todo el tratamiento.\n\n¿Con cuál vas?",
             "nextStep": "waiting_preference"
         },
         "recommendation_3": {
             "step": "waiting_weight",
-            "_note": "Tier 3 — más de 20 kg (rev. 2026-05-26 corrección de horacio: NO recomendamos producto, ofrecemos las 3 opciones. Dosis -plan 120d- se asigna en waiting_preference).",
-            "response": "Para más de 20 kg te ofrezco 3 opciones 🌿\n\n1️⃣ *Cápsulas* — 1 al día, 30 min antes del almuerzo o cena.\n2️⃣ *Gotas* — 10 gotas al día, 30 min antes del almuerzo o cena.\n3️⃣ *Semillas* — infusión nocturna (te paso el ritual si elegís ésta).\n\nVa con guía y acompañamiento por acá durante todo el tratamiento.\n\n¿Con cuál vas?",
+            "_note": "Tier 3 — más de 20 kg (rev. 2026-05-26 2da corrección de horacio: mencionar plan 120 días explícito + advertencia colon irritable en semillas).",
+            "response": "Para más de 20 kg el plan que te corresponde es de *120 días* 🌿\n\nLo podés tomar en 3 formas:\n\n1️⃣ *Cápsulas* — 1 al día, 30 min antes del almuerzo o cena.\n2️⃣ *Gotas* — 10 gotas al día, 30 min antes del almuerzo o cena.\n3️⃣ *Semillas* — infusión nocturna (te paso el ritual si elegís ésta). _No apta para síndrome de colon irritable._\n\nVa con guía y acompañamiento por acá durante todo el tratamiento.\n\n¿Con cuál vas?",
             "nextStep": "waiting_preference"
         },
         "preference_capsulas": {
@@ -88,24 +88,6 @@
             ],
             "response": "¡Dale, vamos con semillas! 🌿\n\nPara tu objetivo te corresponde el *plan de {{PLAN_MONTHS}}*. {{DOSAGE_REASON}}\n\nLa primera semana partís una nuez en 8 y hervís un pedacito 5 min cada noche (o 3 min en microondas); las siguientes en 4. Tomás el agua + el trocito, lo más alejado de la cena posible. Va con guía y te sigo por acá durante todo el tratamiento.\n\n¿Te paso los precios?",
             "nextStep": "waiting_ok"
-        },
-        "closing": {
-            "step": "waiting_plan_choice",
-            "match": [
-                "si",
-                "sisi",
-                "dale",
-                "bueno",
-                "ok",
-                "envialo",
-                "envíalo",
-                "te lo envio",
-                "te lo envío",
-                "mandalo",
-                "envielo"
-            ],
-            "response": "¡Buenísimo! 🎉 Te sigo por acá durante todo el tratamiento.\n\nPasame los datos para la etiqueta:\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\n\n(Que la dirección sea exacta, sin \"aprox\" ni S/N)",
-            "nextStep": "waiting_data"
         },
         "prices": {
             "step": "waiting_ok",
@@ -157,6 +139,25 @@
             "_note": "Cliente confirmó que ya hizo la transferencia ('listo'). Pausamos al cliente y avisamos admin para verificar el comprobante. Pedimos comprobante o número de operación porque la cuenta emisora puede estar a nombre de un tercero y no se puede asumir match por nombre.",
             "response": "¡Perfecto! Para verificarla más rápido, mandame *el comprobante* o el *número de operación* 📸\n\nApenas la cruzo, te confirmo el envío ⏳"
         },
+        "closing": {
+            "step": "waiting_data",
+            "_note": "Pedido de datos de envío. Se dispara DESPUÉS de que el cliente eligió método de pago y, en su caso, pagó (MP confirmado o transferencia avisada con 'listo'). La elección de envío/pago se hace en payment_menu ANTES de este paso — por eso el _note no es 'tras el plan choice'. Para retiro en sucursal: el bot pausa y el admin coordina, este texto no se usa.",
+            "match": [
+                "si",
+                "sisi",
+                "dale",
+                "bueno",
+                "ok",
+                "envialo",
+                "envíalo",
+                "te lo envio",
+                "te lo envío",
+                "mandalo",
+                "envielo"
+            ],
+            "response": "¡Buenísimo! 🎉 Te sigo por acá durante todo el tratamiento.\n\nPasame los datos para la etiqueta:\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\n\n(Que la dirección sea exacta, sin \"aprox\" ni S/N)",
+            "nextStep": "waiting_data"
+        },
         "order_confirmation_mp": {
             "step": "waiting_admin_validation",
             "_note": "Confirmación tras pago completo por MP (envío a domicilio). Placeholders: {{PRODUCT_DETAIL}}, {{PLAN_DETAIL}}, {{TOTAL}}, {{POSTDATADO_LINE}} (5 a 7 días hábiles uniforme).",
@@ -169,8 +170,8 @@
         },
         "order_confirmation_cod": {
             "step": "waiting_admin_validation",
-            "_note": "Confirmación de retiro en sucursal (modelo nuevo may-2026): cliente paga el TOTAL en efectivo al retirar. Sin anticipo. Un asesor coordina la sucursal de Correo Argentino con el cliente.",
-            "response": "📦 CONFIRMACIÓN DE PEDIDO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal a pagar al retirar: *${{TOTAL}}*\n\n✔ Retiro en sucursal de Correo Argentino\n{{POSTDATADO_LINE}}\nUn asesor te contacta enseguida para coordinar la sucursal más cercana.\n\nImportante:\nTenés 72 hs para retirar desde que llega a la sucursal. Pasado ese plazo, el paquete vuelve y se genera un costo logístico de ${{COSTO_LOGISTICO}}."
+            "_note": "Confirmación de retiro en sucursal (modelo nuevo may-2026): cliente paga el TOTAL en efectivo al retirar. Sin anticipo. La sucursal de Correo Argentino la determina el CP del cliente — no hace falta que un asesor se contacte para coordinar (rev. 2026-05-26 corrección de horacio).",
+            "response": "📦 CONFIRMACIÓN DE PEDIDO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal a pagar al retirar: *${{TOTAL}}*\n\n✔ Retiro en sucursal de Correo Argentino — se asigna automáticamente la más cercana a tu código postal.\n{{POSTDATADO_LINE}}\nImportante:\nTenés 72 hs para retirar desde que llega a la sucursal. Pasado ese plazo, el paquete vuelve y se genera un costo logístico de ${{COSTO_LOGISTICO}}."
         },
         "order_confirmation_fallback": {
             "step": "waiting_admin_validation",

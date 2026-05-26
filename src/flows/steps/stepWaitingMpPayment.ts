@@ -68,10 +68,21 @@ export async function handleWaitingMpPayment(
             if (hasAddress) {
                 await _finalizeOrderAndNotifyAdmin(userId, currentState, dependencies);
             } else {
+                // Tomamos la copia de pedido de datos del knowledge — el panel Guiones
+                // muestra la entry `flow.closing` y los vendedores la editan ahí. Si
+                // por alguna razón no existe (mock parcial), usamos fallback fijo.
+                // Modelo nuevo (may-2026): seña $10k eliminada — sólo la mantenemos
+                // como compat para Orders pre-may-2026 con senaAmount>0. En ese caso
+                // el prefijo dice "seña confirmada" para no confundir al cliente.
+                const closingTpl = getFlowTemplate('closing', knowledge);
+                const dataMsg = closingTpl
+                    ? _formatMessage(closingTpl, currentState)
+                    : '¡Perfecto! 🎉 Ahora necesito los datos de envío:\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:';
                 const isSenaFlow = !!(currentState.senaAmount && currentState.senaAmount > 0);
-                const msg = isSenaFlow
-                    ? '¡Perfecto, la seña fue confirmada! 🎉\n\nAhora necesito los datos de envío para despachar 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:'
-                    : '¡Perfecto, el pago fue confirmado! 🎉\n\nAhora necesito los datos de envío para despachar tu pedido 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:';
+                const prefix = isSenaFlow
+                    ? '¡Perfecto, la seña fue confirmada! 🎉\n\n'
+                    : '¡Perfecto, el pago fue confirmado! 🎉\n\n';
+                const msg = prefix + dataMsg;
                 _setStep(currentState, FlowStep.WAITING_DATA);
                 currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
                 saveState(userId);
