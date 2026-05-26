@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
     FileText, MessageSquare, Send, Trash2, Check, RotateCcw, HelpCircle, Edit3,
     User, ChevronDown, ChevronRight, Sparkles, Copy, ThumbsUp, Plus, ArrowDown,
+    ShoppingBag, DollarSign, CreditCard, CheckCircle2, MessageCircle, Hand,
 } from 'lucide-react';
 import api from '../../config/axios';
 import { useAuth } from '../../context/AuthContext';
@@ -26,7 +27,9 @@ const SECTION_LABELS = {
     'flow.preference_gotas': 'Cliente elige gotas',
     'flow.preference_semillas': 'Cliente elige semillas',
     'flow.closing': 'Cierre — pide datos de envío',
-    'flow.payment_menu': 'TEXTO 4 — Menú de pago (3 opciones)',
+    'flow.payment_menu': 'TEXTO 4 — Menú de pago (envío + medio)',
+    'flow.payment_domicilio_choice': 'Submenú: domicilio → MP o transferencia',
+    'flow.payment_retiro_confirm': 'Confirmación retiro en sucursal',
     'flow.payment_transfer_alias': 'TEXTO 5b — Transferencia (alias)',
     'flow.payment_cod_retry': 'TEXTO 5c — Contra reembolso (modalidad)',
     'flow.payment_cod_anticipo': 'TEXTO 5d — Confirmación COD (anticipo)',
@@ -48,6 +51,60 @@ const TYPE_META = {
     correction: { label: 'Corrección', icon: Edit3,         tone: 'warning' },
     question:   { label: 'Pregunta',   icon: HelpCircle,    tone: 'info'    },
 };
+
+// Agrupación visual del guión en 6 etapas del flujo. Cada etapa es un bloque
+// colapsable; las secciones (y los slots "entre dos" dentro de la misma etapa)
+// se renderizan adentro cuando se expande. Las "between" cross-etapa quedan
+// como una mini-row entre los bloques (raras, pero las conservamos para no
+// perder comentarios viejos creados en esos paths).
+const STAGE_GROUPS = [
+    {
+        key: 'onboarding',
+        label: 'Saludo y recomendación',
+        icon: Hand,
+        sectionKeys: ['greeting', 'recommendation', 'recommendation_1', 'recommendation_2', 'recommendation_3'],
+    },
+    {
+        key: 'product',
+        label: 'Elige producto',
+        icon: ShoppingBag,
+        sectionKeys: ['preference_capsulas', 'preference_gotas', 'preference_semillas'],
+    },
+    {
+        key: 'prices',
+        label: 'Precios',
+        icon: DollarSign,
+        sectionKeys: ['prices'],
+    },
+    {
+        key: 'payment',
+        label: 'Pago',
+        icon: CreditCard,
+        sectionKeys: [
+            'payment_menu', 'payment_domicilio_choice', 'payment_retiro_confirm',
+            'payment_transfer_alias', 'payment_mp_link', 'payment_mp_link_sena',
+            'payment_mp_failed', 'payment_mp_retry', 'payment_mp_retry_sena',
+            'payment_cod_retry', 'payment_cod_anticipo',
+            'transfer_received', 'cod_received',
+        ],
+    },
+    {
+        key: 'confirmation',
+        label: 'Cierre y confirmación',
+        icon: CheckCircle2,
+        sectionKeys: [
+            'closing',
+            'order_confirmation_mp', 'order_confirmation_transfer',
+            'order_confirmation_cod', 'order_confirmation_fallback',
+        ],
+    },
+    {
+        key: 'faq',
+        label: 'FAQ',
+        icon: MessageCircle,
+        isFaq: true,
+    },
+];
 
 // Path estable para comentarios entre dos pasos. Lo dejamos como string
 // para reusar el mismo endpoint sin cambios en el backend.
@@ -105,6 +162,16 @@ const GuionView = () => {
     const [loading, setLoading] = useState(true);
     const [expandedSection, setExpandedSection] = useState(null);
     const [showResolved, setShowResolved] = useState(false);
+    // Etapas expandidas (Set de stage.key). Default colapsado; al cargar
+    // comentarios decidimos auto-abrir las que tengan pendientes.
+    const [expandedStages, setExpandedStages] = useState(() => new Set());
+    const toggleStage = (key) => {
+        setExpandedStages(prev => {
+            const next = new Set(prev);
+            if (next.has(key)) next.delete(key); else next.add(key);
+            return next;
+        });
+    };
 
     // Highlight de comentarios nuevos: lastVisit en localStorage, comentarios
     // con createdAt > lastVisit aparecen marcados.
@@ -156,6 +223,30 @@ const GuionView = () => {
         fetchComments(activeScript);
         setExpandedSection(null);
     }, [activeScript, fetchComments]);
+
+    // Auto-expandir etapas que tengan comentarios pendientes. Solo cuando
+    // cambia activeScript o comments — evita re-cerrar etapas que el user
+    // abrió manualmente (porque la decisión se basa en el set inicial).
+    useEffect(() => {
+        const pending = comments.filter(c => !c.resolved);
+        if (pending.length === 0) return;
+        setExpandedStages(prev => {
+            const next = new Set(prev);
+            for (const group of STAGE_GROUPS) {
+                const pathPrefixes = group.isFaq
+                    ? ['faq[']
+                    : group.sectionKeys.map(k => `flow.${k}`);
+                const hasPending = pending.some(c => {
+                    if (group.isFaq) return c.sectionPath.startsWith('faq[');
+                    return pathPrefixes.includes(c.sectionPath)
+                        || (c.sectionPath.startsWith('between:') &&
+                            pathPrefixes.some(p => c.sectionPath.includes(p)));
+                });
+                if (hasPending) next.add(group.key);
+            }
+            return next;
+        });
+    }, [activeScript, comments]);
 
     // Real-time: socket eventos para refresh sin recarga.
     useEffect(() => {
@@ -260,34 +351,30 @@ const GuionView = () => {
         );
     }
 
-    // Orden del flujo: greeting → recommendations → prices (TEXTO 3) → preference
-    // → closing (pide datos) → menú de pago (TEXTO 4) → ramas de pago
-    // (TEXTO 5: MP / transferencia / COD) → confirmaciones finales.
-    const ORDERED_FLOW_KEYS = [
-        'greeting',
-        'recommendation', 'recommendation_1', 'recommendation_2', 'recommendation_3',
-        'prices',
-        'preference_capsulas', 'preference_gotas', 'preference_semillas',
-        'closing',
-        'payment_menu',
-        'payment_mp_link', 'payment_mp_link_sena',
-        'payment_transfer_alias',
-        'payment_cod_retry', 'payment_cod_anticipo',
-        'payment_mp_failed', 'payment_mp_retry', 'payment_mp_retry_sena',
-        'transfer_received', 'cod_received',
-        'order_confirmation_mp', 'order_confirmation_transfer', 'order_confirmation_cod', 'order_confirmation_fallback',
-    ];
-
-    const sections = [];
-    ORDERED_FLOW_KEYS.forEach(k => {
-        if (activeGuion.flow?.[k]?.response) sections.push({ path: `flow.${k}`, text: activeGuion.flow[k].response });
-    });
-    (activeGuion.faq || []).forEach((faq, idx) => {
-        sections.push({
-            path: `faq[${idx}]`, text: faq.response, isFaq: true,
-            keywords: faq.keywords, note: faq._note,
-        });
-    });
+    // Armamos las secciones agrupadas por etapa siguiendo el orden de
+    // STAGE_GROUPS. Cada sección lleva su `groupKey` para poder renderizar
+    // entre/dentro de etapa correctamente. Las FAQs van en la etapa "faq".
+    const sectionsByGroup = STAGE_GROUPS.map(group => {
+        if (group.isFaq) {
+            const faqs = (activeGuion.faq || []).map((faq, idx) => ({
+                path: `faq[${idx}]`,
+                text: faq.response,
+                isFaq: true,
+                keywords: faq.keywords,
+                note: faq._note,
+                groupKey: group.key,
+            }));
+            return { group, sections: faqs };
+        }
+        const items = group.sectionKeys
+            .filter(k => activeGuion.flow?.[k]?.response)
+            .map(k => ({
+                path: `flow.${k}`,
+                text: activeGuion.flow[k].response,
+                groupKey: group.key,
+            }));
+        return { group, sections: items };
+    }).filter(g => g.sections.length > 0);
 
     const visibleComments = showResolved ? comments : comments.filter(c => !c.resolved);
     const commentsBySection = visibleComments.reduce((acc, c) => {
@@ -296,6 +383,7 @@ const GuionView = () => {
         return acc;
     }, {});
     const totalUnresolved = comments.filter(c => !c.resolved).length;
+    const totalSections = sectionsByGroup.reduce((acc, g) => acc + g.sections.length, 0);
 
     return (
         <div className="max-w-5xl mx-auto w-full space-y-4">
@@ -349,65 +437,163 @@ const GuionView = () => {
                 )}
             </Card>
 
-            {/* Toggle resueltos + stats */}
-            <div className="flex items-center justify-between">
+            {/* Toggle resueltos + stats + controles globales */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    {sections.length} secciones · {totalUnresolved} comentarios pendientes
+                    {totalSections} secciones en {sectionsByGroup.length} etapas · {totalUnresolved} comentarios pendientes
                 </p>
-                <label className="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-400 cursor-pointer">
-                    <input
-                        type="checkbox"
-                        checked={showResolved}
-                        onChange={(e) => setShowResolved(e.target.checked)}
-                        className="rounded text-accent-600 focus:ring-accent-500 cursor-pointer"
-                    />
-                    Mostrar resueltos
-                </label>
+                <div className="flex items-center gap-3">
+                    <button
+                        type="button"
+                        onClick={() => setExpandedStages(new Set(STAGE_GROUPS.map(g => g.key)))}
+                        className="text-[11px] font-medium text-accent-600 dark:text-accent-400 hover:underline"
+                    >
+                        Expandir todo
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setExpandedStages(new Set())}
+                        className="text-[11px] font-medium text-slate-600 dark:text-slate-400 hover:underline"
+                    >
+                        Colapsar todo
+                    </button>
+                    <label className="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-400 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={showResolved}
+                            onChange={(e) => setShowResolved(e.target.checked)}
+                            className="rounded text-accent-600 focus:ring-accent-500 cursor-pointer"
+                        />
+                        Mostrar resueltos
+                    </label>
+                </div>
             </div>
 
-            {/* Secciones */}
+            {/* Etapas */}
             <div className="space-y-2">
-                {sections.map((section, idx) => {
-                    const sectionComments = commentsBySection[section.path] || [];
-                    const isExpanded = expandedSection === section.path;
-                    const sectionLabel = SECTION_LABELS[section.path]
-                        || (section.isFaq ? `FAQ · "${(section.keywords || [])[0] || 'pregunta'}"` : section.path);
+                {sectionsByGroup.map(({ group, sections: groupSections }, gIdx) => {
+                    const Icon = group.icon;
+                    const isStageExpanded = expandedStages.has(group.key);
 
-                    const next = sections[idx + 1];
-                    const showBetween = next && !section.isFaq && !next.isFaq;
-                    const slotPath = showBetween ? betweenPath(section.path, next.path) : null;
-                    const slotComments = slotPath ? (commentsBySection[slotPath] || []) : [];
-                    const slotExpanded = slotPath && expandedSection === slotPath;
+                    // Comentarios pendientes (visibles) en cualquier path de esta etapa,
+                    // incluyendo entre-de-etapa entre dos secciones consecutivas internas.
+                    const stagePaths = new Set(groupSections.map(s => s.path));
+                    for (let i = 0; i < groupSections.length - 1; i++) {
+                        if (!groupSections[i].isFaq && !groupSections[i + 1].isFaq) {
+                            stagePaths.add(betweenPath(groupSections[i].path, groupSections[i + 1].path));
+                        }
+                    }
+                    const stagePending = visibleComments.filter(c => stagePaths.has(c.sectionPath) && !c.resolved).length;
+                    const stageTotal = visibleComments.filter(c => stagePaths.has(c.sectionPath)).length;
+
+                    // Cross-stage between: conecta la última sección de ESTA etapa con la primera de la SIGUIENTE.
+                    // No lo dibujamos por defecto (raro); pero si tiene comentarios, lo mostramos
+                    // como pequeña row entre las dos cards para no perderlos.
+                    const nextGroupData = sectionsByGroup[gIdx + 1];
+                    let crossSlot = null;
+                    if (nextGroupData) {
+                        const last = groupSections[groupSections.length - 1];
+                        const next = nextGroupData.sections[0];
+                        if (last && next && !last.isFaq && !next.isFaq) {
+                            const sp = betweenPath(last.path, next.path);
+                            crossSlot = { slotPath: sp, prev: last, next, comments: commentsBySection[sp] || [] };
+                        }
+                    }
 
                     return (
-                        <React.Fragment key={section.path}>
-                            <SectionCard
-                                sectionPath={section.path}
-                                label={sectionLabel}
-                                text={section.text}
-                                note={section.note}
-                                keywords={section.keywords}
-                                isFaq={section.isFaq}
-                                comments={sectionComments}
-                                isExpanded={isExpanded}
-                                onToggle={() => setExpandedSection(isExpanded ? null : section.path)}
-                                onAddComment={handleAddComment}
-                                onResolve={handleResolveComment}
-                                onDelete={handleDeleteComment}
-                                onReact={handleReact}
-                                onCopySuggested={handleCopySuggested}
-                                currentUserId={user?.id}
-                                isAdmin={isAdmin}
-                                lastVisitTs={lastVisitTs}
-                            />
-                            {showBetween && (
+                        <React.Fragment key={group.key}>
+                            <Card padding="none" className="overflow-hidden">
+                                <button
+                                    type="button"
+                                    onClick={() => toggleStage(group.key)}
+                                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-left transition-colors"
+                                    aria-expanded={isStageExpanded}
+                                >
+                                    {isStageExpanded
+                                        ? <ChevronDown size={18} className="text-slate-500" />
+                                        : <ChevronRight size={18} className="text-slate-500" />}
+                                    <Icon size={18} className="text-accent-600 dark:text-accent-400" />
+                                    <span className="flex-1 text-sm font-semibold text-slate-800 dark:text-slate-200">
+                                        {group.label}
+                                    </span>
+                                    <span className="text-[11px] text-slate-500 dark:text-slate-400 tabular-nums">
+                                        {groupSections.length} {group.isFaq ? 'preguntas' : 'secciones'}
+                                    </span>
+                                    {stagePending > 0 && (
+                                        <Badge tone="warning">{stagePending}</Badge>
+                                    )}
+                                    {stagePending === 0 && stageTotal > 0 && showResolved && (
+                                        <Badge tone="neutral">{stageTotal}</Badge>
+                                    )}
+                                </button>
+                                {isStageExpanded && (
+                                    <div className="border-t border-slate-200 dark:border-slate-700 px-3 py-3 space-y-2 bg-slate-50/50 dark:bg-slate-900/20">
+                                        {groupSections.map((section, idx) => {
+                                            const sectionComments = commentsBySection[section.path] || [];
+                                            const isExpanded = expandedSection === section.path;
+                                            const sectionLabel = SECTION_LABELS[section.path]
+                                                || (section.isFaq ? `FAQ · "${(section.keywords || [])[0] || 'pregunta'}"` : section.path);
+
+                                            const next = groupSections[idx + 1];
+                                            const showBetween = next && !section.isFaq && !next.isFaq;
+                                            const slotPath = showBetween ? betweenPath(section.path, next.path) : null;
+                                            const slotComments = slotPath ? (commentsBySection[slotPath] || []) : [];
+                                            const slotExpanded = slotPath && expandedSection === slotPath;
+
+                                            return (
+                                                <React.Fragment key={section.path}>
+                                                    <SectionCard
+                                                        sectionPath={section.path}
+                                                        label={sectionLabel}
+                                                        text={section.text}
+                                                        note={section.note}
+                                                        keywords={section.keywords}
+                                                        isFaq={section.isFaq}
+                                                        comments={sectionComments}
+                                                        isExpanded={isExpanded}
+                                                        onToggle={() => setExpandedSection(isExpanded ? null : section.path)}
+                                                        onAddComment={handleAddComment}
+                                                        onResolve={handleResolveComment}
+                                                        onDelete={handleDeleteComment}
+                                                        onReact={handleReact}
+                                                        onCopySuggested={handleCopySuggested}
+                                                        currentUserId={user?.id}
+                                                        isAdmin={isAdmin}
+                                                        lastVisitTs={lastVisitTs}
+                                                    />
+                                                    {showBetween && (
+                                                        <BetweenSlot
+                                                            sectionPath={slotPath}
+                                                            prevLabel={sectionLabel}
+                                                            nextLabel={SECTION_LABELS[next.path] || next.path}
+                                                            comments={slotComments}
+                                                            isExpanded={slotExpanded}
+                                                            onToggle={() => setExpandedSection(slotExpanded ? null : slotPath)}
+                                                            onAddComment={handleAddComment}
+                                                            onResolve={handleResolveComment}
+                                                            onDelete={handleDeleteComment}
+                                                            onReact={handleReact}
+                                                            onCopySuggested={handleCopySuggested}
+                                                            currentUserId={user?.id}
+                                                            isAdmin={isAdmin}
+                                                            lastVisitTs={lastVisitTs}
+                                                        />
+                                                    )}
+                                                </React.Fragment>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </Card>
+                            {/* Cross-stage between: solo si tiene comentarios (rare path) */}
+                            {crossSlot && crossSlot.comments.length > 0 && (
                                 <BetweenSlot
-                                    sectionPath={slotPath}
-                                    prevLabel={sectionLabel}
-                                    nextLabel={SECTION_LABELS[next.path] || next.path}
-                                    comments={slotComments}
-                                    isExpanded={slotExpanded}
-                                    onToggle={() => setExpandedSection(slotExpanded ? null : slotPath)}
+                                    sectionPath={crossSlot.slotPath}
+                                    prevLabel={SECTION_LABELS[crossSlot.prev.path] || crossSlot.prev.path}
+                                    nextLabel={SECTION_LABELS[crossSlot.next.path] || crossSlot.next.path}
+                                    comments={crossSlot.comments}
+                                    isExpanded={expandedSection === crossSlot.slotPath}
+                                    onToggle={() => setExpandedSection(expandedSection === crossSlot.slotPath ? null : crossSlot.slotPath)}
                                     onAddComment={handleAddComment}
                                     onResolve={handleResolveComment}
                                     onDelete={handleDeleteComment}
