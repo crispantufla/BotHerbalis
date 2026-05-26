@@ -373,6 +373,30 @@ function _pushHistory(state: any, entry: { role: 'user' | 'bot' | 'system'; cont
     }
 }
 
+/**
+ * V7 (may-2026): si el JSON setea preference_X.nextStep = 'waiting_payment_method',
+ * tras enviar el preference_X mandamos el payment_menu como segundo mensaje.
+ * En V5/V6 (legacy) el nextStep era 'waiting_ok' y este helper no hace nada.
+ * Centralizado acá porque lo usan tanto stepWaitingPreference como stepWaitingWeight
+ * (el path suggestedProduct, cuando el cliente menciona el producto antes de los kilos).
+ */
+async function _maybeSendPaymentMenuV7(
+    userId: string,
+    nextStep: string | undefined,
+    currentState: any,
+    knowledge: any,
+    dependencies: any
+): Promise<void> {
+    if (nextStep !== 'waiting_payment_method') return;
+    const { buildPaymentMessage } = require('../../utils/messageTemplates');
+    const { sendMessageWithDelay, saveState } = dependencies;
+    const paymentMsg = buildPaymentMessage(currentState, knowledge);
+    currentState.history.push({ role: 'bot', content: paymentMsg, timestamp: Date.now() });
+    saveState(userId);
+    await sendMessageWithDelay(userId, paymentMsg);
+    logger.info(`[V7-AUTO-PAYMENT] User ${userId} → payment_menu enviado tras confirmar producto.`);
+}
+
 export {
     _cleanPhone,
     _setStep,
@@ -384,5 +408,6 @@ export {
     _detectProductPlanChange,
     _resolveNewProductPlan,
     _assignProductAndPlanByTier,
-    _pushHistory
+    _pushHistory,
+    _maybeSendPaymentMenuV7
 };

@@ -1,27 +1,7 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _formatMessage } from '../utils/messages';
-import { _setStep, _maybeUpsell, _detectPostdatado, _assignProductAndPlanByTier } from '../utils/flowHelpers';
-import { buildPaymentMessage } from '../../utils/messageTemplates';
+import { _setStep, _maybeUpsell, _detectPostdatado, _assignProductAndPlanByTier, _maybeSendPaymentMenuV7 } from '../utils/flowHelpers';
 import logger from '../../utils/logger';
-
-// V7 (may-2026): tras el preference_X, si el JSON setea nextStep=waiting_payment_method,
-// mandamos payment_menu como segundo mensaje automático y skip waiting_ok+waiting_plan_choice.
-// V5/V6: nextStep es waiting_ok y ese segundo paso lo dispara el cliente diciendo "sí".
-async function _maybeSendPaymentMenuV7(
-    userId: string,
-    nextStep: string | undefined,
-    currentState: UserState,
-    knowledge: any,
-    dependencies: any
-): Promise<void> {
-    if (nextStep !== FlowStep.WAITING_PAYMENT_METHOD) return;
-    const { sendMessageWithDelay, saveState } = dependencies;
-    const paymentMsg = buildPaymentMessage(currentState, knowledge);
-    currentState.history.push({ role: 'bot', content: paymentMsg, timestamp: Date.now() });
-    saveState(userId);
-    await sendMessageWithDelay(userId, paymentMsg);
-    logger.info(`[V7-AUTO-PAYMENT] User ${userId} → payment_menu enviado tras confirmar producto.`);
-}
 
 export async function handleWaitingPreference(
     userId: string,

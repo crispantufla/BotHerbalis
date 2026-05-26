@@ -1,7 +1,59 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _formatMessage } from '../utils/messages';
-import { _setStep, _maybeUpsell, _pauseAndAlert, _assignProductAndPlanByTier } from '../utils/flowHelpers';
+import { _setStep, _maybeUpsell, _pauseAndAlert, _assignProductAndPlanByTier, _maybeSendPaymentMenuV7 } from '../utils/flowHelpers';
 import logger from '../../utils/logger';
+
+/**
+ * Determina el tier (1/2/3) según los kilos del state y el script.
+ * V7 (2 tiers): >10 → tier 2. V5/V6 (3 tiers): >20 → tier 3.
+ */
+function _resolveTier(weightGoal: number, knowledge: any): '1' | '2' | '3' {
+    const w = typeof weightGoal === 'number' ? weightGoal : parseInt(String(weightGoal), 10) || 0;
+    const hasRec3 = !!knowledge?.flow?.recommendation_3;
+    if (!hasRec3) return w <= 10 ? '1' : '2';
+    if (w <= 10) return '1';
+    if (w <= 20) return '2';
+    return '3';
+}
+
+/**
+ * Envía el `recommendation_X` correspondiente al tier + (V7) `prices_X` como
+ * segundo mensaje automático. Centralizado para que TODOS los entrypoints
+ * (main flow, dual-goal, AI fallback) usen el mismo routing y no caigan al
+ * `knowledge.flow.recommendation` genérico — bug detectado en review V7:
+ * dual-goal y AI fallback mandaban el rec genérico sin tier ni auto-prices.
+ */
+async function _sendTierRecommendation(
+    userId: string,
+    currentState: UserState,
+    knowledge: any,
+    dependencies: any
+): Promise<void> {
+    const { sendMessageWithDelay, saveState } = dependencies;
+    const wRaw = currentState.weightGoal;
+    const wNum = typeof wRaw === 'number' ? wRaw : parseInt(String(wRaw || 0), 10) || 0;
+    const tier = _resolveTier(wNum, knowledge);
+    const tierNode = knowledge?.flow?.[`recommendation_${tier}`] || knowledge?.flow?.recommendation;
+    if (!tierNode) return;
+
+    const tierMsg = _formatMessage(tierNode.response, currentState);
+    _setStep(currentState, tierNode.nextStep || FlowStep.WAITING_PREFERENCE);
+    currentState.history.push({ role: 'bot', content: tierMsg, timestamp: Date.now() });
+    saveState(userId);
+    await sendMessageWithDelay(userId, tierMsg);
+
+    // V7: auto-followup con prices_60 / prices_120 (segundo mensaje del guion).
+    // V5/V6: prices_X no existen, este block no hace nada.
+    const planDays = tier === '1' ? '60' : '120';
+    const pricesNode = knowledge?.flow?.[`prices_${planDays}`];
+    if (pricesNode?.response) {
+        const pricesMsg = _formatMessage(pricesNode.response, currentState);
+        currentState.history.push({ role: 'bot', content: pricesMsg, timestamp: Date.now() });
+        saveState(userId);
+        await sendMessageWithDelay(userId, pricesMsg);
+        logger.info(`[V7-AUTO-PRICES] User ${userId} → prices_${planDays} enviado tras recommendation_${tier}.`);
+    }
+}
 
 export async function handleWaitingWeight(
     userId: string,
@@ -128,26 +180,38 @@ export async function handleWaitingWeight(
             userState: currentState
         });
         if (aiDual.response) {
-            const recNode = knowledge.flow.recommendation;
-            _setStep(currentState, recNode.nextStep);
+            // Mandamos primero la respuesta empática del AI a la pregunta, después
+            // disparamos el tier-routing (rec_X + prices_X auto V7) para no perder
+            // ese paso. Antes este branch caía a knowledge.flow.recommendation
+            // genérico, sin auto-prices ni tier — bug detectado en review V7.
             currentState.history.push({ role: 'bot', content: aiDual.response, timestamp: Date.now() });
             saveState(userId);
             await sendMessageWithDelay(userId, aiDual.response);
+            await _sendTierRecommendation(userId, currentState, knowledge, dependencies);
             return { matched: true };
         }
-        // AI failed but we already extracted weight — proceed to next step with the weight we have
-        logger.warn(`[AI-FALLBACK] Dual-goal AI failed for ${userId}, but weight (${currentState.weightGoal}kg) was extracted. Proceeding.`);
-        const recNode = knowledge.flow.recommendation;
-        const { _formatMessage: fmtMsg } = require('../utils/messages');
-        const recMsg = fmtMsg(recNode.response, currentState);
-        _setStep(currentState, recNode.nextStep);
-        currentState.history.push({ role: 'bot', content: recMsg, timestamp: Date.now() });
-        saveState(userId);
-        await sendMessageWithDelay(userId, recMsg);
+        // AI failed but we already extracted weight — proceed via tier routing.
+        logger.warn(`[AI-FALLBACK] Dual-goal AI failed for ${userId}, but weight (${currentState.weightGoal}kg) was extracted. Proceeding via tier routing.`);
+        await _sendTierRecommendation(userId, currentState, knowledge, dependencies);
         return { matched: true };
     }
 
     if ((hasNumber || vagueWeightTier) && !hasQuestion && !treatAsLong) {
+        // V7 guard: si el cliente responde "3" pelado (sin "kilos"/"kg"), es muy
+        // probable que esté eligiendo "opción 3" pensando que existía como en V5.
+        // En V7 solo hay opciones 1 y 2. Re-preguntamos sin interpretarlo como 3 kg
+        // (que caería en tier 1 y le mandaría el plan equivocado).
+        const isTwoTierScriptForGuard = !!(knowledge?.flow?.recommendation_1 && !knowledge?.flow?.recommendation_3);
+        const bareThree = /^\s*3\s*[\.\)°]?\s*$/.test(text);
+        if (isTwoTierScriptForGuard && bareThree) {
+            const reaskMsg = 'Mmm, solo tengo 2 opciones acá 😅\n\n1️⃣ Hasta 10 kg\n2️⃣ Más de 10 kg\n\n¿Cuál es lo tuyo?';
+            currentState.history.push({ role: 'bot', content: reaskMsg, timestamp: Date.now() });
+            saveState(userId);
+            await sendMessageWithDelay(userId, reaskMsg);
+            logger.info(`[V7-GUARD] User ${userId} respondió "3" en script de 2 tiers — re-preguntando opciones válidas.`);
+            return { matched: true };
+        }
+
         const extracted = _extractWeightGoal();
         if (extracted != null) currentState.weightGoal = extracted;
 
@@ -160,68 +224,33 @@ export async function handleWaitingWeight(
         const hasTierResponses = !!(knowledge?.flow?.recommendation_1 || knowledge?.flow?.recommendation_2 || knowledge?.flow?.recommendation_3);
         const isTwoTierScript = hasTierResponses && !knowledge?.flow?.recommendation_3;
         if (hasTierResponses) {
-            const w = currentState.weightGoal || 0;
             const trimmed = text.trim();
             // En V7 sólo aceptamos "1" o "2" como opción explícita.
             const isOptionPick = isTwoTierScript
                 ? trimmed.length <= 3 && (trimmed === '1' || trimmed === '2')
                 : trimmed.length <= 3 && (trimmed === '1' || trimmed === '2' || trimmed === '3');
-            let tier: '1' | '2' | '3';
+
+            // Determinar weightGoal por opción/vague antes de delegar al helper.
+            // El helper _resolveTier decide el tier según weightGoal + script.
             if (vagueWeightTier && !isOptionPick && !hasExplicitGoal) {
-                // En V7 colapsamos vague-tier 3 → 2 (no hay tier 3).
-                tier = isTwoTierScript && vagueWeightTier === '3' ? '2' : vagueWeightTier;
-                if (tier === '1') currentState.weightGoal = 8;
-                else if (tier === '2') currentState.weightGoal = 15;
+                // En V7 colapsamos vague-tier 3 → tier 2 (no hay tier 3).
+                const t = isTwoTierScript && vagueWeightTier === '3' ? '2' : vagueWeightTier;
+                if (t === '1') currentState.weightGoal = 8;
+                else if (t === '2') currentState.weightGoal = 15;
                 else currentState.weightGoal = 25;
-                logger.info(`[VAGUE-WEIGHT] User ${userId} respondió "${text.trim()}" → tier ${tier} (default weightGoal=${currentState.weightGoal}kg, twoTier=${isTwoTierScript}).`);
+                logger.info(`[VAGUE-WEIGHT] User ${userId} respondió "${text.trim()}" → tier ${t} (default weightGoal=${currentState.weightGoal}kg, twoTier=${isTwoTierScript}).`);
             } else if (isOptionPick) {
-                tier = trimmed as '1' | '2' | '3';
-                if (tier === '1') currentState.weightGoal = 8;
-                else if (tier === '2') currentState.weightGoal = 15;
+                if (trimmed === '1') currentState.weightGoal = 8;
+                else if (trimmed === '2') currentState.weightGoal = 15;
                 else currentState.weightGoal = 25;
-            } else {
-                const wNum = typeof w === 'number' ? w : parseInt(String(w), 10) || 0;
-                if (isTwoTierScript) {
-                    // V7: ≤10 → tier 1, +10 → tier 2
-                    tier = wNum <= 10 ? '1' : '2';
-                } else {
-                    if (wNum <= 10) tier = '1';
-                    else if (wNum <= 20) tier = '2';
-                    else tier = '3';
-                }
             }
 
             // NO asignamos producto/plan acá. El nuevo modelo (V5+/V7) ofrece las 3
             // opciones en recommendation_X y deja al cliente elegir producto en
             // waiting_preference. La dosis (plan 60 o 120) se asigna ahí según el
-            // tier preservado en weightGoal:
-            //   - V7: tier 1 (≤10) → 60d, tier 2 (+10) → 120d
-            //   - V5/V6: tier 1 → 60d, tier 2/3 → 120d
-
-            const tierKey = `recommendation_${tier}`;
-            const tierNode = knowledge.flow[tierKey] || knowledge.flow.recommendation;
-            const tierMsg = _formatMessage(tierNode.response, currentState);
-
-            _setStep(currentState, tierNode.nextStep || FlowStep.WAITING_PREFERENCE);
-            currentState.history.push({ role: 'bot', content: tierMsg, timestamp: Date.now() });
-            saveState(userId);
-            await sendMessageWithDelay(userId, tierMsg);
-            logger.info(`[TIER] User ${userId} (script=${currentState.assignedScript}) → tier ${tier} (weightGoal=${currentState.weightGoal}kg, twoTier=${isTwoTierScript}); product/plan se asigna en waiting_preference.`);
-
-            // V7: auto-followup con prices_60 (tier 1) o prices_120 (tier 2). Es el
-            // "segundo mensaje" del guión nuevo — los precios llegan sin que el
-            // cliente tenga que pedirlos. Lo mandamos solo si existe la entry en
-            // el knowledge (V5/V6 no la tienen y siguen el flujo viejo).
-            const planDays = tier === '1' ? '60' : '120';
-            const pricesKey = `prices_${planDays}`;
-            const pricesNode = knowledge?.flow?.[pricesKey];
-            if (pricesNode?.response) {
-                const pricesMsg = _formatMessage(pricesNode.response, currentState);
-                currentState.history.push({ role: 'bot', content: pricesMsg, timestamp: Date.now() });
-                saveState(userId);
-                await sendMessageWithDelay(userId, pricesMsg);
-                logger.info(`[V7-AUTO-PRICES] User ${userId} → enviado ${pricesKey} tras tier ${tier}.`);
-            }
+            // tier preservado en weightGoal.
+            await _sendTierRecommendation(userId, currentState, knowledge, dependencies);
+            logger.info(`[TIER] User ${userId} (script=${currentState.assignedScript}) → weightGoal=${currentState.weightGoal}kg, twoTier=${isTwoTierScript}; product/plan se asigna en waiting_preference.`);
             return { matched: true };
         }
 
@@ -244,16 +273,16 @@ export async function handleWaitingWeight(
             saveState(userId);
             await sendMessageWithDelay(userId, msg);
 
+            // V7: si preference_X.nextStep es waiting_payment_method, mandamos
+            // el payment_menu como segundo mensaje (sin esto el cliente leía
+            // "Te paso las formas de pago 👇" pero no llegaban).
+            await _maybeSendPaymentMenuV7(userId, priceNode.nextStep, currentState, knowledge, dependencies);
             await _maybeUpsell(currentState, sendMessageWithDelay, userId, saveState);
             return { matched: true };
         } else {
-            const recNode = knowledge.flow.recommendation;
-            const recMsg = _formatMessage(recNode.response, currentState);
-
-            _setStep(currentState, recNode.nextStep);
-            currentState.history.push({ role: 'bot', content: recMsg, timestamp: Date.now() });
-            saveState(userId);
-            await sendMessageWithDelay(userId, recMsg);
+            // Sin suggestedProduct: ruta por tier (V7 manda rec_X + prices_X).
+            // En scripts legacy sin recommendation_X cae al recommendation genérico.
+            await _sendTierRecommendation(userId, currentState, knowledge, dependencies);
             return { matched: true };
         }
     } else {
@@ -311,16 +340,13 @@ export async function handleWaitingWeight(
                     saveState(userId);
                     await sendMessageWithDelay(userId, msg);
 
+                    await _maybeSendPaymentMenuV7(userId, priceNode.nextStep, currentState, knowledge, dependencies);
                     await _maybeUpsell(currentState, sendMessageWithDelay, userId, saveState);
                     return { matched: true };
                 } else {
-                    const recNode = knowledge.flow.recommendation;
-                    const recMsg = _formatMessage(recNode.response, currentState);
-
-                    _setStep(currentState, recNode.nextStep);
-                    currentState.history.push({ role: 'bot', content: recMsg, timestamp: Date.now() });
-                    saveState(userId);
-                    await sendMessageWithDelay(userId, recMsg);
+                    // V7: tier routing + auto prices_X. Antes caía al recommendation
+                    // genérico — bug detectado en review V7.
+                    await _sendTierRecommendation(userId, currentState, knowledge, dependencies);
                     return { matched: true };
                 }
             } else if (aiWeight.response) {
