@@ -16,6 +16,7 @@ import ManualsView from '../../components/corporate/ManualsView';
 import PaymentsView from '../../components/corporate/PaymentsView';
 import AiReportsView from '../../components/corporate/AiReportsView';
 import GuionView from '../../components/corporate/GuionView';
+import PlaygroundView from '../../components/corporate/PlaygroundView';
 import AccountsView from '../../components/admin/AccountsView';
 import AccountStatsView from '../../components/admin/AccountStatsView';
 import FunnelAnalyticsView from '../../components/admin/FunnelAnalyticsView';
@@ -24,7 +25,7 @@ import SellerSelector from '../../components/admin/SellerSelector';
 import WhatsappViewerView from '../../components/corporate/WhatsappViewerView';
 import ManualOrderEntryModal from '../../components/corporate/components/ManualOrderEntryModal';
 
-import { Wifi, MessageCircle, Database, Settings, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Bell, AlertTriangle, BookOpen, MoreHorizontal, CreditCard, Users, Monitor, LifeBuoy, MessagesSquare } from 'lucide-react';
+import { Wifi, MessageCircle, Database, Settings, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Bell, AlertTriangle, BookOpen, MoreHorizontal, CreditCard, Users, Monitor, LifeBuoy, MessagesSquare, FlaskConical } from 'lucide-react';
 
 const CorporateDashboard = () => {
     const { socket } = useSocket();
@@ -273,6 +274,7 @@ const CorporateDashboard = () => {
                 </div>
             );
             case 'guion': return <GuionView />;
+            case 'playground': return <PlaygroundView />;
             case 'accounts': return <AccountsView />;
             case 'account-stats': return <AccountStatsView />;
             case 'funnel-analytics': return <FunnelAnalyticsView />;
@@ -363,6 +365,7 @@ const CorporateDashboard = () => {
                     <NavItem tab="statistics" icon={BarChart2} label="Estadísticas" />
                     <NavItem tab="payments" icon={CreditCard} label="Pagos MP" />
                     <NavItem tab="guion" icon={MessagesSquare} label="Guiones (notas)" />
+                    <NavItem tab="playground" icon={FlaskConical} label="Probar bot" />
                     <NavItem tab="gallery" icon={ImageIcon} label="Galería de Medios" />
                     <NavItem tab="manuals" icon={BookOpen} label="Manuales" />
                     {isAdmin && <NavItem tab="ai-reports" icon={AlertTriangle} label="Errores de IA" />}

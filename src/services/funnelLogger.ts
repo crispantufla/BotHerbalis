@@ -15,6 +15,13 @@
 import logger from '../utils/logger';
 const { prisma } = require('../../db');
 
+// Guard para el playground del dashboard: sessions sintéticas usan sellerId='playground'
+// (o phone con prefix 'playground_'). En ese caso NO escribimos a FunnelEvent /
+// MessageEvent — el playground es efímero y no debe contaminar las métricas.
+function _isPlayground(sellerId?: string, phone?: string): boolean {
+    return sellerId === 'playground' || !!(phone && phone.startsWith('playground'));
+}
+
 // Orden canónico del embudo — usado para distinguir "advanced" vs "back".
 // Decisión: waiting_data y waiting_maps_confirmation NO se incluyen en el
 // orden, porque se ejecutan en posiciones distintas según la rama de pago:
@@ -64,6 +71,7 @@ export async function logStepTransition(
 ): Promise<void> {
     if (!sellerId || !phone || !stepTo) return;
     if (stepFrom === stepTo) return; // sin cambio real
+    if (_isPlayground(sellerId, phone)) return;
 
     const exitType = classifyTransition(stepFrom, stepTo);
 
@@ -93,6 +101,7 @@ export async function markExit(
     exitType: 'paused' | 'dropped' | 'completed'
 ): Promise<void> {
     if (!sellerId || !phone) return;
+    if (_isPlayground(sellerId, phone)) return;
     try {
         await prisma.funnelEvent.updateMany({
             where: { sellerId, phone, exitedAt: null },
@@ -106,6 +115,7 @@ export async function markExit(
 /** Incrementa contador de mensajes del user en el step abierto actual. */
 export async function incrementMessageCount(sellerId: string, phone: string): Promise<void> {
     if (!sellerId || !phone) return;
+    if (_isPlayground(sellerId, phone)) return;
     try {
         await prisma.funnelEvent.updateMany({
             where: { sellerId, phone, exitedAt: null },
@@ -117,6 +127,7 @@ export async function incrementMessageCount(sellerId: string, phone: string): Pr
 /** Incrementa contador de llamadas a AI en el step abierto actual. */
 export async function incrementAiCallCount(sellerId: string, phone: string): Promise<void> {
     if (!sellerId || !phone) return;
+    if (_isPlayground(sellerId, phone)) return;
     try {
         await prisma.funnelEvent.updateMany({
             where: { sellerId, phone, exitedAt: null },
@@ -144,6 +155,7 @@ export async function logMessage(args: {
 }): Promise<void> {
     const { sellerId, phone, step, matched, priceObjection = false } = args;
     if (!sellerId || !phone || !step) return;
+    if (_isPlayground(sellerId, phone)) return;
 
     try {
         await prisma.messageEvent.create({
