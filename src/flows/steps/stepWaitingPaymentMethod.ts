@@ -87,7 +87,13 @@ export async function handleWaitingPaymentMethod(
             currentState.senaAmount = null;
             currentState.senaPaid = false;
             _setStep(currentState, FlowStep.WAITING_MP_PAYMENT);
+            // Ack corto antes de que el step de MP genere el link, sobre todo
+            // cuando el cliente pidió por tarjeta de crédito explícito: deja
+            // claro que el cobro va a salir vía MP sin que se sienta abrupto.
+            const ackMsg = 'Ok, te paso el link de pago 👇';
+            currentState.history.push({ role: 'bot', content: ackMsg, timestamp: Date.now() });
             saveState(userId);
+            await sendMessageWithDelay(userId, ackMsg);
             logger.info(`[PAYMENT_METHOD] ${userId} → DOMICILIO + MP`);
             return { matched: false, staleReprocess: true } as any;
         }
@@ -164,7 +170,12 @@ export async function handleWaitingPaymentMethod(
             currentState.senaAmount = null;
             currentState.senaPaid = false;
             _setStep(currentState, FlowStep.WAITING_MP_PAYMENT);
+            // Ack corto antes de que el step MP genere el link — cubre el caso
+            // "tarjeta de crédito" donde el cliente espera respuesta inmediata.
+            const ackMsg = 'Ok, te paso el link de pago 👇';
+            currentState.history.push({ role: 'bot', content: ackMsg, timestamp: Date.now() });
             saveState(userId);
+            await sendMessageWithDelay(userId, ackMsg);
             logger.info(`[PAYMENT_METHOD] ${userId} → DOMICILIO + MP (atajo)`);
             return { matched: false, staleReprocess: true } as any;
         }

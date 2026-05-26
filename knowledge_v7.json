@@ -29,14 +29,14 @@
         },
         "recommendation_1": {
             "step": "waiting_weight",
-            "_note": "Tier 1 — hasta 10 kg → plan 60 días. Texto A (recomendación + 3 formas + instrucciones de la semilla). El handler manda este mensaje + esperar delay + mandar prices_60 automáticamente.",
-            "response": "Para hasta 10 kg te recomiendo plan de *60 días* 🌿\n\n1️⃣ *Cápsulas* — 1 al día, 30 min antes del almuerzo o cena.\n2️⃣ *Gotas* — 10 gotas al día, 30 min antes del almuerzo o cena.\n3️⃣ *Semillas* — infusión nocturna.\n\n*Cómo se prepara la semilla:* la primera semana partís una nuez en 8 partes, las siguientes en 4. Cada noche hervís un pedacito 5 minutos al fuego (o 3 en microondas). Cuanta más agua uses, mejor — así se consume la semilla. Te tomás el agua y tragás el trocito, lo más alejado de la cena posible, cuando te vas a dormir.",
+            "_note": "Tier 1 — hasta 10 kg → plan 60 días. Texto A (recomendación + 3 formas + instrucciones de la semilla). El handler manda este mensaje + esperar delay + mandar prices_60 automáticamente. Rev. 2026-05-27: aclara 'solo una' presentación + warning colon irritable en semillas.",
+            "response": "Para hasta 10 kg te recomiendo plan de *60 días* 🌿\n\nPodés elegir entre estas tres presentaciones (solo una):\n\n1️⃣ *Cápsulas* — 1 al día, 30 min antes del almuerzo o cena.\n2️⃣ *Gotas* — 10 gotas al día, 30 min antes del almuerzo o cena.\n3️⃣ *Semillas* — infusión nocturna.\n\n*Cómo se prepara la semilla:* la primera semana partís una nuez en 8 partes, las siguientes en 4. Cada noche hervís un pedacito 5 minutos al fuego (o 3 en microondas). Cuanta más agua uses, mejor — así se consume la semilla. Te tomás el agua y tragás el trocito, lo más alejado de la cena posible, cuando te vas a dormir. *NO apto en casos de colon irritable.*",
             "nextStep": "waiting_preference"
         },
         "recommendation_2": {
             "step": "waiting_weight",
-            "_note": "Tier 2 — más de 10 kg → plan 120 días. Mismo formato que recommendation_1 pero con plan 120d. Auto-followup con prices_120.",
-            "response": "Para más de 10 kg te recomiendo plan de *120 días* 🌿\n\n1️⃣ *Cápsulas* — 1 al día, 30 min antes del almuerzo o cena.\n2️⃣ *Gotas* — 10 gotas al día, 30 min antes del almuerzo o cena.\n3️⃣ *Semillas* — infusión nocturna.\n\n*Cómo se prepara la semilla:* la primera semana partís una nuez en 8 partes, las siguientes en 4. Cada noche hervís un pedacito 5 minutos al fuego (o 3 en microondas). Cuanta más agua uses, mejor — así se consume la semilla. Te tomás el agua y tragás el trocito, lo más alejado de la cena posible, cuando te vas a dormir.",
+            "_note": "Tier 2 — más de 10 kg → plan 120 días. Mismo formato que recommendation_1 pero con plan 120d. Auto-followup con prices_120. Rev. 2026-05-27: aclara 'solo una' presentación + warning colon irritable en semillas.",
+            "response": "Para más de 10 kg te recomiendo plan de *120 días* 🌿\n\nPodés elegir entre estas tres presentaciones (solo una):\n\n1️⃣ *Cápsulas* — 1 al día, 30 min antes del almuerzo o cena.\n2️⃣ *Gotas* — 10 gotas al día, 30 min antes del almuerzo o cena.\n3️⃣ *Semillas* — infusión nocturna.\n\n*Cómo se prepara la semilla:* la primera semana partís una nuez en 8 partes, las siguientes en 4. Cada noche hervís un pedacito 5 minutos al fuego (o 3 en microondas). Cuanta más agua uses, mejor — así se consume la semilla. Te tomás el agua y tragás el trocito, lo más alejado de la cena posible, cuando te vas a dormir. *NO apto en casos de colon irritable.*",
             "nextStep": "waiting_preference"
         },
         "prices_60": {
