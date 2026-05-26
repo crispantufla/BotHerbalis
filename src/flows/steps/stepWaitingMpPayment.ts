@@ -7,11 +7,6 @@ import { randomUUID } from 'crypto';
 import logger from '../../utils/logger';
 
 const PAID_KEYWORDS = /\b(listo|pague|pagu[eé]|pago hecho|hice el pago|ya pague|ya pagu[eé]|realice|realic[eé]|confirmo|listo el pago|pago listo|lo hice|hecho|ok listo)\b/i;
-// Regex permisivo para extraer email — válido en mayoría de proveedores comunes.
-// Aceptamos espacios alrededor; en la práctica los clientes pegan el email así.
-const EMAIL_RE = /([A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,})/;
-// Palabras con las que el cliente puede explícitamente saltear el email.
-const SKIP_EMAIL_RE = /\b(no tengo|no s[eé]|no recuerdo|no me acuerdo|sin (mail|email|correo)|sin\s*$|omiti[r]?|salt[ea]r?|skip|despu[eé]s|mas tarde|m[aá]s tarde|no quiero|paso|no\.?)\b/i;
 // Numeración del menú actual (1=MP, 2=Transferencia, 3=Contra reembolso).
 // Quitamos "segund[oa]|segunda" porque aparecen en direcciones (calles tipo
 // "Segunda Junta", "entre segundo sombra y corbalán"). El "2" suelto solo se
@@ -40,11 +35,12 @@ export async function handleWaitingMpPayment(
 ): Promise<{ matched: boolean }> {
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
 
-    // ── ENTRY: Sin link todavía — pedir email primero (opcional) y generar ────
+    // ── ENTRY: Sin link todavía — generar y mandar directo ────────────────────
+    // Rev. 2026-05-27: ya no pedimos email antes del link (era fricción innecesaria).
+    // El email se sigue capturando silenciosamente si el cliente lo deja caer en el
+    // mensaje de datos de envío (ver stepWaitingData._DATA_EMAIL_RE). Sin email
+    // MP igual genera el link — payer.email es opcional en la API de preferences.
     if (!currentState.mpPaymentLinkUrl) {
-        const emailSubflow = await _handleEmailSubflow(userId, text, currentState, dependencies);
-        if (emailSubflow === 'asked') return { matched: true };  // esperamos respuesta del cliente
-        // emailSubflow === 'ready' (capturamos o salteamos) → seguimos a generar el link
         await _generateAndSendLink(userId, currentState, knowledge, dependencies);
         return { matched: true };
     }
@@ -77,7 +73,7 @@ export async function handleWaitingMpPayment(
                 const closingTpl = getFlowTemplate('closing', knowledge);
                 const dataMsg = closingTpl
                     ? _formatMessage(closingTpl, currentState)
-                    : '¡Perfecto! 🎉 Ahora necesito los datos de envío:\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:';
+                    : '¡Perfecto! 🎉 Ahora necesito los datos de envío:\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nEmail (opcional, para el comprobante de MP):';
                 const isSenaFlow = !!(currentState.senaAmount && currentState.senaAmount > 0);
                 const prefix = isSenaFlow
                     ? '¡Perfecto, la seña fue confirmada! 🎉\n\n'
@@ -268,74 +264,6 @@ export async function handleWaitingMpPayment(
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-
-/**
- * Pide el email al cliente UNA VEZ al entrar al flujo MP. Si lo provee, lo
- * guarda en state.email. Si no lo recuerda o lo omite, queda en '' (string
- * vacío = "preguntamos y el cliente eligió omitir") y seguimos sin email.
- *
- * Returns:
- *   'asked' → acabamos de mandar el pedido, hay que esperar la respuesta.
- *   'ready' → ya tenemos email (o el cliente lo omitió) — listo para generar link.
- */
-async function _handleEmailSubflow(
-    userId: string,
-    text: string,
-    currentState: UserState,
-    dependencies: any
-): Promise<'asked' | 'ready'> {
-    const { sendMessageWithDelay, saveState } = dependencies;
-
-    // Ya tenemos un email (capturado antes en waiting_data o en una llamada previa).
-    if (typeof currentState.email === 'string' && currentState.email.length > 0) {
-        return 'ready';
-    }
-    // Ya preguntamos y el cliente eligió omitir.
-    if (currentState.email === '') {
-        return 'ready';
-    }
-
-    // Si todavía no preguntamos → preguntar (mensaje enfático sobre importancia).
-    if (!currentState.emailAskedAt) {
-        const isSenaFlow = !!(currentState.senaAmount && currentState.senaAmount > 0);
-        const askMsg = isSenaFlow
-            ? `Antes de generarte el link de la seña, necesito tu *email* 📧\n\nEs importante para que Mercado Pago te mande el comprobante de la operación y para hacer seguimiento del pago. ¿Me lo pasás?`
-            : `Antes de generarte el link, necesito tu *email* 📧\n\nEs importante para que Mercado Pago te mande el comprobante de la operación y para hacer seguimiento del pago. ¿Me lo pasás?`;
-        currentState.emailAskedAt = Date.now();
-        currentState.history.push({ role: 'bot', content: askMsg, timestamp: Date.now() });
-        saveState(userId);
-        await sendMessageWithDelay(userId, askMsg);
-        return 'asked';
-    }
-
-    // Ya preguntamos en una corrida previa, este mensaje es la respuesta del cliente.
-    const emailMatch = text.match(EMAIL_RE);
-    if (emailMatch) {
-        currentState.email = emailMatch[1].toLowerCase();
-        logger.info(`[MP_PAYMENT] Email capturado para ${userId}: ${currentState.email}`);
-        saveState(userId);
-        return 'ready';
-    }
-
-    // Si el cliente intenta omitir/no proveer email, INSISTIMOS una sola vez
-    // antes de aceptar omitir. Sube significativamente la tasa de captura.
-    if (!(currentState as any).emailReask && SKIP_EMAIL_RE.test(text)) {
-        (currentState as any).emailReask = true;
-        const reaskMsg = `Tranqui, te entiendo 😊 Pero si podés, mejor que me lo pases — sin email Mercado Pago no te puede enviar el comprobante de la operación, y después es más difícil hacer seguimiento del pago.\n\n¿Tenés alguno aunque sea viejo? Si realmente no usás email, decime *"no tengo"* y seguimos igual.`;
-        currentState.history.push({ role: 'bot', content: reaskMsg, timestamp: Date.now() });
-        saveState(userId);
-        await sendMessageWithDelay(userId, reaskMsg);
-        return 'asked';
-    }
-
-    // Insistimos una vez y aún así el cliente no provee email — omitimos sin
-    // bloquear la venta. Política: "preferimos venta sin email vs sin venta".
-    currentState.email = '';
-    const wasExplicitSkip = SKIP_EMAIL_RE.test(text);
-    logger.info(`[MP_PAYMENT] Email omitido para ${userId} tras re-ask (${wasExplicitSkip ? 'skip explícito' : 'sin email en respuesta'})`);
-    saveState(userId);
-    return 'ready';
-}
 
 // Cuántos intentos hacemos al MP API antes de pausar. Cubre blips transitorios
 // (5xx, network glitches, rate limits cortos). El backoff entre intentos lo
@@ -629,5 +557,5 @@ async function _finalizeOrderAndNotifyAdmin(
 
 function _getClosingMsg(knowledge: any): string {
     return knowledge?.flow?.closing?.response ||
-        'Perfecto! Pasame los datos para armar la etiqueta de envío 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:';
+        'Perfecto! Pasame los datos para armar la etiqueta de envío 👇\n\nNombre completo:\nCalle:\nNúmero:\nLocalidad:\nCódigo postal:\nEmail (opcional, para el comprobante de MP):';
 }

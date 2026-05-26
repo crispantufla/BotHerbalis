@@ -484,48 +484,35 @@ describe('Compat legacy — state pre-may-2026 con senaAmount=10000', () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-// BLOQUE 6b: Subflow de email antes de generar el link MP
+// BLOQUE 6b: Email opcional sin subflow obligatorio (rev 2026-05-27)
 // ════════════════════════════════════════════════════════════════════════════
-describe('stepWaitingMpPayment — subflow email', () => {
+//
+// El subflow de email que pedía mail ANTES de generar el link MP fue eliminado
+// — era fricción innecesaria. Ahora:
+//   - Sin link: se genera directo sin payer.email.
+//   - Si state.email ya existe (capturado silenciosamente desde stepWaitingData
+//     cuando el cliente lo deja caer junto a los datos de envío), se pre-llena
+//     payer.email en la preferencia MP para el comprobante automático.
+//
+describe('stepWaitingMpPayment — email opcional', () => {
 
-    test('[6b.1] Entry sin email → pregunta y NO genera link todavía', async () => {
-        const state = makeMpState({ email: undefined, emailAskedAt: undefined });
+    test('[6b.1] Sin email en state → genera link directo SIN pedir email primero', async () => {
+        const state = makeMpState({ email: undefined });
         await handleWaitingMpPayment('em1', 'hola', 'hola', state, knowledge, deps);
-        expect(mockPreferenceCreate).not.toHaveBeenCalled();
-        expect(state.emailAskedAt).toBeTruthy();
-        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
-        expect(sent).toMatch(/email/i);
-        // El primer ask explica POR QUÉ pide el email (comprobante MP) — no menciona
-        // "sin email" todavía (eso aparece recién en el re-ask si el cliente intenta omitir).
-        expect(sent).toMatch(/comprobante|seguimiento/i);
-    });
-
-    test('[6b.2] Cliente responde con email válido → se guarda y genera link con payer.email', async () => {
-        const state = makeMpState({ email: undefined, emailAskedAt: Date.now() });
-        await handleWaitingMpPayment('em2', 'mi mail es Juan.Perez@gmail.com', 'mi mail es juan.perez@gmail.com', state, knowledge, deps);
-        expect(state.email).toBe('juan.perez@gmail.com');
-        expect(mockPreferenceCreate).toHaveBeenCalledTimes(1);
-        const call = mockPreferenceCreate.mock.calls[0][0];
-        expect(call.body.payer).toEqual({ email: 'juan.perez@gmail.com' });
-    });
-
-    test('[6b.3] Cliente dice "sin email" tras re-ask → genera link sin payer.email', async () => {
-        // El subflow tiene 2 turnos: primero pregunta, después re-ask si intenta
-        // omitir, y SOLO al 3er turno acepta el skip. Acá simulamos el estado
-        // post-re-ask con emailReask=true (ya insistimos una vez).
-        const state = makeMpState({ email: undefined, emailAskedAt: Date.now(), emailReask: true });
-        await handleWaitingMpPayment('em3', 'sin email', 'sin email', state, knowledge, deps);
-        expect(state.email).toBe('');
         expect(mockPreferenceCreate).toHaveBeenCalledTimes(1);
         const call = mockPreferenceCreate.mock.calls[0][0];
         expect(call.body.payer).toBeUndefined();
+        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
+        // Manda el link de MP — no pregunta por el email primero.
+        expect(sent).toMatch(/Link de Mercado Pago|mp\.com\/checkout/i);
     });
 
-    test('[6b.4] Cliente responde con texto random → omite email y genera link', async () => {
-        const state = makeMpState({ email: undefined, emailAskedAt: Date.now() });
-        await handleWaitingMpPayment('em4', 'ok dale', 'ok dale', state, knowledge, deps);
-        expect(state.email).toBe('');
+    test('[6b.2] Email previamente capturado en waiting_data → genera link CON payer.email', async () => {
+        const state = makeMpState({ email: 'juan.perez@gmail.com' });
+        await handleWaitingMpPayment('em2', 'hola', 'hola', state, knowledge, deps);
         expect(mockPreferenceCreate).toHaveBeenCalledTimes(1);
+        const call = mockPreferenceCreate.mock.calls[0][0];
+        expect(call.body.payer).toEqual({ email: 'juan.perez@gmail.com' });
     });
 });
 
@@ -535,10 +522,10 @@ describe('stepWaitingMpPayment — subflow email', () => {
 describe('stepWaitingMpPayment — retry/error handling', () => {
 
     test('[6c.1] MP falla 1 vez y luego anda → 2 intentos, link entregado, sin pause', async () => {
-        // emailReask=true para que "sin email" salte el re-ask y genere el link directo.
-        const state = makeMpState({ email: undefined, emailAskedAt: Date.now(), emailReask: true });
+        // Sin subflow de email, el link se genera al entrar a waiting_mp_payment.
+        const state = makeMpState({ email: undefined });
         mockPreferenceCreate.mockRejectedValueOnce(new Error('Network blip'));
-        await handleWaitingMpPayment('retry1', 'sin email', 'sin email', state, knowledge, deps);
+        await handleWaitingMpPayment('retry1', 'hola', 'hola', state, knowledge, deps);
         expect(mockPreferenceCreate).toHaveBeenCalledTimes(2);
         expect(state.mpPaymentLinkUrl).toBe('https://mp.com/checkout/pref_test');
         const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
@@ -546,9 +533,9 @@ describe('stepWaitingMpPayment — retry/error handling', () => {
     }, 15000);
 
     test('[6c.2] MP falla siempre → pause + alert con e.message + mensaje honesto al cliente', async () => {
-        const state = makeMpState({ email: undefined, emailAskedAt: Date.now(), emailReask: true });
+        const state = makeMpState({ email: undefined });
         mockPreferenceCreate.mockRejectedValue(new Error('invalid payer email'));
-        await handleWaitingMpPayment('retry2', 'sin email', 'sin email', state, knowledge, deps);
+        await handleWaitingMpPayment('retry2', 'hola', 'hola', state, knowledge, deps);
         expect(mockPreferenceCreate).toHaveBeenCalledTimes(2);
         const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
         expect(sent).toMatch(/problema técnico/i);

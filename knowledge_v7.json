@@ -120,7 +120,7 @@
         "payment_mp_link": {
             "step": "waiting_mp_payment",
             "_note": "TEXTO 5a — Cliente eligió Mercado Pago. Le mandamos el link + detalle del pedido + pedido de datos en paralelo. Placeholders: {{PRODUCT}}, {{PLAN}}, {{TOTAL}}, {{LINK}}.",
-            "response": "💳 Link de Mercado Pago:\n\n{{LINK}}\n\nTotal: ${{TOTAL}} — {{PRODUCT}} {{PLAN}} días\n\nCuando termines de pagar, mandame \"listo\" y verifico.\n\nMientras, pasame los datos de envío:\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:",
+            "response": "💳 Link de Mercado Pago:\n\n{{LINK}}\n\nTotal: ${{TOTAL}} — {{PRODUCT}} {{PLAN}} días\n\nCuando termines de pagar, mandame \"listo\" y verifico.\n\nMientras, pasame los datos de envío:\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nEmail (opcional, para el comprobante de MP):",
             "nextStep": "waiting_mp_payment"
         },
         "payment_mp_failed": {
@@ -154,7 +154,7 @@
                 "mandalo",
                 "envielo"
             ],
-            "response": "¡Buenísimo! 🎉 Te sigo por acá durante todo el tratamiento.\n\nPasame los datos para la etiqueta:\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\n\n(Que la dirección sea exacta, sin \"aprox\" ni S/N)",
+            "response": "¡Buenísimo! 🎉 Te sigo por acá durante todo el tratamiento.\n\nPasame los datos para la etiqueta:\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nEmail (opcional, para el comprobante de MP):\n\n(Que la dirección sea exacta, sin \"aprox\" ni S/N)",
             "nextStep": "waiting_data"
         },
         "order_confirmation_mp": {
