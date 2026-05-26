@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Send, RotateCcw, Loader2, Clock, ZapOff, ChevronRight, FlaskConical } from 'lucide-react';
+import { Send, RotateCcw, Loader2, Clock, ZapOff, ChevronRight, FlaskConical, AlertTriangle } from 'lucide-react';
 import api from '../../config/axios';
 import { Card, Button, IconButton, Badge, useToast } from '../ui';
+import AiCorrectionModal from './components/AiCorrectionModal';
 
 // Steps del flow real (orden cosmético para el dropdown "Forzar step").
 const FORCE_STEPS = [
@@ -37,6 +38,9 @@ const PlaygroundView = () => {
     const [sending, setSending] = useState(false);
     const [useDelay, setUseDelay] = useState(false);
     const [forceStep, setForceStep] = useState('');
+    // Índice del mensaje del bot que el usuario quiere reportar como error de IA.
+    // null = modal cerrado.
+    const [reportingIdx, setReportingIdx] = useState(null);
     const messagesEndRef = useRef(null);
 
     // Generar una sesión nueva al montar.
@@ -200,7 +204,11 @@ const PlaygroundView = () => {
                             </div>
                         )}
                         {messages.map((m, idx) => (
-                            <MessageBubble key={idx} message={m} />
+                            <MessageBubble
+                                key={idx}
+                                message={m}
+                                onReport={m.role === 'bot' ? () => setReportingIdx(idx) : null}
+                            />
                         ))}
                         {sending && (
                             <div className="flex items-center gap-2 text-xs text-slate-400 px-3">
@@ -239,12 +247,29 @@ const PlaygroundView = () => {
                 {/* State Panel */}
                 <StatePanel state={state} />
             </div>
+
+            {/* Modal de reporte de error de IA — reusa el mismo de CommsView.
+                Adaptamos los mensajes del playground ({role, content}) al formato
+                que espera el modal ({id, body, fromMe}). El reporte va a la misma
+                tabla AiErrorReport con userPhone='playground_<sessionId>' para
+                identificarlo en la sección "Errores de IA". */}
+            <AiCorrectionModal
+                isOpen={reportingIdx !== null}
+                onClose={() => setReportingIdx(null)}
+                messages={messages.map((m, i) => ({
+                    id: i,
+                    body: m.content,
+                    fromMe: m.role === 'bot',
+                }))}
+                reportedMsgId={reportingIdx}
+                selectedChat={{ id: `playground_${sessionId || 'unknown'}@c.us` }}
+            />
         </div>
     );
 };
 
 // ─── MessageBubble ─────────────────────────────────────────────────────────
-function MessageBubble({ message }) {
+function MessageBubble({ message, onReport }) {
     if (message.role === 'system') {
         return (
             <div className="flex justify-center">
@@ -256,7 +281,7 @@ function MessageBubble({ message }) {
     }
     const isUser = message.role === 'user';
     return (
-        <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+        <div className={`group flex items-start gap-1.5 ${isUser ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[80%] px-3 py-2 rounded-lg whitespace-pre-wrap text-sm ${
                 isUser
                     ? 'bg-accent-600 text-white rounded-br-sm'
@@ -264,6 +289,19 @@ function MessageBubble({ message }) {
             }`}>
                 {message.content}
             </div>
+            {/* Botón "reportar" solo sobre mensajes del bot, visible en hover.
+                Manda al modal AiCorrectionModal que persiste en AiErrorReport y
+                aparece en la sección "Errores de IA". */}
+            {onReport && (
+                <button
+                    type="button"
+                    onClick={onReport}
+                    title="Reportar como error de IA"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 focus:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-amber-400 self-center"
+                >
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                </button>
+            )}
         </div>
     );
 }

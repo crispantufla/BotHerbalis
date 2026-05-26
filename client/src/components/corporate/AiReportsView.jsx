@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { AlertTriangle, Trash2, ChevronDown, ChevronUp, RefreshCw, MessageSquare } from 'lucide-react';
+import { AlertTriangle, Trash2, ChevronDown, ChevronUp, RefreshCw, MessageSquare, FlaskConical } from 'lucide-react';
 import api from '../../config/axios';
 import {
     Card, Button, IconButton, Badge, EmptyState, useToast, cn
@@ -89,7 +89,14 @@ const AiReportsView = () => {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-2 flex-wrap">
-                                            <span className="text-xs font-mono text-slate-600 dark:text-slate-300">+{report.userPhone}</span>
+                                            {report.userPhone?.startsWith('playground_') ? (
+                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-accent-600 dark:text-accent-400 bg-accent-50 dark:bg-accent-900/30 px-1.5 py-0.5 rounded">
+                                                    <FlaskConical className="w-3 h-3" />
+                                                    Playground
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs font-mono text-slate-600 dark:text-slate-300">+{report.userPhone}</span>
+                                            )}
                                             <span className="text-[10px] text-slate-400 dark:text-slate-500 tabular-nums">
                                                 {formatDate(report.createdAt)}
                                             </span>

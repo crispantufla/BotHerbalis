@@ -119,24 +119,28 @@ const AiCorrectionModal = ({ isOpen, onClose, messages = [], reportedMsgId, sele
                         ></textarea>
                     </div>
 
-                    {/* Also delete checkbox */}
-                    <label className="flex items-start gap-3 p-4 rounded-2xl border-2 border-slate-200 dark:border-slate-700 hover:border-rose-400 dark:hover:border-rose-500 transition-colors cursor-pointer bg-slate-50 dark:bg-slate-800/40">
-                        <input
-                            type="checkbox"
-                            checked={alsoDelete}
-                            onChange={(e) => setAlsoDelete(e.target.checked)}
-                            className="mt-0.5 w-5 h-5 rounded text-rose-600 border-slate-300 focus:ring-2 focus:ring-rose-400 cursor-pointer"
-                        />
-                        <div className="flex-1">
-                            <div className="flex items-center gap-2 font-bold text-slate-800 dark:text-slate-100 text-sm">
-                                <Trash2 className="w-4 h-4 text-rose-500" />
-                                Eliminar también el mensaje del WhatsApp del cliente
+                    {/* Also delete checkbox — solo en el chat real (con onDeleteMessage).
+                        En el playground no aplica: la conversación es efímera y no hay
+                        mensaje real en WhatsApp para eliminar. */}
+                    {typeof onDeleteMessage === 'function' && (
+                        <label className="flex items-start gap-3 p-4 rounded-2xl border-2 border-slate-200 dark:border-slate-700 hover:border-rose-400 dark:hover:border-rose-500 transition-colors cursor-pointer bg-slate-50 dark:bg-slate-800/40">
+                            <input
+                                type="checkbox"
+                                checked={alsoDelete}
+                                onChange={(e) => setAlsoDelete(e.target.checked)}
+                                className="mt-0.5 w-5 h-5 rounded text-rose-600 border-slate-300 focus:ring-2 focus:ring-rose-400 cursor-pointer"
+                            />
+                            <div className="flex-1">
+                                <div className="flex items-center gap-2 font-bold text-slate-800 dark:text-slate-100 text-sm">
+                                    <Trash2 className="w-4 h-4 text-rose-500" />
+                                    Eliminar también el mensaje del WhatsApp del cliente
+                                </div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-snug">
+                                    Borra el mensaje para todos (vos y el cliente). Solo funciona si el mensaje fue enviado hace menos de ~2 horas.
+                                </p>
                             </div>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-snug">
-                                Borra el mensaje para todos (vos y el cliente). Solo funciona si el mensaje fue enviado hace menos de ~2 horas.
-                            </p>
-                        </div>
-                    </label>
+                        </label>
+                    )}
                 </div>
 
                 {/* Footer */}
