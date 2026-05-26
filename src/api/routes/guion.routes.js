@@ -5,10 +5,9 @@ const { prisma } = require('../../../db');
 const logger = require('../../utils/logger');
 
 const SCRIPTS_DIR = path.join(__dirname, '../../..');
-// v3 y v4 fueron archivados (archive/knowledge_v3.json, archive/knowledge_v4.json).
-// v5 (Asesor consultivo) y v6 (Elena charla) son los guiones activos que el equipo
-// usa para A/B testing y revisión. El UI permite comentar/anotar ambos.
-const AVAILABLE_SCRIPTS = ['v5', 'v6'];
+// v3..v6 fueron archivados (archive/knowledge_v*.json). v7 (Elena, 2 tiers) es
+// el único guion activo desde may-2026. El UI muestra/edita V7 exclusivamente.
+const AVAILABLE_SCRIPTS = ['v7'];
 
 function _loadScript(name) {
     if (!AVAILABLE_SCRIPTS.includes(name)) return null;

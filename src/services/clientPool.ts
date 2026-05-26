@@ -263,7 +263,7 @@ class ClientPool {
             get pausedUsers() { return stateManager.pausedUsers; },
             sessionAlerts: [] as any[],
             get config() { return stateManager.config; },
-            get knowledge() { return stateManager.multiKnowledge[stateManager.config.activeScript || 'v6']; },
+            get knowledge() { return stateManager.multiKnowledge[stateManager.config.activeScript || 'v7']; },
             get multiKnowledge() { return stateManager.multiKnowledge; },
             isConnected: false,
             qrCodeData: null as string | null,

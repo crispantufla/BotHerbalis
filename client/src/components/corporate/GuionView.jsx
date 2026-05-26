@@ -12,8 +12,7 @@ import {
 } from '../ui';
 
 const SCRIPT_LABELS = {
-    v5: { name: 'V5 · Asesor consultivo', tone: 'Pregunta kilos primero, recomienda según objetivo' },
-    v6: { name: 'V6 · Elena charla',      tone: 'Tono cálido, conversacional, argentino' },
+    v7: { name: 'V7 · Elena', tone: '2 tiers (≤10 kg → 60d, +10 kg → 120d). Persona Elena, tono argentino cálido. Tras pedir kilos, manda recomendación + precios en mensajes seguidos.' },
 };
 
 const SECTION_LABELS = {
@@ -22,7 +21,9 @@ const SECTION_LABELS = {
     'flow.recommendation_1': 'Recomendación tier 1 (hasta 10 kg)',
     'flow.recommendation_2': 'Recomendación tier 2 (10 a 20 kg)',
     'flow.recommendation_3': 'Recomendación tier 3 (más de 20 kg)',
-    'flow.prices': 'TEXTO 3 — Precios del plan (60 vs 120)',
+    'flow.prices_60': 'Precios tier 1 (auto, plan 60d)',
+    'flow.prices_120': 'Precios tier 2 (auto, plan 120d)',
+    'flow.prices': 'TEXTO 3 — Precios (legacy V5/V6)',
     'flow.preference_capsulas': 'Cliente elige cápsulas',
     'flow.preference_gotas': 'Cliente elige gotas',
     'flow.preference_semillas': 'Cliente elige semillas',
@@ -74,7 +75,7 @@ const STAGE_GROUPS = [
         key: 'prices',
         label: 'Precios',
         icon: DollarSign,
-        sectionKeys: ['prices'],
+        sectionKeys: ['prices_60', 'prices_120', 'prices'],
     },
     {
         key: 'payment',
@@ -155,10 +156,10 @@ const GuionView = () => {
     const { socket } = useSocket();
     const isAdmin = user?.role === 'admin';
 
-    const [activeScript, setActiveScript] = useState('v5');
+    const [activeScript, setActiveScript] = useState('v7');
     const [guiones, setGuiones] = useState([]);
     const [comments, setComments] = useState([]);
-    const [counts, setCounts] = useState({ v5: 0 });
+    const [counts, setCounts] = useState({ v7: 0 });
     const [loading, setLoading] = useState(true);
     const [expandedSection, setExpandedSection] = useState(null);
     const [showResolved, setShowResolved] = useState(false);
@@ -206,7 +207,7 @@ const GuionView = () => {
     const fetchCounts = useCallback(async () => {
         try {
             const res = await api.get('/api/guion-comments/counts');
-            setCounts(res.data.counts || { v5: 0 });
+            setCounts(res.data.counts || { v7: 0 });
         } catch { /* silencioso */ }
     }, []);
 

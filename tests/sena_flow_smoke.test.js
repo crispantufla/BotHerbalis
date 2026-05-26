@@ -14,8 +14,8 @@ const fs = require('fs');
 
 const tpl = require('../src/utils/messageTemplates');
 
-const v5 = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'knowledge_v5.json'), 'utf8'));
-const v6 = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'knowledge_v6.json'), 'utf8'));
+// V5/V6 archivados en may-2026; V7 es el único guion activo.
+const v7 = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'knowledge_v7.json'), 'utf8'));
 
 describe('Modelo nuevo de pago — buildPaymentMessage (envío primero, sin anticipo)', () => {
     const pm = tpl.buildPaymentMessage({ selectedPlan: '60', totalPrice: '46.900' });
@@ -55,8 +55,7 @@ describe('Modelo nuevo de pago — buildPaymentMessage (envío primero, sin anti
 
 describe('Modelo nuevo — payment_domicilio_choice (submenú prepago tras elegir domicilio)', () => {
     test.each([
-        ['V5', v5],
-        ['V6', v6],
+        ['V7', v7],
     ])('%s: existe la entry y ofrece MP + Transferencia', (_n, guion) => {
         const choice = guion.flow.payment_domicilio_choice;
         expect(choice).toBeDefined();
@@ -67,8 +66,7 @@ describe('Modelo nuevo — payment_domicilio_choice (submenú prepago tras elegi
 
 describe('Modelo nuevo — payment_retiro_confirm (confirmación tras elegir retiro)', () => {
     test.each([
-        ['V5', v5],
-        ['V6', v6],
+        ['V7', v7],
     ])('%s: existe la entry y aclara "total en efectivo al retirar"', (_n, guion) => {
         const confirm = guion.flow.payment_retiro_confirm;
         expect(confirm).toBeDefined();
@@ -82,15 +80,13 @@ describe('Modelo nuevo — payment_retiro_confirm (confirmación tras elegir ret
 
 describe('Modelo nuevo — rules en V5 y V6', () => {
     test.each([
-        ['V5', v5],
-        ['V6', v6],
+        ['V7', v7],
     ])('%s: prepayIncentive desactivado', (_n, guion) => {
         expect(guion.rules.prepayIncentive.enabled).toBe(false);
     });
 
     test.each([
-        ['V5', v5],
-        ['V6', v6],
+        ['V7', v7],
     ])('%s: contraReembolsoMAX senaTransfer=0 (sin anticipo) + spontaneous + appliesTo=all', (_n, guion) => {
         expect(guion.rules.contraReembolsoMAX.senaTransfer).toBe(0);
         expect(guion.rules.contraReembolsoMAX.spontaneous).toBe(true);
@@ -99,8 +95,7 @@ describe('Modelo nuevo — rules en V5 y V6', () => {
     });
 
     test.each([
-        ['V5', v5],
-        ['V6', v6],
+        ['V7', v7],
     ])('%s: defaultPaymentMethod = shipping_first + bankAlias oficial', (_n, guion) => {
         expect(guion.rules.defaultPaymentMethod).toBe('shipping_first');
         expect(guion.rules.bankAlias.alias).toBe('HERBALIS.TIENDA');
@@ -110,8 +105,7 @@ describe('Modelo nuevo — rules en V5 y V6', () => {
 
 describe('Modelo nuevo — FAQ en V5 y V6', () => {
     test.each([
-        ['V5', v5],
-        ['V6', v6],
+        ['V7', v7],
     ])('%s: FAQ "estafa" sigue liderando con trust signals + ofrece retiro como risk reversal', (_n, guion) => {
         const estafaFaq = guion.faq.find(f => f.keywords.some(k => k === 'estafa'));
         expect(estafaFaq).toBeDefined();
@@ -124,8 +118,7 @@ describe('Modelo nuevo — FAQ en V5 y V6', () => {
     });
 
     test.each([
-        ['V5', v5],
-        ['V6', v6],
+        ['V7', v7],
     ])('%s: FAQ "contra reembolso" describe retiro en sucursal (sin anticipo)', (_n, guion) => {
         const codFaq = guion.faq.find(f => f.keywords.some(k => k === 'contra reembolso'));
         expect(codFaq).toBeDefined();
@@ -137,8 +130,7 @@ describe('Modelo nuevo — FAQ en V5 y V6', () => {
     });
 
     test.each([
-        ['V5', v5],
-        ['V6', v6],
+        ['V7', v7],
     ])('%s: FAQ "transferencia" expone el alias oficial', (_n, guion) => {
         const trfFaq = guion.faq.find(f => f.keywords.some(k => k === 'transferencia'));
         expect(trfFaq).toBeDefined();
@@ -147,8 +139,7 @@ describe('Modelo nuevo — FAQ en V5 y V6', () => {
     });
 
     test.each([
-        ['V5', v5],
-        ['V6', v6],
+        ['V7', v7],
     ])('%s: FAQ "shipping" unifica 5 a 7 días hábiles + menciona ambas opciones de envío', (_n, guion) => {
         const shipFaq = guion.faq.find(f => f.keywords.some(k => k === 'como lo recibo' || k === 'envio'));
         expect(shipFaq).toBeDefined();
@@ -161,8 +152,7 @@ describe('Modelo nuevo — FAQ en V5 y V6', () => {
     });
 
     test.each([
-        ['V5', v5],
-        ['V6', v6],
+        ['V7', v7],
     ])('%s: ningún mensaje en flow/faq promete descuento de $6.000', (_n, guion) => {
         const allText = JSON.stringify(guion.flow) + JSON.stringify(guion.faq);
         expect(allText).not.toMatch(/descuento de \$\s*6\.000/i);
@@ -171,24 +161,31 @@ describe('Modelo nuevo — FAQ en V5 y V6', () => {
     });
 });
 
-describe('Modelo nuevo — recommendations (no muestran precios; cierran con pregunta de avance)', () => {
-    // V5 rev. 2026-05-26: recommendation_X ofrece las 3 opciones de producto y
-    // pregunta "¿con cuál vas?" — la dosis y los precios van más adelante.
-    // V6: sigue el modelo anterior (recomienda un producto y pide aceptación
-    // para mostrar precios).
-    test.each([
-        ['V5', v5],
-        ['V6', v6],
-    ])('%s: recommendation_1/2/3 no filtran precios y cierran con pregunta de avance', (_n, guion) => {
-        ['recommendation_1', 'recommendation_2', 'recommendation_3'].forEach(key => {
-            const resp = guion.flow[key].response;
+describe('V7 — recommendations no filtran precios; los precios van en prices_60/_120', () => {
+    // V7: recommendation_1/2 (sólo 2 tiers, no hay rec_3) ofrecen las 3 opciones
+    // de producto + instrucción de semilla. La pregunta de avance ("¿qué opción
+    // preferís?") está en prices_60/_120 que se manda automáticamente como
+    // segundo mensaje desde stepWaitingWeight.
+    test('recommendation_1 y _2 no filtran precios', () => {
+        ['recommendation_1', 'recommendation_2'].forEach(key => {
+            const resp = v7.flow[key].response;
             expect(resp).not.toMatch(/\{\{PRICE_/);
             expect(resp).not.toMatch(/\$\s*\d{2,}\.\d{3}/);
-            // Acepta "¿te paso los precios?" (V6) o "¿con cuál vas?" (V5 nuevo flujo).
-            expect(resp).toMatch(/precios|con cu[aá]l/i);
             expect(resp).not.toMatch(/te bajo \$\s*6\.000/i);
             expect(resp).not.toMatch(/unidad extra de regalo/i);
         });
+    });
+
+    test('prices_60 y prices_120 muestran las 3 opciones con placeholders + pregunta de avance', () => {
+        ['prices_60', 'prices_120'].forEach(key => {
+            const resp = v7.flow[key].response;
+            expect(resp).toMatch(/\{\{PRICE_/);
+            expect(resp).toMatch(/qu[eé] opci[oó]n prefer/i);
+        });
+    });
+
+    test('V7 NO tiene recommendation_3 (sólo 2 tiers)', () => {
+        expect(v7.flow.recommendation_3).toBeUndefined();
     });
 });
 

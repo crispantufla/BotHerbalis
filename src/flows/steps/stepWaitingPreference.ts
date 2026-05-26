@@ -1,7 +1,27 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _formatMessage } from '../utils/messages';
 import { _setStep, _maybeUpsell, _detectPostdatado, _assignProductAndPlanByTier } from '../utils/flowHelpers';
+import { buildPaymentMessage } from '../../utils/messageTemplates';
 import logger from '../../utils/logger';
+
+// V7 (may-2026): tras el preference_X, si el JSON setea nextStep=waiting_payment_method,
+// mandamos payment_menu como segundo mensaje automático y skip waiting_ok+waiting_plan_choice.
+// V5/V6: nextStep es waiting_ok y ese segundo paso lo dispara el cliente diciendo "sí".
+async function _maybeSendPaymentMenuV7(
+    userId: string,
+    nextStep: string | undefined,
+    currentState: UserState,
+    knowledge: any,
+    dependencies: any
+): Promise<void> {
+    if (nextStep !== FlowStep.WAITING_PAYMENT_METHOD) return;
+    const { sendMessageWithDelay, saveState } = dependencies;
+    const paymentMsg = buildPaymentMessage(currentState, knowledge);
+    currentState.history.push({ role: 'bot', content: paymentMsg, timestamp: Date.now() });
+    saveState(userId);
+    await sendMessageWithDelay(userId, paymentMsg);
+    logger.info(`[V7-AUTO-PAYMENT] User ${userId} → payment_menu enviado tras confirmar producto.`);
+}
 
 export async function handleWaitingPreference(
     userId: string,
@@ -72,6 +92,7 @@ export async function handleWaitingPreference(
             currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
             saveState(userId);
             await sendMessageWithDelay(userId, msg);
+            await _maybeSendPaymentMenuV7(userId, priceNode.nextStep, currentState, knowledge, dependencies);
             await _maybeUpsell(currentState, sendMessageWithDelay, userId, saveState);
             return { matched: true };
         }
@@ -139,6 +160,7 @@ export async function handleWaitingPreference(
                 saveState(userId);
                 await sendMessageWithDelay(userId, msg);
 
+                await _maybeSendPaymentMenuV7(userId, priceNode.nextStep, currentState, knowledge, dependencies);
                 await _maybeUpsell(currentState, sendMessageWithDelay, userId, saveState);
                 return { matched: true };
             }
@@ -153,32 +175,38 @@ export async function handleWaitingPreference(
 
     if (mentionsCapsulas) {
         _assignProductAndPlanByTier(currentState, "Cápsulas de nuez de la india");
-        const msg = _formatMessage(knowledge.flow.preference_capsulas.response, currentState);
+        const node = knowledge.flow.preference_capsulas;
+        const msg = _formatMessage(node.response, currentState);
 
-        _setStep(currentState, knowledge.flow.preference_capsulas.nextStep);
+        _setStep(currentState, node.nextStep);
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
+        await _maybeSendPaymentMenuV7(userId, node.nextStep, currentState, knowledge, dependencies);
         await _maybeUpsell(currentState, sendMessageWithDelay, userId, saveState);
         return { matched: true };
     } else if (mentionsSemillas) {
         _assignProductAndPlanByTier(currentState, "Semillas de nuez de la india");
-        const msg = _formatMessage(knowledge.flow.preference_semillas.response, currentState);
+        const node = knowledge.flow.preference_semillas;
+        const msg = _formatMessage(node.response, currentState);
 
-        _setStep(currentState, knowledge.flow.preference_semillas.nextStep);
+        _setStep(currentState, node.nextStep);
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
+        await _maybeSendPaymentMenuV7(userId, node.nextStep, currentState, knowledge, dependencies);
         await _maybeUpsell(currentState, sendMessageWithDelay, userId, saveState);
         return { matched: true };
     } else if (knowledge.flow.preference_gotas && mentionsGotas) {
         _assignProductAndPlanByTier(currentState, "Gotas de nuez de la india");
-        const msg = _formatMessage(knowledge.flow.preference_gotas.response, currentState);
+        const node = knowledge.flow.preference_gotas;
+        const msg = _formatMessage(node.response, currentState);
 
-        _setStep(currentState, knowledge.flow.preference_gotas.nextStep);
+        _setStep(currentState, node.nextStep);
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
+        await _maybeSendPaymentMenuV7(userId, node.nextStep, currentState, knowledge, dependencies);
         await _maybeUpsell(currentState, sendMessageWithDelay, userId, saveState);
         return { matched: true };
     } else {
@@ -229,6 +257,7 @@ export async function handleWaitingPreference(
                 saveState(userId);
                 await sendMessageWithDelay(userId, msg);
 
+                await _maybeSendPaymentMenuV7(userId, priceNode.nextStep, currentState, knowledge, dependencies);
                 await _maybeUpsell(currentState, sendMessageWithDelay, userId, saveState);
                 return { matched: true };
             }

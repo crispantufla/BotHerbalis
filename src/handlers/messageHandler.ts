@@ -58,26 +58,19 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
         logger.info(`[DEBOUNCE][${sellerId}] Processing ${sortedMessages.length} msg(s) from ${userId}: "${combinedText}"`);
 
         try {
-            const isRotacion = config.activeScript === 'rotacion';
-            const legacyScripts = ['v1', 'v2', 'v3', 'v4'];
+            // V7 es el único script activo (may-2026). v1..v6 + rotacion fueron archivados.
+            // Si la DB devuelve un valor legacy, lo coercemos a v7.
+            const legacyScripts = ['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'rotacion'];
             let effectiveScript = userState[userId]?.assignedScript;
-            // Si el usuario tiene assignedScript de un guion archivado, migrar a v5
-            // (no podemos cargarle el guion archivado).
             if (effectiveScript && legacyScripts.includes(effectiveScript)) {
-                effectiveScript = 'v6';
+                effectiveScript = 'v7';
                 if (userState[userId]) {
                     userState[userId].assignedScript = effectiveScript;
                     saveState(userId);
                 }
             }
             if (!effectiveScript) {
-                if (isRotacion) {
-                    effectiveScript = Math.random() < 0.5 ? 'v5' : 'v6';
-                } else {
-                    effectiveScript = config.activeScript || 'v6';
-                }
-                // Persist the assignment if the user already has state; otherwise
-                // salesFlow will freeze it when it creates the state on first message.
+                effectiveScript = 'v7';
                 if (userState[userId]) {
                     userState[userId].assignedScript = effectiveScript;
                     saveState(userId);

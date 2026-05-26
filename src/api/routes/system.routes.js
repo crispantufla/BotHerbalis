@@ -497,12 +497,11 @@ module.exports = (clientPool) => {
     router.get('/script/active', ...withSeller(clientPool), requireAdmin, (req, res) => {
         const { config, ss } = getCtx(req);
         res.json({
-            active: config.activeScript || 'v6',
-            available: ss?.availableScripts || ['v5', 'v6'],
+            active: config.activeScript || 'v7',
+            available: ss?.availableScripts || ['v7'],
             stats: config.scriptStats || {},
             labels: {
-                'v5': 'V5 — Asesor consultivo',
-                'v6': 'V6 — Elena charla'
+                'v7': 'V7 — Elena · 2 tiers (60d / 120d)'
             }
         });
     });

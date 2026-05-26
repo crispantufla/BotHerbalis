@@ -82,7 +82,7 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
                 step,
                 messageId,
                 sellerId,
-                assignedScript: userState[chatId]?.assignedScript || config?.activeScript || 'v6'
+                assignedScript: userState[chatId]?.assignedScript || config?.activeScript || 'v7'
             };
             sharedState.io.to(sellerId).emit('new_log', payload);
             sharedState.io.to('admin').emit('new_log', payload);

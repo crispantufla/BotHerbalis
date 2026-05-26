@@ -71,30 +71,25 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
     const pausedUsers = new Set<string>();
     const config: BotConfig = {
         alertNumbers: [],
-        activeScript: 'v6',
+        activeScript: 'v7',
         scriptStats: {
-            v5: { started: 0, completed: 0 },
-            v6: { started: 0, completed: 0 }
+            v7: { started: 0, completed: 0 }
         }
     };
 
-    // Knowledge files: load from DATA_DIR first, fallback to source root
+    // Knowledge files: load from DATA_DIR first, fallback to source root.
+    // v3/v4/v5/v6 fueron archivados (archive/knowledge_v*.json). Solo v7 está activo
+    // (may-2026: 2 tiers, persona Elena, payment_menu auto tras elegir producto).
+    // Si la DB todavía tiene config.activeScript en valor archivado, se hace
+    // migración defensiva más abajo (ver loadState).
     const sourceRoot = path.join(__dirname, '../..');
-    // v3/v4 fueron archivados (archive/knowledge_v3.json, archive/knowledge_v4.json).
-    // Solo v5 y v6 están activos. Si la DB todavía tiene config.activeScript='v3'/'v4',
-    // se hace migración defensiva más abajo (ver loadKnowledge).
     const multiKnowledge: Record<string, any> = {
-        v5: { flow: {}, faq: [] },
-        v6: { flow: {}, faq: [] }
+        v7: { flow: {}, faq: [] }
     };
     const knowledgeFiles: Record<string, { save: string; source: string }> = {
-        v5: {
-            save: path.join(dataDir, `knowledge_v5_${sellerId}.json`),
-            source: path.join(sourceRoot, 'knowledge_v5.json')
-        },
-        v6: {
-            save: path.join(dataDir, `knowledge_v6_${sellerId}.json`),
-            source: path.join(sourceRoot, 'knowledge_v6.json')
+        v7: {
+            save: path.join(dataDir, `knowledge_v7_${sellerId}.json`),
+            source: path.join(sourceRoot, 'knowledge_v7.json')
         }
     };
     const availableScripts = Object.keys(knowledgeFiles);
@@ -116,7 +111,7 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
 
     async function saveKnowledge(scriptName: string | null = null) {
         try {
-            const name = scriptName || config.activeScript || 'v6';
+            const name = scriptName || config.activeScript || 'v7';
             const paths = knowledgeFiles[name];
             if (paths && multiKnowledge[name]) {
                 await atomicWriteFile(paths.save, JSON.stringify(multiKnowledge[name], null, 2));
@@ -246,17 +241,14 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
             }
             if (!config.alertNumbers) config.alertNumbers = [];
 
-            // Migrate legacy activeScript values (v1/v2/v3/v4 fueron archivados).
-            // Si la DB todavía tiene un guion archivado seleccionado, lo migramos a v6
-            // (default elegido al fijar V6 como guion principal el 15-may-2026).
-            // 'rotacion' se mantiene como opción seleccionable manualmente.
-            const legacyScripts = ['v1', 'v2', 'v3', 'v4'];
+            // Migrate legacy activeScript values (v1..v6 + rotacion fueron archivados may-2026).
+            // V7 es el único script activo. Si la DB todavía tiene un valor archivado,
+            // lo migramos a v7. scriptStats viejas quedan como histórico, no se tocan.
+            const legacyScripts = ['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'rotacion'];
             if (config.activeScript && legacyScripts.includes(config.activeScript)) {
-                logger.warn(`[STATE][${sellerId}] activeScript="${config.activeScript}" archivado → migrando a "v6"`);
-                config.activeScript = 'v6';
+                logger.warn(`[STATE][${sellerId}] activeScript="${config.activeScript}" archivado → migrando a "v7"`);
+                config.activeScript = 'v7';
             }
-            // scriptStats puede tener entradas de v1/v2/v3/v4 — las dejamos como histórico,
-            // pero no se incrementan más ya que el rotador y handler solo usan v5/v6.
 
             logger.info(`[STATE][${sellerId}] Loaded ${dbUsers.length} users, config synced`);
         } catch (e: any) {

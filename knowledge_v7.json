@@ -1,0 +1,409 @@
+{
+    "meta": {
+        "name": "Guión V7 — Elena · 2 tiers (60d / 120d)",
+        "description": "Guión simplificado may-2026: persona Elena (tono cálido argentino), 2 tiers (hasta 10 kg → plan 60 días; más de 10 kg → plan 120 días). Tras pedir kilos, el bot envía dos mensajes seguidos (recomendación + precios). Cuando el cliente elige producto, confirma el total y va directo al menú de pago. Modelo de pago nuevo: retiro en sucursal (paga total al retirar) o envío a domicilio (prepago MP/transferencia).",
+        "version": "7.0"
+    },
+    "flow": {
+        "greeting": {
+            "step": "greeting",
+            "keywords": [
+                "hola",
+                "precio",
+                "info",
+                "buenas",
+                "herbalis",
+                "nuez",
+                "kilos",
+                "bajar",
+                "cuanto",
+                "vale",
+                "costo",
+                "gotas",
+                "capsulas",
+                "capsula"
+            ],
+            "_note": "Saludo V7. Presenta producto + 3 formas + pregunta kilos en 2 tiers. Persona Elena.",
+            "response": "¡Hola! 😊 Soy Elena de Herbalis.\n\nTe ayudo a bajar de peso de forma natural.\n\nTe ofrezco la Nuez de la India en tres opciones:\n\n🌿 En estado natural (semillas)\n💊 En cápsulas\n💧 En gotas\n\nTodas 100% naturales.\n\nPara recomendarte bien, contame cuánto te gustaría bajar:\n\n1️⃣ Hasta 10 kg\n2️⃣ Más de 10 kg\n\n13 años acompañando, casi 70.000 clientes. Envío gratis a todo el país.",
+            "nextStep": "waiting_weight"
+        },
+        "recommendation_1": {
+            "step": "waiting_weight",
+            "_note": "Tier 1 — hasta 10 kg → plan 60 días. Texto A (recomendación + 3 formas + instrucciones de la semilla). El handler manda este mensaje + esperar delay + mandar prices_60 automáticamente.",
+            "response": "Para hasta 10 kg te recomiendo plan de *60 días* 🌿\n\n1️⃣ *Cápsulas* — 1 al día, 30 min antes del almuerzo o cena.\n2️⃣ *Gotas* — 10 gotas al día, 30 min antes del almuerzo o cena.\n3️⃣ *Semillas* — infusión nocturna.\n\n*Cómo se prepara la semilla:* la primera semana partís una nuez en 8 partes, las siguientes en 4. Cada noche hervís un pedacito 5 minutos al fuego (o 3 en microondas). Cuanta más agua uses, mejor — así se consume la semilla. Te tomás el agua y tragás el trocito, lo más alejado de la cena posible, cuando te vas a dormir.",
+            "nextStep": "waiting_preference"
+        },
+        "recommendation_2": {
+            "step": "waiting_weight",
+            "_note": "Tier 2 — más de 10 kg → plan 120 días. Mismo formato que recommendation_1 pero con plan 120d. Auto-followup con prices_120.",
+            "response": "Para más de 10 kg te recomiendo plan de *120 días* 🌿\n\n1️⃣ *Cápsulas* — 1 al día, 30 min antes del almuerzo o cena.\n2️⃣ *Gotas* — 10 gotas al día, 30 min antes del almuerzo o cena.\n3️⃣ *Semillas* — infusión nocturna.\n\n*Cómo se prepara la semilla:* la primera semana partís una nuez en 8 partes, las siguientes en 4. Cada noche hervís un pedacito 5 minutos al fuego (o 3 en microondas). Cuanta más agua uses, mejor — así se consume la semilla. Te tomás el agua y tragás el trocito, lo más alejado de la cena posible, cuando te vas a dormir.",
+            "nextStep": "waiting_preference"
+        },
+        "prices_60": {
+            "step": "waiting_weight",
+            "_note": "Texto B — segundo mensaje automático tras recommendation_1 (tier 1, plan 60d). Lo dispara el handler de stepWaitingWeight inmediatamente después de mandar recommendation_1, con un pequeño delay. NO tiene nextStep — el step lo setea el handler tras el envío.",
+            "response": "1️⃣ Cápsulas × 60 días — *${{PRICE_CAPSULAS_60}}*\n2️⃣ Gotas × 60 días — *${{PRICE_GOTAS_60}}*\n3️⃣ Semillas × 60 días — *${{PRICE_SEMILLAS_60}}*\n\n¿Qué opción preferís?"
+        },
+        "prices_120": {
+            "step": "waiting_weight",
+            "_note": "Texto B — segundo mensaje automático tras recommendation_2 (tier 2, plan 120d). Disparado por stepWaitingWeight.",
+            "response": "1️⃣ Cápsulas × 120 días — *${{PRICE_CAPSULAS_120}}*\n2️⃣ Gotas × 120 días — *${{PRICE_GOTAS_120}}*\n3️⃣ Semillas × 120 días — *${{PRICE_SEMILLAS_120}}*\n\n¿Qué opción preferís?"
+        },
+        "preference_capsulas": {
+            "step": "waiting_preference",
+            "_note": "Cliente eligió cápsulas. El plan ya está determinado por el tier (60 si ≤10kg, 120 si +10kg). El handler asigna selectedProduct + selectedPlan + total y envía este mensaje + payment_menu como segundo mensaje. nextStep: waiting_payment_method (skip waiting_ok y waiting_plan_choice del flow viejo).",
+            "match": [
+                "capsula",
+                "capsulas",
+                "pastilla",
+                "pastillas",
+                "practico",
+                "practica"
+            ],
+            "response": "¡Dale, vamos con *cápsulas {{PLAN}} días*! 💊\n\nTotal: *${{TOTAL}}*\n\nTe paso las formas de pago 👇",
+            "nextStep": "waiting_payment_method"
+        },
+        "preference_gotas": {
+            "step": "waiting_preference",
+            "_note": "Cliente eligió gotas. Igual que preference_capsulas pero con producto distinto.",
+            "match": [
+                "gotas",
+                "liquido",
+                "gotero"
+            ],
+            "response": "¡Dale, vamos con *gotas {{PLAN}} días*! 💧\n\nTotal: *${{TOTAL}}*\n\nTe paso las formas de pago 👇",
+            "nextStep": "waiting_payment_method"
+        },
+        "preference_semillas": {
+            "step": "waiting_preference",
+            "_note": "Cliente eligió semillas. Igual que las otras dos preferencias.",
+            "match": [
+                "semilla",
+                "semillas",
+                "infusion",
+                "yuyos",
+                "te de semilla",
+                "natural"
+            ],
+            "response": "¡Dale, vamos con *semillas {{PLAN}} días*! 🌿\n\nTotal: *${{TOTAL}}*\n\nTe paso las formas de pago 👇",
+            "nextStep": "waiting_payment_method"
+        },
+        "prices": {
+            "step": "waiting_ok",
+            "_note": "LEGACY — sólo usado por clientes en mid-flow (step waiting_ok) que estaban en V5 al deployar V7. En el flujo nuevo no se llama porque stepWaitingWeight skipea waiting_ok. Se mantiene por compat.",
+            "response": "Plan 2 meses: ${{PRICE_60}}\nPlan 4 meses: ${{PRICE_120}}\n\n¿Con cuál vas?",
+            "nextStep": "waiting_plan_choice"
+        },
+        "payment_menu": {
+            "step": "waiting_payment_method",
+            "_note": "TEXTO 4 — Menú envío + medios de pago. Disparado por buildPaymentMessage. Modelo nuevo (may-2026): primero elige tipo de envío, después método. Retiro=contrarreembolso al retirar (sin anticipo). Domicilio=prepago (MP/Transfer).",
+            "response": "📦 El envío se realiza por Correo Argentino y demora entre 5 y 7 días hábiles.\n\nOpciones de envío:\n1️⃣ Retiro en sucursal → se paga al retirar (contrarreembolso)\n2️⃣ Envío a domicilio → se abona previamente\n\n💳 Medios de pago:\nMercadoPago – Transferencia – Rapipago – PagoFácil\n💳 Tarjeta de crédito\n\n👉 Por favor, decime:\n* Si preferís retiro en sucursal o envío a domicilio\n\n‼️ Ambos envíos son GRATIS ‼️",
+            "nextStep": "waiting_payment_method"
+        },
+        "payment_domicilio_choice": {
+            "step": "waiting_payment_method",
+            "_note": "Cliente eligió envío a domicilio. Submenú de medio de pago (prepago). Rapipago/PagoFácil/Tarjeta se canalizan dentro del link de Mercado Pago.",
+            "response": "Perfecto, lo mandamos a tu domicilio 🏠\n\n¿Cómo querés abonar?\n\n1️⃣ *Mercado Pago* — tarjeta, débito, app MP, o llevás el código y pagás en efectivo en Pago Fácil o Rapipago\n2️⃣ *Transferencia bancaria* — te paso el alias",
+            "nextStep": "waiting_payment_method"
+        },
+        "payment_retiro_confirm": {
+            "step": "waiting_admin_validation",
+            "_note": "Cliente eligió retiro en sucursal. NO hay anticipo — paga el total en efectivo cuando retira. La sucursal se asigna automáticamente por el código postal del cliente.",
+            "response": "¡Listo! Lo dejamos para retiro en sucursal 📦\n\nVas a pagar el total *${{TOTAL}}* en efectivo cuando lo retires.\n\nLa sucursal de Correo Argentino se asigna sola, la más cercana a tu código postal 😊"
+        },
+        "payment_transfer_alias": {
+            "step": "waiting_transfer_confirmation",
+            "_note": "TEXTO 5b — Cliente eligió transferencia bancaria. Le pasamos alias + titular + monto total. Placeholders: {{ALIAS}}, {{TITULAR}}, {{TOTAL}}.",
+            "response": "¡Perfecto! Para transferir usá el alias *{{ALIAS}}* a nombre de *{{TITULAR}}* 🏦\n\nMonto: ${{TOTAL}}\n\nUna vez que realices la transferencia, escribime *\"listo\"* y coordinamos el envío 😊",
+            "nextStep": "waiting_transfer_confirmation"
+        },
+        "payment_mp_link": {
+            "step": "waiting_mp_payment",
+            "_note": "TEXTO 5a — Cliente eligió Mercado Pago. Le mandamos el link + detalle del pedido + pedido de datos en paralelo. Placeholders: {{PRODUCT}}, {{PLAN}}, {{TOTAL}}, {{LINK}}.",
+            "response": "💳 Link de Mercado Pago:\n\n{{LINK}}\n\nTotal: ${{TOTAL}} — {{PRODUCT}} {{PLAN}} días\n\nCuando termines de pagar, mandame \"listo\" y verifico.\n\nMientras, pasame los datos de envío:\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:",
+            "nextStep": "waiting_mp_payment"
+        },
+        "payment_mp_failed": {
+            "step": "waiting_mp_payment",
+            "_note": "Mensaje al cliente cuando fallaron 2 intentos consecutivos de generar el link MP. Se pausa al cliente y se notifica admin (con e.message en el alert).",
+            "response": "Tuve un problema técnico generando el link de pago 😕\n\nEn un momento te contacta un asesor para resolverlo. Disculpá la molestia 🙏"
+        },
+        "payment_mp_retry": {
+            "step": "waiting_mp_payment",
+            "_note": "Mensaje cuando MP devuelve el pago como rejected/error tras un intento del cliente. Se ofrece reintento con otras formas dentro de MP.",
+            "response": "⚠️ Hubo un problema con el pago de MercadoPago, pudo ser la tarjeta o un rechazo del banco.\n\nProbá de nuevo con otra forma:\n✅ Tarjeta de crédito\n✅ Débito\n✅ Saldo Mercado Pago\n\nTe genero un nuevo link para volver a intentarlo, decime cuando esté listo 😊"
+        },
+        "transfer_received": {
+            "step": "waiting_transfer_confirmation",
+            "_note": "Cliente confirmó que ya hizo la transferencia ('listo'). Pausamos al cliente y avisamos admin para verificar el comprobante.",
+            "response": "¡Perfecto! Para verificarla más rápido, mandame *el comprobante* o el *número de operación* 📸\n\nApenas la cruzo, te confirmo el envío ⏳"
+        },
+        "closing": {
+            "step": "waiting_data",
+            "_note": "Pedido de datos de envío. Se dispara DESPUÉS de que el cliente eligió método de pago y, en su caso, pagó (MP confirmado o transferencia avisada con 'listo'). Para retiro en sucursal: el bot pausa y el admin coordina, este texto no se usa.",
+            "match": [
+                "si",
+                "sisi",
+                "dale",
+                "bueno",
+                "ok",
+                "envialo",
+                "envíalo",
+                "te lo envio",
+                "te lo envío",
+                "mandalo",
+                "envielo"
+            ],
+            "response": "¡Buenísimo! 🎉 Te sigo por acá durante todo el tratamiento.\n\nPasame los datos para la etiqueta:\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\n\n(Que la dirección sea exacta, sin \"aprox\" ni S/N)",
+            "nextStep": "waiting_data"
+        },
+        "order_confirmation_mp": {
+            "step": "waiting_admin_validation",
+            "_note": "Confirmación tras pago completo por MP (envío a domicilio). Placeholders: {{PRODUCT_DETAIL}}, {{PLAN_DETAIL}}, {{TOTAL}}, {{POSTDATADO_LINE}} (5 a 7 días hábiles uniforme).",
+            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✅ Pago recibido via MercadoPago\n\n✔ Correo Argentino — envío a domicilio\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs para retirar.\n\n👉 ¿Me confirmás que podés retirarlo en sucursal dentro de las 72 hs si fuera necesario?"
+        },
+        "order_confirmation_transfer": {
+            "step": "waiting_admin_validation",
+            "_note": "Confirmación tras pago por transferencia bancaria (envío a domicilio).",
+            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✅ Pago recibido via Transferencia\n\n✔ Correo Argentino — envío a domicilio\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs para retirar.\n\n👉 ¿Me confirmás que podés retirarlo en sucursal dentro de las 72 hs si fuera necesario?"
+        },
+        "order_confirmation_cod": {
+            "step": "waiting_admin_validation",
+            "_note": "Confirmación de retiro en sucursal (modelo nuevo may-2026): cliente paga el TOTAL en efectivo al retirar. Sin anticipo. La sucursal de Correo Argentino se asigna automáticamente por el código postal.",
+            "response": "📦 CONFIRMACIÓN DE PEDIDO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal a pagar al retirar: *${{TOTAL}}*\n\n✔ Retiro en sucursal de Correo Argentino — se asigna automáticamente la más cercana a tu código postal.\n{{POSTDATADO_LINE}}\nImportante:\nTenés 72 hs para retirar desde que llega a la sucursal. Pasado ese plazo, el paquete vuelve y se genera un costo logístico de ${{COSTO_LOGISTICO}}."
+        },
+        "order_confirmation_fallback": {
+            "step": "waiting_admin_validation",
+            "_note": "Fallback si el paymentMethod del state no matchea con ninguno conocido. Logueamos warn en código.",
+            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✔ Correo Argentino\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs."
+        }
+    },
+    "faq": [
+        {
+            "keywords": [
+                "funciona de verdad",
+                "funciona",
+                "sirve",
+                "verdad",
+                "posta",
+                "es real",
+                "duda 1",
+                "opcion 1",
+                "1"
+            ],
+            "_note": "FAQ menu opción 1 — '¿Funciona de verdad?'",
+            "response": "Sí, funciona y posta 🌿\n\nLa nuez de la india viene andando hace una banda para bajar de peso de forma natural. Llevamos *13 años* y pasaron casi *70 mil clientes* por el tratamiento.\n\nEs 100% natural, sin químicos raros ni cosas agregadas.\n\n¿Te lo envío?"
+        },
+        {
+            "keywords": [
+                "es seguro",
+                "seguro",
+                "duda 2",
+                "opcion 2"
+            ],
+            "_note": "FAQ menu opción 2 — '¿Es seguro?'",
+            "response": "Sí, es seguro 🌿\n\nEs 100% natural, sin químicos ni cosas agregadas. Llevamos *13 años* y casi *70 mil clientes*, nunca tuvimos un problema asociado.\n\nLas únicas contraindicaciones son embarazo, lactancia, menores de 18 y mayores de 80 años.\n\n¿Te lo envío?"
+        },
+        {
+            "keywords": [
+                "contraindicaciones",
+                "contraindicacion",
+                "embarazo",
+                "lactancia",
+                "duda 3",
+                "opcion 3"
+            ],
+            "_note": "FAQ menu opción 3 — '¿Tiene contraindicaciones?'",
+            "response": "Las únicas contraindicaciones son:\n\n🚫 Embarazo\n🚫 Lactancia\n🚫 Menores de 18 años\n🚫 Mayores de 80 años\n\nNo se cruza con tratamientos habituales (presión, tiroides, diabetes, etc.). Un montón de gente con esas condiciones lo toma sin drama.\n\n¿Te lo envío?"
+        },
+        {
+            "keywords": [
+                "como lo recibo",
+                "como llega",
+                "cuanto tarda",
+                "tarda",
+                "demora",
+                "tiempo",
+                "envio",
+                "duda 4",
+                "opcion 4"
+            ],
+            "_note": "FAQ menu opción 4 — '¿Cómo lo recibo y cuánto tarda?'. Modelo unificado may-2026: 5 a 7 días hábiles para todo. Dos opciones de envío: retiro en sucursal o entrega a domicilio. Ambos son gratis.",
+            "response": "📦 *Envíos por Correo Argentino* — *5 a 7 días hábiles*.\n\nTenés 2 opciones:\n1️⃣ *Retiro en sucursal* — pagás al retirar (contrarreembolso)\n2️⃣ *Envío a domicilio* — se abona previamente\n\n‼️ Ambos envíos son *GRATIS* ‼️\n\nSi el cartero no te encuentra, te avisamos y tenés 72 hs para retirarlo en sucursal.\n\n👉 ¿Avanzamos?"
+        },
+        {
+            "keywords": [
+                "tarjeta",
+                "mercadopago",
+                "mp",
+                "como pago",
+                "forma de pago",
+                "metodo de pago",
+                "cuotas"
+            ],
+            "_note": "Resumen del modelo nuevo (may-2026): 2 tipos de envío con sus medios asociados. Si el cliente ya eligió, no responder esto.",
+            "response": "Tenemos 2 opciones de envío 📦\n\n1️⃣ *Retiro en sucursal* → pagás el total *en efectivo al retirar* (contrarreembolso)\n2️⃣ *Envío a domicilio* → se abona previamente por *Mercado Pago* (tarjeta, débito, app MP, o efectivo en Pago Fácil/Rapipago) o *transferencia bancaria*\n\n‼️ Ambos envíos son GRATIS ‼️\n\n¿Cuál te queda más cómoda?"
+        },
+        {
+            "keywords": [
+                "transferencia",
+                "transferir",
+                "cbu",
+                "alias",
+                "banco"
+            ],
+            "_note": "Transferencia es una de las 3 opciones espontáneas. Alias oficial: HERBALIS.TIENDA a nombre de BIO ORIGEN S.A.S..",
+            "response": "¡Dale, podemos por *transferencia bancaria* 🏦\n\nAlias: *HERBALIS.TIENDA*\nTitular: *BIO ORIGEN S.A.S.*\n\nCuando confirmes el pedido te recuerdo el monto. ¿Avanzamos así?"
+        },
+        {
+            "keywords": [
+                "contra reembolso",
+                "contrarembolso",
+                "contra rembolso",
+                "pago al recibir",
+                "al recibir",
+                "pagar al recibir",
+                "efectivo al cartero",
+                "cuando llega"
+            ],
+            "_note": "Contrarreembolso modelo nuevo (may-2026): retiro en sucursal de Correo Argentino, paga el TOTAL en efectivo al retirar. Sin anticipo previo. Si el cliente prefiere entrega a domicilio, debe abonar previamente (MP o transferencia).",
+            "response": "Dale, podemos coordinar pago al recibir 😊\n\nLa modalidad es: te dejamos el paquete en una *sucursal de Correo Argentino* cerca tuyo, y pagás el *total en efectivo al retirar*. El envío sale gratis.\n\nLa sucursal se asigna sola, la más cercana a tu código postal. ¿Avanzamos así?"
+        },
+        {
+            "keywords": [
+                "muy caro",
+                "es mucho",
+                "mucha plata",
+                "sale un monton",
+                "no me alcanza"
+            ],
+            "response": "Te entiendo 😊 La plata cuesta ganarla.\n\nFijate que en el tratamiento va todo: el producto, el envío gratis y que te sigo por acá durante toda la cursada.\n\nSi te conviene, podemos *programar el envío* para después de cobrar.\n\n¿Desde qué día te queda cómodo?"
+        },
+        {
+            "keywords": [
+                "no tengo",
+                "cobro",
+                "quincena",
+                "fin de mes"
+            ],
+            "response": "¡Tranqui! 😊 Podemos *programar la entrega* para después de la fecha que cobrás. El precio queda congelado.\n\n¿Desde qué día te queda cómodo recibirlo?"
+        },
+        {
+            "keywords": [
+                "rebote"
+            ],
+            "response": "*No hay rebote*. Ese problema viene con métodos agresivos: dietas re restrictivas o químicos. Esto es 100% natural y el descenso es gradual, así que el cuerpo no se acostumbra mal."
+        },
+        {
+            "keywords": [
+                "diabetes",
+                "hipotiroidismo",
+                "tiroides",
+                "presion",
+                "hipertension"
+            ],
+            "response": "Un montón de gente con esas condiciones lo toma sin drama 🌿\n\nEs natural y no se cruza con tratamientos habituales. Las únicas contraindicaciones son embarazo, lactancia, menores de 18 y mayores de 80."
+        },
+        {
+            "keywords": [
+                "estafa",
+                "trucho",
+                "mentira",
+                "robo",
+                "engaño",
+                "chanta"
+            ],
+            "_note": "NO promocionar contra reembolso como solución de confianza. Liderar con trust signals. Si insiste, ofrecer retiro en sucursal: paga el total en efectivo cuando lo retira.",
+            "response": "Te entiendo, hoy se ven cosas raras por internet 😊\n\nMirá, llevamos *13 años* distribuyendo este producto y pasaron casi *50 mil clientes*. Es serio, no somos un kiosco que abrió ayer.\n\nSi te queda más tranqui, podemos coordinar *retiro en sucursal*: te dejamos el paquete en una sucursal de Correo Argentino cerca tuyo y pagás el total *en efectivo al retirar*. ¿Cómo querés avanzar?"
+        },
+        {
+            "keywords": [
+                "como se toma",
+                "como tomo",
+                "como se usa",
+                "cuantas capsulas",
+                "cantidad"
+            ],
+            "response": "💊 *Cápsulas:* una al día, 30 min antes del almuerzo o cena, con un vaso de agua.\n💧 *Gotas:* 10 gotitas una vez al día (almuerzo o cena).\n🌿 *Semillas:* infusión nocturna. La primera semana partís una nuez en 8 partes y hervís un pedacito 5 minutos (o 3 en microondas) cada noche. Las siguientes semanas en 4. Te tomás el agua + el trocito, lo más alejado de la cena posible.\n\nSi tenés dudas en el tratamiento, escribime por acá 📞"
+        },
+        {
+            "keywords": [
+                "garantia",
+                "devolucion",
+                "devolver",
+                "no me gusto",
+                "quiero devolver"
+            ],
+            "response": "Si te llega dañado lo reenviamos sin costo. No hacemos devolución de plata ni damos garantía de resultados (cada cuerpo responde distinto), pero llevamos *13 años* y casi *70 mil clientes* avalan el producto 😊"
+        },
+        {
+            "keywords": [
+                "factura",
+                "comprobante",
+                "ticket"
+            ],
+            "response": "El comprobante de tu compra es el que te da el correo al momento de la entrega 😊"
+        },
+        {
+            "keywords": [
+                "tracking",
+                "seguimiento",
+                "rastreo",
+                "donde esta mi pedido"
+            ],
+            "response": "A partir de las 48 hs podés pedirnos el código de seguimiento 📦\n\nDe todos modos nosotros hacemos el seguimiento por vos y si surge algo te avisamos en el día."
+        },
+        {
+            "keywords": [
+                "discreto",
+                "paquete discreto",
+                "que dice el paquete",
+                "viene marcado"
+            ],
+            "response": "El envío es totalmente discreto, sin marcas ni indicación del contenido 📦"
+        },
+        {
+            "keywords": [
+                "donde estan",
+                "tienen local",
+                "puedo ir",
+                "punto de venta",
+                "local fisico"
+            ],
+            "response": "No tenemos local de venta al público. Trabajamos 100% online y los envíos son por Correo Argentino a todo el país 📦"
+        }
+    ],
+    "rules": {
+        "alwaysEndWithQuestion": true,
+        "maxFollowUps": 1,
+        "noNegotiatePrice": true,
+        "noDiscounts": true,
+        "noCreditCard": false,
+        "noArgue": true,
+        "keepResponsesShort": true,
+        "defaultPaymentMethod": "shipping_first",
+        "_note_defaultPayment": "Modelo nuevo (may-2026): el menú pregunta primero por TIPO DE ENVÍO. (1) Retiro en sucursal = contrarreembolso 100% al retirar, sin anticipo. (2) Envío a domicilio = prepago por Mercado Pago (alias HERBALIS.TIENDA — BIO ORIGEN S.A.S. para transferencia). Rapipago/PagoFácil/Tarjeta se canalizan dentro del link de MP. El bot NUNCA menciona cuotas.",
+        "bankAlias": {
+            "alias": "HERBALIS.TIENDA",
+            "titular": "BIO ORIGEN S.A.S."
+        },
+        "contraReembolsoMAX": {
+            "enabled": true,
+            "spontaneous": true,
+            "senaTransfer": 0,
+            "adicional": 0,
+            "appliesTo": "all",
+            "description": "Contrarreembolso (modelo nuevo may-2026): retiro en sucursal de Correo Argentino. El cliente paga el TOTAL en efectivo al retirar. Sin anticipo. Aplica a TODOS los planes (60d y 120d) y a TODOS los clientes."
+        },
+        "costoLogisticoRechazo": 18000,
+        "ageLimits": {
+            "min": 18,
+            "max": 80
+        },
+        "prepayIncentive": {
+            "enabled": false,
+            "_note": "DESACTIVADO. Ya no hay descuento ni regalo por prepagar — Mercado Pago es la modalidad por defecto, no una alternativa premiada."
+        },
+        "closeIfNotAccepted": "Trabajamos bajo estas modalidades.\n\nSi en algún momento te resulta cómodo avanzar, acá estamos 😊"
+    }
+}

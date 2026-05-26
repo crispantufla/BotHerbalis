@@ -23,12 +23,14 @@ function isPriceQuestion(text: string): boolean {
 }
 
 /**
- * Cache del knowledge default (v6) leído del disco. mtime check para invalidar
+ * Cache del knowledge default (v7) leído del disco. mtime check para invalidar
  * cuando el archivo se edita en runtime (panel Guiones). Solo se usa cuando el
  * caller NO pasa knowledge (típicamente scheduler/auto-approve).
+ *
+ * Rev. 2026-05-26: V5/V6 fueron archivados a archive/. V7 es el único activo.
  */
 let _knowledgeCache: { mtime: number; data: any } | null = null;
-const _DEFAULT_KNOWLEDGE_PATH = path.join(__dirname, '..', '..', 'knowledge_v6.json');
+const _DEFAULT_KNOWLEDGE_PATH = path.join(__dirname, '..', '..', 'knowledge_v7.json');
 
 function _loadDefaultKnowledge(): any {
     try {

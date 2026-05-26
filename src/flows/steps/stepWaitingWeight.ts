@@ -36,7 +36,11 @@ export async function handleWaitingWeight(
     // ni producto sugerido y el último mensaje del bot fue la pregunta del rango.
     const isEmptyAffirmative = /^(s+i+|si+|sip|sii+|dale|ok|okey|okis|listo|bueno|claro|obvio|perfecto|genial)\s*[!.]*\s*$/i.test(text.trim());
     if (isEmptyAffirmative && !currentState.weightGoal && !(currentState as any).suggestedProduct) {
-        const reaskMsg = '¡Genial! 😊 ¿Cuántos kilos querés bajar?\n\n1️⃣ Pocos (hasta 10 kg)\n2️⃣ Bastante (10 a 20)\n3️⃣ Mucho (más de 20)';
+        // V7 (sin rec_3): 2 tiers. V5/V6: 3 tiers. Adaptamos el reask al script.
+        const isTwoTier = !!(knowledge?.flow?.recommendation_1 && !knowledge?.flow?.recommendation_3);
+        const reaskMsg = isTwoTier
+            ? '¡Genial! 😊 ¿Cuántos kilos querés bajar?\n\n1️⃣ Hasta 10 kg\n2️⃣ Más de 10 kg'
+            : '¡Genial! 😊 ¿Cuántos kilos querés bajar?\n\n1️⃣ Pocos (hasta 10 kg)\n2️⃣ Bastante (10 a 20)\n3️⃣ Mucho (más de 20)';
         currentState.history.push({ role: 'bot', content: reaskMsg, timestamp: Date.now() });
         saveState(userId);
         await sendMessageWithDelay(userId, reaskMsg);
@@ -147,50 +151,53 @@ export async function handleWaitingWeight(
         const extracted = _extractWeightGoal();
         if (extracted != null) currentState.weightGoal = extracted;
 
-        // ── Ruta consultiva (V5/V6/futuros): tier-based routing ────────────
-        // Si el knowledge tiene recommendation_1/2/3, asumimos guión consultivo:
-        // el cliente eligió 1 (hasta 10), 2 (10-20) o 3 (más de 20) y mapeamos
-        // directo a producto + plan + pitch del tier sin pasar por
-        // waiting_preference. Esto reemplaza la pregunta de producto del V3/V4
-        // y aplica a cualquier script futuro que tenga estos textos.
+        // ── Ruta consultiva (V5/V6/V7): tier-based routing ─────────────────
+        // V7 (may-2026): SOLO 2 tiers (recommendation_1=≤10kg→60d, recommendation_2=+10kg→120d).
+        //   Si el knowledge tiene SOLO rec_1 + rec_2 (sin rec_3), asumimos V7 y mapeamos
+        //   cualquier kilo > 10 a tier 2. Además, tras mandar recommendation_X enviamos
+        //   prices_X automáticamente como segundo mensaje.
+        // V5/V6 legacy: 3 tiers (rec_1/2/3). Sin auto-followup de precios.
         const hasTierResponses = !!(knowledge?.flow?.recommendation_1 || knowledge?.flow?.recommendation_2 || knowledge?.flow?.recommendation_3);
+        const isTwoTierScript = hasTierResponses && !knowledge?.flow?.recommendation_3;
         if (hasTierResponses) {
             const w = currentState.weightGoal || 0;
-            // Tier por número de opción (1/2/3) si es corto, o por kilos exactos.
             const trimmed = text.trim();
-            const isOptionPick = trimmed.length <= 3 && (trimmed === '1' || trimmed === '2' || trimmed === '3');
+            // En V7 sólo aceptamos "1" o "2" como opción explícita.
+            const isOptionPick = isTwoTierScript
+                ? trimmed.length <= 3 && (trimmed === '1' || trimmed === '2')
+                : trimmed.length <= 3 && (trimmed === '1' || trimmed === '2' || trimmed === '3');
             let tier: '1' | '2' | '3';
             if (vagueWeightTier && !isOptionPick && !hasExplicitGoal) {
-                tier = vagueWeightTier;
+                // En V7 colapsamos vague-tier 3 → 2 (no hay tier 3).
+                tier = isTwoTierScript && vagueWeightTier === '3' ? '2' : vagueWeightTier;
                 if (tier === '1') currentState.weightGoal = 8;
                 else if (tier === '2') currentState.weightGoal = 15;
                 else currentState.weightGoal = 25;
-                logger.info(`[VAGUE-WEIGHT] User ${userId} respondió "${text.trim()}" → tier ${tier} (default weightGoal=${currentState.weightGoal}kg).`);
+                logger.info(`[VAGUE-WEIGHT] User ${userId} respondió "${text.trim()}" → tier ${tier} (default weightGoal=${currentState.weightGoal}kg, twoTier=${isTwoTierScript}).`);
             } else if (isOptionPick) {
                 tier = trimmed as '1' | '2' | '3';
-                // weightGoal aproximado del tier para AI/analytics downstream
                 if (tier === '1') currentState.weightGoal = 8;
                 else if (tier === '2') currentState.weightGoal = 15;
                 else currentState.weightGoal = 25;
             } else {
                 const wNum = typeof w === 'number' ? w : parseInt(String(w), 10) || 0;
-                if (wNum <= 10) tier = '1';
-                else if (wNum <= 20) tier = '2';
-                else tier = '3';
+                if (isTwoTierScript) {
+                    // V7: ≤10 → tier 1, +10 → tier 2
+                    tier = wNum <= 10 ? '1' : '2';
+                } else {
+                    if (wNum <= 10) tier = '1';
+                    else if (wNum <= 20) tier = '2';
+                    else tier = '3';
+                }
             }
 
-            // Rev. 2026-05-26 (corrección de horacio): NO asignamos producto ni
-            // plan acá. El nuevo modelo de V5 ofrece las 3 opciones iguales
-            // (cápsulas / gotas / semillas) en recommendation_X y deja al
-            // cliente elegir en waiting_preference. La dosis (plan 60 o 120
-            // días) se asigna recién al recibir la preferencia, según el tier:
-            //   - tier 1 (≤10 kg) → 60d
-            //   - tier 2 (10-20 kg) → 120d
-            //   - tier 3 (>20 kg) → 120d
-            // El weightGoal queda guardado para que stepWaitingPreference
-            // pueda derivar la dosis cuando el cliente confirme producto.
+            // NO asignamos producto/plan acá. El nuevo modelo (V5+/V7) ofrece las 3
+            // opciones en recommendation_X y deja al cliente elegir producto en
+            // waiting_preference. La dosis (plan 60 o 120) se asigna ahí según el
+            // tier preservado en weightGoal:
+            //   - V7: tier 1 (≤10) → 60d, tier 2 (+10) → 120d
+            //   - V5/V6: tier 1 → 60d, tier 2/3 → 120d
 
-            // Mensaje del tier — ofrece las 3 opciones de producto.
             const tierKey = `recommendation_${tier}`;
             const tierNode = knowledge.flow[tierKey] || knowledge.flow.recommendation;
             const tierMsg = _formatMessage(tierNode.response, currentState);
@@ -199,7 +206,22 @@ export async function handleWaitingWeight(
             currentState.history.push({ role: 'bot', content: tierMsg, timestamp: Date.now() });
             saveState(userId);
             await sendMessageWithDelay(userId, tierMsg);
-            logger.info(`[TIER] User ${userId} (script=${currentState.assignedScript}) → tier ${tier} (weightGoal=${currentState.weightGoal}kg); product/plan se asigna en waiting_preference.`);
+            logger.info(`[TIER] User ${userId} (script=${currentState.assignedScript}) → tier ${tier} (weightGoal=${currentState.weightGoal}kg, twoTier=${isTwoTierScript}); product/plan se asigna en waiting_preference.`);
+
+            // V7: auto-followup con prices_60 (tier 1) o prices_120 (tier 2). Es el
+            // "segundo mensaje" del guión nuevo — los precios llegan sin que el
+            // cliente tenga que pedirlos. Lo mandamos solo si existe la entry en
+            // el knowledge (V5/V6 no la tienen y siguen el flujo viejo).
+            const planDays = tier === '1' ? '60' : '120';
+            const pricesKey = `prices_${planDays}`;
+            const pricesNode = knowledge?.flow?.[pricesKey];
+            if (pricesNode?.response) {
+                const pricesMsg = _formatMessage(pricesNode.response, currentState);
+                currentState.history.push({ role: 'bot', content: pricesMsg, timestamp: Date.now() });
+                saveState(userId);
+                await sendMessageWithDelay(userId, pricesMsg);
+                logger.info(`[V7-AUTO-PRICES] User ${userId} → enviado ${pricesKey} tras tier ${tier}.`);
+            }
             return { matched: true };
         }
 
