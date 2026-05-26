@@ -1,7 +1,6 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _formatMessage } from '../utils/messages';
-import { _setStep, _maybeUpsell, _pauseAndAlert } from '../utils/flowHelpers';
-import { _getPrice } from '../utils/pricing';
+import { _setStep, _maybeUpsell, _pauseAndAlert, _assignProductAndPlanByTier } from '../utils/flowHelpers';
 import logger from '../../utils/logger';
 
 export async function handleWaitingWeight(
@@ -37,11 +36,32 @@ export async function handleWaitingWeight(
     // ni producto sugerido y el último mensaje del bot fue la pregunta del rango.
     const isEmptyAffirmative = /^(s+i+|si+|sip|sii+|dale|ok|okey|okis|listo|bueno|claro|obvio|perfecto|genial)\s*[!.]*\s*$/i.test(text.trim());
     if (isEmptyAffirmative && !currentState.weightGoal && !(currentState as any).suggestedProduct) {
-        const reaskMsg = '¡Genial! 😊 ¿Cuántos kilos querés bajar? ¿Hasta 10, entre 10 y 20, o más de 20?';
+        const reaskMsg = '¡Genial! 😊 ¿Cuántos kilos querés bajar?\n\n1️⃣ Pocos (hasta 10 kg)\n2️⃣ Bastante (10 a 20)\n3️⃣ Mucho (más de 20)';
         currentState.history.push({ role: 'bot', content: reaskMsg, timestamp: Date.now() });
         saveState(userId);
         await sendMessageWithDelay(userId, reaskMsg);
         return { matched: true };
+    }
+
+    // Respuestas léxicas vagas: el greeting muestra "Pocos / Bastante / Mucho"
+    // como labels de 1/2/3, así que muchos clientes responden con esas palabras
+    // en lugar del número o los kilos. Sin este shortcut, "bastante" cae al AI
+    // fallback que re-pregunta y el cliente abandona (datos research 2026-05-26:
+    // 21% de drop en waiting_weight). Mapeamos al tier correspondiente con un
+    // weightGoal default conservador (8 / 15 / 25 kg) para que stepWaitingPreference
+    // pueda asignar plan después.
+    let vagueWeightTier: '1' | '2' | '3' | null = null;
+    if (!currentState.weightGoal) {
+        // Mensaje corto y sin número: matchear keyword vago. Mensajes largos van
+        // al AI fallback (puede haber contexto que cambia la interpretación).
+        const lex = normalizedText.trim();
+        const noNumberInLex = !/\d/.test(lex);
+        if (noNumberInLex && lex.length <= 35) {
+            // Orden importa: mucho/muchísimo antes que poco para evitar overlap.
+            if (/\b(much[oa]s?|much[ií]simo[as]?|un mont[oó]n|demasiado[as]?|bocha|banda)\b/i.test(lex)) vagueWeightTier = '3';
+            else if (/\b(bastante[s]?|varios?|regular|algunos?|m[aá]s o menos|masomenos)\b/i.test(lex)) vagueWeightTier = '2';
+            else if (/\b(poc[oa]s?|poquit[oa]s?|un poco|kilit[oa]s?)\b/i.test(lex)) vagueWeightTier = '1';
+        }
     }
 
     const tLow = text.toLowerCase();
@@ -130,7 +150,7 @@ export async function handleWaitingWeight(
         return { matched: true };
     }
 
-    if (hasNumber && !hasQuestion && !treatAsLong) {
+    if ((hasNumber || vagueWeightTier) && !hasQuestion && !treatAsLong) {
         const extracted = _extractWeightGoal();
         if (extracted != null) currentState.weightGoal = extracted;
 
@@ -147,7 +167,13 @@ export async function handleWaitingWeight(
             const trimmed = text.trim();
             const isOptionPick = trimmed.length <= 3 && (trimmed === '1' || trimmed === '2' || trimmed === '3');
             let tier: '1' | '2' | '3';
-            if (isOptionPick) {
+            if (vagueWeightTier && !isOptionPick && !hasExplicitGoal) {
+                tier = vagueWeightTier;
+                if (tier === '1') currentState.weightGoal = 8;
+                else if (tier === '2') currentState.weightGoal = 15;
+                else currentState.weightGoal = 25;
+                logger.info(`[VAGUE-WEIGHT] User ${userId} respondió "${text.trim()}" → tier ${tier} (default weightGoal=${currentState.weightGoal}kg).`);
+            } else if (isOptionPick) {
                 tier = trimmed as '1' | '2' | '3';
                 // weightGoal aproximado del tier para AI/analytics downstream
                 if (tier === '1') currentState.weightGoal = 8;
@@ -160,55 +186,36 @@ export async function handleWaitingWeight(
                 else tier = '3';
             }
 
-            // Asignación producto + plan según tier
-            // Tier 1 cambió de Gotas → Cápsulas 60d: cápsulas era el 75% de las
-            // ventas del marzo glorioso, y el prompt de IA ya dice "NUNCA
-            // recomiendes gotas para poco peso" (ai.ts:69). Dejamos las gotas
-            // sólo para mayores de 70 años / preferencia explícita.
-            //
-            // Precio leído de _getPrice (= prices.json). Antes leíamos
-            // knowledge?._prices?.capsulas60 — esa clave NO existe en los
-            // knowledge JSON, así que el price quedaba vacío y calculateTotal
-            // emitía el warning "invalid price value" hasta que el cliente
-            // elegía plan y se rebuildaba el cart.
-            const product = 'Cápsulas de nuez de la india';
-            if (tier === '1') {
-                currentState.selectedProduct = product;
-                currentState.selectedPlan = '60';
-                currentState.cart = [{ product, plan: '60', price: _getPrice(product, '60') }];
-            } else if (tier === '2') {
-                // Tier 2 (10-20 kg) cambió de Cápsulas 60d → 120d (decisión
-                // mayo 2026): el plan 120 cubre el tratamiento completo para
-                // este rango con mejor adherencia y AOV más alto. Tier 1 se
-                // mantiene en 60d porque para pocos kilos 60d alcanza.
-                currentState.selectedProduct = product;
-                currentState.selectedPlan = '120';
-                currentState.cart = [{ product, plan: '120', price: _getPrice(product, '120') }];
-            } else {
-                currentState.selectedProduct = product;
-                currentState.selectedPlan = '120';
-                currentState.cart = [{ product, plan: '120', price: _getPrice(product, '120') }];
-            }
+            // Rev. 2026-05-26 (corrección de horacio): NO asignamos producto ni
+            // plan acá. El nuevo modelo de V5 ofrece las 3 opciones iguales
+            // (cápsulas / gotas / semillas) en recommendation_X y deja al
+            // cliente elegir en waiting_preference. La dosis (plan 60 o 120
+            // días) se asigna recién al recibir la preferencia, según el tier:
+            //   - tier 1 (≤10 kg) → 60d
+            //   - tier 2 (10-20 kg) → 120d
+            //   - tier 3 (>20 kg) → 120d
+            // El weightGoal queda guardado para que stepWaitingPreference
+            // pueda derivar la dosis cuando el cliente confirme producto.
 
-            const { calculateTotal } = require('../utils/cartHelpers');
-            calculateTotal(currentState);
-
-            // Mensaje del tier — pitch + price + prepay incentive + cierre
+            // Mensaje del tier — ofrece las 3 opciones de producto.
             const tierKey = `recommendation_${tier}`;
             const tierNode = knowledge.flow[tierKey] || knowledge.flow.recommendation;
             const tierMsg = _formatMessage(tierNode.response, currentState);
 
-            _setStep(currentState, tierNode.nextStep || FlowStep.WAITING_OK);
+            _setStep(currentState, tierNode.nextStep || FlowStep.WAITING_PREFERENCE);
             currentState.history.push({ role: 'bot', content: tierMsg, timestamp: Date.now() });
             saveState(userId);
             await sendMessageWithDelay(userId, tierMsg);
-            logger.info(`[TIER] User ${userId} (script=${currentState.assignedScript}) → tier ${tier}, ${currentState.selectedProduct} ${currentState.selectedPlan}d`);
+            logger.info(`[TIER] User ${userId} (script=${currentState.assignedScript}) → tier ${tier} (weightGoal=${currentState.weightGoal}kg); product/plan se asigna en waiting_preference.`);
             return { matched: true };
         }
 
         if ((currentState as any).suggestedProduct) {
             logger.info(`[LOGIC] User ${userId} already suggested ${(currentState as any).suggestedProduct}, skipping preference question.`);
-            currentState.selectedProduct = (currentState as any).suggestedProduct;
+            // Rev. 2026-05-26: el cliente ya había mencionado producto antes
+            // de dar los kilos. Asignamos producto + plan por tier para que
+            // preference_X resuelva {{PLAN_MONTHS}} y {{DOSAGE_REASON}}.
+            _assignProductAndPlanByTier(currentState, (currentState as any).suggestedProduct);
 
             let priceNode;
             const currentProduct = currentState.selectedProduct || "";
@@ -275,7 +282,7 @@ export async function handleWaitingWeight(
 
                 if ((currentState as any).suggestedProduct) {
                     logger.info(`[LOGIC] AI goalMet weight, user already suggested ${(currentState as any).suggestedProduct}, skipping preference.`);
-                    currentState.selectedProduct = (currentState as any).suggestedProduct;
+                    _assignProductAndPlanByTier(currentState, (currentState as any).suggestedProduct);
 
                     let priceNode;
                     const currentProduct = currentState.selectedProduct || "";

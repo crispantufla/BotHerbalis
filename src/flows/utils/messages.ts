@@ -56,6 +56,24 @@ function _formatMessage(text: string | string[], state: any): string {
         }
         if (state.selectedPlan) {
             formatted = formatted.replace(/{{PLAN}}/g, state.selectedPlan);
+            // PLAN_MONTHS: forma humana del plan ("2 meses" / "4 meses" / "{N} meses").
+            // Usado por preference_X en V5 cuando se le indica la dosis al cliente.
+            const planNum = parseInt(String(state.selectedPlan), 10);
+            const months = isNaN(planNum) ? '' : `${Math.round(planNum / 30)} meses`;
+            formatted = formatted.replace(/{{PLAN_MONTHS}}/g, months);
+        }
+        // DOSAGE_REASON: comentario sobre la dosis recomendada en V5 según los kilos
+        // a bajar. Texto pedido por horacio (corrección 2026-05-26):
+        //   - tier 1 (≤10 kg, plan 60d): "alcanza para tu objetivo"
+        //   - tier 2 (10-20 kg, plan 120d): "te puede sobrar pero muchas usan el sobrante de mantenimiento"
+        //   - tier 3 (>20 kg, plan 120d): "es lo que el cuerpo necesita"
+        {
+            const w = typeof state.weightGoal === 'number' ? state.weightGoal : parseInt(String(state.weightGoal || 0), 10) || 0;
+            let reason = '';
+            if (w > 0 && w <= 10) reason = 'Con el plan de 60 días te alcanza para tu objetivo.';
+            else if (w > 10 && w <= 20) reason = 'Con el plan de 120 días te puede sobrar un poco; muchas clientas usan el sobrante como mantenimiento.';
+            else if (w > 20) reason = 'El plan de 120 días es el tiempo que tu cuerpo necesita para bajar tranqui, sin rebote.';
+            formatted = formatted.replace(/{{DOSAGE_REASON}}/g, reason);
         }
         if (state.totalPrice) {
             formatted = formatted.replace(/{{TOTAL}}/g, state.totalPrice);

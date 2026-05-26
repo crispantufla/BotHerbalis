@@ -1,8 +1,8 @@
 {
     "meta": {
-        "name": "Guión V5 — Asesor consultivo (cápsulas + gotas)",
-        "description": "Guión consultivo: arranca preguntando kilos, recomienda producto+plan según objetivo, cierra con link de Mercado Pago como única opción ofrecida. Contra reembolso y transferencia solo si el cliente las pide. Solo cápsulas y gotas activas — semillas se ofrecen únicamente si el cliente las pide explícitamente.",
-        "version": "5.0"
+        "name": "Guión V5 — Asesor consultivo (3 opciones iguales)",
+        "description": "Guión consultivo (rev. 2026-05-26): arranca preguntando kilos, ofrece las 3 opciones de producto (cápsulas / gotas / semillas) sin push de ninguna en particular. Cuando el cliente elige producto, se le asigna la dosis (plan 60 o 120 días) según los kilos. Modelo de pago nuevo: retiro en sucursal (paga total al retirar, sin anticipo) o envío a domicilio (prepago por MP o transferencia). Sin descuentos por volumen.",
+        "version": "5.1"
     },
     "flow": {
         "greeting": {
@@ -28,31 +28,31 @@
         },
         "recommendation": {
             "step": "waiting_weight",
-            "_note": "Fallback genérico cuando no se puede determinar el tier (no se debería usar en V5; el handler usa recommendation_1/2/3). NO re-pregunta el rango — el saludo ya lo pidió. Solo acusamos recibo y esperamos a que el handler matchee con keywords o caiga en IA.",
-            "response": "¡Buenísimo! 😊 Dame un segundo y te recomiendo el plan que mejor te sirve.",
-            "nextStep": "waiting_ok"
+            "_note": "Fallback genérico (rev. 2026-05-26 corrección de horacio). NO recomienda un producto — ofrece las 3 opciones con su modo de consumo. La dosis en días se asigna en waiting_preference según los kilos del cliente.",
+            "response": "¡Buenísimo! Te ofrezco la Nuez de la India en 3 opciones 🌿\n\n1️⃣ *Cápsulas* — 1 al día, 30 min antes del almuerzo o cena.\n2️⃣ *Gotas* — 10 gotas al día, 30 min antes del almuerzo o cena.\n3️⃣ *Semillas* — infusión nocturna. Primera semana partís la nuez en 8 y hervís un pedacito 5 min cada noche; después en 4. Tomás el agua + el trocito, lo más alejado de la cena posible.\n\n¿Con cuál vas?",
+            "nextStep": "waiting_preference"
         },
         "recommendation_1": {
             "step": "waiting_weight",
-            "_note": "Tier 1 — hasta 10 kg → Cápsulas 60 días. Cambio mayo 2026: cápsulas era el 75% de las ventas en marzo (mes de mejor conversión, 10.7%). Las gotas quedan reservadas para >70 años o pedido explícito del cliente.",
-            "response": "Para vos te recomiendo cápsulas, plan 2 meses 💊\n\nCon ese rango baja la mayoría entre 7 y 10 kilos. Una al día antes del almuerzo o la cena.\n\nVa con guía y te sigo por acá durante todo el tratamiento.\n\n¿Te paso los precios?",
-            "nextStep": "waiting_ok"
+            "_note": "Tier 1 — hasta 10 kg (rev. 2026-05-26 corrección de horacio: NO recomendamos producto, ofrecemos las 3 opciones. La dosis -plan 60d- se asigna en waiting_preference cuando elige producto).",
+            "response": "Para hasta 10 kg te ofrezco 3 opciones 🌿\n\n1️⃣ *Cápsulas* — 1 al día, 30 min antes del almuerzo o cena.\n2️⃣ *Gotas* — 10 gotas al día, 30 min antes del almuerzo o cena.\n3️⃣ *Semillas* — infusión nocturna (te paso el ritual si elegís ésta).\n\nVa con guía y te sigo por acá durante todo el tratamiento.\n\n¿Con cuál vas?",
+            "nextStep": "waiting_preference"
         },
         "recommendation_2": {
             "step": "waiting_weight",
-            "_note": "Tier 2 — 10 a 20 kg → Cápsulas 120 días (cambio mayo 2026: antes era 60d). El plan 4 meses cubre el tratamiento completo para este rango con mejor adherencia y sin rebote.",
-            "response": "Para vos te recomiendo cápsulas, plan 4 meses 💪\n\nCon ese rango baja la mayoría entre 15 y 20 kilos. Los 4 meses son clave para que el cuerpo se acostumbre tranqui, sin rebote.\n\nUna al día antes del almuerzo o cena, con guía y acompañamiento por acá.\n\n¿Te paso los precios?",
-            "nextStep": "waiting_ok"
+            "_note": "Tier 2 — 10 a 20 kg (rev. 2026-05-26 corrección de horacio: NO recomendamos producto, ofrecemos las 3 opciones. Dosis -plan 120d- se asigna en waiting_preference).",
+            "response": "Para bajar entre 10 y 20 kg te ofrezco 3 opciones 🌿\n\n1️⃣ *Cápsulas* — 1 al día, 30 min antes del almuerzo o cena.\n2️⃣ *Gotas* — 10 gotas al día, 30 min antes del almuerzo o cena.\n3️⃣ *Semillas* — infusión nocturna (te paso el ritual si elegís ésta).\n\nVa con guía y acompañamiento por acá durante todo el tratamiento.\n\n¿Con cuál vas?",
+            "nextStep": "waiting_preference"
         },
         "recommendation_3": {
             "step": "waiting_weight",
-            "_note": "Tier 3 — más de 20 kg → Cápsulas 120 días. TEXTO 1+2 (recomendación + cómo funciona). Termina pidiendo aceptación para mostrar precios.",
-            "response": "Para más de 20 kilos te conviene cápsulas plan 4 meses 💪\n\nEs el tiempo que el cuerpo necesita para bajar tranqui, sin rebote.\n\nUna al día antes del almuerzo o cena, con guía y acompañamiento por acá.\n\n¿Te paso los precios?",
-            "nextStep": "waiting_ok"
+            "_note": "Tier 3 — más de 20 kg (rev. 2026-05-26 corrección de horacio: NO recomendamos producto, ofrecemos las 3 opciones. Dosis -plan 120d- se asigna en waiting_preference).",
+            "response": "Para más de 20 kg te ofrezco 3 opciones 🌿\n\n1️⃣ *Cápsulas* — 1 al día, 30 min antes del almuerzo o cena.\n2️⃣ *Gotas* — 10 gotas al día, 30 min antes del almuerzo o cena.\n3️⃣ *Semillas* — infusión nocturna (te paso el ritual si elegís ésta).\n\nVa con guía y acompañamiento por acá durante todo el tratamiento.\n\n¿Con cuál vas?",
+            "nextStep": "waiting_preference"
         },
         "preference_capsulas": {
             "step": "waiting_preference",
-            "_note": "En v5 el handler v5 ya setea el producto desde el kilos. Esta entrada se mantiene por compat (cliente que escribe 'cápsulas' directo en cualquier momento). NO duplica los precios — el TEXTO 3 (entry 'prices') ya los muestra y pregunta el plan.",
+            "_note": "Cliente eligió cápsulas (rev. 2026-05-26 corrección de horacio). Acá se le DA la dosis según los kilos a bajar: tier 1 → plan 60d, tier 2 y 3 → plan 120d. El handler asigna selectedPlan antes de formatear, así {{PLAN_MONTHS}} y {{DOSAGE_REASON}} se resuelven al tier correcto.",
             "match": [
                 "capsula",
                 "capsulas",
@@ -61,23 +61,23 @@
                 "practico",
                 "practica"
             ],
-            "response": "¡Dale! 💊 Las cápsulas son lo más práctico: una al día, 30 min antes de la comida principal.\n\n¿Te paso los precios? 😊",
+            "response": "¡Dale, vamos con cápsulas! 💊\n\nPara tu objetivo te corresponde el *plan de {{PLAN_MONTHS}}*. {{DOSAGE_REASON}}\n\nUna al día, 30 min antes del almuerzo o cena. Va con guía y te sigo por acá durante todo el tratamiento.\n\n¿Te paso los precios?",
             "nextStep": "waiting_ok"
         },
         "preference_gotas": {
             "step": "waiting_preference",
-            "_note": "Soft-push de cápsulas (regla ai.ts:286 — 'Cápsulas SIEMPRE opción principal'). Mencionamos que las cápsulas son lo que más eligen + ofrecemos cambio sin presión. Si el cliente insiste en gotas, avanza normal a waiting_ok.",
+            "_note": "Cliente eligió gotas (rev. 2026-05-26 corrección de horacio: las 3 opciones son iguales, sin soft-push). Acá se le DA la dosis según los kilos: tier 1 → 60d, tier 2 y 3 → 120d.",
             "match": [
                 "gotas",
                 "liquido",
                 "gotero"
             ],
-            "response": "Las gotas son re suaves 💧: 10 gotitas una vez al día.\n\nIgual, la mayoría termina yendo con cápsulas porque dan mejor resultado. Las gotas las dejamos para gente más grande o con dificultad para tragar.\n\n¿Vas con gotas o probás cápsulas?",
+            "response": "¡Dale, vamos con gotas! 💧\n\nPara tu objetivo te corresponde el *plan de {{PLAN_MONTHS}}*. {{DOSAGE_REASON}}\n\n10 gotas al día, 30 min antes del almuerzo o cena. Va con guía y te sigo por acá durante todo el tratamiento.\n\n¿Te paso los precios?",
             "nextStep": "waiting_ok"
         },
         "preference_semillas": {
             "step": "waiting_preference",
-            "_note": "En v5, semillas SOLO se ofrecen cuando el cliente las pide explícitamente. No se incluyen en el flujo principal. NO duplica precios — el TEXTO 3 los muestra después del OK.",
+            "_note": "Cliente eligió semillas (rev. 2026-05-26 corrección de horacio: las 3 opciones son iguales, sin soft-push). Acá se le DA la dosis según los kilos: tier 1 → 60d, tier 2 y 3 → 120d.",
             "match": [
                 "semilla",
                 "semillas",
@@ -86,7 +86,7 @@
                 "te de semilla",
                 "natural"
             ],
-            "response": "Las semillas son lo más natural 🌿, se preparan como infusión cada noche.\n\nLa mayoría termina yendo igual con cápsulas porque dan resultados más rápido. Las semillas son geniales si te copa el ritual.\n\n¿Te copa probar con semillas o vamos con cápsulas?",
+            "response": "¡Dale, vamos con semillas! 🌿\n\nPara tu objetivo te corresponde el *plan de {{PLAN_MONTHS}}*. {{DOSAGE_REASON}}\n\nLa primera semana partís una nuez en 8 y hervís un pedacito 5 min cada noche (o 3 min en microondas); las siguientes en 4. Tomás el agua + el trocito, lo más alejado de la cena posible. Va con guía y te sigo por acá durante todo el tratamiento.\n\n¿Te paso los precios?",
             "nextStep": "waiting_ok"
         },
         "closing": {
@@ -109,8 +109,8 @@
         },
         "prices": {
             "step": "waiting_ok",
-            "_note": "TEXTO 3 — Tras la recomendación, cliente dijo 'sí, pasame los precios'. Mostramos los 2 planes del producto seleccionado y pedimos elección. Disparado desde stepWaitingOk._buildPricesMessage. Placeholders: {{PRICE_60}}, {{PRICE_120}} se sustituyen con _getPrice(producto, plan).",
-            "response": "Plan 2 meses: ${{PRICE_60}}\nPlan 4 meses: ${{PRICE_120}} ⭐\n\nEl de 4 meses es el más elegido. Un montón de clientas siguen después con 1 o 2 cápsulas por semana como mantenimiento.\n\n_Si llevás para alguien más en casa, el 3° producto te queda 50% off._\n\n¿Con cuál vas?",
+            "_note": "TEXTO 3 — Tras la recomendación, cliente dijo 'sí, pasame los precios'. Mostramos los 2 planes del producto seleccionado y pedimos elección. Disparado desde stepWaitingOk._buildPricesMessage. Placeholders: {{PRICE_60}}, {{PRICE_120}} se sustituyen con _getPrice(producto, plan). Rev. 2026-05-26: se eliminó la línea de '3° producto 50% off' por pedido de horacio.",
+            "response": "Plan 2 meses: ${{PRICE_60}}\nPlan 4 meses: ${{PRICE_120}} ⭐\n\nEl de 4 meses es el más elegido. Un montón de clientas siguen después con 1 o 2 cápsulas por semana como mantenimiento.\n\n¿Con cuál vas?",
             "nextStep": "waiting_plan_choice"
         },
         "payment_menu": {
@@ -136,34 +136,10 @@
             "response": "¡Perfecto! Para transferir usá el alias *{{ALIAS}}* a nombre de *{{TITULAR}}* 🏦\n\nMonto: ${{TOTAL}}\n\nUna vez que realices la transferencia, escribime *\"listo\"* y coordinamos el envío 😊",
             "nextStep": "waiting_transfer_confirmation"
         },
-        "payment_cod_retry": {
-            "step": "waiting_payment_method",
-            "_note": "LEGACY (deprecated may-2026). Mensaje del flujo anticipo $10k + saldo al cartero. Reemplazado por payment_retiro_confirm (modelo nuevo: 100% al retirar en sucursal). Se conserva por si rollback rápido.",
-            "response": "Dale 👍\n\nLa modalidad es: adelantás $10.000 (cubre el envío) y el resto en efectivo al cartero cuando te llega.\n\nMisma plata, solo cambia el momento. ¿Avanzamos?",
-            "nextStep": "waiting_payment_method"
-        },
-        "payment_cod_method_choice": {
-            "step": "waiting_payment_method",
-            "_note": "LEGACY (deprecated may-2026). Submenú anticipo $10k por transferencia o MP. Ya no se dispara — el nuevo modelo no tiene anticipo.",
-            "response": "¡Perfecto! ¿El anticipo de $10.000 lo querés hacer por...\n\n1️⃣ *Transferencia bancaria* — te paso el alias y mandás el comprobante\n2️⃣ *Mercado Pago* — te paso el link y se acredita al instante\n\n¿Cuál preferís?",
-            "nextStep": "waiting_payment_method"
-        },
-        "payment_cod_anticipo": {
-            "step": "waiting_transfer_confirmation",
-            "_note": "LEGACY (deprecated may-2026). Anticipo por transferencia. Ya no se dispara — el nuevo modelo no tiene anticipo.",
-            "response": "¡Perfecto! Para el *anticipo de $10.000* por transferencia usá el alias *{{ALIAS}}* a nombre de *{{TITULAR}}* 🏦\n\nCuando termines, mandame *el comprobante* o el *número de operación* 📸\n\nCuando te llegue el paquete, pagás el saldo *${{SALDO}}* en efectivo al cartero 📦",
-            "nextStep": "waiting_transfer_confirmation"
-        },
         "payment_mp_link": {
             "step": "waiting_mp_payment",
             "_note": "TEXTO 5a — Cliente eligió Mercado Pago. Le mandamos el link + detalle del pedido + pedido de datos en paralelo. Placeholders: {{PRODUCT}}, {{PLAN}}, {{TOTAL}}, {{LINK}}.",
             "response": "💳 Link de Mercado Pago:\n\n{{LINK}}\n\nTotal: ${{TOTAL}} — {{PRODUCT}} {{PLAN}} días\n\nCuando termines de pagar, mandame \"listo\" y verifico.\n\nMientras, pasame los datos de envío:\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:",
-            "nextStep": "waiting_mp_payment"
-        },
-        "payment_mp_link_sena": {
-            "step": "waiting_mp_payment",
-            "_note": "LEGACY (deprecated may-2026). Link MP por seña $10k. Ya no se dispara — el modelo nuevo elimina seña/anticipo. Se conserva por si rollback.",
-            "response": "💳 Link para la seña de Mercado Pago:\n\n{{LINK}}\n\nSeña: ${{SENA_AMOUNT}}\nSaldo al cartero: ${{SENA_REMAINDER}}\n\nCuando termines, mandame \"listo\" y verifico.\n\nMientras, pasame los datos de envío:\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:",
             "nextStep": "waiting_mp_payment"
         },
         "payment_mp_failed": {
@@ -176,20 +152,10 @@
             "_note": "Mensaje cuando MP devuelve el pago como rejected/error tras un intento del cliente. Se ofrece reintento con otras formas dentro de MP.",
             "response": "⚠️ Hubo un problema con el pago de MercadoPago, pudo ser la tarjeta o un rechazo del banco.\n\nProbá de nuevo con otra forma:\n✅ Tarjeta de crédito\n✅ Débito\n✅ Saldo Mercado Pago\n\nTe genero un nuevo link para volver a intentarlo, decime cuando esté listo 😊"
         },
-        "payment_mp_retry_sena": {
-            "step": "waiting_mp_payment",
-            "_note": "LEGACY (deprecated may-2026). Retry MP del flujo seña. Ya no se dispara — el modelo nuevo elimina seña.",
-            "response": "⚠️ Hubo un problema con el pago de la seña — pudo ser la tarjeta o un rechazo del banco.\n\nProbá de nuevo con otra forma:\n✅ Tarjeta de crédito\n✅ Débito\n✅ Saldo Mercado Pago\n\nTe genero un nuevo link para volver a intentarlo. Cuando termines, mandame *el comprobante* o el *número de operación* y verifico el pago 📸"
-        },
         "transfer_received": {
             "step": "waiting_transfer_confirmation",
             "_note": "Cliente confirmó que ya hizo la transferencia ('listo'). Pausamos al cliente y avisamos admin para verificar el comprobante. Pedimos comprobante o número de operación porque la cuenta emisora puede estar a nombre de un tercero y no se puede asumir match por nombre.",
             "response": "¡Perfecto! Para verificarla más rápido, mandame *el comprobante* o el *número de operación* 📸\n\nApenas la cruzo, te confirmo el envío ⏳"
-        },
-        "cod_received": {
-            "step": "waiting_transfer_confirmation",
-            "_note": "LEGACY (deprecated may-2026). Mensaje cuando el cliente confirma haber enviado el anticipo $10k. Reemplazado por payment_retiro_confirm (modelo nuevo sin anticipo).",
-            "response": "¡Perfecto! Para verificar el anticipo, mandame *el comprobante* o el *número de operación* 📸\n\nApenas lo cruzo, despachamos. El saldo lo pagás en efectivo al cartero cuando llega 📦"
         },
         "order_confirmation_mp": {
             "step": "waiting_admin_validation",

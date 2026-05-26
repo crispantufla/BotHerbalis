@@ -1,6 +1,6 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _formatMessage } from '../utils/messages';
-import { _setStep, _maybeUpsell, _detectPostdatado } from '../utils/flowHelpers';
+import { _setStep, _maybeUpsell, _detectPostdatado, _assignProductAndPlanByTier } from '../utils/flowHelpers';
 import logger from '../../utils/logger';
 
 export async function handleWaitingPreference(
@@ -76,7 +76,7 @@ export async function handleWaitingPreference(
         const directRecommend = /\b(lo (mas|más) (efectivo|eficaz|mejor|rapido|rápido|potente)|lo mejor|cualquiera|el (mas|más) (efectivo|eficaz|mejor|rapido|rápido|potente)|el que (sea )?mejor|recomienda(me|n)? vos|recomendame|tu eligen?|elegi vos)\b/i;
         if (directRecommend.test(normalizedText.trim())) {
             logger.info(`[HARDCODED-PREF] User asked for recommendation ("${text.substring(0, 40)}"), defaulting to Cápsulas.`);
-            currentState.selectedProduct = 'Cápsulas de nuez de la india';
+            _assignProductAndPlanByTier(currentState, 'Cápsulas de nuez de la india');
             const priceNode = knowledge.flow.preference_capsulas;
             const adapted = adaptResponsePrefix(priceNode.response, normalizedText, 'capsula');
             const msg = _formatMessage(adapted, currentState);
@@ -134,13 +134,13 @@ export async function handleWaitingPreference(
             const ext = aiRecommendation.extractedData.toLowerCase();
             let priceNode;
             if (ext.includes('cápsula') || ext.includes('capsula')) {
-                currentState.selectedProduct = 'Cápsulas de nuez de la india';
+                _assignProductAndPlanByTier(currentState, 'Cápsulas de nuez de la india');
                 priceNode = knowledge.flow.preference_capsulas;
             } else if (ext.includes('gota')) {
-                currentState.selectedProduct = 'Gotas de nuez de la india';
+                _assignProductAndPlanByTier(currentState, 'Gotas de nuez de la india');
                 priceNode = knowledge.flow.preference_gotas;
             } else if (ext.includes('semilla')) {
-                currentState.selectedProduct = 'Semillas de nuez de la india';
+                _assignProductAndPlanByTier(currentState, 'Semillas de nuez de la india');
                 priceNode = knowledge.flow.preference_semillas;
             }
 
@@ -165,7 +165,7 @@ export async function handleWaitingPreference(
     }
 
     if (mentionsCapsulas) {
-        currentState.selectedProduct = "Cápsulas de nuez de la india";
+        _assignProductAndPlanByTier(currentState, "Cápsulas de nuez de la india");
         const msg = _formatMessage(knowledge.flow.preference_capsulas.response, currentState);
 
         _setStep(currentState, knowledge.flow.preference_capsulas.nextStep);
@@ -175,7 +175,7 @@ export async function handleWaitingPreference(
         await _maybeUpsell(currentState, sendMessageWithDelay, userId, saveState);
         return { matched: true };
     } else if (mentionsSemillas) {
-        currentState.selectedProduct = "Semillas de nuez de la india";
+        _assignProductAndPlanByTier(currentState, "Semillas de nuez de la india");
         const msg = _formatMessage(knowledge.flow.preference_semillas.response, currentState);
 
         _setStep(currentState, knowledge.flow.preference_semillas.nextStep);
@@ -185,7 +185,7 @@ export async function handleWaitingPreference(
         await _maybeUpsell(currentState, sendMessageWithDelay, userId, saveState);
         return { matched: true };
     } else if (knowledge.flow.preference_gotas && mentionsGotas) {
-        currentState.selectedProduct = "Gotas de nuez de la india";
+        _assignProductAndPlanByTier(currentState, "Gotas de nuez de la india");
         const msg = _formatMessage(knowledge.flow.preference_gotas.response, currentState);
 
         _setStep(currentState, knowledge.flow.preference_gotas.nextStep);
@@ -223,13 +223,13 @@ export async function handleWaitingPreference(
             const ext = aiPref.extractedData.toLowerCase();
             let priceNode;
             if (ext.includes('cápsula') || ext.includes('capsula')) {
-                currentState.selectedProduct = 'Cápsulas de nuez de la india';
+                _assignProductAndPlanByTier(currentState, 'Cápsulas de nuez de la india');
                 priceNode = knowledge.flow.price_capsulas || knowledge.flow.preference_capsulas;
             } else if (ext.includes('gota')) {
-                currentState.selectedProduct = 'Gotas de nuez de la india';
+                _assignProductAndPlanByTier(currentState, 'Gotas de nuez de la india');
                 priceNode = knowledge.flow.price_gotas || knowledge.flow.preference_gotas;
             } else if (ext.includes('semilla')) {
-                currentState.selectedProduct = 'Semillas de nuez de la india';
+                _assignProductAndPlanByTier(currentState, 'Semillas de nuez de la india');
                 priceNode = knowledge.flow.price_semillas || knowledge.flow.preference_semillas;
             }
 

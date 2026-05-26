@@ -345,6 +345,26 @@ function _resolveNewProductPlan(normalizedText: string, currentProduct: string |
  * abandoned cart) podían empujar entradas indefinidamente a usuarios que
  * nunca volvían a entrar al flujo. Centralizar aquí evita drift.
  */
+/**
+ * Asigna producto + plan + cart + total en el state según el producto que
+ * eligió el cliente y los kilos a bajar. Plan por tier (V5 rev. 2026-05-26):
+ *   - tier 1 (≤10 kg) → 60d
+ *   - tier 2 (10-20 kg) → 120d
+ *   - tier 3 (>20 kg) → 120d
+ * Si no hay weightGoal todavía (caso edge: cliente mencionó producto antes
+ * de kilos y la lógica del weight step no extrajo nada), default a 120d.
+ */
+function _assignProductAndPlanByTier(state: any, productFullName: string): void {
+    const { _getPrice } = require('./pricing');
+    const { calculateTotal } = require('./cartHelpers');
+    const w = typeof state.weightGoal === 'number' ? state.weightGoal : parseInt(String(state.weightGoal || 0), 10) || 0;
+    const plan = w > 0 && w <= 10 ? '60' : '120';
+    state.selectedProduct = productFullName;
+    state.selectedPlan = plan;
+    state.cart = [{ product: productFullName, plan, price: _getPrice(productFullName, plan) }];
+    calculateTotal(state);
+}
+
 function _pushHistory(state: any, entry: { role: 'user' | 'bot' | 'system'; content: string; timestamp?: number }) {
     if (!state.history) state.history = [];
     state.history.push({ ...entry, timestamp: entry.timestamp || Date.now() });
@@ -363,5 +383,6 @@ export {
     _extractSilentVariables,
     _detectProductPlanChange,
     _resolveNewProductPlan,
+    _assignProductAndPlanByTier,
     _pushHistory
 };

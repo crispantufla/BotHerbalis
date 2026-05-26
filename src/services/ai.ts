@@ -66,7 +66,7 @@ const RULE_BASE = [
     { id: 'repetido', keywords: ['ya compre', 'volvi a escribir', 'soy cliente', 'otra vez'], text: 'CLIENTE REPETIDO: Si dicen que ya compraron antes o quieren volver a comprar: reconocé que ya son parte de Herbalis y avanzá rápido con la elección de producto y plan. Mismo flujo de pago que cualquier cliente (MP por defecto).' },
     { id: 'muestra', keywords: ['muestra gratis', 'probar', 'regalan'], text: 'MUESTRAS GRATIS: No hay muestras gratis. Recordales que llevamos más de 13 años distribuyendo con más de 70 mil clientes satisfechos.' },
     { id: 'amamantando', keywords: ['amamantando', 'dando la teta', 'lactancia', 'bebe', 'amamantar'], text: 'AMAMANTANDO ESTRICTO: Si la persona está amamantando, NO vendemos. Sin importar la edad del bebé (ni aunque tenga 2 o 3 años). Priorizamos la salud del bebé.' },
-    { id: 'pocos_kilos', keywords: ['pocos kilos', 'bajar 2', 'bajar 3', 'bajar 4', 'bajar 5', 'un par de kilos'], text: 'BAJAR POCOS KILOS: Si quieren bajar pocos kilos (3, 5, etc.), SIEMPRE recomendá CÁPSULAS como primera opción. NUNCA recomiendes gotas para poco peso. Cápsulas son lo más efectivo y práctico.' },
+    { id: 'pocos_kilos', keywords: ['pocos kilos', 'bajar 2', 'bajar 3', 'bajar 4', 'bajar 5', 'un par de kilos'], text: 'BAJAR POCOS KILOS: Si quieren bajar pocos kilos (3, 5, etc.), corresponde el plan de 60 días (2 meses). Las 3 opciones de producto (cápsulas, gotas, semillas) están disponibles para cualquier rango — no empujes una en particular, el cliente elige.' },
     { id: 'cantidad', keywords: ['descuento por 3', 'mas de 2', 'comprar para mi y para', 'llevar varios'], text: 'DESCUENTO POR CANTIDAD: Si compran más de 120 días (puede ser combinado, ej: 60 gotas + 60 cápsulas), el tercer producto más barato va al 50% de descuento.' },
     { id: 'devolucion', keywords: ['garantia', 'devolucion', 'reembolso', 'devolver la plata', 'si no funciona'], text: 'DEVOLUCIÓN DE DINERO: NO hay devolución de dinero ni garantía de resultados. Si el producto llega dañado lo reenviamos sin costo, pero no se devuelve plata.' },
     { id: 'cancelar', keywords: ['cancelar pedido', 'no me llego', 'anular compra'], text: 'CANCELAR PEDIDO: Si quieren cancelar un pedido o dicen que no les llegó un pedido anterior, respondé: "Voy a derivar tu caso a un asesor" y goalMet=false. NO intentes resolver esto vos.' },
@@ -280,10 +280,11 @@ ${rulesText}`;
 
 function _getModuleEarlyFunnel(prices: Record<string, any>): string {
     return `
-PRODUCTOS Y PRECIOS:
-- Cápsulas: $${prices['Cápsulas']['60']} (60d) / $${prices['Cápsulas']['120']} (120d). ESTRELLA, OPCIÓN PRINCIPAL Y MÁS EFECTIVA SIEMPRE (sin importar la cantidad de kilos).
-- Semillas: $${prices['Semillas']['60']} (60d) / $${prices['Semillas']['120']} (120d). Tradicional, 100% natural.
-- Gotas: $${prices['Gotas']['60']} (60d) / $${prices['Gotas']['120']} (120d). SOLO ofrecer a >70 años. PRECAUCIÓN: Si alguien joven pide gotas o busca algo "para pocos kilos", usá el argumento de que "las gotas son extremadamente suaves" COMO ARMA DE VENTA para convencerlos de llevar las Cápsulas, que siempre son mejores.
+PRODUCTOS Y PRECIOS (modelo V5 rev. 2026-05-26 — las 3 opciones se ofrecen iguales, no empujes una sola):
+- Cápsulas: $${prices['Cápsulas']['60']} (60d) / $${prices['Cápsulas']['120']} (120d). Forma práctica del producto.
+- Semillas: $${prices['Semillas']['60']} (60d) / $${prices['Semillas']['120']} (120d). Forma 100% natural — ritual nocturno de infusión.
+- Gotas: $${prices['Gotas']['60']} (60d) / $${prices['Gotas']['120']} (120d). Forma líquida — suaves al estómago.
+- DOSIS (días) según los kilos a bajar: hasta 10 kg → plan 60d; 10-20 kg → plan 120d (puede sobrar, sirve de mantenimiento); más de 20 kg → plan 120d (es lo que el cuerpo necesita).
 - Envío GRATIS por Correo Argentino (5 a 7 días hábiles). Dos opciones: retiro en sucursal (pago al retirar) o envío a domicilio (prepago por Mercado Pago o transferencia).
 - Sin efecto rebote (100% natural).
 
@@ -295,14 +296,16 @@ C) Ya aclararon ≥18 en historial: NO volver a mencionar restricción. "Perfect
 
 QUÉ ES Y CÓMO FUNCIONA (palabras simples):
 - Semillas: El producto en su estado 100% natural. Limpia el sistema digestivo y quema grasa.
-- Gotas: Extracción del aceite de la nuez en clorofila. Más suaves, recomendadas SOLO para personas >70 años o con dificultad para tragar pastillas. NO para clientes que quieren bajar pocos kilos — para esos, cápsulas.
-- Cápsulas: Extracción del componente activo puro. Más potentes y efectivas — opción principal para TODOS los rangos de kilos.
+- Gotas: Extracción del aceite de la nuez en clorofila. Forma líquida, suave al estómago — útil para quienes tienen dificultad para tragar pastillas o problemas digestivos.
+- Cápsulas: Extracción del componente activo puro. Forma compacta y práctica.
+- Las 3 formas funcionan igual para bajar de peso — el cliente elige cuál le queda más cómoda.
 - Síntomas normales al principio: malestar de panza, gases. Es señal de que funciona. Se va en la primera semana tomando agua.
 
 REGLAS DE ESTE PASO:
-- "Lo más efectivo/rápido/mejor": recomendar CÁPSULAS directo.
-- Habla en PASADO ("yo tomaba semillas"): NO es elección actual. "¡Qué bueno que las conocés! Te recomiendo las cápsulas ahora, son lo más efectivo 😊"
-- Si dudan gotas vs cápsulas o tienen pocos kilos: "Las gotas son útiles como mantenimiento por ser extremadamente suaves, pero para tu objetivo te súper recomiendo las cápsulas que van directo a la grasa."
+- NO empujes un producto en particular. Si el cliente pregunta "cuál es mejor", explicale las 3 formas y que funcionan igual; dejá que decida.
+- Si pide explícitamente "lo más efectivo/rápido/mejor" o "elegí vos": recomendá cápsulas (forma práctica, la más elegida) PERO aclarando que las 3 funcionan igual.
+- Si tiene gastritis/úlcera/acidez: cápsulas o gotas (semillas pueden irritar — sí es una contraindicación real).
+- Habla en PASADO ("yo tomaba semillas"): NO es elección actual. "¡Qué bueno que las conocés! ¿Querés ir con semillas de nuevo o probás otra forma?"
 - Precios: Si piden "precio" genérico: "$${prices['Semillas']?.['60'] || '36.900'} a $${prices['Gotas']?.['120'] || '68.900'}". Si insisten/piden todos: dar detalle completo.`;
 }
 
@@ -666,8 +669,9 @@ class AIService {
             if (pathInfo) knowledgeContext += `- SOBRE PATOLOGÍAS: "${pathInfo}"\n`;
 
             if (['waiting_weight', 'waiting_preference'].includes(step)) {
-                knowledgeContext += `- Productos principales: Cápsulas(prácticas, MAS EFECTIVAS y recomendadas SIEMPRE) y Semillas(naturales).\n`;
-                knowledgeContext += `- Gotas: SOLO ofrecer a >70 años. Si alguien con pocos kilos pide gotas, decile que "son extremadamente suaves" para persuadirlo a elegir Cápsulas.\n`;
+                knowledgeContext += `- 3 OPCIONES DE PRODUCTO (rev. 2026-05-26): Cápsulas (forma práctica), Gotas (forma líquida, suave al estómago), Semillas (forma 100% natural, ritual de infusión nocturna). Las 3 funcionan igual — no empujes una sola, dejá que el cliente elija.\n`;
+                knowledgeContext += `- DOSIS por kilos: hasta 10 kg → 60 días; 10-20 kg → 120 días (sobra un poco, sirve mantenimiento); más de 20 kg → 120 días (lo que el cuerpo necesita).\n`;
+                knowledgeContext += `- Gastritis/úlcera/acidez: cápsulas o gotas (semillas pueden irritar). Es la única razón médica para descartar una forma.\n`;
                 knowledgeContext += `- Contraindicaciones: solo embarazo y lactancia.NO menores de edad.\n`;
                 knowledgeContext += `- PRECIOS: Si preguntan "precio" en general, decí "$${priceSem60} a $${priceGotas120}".PERO si preguntan "precio de todos", "lista de precios" o insisten, PASALES TODOS LOS PRECIOS detallados: ${priceString}.\n`;
                 knowledgeContext += `- ENVÍO Y PAGO: Envío gratis por Correo Argentino (5 a 7 días hábiles). 2 opciones: retiro en sucursal (paga al retirar) o envío a domicilio (prepago por Mercado Pago o transferencia). NUNCA menciones cuotas ni anticipo.\n`;

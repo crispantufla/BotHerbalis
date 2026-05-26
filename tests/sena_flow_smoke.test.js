@@ -171,16 +171,21 @@ describe('Modelo nuevo — FAQ en V5 y V6', () => {
     });
 });
 
-describe('Modelo nuevo — recommendations (TEXTO 1+2 → "¿Te paso los precios?")', () => {
+describe('Modelo nuevo — recommendations (no muestran precios; cierran con pregunta de avance)', () => {
+    // V5 rev. 2026-05-26: recommendation_X ofrece las 3 opciones de producto y
+    // pregunta "¿con cuál vas?" — la dosis y los precios van más adelante.
+    // V6: sigue el modelo anterior (recomienda un producto y pide aceptación
+    // para mostrar precios).
     test.each([
         ['V5', v5],
         ['V6', v6],
-    ])('%s: recommendation_1/2/3 terminan pidiendo aceptación para mostrar precios', (_n, guion) => {
+    ])('%s: recommendation_1/2/3 no filtran precios y cierran con pregunta de avance', (_n, guion) => {
         ['recommendation_1', 'recommendation_2', 'recommendation_3'].forEach(key => {
             const resp = guion.flow[key].response;
             expect(resp).not.toMatch(/\{\{PRICE_/);
             expect(resp).not.toMatch(/\$\s*\d{2,}\.\d{3}/);
-            expect(resp).toMatch(/precios/i);
+            // Acepta "¿te paso los precios?" (V6) o "¿con cuál vas?" (V5 nuevo flujo).
+            expect(resp).toMatch(/precios|con cu[aá]l/i);
             expect(resp).not.toMatch(/te bajo \$\s*6\.000/i);
             expect(resp).not.toMatch(/unidad extra de regalo/i);
         });
