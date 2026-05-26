@@ -56,30 +56,18 @@ export async function handleWaitingPreference(
     const hasObjection = /\b(tragar|ahogar|grandes|cuestan|complicado|dificil|miedo a ahogarme)\b/i.test(normalizedText);
     const isComparison = totalMatches > 1 || hasObjection || (hasQuestionOrConcern && totalMatches >= 1) || (totalMatches === 0 && /\b(cual|recomend|mejor|diferencia|que me recomiendas|que me conviene|cual me das|asesorame|efectiv|rapido)\b/i.test(normalizedText));
 
-    const adaptResponsePrefix = (rawResponse: string, userText: string, extString: string) => {
-        if (/\b(cual|recomend|mejor|efectiv|rapido|diferencia)\b/i.test(userText)) {
-            if (extString.includes('capsula')) {
-                return rawResponse.replace(/Dale, buenísimo 👍 Excelente elección\./i, "Lo más efectivo sin duda son las cápsulas 💪.");
-            } else if (extString.includes('semilla')) {
-                return rawResponse.replace(/Dale, buenísimo 🌿 La semilla natural es la clásica, súper potente\./i, "Si buscás lo más natural, te recomiendo las semillas 🌿.");
-            } else if (extString.includes('gota')) {
-                return rawResponse.replace(/Dale, buenísimo 🌿 Las gotas son discretas y se absorben rápido\./i, "En tu caso, lo mejor y más suave van a ser las gotas 🌿.");
-            }
-        }
-        return rawResponse;
-    };
-
     if (isComparison) {
-        // HARDCODED: "lo más efectivo" / "lo mejor" / "lo más rápido" / "cualquiera"
-        // mapea siempre a Cápsulas. Antes dependía 100% del AI; si fallaba (timeout,
-        // circuit breaker), el bot pausaba. Ahora hay un fallback deterministico.
+        // HARDCODED: si el cliente DELEGA explícitamente ("elegí vos", "lo mejor",
+        // "cualquiera"), default determinístico a cápsulas (forma práctica) sin
+        // mentir diciendo "es lo más efectivo". Las 3 funcionan igual; cápsulas
+        // se elige solo porque es la forma más usada. Este fallback existe para
+        // no depender de la IA cuando claramente el cliente delega.
         const directRecommend = /\b(lo (mas|más) (efectivo|eficaz|mejor|rapido|rápido|potente)|lo mejor|cualquiera|el (mas|más) (efectivo|eficaz|mejor|rapido|rápido|potente)|el que (sea )?mejor|recomienda(me|n)? vos|recomendame|tu eligen?|elegi vos)\b/i;
         if (directRecommend.test(normalizedText.trim())) {
-            logger.info(`[HARDCODED-PREF] User asked for recommendation ("${text.substring(0, 40)}"), defaulting to Cápsulas.`);
+            logger.info(`[HARDCODED-PREF] User ${userId} delegó la elección ("${text.substring(0, 40)}") → default Cápsulas.`);
             _assignProductAndPlanByTier(currentState, 'Cápsulas de nuez de la india');
             const priceNode = knowledge.flow.preference_capsulas;
-            const adapted = adaptResponsePrefix(priceNode.response, normalizedText, 'capsula');
-            const msg = _formatMessage(adapted, currentState);
+            const msg = _formatMessage(priceNode.response, currentState);
             _setStep(currentState, priceNode.nextStep);
             currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
             saveState(userId);
@@ -89,18 +77,18 @@ export async function handleWaitingPreference(
         }
 
         if (/^(capsulas? o gotas?|gotas? o capsulas?|capsulas o gotas porfa(?:vor)?)$/i.test(normalizedText.trim())) {
-            logger.info(`[HARDCODED-PREF] User asked "capsulas o gotas", sending hardcoded recommendation.`);
-            const hardcodedRec1 = "Personalmente te recomiendo las cápsulas, suelen ser más efectivas 💪.";
-            const hardcodedRec2 = "Las gotas las recomendamos ya para gente mayor o con problemas digestivos.\n\n👉 ¿Avanzamos con cápsulas entonces?";
+            logger.info(`[HARDCODED-PREF] User ${userId} preguntó "capsulas o gotas" — comparamos forma sin push.`);
+            const cmp1 = "Las dos formas funcionan igual de bien 🌿";
+            const cmp2 = "Las *cápsulas* son la forma más práctica — una al día y listo.\nLas *gotas* son líquidas y un poco más suaves al estómago.\n\n👉 ¿Con cuál vas?";
 
-            currentState.history.push({ role: 'bot', content: hardcodedRec1, timestamp: Date.now() });
-            await sendMessageWithDelay(userId, hardcodedRec1);
+            currentState.history.push({ role: 'bot', content: cmp1, timestamp: Date.now() });
+            await sendMessageWithDelay(userId, cmp1);
 
-            currentState.history.push({ role: 'bot', content: hardcodedRec2, timestamp: Date.now() });
+            currentState.history.push({ role: 'bot', content: cmp2, timestamp: Date.now() });
             _setStep(currentState, FlowStep.WAITING_PREFERENCE);
             currentState.consultativeSale = true;
             saveState(userId);
-            await sendMessageWithDelay(userId, hardcodedRec2);
+            await sendMessageWithDelay(userId, cmp2);
 
             return { matched: true };
         }
@@ -109,15 +97,15 @@ export async function handleWaitingPreference(
 
         const aiRecommendation = await aiService.chat(text, {
             step: FlowStep.WAITING_PREF_CONSULT,
-            goal: `El usuario está indeciso entre productos, pide recomendaciones, O está aceptando una recomendación previa ("dale", "bueno"). REGLAS DE RECOMENDACIÓN (CRÍTICO):
-            1) Si el usuario YA ESTÁ ACEPTANDO tu recomendación previa (ej: "dale", "bueno", "capsulas"), ¡tu objetivo está cumplido! Respondé con goalMet=true y extractedData="Cápsulas de nuez de la india".
-            2) Si pide "lo más efectivo", "lo mejor", "lo más rápido" o "cualquiera": El objetivo está cumplido automáticamente, respondé goalMet=true y extractedData="Cápsulas de nuez de la india".
-            3) EMOCIÓN Y SALUD: Si cuenta su historia de peso, problemas médicos (tiroides, operaciones) o inseguridades, REDACTA UN PÁRRAFO EXTENSO Y PROFUNDAMENTE EMPÁTICO validando sus sentimientos ANTES de recomendar nada.
-            4) Si duda o insiste entre GOTAS y CÁPSULAS o te pide recomendación: Decile con mucha calidez y detalle "Personalmente te recomiendo las cápsulas, suelen ser más efectivas. Las gotas las recomendamos ya para gente mayor o con problemas digestivos." Luego preguntale con cuál prefiere avanzar.
-            5) Si pide "info de las 3", "precio de las 3" o "todas": brindá un resumen explicativo detallado con los precios base de 60 días para Cápsulas, Gotas y Semillas (extraídos del knowledge) y luego preguntá cuál prefiere probar.
-            6) Si pregunta por envío o medios de pago, aclara con amabilidad que el envío es gratis a todo el país (5 a 7 días hábiles) y que tenemos 2 opciones: retiro en sucursal (paga el total en efectivo al retirar, sin anticipo) o envío a domicilio (prepago por Mercado Pago o transferencia). NUNCA menciones cuotas ni anticipo. Luego preguntale con cuál producto prefiere avanzar.
-            7) HORARIOS DE ENVÍO: Si pregunta a qué hora llega o pide un horario (tarde/mañana), respondé con firmeza pero amabilidad: "No tenemos ningún control sobre los carteros del Correo Argentino, por lo que no podemos asegurar en qué horario pasará por tu domicilio. Pero quedate tranqui que monitoreamos el envío y si no te encuentran te avisamos en el acto para que lo retires por sucursal". Luego preguntá con cuál producto avanzar.
-            SOLO marcá goalMet=true si el cliente ya eligió o si explícitamente pidió "lo mejor/más rápido" (asumiendo cápsulas).`,
+            goal: `El usuario está indeciso entre productos o pide recomendaciones. Modelo V5 (rev. 2026-05-26): las 3 opciones (Cápsulas / Gotas / Semillas) se ofrecen IGUALES — no empujes una en particular. REGLAS:
+            1) Si el usuario MENCIONÓ EXPLÍCITAMENTE un producto (ej: "capsulas", "gotas", "semillas"), goalMet=true con extractedData del producto que dijo.
+            2) Si el usuario está aceptando con un genérico ("dale", "bueno", "ok") SIN nombrar producto, NO ASUMAS — goalMet=false y re-preguntá "¿con cuál vas, cápsulas, gotas o semillas?".
+            3) Si pide "lo más efectivo/mejor/rápido", "cualquiera" o "elegí vos": el cliente está DELEGANDO. Asumí Cápsulas (forma más práctica) PERO sin decir que son "más efectivas" — decí "Te traigo cápsulas que es la forma más práctica, las 3 funcionan igual". goalMet=true, extractedData="Cápsulas de nuez de la india".
+            4) EMOCIÓN Y SALUD: Si cuenta su historia de peso, problemas médicos (tiroides, operaciones) o inseguridades, REDACTÁ UN PÁRRAFO EMPÁTICO validando sus sentimientos ANTES de cerrar nada. goalMet=false.
+            5) Si tiene GASTRITIS / úlcera / acidez: recomendá cápsulas o gotas (semillas pueden irritar — es una contraindicación real). goalMet=false hasta que confirme.
+            6) Si pide "info de las 3", "precio de las 3" o "todas": dale un resumen breve de las 3 opciones con sus precios de 60 días (del knowledge). NO empujes ninguna. Después preguntá cuál prefiere.
+            7) Si pregunta por envío o medios de pago: envío gratis 5 a 7 días hábiles. 2 opciones: retiro en sucursal (paga total al retirar, sin anticipo) o domicilio (prepago por MP o transferencia). NUNCA menciones cuotas ni anticipo. Después preguntá con cuál producto avanzar.
+            8) HORARIOS DE ENVÍO: si pregunta a qué hora llega o pide un horario, respondé que no controlamos al cartero del Correo Argentino, pero que avisamos si no lo encuentran. Después preguntá con cuál producto avanzar.`,
             history: currentState.history,
             summary: currentState.summary,
             knowledge: knowledge,
@@ -145,8 +133,7 @@ export async function handleWaitingPreference(
             }
 
             if (priceNode) {
-                const adaptedResponse = adaptResponsePrefix(priceNode.response, normalizedText, ext);
-                const msg = _formatMessage(adaptedResponse, currentState);
+                const msg = _formatMessage(priceNode.response, currentState);
                 _setStep(currentState, priceNode.nextStep);
                 currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
                 saveState(userId);
@@ -198,15 +185,17 @@ export async function handleWaitingPreference(
         logger.info(`[AI-FALLBACK] waiting_preference: No keyword match for ${userId}`);
         const aiPref = await aiService.chat(text, {
             step: FlowStep.WAITING_PREFERENCE,
-            goal: `Determinar si quiere cápsulas/gotas (opción práctica), semillas (opción natural) o AMBAS. REGLAS CRÍTICAS DE HUMANIZACIÓN: 
-1) EMOCIÓN Y SALUD: Si hace un descargo sobre su peso, operaciones o inseguridades médicas, REDACTÁ MÚLTIPLES PÁRRAFOS demostrando altísima empatía y contención. Usa un tono explayado y compasivo antes de darle la recomendación del producto. NO SEAS ROBÓTICA NI BREVE ante temas sensibles.
-2) Usa muletillas simpáticas al conversar ("Dale perfecto", "Entiendo bárbaro", "Tranqui te explico super detallado"). 
-3) Si duda o pregunta entre GOTAS y CÁPSULAS o te pide recomendación: Decile "Personalmente te recomiendo las cápsulas, suelen ser más efectivas. Las gotas las recomendamos ya para gente mayor o con problemas digestivos." Luego preguntale con cuál prefiere avanzar. 
-4) Si habla en PASADO ("yo tomaba", "antes usé"), decile tipo "Ah mirá que bueno que ya las conoces y pudiste sacarles provecho! Entonces vayamos con las CÁPSULAS directamente". 
-5) Si pide información o precios de "las 3", "todas", o "los 3", brindá una explicación extensa y amable de Cápsulas, Semillas y Gotas con sus precios correspondientes de 60 días (usando el knowledge) y luego preguntá cuál prefiere. 
-6) Si el usuario pregunta si puede recibir el pedido o pagarlo un día concreto, DALE EL OK Y CONFIRMÁ EL PRODUCTO. 
-7) Si pregunta por envío o medios de pago, aclará de forma cálida que el envío es gratis a todo el país (5 a 7 días hábiles), y que tenemos 2 opciones: retiro en sucursal (paga el total en efectivo al retirar) o envío a domicilio (prepago por Mercado Pago o transferencia). NUNCA menciones anticipo de $10.000. NUNCA menciones cuotas. Si pregunta por horarios, aclará que no tenemos control sobre los carteros de Correo Argentino pero que avisamos si no lo encuentran. Luego preguntale con cuál producto prefiere avanzar.
-🔴 REGLA ABSOLUTA DE CONFIRMACIÓN: Si el usuario ya aceptó tu sugerencia o eligió explícita O implícitamente (ej: "dale", "si", "bueno"), NO DEBES GENERAR RESPUESTA. Debes marcar goalMet=true y extractedData="PRODUCTO: Cápsulas de nuez de la india" inmediatamente.`,
+            goal: `Determinar qué producto prefiere el usuario: Cápsulas, Gotas o Semillas. Modelo V5 (rev. 2026-05-26): las 3 opciones se ofrecen IGUALES — no empujes una en particular.
+1) EMOCIÓN Y SALUD: Si hace un descargo sobre su peso, operaciones o inseguridades médicas, REDACTÁ MÚLTIPLES PÁRRAFOS demostrando altísima empatía y contención. Tono explayado y compasivo antes de cerrar nada.
+2) Usá muletillas argentinas naturales ("dale", "tranqui", "te cuento") sin exagerar.
+3) Si MENCIONA explícitamente un producto ("capsulas", "gotas", "semillas"), goalMet=true, extractedData con el producto.
+4) Si solo dice "dale"/"si"/"bueno" SIN nombrar producto, NO asumas — goalMet=false y re-preguntá "¿con cuál te gustaría avanzar: cápsulas, gotas o semillas?".
+5) Si pide "lo más efectivo/mejor/rápido", "cualquiera" o "elegí vos": el cliente delega. Asumí cápsulas (forma más práctica) PERO aclarando que las 3 funcionan igual. extractedData="PRODUCTO: Cápsulas de nuez de la india".
+6) Si habla en PASADO ("yo tomaba semillas"): preguntá si quiere repetir o probar otra forma — no le impongas cápsulas.
+7) Si tiene gastritis/úlcera/acidez: recomendá cápsulas o gotas (semillas pueden irritar). goalMet=false hasta que confirme.
+8) Si pide información o precios de "las 3", brindá explicación breve de las 3 formas con precios de 60 días (knowledge). Después preguntá cuál prefiere.
+9) Si pregunta si puede pagar/recibir un día concreto: dale el OK y volvé a la elección de producto.
+10) Si pregunta por envío o medios de pago: envío gratis 5 a 7 días hábiles, 2 opciones (retiro en sucursal sin anticipo / domicilio prepago MP o transfer). NUNCA menciones anticipo ni cuotas. Después preguntá producto.`,
             history: currentState.history,
             summary: currentState.summary,
             knowledge: knowledge,
@@ -234,8 +223,7 @@ export async function handleWaitingPreference(
             }
 
             if (priceNode) {
-                const adaptedResponse = adaptResponsePrefix(priceNode.response, normalizedText, ext);
-                const msg = _formatMessage(adaptedResponse, currentState);
+                const msg = _formatMessage(priceNode.response, currentState);
                 _setStep(currentState, priceNode.nextStep);
                 currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
                 saveState(userId);

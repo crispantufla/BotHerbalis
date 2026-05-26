@@ -71,13 +71,6 @@ export async function handleWaitingWeight(
     else if (tLow.includes('gota')) implicitProduct = "Gotas de nuez de la india";
     else if (tLow.includes('semilla')) implicitProduct = "Semillas de nuez de la india";
 
-    if (!implicitProduct && currentState.history && currentState.history.length > 0) {
-        const lastBotMsg = [...currentState.history].reverse().find(m => m.role === 'bot');
-        if (lastBotMsg && lastBotMsg.content.toLowerCase().includes('cápsulas son la opción más efectiva')) {
-            implicitProduct = "Cápsulas de nuez de la india";
-        }
-    }
-
     if (implicitProduct) {
         (currentState as any).suggestedProduct = implicitProduct;
         logger.info(`[LOGIC] Implicitly detected product: ${implicitProduct}`);
@@ -258,7 +251,7 @@ export async function handleWaitingWeight(
 
         if (isRefusal || (currentState as any).weightRefusals > 2) {
             logger.info(`[LOGIC] User ${userId} refused/failed weight question too many times (${(currentState as any).weightRefusals}). Skipping to preference.`);
-            const skipMsg = "¡Entiendo, no hay problema! 👌 Pasemos directo a ver qué opción es mejor para vos.\n\nTenemos:\n1️⃣ Cápsulas (Lo más efectivo y práctico — opción recomendada)\n2️⃣ Semillas/Infusión (Más natural, en formato infusión)\n3️⃣ Gotas (Para personas mayores de 70 o con dificultad para tragar pastillas)\n\n¿Cuál te gustaría probar?";
+            const skipMsg = "¡Entiendo, no hay problema! 👌 Pasemos directo a ver qué forma del producto preferís.\n\nTenemos 3 opciones:\n1️⃣ *Cápsulas* (forma práctica — una al día)\n2️⃣ *Gotas* (forma líquida — suave al estómago)\n3️⃣ *Semillas* (100% natural — ritual de infusión nocturna)\n\n¿Con cuál vas?";
 
             _setStep(currentState, FlowStep.WAITING_PREFERENCE);
             currentState.history.push({ role: 'bot', content: skipMsg, timestamp: Date.now() });

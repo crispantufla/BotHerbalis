@@ -18,24 +18,23 @@ export async function handleWaitingTransferConfirmation(
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
 
     // ── Cliente confirma que ya transfirió ─────────────────────────────────────
-    // Modelo nuevo (may-2026): transferencia siempre por el TOTAL (envío a
-    // domicilio prepago). El branch anticipo $10k es legacy (compat).
+    // Modelo nuevo (may-2026): transferencia siempre por el TOTAL. Si state.senaAmount=10000
+    // (Order legacy pre-may-2026), pausamos igual y el admin coordina por separado —
+    // el mensaje al cliente es neutro, no menciona "anticipo / saldo al cartero".
     const normalizedForPaid = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     const isLegacyCodAnticipo = currentState.paymentMethod === 'contrarembolso' && currentState.senaAmount === 10000;
     if (PAID_KEYWORDS.test(text) || PAID_KEYWORDS.test(normalizedForPaid)) {
         const { _formatMessage: _fmt } = require('../utils/messages');
         const { getFlowTemplate: _gft } = require('../../utils/messageTemplates');
-        const paidTpl = _gft(isLegacyCodAnticipo ? 'cod_received' : 'transfer_received', knowledge);
+        const paidTpl = _gft('transfer_received', knowledge);
         const msg = paidTpl
             ? _fmt(paidTpl, currentState)
-            : (isLegacyCodAnticipo
-                ? '¡Perfecto! Recibimos tu aviso del anticipo. Verificamos la transferencia y te confirmamos el envío en breve. El saldo lo pagás en efectivo al cartero cuando llega 📦'
-                : '¡Perfecto! Recibimos tu aviso. Verificamos la transferencia y te confirmamos el envío en breve ⏳');
+            : '¡Perfecto! Recibimos tu aviso. Verificamos la transferencia y te confirmamos el envío en breve ⏳';
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
         const adminMsg = isLegacyCodAnticipo
-            ? '[LEGACY] Cliente avisó haber hecho el ANTICIPO de $10.000 (flujo pre-may-2026) — verificar comprobante.'
+            ? '[LEGACY] Cliente avisó pago de Order pre-may-2026 con senaAmount=$10.000 — verificar comprobante y coordinar saldo manualmente.'
             : 'Cliente avisó que hizo la transferencia — verificar comprobante y confirmar envío.';
         await _pauseAndAlert(userId, currentState, dependencies, text, adminMsg);
         return { matched: true };

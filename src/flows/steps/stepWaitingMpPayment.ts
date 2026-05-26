@@ -93,8 +93,12 @@ export async function handleWaitingMpPayment(
             // saldo MP, etc.). Si quieren cambiar a COD o transferencia, lo deben
             // pedir explícitamente y el handler de arriba (CASH_FALLBACK_KEYWORDS /
             // TRANSFER_FALLBACK_KEYWORDS) los enruta correctamente.
-            const wasSena = !!(currentState.senaAmount && currentState.senaAmount > 0);
-            const tpl = getFlowTemplate(wasSena ? 'payment_mp_retry_sena' : 'payment_mp_retry', knowledge);
+            // Modelo nuevo (may-2026): el retry siempre usa el template payment_mp_retry
+            // (sin diferenciar seña). Las plantillas _sena fueron eliminadas en V5/V6.
+            // Si state.senaAmount > 0 (Order legacy), el mensaje neutro sirve igual:
+            // el cliente reintenta el link y la cobranza del saldo legacy se coordina
+            // por admin via _pauseAndAlert (no por el bot).
+            const tpl = getFlowTemplate('payment_mp_retry', knowledge);
             const msg = tpl
                 ? _formatMessage(tpl, currentState)
                 : '⚠️ Hubo un problema con el pago — probá de nuevo con otra forma (tarjeta, débito, saldo MP).';
@@ -469,10 +473,13 @@ async function _tryCreateAndSendMpLink(
 
     // El _formatMessage usa cart para PRODUCT, pero también permitimos override con
     // el productName ya computado (multi-item ya viene unificado en cart map).
-    const linkTpl = getFlowTemplate(isSena ? 'payment_mp_link_sena' : 'payment_mp_link', knowledge) ||
-        (isSena
-            ? `💳 *Seña por Mercado Pago*\n\nPedido: *{{PRODUCT}}* — Plan {{PLAN}} días\nTotal del pedido: *${'$'}{{TOTAL}}*\nSeña: *${'$'}{{SENA_AMOUNT}}*\nSaldo al cartero: *${'$'}{{SENA_REMAINDER}}*\n\n{{LINK}}\n\nEscribime *"listo"* cuando termines.`
-            : `💳 *Pago online via MercadoPago*\n\nPedido: *{{PRODUCT}}* — Plan {{PLAN}} días\nTotal: *${'$'}{{TOTAL}}*\n\n{{LINK}}\n\nEscribime *"listo"* cuando termines.`);
+    //
+    // Modelo nuevo (may-2026): siempre se usa payment_mp_link. Las plantillas _sena
+    // fueron eliminadas de V5/V6. Si state.senaAmount > 0 (Order legacy), el bot
+    // genera el link por ese monto igual (variable amount arriba), pero el mensaje
+    // ya no menciona "seña/saldo al cartero" — el admin coordina por separado.
+    const linkTpl = getFlowTemplate('payment_mp_link', knowledge) ||
+        `💳 *Pago online via MercadoPago*\n\nPedido: *{{PRODUCT}}* — Plan {{PLAN}} días\nTotal: *${'$'}{{TOTAL}}*\n\n{{LINK}}\n\nEscribime *"listo"* cuando termines.`;
     // Inyectamos productName en state efímero para que {{PRODUCT}} muestre el cart concatenado.
     const stateForFmt = { ...currentState, selectedProduct: productName };
     const msg = _formatMessage(linkTpl, stateForFmt);

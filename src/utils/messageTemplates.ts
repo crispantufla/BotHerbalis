@@ -128,21 +128,6 @@ function buildPaymentMessage(state: any, knowledge?: any): string {
 }
 
 /**
- * TEXTO 5c — Cliente eligió contra reembolso por 1ª vez. Explica modalidad
- * (anticipo $10k al alias + saldo al cartero) y pide confirmación.
- * Plantilla: knowledge.flow.payment_cod_retry.response.
- */
-function buildCashRetryMessage(state: any, knowledge?: any): string {
-    const k = knowledge || _loadDefaultKnowledge();
-    const tpl = _getFlowResponse(k, 'payment_cod_retry');
-    if (!tpl) {
-        logger.error('[messageTemplates] flow.payment_cod_retry missing in knowledge');
-        return 'Podemos coordinar pago al recibir.';
-    }
-    return _formatMessage(tpl, state);
-}
-
-/**
  * Build the order confirmation message sent to the client.
  * Plantilla: knowledge.flow.order_confirmation_{mp|transfer|cod|fallback}.response.
  * Used by both handleAdminCommand (manual approval) and autoApproveOrders (scheduler).
@@ -186,7 +171,6 @@ function getFlowTemplate(key: string, knowledge?: any): string | null {
 export {
     buildConfirmationMessage,
     buildPaymentMessage,
-    buildCashRetryMessage,
     buildPersonalizedPriceResponse,
     isPriceQuestion,
     detectProductInText,

@@ -136,34 +136,10 @@
             "response": "¡Perfecto! Para transferir usá el alias *{{ALIAS}}* a nombre de *{{TITULAR}}* 🏦\n\nMonto: ${{TOTAL}}\n\nUna vez que realices la transferencia, escribime *\"listo\"* y coordinamos el envío 😊",
             "nextStep": "waiting_transfer_confirmation"
         },
-        "payment_cod_retry": {
-            "step": "waiting_payment_method",
-            "_note": "LEGACY (deprecated may-2026). Mensaje del flujo anticipo $10k + saldo al cartero. Reemplazado por payment_retiro_confirm.",
-            "response": "Dale 👍\n\nLa modalidad es: adelantás $10.000 (cubre el envío) y el resto lo pagás en efectivo al cartero cuando te llega.\n\nEs la misma plata, solo cambia el momento. ¿Avanzamos así?",
-            "nextStep": "waiting_payment_method"
-        },
-        "payment_cod_method_choice": {
-            "step": "waiting_payment_method",
-            "_note": "LEGACY (deprecated may-2026). Submenú anticipo $10k. Ya no se dispara.",
-            "response": "¡Dale! ¿El anticipo de $10.000 lo querés hacer por...\n\n1️⃣ *Transferencia bancaria* — te paso el alias y me mandás el comprobante\n2️⃣ *Mercado Pago* — te paso el link y se acredita al toque\n\n¿Cuál te queda más cómoda?",
-            "nextStep": "waiting_payment_method"
-        },
-        "payment_cod_anticipo": {
-            "step": "waiting_transfer_confirmation",
-            "_note": "LEGACY (deprecated may-2026). Anticipo por transferencia. Ya no se dispara.",
-            "response": "¡Perfecto! Para el *anticipo de $10.000* por transferencia usá el alias *{{ALIAS}}* a nombre de *{{TITULAR}}* 🏦\n\nCuando termines, mandame *el comprobante* o el *número de operación* 📸\n\nCuando te llegue el paquete, pagás el saldo *${{SALDO}}* en efectivo al cartero 📦",
-            "nextStep": "waiting_transfer_confirmation"
-        },
         "payment_mp_link": {
             "step": "waiting_mp_payment",
             "_note": "TEXTO 5a — Cliente eligió Mercado Pago. Le mandamos el link + detalle del pedido + pedido de datos en paralelo. Placeholders: {{PRODUCT}}, {{PLAN}}, {{TOTAL}}, {{LINK}}.",
             "response": "💳 Acá va tu link de Mercado Pago:\n\n{{LINK}}\n\nTotal: ${{TOTAL}} — {{PRODUCT}} {{PLAN}} días\n\nCuando pagues, mandame \"listo\" y verifico.\n\nMientras, pasame los datos de envío:\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:",
-            "nextStep": "waiting_mp_payment"
-        },
-        "payment_mp_link_sena": {
-            "step": "waiting_mp_payment",
-            "_note": "LEGACY (deprecated may-2026). Link MP por seña $10k. Ya no se dispara.",
-            "response": "💳 Link para la seña de Mercado Pago:\n\n{{LINK}}\n\nSeña: ${{SENA_AMOUNT}}\nSaldo al cartero: ${{SENA_REMAINDER}}\n\nCuando termines, mandame \"listo\" y verifico.\n\nMientras, pasame los datos de envío:\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:",
             "nextStep": "waiting_mp_payment"
         },
         "payment_mp_failed": {
@@ -176,20 +152,10 @@
             "_note": "Mensaje cuando MP devuelve el pago como rejected/error tras un intento del cliente. Se ofrece reintento con otras formas dentro de MP.",
             "response": "⚠️ Hubo un problema con el pago de MercadoPago, pudo ser la tarjeta o un rechazo del banco.\n\nProbá de nuevo con otra forma:\n✅ Tarjeta de crédito\n✅ Débito\n✅ Saldo Mercado Pago\n\nTe genero un nuevo link para volver a intentarlo, decime cuando esté listo 😊"
         },
-        "payment_mp_retry_sena": {
-            "step": "waiting_mp_payment",
-            "_note": "LEGACY (deprecated may-2026). Retry MP del flujo seña. Ya no se dispara.",
-            "response": "⚠️ Hubo un problema con el pago de la seña — pudo ser la tarjeta o un rechazo del banco.\n\nProbá de nuevo con otra forma:\n✅ Tarjeta de crédito\n✅ Débito\n✅ Saldo Mercado Pago\n\nTe genero un nuevo link para volver a intentarlo. Cuando termines, mandame *el comprobante* o el *número de operación* y verifico el pago 📸"
-        },
         "transfer_received": {
             "step": "waiting_transfer_confirmation",
             "_note": "Cliente confirmó que ya hizo la transferencia ('listo'). Pausamos al cliente y avisamos admin para verificar el comprobante. Pedimos comprobante o número de operación porque la cuenta emisora puede estar a nombre de un tercero y no se puede asumir match por nombre.",
             "response": "¡Perfecto! Para verificarla más rápido, mandame *el comprobante* o el *número de operación* 📸\n\nApenas la cruzo, te confirmo el envío ⏳"
-        },
-        "cod_received": {
-            "step": "waiting_transfer_confirmation",
-            "_note": "LEGACY (deprecated may-2026). Mensaje cuando el cliente confirma haber enviado el anticipo $10k. Reemplazado por payment_retiro_confirm.",
-            "response": "¡Perfecto! Para verificar el anticipo, mandame *el comprobante* o el *número de operación* 📸\n\nApenas lo cruzo, despachamos. El saldo lo pagás en efectivo al cartero cuando llega 📦"
         },
         "order_confirmation_mp": {
             "step": "waiting_admin_validation",
