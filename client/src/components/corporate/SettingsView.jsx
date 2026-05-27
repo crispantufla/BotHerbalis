@@ -9,19 +9,18 @@ import {
     Button, IconButton, Card, Badge, Input, useToast, cn
 } from '../ui';
 
-// 3 modelos posibles. `rotacion` no tiene stats individuales — distribuye
-// 50/50 entre v5 y v6.
+// V7 es el único guion activo desde may-2026. V5/V6 (+ rotación A/B) fueron
+// archivados a archive/ — se conserva el array como SCRIPTS por si en el
+// futuro se reactivara otra variante, pero hoy queda con un único item.
 const SCRIPTS = [
-    { id: 'v5',       name: 'V5 · Asesor consultivo',  desc: 'Pregunta kilos, recomienda según objetivo.',  tone: 'info'    },
-    { id: 'v6',       name: 'V6 · Elena charla',        desc: 'Tono cálido, conversacional, argentino.',     tone: 'purple'  },
-    { id: 'rotacion', name: 'A/B testing V5 vs V6',     desc: 'Distribuye 50/50 entre V5 y V6.',             tone: 'warning' },
+    { id: 'v7', name: 'V7 · Elena (2 tiers)', desc: 'Persona Elena. 2 tiers (hasta 10 kg → 60d, +10 kg → 120d). Tras pedir kilos manda recomendación + precios en mensajes seguidos.', tone: 'info' },
 ];
 
 const SettingsView = ({ status }) => {
     const { socket } = useSocket();
     const { toast, confirm } = useToast();
 
-    const [activeScript, setActiveScript] = useState('v5');
+    const [activeScript, setActiveScript] = useState('v7');
     const [scriptStats, setScriptStats] = useState({});
     const [switchingScript, setSwitchingScript] = useState(false);
     const [resettingStats, setResettingStats] = useState(false);
@@ -97,7 +96,7 @@ const SettingsView = ({ status }) => {
     // el handler — está en el historial git.
 
     const handleResetScriptStats = async () => {
-        const ok = await confirm('¿Reiniciar contadores de conversión de V5 y V6?\n\nEmpiezan de cero. Útil cuando los guiones cambiaron y los números viejos ya no son comparables. No afecta ventas ni pedidos.');
+        const ok = await confirm('¿Reiniciar contadores de conversión del guion?\n\nEmpiezan de cero. Útil cuando los guiones cambiaron y los números viejos ya no son comparables. No afecta ventas ni pedidos.');
         if (!ok) return;
         setResettingStats(true);
         try {
@@ -246,7 +245,7 @@ const SettingsView = ({ status }) => {
                                         isActive
                                             ? 'border-accent-500 bg-accent-50/50 dark:bg-accent-900/15 shadow-card-hover'
                                             : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 hover:border-accent-300 dark:hover:border-accent-700',
-                                        script.id === 'rotacion' && 'sm:col-span-2'
+                                        SCRIPTS.length === 1 && 'sm:col-span-2'
                                     )}
                                 >
                                     <div className="flex items-start gap-2 mb-2">

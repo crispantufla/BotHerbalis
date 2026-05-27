@@ -37,7 +37,7 @@ const CommsView = ({ initialChatId, onChatSelected, onChatOpened, initialSearch 
 
     // Datos
     const [scriptFlow, setScriptFlow] = useState({});
-    const [availableScripts, setAvailableScripts] = useState({ v3: {}, v4: {} });
+    const [availableScripts, setAvailableScripts] = useState({ v7: {} });
     const [prices, setPrices] = useState(null);
     const [summarizing, setSummarizing] = useState(false);
     const [summaryText, setSummaryText] = useState(null);
@@ -170,29 +170,35 @@ const CommsView = ({ initialChatId, onChatSelected, onChatOpened, initialSearch 
         }
     }, [initialChatId, chats, onChatSelected]);
 
-    // Bootstrap: cargar scripts (v3+v4) y precios en paralelo
+    // Bootstrap: cargar el guion activo (V7) y precios en paralelo.
+    // V5/V6 fueron archivados may-2026 — solo V7 está vivo.
     useEffect(() => {
         (async () => {
             try {
-                const [scriptV3, scriptV4, pricesRes] = await Promise.all([
-                    api.get('/api/script/v3'),
-                    api.get('/api/script/v4'),
+                const [scriptV7, pricesRes] = await Promise.all([
+                    api.get('/api/script/v7'),
                     api.get('/api/prices'),
                 ]);
-                const scripts = { v3: scriptV3.data?.flow || {}, v4: scriptV4.data?.flow || {} };
+                const scripts = { v7: scriptV7.data?.flow || {} };
                 setAvailableScripts(scripts);
-                setScriptFlow(scripts.v3);
+                setScriptFlow(scripts.v7);
                 if (pricesRes.data) setPrices(pricesRes.data);
             } catch (e) { console.error('Error fetching scripts:', e); }
         })();
     }, []);
 
     // Cambiar de flow según el assignedScript del chat seleccionado.
+    // V7 es el único guion activo desde may-2026 — los chats viejos pueden
+    // tener assignedScript='v5'/'v6' grabado, pero el backend ya migra esos
+    // valores en runtime. Default a 'v7' si no viene seteado.
     useEffect(() => {
         if (!selectedChat) return;
-        const targetVersion = selectedChat.assignedScript || 'v3';
+        const targetVersion = selectedChat.assignedScript || 'v7';
         if (availableScripts[targetVersion]) {
             setScriptFlow(availableScripts[targetVersion]);
+        } else if (availableScripts['v7']) {
+            // Chat con assignedScript de un guion archivado (v3..v6) — caemos a V7.
+            setScriptFlow(availableScripts['v7']);
         }
     }, [selectedChat, availableScripts]);
 

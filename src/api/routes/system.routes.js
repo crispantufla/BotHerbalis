@@ -552,13 +552,15 @@ module.exports = (clientPool) => {
         }
     });
 
-    // GET /script/:version — readable by all authenticated users (sellers need it for the Guión panel)
-    // v1/v2/v3/v4 fueron archivados — esta ruta legacy sirve para descargar versiones archivadas.
+    // GET /script/:version — readable by all authenticated users.
+    // v1..v6 fueron archivados a archive/. v7 (Elena, 2 tiers) es el único activo
+    // desde may-2026. Si el frontend pide un guion archivado, lo devolvemos desde
+    // archive/ para no romper UIs viejas que todavía cacheen esos endpoints.
     router.get('/script/:version', ...withSeller(clientPool), async (req, res) => {
         try {
             const { version } = req.params;
-            const archived = ['v1', 'v2', 'v3', 'v4'];
-            const active = ['v5', 'v6'];
+            const archived = ['v1', 'v2', 'v3', 'v4', 'v5', 'v6'];
+            const active = ['v7'];
 
             if (![...archived, ...active].includes(version)) {
                 return res.status(404).json({ error: 'Script no encontrado' });

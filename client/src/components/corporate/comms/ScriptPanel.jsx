@@ -82,7 +82,7 @@ export default function ScriptPanel({
                         <h4 className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                             Guión sugerido
                         </h4>
-                        <Badge tone="accent" size="sm">{(assignedScript || 'v3').toUpperCase()}</Badge>
+                        <Badge tone="accent" size="sm">{(assignedScript || 'v7').toUpperCase()}</Badge>
                     </div>
 
                     {Object.keys(scriptFlow).length > 0 ? (
