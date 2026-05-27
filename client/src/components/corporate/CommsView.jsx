@@ -225,20 +225,77 @@ const CommsView = ({ initialChatId, onChatSelected, onChatOpened, initialSearch 
                 .replace(/{{COSTO_LOGISTICO}}/g, p.costoLogistico || '18.000');
         }
         const ctx = chat || selectedChat;
-        if (ctx) {
-            const product = ctx.selectedProduct || ctx.cart?.[0]?.product || 'Producto';
-            const plan = ctx.selectedPlan || ctx.cart?.[0]?.plan || '60';
-            let total = ctx.totalPrice || '';
-            if (!total && ctx.cart?.length > 0) {
-                total = ctx.cart
-                    .reduce((s, i) => s + parseInt((i.price || '0').toString().replace(/\D/g, '')), 0)
-                    .toLocaleString('es-AR');
-            }
-            result = result
-                .replace(/{{PRODUCT}}/g, product)
-                .replace(/{{PLAN}}/g, plan)
-                .replace(/{{TOTAL}}/g, total ? `$${total}` : '$0');
+        const product = ctx?.selectedProduct || ctx?.cart?.[0]?.product || 'Producto';
+        const plan = ctx?.selectedPlan || ctx?.cart?.[0]?.plan || '60';
+        let total = ctx?.totalPrice || '';
+        if (!total && ctx?.cart?.length > 0) {
+            total = ctx.cart
+                .reduce((s, i) => s + parseInt((i.price || '0').toString().replace(/\D/g, '')), 0)
+                .toLocaleString('es-AR');
         }
+        result = result
+            .replace(/{{PRODUCT}}/g, product)
+            .replace(/{{PRODUCT_DETAIL}}/g, product)
+            .replace(/{{PLAN}}/g, plan)
+            .replace(/{{PLAN_DETAIL}}/g, `${plan} días`)
+            .replace(/{{TOTAL}}/g, total ? total : '0');
+
+        // PLAN_MONTHS: "2 meses" / "4 meses"
+        const planNum = parseInt(String(plan), 10);
+        const months = isNaN(planNum) ? '' : `${Math.round(planNum / 30)} meses`;
+        result = result.replace(/{{PLAN_MONTHS}}/g, months);
+
+        // DOSAGE_REASON según weightGoal (mismo mapeo que server-side messages.ts)
+        const w = typeof ctx?.weightGoal === 'number'
+            ? ctx.weightGoal
+            : parseInt(String(ctx?.weightGoal || 0), 10) || 0;
+        let dosageReason = '';
+        if (w > 0 && w <= 10) dosageReason = 'Con el plan de 60 días te alcanza para tu objetivo.';
+        else if (w > 10 && w <= 20) dosageReason = 'Con el plan de 120 días te puede sobrar un poco; muchas clientas usan el sobrante como mantenimiento.';
+        else if (w > 20) dosageReason = 'El plan de 120 días es el tiempo que tu cuerpo necesita para bajar tranqui, sin rebote.';
+        result = result.replace(/{{DOSAGE_REASON}}/g, dosageReason);
+
+        // PRICE_60 / PRICE_120 genéricos según producto seleccionado.
+        const productKey = product.includes('Gota') ? 'Gotas'
+            : product.includes('Semilla') ? 'Semillas'
+            : 'Cápsulas';
+        result = result
+            .replace(/{{PRICE_60}}/g, prices?.[productKey]?.['60'] || '')
+            .replace(/{{PRICE_120}}/g, prices?.[productKey]?.['120'] || '');
+
+        // PRICE_PER_DAY_X_120 — para anclas de precio/día en V6 legacy. Calculo
+        // como (precio plan 120 / 120) redondeado.
+        const perDay = (priceStr) => {
+            if (!priceStr) return '';
+            const n = parseInt(priceStr.replace(/\./g, ''), 10);
+            if (isNaN(n)) return '';
+            return Math.round(n / 120).toLocaleString('es-AR');
+        };
+        result = result
+            .replace(/{{PRICE_PER_DAY_CAPSULAS_120}}/g, perDay(prices?.['Cápsulas']?.['120']))
+            .replace(/{{PRICE_PER_DAY_SEMILLAS_120}}/g, perDay(prices?.['Semillas']?.['120']))
+            .replace(/{{PRICE_PER_DAY_GOTAS_120}}/g, perDay(prices?.['Gotas']?.['120']))
+            .replace(/{{PRICE_PER_DAY_120}}/g, perDay(prices?.[productKey]?.['120']));
+
+        // Constantes bancarias + entrega standard + saldo legacy seña.
+        // POSTDATADO_LINE: muestra entrega standard (5-7 días). Para el preview
+        // no contamos con state.postdatado — el server lo resuelve en runtime.
+        result = result
+            .replace(/{{ALIAS}}/g, 'HERBALIS.TIENDA')
+            .replace(/{{TITULAR}}/g, 'BIO ORIGEN S.A.S.')
+            .replace(/{{ANTICIPO}}/g, '10.000')
+            .replace(/{{POSTDATADO_LINE}}/g, '✔ Entrega estimada: 5 a 7 días hábiles desde la confirmación\n')
+            .replace(/{{CARTO_LINE}}/g, '')
+            .replace(/{{LINK}}/g, '(link se genera al confirmar el pago)')
+            .replace(/{{SENA_AMOUNT}}/g, '10.000')
+            .replace(/{{SENA_AMOUNT_FMT}}/g, '10.000')
+            .replace(/{{SENA_REMAINDER}}/g, '')
+            .replace(/{{SALDO}}/g, '');
+
+        // Sweep defensivo: cualquier {{X}} residual queda invisible en el preview
+        // (igual que hace el server-side _formatMessage antes de mandar al cliente).
+        result = result.replace(/\{\{\s*[A-Z_][A-Z0-9_]*\s*\}\}/g, '');
+
         return result;
     };
 
