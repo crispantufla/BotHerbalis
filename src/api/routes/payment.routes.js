@@ -84,6 +84,73 @@ module.exports = (clientPool) => {
         }
     });
 
+    // POST /payments/manual-link — admin/seller genera un link MP manualmente
+    // desde el dashboard (ej: panel Asistente IA, modal de Payment MP Link).
+    // Recibe { amount } y devuelve { link } tras crear la preferencia en MP +
+    // persistir el PaymentLink. NO se asocia a un chat específico —
+    // sellerPhone queda null y el seller pega el link manualmente en el chat.
+    router.post('/payments/manual-link', ...withSeller(clientPool), async (req, res) => {
+        try {
+            const { amount, title } = req.body || {};
+            const amt = parseFloat(String(amount || '').replace(',', '.').replace(/[^\d.]/g, ''));
+            if (!amt || isNaN(amt) || amt <= 0) {
+                return res.status(400).json({ error: 'Monto inválido' });
+            }
+
+            const mpToken = process.env.MP_ACCESS_TOKEN;
+            if (!mpToken) return res.status(503).json({ error: 'MP_ACCESS_TOKEN no configurado' });
+
+            const { MercadoPagoConfig, Preference } = require('mercadopago');
+            const { randomUUID } = require('crypto');
+            const externalRef = randomUUID();
+            const webhookUrl = process.env.MP_WEBHOOK_URL;
+            const mpClient = new MercadoPagoConfig({ accessToken: mpToken });
+            const preference = new Preference(mpClient);
+            const body = {
+                items: [{
+                    title: (title || 'Pago Herbalis').toString().slice(0, 80),
+                    quantity: 1, unit_price: amt, currency_id: 'ARS',
+                }],
+                back_urls: {
+                    success: 'https://herbalis.com.ar',
+                    failure: 'https://herbalis.com.ar',
+                    pending: 'https://herbalis.com.ar',
+                },
+                auto_return: 'approved',
+                external_reference: externalRef,
+            };
+            if (webhookUrl) body.notification_url = webhookUrl;
+            const response = await preference.create({ body });
+            const link = response.init_point;
+
+            const instanceId = getInstanceId(req);
+            const record = await prisma.paymentLink.create({
+                data: {
+                    preferenceId: response.id,
+                    externalRef,
+                    amount: amt,
+                    link,
+                    source: 'manual_dashboard',
+                    status: 'pending',
+                    instanceId: instanceId || 'default',
+                },
+            });
+
+            // Emitir socket event para refrescar PaymentsView en vivo.
+            const io = req.sellerInstance?.sharedState?.io;
+            if (io && instanceId) {
+                io.to(instanceId).emit('payment_created', record);
+                io.to('admin').emit('payment_created', { ...record, sellerId: instanceId });
+            }
+
+            logger.info(`[PAYMENTS] Manual link created: $${amt} ARS (instance=${instanceId})`);
+            res.json({ link, amount: amt, id: record.id });
+        } catch (e) {
+            logger.error(`[PAYMENTS] Error creating manual link: ${e?.message || e}`);
+            res.status(500).json({ error: e?.message || 'Error generando link MP' });
+        }
+    });
+
     // POST /mp-webhook — IPN from MercadoPago (no auth, verified by HMAC)
     router.post('/mp-webhook', async (req, res) => {
         res.sendStatus(200); // Respond immediately to MP

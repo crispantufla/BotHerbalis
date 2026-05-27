@@ -16,6 +16,7 @@ import ChatMessageList from './components/ChatMessageList';
 import ChatInputArea from './components/ChatInputArea';
 import AiCorrectionModal from './components/AiCorrectionModal';
 import ManualOrderEntryModal from './components/ManualOrderEntryModal';
+import ManualMpLinkModal from './components/ManualMpLinkModal';
 
 import ChatSidebarItem from './comms/ChatSidebarItem';
 import AlertBanner from './comms/AlertBanner';
@@ -62,6 +63,9 @@ const CommsView = ({ initialChatId, onChatSelected, onChatOpened, initialSearch 
     const [showConfirmFillModal, setShowConfirmFillModal] = useState(false);
     const [confirmFillTemplate, setConfirmFillTemplate] = useState('');
     const [confirmFillData, setConfirmFillData] = useState({ product: '', plan: '60', total: '' });
+    const [showMpLinkModal, setShowMpLinkModal] = useState(false);
+    const [mpLinkTemplate, setMpLinkTemplate] = useState('');
+    const [mpLinkSuggestedAmount, setMpLinkSuggestedAmount] = useState('');
 
     const {
         chats, messages, setMessages,
@@ -334,14 +338,18 @@ const CommsView = ({ initialChatId, onChatSelected, onChatOpened, initialSearch 
     };
 
     const buildConfirmMessage = (template, { product, plan, total }) => {
-        const costoLog = prices?.costoLogistico || '18.000';
-        const totalStr = total ? (total.startsWith('$') ? total : `$${total}`) : '$0';
-        return template
-            .replace(/{{PRODUCT}}/g, product || 'Producto')
-            .replace(/{{PLAN}}/g, plan || '60')
-            .replace(/{{TOTAL}}/g, totalStr)
-            .replace(/{{COSTO_LOGISTICO}}/g, costoLog)
-            .replace(/{{ADICIONAL_MAX}}/g, prices?.adicionalMAX || '0');
+        // Construimos un "fake chat" con los valores del modal para reusar
+        // formatScriptMessage (cubre PRODUCT/PLAN/TOTAL + ALIAS, TITULAR,
+        // POSTDATADO_LINE, PRODUCT_DETAIL, PLAN_DETAIL, etc.). Sin esto algunos
+        // placeholders del order_confirmation_* quedaban literales.
+        const totalClean = String(total || '').replace(/^\$+/, '').trim();
+        const fakeChat = {
+            selectedProduct: product || 'Producto',
+            selectedPlan: plan || '60',
+            totalPrice: totalClean,
+            cart: [],
+        };
+        return formatScriptMessage(template, fakeChat);
     };
 
     // ─── Handlers ──────────────────────────────────────────────────────────
@@ -528,7 +536,22 @@ Teléfono: ${phoneDisplay}`;
     };
 
     const handlePickScriptStep = (stepKey, scriptResponse) => {
-        if (stepKey === 'confirmation') {
+        // payment_mp_link → necesita un link real de MP. Abrimos modal que pide
+        // el monto, crea la preferencia en MP, y sustituye {{LINK}} con la URL real.
+        if (stepKey === 'payment_mp_link') {
+            // Sugerimos el total del chat seleccionado si existe.
+            const suggested = selectedChat?.totalPrice
+                || selectedChat?.cart?.reduce((s, i) => s + parseInt((i.price || '0').toString().replace(/\D/g, '') || 0, 10), 0)
+                || '';
+            setMpLinkSuggestedAmount(String(suggested).replace(/\./g, '') || '');
+            setMpLinkTemplate(scriptResponse);
+            setShowMpLinkModal(true);
+            return;
+        }
+
+        // order_confirmation_* → si el extractor detecta product+plan+total, se inserta
+        // directo. Si falta algo, abrimos el modal con selector para completar.
+        if (stepKey.startsWith('order_confirmation_') || stepKey === 'confirmation') {
             const ctx = extractConfirmationContext();
             if (ctx.product && ctx.plan && ctx.total) {
                 if (!selectedChat.isPaused) handleToggleBot();
@@ -538,10 +561,12 @@ Teléfono: ${phoneDisplay}`;
                 setConfirmFillTemplate(scriptResponse);
                 setShowConfirmFillModal(true);
             }
-        } else {
-            if (!selectedChat.isPaused) handleToggleBot();
-            setInput(formatScriptMessage(scriptResponse, selectedChat));
+            return;
         }
+
+        // Default: inserta el template formateado en el input.
+        if (!selectedChat.isPaused) handleToggleBot();
+        setInput(formatScriptMessage(scriptResponse, selectedChat));
     };
 
     // ─── Render ────────────────────────────────────────────────────────────
@@ -879,6 +904,25 @@ Teléfono: ${phoneDisplay}`;
                     </Button>
                 </Modal.Footer>
             </Modal>
+
+            {/* Manual MP Link Modal — abre cuando hacen click en payment_mp_link.
+                Pide monto, crea preferencia MP real, y sustituye {{LINK}} en el template. */}
+            <ManualMpLinkModal
+                isOpen={showMpLinkModal}
+                onClose={() => setShowMpLinkModal(false)}
+                template={mpLinkTemplate}
+                suggestedAmount={mpLinkSuggestedAmount}
+                formatTemplate={(text, { link }) => {
+                    const filled = formatScriptMessage(text, selectedChat);
+                    return filled.replace(/\(link se genera al confirmar el pago\)/g, link)
+                                 .replace(/{{LINK}}/g, link);
+                }}
+                onLinkReady={(finalMsg) => {
+                    if (selectedChat && !selectedChat.isPaused) handleToggleBot();
+                    setInput(finalMsg);
+                    setShowMpLinkModal(false);
+                }}
+            />
 
             {/* AI Correction Modal — su propio sub-componente */}
             <AiCorrectionModal
