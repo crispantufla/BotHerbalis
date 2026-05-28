@@ -142,7 +142,13 @@ const CorporateDashboard = () => {
             socket.on('ready', handleReady);
             socket.on('status_change', handleStatusChange);
             socket.on('global_pause_changed', handleGlobalPauseChanged);
-            socket.on('new_alert', (newAlert) => setAlerts(prev => [newAlert, ...prev]));
+            // Solo mantenemos la alerta más reciente por userPhone. Si entra una
+            // nueva para un cliente que ya tenía alerta, la reemplazamos en lugar
+            // de acumular (el backend ya hace la misma dedup sobre sessionAlerts).
+            socket.on('new_alert', (newAlert) => setAlerts(prev => [
+                newAlert,
+                ...prev.filter(a => a.userPhone !== newAlert.userPhone),
+            ]));
             socket.on('alerts_updated', (updated) => setAlerts(updated));
             return () => {
                 socket.off('qr', handleQr);

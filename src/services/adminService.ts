@@ -137,12 +137,23 @@ export async function notifyAdmin(
     logger.info(`[ADMIN ALERT] ${reason} (User: ${userPhone})`);
 
     const now = Date.now();
-    // Search for the most recent alert from THIS user+reason, not just sessionAlerts[0]
-    // (avoids missed dedup when another user's alert is at the front of the list)
-    const lastAlert: AlertEntry | undefined = sharedState.sessionAlerts.find(
+    // Dedup por (userPhone + reason) en ventana de 8s — evita duplicar
+    // ráfagas del mismo evento.
+    const lastSameReason: AlertEntry | undefined = sharedState.sessionAlerts.find(
         (a: AlertEntry) => a.userPhone === userPhone && a.reason === reason
     );
-    if (lastAlert && (now - lastAlert.id < 8000)) return;
+    if (lastSameReason && (now - lastSameReason.id < 8000)) return;
+
+    // Reemplazo por userPhone: si ya hay alertas de este cliente (sin importar
+    // la razón), las eliminamos antes de pushear la nueva. El admin debe ver
+    // SOLO la más reciente — antes se acumulaban "Cliente en pausa te escribió"
+    // + "BOT PAUSADO — Necesita intervención" para el mismo chat y confundían.
+    // El frontend hace la misma dedup al recibir new_alert (CorporateDashboard).
+    if (sharedState.sessionAlerts.some((a: AlertEntry) => a.userPhone === userPhone)) {
+        sharedState.sessionAlerts = sharedState.sessionAlerts.filter(
+            (a: AlertEntry) => a.userPhone !== userPhone
+        );
+    }
 
     sharedState.lastAlertUser = userPhone;
 
