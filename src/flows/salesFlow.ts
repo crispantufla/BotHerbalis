@@ -319,6 +319,16 @@ export async function processSalesFlow(
         }
     }
 
+    // Re-entry desde anuncio sin peso registrado (reporte 2026-05-27): un cliente
+    // que retoma desde un click-to-WhatsApp y NO había dado kilos en sesión previa
+    // debe volver al saludo. Sin este reset, stepWaitingWeight quedaba mascando
+    // "Quiero más información" sin tier y la IA alucinaba un weightGoal.
+    if (_detectAdSource(text) && !currentState.weightGoal && currentState.step !== 'greeting') {
+        logger.info(`[AD-RE-ENTRY] User ${userId} re-entró desde ${_detectAdSource(text)} sin weightGoal (step previo: ${currentState.step}). Reset a greeting.`);
+        _setStep(currentState, FlowStep.GREETING);
+        saveState(userId);
+    }
+
     // 2. Execute Global Interceptors (Priority 0 and 1)
     const globalsResult = await processGlobals(userId, text, normalizedText, currentState, knowledge, dependencies);
     if (globalsResult && globalsResult.matched) {

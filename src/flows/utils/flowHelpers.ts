@@ -108,7 +108,7 @@ function _detectPostdatado(normalizedText: string): string | null {
         /cuando\s+(?:cobre|cobr[eo]|me\s+deposit[ae]n|me\s+pagu?en|tenga\s+(?:la\s+)?plata|tenga\s+(?:el\s+)?(?:dinero|efectivo)|junte\s+(?:la\s+)?plata|junte\s+(?:el\s+)?efectivo|consiga\s+(?:la\s+)?plata|me\s+alcance)/i,
         /(?:cobro|depositan|pagan)\s+(?:el\s+\d{1,2}|a\s+principio|la\s+quincena)/i,
         /(?:apenas|en\s+cuanto|cuando)\s+(?:cuente\s+con|tenga|junte|consiga|cobre)/i,
-        /el\s+\d{1,2}(?=[\s,.]|$)/i,
+        /(?:el|del|para\s+el|despu[eé]s\s+del|a\s+partir\s+del)\s+\d{1,2}(?=[\s,.]|$)/i,
         /(?:la\s+)?(?:quincena|semana\s+que\s+viene|mes\s+que\s+viene|pr[oó]ximo\s+mes)/i,
         // Skip day-of-week when user is only talking about when they get paid —
         // delivery takes 5-7 business days so they'll have the money by then.

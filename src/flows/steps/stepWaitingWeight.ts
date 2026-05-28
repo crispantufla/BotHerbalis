@@ -313,14 +313,20 @@ export async function handleWaitingWeight(
             logger.info(`[AI-FALLBACK] waiting_weight: No number detected for ${userId}`);
             const aiWeight = await aiService.chat(text, {
                 step: FlowStep.WAITING_WEIGHT,
-                goal: 'El usuario NO te dijo cuántos kilos quiere bajar. Tu único objetivo: re-preguntar el rango de kilos de forma natural y BREVE. REGLAS DURAS: (a) Máx 1-2 frases cortas, total ~150 caracteres. (b) PROHIBIDO repetir info ya dada (que enviamos a todo el país, que las cápsulas son efectivas, etc). (c) Una sola pregunta al final, NUNCA dos. (d) Si dijo de qué provincia es, una reacción humana corta ("Ay qué lindo [lugar]!" o similar) y directo a la pregunta. (e) Si dijo no saberlo, ofrecé estimación rápida. (f) Terminá con: "¿Cuántos kilos querés bajar?" o variante natural — UNA pregunta sola.',
+                goal: 'El usuario NO te dijo cuántos kilos quiere bajar. Tu único objetivo: re-preguntar el rango de kilos de forma natural y BREVE. REGLAS DURAS: (a) Máx 1-2 frases cortas, total ~150 caracteres. (b) PROHIBIDO repetir info ya dada (que enviamos a todo el país, que las cápsulas son efectivas, etc). (c) Una sola pregunta al final, NUNCA dos. (d) PROHIBIDO comentar sobre la provincia/ciudad del cliente ("qué lindo X", "tengo familia ahí", etc.) — son comentarios obsecuentes que el admin reportó. Ignorá el dato de ubicación y andá directo a la pregunta. (e) Si dijo no saberlo, ofrecé estimación rápida. (f) Terminá con: "¿Cuántos kilos querés bajar?" o variante natural — UNA pregunta sola.',
                 history: currentState.history,
                 summary: currentState.summary,
                 knowledge: knowledge,
                 userState: currentState
             });
 
-            if (aiWeight.goalMet && aiWeight.extractedData) {
+            // Guard anti-alucinación (reporte 2026-05-27 horacio): clientes que
+            // entran con "¡Hola! Quiero más información" SIN números ni indicios
+            // de peso terminaban en tier 1 porque la IA inventaba goalMet=true
+            // con un weightGoal alucinado. Solo confiamos en goalMet si el texto
+            // del cliente contiene palabras asociadas a peso o un número en rango.
+            const hasWeightSignal = /\d|kilo|kg|peso|bajar|perder|adelgazar|mucho|bastante|poco|much[ií]simo|grande|chico|enorme/i.test(normalizedText);
+            if (aiWeight.goalMet && aiWeight.extractedData && hasWeightSignal) {
                 const extNum = aiWeight.extractedData.match(/\d+/);
                 if (extNum) currentState.weightGoal = parseInt(extNum[0], 10);
 

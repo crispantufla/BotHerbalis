@@ -1,5 +1,5 @@
 import { UserState, FlowStep } from '../../types/state';
-import { _setStep, _pauseAndAlert } from '../utils/flowHelpers';
+import { _setStep, _pauseAndAlert, _detectPostdatado } from '../utils/flowHelpers';
 import { getFlowTemplate } from '../../utils/messageTemplates';
 import { calculateTotal } from '../utils/cartHelpers';
 import { _formatMessage } from '../utils/messages';
@@ -73,6 +73,19 @@ export async function handleWaitingPaymentMethod(
     if (!hasValidTotal && currentState.cart && currentState.cart.length > 0) {
         logger.warn(`[PAYMENT_METHOD] totalPrice corrupto/vacío para ${userId} — recalculando desde cart`);
         calculateTotal(currentState);
+    }
+
+    // Capturar postdatado si el cliente mencionó una fecha futura junto a la
+    // elección de envío (reporte 2026-05-28: "A domicilio ya estaré avisándole
+    // después del 10 recién" → el bot ignoraba el "después del 10"). Lo
+    // guardamos en state.postdatado para que aparezca en order_confirmation_*.
+    if (!currentState.postdatado) {
+        const detectedPostdate = _detectPostdatado(normalizedText);
+        if (detectedPostdate) {
+            currentState.postdatado = detectedPostdate;
+            logger.info(`[PAYMENT_METHOD] Postdatado capturado para ${userId}: "${detectedPostdate}"`);
+            saveState(userId);
+        }
     }
 
     const optionNum = _detectOptionNumber(text);
@@ -152,11 +165,16 @@ export async function handleWaitingPaymentMethod(
         currentState.paymentSubChoiceAsked = true;
         const tpl = getFlowTemplate('payment_domicilio_choice', knowledge) ||
             `Perfecto, lo mandamos a tu domicilio 🏠\n\n¿Cómo querés abonar?\n\n1️⃣ *Mercado Pago*\n2️⃣ *Transferencia bancaria*`;
-        const msg = _formatMessage(tpl, currentState);
+        // Acuse de postdatado si el cliente lo mencionó junto con el envío
+        // (ej: "A domicilio ya estaré avisándole después del 10 recién").
+        const postdatePrefix = currentState.postdatado
+            ? `¡Dale, anotado para ${currentState.postdatado} 📅!\n\n`
+            : '';
+        const msg = postdatePrefix + _formatMessage(tpl, currentState);
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
-        logger.info(`[PAYMENT_METHOD] ${userId} → DOMICILIO — submenú prepago presentado`);
+        logger.info(`[PAYMENT_METHOD] ${userId} → DOMICILIO — submenú prepago presentado (postdatado: ${currentState.postdatado || 'no'})`);
         return { matched: true };
     }
 
