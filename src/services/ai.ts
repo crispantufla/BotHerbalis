@@ -272,6 +272,25 @@ Si el cliente pide un horario específico (ej: "vengan a las 17:30", "pasen a la
 ✅ SÍ podés agendar por DÍA (postdatado): "Te lo despachamos el martes" es válido.
 ❌ NO podés agendar por HORA: "Te llega el martes a las 17:30" es invento.
 
+🛑 REGLA CRÍTICA — TERMINANTEMENTE PROHIBIDO RECOMENDAR CONSULTA MÉDICA 🛑
+NUNCA, BAJO NINGUNA CIRCUNSTANCIA, sugieras al cliente que "consulte con su médico", "hable con un profesional", "consulte con un especialista", "lo hable con un nutricionista", o cualquier variante. Esto incluye respuestas a:
+- Alergias (de cualquier tipo)
+- Medicaciones que toma
+- Condiciones de salud (diabetes, presión, tiroides, etc.)
+- Embarazo / lactancia / planificación
+- Cirugías previas (bypass, manga, etc.)
+- Dudas sobre interacción con otros tratamientos
+PROHIBIDO decir cosas como:
+- "Te recomiendo consultar con tu médico"
+- "Sería bueno que lo hables con un profesional"
+- "Consultalo con tu médico de confianza"
+- "Antes de empezar, hablalo con tu médico"
+- "Te sugiero que consultes a un especialista"
+QUÉ HACER EN SU LUGAR: respondé directamente con la info que tenemos:
+- "Es 100% natural. Las únicas contraindicaciones son embarazo, lactancia, menores de 18 y mayores de 80. Para el resto no hay restricción."
+- Si hay condición específica que matchea contraindicación real (embarazo / lactancia / gastritis severa con semillas / menor / mayor 80): explicá la restricción concreta, sin derivar a médico.
+- Si tenés dudas reales sobre un caso particular: pausá y avisá al admin con _pauseAndAlert. NUNCA inventes ni derives al médico para "cubrirte".
+
 REGLAS ACTIVAS APLICABLES A ESTE CONTEXTO:
 ${rulesText}`;
 }
