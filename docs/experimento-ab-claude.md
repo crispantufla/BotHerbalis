@@ -1,8 +1,17 @@
-# Experimento A/B — Claude vs GPT-4o
+# Claude como motor del bot (migración full)
 
-**Activado:** 2026-05-30
-**Revisión prevista:** ~2026-06-04 (5 días después)
-**Estado al activar:** `CLAUDE_AB_SELLERS=horacio`, `CLAUDE_AB_PERCENT=30`
+> **Actualización 2026-05-31 — MIGRACIÓN FULL.** Tras el A/B (horacio 30%) y una
+> comparación cualitativa off-script, se decidió ir **100% Claude** y dejar GPT atrás:
+> `CLAUDE_AB_SELLERS=*` (todos los sellers), `CLAUDE_AB_PERCENT=100`. Ya **no hay grupo
+> de control** GPT — GPT-4o queda solo como *fallback* si Claude falla. La "revisión"
+> del ~04-jun pasa a ser un **antes/después** de conversión (período Claude vs período
+> GPT previo) + costo Anthropic, no un A/B. El resto de este doc describe el mecanismo
+> original del A/B (sigue válido; con `PERCENT=100` y `SELLERS=*` simplemente cae todo
+> en Claude). Rollback instantáneo: `railway variables --set CLAUDE_AB_PERCENT=0`.
+
+**Activado:** 2026-05-30 (A/B 30%) → 2026-05-31 (full 100%)
+**Revisión prevista:** ~2026-06-04
+**Estado actual:** `CLAUDE_AB_SELLERS=*`, `CLAUDE_AB_PERCENT=100`
 
 ## Qué se está probando
 
