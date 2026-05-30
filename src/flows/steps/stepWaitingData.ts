@@ -892,14 +892,22 @@ export async function handleWaitingData(
         if (safetyResult) return safetyResult;
     }
 
-    // 10. Check for explicit address targeting pause
+    // 10. Dirección no parseada. Rev 2026-05-30: si el cliente YA está comprando
+    // (manda algo que parece una dirección) pero el parser no la pudo extraer, NO
+    // pausamos al primer fallo — era el caso "IA falló en extraer la calle", que
+    // dejaba clientes parkeados en la línea de llegada. Re-preguntamos la calle de
+    // forma puntual UNA vez; recién al 2do fallo (addressAttempts >= 2) escalamos.
     const textWordCount = text.split(/\s+/).length;
     const isExplicitTargetingStreet = !currentState.partialAddress?.calle && /\d/.test(text) && textWordCount >= 3 && !classification.isDataQuestionOrEmotion;
-    if (!madeProgress && (currentState.addressAttempts >= 2 || (currentState.addressAttempts >= 1 && isExplicitTargetingStreet))) {
-        const alertReason = isExplicitTargetingStreet
-            ? 'La IA falló en extraer la calle de un mensaje que parece claramente una dirección.'
-            : 'La IA no pudo procesar correctamente los datos ingresados en el primer intento.';
-        await _pauseAndAlert(userId, currentState, dependencies, text, alertReason);
+    if (!madeProgress && isExplicitTargetingStreet && currentState.addressAttempts < 2) {
+        const reAskMsg = 'Perdoná, no me quedó clara la dirección 🙈 ¿Me pasás la *calle y la altura* (número)? Si es esquina o no tiene número, contame cómo llegar 😊';
+        currentState.history.push({ role: 'bot', content: reAskMsg, timestamp: Date.now() });
+        dependencies.saveState(userId);
+        await dependencies.sendMessageWithDelay(userId, reAskMsg);
+        return { matched: true };
+    }
+    if (!madeProgress && currentState.addressAttempts >= 2) {
+        await _pauseAndAlert(userId, currentState, dependencies, text, 'La IA no pudo extraer la dirección del cliente tras 2 intentos. Intervención manual requerida.');
         return { matched: true };
     }
 
