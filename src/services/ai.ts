@@ -157,6 +157,11 @@ const CLAUDE_MODEL_SIMPLE = process.env.CLAUDE_MODEL_SIMPLE || "claude-haiku-4-5
 const CLAUDE_AB_SELLERS = new Set(
     (process.env.CLAUDE_AB_SELLERS || "").split(",").map(s => s.trim()).filter(Boolean)
 );
+// % de las conversaciones del seller que van a Claude (split DENTRO del seller,
+// determinista y estable por teléfono). Default 50/50. Sirve cuando un solo seller
+// concentra el tráfico y el A/B debe correr entre sus propios clientes (no entre
+// sellers). Mantener fijo durante el experimento: cambiarlo re-asigna los brazos.
+const CLAUDE_AB_PERCENT = Math.max(0, Math.min(100, parseInt(process.env.CLAUDE_AB_PERCENT || "50", 10) || 0));
 // History window: con el summary rolling (SUMMARIZE_TRIGGER=30) el contexto
 // viejo queda condensado, así que 30 mensajes vivos son suficientes. Antes
 // teníamos 50 — eso inflaba el prompt y subía latencia sin aporte real.
@@ -586,10 +591,17 @@ class AIService {
         }
     }
 
-    /** A/B: ¿este (seller, step) debe correr sobre Claude en vez de GPT-4o? */
-    _useClaudeFor(sellerId?: string): boolean {
+    /** A/B: ¿esta conversación (seller + teléfono) debe correr sobre Claude?
+     * Split determinista y estable por teléfono: el mismo cliente cae siempre en
+     * el mismo brazo (no flipea a mitad de conversación). Así el A/B corre DENTRO
+     * de un seller, sobre el mismo tráfico, en vez de comparar sellers distintos. */
+    _useClaudeFor(sellerId?: string, phone?: string): boolean {
         if (this._claudeDisabled || !this.anthropic || !sellerId) return false;
-        return CLAUDE_AB_SELLERS.has(sellerId);
+        if (!CLAUDE_AB_SELLERS.has(sellerId)) return false;
+        if (CLAUDE_AB_PERCENT >= 100) return true;
+        if (CLAUDE_AB_PERCENT <= 0 || !phone) return false;
+        const h = parseInt(crypto.createHash('md5').update(String(phone)).digest('hex').slice(0, 8), 16);
+        return (h % 100) < CLAUDE_AB_PERCENT;
     }
 
     /**
@@ -913,7 +925,7 @@ INSTRUCCIONES:
 
             // A/B Claude: si este seller está en el experimento, el chat corre sobre
             // Claude. Si Claude falla, caemos al path OpenAI de abajo (resiliencia).
-            if (this._useClaudeFor(context.sellerId)) {
+            if (this._useClaudeFor(context.sellerId, context.phone)) {
                 const cArgs = await this._claudeChat(systemPrompt, userPrompt, step, context.sellerId!);
                 if (cArgs && cArgs.response) {
                     if (!cArgs.goalMet && !cArgs.extractedData && !hasOrderContext) {
