@@ -247,6 +247,30 @@ export async function handleWaitingWeight(
                 else if (t === '2') currentState.weightGoal = 15;
                 else currentState.weightGoal = 25;
                 logger.info(`[VAGUE-WEIGHT] User ${userId} respondió "${text.trim()}" → tier ${t} (default weightGoal=${currentState.weightGoal}kg, twoTier=${isTwoTierScript}).`);
+
+                // Reacción HUMANA antes del volcado scripted (feedback 2026-05-30:
+                // ante "muchos" el bot asumía el tier y disparaba recomendación+precios
+                // sin una sola línea humana). El cliente respondió algo VAGO, no un
+                // número: generamos un ack cálido y breve con la IA (acá el modelo
+                // elegido —GPT/Claude— sí importa) y después seguimos con el tier
+                // routing. Si la IA falla, seguimos directo a la recomendación.
+                try {
+                    const ackAi = await aiService.chat(text, {
+                        step: FlowStep.WAITING_WEIGHT,
+                        goal: `El cliente respondió de forma VAGA cuánto quiere bajar (dijo: "${text.trim()}"), SIN dar un número. Reaccioná como una vendedora humana y cálida en UNA sola frase corta (máx ~90 caracteres): validá sus ganas con naturalidad, SIN asumir ni mencionar ninguna cantidad de kilos, SIN listar productos ni precios, SIN hacer ninguna pregunta. Ejemplos: "muchos" → "¡Uh, con todas las ganas! Me encanta 💪". "un poco" → "¡Dale, para sentirte un toque mejor! 😊". "bastante" → "¡Buenísimo, con ganas de un cambio en serio! 💪". Devolvé SOLO esa frase.`,
+                        history: currentState.history,
+                        summary: currentState.summary,
+                        knowledge,
+                        userState: currentState
+                    });
+                    if (ackAi.response) {
+                        currentState.history.push({ role: 'bot', content: ackAi.response, timestamp: Date.now() });
+                        saveState(userId);
+                        await sendMessageWithDelay(userId, ackAi.response);
+                    }
+                } catch (e: any) {
+                    logger.warn(`[VAGUE-WEIGHT] ack AI falló para ${userId}: ${e.message} — sigo a la recomendación.`);
+                }
             } else if (isOptionPick) {
                 if (trimmed === '1') currentState.weightGoal = 8;
                 else if (trimmed === '2') currentState.weightGoal = 15;
