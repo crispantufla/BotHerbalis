@@ -24,8 +24,9 @@ describe('Modelo nuevo de pago — buildPaymentMessage (envío primero, sin anti
         expect(pm).toMatch(/Retiro en sucursal/i);
         expect(pm).toMatch(/Env[íi]o a domicilio/i);
     });
-    test('Menciona contrarreembolso vinculado al retiro', () => {
-        expect(pm).toMatch(/contrarre?embolso/i);
+    test('Vincula el retiro con pago al retirar (en efectivo)', () => {
+        expect(pm).toMatch(/al retirar/i);
+        expect(pm).toMatch(/efectivo/i);
     });
     test('Lista medios de pago para domicilio (MercadoPago, Transferencia)', () => {
         expect(pm).toMatch(/MercadoPago/i);
