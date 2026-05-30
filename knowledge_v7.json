@@ -29,25 +29,25 @@
         },
         "recommendation_1": {
             "step": "waiting_weight",
-            "_note": "Tier 1 — hasta 10 kg → plan 60 días. Texto A (recomendación + 3 formas + instrucciones de la semilla). El handler manda este mensaje + esperar delay + mandar prices_60 automáticamente. Rev. 2026-05-27: aclara 'solo una' presentación + warning colon irritable en semillas.",
-            "response": "Para hasta 10 kg te recomiendo plan de *60 días* 🌿\n\nPodés elegir entre estas tres presentaciones (solo una):\n\n1️⃣ *Cápsulas* — 1 al día, 30 min antes del almuerzo o cena.\n2️⃣ *Gotas* — 10 gotas al día, 30 min antes del almuerzo o cena.\n3️⃣ *Semillas* — infusión nocturna.\n\n*Cómo se prepara la semilla:* la primera semana partís una nuez en 8 partes, las siguientes en 4. Cada noche hervís un pedacito 5 minutos al fuego (o 3 en microondas). Cuanta más agua uses, mejor — así se consume la semilla. Te tomás el agua y tragás el trocito, lo más alejado de la cena posible, cuando te vas a dormir. *NO apto en casos de colon irritable.*",
+            "_note": "Tier 1 — hasta 10 kg → plan 60 días. Texto A (recomendación + 3 formas, liviano). El handler manda este mensaje + delay + prices_60 automáticamente. Rev. 2026-05-30: aligerado — el instructivo de preparación de la semilla y el warning de colon irritable se movieron a preference_semillas para no recargar el camino al precio.",
+            "response": "Para hasta 10 kg te recomiendo el plan de *60 días* 🌿\n\nPodés elegir UNA de estas tres presentaciones:\n\n1️⃣ *Cápsulas* — 1 al día, 30 min antes del almuerzo o la cena.\n2️⃣ *Gotas* — 10 gotas al día, 30 min antes del almuerzo o la cena.\n3️⃣ *Semillas* — una infusión antes de dormir (lleva una preparación simple).\n\nLas tres son 100% naturales y funcionan igual para bajar de peso 😊",
             "nextStep": "waiting_preference"
         },
         "recommendation_2": {
             "step": "waiting_weight",
-            "_note": "Tier 2 — más de 10 kg → plan 120 días. Mismo formato que recommendation_1 pero con plan 120d. Auto-followup con prices_120. Rev. 2026-05-27: aclara 'solo una' presentación + warning colon irritable en semillas.",
-            "response": "Para más de 10 kg te recomiendo plan de *120 días* 🌿\n\nPodés elegir entre estas tres presentaciones (solo una):\n\n1️⃣ *Cápsulas* — 1 al día, 30 min antes del almuerzo o cena.\n2️⃣ *Gotas* — 10 gotas al día, 30 min antes del almuerzo o cena.\n3️⃣ *Semillas* — infusión nocturna.\n\n*Cómo se prepara la semilla:* la primera semana partís una nuez en 8 partes, las siguientes en 4. Cada noche hervís un pedacito 5 minutos al fuego (o 3 en microondas). Cuanta más agua uses, mejor — así se consume la semilla. Te tomás el agua y tragás el trocito, lo más alejado de la cena posible, cuando te vas a dormir. *NO apto en casos de colon irritable.*",
+            "_note": "Tier 2 — más de 10 kg → plan 120 días. Mismo formato que recommendation_1 pero con plan 120d. Auto-followup con prices_120. Rev. 2026-05-30: aligerado — preparación de la semilla y warning de colon irritable movidos a preference_semillas.",
+            "response": "Para más de 10 kg te recomiendo el plan de *120 días* 🌿\n\nPodés elegir UNA de estas tres presentaciones:\n\n1️⃣ *Cápsulas* — 1 al día, 30 min antes del almuerzo o la cena.\n2️⃣ *Gotas* — 10 gotas al día, 30 min antes del almuerzo o la cena.\n3️⃣ *Semillas* — una infusión antes de dormir (lleva una preparación simple).\n\nLas tres son 100% naturales y funcionan igual para bajar de peso 😊",
             "nextStep": "waiting_preference"
         },
         "prices_60": {
             "step": "waiting_weight",
             "_note": "Texto B — segundo mensaje automático tras recommendation_1 (tier 1, plan 60d). Lo dispara el handler de stepWaitingWeight inmediatamente después de mandar recommendation_1, con un pequeño delay. NO tiene nextStep — el step lo setea el handler tras el envío.",
-            "response": "1️⃣ Cápsulas × 60 días — *${{PRICE_CAPSULAS_60}}*\n2️⃣ Gotas × 60 días — *${{PRICE_GOTAS_60}}*\n3️⃣ Semillas × 60 días — *${{PRICE_SEMILLAS_60}}*\n\n¿Qué opción preferís?"
+            "response": "1️⃣ *Cápsulas* × 60 días — *${{PRICE_CAPSULAS_60}}*\n2️⃣ *Gotas* × 60 días — *${{PRICE_GOTAS_60}}*\n3️⃣ *Semillas* × 60 días — *${{PRICE_SEMILLAS_60}}*\n\nTodo incluye *envío gratis* a todo el país y que te acompaño por acá durante todo el tratamiento 🙌\n\n¿Con cuál querés arrancar?"
         },
         "prices_120": {
             "step": "waiting_weight",
             "_note": "Texto B — segundo mensaje automático tras recommendation_2 (tier 2, plan 120d). Disparado por stepWaitingWeight.",
-            "response": "1️⃣ Cápsulas × 120 días — *${{PRICE_CAPSULAS_120}}*\n2️⃣ Gotas × 120 días — *${{PRICE_GOTAS_120}}*\n3️⃣ Semillas × 120 días — *${{PRICE_SEMILLAS_120}}*\n\n¿Qué opción preferís?"
+            "response": "1️⃣ *Cápsulas* × 120 días — *${{PRICE_CAPSULAS_120}}*\n2️⃣ *Gotas* × 120 días — *${{PRICE_GOTAS_120}}*\n3️⃣ *Semillas* × 120 días — *${{PRICE_SEMILLAS_120}}*\n\nTodo incluye *envío gratis* a todo el país y que te acompaño por acá durante todo el tratamiento 🙌\n\n¿Con cuál querés arrancar?"
         },
         "preference_capsulas": {
             "step": "waiting_preference",
@@ -76,7 +76,7 @@
         },
         "preference_semillas": {
             "step": "waiting_preference",
-            "_note": "Cliente eligió semillas. Igual que las otras dos preferencias.",
+            "_note": "Cliente eligió semillas. Incluye el instructivo de preparación + warning de colon irritable (movido acá desde recommendation_1/2 el 2026-05-30 para aligerar el reveal de precio).",
             "match": [
                 "semilla",
                 "semillas",
@@ -85,7 +85,7 @@
                 "te de semilla",
                 "natural"
             ],
-            "response": "¡Dale, vamos con *semillas {{PLAN}} días*! 🌿\n\nTotal: *${{TOTAL}}*\n\nTe paso las formas de pago 👇",
+            "response": "¡Dale, vamos con *semillas {{PLAN}} días*! 🌿\n\n*Cómo se prepara:* la primera semana partís una nuez en 8 partes, las siguientes en 4. Cada noche hervís un pedacito 5 min (o 3 en microondas) — cuanta más agua, mejor. Te tomás el agua y tragás el trocito antes de dormir, lo más lejos de la cena. *No apta en casos de colon irritable.*\n\nTotal: *${{TOTAL}}*\n\nTe paso las formas de pago 👇",
             "nextStep": "waiting_payment_method"
         },
         "prices": {

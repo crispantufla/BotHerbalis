@@ -164,9 +164,10 @@ describe('Modelo nuevo — FAQ en V5 y V6', () => {
 
 describe('V7 — recommendations no filtran precios; los precios van en prices_60/_120', () => {
     // V7: recommendation_1/2 (sólo 2 tiers, no hay rec_3) ofrecen las 3 opciones
-    // de producto + instrucción de semilla. La pregunta de avance ("¿qué opción
-    // preferís?") está en prices_60/_120 que se manda automáticamente como
-    // segundo mensaje desde stepWaitingWeight.
+    // de producto (livianas — el instructivo de la semilla se movió a
+    // preference_semillas). La pregunta de avance ("¿con cuál querés arrancar?")
+    // está en prices_60/_120 que se manda automáticamente como segundo mensaje
+    // desde stepWaitingWeight.
     test('recommendation_1 y _2 no filtran precios', () => {
         ['recommendation_1', 'recommendation_2'].forEach(key => {
             const resp = v7.flow[key].response;
@@ -181,7 +182,7 @@ describe('V7 — recommendations no filtran precios; los precios van en prices_6
         ['prices_60', 'prices_120'].forEach(key => {
             const resp = v7.flow[key].response;
             expect(resp).toMatch(/\{\{PRICE_/);
-            expect(resp).toMatch(/qu[eé] opci[oó]n prefer/i);
+            expect(resp).toMatch(/con cu[aá]l quer[eé]s arrancar/i);
         });
     });
 
