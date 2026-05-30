@@ -27,24 +27,49 @@ async function _sendTierRecommendation(
     userId: string,
     currentState: UserState,
     knowledge: any,
-    dependencies: any
+    dependencies: any,
+    userText: string = ''
 ): Promise<void> {
-    const { sendMessageWithDelay, saveState } = dependencies;
+    const { sendMessageWithDelay, saveState, aiService } = dependencies;
     const wRaw = currentState.weightGoal;
     const wNum = typeof wRaw === 'number' ? wRaw : parseInt(String(wRaw || 0), 10) || 0;
     const tier = _resolveTier(wNum, knowledge);
     const tierNode = knowledge?.flow?.[`recommendation_${tier}`] || knowledge?.flow?.recommendation;
     if (!tierNode) return;
+    const planDays = tier === '1' ? '60' : '120';
 
-    const tierMsg = _formatMessage(tierNode.response, currentState);
+    // Recomendación AI-led (rev 2026-05-30 — "darle más libertad a la IA"):
+    // en vez de la plantilla cruda, la IA REDACTA la recomendación respondiendo a lo
+    // que dijo el cliente, con el plan y las 3 opciones inyectadas (datos exactos).
+    // Si la IA falla, cae a la plantilla scripted. Los PRECIOS NO los toca la IA —
+    // van en el segundo mensaje scripted con los números reales de pricing.
+    let tierMsg: string | null = null;
+    if (aiService && typeof aiService.chat === 'function') {
+        try {
+            const recGoal = `El cliente acaba de decirte cuánto quiere bajar (último mensaje: "${userText}"). Tu tarea: recomendarle el plan de *${planDays} días* y presentarle las TRES presentaciones para que elija. REGLAS:\n(1) Arrancá reaccionando con calidez y de forma NATURAL a lo que dijo (sin asumir ni mencionar un número exacto de kilos si no lo dio).\n(2) Recomendá el plan de *${planDays} días*.\n(3) Listá las 3 opciones EXACTAS, una por línea con su número:\n"1️⃣ *Cápsulas* — 1 al día, 30 min antes del almuerzo o la cena.\n2️⃣ *Gotas* — 10 gotas al día, 30 min antes del almuerzo o la cena.\n3️⃣ *Semillas* — una infusión antes de dormir (lleva una preparación simple)."\n(4) Aclarar que las tres son 100% naturales y funcionan igual para bajar de peso.\n(5) 🛑 PROHIBIDO mencionar precios o cualquier monto de plata (van en el mensaje siguiente, aparte).\n(6) NO inventes nada fuera de esto. Cerrá de forma cálida, sin presionar. goalMet=true.`;
+            const aiRec = await aiService.chat(userText || 'dale', {
+                step: FlowStep.WAITING_WEIGHT,
+                goal: recGoal,
+                history: currentState.history,
+                summary: currentState.summary,
+                knowledge,
+                userState: currentState
+            });
+            if (aiRec.response) tierMsg = aiRec.response;
+        } catch (e: any) {
+            logger.warn(`[REC-AI] Recomendación AI falló para ${userId}: ${e.message} — uso plantilla scripted.`);
+        }
+    }
+    if (!tierMsg) tierMsg = _formatMessage(tierNode.response, currentState); // fallback scripted
+
     _setStep(currentState, tierNode.nextStep || FlowStep.WAITING_PREFERENCE);
     currentState.history.push({ role: 'bot', content: tierMsg, timestamp: Date.now() });
     saveState(userId);
     await sendMessageWithDelay(userId, tierMsg);
 
     // V7: auto-followup con prices_60 / prices_120 (segundo mensaje del guion).
-    // V5/V6: prices_X no existen, este block no hace nada.
-    const planDays = tier === '1' ? '60' : '120';
+    // Este SIEMPRE es scripted — precios exactos, lista numerada canónica (ancla el
+    // 1/2/3 aunque la IA arriba haya redactado libre). V5/V6: prices_X no existen.
     const pricesNode = knowledge?.flow?.[`prices_${planDays}`];
     if (pricesNode?.response) {
         const pricesMsg = _formatMessage(pricesNode.response, currentState);
@@ -195,7 +220,7 @@ export async function handleWaitingWeight(
             currentState.history.push({ role: 'bot', content: aiDual.response, timestamp: Date.now() });
             saveState(userId);
             await sendMessageWithDelay(userId, aiDual.response);
-            await _sendTierRecommendation(userId, currentState, knowledge, dependencies);
+            await _sendTierRecommendation(userId, currentState, knowledge, dependencies, text);
             return { matched: true };
         }
         // AI failed but we already extracted weight — proceed via tier routing.
@@ -247,30 +272,6 @@ export async function handleWaitingWeight(
                 else if (t === '2') currentState.weightGoal = 15;
                 else currentState.weightGoal = 25;
                 logger.info(`[VAGUE-WEIGHT] User ${userId} respondió "${text.trim()}" → tier ${t} (default weightGoal=${currentState.weightGoal}kg, twoTier=${isTwoTierScript}).`);
-
-                // Reacción HUMANA antes del volcado scripted (feedback 2026-05-30:
-                // ante "muchos" el bot asumía el tier y disparaba recomendación+precios
-                // sin una sola línea humana). El cliente respondió algo VAGO, no un
-                // número: generamos un ack cálido y breve con la IA (acá el modelo
-                // elegido —GPT/Claude— sí importa) y después seguimos con el tier
-                // routing. Si la IA falla, seguimos directo a la recomendación.
-                try {
-                    const ackAi = await aiService.chat(text, {
-                        step: FlowStep.WAITING_WEIGHT,
-                        goal: `El cliente respondió de forma VAGA cuánto quiere bajar (dijo: "${text.trim()}"), SIN dar un número. Reaccioná como una vendedora humana y cálida en UNA sola frase corta (máx ~90 caracteres): validá sus ganas con naturalidad, SIN asumir ni mencionar ninguna cantidad de kilos, SIN listar productos ni precios, SIN hacer ninguna pregunta. Ejemplos: "muchos" → "¡Uh, con todas las ganas! Me encanta 💪". "un poco" → "¡Dale, para sentirte un toque mejor! 😊". "bastante" → "¡Buenísimo, con ganas de un cambio en serio! 💪". Devolvé SOLO esa frase.`,
-                        history: currentState.history,
-                        summary: currentState.summary,
-                        knowledge,
-                        userState: currentState
-                    });
-                    if (ackAi.response) {
-                        currentState.history.push({ role: 'bot', content: ackAi.response, timestamp: Date.now() });
-                        saveState(userId);
-                        await sendMessageWithDelay(userId, ackAi.response);
-                    }
-                } catch (e: any) {
-                    logger.warn(`[VAGUE-WEIGHT] ack AI falló para ${userId}: ${e.message} — sigo a la recomendación.`);
-                }
             } else if (isOptionPick) {
                 if (trimmed === '1') currentState.weightGoal = 8;
                 else if (trimmed === '2') currentState.weightGoal = 15;
@@ -281,7 +282,7 @@ export async function handleWaitingWeight(
             // opciones en recommendation_X y deja al cliente elegir producto en
             // waiting_preference. La dosis (plan 60 o 120) se asigna ahí según el
             // tier preservado en weightGoal.
-            await _sendTierRecommendation(userId, currentState, knowledge, dependencies);
+            await _sendTierRecommendation(userId, currentState, knowledge, dependencies, text);
             logger.info(`[TIER] User ${userId} (script=${currentState.assignedScript}) → weightGoal=${currentState.weightGoal}kg, twoTier=${isTwoTierScript}; product/plan se asigna en waiting_preference.`);
             return { matched: true };
         }
@@ -314,7 +315,7 @@ export async function handleWaitingWeight(
         } else {
             // Sin suggestedProduct: ruta por tier (V7 manda rec_X + prices_X).
             // En scripts legacy sin recommendation_X cae al recommendation genérico.
-            await _sendTierRecommendation(userId, currentState, knowledge, dependencies);
+            await _sendTierRecommendation(userId, currentState, knowledge, dependencies, text);
             return { matched: true };
         }
     } else {
@@ -384,7 +385,7 @@ export async function handleWaitingWeight(
                 } else {
                     // V7: tier routing + auto prices_X. Antes caía al recommendation
                     // genérico — bug detectado en review V7.
-                    await _sendTierRecommendation(userId, currentState, knowledge, dependencies);
+                    await _sendTierRecommendation(userId, currentState, knowledge, dependencies, text);
                     return { matched: true };
                 }
             } else if (aiWeight.response) {
