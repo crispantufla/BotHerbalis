@@ -608,7 +608,9 @@ class AIService {
      * de un seller, sobre el mismo tráfico, en vez de comparar sellers distintos. */
     _useClaudeFor(sellerId?: string, phone?: string): boolean {
         if (this._claudeDisabled || !this.anthropic || !sellerId) return false;
-        if (!CLAUDE_AB_SELLERS.has(sellerId)) return false;
+        // '*' en CLAUDE_AB_SELLERS = TODOS los sellers (migración full a Claude,
+        // incluye sellers futuros). Si no, solo los listados.
+        if (!CLAUDE_AB_SELLERS.has('*') && !CLAUDE_AB_SELLERS.has(sellerId)) return false;
         if (CLAUDE_AB_PERCENT >= 100) return true;
         if (CLAUDE_AB_PERCENT <= 0 || !phone) return false;
         const h = parseInt(crypto.createHash('md5').update(String(phone)).digest('hex').slice(0, 8), 16);
