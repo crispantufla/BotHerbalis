@@ -112,11 +112,19 @@ export async function handleWaitingWeight(
         // al AI fallback (puede haber contexto que cambia la interpretación).
         const lex = normalizedText.trim();
         const noNumberInLex = !/\d/.test(lex);
-        if (noNumberInLex && lex.length <= 35) {
+        if (noNumberInLex && lex.length <= 50) {
             // Orden importa: mucho/muchísimo antes que poco para evitar overlap.
             if (/\b(much[oa]s?|much[ií]simo[as]?|un mont[oó]n|demasiado[as]?|bocha|banda)\b/i.test(lex)) vagueWeightTier = '3';
             else if (/\b(bastante[s]?|varios?|regular|algunos?|m[aá]s o menos|masomenos)\b/i.test(lex)) vagueWeightTier = '2';
             else if (/\b(poc[oa]s?|poquit[oa]s?|un poco|kilit[oa]s?)\b/i.test(lex)) vagueWeightTier = '1';
+            // Números escritos (reporte 2026-05-28 5491162654840: "Más de diez" caía
+            // al AI fallback y la IA alucinaba el flow).
+            //   "diez" / "10" sueltos → tier 1 (≤10 kg, plan 60d).
+            //   "más de diez" o cualquier número 11+ → tier 2 (+10 kg, plan 120d).
+            else if (/\bm[aá]s\s+de\s+(diez|10)\b/i.test(lex)) vagueWeightTier = '2';
+            else if (/\bm[aá]s\s+de\s+(once|doce|trece|catorce|quince|diecis[ée]is|diecisiete|dieciocho|diecinueve|veinte|veintic|treinta|cuarenta|cincuenta)\b/i.test(lex)) vagueWeightTier = '2';
+            else if (/\b(once|doce|trece|catorce|quince|diecis[ée]is|diecisiete|dieciocho|diecinueve|veinte|veintic|treinta|cuarenta|cincuenta)\b/i.test(lex)) vagueWeightTier = '2';
+            else if (/\b(diez)\b/i.test(lex)) vagueWeightTier = '1';
         }
     }
 

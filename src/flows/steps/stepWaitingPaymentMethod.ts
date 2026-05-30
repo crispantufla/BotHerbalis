@@ -27,6 +27,12 @@ const TRANSFER_KEYWORDS = /\b(transfer[ei]ncia|transf\b|transferir|alias|dep[óo
 const OPTION_PICKER = /(^|\s)(?:opci[óo]n\s+|la\s+|el\s+|n[uú]mero\s+|\#)?(\d)\s*[\.\)]?\s*$/i;
 const STANDALONE_NUM_WORD = /^\s*(?:la\s+|el\s+|opci[óo]n\s+)?(uno|dos|primer[oa]|segund[oa])\s*[\.\)]?\s*$/i;
 
+// Despedida suave / dilación / "lo veo después" (reportes 2026-05-29 5493751416938
+// + 5491150190999 + 5492604649413). El cliente no elige opción de envío, dice
+// algo tipo "voy a ver", "gracias", "me comunico", "ahora estoy averiguando".
+// En estos casos pausamos para que el admin retome — no insistimos con el menú.
+const SOFT_BAILOUT = /\b(gracias|voy a (ver|hacer|pensar|fijarme)|despu[eé]s te (escribo|aviso|hablo|digo|comunico)|me comunico|me fijo|lo pienso|lo veo|lo miro|estoy averiguando|solo (estoy )?averiguando|m[aá]s adelante|en un rato|en otro momento|cuando pueda|capaz despu[eé]s)\b/i;
+
 function _detectOptionNumber(text: string): '1' | '2' | null {
     const trimmed = text.trim();
     if (trimmed.length <= 25) {
@@ -90,8 +96,44 @@ export async function handleWaitingPaymentMethod(
 
     const optionNum = _detectOptionNumber(text);
 
+    // ── Soft bailout / dilación (rev. 2026-05-30 reportes horacio) ─────────────
+    // Cliente dice "gracias, voy a ver", "lo pienso", "me comunico", "ahora
+    // averiguando", etc. SIN elegir opción de envío clara → no insistir, pausar.
+    // Excepción: si TAMBIÉN matchea RETIRO/DOMICILIO/MP/Transfer, dejamos que
+    // el flow procese la elección normalmente.
+    const hasShippingChoice = !!optionNum
+        || RETIRO_KEYWORDS.test(text)
+        || DOMICILIO_KEYWORDS.test(text)
+        || MP_KEYWORDS.test(text)
+        || TRANSFER_KEYWORDS.test(normalizedText);
+    if (!hasShippingChoice && SOFT_BAILOUT.test(normalizedText)) {
+        const ackMsg = currentState.postdatado
+            ? `¡Dale, te lo dejo anotado para *${currentState.postdatado}* 📅\n\nCuando estés lista, escribime y lo despachamos 😊`
+            : `¡Dale, sin problema! Cuando estés lista, escribime y avanzamos 😊`;
+        currentState.history.push({ role: 'bot', content: ackMsg, timestamp: Date.now() });
+        saveState(userId);
+        await sendMessageWithDelay(userId, ackMsg);
+        await _pauseAndAlert(
+            userId, currentState, dependencies, text,
+            `Cliente posterga decisión en waiting_payment_method (${currentState.postdatado ? 'postdatado ' + currentState.postdatado : 'sin fecha'}). Mensaje: "${text}". Pausado para que el admin retome cuando reescriba.`
+        );
+        logger.info(`[PAYMENT_METHOD] ${userId} → soft bailout detectado, pausado.`);
+        return { matched: true };
+    }
+
     // ── Sub-menú: el cliente ya eligió domicilio, ahora elige MP o Transferencia
     if (currentState.paymentSubChoiceAsked) {
+        // Reset si el cliente cambió de idea y ahora prefiere retiro (reporte
+        // 2026-05-29 5493435080705: el cliente clarificó "sería en sucursal" en
+        // el submenú y el bot insistía con MP/Transfer). Reseteamos el flag y
+        // dejamos que el path RETIRO de más abajo procese.
+        if (RETIRO_KEYWORDS.test(text)) {
+            logger.info(`[PAYMENT_METHOD] ${userId} cambió de domicilio a RETIRO en submenú — reset y reprocesar.`);
+            currentState.paymentSubChoiceAsked = false;
+            currentState.shippingChoice = null;
+            saveState(userId);
+            // Caemos al path RETIRO normal sin return — el matchea por RETIRO_KEYWORDS abajo.
+        } else {
         const choseMp = (optionNum === '1') || MP_KEYWORDS.test(text);
         const choseTransfer = (optionNum === '2') || TRANSFER_KEYWORDS.test(normalizedText);
 
@@ -133,29 +175,27 @@ export async function handleWaitingPaymentMethod(
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
         return { matched: true };
+        }
     }
 
     // ── Elección 1: Retiro en sucursal (contrarreembolso, 100% al retirar) ────
+    // Rev. 2026-05-30: en lugar de pausar inmediatamente, le pedimos los datos
+    // al cliente (con aclaración de "es para buscar la sucursal más cercana") y
+    // dejamos que pase por waiting_data. Al guardar la orden, calle se reescribe
+    // a "A sucursal" y la calle real queda en calleOriginal (ver stepWaitingData
+    // y _finalizeOrderAndNotifyAdmin).
     if (optionNum === '1' || RETIRO_KEYWORDS.test(text)) {
         currentState.paymentMethod = 'contrarembolso';
         currentState.senaAmount = 0;
         currentState.senaPaid = false;
         currentState.shippingChoice = 'retiro';
 
-        const tpl = getFlowTemplate('payment_retiro_confirm', knowledge) ||
-            `¡Perfecto! Lo dejamos para retiro en sucursal 📦\n\nVas a pagar el total *${'$'}{{TOTAL}}* en efectivo cuando lo retirés.\n\nUn asesor te contacta enseguida para coordinar la sucursal más cercana 😊`;
-        const msg = _formatMessage(tpl, currentState);
+        const msg = `¡Listo! Lo dejamos para retiro en sucursal 📦\n\nVas a pagar el total *$${currentState.totalPrice || '?'}* en efectivo cuando lo retirés.\n\nPasame tu dirección para asignarte la sucursal de Correo Argentino más cercana a tu zona:\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nProvincia:`;
+        _setStep(currentState, FlowStep.WAITING_DATA);
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
-
-        const addr: any = currentState.partialAddress || {};
-        const addrSummary = [addr.calle, addr.ciudad, addr.cp].filter(Boolean).join(', ') || 'sin dirección';
-        await _pauseAndAlert(
-            userId, currentState, dependencies, text,
-            `Cliente eligió RETIRO EN SUCURSAL. Coordinar sucursal de Correo Argentino más cercana a: ${addrSummary}. Paga el total $${currentState.totalPrice || '?'} en efectivo al retirar.`
-        );
-        logger.info(`[PAYMENT_METHOD] ${userId} → RETIRO EN SUCURSAL — pausado para coordinación admin`);
+        logger.info(`[PAYMENT_METHOD] ${userId} → RETIRO EN SUCURSAL — pidiendo datos para buscar sucursal cercana`);
         return { matched: true };
     }
 

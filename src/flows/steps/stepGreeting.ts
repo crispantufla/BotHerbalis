@@ -153,11 +153,11 @@ export async function handleGreeting(
     // positivos como "compré 3 kilos de fruta" (si el contexto es producto)
     // o "bajar 15 escalones".
     const hasExplicitGoal = (
-        // Patrón A: "10 kg", "10 kilos", "10 kilogramos"
-        /\b\d{1,3}\s*(?:kg|kilos?|kilogramos?)\b/i.test(text) ||
-        // Patrón B: "bajar 10" / "perder 10" SEGUIDO opcionalmente de un sufijo
-        // que confirme que se refiere a peso. Sin sufijo, no asumimos.
-        /\b(?:bajar|perder)\s+\d{1,3}\s*(?:kg|kilos?|kilogramos?|de peso)\b/i.test(text)
+        // Patrón A: "10 kg", "10 kgs", "10 k", "10 kilos", "10 kilogramos"
+        // ("10 k" matcheaba antes solo si era "kg" — reporte 2026-05-28 horacio).
+        /\b\d{1,3}\s*(?:kg?s?|kilos?|kilogramos?)\b/i.test(text) ||
+        // Patrón B: "bajar 10" / "perder 10" con sufijo opcional de unidad.
+        /\b(?:bajar|perder)\s+\d{1,3}\s*(?:kg?s?|kilos?|kilogramos?|de peso)?\b/i.test(text)
     );
 
     if (hasExplicitGoal) {

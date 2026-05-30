@@ -238,13 +238,13 @@ async function _handleAiFallback(
 
     let aiGoal = "";
     if (classification.isPaymentTiming) {
-        aiGoal = `El cliente dice que todavía no cobró, que está esperando su sueldo, o que va a esperar a cobrar para escribirte. DEBES INSISTIR y ofrecerle congelar el precio programando el envío a futuro. Respondé algo como: "¡No hace falta que esperes a cobrar para pedirlo! 😊 Podemos dejar el pedido cargado hoy para congelarte el precio actual, y yo te lo envío recién la fecha que me digas que cobrás. ¿A partir de qué fecha de la semana que viene te quedaría bien recibirlo?". NO aceptes un "te escribo después" sin antes ofrecerle fervientemente congelar el precio postdatando el envío.`;
+        aiGoal = `El cliente dice que todavía no cobró, que está esperando su sueldo, o que va a esperar a cobrar para escribirte. DEBES INSISTIR y ofrecerle postdatar el envío. Respondé directo: "¡No hace falta que esperes! 😊 Te lo agendamos y lo despacho la fecha que vos me digas. ¿A partir de qué día te queda cómodo recibirlo?". NO aceptes un "te escribo después" sin antes ofrecer postdatar. PROHIBIDO mencionar "congelar precio" / "congelar promo" — el mensaje debe ser directo sin urgencia falsa.`;
     } else if (classification.isHesitation) {
         aiGoal = `El cliente dice que ahora no puede, que la semana que viene, que no tiene plata, o alguna variación de "todavía no". IMPORTANTE: El envío tarda *5 a 7 días hábiles* y existe la opción de *retiro en sucursal* (paga el total en efectivo cuando va a buscar el paquete a la sucursal de Correo Argentino, sin anticipo previo). Respondé con MUCHA empatía y mencioná estos dos puntos: (1) "El envío tarda 5 a 7 días hábiles, así que para cuando te llegue ya vas a poder" y (2) "Tenés la opción de retiro en sucursal: pagás el total cuando lo retirás, no necesitás pagar nada ahora". Si aún así dice que no puede, ofrecé postdatar: "Si preferís, podemos agendar el envío para la fecha que te quede mejor, por ejemplo principio de mes. ¿Qué te parece?". NO aceptes un rechazo directo sin antes explicarle la opción de retiro en sucursal y ofrecer postdatar.`;
     } else if (classification.isObjectionOrComment) {
         aiGoal = `El usuario hizo un comentario sobre probar el producto primero, o expresó dudas sobre los resultados (ej: "si me da resultado compro más"). Respondé validando su decisión con extrema seguridad y empatía. A continuación, VOLVÉ a pedir sutilmente los datos de envío que estaban pendientes (Nombre, Dirección, Ciudad). NO ofrezcas otros productos.`;
     } else {
-        aiGoal = `El usuario tiene una duda o expresa una preocupación en plena toma de datos (ej: pregunta cómo se paga, cuándo llega, si le entregan en el trabajo, o cuenta un largo problema personal). DEBES RESPONDER SU TEXTO DIRECTAMENTE de forma EXTENSA Y MUY EMPÁTICA usando el Knowledge. Si expresa miedos sobre demoras o recepción, redactá un párrafo largo brindando tranquilidad absoluta. Si pregunta si puede recibir en su TRABAJO, responde sus opciones. Si pregunta sobre la función del producto o qué hace: "La Nuez de la India ayuda a acompañar el proceso natural del cuerpo para eliminar excesos. Muchas personas notan menos hinchazón, más liviandad y un descenso progresivo de peso. Es un apoyo natural para sentirte mejor sin métodos agresivos.". Si pregunta sobre dieta/comidas: "La Nuez de la India puede utilizarse sin hacer dietas estrictas...". Si pregunta dónde queda la oficina/local: "Somos Herbalis...". Si pregunta formas de pago: "El pago es únicamente en efectivo...". Si pregunta tiempos: "Los envíos se realizan cuanto antes y tardan 5 a 7 días hábiles.". Si pregunta contraindicaciones: "Es un producto 100% natural...". Nunca lo obligues a dar los datos bruscamente, respondé su duda con muchísima calidez, y cerrá sutilmente preguntando: "¿Te parece que lo dejemos anotado?" o "¿Te tomo los datos?".\n\nEXCEPCIÓN CRÍTICA - HESITACIÓN TIPO "TE AVISO": Si el cliente dice "luego te escribo", "te confirmo después", o "lo pienso y te aviso": NO LO ACEPTES A LA PRIMERA. Respondé ofreciendo congelar el precio: "¡Dale! Igual, si querés podemos dejar el paquete ya separado a tu nombre para congelarte el precio actual y te lo mando recién cuando vos me des el ok. ¿Te parece bien así aprovechás la promo de envío?".`;
+        aiGoal = `El usuario tiene una duda o expresa una preocupación en plena toma de datos (ej: pregunta cómo se paga, cuándo llega, si le entregan en el trabajo, o cuenta un largo problema personal). DEBES RESPONDER SU TEXTO DIRECTAMENTE de forma EXTENSA Y MUY EMPÁTICA usando el Knowledge. Si expresa miedos sobre demoras o recepción, redactá un párrafo largo brindando tranquilidad absoluta. Si pregunta si puede recibir en su TRABAJO, responde sus opciones. Si pregunta sobre la función del producto o qué hace: "La Nuez de la India ayuda a acompañar el proceso natural del cuerpo para eliminar excesos. Muchas personas notan menos hinchazón, más liviandad y un descenso progresivo de peso. Es un apoyo natural para sentirte mejor sin métodos agresivos.". Si pregunta sobre dieta/comidas: "La Nuez de la India puede utilizarse sin hacer dietas estrictas...". Si pregunta dónde queda la oficina/local: "Somos Herbalis...". Si pregunta formas de pago: "El pago es únicamente en efectivo...". Si pregunta tiempos: "Los envíos se realizan cuanto antes y tardan 5 a 7 días hábiles.". Si pregunta contraindicaciones: "Es un producto 100% natural...". Nunca lo obligues a dar los datos bruscamente, respondé su duda con muchísima calidez, y cerrá sutilmente preguntando: "¿Te parece que lo dejemos anotado?" o "¿Te tomo los datos?".\n\nEXCEPCIÓN CRÍTICA - HESITACIÓN TIPO "TE AVISO": Si el cliente dice "luego te escribo", "te confirmo después", o "lo pienso y te aviso": NO LO ACEPTES A LA PRIMERA. Respondé directo ofreciendo postdatar: "¡Dale! Igual, si querés te lo dejamos agendado para la fecha que vos prefieras y lo despacho ese día. ¿A partir de qué día te queda cómodo recibirlo?". PROHIBIDO mencionar "congelar precio" / "congelar promo".`;
     }
 
     const aiData = await aiService.chat(text, {
@@ -649,7 +649,20 @@ async function _validateAndAssembleOrder(
         currentState.cart = [{ product, plan, price }];
     }
 
-    currentState.pendingOrder = { ...addr, calleOriginal, cart: currentState.cart };
+    // Si el cliente eligió retiro en sucursal: la dirección que pasó es solo
+    // para asignar la sucursal de Correo Argentino más cercana. En el pendingOrder
+    // y en la venta final, la calle figura como "A sucursal" (calleOriginal conserva
+    // la calle real para que el admin sepa la zona). Rev. 2026-05-30 horacio.
+    if (currentState.shippingChoice === 'retiro') {
+        currentState.pendingOrder = {
+            ...addr,
+            calleOriginal: addr.calle || calleOriginal,
+            calle: 'A sucursal',
+            cart: currentState.cart,
+        };
+    } else {
+        currentState.pendingOrder = { ...addr, calleOriginal, cart: currentState.cart };
+    }
     currentState.partialAddress = {} as any;
 
     const total = currentState.cart.reduce((sum: number, i: any) => sum + parseInt(i.price.toString().replace(/\./g, '')), 0);

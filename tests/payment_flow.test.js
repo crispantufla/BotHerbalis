@@ -295,14 +295,20 @@ describe('Menú envío → Retiro en sucursal (opción 1)', () => {
         expect(sent).not.toMatch(/10\.000/);
     });
 
-    test('[2.5] Tras elegir retiro, el cliente queda PAUSADO para coordinación admin', async () => {
+    test('[2.5] Tras elegir retiro, el bot pide datos para asignar sucursal (no pausa)', async () => {
+        // Rev. 2026-05-30: retiro ya no pausa inmediatamente. Pide nombre/calle/CP
+        // explicando que es para asignar la sucursal de Correo más cercana, y
+        // pasa a waiting_data. La calle real va a calleOriginal y `calle`
+        // se reescribe a "A sucursal" cuando se arma la orden final.
         const state = makePaymentState('60');
         await handleWaitingPaymentMethod('r5', '1', '1', state, knowledge, deps);
-        expect(deps.sharedState.pausedUsers.has('r5')).toBe(true);
-        expect(mockNotify).toHaveBeenCalled();
-        const adminArgs = mockNotify.mock.calls.map(args => args.join(' ')).join(' ');
-        expect(adminArgs).toMatch(/RETIRO EN SUCURSAL/i);
-        expect(adminArgs).toMatch(/Belgrano 123/);
+        expect(state.shippingChoice).toBe('retiro');
+        expect(state.paymentMethod).toBe('contrarembolso');
+        expect(state.step).toBe('waiting_data');
+        expect(deps.sharedState.pausedUsers.has('r5')).toBe(false);
+        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
+        expect(sent).toMatch(/retiro en sucursal/i);
+        expect(sent).toMatch(/Pasame tu dirección|datos.*sucursal/i);
     });
 });
 

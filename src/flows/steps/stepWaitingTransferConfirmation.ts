@@ -61,9 +61,10 @@ export async function handleWaitingTransferConfirmation(
 
         if (hasAddress) {
             const { buildConfirmationMessage } = require('../../utils/messageTemplates');
+            const isPickup = currentState.shippingChoice === 'retiro';
             currentState.pendingOrder = {
                 nombre: addr.nombre,
-                calle: addr.calle,
+                calle: isPickup ? 'A sucursal' : addr.calle,
                 ciudad: addr.ciudad,
                 cp: addr.cp,
                 provincia: addr.provincia,

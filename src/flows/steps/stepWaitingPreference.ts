@@ -38,9 +38,13 @@ export async function handleWaitingPreference(
     let numericCapsulas = false, numericSemillas = false, numericGotas = false;
     if (numericReply && !hasQuestionOrConcern && trimmed.length <= 30) {
         const choice = numericReply[1];
+        // Mapeo según el orden de prices_60/120 en V7: 1=Cápsulas, 2=Gotas, 3=Semillas.
+        // Bug previo (reportes 2026-05-29 5493813928867 + 5493562507143): los slots
+        // 2 y 3 estaban invertidos — "3" mapeaba a gotas y "2" a semillas, contra
+        // lo que el cliente ve en pantalla.
         if (choice === '1') numericCapsulas = true;
-        else if (choice === '2') numericSemillas = true;
-        else if (choice === '3') numericGotas = true;
+        else if (choice === '2') numericGotas = true;
+        else if (choice === '3') numericSemillas = true;
         logger.info(`[NUMERIC-PREF] User ${userId} replied with option ${choice} ("${text.substring(0, 30)}").`);
     }
 
