@@ -144,6 +144,19 @@ export interface AIParsedResponse {
 const MODEL = "gpt-4o-mini";
 const MODEL_PREMIUM = "gpt-4o";
 const MAX_RETRIES = 3;
+
+// ── A/B Claude (may-2026) ──────────────────────────────────────────────────
+// Experimento: los sellers listados en CLAUDE_AB_SELLERS corren el chat() sobre
+// Claude (Sonnet en pasos premium, Haiku en el resto) en vez de GPT-4o, para
+// comparar conversión y tasa de errores de IA. Si la env está vacía o falta
+// ANTHROPIC_API_KEY, el experimento queda OFF y todo corre igual que siempre.
+// El resto de las llamadas (whisper, embeddings, visión, summary, parseAddress)
+// se mantienen en OpenAI — Anthropic no tiene audio ni embeddings.
+const CLAUDE_MODEL_PREMIUM = process.env.CLAUDE_MODEL_PREMIUM || "claude-sonnet-4-6";
+const CLAUDE_MODEL_SIMPLE = process.env.CLAUDE_MODEL_SIMPLE || "claude-haiku-4-5-20251001";
+const CLAUDE_AB_SELLERS = new Set(
+    (process.env.CLAUDE_AB_SELLERS || "").split(",").map(s => s.trim()).filter(Boolean)
+);
 // History window: con el summary rolling (SUMMARIZE_TRIGGER=30) el contexto
 // viejo queda condensado, así que 30 mensajes vivos son suficientes. Antes
 // teníamos 50 — eso inflaba el prompt y subía latencia sin aporte real.
@@ -538,6 +551,9 @@ class AIService {
     // Per-seller circuit breakers — prevents one seller's OpenAI failures from blocking all others
     _circuitBreakers: Map<string, { failures: number, openUntil: number }>;
     _disabled: boolean;
+    // A/B Claude — cliente Anthropic (lazy, solo si el experimento está activo)
+    anthropic: any;
+    _claudeDisabled: boolean;
 
     constructor() {
         const apiKey = process.env.OPENAI_API_KEY || "";
@@ -553,6 +569,73 @@ class AIService {
         this.cache = new NodeCache({ stdTTL: CACHE_TTL_SECONDS, checkperiod: 120, maxKeys: 1000 });
         this.stats = { calls: 0, cached: 0, retries: 0, errors: 0, promptTokens: 0, completionTokens: 0, estimatedCostUSD: 0 };
         this._circuitBreakers = new Map();
+
+        // A/B Claude: init solo si hay sellers en el experimento + key. Si no, OFF.
+        const anthropicKey = process.env.ANTHROPIC_API_KEY || "";
+        this._claudeDisabled = !anthropicKey || CLAUDE_AB_SELLERS.size === 0;
+        this.anthropic = null;
+        if (!this._claudeDisabled) {
+            try {
+                const Anthropic = require('@anthropic-ai/sdk');
+                this.anthropic = new (Anthropic.default || Anthropic)({ apiKey: anthropicKey, timeout: 20_000 });
+                logger.info(`📡[AI] Claude A/B ON para sellers [${[...CLAUDE_AB_SELLERS].join(', ')}] — premium=${CLAUDE_MODEL_PREMIUM}, simple=${CLAUDE_MODEL_SIMPLE}`);
+            } catch (e: any) {
+                logger.error(`[AI] No se pudo iniciar Anthropic SDK, A/B desactivado: ${e.message}`);
+                this._claudeDisabled = true;
+            }
+        }
+    }
+
+    /** A/B: ¿este (seller, step) debe correr sobre Claude en vez de GPT-4o? */
+    _useClaudeFor(sellerId?: string): boolean {
+        if (this._claudeDisabled || !this.anthropic || !sellerId) return false;
+        return CLAUDE_AB_SELLERS.has(sellerId);
+    }
+
+    /**
+     * Llamada de chat sobre Claude (Anthropic Messages API + tool use).
+     * Devuelve los args del tool control_dialog_flow ({response, goalMet, extractedData})
+     * o null si falla (el caller cae a OpenAI como fallback).
+     */
+    async _claudeChat(systemPrompt: string, userPrompt: string, step: string, sellerId: string): Promise<{ response?: string; goalMet?: boolean; extractedData?: string | null } | null> {
+        try {
+            const model = PREMIUM_STEPS.has(step) ? CLAUDE_MODEL_PREMIUM : CLAUDE_MODEL_SIMPLE;
+            const result: any = await this._callQueued(
+                () => this.anthropic.messages.create({
+                    model,
+                    max_tokens: 800,
+                    temperature: 0.6,
+                    system: systemPrompt,
+                    messages: [{ role: "user", content: userPrompt }],
+                    tools: [{
+                        name: "control_dialog_flow",
+                        description: "Emite la respuesta al cliente y gestiona el embudo de ventas",
+                        input_schema: {
+                            type: "object",
+                            properties: {
+                                response: { type: "string", description: "Tu respuesta para el cliente. Proporcional al mensaje: corta si es una pregunta rápida, extensa y empática solo en momentos emocionales/objeciones." },
+                                goalMet: { type: "boolean", description: "Si el cliente cumplió el objetivo del paso actual" },
+                                extractedData: { type: "string", description: "Datos extraídos de la intención del usuario (producto, quejas, edad, tags), o vacío" }
+                            },
+                            required: ["response", "goalMet"]
+                        }
+                    }],
+                    tool_choice: { type: "tool", name: "control_dialog_flow" }
+                }),
+                `claude_chat_${step}_${userPrompt}`, // namespace de caché distinto al de OpenAI
+                undefined,
+                sellerId
+            );
+            const toolUse = (result?.content || []).find((c: any) => c.type === 'tool_use');
+            if (toolUse && toolUse.input) {
+                return { response: toolUse.input.response, goalMet: toolUse.input.goalMet, extractedData: toolUse.input.extractedData || null };
+            }
+            logger.warn(`[AI][CLAUDE-AB] respuesta sin tool_use para ${sellerId} (step ${step})`);
+            return null;
+        } catch (e: any) {
+            logger.error(`[AI][CLAUDE-AB] error para ${sellerId} (step ${step}): ${e.message}`);
+            return null;
+        }
     }
 
     _getCircuitBreaker(sellerId: string = 'global'): { failures: number, openUntil: number } {
@@ -605,7 +688,7 @@ class AIService {
                 break;
             } catch (e: any) {
                 const status = e.status || e.statusCode;
-                const isRetryable = status === 429 || status === 500 || status === 502 || status === 503 || e.code === 'ETIMEDOUT' || e.code === 'ECONNRESET';
+                const isRetryable = status === 429 || status === 500 || status === 502 || status === 503 || status === 529 || e.code === 'ETIMEDOUT' || e.code === 'ECONNRESET';
                 if (isRetryable) {
                     this.stats.retries++;
                     const waitTime = Math.pow(2, attempt + 1) * 1000 + Math.floor(Math.random() * 1000);
@@ -634,12 +717,25 @@ class AIService {
         const usage = (result as any)?.usage;
         if (usage) {
             const model = (result as any)?.model || '';
-            const isPremium = model.startsWith('gpt-4o') && !model.includes('mini');
-            const inputRate  = isPremium ? 0.0000025 : 0.00000015;
-            const outputRate = isPremium ? 0.00001   : 0.0000006;
-            this.stats.promptTokens += usage.prompt_tokens || 0;
-            this.stats.completionTokens += usage.completion_tokens || 0;
-            this.stats.estimatedCostUSD += ((usage.prompt_tokens || 0) * inputRate) + ((usage.completion_tokens || 0) * outputRate);
+            if (model.startsWith('claude')) {
+                // Anthropic usa input_tokens/output_tokens. Sonnet ~$3/$15 por M; Haiku ~$0.80/$4.
+                const inTok = usage.input_tokens || 0;
+                const outTok = usage.output_tokens || 0;
+                const isBig = model.includes('sonnet') || model.includes('opus');
+                const inputRate  = isBig ? 0.000003 : 0.0000008;
+                const outputRate = isBig ? 0.000015 : 0.000004;
+                this.stats.promptTokens += inTok;
+                this.stats.completionTokens += outTok;
+                this.stats.estimatedCostUSD += (inTok * inputRate) + (outTok * outputRate);
+            } else {
+                // OpenAI: prompt_tokens/completion_tokens
+                const isPremium = model.startsWith('gpt-4o') && !model.includes('mini');
+                const inputRate  = isPremium ? 0.0000025 : 0.00000015;
+                const outputRate = isPremium ? 0.00001   : 0.0000006;
+                this.stats.promptTokens += usage.prompt_tokens || 0;
+                this.stats.completionTokens += usage.completion_tokens || 0;
+                this.stats.estimatedCostUSD += ((usage.prompt_tokens || 0) * inputRate) + ((usage.completion_tokens || 0) * outputRate);
+            }
         }
 
         // Cache the result
@@ -814,6 +910,24 @@ INSTRUCCIONES:
 
             const chatModel = _getModelForStep(step);
             const systemPrompt = await _buildSystemPrompt(step, userText);
+
+            // A/B Claude: si este seller está en el experimento, el chat corre sobre
+            // Claude. Si Claude falla, caemos al path OpenAI de abajo (resiliencia).
+            if (this._useClaudeFor(context.sellerId)) {
+                const cArgs = await this._claudeChat(systemPrompt, userPrompt, step, context.sellerId!);
+                if (cArgs && cArgs.response) {
+                    if (!cArgs.goalMet && !cArgs.extractedData && !hasOrderContext) {
+                        storeSemanticCache(this.client, step, userText, cArgs.response).catch(() => { /* best effort */ });
+                    }
+                    return {
+                        response: sanitizeForWhatsApp(cArgs.response),
+                        goalMet: cArgs.goalMet,
+                        extractedData: cArgs.extractedData || null
+                    };
+                }
+                logger.warn(`[AI][CLAUDE-AB] fallback a OpenAI para ${context.sellerId} (step ${step})`);
+            }
+
             const result: any = await this._callQueued(
                 () => this.client.chat.completions.create({
                     model: chatModel,
