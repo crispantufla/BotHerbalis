@@ -45,4 +45,25 @@ function isOwnerOrAdmin(req, recordInstanceId) {
     return recordInstanceId === getInstanceId(req);
 }
 
-module.exports = { withSeller, requireSellerInstance, getInstanceId, isOwnerOrAdmin };
+// instanceIds reservados que NO representan a un seller real. Cualquier query
+// de Orders/User para dashboard, analítica o logística debería excluirlos
+// para que no contaminen métricas ni listados.
+//   __legacy_import__ — clientes históricos argentinos importados desde
+//     Clientes_AR.txt (2026-05-30). Existen solo para que salesFlow detecte
+//     re-entry y pause el bot — no son pedidos reales.
+const NON_SELLER_INSTANCE_IDS = ['__legacy_import__'];
+
+/**
+ * applyNonSellerExclusion — agrega `instanceId: { notIn: NON_SELLER_INSTANCE_IDS }`
+ * a un `where` de Prisma cuando NO se está filtrando por un seller específico.
+ * Si el `where` ya tiene `instanceId` (filtro de seller activo), no toca nada.
+ */
+function applyNonSellerExclusion(where) {
+    if (!where || where.instanceId !== undefined) return where || {};
+    return { ...where, instanceId: { notIn: NON_SELLER_INSTANCE_IDS } };
+}
+
+module.exports = {
+    withSeller, requireSellerInstance, getInstanceId, isOwnerOrAdmin,
+    NON_SELLER_INSTANCE_IDS, applyNonSellerExclusion,
+};

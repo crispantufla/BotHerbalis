@@ -8,7 +8,7 @@ const { aiService } = require('../../../src/services/ai');
 
 module.exports = (clientPool) => {
     const router = express.Router();
-    const { withSeller, getInstanceId } = require('./routeHelpers');
+    const { withSeller, getInstanceId, applyNonSellerExclusion } = require('./routeHelpers');
     const { requireAdmin } = require('../../middleware/jwtAuth');
     const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../../..');
 
@@ -183,7 +183,7 @@ module.exports = (clientPool) => {
                 return new Date(`${y}-${m}-${d}T03:00:00.000Z`);
             })();
 
-            const whereBase = INSTANCE_ID ? { instanceId: INSTANCE_ID } : {};
+            const whereBase = applyNonSellerExclusion(INSTANCE_ID ? { instanceId: INSTANCE_ID } : {});
 
             // Fetch database aggregations in parallel for performance
             const [totalCount, todayStats, completedStats, newChatsToday] = await Promise.all([
@@ -275,7 +275,7 @@ module.exports = (clientPool) => {
             thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
             thirtyDaysAgo.setHours(0, 0, 0, 0);
 
-            const whereBase = INSTANCE_ID ? { instanceId: INSTANCE_ID } : {};
+            const whereBase = applyNonSellerExclusion(INSTANCE_ID ? { instanceId: INSTANCE_ID } : {});
 
             // Fetch all orders and stats from the last 30 days for this instance
             const [orders, dailyStatsRecords] = await Promise.all([
@@ -667,7 +667,7 @@ module.exports = (clientPool) => {
             const rssMB = Math.round(memUsage.rss / 1024 / 1024);
             const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
 
-            const whereBase = INSTANCE_ID ? { instanceId: INSTANCE_ID } : {};
+            const whereBase = applyNonSellerExclusion(INSTANCE_ID ? { instanceId: INSTANCE_ID } : {});
 
             // Count total users in DB
             const totalUsers = await prisma.user.count({ where: whereBase });
@@ -729,7 +729,7 @@ module.exports = (clientPool) => {
             const INSTANCE_ID = getInstanceId(req);
             const { prisma } = require('../../../db');
 
-            const whereBase = INSTANCE_ID ? { instanceId: INSTANCE_ID } : {};
+            const whereBase = applyNonSellerExclusion(INSTANCE_ID ? { instanceId: INSTANCE_ID } : {});
 
             // 0. Snapshot daily stats before deleting users
             // Use Argentina timezone to match dashboard

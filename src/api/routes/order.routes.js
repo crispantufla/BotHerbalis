@@ -48,11 +48,12 @@ module.exports = (clientPool) => {
     // GET /orders/sellers — distinct instanceIds present in Order table.
     // Used by Logística filter to include "ghost" sellers (accounts deleted
     // but with preserved orders, e.g. denis post-hard-delete).
+    // Excluimos namespaces "no-seller" (default + __legacy_import__).
     router.get('/orders/sellers', ...withSeller(clientPool), async (req, res) => {
         try {
             const { prisma } = require('../../../db');
             const rows = await prisma.order.findMany({
-                where: { instanceId: { not: 'default' } },
+                where: { instanceId: { notIn: ['default', '__legacy_import__'] } },
                 select: { instanceId: true },
                 distinct: ['instanceId'],
             });
@@ -89,7 +90,12 @@ module.exports = (clientPool) => {
             const effectiveInstanceId = isAdmin
                 ? (instanceIdFromCtx || requestedInstanceId || null)
                 : instanceIdFromCtx;
-            const where = effectiveInstanceId ? { instanceId: effectiveInstanceId } : {};
+            // Vista agregada sin seller específico: excluimos namespaces "no-seller"
+            // (__legacy_import__ tiene los 21k clientes históricos de Argentina —
+            // están en DB solo para el gate de detección, no son pedidos reales).
+            const where = effectiveInstanceId
+                ? { instanceId: effectiveInstanceId }
+                : { instanceId: { notIn: ['__legacy_import__'] } };
 
             // Filtro de status server-side. Antes era client-side sobre la página
             // actual, así que filtrar "Pendiente" mostraba solo los pending de

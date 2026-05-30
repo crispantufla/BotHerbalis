@@ -7,7 +7,7 @@ const AR_TZ = 'America/Argentina/Buenos_Aires';
 
 module.exports = (clientPool) => {
     const router = express.Router();
-    const { withSeller, getInstanceId } = require('./routeHelpers');
+    const { withSeller, getInstanceId, applyNonSellerExclusion } = require('./routeHelpers');
     const { jwtOrApiToken } = require('../../middleware/apiTokenAuth');
     const { sellerContext } = require('../../middleware/sellerContext');
 
@@ -47,8 +47,11 @@ module.exports = (clientPool) => {
             const instanceId = getInstanceId(req);
             const { currentStart, previousStart, previousEnd } = getPeriods(days);
 
-            const baseWhere = { status: { not: 'Cancelado' } };
-            if (instanceId) baseWhere.instanceId = instanceId;
+            const baseWhere = applyNonSellerExclusion(
+                instanceId
+                    ? { status: { not: 'Cancelado' }, instanceId }
+                    : { status: { not: 'Cancelado' } }
+            );
 
             // Fetch current period data
             const currentAgg = await prisma.order.aggregate({
@@ -100,8 +103,11 @@ module.exports = (clientPool) => {
             const instanceId = getInstanceId(req);
             const { currentStart } = getPeriods(days);
 
-            const baseWhere = { status: { not: 'Cancelado' } };
-            if (instanceId) baseWhere.instanceId = instanceId;
+            const baseWhere = applyNonSellerExclusion(
+                instanceId
+                    ? { status: { not: 'Cancelado' }, instanceId }
+                    : { status: { not: 'Cancelado' } }
+            );
 
             const orders = await prisma.order.findMany({
                 where: { ...baseWhere, createdAt: { gte: currentStart } },
@@ -181,13 +187,15 @@ module.exports = (clientPool) => {
             const instanceId = getInstanceId(req);
             const { currentStart } = getPeriods(days);
 
-            const baseWhere = { status: { not: 'Cancelado' } };
-            const baseUserWhere = {};
+            let baseWhere = { status: { not: 'Cancelado' } };
+            let baseUserWhere = {};
 
             if (instanceId) {
                 baseWhere.instanceId = instanceId;
                 baseUserWhere.instanceId = instanceId;
             }
+            baseWhere = applyNonSellerExclusion(baseWhere);
+            baseUserWhere = applyNonSellerExclusion(baseUserWhere);
 
             // Top provinces
             const provinces = await prisma.order.groupBy({
@@ -291,7 +299,7 @@ module.exports = (clientPool) => {
             since.setDate(since.getDate() - days);
             since.setHours(0, 0, 0, 0);
 
-            const whereBase = instanceId ? { instanceId } : {};
+            const whereBase = applyNonSellerExclusion(instanceId ? { instanceId } : {});
 
             const snapshots = await prisma.dailyStats.findMany({
                 where: { ...whereBase, date: { gte: since }, stepCounts: { not: null } },
@@ -343,7 +351,7 @@ module.exports = (clientPool) => {
             since.setDate(since.getDate() - days);
             since.setHours(0, 0, 0, 0);
 
-            const whereBase = instanceId ? { instanceId } : {};
+            const whereBase = applyNonSellerExclusion(instanceId ? { instanceId } : {});
 
             // Fetch users with profileData to extract adSource
             const users = await prisma.user.findMany({
@@ -917,15 +925,17 @@ module.exports = (clientPool) => {
             since.setDate(since.getDate() - days);
             since.setHours(0, 0, 0, 0);
 
-            const userWhere = { createdAt: { gte: since } };
+            let userWhere = { createdAt: { gte: since } };
             if (instanceId) userWhere.instanceId = instanceId;
+            userWhere = applyNonSellerExclusion(userWhere);
             const users = await prisma.user.findMany({
                 where: userWhere,
                 select: { phone: true, profileData: true, createdAt: true },
             });
 
-            const orderWhere = { createdAt: { gte: since }, status: { not: 'Cancelado' } };
+            let orderWhere = { createdAt: { gte: since }, status: { not: 'Cancelado' } };
             if (instanceId) orderWhere.instanceId = instanceId;
+            orderWhere = applyNonSellerExclusion(orderWhere);
             const orders = await prisma.order.findMany({
                 where: orderWhere,
                 select: { userPhone: true, totalPrice: true },
