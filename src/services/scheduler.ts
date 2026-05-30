@@ -830,7 +830,7 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
         if (mpReminderStage === 0 && minsSince >= 30) {
             const linkUrl = (state as any).mpPaymentLinkUrl;
             const linkLine = linkUrl ? `\n\nAcá te dejo el link de nuevo:\n${linkUrl}` : '';
-            const msg = `¡Hola! 👋 ¿Tuviste algún problema con el pago de MercadoPago? Si te quedó alguna duda, decime y lo resolvemos 🙂${linkLine}`;
+            const msg = `¡Hola! 👋 ¿Pudiste con el pago de Mercado Pago? Cualquier duda la resolvemos 🙂 Acordate que pagás 100% protegido: si por algo no te llega, MP te devuelve la plata.${linkLine}`;
             try {
                 await sendMessageWithDelay(userId, msg);
                 _pushHistory(state, { role: 'bot', content: msg });
@@ -888,7 +888,7 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
         if (mpReminderStage === 2 && minsSince >= 1440) {
             const linkUrl = (state as any).mpPaymentLinkUrl;
             const linkLine = linkUrl ? `\n\nAcá te dejo el link otra vez:\n${linkUrl}` : '';
-            const msg = `¡Hola! ¿Cómo va? 😊\n\nVi que el pago de MercadoPago quedó pendiente. Te recuerdo que los pedidos llegan en *5 a 7 días hábiles* desde la confirmación del pago.\n\nSi preferís, te lo puedo programar para una fecha más adelante (cuando cobres) y te congelo el precio de hoy. Avisame qué te conviene.${linkLine}`;
+            const msg = `¡Hola! ¿Cómo va? 😊\n\nVi que el pago de MercadoPago quedó pendiente. Te recuerdo que los pedidos llegan en *5 a 7 días hábiles* desde la confirmación del pago.\n\nSi preferís, te lo puedo programar para una fecha más adelante (cuando cobres) y lo despacho recién ese día. ¿A partir de qué día te queda cómodo recibirlo?${linkLine}`;
             try {
                 await sendMessageWithDelay(userId, msg);
                 _pushHistory(state, { role: 'bot', content: msg });
@@ -903,7 +903,7 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
 
         // Stage 4: 72 horas sin pagar — última oportunidad.
         if (mpReminderStage === 3 && minsSince >= 4320) {
-            const msg = `¡Hola! 🙂 Ya es el último mensaje que te mando por este pedido.\n\nSi querés podemos:\n\n📅 *Programarlo postdatado* — me decís la fecha y te congelo el precio\n💳 *Retomar el pago de MP* hoy mismo\n\nSi no querés avanzar, ningún drama — me decís y lo cerramos. Te dejo elegir 😊`;
+            const msg = `¡Hola! 🙂 Ya es el último mensaje que te mando por este pedido.\n\nSi querés podemos:\n\n📅 *Programarlo postdatado* — me decís la fecha y lo despacho ese día\n💳 *Retomar el pago de MP* hoy mismo\n\nSi no querés avanzar, ningún drama — me decís y lo cerramos. Te dejo elegir 😊`;
             try {
                 await sendMessageWithDelay(userId, msg);
                 _pushHistory(state, { role: 'bot', content: msg });

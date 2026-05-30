@@ -120,7 +120,7 @@
         "payment_mp_link": {
             "step": "waiting_mp_payment",
             "_note": "TEXTO 5a — Cliente eligió Mercado Pago. Le mandamos el link + detalle del pedido + pedido de datos en paralelo. Placeholders: {{PRODUCT}}, {{PLAN}}, {{TOTAL}}, {{LINK}}.",
-            "response": "💳 Link de Mercado Pago:\n\n{{LINK}}\n\nTotal: ${{TOTAL}} — {{PRODUCT}} {{PLAN}} días\n\nCuando termines de pagar, mandame \"listo\" y verifico.\n\nMientras, pasame los datos de envío:\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nEmail (opcional, para el comprobante de MP):",
+            "response": "💳 Te dejo el link para pagar con Mercado Pago:\n\n{{LINK}}\n\nTotal: ${{TOTAL}} — {{PRODUCT}} {{PLAN}} días\n\nPagás 100% protegido: si por algo no te llega, Mercado Pago te devuelve la plata 👌 Podés pagar con tarjeta, débito, o en efectivo en Pago Fácil/Rapipago con el código.\n\nCuando termines, mandame \"listo\" y coordinamos el envío 😊\n\nMientras tanto, pasame los datos para la etiqueta:\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nEmail (opcional, para el comprobante de MP):",
             "nextStep": "waiting_mp_payment"
         },
         "payment_mp_failed": {
@@ -286,7 +286,7 @@
                 "quincena",
                 "fin de mes"
             ],
-            "response": "¡Tranqui! 😊 Podemos *programar la entrega* para después de la fecha que cobrás. El precio queda congelado.\n\n¿Desde qué día te queda cómodo recibirlo?"
+            "response": "¡Tranqui! 😊 Podemos *programar la entrega* para después de la fecha que cobrás y lo despacho ese día.\n\n¿Desde qué día te queda cómodo recibirlo?"
         },
         {
             "keywords": [

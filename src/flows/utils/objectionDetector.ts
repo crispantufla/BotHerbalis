@@ -98,7 +98,7 @@ const REBUTTALS: Record<ObjectionMatch['type'], string[]> = {
         'Dale, escuchame bien: el de 120 días sale más conveniente por cápsula que el de 60, y si te queda más cómodo podés elegir retiro en sucursal (pagás al retirar). ¿Avanzamos con ese? 😊',
     ],
     consultar: [
-        '¡Dale, obvio! 😊 Mirá, podemos dejar el pedido reservado a tu nombre para congelarte el precio de hoy mientras lo charlás. ¿Te parece que te lo aguarde así?',
+        '¡Dale, obvio! 😊 Mirá, podemos dejar el pedido reservado a tu nombre mientras lo charlás, y lo despacho cuando me des el OK. ¿Te parece que te lo aguarde así?',
         'Totalmente entendible 🙌 Si querés, te dejo el pedido cargado con tus datos para que lo charles sin apuro y no pierdas el precio. ¿Te parece?',
     ],
     miedo: [
@@ -111,10 +111,10 @@ const REBUTTALS: Record<ObjectionMatch['type'], string[]> = {
     ],
     postergar: [
         '¡No hay drama! 😊 Si te queda más cómodo, podemos coordinar *retiro en sucursal* — te dejamos el paquete en una sucursal de Correo Argentino cerca tuyo y pagás el total *en efectivo cuando lo retirás*. ¿Te cargo el pedido?',
-        '¡Tranqui! 🙌 Si preferís, podemos dejar el pedido cargado HOY para congelarte el precio actual, y te lo enviamos para la fecha que vos me digas que cobrás. ¿Te parece así? 😊',
+        '¡Tranqui! 🙌 Si preferís, podemos dejar el pedido cargado y te lo enviamos para la fecha que vos me digas que cobrás. Lo despacho recién ese día. ¿Te parece así? 😊',
     ],
     pensar: [
-        '¡Obvio, pensalo tranqui! 😊 Si querés te dejo el pedido reservado con tu nombre para congelarte el precio de hoy, y lo despachamos cuando me des el visto bueno. ¿Te lo aguanto así?',
+        '¡Obvio, pensalo tranqui! 😊 Si querés te dejo el pedido reservado con tu nombre, y lo despachamos cuando me des el visto bueno. ¿Te lo aguanto así?',
         '¡Dale, sin apuro! 🙌 Te lo puedo dejar reservado a tu nombre para que no pierdas el precio de hoy. Vos lo pensás y cuando me decís, lo mandamos. ¿Te parece?',
     ],
 };
@@ -143,7 +143,7 @@ const ESCALATED_REBUTTALS: Record<ObjectionMatch['type'], string[]> = {
     ],
     postergar: [
         'Mirá, te propongo concreto: *te reservo el precio de hoy y te lo agendo para la fecha que cobres*. Decime el día exacto (por ejemplo: 30/05 o "5 del mes que viene") y te lo despacho para que te llegue justo. ¿Te conviene así?',
-        'Dale, *te lo congelo al precio de hoy y te lo programo postdatado* — me decís la fecha de cobro y el bot lo despacha justo para entonces. ¿Para qué día te conviene?',
+        'Dale, *te lo programo postdatado* — me decís la fecha de cobro y el bot lo despacha justo para entonces. ¿Para qué día te conviene?',
     ],
     pensar: [
         'Dale, *te reservo el pedido a tu nombre por 48 horas* con el precio de hoy. En ese plazo me decís si avanzamos, si no, lo libero sin compromiso. ¿Te parece?',
