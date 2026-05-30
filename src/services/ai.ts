@@ -910,7 +910,11 @@ INSTRUCCIONES:
                 userStateSnap?.postdatado ||
                 (userStateSnap?.partialAddress && Object.keys(userStateSnap.partialAddress).length > 0)
             );
-            if (!hasOrderContext) {
+            // En el playground (context.forceClaude definido) NO usamos el semantic
+            // cache: si no, GPT y Claude devolverían la MISMA respuesta cacheada y no
+            // se podrían comparar. Tampoco queremos contaminar el cache de prod con
+            // respuestas de prueba (el store de abajo también se saltea en ese caso).
+            if (!hasOrderContext && context.forceClaude === undefined) {
                 try {
                     const cached = await lookupSemanticCache(this.client, step, userText);
                     if (cached) {
@@ -944,7 +948,7 @@ INSTRUCCIONES:
             if (useClaudeNow) {
                 const cArgs = await this._claudeChat(systemPrompt, userPrompt, step, context.sellerId!);
                 if (cArgs && cArgs.response) {
-                    if (!cArgs.goalMet && !cArgs.extractedData && !hasOrderContext) {
+                    if (!cArgs.goalMet && !cArgs.extractedData && !hasOrderContext && context.forceClaude === undefined) {
                         storeSemanticCache(this.client, step, userText, cArgs.response).catch(() => { /* best effort */ });
                     }
                     return {
@@ -1000,7 +1004,8 @@ INSTRUCCIONES:
                     args.response &&
                     !args.goalMet &&
                     !args.extractedData &&
-                    !hasOrderContext
+                    !hasOrderContext &&
+                    context.forceClaude === undefined
                 ) {
                     storeSemanticCache(this.client, step, userText, args.response)
                         .catch(() => { /* best effort */ });
