@@ -13,6 +13,17 @@ export async function handleWaitingPreference(
 ): Promise<{ matched: boolean }> {
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
 
+    // Plan elegido por el cliente (rev 2026-05-30): con prices_both ve los 2 planes
+    // y puede pedir el 120 aunque le recomendemos 60. Si menciona un plan, lo
+    // guardamos en _planChoice para que _assignProductAndPlanByTier lo respete.
+    // No colisiona con la elección de producto (1/2/3): acá pedimos "120"/"4 meses",
+    // nunca un dígito suelto.
+    if (/\b(120|4\s*meses|cuatro\s*meses|el\s+(largo|completo|grande))\b/i.test(normalizedText)) {
+        (currentState as any)._planChoice = '120';
+    } else if (/\b(60|2\s*meses|dos\s*meses|el\s+(corto|chico))\b/i.test(normalizedText)) {
+        (currentState as any)._planChoice = '60';
+    }
+
     // SCRIPT FIRST: Check if the user is asking for a deferred "postdatado" date early
     const earlyPostdatado = _detectPostdatado(normalizedText);
     if (earlyPostdatado) {

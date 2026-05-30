@@ -49,6 +49,11 @@
             "_note": "Texto B — segundo mensaje automático tras recommendation_2 (tier 2, plan 120d). Disparado por stepWaitingWeight.",
             "response": "1️⃣ *Cápsulas* × 120 días — *${{PRICE_CAPSULAS_120}}*\n2️⃣ *Gotas* × 120 días — *${{PRICE_GOTAS_120}}*\n3️⃣ *Semillas* × 120 días — *${{PRICE_SEMILLAS_120}}*\n\nTodo incluye *envío gratis* a todo el país y que te acompaño por acá durante todo el tratamiento 🙌\n\n¿Con cuál querés arrancar?"
         },
+        "prices_both": {
+            "step": "waiting_weight",
+            "_note": "Texto B (rev. 2026-05-30): muestra AMBOS planes (60 y 120 días) para las 3 presentaciones, no solo el del tier recomendado. Motivo: aunque recomendemos 60, la mayoría termina comprando 120 al verlo. Empuje suave al 120. Disparado por stepWaitingWeight tras recommendation_X. El cliente elige producto (1/2/3) y, si dice 60/120, ese plan se respeta (stepWaitingPreference); si no, queda el del tier.",
+            "response": "Cada presentación viene en plan de *60 días* o *120 días*:\n\n1️⃣ *Cápsulas* — 60d ${{PRICE_CAPSULAS_60}} · 120d ${{PRICE_CAPSULAS_120}}\n2️⃣ *Gotas* — 60d ${{PRICE_GOTAS_60}} · 120d ${{PRICE_GOTAS_120}}\n3️⃣ *Semillas* — 60d ${{PRICE_SEMILLAS_60}} · 120d ${{PRICE_SEMILLAS_120}}\n\nEl de *120 días* es el tratamiento completo y es el que más eligen 💪 Todo con *envío gratis*.\n\n¿Con cuál arrancás? (decime la opción, y si va de 60 o 120 días)"
+        },
         "preference_capsulas": {
             "step": "waiting_preference",
             "_note": "Cliente eligió cápsulas. El plan ya está determinado por el tier (60 si ≤10kg, 120 si +10kg). El handler asigna selectedProduct + selectedPlan + total y envía este mensaje + payment_menu como segundo mensaje. nextStep: waiting_payment_method (skip waiting_ok y waiting_plan_choice del flow viejo).",

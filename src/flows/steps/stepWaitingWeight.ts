@@ -70,7 +70,10 @@ async function _sendTierRecommendation(
     // V7: auto-followup con prices_60 / prices_120 (segundo mensaje del guion).
     // Este SIEMPRE es scripted — precios exactos, lista numerada canónica (ancla el
     // 1/2/3 aunque la IA arriba haya redactado libre). V5/V6: prices_X no existen.
-    const pricesNode = knowledge?.flow?.[`prices_${planDays}`];
+    // prices_both (rev 2026-05-30): muestra AMBOS planes (60+120) para empujar el
+    // upsell — aunque recomendemos 60, la mayoría compra 120 al verlo. Fallback a
+    // prices_${planDays} (solo el plan del tier) si el guion no tiene prices_both.
+    const pricesNode = knowledge?.flow?.prices_both || knowledge?.flow?.[`prices_${planDays}`];
     if (pricesNode?.response) {
         const pricesMsg = _formatMessage(pricesNode.response, currentState);
         currentState.history.push({ role: 'bot', content: pricesMsg, timestamp: Date.now() });
@@ -90,7 +93,11 @@ export async function handleWaitingWeight(
 ): Promise<{ matched: boolean }> {
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
 
-    const hasNumber = /\d+/.test(text.trim());
+    // No confundir el número de un descuento/porcentaje con kilos: "haceme 50% de
+    // descuento" NO es "bajar 50 kg" (bug del test off-script 2026-05-30). Sacamos
+    // los "\d+%" antes de detectar/extraer peso.
+    const _weightText = text.replace(/\d+\s*%/g, ' ');
+    const hasNumber = /\d+/.test(_weightText.trim());
     const hasQuestion = /\b(como|cómo|cuando|cuándo|que|qué|donde|dónde|por que|por qué|cual|cuál|duda|consulta|precio|costo|sale|cuesta|valor|paga|cobr|tarjeta|efectivo|transferencia|contraindicaciones|contraindicacion|efectos|mal|dieta|rebote|salud|dañin|riñon|riñón|higado|hígado|corazon|corazón|diabetes|diabetico|diabética|diabético|presion|presión|hipertens|operad|cirugía|cirugia|enferm|tiroides|medicamento|medica|pastillas para)\b/i.test(normalizedText) || normalizedText.includes('?');
     // If text is super long (like a transcription), force AI to handle it so we don't look robotic
     const isVeryLongMessage = text.split(/\s+/).length > 20;
@@ -192,7 +199,7 @@ export async function handleWaitingWeight(
             const n = parseInt(explicitGoalMatch[1], 10);
             if (n >= 3 && n <= 50) return n;
         }
-        const allNums = (text.match(/\d{1,3}/g) || []).map(s => parseInt(s, 10));
+        const allNums = (_weightText.match(/\d{1,3}/g) || []).map(s => parseInt(s, 10));
         const inRange = allNums.find(n => n >= 3 && n <= 50);
         if (inRange != null) return inRange;
         return allNums[0] ?? null;
