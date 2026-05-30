@@ -12,6 +12,7 @@ interface GreetingDependencies {
     saveState: (userId: string) => void;
     effectiveScript?: string;
     config?: { scriptStats?: Record<string, { started: number; completed: number }>; activeScript?: string };
+    aiService?: any;
 }
 
 export async function handleGreeting(
@@ -58,6 +59,43 @@ export async function handleGreeting(
             dependencies.config.scriptStats[trackScript] = { started: 0, completed: 0 };
         }
         dependencies.config.scriptStats[trackScript].started++;
+    }
+
+    // --- Apertura sustantiva: el cliente arrancó con una pregunta/objeción real
+    // (no un "hola" pelado). En vez de volcar el saludo enlatado ignorándola
+    // (feedback off-script 2026-05-30), la IA responde la consulta + se presenta +
+    // pide los kilos. Candados: (a) solo si NO es saludo simple / anuncio / peso
+    // explícito; (b) si la IA falla, cae al saludo scripted de abajo. ---
+    const _norm = text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    const _isAdTrigger = /vengo de un anuncio|quiero m[aá]s informaci[oó]n|conseguir m[aá]s informaci[oó]n/i.test(text);
+    const _hasWeightInOpening = /\b\d{1,3}\s*(?:kg?s?|kilos?|kilogramos?)\b/i.test(text) || /\b(?:bajar|perder)\s+\d{1,3}/i.test(text);
+    const _substantiveOpening = !_isAdTrigger && !_hasWeightInOpening && (
+        /\?/.test(text) ||
+        /\b(cuanto (sale|cuesta|vale|es)|que precio|el precio|precios?|estudios?|anmat|cientific|chamuyo|estafa|trucho|mentira|sirve|funciona de verdad|es seguro|seguro que|contraindicaci|hace mal|da[ñn]in|garant[ií]a|devuelven|devoluci[oó]n|reembolso|sos un bot|sos real|sos human|sos una maquina|es real esto|de donde son|donde estan|tienen local)\b/i.test(_norm)
+    );
+    const _ai = (dependencies as any).aiService;
+    if (_substantiveOpening && _ai && typeof _ai.chat === 'function') {
+        try {
+            const openGoal = `El cliente ABRIÓ la conversación con una pregunta o comentario, NO un saludo simple. Su mensaje: "${text}". Sos Elena de Herbalis. (1) Respondé su consulta/comentario de forma cálida, honesta y BREVE con el knowledge — sin inventar precios, estudios ni datos que no tengas. (2) Si pregunta el PRECIO, NO tires un número suelto: decile que depende del plan (60 o 120 días) y que para recomendarte bien primero necesitás saber cuántos kilos quiere bajar. (3) Presentate en una línea como Elena de Herbalis (Nuez de la India, 100% natural) si viene al caso. (4) Cerrá con UNA sola pregunta: cuántos kilos querés bajar, ¿hasta 10 kg o más de 10 kg? 🛑 NO derives al médico bajo ninguna circunstancia.`;
+            const aiOpen = await _ai.chat(text, {
+                step: 'greeting',
+                goal: openGoal,
+                history: currentState.history,
+                summary: currentState.summary,
+                knowledge,
+                userState: currentState,
+            });
+            if (aiOpen.response) {
+                currentState.history.push({ role: 'bot', content: aiOpen.response, timestamp: Date.now() });
+                await sendMessageWithDelay(userId, aiOpen.response);
+                _setStep(currentState, knowledge.flow.greeting.nextStep);
+                saveState(userId);
+                logger.info(`[GREETING-AI] User ${userId} abrió con consulta sustantiva — IA respondió + encarriló a kilos.`);
+                return { matched: true };
+            }
+        } catch (e: any) {
+            logger.warn(`[GREETING-AI] falló para ${userId}: ${e.message} — caigo al saludo scripted.`);
+        }
     }
 
     // 1. A/B variant selection — si knowledge.flow.greeting_variants existe y
