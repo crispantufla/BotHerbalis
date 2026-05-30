@@ -81,18 +81,24 @@ export async function processSalesFlow(
         };
 
         // --- CHECK 1: Cross-reference against Orders DB ---
-        // If this phone has an existing order under this seller, they're a past customer — route to post-sale
+        // Si el phone tiene Order en este seller O en el namespace legacy
+        // (__legacy_import__ — clientes históricos importados desde Clientes_AR.txt),
+        // es un cliente conocido → ruta post-sale para que el bot no le hable.
         try {
             const { prisma } = require('../../db');
             const cleanPhone = _cleanPhone(userId);
             const instanceId = dependencies.sellerId || dependencies.sharedState?.sellerId || process.env.INSTANCE_ID || 'default';
             const existingOrder = await prisma.order.findFirst({
-                where: { userPhone: cleanPhone, instanceId },
+                where: {
+                    userPhone: cleanPhone,
+                    instanceId: { in: [instanceId, '__legacy_import__'] },
+                },
                 orderBy: { createdAt: 'desc' }
             });
 
             if (existingOrder) {
-                logger.info(`[ORDER-CHECK] User ${userId} has existing order (status: ${existingOrder.status}). Routing to post-sale.`);
+                const isLegacy = existingOrder.instanceId === '__legacy_import__';
+                logger.info(`[ORDER-CHECK] User ${userId} has existing order (status: ${existingOrder.status}, legacy=${isLegacy}). Routing to post-sale.`);
                 _setStep(userState[userId], FlowStep.COMPLETED);
                 userState[userId].selectedProduct = existingOrder.products;
                 saveState(userId);
