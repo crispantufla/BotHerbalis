@@ -118,6 +118,9 @@ export interface APIContext {
     // FunnelEvent abierto del (seller, phone). Fire-and-forget, no bloquea.
     sellerId?: string;
     phone?: string;
+    // Override de modelo (lo usa el playground "Probar bot"): true fuerza Claude,
+    // false fuerza GPT-4o, undefined deja decidir al A/B por seller/%.
+    forceClaude?: boolean;
 }
 
 export interface AIParsedResponse {
@@ -575,20 +578,27 @@ class AIService {
         this.stats = { calls: 0, cached: 0, retries: 0, errors: 0, promptTokens: 0, completionTokens: 0, estimatedCostUSD: 0 };
         this._circuitBreakers = new Map();
 
-        // A/B Claude: init solo si hay sellers en el experimento + key. Si no, OFF.
+        // Claude: el cliente se inicializa SIEMPRE que haya ANTHROPIC_API_KEY,
+        // independientemente del A/B — así el playground "Probar bot" puede forzar
+        // Claude aunque no haya ningún seller en el experimento. El A/B (por seller
+        // y %) se decide aparte en _useClaudeFor.
         const anthropicKey = process.env.ANTHROPIC_API_KEY || "";
-        this._claudeDisabled = !anthropicKey || CLAUDE_AB_SELLERS.size === 0;
         this.anthropic = null;
-        if (!this._claudeDisabled) {
+        if (anthropicKey) {
             try {
                 const Anthropic = require('@anthropic-ai/sdk');
                 this.anthropic = new (Anthropic.default || Anthropic)({ apiKey: anthropicKey, timeout: 20_000 });
-                logger.info(`📡[AI] Claude A/B ON para sellers [${[...CLAUDE_AB_SELLERS].join(', ')}] — premium=${CLAUDE_MODEL_PREMIUM}, simple=${CLAUDE_MODEL_SIMPLE}`);
+                if (CLAUDE_AB_SELLERS.size > 0) {
+                    logger.info(`📡[AI] Claude A/B ON para [${[...CLAUDE_AB_SELLERS].join(', ')}] @ ${CLAUDE_AB_PERCENT}% — premium=${CLAUDE_MODEL_PREMIUM}, simple=${CLAUDE_MODEL_SIMPLE}`);
+                } else {
+                    logger.info(`📡[AI] Anthropic listo (Claude disponible para playground; A/B OFF)`);
+                }
             } catch (e: any) {
-                logger.error(`[AI] No se pudo iniciar Anthropic SDK, A/B desactivado: ${e.message}`);
-                this._claudeDisabled = true;
+                logger.error(`[AI] No se pudo iniciar Anthropic SDK: ${e.message}`);
+                this.anthropic = null;
             }
         }
+        this._claudeDisabled = !this.anthropic;
     }
 
     /** A/B: ¿esta conversación (seller + teléfono) debe correr sobre Claude?
@@ -923,9 +933,15 @@ INSTRUCCIONES:
             const chatModel = _getModelForStep(step);
             const systemPrompt = await _buildSystemPrompt(step, userText);
 
-            // A/B Claude: si este seller está en el experimento, el chat corre sobre
-            // Claude. Si Claude falla, caemos al path OpenAI de abajo (resiliencia).
-            if (this._useClaudeFor(context.sellerId, context.phone)) {
+            // Decisión de modelo: el playground puede forzar (context.forceClaude);
+            // si no, aplica el A/B por seller/%. Si Claude falla, caemos al path
+            // OpenAI de abajo (resiliencia).
+            let useClaudeNow: boolean;
+            if (context.forceClaude === true) useClaudeNow = !!this.anthropic;
+            else if (context.forceClaude === false) useClaudeNow = false;
+            else useClaudeNow = this._useClaudeFor(context.sellerId, context.phone);
+
+            if (useClaudeNow) {
                 const cArgs = await this._claudeChat(systemPrompt, userPrompt, step, context.sellerId!);
                 if (cArgs && cArgs.response) {
                     if (!cArgs.goalMet && !cArgs.extractedData && !hasOrderContext) {

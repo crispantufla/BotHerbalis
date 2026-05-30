@@ -58,9 +58,23 @@ function _getOrCreateSession(sessionId) {
     return session;
 }
 
-function _buildDependencies(replies, useDelay) {
+function _buildDependencies(replies, useDelay, model) {
     // aiService real — el playground usa la misma IA que producción.
     const { aiService } = require('../../services/ai');
+
+    // Botón "modelo" del playground: 'claude' fuerza Claude, 'gpt' fuerza GPT-4o,
+    // undefined deja la lógica normal. Envolvemos chat() para inyectar forceClaude
+    // en el context (igual que salesFlow inyecta sellerId/phone; los Proxy componen).
+    const forceClaude = model === 'claude' ? true : (model === 'gpt' ? false : undefined);
+    const wrappedAi = (forceClaude === undefined) ? aiService : new Proxy(aiService, {
+        get(target, prop) {
+            if (prop === 'chat') {
+                return (text, context) => target.chat(text, { ...context, forceClaude });
+            }
+            const v = target[prop];
+            return typeof v === 'function' ? v.bind(target) : v;
+        }
+    });
 
     return {
         saveState: () => {},
@@ -73,7 +87,7 @@ function _buildDependencies(replies, useDelay) {
             replies.push({ role: 'bot', content: msg, timestamp: Date.now() });
         },
         notifyAdmin: async () => {},
-        aiService,
+        aiService: wrappedAi,
         logAndEmit: () => {},
         saveOrderToLocal: () => {},
         cancelLatestOrder: async () => null,
@@ -98,7 +112,7 @@ module.exports = () => {
     // respuestas del bot + el state actualizado.
     // body: { sessionId, message, useDelay }
     router.post('/playground/message', jwtAuthMiddleware, async (req, res) => {
-        const { sessionId, message, useDelay = false } = req.body || {};
+        const { sessionId, message, useDelay = false, model } = req.body || {};
         if (!sessionId || !message) {
             return res.status(400).json({ error: 'sessionId y message son requeridos' });
         }
@@ -120,7 +134,7 @@ module.exports = () => {
             });
         }
 
-        const deps = _buildDependencies(replies, !!useDelay);
+        const deps = _buildDependencies(replies, !!useDelay, model);
 
         try {
             await processSalesFlow(userId, message, session.userState, knowledge, deps);

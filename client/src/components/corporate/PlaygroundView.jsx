@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Send, RotateCcw, Loader2, Clock, ZapOff, ChevronRight, FlaskConical, AlertTriangle } from 'lucide-react';
+import { Send, RotateCcw, Loader2, Clock, ZapOff, ChevronRight, FlaskConical, AlertTriangle, Cpu } from 'lucide-react';
 import api from '../../config/axios';
 import { Card, Button, IconButton, Badge, useToast } from '../ui';
 import AiCorrectionModal from './components/AiCorrectionModal';
@@ -37,6 +37,7 @@ const PlaygroundView = () => {
     const [input, setInput] = useState('');
     const [sending, setSending] = useState(false);
     const [useDelay, setUseDelay] = useState(false);
+    const [model, setModel] = useState('gpt'); // 'gpt' | 'claude' — qué motor usa el bot en el playground
     const [forceStep, setForceStep] = useState('');
     // Índice del mensaje del bot que el usuario quiere reportar como error de IA.
     // null = modal cerrado.
@@ -75,6 +76,7 @@ const PlaygroundView = () => {
                 sessionId,
                 message: userMsg.content,
                 useDelay,
+                model,
             });
             const replies = res.data.replies || [];
             setMessages(prev => [...prev, ...replies]);
@@ -160,6 +162,31 @@ const PlaygroundView = () => {
                             ? <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> Delay humanizado (4-8s)</span>
                             : <span className="flex items-center gap-1"><ZapOff className="w-3 h-3" /> Respuesta inmediata</span>}
                     </label>
+
+                    {/* Toggle de modelo: con qué motor responde el bot en el playground. */}
+                    <div className="flex items-center gap-1.5">
+                        <span className="flex items-center gap-1 text-xs font-medium text-slate-600 dark:text-slate-400">
+                            <Cpu className="w-3 h-3" /> Modelo
+                        </span>
+                        <div className="flex items-center gap-0.5 rounded-control bg-slate-100 dark:bg-slate-800 p-0.5 text-xs font-medium">
+                            <button
+                                type="button"
+                                onClick={() => setModel('gpt')}
+                                className={`px-2.5 h-7 rounded-control transition-colors ${model === 'gpt' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                title="Responder con GPT-4o (producción actual)"
+                            >
+                                GPT-4o
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setModel('claude')}
+                                className={`px-2.5 h-7 rounded-control transition-colors ${model === 'claude' ? 'bg-white dark:bg-slate-700 text-accent-700 dark:text-accent-300 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                title="Responder con Claude (Sonnet en pasos premium)"
+                            >
+                                Claude
+                            </button>
+                        </div>
+                    </div>
 
                     <div className="flex items-center gap-2 ml-auto">
                         <select
