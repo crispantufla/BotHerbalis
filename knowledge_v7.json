@@ -97,7 +97,7 @@
         "payment_menu": {
             "step": "waiting_payment_method",
             "_note": "TEXTO 4 — Menú envío + medios de pago. Disparado por buildPaymentMessage. Modelo nuevo (may-2026): primero elige tipo de envío, después método. Retiro=contrarreembolso al retirar (sin anticipo). Domicilio=prepago (MP/Transfer).",
-            "response": "📦 El envío se realiza por Correo Argentino y demora entre 5 y 7 días hábiles.\n\nOpciones de envío:\n1️⃣ Retiro en sucursal → se paga al retirar (contrarreembolso)\n2️⃣ Envío a domicilio → se abona previamente\n\n💳 Medios de pago:\nMercadoPago – Transferencia – Rapipago – PagoFácil\n💳 Tarjeta de crédito\n\n👉 Por favor, decime:\n* Si preferís retiro en sucursal o envío a domicilio\n\n‼️ Ambos envíos son GRATIS ‼️",
+            "response": "📦 El envío se realiza por Correo Argentino y demora entre 5 y 7 días hábiles.\n\nOpciones de envío:\n1️⃣ Retiro en sucursal → se paga al retirar (Solo efectivo)\n2️⃣ Envío a domicilio → se abona previamente\n\n💳 Medios de pago:\nMercadoPago – Transferencia – Rapipago – PagoFácil\n💳 Tarjeta de crédito\n\n👉 Por favor, decime:\n* Si preferís retiro en sucursal y pagar al recibir o envío a domicilio con pago anticipado?\n\n‼️ Ambos envíos son GRATIS ‼️",
             "nextStep": "waiting_payment_method"
         },
         "payment_domicilio_choice": {
