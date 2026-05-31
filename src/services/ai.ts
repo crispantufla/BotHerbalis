@@ -335,6 +335,7 @@ const PAYMENT_POLICY = `MEDIOS DE PAGO (modelo nuevo may-2026 — 2 tipos de env
 - NUNCA mencionar "anticipo de $10.000" — esa modalidad fue eliminada en mayo 2026.
 - NUNCA mencionar "adicional de $6.000" — esa política ya no existe.
 - NUNCA usar urgencia/escasez tipo "congelar el precio" o "el precio de hoy" — esa modalidad no existe.
+- 🛑 "PAGO AL RECIBIR" CON MEDIO PREPAGO: si el cliente dice que quiere pagar "al recibir", "al cartero" o "contra entrega" CON Mercado Pago, tarjeta o transferencia, ACLARALE que esos medios se pagan ANTES del envío (online), NO al cartero. Pagar al recibir en EFECTIVO es SOLO retiro en sucursal. No lo mandes al link de MP sin aclarar esto primero; después pedile que elija retiro o domicilio.
 - El envío siempre es gratis (ambos tipos), demora *5 a 7 días hábiles* (igual para todos los métodos).`;
 
 // ── STEP MODULES (only one is sent per call, positioned in the middle) ──

@@ -27,6 +27,13 @@ const TRANSFER_KEYWORDS = /\b(transfer[ei]ncia|transf\b|transferir|alias|dep[óo
 const OPTION_PICKER = /(^|\s)(?:opci[óo]n\s+|la\s+|el\s+|n[uú]mero\s+|\#)?(\d)\s*[\.\)]?\s*$/i;
 const STANDALONE_NUM_WORD = /^\s*(?:la\s+|el\s+|opci[óo]n\s+)?(uno|dos|primer[oa]|segund[oa])\s*[\.\)]?\s*$/i;
 
+// Malentendido "pago al recibir" con medio prepago (caso real 5492954235122,
+// 2026-05-31): "Envío a domicilio pago con mercado pago al recibir". La clienta
+// cree que le paga al cartero con MP/transferencia — eso NO existe. Con esos
+// medios el pago es ANTES (online); pagar al recibir en efectivo es SOLO retiro
+// en sucursal. Si NO mencionó retiro/sucursal, hay que aclararlo antes de avanzar.
+const PAY_ON_DELIVERY = /\b(al recibir|al recibirlo|al recibirla|cuando (?:lo |la |me )?reciba|cuando (?:me )?llegue|cuando me lo traigan|cuando me lo entreguen|contra ?entrega|al cartero|al recibir el (?:paquete|producto|pedido))\b/i;
+
 // Despedida suave / dilación / "lo veo después" (reportes 2026-05-29 5493751416938
 // + 5491150190999 + 5492604649413). El cliente no elige opción de envío, dice
 // algo tipo "voy a ver", "gracias", "me comunico", "ahora estoy averiguando".
@@ -70,6 +77,26 @@ export async function handleWaitingPaymentMethod(
         saveState(userId);
         await sendMessageWithDelay(userId, reply);
         await _pauseAndAlert(userId, currentState, dependencies, text, 'Cliente quiere retirar en persona / es de Rosario en waiting_payment_method. Admin coordinar logística.');
+        return { matched: true };
+    }
+
+    // ── Malentendido: "pago al recibir" con MP/transferencia/domicilio ─────────
+    // La clienta quiere pagar al cartero con un medio que es PREPAGO. Aclaramos
+    // (con empatía — suele venir de miedo a estafa) y re-preguntamos, SIN avanzar
+    // al link ni al submenú. Si mencionó retiro/sucursal, NO es malentendido
+    // (ahí pagar al recibir en efectivo es correcto) → dejamos pasar.
+    const alreadyPaidMpClar = currentState.paymentMethod === 'mercadopago' && (currentState as any).mpStatus === 'approved';
+    if (!alreadyPaidMpClar
+        && PAY_ON_DELIVERY.test(normalizedText)
+        && !RETIRO_KEYWORDS.test(text)
+        && (MP_KEYWORDS.test(text) || TRANSFER_KEYWORDS.test(normalizedText) || DOMICILIO_KEYWORDS.test(text))) {
+        currentState.paymentSubChoiceAsked = false;
+        currentState.shippingChoice = null;
+        const msg = `¡Ojo, te aclaro así no hay malentendidos! 😊\n\nCon *Mercado Pago* o *transferencia* el pago es *antes* del envío (online) — al cartero no se le paga.\n\nPara *pagar al recibir, en efectivo*, la opción es *retiro en sucursal*: te llega a una sucursal de Correo Argentino cerca tuyo y pagás el total recién cuando lo retirás 💵\n\n¿Cómo preferís?\n1️⃣ *Retiro en sucursal* (pagás al retirar, en efectivo)\n2️⃣ *Envío a tu casa* (pagás ahora con Mercado Pago o transferencia)`;
+        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        saveState(userId);
+        await sendMessageWithDelay(userId, msg);
+        logger.info(`[PAYMENT_METHOD] ${userId} → malentendido "pago al recibir" con medio prepago/domicilio. Aclarado, re-preguntando.`);
         return { matched: true };
     }
 
@@ -190,7 +217,14 @@ export async function handleWaitingPaymentMethod(
         currentState.senaPaid = false;
         currentState.shippingChoice = 'retiro';
 
-        const msg = `¡Listo! Lo dejamos para retiro en sucursal 📦\n\nVas a pagar el total *$${currentState.totalPrice || '?'}* en efectivo cuando lo retirés.\n\nPasame tu dirección para asignarte la sucursal de Correo Argentino más cercana a tu zona:\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nProvincia:`;
+        // Retiro en sucursal NO necesita calle/número: con localidad + CP se asigna
+        // la sucursal de Correo Argentino que corresponde. Pre-seteamos calle='A
+        // sucursal' para que waiting_data NO pida ni valide la calle (el parseo de
+        // calle y la validación por Maps quedan guardados por !partialAddress.calle).
+        if (!currentState.partialAddress) currentState.partialAddress = {};
+        currentState.partialAddress.calle = 'A sucursal';
+
+        const msg = `¡Listo! Lo dejamos para retiro en sucursal 📦\n\nVas a pagar el total *$${currentState.totalPrice || '?'}* en efectivo cuando lo retirés.\n\nNo necesito tu dirección exacta — con tu *localidad y código postal* te asigno la sucursal de Correo Argentino que te corresponde. Pasame:\n\nNombre completo:\nLocalidad / Ciudad:\nCódigo postal:`;
         _setStep(currentState, FlowStep.WAITING_DATA);
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);

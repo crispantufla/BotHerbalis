@@ -193,6 +193,33 @@ afterAll(() => { delete process.env.MP_ACCESS_TOKEN; });
 // ════════════════════════════════════════════════════════════════════════════
 
 // ════════════════════════════════════════════════════════════════════════════
+// BLOQUE 1b: malentendido "pago al recibir" con medio prepago (caso 5492954235122)
+// ════════════════════════════════════════════════════════════════════════════
+describe('Aclaración "pago al recibir" con MP/domicilio', () => {
+    const norm = (t) => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+    test('"Envío a domicilio pago con mercado pago al recibir" → aclara, NO avanza al link/submenú', async () => {
+        const state = makePaymentState('60');
+        const txt = 'Envio a domicilio pago con mercado pago al recibir';
+        await handleWaitingPaymentMethod('m1', txt, norm(txt), state, knowledge, deps);
+        expect(state.step).toBe('waiting_payment_method');
+        expect(state.paymentMethod).not.toBe('mercadopago');
+        expect(state.paymentSubChoiceAsked).toBeFalsy();
+        const sent = mockSend.mock.calls.map(([, m]) => m).join(' ');
+        expect(sent).toMatch(/antes del env[íi]o|al cartero no se le paga/i);
+        expect(sent).toMatch(/retiro en sucursal/i);
+    });
+
+    test('"retiro en sucursal y pago al recibir en efectivo" → NO es malentendido, va a retiro', async () => {
+        const state = makePaymentState('60');
+        const txt = 'retiro en sucursal y pago al recibir en efectivo';
+        await handleWaitingPaymentMethod('m2', txt, norm(txt), state, knowledge, deps);
+        expect(state.shippingChoice).toBe('retiro');
+        expect(state.paymentMethod).toBe('contrarembolso');
+    });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
 // BLOQUE 2: stepWaitingPaymentMethod — Retiro en sucursal (opción 1)
 // ════════════════════════════════════════════════════════════════════════════
 describe('Menú envío → Retiro en sucursal (opción 1)', () => {
@@ -231,20 +258,23 @@ describe('Menú envío → Retiro en sucursal (opción 1)', () => {
         expect(sent).not.toMatch(/10\.000/);
     });
 
-    test('[2.5] Tras elegir retiro, el bot pide datos para asignar sucursal (no pausa)', async () => {
-        // Rev. 2026-05-30: retiro ya no pausa inmediatamente. Pide nombre/calle/CP
-        // explicando que es para asignar la sucursal de Correo más cercana, y
-        // pasa a waiting_data. La calle real va a calleOriginal y `calle`
-        // se reescribe a "A sucursal" cuando se arma la orden final.
-        const state = makePaymentState('60');
+    test('[2.5] Tras elegir retiro, pide SOLO localidad + CP (no calle) y pre-setea calle="A sucursal"', async () => {
+        // Rev. 2026-05-31: retiro NO pide calle/número. Con localidad + CP se
+        // asigna la sucursal que corresponde. Pre-setea partialAddress.calle="A
+        // sucursal" para que waiting_data no pida ni valide la calle.
+        const state = makePaymentState('60', { partialAddress: {} });
         await handleWaitingPaymentMethod('r5', '1', '1', state, knowledge, deps);
         expect(state.shippingChoice).toBe('retiro');
         expect(state.paymentMethod).toBe('contrarembolso');
         expect(state.step).toBe('waiting_data');
+        expect(state.partialAddress.calle).toBe('A sucursal');
         expect(deps.sharedState.pausedUsers.has('r5')).toBe(false);
         const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
         expect(sent).toMatch(/retiro en sucursal/i);
-        expect(sent).toMatch(/Pasame tu dirección|datos.*sucursal/i);
+        expect(sent).toMatch(/localidad/i);
+        expect(sent).toMatch(/c[óo]digo postal/i);
+        // NO debe pedir calle y número
+        expect(sent).not.toMatch(/calle y n[úu]mero/i);
     });
 });
 
