@@ -2,9 +2,7 @@ import { UserState } from '../../types/state';
 import { handleGreeting } from './stepGreeting';
 import { handleWaitingWeight } from './stepWaitingWeight';
 import { handleWaitingPreference } from './stepWaitingPreference';
-import { handleWaitingPriceConfirmation } from './stepWaitingPriceConfirmation';
 import { handleWaitingPlanChoice } from './stepWaitingPlanChoice';
-import { handleWaitingOk } from './stepWaitingOk';
 import { handleWaitingData } from './stepWaitingData';
 import { handleWaitingFinalConfirmation } from './stepWaitingFinalConfirmation';
 import { handleWaitingMapsConfirmation } from './stepWaitingMapsConfirmation';
@@ -35,14 +33,8 @@ export async function processStep(
         case 'waiting_preference':
             result = await handleWaitingPreference(userId, text, normalizedText, currentState, knowledge, dependencies);
             break;
-        case 'waiting_price_confirmation':
-            result = await handleWaitingPriceConfirmation(userId, text, normalizedText, currentState, knowledge, dependencies);
-            break;
         case 'waiting_plan_choice':
             result = await handleWaitingPlanChoice(userId, text, normalizedText, currentState, knowledge, dependencies);
-            break;
-        case 'waiting_ok':
-            result = await handleWaitingOk(userId, text, normalizedText, currentState, knowledge, dependencies);
             break;
         case 'waiting_data':
             result = await handleWaitingData(userId, text, normalizedText, currentState, knowledge, dependencies);
@@ -88,6 +80,11 @@ export async function processStep(
                 'waiting_legal_acceptance': 'waiting_final_confirmation',
                 'waiting_payment_method': 'waiting_payment_method', // already valid — just re-process
                 'waiting_mp_payment': 'waiting_payment_method',      // MP link likely expired — restart payment
+                // Steps legacy V5/V6 (eliminados en V7). Cualquier estado viejo que
+                // quede en DB se reencauza a waiting_preference (re-deriva producto/
+                // plan de forma segura, sin perder weightGoal). V7 nunca rutea acá.
+                'waiting_ok': 'waiting_preference',
+                'waiting_price_confirmation': 'waiting_preference',
             };
             const migratedStep = stepMigrations[currentState.step];
 

@@ -99,7 +99,7 @@ const ABANDON_REASON_MESSAGES: Record<string, string[]> = {
     ],
     hesitation: [
         '¡Hola! 😊 Sin apuro. El envío tarda *5 a 7 días hábiles* por Correo Argentino. ¿Avanzamos cuando quieras?',
-        'Hola 👋 Si querés te dejo el pedido reservado con el precio de hoy así no pierde la promo. ¿Te parece?',
+        'Hola 👋 Si te quedó alguna duda para decidir, contame y te ayudo. Y si querés, te lo puedo agendar para la fecha que te quede cómoda 😊',
     ],
     objection: [
         '¡Hola! 😊 ¿Quedó alguna duda sobre el producto? Hace más de 13 años que distribuimos a todo el país, con más de 70 mil clientes satisfechos y casos de más de 40 kilos perdidos. Si tenés alguna pregunta te la respondo con gusto 💪',
@@ -572,6 +572,71 @@ function rollupRescueMetrics(sharedState: SchedulerSharedState, dependencies: Sc
     }
 }
 
+/**
+ * checkAiBudget — guardián de gasto de IA (Claude + GPT).
+ *
+ * Acumula el costo mensual de IA en un archivo en DATA_DIR (sobrevive a los
+ * restarts; `aiService.stats.estimatedCostUSD` es per-proceso y se resetea).
+ * Alerta al admin UNA vez al 80% y UNA vez al 100% del tope mensual
+ * (AI_MONTHLY_BUDGET_USD, default $500). Importa porque migramos el 100% del
+ * tráfico a Claude (Sonnet) — más caro: si Anthropic corta por saldo, Claude
+ * empieza a fallar y todo cae a GPT-4o en SILENCIO (solo se nota por la caída
+ * de calidad). Esto avisa antes de llegar ahí.
+ *
+ * Registrado UNA vez globalmente (el costo es global, no por seller).
+ */
+async function checkAiBudget(dependencies: SchedulerDependencies): Promise<void> {
+    try {
+        const fs = require('fs');
+        const path = require('path');
+        const { aiService } = require('./ai');
+        const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../../..');
+
+        const budget = Math.max(0, parseFloat(process.env.AI_MONTHLY_BUDGET_USD || '500') || 0);
+        if (budget <= 0) return; // tope desactivado
+
+        const delta = aiService.getCostDeltaUSD();
+        const now = new Date();
+        const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const file = path.join(DATA_DIR, `ai-cost-${monthKey}.json`);
+
+        let acc = { month: monthKey, totalUSD: 0, alerted80: false, alerted100: false };
+        try {
+            if (fs.existsSync(file)) acc = JSON.parse(fs.readFileSync(file, 'utf8'));
+        } catch { /* corrupto → arrancamos de cero */ }
+        if (acc.month !== monthKey) acc = { month: monthKey, totalUSD: 0, alerted80: false, alerted100: false };
+
+        acc.totalUSD = (acc.totalUSD || 0) + delta;
+        const pct = (acc.totalUSD / budget) * 100;
+
+        if (!acc.alerted100 && acc.totalUSD >= budget) {
+            acc.alerted100 = true;
+            logger.error(`[AI-BUDGET] 🔴 Tope mensual SUPERADO: $${acc.totalUSD.toFixed(2)} / $${budget} (${pct.toFixed(0)}%)`);
+            await dependencies.notifyAdmin(
+                '🔴 Presupuesto de IA SUPERADO',
+                'sistema-costos',
+                `El gasto de IA del mes (${monthKey}) llegó a $${acc.totalUSD.toFixed(2)} sobre el tope de $${budget}.\n\n⚠️ Si Anthropic corta por saldo, Claude empieza a fallar y el bot cae a GPT-4o solo. Revisá la cuenta o subí el tope.`
+            ).catch(() => {});
+        } else if (!acc.alerted80 && acc.totalUSD >= budget * 0.8) {
+            acc.alerted80 = true;
+            logger.warn(`[AI-BUDGET] 🟡 Tope mensual al ${pct.toFixed(0)}%: $${acc.totalUSD.toFixed(2)} / $${budget}`);
+            await dependencies.notifyAdmin(
+                '🟡 Presupuesto de IA al 80%',
+                'sistema-costos',
+                `El gasto de IA del mes (${monthKey}) va en $${acc.totalUSD.toFixed(2)} (${pct.toFixed(0)}% del tope de $${budget}). Ojo con el ritmo.`
+            ).catch(() => {});
+        }
+
+        try {
+            fs.writeFileSync(file, JSON.stringify(acc), 'utf8');
+        } catch (e: any) {
+            logger.warn(`[AI-BUDGET] No se pudo persistir el costo: ${e.message}`);
+        }
+    } catch (e: any) {
+        logger.warn(`[AI-BUDGET] check falló: ${e?.message || e}`);
+    }
+}
+
 // ══════════════════════════════════════════════════════════════
 // CRON SCHEDULER — All times in Argentina (UTC-3)
 // ══════════════════════════════════════════════════════════════
@@ -664,6 +729,17 @@ function startScheduler(sharedState: SchedulerSharedState, dependencies: Schedul
             cleanupOldChatLogs();
         }, { timezone: TIMEZONE });
         logger.info('[SCHEDULER] ✅ cleanupOldChatLogs → 03:00 ARG el día 1 de cada mes (global)');
+    }
+
+    // ── AI BUDGET GUARD: cada 30 min, registrado UNA vez globalmente ──
+    // Acumula el gasto de IA del mes y alerta al admin al 80% / 100% del tope.
+    // Global porque el costo de IA es de todo el proceso, no por seller.
+    if (!(global as any).__aiBudgetRegistered) {
+        (global as any).__aiBudgetRegistered = true;
+        cron.schedule('*/30 * * * *', () => {
+            checkAiBudget(dependencies);
+        }, { timezone: TIMEZONE });
+        logger.info('[SCHEDULER] ✅ checkAiBudget → cada 30 min (global)');
     }
 
     // ── FUNNEL DROP-OUT SWEEP: cada 15 min, registrado UNA vez globalmente ──

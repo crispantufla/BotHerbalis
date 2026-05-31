@@ -2,7 +2,6 @@
  * Payment method flow tests — modelo vigente (may-2026 rev 2).
  *
  * Cobertura:
- *  - stepWaitingOk → "si/dale" tras recomendación dispara mensaje de precios + PLAN_CHOICE
  *  - stepWaitingPaymentMethod → menú de envío 2-opciones (retiro vs domicilio)
  *      · "1" / "retiro" / "sucursal" → contrarrembolso, paga total al retirar (pause+alert)
  *      · "2" / "domicilio" / "casa" → submenú MP/Transferencia (paymentSubChoiceAsked=true)
@@ -63,7 +62,6 @@ jest.mock('../src/services/ai', () => ({
     },
 }));
 
-const { handleWaitingOk } = require('../src/flows/steps/stepWaitingOk');
 const { handleWaitingPaymentMethod } = require('../src/flows/steps/stepWaitingPaymentMethod');
 const { handleWaitingMpPayment } = require('../src/flows/steps/stepWaitingMpPayment');
 const { aiService } = require('../src/services/ai');
@@ -189,72 +187,10 @@ beforeEach(() => {
 afterAll(() => { delete process.env.MP_ACCESS_TOKEN; });
 
 // ════════════════════════════════════════════════════════════════════════════
-// BLOQUE 1: stepWaitingOk — "si/dale" tras la recomendación dispara TEXTO 3 (precios)
+// BLOQUE 1 (stepWaitingOk) ELIMINADO: el step waiting_ok no existe en V7 —
+// stepWaitingWeight/Preference van directo a waiting_payment_method. El handler
+// fue removido del código; ver migración legacy en src/flows/steps/index.ts.
 // ════════════════════════════════════════════════════════════════════════════
-describe('stepWaitingOk → muestra precios y va a waiting_plan_choice', () => {
-
-    test('[1.1] "si" → pasa a waiting_plan_choice (no payment todavía)', async () => {
-        const state = makeOkState();
-        await handleWaitingOk('u1', 'si', 'si', state, knowledge, deps);
-        expect(state.step).toBe('waiting_plan_choice');
-    });
-
-    test('[1.2] "dale" → pasa a waiting_plan_choice', async () => {
-        const state = makeOkState();
-        await handleWaitingOk('u2', 'dale', 'dale', state, knowledge, deps);
-        expect(state.step).toBe('waiting_plan_choice');
-    });
-
-    test('[1.3] mensaje muestra los 2 planes (60 y 120) y pide elección', async () => {
-        const state = makeOkState();
-        await handleWaitingOk('u3', 'si', 'si', state, knowledge, deps);
-        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
-        expect(sent).toMatch(/Plan 2 meses/i);
-        expect(sent).toMatch(/Plan 4 meses/i);
-        expect(sent).toMatch(/\?/);
-    });
-
-    test('[1.4] mensaje de precios NO menciona métodos de pago (eso es TEXTO 4)', async () => {
-        const state = makeOkState();
-        await handleWaitingOk('u4', 'si', 'si', state, knowledge, deps);
-        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
-        expect(sent).not.toMatch(/Mercado Pago/i);
-        expect(sent).not.toMatch(/Transferencia/i);
-        expect(sent).not.toMatch(/Contra reembolso/i);
-    });
-
-    test('[1.5] mensaje de precios NO menciona adicional de $6.000', async () => {
-        const state = makeOkState({ selectedPlan: '60' });
-        await handleWaitingOk('u5', 'si', 'si', state, knowledge, deps);
-        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
-        expect(sent).not.toMatch(/\$\s*6\.000/);
-        expect(sent).not.toMatch(/adicional/i);
-    });
-
-    test('[1.6] Negativa → NO va a waiting_plan_choice', async () => {
-        const state = makeOkState();
-        await handleWaitingOk('u6', 'no no quiero', 'no no quiero', state, knowledge, deps);
-        expect(state.step).not.toBe('waiting_plan_choice');
-    });
-
-    test('[1.7] "precio" → muestra los 2 planes', async () => {
-        const state = makeOkState();
-        await handleWaitingOk('u7', 'precio', 'precio', state, knowledge, deps);
-        expect(state.step).toBe('waiting_plan_choice');
-        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
-        expect(sent).toMatch(/Plan 2 meses/i);
-        expect(sent).toMatch(/Plan 4 meses/i);
-    });
-
-    test('[1.8] "cuanto sale" → muestra los 2 planes', async () => {
-        const state = makeOkState();
-        await handleWaitingOk('u8', 'cuanto sale', 'cuanto sale', state, knowledge, deps);
-        expect(state.step).toBe('waiting_plan_choice');
-        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
-        expect(sent).toMatch(/Plan 2 meses/i);
-        expect(sent).toMatch(/Plan 4 meses/i);
-    });
-});
 
 // ════════════════════════════════════════════════════════════════════════════
 // BLOQUE 2: stepWaitingPaymentMethod — Retiro en sucursal (opción 1)

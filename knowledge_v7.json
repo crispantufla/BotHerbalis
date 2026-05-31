@@ -93,12 +93,6 @@
             "response": "¡Dale, vamos con *semillas {{PLAN}} días*! 🌿\n\n*Cómo se prepara:* la primera semana partís una nuez en 8 partes, las siguientes en 4. Cada noche hervís un pedacito 5 min (o 3 en microondas) — cuanta más agua, mejor. Te tomás el agua y tragás el trocito antes de dormir, lo más lejos de la cena. *No apta en casos de colon irritable.*\n\nTotal: *${{TOTAL}}*\n\nTe paso las formas de pago 👇",
             "nextStep": "waiting_payment_method"
         },
-        "prices": {
-            "step": "waiting_ok",
-            "_note": "LEGACY — sólo usado por clientes en mid-flow (step waiting_ok) que estaban en V5 al deployar V7. En el flujo nuevo no se llama porque stepWaitingWeight skipea waiting_ok. Se mantiene por compat.",
-            "response": "Plan 2 meses: ${{PRICE_60}}\nPlan 4 meses: ${{PRICE_120}}\n\n¿Con cuál vas?",
-            "nextStep": "waiting_plan_choice"
-        },
         "payment_menu": {
             "step": "waiting_payment_method",
             "_note": "TEXTO 4 — Menú envío + medios de pago. Disparado por buildPaymentMessage. Modelo nuevo (may-2026): primero elige tipo de envío, después método. Retiro=contrarreembolso al retirar (sin anticipo). Domicilio=prepago (MP/Transfer).",

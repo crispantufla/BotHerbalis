@@ -1,5 +1,6 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _setStep, _detectProductPlanChange, _resolveNewProductPlan } from '../utils/flowHelpers';
+import { parsePostdatado, parseProductChange } from '../utils/extractedData';
 import { _getPrice, _getPrices } from '../utils/pricing';
 import { _isAffirmative } from '../utils/validation';
 import logger from '../../utils/logger';
@@ -174,21 +175,16 @@ export async function handleWaitingFinalConfirmation(
             saveState(userId);
             return { matched: true };
         } else if (aiResponse.response) {
-            if (aiResponse.extractedData && /POSTDATADO/i.test(aiResponse.extractedData)) {
-                const postdatadoMatch = aiResponse.extractedData.match(/POSTDATADO:\s*(.+)/i);
-                if (postdatadoMatch) {
-                    currentState.postdatado = postdatadoMatch[1].trim();
-                }
-            }
+            const _pd = parsePostdatado(aiResponse.extractedData);
+            if (_pd) currentState.postdatado = _pd;
             // Handle product/plan change detected by AI
-            if (aiResponse.extractedData && /CAMBIO_PRODUCTO/i.test(aiResponse.extractedData)) {
-                const productMatch = aiResponse.extractedData.match(/CAMBIO_PRODUCTO:\s*(.+?)(?:\s+PLAN:|$)/i);
-                const planMatch = aiResponse.extractedData.match(/PLAN:\s*(\d+)/i);
-                if (productMatch) {
+            const _chg = parseProductChange(aiResponse.extractedData);
+            if (_chg.product) {
+                {
                     const resolved = _resolveNewProductPlan(
-                        productMatch[1].trim().toLowerCase(),
+                        _chg.product.toLowerCase(),
                         currentState.selectedProduct,
-                        planMatch ? planMatch[1] : currentState.selectedPlan
+                        _chg.plan || currentState.selectedPlan
                     );
                     if (resolved.newProduct !== currentState.selectedProduct || resolved.newPlan !== currentState.selectedPlan) {
                         currentState.selectedProduct = resolved.newProduct;

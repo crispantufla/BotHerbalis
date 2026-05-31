@@ -64,15 +64,6 @@ async function _maybeUpsell(currentState: UserState, sendMessageWithDelay: Funct
 }
 
 /**
- * _hasCompleteAddress
- * Checks if the user state has enough address data to skip re-asking.
- */
-function _hasCompleteAddress(state: UserState): boolean {
-    const addr = state.partialAddress || {};
-    return !!(addr.nombre && addr.calle && addr.ciudad);
-}
-
-/**
  * _detectPostdatado
  * Detects if text contains a postdating request (future delivery date).
  * Returns a CLEAN date string (e.g. "1 de julio", "principio de mes") or null.
@@ -116,7 +107,8 @@ function _detectPostdatado(normalizedText: string): string | null {
         /pasado\s+mañana/i,
         // Vaguidad económica como "cuando tenga plata" sin fecha específica:
         // marcamos como postdatado "indefinido" para que el flow ofrezca
-        // congelar el precio.
+        // postdatar el envío (preguntar la fecha cómoda). PROHIBIDO ofrecer
+        // "congelar el precio" — esa modalidad de urgencia fue eliminada.
         /cuando\s+(?:la\s+)?(?:plata|efectivo|dinero)/i,
     ];
 
@@ -200,29 +192,6 @@ async function _pauseAndAlert(userId: string, currentState: UserState, dependenc
     }
 
     logger.info(`⏸️ [BOT] User ${userId} paused. Reason: ${reason}${nightLabel}`);
-}
-
-/**
- * _extractUserName
- * Silently detects when the user introduces themselves ("soy María", "me llamo Juan",
- * "mi nombre es Ana") and stores the first name in state.userName.
- * Only fires if the name hasn't been set yet to avoid overwriting.
- */
-function _extractUserName(normalizedText: string, currentState: any): boolean {
-    if (currentState.userName) return false; // already known
-
-    const nameMatch = normalizedText.match(
-        /\b(?:soy|me\s+llamo|mi\s+nombre\s+es|llamame|me\s+dicen)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]{2,}(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]{2,})?)\b/i
-    );
-    if (!nameMatch || !nameMatch[1]) return false;
-
-    const name = nameMatch[1].trim();
-    // Reject common filler/condition words that follow "soy" but aren't names
-    const STOP_WORDS = /^(bien|mal|una|uno|por|para|que|como|donde|cuando|mucho|poco|seguro|esto|eso|aca|alla|jubilad[ao]|pensionad[ao]|emplead[ao]|docente|maestra|maestro|estudiante|trabajador[ao]|ama|ama de casa|enfermera|enfermero|medic[ao]|profesora|profesor|autonomo|autonoma|comerciante|nuevo|nueva|interesad[ao]|curiosa|curioso|dietista|nutricionista)$/i;
-    if (STOP_WORDS.test(name.split(' ')[0])) return false;
-
-    currentState.userName = name;
-    return true;
 }
 
 /**
@@ -405,7 +374,6 @@ export {
     _cleanPhone,
     _setStep,
     _maybeUpsell,
-    _hasCompleteAddress,
     _detectPostdatado,
     _pauseAndAlert,
     _extractSilentVariables,

@@ -5,6 +5,7 @@ import { processGlobals } from './globals';
 import { processStep } from './steps';
 import { _pauseAndAlert, _setStep, _extractSilentVariables, _cleanPhone } from './utils/flowHelpers';
 import { detectObjection } from './utils/objectionDetector';
+import { parseControlTag } from './utils/extractedData';
 
 interface SalesFlowDependencies {
     saveState: (userId?: string) => void;
@@ -218,6 +219,11 @@ export async function processSalesFlow(
 
     const currentState = userState[userId];
 
+    // Tag de control de IA por-turno (lo setea el proxy de chat más abajo si la
+    // IA emite REJECT_MEDICAL). Se limpia al inicio de cada turno para que un tag
+    // de un turno previo (ej: que terminó en pausa) no dispare falsamente.
+    (currentState as any)._aiControlTag = null;
+
     // Stash identity on state so _setStep / _pauseAndAlert pueden loguear
     // transiciones de funnel a DB sin cambiar las 59 firmas que ya existen.
     const _ctx = {
@@ -234,8 +240,20 @@ export async function processSalesFlow(
         const wrappedAi = new Proxy(origAi, {
             get(target: any, prop: string) {
                 if (prop === 'chat') {
-                    return (text: string, context: any) =>
-                        target.chat(text, { ...context, sellerId: _ctx.sellerId, phone: _ctx.phone });
+                    return async (text: string, context: any) => {
+                        const res = await target.chat(text, { ...context, sellerId: _ctx.sellerId, phone: _ctx.phone });
+                        // Routing robusto e independiente del modelo: Claude puede parafrasear
+                        // la prosa, así que el control de flujo CRÍTICO (rechazo médico, abuso,
+                        // cancelación, reventa) se rige por el TAG de extractedData, no por el
+                        // texto. Lo stasheamos en el state para que el post-procesado lo lea.
+                        // (Antes los tags se emitían pero nadie los consumía: el único
+                        // disparador era un substring exacto, frágil tras la migración a Claude.)
+                        try {
+                            const tag = parseControlTag(res?.extractedData);
+                            if (tag) (currentState as any)._aiControlTag = tag;
+                        } catch { /* noop */ }
+                        return res;
+                    };
                 }
                 const v = target[prop];
                 return typeof v === 'function' ? v.bind(target) : v;
@@ -407,19 +425,56 @@ export async function processSalesFlow(
         return { matched: true, paused: true };
     }
 
+    // 5.0 Robust control-tag routing (model-independent). Los tags de control
+    // que emite la IA (stasheados por el proxy de chat) rigen el flujo crítico
+    // SIN depender de que el modelo reproduzca una frase exacta — clave tras la
+    // migración a Claude (parafrasea). Sólo tags cuyo falso positivo es
+    // recuperable y NO afecta a un comprador (médico/abuso/cancelación/reventa).
+    const _controlTag = (currentState as any)._aiControlTag;
+    if (_controlTag === 'REJECT_MEDICAL') {
+        logger.info(`[AI MEDICAL REJECT] User ${userId} marcado REJECT_MEDICAL vía tag. Halting flow.`);
+        _setStep(currentState, FlowStep.REJECTED_MEDICAL);
+        (currentState as any)._aiControlTag = null;
+        saveState(userId);
+    } else if (_controlTag === 'ABUSE') {
+        logger.info(`[ABUSE REJECT] User ${userId} marcado ABUSE vía tag. Halting flow.`);
+        _setStep(currentState, FlowStep.REJECTED_ABUSIVE);
+        (currentState as any)._aiControlTag = null;
+        await _pauseAndAlert(userId, currentState, dependencies, text, 'El cliente insultó al bot y fue bloqueado automáticamente.');
+        saveState(userId);
+    } else if (_controlTag === 'CANCEL_ORDER') {
+        logger.info(`[CANCEL PAUSE] User ${userId} marcado CANCEL_ORDER vía tag. Halting flow.`);
+        (currentState as any)._aiControlTag = null;
+        await _pauseAndAlert(userId, currentState, dependencies, text, 'El cliente desea cancelar, reclamar o derivar el caso a un humano.');
+        saveState(userId);
+    } else if (_controlTag === 'RESELLER') {
+        logger.info(`[RESELLER PAUSE] User ${userId} marcado RESELLER vía tag. Halting flow.`);
+        (currentState as any)._aiControlTag = null;
+        await _pauseAndAlert(userId, currentState, dependencies, text, 'El cliente está interesado en reventa/compras por mayor. Derivado a Horacio.');
+        saveState(userId);
+    }
+
+    // Si ya actuó un tag de control arriba, NO repetimos el match por prosa de
+    // la misma categoría (evita doble-pausa). El rechazo genérico y la indecisión
+    // NO tienen tag (son sensibles a la conversión) → siempre por prosa.
+    const _controlHandled = !!_controlTag;
+
     // 5. Post-Processing Context Triggers Check
     if (currentState.history && currentState.history.length > 0) {
         const lastHistory = currentState.history[currentState.history.length - 1];
         if (lastHistory.role === 'bot') {
             const botMsg = lastHistory.content;
 
-            if (botMsg.includes('por precaución no recomendamos el consumo') || botMsg.includes('por precaución no recomendamos el uso durante')) {
-                logger.info(`[AI MEDICAL REJECT] Intercepted AI rejection for user ${userId}. Halting flow.`);
+            // Fallback por prosa (flujos viejos / modelos que no emiten el tag).
+            // El path robusto es el tag de arriba.
+            if (!_controlHandled && currentState.step !== FlowStep.REJECTED_MEDICAL &&
+                (botMsg.includes('por precaución no recomendamos el consumo') || botMsg.includes('por precaución no recomendamos el uso durante'))) {
+                logger.info(`[AI MEDICAL REJECT] Intercepted AI rejection (prosa) for user ${userId}. Halting flow.`);
                 _setStep(currentState, FlowStep.REJECTED_MEDICAL);
                 saveState(userId);
             }
 
-            if (botMsg.includes('Por falta de respeto damos por terminada la comunicación')) {
+            if (!_controlHandled && botMsg.includes('Por falta de respeto damos por terminada la comunicación')) {
                 logger.info(`[ABUSE REJECT] Intercepted AI abuse rejection for user ${userId}. Halting flow.`);
                 await _pauseAndAlert(userId, currentState, dependencies, text, 'El cliente insultó al bot y fue bloqueado automáticamente.');
                 saveState(userId);
@@ -437,13 +492,16 @@ export async function processSalesFlow(
                 saveState(userId);
             }
 
-            if (botMsg.includes('Voy a derivar tu caso a un asesor')) {
+            if (!_controlHandled && botMsg.includes('Voy a derivar tu caso a un asesor')) {
                 logger.info(`[CANCEL PAUSE] Intercepted cancel/complaint for user ${userId}. Halting flow.`);
                 await _pauseAndAlert(userId, currentState, dependencies, text, 'El cliente desea cancelar, reclamar o derivar el caso a un humano.');
                 saveState(userId);
             }
 
-            if (botMsg.includes('3413755757') || botMsg.includes('Horacio')) {
+            // Señal robusta: el teléfono de reventa (único e inequívoco), tolerando
+            // separadores ("341 375 5757"). NO matcheamos el nombre "Horacio" suelto
+            // — es también un nombre de seller y disparaba pausas falsas.
+            if (!_controlHandled && (botMsg.includes('3413755757') || botMsg.replace(/\D/g, '').includes('3413755757'))) {
                 logger.info(`[RESELLER PAUSE] Intercepted reseller intent for user ${userId}. Halting flow.`);
                 await _pauseAndAlert(userId, currentState, dependencies, text, 'El cliente está interesado en reventa/compras por mayor. Derivado a Horacio.');
                 saveState(userId);

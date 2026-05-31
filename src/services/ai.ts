@@ -69,13 +69,13 @@ const RULE_BASE = [
     { id: 'pocos_kilos', keywords: ['pocos kilos', 'bajar 2', 'bajar 3', 'bajar 4', 'bajar 5', 'un par de kilos'], text: 'BAJAR POCOS KILOS: Si quieren bajar pocos kilos (3, 5, etc.), corresponde el plan de 60 días (2 meses). Las 3 opciones de producto (cápsulas, gotas, semillas) están disponibles para cualquier rango — no empujes una en particular, el cliente elige.' },
     { id: 'cantidad', keywords: ['descuento por 3', 'mas de 2', 'comprar para mi y para', 'llevar varios'], text: 'DESCUENTO POR CANTIDAD: Si compran más de 120 días (puede ser combinado, ej: 60 gotas + 60 cápsulas), el tercer producto más barato va al 50% de descuento.' },
     { id: 'devolucion', keywords: ['garantia', 'devolucion', 'reembolso', 'devolver la plata', 'si no funciona'], text: 'DEVOLUCIÓN DE DINERO: NO hay devolución de dinero ni garantía de resultados. Si el producto llega dañado lo reenviamos sin costo, pero no se devuelve plata.' },
-    { id: 'cancelar', keywords: ['cancelar pedido', 'no me llego', 'anular compra'], text: 'CANCELAR PEDIDO: Si quieren cancelar un pedido o dicen que no les llegó un pedido anterior, respondé: "Voy a derivar tu caso a un asesor" y goalMet=false. NO intentes resolver esto vos.' },
+    { id: 'cancelar', keywords: ['cancelar pedido', 'no me llego', 'anular compra'], text: 'CANCELAR PEDIDO: Si quieren cancelar un pedido o dicen que no les llegó un pedido anterior, respondé: "Voy a derivar tu caso a un asesor" y goalMet=false, extractedData="CANCEL_ORDER". NO intentes resolver esto vos.' },
     { id: 'brasil', keywords: ['nuez de brasil', 'brasil'], text: 'NUEZ DE BRASIL: La Nuez de la India NO es lo mismo que la nuez de Brasil. Son frutos completamente diferentes.' },
-    { id: 'abuso', keywords: ['boluda', 'puta', 'estafa', 'ladrones', 'mierda', 'hija de', 'tonta', 'estafadores', 'hdp'], text: 'ABUSO: Si el usuario te insulta o usa lenguaje obsceno: a la primera vez advertíle. A la SEGUNDA vez, respondé "Por falta de respeto damos por terminada la comunicación." y goalMet=false.' },
+    { id: 'abuso', keywords: ['boluda', 'puta', 'estafa', 'ladrones', 'mierda', 'hija de', 'tonta', 'estafadores', 'hdp'], text: 'ABUSO: Si el usuario te insulta o usa lenguaje obsceno: a la primera vez advertíle. A la SEGUNDA vez, respondé "Por falta de respeto damos por terminada la comunicación." y goalMet=false, extractedData="ABUSE".' },
     { id: 'saludos_desubicados', keywords: ['hola', 'buenas', 'buen dia', 'buen día', 'buenas tardes'], text: 'SALUDOS DESUBICADOS: Si el usuario te manda "Hola" o te saluda a mitad de la recolección de datos, NO devuelvas el saludo como si recién empezaras a hablar. Ignorá el saludo y continuá pidiendo los datos que faltan.' },
     { id: 'indecision', keywords: ['mejor', 'no se', 'o tal vez', 'puede ser'], text: 'INDECISIÓN: Si el usuario cambia de producto más de 3 veces o duda demasiado, frenalo: "Pensalo tranquilo y cuando estés 100% segura retomamos el pedido 😊" y goalMet=false.' },
     { id: 'dificultad_tragar', keywords: ['tragar', 'ahogar', 'grandes', 'cuestan', 'complicado', 'dificil', 'miedo a ahogarme', 'tamaño', 'capsulas grandes'], text: 'DIFICULTAD PARA TRAGAR: Si el usuario menciona que le cuesta tragar pastillas, tiene miedo a ahogarse o pregunta por el tamaño, TRANQUILIZALO: "¡Quedate tranqui! Son súper chiquitas y muy fáciles de tragar, no vas a tener ningún problema 😊". Luego preguntale con cuál plan quiere avanzar.' },
-    { id: 'reventa', keywords: ['revender', 'por mayor', 'mayorista', 'reventa', 'precio de fabrica', 'precios para vender', 'negocio'], text: 'REVENTA O COMPRA POR MAYOR: Si el cliente busca comprar para revender o precios mayoristas, INMEDIATAMENTE respondé: "Para todo lo que es reventa o venta por mayor te pido que te contactes por WhatsApp con Horacio al 3413755757. Él te va a asesorar con gusto." y FINALIZAS LA CONVERSACION (goalMet=false). NO intentes vender.' }
+    { id: 'reventa', keywords: ['revender', 'por mayor', 'mayorista', 'reventa', 'precio de fabrica', 'precios para vender', 'negocio'], text: 'REVENTA O COMPRA POR MAYOR: Si el cliente busca comprar para revender o precios mayoristas, INMEDIATAMENTE respondé: "Para todo lo que es reventa o venta por mayor te pido que te contactes por WhatsApp con Horacio al 3413755757. Él te va a asesorar con gusto." y FINALIZAS LA CONVERSACION (goalMet=false, extractedData="RESELLER"). NO intentes vender.' }
 ];
 
 function _getRelevantRules(userText: string): string[] {
@@ -319,6 +319,24 @@ REGLAS ACTIVAS APLICABLES A ESTE CONTEXTO:
 ${rulesText}`;
 }
 
+// ── POLÍTICA DE PAGO (fuente única) ──
+// Antes este texto estaba duplicado palabra por palabra en varios módulos del
+// prompt (plan_choice, objection, knowledgeContext) + RULE_BASE. Cada cambio de
+// modelo de pago obligaba a tocar todos — y cuando uno se escapaba salían bugs
+// de copy (ej: el "precio de hoy/promo" que sobrevivió a la purga). Centralizado
+// acá: cambiar la política de pago = editar SOLO esta constante.
+const PAYMENT_POLICY = `MEDIOS DE PAGO (modelo nuevo may-2026 — 2 tipos de envío):
+- *Retiro en sucursal* → contrarrembolso, paga el TOTAL en efectivo al retirar en una sucursal de Correo Argentino. Sin anticipo previo. Un asesor coordina la sucursal más cercana al cliente.
+- *Envío a domicilio* → se abona previamente. El cliente elige medio: (a) ⭐ Mercado Pago (link único — tarjeta, débito, app MP o efectivo en Pago Fácil/Rapipago); o (b) Transferencia bancaria al alias HERBALIS.TIENDA a nombre de BIO ORIGEN S.A.S.
+- ARGUMENTO DE VENTA MP (cuando duda de pagar antes de recibir): "Mercado Pago protege al comprador — si hay un problema con el envío, MP devuelve la plata."
+- ARGUMENTO DE COBERTURA MP ("no tengo tarjeta"): "El link de Mercado Pago no necesita tarjeta — podés llevar el código y pagar en efectivo en cualquier Pago Fácil o Rapipago del barrio."
+- ARGUMENTO DE CONFIANZA (si duda de pagar antes): ofrecer retiro en sucursal — "si nunca te llega, no pagás nada".
+- NUNCA mencionar cuotas (el cliente verá lo que su tarjeta permita al abrir el link de MP, pero el bot NO promete ni menciona cuotas).
+- NUNCA mencionar "anticipo de $10.000" — esa modalidad fue eliminada en mayo 2026.
+- NUNCA mencionar "adicional de $6.000" — esa política ya no existe.
+- NUNCA usar urgencia/escasez tipo "congelar el precio" o "el precio de hoy" — esa modalidad no existe.
+- El envío siempre es gratis (ambos tipos), demora *5 a 7 días hábiles* (igual para todos los métodos).`;
+
 // ── STEP MODULES (only one is sent per call, positioned in the middle) ──
 
 function _getModuleEarlyFunnel(prices: Record<string, any>): string {
@@ -371,16 +389,7 @@ DESCUENTOS POR VOLUMEN (SOLO si preguntan por varias unidades):
 
 ENVÍO: Gratis por Correo Argentino. Demora uniforme: *5 a 7 días hábiles* (igual para todos los métodos de pago).
 
-MEDIOS DE PAGO (modelo nuevo may-2026 — 2 tipos de envío):
-- *Retiro en sucursal* → contrarrembolso, paga el TOTAL en efectivo al retirar en una sucursal de Correo Argentino. Sin anticipo previo. Un asesor coordina la sucursal más cercana al cliente.
-- *Envío a domicilio* → se abona previamente. El cliente elige medio: (a) ⭐ Mercado Pago (link único — tarjeta, débito, app MP o efectivo en Pago Fácil/Rapipago); o (b) Transferencia bancaria al alias HERBALIS.TIENDA a nombre de BIO ORIGEN S.A.S.
-- ARGUMENTO DE VENTA MP (cuando duda de pagar antes de recibir): "Mercado Pago protege al comprador — si hay un problema con el envío, MP devuelve la plata."
-- ARGUMENTO DE COBERTURA MP ("no tengo tarjeta"): "El link de Mercado Pago no necesita tarjeta — podés llevar el código y pagar en efectivo en cualquier Pago Fácil o Rapipago del barrio."
-- ARGUMENTO DE CONFIANZA (si duda de pagar antes): ofrecer retiro en sucursal — "si nunca te llega, no pagás nada".
-- NUNCA mencionar cuotas (el cliente verá lo que su tarjeta permita al abrir el link de MP, pero el bot NO promete ni menciona cuotas).
-- NUNCA mencionar "anticipo de $10.000" — esa modalidad fue eliminada en mayo 2026.
-- NUNCA mencionar "adicional de $6.000" — esa política ya no existe.
-- El envío siempre es gratis (ambos tipos).
+${PAYMENT_POLICY}
 
 EFECTOS: Solo efecto laxante/diurético leve los primeros días. Normal y transitorio. Se va en la primera semana tomando agua.
 
@@ -425,10 +434,9 @@ OBJECIONES COMUNES:
 - POSTERGACIÓN(Postdatar): Si el cliente dice "no tengo plata ahora" / "cobro el X" / "recién el mes que viene" / "después te aviso cuando cobre":
     - DEBES FRENAR ESA OBJECIÓN OFRECIENDO POSTDATAR. No le digas "dale, avisame". Decile directo: "¡Tranqui! ¿A partir de qué día te queda cómodo recibirlo? Te lo agendamos y lo despacho recién ese día". Si dicen SÍ o dan fecha: "Perfecto 😊", extraé POSTDATADO: [fecha] y seguí cerrando la venta pidiendo los datos. Si dicen NO definitivamente, recién ahí aceptá ("Tranqui, acá estoy"). NUNCA rompas el flujo de venta por una postergación de pago sin pelearlo. PROHIBIDO mencionar "congelar precio" o "congelar promo".
 
-PAGO Y ENVÍO (modelo nuevo may-2026):
-- 2 OPCIONES DE ENVÍO: 1) *Retiro en sucursal* → contrarrembolso, paga total en efectivo al retirar (sin anticipo); 2) *Envío a domicilio* → prepago por Mercado Pago (tarjeta, débito, app MP, o efectivo en Pago Fácil/Rapipago) o transferencia bancaria al alias HERBALIS.TIENDA. NUNCA digas "anticipo de $10.000" (modalidad eliminada). NUNCA mencionés "cuotas".
-- En retiro: el cliente paga el TOTAL en efectivo cuando va a la sucursal de Correo Argentino. No se cobra anticipo previo.
-- Envío GRATIS por Correo Argentino, demora *5 a 7 días hábiles* (igual para ambos tipos).
+${PAYMENT_POLICY}
+
+PAGO Y ENVÍO — NOTAS DE ESTE PASO:
 - Si "llega" + "pago/abona/plata/cobran": ES PREGUNTA DE PAGO, no de entrega.
 - Correo Argentino NO abre sábados / domingos.NO controlamos día / hora exacta.
 - CONDICIÓN SÁBADO: Si el cliente dice "mejor si es sábado", "entreguen el sábado" o similar durante la confirmación: NO confirmes el pedido(goalMet = false).Respondé EXACTAMENTE: "Los carteros normalmente no trabajan los sabados, en caso de no poder entregartelo en persona podrias ir a buscarlo a la sucursal no?" y esperá su afirmación.
@@ -563,6 +571,9 @@ class AIService {
     // A/B Claude — cliente Anthropic (lazy, solo si el experimento está activo)
     anthropic: any;
     _claudeDisabled: boolean;
+    // Marca de cuánto costo ya se "flusheó" al contador mensual en disco
+    // (ver getCostDeltaUSD + el guardián de presupuesto del scheduler).
+    _costFlushedUSD: number;
 
     constructor() {
         const apiKey = process.env.OPENAI_API_KEY || "";
@@ -577,6 +588,7 @@ class AIService {
         this.model = MODEL;
         this.cache = new NodeCache({ stdTTL: CACHE_TTL_SECONDS, checkperiod: 120, maxKeys: 1000 });
         this.stats = { calls: 0, cached: 0, retries: 0, errors: 0, promptTokens: 0, completionTokens: 0, estimatedCostUSD: 0 };
+        this._costFlushedUSD = 0;
         this._circuitBreakers = new Map();
 
         // Claude: el cliente se inicializa SIEMPRE que haya ANTHROPIC_API_KEY,
@@ -901,6 +913,16 @@ INSTRUCCIONES:
         try {
             const step = context.step || 'general';
 
+            // Decisión de modelo ADELANTADA (antes la calculábamos después del
+            // lookup): la necesitamos para namespacear el semantic cache por
+            // engine. El playground puede forzar (context.forceClaude); si no,
+            // aplica el A/B por seller/%. Si Claude falla, caemos a OpenAI abajo.
+            let useClaudeNow: boolean;
+            if (context.forceClaude === true) useClaudeNow = !!this.anthropic;
+            else if (context.forceClaude === false) useClaudeNow = false;
+            else useClaudeNow = this._useClaudeFor(context.sellerId, context.phone);
+            const cacheEngine = useClaudeNow ? 'claude' : 'openai';
+
             // ── Semantic cache lookup (FAQs / paraphrased questions) ──
             // Only hits cacheable steps; skipped automatically otherwise.
             // Respects conversation-specific state: if totalPrice, cart items,
@@ -919,7 +941,7 @@ INSTRUCCIONES:
             // respuestas de prueba (el store de abajo también se saltea en ese caso).
             if (!hasOrderContext && context.forceClaude === undefined) {
                 try {
-                    const cached = await lookupSemanticCache(this.client, step, userText);
+                    const cached = await lookupSemanticCache(this.client, step, userText, cacheEngine);
                     if (cached) {
                         this.stats.cached++;
                         return { response: sanitizeForWhatsApp(cached.response), goalMet: false, extractedData: null };
@@ -940,19 +962,12 @@ INSTRUCCIONES:
             const chatModel = _getModelForStep(step);
             const systemPrompt = await _buildSystemPrompt(step, userText);
 
-            // Decisión de modelo: el playground puede forzar (context.forceClaude);
-            // si no, aplica el A/B por seller/%. Si Claude falla, caemos al path
-            // OpenAI de abajo (resiliencia).
-            let useClaudeNow: boolean;
-            if (context.forceClaude === true) useClaudeNow = !!this.anthropic;
-            else if (context.forceClaude === false) useClaudeNow = false;
-            else useClaudeNow = this._useClaudeFor(context.sellerId, context.phone);
-
+            // useClaudeNow ya se calculó arriba (lo necesitábamos para el cache).
             if (useClaudeNow) {
                 const cArgs = await this._claudeChat(systemPrompt, userPrompt, step, context.sellerId!);
                 if (cArgs && cArgs.response) {
                     if (!cArgs.goalMet && !cArgs.extractedData && !hasOrderContext && context.forceClaude === undefined) {
-                        storeSemanticCache(this.client, step, userText, cArgs.response).catch(() => { /* best effort */ });
+                        storeSemanticCache(this.client, step, userText, cArgs.response, cacheEngine).catch(() => { /* best effort */ });
                     }
                     return {
                         response: sanitizeForWhatsApp(cArgs.response),
@@ -1010,7 +1025,7 @@ INSTRUCCIONES:
                     !hasOrderContext &&
                     context.forceClaude === undefined
                 ) {
-                    storeSemanticCache(this.client, step, userText, args.response)
+                    storeSemanticCache(this.client, step, userText, args.response, cacheEngine)
                         .catch(() => { /* best effort */ });
                 }
                 return {
@@ -1417,6 +1432,20 @@ SITUACION: El ADMINISTRADOR del negocio te da una instrucción DIRECTA para envi
             ...this.stats,
             cacheSize: this.cache.keys().length
         };
+    }
+
+    /**
+     * Costo (USD) acumulado desde la última vez que se llamó a este método.
+     * Lo usa el guardián de presupuesto del scheduler para acumular el gasto
+     * mensual en disco de forma incremental, sobreviviendo a los restarts
+     * (estimatedCostUSD es per-proceso y se resetea al reiniciar). En un
+     * restart se pierde, como mucho, el delta del último intervalo (~30 min).
+     */
+    getCostDeltaUSD(): number {
+        const total = this.stats.estimatedCostUSD || 0;
+        const delta = total - this._costFlushedUSD;
+        this._costFlushedUSD = total;
+        return delta > 0 ? delta : 0;
     }
 
 }

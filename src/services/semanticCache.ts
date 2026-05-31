@@ -118,7 +118,8 @@ async function _getCandidates(step: string): Promise<CandidateRow[]> {
 export async function lookupSemanticCache(
     openai: OpenAI,
     step: string,
-    userText: string
+    userText: string,
+    engine: string = 'openai'
 ): Promise<{ response: string; similarity: number } | null> {
     if (!CACHEABLE_STEPS.has(step)) return null;
     if (!userText || userText.trim().length < WRITE_MIN_USER_CHARS) return null;
@@ -126,7 +127,12 @@ export async function lookupSemanticCache(
     const embedding = await _embed(openai, userText);
     if (!embedding) return null;
 
-    const candidates = await _getCandidates(step);
+    // Namespaceamos por engine: una respuesta generada por GPT NO debe servirse
+    // a una conversación que ahora corre sobre Claude (y viceversa). Reusa la
+    // columna `step` (sin migración): las filas viejas de GPT quedan huérfanas
+    // bajo el namespace 'openai:' y caen fuera de la ventana por lastHit.
+    const nsStep = `${engine}:${step}`;
+    const candidates = await _getCandidates(nsStep);
     if (candidates.length === 0) return null;
 
     let best: { row: CandidateRow; sim: number } | null = null;
@@ -162,7 +168,8 @@ export async function storeSemanticCache(
     openai: OpenAI,
     step: string,
     userText: string,
-    response: string
+    response: string,
+    engine: string = 'openai'
 ): Promise<void> {
     if (!CACHEABLE_STEPS.has(step)) return;
     if (!userText || userText.trim().length < WRITE_MIN_USER_CHARS) return;
@@ -171,17 +178,18 @@ export async function storeSemanticCache(
     const embedding = await _embed(openai, userText);
     if (!embedding) return;
 
+    const nsStep = `${engine}:${step}`;
     try {
         const { prisma } = require('../../db');
         await prisma.aiSemanticCache.create({
             data: {
-                step,
+                step: nsStep,
                 userText: userText.slice(0, 500),
                 embedding: JSON.stringify(embedding),
                 response,
             },
         });
-        candidateCache.del(step); // force refresh on next lookup
+        candidateCache.del(nsStep); // force refresh on next lookup
         logger.info(`[SEM-CACHE] STORED step=${step} len=${response.length}`);
     } catch (e: any) {
         logger.warn(`[SEM-CACHE] Store failed: ${e.message}`);
