@@ -19,14 +19,24 @@ function _formatMessage(text: string | string[], state: any): string {
         return _formatPrice(Math.round(parsed / days));
     };
 
+    // Normaliza el formato de un precio guardado en prices.json: tolera valores
+    // con o sin punto de miles ("49900" o "49.900") y SIEMPRE devuelve dotted
+    // ("49.900"). Sin esto, si un precio se carga sin punto desde el dashboard,
+    // se mostraba feo ("$49900") en prices_both mientras otros salían "$36.900".
+    const _fmt = (priceStr: string | undefined): string => {
+        if (!priceStr) return '';
+        const n = parseInt(String(priceStr).replace(/\./g, ''), 10);
+        return isNaN(n) ? String(priceStr) : _formatPrice(n);
+    };
+
     let formatted = textToFormat;
     // Replace {{PRICE_PRODUCT_PLAN}}
-    formatted = formatted.replace(/{{PRICE_CAPSULAS_60}}/g, prices['Cápsulas']?.['60'] || '');
-    formatted = formatted.replace(/{{PRICE_CAPSULAS_120}}/g, prices['Cápsulas']?.['120'] || '');
-    formatted = formatted.replace(/{{PRICE_SEMILLAS_60}}/g, prices['Semillas']?.['60'] || '');
-    formatted = formatted.replace(/{{PRICE_SEMILLAS_120}}/g, prices['Semillas']?.['120'] || '');
-    formatted = formatted.replace(/{{PRICE_GOTAS_60}}/g, prices['Gotas']?.['60'] || '');
-    formatted = formatted.replace(/{{PRICE_GOTAS_120}}/g, prices['Gotas']?.['120'] || '');
+    formatted = formatted.replace(/{{PRICE_CAPSULAS_60}}/g, _fmt(prices['Cápsulas']?.['60']));
+    formatted = formatted.replace(/{{PRICE_CAPSULAS_120}}/g, _fmt(prices['Cápsulas']?.['120']));
+    formatted = formatted.replace(/{{PRICE_SEMILLAS_60}}/g, _fmt(prices['Semillas']?.['60']));
+    formatted = formatted.replace(/{{PRICE_SEMILLAS_120}}/g, _fmt(prices['Semillas']?.['120']));
+    formatted = formatted.replace(/{{PRICE_GOTAS_60}}/g, _fmt(prices['Gotas']?.['60']));
+    formatted = formatted.replace(/{{PRICE_GOTAS_120}}/g, _fmt(prices['Gotas']?.['120']));
     // Anclaje de valor: precio/día para los planes 120 (justifica el ticket vs el de 60).
     formatted = formatted.replace(/{{PRICE_PER_DAY_CAPSULAS_120}}/g, _perDay(prices['Cápsulas']?.['120'], 120));
     formatted = formatted.replace(/{{PRICE_PER_DAY_SEMILLAS_120}}/g, _perDay(prices['Semillas']?.['120'], 120));
@@ -43,11 +53,11 @@ function _formatMessage(text: string | string[], state: any): string {
     // Política mayo 2026: el adicional por contra reembolso fue eliminado, por lo
     // que {{PRICE_TOTAL_*_60}} ahora es idéntico a {{PRICE_*_60}}. Se mantienen
     // los placeholders sólo por compatibilidad con plantillas legacy.
-    formatted = formatted.replace(/{{PRICE_TOTAL_CAPSULAS_60}}/g, prices['Cápsulas']?.['60'] || '');
-    formatted = formatted.replace(/{{PRICE_TOTAL_SEMILLAS_60}}/g, prices['Semillas']?.['60'] || '');
-    formatted = formatted.replace(/{{PRICE_TOTAL_GOTAS_60}}/g, prices['Gotas']?.['60'] || '');
+    formatted = formatted.replace(/{{PRICE_TOTAL_CAPSULAS_60}}/g, _fmt(prices['Cápsulas']?.['60']));
+    formatted = formatted.replace(/{{PRICE_TOTAL_SEMILLAS_60}}/g, _fmt(prices['Semillas']?.['60']));
+    formatted = formatted.replace(/{{PRICE_TOTAL_GOTAS_60}}/g, _fmt(prices['Gotas']?.['60']));
     formatted = formatted.replace(/{{ADICIONAL_MAX}}/g, '0');
-    formatted = formatted.replace(/{{COSTO_LOGISTICO}}/g, prices.costoLogistico || '18.000');
+    formatted = formatted.replace(/{{COSTO_LOGISTICO}}/g, _fmt(prices.costoLogistico) || '18.000');
 
     // Replace dynamic order placeholders if state is provided
     if (state) {
