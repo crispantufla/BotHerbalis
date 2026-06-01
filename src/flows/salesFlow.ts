@@ -99,11 +99,26 @@ export async function processSalesFlow(
 
             if (existingOrder) {
                 const isLegacy = existingOrder.instanceId === '__legacy_import__';
-                logger.info(`[ORDER-CHECK] User ${userId} has existing order (status: ${existingOrder.status}, legacy=${isLegacy}). Routing to post-sale.`);
-                _setStep(userState[userId], FlowStep.COMPLETED);
-                userState[userId].selectedProduct = existingOrder.products;
-                saveState(userId);
-                // Don't return — let the flow continue into stepCompleted handler below
+                const showsPurchaseIntent = PURCHASE_INTENT_KEYWORDS.test(normalizedText);
+                if (showsPurchaseIntent) {
+                    // Cliente conocido/histórico que VUELVE con intención de compra
+                    // (pidió precio, quiere comprar, etc.): NO lo pausamos como
+                    // post-venta — es el lead más tibio que hay. Lo atendemos como
+                    // recompra pero SIN la presentación (ya nos conoce): saltamos el
+                    // greeting yendo directo a waiting_weight, y el step responde su
+                    // consulta. Mismo criterio que el CHECK 2 (historial de chat).
+                    logger.info(`[ORDER-CHECK] User ${userId} es cliente conocido (legacy=${isLegacy}) y muestra intención de compra → atender como recompra (sin presentación).`);
+                    _setStep(userState[userId], FlowStep.WAITING_WEIGHT);
+                    (userState[userId] as any).isReturningClient = true;
+                    saveState(userId);
+                    // Don't return — continúa el flujo normal de venta.
+                } else {
+                    logger.info(`[ORDER-CHECK] User ${userId} has existing order (status: ${existingOrder.status}, legacy=${isLegacy}). Routing to post-sale.`);
+                    _setStep(userState[userId], FlowStep.COMPLETED);
+                    userState[userId].selectedProduct = existingOrder.products;
+                    saveState(userId);
+                    // Don't return — let the flow continue into stepCompleted handler below
+                }
             }
         } catch (err: any) {
             logger.error(`[ORDER-CHECK] Failed to query orders for ${userId}:`, err.message);
