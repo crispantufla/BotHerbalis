@@ -366,8 +366,9 @@ export function createOutgoingMessageHandler(ctx: {
     pausedUsers: Set<string>;
     sharedState: any;
     botSentMessageIds: Set<string>;
+    logAndEmit: (chatId: string, sender: string, text: string, step?: string, messageId?: string | null) => void;
 }): (msg: any) => Promise<void> {
-    const { sellerId, userState, pausedUsers, sharedState, botSentMessageIds } = ctx;
+    const { sellerId, userState, pausedUsers, sharedState, botSentMessageIds, logAndEmit } = ctx;
     const { dismissAlertsForUser } = require('../services/adminService');
 
     return async function outgoingHandler(msg: any): Promise<void> {
@@ -393,6 +394,26 @@ export function createOutgoingMessageHandler(ctx: {
             if (msgId && botSentMessageIds.has(msgId)) return;
 
             const targetId = msg.to;
+
+            // Registrar el mensaje manual del admin (escrito desde el teléfono del
+            // bot) en el historial + emitirlo al dashboard en tiempo real. Antes NO
+            // se registraba: solo se veía si el fetch en vivo de WhatsApp respondía
+            // al abrir el chat, y si caía al fallback de DB no aparecía (reporte de
+            // horacio: "lo que mando desde el móvil no se refleja"). Se loguea como
+            // 'admin'. El de-dup de /history (sameRole + body + 60s) evita duplicar
+            // con el mensaje que igual trae el fetch en vivo de WhatsApp.
+            try {
+                let logText = (msg.body || '').trim();
+                if (!logText && msg.hasMedia) {
+                    if (msg.type === 'image' || msg.type === 'sticker') logText = '📷 Imagen enviada';
+                    else if (msg.type === 'audio' || msg.type === 'ptt') logText = '🎤 Audio enviado';
+                    else if (msg.type === 'document') logText = '📄 Documento enviado';
+                    else logText = '[archivo enviado]';
+                }
+                if (logText) logAndEmit(targetId, 'admin', logText, userState[targetId]?.step, msgId);
+            } catch (e: any) {
+                logger.warn(`[MANUAL-CHAT][${sellerId}] No se pudo registrar mensaje manual a ${targetId}: ${e?.message}`);
+            }
 
             // Admin contestó manualmente → descartar cualquier alerta pendiente
             // de este usuario. Si tomó acción, ya vio la notificación.

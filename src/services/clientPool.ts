@@ -519,15 +519,16 @@ class ClientPool {
 
         // Outgoing handler — capta mensajes que el admin escribe manualmente
         // desde el WhatsApp del bot. El evento 'message' NO los emite (solo
-        // entrantes); 'message_create' sí emite ambos. Su único trabajo es
-        // pausar chats nuevos iniciados por admin para que el bot no dispare
-        // la bienvenida cuando el cliente responda.
+        // entrantes); 'message_create' sí emite ambos. Pausa chats nuevos
+        // iniciados por admin y registra (logAndEmit) los mensajes manuales para
+        // que queden en el historial y se reflejen en el dashboard en tiempo real.
         const outgoingHandler = createOutgoingMessageHandler({
             sellerId,
             userState: stateManager.userState,
             pausedUsers: stateManager.pausedUsers,
             sharedState,
             botSentMessageIds,
+            logAndEmit: helpers.logAndEmit,
         });
         client.on('message_create', outgoingHandler);
 
