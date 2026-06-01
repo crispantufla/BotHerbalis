@@ -3,7 +3,7 @@
  * - Menú de envío 2-opciones: retiro en sucursal vs envío a domicilio
  * - Retiro en sucursal → contrarrembolso, paga total en efectivo al retirar (sin anticipo)
  * - Envío a domicilio → prepago por Mercado Pago o transferencia (alias HERBALIS.TIENDA)
- * - 5 a 7 días hábiles uniforme
+ * - 7 a 10 días hábiles uniforme
  * - Sin adicional $6.000, sin anticipo $10.000, sin cuotas
  *
  * Nombre del archivo conservado por historia git (originalmente testeaba el flujo seña).
@@ -37,9 +37,9 @@ describe('Modelo nuevo de pago — buildPaymentMessage (envío primero, sin anti
         expect(pm).toMatch(/PagoF[áa]cil/i);
         expect(pm).toMatch(/Tarjeta/i);
     });
-    test('Promete envío gratis y 5 a 7 días hábiles', () => {
+    test('Promete envío gratis y 7 a 10 días hábiles', () => {
         expect(pm).toMatch(/GRATIS/i);
-        expect(pm).toMatch(/5 y 7 d[íi]as/i);
+        expect(pm).toMatch(/7 y 10 d[íi]as/i);
     });
     test('NO menciona anticipo de $10.000 (modalidad eliminada)', () => {
         expect(pm).not.toMatch(/10\.000/);
@@ -141,15 +141,15 @@ describe('Modelo nuevo — FAQ en V5 y V6', () => {
 
     test.each([
         ['V7', v7],
-    ])('%s: FAQ "shipping" unifica 5 a 7 días hábiles + menciona ambas opciones de envío', (_n, guion) => {
+    ])('%s: FAQ "shipping" unifica 7 a 10 días hábiles + menciona ambas opciones de envío', (_n, guion) => {
         const shipFaq = guion.faq.find(f => f.keywords.some(k => k === 'como lo recibo' || k === 'envio'));
         expect(shipFaq).toBeDefined();
-        expect(shipFaq.response).toMatch(/5 a 7 d[íi]as/i);
+        expect(shipFaq.response).toMatch(/7 a 10 d[íi]as/i);
         expect(shipFaq.response).toMatch(/Retiro en sucursal/i);
         expect(shipFaq.response).toMatch(/Env[íi]o a domicilio/i);
-        // No menciona el viejo split 4-6 / 7-10
+        // No menciona el viejo split 4-6 / 7-10 hábiles ni el viejo 5 a 7
         expect(shipFaq.response).not.toMatch(/4 a 6/);
-        expect(shipFaq.response).not.toMatch(/7 a 10/);
+        expect(shipFaq.response).not.toMatch(/5 a 7/);
     });
 
     test.each([

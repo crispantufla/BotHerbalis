@@ -282,13 +282,13 @@ const CommsView = ({ initialChatId, onChatSelected, onChatOpened, initialSearch 
             .replace(/{{PRICE_PER_DAY_120}}/g, perDay(prices?.[productKey]?.['120']));
 
         // Constantes bancarias + entrega standard + saldo legacy seña.
-        // POSTDATADO_LINE: muestra entrega standard (5-7 días). Para el preview
+        // POSTDATADO_LINE: muestra entrega standard (7-10 días). Para el preview
         // no contamos con state.postdatado — el server lo resuelve en runtime.
         result = result
             .replace(/{{ALIAS}}/g, 'HERBALIS.TIENDA')
             .replace(/{{TITULAR}}/g, 'BIO ORIGEN S.A.S.')
             .replace(/{{ANTICIPO}}/g, '10.000')
-            .replace(/{{POSTDATADO_LINE}}/g, '✔ Entrega estimada: 5 a 7 días hábiles desde la confirmación\n')
+            .replace(/{{POSTDATADO_LINE}}/g, '✔ Entrega estimada: 7 a 10 días hábiles desde la confirmación\n')
             .replace(/{{CARTO_LINE}}/g, '')
             .replace(/{{LINK}}/g, '(link se genera al confirmar el pago)')
             .replace(/{{SENA_AMOUNT}}/g, '10.000')
