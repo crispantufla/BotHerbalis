@@ -200,8 +200,24 @@ export async function handleWaitingWeight(
             if (n >= 3 && n <= 50) return n;
         }
         const allNums = (_weightText.match(/\d{1,3}/g) || []).map(s => parseInt(s, 10));
-        const inRange = allNums.find(n => n >= 3 && n <= 50);
-        if (inRange != null) return inRange;
+        const inRangeNums = allNums.filter(n => n >= 3 && n <= 50);
+        // PISO: el cliente da una cota inferior. Tomamos el MAYOR número en rango
+        // para que caiga en el tier correcto (ej: "más de 10 … mínimo 25" → 25,
+        // no 10). "más de N" es ESTRICTAMENTE mayor → usamos al menos N+1 (así
+        // "más de 10" cae en tier 2, no en 10/tier 1). Sólo con cue de piso, para
+        // no romper "bajar 8, tengo 45 años" (sin cue → primer número). Reporte
+        // real 5491168816042 (01-jun-2026).
+        const moreThan = _weightText.match(/\b(?:mas de|m[áa]s de|arriba de|mas que|m[áa]s que)\s+(\d{1,3})/i);
+        const hasFloorCue = !!moreThan || /\b(m[ií]nimo|minino|por lo menos|al menos|mucho mas)\b/i.test(_weightText);
+        if (hasFloorCue) {
+            const candidates = [...inRangeNums];
+            if (moreThan) {
+                const n = parseInt(moreThan[1], 10) + 1; // estrictamente mayor
+                if (n >= 3 && n <= 50) candidates.push(n);
+            }
+            if (candidates.length) return Math.max(...candidates);
+        }
+        if (inRangeNums.length) return inRangeNums[0];
         return allNums[0] ?? null;
     }
 
@@ -283,6 +299,28 @@ export async function handleWaitingWeight(
                 if (trimmed === '1') currentState.weightGoal = 8;
                 else if (trimmed === '2') currentState.weightGoal = 15;
                 else currentState.weightGoal = 25;
+            }
+
+            // Si el cliente YA eligió producto (lo mencionó antes de dar los kilos),
+            // NO le re-mostramos las 3 opciones: le asignamos ese producto + el plan
+            // del tier (la dosis), le pasamos el precio de ESE producto y seguimos al
+            // pago. Sin esto, alguien que dijo "cápsulas" y después "mínimo 25 kilos"
+            // recibía igual el menú genérico (reporte 5491168816042, 01-jun-2026).
+            const _suggested = (currentState as any).suggestedProduct;
+            if (_suggested) {
+                _assignProductAndPlanByTier(currentState, _suggested);
+                const cp = currentState.selectedProduct || '';
+                const priceNode = cp.includes('Cápsulas') ? knowledge.flow.preference_capsulas
+                    : cp.includes('Gotas') ? knowledge.flow.preference_gotas
+                    : knowledge.flow.preference_semillas;
+                const pmsg = _formatMessage(priceNode.response, currentState);
+                _setStep(currentState, priceNode.nextStep);
+                currentState.history.push({ role: 'bot', content: pmsg, timestamp: Date.now() });
+                saveState(userId);
+                await sendMessageWithDelay(userId, pmsg);
+                await _maybeSendPaymentMenuV7(userId, priceNode.nextStep, currentState, knowledge, dependencies);
+                logger.info(`[TIER] User ${userId} ya eligió ${_suggested}; weightGoal=${currentState.weightGoal}kg → plan ${currentState.selectedPlan}; salto recomendación genérica.`);
+                return { matched: true };
             }
 
             // NO asignamos producto/plan acá. El nuevo modelo (V5+/V7) ofrece las 3

@@ -102,3 +102,41 @@ describe('V7 golden path — greeting → weight → preference → menú de pag
         expect(state.step).toBe('waiting_payment_method');
     });
 });
+
+describe('V7 — ya eligió producto + da el peso (reporte 5491168816042)', () => {
+    function suggestedState() {
+        const s = freshState();
+        s.step = 'waiting_weight';
+        s.suggestedProduct = 'Cápsulas de nuez de la india'; // dijo "me quedo con cápsulas" antes
+        return s;
+    }
+
+    test('"mínimo 25 kilos" → extrae 25 (no 10), asigna Cápsulas 120 y va al pago', async () => {
+        const { deps } = makeDeps();
+        const state = suggestedState();
+        const txt = 'Quiero bajar mucho mas de 10 kilos. Tengo sobrepeso minino 25 kilos';
+        await handleWaitingWeight('w1@c.us', txt, txt.toLowerCase(), state, v7, deps);
+        expect(state.weightGoal).toBe(25);              // no 10
+        expect(state.selectedProduct).toMatch(/Cápsulas/i);
+        expect(state.selectedPlan).toBe('120');         // tier 2 → 120
+        expect(state.step).toBe('waiting_payment_method');
+    });
+
+    test('"más de 10" solo (sin segundo número) → tier 2 / plan 120', async () => {
+        const { deps } = makeDeps();
+        const state = suggestedState();
+        const txt = 'quiero bajar mas de 10 kilos';
+        await handleWaitingWeight('w3@c.us', txt, txt.toLowerCase(), state, v7, deps);
+        expect(state.selectedPlan).toBe('120');
+        expect(state.step).toBe('waiting_payment_method');
+    });
+
+    test('sin cue de piso, "bajar 8, tengo 45 años" → 8 (no 45)', async () => {
+        const { deps } = makeDeps();
+        const state = suggestedState();
+        const txt = 'quiero bajar 8 kilos, tengo 45 años';
+        await handleWaitingWeight('w2@c.us', txt, txt.toLowerCase(), state, v7, deps);
+        expect(state.weightGoal).toBe(8);               // edad 45 NO se confunde con objetivo
+        expect(state.selectedPlan).toBe('60');          // tier 1 → 60
+    });
+});
