@@ -102,7 +102,7 @@
         "payment_domicilio_choice": {
             "step": "waiting_payment_method",
             "_note": "Cliente eligió envío a domicilio. Submenú de medio de pago (prepago). Rapipago/PagoFácil/Tarjeta se canalizan dentro del link de Mercado Pago.",
-            "response": "Perfecto, lo mandamos a tu domicilio 🏠\n\n¿Cómo querés abonar?\n\n1️⃣ *Mercado Pago* — tarjeta, débito, app MP, o llevás el código y pagás en efectivo en Pago Fácil o Rapipago\n2️⃣ *Transferencia bancaria* — te paso el alias",
+            "response": "Perfecto, lo mandamos a tu domicilio 🏠\n\n¿Cómo querés abonar?\n\n1️⃣ *Mercado Pago* — te envío un *link de pago* (tarjeta, débito, app MP, o llevás el código y pagás en efectivo en Pago Fácil o Rapipago)\n2️⃣ *Transferencia bancaria* — te paso el alias",
             "nextStep": "waiting_payment_method"
         },
         "payment_retiro_confirm": {
