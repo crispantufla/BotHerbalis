@@ -33,6 +33,7 @@ const RULE_BASE = [
     { id: 'rechazo', keywords: ['no quiero', 'no me interesa', 'dejame', 'callate', 'no molestes', 'basta', 'paren', 'dejen de', 'spam', 'bloqueado'], text: 'RECHAZO EXPLÍCITO: Si el usuario dice "no quiero nada", "no me interesa", "callate", "dejame en paz", "basta", "no molestes" o cualquier rechazo claro: NO sigas vendiendo. Respondé con algo breve y respetuoso como "¡Disculpá la molestia! Si en algún momento necesitás algo, acá estamos 😊" y NADA MÁS. goalMet=false, extractedData="NEED_ADMIN".' },
     { id: 'no_ofertas', keywords: ['descuento', 'oferta', 'promo', 'rebaja', 'precio menor', 'mas barato', 'tarjeta'], text: 'NO negocies precio. NO ofrezcas descuentos (salvo que pregunten). NO ofrezcas tarjeta.' },
     { id: 'no_derivar', keywords: [], text: 'PROHIBIDO decir "hablá con un asesor" o "contactá a soporte". Vos resolvés.' },
+    { id: 'no_cierre_falso', keywords: [], text: 'NUNCA anuncies que el pedido está confirmado/cerrado/ingresado, ni digas "listo todo", "ya está tu pedido", "queda confirmado" o "¡listo todo entonces!". Esa confirmación la emite el SISTEMA cuando la orden se genera de verdad, NO vos. Tu trabajo es juntar los datos y responder dudas; si te parece que ya está todo, NO declares el cierre — seguí el paso (pedí la confirmación final o los datos que falten). Anunciar un cierre que el sistema no registró deja al cliente creyendo que compró cuando NO hay pedido (venta fantasma).' },
     { id: 'silencio', keywords: [], text: 'Mensajes <3 palabras sin contexto: "Jaja perdona, ¿me repetís? No te escuché bien 😅".' },
     { id: 'no_vender_ciego', keywords: [], text: 'NO confirmes un pedido sin saber: producto + plan (60 o 120 días).' },
     { id: 'contexto', keywords: [], text: 'CONTEXTO DE PREGUNTAS: Si preguntan "y las gotas?" después de hablar de CÓMO SE TOMAN, respondé cómo se toman. Si hablaste de PRECIOS, respondé precios. Mantené el tema.' },
@@ -89,6 +90,7 @@ function _getRelevantRules(userText: string): string[] {
     activeRules.push(RULE_BASE.find(r => r.id === 'anti_inv')!.text);
     activeRules.push(RULE_BASE.find(r => r.id === 'cierre')!.text);
     activeRules.push(RULE_BASE.find(r => r.id === 'no_derivar')!.text);
+    activeRules.push(RULE_BASE.find(r => r.id === 'no_cierre_falso')!.text);
     activeRules.push(RULE_BASE.find(r => r.id === 'no_vender_ciego')!.text);
     activeRules.push(RULE_BASE.find(r => r.id === 'coherencia')!.text);
     activeRules.push(RULE_BASE.find(r => r.id === 'saludos_desubicados')!.text);

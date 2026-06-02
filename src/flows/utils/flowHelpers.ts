@@ -338,6 +338,24 @@ function _assignProductAndPlanByTier(state: any, productFullName: string): void 
     calculateTotal(state);
 }
 
+/**
+ * _isGhostClose
+ * Detecta una "venta fantasma": la IA dio por cerrado/confirmado el pedido en su
+ * texto, pero el flujo NO generó la orden (sin pendingOrder) y el step no es uno
+ * de cierre real. Eso deja al cliente creyendo que compró cuando el sistema no
+ * tiene nada (caso 5493442465660). Las confirmaciones LEGÍTIMAS no matchean: se
+ * emiten con pendingOrder seteado, en steps de cierre (excluidos), o fuera del
+ * flujo (al aprobar la orden ya creada).
+ */
+const _GHOST_CLOSE_LANG = /(pedido confirmado|listo,?\s+todo|todo listo|ya est[aá] todo listo|ya est[aá] tu pedido|tu pedido qued[oó]|tu pedido est[aá] (confirmado|listo)|queda confirmado|pedido ingresado|ya qued[oó] (tu pedido|todo))/i;
+const _GHOST_CLOSE_CLOSED_STEPS = ['waiting_admin_validation', 'waiting_admin_ok', 'completed', 'rejected_medical', 'rejected_abusive', 'rejected_geo'];
+function _isGhostClose(botMsg: string | null | undefined, step: string, hasPendingOrder: boolean): boolean {
+    if (!botMsg) return false;
+    if (hasPendingOrder) return false;
+    if (_GHOST_CLOSE_CLOSED_STEPS.includes(step)) return false;
+    return _GHOST_CLOSE_LANG.test(botMsg);
+}
+
 function _pushHistory(state: any, entry: { role: 'user' | 'bot' | 'system'; content: string; timestamp?: number }) {
     if (!state.history) state.history = [];
     state.history.push({ ...entry, timestamp: entry.timestamp || Date.now() });
@@ -381,5 +399,6 @@ export {
     _resolveNewProductPlan,
     _assignProductAndPlanByTier,
     _pushHistory,
-    _maybeSendPaymentMenuV7
+    _maybeSendPaymentMenuV7,
+    _isGhostClose
 };

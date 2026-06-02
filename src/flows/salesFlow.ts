@@ -3,7 +3,7 @@ import { pauseUser } from '../services/pauseService';
 import logger from '../utils/logger';
 import { processGlobals } from './globals';
 import { processStep } from './steps';
-import { _pauseAndAlert, _setStep, _extractSilentVariables, _cleanPhone } from './utils/flowHelpers';
+import { _pauseAndAlert, _setStep, _extractSilentVariables, _cleanPhone, _isGhostClose } from './utils/flowHelpers';
 import { detectObjection } from './utils/objectionDetector';
 import { parseControlTag } from './utils/extractedData';
 
@@ -519,6 +519,15 @@ export async function processSalesFlow(
             if (!_controlHandled && (botMsg.includes('3413755757') || botMsg.replace(/\D/g, '').includes('3413755757'))) {
                 logger.info(`[RESELLER PAUSE] Intercepted reseller intent for user ${userId}. Halting flow.`);
                 await _pauseAndAlert(userId, currentState, dependencies, text, 'El cliente está interesado en reventa/compras por mayor. Derivado a Horacio.');
+                saveState(userId);
+            }
+
+            // 🛑 GUARD ANTI VENTA-FANTASMA (ver _isGhostClose): la IA "cerró" la venta
+            // por texto pero el flujo NO generó la orden. En vez de perderla en
+            // silencio, pausamos + avisamos al admin para que la cargue/contacte.
+            if (_isGhostClose(botMsg, currentState.step, !!(currentState as any).pendingOrder)) {
+                logger.warn(`[GHOST-CLOSE] User ${userId}: el bot dio por cerrada la venta en step "${currentState.step}" SIN orden generada (sin pendingOrder). Pausando + alertando.`);
+                await _pauseAndAlert(userId, currentState, dependencies, text, '⚠️ VENTA FANTASMA: el bot dio por confirmado/listo un pedido pero el sistema NO lo registró (sin orden). Revisá la conversación y cargá/contactá al cliente manualmente.');
                 saveState(userId);
             }
         }
