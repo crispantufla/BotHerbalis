@@ -64,6 +64,7 @@ jest.mock('../src/services/ai', () => ({
 
 const { handleWaitingPaymentMethod } = require('../src/flows/steps/stepWaitingPaymentMethod');
 const { handleWaitingMpPayment } = require('../src/flows/steps/stepWaitingMpPayment');
+const { handleWaitingTransferConfirmation } = require('../src/flows/steps/stepWaitingTransferConfirmation');
 const { aiService } = require('../src/services/ai');
 
 // ─── Shared mocks ────────────────────────────────────────────────────────────
@@ -350,6 +351,37 @@ describe('Menú envío → Envío a domicilio (opción 2) + submenú prepago', (
         const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
         expect(sent).toMatch(/Mercado Pago/i);
         expect(sent).toMatch(/Transferencia/i);
+    });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// BLOQUE 3b: en transferencia, cliente cambia a "retiro en sucursal" (venta fantasma 5493442465660)
+// ════════════════════════════════════════════════════════════════════════════
+describe('waiting_transfer_confirmation → cliente pide retiro en sucursal', () => {
+    const norm = (t) => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+    test('"Sisi retiro en sucursal" reencamina a payment_method (no se queda en transfer ni inventa confirmación)', async () => {
+        const state = makePaymentState('60', {
+            step: 'waiting_transfer_confirmation',
+            paymentMethod: 'transferencia',
+            shippingChoice: 'domicilio',
+        });
+        const txt = 'Sisi retiro en sucursal, me dijiste que es envío gratuito';
+        const r = await handleWaitingTransferConfirmation('t1', txt, norm(txt), state, knowledge, deps);
+        expect(r.staleReprocess).toBe(true);
+        expect(state.step).toBe('waiting_payment_method');
+        expect(state.paymentMethod).toBeNull();
+        expect(state.shippingChoice).toBeNull();
+    });
+
+    test('"listo" sí confirma transferencia (no se rompe el caso normal)', async () => {
+        const state = makePaymentState('60', {
+            step: 'waiting_transfer_confirmation',
+            paymentMethod: 'transferencia',
+            shippingChoice: 'domicilio',
+        });
+        await handleWaitingTransferConfirmation('t2', 'listo ya transferí', 'listo ya transferi', state, knowledge, deps);
+        expect(deps.sharedState.pausedUsers.has('t2')).toBe(true); // pausa para verificar comprobante
     });
 });
 

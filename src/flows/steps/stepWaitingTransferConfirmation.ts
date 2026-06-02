@@ -1,11 +1,14 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _setStep, _pauseAndAlert } from '../utils/flowHelpers';
-import { calculateTotal } from '../utils/cartHelpers';
 import logger from '../../utils/logger';
 
 const PAID_KEYWORDS = /\b(listo|pague|pagu[eé]|transferi|transferido|transfer[ií]|ya transferi|ya transfer[ií]|realice|realic[eé]|hice la transferencia|hecho|ok listo|lo hice|envi[eé] la transferencia|ya la hice)\b/i;
 const MP_KEYWORDS = /\b(mercadopago|mercado.?pago|mp|link|online|digital|qr|tarjeta|credito|debito|2|segundo|pago online|pago digital)\b/i;
-const CASH_KEYWORDS = /\b(contra.?reembolso|contrarembolso|efectivo|cash|1|primero|primera|al recibir|cartero|cuando llega)\b/i;
+// Cambio a RETIRO EN SUCURSAL / pago al retirar. En el modelo nuevo,
+// contrarreembolso = retiro en sucursal. Incluye "retiro"/"sucursal"/"retirar"
+// (faltaban: por eso "retiro en sucursal" no se detectaba y caía al AI, que
+// "confirmaba" sin crear la orden — venta fantasma, reporte 5493442465660).
+const RETIRO_OR_CASH_KEYWORDS = /\b(retiro|retirar|sucursal|contra.?reembolso|contrarembolso|efectivo|cash|1|primero|primera|al recibir|cartero|cuando llega)\b/i;
 
 export async function handleWaitingTransferConfirmation(
     userId: string,
@@ -50,41 +53,21 @@ export async function handleWaitingTransferConfirmation(
         return { matched: false, staleReprocess: true } as any;
     }
 
-    // ── Cliente cambia a contra reembolso ──────────────────────────────────────
-    if (CASH_KEYWORDS.test(normalizedText)) {
-        logger.info(`[TRANSFER_CONFIRM] Cliente ${userId} cambió de transferencia a contra reembolso`);
-        currentState.paymentMethod = 'contrarembolso';
-        calculateTotal(currentState);
-
-        const addr = currentState.partialAddress || {};
-        const hasAddress = !!(addr.nombre && addr.calle && addr.ciudad);
-
-        if (hasAddress) {
-            const { buildConfirmationMessage } = require('../../utils/messageTemplates');
-            const isPickup = currentState.shippingChoice === 'retiro';
-            currentState.pendingOrder = {
-                nombre: addr.nombre,
-                calle: isPickup ? 'A sucursal' : addr.calle,
-                ciudad: addr.ciudad,
-                cp: addr.cp,
-                provincia: addr.provincia,
-                calleOriginal: (addr as any).calleOriginal || addr.calle,
-                cart: currentState.cart
-            };
-            const summaryMsg = buildConfirmationMessage(currentState, knowledge);
-            _setStep(currentState, FlowStep.WAITING_FINAL_CONFIRMATION);
-            currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
-            saveState(userId);
-            await sendMessageWithDelay(userId, summaryMsg);
-            return { matched: true };
-        }
-
-        const closingMsg = knowledge?.flow?.closing?.response || '¡Genial! Pasame los datos de envío 👇\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:';
-        _setStep(currentState, FlowStep.WAITING_DATA);
-        currentState.history.push({ role: 'bot', content: closingMsg, timestamp: Date.now() });
+    // ── Cliente cambia a RETIRO EN SUCURSAL / pago al retirar ───────────────────
+    // Reencaminamos al step de método de pago, que tiene la lógica CORRECTA de
+    // retiro (pide solo localidad+CP, pre-setea calle='A sucursal', y arma la
+    // orden vía waiting_data). Antes este branch armaba la orden inline usando
+    // shippingChoice que quedaba en 'domicilio' (de la rama transferencia) → calle
+    // real en vez de "A sucursal", y si faltaban datos el AI fallback charlaba sin
+    // crear nada. Routear a payment_method unifica con la lógica buena.
+    if (RETIRO_OR_CASH_KEYWORDS.test(normalizedText)) {
+        logger.info(`[TRANSFER_CONFIRM] Cliente ${userId} cambió de transferencia a retiro en sucursal — reencaminando a payment_method`);
+        currentState.paymentMethod = null;
+        currentState.shippingChoice = null;
+        (currentState as any).paymentSubChoiceAsked = false;
+        _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
         saveState(userId);
-        await sendMessageWithDelay(userId, closingMsg);
-        return { matched: true };
+        return { matched: false, staleReprocess: true } as any;
     }
 
     // ── AI fallback ────────────────────────────────────────────────────────────
