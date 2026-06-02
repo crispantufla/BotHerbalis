@@ -172,11 +172,25 @@ export async function handleWaitingWeight(
         logger.info(`[LOGIC] Implicitly detected product: ${implicitProduct}`);
     }
 
+    // Declinación cordial: "por ahora no puedo comprar / solo pregunté el precio,
+    // gracias". NO es negarse a dar el peso (eso es isRefusal → skip a preferencia);
+    // es CERRAR la consulta (estaba averiguando precio). Tratarlo como weight-refusal
+    // hace que el bot empuje productos y la clienta se frustre (reporte 5491136769277:
+    // "Por ahora no puedo comprar, yo pregunté precio, gracias" → el bot mostró
+    // productos en vez de soltar). Back-off cordial + pausa.
+    const isPriceCheckDecline =
+        /\bno (puedo|voy a|podr[ií]a|pienso) (comprar|comprarlo|adquirir|seguir|avanzar)\b/i.test(normalizedText)
+        || /\bpor ahora no (puedo|compro|voy|quiero comprar)\b/i.test(normalizedText)
+        || /\bno (compro|comprar[ée]|voy a comprar)(\s+(ahora|por ahora|nada))?\b/i.test(normalizedText)
+        || /\b(solo|solamente|yo|nomas|nom[áa]s|[úu]nicamente)\s+(pregunt[ée]|preguntaba|consult\w*|quer[ií]a)\b.{0,20}(precio|saber|info|averiguar)/i.test(normalizedText)
+        || /\b(era|fue)\s+(solo\s+)?(una\s+)?(consulta|pregunta|para\s+(saber|averiguar))\b/i.test(normalizedText);
+
     // Hard rejection = not interested in the product at all → pause & alert admin
     const isHardRejection = /\b(no (quiero|me interesa)\s*(nada|comprar|saber)?|callate|callate|dejame|basta|no molest|spam)\b/i.test(normalizedText)
         && /\b(nada|comprar|saber|callate|dejame|basta|molest|spam|paz)\b/i.test(normalizedText);
-    // Soft refusal = doesn't want to answer weight specifically → skip to preference
-    const isRefusal = !isHardRejection && /\b(no (voy|puedo)|prefiero no|que tenes|mostrame)\b/i.test(normalizedText);
+    // Soft refusal = doesn't want to answer weight specifically → skip to preference.
+    // Excluye la declinación de compra de arriba (esa NO empuja productos).
+    const isRefusal = !isHardRejection && !isPriceCheckDecline && /\b(no (voy|puedo)|prefiero no|que tenes|mostrame)\b/i.test(normalizedText);
 
     // Extracción robusta del objetivo de bajar: si tenemos goal explícito
     // (regex que matchea "bajar X kilos"), lo usamos. Sino, buscamos el primer
@@ -368,13 +382,17 @@ export async function handleWaitingWeight(
             (currentState as any).weightRefusals = ((currentState as any).weightRefusals || 0) + 1;
         }
 
-        if (isHardRejection) {
-            logger.info(`[REJECTION] User ${userId} explicitly rejected at weight step. Pausing.`);
-            const rejectMsg = '¡Disculpá la molestia! Si en algún momento necesitás algo, acá estamos 😊';
+        if (isHardRejection || isPriceCheckDecline) {
+            logger.info(`[REJECTION] User ${userId} ${isPriceCheckDecline ? 'declinó la compra (solo preguntaba precio / por ahora no)' : 'rechazó la conversación'} en waiting_weight. Back-off + pausa.`);
+            const rejectMsg = isPriceCheckDecline
+                ? '¡Dale, sin problema! 😊 Cualquier cosa que necesites, acá estoy. ¡Que tengas un lindo día! 🌿'
+                : '¡Disculpá la molestia! Si en algún momento necesitás algo, acá estamos 😊';
             currentState.history.push({ role: 'bot', content: rejectMsg, timestamp: Date.now() });
             saveState(userId);
             await sendMessageWithDelay(userId, rejectMsg);
-            await _pauseAndAlert(userId, currentState, dependencies, text, 'El cliente rechazó la conversación explícitamente.');
+            await _pauseAndAlert(userId, currentState, dependencies, text, isPriceCheckDecline
+                ? 'El cliente declinó la compra (estaba averiguando precio / "por ahora no"). Bot soltó cordialmente.'
+                : 'El cliente rechazó la conversación explícitamente.');
             return { matched: true };
         }
 

@@ -81,6 +81,19 @@ describe('V7 golden path — greeting → weight → preference → menú de pag
         expect(allSent).not.toMatch(/Te ofrezco la Nuez de la India en tres opciones/i); // no presentación larga
     });
 
+    test('"por ahora no puedo comprar, solo pregunté precio" → back-off + pausa, NO empuja productos', async () => {
+        const { deps, sent } = makeDeps();
+        const state = freshState();
+        state.step = 'waiting_weight';
+        const txt = 'Por ahora no puedo comprar, yo pregunté precio, gracias';
+        const norm = txt.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+        await handleWaitingWeight('decl1@c.us', txt, norm, state, v7, deps);
+        expect(state.step).toBe('waiting_weight');                  // NO avanzó a preferencia
+        expect(deps.sharedState.pausedUsers.has('decl1@c.us')).toBe(true);
+        const allSent = sent.join(' \n ');
+        expect(allSent).not.toMatch(/Pasemos directo a ver qu[ée] forma/i); // no empujó productos
+    });
+
     test('"quiero bajar 8 kilos" → weightGoal=8, tier 1, pasa a waiting_preference', async () => {
         const { deps, sent } = makeDeps();
         const state = freshState();
