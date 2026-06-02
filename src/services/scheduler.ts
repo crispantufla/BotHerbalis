@@ -812,10 +812,19 @@ async function snapshotDailyStats(sharedState?: SchedulerSharedState) {
         const startOfDay = new Date(argNow);
         startOfDay.setHours(0, 0, 0, 0);
 
-        // Count ONLY new users generated today
-        const totalUsersToday = await prisma.user.count({ 
-            where: { instanceId: INSTANCE_ID, createdAt: { gte: startOfDay } } 
-        });
+        // "Chats" del día = PROSPECTOS que entraron al embudo (stepTo
+        // greeting/waiting_weight), NO todo contacto nuevo. Los que el bot
+        // ignora/pausa (post-venta, import histórico, correo, equivocados) se
+        // rutean a 'completed' y nunca llegan a waiting_weight, así que no cuentan.
+        const totalUsersToday = (await prisma.funnelEvent.findMany({
+            where: {
+                stepTo: { in: ['greeting', 'waiting_weight'] },
+                enteredAt: { gte: startOfDay },
+                sellerId: INSTANCE_ID,
+            },
+            select: { phone: true },
+            distinct: ['phone'],
+        })).length;
 
         const todayStats = await prisma.order.aggregate({
             _count: true,

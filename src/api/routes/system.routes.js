@@ -185,8 +185,19 @@ module.exports = (clientPool) => {
 
             const whereBase = applyNonSellerExclusion(INSTANCE_ID ? { instanceId: INSTANCE_ID } : {});
 
+            // "Nuevos chats" = PROSPECTOS que entraron al embudo hoy (FunnelEvent
+            // stepTo greeting/waiting_weight). Los contactos que el bot ignora/pausa
+            // (ex-cliente/post-venta, import histórico, correo, número equivocado) se
+            // rutean a 'completed' y nunca llegan a waiting_weight, así que NO entran
+            // en el conteo ni deflactan la conversión. Antes se contaba User.createdAt
+            // = hoy, que sumaba a TODOS esos contactos ignorados (denominador inflado).
+            const funnelWhere = {
+                stepTo: { in: ['greeting', 'waiting_weight'] },
+                enteredAt: { gte: startOfDay },
+                ...(INSTANCE_ID ? { sellerId: INSTANCE_ID } : {}),
+            };
             // Fetch database aggregations in parallel for performance
-            const [totalCount, todayStats, completedStats, newChatsToday] = await Promise.all([
+            const [totalCount, todayStats, completedStats, prospectRows] = await Promise.all([
                 prisma.order.count({ where: whereBase }),
                 prisma.order.aggregate({
                     _count: true,
@@ -200,12 +211,14 @@ module.exports = (clientPool) => {
                         ...whereBase
                     }
                 }),
-                // Tráfico de nuevos chats del día — usuarios cuya primera
-                // aparición en DB es hoy (User.createdAt = primer mensaje recibido).
-                prisma.user.count({
-                    where: { createdAt: { gte: startOfDay }, ...whereBase }
+                prisma.funnelEvent.findMany({
+                    where: funnelWhere,
+                    select: { phone: true, sellerId: true },
+                    distinct: ['phone', 'sellerId'],
                 })
             ]);
+            // Prospectos únicos (teléfono+seller) que entraron al embudo hoy.
+            const newChatsToday = prospectRows.length;
 
             // Sesiones / pausas / config: viven en memoria por seller. Para vista
             // global (admin sin sellerId), agregamos sumando todos los pools activos.
@@ -737,10 +750,19 @@ module.exports = (clientPool) => {
             const startOfDay = new Date(argNow);
             startOfDay.setUTCHours(0, 0, 0, 0);
 
-            // Get total chats created TODAY in DB before wiping
-            const totalUsersToday = await prisma.user.count({
-                where: { ...whereBase, createdAt: { gte: startOfDay } }
-            });
+            // "Chats" del día = PROSPECTOS que entraron al embudo (stepTo
+            // greeting/waiting_weight), NO todo contacto nuevo. Excluye los que el
+            // bot ignora/pausa (post-venta, import histórico, correo, equivocados),
+            // que se rutean a 'completed' y nunca llegan a waiting_weight.
+            const totalUsersToday = (await prisma.funnelEvent.findMany({
+                where: {
+                    stepTo: { in: ['greeting', 'waiting_weight'] },
+                    enteredAt: { gte: startOfDay },
+                    ...(INSTANCE_ID ? { sellerId: INSTANCE_ID } : {}),
+                },
+                select: { phone: true, sellerId: true },
+                distinct: ['phone', 'sellerId'],
+            })).length;
 
             // Save daily stat BEFORE resetting
             if (INSTANCE_ID) {
