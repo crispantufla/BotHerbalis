@@ -98,6 +98,26 @@ export async function handleGreeting(
         }
     }
 
+    // Atajo: el cliente YA dio el peso en el saludo (ej: "peso 85, quiero llegar
+    // a 60", "bajar 20 kg"). Mandar la presentación larga + la pregunta de kilos
+    // ("¿Hasta 10 o más de 10?") es redundante y son 3 mensajes de golpe (reporte
+    // horacio). Saltamos directo a procesar el peso: la recomendación que sigue ya
+    // saluda con calidez, lista las opciones y CIERRA CON UNA PREGUNTA. Antes el
+    // split de la presentación no matcheaba el texto V7 y la pregunta de kilos se
+    // colaba igual.
+    const hasExplicitGoal = (
+        /\b\d{1,3}\s*(?:kg?s?|kilos?|kilogramos?)\b/i.test(text) ||
+        /\b(?:bajar|perder)\s+\d{1,3}\s*(?:kg?s?|kilos?|kilogramos?|de peso)?\b/i.test(text)
+    );
+    if (hasExplicitGoal) {
+        logger.info(`[GREETING-SHORTCUT] User ${userId} dio el peso en el saludo — sin presentación larga ni pregunta de kilos; proceso el peso directo.`);
+        _setStep(currentState, knowledge.flow.greeting.nextStep);
+        saveState(userId);
+        const fakeUserStateMap = { [userId]: currentState };
+        await processSalesFlow(userId, text, fakeUserStateMap, knowledge, dependencies);
+        return { matched: true };
+    }
+
     // 1. A/B variant selection — si knowledge.flow.greeting_variants existe y
     // tiene entradas, elegimos una variante deterministicamente por phone.
     // Persistimos la variante en state para que el mismo cliente no salte entre
@@ -184,30 +204,8 @@ export async function handleGreeting(
         logger.error('[GREETING] Failed to send image:', e.message);
     }
 
-    // 3. Atajo: si el cliente ya dio el objetivo de PESO en el primer mensaje
-    // (ej: "quiero bajar 10 kilos", "tengo 20 kg de más"), evitamos repetir
-    // la pregunta y procesamos su mensaje directo en waiting_weight.
-    // Estricto: el número debe ir pegado a "kg|kilos|peso" para evitar falsos
-    // positivos como "compré 3 kilos de fruta" (si el contexto es producto)
-    // o "bajar 15 escalones".
-    const hasExplicitGoal = (
-        // Patrón A: "10 kg", "10 kgs", "10 k", "10 kilos", "10 kilogramos"
-        // ("10 k" matcheaba antes solo si era "kg" — reporte 2026-05-28 horacio).
-        /\b\d{1,3}\s*(?:kg?s?|kilos?|kilogramos?)\b/i.test(text) ||
-        // Patrón B: "bajar 10" / "perder 10" con sufijo opcional de unidad.
-        /\b(?:bajar|perder)\s+\d{1,3}\s*(?:kg?s?|kilos?|kilogramos?|de peso)?\b/i.test(text)
-    );
-
-    if (hasExplicitGoal) {
-        logger.info(`[GREETING-SHORTCUT] User ${userId} provided weight goal in first message — skipping kilos question.`);
-        _setStep(currentState, knowledge.flow.greeting.nextStep);
-        saveState(userId);
-        const fakeUserStateMap = { [userId]: currentState };
-        await processSalesFlow(userId, text, fakeUserStateMap, knowledge, dependencies);
-        return { matched: true };
-    }
-
-    // 4. Send Question Part (kilos) — only if we didn't shortcut above
+    // 4. Send Question Part (kilos) — el atajo de peso-en-saludo ya se manejó
+    // arriba (antes de la presentación), así que acá solo cae el saludo normal.
     if (greetingPart2) {
         currentState.history.push({ role: 'bot', content: greetingPart2, timestamp: Date.now() });
         await sendMessageWithDelay(userId, greetingPart2);

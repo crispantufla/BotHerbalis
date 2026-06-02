@@ -66,6 +66,21 @@ describe('V7 golden path — greeting → weight → preference → menú de pag
         expect(state.step).toBe('waiting_weight');
     });
 
+    test('peso en el saludo → NO manda pregunta de kilos ni presentación larga; pasa a preferencia', async () => {
+        const { deps, sent } = makeDeps();
+        const state = freshState();
+        await handleGreeting('gold1b@c.us', 'Hola, quiero bajar 20 kilos', state, v7, deps);
+        expect(state.step).toBe('waiting_preference');     // encadenó solo
+        expect(state.weightGoal).toBe(20);
+        const allSent = sent.join(' \n ');
+        // "Hasta 10 kg" es único de la pregunta de kilos (1️⃣ Hasta 10 kg / 2️⃣ Más
+        // de 10 kg). La recomendación sí puede decir "para más de 10 kg te
+        // recomiendo 120 días", por eso solo chequeamos "Hasta 10 kg".
+        expect(allSent).not.toMatch(/Hasta 10 kg/i);        // no re-preguntó kilos
+        expect(allSent).not.toMatch(/contame cu[áa]nto te gustar[íi]a bajar/i); // no presentación con pregunta de kilos
+        expect(allSent).not.toMatch(/Te ofrezco la Nuez de la India en tres opciones/i); // no presentación larga
+    });
+
     test('"quiero bajar 8 kilos" → weightGoal=8, tier 1, pasa a waiting_preference', async () => {
         const { deps, sent } = makeDeps();
         const state = freshState();
