@@ -7,7 +7,6 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { SellerProvider } from './context/SellerContext';
 import CorporateDashboard from './pages/designs/CorporateDashboard';
 import Login from './pages/Login';
-import WaWebStandalone from './pages/WaWebStandalone';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -29,13 +28,6 @@ function App() {
                                     <Routes>
                                         {/* Public Route */}
                                         <Route path="/login" element={<Login />} />
-
-                                        {/* Standalone full-window WhatsApp Web viewer (no sidebar/header) */}
-                                        <Route path="/wa-web" element={
-                                            <ProtectedRoute>
-                                                <WaWebStandalone />
-                                            </ProtectedRoute>
-                                        } />
 
                                         {/* Protected Route - Corporate Enterprise V2 (Main Dashboard) */}
                                         <Route path="/*" element={

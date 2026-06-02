@@ -22,11 +22,7 @@ const playgroundRoutes = require('./routes/playground.routes');
 
 const { jwtAuthMiddleware } = require('../middleware/jwtAuth');
 const { verifyToken } = require('../middleware/jwtAuth');
-const { canViewSeller, isAuthorizedUser } = require('../services/waStream');
-const { vncManager } = require('../services/vncManager');
 const onlineTracker = require('../services/onlineTracker');
-const WebSocket = require('ws');
-const net = require('net');
 
 /**
  * startServer(clientPool)
@@ -103,72 +99,6 @@ function startServer(clientPool) {
     app.use('/api', playgroundRoutes());
     app.use('/api', apiTokensRoutes());
 
-    // --- VNC viewer tracking ---
-    // State + helpers for the concurrent-headful cap. The upgrade handler
-    // further down consumes these; we set them up here so the status endpoint
-    // (registered right below) can answer before the SPA fallback swallows it.
-    const VNC_MAX_HEADFUL = Math.max(1, parseInt(process.env.VNC_MAX_HEADFUL || '3', 10));
-    const vncViewerCounts = new Map();
-    const vncTeardownTimers = new Map();
-    const vncViewers = new Map();
-    let vncViewerSeq = 0;
-    const VNC_GRACE_MS = 3 * 60 * 1000;
-
-    function buildViewerStatus() {
-        const bySeller = new Map();
-        for (const v of vncViewers.values()) {
-            if (!bySeller.has(v.sellerId)) bySeller.set(v.sellerId, []);
-            bySeller.get(v.sellerId).push({ accountName: v.accountName, since: v.since });
-        }
-        const activeSellers = Array.from(bySeller.entries()).map(([sellerId, viewers]) => ({ sellerId, viewers }));
-        return {
-            max: VNC_MAX_HEADFUL,
-            activeSellers,
-            headfulCount: vncManager.getActiveSellers().length,
-            atCapacity: vncManager.getActiveSellers().length >= VNC_MAX_HEADFUL,
-        };
-    }
-
-    function broadcastViewerStatus() {
-        try { io.emit('wa_viewer:status', buildViewerStatus()); } catch (e) { /* ignore */ }
-    }
-
-    function acquireVncViewer(sellerId, accountName, accountId) {
-        const t = vncTeardownTimers.get(sellerId);
-        if (t) { clearTimeout(t); vncTeardownTimers.delete(sellerId); }
-        const count = (vncViewerCounts.get(sellerId) || 0) + 1;
-        vncViewerCounts.set(sellerId, count);
-        const id = ++vncViewerSeq;
-        vncViewers.set(id, { accountName: accountName || 'anónimo', accountId, sellerId, since: Date.now() });
-        broadcastViewerStatus();
-        return id;
-    }
-
-    function releaseVncViewer(sellerId, viewerId) {
-        if (viewerId) vncViewers.delete(viewerId);
-        const count = Math.max(0, (vncViewerCounts.get(sellerId) || 0) - 1);
-        vncViewerCounts.set(sellerId, count);
-        broadcastViewerStatus();
-        if (count === 0 && !vncTeardownTimers.has(sellerId)) {
-            const timer = setTimeout(() => {
-                vncTeardownTimers.delete(sellerId);
-                if ((vncViewerCounts.get(sellerId) || 0) === 0) {
-                    logger.info(`[VNC_LAZY] No viewers for ${sellerId}, tearing down headful`);
-                    clientPool.disableHeadful(sellerId)
-                        .then(() => broadcastViewerStatus())
-                        .catch(e => logger.error(`[VNC_LAZY] disableHeadful(${sellerId}) failed: ${e.message}`));
-                }
-            }, VNC_GRACE_MS);
-            vncTeardownTimers.set(sellerId, timer);
-        }
-    }
-
-    // Queue-status endpoint: the viewer polls this while waiting for a slot.
-    app.get('/api/wa-viewer/status', jwtAuthMiddleware, (req, res) => {
-        if (!isAuthorizedUser(req.account)) return res.status(403).json({ error: 'forbidden' });
-        res.json(buildViewerStatus());
-    });
-
     // SPA fallback
     app.use((req, res, next) => {
         if (req.method !== 'GET') return next();
@@ -181,126 +111,6 @@ function startServer(clientPool) {
     app.use((err, req, res, next) => {
         logger.error(`[API ERROR] [${req.requestId}] ${req.method} ${req.url}:`, err.message);
         res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
-    });
-
-    // --- VNC PROXY (WebSocket ↔ TCP) ---
-    // noVNC in the browser opens ws://host/vnc-ws/:sellerId?token=JWT
-    // We authenticate via JWT, lazily switch the seller into headful+VNC mode
-    // if nobody is currently viewing, resolve the seller's local x11vnc port,
-    // and bridge the WS frames straight to the TCP socket.
-    //
-    // Reference-counted: the seller stays headful while at least one viewer is
-    // connected. When the last viewer disconnects we schedule a teardown after
-    // VNC_GRACE_MS to survive reloads without flipping modes constantly.
-    const vncWss = new WebSocket.Server({ noServer: true });
-
-    server.on('upgrade', async (req, socket, head) => {
-        const url = req.url || '';
-        const match = url.match(/^\/vnc-ws\/([^/?]+)/);
-        if (!match) return;  // let Socket.IO handle its own /socket.io/* upgrades
-        const sellerId = decodeURIComponent(match[1]);
-
-        let account = null;
-        try {
-            const tokenMatch = url.match(/[?&]token=([^&]+)/);
-            const token = tokenMatch ? decodeURIComponent(tokenMatch[1]) : null;
-            if (!token) throw new Error('no_token');
-            account = verifyToken(token);
-            if (!account.name && account.accountId && account.accountId !== 'legacy' && account.accountId !== 'legacy-admin') {
-                try {
-                    const { prisma } = require('../../db');
-                    const acc = await prisma.account.findUnique({ where: { id: account.accountId }, select: { name: true } });
-                    if (acc?.name) account.name = acc.name;
-                } catch (e) { /* ignore */ }
-            } else if (!account.name && account.accountId === 'legacy-admin') {
-                account.name = process.env.ADMIN_USER || 'admin';
-            }
-            if (!canViewSeller(account, sellerId)) throw new Error('forbidden');
-        } catch (e) {
-            logger.warn(`[VNC_PROXY] Upgrade rejected for ${sellerId}: ${e.message}`);
-            socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-            socket.destroy();
-            return;
-        }
-
-        // Enforce the concurrent-headful cap. Piggy-backing a viewer onto a
-        // seller that is already headful is free (same Chromium), so only
-        // reject when this upgrade would create a new headful session and we
-        // are already at capacity.
-        if (!vncManager.isActive(sellerId) && vncManager.getActiveSellers().length >= VNC_MAX_HEADFUL) {
-            const status = buildViewerStatus();
-            const body = JSON.stringify({ error: 'queue_full', ...status });
-            logger.warn(`[VNC_PROXY] Rejected ${account.name || '?'} for ${sellerId}: at capacity (${status.headfulCount}/${VNC_MAX_HEADFUL})`);
-            socket.write(
-                'HTTP/1.1 503 Service Unavailable\r\n' +
-                'Content-Type: application/json\r\n' +
-                'Content-Length: ' + Buffer.byteLength(body) + '\r\n' +
-                'Connection: close\r\n\r\n' + body
-            );
-            socket.destroy();
-            return;
-        }
-
-        // Lazy switch: swap seller into headful+VNC if not already. First viewer
-        // pays the reconnect cost (~15-30s while Chromium restarts). Subsequent
-        // viewers reuse the running session via switchingPromises dedup.
-        try {
-            const result = await clientPool.enableHeadful(sellerId);
-            if (!result) {
-                logger.warn(`[VNC_PROXY] VNC disabled globally (ENABLE_VNC!=true)`);
-                socket.write('HTTP/1.1 503 Service Unavailable\r\n\r\n');
-                socket.destroy();
-                return;
-            }
-        } catch (e) {
-            logger.error(`[VNC_PROXY] enableHeadful(${sellerId}) failed: ${e.message}`);
-            socket.write('HTTP/1.1 500 Internal Server Error\r\n\r\n');
-            socket.destroy();
-            return;
-        }
-
-        if (socket.destroyed) return; // client gave up during the switch
-
-        const port = vncManager.getPort(sellerId);
-        if (!port) {
-            logger.warn(`[VNC_PROXY] No active VNC session for ${sellerId} after enable`);
-            socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
-            socket.destroy();
-            return;
-        }
-
-        const viewerId = acquireVncViewer(sellerId, account.name, account.accountId);
-
-        vncWss.handleUpgrade(req, socket, head, (ws) => {
-            const tcp = net.connect(port, '127.0.0.1');
-            let closed = false;
-            const cleanup = () => {
-                if (closed) return;
-                closed = true;
-                releaseVncViewer(sellerId, viewerId);
-                try { tcp.destroy(); } catch (e) { /* ignore */ }
-                try { ws.close(); } catch (e) { /* ignore */ }
-            };
-            tcp.on('connect', () => logger.info(`[VNC_PROXY] ${sellerId} bridged (port ${port}, viewers=${vncViewerCounts.get(sellerId) || 0})`));
-            ws.on('message', (data) => {
-                if (closed || tcp.destroyed) return;
-                try { tcp.write(data); } catch (e) { cleanup(); }
-            });
-            tcp.on('data', (data) => {
-                if (closed || ws.readyState !== WebSocket.OPEN) return;
-                try { ws.send(data); } catch (e) { cleanup(); }
-            });
-            ws.on('close', cleanup);
-            tcp.on('close', cleanup);
-            ws.on('error', (err) => {
-                logger.warn(`[VNC_PROXY] ${sellerId} WS error: ${err.message}`);
-                cleanup();
-            });
-            tcp.on('error', (err) => {
-                logger.warn(`[VNC_PROXY] ${sellerId} TCP error: ${err.message}`);
-                cleanup();
-            });
-        });
     });
 
     // --- SOCKET.IO AUTH ---

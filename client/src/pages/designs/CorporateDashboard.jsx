@@ -22,10 +22,9 @@ import AccountStatsView from '../../components/admin/AccountStatsView';
 import FunnelAnalyticsView from '../../components/admin/FunnelAnalyticsView';
 import RescueQueueView from '../../components/admin/RescueQueueView';
 import SellerSelector from '../../components/admin/SellerSelector';
-import WhatsappViewerView from '../../components/corporate/WhatsappViewerView';
 import ManualOrderEntryModal from '../../components/corporate/components/ManualOrderEntryModal';
 
-import { Wifi, MessageCircle, Database, Settings, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Bell, AlertTriangle, BookOpen, MoreHorizontal, CreditCard, Users, Monitor, LifeBuoy, MessagesSquare, FlaskConical } from 'lucide-react';
+import { Wifi, MessageCircle, Database, Settings, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Bell, AlertTriangle, BookOpen, MoreHorizontal, CreditCard, Users, LifeBuoy, MessagesSquare, FlaskConical } from 'lucide-react';
 
 const CorporateDashboard = () => {
     const { socket } = useSocket();
@@ -285,7 +284,6 @@ const CorporateDashboard = () => {
             case 'account-stats': return <AccountStatsView />;
             case 'funnel-analytics': return <FunnelAnalyticsView />;
             case 'rescue-queue': return <RescueQueueView onGoToChat={(chatId) => handleQuickAction(chatId, 'chat')} />;
-            case 'wa-web': return <WhatsappViewerView />;
             default: return <DashboardView alerts={alerts} config={config} handleQuickAction={handleQuickAction} status={status} qrData={qrData} />;
         }
     };
@@ -375,7 +373,6 @@ const CorporateDashboard = () => {
                     <NavItem tab="gallery" icon={ImageIcon} label="Galería de Medios" />
                     <NavItem tab="manuals" icon={BookOpen} label="Manuales" />
                     {isAdmin && <NavItem tab="ai-reports" icon={AlertTriangle} label="Errores de IA" />}
-                    {user?.canViewWaWeb && <NavItem tab="wa-web" icon={Monitor} label="WhatsApp Web" />}
 
                     <div className="pt-6 mt-6 border-t border-slate-200/50 dark:border-slate-700/50">
                         {(!sidebarCollapsed || isMobile) && <p className="text-xs 2xl:text-sm font-semibold text-slate-400 dark:text-slate-300 uppercase tracking-wider mb-4 px-4">Administración</p>}

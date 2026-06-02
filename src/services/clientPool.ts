@@ -21,8 +21,6 @@ const { startScheduler } = require('./scheduler');
 const { restorePausedUsersFromDB } = require('./pauseService');
 const { handleAdminCommand: handleAdminCommandCtrl } = require('./adminService');
 const { buildConfirmationMessage } = require('../utils/messageTemplates');
-const { vncManager } = require('./vncManager');
-const { attachBotPanel } = require('./botPanel');
 
 export interface SellerInstance {
     sellerId: string;
@@ -36,7 +34,6 @@ export interface SellerInstance {
     schedulerStarted: boolean;
     reconnectAttempts: number;
     qrTimer: ReturnType<typeof setTimeout> | null;
-    headful: boolean;  // true = Xvfb+x11vnc+headful Chromium, false = plain headless
     botSentMessageIds: Set<string>;  // IDs of messages sent via client.sendMessage — used to distinguish bot vs manual admin in 'message_create'
     stop: () => Promise<void>;
 }
@@ -74,7 +71,6 @@ class ClientPool {
     private instances: Map<string, SellerInstance> = new Map();
     private knownSellers: Set<string> = new Set();
     private startingPromises: Map<string, Promise<void>> = new Map();
-    private switchingPromises: Map<string, Promise<void>> = new Map(); // headful↔headless mutex
     private initQueue: Promise<void> = Promise.resolve(); // Serialize Chrome startups
     private io: any = null;
     private redlock: any = null;
@@ -105,13 +101,6 @@ class ClientPool {
 
     /** Start seller if registered but not yet running. Returns immediately if already running. */
     async ensureStarted(sellerId: string): Promise<void> {
-        // If a headful/headless mode switch is mid-flight, wait for it to finish.
-        // Otherwise we'd race on the seller's LocalAuth directory (a second Chromium
-        // refuses to start with "browser is already running").
-        const switching = this.switchingPromises.get(sellerId);
-        if (switching) {
-            try { await switching; } catch { /* ignore */ }
-        }
         if (this.instances.has(sellerId)) return;
         if (!this.knownSellers.has(sellerId)) {
             logger.warn(`[POOL] ensureStarted: ${sellerId} is not a known seller`);
@@ -153,14 +142,13 @@ class ClientPool {
         );
     }
 
-    async startSeller(sellerId: string, opts?: { headful?: boolean }): Promise<void> {
+    async startSeller(sellerId: string): Promise<void> {
         if (this.instances.has(sellerId)) {
             logger.warn(`[POOL] Seller ${sellerId} already running`);
             return;
         }
 
-        const wantHeadful = !!opts?.headful;
-        logger.info(`[POOL] Starting seller: ${sellerId}${wantHeadful ? ' (headful/VNC)' : ''}`);
+        logger.info(`[POOL] Starting seller: ${sellerId}`);
         const dataDir = getDataDir(sellerId);
         const authPath = path.join(dataDir, '.wwebjs_auth');
         cleanChromeLocks(authPath);
@@ -181,11 +169,6 @@ class ClientPool {
         // Queue + Worker
         const queue = createQueue(sellerId);
 
-        // Start per-seller Xvfb+x11vnc only when the caller explicitly asks for
-        // headful mode (lazy: only while a viewer is connected). Returns null
-        // when ENABLE_VNC != 'true' so Chromium falls back to headless mode.
-        const vnc = wantHeadful ? await vncManager.startForSeller(sellerId) : null;
-
         // WhatsApp client — config aligned with main branch (proven to persist sessions)
         const webCachePath = path.join(dataDir, '.wwebjs_cache');
         const client = new Client({
@@ -197,13 +180,8 @@ class ClientPool {
                 path: webCachePath,
             },
             puppeteer: {
-                headless: vnc ? false : true,
-                ...(vnc && { env: { ...process.env, DISPLAY: vnc.display } }),
+                headless: true,
                 ...(process.env.PUPPETEER_EXECUTABLE_PATH && { executablePath: process.env.PUPPETEER_EXECUTABLE_PATH }),
-                // Strip Chromium's "controlled by automated test software" infobar
-                // — under VNC the viewer sees it as a ~30px black bar at the top.
-                // Only drop it when we're showing the window (headful/VNC).
-                ...(vnc && { ignoreDefaultArgs: ['--enable-automation'] }),
                 args: [
                     '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
                     '--disable-accelerated-2d-canvas', '--disable-gpu',
@@ -226,14 +204,6 @@ class ClientPool {
                     '--mute-audio', '--disable-translate', '--disable-speech-api',
                     // Un único --disable-features consolidado (Chromium solo lee uno).
                     '--disable-features=IsolateOrigins,site-per-process,NetworkService,TranslateUI,MediaRouter,DialMediaRouteProvider,OptimizationHints,AudioServiceOutOfProcess',
-                    // Chromium must fill the Xvfb screen exactly — there's no WM to maximise it.
-                    // --kiosk hides tabs/address bar; --disable-infobars kills residual yellow bars.
-                    ...(vnc ? [
-                        '--window-size=1366,768',
-                        '--window-position=0,0',
-                        '--kiosk',
-                        '--disable-infobars',
-                    ] : []),
                 ],
                 timeout: 120000
             }
@@ -359,7 +329,6 @@ class ClientPool {
             queue, worker, pendingMessages, helpers,
             schedulerStarted: false, reconnectAttempts: 0,
             qrTimer: null,
-            headful: !!vnc,
             botSentMessageIds,
             stop: async () => this.stopSeller(sellerId)
         };
@@ -429,15 +398,6 @@ class ClientPool {
                     saveOrderToLocal: helpers.saveOrderToLocal
                 });
                 instance.schedulerStarted = true;
-            }
-
-            // Inject the in-WhatsApp-Web control panel (Phase 1: ping bridge).
-            // Only meaningful when this seller is headful/VNC — on headless
-            // Chromium nothing is watching anyway.
-            if (instance.headful) {
-                attachBotPanel(instance).catch((e: any) =>
-                    logger.warn(`[POOL][${sellerId}] attachBotPanel failed: ${e.message}`)
-                );
             }
         });
 
@@ -563,7 +523,6 @@ class ClientPool {
             try { client.removeAllListeners(); } catch (e) { /* ignore */ }
             try { await Promise.race([client.destroy(), new Promise(r => setTimeout(r, 5000))]); } catch (e) { /* ignore */ }
             try { await shutdownSellerQueue(queue, worker, sellerId); } catch (e) { /* ignore */ }
-            try { vncManager.stopForSeller(sellerId); } catch (e) { /* ignore */ }
             pool.instances.delete(sellerId);
             // Schedule recovery — don't let seller stay dead forever
             if (pool.knownSellers.has(sellerId)) {
@@ -589,7 +548,7 @@ class ClientPool {
         const instance = this.instances.get(sellerId);
         if (!instance) return;
         // Delete from map up-front so a concurrent stopSeller (e.g. watchdog
-        // racing with enableHeadful) short-circuits instead of double-destroying
+        // racing with a restart) short-circuits instead of double-destroying
         // the same client / queue.
         this.instances.delete(sellerId);
 
@@ -608,8 +567,6 @@ class ClientPool {
             }
         } catch (e) { /* already dead — fine */ }
         try { await shutdownSellerQueue(instance.queue, instance.worker, sellerId); } catch (e) { /* ignore */ }
-        // Tear down Xvfb + x11vnc for this seller (no-op if VNC is disabled)
-        try { vncManager.stopForSeller(sellerId); } catch (e) { /* ignore */ }
 
         await prisma.whatsAppSession.upsert({
             where: { sellerId },
@@ -626,72 +583,6 @@ class ClientPool {
         // Go through initQueue to prevent concurrent Chrome launches
         this.knownSellers.add(sellerId);
         await this.ensureStarted(sellerId);
-    }
-
-    /**
-     * Swap a running seller into headful+VNC mode. Idempotent: if already
-     * headful, returns the existing VNC port. Serialized per-seller via
-     * switchingPromises to prevent concurrent stops/starts from racing.
-     *
-     * Note: returns as soon as Xvfb+x11vnc are up and the new Chromium has been
-     * spawned. WhatsApp Web still needs ~10-20s after that to reconnect via
-     * LocalAuth; the noVNC client will show a blank/grey screen until then.
-     */
-    async enableHeadful(sellerId: string): Promise<{ port: number } | null> {
-        if (!vncManager.isEnabled()) return null;
-
-        // Serialize against both in-flight switches AND in-flight lazy starts
-        // on this seller. A parallel ensureStarted would otherwise spawn a
-        // second Chromium into the same LocalAuth dir and crash-retry.
-        const starting = this.startingPromises.get(sellerId);
-        if (starting) { try { await starting; } catch { /* ignore */ } }
-        const existing = this.switchingPromises.get(sellerId);
-        if (existing) { try { await existing; } catch { /* ignore */ } }
-
-        const current = this.instances.get(sellerId);
-        if (current?.headful) {
-            const port = vncManager.getPort(sellerId);
-            return port ? { port } : null;
-        }
-
-        const p = (async () => {
-            if (this.instances.has(sellerId)) {
-                await this.stopSeller(sellerId);
-                await new Promise(r => setTimeout(r, 2000));
-            }
-            this.knownSellers.add(sellerId);
-            await this.startSeller(sellerId, { headful: true });
-        })();
-        this.switchingPromises.set(sellerId, p);
-        try { await p; } finally { this.switchingPromises.delete(sellerId); }
-
-        const port = vncManager.getPort(sellerId);
-        return port ? { port } : null;
-    }
-
-    /**
-     * Tear down headful/VNC for a seller and return it to plain headless.
-     * No-op if the seller is already headless or not running.
-     */
-    async disableHeadful(sellerId: string): Promise<void> {
-        // Same serialization rule as enableHeadful — don't overlap with a
-        // pending lazy start or another in-flight switch.
-        const starting = this.startingPromises.get(sellerId);
-        if (starting) { try { await starting; } catch { /* ignore */ } }
-        const existing = this.switchingPromises.get(sellerId);
-        if (existing) { try { await existing; } catch { /* ignore */ } }
-
-        const current = this.instances.get(sellerId);
-        if (!current || !current.headful) return;
-
-        const p = (async () => {
-            await this.stopSeller(sellerId);
-            await new Promise(r => setTimeout(r, 2000));
-            this.knownSellers.add(sellerId);
-            await this.startSeller(sellerId, { headful: false });
-        })();
-        this.switchingPromises.set(sellerId, p);
-        try { await p; } finally { this.switchingPromises.delete(sellerId); }
     }
 
     /** Wipe session directory and start fresh (forces new QR scan). */
@@ -733,8 +624,7 @@ class ClientPool {
      * A esa franja casi no entran mensajes; mantener 8 Chromiums prendidos
      * cuesta ~4 GB de RAM para nada. Los reiniciamos a las 7 AM.
      *
-     * No toca sellers en modo headful (alguien podría estar viendo el VNC)
-     * ni sellers que el admin haya detenido manualmente.
+     * No toca sellers que el admin haya detenido manualmente.
      *
      * Se puede deshabilitar con DISABLE_NIGHT_MODE=true.
      */
@@ -767,7 +657,6 @@ class ClientPool {
                 const night = isNightWindow();
                 if (night) {
                     for (const [sellerId, instance] of this.instances) {
-                        if (instance.headful) continue; // no matar viewers activos
                         if (this.nightStoppedSellers.has(sellerId)) continue;
                         logger.info(`[NIGHT] Stopping ${sellerId} (3-7 AM AR window)`);
                         this.nightStoppedSellers.add(sellerId);

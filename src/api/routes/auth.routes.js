@@ -9,7 +9,6 @@ const {
     requireAdmin,
 } = require('../../middleware/jwtAuth');
 const logger = require('../../utils/logger');
-const { isAuthorizedUser } = require('../../services/waStream');
 const onlineTracker = require('../../services/onlineTracker');
 
 // Constant-time string comparison usando crypto.timingSafeEqual.
@@ -50,7 +49,6 @@ module.exports = (client, sharedState) => {
                             name: account.name,
                             role: account.role,
                             sellerId: account.sellerId,
-                            canViewWaWeb: isAuthorizedUser(account),
                         },
                     });
                 }
@@ -79,7 +77,6 @@ module.exports = (client, sharedState) => {
                     name: validUser,
                     role: 'admin',
                     sellerId: null,
-                    canViewWaWeb: isAuthorizedUser({ name: validUser, role: 'admin', sellerId: null }),
                 },
             });
         }
@@ -97,7 +94,6 @@ module.exports = (client, sharedState) => {
                 name: legacyName,
                 role: 'admin',
                 sellerId: req.account.sellerId,
-                canViewWaWeb: isAuthorizedUser({ name: legacyName, role: 'admin', sellerId: req.account.sellerId }),
             });
         }
 
@@ -110,7 +106,7 @@ module.exports = (client, sharedState) => {
             return res.status(401).json({ error: 'Account not found or inactive' });
         }
 
-        res.json({ ...account, canViewWaWeb: isAuthorizedUser(account) });
+        res.json(account);
     });
 
     // ─── GET /api/accounts ──────────────────────────────────────────
