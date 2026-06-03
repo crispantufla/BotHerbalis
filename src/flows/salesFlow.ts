@@ -99,25 +99,36 @@ export async function processSalesFlow(
 
             if (existingOrder) {
                 const isLegacy = existingOrder.instanceId === '__legacy_import__';
-                const showsPurchaseIntent = PURCHASE_INTENT_KEYWORDS.test(normalizedText);
-                if (showsPurchaseIntent) {
-                    // Cliente conocido/histórico que VUELVE con intención de compra
-                    // (pidió precio, quiere comprar, etc.): NO lo pausamos como
-                    // post-venta — es el lead más tibio que hay. Lo atendemos como
-                    // recompra pero SIN la presentación (ya nos conoce): saltamos el
-                    // greeting yendo directo a waiting_weight, y el step responde su
-                    // consulta. Mismo criterio que el CHECK 2 (historial de chat).
-                    logger.info(`[ORDER-CHECK] User ${userId} es cliente conocido (legacy=${isLegacy}) y muestra intención de compra → atender como recompra (sin presentación).`);
-                    _setStep(userState[userId], FlowStep.WAITING_WEIGHT);
-                    (userState[userId] as any).isReturningClient = true;
-                    saveState(userId);
-                    // Don't return — continúa el flujo normal de venta.
+                if (isLegacy) {
+                    // Contacto del import histórico (Clientes_AR.txt, __legacy_import__):
+                    // NO es un comprador real del bot — es una lista fría importada. NO
+                    // aplica ni el fast-track de recompra ni el pause de post-venta: se
+                    // trata como lead nuevo y recibe el saludo completo del guion (Elena).
+                    // El step queda en 'greeting' (default del state fresco).
+                    // Bug 2026-06-04 (reporte 5493564578992): el legacy import caía a
+                    // waiting_weight y la IA respondía "¡Holaa de nuevo! ¿cuántos kilos?"
+                    // en vez del saludo. Ver el match amplio de PURCHASE_INTENT_KEYWORDS.
+                    logger.info(`[ORDER-CHECK] User ${userId} matchea SOLO el import legacy (no es comprador real) → lead nuevo, saludo normal.`);
                 } else {
-                    logger.info(`[ORDER-CHECK] User ${userId} has existing order (status: ${existingOrder.status}, legacy=${isLegacy}). Routing to post-sale.`);
-                    _setStep(userState[userId], FlowStep.COMPLETED);
-                    userState[userId].selectedProduct = existingOrder.products;
-                    saveState(userId);
-                    // Don't return — let the flow continue into stepCompleted handler below
+                    const showsPurchaseIntent = PURCHASE_INTENT_KEYWORDS.test(normalizedText);
+                    if (showsPurchaseIntent) {
+                        // Comprador real que VUELVE con intención de compra (pidió precio,
+                        // quiere comprar, etc.): NO lo pausamos como post-venta — es el
+                        // lead más tibio que hay. Lo atendemos como recompra pero SIN la
+                        // presentación (ya nos conoce): saltamos el greeting yendo directo
+                        // a waiting_weight, y el step responde su consulta.
+                        logger.info(`[ORDER-CHECK] User ${userId} es comprador real y muestra intención de compra → atender como recompra (sin presentación).`);
+                        _setStep(userState[userId], FlowStep.WAITING_WEIGHT);
+                        (userState[userId] as any).isReturningClient = true;
+                        saveState(userId);
+                        // Don't return — continúa el flujo normal de venta.
+                    } else {
+                        logger.info(`[ORDER-CHECK] User ${userId} has existing order (status: ${existingOrder.status}). Routing to post-sale.`);
+                        _setStep(userState[userId], FlowStep.COMPLETED);
+                        userState[userId].selectedProduct = existingOrder.products;
+                        saveState(userId);
+                        // Don't return — let the flow continue into stepCompleted handler below
+                    }
                 }
             }
         } catch (err: any) {
