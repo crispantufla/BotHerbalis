@@ -73,23 +73,31 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
         alertNumbers: [],
         activeScript: 'v7',
         scriptStats: {
-            v7: { started: 0, completed: 0 }
+            v7: { started: 0, completed: 0 },
+            v3: { started: 0, completed: 0 }
         }
     };
 
     // Knowledge files: load from DATA_DIR first, fallback to source root.
-    // v3/v4/v5/v6 fueron archivados (archive/knowledge_v*.json). Solo v7 está activo
-    // (may-2026: 2 tiers, persona Elena, payment_menu auto tras elegir producto).
-    // Si la DB todavía tiene config.activeScript en valor archivado, se hace
-    // migración defensiva más abajo (ver loadState).
+    // v7 es el default. v3 (reconstruido, jun-2026): guión del pico de conversión
+    // de Horacio (mar-2026), re-mapeado a la estructura de nodos de V7 para correr
+    // sobre el mismo engine sin romper pagos/dashboard. Se activa por seller con
+    // config.activeScript = 'v3' (botón/endpoint de selección de guión). v4/v5/v6
+    // siguen archivados. Si la DB tiene un activeScript archivado distinto de v3,
+    // se migra defensivamente a v7 más abajo (ver loadState).
     const sourceRoot = path.join(__dirname, '../..');
     const multiKnowledge: Record<string, any> = {
-        v7: { flow: {}, faq: [] }
+        v7: { flow: {}, faq: [] },
+        v3: { flow: {}, faq: [] }
     };
     const knowledgeFiles: Record<string, { save: string; source: string }> = {
         v7: {
             save: path.join(dataDir, `knowledge_v7_${sellerId}.json`),
             source: path.join(sourceRoot, 'knowledge_v7.json')
+        },
+        v3: {
+            save: path.join(dataDir, `knowledge_v3_${sellerId}.json`),
+            source: path.join(sourceRoot, 'knowledge_v3.json')
         }
     };
     const availableScripts = Object.keys(knowledgeFiles);
@@ -241,11 +249,13 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
             }
             if (!config.alertNumbers) config.alertNumbers = [];
 
-            // Migrate legacy activeScript values (v1..v6 + rotacion fueron archivados may-2026).
-            // V7 es el único script activo. Si la DB todavía tiene un valor archivado,
-            // lo migramos a v7. scriptStats viejas quedan como histórico, no se tocan.
-            const legacyScripts = ['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'rotacion'];
-            if (config.activeScript && legacyScripts.includes(config.activeScript)) {
+            // Migrate legacy activeScript values. Scripts soportados: v7 (default) y
+            // v3 (reconstruido jun-2026, guión del pico de marzo sobre engine V7).
+            // v1/v2/v4/v5/v6/rotacion siguen archivados → se migran a v7. scriptStats
+            // viejas quedan como histórico, no se tocan.
+            const supportedScripts = ['v7', 'v3'];
+            const legacyScripts = ['v1', 'v2', 'v4', 'v5', 'v6', 'rotacion'];
+            if (config.activeScript && legacyScripts.includes(config.activeScript) && !supportedScripts.includes(config.activeScript)) {
                 logger.warn(`[STATE][${sellerId}] activeScript="${config.activeScript}" archivado → migrando a "v7"`);
                 config.activeScript = 'v7';
             }

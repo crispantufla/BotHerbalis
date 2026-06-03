@@ -58,19 +58,25 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
         logger.info(`[DEBOUNCE][${sellerId}] Processing ${sortedMessages.length} msg(s) from ${userId}: "${combinedText}"`);
 
         try {
-            // V7 es el único script activo (may-2026). v1..v6 + rotacion fueron archivados.
-            // Si la DB devuelve un valor legacy, lo coercemos a v7.
-            const legacyScripts = ['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'rotacion'];
+            // Scripts soportados: v7 (default) y v3 (reconstruido jun-2026). El script
+            // que se aplica a un usuario nuevo es el activeScript del seller; los users
+            // ya en curso conservan el assignedScript con el que arrancaron. Valores
+            // legacy (v1/v2/v4/v5/v6/rotacion) se coercen a v7.
+            const supportedScripts = ['v7', 'v3'];
             let effectiveScript = userState[userId]?.assignedScript;
-            if (effectiveScript && legacyScripts.includes(effectiveScript)) {
-                effectiveScript = 'v7';
+            if (effectiveScript && !supportedScripts.includes(effectiveScript)) {
+                effectiveScript = config?.activeScript && supportedScripts.includes(config.activeScript)
+                    ? config.activeScript
+                    : 'v7';
                 if (userState[userId]) {
                     userState[userId].assignedScript = effectiveScript;
                     saveState(userId);
                 }
             }
             if (!effectiveScript) {
-                effectiveScript = 'v7';
+                effectiveScript = config?.activeScript && supportedScripts.includes(config.activeScript)
+                    ? config.activeScript
+                    : 'v7';
                 if (userState[userId]) {
                     userState[userId].assignedScript = effectiveScript;
                     saveState(userId);

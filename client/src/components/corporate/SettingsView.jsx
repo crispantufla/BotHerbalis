@@ -9,11 +9,12 @@ import {
     Button, IconButton, Card, Badge, Input, useToast, cn
 } from '../ui';
 
-// V7 es el único guion activo desde may-2026. V5/V6 (+ rotación A/B) fueron
-// archivados a archive/ — se conserva el array como SCRIPTS por si en el
-// futuro se reactivara otra variante, pero hoy queda con un único item.
+// Guiones seleccionables por seller. v7 (default, Elena) y v3 (reconstruido
+// jun-2026 sobre el engine V7 — guión del pico de conversión de marzo). El switch
+// recarga el knowledge del seller sin reiniciar el bot. v4/v5/v6 siguen archivados.
 const SCRIPTS = [
     { id: 'v7', name: 'V7 · Elena (2 tiers)', desc: 'Persona Elena. 2 tiers (hasta 10 kg → 60d, +10 kg → 120d). Tras pedir kilos manda recomendación + precios en mensajes seguidos.', tone: 'info' },
+    { id: 'v3', name: 'V3 · Profesional (pico mar-2026)', desc: 'Voz del guión que tuvo el pico de conversión (~10%, mar-2026): saludo con precio al frente, "13 años", push de cápsulas, tono directo. Corre sobre el engine V7 (MercadoPago, transferencia y retiro intactos). NO reproduce el contra-reembolso a domicilio del V3 original.', tone: 'warning' },
 ];
 
 const SettingsView = ({ status }) => {

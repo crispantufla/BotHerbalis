@@ -1,0 +1,297 @@
+{
+    "meta": {
+        "name": "Guión V3 (reconstruido) — Profesional, sobre engine V7",
+        "description": "RECONSTRUCCIÓN del guión V3 que tuvo el pico de conversión de Horacio (semanas del 16 y 23 de marzo 2026, ~9-10%). Adaptado a la estructura de nodos del engine V7 para que NO se rompa nada del flujo actual (MercadoPago, transferencia, retiro en sucursal, dashboard). LO QUE APORTA V3: la VOZ del funnel — saludo con rango de precio al frente, '13 años', push de cápsulas como 'lo más efectivo y práctico', tono profesional y conciso, cierre directo. LO QUE SE MANTIENE DE V7 (verbatim): todo el subsistema de pago (payment_menu, MP, transferencia, retiro), las confirmaciones de orden, el FAQ de pago y las reglas — porque el engine V7 y la oferta actual NO tienen el adicional de $6.000 ni el COD a domicilio que tenía el V3 original; reproducir esos textos sería mentirle al cliente. CAVEAT (documentado en archive/peak-march-2026/README.md): el driver real del pico de marzo fue probablemente la OFERTA (contra-reembolso a domicilio), que no se reproduce acá. Orden de productos forzado a 1=Cápsulas, 2=Gotas, 3=Semillas por el mapeo hardcodeado en stepWaitingPreference.",
+        "version": "3.0-compat-v7"
+    },
+    "flow": {
+        "greeting": {
+            "step": "greeting",
+            "keywords": [
+                "hola",
+                "precio",
+                "info",
+                "buenas",
+                "herbalis",
+                "nuez",
+                "kilos",
+                "bajar",
+                "cuanto",
+                "vale",
+                "costo",
+                "gotas",
+                "capsulas",
+                "capsula"
+            ],
+            "_note": "Saludo V3: rango de precio al frente + 13 años + pago al recibir + pregunta de kilos abierta (hasta 10 / 10-20 / +20). El engine V7 mapea cualquier respuesta >10kg a tier 2 (plan 120) y ≤10kg a tier 1 (plan 60).",
+            "response": "¡Hola! 😊\n\nLos tratamientos con Nuez de la India están entre $37.000 y $69.000, según duración y formato.\n\nTrabajamos hace más de 13 años con:\n✔ Cápsulas\n✔ Gotas\n✔ Semillas\n\n📦 Enviamos a todo el país\n🛍️ Pago al recibir\n\nPara recomendarte bien:\n¿Buscás bajar hasta 10 kg, entre 10 y 20 kg o más de 20 kg?",
+            "nextStep": "waiting_weight"
+        },
+        "recommendation_1": {
+            "step": "waiting_weight",
+            "_note": "Tier 1 (≤10 kg → plan 60). V3 NO diferenciaba la recomendación por tier — usa el mismo texto que recommendation_2. Push de cápsulas como 'lo más efectivo y práctico'. ORDEN forzado a V7 (1=Cáps, 2=Gotas, 3=Semillas) por el mapeo numérico hardcodeado del step.",
+            "response": "Perfecto 👌\n\nEse objetivo es totalmente posible. Pasemos directo a ver qué opción es mejor para vos.\n\nTenemos:\n1️⃣ *Cápsulas* (Lo más efectivo y práctico)\n2️⃣ *Gotas* (Para mayores de 70 años o poquitos kilos)\n3️⃣ *Semillas/Infusión* (Más natural)\n\n¿Cuál te gustaría probar?",
+            "nextStep": "waiting_preference"
+        },
+        "recommendation_2": {
+            "step": "waiting_weight",
+            "_note": "Tier 2 (+10 kg → plan 120). Mismo texto que recommendation_1 (V3 no diferenciaba por tier; el plan lo asigna el engine según los kilos).",
+            "response": "Perfecto 👌\n\nEse objetivo es totalmente posible. Pasemos directo a ver qué opción es mejor para vos.\n\nTenemos:\n1️⃣ *Cápsulas* (Lo más efectivo y práctico)\n2️⃣ *Gotas* (Para mayores de 70 años o poquitos kilos)\n3️⃣ *Semillas/Infusión* (Más natural)\n\n¿Cuál te gustaría probar?",
+            "nextStep": "waiting_preference"
+        },
+        "prices_60": {
+            "step": "waiting_weight",
+            "_note": "Nodo de parity estructural (ya NO se auto-envía tras la recomendación, rev. 2026-06-03). Se conserva por compatibilidad y como fallback.",
+            "response": "1️⃣ *Cápsulas* × 60 días — *${{PRICE_CAPSULAS_60}}*\n2️⃣ *Gotas* × 60 días — *${{PRICE_GOTAS_60}}*\n3️⃣ *Semillas* × 60 días — *${{PRICE_SEMILLAS_60}}*\n\n📦 Envío gratis a todo el país.\n\n¿Con cuál querés arrancar?"
+        },
+        "prices_120": {
+            "step": "waiting_weight",
+            "_note": "Nodo de parity estructural (no auto-enviado). Fallback.",
+            "response": "1️⃣ *Cápsulas* × 120 días — *${{PRICE_CAPSULAS_120}}*\n2️⃣ *Gotas* × 120 días — *${{PRICE_GOTAS_120}}*\n3️⃣ *Semillas* × 120 días — *${{PRICE_SEMILLAS_120}}*\n\n📦 Envío gratis a todo el país.\n\n¿Con cuál querés arrancar?"
+        },
+        "prices_both": {
+            "step": "waiting_weight",
+            "_note": "Nodo de parity estructural (no auto-enviado). Fallback.",
+            "response": "Cada presentación viene en plan de *60 días* o *120 días*:\n\n1️⃣ *Cápsulas* — 60d ${{PRICE_CAPSULAS_60}} · 120d ${{PRICE_CAPSULAS_120}}\n2️⃣ *Gotas* — 60d ${{PRICE_GOTAS_60}} · 120d ${{PRICE_GOTAS_120}}\n3️⃣ *Semillas* — 60d ${{PRICE_SEMILLAS_60}} · 120d ${{PRICE_SEMILLAS_120}}\n\n📦 Envío gratis a todo el país.\n\n¿Con cuál arrancás?"
+        },
+        "preference_capsulas": {
+            "step": "waiting_preference",
+            "_note": "Cliente eligió cápsulas. Tono V3 (práctica, dosis) + rieles V7 ({{PLAN}}/{{TOTAL}} + menú de pago). nextStep: waiting_payment_method.",
+            "match": [
+                "capsula",
+                "capsulas",
+                "pastilla",
+                "pastillas",
+                "practico",
+                "practica"
+            ],
+            "response": "Genial 👍 Las cápsulas son la opción más práctica para vos.\n\n💊 Se toman 1 por día, 30 min antes del almuerzo o la cena.\n\nVamos con *cápsulas {{PLAN}} días* — Total: *${{TOTAL}}*\n\n📦 Envío gratis a todo el país.\n\nTe paso las formas de pago 👇",
+            "nextStep": "waiting_payment_method"
+        },
+        "preference_gotas": {
+            "step": "waiting_preference",
+            "_note": "Cliente eligió gotas. Tono V3 + rieles V7.",
+            "match": [
+                "gotas",
+                "liquido",
+                "gotero"
+            ],
+            "response": "Genial 🌿 Las gotas son prácticas y discretas.\n\n💧 Se toman 10 gotas por día, 30 min antes del almuerzo o la cena.\n\nVamos con *gotas {{PLAN}} días* — Total: *${{TOTAL}}*\n\n📦 Envío gratis a todo el país.\n\nTe paso las formas de pago 👇",
+            "nextStep": "waiting_payment_method"
+        },
+        "preference_semillas": {
+            "step": "waiting_preference",
+            "_note": "Cliente eligió semillas. Tono V3 + instructivo de preparación (se conserva, es info crítica) + rieles V7.",
+            "match": [
+                "semilla",
+                "semillas",
+                "infusion",
+                "yuyos",
+                "te de semilla",
+                "natural",
+                "tradicional"
+            ],
+            "response": "Genial 🌿 La semilla en estado natural es la opción más elegida.\n\n*Cómo se prepara:* la primera semana partís una nuez en 8 partes, las siguientes en 4. Cada noche hervís un pedacito 5 min (o 3 en microondas). Te tomás el agua y tragás el trocito antes de dormir, lo más lejos de la cena. *No apta en casos de colon irritable.*\n\nVamos con *semillas {{PLAN}} días* — Total: *${{TOTAL}}*\n\n📦 Envío gratis a todo el país.\n\nTe paso las formas de pago 👇",
+            "nextStep": "waiting_payment_method"
+        },
+        "payment_menu": {
+            "step": "waiting_payment_method",
+            "_note": "V7 verbatim — subsistema de pago intacto (no perder MercadoPago).",
+            "response": "📦 El envío se realiza por Correo Argentino y demora entre 7 y 10 días hábiles.\n\nOpciones de envío:\n1️⃣ Retiro en sucursal → se paga al retirar (Solo efectivo)\n2️⃣ Envío a domicilio → se abona previamente\n\n💳 Medios de pago:\nMercadoPago – Transferencia – Rapipago – PagoFácil\n💳 Tarjeta de crédito\n\n👉 Por favor, decime:\n* Si preferís retiro en sucursal y pagar al recibir o envío a domicilio con pago anticipado?\n\n‼️ Ambos envíos son GRATIS ‼️",
+            "nextStep": "waiting_payment_method"
+        },
+        "payment_domicilio_choice": {
+            "step": "waiting_payment_method",
+            "_note": "V7 verbatim.",
+            "response": "Perfecto, lo mandamos a tu domicilio 🏠\n\n¿Cómo querés abonar?\n\n1️⃣ *Mercado Pago* — te envío un *link de pago* (tarjeta, débito, app MP, o llevás el código y pagás en efectivo en Pago Fácil o Rapipago)\n2️⃣ *Transferencia bancaria* — te paso el alias",
+            "nextStep": "waiting_payment_method"
+        },
+        "payment_retiro_confirm": {
+            "step": "waiting_admin_validation",
+            "_note": "V7 verbatim.",
+            "response": "¡Listo! Lo dejamos para retiro en sucursal 📦\n\nVas a pagar el total *${{TOTAL}}* en efectivo cuando lo retires.\n\nLa sucursal de Correo Argentino se asigna sola, la más cercana a tu código postal 😊"
+        },
+        "payment_transfer_alias": {
+            "step": "waiting_transfer_confirmation",
+            "_note": "V7 verbatim. Placeholders {{ALIAS}}, {{TITULAR}}, {{TOTAL}}.",
+            "response": "¡Perfecto! Para transferir usá el alias *{{ALIAS}}* a nombre de *{{TITULAR}}* 🏦\n\nMonto: ${{TOTAL}}\n\nUna vez que realices la transferencia, escribime *\"listo\"* y coordinamos el envío 😊",
+            "nextStep": "waiting_transfer_confirmation"
+        },
+        "payment_mp_link": {
+            "step": "waiting_mp_payment",
+            "_note": "V7 verbatim. Placeholders {{PRODUCT}}, {{PLAN}}, {{TOTAL}}, {{LINK}}.",
+            "response": "💳 Te dejo el link para pagar con Mercado Pago:\n\n{{LINK}}\n\nTotal: ${{TOTAL}} — {{PRODUCT}} {{PLAN}} días\n\nPagás 100% protegido: si por algo no te llega, Mercado Pago te devuelve la plata 👌 Podés pagar con tarjeta, débito, o en efectivo en Pago Fácil/Rapipago con el código.\n\nCuando termines, mandame \"listo\" y coordinamos el envío 😊\n\nMientras tanto, pasame los datos para la etiqueta:\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nEmail (opcional, para el comprobante de MP):",
+            "nextStep": "waiting_mp_payment"
+        },
+        "payment_mp_failed": {
+            "step": "waiting_mp_payment",
+            "_note": "V7 verbatim.",
+            "response": "Tuve un problema técnico generando el link de pago 😕\n\nEn un momento te contacta un asesor para resolverlo. Disculpá la molestia 🙏"
+        },
+        "payment_mp_retry": {
+            "step": "waiting_mp_payment",
+            "_note": "V7 verbatim.",
+            "response": "⚠️ Hubo un problema con el pago de MercadoPago, pudo ser la tarjeta o un rechazo del banco.\n\nProbá de nuevo con otra forma:\n✅ Tarjeta de crédito\n✅ Débito\n✅ Saldo Mercado Pago\n\nTe genero un nuevo link para volver a intentarlo, decime cuando esté listo 😊"
+        },
+        "transfer_received": {
+            "step": "waiting_transfer_confirmation",
+            "_note": "V7 verbatim.",
+            "response": "¡Perfecto! Para verificarla más rápido, mandame *el comprobante* o el *número de operación* 📸\n\nApenas la cruzo, te confirmo el envío ⏳"
+        },
+        "closing": {
+            "step": "waiting_data",
+            "_note": "Pedido de datos. Tono V3 ('¡Excelente! 🎉 Tomamos los datos') + campos V7 (incluye email para comprobante MP).",
+            "match": [
+                "si",
+                "sisi",
+                "dale",
+                "bueno",
+                "ok",
+                "envialo",
+                "envíalo",
+                "te lo envio",
+                "te lo envío",
+                "mandalo",
+                "envielo"
+            ],
+            "response": "¡Excelente! 🎉 Tomamos los datos para armar la etiqueta de envío 👇\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nEmail (opcional, para el comprobante de MP):\n\n(La dirección debe ser exacta, sin esquinas ni \"aprox\")",
+            "nextStep": "waiting_data"
+        },
+        "order_confirmation_mp": {
+            "step": "waiting_admin_validation",
+            "_note": "V7 verbatim.",
+            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✅ Pago recibido via MercadoPago\n\n✔ Correo Argentino — envío a domicilio\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs para retirar.\n\n👉 ¿Me confirmás que podés retirarlo en sucursal dentro de las 72 hs si fuera necesario?"
+        },
+        "order_confirmation_transfer": {
+            "step": "waiting_admin_validation",
+            "_note": "V7 verbatim.",
+            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✅ Pago recibido via Transferencia\n\n✔ Correo Argentino — envío a domicilio\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs para retirar.\n\n👉 ¿Me confirmás que podés retirarlo en sucursal dentro de las 72 hs si fuera necesario?"
+        },
+        "order_confirmation_cod": {
+            "step": "waiting_admin_validation",
+            "_note": "V7 verbatim — retiro en sucursal, paga total al retirar.",
+            "response": "📦 CONFIRMACIÓN DE PEDIDO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal a pagar al retirar: *${{TOTAL}}*\n\n✔ Retiro en sucursal de Correo Argentino — se asigna automáticamente la más cercana a tu código postal.\n{{POSTDATADO_LINE}}\nImportante:\nTenés 72 hs para retirar desde que llega a la sucursal. Pasado ese plazo, el paquete vuelve y se genera un costo logístico de ${{COSTO_LOGISTICO}}."
+        },
+        "order_confirmation_fallback": {
+            "step": "waiting_admin_validation",
+            "_note": "V7 verbatim.",
+            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✔ Correo Argentino\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs."
+        }
+    },
+    "faq": [
+        {
+            "keywords": ["funciona de verdad", "funciona", "sirve", "verdad", "posta", "es real", "duda 1", "opcion 1", "1"],
+            "_note": "V7 verbatim (consistente con la oferta actual).",
+            "response": "Sí, funciona y posta 🌿\n\nLa nuez de la india viene andando hace una banda para bajar de peso de forma natural. Llevamos *13 años* y pasaron casi *70 mil clientes* por el tratamiento.\n\nEs 100% natural, sin químicos raros ni cosas agregadas.\n\n¿Te lo envío?"
+        },
+        {
+            "keywords": ["es seguro", "seguro", "duda 2", "opcion 2"],
+            "response": "Sí, es seguro 🌿\n\nEs 100% natural, sin químicos ni cosas agregadas. Llevamos *13 años* y casi *70 mil clientes*, nunca tuvimos un problema asociado.\n\nLas únicas contraindicaciones son embarazo, lactancia, menores de 18 y mayores de 80 años.\n\n¿Te lo envío?"
+        },
+        {
+            "keywords": ["contraindicaciones", "contraindicacion", "embarazo", "lactancia", "duda 3", "opcion 3"],
+            "response": "Las únicas contraindicaciones son:\n\n🚫 Embarazo\n🚫 Lactancia\n🚫 Menores de 18 años\n🚫 Mayores de 80 años\n\nNo se cruza con tratamientos habituales (presión, tiroides, diabetes, etc.). Un montón de gente con esas condiciones lo toma sin drama.\n\n¿Te lo envío?"
+        },
+        {
+            "keywords": ["como lo recibo", "como llega", "cuanto tarda", "tarda", "demora", "tiempo", "envio", "duda 4", "opcion 4"],
+            "_note": "V7 verbatim — modelo de envío actual (retiro o domicilio, ambos gratis).",
+            "response": "📦 *Envíos por Correo Argentino* — *7 a 10 días hábiles*.\n\nTenés 2 opciones:\n1️⃣ *Retiro en sucursal* — pagás al retirar (contrarreembolso)\n2️⃣ *Envío a domicilio* — se abona previamente\n\n‼️ Ambos envíos son *GRATIS* ‼️\n\nSi el cartero no te encuentra, te avisamos y tenés 72 hs para retirarlo en sucursal.\n\n👉 ¿Avanzamos?"
+        },
+        {
+            "keywords": ["tarjeta", "mercadopago", "mp", "como pago", "forma de pago", "metodo de pago", "cuotas"],
+            "_note": "V7 verbatim — medios de pago actuales.",
+            "response": "Tenemos 2 opciones de envío 📦\n\n1️⃣ *Retiro en sucursal* → pagás el total *en efectivo al retirar* (contrarreembolso)\n2️⃣ *Envío a domicilio* → se abona previamente por *Mercado Pago* (tarjeta, débito, app MP, o efectivo en Pago Fácil/Rapipago) o *transferencia bancaria*\n\n‼️ Ambos envíos son GRATIS ‼️\n\n¿Cuál te queda más cómoda?"
+        },
+        {
+            "keywords": ["transferencia", "transferir", "cbu", "alias", "banco"],
+            "response": "¡Dale, podemos por *transferencia bancaria* 🏦\n\nAlias: *HERBALIS.TIENDA*\nTitular: *BIO ORIGEN S.A.S.*\n\nCuando confirmes el pedido te recuerdo el monto. ¿Avanzamos así?"
+        },
+        {
+            "keywords": ["contra reembolso", "contrarembolso", "contra rembolso", "pago al recibir", "al recibir", "pagar al recibir", "efectivo al cartero", "cuando llega"],
+            "_note": "V7 verbatim — contrarreembolso = retiro en sucursal (modelo actual).",
+            "response": "Dale, podemos coordinar pago al recibir 😊\n\nLa modalidad es: te dejamos el paquete en una *sucursal de Correo Argentino* cerca tuyo, y pagás el *total en efectivo al retirar*. El envío sale gratis.\n\nLa sucursal se asigna sola, la más cercana a tu código postal. ¿Avanzamos así?"
+        },
+        {
+            "keywords": ["muy caro", "es mucho", "mucha plata", "sale un monton", "no me alcanza"],
+            "_note": "Tono V3 conciso.",
+            "response": "Entiendo 😊\n\nEs un tratamiento completo de 60 o 120 días con envío incluido. Si te conviene, podemos *programar el envío* para después de cobrar.\n\n¿Desde qué día te queda cómodo?"
+        },
+        {
+            "keywords": ["no tengo", "cobro", "quincena", "fin de mes"],
+            "response": "¡Tranqui! 😊 Podemos *programar la entrega* para después de la fecha que cobrás y lo despacho ese día.\n\n¿Desde qué día te queda cómodo recibirlo?"
+        },
+        {
+            "keywords": ["rebote"],
+            "_note": "Tono V3.",
+            "response": "No.\n\nEl rebote suele aparecer con métodos agresivos. La Nuez es natural y el descenso es progresivo."
+        },
+        {
+            "keywords": ["diabetes", "hipotiroidismo", "tiroides", "presion", "hipertension"],
+            "_note": "Tono V3.",
+            "response": "Muchas personas con esas condiciones lo consumen sin inconvenientes.\n\nEs natural y no interfiere con tratamientos habituales. La única contraindicación es embarazo o lactancia."
+        },
+        {
+            "keywords": ["estafa", "trucho", "mentira", "robo", "engaño", "chanta"],
+            "_note": "V7 verbatim — trust signals + retiro como risk reversal.",
+            "response": "Te entiendo, hoy se ven cosas raras por internet 😊\n\nMirá, llevamos *13 años* distribuyendo este producto y pasaron casi *50 mil clientes*. Es serio, no somos un kiosco que abrió ayer.\n\nSi te queda más tranqui, podemos coordinar *retiro en sucursal*: te dejamos el paquete en una sucursal de Correo Argentino cerca tuyo y pagás el total *en efectivo al retirar*. ¿Cómo querés avanzar?"
+        },
+        {
+            "keywords": ["cual me conviene", "cual es mejor", "diferencia", "que recomendas", "estoy dudando"],
+            "_note": "Tono V3 — push consultivo a cápsulas.",
+            "response": "Si buscás algo práctico sin preparar nada, las *cápsulas* son la opción más elegida 💊\n\nLas tres funcionan igual de bien para bajar de peso. ¿Te reservo el de 60 o 120 días?"
+        },
+        {
+            "keywords": ["como se toma", "como tomo", "como se usa", "cuantas capsulas", "cantidad"],
+            "response": "💊 *Cápsulas:* una al día, 30 min antes del almuerzo o cena, con un vaso de agua.\n💧 *Gotas:* 10 gotitas una vez al día (almuerzo o cena).\n🌿 *Semillas:* infusión nocturna. La primera semana partís una nuez en 8 partes y hervís un pedacito 5 minutos (o 3 en microondas) cada noche. Las siguientes semanas en 4. Te tomás el agua + el trocito, lo más alejado de la cena posible."
+        },
+        {
+            "keywords": ["dieta", "comer", "comida"],
+            "_note": "Tono V3.",
+            "response": "No necesitás dietas estrictas.\n\nSi además cuidás un poco la alimentación o sumás movimiento, los resultados suelen verse más rápido."
+        },
+        {
+            "keywords": ["garantia", "devolucion", "devolver", "reembolso", "no me gusto", "quiero devolver"],
+            "response": "Si te llega dañado lo reenviamos sin costo. No hacemos devolución de plata ni damos garantía de resultados (cada cuerpo responde distinto), pero llevamos *13 años* y casi *70 mil clientes* avalan el producto 😊"
+        },
+        {
+            "keywords": ["tracking", "seguimiento", "rastreo", "donde esta mi pedido"],
+            "response": "A partir de las 48 hs podés pedirnos el código de seguimiento 📦\n\nDe todos modos nosotros hacemos el seguimiento por vos y si surge algo te avisamos en el día."
+        },
+        {
+            "keywords": ["donde estan", "tienen local", "puedo ir", "punto de venta", "local fisico"],
+            "response": "No tenemos local de venta al público. Trabajamos 100% online y los envíos son por Correo Argentino a todo el país 📦"
+        }
+    ],
+    "rules": {
+        "alwaysEndWithQuestion": true,
+        "maxFollowUps": 1,
+        "noNegotiatePrice": true,
+        "noDiscounts": true,
+        "noCreditCard": false,
+        "noArgue": true,
+        "keepResponsesShort": true,
+        "defaultPaymentMethod": "shipping_first",
+        "_note_rules": "Reglas heredadas de V7 (modelo de pago actual). NO se usa el contraReembolsoMAX con adicional $6.000 del V3 original — el engine V7 no lo aplica y reproducirlo confundiría el cálculo de precios.",
+        "bankAlias": {
+            "alias": "HERBALIS.TIENDA",
+            "titular": "BIO ORIGEN S.A.S."
+        },
+        "contraReembolsoMAX": {
+            "enabled": true,
+            "spontaneous": true,
+            "senaTransfer": 0,
+            "adicional": 0,
+            "appliesTo": "all",
+            "description": "Contrarreembolso modelo actual: retiro en sucursal, paga total en efectivo al retirar. Sin anticipo, sin adicional."
+        },
+        "costoLogisticoRechazo": 18000,
+        "ageLimits": {
+            "min": 18,
+            "max": 80
+        },
+        "prepayIncentive": {
+            "enabled": false
+        },
+        "closeIfNotAccepted": "Trabajamos bajo estas modalidades.\n\nSi en algún momento te resulta cómodo avanzar, acá estamos 😊"
+    }
+}

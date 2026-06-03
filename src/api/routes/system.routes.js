@@ -514,7 +514,8 @@ module.exports = (clientPool) => {
             available: ss?.availableScripts || ['v7'],
             stats: config.scriptStats || {},
             labels: {
-                'v7': 'V7 — Elena · 2 tiers (60d / 120d)'
+                'v7': 'V7 — Elena · 2 tiers (60d / 120d)',
+                'v3': 'V3 — Profesional · pico de conversión (mar-2026)'
             }
         });
     });
