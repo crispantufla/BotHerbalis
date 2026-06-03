@@ -100,15 +100,21 @@ export async function processSalesFlow(
             if (existingOrder) {
                 const isLegacy = existingOrder.instanceId === '__legacy_import__';
                 if (isLegacy) {
-                    // Contacto del import histórico (Clientes_AR.txt, __legacy_import__):
-                    // NO es un comprador real del bot — es una lista fría importada. NO
-                    // aplica ni el fast-track de recompra ni el pause de post-venta: se
-                    // trata como lead nuevo y recibe el saludo completo del guion (Elena).
-                    // El step queda en 'greeting' (default del state fresco).
-                    // Bug 2026-06-04 (reporte 5493564578992): el legacy import caía a
-                    // waiting_weight y la IA respondía "¡Holaa de nuevo! ¿cuántos kilos?"
-                    // en vez del saludo. Ver el match amplio de PURCHASE_INTENT_KEYWORDS.
-                    logger.info(`[ORDER-CHECK] User ${userId} matchea SOLO el import legacy (no es comprador real) → lead nuevo, saludo normal.`);
+                    // Contacto del padrón histórico importado (Clientes_AR.txt,
+                    // __legacy_import__): es un CLIENTE VIEJO, no un lead nuevo. El bot
+                    // NO lo atiende (ni saludo ni flujo de venta): se PAUSA y se alerta
+                    // al admin para que lo tome un humano. (rev 2026-06-04, reporte
+                    // 5493564578992 — antes el match amplio de PURCHASE_INTENT_KEYWORDS
+                    // lo mandaba a waiting_weight y la IA respondía "de nuevo, ¿cuántos
+                    // kilos?" en vez de derivarlo.)
+                    logger.info(`[ORDER-CHECK] User ${userId} es cliente del padrón histórico (import legacy) → pausa + alerta admin.`);
+                    await pauseUser(
+                        userId,
+                        '📇 Cliente del padrón histórico (import)',
+                        { sharedState: dependencies.sharedState, notifyAdmin: dependencies.notifyAdmin },
+                        `Teléfono del import histórico (Clientes_AR.txt). Volvió a escribir: "${text.substring(0, 100)}". Pausado para atención humana.`
+                    );
+                    return { matched: true, paused: true };
                 } else {
                     const showsPurchaseIntent = PURCHASE_INTENT_KEYWORDS.test(normalizedText);
                     if (showsPurchaseIntent) {
