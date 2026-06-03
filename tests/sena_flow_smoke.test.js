@@ -165,9 +165,11 @@ describe('Modelo nuevo — FAQ en V5 y V6', () => {
 describe('V7 — recommendations no filtran precios; los precios van en prices_60/_120', () => {
     // V7: recommendation_1/2 (sólo 2 tiers, no hay rec_3) ofrecen las 3 opciones
     // de producto (livianas — el instructivo de la semilla se movió a
-    // preference_semillas). La pregunta de avance ("¿con cuál querés arrancar?")
-    // está en prices_60/_120 que se manda automáticamente como segundo mensaje
-    // desde stepWaitingWeight.
+    // preference_semillas). NOTA (2026-06-03): prices_60/_120/_both ya NO se
+    // auto-envían tras la recomendación (se mandaba la grilla de 3 precios sin que
+    // el cliente eligiera). Ahora el precio llega en preference_X al elegir la
+    // presentación. Estos nodos quedan en el JSON como referencia y se siguen
+    // validando estructuralmente.
     test('recommendation_1 y _2 no filtran precios', () => {
         ['recommendation_1', 'recommendation_2'].forEach(key => {
             const resp = v7.flow[key].response;

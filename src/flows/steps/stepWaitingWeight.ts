@@ -67,20 +67,13 @@ async function _sendTierRecommendation(
     saveState(userId);
     await sendMessageWithDelay(userId, tierMsg);
 
-    // V7: auto-followup con prices_60 / prices_120 (segundo mensaje del guion).
-    // Este SIEMPRE es scripted — precios exactos, lista numerada canónica (ancla el
-    // 1/2/3 aunque la IA arriba haya redactado libre). V5/V6: prices_X no existen.
-    // prices_both (rev 2026-05-30): muestra AMBOS planes (60+120) para empujar el
-    // upsell — aunque recomendemos 60, la mayoría compra 120 al verlo. Fallback a
-    // prices_${planDays} (solo el plan del tier) si el guion no tiene prices_both.
-    const pricesNode = knowledge?.flow?.prices_both || knowledge?.flow?.[`prices_${planDays}`];
-    if (pricesNode?.response) {
-        const pricesMsg = _formatMessage(pricesNode.response, currentState);
-        currentState.history.push({ role: 'bot', content: pricesMsg, timestamp: Date.now() });
-        saveState(userId);
-        await sendMessageWithDelay(userId, pricesMsg);
-        logger.info(`[V7-AUTO-PRICES] User ${userId} → prices_${planDays} enviado tras recommendation_${tier}.`);
-    }
+    // NO auto-enviamos precios acá (rev 2026-06-03). Antes este step disparaba
+    // prices_both como segundo mensaje automático → el cliente recibía la
+    // recomendación + la grilla de los 3 precios JUNTAS, sin elegir nada. El admin
+    // pidió cortar eso: mandar SOLO la recomendación (elegí 1/2/3) y recién mostrar
+    // el precio de la presentación elegida en waiting_preference (preference_X →
+    // muestra el Total del producto que el cliente pidió). Un precio por turno,
+    // solo lo que pidió.
 }
 
 export async function handleWaitingWeight(
