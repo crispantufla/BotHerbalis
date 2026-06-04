@@ -107,12 +107,19 @@ export async function processSalesFlow(
                     // 5493564578992 — antes el match amplio de PURCHASE_INTENT_KEYWORDS
                     // lo mandaba a waiting_weight y la IA respondía "de nuevo, ¿cuántos
                     // kilos?" en vez de derivarlo.)
-                    logger.info(`[ORDER-CHECK] User ${userId} es cliente del padrón histórico (import legacy) → pausa + alerta admin.`);
+                    logger.info(`[ORDER-CHECK] User ${userId} es cliente del padrón histórico (import legacy) → mensaje de derivación + pausa + alerta admin.`);
+                    // Mensaje al cliente: avisarle que se lo deriva a una oficial de
+                    // atención (no dejarlo en visto). Después se pausa para que lo tome
+                    // un humano (rev 2026-06-04).
+                    const derivMsg = 'Teniendo en cuenta que ya sos cliente, te derivo con una oficial de atención al cliente que te va a ayudar enseguida 😊';
+                    if (!userState[userId].history) userState[userId].history = [];
+                    userState[userId].history.push({ role: 'bot', content: derivMsg, timestamp: Date.now() });
+                    await dependencies.sendMessageWithDelay(userId, derivMsg);
                     await pauseUser(
                         userId,
                         '📇 Cliente del padrón histórico (import)',
                         { sharedState: dependencies.sharedState, notifyAdmin: dependencies.notifyAdmin },
-                        `Teléfono del import histórico (Clientes_AR.txt). Volvió a escribir: "${text.substring(0, 100)}". Pausado para atención humana.`
+                        `Teléfono del import histórico (Clientes_AR.txt). Volvió a escribir: "${text.substring(0, 100)}". Se le avisó la derivación y se pausó para atención humana.`
                     );
                     return { matched: true, paused: true };
                 } else {

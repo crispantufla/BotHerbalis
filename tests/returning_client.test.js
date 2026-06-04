@@ -69,6 +69,8 @@ describe('CHECK 1 — contacto del padrón histórico (import legacy) que escrib
         expect(pausedUsers.has(userId)).toBe(true);
         expect(deps.notifyAdmin).toHaveBeenCalled();
         expect(greetingWasSent(deps)).toBe(false);
+        // Le avisa al cliente que lo deriva a atención al cliente (no lo deja en visto)
+        expect(deps.sendMessageWithDelay).toHaveBeenCalledWith(userId, expect.stringMatching(/atenci[oó]n al cliente/i));
     });
 
     test('legacy + saludo suelto ("buenas") → PAUSA + alerta admin', async () => {
@@ -82,6 +84,7 @@ describe('CHECK 1 — contacto del padrón histórico (import legacy) que escrib
         await processSalesFlow(userId, 'buenas', userState, knowledge, deps);
         expect(pausedUsers.has(userId)).toBe(true);
         expect(deps.notifyAdmin).toHaveBeenCalled();
+        expect(deps.sendMessageWithDelay).toHaveBeenCalledWith(userId, expect.stringMatching(/atenci[oó]n al cliente/i));
     });
 });
 
