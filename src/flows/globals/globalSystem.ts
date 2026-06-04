@@ -107,8 +107,16 @@ export async function handleSystemGlobals(
     // Skip when collecting address (waiting_data) — street names like "Avenida España", "Calle Chile" etc.
     // would false-positive. Google Maps in stepWaitingData validates the country instead.
     const GEO_REGEX = /\b(espana|españa|mexico|méxico|chile|colombia|peru|perú|uruguay|bolivia|paraguay|ecuador|venezuela|brasil|panama|panamá|costa rica|eeuu|ee\.?\s?uu\.?|estados unidos|europa|fuera del pais|fuera de argentina|otro pais|no estoy en argentina|vivo en el exterior|desde afuera|no soy de argentina)\b/i;
+    // Excepción: lugares ARGENTINOS que contienen el nombre de un país, o aclaraciones
+    // de que el cliente SÍ está en Argentina. Concepción del Uruguay y Río Uruguay
+    // están en Entre Ríos. Sin esto, un cliente de "Concepción del Uruguay" quedaba
+    // geo-rechazado y NO podía salir del bloqueo aunque aclarara que es Argentina
+    // (reporte 5493442409792, jun-2026: el bot lo rechazó 4 veces, intervino el admin).
+    const GEO_AR_EXCEPTION = /\b(concepcion del?\s+uruguay|rio uruguay|paso del?\s+uruguay|entre rios|soy de argentina|estoy en argentina|vivo en argentina|si soy de (aca|argentina)|aca en argentina|es (en )?argentina|de entre rios)\b/i;
     const isCollectingAddress = currentState.step === 'waiting_data';
-    if (GEO_REGEX.test(normalizedText) && !currentState.geoRejected && !isCollectingAddress) {
+    const clarifiesArgentina = GEO_AR_EXCEPTION.test(normalizedText);
+
+    if (GEO_REGEX.test(normalizedText) && !clarifiesArgentina && !currentState.geoRejected && !isCollectingAddress) {
         logger.info(`[GEO REJECT] User ${userId} is outside Argentina: "${text}"`);
         currentState.geoRejected = true;
         const msg = 'Lamentablemente solo hacemos envíos dentro de Argentina 😔 Si en algún momento necesitás para alguien de acá, ¡con gusto te ayudamos!';
@@ -119,6 +127,17 @@ export async function handleSystemGlobals(
         return { matched: true };
     }
     if (currentState.geoRejected || currentState.step === 'rejected_geo') {
+        // Recuperación de falso positivo: si el cliente aclara que SÍ está en Argentina
+        // (ej: "es Concepción del Uruguay, Entre Ríos"), levantamos el rechazo y lo
+        // derivamos a un humano en vez de seguir bloqueando robóticamente.
+        if (clarifiesArgentina) {
+            logger.info(`[GEO REJECT] User ${userId} aclara que está en Argentina ("${text}") → levanto geoRejected y derivo a admin.`);
+            currentState.geoRejected = false;
+            _setStep(currentState, 'greeting');
+            await _pauseAndAlert(userId, currentState, dependencies, text, '📍 Cliente geo-rechazado que aclara estar en Argentina (posible falso positivo, ej: Concepción del Uruguay / Entre Ríos). Revisar y continuar la venta a mano.');
+            saveState(userId);
+            return { matched: true };
+        }
         logger.info(`[GEO REJECT] User ${userId} already geo-rejected, blocking.`);
         const msg = 'Como te comenté, lamentablemente solo realizamos envíos dentro de Argentina 😔';
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
