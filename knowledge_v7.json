@@ -56,7 +56,7 @@
         },
         "preference_capsulas": {
             "step": "waiting_preference",
-            "_note": "Cliente eligió cápsulas. El plan ya está determinado por el tier (60 si ≤10kg, 120 si +10kg). El handler asigna selectedProduct + selectedPlan + total y envía este mensaje + payment_menu como segundo mensaje. nextStep: waiting_payment_method (skip waiting_ok y waiting_plan_choice del flow viejo).",
+            "_note": "Cliente eligió cápsulas. Rev. 2026-06-04: el reveal de precio muestra SIEMPRE ambos planes (60 y 120) del producto elegido y el cliente elige cuál. nextStep: waiting_plan_choice (que captura 60/120 → menú de pago). El handler asigna selectedProduct y un plan tentativo por tier; el plan definitivo lo fija waiting_plan_choice. _maybeUpsell (peso>10) agrega el nudge al 120 después de este mensaje.",
             "match": [
                 "capsula",
                 "capsulas",
@@ -65,8 +65,8 @@
                 "practico",
                 "practica"
             ],
-            "response": "¡Dale, vamos con *cápsulas {{PLAN}} días*! 💊\n\nTotal: *${{TOTAL}}*\n\nTe paso las formas de pago 👇",
-            "nextStep": "waiting_payment_method"
+            "response": "¡Genial, las *cápsulas*! 💊\n\nVienen en dos planes:\n🔹 *60 días* → ${{PRICE_CAPSULAS_60}}\n🔹 *120 días* → ${{PRICE_CAPSULAS_120}}\n\nEl de *120 días* es el tratamiento completo y el que más eligen 💪 Envío gratis a todo el país.\n\n¿Con cuál vas, 60 o 120 días?",
+            "nextStep": "waiting_plan_choice"
         },
         "preference_gotas": {
             "step": "waiting_preference",
@@ -76,12 +76,12 @@
                 "liquido",
                 "gotero"
             ],
-            "response": "¡Dale, vamos con *gotas {{PLAN}} días*! 💧\n\nTotal: *${{TOTAL}}*\n\nTe paso las formas de pago 👇",
-            "nextStep": "waiting_payment_method"
+            "response": "¡Genial, las *gotas*! 💧\n\nVienen en dos planes:\n🔹 *60 días* → ${{PRICE_GOTAS_60}}\n🔹 *120 días* → ${{PRICE_GOTAS_120}}\n\nEl de *120 días* es el tratamiento completo y el que más eligen 💪 Envío gratis a todo el país.\n\n¿Con cuál vas, 60 o 120 días?",
+            "nextStep": "waiting_plan_choice"
         },
         "preference_semillas": {
             "step": "waiting_preference",
-            "_note": "Cliente eligió semillas. Incluye el instructivo de preparación + warning de colon irritable (movido acá desde recommendation_1/2 el 2026-05-30 para aligerar el reveal de precio).",
+            "_note": "Cliente eligió semillas. Muestra ambos planes (60 y 120) + instructivo de preparación + warning de colon irritable. nextStep: waiting_plan_choice (rev. 2026-06-04).",
             "match": [
                 "semilla",
                 "semillas",
@@ -90,8 +90,8 @@
                 "te de semilla",
                 "natural"
             ],
-            "response": "¡Dale, vamos con *semillas {{PLAN}} días*! 🌿\n\n*Cómo se prepara:* la primera semana partís una nuez en 8 partes, las siguientes en 4. Cada noche hervís un pedacito 5 min (o 3 en microondas) — cuanta más agua, mejor. Te tomás el agua y tragás el trocito antes de dormir, lo más lejos de la cena. *No apta en casos de colon irritable.*\n\nTotal: *${{TOTAL}}*\n\nTe paso las formas de pago 👇",
-            "nextStep": "waiting_payment_method"
+            "response": "¡Genial, las *semillas*! 🌿\n\n*Cómo se prepara:* la primera semana partís una nuez en 8 partes, las siguientes en 4. Cada noche hervís un pedacito 5 min (o 3 en microondas) — cuanta más agua, mejor. Te tomás el agua y tragás el trocito antes de dormir, lo más lejos de la cena. *No apta en casos de colon irritable.*\n\nVienen en dos planes:\n🔹 *60 días* → ${{PRICE_SEMILLAS_60}}\n🔹 *120 días* → ${{PRICE_SEMILLAS_120}}\n\nEnvío gratis a todo el país.\n\n¿Con cuál vas, 60 o 120 días?",
+            "nextStep": "waiting_plan_choice"
         },
         "payment_menu": {
             "step": "waiting_payment_method",

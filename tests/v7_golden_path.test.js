@@ -2,7 +2,9 @@
  * V7 golden path — early funnel manejado por los step handlers.
  *
  * Cubre el tramo que ninguna otra suite testeaba tras retirar los tests V3:
- *   greeting → waiting_weight → waiting_preference → (menú de pago)
+ *   greeting → waiting_weight → waiting_preference → (elección de plan 60/120)
+ * Rev. 2026-06-04: al elegir producto, preference_X muestra AMBOS planes (60 y
+ * 120) y manda a waiting_plan_choice; el menú de pago llega recién tras elegir plan.
  * Es determinista: usa las rutas por número/keyword, así que NO depende de la IA
  * (el stub de aiService devuelve response:null para forzar el fallback scripted).
  * El tramo de pago en sí (retiro / domicilio / MP / transferencia) lo cubre
@@ -104,30 +106,32 @@ describe('V7 golden path — greeting → weight → preference → menú de pag
         expect(sent.length).toBeGreaterThan(0); // mandó recomendación + precios
     });
 
-    test('"capsulas" → asigna Cápsulas plan 60 y dispara el menú de pago (waiting_payment_method)', async () => {
+    test('"capsulas" → asigna Cápsulas y muestra AMBOS planes (60 y 120) → waiting_plan_choice', async () => {
         const { deps, sent } = makeDeps();
         const state = freshState();
         state.step = 'waiting_preference';
-        state.weightGoal = 8; // tier 1 → plan 60
+        state.weightGoal = 8; // tier 1
         await handleWaitingPreference('gold3@c.us', 'capsulas', 'capsulas', state, v7, deps);
 
         expect(state.selectedProduct).toMatch(/Cápsulas/i);
-        expect(state.selectedPlan).toBe('60');
-        expect(state.step).toBe('waiting_payment_method');
+        expect(state.step).toBe('waiting_plan_choice');
 
         const allSent = sent.join(' \n ');
-        expect(allSent).toMatch(/Retiro en sucursal/i);
-        expect(allSent).toMatch(/Env[íi]o a domicilio/i);
+        expect(allSent).toMatch(/60 d[íi]as/i);   // muestra el plan 60
+        expect(allSent).toMatch(/120 d[íi]as/i);  // y el plan 120
+        expect(allSent).toMatch(/¿Con cu[áa]l vas/i);
     });
 
-    test('+10 kg → tier 2 → plan 120 (upsell del tratamiento completo)', async () => {
-        const { deps } = makeDeps();
+    test('+10 kg → tier 2 → muestra ambos planes + upsell al 120 → waiting_plan_choice', async () => {
+        const { deps, sent } = makeDeps();
         const state = freshState();
         state.step = 'waiting_preference';
-        state.weightGoal = 18; // tier 2 → plan 120
+        state.weightGoal = 18; // tier 2 → _maybeUpsell nudgea al 120
         await handleWaitingPreference('gold4@c.us', 'capsulas', 'capsulas', state, v7, deps);
-        expect(state.selectedPlan).toBe('120');
-        expect(state.step).toBe('waiting_payment_method');
+        expect(state.step).toBe('waiting_plan_choice');
+        const allSent = sent.join(' \n ');
+        expect(allSent).toMatch(/120 d[íi]as/i);
+        expect(allSent).toMatch(/recomendar[íi]a el de 120/i); // upsell de _maybeUpsell (peso>10)
     });
 });
 
@@ -139,24 +143,24 @@ describe('V7 — ya eligió producto + da el peso (reporte 5491168816042)', () =
         return s;
     }
 
-    test('"mínimo 25 kilos" → extrae 25 (no 10), asigna Cápsulas 120 y va al pago', async () => {
+    test('"mínimo 25 kilos" → extrae 25 (no 10), asigna Cápsulas 120 (tentativo) → waiting_plan_choice', async () => {
         const { deps } = makeDeps();
         const state = suggestedState();
         const txt = 'Quiero bajar mucho mas de 10 kilos. Tengo sobrepeso minino 25 kilos';
         await handleWaitingWeight('w1@c.us', txt, txt.toLowerCase(), state, v7, deps);
         expect(state.weightGoal).toBe(25);              // no 10
         expect(state.selectedProduct).toMatch(/Cápsulas/i);
-        expect(state.selectedPlan).toBe('120');         // tier 2 → 120
-        expect(state.step).toBe('waiting_payment_method');
+        expect(state.selectedPlan).toBe('120');         // tier 2 → 120 (plan tentativo)
+        expect(state.step).toBe('waiting_plan_choice');
     });
 
-    test('"más de 10" solo (sin segundo número) → tier 2 / plan 120', async () => {
+    test('"más de 10" solo (sin segundo número) → tier 2 / plan 120 → waiting_plan_choice', async () => {
         const { deps } = makeDeps();
         const state = suggestedState();
         const txt = 'quiero bajar mas de 10 kilos';
         await handleWaitingWeight('w3@c.us', txt, txt.toLowerCase(), state, v7, deps);
         expect(state.selectedPlan).toBe('120');
-        expect(state.step).toBe('waiting_payment_method');
+        expect(state.step).toBe('waiting_plan_choice');
     });
 
     test('sin cue de piso, "bajar 8, tengo 45 años" → 8 (no 45)', async () => {
