@@ -41,7 +41,24 @@ export async function handleSystemGlobals(
             return { matched: true };
         } else if (confirmNo) {
             currentState.pendingCancelConfirm = false;
-            const continueMsg = '¡Qué bien! Seguimos entonces 😊 ¿En qué te puedo ayudar?';
+            // Retomar el HILO: re-enviar el último prompt real del bot ANTES de que
+            // se metiera la pregunta de cancelación, en vez de soltar con un genérico
+            // "¿en qué te puedo ayudar?". Reporte 5491157450451: el cliente venía de
+            // "¿confirmás que podés retirar?", un audio se transcribió "...me arrepentí
+            // ya" → cancel-confirm; el cliente aclaró "no, voy a retirar, afirmativo"
+            // y el bot perdió el hilo en vez de retomar la confirmación.
+            const CANCEL_PROMPT_RE = /quer[ée]s (continuar|cancelar)|para cancelar|confirm[áa]s que quer[ée]s cancelar/i;
+            let resumePrompt: string | null = null;
+            for (let i = currentState.history.length - 1; i >= 0; i--) {
+                const h = currentState.history[i];
+                if (h.role !== 'bot') continue;
+                if (CANCEL_PROMPT_RE.test(h.content || '')) continue; // saltear prompts de cancelación
+                resumePrompt = h.content;
+                break;
+            }
+            const continueMsg = resumePrompt
+                ? `¡Perfecto, seguimos! 😊\n\n${resumePrompt}`
+                : '¡Qué bien, seguimos! 😊 ¿Avanzamos con el pedido?';
             currentState.history.push({ role: 'bot', content: continueMsg, timestamp: Date.now() });
             await sendMessageWithDelay(userId, continueMsg);
             saveState(userId);
