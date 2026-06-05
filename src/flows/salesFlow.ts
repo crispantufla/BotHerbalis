@@ -475,6 +475,15 @@ export async function processSalesFlow(
         _setStep(currentState, FlowStep.REJECTED_MEDICAL);
         (currentState as any)._aiControlTag = null;
         saveState(userId);
+    } else if (_controlTag === 'ADVERSE_REACTION') {
+        // El cliente reportó que el producto le hizo mal / le causó síntomas. Es un
+        // tema de SALUD: el bot ya respondió derivando (vía la regla reaccion_adversa)
+        // y NO debe vender. Pausamos + alertamos para atención humana. (reporte Lidia
+        // 5493782465845, 2026-06-04 — el bot había upselleado sobre el reporte.)
+        logger.info(`[ADVERSE-REACTION] User ${userId} reportó reacción adversa al producto. Derivo a humano.`);
+        (currentState as any)._aiControlTag = null;
+        await _pauseAndAlert(userId, currentState, dependencies, text, '⚠️ Cliente reporta una REACCIÓN ADVERSA al producto (tema de salud). Derivado a atención humana — NO vender, revisar el caso.');
+        saveState(userId);
     } else if (_controlTag === 'ABUSE') {
         logger.info(`[ABUSE REJECT] User ${userId} marcado ABUSE vía tag. Halting flow.`);
         _setStep(currentState, FlowStep.REJECTED_ABUSIVE);

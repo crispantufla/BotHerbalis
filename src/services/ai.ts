@@ -56,6 +56,7 @@ const RULE_BASE = [
     { id: 'gastritis', keywords: ['gastritis', 'ulcera', 'acidez', 'estomago', 'reflujo', 'ardor'], text: 'GASTRITIS: Si mencionan gastritis, úlcera o acidez estomacal: recomendá CÁPSULAS o GOTAS (son más suaves). Las SEMILLAS NO, porque son más fuertes para el estómago.' },
     { id: 'corazon', keywords: ['colesterol', 'trigliceridos', 'arritmia', 'marcapasos', 'corazon', 'hipertension', 'presion'], text: 'COLESTEROL/CORAZÓN: Si mencionan colesterol alto, triglicéridos, arritmia, marcapasos o problemas cardíacos: todas las opciones son buenas. Bajar de peso beneficia mucho la salud cardiovascular y ayuda a reducir el colesterol.' },
     { id: 'terminal', keywords: ['bypass', 'manga gastrica', 'bariatrica', 'cancer', 'quimioterapia', 'terminal', 'dialisis', 'tumor'], text: 'BYPASS/TERMINAL: Si mencionan bypass gástrico, manga gástrica, cirugía bariátrica, cáncer, quimioterapia o enfermedades terminales: RECHAZÁ la venta amablemente. "Por precaución no recomendamos el consumo en tu caso. Priorizamos tu salud 🌿". goalMet=false.' },
+    { id: 'reaccion_adversa', keywords: ['me hace mal', 'me hizo mal', 'me cae mal', 'me cayo mal', 'baja la presion', 'dolor de cabeza', 'dolor de panza', 'dolor de estomago', 'me descompuse', 'me enfermo', 'casi me mata', 'casi me mato', 'efectos secundarios', 'reaccion', 'alergia', 'nauseas', 'mareos', 'vomitos'], text: 'REACCIÓN ADVERSA (PRIORIDAD MÁXIMA, por encima de cualquier objetivo de venta): Si el cliente CUENTA que el producto le hizo mal o le causó síntomas que YA tuvo (le baja/bajó la presión, dolor de cabeza/panza/estómago, le cayó mal, se descompuso, "casi me mata/mató", náuseas, mareos, vómitos, alergia, etc. — aunque lo escriba con errores o sea un audio confuso). NO es una pregunta hipotética ("¿puede hacer mal?"), es algo que le PASÓ. Es un tema de SALUD: NO minimices, NO digas que otra presentación no le hará efecto, NO recomiendes otro producto, NO hagas upsell, NUNCA menciones precios. Respondé EXACTAMENTE y SOLO con: "Lamento muchísimo que te haya pasado eso 🙏 Le paso tu caso a una asesora de atención al cliente para que pueda ayudarte". goalMet=false, extractedData="ADVERSE_REACTION".' },
     { id: 'edad_70', keywords: ['70 años', '75 años', 'setenta'], text: 'EDAD >70: Si la persona tiene 70-80 años, recomendá SOLO gotas (la opción más suave). NUNCA ofrezcas cápsulas ni semillas a mayores de 70.' },
     { id: 'edad_80', keywords: ['80 años', '85 años', '90 años', 'ochenta', 'noventa', 'muy mayor'], text: 'EDAD >80: Si la persona tiene más de 80 años, RECHAZÁ la venta amablemente. "Por precaución, para personas mayores de 80 no recomendamos el consumo. Priorizamos tu salud 🌿". goalMet=false.' },
     { id: 'factura', keywords: ['factura', 'ticket', 'comprobante de pago', 'afip'], text: 'FACTURA: No emitimos factura. El comprobante es el que da el correo al momento de la entrega.' },
@@ -97,6 +98,10 @@ function _getRelevantRules(userText: string): string[] {
     activeRules.push(RULE_BASE.find(r => r.id === 'abuso')!.text);
     activeRules.push(RULE_BASE.find(r => r.id === 'indecision')!.text);
     activeRules.push(RULE_BASE.find(r => r.id === 'reventa')!.text);
+    // Siempre activa: la reacción adversa es un tema de salud — la IA debe poder
+    // cortar el upsell aunque el cliente la reporte con errores/typos o audio
+    // confuso (que el keyword-match no captaría). Reporte Lidia (2026-06-04).
+    activeRules.push(RULE_BASE.find(r => r.id === 'reaccion_adversa')!.text);
 
     // Contextually inject specific rules if keywords match
     for (const rule of RULE_BASE) {

@@ -16,7 +16,7 @@
 // comprador legítimo (rechazo médico, abuso, cancelación, reventa). La
 // "indecisión" y el rechazo genérico NO se rigen por tag a propósito: ahí un
 // disparo de más pausaría a un comprador dudoso y golpearía la conversión.
-export const CONTROL_TAGS = ['REJECT_MEDICAL', 'ABUSE', 'CANCEL_ORDER', 'RESELLER'] as const;
+export const CONTROL_TAGS = ['REJECT_MEDICAL', 'ADVERSE_REACTION', 'ABUSE', 'CANCEL_ORDER', 'RESELLER'] as const;
 export type ControlTag = typeof CONTROL_TAGS[number];
 
 /** Devuelve el primer tag de control presente en extractedData, o null. */
