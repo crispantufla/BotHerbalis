@@ -511,15 +511,20 @@ async function _validateAndAssembleOrder(
     const { sendMessageWithDelay, saveState } = dependencies;
     const addr = currentState.partialAddress;
 
-    // Auto-suggest CP from city (static table first, then Google Maps)
+    // Auto-suggest CP from city (static table first, then Google Maps).
+    // Rev 2026-06-05 (reporte Bela / Bernardo de Yrigoyen): el lookup de Maps ya NO
+    // exige tener la calle. En RETIRO en sucursal no hay calle, y la ciudad sola
+    // alcanza para geocodificar el CP ("ciudad, Argentina"). Sin esto, si la ciudad
+    // no estaba en la tabla estática y el cliente no sabía el CP, el bot repetía la
+    // misma pregunta del CP en loop.
     if (addr.ciudad && !addr.cp) {
         const suggestedCP = suggestCPByCity(addr.ciudad);
         if (suggestedCP) {
             addr.cp = suggestedCP;
             logger.info(`[ADDRESS] Auto-suggested CP ${suggestedCP} for city "${addr.ciudad}" (user ${userId})`);
-        } else if (addr.calle) {
-            // Lookup CP via Google Maps geocoding
-            const mapsCP = await lookupCPFromMaps(addr.calle, addr.ciudad);
+        } else {
+            // Lookup CP via Google Maps geocoding — con calle si la hay, o solo la ciudad.
+            const mapsCP = await lookupCPFromMaps(addr.calle || '', addr.ciudad);
             if (mapsCP) {
                 currentState.pendingCPFromMaps = mapsCP;
                 const cpMsg = `Encontré que tu código postal podría ser *${mapsCP}*. ¿Es correcto? 😊`;
