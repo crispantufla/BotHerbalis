@@ -109,7 +109,19 @@ export const useChat = (selectedChatId) => {
                 let timestamp = data.timestamp ? new Date(data.timestamp).getTime() : Date.now();
                 const currentSelectedId = selectedChatIdRef.current;
 
-                if (currentSelectedId === data.chatId) {
+                // Match teléfono-tolerante (mismo criterio que el preview de la lista
+                // más abajo): el chatId del socket puede diferir del id de la lista
+                // cuando el número resuelve vía @lid/proxy (más común si hay otra
+                // sesión de WhatsApp Web abierta). Sin esto, el preview se actualizaba
+                // (match difuso) pero el append a la ventana abierta fallaba (match
+                // exacto) → el mensaje aparecía en la lista pero no en el chat abierto.
+                const incomingPhone = data.chatId.replace(/\D/g, '');
+                const matchesSelected = !!currentSelectedId && (
+                    currentSelectedId === data.chatId ||
+                    (incomingPhone.length >= 10 && currentSelectedId.replace(/\D/g, '').endsWith(incomingPhone.slice(-10)))
+                );
+
+                if (matchesSelected) {
                     const isMe = data.sender === 'bot' || data.sender === 'admin';
                     const newMsg = { id: data.messageId || `socket-${timestamp}`, fromMe: isMe, body: data.text || '', type: 'chat', timestamp };
                     setMessages((prev) => {
@@ -130,7 +142,6 @@ export const useChat = (selectedChatId) => {
 
                 setChats((prev) => {
                     if (!Array.isArray(prev)) return [];
-                    const incomingPhone = data.chatId.replace(/\D/g, '');
                     const existingChat = prev.find(c => c.id === data.chatId || (incomingPhone && c.id.replace(/\D/g, '').endsWith(incomingPhone.slice(-10))));
 
                     if (existingChat) {
