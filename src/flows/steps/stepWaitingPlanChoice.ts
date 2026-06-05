@@ -73,6 +73,26 @@ export async function handleWaitingPlanChoice(
         if (handled) return { matched: true };
     }
 
+    // ── Cliente ya saltó a elegir ENVÍO/PAGO junto con (o después de) el plan ──
+    // Si menciona retiro/domicilio/MP/transferencia/pago-al-retirar y tenemos plan
+    // (del mensaje o el ya elegido), NO re-preguntamos el menú de pago: fijamos el
+    // plan y delegamos a handleWaitingPaymentMethod, que tiene todo el ruteo. Evita
+    // el doble mensaje "¿me pasás tu nombre?" + "¿retiro o domicilio?" (reporte Bela
+    // 2026-06-05: dijo "120 días, pago cuando retiro" y el bot mandó ambos).
+    const SHIPPING_PAY_SIGNAL = /\b(retiro|sucursal|contra.?reembolso|contrarembolso|al retirar|cuando (?:lo |la )?retiro|a domicilio|a mi casa|a mi domicilio|mercado.?pago|\bmp\b|transferencia|transferir)\b/i;
+    if (SHIPPING_PAY_SIGNAL.test(normalizedText)) {
+        const planInMsg = normalizedText.match(/\b(60|120)\b/);
+        const plan = planInMsg ? planInMsg[1] : (currentState.selectedPlan || null);
+        if (plan && currentState.selectedProduct) {
+            buildCartFromSelection(currentState.selectedProduct, plan, currentState);
+            _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
+            saveState(userId);
+            logger.info(`[PLAN_CHOICE] ${userId} ya indicó envío/pago con plan ${plan} ("${text.slice(0, 40)}") → delego a waiting_payment_method (sin re-preguntar el menú).`);
+            const { handleWaitingPaymentMethod } = require('./stepWaitingPaymentMethod');
+            return await handleWaitingPaymentMethod(userId, text, normalizedText, currentState, knowledge, dependencies);
+        }
+    }
+
     const products = [
         { match: /c[áa]psula|pastilla/i, name: 'Cápsulas' },
         { match: /semilla|infusi[óo]n|t[ée]|yuyo/i, name: 'Semillas' },
