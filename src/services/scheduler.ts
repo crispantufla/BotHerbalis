@@ -61,6 +61,33 @@ const ABANDONED_CART_MAX_HOURS = 24;
 const AUTO_APPROVE_THRESHOLD_MINS = 15;
 const CLEANUP_THRESHOLD_DAYS = 30;
 
+// ── Ventana de servicio de WhatsApp (24h) ───────────────────────────────────
+// Fuera de las 24h desde el ÚLTIMO mensaje del cliente, los mensajes free-form
+// son spam / violación de política (riesgo de ban del número). Toda recuperación
+// automática queda DENTRO de la ventana. Margen a 22h para no caer en el borde
+// por la granularidad del cron + el delay de envío.
+const MAX_REENGAGE_HOURS = 22;
+// Anti-ráfaga: no enviar todos los seguimientos juntos en un mismo tick (Meta lo
+// detecta como spam). Tope por corrida + jitter entre envíos.
+const MAX_REENGAGE_PER_RUN = 8;
+
+const _sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/**
+ * Horas desde el ÚLTIMO mensaje ENTRANTE del cliente (no desde nuestras
+ * respuestas). Es la métrica real de la ventana de 24h de WhatsApp.
+ * `lastActivityAt` se contamina con envíos del admin (chat.routes), por eso
+ * preferimos el último `role:'user'` del historial.
+ */
+function _hoursSinceLastInbound(state: UserState, now: number): number | null {
+    const hist = state.history || [];
+    for (let i = hist.length - 1; i >= 0; i--) {
+        const h: any = hist[i];
+        if (h && h.role === 'user' && h.timestamp) return differenceInHours(now, h.timestamp);
+    }
+    return state.lastActivityAt ? differenceInHours(now, state.lastActivityAt) : null;
+}
+
 /**
  * _detectAbandonReason
  * Inspects the last user message and state signals to determine why the user
@@ -273,6 +300,12 @@ async function autoApproveOrders(sharedState: SchedulerSharedState, dependencies
  * Sends a follow-up message to users inactive for 24h+ on re-engageable steps
  */
 async function checkColdLeads(sharedState: SchedulerSharedState, dependencies: SchedulerDependencies): Promise<void> {
+    // DESACTIVADO (jun-2026): apuntaba a inactivos ≥24h, FUERA de la ventana de
+    // servicio de WhatsApp → spam / violación de política. La recuperación ahora
+    // es SOLO dentro de las 24h (checkAbandonedCarts). El cron quedó removido;
+    // dejamos la función inerte por compatibilidad/exports.
+    return;
+
     const { userState, pausedUsers } = sharedState;
     const { sendMessageWithDelay, saveState } = dependencies;
     const now = Date.now();
@@ -325,45 +358,54 @@ async function checkAbandonedCarts(sharedState: SchedulerSharedState, dependenci
     const { userState, pausedUsers } = sharedState;
     const { sendMessageWithDelay, saveState } = dependencies;
     const now = Date.now();
+    let sentThisRun = 0; // Anti-ráfaga: tope de envíos por corrida.
 
     for (const [userId, state] of Object.entries(userState)) {
+        if (sentThisRun >= MAX_REENGAGE_PER_RUN) {
+            logger.info(`[SCHEDULER] Abandoned cart: tope de ${MAX_REENGAGE_PER_RUN} envíos por corrida alcanzado — el resto se retoma en el próximo tick.`);
+            break;
+        }
         if (!RE_ENGAGEABLE_STEPS.has(state.step)) continue;
         if (!isBusinessHours()) continue;
         if (pausedUsers && pausedUsers.has(userId)) continue;
         if (state.cartRecovered) continue;
-        if (state.reengagementSent) continue; // Already got a cold lead message
+        if (state.reengagementSent) continue;
 
-        const lastActivity = state.lastActivityAt || state.stepEnteredAt;
-        if (!lastActivity) continue;
+        // Ventana de 24h de WhatsApp: medimos desde el ÚLTIMO mensaje del CLIENTE.
+        // NUNCA re-engagear fuera de la ventana (sería spam / violación de política).
+        const hours = _hoursSinceLastInbound(state, now);
+        if (hours === null) continue;
+        if (hours <= ABANDONED_CART_MIN_HOURS || hours >= MAX_REENGAGE_HOURS) continue;
 
-        const hours = differenceInHours(now, lastActivity);
-        if (hours > ABANDONED_CART_MIN_HOURS && hours < ABANDONED_CART_MAX_HOURS) {
-            logger.info(`[SCHEDULER] Abandoned cart detected: ${userId} inactive for ${hours}h on "${state.step}"`);
+        logger.info(`[SCHEDULER] Abandoned cart detected: ${userId} inactive for ${hours}h on "${state.step}"`);
 
-            // Contextual message: first check abandon reason, fall back to step-specific
-            const reason = _detectAbandonReason(state);
-            const reasonMessages = ABANDON_REASON_MESSAGES[reason];
-            const stepMessages = CONTEXTUAL_FOLLOW_UPS[state.step];
-            const pool = (reason !== 'generic' ? reasonMessages : null) || stepMessages || ABANDON_REASON_MESSAGES.generic;
-            const { msg: rawMsg, variantIndex } = _pickVariant(pool);
-            const msg = _withName(rawMsg, state);
-            try {
-                await sendMessageWithDelay(userId, msg);
-                _pushHistory(state, { role: 'bot', content: msg });
-                state.cartRecovered = true;
-                // A/B tracking
-                state.followUpData = {
-                    type: 'abandoned_cart',
-                    reason,
-                    step: state.step,
-                    variantIndex,
-                    sentAt: Date.now(),
-                    converted: false
-                };
-                saveState(userId);
-            } catch (e: any) {
-                logger.error(`[SCHEDULER] Failed to send abandoned cart message to ${userId}:`, e.message);
-            }
+        // Contextual message: first check abandon reason, fall back to step-specific
+        const reason = _detectAbandonReason(state);
+        const reasonMessages = ABANDON_REASON_MESSAGES[reason];
+        const stepMessages = CONTEXTUAL_FOLLOW_UPS[state.step];
+        const pool = (reason !== 'generic' ? reasonMessages : null) || stepMessages || ABANDON_REASON_MESSAGES.generic;
+        const { msg: rawMsg, variantIndex } = _pickVariant(pool);
+        const msg = _withName(rawMsg, state);
+        try {
+            await sendMessageWithDelay(userId, msg);
+            _pushHistory(state, { role: 'bot', content: msg });
+            state.cartRecovered = true;
+            // A/B tracking
+            state.followUpData = {
+                type: 'abandoned_cart',
+                reason,
+                step: state.step,
+                variantIndex,
+                sentAt: Date.now(),
+                converted: false
+            };
+            saveState(userId);
+            sentThisRun++;
+            // Espaciar los envíos del lote (sumado al delay propio de
+            // sendMessageWithDelay) para no gatillar la detección de spam de Meta.
+            if (process.env.NODE_ENV !== 'test') await _sleep(5000 + Math.floor(Math.random() * 10000));
+        } catch (e: any) {
+            logger.error(`[SCHEDULER] Failed to send abandoned cart message to ${userId}:`, e.message);
         }
     }
 }
@@ -372,6 +414,11 @@ async function checkAbandonedCarts(sharedState: SchedulerSharedState, dependenci
  * checkSecondFollowUp — Soft second touch for users who got one follow-up but didn't respond (48-72h)
  */
 async function checkSecondFollowUp(sharedState: SchedulerSharedState, dependencies: SchedulerDependencies): Promise<void> {
+    // DESACTIVADO (jun-2026): apuntaba a 48-72h, MUY fuera de la ventana de 24h
+    // de WhatsApp → spam. Recuperación solo dentro de 24h (checkAbandonedCarts).
+    // Cron removido; función inerte por compatibilidad.
+    return;
+
     const { userState, pausedUsers } = sharedState;
     const { sendMessageWithDelay, saveState } = dependencies;
     const now = Date.now();
@@ -651,26 +698,17 @@ function startScheduler(sharedState: SchedulerSharedState, dependencies: Schedul
     }, { timezone: TIMEZONE });
     logger.info('[SCHEDULER] ✅ autoApproveOrders → cada 3 min (9-23h ARG)');
 
-    // ── COLD LEADS: a las 10am y 6pm Argentina ──
-    // Horas óptimas para re-engagement (mañana y tarde).
-    cron.schedule('0 10,18 * * *', () => {
-        checkColdLeads(sharedState, dependencies);
-    }, { timezone: TIMEZONE });
-    logger.info('[SCHEDULER] ✅ checkColdLeads → 10:00 y 18:00 ARG');
+    // ── COLD LEADS (≥24h) y SECOND FOLLOW-UP (48-72h): DESACTIVADOS jun-2026 ──
+    // Quedaban FUERA de la ventana de servicio de 24h de WhatsApp (spam/ban).
+    // La recuperación ahora es ÚNICAMENTE dentro de 24h (checkAbandonedCarts).
 
     // ── ABANDONED CARTS: al inicio de cada hora, solo de 10 a 21hs Argentina ──
-    // Asegura que NUNCA se escriba de madrugada o pasadas las 22hs.
+    // Único nudge de recuperación, SIEMPRE dentro de la ventana de 24h (4-22h sin
+    // respuesta del cliente) y con throttle anti-ráfaga (tope por corrida + jitter).
     cron.schedule('0 10-21 * * *', () => {
         checkAbandonedCarts(sharedState, dependencies);
     }, { timezone: TIMEZONE });
-    logger.info('[SCHEDULER] ✅ checkAbandonedCarts → cada hora de 10 a 21 ARG');
-
-    // ── SECOND FOLLOW-UP: a las 14:00 Argentina ──
-    // Segundo toque suave para usuarios que ya recibieron un follow-up pero no respondieron (48-72h).
-    cron.schedule('0 14 * * *', () => {
-        checkSecondFollowUp(sharedState, dependencies);
-    }, { timezone: TIMEZONE });
-    logger.info('[SCHEDULER] ✅ checkSecondFollowUp → 14:00 ARG (diario)');
+    logger.info('[SCHEDULER] ✅ checkAbandonedCarts → cada hora de 10 a 21 ARG (solo dentro de 24h)');
 
     // ── RESCUE METRICS ROLLUP: a las 23:50 Argentina ──
     // Aggrega followUpData pendiente en config.rescueStats para métricas durables.
