@@ -399,6 +399,73 @@ async function _maybeSendPaymentMenuV7(
     logger.info(`[V7-AUTO-PAYMENT] User ${userId} → payment_menu enviado tras confirmar producto.`);
 }
 
+// ── Cambio de opinión de envío/pago en steps posteriores (jun-2026) ──────────
+// Un cliente que YA pasó por waiting_payment_method puede cambiar de idea sobre el
+// TIPO DE ENVÍO o el MEDIO DE PAGO en pasos donde antes no se detectaba
+// (waiting_data, waiting_final_confirmation) → caía a IA/parser de dirección y se
+// confundía (raíz común de varios bugs de may/jun-2026).
+//
+// Única fuente de verdad para APLICAR la elección de envío/pago = handleWaitingPaymentMethod.
+// Acá SOLO detectamos el cambio EXPLÍCITO y reencauzamos al step de pago (vía
+// staleReprocess), igual que ya hace stepWaitingTransferConfirmation. No armamos
+// mensajes: el reproceso por payment_method re-deriva todo del texto original.
+//
+// Detección ESTRICTA a propósito: exige un MARCADOR de cambio ("mejor", "prefiero",
+// "cambié", "en realidad"...) para NO dispararse con direcciones normales que
+// mencionan "domicilio" o un número. Además solo cuenta si DIFIERE de lo ya elegido.
+const _SHIPSWITCH_MARKER = /\b(mejor|prefiero|prefer[ií]a|en realidad|en vez|en lugar|cambi[ée]|cambiar|quiero cambiar|me conviene|recapacit|me arrepent)\b/i;
+const _SHIPSWITCH_RETIRO = /\b(retiro|retir(?:ar|o)|en sucursal|a sucursal|sucursal del? correo|contra.?re?embolso)\b/i;
+const _SHIPSWITCH_DOMICILIO = /\b(a domicilio|a mi casa|a mi domicilio|en mi casa|que me lo manden|env[íi]o a domicilio|a la direcci[óo]n)\b/i;
+const _SHIPSWITCH_TARJETA = /\b(tarjeta|cr[ée]dito|mercado.?pago|link de pago|pago online)\b/i;
+const _SHIPSWITCH_TRANSFER = /\b(transfer[ei]ncia|transferir|por transferencia|al alias)\b/i;
+
+function _detectShipPaySwitch(
+    normalizedText: string,
+    currentState: any
+): { shipping?: 'retiro' | 'domicilio'; payment?: 'mercadopago' | 'transferencia' } | null {
+    if (!_SHIPSWITCH_MARKER.test(normalizedText)) return null;
+    let shipping: 'retiro' | 'domicilio' | undefined;
+    let payment: 'mercadopago' | 'transferencia' | undefined;
+    if (_SHIPSWITCH_RETIRO.test(normalizedText) && currentState.shippingChoice !== 'retiro') shipping = 'retiro';
+    else if (_SHIPSWITCH_DOMICILIO.test(normalizedText) && currentState.shippingChoice !== 'domicilio') shipping = 'domicilio';
+    if (_SHIPSWITCH_TRANSFER.test(normalizedText) && currentState.paymentMethod !== 'transferencia') payment = 'transferencia';
+    else if (_SHIPSWITCH_TARJETA.test(normalizedText) && currentState.paymentMethod !== 'mercadopago') payment = 'mercadopago';
+    if (!shipping && !payment) return null;
+    return { shipping, payment };
+}
+
+/**
+ * Si el cliente cambió de idea sobre envío/pago en un step posterior, resetea los
+ * flags acoplados y reencauza a waiting_payment_method. Devuelve un resultado
+ * staleReprocess listo para retornar, o null si no hubo cambio.
+ */
+function _handleShipPaySwitch(
+    userId: string,
+    normalizedText: string,
+    currentState: any,
+    dependencies: any
+): { matched: boolean; staleReprocess?: boolean } | null {
+    const sw = _detectShipPaySwitch(normalizedText, currentState);
+    if (!sw) return null;
+    if (sw.shipping) {
+        currentState.shippingChoice = null;
+        currentState.paymentMethod = null;
+        currentState.paymentSubChoiceAsked = false;
+        // Venía de retiro: la calle estaba pre-seteada a "A sucursal". La limpiamos
+        // para que un cambio a domicilio vuelva a pedir la dirección real.
+        if (currentState.partialAddress && currentState.partialAddress.calle === 'A sucursal') {
+            currentState.partialAddress.calle = undefined;
+        }
+    } else if (sw.payment) {
+        currentState.paymentMethod = null;
+        currentState.paymentSubChoiceAsked = false;
+    }
+    _setStep(currentState, 'waiting_payment_method');
+    if (dependencies && typeof dependencies.saveState === 'function') dependencies.saveState(userId);
+    logger.info(`[SHIP-PAY-SWITCH] ${userId} cambió de idea (${JSON.stringify(sw)}) → reencauzado a waiting_payment_method.`);
+    return { matched: false, staleReprocess: true };
+}
+
 export {
     _cleanPhone,
     _setStep,
@@ -411,5 +478,7 @@ export {
     _assignProductAndPlanByTier,
     _pushHistory,
     _maybeSendPaymentMenuV7,
-    _isGhostClose
+    _isGhostClose,
+    _detectShipPaySwitch,
+    _handleShipPaySwitch
 };

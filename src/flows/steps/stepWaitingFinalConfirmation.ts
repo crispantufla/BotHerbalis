@@ -1,5 +1,5 @@
 import { UserState, FlowStep } from '../../types/state';
-import { _setStep, _detectProductPlanChange, _resolveNewProductPlan } from '../utils/flowHelpers';
+import { _setStep, _detectProductPlanChange, _resolveNewProductPlan, _handleShipPaySwitch } from '../utils/flowHelpers';
 import { parsePostdatado, parseProductChange } from '../utils/extractedData';
 import { _getPrice, _getPrices } from '../utils/pricing';
 import { _isAffirmative } from '../utils/validation';
@@ -44,6 +44,12 @@ export async function handleWaitingFinalConfirmation(
             return { matched: true };
         }
     }
+
+    // Cambio de idea sobre envío/pago (jun-2026): si el cliente pide otro envío/medio
+    // ("no, mejor lo retiro", "mejor pagá con tarjeta") en la confirmación final,
+    // reencauzamos a waiting_payment_method en vez de tratarlo como confirmación.
+    const switchResult = _handleShipPaySwitch(userId, normalizedText, currentState, dependencies);
+    if (switchResult) return switchResult as any;
 
     const _buildOrderData = (extra = {}) => {
         const addr = currentState.partialAddress || {};
