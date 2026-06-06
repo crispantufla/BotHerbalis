@@ -417,29 +417,32 @@ const CommsView = ({ initialChatId, onChatSelected, onChatOpened, initialSearch 
         catch { toast.error('Error al enviar mensaje'); }
     };
 
+    // Paso 1: SIEMPRE abrimos el modal de verificación (con mensaje o sin). Pedimos
+    // un "preview" al backend (detecta datos + tipo de envío + medio de pago +
+    // producto SIN crear la orden) y pre-cargamos el modal. La orden se crea recién
+    // cuando el admin confirma el modal.
     const handleManualCompletion = async (silent = false) => {
         if (!selectedChat) return;
         try {
-            await api.post('/api/orders/manual-complete', { chatId: selectedChat.id, silent });
-            toast.success(silent ? 'Venta registrada sin enviar confirmación' : 'Pedido ingresado y confirmación enviada');
-            setInput('');
+            const res = await api.post('/api/orders/manual-complete', { chatId: selectedChat.id, silent, preview: true });
+            setManualEntry({ chatId: selectedChat.id, silent, prefill: res.data?.prefill || {} });
         } catch (e) {
-            if (e.response?.status === 422 && e.response?.data?.needsManualEntry) {
-                setManualEntry({ chatId: selectedChat.id, silent, prefill: e.response.data.extracted || {} });
-                return;
-            }
-            toast.error('Error al registrar pedido: ' + (e.response?.data?.error || e.message));
+            toast.error('No pude preparar el pedido: ' + (e.response?.data?.error || e.message));
         }
     };
 
-    const handleManualEntrySubmit = async (manualAddr) => {
+    // Paso 2: el admin verificó/ajustó en el modal y confirma. Acá sí se crea la
+    // orden, enviando los datos + el tipo de envío y medio de pago elegidos.
+    const handleManualEntrySubmit = async ({ manualAddr, shippingType, paymentMethod }) => {
         if (!manualEntry) return;
         setSubmittingManual(true);
         try {
             await api.post('/api/orders/manual-complete', {
-                chatId: manualEntry.chatId, silent: manualEntry.silent, manualAddr,
+                chatId: manualEntry.chatId,
+                silent: manualEntry.silent,
+                manualAddr, shippingType, paymentMethod,
             });
-            toast.success(manualEntry.silent ? 'Venta registrada con datos manuales' : 'Pedido ingresado con datos manuales');
+            toast.success(manualEntry.silent ? 'Venta registrada (sin mensaje)' : 'Pedido ingresado y confirmación enviada');
             setManualEntry(null);
             setInput('');
         } catch (e) {
@@ -942,11 +945,12 @@ Teléfono: ${phoneDisplay}`;
                 }}
             />
 
-            {/* Manual order entry — abre cuando el backend devuelve 422 */}
+            {/* Verificación de pedido — se abre SIEMPRE al confirmar (con o sin mensaje) */}
             <ManualOrderEntryModal
                 open={!!manualEntry}
                 chatId={manualEntry?.chatId}
                 prefill={manualEntry?.prefill}
+                silent={manualEntry?.silent}
                 onClose={() => !submittingManual && setManualEntry(null)}
                 onSubmit={handleManualEntrySubmit}
                 submitting={submittingManual}

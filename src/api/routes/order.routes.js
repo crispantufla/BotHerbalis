@@ -421,6 +421,13 @@ module.exports = (clientPool) => {
             chatId = await resolveChatIdLocal(chatId);
             logger.info(`[MANUAL-COMPLETE] Resolved chatId: ${chatId}`);
 
+            // phoneNumeric se declara ACÁ ARRIBA a propósito. Antes era `const` al
+            // final (~L590) y el bloque de rescate desde ChatLog lo usaba antes de
+            // declararse: por la temporal dead zone tiraba ReferenceError que el
+            // try/catch se tragaba como "DB chatLog query failed" → el rescate desde
+            // la DB NUNCA funcionaba (caso Nora Aguirre 06-jun).
+            const phoneNumeric = chatId.split('@')[0];
+
             const userState = sellerSharedState?.userState;
             const state = userState?.[chatId];
 
@@ -519,13 +526,72 @@ module.exports = (clientPool) => {
                 logger.info(`[MANUAL-COMPLETE] Address override from admin form for ${chatId}: ${addr.nombre} / ${addr.calle}`);
             }
 
-            // GATE: si falta cualquiera de los 3 campos esenciales para el envio
-            // (nombre, calle o ciudad), NO creamos una orden incompleta. Devolvemos
-            // lo que se logro extraer parcialmente y abrimos el modal de entrada
-            // manual del admin con esos campos pre-rellenados.
+            // RETIRO EN SUCURSAL: no tiene calle (con localidad + CP el Correo
+            // asigna la sucursal). Si no lo detectamos, el gate de abajo exige
+            // calle y rechaza pedidos de retiro con datos completos (nombre +
+            // localidad + CP) forzando carga manual. Caso real Nora Aguirre 06-jun:
+            // dio nombre + "San Miguel de Tucumán" + CP 4000 y el botón no los tomó
+            // porque "faltaba la calle".
+            const _lc = (s) => (s || '').toLowerCase();
+            const botHistText = (state.history || [])
+                .filter(m => m.role === 'bot' || m.role === 'admin')
+                .map(m => _lc(m.content)).join(' ');
+            // Domicilio ya comprometido (prepago) → NO es retiro. Excluye falsos
+            // positivos: el menú menciona "retiro en sucursal" para TODOS.
+            // OJO: frases de COMPROMISO, no de explicación. El bot menciona el
+            // alias "herbalis.tienda" al explicar opciones aunque el cliente NO
+            // elija transferencia (falso positivo real en el caso Nora Aguirre).
+            const domicilioCommitted =
+                state.shippingChoice === 'domicilio'
+                || state.paymentMethod === 'mercadopago'
+                || state.paymentMethod === 'transferencia'
+                || !!state.mpPaymentLinkUrl
+                || /lo mandamos a tu domicilio|para transferir us[áa] el alias|te dejo el link para pagar con mercado pago/.test(botHistText);
+            // Retiro comprometido: frases de COMPROMISO del bot/admin (no la mera
+            // línea de oferta del menú), o señales explícitas del state/dirección.
+            const retiroCommitted =
+                state.shippingChoice === 'retiro'
+                || state.paymentMethod === 'contrarembolso'
+                || /\bsucursal\b/.test(_lc(addr.calle))
+                || /(dejamos|armamos|vamos con|entonces vamos|confirmamos).{0,80}retiro en sucursal/.test(botHistText)
+                || /pag[áa]s? el total.{0,40}(al retirar|cuando lo retir)/.test(botHistText);
+            // El admin puede forzar tipo de envío y método de pago desde el modal
+            // de verificación; esos overrides pisan la detección automática.
+            const shippingTypeReq = req.body?.shippingType;   // 'domicilio' | 'sucursal'
+            const paymentMethodReq = req.body?.paymentMethod; // 'mercadopago' | 'transferencia' | 'contrarembolso'
+            const detectedRetiro = retiroCommitted && !domicilioCommitted;
+            const isRetiro = shippingTypeReq ? (shippingTypeReq === 'sucursal') : detectedRetiro;
+
+            if (isRetiro) {
+                // Retiro en sucursal: la calle no aplica. Conservamos la calle real
+                // (si la había) en calleOriginal para referencia del admin.
+                if (addr.calle && _lc(addr.calle) !== 'a sucursal' && !addr.calleOriginal) {
+                    addr.calleOriginal = addr.calle;
+                }
+                addr.calle = 'A sucursal';
+                state.partialAddress = addr;
+            }
+
+            // Método de pago: override explícito del modal, o default según envío.
+            if (paymentMethodReq) {
+                state.paymentMethod = paymentMethodReq;
+            } else if (isRetiro && !state.paymentMethod) {
+                state.paymentMethod = 'contrarembolso';
+            }
+            const paymentMethodDefault = state.paymentMethod || (isRetiro ? 'contrarembolso' : 'mercadopago');
+            logger.info(`[MANUAL-COMPLETE] ${chatId} envío=${isRetiro ? 'sucursal' : 'domicilio'} pago=${paymentMethodDefault} (shippingTypeReq=${shippingTypeReq || 'auto'})`);
+
+            // GATE: no creamos órdenes incompletas. Domicilio exige
+            // nombre+calle+ciudad; retiro en sucursal exige nombre+ciudad+CP (la
+            // calle no aplica). En modo preview NO bloqueamos: el modal de
+            // verificación se abre igual con lo que se haya podido extraer.
+            const preview = req.body?.preview === true;
             const allowEmpty = req.body?.allowEmpty === true;
-            if (!allowEmpty && !manualAddr && (!addr.nombre || !addr.calle || !addr.ciudad)) {
-                logger.warn(`[MANUAL-COMPLETE] Datos incompletos para ${chatId}: nombre=${!!addr.nombre} calle=${!!addr.calle} ciudad=${!!addr.ciudad}. Asking admin for manual entry.`);
+            const missingEssential = isRetiro
+                ? (!addr.nombre || !addr.ciudad || !addr.cp)
+                : (!addr.nombre || !addr.calle || !addr.ciudad);
+            if (!preview && !allowEmpty && !manualAddr && missingEssential) {
+                logger.warn(`[MANUAL-COMPLETE] Datos incompletos para ${chatId} (retiro=${isRetiro}): nombre=${!!addr.nombre} calle=${!!addr.calle} ciudad=${!!addr.ciudad} cp=${!!addr.cp}. Asking admin for manual entry.`);
                 return res.status(422).json({
                     error: 'Faltan datos de envío del cliente.',
                     detail: 'Completá los datos faltantes.',
@@ -587,7 +653,32 @@ module.exports = (clientPool) => {
             const rawPlan = cart.map(i => `${i.plan} días`).join(' + ') || `${plan} días`;
             const product = normalizeProductName(rawProduct, rawPlan, total);
 
-            const phoneNumeric = chatId.split('@')[0];
+            // PREVIEW: el panel SIEMPRE abre el modal de verificación antes de
+            // confirmar (con mensaje o sin). Devolvemos lo detectado (datos + envío
+            // + pago + producto) SIN crear la orden. La orden se crea recién cuando
+            // el admin confirma el modal (request sin preview, con manualAddr +
+            // shippingType + paymentMethod).
+            if (preview) {
+                return res.json({
+                    preview: true,
+                    prefill: {
+                        nombre: addr.nombre || '',
+                        // Mostramos la calle real (calleOriginal si es retiro) para que,
+                        // si el admin cambia a domicilio, el campo venga pre-cargado.
+                        calle: isRetiro ? (addr.calleOriginal || '') : (addr.calle || ''),
+                        ciudad: addr.ciudad || '',
+                        provincia: addr.provincia || '',
+                        cp: addr.cp || '',
+                        shippingType: isRetiro ? 'sucursal' : 'domicilio',
+                        paymentMethod: paymentMethodDefault,
+                        product,
+                        plan: String(plan),
+                        total,
+                    }
+                });
+            }
+
+            // phoneNumeric ya se declaró al inicio del handler (ver nota arriba).
 
             const { prisma } = require('../../../db');
 
