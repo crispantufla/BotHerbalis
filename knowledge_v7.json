@@ -65,7 +65,7 @@
                 "practico",
                 "practica"
             ],
-            "response": "¡Genial, las *cápsulas*! 💊\n\nVienen en dos planes:\n🔹 *60 días* → ${{PRICE_CAPSULAS_60}}\n🔹 *120 días* → ${{PRICE_CAPSULAS_120}}\n\nEl de *120 días* es el tratamiento completo y el que más eligen 💪 Envío gratis a todo el país.\n\n¿Con cuál vas, 60 o 120 días?",
+            "response": "¡Genial, las *cápsulas*! 💊 Son un *gran quemador de grasa natural* 🔥\n\nVienen en dos planes:\n🔹 *60 días* → ${{PRICE_CAPSULAS_60}}\n🔹 *120 días* → ${{PRICE_CAPSULAS_120}}\n\nEl de *120 días* es el tratamiento completo y el que más eligen 💪 Envío gratis a todo el país.\n\n¿Con cuál vas, 60 o 120 días?",
             "nextStep": "waiting_plan_choice"
         },
         "preference_gotas": {
