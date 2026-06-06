@@ -108,7 +108,7 @@ export async function handleWaitingMpPayment(
             const tpl = getFlowTemplate('payment_mp_retry', knowledge);
             const msg = tpl
                 ? _formatMessage(tpl, currentState)
-                : '⚠️ Hubo un problema con el pago — probá de nuevo con otra forma (tarjeta, débito, saldo MP).';
+                : '⚠️ Hubo un problema con el pago — probá de nuevo con tu tarjeta de crédito, o decime si preferís transferencia o retiro en sucursal.';
             // Mantenemos senaAmount si era flujo seña — para regenerar link por $10k.
             currentState.mpPaymentLinkId = null;
             currentState.mpPaymentLinkUrl = null;
@@ -230,7 +230,7 @@ export async function handleWaitingMpPayment(
     // ── AI fallback ────────────────────────────────────────────────────────────
     const aiRes = await aiService.chat(text, {
         step: 'waiting_mp_payment',
-        goal: `El cliente tiene un enlace de pago de MercadoPago y debe completarlo. Enlace ya enviado: ${currentState.mpPaymentLinkUrl}\n\nSi tiene dudas, explicale cómo pagar (tarjeta, débito, app MP, código en Pago Fácil/Rapipago).\n\nALTERNATIVAS si quiere cambiar de método (modelo nuevo may-2026):\n- Transferencia (envío a domicilio prepago): alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*\n- Retiro en sucursal (contrarrembolso): paga el TOTAL en efectivo al retirar en una sucursal de Correo Argentino. Sin anticipo previo.\n- NUNCA menciones anticipo de $10.000 (modalidad eliminada).\n\n🔴 OBJECIÓN ECONÓMICA / POSTERGAR PAGO (CRÍTICO):\nSi el cliente dice cosas como "veo después de juntar el efectivo", "cuando cobre", "cuando tenga plata", "cuando consiga el dinero", "es mucho interés", "ahora no puedo", "apenas tenga me comunico", "me alcance la plata", NO INTERPRETES eso como confirmación. Es una OBJECIÓN ECONÓMICA y debés ofrecer POSTDATADO:\n  → "¡Tranqui! ¿A partir de qué día te queda cómodo recibirlo? Te lo agendamos y lo despacho recién ese día." (PROHIBIDO mencionar "congelar precio")\n  → Si dice SÍ → goalMet=false, extractedData="POSTDATADO: [fecha o 'indefinido']", quedate en este step esperando el aviso.\n  → Si dice NO → goalMet=false, dejá el chat abierto sin presión.\n\nNUNCA reenvíes el link a menos que lo pida. NUNCA respondas con "Excelente decisión!" o frases de cierre cuando el cliente claramente está posponiendo. Esperá que confirme el pago con "listo" o "ya pagué".`,
+        goal: `El cliente tiene un enlace de pago de MercadoPago y debe completarlo. Enlace ya enviado: ${currentState.mpPaymentLinkUrl}\n\nSi tiene dudas, explicale que el link es para pagar con tarjeta de crédito (es online y 100% protegido).\n\nALTERNATIVAS si quiere cambiar de método (modelo nuevo may-2026):\n- Transferencia (envío a domicilio prepago): alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*\n- Retiro en sucursal (contrarrembolso): paga el TOTAL en efectivo al retirar en una sucursal de Correo Argentino. Sin anticipo previo.\n- NUNCA menciones anticipo de $10.000 (modalidad eliminada).\n\n🔴 OBJECIÓN ECONÓMICA / POSTERGAR PAGO (CRÍTICO):\nSi el cliente dice cosas como "veo después de juntar el efectivo", "cuando cobre", "cuando tenga plata", "cuando consiga el dinero", "es mucho interés", "ahora no puedo", "apenas tenga me comunico", "me alcance la plata", NO INTERPRETES eso como confirmación. Es una OBJECIÓN ECONÓMICA y debés ofrecer POSTDATADO:\n  → "¡Tranqui! ¿A partir de qué día te queda cómodo recibirlo? Te lo agendamos y lo despacho recién ese día." (PROHIBIDO mencionar "congelar precio")\n  → Si dice SÍ → goalMet=false, extractedData="POSTDATADO: [fecha o 'indefinido']", quedate en este step esperando el aviso.\n  → Si dice NO → goalMet=false, dejá el chat abierto sin presión.\n\nNUNCA reenvíes el link a menos que lo pida. NUNCA respondas con "Excelente decisión!" o frases de cierre cuando el cliente claramente está posponiendo. Esperá que confirme el pago con "listo" o "ya pagué".`,
         history: currentState.history,
         summary: currentState.summary,
         knowledge,
@@ -418,7 +418,7 @@ async function _tryCreateAndSendMpLink(
     // genera el link por ese monto igual (variable amount arriba), pero el mensaje
     // ya no menciona "seña/saldo al cartero" — el admin coordina por separado.
     const linkTpl = getFlowTemplate('payment_mp_link', knowledge) ||
-        `💳 *Pago online via MercadoPago*\n\nPedido: *{{PRODUCT}}* — Plan {{PLAN}} días\nTotal: *${'$'}{{TOTAL}}*\n\n{{LINK}}\n\nEscribime *"listo"* cuando termines.`;
+        `💳 *Pago con tarjeta de crédito*\n\nPedido: *{{PRODUCT}}* — Plan {{PLAN}} días\nTotal: *${'$'}{{TOTAL}}*\n\n{{LINK}}\n\nEscribime *"listo"* cuando termines.`;
     // Inyectamos productName en state efímero para que {{PRODUCT}} muestre el cart concatenado.
     const stateForFmt = { ...currentState, selectedProduct: productName };
     const msg = _formatMessage(linkTpl, stateForFmt);

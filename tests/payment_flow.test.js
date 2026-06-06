@@ -284,15 +284,16 @@ describe('Menú envío → Retiro en sucursal (opción 1)', () => {
 // ════════════════════════════════════════════════════════════════════════════
 describe('Menú envío → Envío a domicilio (opción 2) + submenú prepago', () => {
 
-    test('[3.1] "2" → setea shippingChoice=domicilio y muestra submenú MP/Transfer', async () => {
+    test('[3.1] "2" → setea shippingChoice=domicilio y muestra submenú Tarjeta/Transfer', async () => {
         const state = makePaymentState('60');
         await handleWaitingPaymentMethod('d1', '2', '2', state, knowledge, deps);
         expect(state.shippingChoice).toBe('domicilio');
         expect(state.paymentSubChoiceAsked).toBe(true);
         expect(state.step).toBe('waiting_payment_method'); // sigue esperando submenú
         const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
-        expect(sent).toMatch(/Mercado Pago/i);
+        expect(sent).toMatch(/Tarjeta de cr[ée]dito/i);
         expect(sent).toMatch(/Transferencia bancaria/i);
+        expect(sent).not.toMatch(/mercado\s?pago/i);
     });
 
     test('[3.2] "domicilio" → submenú', async () => {
@@ -335,6 +336,25 @@ describe('Menú envío → Envío a domicilio (opción 2) + submenú prepago', (
         const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
         expect(sent).toMatch(/HERBALIS\.TIENDA/);
         expect(sent).toMatch(/BIO ORIGEN S.A.S./);
+    });
+
+    // Combo jun-2026: el cliente puede pedir RETIRO en sucursal pagando por
+    // TRANSFERENCIA. No es el flujo estándar (retiro = efectivo) → damos el alias,
+    // pedimos datos para la sucursal y derivamos a un asesor (no auto-confirmamos).
+    test('[3.7] "retiro en sucursal pero pago por transferencia" → retiro + transferencia + alias + pausa', async () => {
+        mockPauseUsers.clear();
+        const state = makePaymentState('60');
+        const txt = 'quiero retiro en sucursal pero pagar por transferencia';
+        await handleWaitingPaymentMethod('combo1', txt, txt, state, knowledge, deps);
+        expect(state.shippingChoice).toBe('retiro');
+        expect(state.paymentMethod).toBe('transferencia');
+        expect(state.partialAddress.calle).toBe('A sucursal');
+        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
+        expect(sent).toMatch(/HERBALIS\.TIENDA/);
+        expect(sent).toMatch(/sucursal/i);
+        expect(sent).toMatch(/transferencia/i);
+        // Combo no estándar → derivado a un asesor para coordinar/verificar.
+        expect(mockPauseUsers.has('combo1')).toBe(true);
     });
 
     test('[3.7] Submenú "transferencia" → transfer', async () => {
@@ -476,7 +496,7 @@ describe('stepWaitingMpPayment — link MP por el total', () => {
         const state = makeMpState();
         await handleWaitingMpPayment('mppy2', 'hola', 'hola', state, knowledge, deps);
         const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
-        expect(sent).toMatch(/Mercado Pago/i);
+        expect(sent).toMatch(/tarjeta de cr[ée]dito/i);
         expect(sent).toMatch(/Total/i);
         expect(sent).not.toMatch(/Seña/i);
     });
@@ -529,8 +549,8 @@ describe('stepWaitingMpPayment — email opcional', () => {
         const call = mockPreferenceCreate.mock.calls[0][0];
         expect(call.body.payer).toBeUndefined();
         const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
-        // Manda el link de MP — no pregunta por el email primero.
-        expect(sent).toMatch(/Link de Mercado Pago|mp\.com\/checkout/i);
+        // Manda el link de pago — no pregunta por el email primero.
+        expect(sent).toMatch(/tarjeta de cr[ée]dito|mp\.com\/checkout/i);
     });
 
     test('[6b.2] Email previamente capturado en waiting_data → genera link CON payer.email', async () => {

@@ -28,14 +28,14 @@ describe('Modelo nuevo de pago — buildPaymentMessage (envío primero, sin anti
         expect(pm).toMatch(/al retirar/i);
         expect(pm).toMatch(/efectivo/i);
     });
-    test('Lista medios de pago para domicilio (MercadoPago, Transferencia)', () => {
-        expect(pm).toMatch(/MercadoPago/i);
-        expect(pm).toMatch(/Transferencia/i);
+    test('Lista medios de pago para domicilio (tarjeta de crédito, transferencia)', () => {
+        expect(pm).toMatch(/tarjeta de cr[ée]dito/i);
+        expect(pm).toMatch(/transferencia/i);
     });
-    test('Menciona canales de MP (Rapipago, PagoFácil, Tarjeta)', () => {
-        expect(pm).toMatch(/Rapipago/i);
-        expect(pm).toMatch(/PagoF[áa]cil/i);
-        expect(pm).toMatch(/Tarjeta/i);
+    test('Ya NO ofrece Mercado Pago / Pago Fácil / Rapipago al cliente (decisión jun-2026)', () => {
+        expect(pm).not.toMatch(/mercado\s?pago/i);
+        expect(pm).not.toMatch(/rapipago/i);
+        expect(pm).not.toMatch(/pago\s?f[áa]cil/i);
     });
     test('Promete envío gratis y 7 a 10 días hábiles', () => {
         expect(pm).toMatch(/GRATIS/i);
@@ -57,11 +57,13 @@ describe('Modelo nuevo de pago — buildPaymentMessage (envío primero, sin anti
 describe('Modelo nuevo — payment_domicilio_choice (submenú prepago tras elegir domicilio)', () => {
     test.each([
         ['V7', v7],
-    ])('%s: existe la entry y ofrece MP + Transferencia', (_n, guion) => {
+    ])('%s: existe la entry y ofrece Tarjeta de crédito + Transferencia (sin Mercado Pago/Pago Fácil/Rapipago)', (_n, guion) => {
         const choice = guion.flow.payment_domicilio_choice;
         expect(choice).toBeDefined();
-        expect(choice.response).toMatch(/Mercado Pago/i);
+        expect(choice.response).toMatch(/Tarjeta de cr[ée]dito/i);
         expect(choice.response).toMatch(/Transferencia bancaria/i);
+        expect(choice.response).not.toMatch(/mercado\s?pago/i);
+        expect(choice.response).not.toMatch(/rapipago|pago\s?f[áa]cil/i);
     });
 });
 
@@ -216,5 +218,41 @@ describe('_formatMessage — defensa contra placeholder leak (regresión Silvina
         const out = _formatMessage(txt, null);
         expect(out).toMatch(/HERBALIS\.TIENDA/);
         expect(out).toMatch(/BIO ORIGEN S\.A\.S\./);
+    });
+});
+
+describe('Renombre "Tarjeta de crédito" + poda de medios (corrección jun-2026)', () => {
+    // De cara al cliente el medio online se llama "Tarjeta de crédito".
+    // Ya NO se ofrecen Mercado Pago (como nombre), débito, saldo en app, Pago Fácil ni Rapipago.
+    const customerFacingKeys = ['payment_menu', 'payment_domicilio_choice', 'payment_mp_link', 'payment_mp_retry'];
+
+    test.each(customerFacingKeys)('flow.%s no nombra Mercado Pago / Pago Fácil / Rapipago / débito / saldo al cliente', (key) => {
+        const resp = v7.flow[key].response;
+        expect(resp).toBeDefined();
+        expect(resp).not.toMatch(/mercado\s?pago/i);
+        expect(resp).not.toMatch(/rapipago/i);
+        expect(resp).not.toMatch(/pago\s?f[áa]cil/i);
+        expect(resp).not.toMatch(/d[ée]bito/i);
+        expect(resp).not.toMatch(/saldo/i);
+    });
+
+    test('payment_domicilio_choice ofrece "Tarjeta de crédito" como opción 1', () => {
+        expect(v7.flow.payment_domicilio_choice.response).toMatch(/Tarjeta de cr[ée]dito/i);
+    });
+
+    test('payment_mp_link dice "tarjeta de crédito" (no "Mercado Pago")', () => {
+        expect(v7.flow.payment_mp_link.response).toMatch(/tarjeta de cr[ée]dito/i);
+    });
+
+    test('order_confirmation_mp confirma el pago sin nombrar "MercadoPago"', () => {
+        const resp = v7.flow.order_confirmation_mp.response;
+        expect(resp).not.toMatch(/mercado\s?pago/i);
+        expect(resp).toMatch(/tarjeta de cr[ée]dito/i);
+    });
+
+    test('FAQ de envío informa el costo de devolución de $18.000', () => {
+        const shipFaq = v7.faq.find(f => f.keywords.some(k => k === 'como lo recibo' || k === 'envio'));
+        expect(shipFaq).toBeDefined();
+        expect(shipFaq.response).toMatch(/18\.000/);
     });
 });

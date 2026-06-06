@@ -19,7 +19,8 @@ const RETIRO_KEYWORDS = /\b(retiro|retir(?:ar|o)\s+en\s+sucursal|en\s+sucursal|a
 const DOMICILIO_KEYWORDS = /\b(domicilio|a\s+(?:mi\s+)?casa|a\s+mi\s+domicilio|env[ií]o\s+a\s+(?:mi\s+)?domicilio|env[ií]o\s+a\s+casa|envialo|envíalo|mandalo|que\s+lo\s+manden|me\s+lo\s+mand[aá]n|me\s+lo\s+mandan|a\s+mi\s+direcci[óo]n|en\s+mi\s+casa|directo\s+a\s+casa)\b/i;
 
 // Payment method matchers (submenú tras elegir domicilio + atajos).
-// Rapipago/PagoFácil/Tarjeta se canalizan dentro del link MP, así que matchean MP.
+// Rapipago/PagoFácil se siguen detectando como keyword (el cliente puede nombrarlas)
+// y se canalizan por el link de tarjeta de crédito, pero el bot ya NO las ofrece.
 const MP_KEYWORDS = /\b(mercadopago|mercado.?pago|\bmp\b|online|digital|qr|tarjeta|d[ée]bito|cr[ée]dito|pago online|pago digital|pago ahora|por mp|con mp|por mercadopago|aplicaci[óo]n|rapipago|pago\s*f[áa]cil|pagof[áa]cil)\b/i;
 const TRANSFER_KEYWORDS = /\b(transfer[ei]ncia|transf\b|transferir|alias|dep[óo]sito|deposito|banco|bancaria|cbu|cvu|por transferencia)\b/i;
 
@@ -92,7 +93,7 @@ export async function handleWaitingPaymentMethod(
         && (MP_KEYWORDS.test(text) || TRANSFER_KEYWORDS.test(normalizedText) || DOMICILIO_KEYWORDS.test(text))) {
         currentState.paymentSubChoiceAsked = false;
         currentState.shippingChoice = null;
-        const msg = `¡Ojo, te aclaro así no hay malentendidos! 😊\n\nCon *Mercado Pago* o *transferencia* el pago es *antes* del envío (online) — al cartero no se le paga.\n\nPara *pagar al recibir, en efectivo*, la opción es *retiro en sucursal*: te llega a una sucursal de Correo Argentino cerca tuyo y pagás el total recién cuando lo retirás 💵\n\n¿Cómo preferís?\n1️⃣ *Retiro en sucursal* (pagás al retirar, en efectivo)\n2️⃣ *Envío a tu casa* (pagás ahora con Mercado Pago o transferencia)`;
+        const msg = `¡Ojo, te aclaro así no hay malentendidos! 😊\n\nCon *tarjeta de crédito* o *transferencia* el pago es *antes* del envío (online) — al cartero no se le paga.\n\nPara *pagar al recibir, en efectivo*, la opción es *retiro en sucursal*: te llega a una sucursal de Correo Argentino cerca tuyo y pagás el total recién cuando lo retirás 💵\n\n¿Cómo preferís?\n1️⃣ *Retiro en sucursal* (pagás al retirar, en efectivo)\n2️⃣ *Envío a tu casa* (pagás ahora con tarjeta de crédito o transferencia)`;
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
@@ -204,7 +205,7 @@ export async function handleWaitingPaymentMethod(
         if (wantsCashAtHome) {
             currentState.paymentSubChoiceAsked = false;
             currentState.shippingChoice = null;
-            const msg = `¡Te aclaro! 😊 A *domicilio* el pago es *anticipado* (Mercado Pago o transferencia) — al cartero no se le paga.\n\nSi querés *pagar al recibir en efectivo*, lo mandamos a la *sucursal de Correo Argentino* más cercana a tu casa y pagás el total *$${currentState.totalPrice || '?'}* cuando lo retirás 💵\n\n¿Cómo preferís?\n1️⃣ *Retiro en sucursal* (pagás al retirar, en efectivo)\n2️⃣ *Envío a tu casa* (pagás ahora con Mercado Pago o transferencia)`;
+            const msg = `¡Te aclaro! 😊 A *domicilio* el pago es *anticipado* (tarjeta de crédito o transferencia) — al cartero no se le paga.\n\nSi querés *pagar al recibir en efectivo*, lo mandamos a la *sucursal de Correo Argentino* más cercana a tu casa y pagás el total *$${currentState.totalPrice || '?'}* cuando lo retirás 💵\n\n¿Cómo preferís?\n1️⃣ *Retiro en sucursal* (pagás al retirar, en efectivo)\n2️⃣ *Envío a tu casa* (pagás ahora con tarjeta de crédito o transferencia)`;
             currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
             saveState(userId);
             await sendMessageWithDelay(userId, msg);
@@ -217,7 +218,7 @@ export async function handleWaitingPaymentMethod(
         if (asksPrice) {
             const prod = currentState.selectedProduct ? currentState.selectedProduct.split(' de ')[0] : 'el tratamiento';
             const planTxt = currentState.selectedPlan ? ` ${currentState.selectedPlan} días` : '';
-            const msg = `El total es *$${currentState.totalPrice || '?'}* (${prod}${planTxt}) con *envío gratis* 📦\n\n¿Cómo querés abonar?\n1️⃣ *Mercado Pago*\n2️⃣ *Transferencia bancaria*`;
+            const msg = `El total es *$${currentState.totalPrice || '?'}* (${prod}${planTxt}) con *envío gratis* 📦\n\n¿Cómo querés abonar?\n1️⃣ *Tarjeta de crédito*\n2️⃣ *Transferencia bancaria*`;
             currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
             saveState(userId);
             await sendMessageWithDelay(userId, msg);
@@ -228,7 +229,7 @@ export async function handleWaitingPaymentMethod(
         // (c) Otra duda → IA para responderla (con anti-duplicado). No repetimos.
         const aiSub = await aiService.chat(text, {
             step: 'waiting_payment_method',
-            goal: `El cliente eligió ENVÍO A DOMICILIO y debe elegir cómo abonar (es PREPAGO, antes del envío): 1) *Mercado Pago* (tarjeta, débito, app, o efectivo en Pago Fácil/Rapipago con el código) o 2) *Transferencia* al alias *HERBALIS.TIENDA* (BIO ORIGEN S.A.S.). A domicilio NO se paga en efectivo al recibir; el pago en efectivo SOLO existe con *retiro en sucursal* (pagás al retirar). Total del pedido: $${currentState.totalPrice || '?'}. Respondé su duda puntual con calidez y cerrá preguntando con cuál de los 2 medios quiere abonar. NUNCA menciones cuotas ni anticipo.`,
+            goal: `El cliente eligió ENVÍO A DOMICILIO y debe elegir cómo abonar (es PREPAGO, antes del envío): 1) *Tarjeta de crédito* (link de pago protegido) o 2) *Transferencia* al alias *HERBALIS.TIENDA* (BIO ORIGEN S.A.S.). De cara al cliente el medio online se llama "Tarjeta de crédito" (NUNCA "Mercado Pago", débito, Pago Fácil ni Rapipago). A domicilio NO se paga en efectivo al recibir; el pago en efectivo SOLO existe con *retiro en sucursal* (pagás al retirar). Total del pedido: $${currentState.totalPrice || '?'}. Respondé su duda puntual con calidez y cerrá preguntando con cuál de los 2 medios quiere abonar. NUNCA menciones cuotas ni anticipo.`,
             history: currentState.history,
             summary: currentState.summary,
             knowledge,
@@ -244,7 +245,7 @@ export async function handleWaitingPaymentMethod(
         // (d) Último recurso: re-ofrecer el submenú SOLO si no sería un duplicado.
         // Si lo sería, derivamos a humano en vez de entrar en bucle.
         const tpl = getFlowTemplate('payment_domicilio_choice', knowledge) ||
-            `¿Cómo querés abonar?\n\n1️⃣ *Mercado Pago*\n2️⃣ *Transferencia bancaria*`;
+            `¿Cómo querés abonar?\n\n1️⃣ *Tarjeta de crédito*\n2️⃣ *Transferencia bancaria*`;
         const msg = _formatMessage(tpl, currentState);
         if (_isDuplicate(msg, currentState.history)) {
             await _pauseAndAlert(userId, currentState, dependencies, text, 'Cliente en submenú de pago (domicilio) sin elegir MP/transferencia tras varios intentos. Evito bucle — derivar a humano.');
@@ -264,6 +265,28 @@ export async function handleWaitingPaymentMethod(
     // a "A sucursal" y la calle real queda en calleOriginal (ver stepWaitingData
     // y _finalizeOrderAndNotifyAdmin).
     if (optionNum === '1' || RETIRO_KEYWORDS.test(text)) {
+        // ── Combo (jun-2026): RETIRO en sucursal + pago por TRANSFERENCIA ──────────
+        // El estándar de retiro es efectivo al retirar, pero el cliente PUEDE pedir
+        // pagar por transferencia y retirar igual. No es el flujo automático normal:
+        // le damos el alias, pedimos los datos para asignar la sucursal y derivamos a
+        // un asesor para coordinar y verificar la transferencia (no auto-confirmamos
+        // porque el pago por transferencia requiere chequear el comprobante).
+        if (TRANSFER_KEYWORDS.test(normalizedText)) {
+            currentState.shippingChoice = 'retiro';
+            currentState.paymentMethod = 'transferencia';
+            currentState.senaAmount = 0;
+            currentState.senaPaid = false;
+            if (!currentState.partialAddress) currentState.partialAddress = {};
+            currentState.partialAddress.calle = 'A sucursal';
+            const msg = `¡Dale! Lo dejamos para *retiro en sucursal* y lo abonás por *transferencia* 📦\n\nPara transferir usá el alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.* — monto *$${currentState.totalPrice || '?'}*.\n\nPasame también, así te asigno la sucursal más cercana:\nNombre completo:\nLocalidad / Ciudad:\nCódigo postal:\n\nCuando hagas la transferencia, escribime *"listo"* con el comprobante 😊`;
+            currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+            saveState(userId);
+            await sendMessageWithDelay(userId, msg);
+            await _pauseAndAlert(userId, currentState, dependencies, text, `Combo retiro en sucursal + transferencia (lo pidió el cliente). Coordinar la sucursal de Correo Argentino más cercana y verificar la transferencia ($${currentState.totalPrice || '?'}) cuando mande el comprobante.`);
+            logger.info(`[PAYMENT_METHOD] ${userId} → RETIRO + TRANSFERENCIA (combo) — alias enviado, pausado para coordinación.`);
+            return { matched: true };
+        }
+
         currentState.paymentMethod = 'contrarembolso';
         currentState.senaAmount = 0;
         currentState.senaPaid = false;
@@ -290,7 +313,7 @@ export async function handleWaitingPaymentMethod(
         currentState.shippingChoice = 'domicilio';
         currentState.paymentSubChoiceAsked = true;
         const tpl = getFlowTemplate('payment_domicilio_choice', knowledge) ||
-            `Perfecto, lo mandamos a tu domicilio 🏠\n\n¿Cómo querés abonar?\n\n1️⃣ *Mercado Pago*\n2️⃣ *Transferencia bancaria*`;
+            `Perfecto, lo mandamos a tu domicilio 🏠\n\n¿Cómo querés abonar?\n\n1️⃣ *Tarjeta de crédito*\n2️⃣ *Transferencia bancaria*`;
         // Acuse de postdatado si el cliente lo mencionó junto con el envío
         // (ej: "A domicilio ya estaré avisándole después del 10 recién").
         const postdatePrefix = currentState.postdatado
@@ -340,7 +363,7 @@ export async function handleWaitingPaymentMethod(
     // ── AI fallback ───────────────────────────────────────────────────────────
     const aiRes = await aiService.chat(text, {
         step: 'waiting_payment_method',
-        goal: `El cliente debe elegir TIPO DE ENVÍO antes que método de pago. Las 2 opciones son:\n\n1️⃣ *Retiro en sucursal* → paga el TOTAL en efectivo al retirar en una sucursal de Correo Argentino (contrarreembolso, sin anticipo previo). Un asesor coordina la sucursal más cercana al cliente.\n\n2️⃣ *Envío a domicilio* → se abona previamente. Después se elige el medio: Mercado Pago (cubre tarjeta de crédito, débito, app MP, o efectivo en Pago Fácil/Rapipago) o transferencia bancaria al alias *HERBALIS.TIENDA* (BIO ORIGEN S.A.S.).\n\nAmbos envíos son GRATIS (7 a 10 días hábiles por Correo Argentino).\n\nPROHIBICIONES ESTRICTAS:\n- NO mencionar anticipo de $10.000 (esa modalidad fue eliminada en mayo 2026)\n- NO ofrecer pago en efectivo al cartero a domicilio — el contrarreembolso ahora es solo en sucursal\n- NO mencionar cuotas\n- NO inventar aliases distintos al oficial\n\nSi el cliente responde con afirmativa genérica ("dale", "sí") sin aclarar, pedile que elija retiro o domicilio. NUNCA avances sin que confirme cuál de las 2 opciones de ENVÍO eligió.`,
+        goal: `El cliente debe elegir TIPO DE ENVÍO antes que método de pago. Las 2 opciones son:\n\n1️⃣ *Retiro en sucursal* → paga el TOTAL en efectivo al retirar en una sucursal de Correo Argentino (contrarreembolso, sin anticipo previo). Un asesor coordina la sucursal más cercana al cliente.\n\n2️⃣ *Envío a domicilio* → se abona previamente. Después se elige el medio: *tarjeta de crédito* (link de pago protegido) o *transferencia bancaria* al alias *HERBALIS.TIENDA* (BIO ORIGEN S.A.S.). De cara al cliente el medio online se llama "Tarjeta de crédito" (NUNCA "Mercado Pago", débito, Pago Fácil ni Rapipago).\n\nAmbos envíos son GRATIS (7 a 10 días hábiles por Correo Argentino).\n\nPROHIBICIONES ESTRICTAS:\n- NO mencionar anticipo de $10.000 (esa modalidad fue eliminada en mayo 2026)\n- NO ofrecer pago en efectivo al cartero a domicilio — el contrarreembolso ahora es solo en sucursal\n- NO mencionar cuotas\n- NO inventar aliases distintos al oficial\n\nSi el cliente responde con afirmativa genérica ("dale", "sí") sin aclarar, pedile que elija retiro o domicilio. NUNCA avances sin que confirme cuál de las 2 opciones de ENVÍO eligió.`,
         history: currentState.history,
         summary: currentState.summary,
         knowledge,

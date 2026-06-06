@@ -227,7 +227,7 @@ function _getQuickReplies(step: string, userMessage: string): QuickReplyItem[] {
     if (/estafa|trucho|mentira|robo|engaño|chanta|falso|fraude/i.test(normalized)) {
         return [
             { label: 'Mostrar trayectoria', message: 'Llevamos 13 años con más de 50.000 clientes satisfechos. ¿Querés que te pase testimonios?' },
-            { label: 'Aclarar pago MP', message: 'Entiendo tu preocupación. Trabajamos con Mercado Pago — tiene protección al comprador: si no recibís el producto te devuelven el 100%.' },
+            { label: 'Aclarar pago', message: 'Entiendo tu preocupación. El pago con tarjeta de crédito tiene protección al comprador: si no recibís el producto te devuelven el 100%.' },
             { label: 'Dejar abierto', message: 'Respeto tu decisión. Si querés verificar, podés buscarnos en Google o Instagram. Acá estamos cuando quieras.' },
         ];
     }

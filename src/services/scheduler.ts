@@ -953,7 +953,7 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
         if (mpReminderStage === 0 && minsSince >= 30) {
             const linkUrl = (state as any).mpPaymentLinkUrl;
             const linkLine = linkUrl ? `\n\nAcá te dejo el link de nuevo:\n${linkUrl}` : '';
-            const msg = `¡Hola! 👋 ¿Pudiste con el pago de Mercado Pago? Cualquier duda la resolvemos 🙂 Acordate que pagás 100% protegido: si por algo no te llega, MP te devuelve la plata.${linkLine}`;
+            const msg = `¡Hola! 👋 ¿Pudiste con el pago con tarjeta de crédito? Cualquier duda la resolvemos 🙂 Acordate que es 100% protegido: si por algo no te llega, te devuelven la plata.${linkLine}`;
             try {
                 await sendMessageWithDelay(userId, msg);
                 _pushHistory(state, { role: 'bot', content: msg });
@@ -972,7 +972,7 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
         // no completó MP por razones técnicas (no tiene tarjeta a mano, problema
         // con el link, etc.). Una sola vez vía flag mpAlternativeOffered.
         if (mpReminderStage === 1 && !(state as any).mpAlternativeOffered && minsSince >= 90) {
-            const msg = `¡Hola! 👋 Si tuviste alguna dificultad con el link de Mercado Pago, no hay drama 😊\n\nTenés dos alternativas:\n\n💸 *Transferencia bancaria* — al alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*\n🏪 *Retiro en sucursal* — lo retirás en una sucursal de Correo Argentino cerca tuyo y pagás el total en efectivo al retirar (sin anticipo previo)\n\n¿Te queda más cómoda alguna de estas, o seguimos con Mercado Pago?`;
+            const msg = `¡Hola! 👋 Si tuviste alguna dificultad con el link de pago, no hay drama 😊\n\nTenés dos alternativas:\n\n💸 *Transferencia bancaria* — al alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*\n🏪 *Retiro en sucursal* — lo retirás en una sucursal de Correo Argentino cerca tuyo y pagás el total en efectivo al retirar (sin anticipo previo)\n\n¿Te queda más cómoda alguna de estas, o seguimos con la tarjeta de crédito?`;
             try {
                 await sendMessageWithDelay(userId, msg);
                 _pushHistory(state, { role: 'bot', content: msg });
@@ -1011,7 +1011,7 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
         if (mpReminderStage === 2 && minsSince >= 1440) {
             const linkUrl = (state as any).mpPaymentLinkUrl;
             const linkLine = linkUrl ? `\n\nAcá te dejo el link otra vez:\n${linkUrl}` : '';
-            const msg = `¡Hola! ¿Cómo va? 😊\n\nVi que el pago de MercadoPago quedó pendiente. Te recuerdo que los pedidos llegan en *7 a 10 días hábiles* desde la confirmación del pago.\n\nSi preferís, te lo puedo programar para una fecha más adelante (cuando cobres) y lo despacho recién ese día. ¿A partir de qué día te queda cómodo recibirlo?${linkLine}`;
+            const msg = `¡Hola! ¿Cómo va? 😊\n\nVi que el pago con tarjeta quedó pendiente. Te recuerdo que los pedidos llegan en *7 a 10 días hábiles* desde la confirmación del pago.\n\nSi preferís, te lo puedo programar para una fecha más adelante (cuando cobres) y lo despacho recién ese día. ¿A partir de qué día te queda cómodo recibirlo?${linkLine}`;
             try {
                 await sendMessageWithDelay(userId, msg);
                 _pushHistory(state, { role: 'bot', content: msg });

@@ -95,10 +95,10 @@ module.exports = (clientPool) => {
             if (sendToChat) {
                 const client = req.sellerInstance?.client;
                 const chatId = userPhone.includes('@') ? userPhone : `${userPhone.replace(/\D/g, '')}@c.us`;
-                const msg = `💳 *Pago online via MercadoPago*\n\n` +
+                const msg = `💳 *Pago con tarjeta de crédito*\n\n` +
                     `Total: *$${amount.toLocaleString('es-AR')}*\n\n` +
                     `👇 Hacé clic para pagar de forma segura:\n${link}\n\n` +
-                    `Podés pagar con tarjeta, desde la app de MercadoPago o escaneando el QR.\n\n` +
+                    `Es un pago 100% protegido: si por algo no te llega, te devuelven la plata.\n\n` +
                     `✅ Cuando completes el pago, avisame por acá y seguimos con el envío.`;
                 try {
                     if (!client) throw new Error('Cliente WhatsApp no disponible');

@@ -94,7 +94,7 @@ const PATTERNS: { type: ObjectionMatch['type']; regex: RegExp }[] = [
 const REBUTTALS: Record<ObjectionMatch['type'], string[]> = {
     caro: [
         '¡Entiendo! 😊 Pensalo así: es menos que un café por día durante el tratamiento. Y si te queda más cómodo, también podemos coordinar *retiro en sucursal* — pagás el total en efectivo recién cuando lo retirás. ¿Te tiro los datos del plan que más te conviene?',
-        'Te re entiendo 🙌 Tenemos 2 opciones de envío: retiro en sucursal (pagás al retirar) o envío a domicilio prepago (Mercado Pago o transferencia). Es una inversión en vos, con más de 13 años de aval. ¿Te paso los datos para reservarlo?',
+        'Te re entiendo 🙌 Tenemos 2 opciones de envío: retiro en sucursal (pagás al retirar) o envío a domicilio prepago (tarjeta de crédito o transferencia). Es una inversión en vos, con más de 13 años de aval. ¿Te paso los datos para reservarlo?',
         'Dale, escuchame bien: el de 120 días sale más conveniente por cápsula que el de 60, y si te queda más cómodo podés elegir retiro en sucursal (pagás al retirar). ¿Avanzamos con ese? 😊',
     ],
     consultar: [
@@ -103,11 +103,11 @@ const REBUTTALS: Record<ObjectionMatch['type'], string[]> = {
     ],
     miedo: [
         '¡Tranqui, te entiendo! 😊 Hace más de 13 años que distribuimos en todo el país, con más de 70 mil clientes satisfechos. El producto es 100% natural y lo único que podés notar los primeros días es un leve efecto laxante/diurético que se va tomando agua. ¿Qué duda puntual tenés?',
-        'Es re entendible tener dudas la primera vez 🙌 Te cuento: es 100% natural, no tiene químicos. Pagás con Mercado Pago que tiene protección al comprador — si no recibís el producto te devuelven el 100%. ¿Qué duda puntual tenés?',
+        'Es re entendible tener dudas la primera vez 🙌 Te cuento: es 100% natural, no tiene químicos. Pagás con tarjeta de crédito, con protección al comprador — si no recibís el producto te devuelven el 100%. ¿Qué duda puntual tenés?',
     ],
     no_confio: [
-        '¡Te re entiendo, hay mucho trucho por ahí! 😊 Por eso trabajamos con Mercado Pago: tiene protección al comprador, si no te llega el producto te devuelven el 100%. 13 años haciendo esto, más de 70 mil clientes. ¿Te tomo los datos así te llega?',
-        'Dale, es un miedo súper válido 🙌 Mercado Pago es la plataforma de pago más usada del país y tiene protección al comprador integrada. Si querés podés buscarnos en Google o Instagram. ¿Seguimos con los datos?',
+        '¡Te re entiendo, hay mucho trucho por ahí! 😊 Por eso el pago con tarjeta de crédito tiene protección al comprador: si no te llega el producto te devuelven el 100%. 13 años haciendo esto, más de 70 mil clientes. ¿Te tomo los datos así te llega?',
+        'Dale, es un miedo súper válido 🙌 El pago con tarjeta de crédito tiene protección al comprador integrada. Si querés podés buscarnos en Google o Instagram. ¿Seguimos con los datos?',
     ],
     postergar: [
         '¡No hay drama! 😊 Si te queda más cómodo, podemos coordinar *retiro en sucursal* — te dejamos el paquete en una sucursal de Correo Argentino cerca tuyo y pagás el total *en efectivo cuando lo retirás*. ¿Te cargo el pedido?',
@@ -134,11 +134,11 @@ const ESCALATED_REBUTTALS: Record<ObjectionMatch['type'], string[]> = {
         'Te entiendo. *Te dejo el pedido reservado por 48h a tu nombre*, lo charlás tranqui con quien tengas que charlar, y si en ese plazo me das el OK lo despachamos al precio de hoy. ¿Te parece?',
     ],
     miedo: [
-        'Te entiendo. *Mercado Pago tiene protección al comprador*: si el paquete no te llega, ellos te devuelven el 100% del dinero — no depende de nosotros. Es la plataforma más usada del país, regulada por el BCRA. ¿Eso te da más tranquilidad?',
+        'Te entiendo. *El pago con tarjeta de crédito tiene protección al comprador*: si el paquete no te llega, te devuelven el 100% del dinero. Es un pago protegido, no depende de nosotros. ¿Eso te da más tranquilidad?',
         'Te re entiendo. Mirá, *podés googlear "Herbalis" y ver nuestro Instagram* (@herbalis) con clientas reales etiquetadas. Si después de eso seguís con dudas, no avanzamos y listo, cero compromiso. ¿Te parece?',
     ],
     no_confio: [
-        'Te entiendo perfectamente. *Lo más sólido que puedo ofrecerte es la protección al comprador de Mercado Pago*: si el paquete no te llega, MP te devuelve el 100%. Es plata que sale del banco, no de nosotros. ¿Eso te alcanza para que probemos?',
+        'Te entiendo perfectamente. *Lo más sólido que puedo ofrecerte es la protección al comprador del pago con tarjeta de crédito*: si el paquete no te llega, te devuelven el 100%. Es plata que sale del banco, no de nosotros. ¿Eso te alcanza para que probemos?',
         'Dale, mirá: *te invito a buscar "Herbalis" en Google y en Instagram (@herbalis)* — vas a encontrar testimonios reales con foto. Si después de revisar no te convencen, no avanzamos. ¿Te parece justo?',
     ],
     postergar: [

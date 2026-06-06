@@ -96,13 +96,13 @@
         "payment_menu": {
             "step": "waiting_payment_method",
             "_note": "TEXTO 4 — Menú envío + medios de pago. Disparado por buildPaymentMessage. Modelo nuevo (may-2026): primero elige tipo de envío, después método. Retiro=contrarreembolso al retirar (sin anticipo). Domicilio=prepago (MP/Transfer).",
-            "response": "📦 El envío se realiza por Correo Argentino y demora entre 7 y 10 días hábiles.\n\nOpciones de envío:\n1️⃣ Retiro en sucursal → se paga al retirar (Solo efectivo)\n2️⃣ Envío a domicilio → se abona previamente\n\n💳 Medios de pago:\nMercadoPago – Transferencia – Rapipago – PagoFácil\n💳 Tarjeta de crédito\n\n👉 Por favor, decime:\n* Si preferís retiro en sucursal y pagar al recibir o envío a domicilio con pago anticipado?\n\n‼️ Ambos envíos son GRATIS ‼️",
+            "response": "📦 El envío se realiza por Correo Argentino y demora entre 7 y 10 días hábiles.\n\nOpciones de envío:\n1️⃣ Retiro en sucursal → pagás al retirar, en efectivo\n2️⃣ Envío a domicilio → se abona antes (tarjeta de crédito o transferencia)\n\n👉 ¿Preferís retiro en sucursal y pagar al retirar, o envío a domicilio con pago anticipado?\n\n‼️ Ambos envíos son GRATIS ‼️",
             "nextStep": "waiting_payment_method"
         },
         "payment_domicilio_choice": {
             "step": "waiting_payment_method",
-            "_note": "Cliente eligió envío a domicilio. Submenú de medio de pago (prepago). Rapipago/PagoFácil/Tarjeta se canalizan dentro del link de Mercado Pago.",
-            "response": "Perfecto, lo mandamos a tu domicilio 🏠\n\n¿Cómo querés abonar?\n\n1️⃣ *Mercado Pago* — te envío un *link de pago* (tarjeta, débito, app MP, o llevás el código y pagás en efectivo en Pago Fácil o Rapipago)\n2️⃣ *Transferencia bancaria* — te paso el alias",
+            "_note": "Cliente eligió envío a domicilio. Submenú de medio de pago (prepago): tarjeta de crédito (link) o transferencia. NO se ofrecen débito, saldo en app, Pago Fácil ni Rapipago (decisión jun-2026).",
+            "response": "Perfecto, lo mandamos a tu domicilio 🏠\n\n¿Cómo querés abonar?\n\n1️⃣ *Tarjeta de crédito* — te envío un *link de pago* seguro\n2️⃣ *Transferencia bancaria* — te paso el alias",
             "nextStep": "waiting_payment_method"
         },
         "payment_retiro_confirm": {
@@ -118,8 +118,8 @@
         },
         "payment_mp_link": {
             "step": "waiting_mp_payment",
-            "_note": "TEXTO 5a — Cliente eligió Mercado Pago. Le mandamos el link + detalle del pedido + pedido de datos en paralelo. Placeholders: {{PRODUCT}}, {{PLAN}}, {{TOTAL}}, {{LINK}}.",
-            "response": "💳 Te dejo el link para pagar con Mercado Pago:\n\n{{LINK}}\n\nTotal: ${{TOTAL}} — {{PRODUCT}} {{PLAN}} días\n\nPagás 100% protegido: si por algo no te llega, Mercado Pago te devuelve la plata 👌 Podés pagar con tarjeta, débito, o en efectivo en Pago Fácil/Rapipago con el código.\n\nCuando termines, mandame \"listo\" y coordinamos el envío 😊\n\nMientras tanto, pasame los datos para la etiqueta:\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nEmail (opcional, para el comprobante de MP):",
+            "_note": "TEXTO 5a — Cliente eligió tarjeta de crédito. Le mandamos el link + detalle del pedido + pedido de datos en paralelo. Placeholders: {{PRODUCT}}, {{PLAN}}, {{TOTAL}}, {{LINK}}.",
+            "response": "💳 Te dejo el link para pagar con tarjeta de crédito:\n\n{{LINK}}\n\nTotal: ${{TOTAL}} — {{PRODUCT}} {{PLAN}} días\n\nEs 100% protegido: si por algo no te llega, te devuelven la plata 👌\n\nCuando termines, mandame \"listo\" y coordinamos el envío 😊\n\nMientras tanto, pasame los datos para la etiqueta:\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nEmail (opcional, para el comprobante de pago):",
             "nextStep": "waiting_mp_payment"
         },
         "payment_mp_failed": {
@@ -129,8 +129,8 @@
         },
         "payment_mp_retry": {
             "step": "waiting_mp_payment",
-            "_note": "Mensaje cuando MP devuelve el pago como rejected/error tras un intento del cliente. Se ofrece reintento con otras formas dentro de MP.",
-            "response": "⚠️ Hubo un problema con el pago de MercadoPago, pudo ser la tarjeta o un rechazo del banco.\n\nProbá de nuevo con otra forma:\n✅ Tarjeta de crédito\n✅ Débito\n✅ Saldo Mercado Pago\n\nTe genero un nuevo link para volver a intentarlo, decime cuando esté listo 😊"
+            "_note": "Mensaje cuando el pago con tarjeta es rechazado tras un intento. Se ofrece reintentar con la tarjeta, o cambiar a transferencia / retiro en sucursal.",
+            "response": "⚠️ Hubo un problema con el pago, pudo ser la tarjeta o un rechazo del banco.\n\nPodés:\n✅ Reintentar con tu *tarjeta de crédito* (te genero un nuevo link)\n✅ Pagar por *transferencia*\n✅ O *retiro en sucursal* y pagás en efectivo al retirar\n\n¿Cómo seguimos? 😊"
         },
         "transfer_received": {
             "step": "waiting_transfer_confirmation",
@@ -159,7 +159,7 @@
         "order_confirmation_mp": {
             "step": "waiting_admin_validation",
             "_note": "Confirmación tras pago completo por MP (envío a domicilio). Placeholders: {{PRODUCT_DETAIL}}, {{PLAN_DETAIL}}, {{TOTAL}}, {{POSTDATADO_LINE}} (7 a 10 días hábiles uniforme).",
-            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✅ Pago recibido via MercadoPago\n\n✔ Correo Argentino — envío a domicilio\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs para retirar.\n\n👉 ¿Me confirmás que podés retirarlo en sucursal dentro de las 72 hs si fuera necesario?"
+            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✅ Pago recibido (tarjeta de crédito)\n\n✔ Correo Argentino — envío a domicilio\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs para retirar.\n\n👉 ¿Me confirmás que podés retirarlo en sucursal dentro de las 72 hs si fuera necesario?"
         },
         "order_confirmation_transfer": {
             "step": "waiting_admin_validation",
@@ -228,7 +228,7 @@
                 "opcion 4"
             ],
             "_note": "FAQ menu opción 4 — '¿Cómo lo recibo y cuánto tarda?'. Modelo unificado may-2026: 7 a 10 días hábiles para todo. Dos opciones de envío: retiro en sucursal o entrega a domicilio. Ambos son gratis.",
-            "response": "📦 *Envíos por Correo Argentino* — *7 a 10 días hábiles*.\n\nTenés 2 opciones:\n1️⃣ *Retiro en sucursal* — pagás al retirar (contrarreembolso)\n2️⃣ *Envío a domicilio* — se abona previamente\n\n‼️ Ambos envíos son *GRATIS* ‼️\n\nSi el cartero no te encuentra, te avisamos y tenés 72 hs para retirarlo en sucursal.\n\n👉 ¿Avanzamos?"
+            "response": "📦 *Envíos por Correo Argentino* — *7 a 10 días hábiles*.\n\nTenés 2 opciones:\n1️⃣ *Retiro en sucursal* — pagás al retirar (contrarreembolso)\n2️⃣ *Envío a domicilio* — se abona previamente\n\n‼️ Ambos envíos son *GRATIS* ‼️\n\nSi el cartero no te encuentra, te avisamos y tenés 72 hs para retirarlo en sucursal. Si no se retira en ese plazo y el paquete vuelve, se cobran los gastos de devolución ($18.000).\n\n👉 ¿Avanzamos?"
         },
         {
             "keywords": [
@@ -240,8 +240,8 @@
                 "metodo de pago",
                 "cuotas"
             ],
-            "_note": "Resumen del modelo nuevo (may-2026): 2 tipos de envío con sus medios asociados. Si el cliente ya eligió, no responder esto.",
-            "response": "Tenemos 2 opciones de envío 📦\n\n1️⃣ *Retiro en sucursal* → pagás el total *en efectivo al retirar* (contrarreembolso)\n2️⃣ *Envío a domicilio* → se abona previamente por *Mercado Pago* (tarjeta, débito, app MP, o efectivo en Pago Fácil/Rapipago) o *transferencia bancaria*\n\n‼️ Ambos envíos son GRATIS ‼️\n\n¿Cuál te queda más cómoda?"
+            "_note": "Resumen del modelo (jun-2026): 2 tipos de envío con sus medios asociados. Domicilio = tarjeta de crédito o transferencia. Retiro = efectivo al retirar (y transferencia si el cliente lo pide). Si el cliente ya eligió, no responder esto.",
+            "response": "Tenemos 2 opciones de envío 📦\n\n1️⃣ *Retiro en sucursal* → pagás el total *en efectivo al retirar* (contrarreembolso)\n2️⃣ *Envío a domicilio* → se abona previamente con *tarjeta de crédito* o *transferencia bancaria*\n\n‼️ Ambos envíos son GRATIS ‼️\n\n¿Cuál te queda más cómoda?"
         },
         {
             "keywords": [
@@ -387,7 +387,7 @@
         "noArgue": true,
         "keepResponsesShort": true,
         "defaultPaymentMethod": "shipping_first",
-        "_note_defaultPayment": "Modelo nuevo (may-2026): el menú pregunta primero por TIPO DE ENVÍO. (1) Retiro en sucursal = contrarreembolso 100% al retirar, sin anticipo. (2) Envío a domicilio = prepago por Mercado Pago (alias HERBALIS.TIENDA — BIO ORIGEN S.A.S. para transferencia). Rapipago/PagoFácil/Tarjeta se canalizan dentro del link de MP. El bot NUNCA menciona cuotas.",
+        "_note_defaultPayment": "Modelo (jun-2026): el menú pregunta primero por TIPO DE ENVÍO. (1) Retiro en sucursal = contrarreembolso 100% al retirar en efectivo, sin anticipo (y transferencia si el cliente lo pide). (2) Envío a domicilio = prepago con TARJETA DE CRÉDITO (link de pago) o TRANSFERENCIA (alias HERBALIS.TIENDA — BIO ORIGEN S.A.S.). De cara al cliente el medio online se llama 'Tarjeta de crédito' (NO 'Mercado Pago'); ya NO se ofrecen débito, saldo en app, Pago Fácil ni Rapipago. El bot NUNCA menciona cuotas.",
         "bankAlias": {
             "alias": "HERBALIS.TIENDA",
             "titular": "BIO ORIGEN S.A.S."
@@ -407,7 +407,7 @@
         },
         "prepayIncentive": {
             "enabled": false,
-            "_note": "DESACTIVADO. Ya no hay descuento ni regalo por prepagar — Mercado Pago es la modalidad por defecto, no una alternativa premiada."
+            "_note": "DESACTIVADO. Ya no hay descuento ni regalo por prepagar — la tarjeta de crédito es la modalidad por defecto, no una alternativa premiada."
         },
         "closeIfNotAccepted": "Trabajamos bajo estas modalidades.\n\nSi en algún momento te resulta cómodo avanzar, acá estamos 😊"
     }
