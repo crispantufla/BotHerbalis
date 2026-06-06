@@ -619,16 +619,32 @@ module.exports = (clientPool) => {
                 }
             }
 
-            const plan = state.selectedPlan || cart[0]?.plan || rescuedPlan || '60';
+            // El admin puede elegir producto+plan a mano desde el modal cuando el
+            // bot no los detectó. En ese caso el precio sale de la lista oficial.
+            const productTypeReq = req.body?.productType; // 'Cápsulas' | 'Gotas' | 'Semillas'
+            const planReq = req.body?.plan;               // '60' | '120'
+
+            const plan = planReq || state.selectedPlan || cart[0]?.plan || rescuedPlan || '60';
             // Prefer state.totalPrice (refleja el último cambio de plan).
             // Fall back to recalculating from cart only if totalPrice is missing.
             let total;
-            if (state.totalPrice) {
+            if (productTypeReq) {
+                const { _getPrice } = require('../../flows/utils/pricing');
+                total = parseInt(String(_getPrice(productTypeReq, plan)).replace(/\./g, ''), 10) || 0;
+            } else if (state.totalPrice) {
                 total = parseInt(state.totalPrice.toString().replace(/\./g, '').replace(/[^\d]/g, '')) || 0;
             } else if (rescuedTotal) {
                 total = rescuedTotal;
             } else {
                 total = cart.reduce((sum, i) => sum + parseInt((i.price || '0').toString().replace(/\D/g, '')), 0);
+            }
+
+            // Descuento manual del admin: resta al total final. (El bot nunca
+            // descuenta solo; esto es una acción manual desde el panel.)
+            const discountReq = Math.max(0, parseInt(String(req.body?.discount || '0').replace(/[^\d]/g, ''), 10) || 0);
+            if (discountReq > 0) {
+                total = Math.max(0, total - discountReq);
+                logger.info(`[MANUAL-COMPLETE] Descuento manual para ${chatId}: -$${discountReq} → total $${total}`);
             }
 
             // Normalize product name to standard format: "Cápsulas (120 días)"
@@ -649,8 +665,8 @@ module.exports = (clientPool) => {
                 return `${baseType} (${duration} días)`;
             };
 
-            const rawProduct = cart.map(i => i.product).join(' + ') || state.selectedProduct || rescuedProduct || 'Producto';
-            const rawPlan = cart.map(i => `${i.plan} días`).join(' + ') || `${plan} días`;
+            const rawProduct = productTypeReq || cart.map(i => i.product).join(' + ') || state.selectedProduct || rescuedProduct || 'Producto';
+            const rawPlan = productTypeReq ? `${plan} días` : (cart.map(i => `${i.plan} días`).join(' + ') || `${plan} días`);
             const product = normalizeProductName(rawProduct, rawPlan, total);
 
             // PREVIEW: el panel SIEMPRE abre el modal de verificación antes de
@@ -659,6 +675,8 @@ module.exports = (clientPool) => {
             // el admin confirma el modal (request sin preview, con manualAddr +
             // shippingType + paymentMethod).
             if (preview) {
+                const { _getPrices } = require('../../flows/utils/pricing');
+                const productDetected = /Cápsulas|Gotas|Semillas/.test(product);
                 return res.json({
                     preview: true,
                     prefill: {
@@ -674,6 +692,8 @@ module.exports = (clientPool) => {
                         product,
                         plan: String(plan),
                         total,
+                        productDetected,
+                        prices: _getPrices(),
                     }
                 });
             }

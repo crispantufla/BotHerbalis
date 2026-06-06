@@ -433,14 +433,14 @@ const CommsView = ({ initialChatId, onChatSelected, onChatOpened, initialSearch 
 
     // Paso 2: el admin verificó/ajustó en el modal y confirma. Acá sí se crea la
     // orden, enviando los datos + el tipo de envío y medio de pago elegidos.
-    const handleManualEntrySubmit = async ({ manualAddr, shippingType, paymentMethod }) => {
+    const handleManualEntrySubmit = async ({ manualAddr, shippingType, paymentMethod, discount, productType, plan }) => {
         if (!manualEntry) return;
         setSubmittingManual(true);
         try {
             await api.post('/api/orders/manual-complete', {
                 chatId: manualEntry.chatId,
                 silent: manualEntry.silent,
-                manualAddr, shippingType, paymentMethod,
+                manualAddr, shippingType, paymentMethod, discount, productType, plan,
             });
             toast.success(manualEntry.silent ? 'Venta registrada (sin mensaje)' : 'Pedido ingresado y confirmación enviada');
             setManualEntry(null);

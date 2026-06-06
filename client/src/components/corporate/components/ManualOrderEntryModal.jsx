@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Home, Store, CreditCard, Banknote, Send } from 'lucide-react';
+import { X, Save, Home, Store, CreditCard, Banknote, Send, Pill, Droplet, Leaf } from 'lucide-react';
 
 /**
  * Modal de verificación / carga de pedido.
@@ -10,8 +10,11 @@ import { X, Save, Home, Store, CreditCard, Banknote, Send } from 'lucide-react';
  *
  * Reglas de negocio (acopladas):
  *   - Envío a DOMICILIO  → pago: Mercado Pago o Transferencia. Pide dirección completa.
- *   - Retiro en SUCURSAL → pago: Efectivo al retirar. Pide solo Ciudad + CP.
+ *   - Retiro en SUCURSAL → pago: Efectivo al retirar. Pide ciudad + CP + provincia.
  *   (Nombre y apellido se pide siempre — la orden lo necesita.)
+ *   - Si el bot NO detectó el producto, el admin lo elige (producto + plan) y el
+ *     precio sale de la lista oficial.
+ *   - Descuento opcional: resta al total final.
  */
 const PAY_OPTIONS = {
     domicilio: [
@@ -23,11 +26,29 @@ const PAY_OPTIONS = {
     ],
 };
 
+const PRODUCT_OPTIONS = [
+    { value: 'Cápsulas', label: 'Cápsulas', icon: Pill },
+    { value: 'Gotas', label: 'Gotas', icon: Droplet },
+    { value: 'Semillas', label: 'Semillas', icon: Leaf },
+];
+
+const PLAN_OPTIONS = [
+    { value: '60', label: '60 días' },
+    { value: '120', label: '120 días' },
+];
+
+const onlyDigits = (s) => (s || '').toString().replace(/\D/g, '');
+const fmt = (n) => Number(n || 0).toLocaleString('es-AR');
+
 const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onClose, onSubmit, submitting = false }) => {
     const [data, setData] = useState({
         nombre: '', calle: '', ciudad: '', provincia: '', cp: '',
         shippingType: 'domicilio', paymentMethod: 'mercadopago',
+        productType: '', plan: '60', discount: '',
     });
+
+    const productDetected = !!prefill.productDetected;
+    const prices = prefill.prices || null;
 
     useEffect(() => {
         if (!open) return;
@@ -44,6 +65,9 @@ const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onC
             cp: prefill.cp || '',
             shippingType,
             paymentMethod,
+            productType: '',
+            plan: prefill.plan || '60',
+            discount: '',
         });
     }, [open, prefill]);
 
@@ -51,7 +75,6 @@ const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onC
 
     const isSucursal = data.shippingType === 'sucursal';
 
-    // Al cambiar el tipo de envío, re-encuadramos el medio de pago a uno válido.
     const setShipping = (shippingType) => {
         setData(prev => {
             const allowed = PAY_OPTIONS[shippingType].map(o => o.value);
@@ -62,10 +85,23 @@ const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onC
 
     const handleField = (key, value) => setData(prev => ({ ...prev, [key]: value }));
 
-    // Validación según tipo de envío.
-    const isValid = isSucursal
+    // Subtotal: detectado (prefill.total) o calculado desde la lista de precios
+    // cuando el admin elige producto+plan a mano.
+    const liveTotalStr = (!productDetected && data.productType && prices && prices[data.productType])
+        ? prices[data.productType][data.plan]
+        : null;
+    const baseTotal = liveTotalStr != null
+        ? (parseInt(onlyDigits(liveTotalStr), 10) || 0)
+        : (prefill.total ? Number(prefill.total) : 0);
+    const discountNum = parseInt(onlyDigits(data.discount), 10) || 0;
+    const finalTotal = Math.max(0, baseTotal - discountNum);
+
+    // Validación según tipo de envío + producto.
+    const addrValid = isSucursal
         ? (data.nombre.trim() && data.ciudad.trim() && data.cp.trim())
         : (data.nombre.trim() && data.calle.trim() && data.ciudad.trim());
+    const productValid = productDetected || !!data.productType;
+    const isValid = addrValid && productValid;
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -74,6 +110,7 @@ const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onC
             ? {
                 nombre: data.nombre.trim(),
                 ciudad: data.ciudad.trim(),
+                provincia: data.provincia.trim() || null,
                 cp: data.cp.trim() || null,
                 // calle se omite: el backend la setea como "A sucursal".
             }
@@ -84,12 +121,14 @@ const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onC
                 provincia: data.provincia.trim() || null,
                 cp: data.cp.trim() || null,
             };
-        onSubmit({ manualAddr, shippingType: data.shippingType, paymentMethod: data.paymentMethod });
+        onSubmit({
+            manualAddr,
+            shippingType: data.shippingType,
+            paymentMethod: data.paymentMethod,
+            discount: discountNum,
+            ...(productDetected ? {} : { productType: data.productType, plan: data.plan }),
+        });
     };
-
-    const totalFmt = prefill.total
-        ? Number(prefill.total).toLocaleString('es-AR')
-        : null;
 
     return (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}>
@@ -106,15 +145,44 @@ const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onC
                     </p>
                 </div>
 
-                {/* Producto / total detectados (solo lectura) */}
-                {(prefill.product || totalFmt) && (
-                    <div className="mb-4 px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">{prefill.product || 'Producto'}</span>
-                        {totalFmt && <span className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400">${totalFmt}</span>}
-                    </div>
-                )}
-
                 <form onSubmit={handleSubmit} className="space-y-4">
+                    {/* Producto */}
+                    <div>
+                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Producto</label>
+                        {productDetected ? (
+                            <div className="px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
+                                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{prefill.product}</span>
+                            </div>
+                        ) : (
+                            <>
+                                <p className="text-[11px] text-amber-600 dark:text-amber-400 mb-1.5">El bot no detectó el producto — elegilo:</p>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {PRODUCT_OPTIONS.map(opt => (
+                                        <SelectorButton
+                                            key={opt.value}
+                                            active={data.productType === opt.value}
+                                            icon={opt.icon}
+                                            label={opt.label}
+                                            onClick={() => handleField('productType', opt.value)}
+                                            disabled={submitting}
+                                        />
+                                    ))}
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 mt-2">
+                                    {PLAN_OPTIONS.map(opt => (
+                                        <SelectorButton
+                                            key={opt.value}
+                                            active={data.plan === opt.value}
+                                            label={opt.label}
+                                            onClick={() => handleField('plan', opt.value)}
+                                            disabled={submitting}
+                                        />
+                                    ))}
+                                </div>
+                            </>
+                        )}
+                    </div>
+
                     {/* Tipo de envío */}
                     <div>
                         <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Tipo de envío</label>
@@ -139,9 +207,6 @@ const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onC
                                 />
                             ))}
                         </div>
-                        {isSucursal && (
-                            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1.5">Paga el total en efectivo al retirar en la sucursal.</p>
-                        )}
                     </div>
 
                     {/* Datos */}
@@ -153,13 +218,11 @@ const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onC
                         )}
 
                         <div className="grid grid-cols-2 gap-3">
-                            <Field label={isSucursal ? 'Ciudad *' : 'Ciudad *'} value={data.ciudad} onChange={v => handleField('ciudad', v)} placeholder="Rosario" />
+                            <Field label="Ciudad *" value={data.ciudad} onChange={v => handleField('ciudad', v)} placeholder="Rosario" />
                             <Field label={isSucursal ? 'CP *' : 'CP'} value={data.cp} onChange={v => handleField('cp', v)} placeholder="2000" />
                         </div>
 
-                        {!isSucursal && (
-                            <Field label="Provincia" value={data.provincia} onChange={v => handleField('provincia', v)} placeholder="Santa Fe" />
-                        )}
+                        <Field label="Provincia" value={data.provincia} onChange={v => handleField('provincia', v)} placeholder="Santa Fe" />
 
                         {isSucursal && (
                             <p className="text-[11px] text-slate-400 dark:text-slate-500">
@@ -168,7 +231,33 @@ const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onC
                         )}
                     </div>
 
-                    <div className="flex gap-2 pt-2">
+                    {/* Totales + descuento */}
+                    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-3 space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                            <span className="text-slate-500 dark:text-slate-400">Subtotal</span>
+                            <span className="font-semibold text-slate-700 dark:text-slate-200">{baseTotal ? `$${fmt(baseTotal)}` : '—'}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                            <label className="text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">Descuento</label>
+                            <div className="relative w-32">
+                                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={data.discount}
+                                    onChange={e => handleField('discount', onlyDigits(e.target.value))}
+                                    placeholder="0"
+                                    className="w-full pl-6 pr-2 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-right text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-300"
+                                />
+                            </div>
+                        </div>
+                        <div className="flex items-center justify-between border-t border-slate-200 dark:border-slate-700 pt-2">
+                            <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Total final</span>
+                            <span className="text-base font-extrabold text-emerald-600 dark:text-emerald-400">{baseTotal ? `$${fmt(finalTotal)}` : '—'}</span>
+                        </div>
+                    </div>
+
+                    <div className="flex gap-2 pt-1">
                         <button
                             type="button"
                             onClick={onClose}
