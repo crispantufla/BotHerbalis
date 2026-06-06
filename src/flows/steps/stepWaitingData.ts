@@ -704,7 +704,10 @@ async function _askMissingFields(
     else if (missingTier2.length > 0) missing.push(...missingTier2);
 
     let msg;
-    if ((missingTier1.length === 2 && missingTier2.length === 2) || (missingTier1.length > 0 && !madeProgress)) {
+    // Los mensajes "intro" piden Nombre + Dirección. NO los usamos si la calle ya
+    // está resuelta (retiro en sucursal la fija como 'A sucursal'): ahí pedimos por
+    // lista de faltantes (nombre/ciudad/CP) sin mencionar una "Dirección" inexistente.
+    if (!addr.calle && ((missingTier1.length === 2 && missingTier2.length === 2) || (missingTier1.length > 0 && !madeProgress))) {
         const intros = [
             `¿Me pasás tu *Nombre y Apellido* y tú *Dirección* para armar la etiqueta? 😉`,
             `¡Dale! Pasame tu *Nombre completo* y la *Calle y Número* de tu casa 👇`,
@@ -760,6 +763,91 @@ async function _askMissingFields(
     currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
     saveState(userId);
     return { matched: true };
+}
+
+// --- Helper: Retiro en sucursal — captura robusta de datos + armado de orden ---
+// El retiro solo necesita nombre + ciudad + CP (la calle no aplica: queda 'A
+// sucursal'). El flujo normal de waiting_data está pensado para domicilio y, si
+// el bloque de datos viene con una pregunta ("¿necesitás algo más?") o en formato
+// libre, la clasificación lo manda a la IA y los datos NO se persisten: el bot los
+// "lee" pero el estado queda vacío y al mensaje siguiente vuelve a pedirlos
+// (caso real 5493405456106). Acá los capturamos y armamos la orden sí o sí.
+async function _handleRetiroData(
+    userId: string, text: string, normalizedText: string,
+    currentState: UserState, knowledge: any, dependencies: any
+): Promise<{ matched: boolean } | null> {
+    const { sendMessageWithDelay, aiService, saveState } = dependencies;
+
+    const isRetiro = currentState.shippingChoice === 'retiro'
+        || (currentState.partialAddress?.calle || '').toLowerCase() === 'a sucursal';
+    if (!isRetiro) return null;
+
+    if (!currentState.partialAddress) currentState.partialAddress = {};
+    const addr = currentState.partialAddress;
+    addr.calle = 'A sucursal'; // retiro: la calle no aplica, la fijamos siempre
+
+    const already = !!(addr.nombre && addr.ciudad && addr.cp);
+
+    // Solo intentamos parsear si el mensaje "parece datos" (evita gastar una
+    // llamada de IA en confirmaciones cortas tipo "sí, dale").
+    const looksLikeData = /\d/.test(text) || /\n/.test(text) || text.trim().split(/\s+/).length >= 3;
+    let progressed = false;
+    if (!already && looksLikeData) {
+        try {
+            const parsed = await (dependencies.mockAiService || aiService).parseAddress(text);
+            if (parsed && !parsed._error) {
+                if (parsed.nombre && !addr.nombre) { addr.nombre = parsed.nombre; if (!currentState.userName) currentState.userName = parsed.nombre; progressed = true; }
+                if (parsed.ciudad && !addr.ciudad) { addr.ciudad = parsed.ciudad; progressed = true; }
+                if (parsed.cp && !addr.cp) { addr.cp = parsed.cp; progressed = true; }
+                if (parsed.provincia && !addr.provincia) { addr.provincia = parsed.provincia; progressed = true; }
+            }
+        } catch (e: any) {
+            logger.warn(`[RETIRO-DATA] parseAddress falló para ${userId}: ${e.message}`);
+        }
+    }
+
+    // Completo → armar la orden de retiro y pasar a confirmación final.
+    if (addr.nombre && addr.ciudad && addr.cp) {
+        if (!currentState.cart || currentState.cart.length === 0) {
+            const product = currentState.selectedProduct;
+            const plan = currentState.selectedPlan || '60';
+            const price = currentState.price || _getPrice(product, plan);
+            currentState.cart = [{ product, plan, price } as any];
+        }
+        currentState.pendingOrder = {
+            ...addr,
+            calle: 'A sucursal',
+            calleOriginal: (addr as any).calleOriginal || null,
+            cart: currentState.cart,
+        } as any;
+        const total = currentState.cart.reduce((sum: number, i: any) => sum + parseInt(i.price.toString().replace(/\./g, '')), 0);
+        currentState.totalPrice = _formatPrice(total);
+        currentState.partialAddress = {} as any;
+        currentState.fieldReaskCount = {};
+        const summaryMsg = buildConfirmationMessage(currentState, knowledge);
+        currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
+        _setStep(currentState, FlowStep.WAITING_FINAL_CONFIRMATION);
+        saveState(userId);
+        await sendMessageWithDelay(userId, summaryMsg);
+        logger.info(`[RETIRO-DATA] Orden de retiro armada para ${userId}: ${addr.nombre} / ${addr.ciudad} / CP ${addr.cp}.`);
+        return { matched: true };
+    }
+
+    // Capturó algo pero falta → pedir SOLO lo que falta (nunca calle/dirección).
+    if (progressed) {
+        const missing: string[] = [];
+        if (!addr.nombre) missing.push('Nombre y apellido');
+        if (!addr.ciudad) missing.push('Localidad/Ciudad');
+        if (!addr.cp) missing.push('Código postal');
+        saveState(userId);
+        const msg = `¡Genial! Para el retiro en sucursal me falta: *${missing.join(', ')}* 🙌`;
+        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        await sendMessageWithDelay(userId, msg);
+        return { matched: true };
+    }
+
+    // No había datos en el mensaje → dejar que el flujo normal maneje preguntas/objeciones.
+    return null;
 }
 
 // ============================================================
@@ -822,6 +910,12 @@ export async function handleWaitingData(
     // 3. Sucursal intent
     const sucursalResult = await _handleSucursalIntent(userId, normalizedText, currentState, dependencies);
     if (sucursalResult) return sucursalResult;
+
+    // 3.5 Retiro en sucursal: captura robusta de datos (nombre+ciudad+CP) y armado
+    // de la orden, sin depender de la clasificación de domicilio (que perdía los
+    // datos cuando venían con una pregunta o en formato libre — caso 5493405456106).
+    const retiroResult = await _handleRetiroData(userId, text, normalizedText, currentState, knowledge, dependencies);
+    if (retiroResult) return retiroResult;
 
     // 4. Classify message
     const classification = _classifyMessage(text, normalizedText);
