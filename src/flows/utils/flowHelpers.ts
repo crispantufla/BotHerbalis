@@ -140,6 +140,17 @@ async function _pauseAndAlert(userId: string, currentState: UserState, dependenc
         await saveState(userId);
     }
 
+    // Registrar el motivo de la pausa de forma PERMANENTE en el historial (role
+    // 'system'): queda auditable para siempre y visible en el timeline del
+    // dashboard, aunque después se despause (unpauseUser borra pausedAt/pauseReason
+    // del User). NO se le envía nada al cliente — logAndEmit solo persiste + emite
+    // al panel. (Antes el motivo se perdía al despausar; ver caso 5493405456106.)
+    const _logAndEmit = dependencies.logAndEmit || (sharedState && sharedState.logAndEmit);
+    if (typeof _logAndEmit === 'function') {
+        try { _logAndEmit(userId, 'system', `⏸️ Bot pausado — ${reason}`, currentState.step); }
+        catch (e) { /* best effort, no romper el flujo de pausa */ }
+    }
+
     // Fire-and-forget: cerrar el FunnelEvent abierto como 'paused' para que la
     // analítica detecte "aquí el bot se rindió". Si el usuario sigue la charla
     // y avanza, el próximo _setStep abre uno nuevo.

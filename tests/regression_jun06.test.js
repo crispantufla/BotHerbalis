@@ -214,3 +214,26 @@ describe('5. Anti-duplicado global', () => {
         expect(client.sendMessage).toHaveBeenCalledTimes(2);
     });
 });
+
+// ════════════════════════════════════════════════════════════════════════════
+// 6. El motivo de la pausa queda registrado en el historial (auditable)
+// ════════════════════════════════════════════════════════════════════════════
+describe('6. Motivo de pausa registrado en el historial', () => {
+    const { _pauseAndAlert } = require('../src/flows/utils/flowHelpers');
+
+    test('_pauseAndAlert escribe un registro "system" con el motivo', async () => {
+        const logAndEmit = jest.fn();
+        const deps = {
+            notifyAdmin: jest.fn().mockResolvedValue(undefined),
+            saveState: jest.fn(),
+            sendMessageWithDelay: jest.fn().mockResolvedValue(undefined),
+            sharedState: { pausedUsers: new Set(), io: null },
+            logAndEmit,
+        };
+        const state = { step: 'waiting_payment_method', history: [] };
+        await _pauseAndAlert('z1@c.us', state, deps, 'mensaje del cliente', 'Motivo de prueba XYZ');
+        const sysCall = logAndEmit.mock.calls.find(([, role]) => role === 'system');
+        expect(sysCall).toBeTruthy();
+        expect(sysCall[2]).toContain('Motivo de prueba XYZ');
+    });
+});
