@@ -105,7 +105,16 @@ export async function handleSystemGlobals(
 
     // 2.5 ABUSIVE / ANGRY REJECT
     const ABUSIVE_REGEX = /\b(estafador|estafadores|estafa|robo|ladron|ladrones|mierda|puta|puto|boludos|boludeo|boludear|mentirosos|mentira|chantas|chanta|garcas|garca|denunciar|defensa al consumidor)\b/i;
-    if (ABUSIVE_REGEX.test(normalizedText) && currentState.step !== 'rejected_abusive') {
+    // Modismos rioplatenses NO dirigidos al bot: intensificadores ("como un hijo
+    // de puta" = muchísimo) y expresiones ("de/la puta madre"). Los borramos ANTES
+    // de evaluar abuso, así un comprador no queda rechazado por su forma de hablar.
+    // Caso real 5491130735300: "como como un hijo de puta... necesito un quemador
+    // de grasa" (pedía cápsulas) → el bot lo rechazó por abuso. El abuso DIRIGIDO
+    // ("sos un hijo de puta", "son unos estafadores") sigue gatillando porque no se borra.
+    const normWithoutIdioms = normalizedText
+        .replace(/\bcomo\s+(con\s+|que\s+)?(un|una)\s+(hij[oa]\s+de\s+puta|animal|bestia|condenad[oa])\b/gi, ' ')
+        .replace(/\b(de|la)\s+puta\s+madre\b/gi, ' ');
+    if (ABUSIVE_REGEX.test(normWithoutIdioms) && currentState.step !== 'rejected_abusive') {
         logger.info(`[ABUSIVE REJECT] User ${userId} used aggressive language.`);
         const msg = 'Lamento mucho que te sientas de esta manera. Voy a suspender la interacción automática para que un asesor humano atienda y analice tu caso a la brevedad.';
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
