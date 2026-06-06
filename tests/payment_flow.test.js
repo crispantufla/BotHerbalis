@@ -344,13 +344,35 @@ describe('Menú envío → Envío a domicilio (opción 2) + submenú prepago', (
         expect(state.step).toBe('waiting_transfer_confirmation');
     });
 
-    test('[3.8] Submenú ambiguo → re-pregunta', async () => {
+    test('[3.8] Submenú ambiguo → responde vía IA, NO re-pregunta a ciegas', async () => {
         const state = makePaymentState('60', { shippingChoice: 'domicilio', paymentSubChoiceAsked: true });
+        aiService.chat.mockClear();
+        mockSend.mockClear();
         await handleWaitingPaymentMethod('d8', 'no se', 'no se', state, knowledge, deps);
         expect(state.step).toBe('waiting_payment_method');
+        expect(aiService.chat).toHaveBeenCalled();
         const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
-        expect(sent).toMatch(/Mercado Pago/i);
-        expect(sent).toMatch(/Transferencia/i);
+        expect(sent).toMatch(/AI fallback/); // respondió la duda, no el menú repetido
+    });
+
+    // Regresión bucle 5491156581277: el cliente preguntaba si podía pagar en
+    // efectivo en el domicilio y el bot re-mandaba el submenú 5 veces.
+    test('[3.8b] Submenú "sería al contado" → aclara retiro en sucursal (no bucle)', async () => {
+        const state = makePaymentState('60', { shippingChoice: 'domicilio', paymentSubChoiceAsked: true });
+        mockSend.mockClear();
+        await handleWaitingPaymentMethod('d8b', 'Sería al contado', 'seria al contado', state, knowledge, deps);
+        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
+        expect(sent).toMatch(/sucursal/i);
+        expect(sent).toMatch(/retiro/i);
+        expect(state.paymentSubChoiceAsked).toBe(false);
+    });
+
+    test('[3.8c] Submenú "no me pasaste el precio" → responde el precio', async () => {
+        const state = makePaymentState('60', { shippingChoice: 'domicilio', paymentSubChoiceAsked: true });
+        mockSend.mockClear();
+        await handleWaitingPaymentMethod('d8c', 'Pero no me pasastes el precio', 'pero no me pasastes el precio', state, knowledge, deps);
+        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
+        expect(sent).toMatch(/46\.900/);
     });
 });
 

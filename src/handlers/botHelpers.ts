@@ -31,6 +31,12 @@ export interface BotHelpers {
 export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
     const { sellerId, sharedState, client, userState, config, pausedUsers, redlock } = ctx;
 
+    // Anti-duplicado global: último texto que el bot envió a cada chat. Backstop
+    // para que NUNCA se mande 2 veces seguidas el mismo mensaje (bucles que
+    // ignoran al cliente — caso 5491156581277). Por seller (este closure es por
+    // instancia), en memoria, sólo bloquea duplicados CONSECUTIVOS.
+    const _lastBotMsgByChat = new Map<string, string>();
+
     function normalizeProductName(rawProduct: string, rawPlan: string, price: number): string {
         const lower = (rawProduct || '').toLowerCase();
         let baseType = '';
@@ -209,6 +215,15 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
     }
 
     const sendMessageWithDelay = async (chatId: string, content: string, startTime: number = Date.now()): Promise<void> => {
+        // Backstop anti-bucle: nunca reenviar el MISMO texto consecutivamente al
+        // mismo chat. Si pasa, lo ignoramos y avisamos (el cliente ya lo tiene).
+        const _prevSent = _lastBotMsgByChat.get(chatId);
+        if (_prevSent !== undefined && _prevSent.trim() === (content || '').trim() && (content || '').trim().length > 0) {
+            logger.warn(`[ANTI-DUP][${sellerId}] Mensaje idéntico al anterior — NO reenviado a ${chatId}: "${(content || '').slice(0, 70)}"`);
+            return;
+        }
+        _lastBotMsgByChat.set(chatId, content || '');
+
         const minDelay = 4000;
         const maxDelay = 8000;
         const targetTotalDelay = Math.floor(Math.random() * (maxDelay - minDelay + 1) + minDelay);

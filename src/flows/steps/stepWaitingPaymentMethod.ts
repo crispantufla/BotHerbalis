@@ -2,7 +2,7 @@ import { UserState, FlowStep } from '../../types/state';
 import { _setStep, _pauseAndAlert, _detectPostdatado } from '../utils/flowHelpers';
 import { getFlowTemplate } from '../../utils/messageTemplates';
 import { calculateTotal } from '../utils/cartHelpers';
-import { _formatMessage } from '../utils/messages';
+import { _formatMessage, _isDuplicate } from '../utils/messages';
 import logger from '../../utils/logger';
 
 // Modelo nuevo de pago (may-2026): el menú pregunta primero TIPO DE ENVÍO.
@@ -194,10 +194,62 @@ export async function handleWaitingPaymentMethod(
             return { matched: true };
         }
 
-        // Ambigüedad: re-preguntar el submenú.
+        // ── Ambigüedad: NO re-mandamos el mismo submenú a ciegas (causaba bucle
+        // ignorando al cliente — caso 5491156581277). Interpretamos su mensaje.
+
+        // (a) Quiere pagar en efectivo / al contado / en el domicilio / al recibir.
+        // COD a domicilio NO existe → aclaramos y ofrecemos retiro en sucursal.
+        const wantsCashAtHome = /\b(contado|al contado|efectivo|en\s+(el|mi)\s+(domicilio|casa)|en\s+casa|al\s+recibir|contra\s?entrega|cuando\s+(lo|me)\s+(reciba|llegue|entreguen|traigan))\b/i.test(normalizedText)
+            && !MP_KEYWORDS.test(text) && !TRANSFER_KEYWORDS.test(normalizedText);
+        if (wantsCashAtHome) {
+            currentState.paymentSubChoiceAsked = false;
+            currentState.shippingChoice = null;
+            const msg = `¡Te aclaro! 😊 A *domicilio* el pago es *anticipado* (Mercado Pago o transferencia) — al cartero no se le paga.\n\nSi querés *pagar al recibir en efectivo*, lo mandamos a la *sucursal de Correo Argentino* más cercana a tu casa y pagás el total *$${currentState.totalPrice || '?'}* cuando lo retirás 💵\n\n¿Cómo preferís?\n1️⃣ *Retiro en sucursal* (pagás al retirar, en efectivo)\n2️⃣ *Envío a tu casa* (pagás ahora con Mercado Pago o transferencia)`;
+            currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+            saveState(userId);
+            await sendMessageWithDelay(userId, msg);
+            logger.info(`[PAYMENT_METHOD] ${userId} → submenú: pidió pagar en efectivo/domicilio. Aclarado COD = retiro en sucursal.`);
+            return { matched: true };
+        }
+
+        // (b) Pregunta el precio → se lo damos y re-ofrecemos el medio de pago.
+        const asksPrice = /\b(precio|cu[aá]nto|sale|vale|cuesta|valor|no\s+me\s+pasaste|no\s+me\s+pasaron|no\s+me\s+dijiste|cuanto\s+es|cuanto\s+sale)\b/i.test(normalizedText);
+        if (asksPrice) {
+            const prod = currentState.selectedProduct ? currentState.selectedProduct.split(' de ')[0] : 'el tratamiento';
+            const planTxt = currentState.selectedPlan ? ` ${currentState.selectedPlan} días` : '';
+            const msg = `El total es *$${currentState.totalPrice || '?'}* (${prod}${planTxt}) con *envío gratis* 📦\n\n¿Cómo querés abonar?\n1️⃣ *Mercado Pago*\n2️⃣ *Transferencia bancaria*`;
+            currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+            saveState(userId);
+            await sendMessageWithDelay(userId, msg);
+            logger.info(`[PAYMENT_METHOD] ${userId} → submenú: preguntó precio. Respondido + re-ofrecido medio de pago.`);
+            return { matched: true };
+        }
+
+        // (c) Otra duda → IA para responderla (con anti-duplicado). No repetimos.
+        const aiSub = await aiService.chat(text, {
+            step: 'waiting_payment_method',
+            goal: `El cliente eligió ENVÍO A DOMICILIO y debe elegir cómo abonar (es PREPAGO, antes del envío): 1) *Mercado Pago* (tarjeta, débito, app, o efectivo en Pago Fácil/Rapipago con el código) o 2) *Transferencia* al alias *HERBALIS.TIENDA* (BIO ORIGEN S.A.S.). A domicilio NO se paga en efectivo al recibir; el pago en efectivo SOLO existe con *retiro en sucursal* (pagás al retirar). Total del pedido: $${currentState.totalPrice || '?'}. Respondé su duda puntual con calidez y cerrá preguntando con cuál de los 2 medios quiere abonar. NUNCA menciones cuotas ni anticipo.`,
+            history: currentState.history,
+            summary: currentState.summary,
+            knowledge,
+            userState: currentState
+        });
+        if (aiSub.response && !_isDuplicate(aiSub.response, currentState.history)) {
+            currentState.history.push({ role: 'bot', content: aiSub.response, timestamp: Date.now() });
+            saveState(userId);
+            await sendMessageWithDelay(userId, aiSub.response);
+            return { matched: true };
+        }
+
+        // (d) Último recurso: re-ofrecer el submenú SOLO si no sería un duplicado.
+        // Si lo sería, derivamos a humano en vez de entrar en bucle.
         const tpl = getFlowTemplate('payment_domicilio_choice', knowledge) ||
             `¿Cómo querés abonar?\n\n1️⃣ *Mercado Pago*\n2️⃣ *Transferencia bancaria*`;
         const msg = _formatMessage(tpl, currentState);
+        if (_isDuplicate(msg, currentState.history)) {
+            await _pauseAndAlert(userId, currentState, dependencies, text, 'Cliente en submenú de pago (domicilio) sin elegir MP/transferencia tras varios intentos. Evito bucle — derivar a humano.');
+            return { matched: true };
+        }
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
