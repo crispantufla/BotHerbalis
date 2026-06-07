@@ -171,10 +171,39 @@ class ClientPool {
 
         // WhatsApp client — config aligned with main branch (proven to persist sessions)
         const webCachePath = path.join(dataDir, '.wwebjs_cache');
+
+        // Egress proxy (jun-2026): rutear la sesión por una IP del MISMO país que el
+        // teléfono evita el flag "impossible travel" de WhatsApp (la cuenta aparece
+        // activa desde 2 países a la vez → ban). Se setea por seller:
+        //   WA_PROXY_HORACIO=http://usuario:clave@host:puerto   (proxy AR contratado)
+        //   WA_PROXY_HORACIO=socks5://host:puerto               (SOCKS sin auth, ej. Tailscale)
+        // Fallback genérico WA_PROXY para todos. Sin setear → idéntico al comportamiento
+        // anterior (sale por la IP del host, ej. Railway).
+        // Nota: la auth de proxy SOLO funciona con http/https (Chrome no soporta auth en
+        // SOCKS). Para proxy autenticado usar siempre http://.
+        const proxyUrlRaw = process.env[`WA_PROXY_${sellerId.toUpperCase()}`] || process.env.WA_PROXY;
+        let proxyArg: string | undefined;
+        let proxyAuth: { username: string; password: string } | undefined;
+        if (proxyUrlRaw) {
+            try {
+                const u = new URL(proxyUrlRaw);
+                if (u.username) {
+                    proxyAuth = { username: decodeURIComponent(u.username), password: decodeURIComponent(u.password) };
+                    u.username = '';
+                    u.password = '';
+                }
+                proxyArg = `${u.protocol}//${u.host}`; // --proxy-server NO debe llevar credenciales
+            } catch {
+                proxyArg = proxyUrlRaw; // formato host:port simple, usar tal cual
+            }
+            logger.info(`[${sellerId}] Egress vía proxy ${proxyArg}${proxyAuth ? ' (con auth)' : ''}`);
+        }
+
         const client = new Client({
             authStrategy: new LocalAuth({ clientId: sellerId, dataPath: authPath }),
             deviceName: 'Herbalis CRM',
             browserName: 'Panel Empresarial',
+            ...(proxyAuth ? { proxyAuthentication: proxyAuth } : {}),
             webVersionCache: {
                 type: 'local',
                 path: webCachePath,
@@ -204,6 +233,7 @@ class ClientPool {
                     '--mute-audio', '--disable-translate', '--disable-speech-api',
                     // Un único --disable-features consolidado (Chromium solo lee uno).
                     '--disable-features=IsolateOrigins,site-per-process,NetworkService,TranslateUI,MediaRouter,DialMediaRouteProvider,OptimizationHints,AudioServiceOutOfProcess',
+                    ...(proxyArg ? [`--proxy-server=${proxyArg}`] : []),
                 ],
                 timeout: 120000
             }
