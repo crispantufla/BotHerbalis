@@ -22,6 +22,43 @@ const { restorePausedUsersFromDB } = require('./pauseService');
 const { handleAdminCommand: handleAdminCommandCtrl } = require('./adminService');
 const { buildConfirmationMessage } = require('../utils/messageTemplates');
 
+// Cache de proxies locales (proxy-chain) por seller. El reenviador local vive
+// durante todo el proceso y es independiente de los reinicios de Chrome, así que
+// se crea una sola vez por seller y se reusa en cada init.
+const _localEgressProxies = new Map<string, string>();
+
+/**
+ * Resuelve el `--proxy-server` que se le pasa a Chrome para un seller.
+ * - Sin `WA_PROXY_<SELLER>` ni `WA_PROXY` → undefined (sale por la IP del host).
+ * - Proxy SIN auth (ej. `socks5://host:port`) → se usa tal cual.
+ * - Proxy CON auth (`http://user:pass@host:port`) → levanta un reenviador local
+ *   (proxy-chain) que escucha en 127.0.0.1 SIN auth y agrega las credenciales al
+ *   upstream. Chrome habla con el local (sin 407) → el túnel/WebSocket de WhatsApp
+ *   funciona, y la auth viaja desde cualquier IP (no importa que Railway rote la
+ *   IP de salida). page.authenticate NO cubre el WebSocket de WA; por eso el
+ *   reenviador en vez de la opción proxyAuthentication.
+ */
+async function _resolveEgressProxy(sellerId: string): Promise<string | undefined> {
+    const raw = process.env[`WA_PROXY_${sellerId.toUpperCase()}`] || process.env.WA_PROXY;
+    if (!raw) return undefined;
+    if (_localEgressProxies.has(sellerId)) return _localEgressProxies.get(sellerId);
+
+    let hasAuth = false;
+    try { hasAuth = !!new URL(raw).username; } catch { /* formato simple host:port, sin auth */ }
+
+    if (!hasAuth) {
+        _localEgressProxies.set(sellerId, raw);
+        logger.info(`[${sellerId}] Egress vía proxy ${raw} (sin auth)`);
+        return raw;
+    }
+
+    const proxyChain = require('proxy-chain');
+    const local = await proxyChain.anonymizeProxy(raw);
+    _localEgressProxies.set(sellerId, local);
+    logger.info(`[${sellerId}] Egress vía proxy ${local} → reenvía con auth a ${raw.replace(/\/\/[^@]*@/, '//***@')}`);
+    return local;
+}
+
 export interface SellerInstance {
     sellerId: string;
     client: any;
@@ -172,38 +209,17 @@ class ClientPool {
         // WhatsApp client — config aligned with main branch (proven to persist sessions)
         const webCachePath = path.join(dataDir, '.wwebjs_cache');
 
-        // Egress proxy (jun-2026): rutear la sesión por una IP del MISMO país que el
-        // teléfono evita el flag "impossible travel" de WhatsApp (la cuenta aparece
-        // activa desde 2 países a la vez → ban). Se setea por seller:
-        //   WA_PROXY_HORACIO=http://usuario:clave@host:puerto   (proxy AR contratado)
-        //   WA_PROXY_HORACIO=socks5://host:puerto               (SOCKS sin auth, ej. Tailscale)
-        // Fallback genérico WA_PROXY para todos. Sin setear → idéntico al comportamiento
-        // anterior (sale por la IP del host, ej. Railway).
-        // Nota: la auth de proxy SOLO funciona con http/https (Chrome no soporta auth en
-        // SOCKS). Para proxy autenticado usar siempre http://.
-        const proxyUrlRaw = process.env[`WA_PROXY_${sellerId.toUpperCase()}`] || process.env.WA_PROXY;
-        let proxyArg: string | undefined;
-        let proxyAuth: { username: string; password: string } | undefined;
-        if (proxyUrlRaw) {
-            try {
-                const u = new URL(proxyUrlRaw);
-                if (u.username) {
-                    proxyAuth = { username: decodeURIComponent(u.username), password: decodeURIComponent(u.password) };
-                    u.username = '';
-                    u.password = '';
-                }
-                proxyArg = `${u.protocol}//${u.host}`; // --proxy-server NO debe llevar credenciales
-            } catch {
-                proxyArg = proxyUrlRaw; // formato host:port simple, usar tal cual
-            }
-            logger.info(`[${sellerId}] Egress vía proxy ${proxyArg}${proxyAuth ? ' (con auth)' : ''}`);
-        }
+        // Egress proxy (jun-2026): rutea la sesión por una IP del mismo país que el
+        // teléfono para evitar el flag "impossible travel" de WhatsApp. La resolución
+        // (incluido el reenviador local con auth vía proxy-chain) vive en
+        // _resolveEgressProxy. Se setea por seller: WA_PROXY_HORACIO=http://user:pass@host:puerto
+        // (o WA_PROXY genérico). Sin setear → sale por la IP del host (ej. Railway).
+        const proxyArg = await _resolveEgressProxy(sellerId);
 
         const client = new Client({
             authStrategy: new LocalAuth({ clientId: sellerId, dataPath: authPath }),
             deviceName: 'Herbalis CRM',
             browserName: 'Panel Empresarial',
-            ...(proxyAuth ? { proxyAuthentication: proxyAuth } : {}),
             webVersionCache: {
                 type: 'local',
                 path: webCachePath,
