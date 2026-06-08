@@ -75,6 +75,31 @@ export interface SellerInstance {
     stop: () => Promise<void>;
 }
 
+/**
+ * Identidad del dispositivo vinculado (deviceName/browserName) que WhatsApp muestra
+ * en "Dispositivos vinculados" y transmite en el handshake. Se persiste dentro de
+ * `authPath` (.wwebjs_auth) para que sea estable entre reinicios de una misma sesión
+ * pero se regenere cuando se wipea la sesión (el wipe borra .wwebjs_auth). Valores
+ * realistas tipo PC + navegador común, para no transmitir un beacon constante que
+ * delate al bot ni correlacione un número quemado con el siguiente.
+ */
+function _getDeviceIdentity(authPath: string): { deviceName: string; browserName: string } {
+    const idFile = path.join(authPath, '.device-identity.json');
+    try {
+        if (fs.existsSync(idFile)) return JSON.parse(fs.readFileSync(idFile, 'utf8'));
+    } catch { /* archivo corrupto → regenerar abajo */ }
+    const browsers = ['Chrome', 'Microsoft Edge', 'Firefox', 'Brave', 'Opera'];
+    const makes = ['DESKTOP', 'LAPTOP', 'PC'];
+    const pick = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
+    const tag = Math.random().toString(36).slice(2, 8).toUpperCase();
+    const identity = { deviceName: `${pick(makes)}-${tag}`, browserName: pick(browsers) };
+    try {
+        fs.mkdirSync(authPath, { recursive: true });
+        fs.writeFileSync(idFile, JSON.stringify(identity));
+    } catch { /* no persistible → se usa igual en memoria */ }
+    return identity;
+}
+
 function getDataDir(sellerId: string): string {
     const rootDataDir = process.env.DATA_DIR || (process.env.NODE_ENV === 'production' ? path.join(__dirname, '../../data') : path.join(__dirname, '../..'));
     const dir = path.join(rootDataDir, sellerId);
@@ -216,10 +241,17 @@ class ClientPool {
         // (o WA_PROXY genérico). Sin setear → sale por la IP del host (ej. Railway).
         const proxyArg = await _resolveEgressProxy(sellerId);
 
+        // Identidad del dispositivo vinculado. Antes era constante ('Herbalis CRM' /
+        // 'Panel Empresarial') en TODOS los números → un beacon que delataba al bot y
+        // correlacionaba un número quemado con el siguiente. Ahora es aleatoria y
+        // realista (parece una PC/navegador comunes), estable mientras la sesión vive
+        // y regenerada al wipear (vive dentro de .wwebjs_auth, que el wipe borra).
+        const device = _getDeviceIdentity(authPath);
+
         const client = new Client({
             authStrategy: new LocalAuth({ clientId: sellerId, dataPath: authPath }),
-            deviceName: 'Herbalis CRM',
-            browserName: 'Panel Empresarial',
+            deviceName: device.deviceName,
+            browserName: device.browserName,
             webVersionCache: {
                 type: 'local',
                 path: webCachePath,
