@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Herbalis Agent",
+  "version": "0.1.0",
+  "description": "Cliente fino: conecta el WhatsApp Web del vendedor (su IP, su navegador) con el cerebro en Railway.",
+  "permissions": ["storage", "alarms"],
+  "host_permissions": [
+    "https://web.whatsapp.com/*",
+    "https://*.railway.app/*"
+  ],
+  "options_page": "options.html",
+  "content_scripts": [
+    {
+      "matches": ["https://web.whatsapp.com/*"],
+      "js": ["wa-js.js", "bridge.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://web.whatsapp.com/*"],
+      "js": ["connector.js"],
+      "run_at": "document_start",
+      "world": "ISOLATED"
+    }
+  ]
+}

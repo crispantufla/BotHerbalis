@@ -18,6 +18,9 @@ Thumbs.db
 
 /src/generated/prisma
 
+# Bundle de terceros de la extensión (wa-js / WPP) — se bundlea por PC, no se commitea
+extension/wa-js.js
+
 # Railway logs
 logs.*.json
 
