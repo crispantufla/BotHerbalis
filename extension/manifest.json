@@ -6,7 +6,9 @@
   "permissions": ["storage", "alarms"],
   "host_permissions": [
     "https://web.whatsapp.com/*",
-    "https://*.railway.app/*"
+    "https://*.railway.app/*",
+    "http://localhost/*",
+    "ws://localhost/*"
   ],
   "options_page": "options.html",
   "content_scripts": [
