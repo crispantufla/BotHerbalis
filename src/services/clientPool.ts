@@ -631,16 +631,26 @@ class ClientPool {
         await this.ensureStarted(sellerId);
     }
 
-    /** Wipe session directory and start fresh (forces new QR scan). */
+    /**
+     * Wipe session directory and start fresh (forces new QR scan).
+     * Borra TANTO `.wwebjs_auth` (perfil Chromium + sesión WA, donde vive el
+     * device fingerprint) COMO `.wwebjs_cache` (build de WhatsApp Web). Reusar
+     * un perfil viejo entre números distintos correlaciona el dispositivo y hace
+     * que WhatsApp banee el número nuevo en el handshake (ban evasion detection),
+     * por eso el wipe debe dejar el perfil 100% virgen, no solo cerrar sesión.
+     */
     async wipeSessionAndRestart(sellerId: string): Promise<void> {
         if (this.instances.has(sellerId)) {
             await this.stopSeller(sellerId);
         }
         const dataDir = getDataDir(sellerId);
         const authPath = path.join(dataDir, '.wwebjs_auth');
-        if (fs.existsSync(authPath)) {
-            fs.rmSync(authPath, { recursive: true, force: true });
-            logger.info(`[POOL] Wiped session for ${sellerId}: ${authPath}`);
+        const cachePath = path.join(dataDir, '.wwebjs_cache');
+        for (const p of [authPath, cachePath]) {
+            if (fs.existsSync(p)) {
+                fs.rmSync(p, { recursive: true, force: true });
+                logger.info(`[POOL] Wiped ${path.basename(p)} for ${sellerId}: ${p}`);
+            }
         }
         // Go through initQueue to prevent concurrent Chrome launches
         this.knownSellers.add(sellerId);
