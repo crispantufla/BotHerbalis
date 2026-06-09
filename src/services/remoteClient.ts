@@ -13,7 +13,7 @@
  * Superficie replicada (lo que el bot realmente usa — verificado por grep):
  *   eventos:  qr, ready, change_state, auth_failure, disconnected, message, message_create
  *   métodos:  sendMessage, getChatById().{sendStateTyping,sendSeen,fetchMessages},
- *             initialize, destroy, removeAllListeners, resetState
+ *             getChats, getContactById, initialize, destroy, removeAllListeners, resetState
  *   props:    info.wid.user
  */
 
@@ -122,6 +122,39 @@ export class RemoteClient extends EventEmitter implements AgentSink {
                 const r = await self._rpc({ t: 'fetch_messages', chatId, limit: opts.limit ?? 50 });
                 return (r?.messages || []).map((m: any) => self._wrapMessage(m));
             },
+        };
+    }
+
+    /** Lista de chats — la usa GET /api/chats del dashboard. El agente manda los
+     *  campos que la ruta lee; acá solo les damos la forma wwebjs (id objeto). */
+    async getChats(): Promise<any[]> {
+        const r = await this._rpc({ t: 'get_chats' });
+        return (r?.chats || []).map((c: any) => ({
+            id: { _serialized: c.id, user: String(c.id || '').split('@')[0] },
+            name: c.name || '',
+            isGroup: !!c.isGroup,
+            timestamp: c.timestamp || 0,
+            unreadCount: c.unreadCount || 0,
+            lastMessage: c.lastMessage
+                ? {
+                      body: c.lastMessage.body || '',
+                      hasMedia: !!c.lastMessage.hasMedia,
+                      timestamp: c.lastMessage.timestamp || c.timestamp || 0,
+                  }
+                : null,
+        }));
+    }
+
+    /** Contacto por id — lo usan resolveChatId y /api/chats para resolver
+     *  @lid → @c.us (sin esto las pausas quedaban clavadas bajo el lid). */
+    async getContactById(contactId: string): Promise<any> {
+        const r = await this._rpc({ t: 'get_contact', contactId });
+        if (!r || !r.found) throw new Error(`contacto ${contactId} no encontrado`);
+        return {
+            id: { _serialized: r.id || contactId },
+            number: r.number || null,
+            name: r.name || undefined,
+            pushname: r.pushname || undefined,
         };
     }
 

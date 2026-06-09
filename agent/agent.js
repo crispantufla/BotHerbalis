@@ -53,20 +53,29 @@ async function apiCall(method, pathname, body) {
     return data;
 }
 
-// Devuelve el chat que el vendedor tiene ABIERTO. window.Store no está accesible en esta
-// versión, así que: leemos el NOMBRE del chat abierto del DOM y lo matcheamos contra los
-// chats de wwebjs (client.getChats) para obtener su id real (sirve para @lid también).
+// Devuelve el chat que el vendedor tiene ABIERTO, con su id EXACTO, vía los módulos
+// internos de WA Web (WAWebCollections.Chat.getActive) — la misma vía que usa wwebjs.
+// El match por NOMBRE contra client.getChats queda solo como fallback de emergencia:
+// es ambiguo con contactos homónimos y la lista se reordena entre llamadas (llegó a
+// apuntar acciones del panel a OTRO chat).
 async function getOpenChat() {
-    const name = await client.pupPage.evaluate(() => {
+    const res = await client.pupPage.evaluate(() => {
+        try {
+            const Chat = window.require('WAWebCollections').Chat;
+            const active = (typeof Chat.getActive === 'function' && Chat.getActive())
+                || Chat.getModelsArray().find((c) => c.active);
+            if (active) return { id: active.id._serialized, name: active.formattedTitle || active.name || null };
+        } catch (e) { /* módulo no disponible — caemos al DOM */ }
         const h = document.querySelector('#main header');
-        return h ? (h.innerText || '').split('\n')[0].trim() : null;
+        return { id: null, name: h ? (h.innerText || '').split('\n')[0].trim() : null };
     });
-    if (!name) return { id: null, dbg: { reason: 'ningún chat abierto' } };
+    if (res.id) return { id: res.id, dbg: { name: res.name, via: 'store' } };
+    if (!res.name) return { id: null, dbg: { reason: 'ningún chat abierto' } };
     try {
         const chats = await client.getChats();
-        let c = chats.find(x => (x.name || '') === name) || chats.find(x => (x.name || '').trim() === name.trim());
-        return { id: c ? c.id._serialized : null, dbg: { name, matched: !!c, n: chats.length } };
-    } catch (e) { return { id: null, dbg: { name, err: e.message } }; }
+        const c = chats.find(x => (x.name || '').trim() === res.name.trim());
+        return { id: c ? c.id._serialized : null, dbg: { name: res.name, via: 'nombre (ambiguo)', matched: !!c, n: chats.length } };
+    } catch (e) { return { id: null, dbg: { name: res.name, err: e.message } }; }
 }
 
 const HB_INTERVAL_MS = 15000;
@@ -84,6 +93,24 @@ const client = new Client({
 
 let waReady = false;
 let exposed = false;
+
+// Abre el dashboard de Railway en una segunda pestaña del mismo Chrome.
+// WhatsApp queda al frente; la sesión del dashboard persiste en el perfil (user-data-dir).
+let dashOpened = false;
+async function openDashboardTab() {
+    if (dashOpened || !client.pupBrowser || !client.pupPage) return;
+    dashOpened = true;
+    try {
+        const base = String(cfg.apiBase).replace(/\/$/, '') + '/';
+        const pages = await client.pupBrowser.pages();
+        if (!pages.some((p) => p.url().startsWith(base))) {
+            const page = await client.pupBrowser.newPage();
+            await page.goto(base, { waitUntil: 'domcontentloaded', timeout: 60000 });
+            log('dashboard abierto en segunda pestaña:', base);
+        }
+        await client.pupPage.bringToFront();
+    } catch (e) { dashOpened = false; log('no pude abrir el dashboard:', e.message); }
+}
 
 function serializeMsg(m) {
     return {
@@ -239,6 +266,37 @@ async function handleCommand(frame) {
                 ack(id, true, { messages: (msgs || []).map(serializeMsg) });
                 return;
             }
+            case 'get_chats': {
+                // Para GET /api/chats del dashboard. Solo los campos que la ruta lee.
+                const chats = await client.getChats();
+                const out = (chats || []).map((c) => ({
+                    id: c.id && c.id._serialized,
+                    name: c.name || '',
+                    isGroup: !!c.isGroup,
+                    timestamp: c.timestamp || 0,
+                    unreadCount: c.unreadCount || 0,
+                    lastMessage: c.lastMessage ? {
+                        body: c.lastMessage.body || '',
+                        hasMedia: !!c.lastMessage.hasMedia,
+                        timestamp: c.lastMessage.timestamp || 0,
+                    } : null,
+                }));
+                ack(id, true, { chats: out });
+                return;
+            }
+            case 'get_contact': {
+                // Para resolveChatId / resolución @lid→@c.us en Railway.
+                const contact = await client.getContactById(frame.contactId);
+                if (!contact) { ack(id, true, { found: false }); return; }
+                ack(id, true, {
+                    found: true,
+                    id: contact.id && contact.id._serialized,
+                    number: contact.number || null,
+                    name: contact.name || null,
+                    pushname: contact.pushname || null,
+                });
+                return;
+            }
             default:
                 return;
         }
@@ -295,6 +353,11 @@ function stopHeartbeat() { if (hbTimer) { clearInterval(hbTimer); hbTimer = null
 log(`iniciando agente para seller "${cfg.sellerId}"…`);
 connectGateway();
 client.initialize().catch((e) => fail(`no pude iniciar WhatsApp: ${e.message}`));
+
+// Apenas exista la ventana de Chrome (antes del QR/ready), abrir el dashboard al lado.
+const dashTimer = setInterval(() => {
+    if (client.pupBrowser && client.pupPage) { clearInterval(dashTimer); openDashboardTab(); }
+}, 700);
 
 // Errores transitorios de puppeteer/wwebjs (ej. "Execution context was destroyed" cuando
 // WhatsApp se recarga mientras wwebjs inyecta) NO deben tumbar el agente. Los logueamos;

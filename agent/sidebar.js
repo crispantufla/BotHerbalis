@@ -62,7 +62,7 @@ function bootstrap(initW) {
       #hb-feed.ok{color:#00d26a}#hb-feed.err{color:#f15c6d}
       #hb-body details summary{color:#8696a0;font-size:12px;cursor:pointer}
       #hb-body input{background:#202c33;border:1px solid #2a3942;border-radius:8px;color:#e9edef;padding:9px 11px;font-size:14px;outline:none;width:100%;box-sizing:border-box;margin-top:4px}
-      #hb-tog{position:fixed;top:14px;right:0;z-index:100000;background:#00a884;color:#fff;border:0;border-radius:8px 0 0 8px;padding:8px 9px;cursor:pointer;font-size:16px;transition:right .22s ease;line-height:1}
+      #hb-tog{position:fixed;top:76px;right:0;z-index:100000;background:#00a884;color:#fff;border:0;border-radius:8px 0 0 8px;padding:8px 9px;cursor:pointer;font-size:16px;transition:right .22s ease;line-height:1}
     `;
         document.head.appendChild(style);
 

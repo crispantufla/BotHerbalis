@@ -811,6 +811,11 @@ class ClientPool {
         this.watchdogInterval = setInterval(async () => {
             for (const [sellerId, instance] of this.instances) {
                 if (!instance.sharedState.isConnected) continue;
+                // Clientes remotos no tienen Chrome local que vigilar (pupPage es
+                // undefined a propósito): su liveness la cubre el heartbeat del
+                // gateway (onAgentOffline → 'disconnected'). Sin este skip, el
+                // watchdog los mataba cada 3 min con "Page closed".
+                if (instance.client instanceof RemoteClient) continue;
                 try {
                     // Lightweight health check — evaluate JS in the WA page
                     const page = instance.client?.pupPage;
