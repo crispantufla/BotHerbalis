@@ -54,6 +54,7 @@ const client = new Client({
 });
 
 let waReady = false;
+let exposed = false;
 
 function serializeMsg(m) {
     return {
@@ -81,10 +82,26 @@ client.on('ready', async () => {
     const phone = client.info && client.info.wid ? client.info.wid.user : '';
     log('✅ WhatsApp listo. Número:', phone);
     send({ t: 'ready', phone });
-    // Panel lateral en la ventana de WhatsApp del agente.
+    // Panel lateral (botonera) en la ventana de WhatsApp del agente.
     try {
-        await injectSidebar(client.pupPage, { dashboardUrl: cfg.dashboardUrl });
-        log('panel lateral inyectado →', cfg.dashboardUrl);
+        // Expone al panel una función para enviar mensajes vía wwebjs. Una sola vez:
+        // el binding de exposeFunction persiste entre recargas de WhatsApp.
+        if (!exposed) {
+            await client.pupPage.exposeFunction('hbSendMessage', async (number, text) => {
+                try {
+                    const chatId = String(number).replace(/\D/g, '') + '@c.us';
+                    const sent = await client.sendMessage(chatId, text);
+                    log(`▶ enviado desde panel a ${chatId}`);
+                    return { ok: true, id: sent && sent.id ? sent.id._serialized : null };
+                } catch (e) {
+                    log('envío desde panel falló:', e.message);
+                    return { ok: false, error: e.message };
+                }
+            });
+            exposed = true;
+        }
+        await injectSidebar(client.pupPage);
+        log('panel inyectado');
     } catch (e) { log('sidebar:', e.message); }
 });
 client.on('change_state', (s) => { log('estado:', s); send({ t: 'state', state: s }); });
