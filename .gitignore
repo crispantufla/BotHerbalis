@@ -21,6 +21,10 @@ Thumbs.db
 # Bundle de terceros de la extensión (wa-js / WPP) — se bundlea por PC, no se commitea
 extension/wa-js.js
 
+# Agente wwebjs: config con token + auth local, no se commitean
+agent/config.json
+agent/.wwebjs_auth
+
 # Railway logs
 logs.*.json
 
