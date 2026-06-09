@@ -25,6 +25,8 @@ const RPC_TIMEOUT_MS = 30000;
 
 /** Proxy de un mensaje entrante con la forma que espera el bot (campos wwebjs). */
 interface RemoteMessage {
+    getChat: () => Promise<any>;
+    getContact: () => Promise<any>;
     id: { _serialized: string };
     from: string;
     to?: string;
@@ -228,6 +230,27 @@ export class RemoteClient extends EventEmitter implements AgentSink {
                 const r = await self._rpc({ t: 'download', msgId: serialized });
                 if (!r || !r.data) return undefined;
                 return { mimetype: r.mimetype, data: r.data, filename: r.filename };
+            },
+            // messageHandler llama msg.getChat() (isGroup + sendStateRecording) y
+            // msg.getContact() (resolución @lid → teléfono real). Sin esto, TODO
+            // mensaje entrante moría con "msg.getChat is not a function".
+            getChat: async () => {
+                const chat = await self.getChatById(m.from);
+                return {
+                    ...chat,
+                    isGroup: String(m.from || '').endsWith('@g.us'),
+                    sendStateRecording: () => Promise.resolve(),  // cosmético — no hay comando remoto
+                };
+            },
+            getContact: async () => {
+                const r = await self._rpc({ t: 'get_contact', contactId: m.author || m.from });
+                if (!r || !r.found) return null;
+                return {
+                    id: { _serialized: r.id || m.from },
+                    number: r.number || null,
+                    name: r.name || undefined,
+                    pushname: r.pushname || undefined,
+                };
             },
         };
     }
