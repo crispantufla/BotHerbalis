@@ -227,4 +227,14 @@ log(`iniciando agente para seller "${cfg.sellerId}"…`);
 connectGateway();
 client.initialize().catch((e) => fail(`no pude iniciar WhatsApp: ${e.message}`));
 
+// Errores transitorios de puppeteer/wwebjs (ej. "Execution context was destroyed" cuando
+// WhatsApp se recarga mientras wwebjs inyecta) NO deben tumbar el agente. Los logueamos;
+// wwebjs maneja la reconexión por su cuenta.
+process.on('unhandledRejection', (reason) => {
+    log('unhandledRejection (ignorado):', (reason && reason.message) || String(reason));
+});
+process.on('uncaughtException', (e) => {
+    log('uncaughtException (ignorado):', (e && e.message) || String(e));
+});
+
 process.on('SIGINT', async () => { log('cerrando…'); try { await client.destroy(); } catch {} process.exit(0); });
