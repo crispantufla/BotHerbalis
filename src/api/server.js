@@ -44,17 +44,15 @@ function startServer(clientPool) {
     app.set('trust proxy', 1);
     app.use(cors({ origin: allowedOrigin }));
     const helmet = require('helmet');
-    app.use(helmet({
-        // CSP general desactivada (la SPA no la necesita). Activamos SOLO frame-ancestors
-        // para poder embeber el dashboard en el panel del agente sobre web.whatsapp.com.
-        // frameguard off → sin X-Frame-Options (que si no bloquearía el iframe).
-        contentSecurityPolicy: {
-            useDefaults: false,
-            directives: { 'frame-ancestors': ["'self'", 'https://web.whatsapp.com'] },
-        },
-        crossOriginEmbedderPolicy: false,
-        frameguard: false,
-    }));
+    // CSP de helmet apagada (la SPA no la necesita; activarla con useDefaults:false sin
+    // default-src hace que helmet tire error en el arranque). frameguard off → sin
+    // X-Frame-Options. El frame-ancestors lo seteamos a mano abajo (sin la validación de
+    // helmet) para permitir embeber el dashboard SOLO desde web.whatsapp.com (panel del agente).
+    app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false, frameguard: false }));
+    app.use((req, res, next) => {
+        res.setHeader('Content-Security-Policy', "frame-ancestors 'self' https://web.whatsapp.com");
+        next();
+    });
     const compression = require('compression');
     app.use(compression());
     app.use(express.json({ limit: '25mb' }));
