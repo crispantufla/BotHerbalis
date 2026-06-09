@@ -40,6 +40,12 @@ function startServer(clientPool) {
         transports: ['websocket', 'polling']
     });
 
+    // Gateway WSS para el cliente fino (extensión Chrome + wa-js) que corre en la
+    // PC del vendedor en modo remoto. Se monta sobre el mismo httpServer, en /agent
+    // (Socket.IO usa /socket.io/, así que conviven). Ver agentBridge.ts / remoteClient.ts.
+    const { agentHub } = require('../services/agentBridge');
+    agentHub.attach(server);
+
     // Middleware
     app.set('trust proxy', 1);
     app.use(cors({ origin: allowedOrigin }));

@@ -1,0 +1,5 @@
+{
+  "gatewayUrl": "ws://localhost:3100/agent",
+  "sellerId": "domtest",
+  "token": "test-token-123"
+}

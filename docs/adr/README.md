@@ -37,4 +37,4 @@ Qué cambia / qué empeora / qué hay que aceptar como costo.
 
 ## Decisiones documentadas
 
-_(Nada todavía. Cuando aparezca la primera, agregala acá como link)._
+- [ADR-0001: Cliente remoto vía extensión Chrome](0001-cliente-remoto-extension.md) — separar cerebro (Railway) y brazo (PC del vendedor) para evitar el ban instantáneo.

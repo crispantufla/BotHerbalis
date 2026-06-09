@@ -21,6 +21,18 @@ const { startScheduler } = require('./scheduler');
 const { restorePausedUsersFromDB } = require('./pauseService');
 const { handleAdminCommand: handleAdminCommandCtrl } = require('./adminService');
 const { buildConfirmationMessage } = require('../utils/messageTemplates');
+import { RemoteClient } from './remoteClient';
+
+/**
+ * ¿Este seller corre en "modo remoto"? En modo remoto la sesión de WhatsApp no la
+ * sostiene un Chromium headless local sino el cliente fino (extensión Chrome + wa-js)
+ * en la PC del vendedor, vía el AgentHub. Se activa por seller con
+ * WA_MODE_<SELLER>=remote (o WA_MODE=remote global). Default: wwebjs local.
+ */
+function _isRemoteSeller(sellerId: string): boolean {
+    const mode = process.env[`WA_MODE_${sellerId.toUpperCase()}`] || process.env.WA_MODE;
+    return (mode || '').toLowerCase() === 'remote';
+}
 
 // Cache de proxies locales (proxy-chain) por seller. El reenviador local vive
 // durante todo el proceso y es independiente de los reinicios de Chrome, así que
@@ -234,58 +246,70 @@ class ClientPool {
         // WhatsApp client — config aligned with main branch (proven to persist sessions)
         const webCachePath = path.join(dataDir, '.wwebjs_cache');
 
-        // Egress proxy (jun-2026): rutea la sesión por una IP del mismo país que el
-        // teléfono para evitar el flag "impossible travel" de WhatsApp. La resolución
-        // (incluido el reenviador local con auth vía proxy-chain) vive en
-        // _resolveEgressProxy. Se setea por seller: WA_PROXY_HORACIO=http://user:pass@host:puerto
-        // (o WA_PROXY genérico). Sin setear → sale por la IP del host (ej. Railway).
-        const proxyArg = await _resolveEgressProxy(sellerId);
+        // El cliente puede ser:
+        //  - RemoteClient (modo remoto): la sesión la sostiene la extensión Chrome +
+        //    wa-js en la PC del vendedor (su IP, su navegador). Acá no se lanza Chromium;
+        //    el adaptador habla con el agente vía AgentHub. Imita la superficie wwebjs,
+        //    así que todo lo de abajo (eventos, sendMessage, getChatById) no cambia.
+        //  - Client (wwebjs, modo local): Chromium headless local con proxy de egress.
+        let client: any;
+        if (_isRemoteSeller(sellerId)) {
+            logger.info(`[POOL][${sellerId}] Modo REMOTO — sesión vía extensión en la PC del vendedor`);
+            client = new RemoteClient(sellerId);
+        } else {
+            // Egress proxy (jun-2026): rutea la sesión por una IP del mismo país que el
+            // teléfono para evitar el flag "impossible travel" de WhatsApp. La resolución
+            // (incluido el reenviador local con auth vía proxy-chain) vive en
+            // _resolveEgressProxy. Se setea por seller: WA_PROXY_HORACIO=http://user:pass@host:puerto
+            // (o WA_PROXY genérico). Sin setear → sale por la IP del host (ej. Railway).
+            const proxyArg = await _resolveEgressProxy(sellerId);
 
-        // Identidad del dispositivo vinculado. Antes era constante ('Herbalis CRM' /
-        // 'Panel Empresarial') en TODOS los números → un beacon que delataba al bot y
-        // correlacionaba un número quemado con el siguiente. Ahora es aleatoria y
-        // realista (parece una PC/navegador comunes), estable mientras la sesión vive
-        // y regenerada al wipear (vive dentro de .wwebjs_auth, que el wipe borra).
-        const device = _getDeviceIdentity(authPath);
+            // Identidad del dispositivo vinculado. Antes era constante ('Herbalis CRM' /
+            // 'Panel Empresarial') en TODOS los números → un beacon que delataba al bot y
+            // correlacionaba un número quemado con el siguiente. Ahora es aleatoria y
+            // realista (parece una PC/navegador comunes), estable mientras la sesión vive
+            // y regenerada al wipear (vive dentro de .wwebjs_auth, que el wipe borra).
+            const device = _getDeviceIdentity(authPath);
 
-        const client = new Client({
-            authStrategy: new LocalAuth({ clientId: sellerId, dataPath: authPath }),
-            deviceName: device.deviceName,
-            browserName: device.browserName,
-            webVersionCache: {
-                type: 'local',
-                path: webCachePath,
-            },
-            puppeteer: {
-                headless: true,
-                ...(process.env.PUPPETEER_EXECUTABLE_PATH && { executablePath: process.env.PUPPETEER_EXECUTABLE_PATH }),
-                args: [
-                    '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
-                    '--disable-accelerated-2d-canvas', '--disable-gpu',
-                    '--no-first-run', '--no-experiments',
-                    '--ignore-certificate-errors', '--disable-extensions',
-                    '--disable-background-networking', '--disable-background-timer-throttling',
-                    '--disable-backgrounding-occluded-windows',
-                    '--disable-client-side-phishing-detection', '--disable-default-apps',
-                    '--disable-hang-monitor', '--disable-prompt-on-repost',
-                    '--disable-sync', '--disk-cache-size=0', '--disable-gpu-shader-disk-cache',
-                    // Reduce process count per Chrome — Railway containers have PID limits.
-                    // Without these, 6 Chrome = ~90 processes → EAGAIN on fork().
-                    '--renderer-process-limit=1',      // 1 renderer instead of ~4-6
-                    '--disable-site-isolation-trials',  // don't spawn extra renderer per origin
-                    // WA Web rara vez usa >150MB de heap — 256 es holgado y ahorra ~50 MB vs 512.
-                    '--js-flags=--max-old-space-size=256',
-                    // Free cached tiles/images when the tab is idle.
-                    '--aggressive-cache-discard',
-                    // Silenciar subsistemas que WA Web no usa.
-                    '--mute-audio', '--disable-translate', '--disable-speech-api',
-                    // Un único --disable-features consolidado (Chromium solo lee uno).
-                    '--disable-features=IsolateOrigins,site-per-process,NetworkService,TranslateUI,MediaRouter,DialMediaRouteProvider,OptimizationHints,AudioServiceOutOfProcess',
-                    ...(proxyArg ? [`--proxy-server=${proxyArg}`] : []),
-                ],
-                timeout: 120000
-            }
-        });
+            client = new Client({
+                authStrategy: new LocalAuth({ clientId: sellerId, dataPath: authPath }),
+                deviceName: device.deviceName,
+                browserName: device.browserName,
+                webVersionCache: {
+                    type: 'local',
+                    path: webCachePath,
+                },
+                puppeteer: {
+                    headless: true,
+                    ...(process.env.PUPPETEER_EXECUTABLE_PATH && { executablePath: process.env.PUPPETEER_EXECUTABLE_PATH }),
+                    args: [
+                        '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
+                        '--disable-accelerated-2d-canvas', '--disable-gpu',
+                        '--no-first-run', '--no-experiments',
+                        '--ignore-certificate-errors', '--disable-extensions',
+                        '--disable-background-networking', '--disable-background-timer-throttling',
+                        '--disable-backgrounding-occluded-windows',
+                        '--disable-client-side-phishing-detection', '--disable-default-apps',
+                        '--disable-hang-monitor', '--disable-prompt-on-repost',
+                        '--disable-sync', '--disk-cache-size=0', '--disable-gpu-shader-disk-cache',
+                        // Reduce process count per Chrome — Railway containers have PID limits.
+                        // Without these, 6 Chrome = ~90 processes → EAGAIN on fork().
+                        '--renderer-process-limit=1',      // 1 renderer instead of ~4-6
+                        '--disable-site-isolation-trials',  // don't spawn extra renderer per origin
+                        // WA Web rara vez usa >150MB de heap — 256 es holgado y ahorra ~50 MB vs 512.
+                        '--js-flags=--max-old-space-size=256',
+                        // Free cached tiles/images when the tab is idle.
+                        '--aggressive-cache-discard',
+                        // Silenciar subsistemas que WA Web no usa.
+                        '--mute-audio', '--disable-translate', '--disable-speech-api',
+                        // Un único --disable-features consolidado (Chromium solo lee uno).
+                        '--disable-features=IsolateOrigins,site-per-process,NetworkService,TranslateUI,MediaRouter,DialMediaRouteProvider,OptimizationHints,AudioServiceOutOfProcess',
+                        ...(proxyArg ? [`--proxy-server=${proxyArg}`] : []),
+                    ],
+                    timeout: 120000
+                }
+            });
+        }
 
         // Track IDs of messages that the bot itself sends via client.sendMessage.
         // Used by the 'message_create' handler to skip echoes of bot-sent messages

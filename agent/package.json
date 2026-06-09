@@ -1,0 +1,15 @@
+{
+  "name": "herbalis-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Brazo del bot: whatsapp-web.js en la PC del vendedor, conectado al cerebro en Railway vía el gateway /agent.",
+  "main": "agent.js",
+  "scripts": {
+    "start": "node agent.js"
+  },
+  "dependencies": {
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.34.6",
+    "ws": "^8.20.0"
+  }
+}
