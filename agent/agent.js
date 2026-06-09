@@ -147,11 +147,17 @@ client.on('ready', async () => {
                         case 'pause':  await apiCall('POST', '/api/toggle-bot', { chatId, paused: true });  return { ok: true, msg: 'Bot pausado' };
                         case 'resume': await apiCall('POST', '/api/toggle-bot', { chatId, paused: false }); return { ok: true, msg: 'Bot reactivado' };
                         case 'reset':  await apiCall('POST', '/api/reset-chat', { chatId });                return { ok: true, msg: 'Chat reiniciado' };
-                        case 'confirm': { const r = await apiCall('POST', '/api/orders/manual-complete', { chatId, silent: false }); return { ok: true, msg: 'Pedido confirmado', data: r }; }
+                        case 'confirm': { const r = await apiCall('POST', '/api/orders/manual-complete', { chatId, silent: false }); return { ok: true, msg: 'Pedido confirmado (con mensaje)', data: r }; }
+                        case 'confirm_silent': { const r = await apiCall('POST', '/api/orders/manual-complete', { chatId, silent: true }); return { ok: true, msg: 'Pedido registrado (sin mensaje)', data: r }; }
                         case 'summarize': { const r = await apiCall('GET', '/api/summarize/' + encodeURIComponent(chatId)); return { ok: true, msg: 'Resumen', data: (r && (r.summary || r.text)) || r }; }
                         default: return { ok: false, error: 'acción desconocida' };
                     }
                 } catch (e) { log(`acción ${action} falló:`, e.message); return { ok: false, error: e.message }; }
+            });
+            // Trae el guion (pasos) para mostrarlos en el panel.
+            await client.pupPage.exposeFunction('hbGetScript', async () => {
+                try { const r = await apiCall('GET', '/api/script/v7'); return { ok: true, flow: (r && r.flow) || {} }; }
+                catch (e) { return { ok: false, error: e.message }; }
             });
             exposed = true;
         }
