@@ -53,26 +53,20 @@ async function apiCall(method, pathname, body) {
     return data;
 }
 
-// Devuelve el chat que el vendedor tiene ABIERTO (del Store interno de wwebjs).
+// Devuelve el chat que el vendedor tiene ABIERTO. window.Store no está accesible en esta
+// versión, así que: leemos el NOMBRE del chat abierto del DOM y lo matcheamos contra los
+// chats de wwebjs (client.getChats) para obtener su id real (sirve para @lid también).
 async function getOpenChat() {
-    return await client.pupPage.evaluate(() => {
-        const out = { id: null, dbg: {} };
-        try {
-            const S = window.Store;
-            out.dbg.store = !!S; out.dbg.cmd = !!(S && S.Cmd); out.dbg.chat = !!(S && S.Chat);
-            let c = S && S.Cmd && S.Cmd.activeChat;
-            if (c) out.dbg.via = 'Cmd.activeChat';
-            if (!c && S && S.Chat && typeof S.Chat.getActiveChat === 'function') { c = S.Chat.getActiveChat(); if (c) out.dbg.via = 'getActiveChat'; }
-            if (!c && S && S.Chat) {
-                const arr = (typeof S.Chat.getModelsArray === 'function' && S.Chat.getModelsArray()) || S.Chat._models || S.Chat.models || [];
-                out.dbg.n = arr && arr.length;
-                c = arr && arr.find(x => x && x.active);
-                if (c) out.dbg.via = 'active';
-            }
-            out.id = c && c.id ? (c.id._serialized || (c.id.toString && c.id.toString())) : null;
-        } catch (e) { out.dbg.err = String(e); }
-        return out;
+    const name = await client.pupPage.evaluate(() => {
+        const h = document.querySelector('#main header');
+        return h ? (h.innerText || '').split('\n')[0].trim() : null;
     });
+    if (!name) return { id: null, dbg: { reason: 'ningún chat abierto' } };
+    try {
+        const chats = await client.getChats();
+        let c = chats.find(x => (x.name || '') === name) || chats.find(x => (x.name || '').trim() === name.trim());
+        return { id: c ? c.id._serialized : null, dbg: { name, matched: !!c, n: chats.length } };
+    } catch (e) { return { id: null, dbg: { name, err: e.message } }; }
 }
 
 const HB_INTERVAL_MS = 15000;
@@ -174,18 +168,10 @@ client.on('disconnected', (reason) => {
 });
 
 // Entrantes (del cliente)
-client.on('message', async (m) => {
+client.on('message', (m) => {
     const msg = serializeMsg(m);
-    // WhatsApp manda @lid (id de privacidad) para contactos guardados → no es el teléfono.
-    // El salesFlow se identifica por teléfono (pedidos, alertas, estado), así que resolvemos
-    // @lid → teléfono real (contact.id) y mandamos ese como `from`.
-    if (msg.from && msg.from.includes('@lid')) {
-        try {
-            const c = await m.getContact();
-            const real = c && c.id && c.id._serialized;
-            if (real && real.includes('@c.us')) { msg.lid = msg.from; msg.from = real; }
-        } catch (e) { log('   no pude resolver @lid:', e.message); }
-    }
+    // from se deja tal cual (incluye @lid): es lo que enruta bien al enviar de vuelta.
+    // La resolución a teléfono real, si hace falta, se hace del lado de Railway (resolveChatId).
     log(`◀ incoming de ${msg.from}: ${JSON.stringify(msg.body)}`);
     send({ t: 'incoming', msg });
 });
