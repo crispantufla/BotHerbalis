@@ -98,6 +98,28 @@ client.on('ready', async () => {
                     return { ok: false, error: e.message };
                 }
             });
+            // Enviar al chat que el vendedor tiene ABIERTO. El id del chat activo lo saca
+            // del Store interno de wwebjs (varios fallbacks por las dudas).
+            await client.pupPage.exposeFunction('hbSendToOpenChat', async (text) => {
+                try {
+                    const chatId = await client.pupPage.evaluate(() => {
+                        try {
+                            const S = window.Store;
+                            let c = S && S.Cmd && S.Cmd.activeChat;
+                            if (!c && S && S.Chat && S.Chat.getActiveChat) c = S.Chat.getActiveChat();
+                            if (!c && S && S.Chat && S.Chat.active) c = S.Chat.active;
+                            return c && c.id ? (c.id._serialized || (c.id.toString && c.id.toString())) : null;
+                        } catch (e) { return null; }
+                    });
+                    if (!chatId) return { ok: false, error: 'no detecté ningún chat abierto' };
+                    const sent = await client.sendMessage(chatId, text);
+                    log(`▶ enviado al chat abierto ${chatId}`);
+                    return { ok: true, id: sent && sent.id ? sent.id._serialized : null, chatId };
+                } catch (e) {
+                    log('envío a chat abierto falló:', e.message);
+                    return { ok: false, error: e.message };
+                }
+            });
             exposed = true;
         }
         await injectSidebar(client.pupPage);
