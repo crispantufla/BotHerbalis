@@ -187,6 +187,25 @@ client.on('ready', async () => {
                 try { const r = await apiCall('GET', '/api/script/v7'); return { ok: true, flow: (r && r.flow) || {} }; }
                 catch (e) { return { ok: false, error: e.message }; }
             });
+            // Trae los precios reales (para resolver los {{PRICE_*}} del guion en el panel).
+            await client.pupPage.exposeFunction('hbGetPrices', async () => {
+                try { const r = await apiCall('GET', '/api/prices'); return { ok: true, prices: r || {} }; }
+                catch (e) { return { ok: false, error: e.message }; }
+            });
+            // Genera un link de Mercado Pago por `amount` y lo ENVÍA al chat abierto.
+            await client.pupPage.exposeFunction('hbMpLink', async (amount) => {
+                try {
+                    const o = await getOpenChat();
+                    if (!o.id) return { ok: false, error: 'no detecté el chat — dbg: ' + JSON.stringify(o.dbg) };
+                    // Dígitos puros = pesos enteros. Evita que "46.900" (formato AR) se
+                    // interprete como 46,9 por el separador de miles.
+                    const amt = parseInt(String(amount).replace(/\D/g, ''), 10);
+                    if (!amt || amt <= 0) return { ok: false, error: 'monto inválido' };
+                    const r = await apiCall('POST', '/api/mp-link', { amount: amt, userPhone: o.id, sendToChat: true });
+                    if (r && r.sent === false) return { ok: false, error: 'link generado pero no se envió: ' + (r.sendError || '?') };
+                    return { ok: true, msg: `Link MP enviado al chat ($${amt.toLocaleString('es-AR')})`, data: (r && r.link) || r };
+                } catch (e) { return { ok: false, error: e.message }; }
+            });
             exposed = true;
         }
         await injectSidebar(client.pupPage);
@@ -288,10 +307,17 @@ async function handleCommand(frame) {
                 // Para resolveChatId / resolución @lid→@c.us en Railway.
                 const contact = await client.getContactById(frame.contactId);
                 if (!contact) { ack(id, true, { found: false }); return; }
+                const realId = (contact.id && contact.id._serialized) || null;
+                // OJO: contact.number puede traer los dígitos del LID (no el teléfono).
+                // El id del MODELO sí dereferencia lid → @c.us real (verificado en la
+                // WA Web actual), así que el número sale de ahí.
+                const number = (realId && realId.endsWith('@c.us'))
+                    ? realId.split('@')[0]
+                    : (contact.number || null);
                 ack(id, true, {
                     found: true,
-                    id: contact.id && contact.id._serialized,
-                    number: contact.number || null,
+                    id: realId,
+                    number,
                     name: contact.name || null,
                     pushname: contact.pushname || null,
                 });
