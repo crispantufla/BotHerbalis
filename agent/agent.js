@@ -17,6 +17,7 @@ const path = require('path');
 const WebSocket = require('ws');
 const qrcode = require('qrcode-terminal');
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
+const { injectSidebar } = require('./sidebar');
 
 // ── Config ───────────────────────────────────────────────────────────────────
 function loadConfig() {
@@ -28,6 +29,7 @@ function loadConfig() {
     cfg.gatewayUrl = process.env.GATEWAY_URL || cfg.gatewayUrl;
     cfg.sellerId = process.env.SELLER_ID || cfg.sellerId;
     cfg.token = process.env.AGENT_TOKEN || cfg.token;
+    cfg.dashboardUrl = process.env.DASHBOARD_URL || cfg.dashboardUrl || 'https://mainherbalisbot-production.up.railway.app';
     if (!cfg.gatewayUrl || !cfg.sellerId || !cfg.token) {
         fail('Falta config. Completá agent/config.json (gatewayUrl, sellerId, token) o usá variables de entorno.');
     }
@@ -74,11 +76,16 @@ client.on('qr', (qr) => {
 });
 client.on('authenticated', () => log('autenticado'));
 client.on('auth_failure', (m) => { log('auth_failure:', m); send({ t: 'auth_failure', message: m }); });
-client.on('ready', () => {
+client.on('ready', async () => {
     waReady = true;
     const phone = client.info && client.info.wid ? client.info.wid.user : '';
     log('✅ WhatsApp listo. Número:', phone);
     send({ t: 'ready', phone });
+    // Panel lateral en la ventana de WhatsApp del agente.
+    try {
+        await injectSidebar(client.pupPage, { dashboardUrl: cfg.dashboardUrl });
+        log('panel lateral inyectado →', cfg.dashboardUrl);
+    } catch (e) { log('sidebar:', e.message); }
 });
 client.on('change_state', (s) => { log('estado:', s); send({ t: 'state', state: s }); });
 client.on('disconnected', (reason) => {
@@ -89,8 +96,22 @@ client.on('disconnected', (reason) => {
 });
 
 // Entrantes (del cliente)
-client.on('message', (m) => {
-    send({ t: 'incoming', msg: serializeMsg(m) });
+client.on('message', async (m) => {
+    const msg = serializeMsg(m);
+    log(`◀ incoming de ${msg.from}: ${JSON.stringify(msg.body)}`);
+    // WhatsApp usa @lid (id de privacidad) para contactos guardados → no es el teléfono.
+    // wwebjs sí puede resolver el contacto real. Logueamos para ver qué nos da.
+    if (msg.from && msg.from.includes('@lid')) {
+        try {
+            const c = await m.getContact();
+            log('   @lid → contacto:', JSON.stringify({
+                number: c && c.number,
+                id: c && c.id && c.id._serialized,
+                name: c && (c.pushname || c.name || c.shortName),
+            }));
+        } catch (e) { log('   no pude resolver @lid:', e.message); }
+    }
+    send({ t: 'incoming', msg });
 });
 // Salientes — incluye lo que el bot manda y lo que el vendedor escribe a mano desde el
 // celular. Railway deduplica los del bot por msgId (botSentMessageIds); los manuales
