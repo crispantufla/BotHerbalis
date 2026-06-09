@@ -29,7 +29,8 @@ function loadConfig() {
     cfg.gatewayUrl = process.env.GATEWAY_URL || cfg.gatewayUrl;
     cfg.sellerId = process.env.SELLER_ID || cfg.sellerId;
     cfg.token = process.env.AGENT_TOKEN || cfg.token;
-    cfg.dashboardUrl = process.env.DASHBOARD_URL || cfg.dashboardUrl || 'https://mainherbalisbot-production.up.railway.app';
+    cfg.apiBase = process.env.API_BASE || cfg.apiBase || cfg.dashboardUrl || 'https://mainherbalisbot-production.up.railway.app';
+    cfg.apiToken = process.env.API_TOKEN || cfg.apiToken || '';   // JWT del vendedor (para los botones del panel)
     if (!cfg.gatewayUrl || !cfg.sellerId || !cfg.token) {
         fail('Falta config. Completá agent/config.json (gatewayUrl, sellerId, token) o usá variables de entorno.');
     }
@@ -39,6 +40,40 @@ function fail(msg) { console.error('[AGENT] ✗', msg); process.exit(1); }
 const log = (...a) => console.log('[AGENT]', ...a);
 
 const cfg = loadConfig();
+
+// Llama a la API de Railway server-to-server (Node, sin CORS). Auth con el JWT del vendedor.
+async function apiCall(method, pathname, body) {
+    const url = String(cfg.apiBase).replace(/\/$/, '') + pathname;
+    const headers = { 'Content-Type': 'application/json' };
+    if (cfg.apiToken) headers['Authorization'] = 'Bearer ' + cfg.apiToken;
+    const res = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined });
+    const txt = await res.text();
+    let data; try { data = JSON.parse(txt); } catch { data = txt; }
+    if (!res.ok) throw new Error((data && data.error) || ('HTTP ' + res.status));
+    return data;
+}
+
+// Devuelve el chat que el vendedor tiene ABIERTO (del Store interno de wwebjs).
+async function getOpenChat() {
+    return await client.pupPage.evaluate(() => {
+        const out = { id: null, dbg: {} };
+        try {
+            const S = window.Store;
+            out.dbg.store = !!S; out.dbg.cmd = !!(S && S.Cmd); out.dbg.chat = !!(S && S.Chat);
+            let c = S && S.Cmd && S.Cmd.activeChat;
+            if (c) out.dbg.via = 'Cmd.activeChat';
+            if (!c && S && S.Chat && typeof S.Chat.getActiveChat === 'function') { c = S.Chat.getActiveChat(); if (c) out.dbg.via = 'getActiveChat'; }
+            if (!c && S && S.Chat) {
+                const arr = (typeof S.Chat.getModelsArray === 'function' && S.Chat.getModelsArray()) || S.Chat._models || S.Chat.models || [];
+                out.dbg.n = arr && arr.length;
+                c = arr && arr.find(x => x && x.active);
+                if (c) out.dbg.via = 'active';
+            }
+            out.id = c && c.id ? (c.id._serialized || (c.id.toString && c.id.toString())) : null;
+        } catch (e) { out.dbg.err = String(e); }
+        return out;
+    });
+}
 
 const HB_INTERVAL_MS = 15000;
 const RECONNECT_BASE_MS = 2000;
@@ -98,27 +133,31 @@ client.on('ready', async () => {
                     return { ok: false, error: e.message };
                 }
             });
-            // Enviar al chat que el vendedor tiene ABIERTO. El id del chat activo lo saca
-            // del Store interno de wwebjs (varios fallbacks por las dudas).
+            // Enviar al chat que el vendedor tiene ABIERTO.
             await client.pupPage.exposeFunction('hbSendToOpenChat', async (text) => {
                 try {
-                    const chatId = await client.pupPage.evaluate(() => {
-                        try {
-                            const S = window.Store;
-                            let c = S && S.Cmd && S.Cmd.activeChat;
-                            if (!c && S && S.Chat && S.Chat.getActiveChat) c = S.Chat.getActiveChat();
-                            if (!c && S && S.Chat && S.Chat.active) c = S.Chat.active;
-                            return c && c.id ? (c.id._serialized || (c.id.toString && c.id.toString())) : null;
-                        } catch (e) { return null; }
-                    });
-                    if (!chatId) return { ok: false, error: 'no detecté ningún chat abierto' };
-                    const sent = await client.sendMessage(chatId, text);
-                    log(`▶ enviado al chat abierto ${chatId}`);
-                    return { ok: true, id: sent && sent.id ? sent.id._serialized : null, chatId };
-                } catch (e) {
-                    log('envío a chat abierto falló:', e.message);
-                    return { ok: false, error: e.message };
-                }
+                    const o = await getOpenChat();
+                    if (!o.id) return { ok: false, error: 'no detecté el chat — dbg: ' + JSON.stringify(o.dbg) };
+                    const sent = await client.sendMessage(o.id, text);
+                    log(`▶ enviado al chat abierto ${o.id}`);
+                    return { ok: true, id: sent && sent.id ? sent.id._serialized : null, chatId: o.id };
+                } catch (e) { log('envío a chat abierto falló:', e.message); return { ok: false, error: e.message }; }
+            });
+            // Botones del asistente de IA — el agente llama a la API de Railway (sin CORS).
+            await client.pupPage.exposeFunction('hbAction', async (action) => {
+                try {
+                    const o = await getOpenChat();
+                    if (!o.id) return { ok: false, error: 'no detecté el chat — dbg: ' + JSON.stringify(o.dbg) };
+                    const chatId = o.id;
+                    switch (action) {
+                        case 'pause':  await apiCall('POST', '/api/toggle-bot', { chatId, paused: true });  return { ok: true, msg: 'Bot pausado' };
+                        case 'resume': await apiCall('POST', '/api/toggle-bot', { chatId, paused: false }); return { ok: true, msg: 'Bot reactivado' };
+                        case 'reset':  await apiCall('POST', '/api/reset-chat', { chatId });                return { ok: true, msg: 'Chat reiniciado' };
+                        case 'confirm': { const r = await apiCall('POST', '/api/orders/manual-complete', { chatId, silent: false }); return { ok: true, msg: 'Pedido confirmado', data: r }; }
+                        case 'summarize': { const r = await apiCall('GET', '/api/summarize/' + encodeURIComponent(chatId)); return { ok: true, msg: 'Resumen', data: (r && (r.summary || r.text)) || r }; }
+                        default: return { ok: false, error: 'acción desconocida' };
+                    }
+                } catch (e) { log(`acción ${action} falló:`, e.message); return { ok: false, error: e.message }; }
             });
             exposed = true;
         }
@@ -137,19 +176,17 @@ client.on('disconnected', (reason) => {
 // Entrantes (del cliente)
 client.on('message', async (m) => {
     const msg = serializeMsg(m);
-    log(`◀ incoming de ${msg.from}: ${JSON.stringify(msg.body)}`);
-    // WhatsApp usa @lid (id de privacidad) para contactos guardados → no es el teléfono.
-    // wwebjs sí puede resolver el contacto real. Logueamos para ver qué nos da.
+    // WhatsApp manda @lid (id de privacidad) para contactos guardados → no es el teléfono.
+    // El salesFlow se identifica por teléfono (pedidos, alertas, estado), así que resolvemos
+    // @lid → teléfono real (contact.id) y mandamos ese como `from`.
     if (msg.from && msg.from.includes('@lid')) {
         try {
             const c = await m.getContact();
-            log('   @lid → contacto:', JSON.stringify({
-                number: c && c.number,
-                id: c && c.id && c.id._serialized,
-                name: c && (c.pushname || c.name || c.shortName),
-            }));
+            const real = c && c.id && c.id._serialized;
+            if (real && real.includes('@c.us')) { msg.lid = msg.from; msg.from = real; }
         } catch (e) { log('   no pude resolver @lid:', e.message); }
     }
+    log(`◀ incoming de ${msg.from}: ${JSON.stringify(msg.body)}`);
     send({ t: 'incoming', msg });
 });
 // Salientes — incluye lo que el bot manda y lo que el vendedor escribe a mano desde el
