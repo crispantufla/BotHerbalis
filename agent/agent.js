@@ -100,9 +100,10 @@ function serializeMsg(m) {
 }
 
 client.on('qr', (qr) => {
-    log('escaneá este QR con el WhatsApp del vendedor:');
+    log('escaneá este QR con el WhatsApp del vendedor (en ESTA ventana, no en el dashboard):');
     qrcode.generate(qr, { small: true });
-    send({ t: 'qr', data: qr });
+    // NO se reenvía al dashboard: el QR se escanea acá, en la ventana del agente.
+    // (El dashboard ya no muestra QR para un vendedor remoto.)
 });
 client.on('authenticated', () => log('autenticado'));
 client.on('auth_failure', (m) => { log('auth_failure:', m); send({ t: 'auth_failure', message: m }); });
