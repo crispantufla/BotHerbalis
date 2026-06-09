@@ -1,5 +1,14 @@
 {
+  "_comment_local": "Para PROBAR contra el harness de eco local: npx tsx extension/test-gateway.ts",
   "gatewayUrl": "ws://localhost:3100/agent",
   "sellerId": "domtest",
-  "token": "test-token-123"
+  "token": "test-token-123",
+
+  "_comment_prod": "Para PRODUCCIÓN (vendedor real), usar estos en su lugar:",
+  "_gatewayUrl_prod": "wss://mainherbalisbot-production.up.railway.app/agent",
+  "_sellerId_prod": "horacio",
+  "_token_prod": "= WA_AGENT_TOKEN_HORACIO de Railway",
+  "_apiToken_prod": "JWT del vendedor (para los botones del panel: pausar, resumen, guion, confirmar pedido). Se saca del localStorage del dashboard logueado (clave 'token').",
+  "apiBase": "https://mainherbalisbot-production.up.railway.app",
+  "apiToken": ""
 }
