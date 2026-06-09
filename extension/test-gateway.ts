@@ -17,6 +17,9 @@ import { RemoteClient } from '../src/services/remoteClient';
 const SELLER = process.env.TEST_SELLER || 'domtest';
 const TOKEN = process.env.TEST_TOKEN || 'test-token-123';
 const PORT = Number(process.env.TEST_PORT || 3100);
+// Solo se le contesta a ESTE número (evita echarle eco a contactos reales).
+// Cambialo con TEST_PEER=<numero>. Vacío = responde a todos.
+const PEER = (process.env.TEST_PEER || '34679278596').replace(/\D/g, '');
 
 // El gateway valida contra esta env var.
 process.env[`WA_AGENT_TOKEN_${SELLER.toUpperCase()}`] = TOKEN;
@@ -32,6 +35,11 @@ rc.on('change_state', (s: string) => console.log('[TEST] estado:', s));
 rc.on('disconnected', (r: string) => console.log('[TEST] agente desconectado:', r));
 
 rc.on('message', async (m: any) => {
+    const fromDigits = String(m.from).replace(/\D/g, '');
+    if (PEER && fromDigits !== PEER) {
+        console.log(`[TEST] (ignorado — no es ${PEER}) de ${m.from}: ${JSON.stringify(m.body)}`);
+        return;
+    }
     console.log(`\n[TEST] ◀ ENTRANTE de ${m.from}: ${JSON.stringify(m.body)}`);
     try {
         const sent = await rc.sendMessage(m.from, `🤖 eco: ${m.body}`);
