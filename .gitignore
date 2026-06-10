@@ -24,6 +24,11 @@ extension/wa-js.js
 # Agente wwebjs: config con token + auth local, no se commitean
 agent/config.json
 agent/.wwebjs_auth
+agent/.wwebjs_cache
+agent/.agent-version.json
+agent/update-deps.flag
+# Instaladores generados: embeben el token del gateway y el JWT del vendedor
+agent/installer/dist/
 
 # Railway logs
 logs.*.json

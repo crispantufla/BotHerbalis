@@ -19,6 +19,7 @@ const sellersRoutes = require('./routes/sellers.routes');
 const quickRepliesRoutes = require('./routes/quickReplies.routes');
 const guionRoutes = require('./routes/guion.routes');
 const playgroundRoutes = require('./routes/playground.routes');
+const agentDistRoutes = require('./routes/agentDist.routes');
 
 const { jwtAuthMiddleware } = require('../middleware/jwtAuth');
 const { verifyToken } = require('../middleware/jwtAuth');
@@ -94,6 +95,10 @@ function startServer(clientPool) {
         const ok = checks.database === 'connected' && checks.redis === 'connected';
         res.status(ok ? 200 : 503).json({ status: ok ? 'ok' : 'degraded', timestamp: new Date().toISOString() });
     });
+
+    // Distribución del agente remoto (PC del vendedor). Auth propia por
+    // WA_AGENT_TOKEN_* — NO pasa por JWT ni por el rate limiter de /api.
+    app.use('/agent-dist', agentDistRoutes());
 
     // --- MOUNT API ROUTES ---
     // Auth routes (login, accounts CRUD) — no sellerContext needed

@@ -1,0 +1,3 @@
+# run.bat se distribuye desde el container de Railway (checkout Linux) a PCs
+# Windows vía /agent-dist — cmd.exe con line endings LF rompe goto/labels.
+agent/run.bat text eol=crlf

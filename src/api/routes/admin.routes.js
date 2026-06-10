@@ -160,5 +160,19 @@ module.exports = (clientPool) => {
         res.status(400).json({ error: 'Missing action/number or alertNumber' });
     });
 
+    // POST /agent/update — empuja {t:'update'} al agente remoto del seller (PC del
+    // vendedor). El agente baja los archivos nuevos de /agent-dist y se relanza
+    // (exit 99 → run.bat). Uso típico tras deployar un cambio de agent/sidebar.js:
+    //   POST /api/agent/update?sellerId=horacio  (con JWT de admin)
+    router.post('/agent/update', ...withSeller(clientPool), requireAdmin, (req, res) => {
+        const { agentHub } = require('../../services/agentBridge');
+        const sellerId = req.sellerId;
+        if (!sellerId) return res.status(400).json({ error: 'sellerId requerido (?sellerId=… para admins)' });
+        if (!agentHub.isOnline(sellerId)) return res.status(404).json({ error: `Agente de ${sellerId} no conectado` });
+        const sent = agentHub.send(sellerId, { t: 'update' });
+        logger.info(`[AGENT-DIST] Push de update a ${sellerId}: ${sent ? 'enviado' : 'falló'}`);
+        res.json({ ok: sent });
+    });
+
     return router;
 };

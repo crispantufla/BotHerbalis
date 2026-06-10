@@ -18,6 +18,7 @@ const WebSocket = require('ws');
 const qrcode = require('qrcode-terminal');
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const { injectSidebar } = require('./sidebar');
+const { checkAndUpdate } = require('./updater');
 
 // ── Config ───────────────────────────────────────────────────────────────────
 function loadConfig() {
@@ -94,6 +95,32 @@ const client = new Client({
 let waReady = false;
 let exposed = false;
 
+// Health-check del frame: tras una suspensión de la PC + recarga de WA Web, el
+// pupPage de wwebjs puede quedar apuntando a un frame DETACHED — el bot deja de
+// enviar/recibir SIN avisar (el WS al gateway sigue vivo, Railway lo cree ready).
+// Si evaluate cuelga o falla 2 veces seguidas → salir con código ≠0; run.bat lo
+// relanza y wwebjs re-engancha un frame fresco. 2 strikes porque un fallo aislado
+// es normal mientras WA Web se está recargando.
+let watchdogTimer = null;
+let watchdogStrikes = 0;
+function startFrameWatchdog() {
+    if (watchdogTimer) return;
+    watchdogTimer = setInterval(async () => {
+        if (!waReady || !client.pupPage) return;
+        try {
+            await Promise.race([
+                client.pupPage.evaluate('1+1'),
+                new Promise((_, rej) => setTimeout(() => rej(new Error('timeout 10s')), 10000)),
+            ]);
+            watchdogStrikes = 0;
+        } catch (e) {
+            watchdogStrikes++;
+            log(`frame health-check falló (${watchdogStrikes}/2):`, e.message);
+            if (watchdogStrikes >= 2) { log('frame zombie — saliendo para que run.bat relance'); process.exit(1); }
+        }
+    }, 60000);
+}
+
 // Abre el dashboard de Railway en una segunda pestaña del mismo Chrome.
 // WhatsApp queda al frente; la sesión del dashboard persiste en el perfil (user-data-dir).
 let dashOpened = false;
@@ -139,6 +166,7 @@ client.on('ready', async () => {
     const phone = client.info && client.info.wid ? client.info.wid.user : '';
     log('✅ WhatsApp listo. Número:', phone);
     send({ t: 'ready', phone });
+    startFrameWatchdog();
     // Panel lateral (botonera) en la ventana de WhatsApp del agente.
     try {
         // Expone al panel una función para enviar mensajes vía wwebjs. Una sola vez:
@@ -333,6 +361,18 @@ async function handleCommand(frame) {
                 });
                 return;
             }
+            case 'update': {
+                // Push remoto: POST /api/agent/update → gateway → acá. Baja los
+                // archivos nuevos de /agent-dist y sale con 99 (run.bat relanza).
+                log('update remoto solicitado por el gateway…');
+                const updated = await checkAndUpdate(cfg);
+                ack(id, true, { updated });
+                if (updated) {
+                    log('✓ actualizado — reiniciando');
+                    setTimeout(() => process.exit(99), 500); // deja salir el ack por el WS
+                }
+                return;
+            }
             default:
                 return;
         }
@@ -386,14 +426,25 @@ function startHeartbeat() { stopHeartbeat(); hbTimer = setInterval(() => send({ 
 function stopHeartbeat() { if (hbTimer) { clearInterval(hbTimer); hbTimer = null; } }
 
 // ── Arranque ─────────────────────────────────────────────────────────────────
-log(`iniciando agente para seller "${cfg.sellerId}"…`);
-connectGateway();
-client.initialize().catch((e) => fail(`no pude iniciar WhatsApp: ${e.message}`));
+(async () => {
+    log(`iniciando agente para seller "${cfg.sellerId}"…`);
+    // Auto-update ANTES de lanzar Chromium: si hay versión nueva en Railway, se
+    // baja y se sale con 99 — run.bat relanza con el código nuevo. Fail-open: un
+    // updater caído (Railway deployando, sin internet) nunca bloquea el boot.
+    try {
+        if (await checkAndUpdate(cfg)) {
+            log('✓ actualizado — saliendo con código 99 para que run.bat relance la versión nueva');
+            process.exit(99);
+        }
+    } catch (e) { log('updater falló (sigo con la versión actual):', e.message); }
+    connectGateway();
+    client.initialize().catch((e) => fail(`no pude iniciar WhatsApp: ${e.message}`));
 
-// Apenas exista la ventana de Chrome (antes del QR/ready), abrir el dashboard al lado.
-const dashTimer = setInterval(() => {
-    if (client.pupBrowser && client.pupPage) { clearInterval(dashTimer); openDashboardTab(); }
-}, 700);
+    // Apenas exista la ventana de Chrome (antes del QR/ready), abrir el dashboard al lado.
+    const dashTimer = setInterval(() => {
+        if (client.pupBrowser && client.pupPage) { clearInterval(dashTimer); openDashboardTab(); }
+    }, 700);
+})();
 
 // Errores transitorios de puppeteer/wwebjs (ej. "Execution context was destroyed" cuando
 // WhatsApp se recarga mientras wwebjs inyecta) NO deben tumbar el agente. Los logueamos;
