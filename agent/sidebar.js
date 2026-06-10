@@ -96,15 +96,41 @@ function bootstrap(initW) {
         return HB_LABELS[k] || k.replace(/_/g, ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase());
     }
 
+    // priceMap actual (se llena cuando carga el guion). Lo necesita el modal
+    // para auto-completar TOTAL al elegir producto+plan.
+    let currentPriceMap = {};
+
     // Modal para completar a mano los placeholders que el bot no detectó.
+    // PRODUCT/PRODUCT_DETAIL → dropdown fijo (Cápsulas/Gotas/Semillas).
+    // PLAN/PLAN_DETAIL → dropdown 60 días / 120 días / Otro (con input libre).
+    // TOTAL → input editable, pre-llenado desde currentPriceMap según producto+plan.
     function showFillModal(placeholders, prefill, onConfirm) {
         const ov = document.createElement('div');
         ov.id = 'hb-modal-ov';
-        const rows = placeholders.map((k) => {
+        let rows = '';
+        placeholders.forEach((k) => {
             const val = (prefill && prefill[k]) || '';
-            return '<label class="hb-m-l">' + placeholderLabel(k) + '</label>' +
-                   '<input class="hb-m-i" data-k="' + k + '" value="' + String(val).replace(/"/g, '&quot;') + '" />';
-        }).join('');
+            const lbl = '<label class="hb-m-l">' + placeholderLabel(k) + '</label>';
+            if (k === 'PRODUCT_DETAIL' || k === 'PRODUCT') {
+                const prods = ['Cápsulas', 'Gotas', 'Semillas'];
+                const opts = prods.map((p) => '<option value="' + p + '"' + (val === p ? ' selected' : '') + '>' + p + '</option>').join('');
+                rows += lbl + '<select class="hb-m-s" data-k="' + k + '" data-type="product">' + opts + '</select>';
+            } else if (k === 'PLAN_DETAIL' || k === 'PLAN') {
+                const raw = val ? val.replace(/ días$/, '') : '';
+                const isOther = raw && raw !== '60' && raw !== '120';
+                rows += lbl +
+                    '<select class="hb-m-s" data-k="' + k + '" data-type="plan">' +
+                    '<option value="60"' + (raw === '60' ? ' selected' : '') + '>60 días</option>' +
+                    '<option value="120"' + (raw === '120' ? ' selected' : '') + '>120 días</option>' +
+                    '<option value="otro"' + (isOther ? ' selected' : '') + '>Otro…</option>' +
+                    '</select>' +
+                    '<input class="hb-m-i hb-m-plan-other" placeholder="Cantidad de días" value="' + (isOther ? String(raw).replace(/"/g, '&quot;') : '') + '" style="display:' + (isOther ? 'block' : 'none') + ';margin-top:5px" />';
+            } else if (k === 'TOTAL') {
+                rows += lbl + '<input class="hb-m-i" data-k="' + k + '" data-type="total" value="' + String(val).replace(/"/g, '&quot;') + '" placeholder="ej. 49.900" />';
+            } else {
+                rows += lbl + '<input class="hb-m-i" data-k="' + k + '" value="' + String(val).replace(/"/g, '&quot;') + '" />';
+            }
+        });
         ov.innerHTML = '<div id="hb-modal">' +
             '<div class="hb-m-t">Completá los datos del pedido</div>' +
             '<div class="hb-m-sub">El bot no los detectó en la conversación.</div>' +
@@ -112,10 +138,49 @@ function bootstrap(initW) {
             '<div class="hb-m-btns"><button id="hb-m-cancel">Cancelar</button><button id="hb-m-ok">Insertar en el chat</button></div>' +
             '</div>';
         document.body.appendChild(ov);
+
+        // Auto-llena TOTAL cuando cambia producto o plan (solo estándares).
+        function updateTotal() {
+            const totalInput = ov.querySelector('[data-type="total"]');
+            if (!totalInput || !Object.keys(currentPriceMap).length) return;
+            const prodSel = ov.querySelector('[data-type="product"]');
+            const planSel = ov.querySelector('[data-type="plan"]');
+            if (!prodSel || !planSel || planSel.value === 'otro') return;
+            const keyMap = { 'Cápsulas': 'CAPSULAS', 'Gotas': 'GOTAS', 'Semillas': 'SEMILLAS' };
+            const prodKey = keyMap[prodSel.value];
+            if (!prodKey) return;
+            const price = currentPriceMap['PRICE_' + prodKey + '_' + planSel.value];
+            if (price) totalInput.value = price;
+        }
+
+        ov.querySelectorAll('[data-type="plan"]').forEach((sel) => {
+            sel.addEventListener('change', () => {
+                const other = sel.nextElementSibling;
+                if (other && other.classList.contains('hb-m-plan-other')) other.style.display = sel.value === 'otro' ? 'block' : 'none';
+                updateTotal();
+            });
+        });
+        ov.querySelectorAll('[data-type="product"]').forEach((sel) => sel.addEventListener('change', updateTotal));
+        updateTotal();
+
         const close = () => ov.remove();
         const submit = () => {
             const values = {};
-            ov.querySelectorAll('.hb-m-i').forEach((inp) => { values[inp.getAttribute('data-k')] = inp.value.trim(); });
+            ov.querySelectorAll('.hb-m-i').forEach((inp) => {
+                if (inp.classList.contains('hb-m-plan-other')) return;
+                const k = inp.getAttribute('data-k');
+                if (k) values[k] = inp.value.trim();
+            });
+            ov.querySelectorAll('.hb-m-s[data-k]').forEach((sel) => {
+                const k = sel.getAttribute('data-k');
+                if (sel.value === 'otro') {
+                    const other = sel.nextElementSibling;
+                    const raw = (other && other.classList.contains('hb-m-plan-other')) ? other.value.trim() : '';
+                    values[k] = (k === 'PLAN_DETAIL' && raw) ? raw + ' días' : raw;
+                } else {
+                    values[k] = k === 'PLAN_DETAIL' ? sel.value + ' días' : sel.value;
+                }
+            });
             close();
             onConfirm(values);
         };
@@ -123,9 +188,9 @@ function bootstrap(initW) {
         ov.querySelector('#hb-m-ok').onclick = submit;
         ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
         ov.querySelectorAll('.hb-m-i').forEach((inp) => {
-            inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+            if (!inp.classList.contains('hb-m-plan-other')) inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
         });
-        const first = ov.querySelector('.hb-m-i'); if (first) first.focus();
+        const first = ov.querySelector('.hb-m-s,.hb-m-i'); if (first) first.focus();
     }
 
     function build() {
@@ -166,8 +231,9 @@ function bootstrap(initW) {
       #hb-modal .hb-m-t{font-size:calc(14px * var(--hb-fs));font-weight:600;color:#e9edef}
       #hb-modal .hb-m-sub{font-size:calc(11px * var(--hb-fs));color:#8696a0;margin:4px 0 6px}
       #hb-modal .hb-m-l{font-size:calc(11px * var(--hb-fs));color:#8696a0;margin-top:8px}
-      #hb-modal .hb-m-i{background:#202c33;border:1px solid #2a3942;border-radius:7px;color:#e9edef;padding:9px 11px;font-size:calc(13px * var(--hb-fs));outline:none;width:100%;box-sizing:border-box;margin-top:3px}
-      #hb-modal .hb-m-i:focus{border-color:#00a884}
+      #hb-modal .hb-m-i,#hb-modal .hb-m-s{background:#202c33;border:1px solid #2a3942;border-radius:7px;color:#e9edef;padding:9px 11px;font-size:calc(13px * var(--hb-fs));outline:none;width:100%;box-sizing:border-box;margin-top:3px}
+      #hb-modal .hb-m-i:focus,#hb-modal .hb-m-s:focus{border-color:#00a884}
+      #hb-modal .hb-m-s{cursor:pointer;appearance:auto}
       #hb-modal .hb-m-btns{display:flex;gap:8px;margin-top:16px}
       #hb-modal .hb-m-btns button{flex:1;border:0;border-radius:8px;padding:10px;font-size:calc(13px * var(--hb-fs));font-weight:600;cursor:pointer}
       #hb-modal #hb-m-cancel{background:#202c33;color:#aebac1}
@@ -359,7 +425,7 @@ function bootstrap(initW) {
             try {
                 if (typeof window.hbGetPrices === 'function') {
                     const pr = await window.hbGetPrices();
-                    if (pr && pr.ok) priceMap = buildPriceMap(pr.prices);
+                    if (pr && pr.ok) { priceMap = buildPriceMap(pr.prices); currentPriceMap = priceMap; }
                 }
             } catch (e) { /* sin precios → placeholders literales */ }
             try {
