@@ -192,6 +192,16 @@ client.on('ready', async () => {
                 try { const r = await apiCall('GET', '/api/prices'); return { ok: true, prices: r || {} }; }
                 catch (e) { return { ok: false, error: e.message }; }
             });
+            // Trae el state del chat ABIERTO (producto/plan/total/link) para resolver
+            // los placeholders del cliente en el guion; lo que falte lo pide el modal.
+            await client.pupPage.exposeFunction('hbGetChatState', async () => {
+                try {
+                    const o = await getOpenChat();
+                    if (!o.id) return { ok: false, error: 'no detecté el chat — dbg: ' + JSON.stringify(o.dbg) };
+                    const r = await apiCall('GET', '/api/chat-state/' + encodeURIComponent(o.id));
+                    return { ok: true, state: r || {} };
+                } catch (e) { return { ok: false, error: e.message }; }
+            });
             // Genera un link de Mercado Pago por `amount` y lo ENVÍA al chat abierto.
             await client.pupPage.exposeFunction('hbMpLink', async (amount) => {
                 try {

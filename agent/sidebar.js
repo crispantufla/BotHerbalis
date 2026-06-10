@@ -48,12 +48,84 @@ function bootstrap(initW) {
         };
     }
     function resolvePrices(text, map) {
+        return resolveMap(text, map);
+    }
+
+    // Constantes del negocio (siempre resolubles — nunca van al modal).
+    const HB_CONST = { ALIAS: 'HERBALIS.TIENDA', TITULAR: 'BIO ORIGEN S.A.S.', ANTICIPO: '10.000' };
+    // Labels legibles para el modal de relleno.
+    const HB_LABELS = {
+        PRODUCT_DETAIL: 'Producto', PLAN_DETAIL: 'Plan (días)',
+        PRODUCT: 'Producto', PLAN: 'Plan (días)', TOTAL: 'Total ($)',
+        LINK: 'Link de pago (Mercado Pago)', NOMBRE: 'Nombre del cliente',
+        SALDO: 'Saldo ($)', SENA_AMOUNT: 'Seña ($)', SENA_REMAINDER: 'Saldo ($)',
+    };
+
+    // Mapa de placeholders del CLIENTE desde el state del chat (lo que el bot
+    // capturó en la conversación). Los que queden vacíos los pide el modal.
+    function buildClientMap(state) {
+        const s = state || {};
+        const cart = Array.isArray(s.cart) ? s.cart : [];
+        const productDetail = cart.length ? cart.map((i) => i.product).filter(Boolean).join(' + ') : (s.selectedProduct || '');
+        const planDetail = cart.length ? cart.map((i) => i.plan + ' días').join(' + ') : (s.selectedPlan ? s.selectedPlan + ' días' : '');
+        const totalDigits = s.totalPrice != null ? String(s.totalPrice).replace(/\D/g, '') : '';
+        const totalFmt = totalDigits ? parseInt(totalDigits, 10).toLocaleString('es-AR') : '';
+        return {
+            PRODUCT_DETAIL: productDetail,
+            PLAN_DETAIL: planDetail,
+            PRODUCT: s.selectedProduct || '',
+            PLAN: s.selectedPlan ? String(s.selectedPlan) : '',
+            TOTAL: totalFmt,
+            LINK: s.mpPaymentLinkUrl || '',
+            // Línea fija (no es input): se resuelve siempre, nunca va al modal.
+            POSTDATADO_LINE: s.postdatado ? ('📅 Envío programado: ' + s.postdatado) : '✔ Entrega estimada: 7 a 10 días hábiles desde la confirmación',
+        };
+    }
+
+    // Reemplaza {{K}} con map[K] SOLO si tiene valor (los vacíos quedan para el modal).
+    function resolveMap(text, map) {
         let r = String(text == null ? '' : text);
         Object.keys(map).forEach((k) => {
             const v = map[k];
             if (v != null && v !== '') r = r.replace(new RegExp('\\{\\{' + k + '\\}\\}', 'g'), v);
         });
         return r;
+    }
+
+    function placeholderLabel(k) {
+        return HB_LABELS[k] || k.replace(/_/g, ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase());
+    }
+
+    // Modal para completar a mano los placeholders que el bot no detectó.
+    function showFillModal(placeholders, prefill, onConfirm) {
+        const ov = document.createElement('div');
+        ov.id = 'hb-modal-ov';
+        const rows = placeholders.map((k) => {
+            const val = (prefill && prefill[k]) || '';
+            return '<label class="hb-m-l">' + placeholderLabel(k) + '</label>' +
+                   '<input class="hb-m-i" data-k="' + k + '" value="' + String(val).replace(/"/g, '&quot;') + '" />';
+        }).join('');
+        ov.innerHTML = '<div id="hb-modal">' +
+            '<div class="hb-m-t">Completá los datos del pedido</div>' +
+            '<div class="hb-m-sub">El bot no los detectó en la conversación.</div>' +
+            rows +
+            '<div class="hb-m-btns"><button id="hb-m-cancel">Cancelar</button><button id="hb-m-ok">Insertar en el chat</button></div>' +
+            '</div>';
+        document.body.appendChild(ov);
+        const close = () => ov.remove();
+        const submit = () => {
+            const values = {};
+            ov.querySelectorAll('.hb-m-i').forEach((inp) => { values[inp.getAttribute('data-k')] = inp.value.trim(); });
+            close();
+            onConfirm(values);
+        };
+        ov.querySelector('#hb-m-cancel').onclick = close;
+        ov.querySelector('#hb-m-ok').onclick = submit;
+        ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+        ov.querySelectorAll('.hb-m-i').forEach((inp) => {
+            inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+        });
+        const first = ov.querySelector('.hb-m-i'); if (first) first.focus();
     }
 
     function build() {
@@ -88,7 +160,18 @@ function bootstrap(initW) {
       .hb-step{background:#111b21;border:1px solid #222d34;border-radius:8px;padding:8px 10px;cursor:pointer}
       .hb-step:hover{border-color:#00a884;background:#16232b}
       .hb-step .k{font-size:calc(11px * var(--hb-fs));color:#8696a0;text-transform:uppercase}
-      .hb-step .p{font-size:calc(12px * var(--hb-fs));color:#c8d0d4;margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+      .hb-step .p{font-size:calc(12px * var(--hb-fs));color:#c8d0d4;margin-top:3px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap}
+      #hb-modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100001;display:flex;align-items:center;justify-content:center}
+      #hb-modal{background:#0b141a;border:1px solid #2a3942;border-radius:12px;padding:18px;width:300px;max-width:90vw;box-shadow:0 8px 30px rgba(0,0,0,.6);display:flex;flex-direction:column}
+      #hb-modal .hb-m-t{font-size:calc(14px * var(--hb-fs));font-weight:600;color:#e9edef}
+      #hb-modal .hb-m-sub{font-size:calc(11px * var(--hb-fs));color:#8696a0;margin:4px 0 6px}
+      #hb-modal .hb-m-l{font-size:calc(11px * var(--hb-fs));color:#8696a0;margin-top:8px}
+      #hb-modal .hb-m-i{background:#202c33;border:1px solid #2a3942;border-radius:7px;color:#e9edef;padding:9px 11px;font-size:calc(13px * var(--hb-fs));outline:none;width:100%;box-sizing:border-box;margin-top:3px}
+      #hb-modal .hb-m-i:focus{border-color:#00a884}
+      #hb-modal .hb-m-btns{display:flex;gap:8px;margin-top:16px}
+      #hb-modal .hb-m-btns button{flex:1;border:0;border-radius:8px;padding:10px;font-size:calc(13px * var(--hb-fs));font-weight:600;cursor:pointer}
+      #hb-modal #hb-m-cancel{background:#202c33;color:#aebac1}
+      #hb-modal #hb-m-ok{background:#00a884;color:#fff}
       .hb-ord{width:100%;text-align:left;border:1px dashed;border-radius:8px;padding:10px;cursor:pointer;background:transparent;font-size:calc(13px * var(--hb-fs))}
       .hb-ord.g{border-color:#00a884;color:#00d26a}.hb-ord.s{border-color:#3a4a54;color:#aebac1}.hb-ord:disabled{opacity:.5}
       #hb-feed{margin-top:8px;font-size:calc(13px * var(--hb-fs));white-space:pre-wrap;max-height:24vh;overflow-y:auto}
@@ -179,6 +262,51 @@ function bootstrap(initW) {
             return true;
         }
 
+        // Inserta el texto en el cuadro de WhatsApp con verificación + fallback.
+        function doInsert(box, text) {
+            insertIntoComposer(text);
+            setTimeout(() => {
+                if (box.innerText.trim()) {
+                    feed('Listo — revisá el mensaje en el chat y enviá con Enter.', 'ok');
+                } else {
+                    try { navigator.clipboard.writeText(text); feed('No pude escribir directo; lo copié al portapapeles, pegalo con Ctrl+V.', 'err'); }
+                    catch (e2) { feed('No pude escribir en el cuadro de WhatsApp. Copiá el paso a mano.', 'err'); }
+                }
+            }, 150);
+        }
+
+        // Flujo al tocar un paso: precios (ya resueltos) → constantes → state del
+        // cliente → modal por lo que falte → insertar en el chat.
+        async function handleStepClick(textWithPrices) {
+            const box = document.querySelector('#main footer [contenteditable=true]');
+            if (!box) { feed('Abrí un chat primero.', 'err'); return; }
+            let text = resolveMap(textWithPrices, HB_CONST);
+            // ¿Hay placeholders de cliente en este paso? Si no, insertar directo.
+            if (/\{\{[A-Z_][A-Z0-9_]*\}\}/.test(text)) {
+                feed('Buscando datos del pedido…', '');
+                let clientMap = {};
+                try {
+                    if (typeof window.hbGetChatState === 'function') {
+                        const cs = await window.hbGetChatState();
+                        if (cs && cs.ok) clientMap = buildClientMap(cs.state);
+                    }
+                } catch (e) { /* sin state → todo va al modal */ }
+                text = resolveMap(text, clientMap);
+                const remaining = Array.from(new Set((text.match(/\{\{[A-Z_][A-Z0-9_]*\}\}/g) || []).map((s) => s.replace(/[{}]/g, ''))));
+                if (remaining.length) {
+                    showFillModal(remaining, clientMap, (values) => {
+                        let final = text;
+                        Object.keys(values).forEach((k) => { if (values[k]) final = final.replace(new RegExp('\\{\\{' + k + '\\}\\}', 'g'), values[k]); });
+                        // Lo que el vendedor dejó en blanco → borrar el placeholder (no mandar literal).
+                        final = final.replace(/\{\{[A-Z_][A-Z0-9_]*\}\}/g, '');
+                        doInsert(box, final);
+                    });
+                    return;
+                }
+            }
+            doInsert(box, text);
+        }
+
         // Redimensionar arrastrando el borde izquierdo.
         let dragging = false;
         document.getElementById('hb-grip').addEventListener('mousedown', (e) => { dragging = true; e.preventDefault(); document.body.style.userSelect = 'none'; });
@@ -247,22 +375,7 @@ function bootstrap(initW) {
                     const resp = resolvePrices(flow[k].response, priceMap);
                     div.innerHTML = `<div class="k">${k.replace(/_/g, ' ')}</div><div class="p"></div>`;
                     div.querySelector('.p').textContent = resp;
-                    div.onclick = () => {
-                        const box = document.querySelector('#main footer [contenteditable=true]');
-                        if (!box) { feed('Abrí un chat primero.', 'err'); return; }
-                        insertIntoComposer(resp);
-                        // Lexical renderiza async — verificamos a los 150ms. Si no
-                        // entró, fallback al portapapeles (Ctrl+V) para no dejar al
-                        // vendedor sin el texto.
-                        setTimeout(() => {
-                            if (box.innerText.trim()) {
-                                feed('Paso puesto en el chat — completá los {{…}} del cliente y enviá con Enter.', 'ok');
-                            } else {
-                                try { navigator.clipboard.writeText(resp); feed('No pude escribir directo; lo copié al portapapeles, pegalo con Ctrl+V.', 'err'); }
-                                catch (e2) { feed('No pude escribir en el cuadro de WhatsApp. Copiá el paso a mano.', 'err'); }
-                            }
-                        }, 150);
-                    };
+                    div.onclick = () => handleStepClick(resp);
                     cont.appendChild(div);
                 });
             } catch (e) { cont.innerHTML = '<span style="color:#f15c6d;font-size:calc(12px * var(--hb-fs))">Error: ' + (e.message || e) + '</span>'; }

@@ -474,6 +474,29 @@ module.exports = (clientPool) => {
         }
     });
 
+    // GET /chat-state/:id — state liviano del cliente para resolver placeholders
+    // del guion en el panel del agente ({{PRODUCT_DETAIL}}, {{PLAN_DETAIL}},
+    // {{TOTAL}}, {{LINK}}…). Devuelve solo lo que el panel necesita; si el bot
+    // no capturó algún dato, el campo viene null y el panel lo pide por modal.
+    router.get('/chat-state/:id', ...withSeller(clientPool), async (req, res) => {
+        try {
+            const { client: cl, sharedState: ss } = req.sellerInstance || {};
+            const chatId = await resolveChatId(req.params.id, cl);
+            const st = (ss?.userState && (ss.userState[chatId] || ss.userState[req.params.id])) || {};
+            res.json({
+                selectedProduct: st.selectedProduct || null,
+                selectedPlan: st.selectedPlan != null ? String(st.selectedPlan) : null,
+                totalPrice: st.totalPrice != null ? String(st.totalPrice) : null,
+                cart: Array.isArray(st.cart) ? st.cart.map(i => ({ product: i.product, plan: i.plan })) : [],
+                mpPaymentLinkUrl: st.mpPaymentLinkUrl || null,
+                postdatado: st.postdatado || null,
+                step: st.step || null,
+            });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     // GET /history/:id
     router.get('/history/:id', ...withSeller(clientPool), async (req, res) => {
         try {
