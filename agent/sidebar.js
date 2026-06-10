@@ -69,36 +69,30 @@ function bootstrap(initW) {
         display:flex;flex-direction:column;transition:transform .22s ease;border-left:1px solid #222d34}
       #hb-grip{position:absolute;left:0;top:0;width:6px;height:100%;cursor:ew-resize;background:transparent}
       #hb-grip:hover{background:#00a88455}
-      #hb-bar{display:flex;align-items:center;padding:12px 14px;background:#111b21;border-bottom:1px solid #222d34;cursor:default}
-      #hb-bar .hb-t{font-weight:600;font-size:calc(14px * var(--hb-fs))}.hb-sp{flex:1}
-      #hb-bar button{background:#202c33;color:#aebac1;border:0;border-radius:6px;width:28px;height:28px;cursor:pointer}
-      #hb-body{padding:14px;display:flex;flex-direction:column;gap:8px;overflow-y:auto}
-      #hb-fsrow{display:flex;align-items:center;gap:8px;background:#111b21;border:1px solid #222d34;border-radius:8px;padding:8px 10px}
-      #hb-fsrow label{font-size:calc(11px * var(--hb-fs));color:#8696a0;white-space:nowrap}
-      #hb-fsrow input[type=range]{flex:1;accent-color:#00a884;cursor:pointer}
-      #hb-fsval{font-size:calc(11px * var(--hb-fs));color:#00a884;font-weight:600;min-width:38px;text-align:right}
-      #hb-open{background:#111b21;border:1px solid #222d34;border-radius:8px;padding:10px 12px;font-size:calc(13px * var(--hb-fs));color:#aebac1}
+      #hb-bar{display:flex;align-items:center;gap:6px;padding:10px 12px;background:#111b21;border-bottom:1px solid #222d34;cursor:default}
+      #hb-bar .hb-t{font-weight:600;font-size:calc(13px * var(--hb-fs))}.hb-sp{flex:1}
+      #hb-bar .hb-az{font-size:13px;opacity:.75}
+      #hb-bar #hb-fs{width:66px;accent-color:#00a884;cursor:pointer;flex-shrink:0}
+      #hb-bar button{background:#202c33;color:#aebac1;border:0;border-radius:6px;width:26px;height:26px;cursor:pointer;flex-shrink:0}
+      #hb-body{padding:12px;display:flex;flex-direction:column;gap:8px;overflow-y:auto}
+      #hb-open{background:#111b21;border:1px solid #222d34;border-radius:8px;padding:8px 11px;font-size:calc(12px * var(--hb-fs));color:#aebac1}
       #hb-open b{color:#e9edef}
-      .hb-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-      .hb-act{background:#202c33;color:#e9edef;border:1px solid #2a3942;border-radius:8px;padding:10px;font-size:calc(13px * var(--hb-fs));font-weight:500;cursor:pointer;text-align:center}
+      .hb-acts{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
+      .hb-act{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;background:#202c33;color:#e9edef;border:1px solid #2a3942;border-radius:7px;padding:7px 2px;font-size:calc(10px * var(--hb-fs));font-weight:500;cursor:pointer;text-align:center;line-height:1.15}
+      .hb-act .ic{font-size:calc(15px * var(--hb-fs));line-height:1}
       .hb-act:hover{background:#2a3942}.hb-act:disabled{opacity:.5;cursor:default}
       .hb-act.warn{border-color:#f1b44c;color:#f1b44c}
-      .hb-sec{font-size:calc(11px * var(--hb-fs));text-transform:uppercase;letter-spacing:.5px;color:#8696a0;margin-top:10px}
-      .hb-sep{border-top:1px solid #222d34;margin:10px 0 2px}
-      #hb-steps{display:flex;flex-direction:column;gap:6px;max-height:26vh;overflow-y:auto}
+      .hb-act.mp{border-color:#009ee3;color:#4cc3f0}
+      .hb-sec{font-size:calc(11px * var(--hb-fs));text-transform:uppercase;letter-spacing:.5px;color:#8696a0;margin-top:8px}
+      #hb-steps{display:flex;flex-direction:column;gap:6px;max-height:46vh;overflow-y:auto}
       .hb-step{background:#111b21;border:1px solid #222d34;border-radius:8px;padding:8px 10px;cursor:pointer}
-      .hb-step:hover{border-color:#00a884}
+      .hb-step:hover{border-color:#00a884;background:#16232b}
       .hb-step .k{font-size:calc(11px * var(--hb-fs));color:#8696a0;text-transform:uppercase}
       .hb-step .p{font-size:calc(12px * var(--hb-fs));color:#c8d0d4;margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-      #hb-body textarea{background:#202c33;border:1px solid #2a3942;border-radius:8px;color:#e9edef;padding:9px 11px;font-size:calc(14px * var(--hb-fs));font-family:inherit;resize:vertical;min-height:60px;outline:none;width:100%;box-sizing:border-box}
-      #hb-body textarea:focus{border-color:#00a884}
-      .hb-send{background:#00a884;color:#fff;border:0;border-radius:8px;padding:11px;font-size:calc(14px * var(--hb-fs));font-weight:600;cursor:pointer;width:100%}.hb-send:disabled{opacity:.5}
       .hb-ord{width:100%;text-align:left;border:1px dashed;border-radius:8px;padding:10px;cursor:pointer;background:transparent;font-size:calc(13px * var(--hb-fs))}
-      .hb-ord.g{border-color:#00a884;color:#00d26a}.hb-ord.s{border-color:#3a4a54;color:#aebac1}
-      #hb-feed{margin-top:8px;font-size:calc(13px * var(--hb-fs));white-space:pre-wrap;max-height:28vh;overflow-y:auto}
+      .hb-ord.g{border-color:#00a884;color:#00d26a}.hb-ord.s{border-color:#3a4a54;color:#aebac1}.hb-ord:disabled{opacity:.5}
+      #hb-feed{margin-top:8px;font-size:calc(13px * var(--hb-fs));white-space:pre-wrap;max-height:24vh;overflow-y:auto}
       #hb-feed.ok{color:#00d26a}#hb-feed.err{color:#f15c6d}
-      #hb-body details summary{color:#8696a0;font-size:calc(12px * var(--hb-fs));cursor:pointer}
-      #hb-body input{background:#202c33;border:1px solid #2a3942;border-radius:8px;color:#e9edef;padding:9px 11px;font-size:calc(14px * var(--hb-fs));outline:none;width:100%;box-sizing:border-box;margin-top:4px}
       #hb-tog{position:fixed;top:76px;right:0;z-index:100000;background:#00a884;color:#fff;border:0;border-radius:8px 0 0 8px;padding:8px 9px;cursor:pointer;font-size:16px;transition:right .22s ease;line-height:1}
     `;
         document.head.appendChild(style);
@@ -108,36 +102,27 @@ function bootstrap(initW) {
         panel.className = 'hb-col';
         panel.innerHTML = `
       <div id="hb-grip" title="Arrastrar para redimensionar"></div>
-      <div id="hb-bar"><span class="hb-t">🤖 Herbalis · Panel</span><span class="hb-sp"></span><button id="hb-close" title="Cerrar">✕</button></div>
+      <div id="hb-bar">
+        <span class="hb-t">🤖 Herbalis</span>
+        <span class="hb-sp"></span>
+        <span class="hb-az" title="Tamaño de letra">🔤</span>
+        <input id="hb-fs" type="range" min="1" max="2.4" step="0.1" value="1" title="Tamaño de letra" />
+        <button id="hb-close" title="Cerrar">✕</button>
+      </div>
       <div id="hb-body">
-        <div id="hb-fsrow">
-          <label>🔤 Texto</label>
-          <input id="hb-fs" type="range" min="1" max="2.4" step="0.1" value="1" />
-          <span id="hb-fsval">100%</span>
-        </div>
         <div id="hb-open">Chat abierto: <b id="hb-openname">—</b></div>
-        <div class="hb-grid">
-          <button class="hb-act warn" data-act="pause">⏸ Pausar</button>
-          <button class="hb-act" data-act="resume">▶ Reactivar</button>
-          <button class="hb-act" data-act="summarize">📝 Resumen</button>
-          <button class="hb-act" data-act="reset">🧹 Limpiar</button>
+        <div class="hb-acts">
+          <button class="hb-act warn" data-act="pause"><span class="ic">⏸</span>Pausar</button>
+          <button class="hb-act" data-act="resume"><span class="ic">▶</span>Activar</button>
+          <button class="hb-act" data-act="summarize"><span class="ic">📝</span>Resumen</button>
+          <button class="hb-act" data-act="reset"><span class="ic">🧹</span>Limpiar</button>
+          <button class="hb-act mp" id="hb-mp"><span class="ic">💳</span>Cobro MP</button>
         </div>
-        <div class="hb-sec">Guión (V7) — click para insertar</div>
+        <div class="hb-sec">Guión (V7) — tocá un paso para ponerlo en el chat</div>
         <div id="hb-steps"><span style="color:#8696a0;font-size:calc(12px * var(--hb-fs))">Cargando guion…</span></div>
-        <div class="hb-sep"></div>
-        <label style="font-size:calc(12px * var(--hb-fs));color:#8696a0">Mensaje al chat abierto</label>
-        <textarea id="hb-msg" placeholder="Escribí o insertá un paso del guion…"></textarea>
-        <button id="hb-send-open" class="hb-send">Enviar al chat abierto</button>
-        <div class="hb-sec">💳 Cobrar con Mercado Pago</div>
-        <input id="hb-mp-amount" placeholder="Monto, ej: 46900" inputmode="numeric" />
-        <button id="hb-mp-link" class="hb-send" style="margin-top:8px;background:#009ee3">Generar y enviar link MP</button>
         <div class="hb-sec">Confirmar pedido</div>
         <button id="hb-ord-msg" class="hb-ord g">🚀 Pedido ingresado — envía confirmación al cliente</button>
         <button id="hb-ord-sil" class="hb-ord s">📋 Solo registrar — sin enviar mensaje</button>
-        <details><summary>o enviar a un número</summary>
-          <input id="hb-num" placeholder="34679278596" inputmode="numeric" />
-          <button id="hb-send-num" class="hb-send" style="margin-top:8px">Enviar al número</button>
-        </details>
         <div id="hb-feed"></div>
       </div>
     `;
@@ -165,18 +150,34 @@ function bootstrap(initW) {
         // Escala TODO el texto del panel vía la CSS var --hb-fs. Persistido en
         // localStorage (si WA bloquea storage, igual funciona en la sesión).
         const fsInput = document.getElementById('hb-fs');
-        const fsVal = document.getElementById('hb-fsval');
         function applyFs(v) {
             const f = Math.max(1, Math.min(2.4, parseFloat(v) || 1));
             panel.style.setProperty('--hb-fs', f);
-            fsInput.value = f;
-            fsVal.textContent = Math.round(f * 100) + '%';
+            if (fsInput) fsInput.value = f;
             try { localStorage.setItem('hbFontScale', String(f)); } catch (e) { /* storage bloqueado */ }
         }
         let savedFs = 1;
         try { savedFs = localStorage.getItem('hbFontScale') || 1; } catch (e) { /* idem */ }
         applyFs(savedFs);
         fsInput.addEventListener('input', (e) => applyFs(e.target.value));
+
+        // Inserta texto en el CUADRO NATIVO de WhatsApp (editor Lexical). El paste
+        // sintético es la vía que Lexical reconoce y que preserva los saltos de
+        // línea (execCommand insertText los colapsa). Devuelve true si pudo apuntar
+        // al composer; el contenido real se verifica luego (Lexical renderiza async).
+        function insertIntoComposer(text) {
+            const box = document.querySelector('#main footer [contenteditable=true]');
+            if (!box) return false;
+            box.focus();
+            try {
+                document.execCommand('selectAll', false, null);
+                box.dispatchEvent(new InputEvent('beforeinput', { inputType: 'deleteContentBackward', bubbles: true, cancelable: true }));
+            } catch (e) { /* sigue: el paste suele bastar */ }
+            const dt = new DataTransfer();
+            dt.setData('text/plain', text);
+            box.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+            return true;
+        }
 
         // Redimensionar arrastrando el borde izquierdo.
         let dragging = false;
@@ -197,8 +198,8 @@ function bootstrap(initW) {
             finally { if (btn) btn.disabled = false; }
         }
 
-        // ── Acciones ──────────────────────────────────────────────────────────
-        panel.querySelectorAll('.hb-act').forEach((b) => {
+        // ── Acciones (pausar/activar/resumen/limpiar — el MP se maneja aparte) ─
+        panel.querySelectorAll('.hb-act[data-act]').forEach((b) => {
             b.onclick = () => {
                 const act = b.getAttribute('data-act');
                 if (typeof window.hbAction !== 'function') { feed('Agente no conectado.', 'err'); return; }
@@ -209,29 +210,15 @@ function bootstrap(initW) {
         document.getElementById('hb-ord-msg').onclick = (e) => { if (window.confirm('¿Confirmar el pedido y ENVIAR la confirmación al cliente?')) run(e.target, () => window.hbAction('confirm')); };
         document.getElementById('hb-ord-sil').onclick = (e) => { if (window.confirm('¿Registrar el pedido SIN enviar mensaje?')) run(e.target, () => window.hbAction('confirm_silent')); };
 
-        // ── Envío ─────────────────────────────────────────────────────────────
-        document.getElementById('hb-send-open').onclick = (e) => {
-            const msg = document.getElementById('hb-msg').value || '';
-            if (!msg.trim()) { feed('Falta el mensaje.', 'err'); return; }
-            if (typeof window.hbSendToOpenChat !== 'function') { feed('Agente no conectado.', 'err'); return; }
-            run(e.target, async () => { const r = await window.hbSendToOpenChat(msg); if (r && r.ok) document.getElementById('hb-msg').value = ''; return r; });
-        };
-        document.getElementById('hb-send-num').onclick = (e) => {
-            const num = (document.getElementById('hb-num').value || '').replace(/\D/g, '');
-            const msg = document.getElementById('hb-msg').value || '';
-            if (!num || !msg.trim()) { feed('Falta número o mensaje.', 'err'); return; }
-            if (typeof window.hbSendMessage !== 'function') { feed('Agente no conectado.', 'err'); return; }
-            run(e.target, () => window.hbSendMessage(num, msg));
-        };
-
-        // ── Link de Mercado Pago ──────────────────────────────────────────────
-        document.getElementById('hb-mp-link').onclick = (e) => {
-            const raw = (document.getElementById('hb-mp-amount').value || '').replace(/\D/g, '');
-            if (!raw) { feed('Falta el monto.', 'err'); return; }
+        // ── Link de Mercado Pago (botón compacto → pide el monto) ─────────────
+        const mpBtn = document.getElementById('hb-mp');
+        mpBtn.onclick = () => {
             if (typeof window.hbMpLink !== 'function') { feed('Agente no conectado.', 'err'); return; }
+            const raw = (window.prompt('Monto a cobrar con Mercado Pago (en pesos):', '') || '').replace(/\D/g, '');
+            if (!raw) return;
             const fmt = parseInt(raw, 10).toLocaleString('es-AR');
             if (!window.confirm(`¿Generar link de Mercado Pago por $${fmt} y enviarlo al chat abierto?`)) return;
-            run(e.target, async () => { const r = await window.hbMpLink(raw); if (r && r.ok) document.getElementById('hb-mp-amount').value = ''; return r; });
+            run(mpBtn, () => window.hbMpLink(raw));
         };
 
         // ── Guión (pasos) ─────────────────────────────────────────────────────
@@ -260,7 +247,22 @@ function bootstrap(initW) {
                     const resp = resolvePrices(flow[k].response, priceMap);
                     div.innerHTML = `<div class="k">${k.replace(/_/g, ' ')}</div><div class="p"></div>`;
                     div.querySelector('.p').textContent = resp;
-                    div.onclick = () => { document.getElementById('hb-msg').value = resp; document.getElementById('hb-msg').focus(); feed('Paso insertado — revisá y "Enviar al chat abierto". (Precios ya cargados; los {{…}} del cliente se completan a mano.)', ''); };
+                    div.onclick = () => {
+                        const box = document.querySelector('#main footer [contenteditable=true]');
+                        if (!box) { feed('Abrí un chat primero.', 'err'); return; }
+                        insertIntoComposer(resp);
+                        // Lexical renderiza async — verificamos a los 150ms. Si no
+                        // entró, fallback al portapapeles (Ctrl+V) para no dejar al
+                        // vendedor sin el texto.
+                        setTimeout(() => {
+                            if (box.innerText.trim()) {
+                                feed('Paso puesto en el chat — completá los {{…}} del cliente y enviá con Enter.', 'ok');
+                            } else {
+                                try { navigator.clipboard.writeText(resp); feed('No pude escribir directo; lo copié al portapapeles, pegalo con Ctrl+V.', 'err'); }
+                                catch (e2) { feed('No pude escribir en el cuadro de WhatsApp. Copiá el paso a mano.', 'err'); }
+                            }
+                        }, 150);
+                    };
                     cont.appendChild(div);
                 });
             } catch (e) { cont.innerHTML = '<span style="color:#f15c6d;font-size:calc(12px * var(--hb-fs))">Error: ' + (e.message || e) + '</span>'; }
