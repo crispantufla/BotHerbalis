@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-    FileText, Power, Trash2, HardDrive, RefreshCw, KeyRound, RotateCcw, Lock
+    FileText, Power, Trash2, HardDrive, RefreshCw, KeyRound, RotateCcw, Lock, Download, Laptop
 } from 'lucide-react';
 import api from '../../config/axios';
 import { useSocket } from '../../context/SocketContext';
@@ -31,6 +31,8 @@ const SettingsView = ({ status }) => {
 
     const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
     const [pwSaving, setPwSaving] = useState(false);
+
+    const [downloadingAgent, setDownloadingAgent] = useState(false);
 
     useEffect(() => {
         (async () => {
@@ -74,6 +76,29 @@ const SettingsView = ({ status }) => {
             await api.post('/api/whatsapp-logout');
             toast.success('Sesión cerrada. Escaneá el QR para reconectar.');
         } catch { toast.error('Error al cerrar sesión'); }
+    };
+
+    // Descarga el instalador del agente (un .bat autocontenido) para este seller.
+    // La descarga va con el JWT (axios interceptor), así que no sirve un <a href>:
+    // pedimos el blob y lo disparamos a mano. El error del backend viene como blob.
+    const handleDownloadInstaller = async () => {
+        setDownloadingAgent(true);
+        try {
+            const res = await api.get('/api/agent/installer', { responseType: 'blob' });
+            const cd = res.headers['content-disposition'] || '';
+            const m = cd.match(/filename="?([^"]+)"?/);
+            const filename = m ? m[1] : 'Instalar Bot Herbalis.bat';
+            const url = URL.createObjectURL(res.data);
+            const a = document.createElement('a');
+            a.href = url; a.download = filename; a.click();
+            URL.revokeObjectURL(url);
+            toast.success('Instalador descargado. Copialo a la PC del vendedor y hacé doble click.');
+        } catch (e) {
+            let msg = 'Error al generar el instalador';
+            try { const t = await e.response?.data?.text?.(); if (t) msg = JSON.parse(t).error || msg; } catch { /* blob no-json */ }
+            toast.error(msg);
+        }
+        setDownloadingAgent(false);
     };
 
     const handleResetMemory = async () => {
@@ -331,6 +356,34 @@ const SettingsView = ({ status }) => {
                 {/* /Col 2 stack */}
 
                 {/* Card "Herramientas / Generar PDF" eliminado a pedido. */}
+
+                {/* Cliente del bot — instalador para la PC del vendedor */}
+                <Card padding="md" className="xl:col-span-2">
+                    <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-control bg-accent-50 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400 flex items-center justify-center flex-shrink-0">
+                            <Laptop className="w-5 h-5" aria-hidden="true" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm mb-1">
+                                Cliente del bot (PC del vendedor)
+                            </h3>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed mb-4 max-w-md">
+                                Descargá el instalador y copialo a la PC del vendedor. Con un doble click deja
+                                todo listo: instala lo necesario, conecta con el servidor y crea el acceso
+                                directo en el escritorio. Después se actualiza solo.
+                            </p>
+                            <Button
+                                variant="primary"
+                                leftIcon={Download}
+                                onClick={handleDownloadInstaller}
+                                disabled={downloadingAgent}
+                                className={downloadingAgent ? '[&_svg]:animate-pulse' : ''}
+                            >
+                                {downloadingAgent ? 'Generando…' : 'Descargar cliente'}
+                            </Button>
+                        </div>
+                    </div>
+                </Card>
 
                 {/* Danger zone */}
                 <Card padding="md" className="border-danger-200/70 dark:border-danger-900/40 xl:col-span-2">

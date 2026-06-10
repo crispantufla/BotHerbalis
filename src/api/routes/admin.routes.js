@@ -174,5 +174,78 @@ module.exports = (clientPool) => {
         res.json({ ok: sent });
     });
 
+    // GET /agent/installer — genera el instalador del agente para el seller y lo
+    // sirve como un .bat autocontenido (un archivo, doble click). El config (URLs,
+    // WA_AGENT_TOKEN, y un JWT fresco de 365d para los botones del panel) se arma
+    // al vuelo desde el entorno — el container NO tiene agent/config.json. Sin
+    // requireAdmin: cada seller queda lockeado a su sellerId (descarga el propio);
+    // un admin global pasa ?sellerId. Es SU token, no hay escalación.
+    router.get('/agent/installer', ...withSeller(clientPool), async (req, res) => {
+        const fs = require('fs');
+        const path = require('path');
+        const jwt = require('jsonwebtoken');
+        const sellerId = req.sellerId;
+        if (!sellerId) return res.status(400).json({ error: 'sellerId requerido (?sellerId=… para admins globales)' });
+
+        const agentToken = process.env[`WA_AGENT_TOKEN_${sellerId.toUpperCase()}`] || process.env.WA_AGENT_TOKEN;
+        if (!agentToken) return res.status(400).json({ error: `Falta WA_AGENT_TOKEN_${sellerId.toUpperCase()} en el entorno` });
+
+        const secret = process.env.JWT_SECRET || process.env.API_KEY;
+        if (!secret) return res.status(500).json({ error: 'JWT_SECRET no configurado' });
+
+        try {
+            // apiToken: JWT del seller para los botones del panel. 365d — si expira,
+            // el panel deja de operar. Se firma con los datos reales del account.
+            const acc = await prisma.account.findFirst({
+                where: { sellerId }, select: { id: true, role: true, sellerId: true, name: true },
+            });
+            if (!acc) return res.status(404).json({ error: `No hay cuenta para el seller ${sellerId}` });
+            const apiToken = jwt.sign(
+                { accountId: acc.id, role: acc.role, sellerId: acc.sellerId, name: acc.name },
+                secret, { expiresIn: '365d' },
+            );
+
+            // URLs derivadas del host del request (no hardcodeadas) — funciona en
+            // cualquier deploy. ws/http solo en local; wss/https en producción.
+            const host = req.get('host');
+            const local = /localhost|127\.0\.0\.1/.test(host);
+            const cfg = {
+                gatewayUrl: `${local ? 'ws' : 'wss'}://${host}/agent`,
+                sellerId,
+                token: agentToken,
+                apiBase: `${local ? 'http' : 'https'}://${host}`,
+                apiToken,
+            };
+            const b64 = Buffer.from(JSON.stringify(cfg, null, 2), 'utf8').toString('base64');
+
+            const tpl = fs.readFileSync(path.join(__dirname, '../../../agent/installer/install.ps1'), 'utf8');
+            const ps1 = tpl.replace(/__CONFIG_B64__/g, b64);
+
+            // .bat polyglot: cmd corre la 1ra línea; PowerShell se lee a sí mismo
+            // (%~f0), corta tras el marcador #PS# y ejecuta el resto. El marcador en
+            // la línea de comando va como [char]35 para no aparecer literal antes
+            // del real. chcp 65001 = acentos OK en consola.
+            const bat = [
+                '@echo off',
+                'chcp 65001 >nul',
+                `powershell -NoProfile -ExecutionPolicy Bypass -Command "$f=[IO.File]::ReadAllText('%~f0');iex $f.Substring($f.IndexOf([char]35+'PS'+[char]35)+4)"`,
+                'echo.',
+                'pause',
+                'exit /b',
+                '#PS#',
+                ps1,
+            ].join('\r\n');
+
+            logger.info(`[AGENT-DIST] Instalador generado para ${sellerId} (host ${host})`);
+            res.setHeader('Content-Type', 'application/octet-stream');
+            res.setHeader('Content-Disposition', `attachment; filename="Instalar Bot Herbalis - ${sellerId}.bat"`);
+            res.setHeader('Cache-Control', 'no-store');
+            res.send(Buffer.from(bat, 'utf8'));
+        } catch (e) {
+            logger.error('[AGENT-DIST] installer:', e.message);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     return router;
 };
