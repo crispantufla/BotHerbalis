@@ -514,6 +514,13 @@ class ClientPool {
                 this.io.to('admin').emit('status_change', { status: state.toLowerCase(), sellerId });
             }
             if (state === 'TIMEOUT' || state === 'UNPAIRED') {
+                // En modo remoto NO tocar: resetState/safeInit reinicializarían el
+                // RemoteClient (recreándolo → ventana con instance.client undefined →
+                // "getChats of undefined" + doble 'ready'). El UNPAIRED/TIMEOUT del
+                // remoto es transitorio (pairing inicial, teléfono dormido); la
+                // reconexión la maneja el agente en la PC del vendedor (wwebjs se
+                // re-inicializa solo) y la liveness el heartbeat del gateway.
+                if (client instanceof RemoteClient) return;
                 logger.warn(`[POOL][${sellerId}] Connection degraded (${state}), attempting refresh...`);
                 client.resetState().catch(() => {
                     // resetState not available in all versions — fall back to safeInit
