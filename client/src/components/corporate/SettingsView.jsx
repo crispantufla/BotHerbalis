@@ -430,13 +430,16 @@ const SettingsView = ({ status }) => {
                     </div>
                 </Card>
 
-                {/* Cliente del bot — instalador para la PC del vendedor */}
-                <Card padding="md" className="xl:col-span-2">
-                    <div className="flex items-start gap-3">
+                {/* Cliente del bot — instalador para la PC del vendedor.
+                    col-span-1: comparte fila con "Interrupción fuerte" (ambas
+                    son cards de acción cortas; a ancho completo desperdiciaban
+                    media fila cada una). */}
+                <Card padding="md" className="flex flex-col">
+                    <div className="flex items-stretch gap-3 flex-1">
                         <div className="w-10 h-10 rounded-control bg-accent-50 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400 flex items-center justify-center flex-shrink-0">
                             <Laptop className="w-5 h-5" aria-hidden="true" />
                         </div>
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0 flex flex-col">
                             <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm mb-1">
                                 Cliente del bot (PC del vendedor)
                             </h3>
@@ -445,26 +448,28 @@ const SettingsView = ({ status }) => {
                                 todo listo: instala lo necesario, conecta con el servidor y crea el acceso
                                 directo en el escritorio. Después se actualiza solo.
                             </p>
-                            <Button
-                                variant="primary"
-                                leftIcon={Download}
-                                onClick={handleDownloadInstaller}
-                                disabled={downloadingAgent}
-                                className={downloadingAgent ? '[&_svg]:animate-pulse' : ''}
-                            >
-                                {downloadingAgent ? 'Generando…' : 'Descargar cliente'}
-                            </Button>
+                            <div className="mt-auto">
+                                <Button
+                                    variant="primary"
+                                    leftIcon={Download}
+                                    onClick={handleDownloadInstaller}
+                                    disabled={downloadingAgent}
+                                    className={downloadingAgent ? '[&_svg]:animate-pulse' : ''}
+                                >
+                                    {downloadingAgent ? 'Generando…' : 'Descargar cliente'}
+                                </Button>
+                            </div>
                         </div>
                     </div>
                 </Card>
 
-                {/* Danger zone */}
-                <Card padding="md" className="border-danger-200/70 dark:border-danger-900/40 xl:col-span-2">
-                    <div className="flex items-start gap-3">
+                {/* Danger zone — col-span-1, comparte fila con "Cliente del bot". */}
+                <Card padding="md" className="border-danger-200/70 dark:border-danger-900/40 flex flex-col">
+                    <div className="flex items-stretch gap-3 flex-1">
                         <div className="w-10 h-10 rounded-control bg-danger-50 dark:bg-danger-900/30 text-danger-600 dark:text-danger-500 flex items-center justify-center flex-shrink-0">
                             <Power className="w-5 h-5" aria-hidden="true" />
                         </div>
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0 flex flex-col">
                             <h3 className="font-semibold text-danger-700 dark:text-danger-500 text-sm mb-1">
                                 Interrupción fuerte
                             </h3>
@@ -472,9 +477,11 @@ const SettingsView = ({ status }) => {
                                 Cerrar la sesión desconecta inmediatamente el dispositivo vinculado de WhatsApp.
                                 Ningún mensaje será respondido luego de esta acción.
                             </p>
-                            <Button variant="danger" leftIcon={Power} onClick={handleLogout}>
-                                Forzar desconexión
-                            </Button>
+                            <div className="mt-auto">
+                                <Button variant="danger" leftIcon={Power} onClick={handleLogout}>
+                                    Forzar desconexión
+                                </Button>
+                            </div>
                         </div>
                     </div>
                 </Card>
