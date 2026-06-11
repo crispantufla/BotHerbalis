@@ -404,6 +404,34 @@ module.exports = (clientPool) => {
         }
     });
 
+    // GET /config/recover-old-chats - Estado del switch de recuperación de
+    // chats antiguos para este seller (default OFF).
+    router.get('/config/recover-old-chats', ...withSeller(clientPool), (req, res) => {
+        const { config } = getCtx(req);
+        res.json({ recoverOldChats: !!config.recoverOldChats });
+    });
+
+    // POST /config/recover-old-chats - Activa/desactiva la recuperación de
+    // chats antiguos. Con OFF (default) el dashboard NO le pide getChats() a
+    // WhatsApp: no baja el historial previo del dispositivo (lectura masiva
+    // que Meta puede marcar en números nuevos). Body: { enabled: true|false }.
+    router.post('/config/recover-old-chats', ...withSeller(clientPool), (req, res) => {
+        try {
+            const { config, ss } = getCtx(req);
+            const enabled = req.body?.enabled === true;
+            config.recoverOldChats = enabled;
+            if (ss?.saveState) ss.saveState();
+
+            emitScoped(req, 'recover_old_chats_changed', { recoverOldChats: enabled });
+
+            logger.info(`[SYSTEM] recoverOldChats=${enabled} (seller=${req.sellerId})`);
+            res.json({ success: true, recoverOldChats: enabled });
+        } catch (e) {
+            logger.error('Error toggling recoverOldChats:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     // POST /global-pause-all - Pausa/reactiva TODOS los sellers a la vez.
     // Permitido a: (a) admin global (sellerId=null), (b) Horacio (dueño
     // del proyecto — tenant admin con sellerId='horacio'). Body: { pause: true|false }.

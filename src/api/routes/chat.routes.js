@@ -43,6 +43,97 @@ function _getOrdersCache(sellerId) {
 }
 const CACHE_TTL = 60000; // 60 seconds
 
+// Mapea una Order de la DB al formato legacy que espera el frontend en la
+// lista de chats (pastOrders). Extraído para reusarlo entre el camino normal
+// (getChats) y el camino solo-DB (recuperación de chats antiguos apagada).
+function _mapOrderToLegacy(o) {
+    let inferredPlan = '60';
+    const planMatch = (o.products || '').match(/(\d+)/);
+    if (planMatch) inferredPlan = planMatch[1];
+    return {
+        id: o.id,
+        cliente: o.userPhone,
+        status: o.status,
+        producto: o.products,
+        plan: inferredPlan,
+        precio: Math.round(o.totalPrice).toLocaleString('es-AR'),
+        tracking: o.tracking || '',
+        postdatado: o.postdated || '',
+        ciudad: o.ciudad || '',
+        calle: o.calle || '',
+        cp: o.cp || '',
+        createdAt: o.createdAt.toISOString()
+    };
+}
+
+// Construye la lista de chats SOLO desde la DB (ChatLog), sin pedirle
+// getChats() a WhatsApp. Se usa cuando la "recuperación de chats antiguos"
+// está apagada (default): así el dashboard solo muestra los chats que el bot
+// YA atendió, sin bajar del dispositivo el historial previo del vendedor —
+// esa lectura masiva es la que Meta puede marcar en números nuevos.
+async function _buildChatsFromDb(prisma, instanceId, ss, orders) {
+    // Traemos los últimos mensajes y los reducimos a uno por teléfono (el más
+    // reciente). Ya vienen ordenados desc, así que el primero por teléfono gana.
+    const logs = await prisma.chatLog.findMany({
+        where: { instanceId },
+        orderBy: { timestamp: 'desc' },
+        take: 600,
+        select: { userPhone: true, content: true, timestamp: true, role: true }
+    });
+    const latestByPhone = new Map();
+    for (const l of logs) {
+        if (!latestByPhone.has(l.userPhone)) {
+            latestByPhone.set(l.userPhone, l);
+            if (latestByPhone.size >= 150) break;
+        }
+    }
+    const phones = Array.from(latestByPhone.keys());
+    if (phones.length === 0) return [];
+
+    const users = await prisma.user.findMany({
+        where: { instanceId, phone: { in: phones } },
+        select: { phone: true, name: true }
+    });
+    const nameByPhone = new Map(users.map(u => [u.phone, u.name]));
+
+    // Cross-ref de pedidos por últimos 10 dígitos (mismo criterio que getChats).
+    const ordersByPhone = new Map();
+    (orders || []).forEach(o => {
+        if (!o.userPhone) return;
+        const last10 = o.userPhone.replace(/\D/g, '').slice(-10);
+        const key = `${o.instanceId}_${last10}`;
+        if (!ordersByPhone.has(key)) ordersByPhone.set(key, []);
+        ordersByPhone.get(key).push(o);
+    });
+
+    return phones.map(phone => {
+        const l = latestByPhone.get(phone);
+        const id = `${phone}@c.us`;
+        const us = ss?.userState?.[id];
+        const last10 = phone.replace(/\D/g, '').slice(-10);
+        const userOrders = ordersByPhone.get(`${instanceId}_${last10}`) || [];
+        const legacyUserOrders = userOrders.map(_mapOrderToLegacy);
+        const tsMs = l ? new Date(l.timestamp).getTime() : 0;
+        return {
+            id,
+            name: nameByPhone.get(phone) || `+${phone}`,
+            unreadCount: 0,
+            lastMessage: l ? { body: l.content, timestamp: tsMs } : null,
+            timestamp: Math.floor(tsMs / 1000),
+            isPaused: ss?.pausedUsers?.has(id) || false,
+            step: us?.step || 'new',
+            assignedScript: us?.assignedScript || ss?.config?.activeScript || 'v7',
+            selectedProduct: us?.selectedProduct || null,
+            selectedPlan: us?.selectedPlan || null,
+            cart: us?.cart || null,
+            totalPrice: us?.totalPrice || null,
+            partialAddress: us?.partialAddress || null,
+            pastOrders: legacyUserOrders.length > 0 ? legacyUserOrders : null,
+            hasBought: legacyUserOrders.length > 0
+        };
+    }).sort((a, b) => b.timestamp - a.timestamp);
+}
+
 const withTimeout = (promise, ms, rejectMessage) => {
     let timeoutId;
     const timeout = new Promise((_, reject) => {
@@ -239,8 +330,6 @@ module.exports = (clientPool) => {
             return res.json([]); // Return empty list if WA is still initializing
         }
         try {
-            const chats = await withTimeout(cl.getChats(), 30000, 'Timeout retrieving chats');
-
             // Read orders from Database to cross-reference past purchases (Per-seller 60s TTL Cache)
             const currentSellerId = req.sellerId || 'default';
             let orders = [];
@@ -262,6 +351,18 @@ module.exports = (clientPool) => {
             }
 
             const instanceFilterId = getInstanceId(req);
+
+            // Recuperación de chats antiguos APAGADA (default): construimos la
+            // lista solo desde la DB y NO le pedimos getChats() a WhatsApp, para
+            // no bajar el historial previo del dispositivo (lectura masiva que
+            // Meta puede marcar en números nuevos). Se activa desde Ajustes.
+            if (!ss?.config?.recoverOldChats) {
+                const { prisma } = require('../../../db');
+                const dbChats = await _buildChatsFromDb(prisma, instanceFilterId, ss, orders);
+                return res.json(dbChats);
+            }
+
+            const chats = await withTimeout(cl.getChats(), 30000, 'Timeout retrieving chats');
 
             // 1. Resolve @lid and Pre-process
             const mappedPromises = chats.filter(c => !c.isGroup).map(async (c) => {
@@ -413,27 +514,7 @@ module.exports = (clientPool) => {
                 const userOrders = ordersByPhone.get(key) || [];
 
                 // Map DB order to legacy format for frontend
-                const legacyUserOrders = userOrders.map(o => {
-                    // Extract plan number from product string if not explicit (e.g. "Cápsulas (60 días)" -> "60")
-                    let inferredPlan = '60';
-                    const planMatch = (o.products || '').match(/(\d+)/);
-                    if (planMatch) inferredPlan = planMatch[1];
-
-                    return {
-                        id: o.id,
-                        cliente: o.userPhone,
-                        status: o.status,
-                        producto: o.products,
-                        plan: inferredPlan,
-                        precio: Math.round(o.totalPrice).toLocaleString('es-AR'),
-                        tracking: o.tracking || '',
-                        postdatado: o.postdated || '',
-                        ciudad: o.ciudad || '',
-                        calle: o.calle || '',
-                        cp: o.cp || '',
-                        createdAt: o.createdAt.toISOString()
-                    };
-                });
+                const legacyUserOrders = userOrders.map(_mapOrderToLegacy);
 
                 return {
                     id: resolvedId,

@@ -17,6 +17,10 @@ interface BotConfig {
     scriptStats: { [script: string]: { started: number; completed: number } };
     alertNumber?: string;
     globalPause?: boolean;
+    // Recuperación de chats antiguos: si está apagada (default), el dashboard
+    // NO le pide getChats() a WhatsApp (no baja el historial previo del
+    // dispositivo). Apagada por defecto para no marcar números nuevos ante Meta.
+    recoverOldChats?: boolean;
     [key: string]: any;
 }
 
@@ -72,6 +76,7 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
     const config: BotConfig = {
         alertNumbers: [],
         activeScript: 'v7',
+        recoverOldChats: false,
         scriptStats: {
             v7: { started: 0, completed: 0 }
         }
