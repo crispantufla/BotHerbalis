@@ -380,34 +380,37 @@ const SettingsView = ({ status }) => {
                         </Button>
                     </form>
                 </Card>
-                </div>
-                {/* /Col 2 stack */}
 
-                {/* Card "Herramientas / Generar PDF" eliminado a pedido. */}
-
-                {/* Recuperación de chats antiguos (anti-bloqueo Meta) */}
-                <Card padding="md" className="xl:col-span-2">
-                    <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-start gap-3 min-w-0">
-                            <div className="w-10 h-10 rounded-control bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0">
-                                <History className="w-5 h-5" aria-hidden="true" />
-                            </div>
-                            <div className="min-w-0">
-                                <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm mb-1">
-                                    Recuperación de chats antiguos
-                                </h3>
-                                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed max-w-xl">
-                                    Cuando está activada, el panel le pide a WhatsApp <strong>todo el historial
-                                    de conversaciones</strong> del teléfono. En números nuevos esa lectura masiva
-                                    puede hacer que Meta marque la cuenta. Con esta opción <strong>apagada</strong> el
-                                    panel solo muestra los chats que el bot ya atendió; el bot sigue respondiendo
-                                    normalmente a los mensajes nuevos.
-                                </p>
-                                <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1.5">
-                                    Recomendado: dejar <strong>desactivada</strong>, sobre todo en números recién conectados.
-                                </p>
-                            </div>
+                {/* Recuperación de chats antiguos (anti-bloqueo Meta). Va dentro
+                    del stack de la col 2 para rellenar el hueco bajo "Cambiar
+                    contraseña" (el PriceEditor de la izquierda es más alto).
+                    flex-1 + flex-col: la card crece hasta el fondo y el toggle
+                    queda anclado abajo, sin dejar aire. */}
+                <Card padding="md" className="flex-1 flex flex-col">
+                    <div className="flex items-start gap-3 min-w-0 mb-3">
+                        <div className="w-10 h-10 rounded-control bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0">
+                            <History className="w-5 h-5" aria-hidden="true" />
                         </div>
+                        <div className="min-w-0">
+                            <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm mb-1">
+                                Recuperación de chats antiguos
+                            </h3>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                                Cuando está activada, el panel le pide a WhatsApp <strong>todo el historial
+                                de conversaciones</strong> del teléfono. En números nuevos esa lectura masiva
+                                puede hacer que Meta marque la cuenta. Con esta opción <strong>apagada</strong> el
+                                panel solo muestra los chats que el bot ya atendió; el bot sigue respondiendo
+                                normalmente a los mensajes nuevos.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="mt-auto flex items-center justify-between gap-3 pt-3 border-t border-slate-200/70 dark:border-slate-700/70">
+                        <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                            {recoverOldChats ? 'Activada' : 'Desactivada'}
+                            <span className="text-[11px] text-slate-400 dark:text-slate-500 font-normal ml-1.5">
+                                (recomendado: apagada en números nuevos)
+                            </span>
+                        </span>
                         <button
                             type="button"
                             role="switch"
@@ -416,7 +419,7 @@ const SettingsView = ({ status }) => {
                             onClick={handleToggleRecover}
                             disabled={togglingRecover}
                             className={cn(
-                                'relative inline-flex h-6 w-11 flex-shrink-0 rounded-full transition-colors mt-1',
+                                'relative inline-flex h-6 w-11 flex-shrink-0 rounded-full transition-colors',
                                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2',
                                 'disabled:opacity-50 disabled:cursor-not-allowed',
                                 recoverOldChats ? 'bg-accent-500' : 'bg-slate-300 dark:bg-slate-600'
@@ -429,6 +432,10 @@ const SettingsView = ({ status }) => {
                         </button>
                     </div>
                 </Card>
+                </div>
+                {/* /Col 2 stack */}
+
+                {/* Card "Herramientas / Generar PDF" eliminado a pedido. */}
 
                 {/* Cliente del bot — instalador para la PC del vendedor.
                     col-span-1: comparte fila con "Interrupción fuerte" (ambas
