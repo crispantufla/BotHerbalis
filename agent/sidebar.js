@@ -211,7 +211,7 @@ function bootstrap(initW) {
       #hb-bar .hb-az{font-size:13px;opacity:.75}
       #hb-bar #hb-fs{width:66px;accent-color:#00a884;cursor:pointer;flex-shrink:0}
       #hb-bar button{background:#202c33;color:#aebac1;border:0;border-radius:6px;width:26px;height:26px;cursor:pointer;flex-shrink:0}
-      #hb-body{padding:12px;display:flex;flex-direction:column;gap:8px;overflow-y:auto}
+      #hb-body{flex:1;min-height:0;padding:12px;display:flex;flex-direction:column;gap:8px;overflow-y:auto}
       #hb-open{background:#111b21;border:1px solid #222d34;border-radius:8px;padding:8px 11px;font-size:calc(12px * var(--hb-fs));color:#aebac1}
       #hb-open b{color:#e9edef}
       .hb-acts{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
@@ -243,6 +243,7 @@ function bootstrap(initW) {
       #hb-feed{margin-top:8px;font-size:calc(13px * var(--hb-fs));white-space:pre-wrap;max-height:24vh;overflow-y:auto}
       #hb-feed.ok{color:#00d26a}#hb-feed.err{color:#f15c6d}
       #hb-tog{position:fixed;top:76px;right:0;z-index:100000;background:#00a884;color:#fff;border:0;border-radius:8px 0 0 8px;padding:8px 9px;cursor:pointer;font-size:16px;transition:right .22s ease;line-height:1}
+      #hb-credit{flex-shrink:0;text-align:center;padding:7px 10px;border-top:1px solid #222d34;background:#111b21;color:#8696a0;font-size:calc(11px * var(--hb-fs));letter-spacing:.3px}
     `;
         document.head.appendChild(style);
 
@@ -274,6 +275,7 @@ function bootstrap(initW) {
         <button id="hb-ord-sil" class="hb-ord s">📋 Solo registrar — sin enviar mensaje</button>
         <div id="hb-feed"></div>
       </div>
+      <div id="hb-credit">By Cristian Giosue</div>
     `;
         document.body.appendChild(panel);
 
