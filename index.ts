@@ -116,14 +116,30 @@ async function boot() {
     // Graceful shutdown
     const _shutdown = async (signal: string, exitCode: number = 0): Promise<void> => {
         logger.info(`[SHUTDOWN] ${signal} received. Cleaning up...`);
+        // Watchdog: si algún cierre se cuelga, salimos igual. httpServer.close()
+        // espera a que DRENEN todas las conexiones persistentes (el WSS del agente
+        // en /agent nunca cierra solo, ni los sockets de socket.io / keep-alive),
+        // así que su callback puede no dispararse nunca. Sin esta red, el proceso
+        // queda zombie (Redis cerrado, HTTP sin responder) y Railway no lo reinicia
+        // → "Application failed to respond" hasta redeploy manual. El reinicio
+        // preventivo diario (SIGUSR2) caía SIEMPRE en esta trampa.
+        const _watchdog = setTimeout(() => {
+            logger.error('[SHUTDOWN] La limpieza excedió 8s — salida forzada.');
+            process.exit(exitCode);
+        }, 8000);
+        _watchdog.unref();
         try { await require('./src/services/onlineTracker').flushAll(); } catch (e: any) { logger.error('[SHUTDOWN] onlineTracker.flushAll:', e.message); }
         try { await clientPool.stopAll(); } catch (e: any) { logger.error('[SHUTDOWN] clientPool.stopAll:', e.message); }
         try { await shutdownRedis(); } catch (e: any) { logger.error('[SHUTDOWN] shutdownRedis:', e.message); }
         try { await redisClient.quit(); } catch (e: any) { /* ignore */ }
         try { cleanupPauseService(); } catch (e: any) { /* ignore */ }
         try { if (io) io.close(); } catch (e: any) { /* ignore */ }
+        // Forzar el drenaje de conexiones persistentes (WSS del agente, socket.io,
+        // keep-alive) para que httpServer.close() no espere indefinidamente.
+        try { (httpServer as any).closeAllConnections?.(); } catch (e: any) { /* ignore */ }
         try { await new Promise<void>(resolve => httpServer.close(() => resolve())); } catch (e: any) { /* ignore */ }
         try { await prisma.$disconnect(); await pool.end(); } catch (e: any) { /* ignore */ }
+        clearTimeout(_watchdog);
         logger.info('[SHUTDOWN] Clean exit.');
         process.exit(exitCode);
     };
