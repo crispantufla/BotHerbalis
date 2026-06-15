@@ -21,6 +21,11 @@ interface BotConfig {
     // NO le pide getChats() a WhatsApp (no baja el historial previo del
     // dispositivo). Apagada por defecto para no marcar números nuevos ante Meta.
     recoverOldChats?: boolean;
+    // Seguimiento automático (carrito abandonado): si está apagado, el scheduler
+    // NO le manda mensajes proactivos a clientes que quedaron a mitad del embudo.
+    // ENCENDIDO por default (no regresiona sellers existentes); se apaga en
+    // números nuevos para no exhibir actividad proactiva ante Meta.
+    proactiveFollowUps?: boolean;
     [key: string]: any;
 }
 
@@ -77,6 +82,7 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
         alertNumbers: [],
         activeScript: 'v7',
         recoverOldChats: false,
+        proactiveFollowUps: true,
         scriptStats: {
             v7: { started: 0, completed: 0 }
         }

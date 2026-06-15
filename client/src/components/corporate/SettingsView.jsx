@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-    FileText, Power, Trash2, HardDrive, RefreshCw, KeyRound, RotateCcw, Lock, Download, Laptop, History
+    FileText, Power, Trash2, HardDrive, RefreshCw, KeyRound, RotateCcw, Lock, Download, Laptop, History, Send
 } from 'lucide-react';
 import api from '../../config/axios';
 import { useSocket } from '../../context/SocketContext';
@@ -37,6 +37,9 @@ const SettingsView = ({ status }) => {
     const [recoverOldChats, setRecoverOldChats] = useState(false);
     const [togglingRecover, setTogglingRecover] = useState(false);
 
+    const [proactiveFollowUps, setProactiveFollowUps] = useState(true);
+    const [togglingFollowUps, setTogglingFollowUps] = useState(false);
+
     useEffect(() => {
         (async () => {
             try {
@@ -48,6 +51,10 @@ const SettingsView = ({ status }) => {
                 const recRes = await api.get('/api/config/recover-old-chats');
                 setRecoverOldChats(!!recRes.data.recoverOldChats);
             } catch (e) { console.error('Error loading recover-old-chats:', e); }
+            try {
+                const pfRes = await api.get('/api/config/proactive-follow-ups');
+                setProactiveFollowUps(pfRes.data.proactiveFollowUps !== false);
+            } catch (e) { console.error('Error loading proactive-follow-ups:', e); }
         })();
         fetchMemoryStats();
     }, []);
@@ -67,15 +74,18 @@ const SettingsView = ({ status }) => {
         const onMemoryReset = () => fetchMemoryStats();
         const onStatsReset = (data) => { if (data?.stats) setScriptStats(data.stats); };
         const onRecoverChanged = (data) => { if (typeof data?.recoverOldChats === 'boolean') setRecoverOldChats(data.recoverOldChats); };
+        const onFollowUpsChanged = (data) => { if (typeof data?.proactiveFollowUps === 'boolean') setProactiveFollowUps(data.proactiveFollowUps); };
         socket.on('script_changed', onScriptChanged);
         socket.on('memory_reset', onMemoryReset);
         socket.on('script_stats_reset', onStatsReset);
         socket.on('recover_old_chats_changed', onRecoverChanged);
+        socket.on('proactive_follow_ups_changed', onFollowUpsChanged);
         return () => {
             socket.off('script_changed', onScriptChanged);
             socket.off('memory_reset', onMemoryReset);
             socket.off('script_stats_reset', onStatsReset);
             socket.off('recover_old_chats_changed', onRecoverChanged);
+            socket.off('proactive_follow_ups_changed', onFollowUpsChanged);
         };
     }, [socket]);
 
@@ -127,6 +137,24 @@ const SettingsView = ({ status }) => {
             toast.error(e.response?.data?.error || 'Error al cambiar el ajuste');
         }
         setTogglingRecover(false);
+    };
+
+    const handleToggleFollowUps = async () => {
+        if (togglingFollowUps) return;
+        const next = !proactiveFollowUps;
+        setTogglingFollowUps(true);
+        // Optimista: reflejamos el cambio ya; revertimos si el backend falla.
+        setProactiveFollowUps(next);
+        try {
+            await api.post('/api/config/proactive-follow-ups', { enabled: next });
+            toast.success(next
+                ? 'Seguimiento automático activado.'
+                : 'Seguimiento automático desactivado.');
+        } catch (e) {
+            setProactiveFollowUps(!next);
+            toast.error(e.response?.data?.error || 'Error al cambiar el ajuste');
+        }
+        setTogglingFollowUps(false);
     };
 
     const handleResetMemory = async () => {
@@ -382,11 +410,9 @@ const SettingsView = ({ status }) => {
                 </Card>
 
                 {/* Recuperación de chats antiguos (anti-bloqueo Meta). Va dentro
-                    del stack de la col 2 para rellenar el hueco bajo "Cambiar
-                    contraseña" (el PriceEditor de la izquierda es más alto).
-                    flex-1 + flex-col: la card crece hasta el fondo y el toggle
-                    queda anclado abajo, sin dejar aire. */}
-                <Card padding="md" className="flex-1 flex flex-col">
+                    del stack de la col 2. Altura natural; el hueco bajo "Cambiar
+                    contraseña" lo rellena la card de seguimiento (flex-1) de abajo. */}
+                <Card padding="md" className="flex flex-col">
                     <div className="flex items-start gap-3 min-w-0 mb-3">
                         <div className="w-10 h-10 rounded-control bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0">
                             <History className="w-5 h-5" aria-hidden="true" />
@@ -428,6 +454,55 @@ const SettingsView = ({ status }) => {
                             <span className={cn(
                                 'inline-block h-5 w-5 rounded-full bg-white shadow transition-transform mt-0.5',
                                 recoverOldChats ? 'translate-x-[22px]' : 'translate-x-0.5'
+                            )} />
+                        </button>
+                    </div>
+                </Card>
+
+                {/* Seguimiento automático (carrito abandonado). flex-1 para
+                    rellenar el hueco que queda bajo "Cambiar contraseña". */}
+                <Card padding="md" className="flex-1 flex flex-col">
+                    <div className="flex items-start gap-3 min-w-0 mb-3">
+                        <div className="w-10 h-10 rounded-control bg-sky-50 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400 flex items-center justify-center flex-shrink-0">
+                            <Send className="w-5 h-5" aria-hidden="true" />
+                        </div>
+                        <div className="min-w-0">
+                            <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm mb-1">
+                                Seguimiento automático
+                            </h3>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                                Cuando está activado, el bot le <strong>vuelve a escribir solo</strong> a los
+                                clientes que quedaron a mitad de la charla (dentro de las 24h) para reengancharlos.
+                                En números nuevos conviene <strong>apagarlo</strong>: mensajear de forma proactiva
+                                a quien no respondió es lo que más rápido marca una cuenta sin reputación. El bot
+                                sigue respondiendo normal a quien escribe.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="mt-auto flex items-center justify-between gap-3 pt-3 border-t border-slate-200/70 dark:border-slate-700/70">
+                        <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                            {proactiveFollowUps ? 'Activado' : 'Desactivado'}
+                            <span className="text-[11px] text-slate-400 dark:text-slate-500 font-normal ml-1.5">
+                                (recomendado: apagado en números nuevos)
+                            </span>
+                        </span>
+                        <button
+                            type="button"
+                            role="switch"
+                            aria-checked={proactiveFollowUps}
+                            aria-label="Seguimiento automático"
+                            onClick={handleToggleFollowUps}
+                            disabled={togglingFollowUps}
+                            className={cn(
+                                'relative inline-flex h-6 w-11 flex-shrink-0 rounded-full transition-colors',
+                                'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2',
+                                'disabled:opacity-50 disabled:cursor-not-allowed',
+                                proactiveFollowUps ? 'bg-accent-500' : 'bg-slate-300 dark:bg-slate-600'
+                            )}
+                        >
+                            <span className={cn(
+                                'inline-block h-5 w-5 rounded-full bg-white shadow transition-transform mt-0.5',
+                                proactiveFollowUps ? 'translate-x-[22px]' : 'translate-x-0.5'
                             )} />
                         </button>
                     </div>

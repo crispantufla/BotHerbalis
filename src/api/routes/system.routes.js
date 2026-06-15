@@ -432,6 +432,35 @@ module.exports = (clientPool) => {
         }
     });
 
+    // GET /config/proactive-follow-ups - Estado del switch de seguimiento
+    // automático (carrito abandonado). Default ENCENDIDO: solo está apagado si
+    // se guardó explícitamente en false.
+    router.get('/config/proactive-follow-ups', ...withSeller(clientPool), (req, res) => {
+        const { config } = getCtx(req);
+        res.json({ proactiveFollowUps: config.proactiveFollowUps !== false });
+    });
+
+    // POST /config/proactive-follow-ups - Activa/desactiva los mensajes
+    // proactivos de seguimiento. Con OFF, el scheduler NO le escribe a clientes
+    // que quedaron a mitad del embudo (recomendado en números nuevos para no
+    // exhibir actividad proactiva ante Meta). Body: { enabled: true|false }.
+    router.post('/config/proactive-follow-ups', ...withSeller(clientPool), (req, res) => {
+        try {
+            const { config, ss } = getCtx(req);
+            const enabled = req.body?.enabled === true;
+            config.proactiveFollowUps = enabled;
+            if (ss?.saveState) ss.saveState();
+
+            emitScoped(req, 'proactive_follow_ups_changed', { proactiveFollowUps: enabled });
+
+            logger.info(`[SYSTEM] proactiveFollowUps=${enabled} (seller=${req.sellerId})`);
+            res.json({ success: true, proactiveFollowUps: enabled });
+        } catch (e) {
+            logger.error('Error toggling proactiveFollowUps:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     // POST /global-pause-all - Pausa/reactiva TODOS los sellers a la vez.
     // Permitido a: (a) admin global (sellerId=null), (b) Horacio (dueño
     // del proyecto — tenant admin con sellerId='horacio'). Body: { pause: true|false }.

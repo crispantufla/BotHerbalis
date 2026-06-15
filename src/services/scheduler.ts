@@ -356,6 +356,11 @@ async function checkColdLeads(sharedState: SchedulerSharedState, dependencies: S
  */
 async function checkAbandonedCarts(sharedState: SchedulerSharedState, dependencies: SchedulerDependencies): Promise<void> {
     const { userState, pausedUsers } = sharedState;
+    const { config } = sharedState as SchedulerSharedState & { config?: any };
+    // Seguimiento automático apagado para este seller (números nuevos): no enviar
+    // ningún mensaje proactivo. Solo bloquea si está explícitamente en false —
+    // ausente/true = comportamiento de siempre (sellers existentes no se tocan).
+    if (config?.proactiveFollowUps === false) return;
     const { sendMessageWithDelay, saveState } = dependencies;
     const now = Date.now();
     let sentThisRun = 0; // Anti-ráfaga: tope de envíos por corrida.
