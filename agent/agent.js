@@ -88,7 +88,18 @@ const client = new Client({
     authStrategy: new LocalAuth({ clientId: cfg.sellerId, dataPath: path.join(__dirname, '.wwebjs_auth') }),
     puppeteer: {
         headless: false,   // ventana visible: el vendedor escanea el QR y ve que anda
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        // Flags anti-throttling: sin esto, Chrome "duerme" la pestaña de WhatsApp
+        // cuando no está al frente (el agente abre una 2ª pestaña con el dashboard)
+        // o cuando la ventana queda tapada → se cae el WebSocket de WhatsApp y se
+        // re-empareja cada ~30 min (reporte de horacio "se desconecta solo"). Estos
+        // flags mantienen vivos los timers y la red de la pestaña sin foco/ocluida.
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding',
+        ],
     },
 });
 
