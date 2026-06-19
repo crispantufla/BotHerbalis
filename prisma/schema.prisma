@@ -264,6 +264,46 @@ model ApiToken {
   @@index([revokedAt])
 }
 
+/// Pedidos generados desde la TIENDA WEB (proyecto web-v5, repo "Nueva Web
+/// Herbalis"). Vive en este Postgres compartido para tener un registro durable
+/// de las compras online. IMPORTANTE: esta tabla la escribe y lee la app web-v5
+/// mediante SQL crudo (pg) — NO usa este Prisma client. Se declara acá solo para
+/// que las migraciones del bot la conozcan y no reporten drift. Los pagos se
+/// cobran con MercadoPago (misma cuenta MP_ACCESS_TOKEN que usa el bot).
+model WebOrder {
+  id             String    @id // uuid generado por la app web
+  instanceId     String    @default("default")
+  externalRef    String    @unique // = id de la orden, usado como external_reference en MP
+  status         String    @default("pending") // pending | approved | in_process | rejected | cancelled
+  items          Json      // [{ id, name, plan, qty, unitPrice }]
+  subtotal       Float
+  shipping       Float     @default(0)
+  total          Float
+  currency       String    @default("ARS")
+
+  nombre         String?
+  apellido       String?
+  email          String?
+  telefono       String?
+  provincia      String?
+  ciudad         String?
+  calle          String?
+  piso           String?
+  cp             String?
+  notas          String?
+
+  mpPaymentId    String?
+  mpStatus       String?
+  mpStatusDetail String?
+  paidAt         DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @default(now())
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([instanceId])
+}
+
 // Semantic cache: stores FAQ-style bot responses keyed by embedding similarity.
 // The embedding is persisted as JSON-serialized Float[] in a Text column so
 // Postgres native vector support isn't required. Cosine similarity is computed

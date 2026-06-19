@@ -14,6 +14,7 @@ import GalleryView from '../../components/corporate/GalleryView';
 import AdvancedAnalyticsView from '../../components/corporate/AdvancedAnalyticsView';
 import ManualsView from '../../components/corporate/ManualsView';
 import PaymentsView from '../../components/corporate/PaymentsView';
+import WebOrdersView from '../../components/corporate/WebOrdersView';
 import AiReportsView from '../../components/corporate/AiReportsView';
 import GuionView from '../../components/corporate/GuionView';
 import PlaygroundView from '../../components/corporate/PlaygroundView';
@@ -24,7 +25,7 @@ import RescueQueueView from '../../components/admin/RescueQueueView';
 import SellerSelector from '../../components/admin/SellerSelector';
 import ManualOrderEntryModal from '../../components/corporate/components/ManualOrderEntryModal';
 
-import { Wifi, MessageCircle, Database, Settings, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Bell, AlertTriangle, BookOpen, MoreHorizontal, CreditCard, Users, LifeBuoy, MessagesSquare, FlaskConical } from 'lucide-react';
+import { Wifi, MessageCircle, Database, Settings, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Bell, AlertTriangle, BookOpen, MoreHorizontal, CreditCard, Users, LifeBuoy, MessagesSquare, FlaskConical, Package } from 'lucide-react';
 
 const CorporateDashboard = () => {
     const { socket } = useSocket();
@@ -273,6 +274,11 @@ const CorporateDashboard = () => {
                     <PaymentsView onGoToChat={(chatId) => handleQuickAction(chatId, 'chat')} />
                 </div>
             );
+            case 'web-orders': return (
+                <div className="p-6 md:p-8 w-full">
+                    <WebOrdersView />
+                </div>
+            );
             case 'ai-reports': return (
                 <div className="p-6 md:p-8 w-full">
                     <AiReportsView />
@@ -368,6 +374,7 @@ const CorporateDashboard = () => {
                     <NavItem tab="logistics" icon={Database} label="Ventas & Logística" />
                     <NavItem tab="statistics" icon={BarChart2} label="Estadísticas" />
                     <NavItem tab="payments" icon={CreditCard} label="Pagos MP" />
+                    <NavItem tab="web-orders" icon={Package} label="Pedidos web" />
                     <NavItem tab="guion" icon={MessagesSquare} label="Guiones (notas)" />
                     <NavItem tab="playground" icon={FlaskConical} label="Probar bot" />
                     <NavItem tab="gallery" icon={ImageIcon} label="Galería de Medios" />
