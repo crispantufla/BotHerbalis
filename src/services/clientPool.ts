@@ -51,8 +51,24 @@ const _localEgressProxies = new Map<string, string>();
  *   reenviador en vez de la opción proxyAuthentication.
  */
 async function _resolveEgressProxy(sellerId: string): Promise<string | undefined> {
-    const raw = process.env[`WA_PROXY_${sellerId.toUpperCase()}`] || process.env.WA_PROXY;
+    const raw = (process.env[`WA_PROXY_${sellerId.toUpperCase()}`] || process.env.WA_PROXY || '').trim();
     if (!raw) return undefined;
+
+    // Guard: un valor CON esquema (`http://`, `socks5://`) DEBE tener host. Caso real:
+    // `WA_PROXY_HORACIO=http://` (truncado al pegarlo en Railway) → `new URL()` tira,
+    // el catch de abajo lo trataba como "sin auth" y Chrome arrancaba con
+    // `--proxy-server=http://` (host vacío). Con un proxy a un host vacío Chrome no
+    // alcanza NADA → WA Web no levanta el WebSocket → "Execution context was destroyed"
+    // / "callFunctionOn timed out" en loop y el QR muere a los segundos con LOGOUT.
+    // Fallar a "sin proxy" (Chrome al menos conecta y muestra QR) y avisar fuerte.
+    if (/:\/\//.test(raw)) {
+        let host = '';
+        try { host = new URL(raw).hostname; } catch { /* inválido */ }
+        if (!host) {
+            logger.warn(`[${sellerId}] WA_PROXY mal configurado ("${raw}") — sin host. Ignorando proxy: sale por la IP del host. Corregí la variable WA_PROXY_${sellerId.toUpperCase()}.`);
+            return undefined;
+        }
+    }
     if (_localEgressProxies.has(sellerId)) return _localEgressProxies.get(sellerId);
 
     let hasAuth = false;
@@ -470,7 +486,13 @@ class ClientPool {
             logger.info(`[POOL][${sellerId}] ✅ WhatsApp ready!`);
             sharedState.isConnected = true;
             sharedState.qrCodeData = null;
-            sharedState.connectedAt = Math.floor(Date.now() / 1000);
+            // connectedAt marca el corte para ignorar el historial viejo del
+            // teléfono. Se fija UNA SOLA VEZ por proceso. En modo remoto el agente
+            // reemite 'ready' en CADA reconexión/re-emparejado; si lo reseteáramos
+            // acá, los leads que escribieron justo antes de una caída quedarían
+            // "antes de la conexión" y el bot los descartaría como historial →
+            // leads sin responder (reporte de horacio). No se reinicia en reconexión.
+            if (!sharedState.connectedAt) sharedState.connectedAt = Math.floor(Date.now() / 1000);
             instance.reconnectAttempts = 0;
             // Cancel QR timeout — session is now active
             if (instance.qrTimer) { clearTimeout(instance.qrTimer); instance.qrTimer = null; }
