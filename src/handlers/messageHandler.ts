@@ -427,28 +427,32 @@ export function createOutgoingMessageHandler(ctx: {
                 logger.warn(`[MANUAL-CHAT][${sellerId}] Failed to dismiss alerts for ${targetId}: ${e?.message}`);
             }
 
-            // Si el chat ya tiene estado de bot o ya está pausado, no necesitamos
-            // hacer la pausa de nueva conversación.
-            if (userState[targetId]) return;
-            if (pausedUsers.has(targetId)) return;
-
-            // Chat nuevo iniciado manualmente — pausarlo para que el bot no
-            // dispare la bienvenida cuando el cliente responda.
+            // Traspaso por chat: si el vendedor respondió a mano, el bot le CEDE
+            // esa conversación (la pausa) para no pisarlo. Aplica a chats nuevos
+            // iniciados por él Y a chats que el bot venía atendiendo — antes solo
+            // se pausaban los nuevos y el bot seguía pisando los activos (reporte
+            // de horacio). Las pausas NO se auto-liberan: si quiere que el bot
+            // retome, se despausa a mano desde el panel.
+            if (pausedUsers.has(targetId)) return; // ya pausado, nada que hacer
+            const wasBotActive = !!userState[targetId];
             pausedUsers.add(targetId);
             try {
                 const { prisma } = require('../../db');
                 const cleanPhone = targetId.replace('@c.us', '').replace(/\D/g, '');
+                const reason = wasBotActive
+                    ? 'Vendedor tomó la conversación a mano (bot en pausa para no pisar)'
+                    : 'Conversación iniciada manualmente por admin desde WhatsApp';
                 await prisma.user.upsert({
                     where: { phone_instanceId: { phone: cleanPhone, instanceId: sellerId } },
-                    update: { pausedAt: new Date(), pauseReason: 'Conversación iniciada manualmente por admin desde WhatsApp' },
-                    create: { phone: cleanPhone, instanceId: sellerId, pausedAt: new Date(), pauseReason: 'Conversación iniciada manualmente por admin desde WhatsApp' },
+                    update: { pausedAt: new Date(), pauseReason: reason },
+                    create: { phone: cleanPhone, instanceId: sellerId, pausedAt: new Date(), pauseReason: reason },
                 });
             } catch (err: any) {
                 if (err?.code !== 'P2002') {
                     logger.warn(`[MANUAL-CHAT][${sellerId}] Failed to persist pause for ${targetId}: ${err?.message}`);
                 }
             }
-            logger.info(`[MANUAL-CHAT][${sellerId}] Admin escribió manualmente a ${targetId} — chat pausado para no disparar bienvenida`);
+            logger.info(`[MANUAL-CHAT][${sellerId}] Vendedor respondió a mano a ${targetId} — chat pausado (bot cede)${wasBotActive ? ' [tomó charla activa]' : ' [chat nuevo]'}`);
         } catch (err: any) {
             logger.error(`[OUTGOING-HANDLER][${sellerId}] Error: ${err?.message}`);
         }
