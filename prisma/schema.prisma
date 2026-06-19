@@ -296,6 +296,12 @@ model WebOrder {
   mpStatus       String?
   mpStatusDetail String?
   paidAt         DateTime?
+
+  // Fulfillment (despacho) — gestionado desde el panel del bot.
+  shipped        Boolean   @default(false)
+  tracking       String?
+  shippedAt      DateTime?
+
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @default(now())
 

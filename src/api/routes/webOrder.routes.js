@@ -31,5 +31,23 @@ module.exports = (clientPool) => {
         }
     });
 
+    // POST /web-orders/:id/ship — marcar/desmarcar como enviado (+ nº de seguimiento)
+    router.post('/web-orders/:id/ship', ...withSeller(clientPool), async (req, res) => {
+        try {
+            const markShipped = req.body?.shipped !== false; // default true; false = desmarcar
+            const tracking = (req.body?.tracking || '').toString().trim().slice(0, 120) || null;
+            const data = markShipped
+                ? { shipped: true, tracking, shippedAt: new Date() }
+                : { shipped: false, tracking: null, shippedAt: null };
+
+            const order = await prisma.webOrder.update({ where: { id: req.params.id }, data });
+            res.json({ order });
+        } catch (e) {
+            if (e?.code === 'P2025') return res.status(404).json({ error: 'Pedido no encontrado' });
+            logger.error('[WEB-ORDERS] Error marcando envío:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     return router;
 };
