@@ -85,12 +85,14 @@ function _detectPostdatado(normalizedText: string): string | null {
     const hasActionContext = /\b(recibir|recibirlo|llega|llegue|enviar|enviame|envialo|enviamela|enviamelo|mandalo|mandame|mandamela|mandamelo|entregar|cobro|depositan|sueldo|pago|puedo|pueden|venir|mandar|comprar|no tengo|para el|a partir|no puedo ahora|no puedo comprar|juntar|junte|junto|consigo|consiga|conseguir|ahorre|ahorrar|cuente con|me alcance|me alcance la plata|mucho inter[eé]s|cuotas|me comunico|aviso cuando|cuando tenga)\b/i.test(normalizedText);
     if (!hasActionContext) return null;
 
-    // "cobro el viernes" = worried about money, NOT a postdatado request.
-    // A bare day of the week is always ≤7 days away, which is within the 5-7 day delivery window.
-    // If the ONLY action context is payment-related (cobro/depositan/sueldo/pago) and no delivery
-    // verbs are present, a day-of-week date is not postdatado — they'll have money by delivery time.
-    const hasDeliveryContext = /\b(recibir|recibirlo|llega|llegue|enviar|enviame|envialo|enviamela|enviamelo|mandalo|mandame|mandamela|mandamelo|entregar|mandar|comprar)\b/i.test(normalizedText);
-    const onlyPaymentContext = !hasDeliveryContext && /\b(cobro|depositan|sueldo|pago)\b/i.test(normalizedText);
+    // FECHAS CERCANAS = NO postdatar (regla del dueño, caso 1131381951): el envío
+    // tarda *7 a 10 días hábiles*, así que un día de la semana ("el lunes", "el
+    // martes") o "la semana que viene" caen SIEMPRE dentro de ese plazo — si lo
+    // pide hoy llega justo para esa fecha. No los tratamos como postdatado (se
+    // cierra hoy y se le aclara la demora). Solo se postdata lo MÁS lejano que el
+    // plazo: mes que viene, fin de mes, "cuando cobre", una fecha DD de un mes, etc.
+    // (El reframe de "el lunes / no estoy en casa" lo hace la IA vía la regla del
+    // prompt CORE; acá solo evitamos capturar una fecha cercana como postdatado.)
 
     // Extract clean date portion (most specific patterns first)
     const patterns: RegExp[] = [
@@ -100,11 +102,7 @@ function _detectPostdatado(normalizedText: string): string | null {
         /(?:cobro|depositan|pagan)\s+(?:el\s+\d{1,2}|a\s+principio|la\s+quincena)/i,
         /(?:apenas|en\s+cuanto|cuando)\s+(?:cuente\s+con|tenga|junte|consiga|cobre)/i,
         /(?:el|del|para\s+el|despu[eé]s\s+del|a\s+partir\s+del)\s+\d{1,2}(?=[\s,.]|$)/i,
-        /(?:la\s+)?(?:quincena|semana\s+que\s+viene|mes\s+que\s+viene|pr[oó]ximo\s+mes)/i,
-        // Skip day-of-week when user is only talking about when they get paid —
-        // delivery takes 5-7 business days so they'll have the money by then.
-        ...(onlyPaymentContext ? [] : [/(?:el\s+)?(?:lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo)(?:\s+que\s+viene)?/i]),
-        /pasado\s+mañana/i,
+        /(?:la\s+)?(?:quincena|mes\s+que\s+viene|pr[oó]ximo\s+mes)/i,
         // Vaguidad económica como "cuando tenga plata" sin fecha específica:
         // marcamos como postdatado "indefinido" para que el flow ofrezca
         // postdatar el envío (preguntar la fecha cómoda). PROHIBIDO ofrecer
@@ -466,8 +464,29 @@ function _handleShipPaySwitch(
     return { matched: false, staleReprocess: true };
 }
 
+// ── Detector de PREGUNTA / pedido de info ───────────────────────────────────
+// Más robusto que "empieza con palabra interrogativa o termina en ?". Capta
+// interrogativos en MEDIO de la frase. Caso real disparador (1131381951,
+// 2026-06-19): "Con tarjeta cuanto tardan" — el bot NO lo leyó como pregunta
+// (empieza con "con"), vio "tarjeta" y mandó el link de pago en vez de
+// responder la demora. La regla del dueño: el bot no debe APURARSE a matchear
+// keyword cuando el cliente está PREGUNTANDO — primero responde, después avanza.
+// Se mantiene conservador (frases interrogativas, no palabras sueltas) para no
+// marcar afirmaciones como "te paso la calle cuando llegue".
+const _Q_STARTERS = /^\s*(como|cuanto|cuantos|cuantas|cuando|donde|que|cual|por que|sale|cuesta|tarda|tardan|demora|hay|tienen|tenes|puedo|se puede|funciona|sirve|me conviene)\b/i;
+const _Q_ANYWHERE = /\bcuanto\s+(tarda|tardan|sale|cuesta|vale|es|cobran|demora|demoran|seria)\b|\bcomo\s+(funciona|se toma|tomo|pago|se paga|lo pago|abono|recibo|llega|hago)\b|\bcuando\s+(llega|lo mandan|sale|me llega|recibo|lo recibo|despachan)\b|\bque\s+(precio|costo|metodo|metodos|forma de pago|formas de pago)\b|\bdonde\s+(retiro|esta|queda|lo retiro)\b|\bhacen\s+envios?\b/i;
+
+function _isInfoQuestion(text: string): boolean {
+    const raw = (text || '').trim();
+    if (!raw) return false;
+    if (raw.includes('?') || raw.includes('¿')) return true;
+    const t = raw.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    return _Q_STARTERS.test(t) || _Q_ANYWHERE.test(t);
+}
+
 export {
     _cleanPhone,
+    _isInfoQuestion,
     _setStep,
     _maybeUpsell,
     _detectPostdatado,

@@ -1,4 +1,5 @@
 import { UserState } from '../../types/state';
+import { _isInfoQuestion } from '../utils/flowHelpers';
 import logger from '../../utils/logger';
 
 /**
@@ -13,8 +14,6 @@ import logger from '../../utils/logger';
  * Caso disparador: cliente preguntó "Cuanto tarda en llegar?" en
  * waiting_plan_choice; el AI no respondió y el admin tuvo que entrar a mano.
  */
-
-const QUESTION_STARTERS = /^\s*(como|cómo|cuanto|cuánto|cuando|cuándo|donde|dónde|que|qué|cual|cuál|por que|por qué|sale|cuesta|tarda|demora|hay|tienen|tenes|tenés|puedo|se puede|funciona|sirve)\b/i;
 
 function _normalize(s: string): string {
     return (s || '').toLowerCase()
@@ -38,9 +37,10 @@ export async function handleFaq(
     if (!trimmed) return null;
 
     // Solo intercepta si el mensaje parece pregunta — evita falsos positivos
-    // sobre datos de envío, números de plan, afirmaciones, etc.
-    const isQuestion = trimmed.endsWith('?') || QUESTION_STARTERS.test(trimmed);
-    if (!isQuestion) return null;
+    // sobre datos de envío, números de plan, afirmaciones, etc. _isInfoQuestion
+    // capta interrogativos en medio de la frase ("con tarjeta cuanto tardan"),
+    // no solo al inicio o con "?" final.
+    if (!_isInfoQuestion(trimmed)) return null;
 
     // No interferir en pasos finales: ya está pausado o esperando admin.
     const skipSteps = new Set(['waiting_admin_validation', 'completed', 'rejected_medical', 'rejected_abusive', 'rejected_geo', 'closing']);

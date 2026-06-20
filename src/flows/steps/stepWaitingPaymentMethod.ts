@@ -1,5 +1,5 @@
 import { UserState, FlowStep } from '../../types/state';
-import { _setStep, _pauseAndAlert, _detectPostdatado } from '../utils/flowHelpers';
+import { _setStep, _pauseAndAlert, _detectPostdatado, _isInfoQuestion } from '../utils/flowHelpers';
 import { getFlowTemplate } from '../../utils/messageTemplates';
 import { calculateTotal } from '../utils/cartHelpers';
 import { _formatMessage, _isDuplicate } from '../utils/messages';
@@ -17,6 +17,12 @@ const ROSARIO_INTENT_PAY = /\b(soy\s+de\s+rosario|estoy\s+en\s+rosario|vivo\s+en
 // Shipping choice keywords.
 const RETIRO_KEYWORDS = /\b(retiro|retir(?:ar|o)\s+en\s+sucursal|en\s+sucursal|a\s+sucursal|en\s+la\s+sucursal|sucursal\s+(?:de\s+)?correo|contra.?reembolso|contrarembolso)\b/i;
 const DOMICILIO_KEYWORDS = /\b(domicilio|a\s+(?:mi\s+)?casa|a\s+mi\s+domicilio|env[ií]o\s+a\s+(?:mi\s+)?domicilio|env[ií]o\s+a\s+casa|envialo|envíalo|mandalo|que\s+lo\s+manden|me\s+lo\s+mand[aá]n|me\s+lo\s+mandan|a\s+mi\s+direcci[óo]n|en\s+mi\s+casa|directo\s+a\s+casa)\b/i;
+
+// "No puedo/tengo efectivo" — el cliente NIEGA poder pagar en efectivo → necesita
+// PREPAGO (domicilio con tarjeta/transferencia), NO retiro en sucursal (que es
+// justamente pagar en efectivo al retirar). Caso real 1131381951: dijo "no puedo
+// efectivo" y el bot la mandó a retiro — lo opuesto a lo que pedía.
+const NO_CASH = /\bno\s+(?:puedo|tengo|manejo|uso|cuento\s+con|dispongo\s+de|me\s+queda)\s+(?:el\s+|en\s+)?efectivo\b|\bsin\s+efectivo\b|\befectivo\s+no\s+(?:puedo|tengo|manejo|me\s+queda|dispongo)\b/i;
 
 // Payment method matchers (submenú tras elegir domicilio + atajos).
 // Rapipago/PagoFácil se siguen detectando como keyword (el cliente puede nombrarlas)
@@ -68,6 +74,16 @@ export async function handleWaitingPaymentMethod(
     dependencies: any
 ): Promise<{ matched: boolean }> {
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
+
+    // El cliente PREGUNTA algo (cuánto tarda, cómo se paga, dónde retira…) en vez
+    // de elegir. No te apures a matchear "tarjeta"/"retiro"/"domicilio" y disparar
+    // el link o el submenú: si es pregunta, dejamos que el fallback de IA RESPONDA
+    // primero (reaclarando aunque ya lo hayamos dicho) y re-pregunte la opción.
+    // Caso real 1131381951 (2026-06-19): "Con tarjeta cuanto tardan" → el bot vio
+    // "tarjeta" y mandó el link en vez de decir "7 a 10 días". (El submenú de
+    // domicilio tiene su propio manejo de preguntas más abajo, así que no lo
+    // tocamos acá.)
+    const infoQuestion = !currentState.paymentSubChoiceAsked && _isInfoQuestion(text);
 
     // ── Cliente quiere ir al local físico ──────────────────────────────────────
     // Distinto de "retiro en sucursal" del Correo. Pausamos.
@@ -201,6 +217,7 @@ export async function handleWaitingPaymentMethod(
         // (a) Quiere pagar en efectivo / al contado / en el domicilio / al recibir.
         // COD a domicilio NO existe → aclaramos y ofrecemos retiro en sucursal.
         const wantsCashAtHome = /\b(contado|al contado|efectivo|en\s+(el|mi)\s+(domicilio|casa)|en\s+casa|al\s+recibir|contra\s?entrega|cuando\s+(lo|me)\s+(reciba|llegue|entreguen|traigan))\b/i.test(normalizedText)
+            && !NO_CASH.test(normalizedText)
             && !MP_KEYWORDS.test(text) && !TRANSFER_KEYWORDS.test(normalizedText);
         if (wantsCashAtHome) {
             currentState.paymentSubChoiceAsked = false;
@@ -258,13 +275,29 @@ export async function handleWaitingPaymentMethod(
         }
     }
 
+    // ── "No puedo efectivo" → PREPAGO a domicilio (NO retiro) ──────────────────
+    // El cliente niega poder pagar en efectivo. Retiro en sucursal = pagar en
+    // efectivo al retirar, así que mandarlo a retiro es lo contrario de lo que
+    // pidió. Lo encauzamos a domicilio con pago anticipado. Si ADEMÁS pidió retiro
+    // explícito (mensaje mixto), gana el retiro (cae al path de abajo).
+    if (!infoQuestion && NO_CASH.test(normalizedText) && !RETIRO_KEYWORDS.test(text)) {
+        currentState.shippingChoice = 'domicilio';
+        currentState.paymentSubChoiceAsked = true;
+        const msg = `¡Tranqui! Para envío a domicilio el pago es *anticipado* con *tarjeta de crédito* o *transferencia* — no hace falta efectivo 😊\n\n¿Cómo preferís abonar?\n1️⃣ *Tarjeta de crédito*\n2️⃣ *Transferencia bancaria*`;
+        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        saveState(userId);
+        await sendMessageWithDelay(userId, msg);
+        logger.info(`[PAYMENT_METHOD] ${userId} → negó efectivo, encauzado a DOMICILIO prepago (submenú).`);
+        return { matched: true };
+    }
+
     // ── Elección 1: Retiro en sucursal (contrarreembolso, 100% al retirar) ────
     // Rev. 2026-05-30: en lugar de pausar inmediatamente, le pedimos los datos
     // al cliente (con aclaración de "es para buscar la sucursal más cercana") y
     // dejamos que pase por waiting_data. Al guardar la orden, calle se reescribe
     // a "A sucursal" y la calle real queda en calleOriginal (ver stepWaitingData
     // y _finalizeOrderAndNotifyAdmin).
-    if (optionNum === '1' || RETIRO_KEYWORDS.test(text)) {
+    if (!infoQuestion && (optionNum === '1' || RETIRO_KEYWORDS.test(text))) {
         // ── Combo (jun-2026): RETIRO en sucursal + pago por TRANSFERENCIA ──────────
         // El estándar de retiro es efectivo al retirar, pero el cliente PUEDE pedir
         // pagar por transferencia y retirar igual. No es el flujo automático normal:
@@ -309,7 +342,7 @@ export async function handleWaitingPaymentMethod(
     }
 
     // ── Elección 2: Envío a domicilio (prepago) → sub-menú MP/Transfer ─────────
-    if (optionNum === '2' || DOMICILIO_KEYWORDS.test(text)) {
+    if (!infoQuestion && (optionNum === '2' || DOMICILIO_KEYWORDS.test(text))) {
         currentState.shippingChoice = 'domicilio';
         currentState.paymentSubChoiceAsked = true;
         const tpl = getFlowTemplate('payment_domicilio_choice', knowledge) ||
@@ -330,7 +363,7 @@ export async function handleWaitingPaymentMethod(
     // ── Atajo: cliente menciona medio de pago directo sin elegir envío ─────────
     // Asumimos DOMICILIO (es la única opción que admite estos medios). Si quería
     // retiro debería decirlo explícitamente; el modelo nuevo no usa anticipo.
-    if (MP_KEYWORDS.test(text) || TRANSFER_KEYWORDS.test(normalizedText)) {
+    if (!infoQuestion && (MP_KEYWORDS.test(text) || TRANSFER_KEYWORDS.test(normalizedText))) {
         currentState.shippingChoice = 'domicilio';
         if (MP_KEYWORDS.test(text)) {
             currentState.paymentMethod = 'mercadopago';
@@ -363,7 +396,7 @@ export async function handleWaitingPaymentMethod(
     // ── AI fallback ───────────────────────────────────────────────────────────
     const aiRes = await aiService.chat(text, {
         step: 'waiting_payment_method',
-        goal: `El cliente debe elegir TIPO DE ENVÍO antes que método de pago. Las 2 opciones son:\n\n1️⃣ *Retiro en sucursal* → paga el TOTAL en efectivo al retirar en una sucursal de Correo Argentino (contrarreembolso, sin anticipo previo). Un asesor coordina la sucursal más cercana al cliente.\n\n2️⃣ *Envío a domicilio* → se abona previamente. Después se elige el medio: *tarjeta de crédito* (link de pago protegido) o *transferencia bancaria* al alias *HERBALIS.TIENDA* (BIO ORIGEN S.A.S.). De cara al cliente el medio online se llama "Tarjeta de crédito" (NUNCA "Mercado Pago", débito, Pago Fácil ni Rapipago).\n\nAmbos envíos son GRATIS (7 a 10 días hábiles por Correo Argentino).\n\nPROHIBICIONES ESTRICTAS:\n- NO mencionar anticipo de $10.000 (esa modalidad fue eliminada en mayo 2026)\n- NO ofrecer pago en efectivo al cartero a domicilio — el contrarreembolso ahora es solo en sucursal\n- NO mencionar cuotas\n- NO inventar aliases distintos al oficial\n\nSi el cliente responde con afirmativa genérica ("dale", "sí") sin aclarar, pedile que elija retiro o domicilio. NUNCA avances sin que confirme cuál de las 2 opciones de ENVÍO eligió.`,
+        goal: `El cliente debe elegir TIPO DE ENVÍO antes que método de pago. Las 2 opciones son:\n\n1️⃣ *Retiro en sucursal* → paga el TOTAL en efectivo al retirar en una sucursal de Correo Argentino (contrarreembolso, sin anticipo previo). Un asesor coordina la sucursal más cercana al cliente.\n\n2️⃣ *Envío a domicilio* → se abona previamente. Después se elige el medio: *tarjeta de crédito* (link de pago protegido) o *transferencia bancaria* al alias *HERBALIS.TIENDA* (BIO ORIGEN S.A.S.). De cara al cliente el medio online se llama "Tarjeta de crédito" (NUNCA "Mercado Pago", débito, Pago Fácil ni Rapipago).\n\nAmbos envíos son GRATIS (7 a 10 días hábiles por Correo Argentino).\n\nPROHIBICIONES ESTRICTAS:\n- NO mencionar anticipo de $10.000 (esa modalidad fue eliminada en mayo 2026)\n- NO ofrecer pago en efectivo al cartero a domicilio — el contrarreembolso ahora es solo en sucursal\n- NO mencionar cuotas\n- NO inventar aliases distintos al oficial\n\nSi el cliente responde con afirmativa genérica ("dale", "sí") sin aclarar, pedile que elija retiro o domicilio. NUNCA avances sin que confirme cuál de las 2 opciones de ENVÍO eligió.\n\nSi el cliente NIEGA poder pagar en efectivo ("no puedo efectivo", "no tengo efectivo", "no manejo efectivo"): NO lo mandes a retiro en sucursal (que es justamente pagar en efectivo al retirar). Ofrecé envío a DOMICILIO con pago anticipado por tarjeta de crédito o transferencia.\n\nSi el cliente PREGUNTA algo (cuánto tarda, cómo se paga, dónde retira, cuánto sale el envío, etc.) en vez de elegir: RESPONDÉ su pregunta reaclarando la info aunque YA se la hayas dicho antes (los clientes repreguntan y no se acuerdan — está bien repetir), y RECIÉN DESPUÉS re-preguntá si prefiere retiro o domicilio. NUNCA mandes el link de pago ni avances mientras el cliente siga preguntando.`,
         history: currentState.history,
         summary: currentState.summary,
         knowledge,
