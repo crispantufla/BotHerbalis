@@ -96,13 +96,13 @@
         "payment_menu": {
             "step": "waiting_payment_method",
             "_note": "TEXTO 4 — Menú envío + medios de pago. Disparado por buildPaymentMessage. Modelo nuevo (may-2026): primero elige tipo de envío, después método. Retiro=contrarreembolso al retirar (sin anticipo). Domicilio=prepago (MP/Transfer).",
-            "response": "📦 Te lo enviamos GRATIS por Correo Argentino (entre 7 y 10 días hábiles) 😊\n\n1️⃣ *Retiro en sucursal* (lo más cómodo) → no pagás nada por adelantado, abonás el total *en efectivo cuando lo retirás*. La sucursal te la asigna el Correo, la más cercana a tu casa.\n2️⃣ *Envío a domicilio* → lo pagás antes con *tarjeta de crédito* o transferencia.\n\n👉 ¿Preferís retiro en sucursal y pagar al retirar, o envío a domicilio?",
+            "response": "📦 Te lo enviamos GRATIS por Correo Argentino (entre 7 y 10 días hábiles, y más rápido —6 a 7— si lo pagás por adelantado) 😊\n\n1️⃣ *Retiro en sucursal* (lo más cómodo) → no pagás nada por adelantado, abonás el total *en efectivo cuando lo retirás*. La sucursal te la asigna el Correo, la más cercana a tu casa.\n2️⃣ *Envío a domicilio* → lo pagás antes con *tarjeta de crédito* o transferencia, y *al estar pago sale antes: llega en 6 a 7 días hábiles* 🚚\n\n👉 ¿Preferís retiro en sucursal y pagar al retirar, o envío a domicilio?",
             "nextStep": "waiting_payment_method"
         },
         "payment_domicilio_choice": {
             "step": "waiting_payment_method",
             "_note": "Cliente eligió envío a domicilio. Submenú de medio de pago (prepago): tarjeta de crédito (link) o transferencia. NO se ofrecen débito, saldo en app, Pago Fácil ni Rapipago (decisión jun-2026).",
-            "response": "Perfecto, lo mandamos a tu domicilio 🏠\n\n¿Cómo querés abonar?\n\n1️⃣ *Tarjeta de crédito* — te envío un *link de pago* seguro\n2️⃣ *Transferencia bancaria* — te paso el alias",
+            "response": "Perfecto, lo mandamos a tu domicilio 🏠\n\nComo va prepago, al confirmar el pago el pedido sale enseguida y *te llega en 6 a 7 días hábiles* 🚚\n\n¿Cómo querés abonar?\n\n1️⃣ *Tarjeta de crédito* — te envío un *link de pago* seguro\n2️⃣ *Transferencia bancaria* — te paso el alias",
             "nextStep": "waiting_payment_method"
         },
         "payment_retiro_confirm": {
@@ -158,7 +158,7 @@
         },
         "order_confirmation_mp": {
             "step": "waiting_admin_validation",
-            "_note": "Confirmación tras pago completo por MP (envío a domicilio). Placeholders: {{PRODUCT_DETAIL}}, {{PLAN_DETAIL}}, {{TOTAL}}, {{POSTDATADO_LINE}} (7 a 10 días hábiles uniforme).",
+            "_note": "Confirmación tras pago completo por MP (envío a domicilio PREPAGO). Placeholders: {{PRODUCT_DETAIL}}, {{PLAN_DETAIL}}, {{TOTAL}}, {{POSTDATADO_LINE}} (domicilio prepago = 6 a 7 días hábiles; ver branch en messages.ts).",
             "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✅ Pago recibido (tarjeta de crédito)\n\n✔ Correo Argentino — envío a domicilio\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs para retirar.\n\n👉 ¿Me confirmás que podés retirarlo en sucursal dentro de las 72 hs si fuera necesario?"
         },
         "order_confirmation_transfer": {
@@ -227,8 +227,8 @@
                 "duda 4",
                 "opcion 4"
             ],
-            "_note": "FAQ menu opción 4 — '¿Cómo lo recibo y cuánto tarda?'. Modelo unificado may-2026: 7 a 10 días hábiles para todo. Dos opciones de envío: retiro en sucursal o entrega a domicilio. Ambos son gratis.",
-            "response": "📦 *Envíos por Correo Argentino* — *7 a 10 días hábiles*.\n\nTenés 2 opciones:\n1️⃣ *Retiro en sucursal* — pagás al retirar (contrarreembolso)\n2️⃣ *Envío a domicilio* — se abona previamente\n\n‼️ Ambos envíos son *GRATIS* ‼️\n\nSi el cartero no te encuentra, te avisamos y tenés 72 hs para retirarlo en la sucursal más cercana, sin costo.\n\n👉 ¿Avanzamos?"
+            "_note": "FAQ menu opción 4 — '¿Cómo lo recibo y cuánto tarda?'. Modelo jun-2026: retiro en sucursal 7 a 10 días hábiles; envío a domicilio PREPAGO 6 a 7 días hábiles. Dos opciones de envío. Ambos son gratis.",
+            "response": "📦 *Envíos por Correo Argentino* — *7 a 10 días hábiles*.\n\nTenés 2 opciones:\n1️⃣ *Retiro en sucursal* — pagás al retirar (contrarreembolso) → 7 a 10 días hábiles\n2️⃣ *Envío a domicilio* — se abona previamente y, al estar pago, *sale antes: llega en 6 a 7 días hábiles* 🚚\n\n‼️ Ambos envíos son *GRATIS* ‼️\n\nSi el cartero no te encuentra, te avisamos y tenés 72 hs para retirarlo en la sucursal más cercana, sin costo.\n\n👉 ¿Avanzamos?"
         },
         {
             "keywords": [

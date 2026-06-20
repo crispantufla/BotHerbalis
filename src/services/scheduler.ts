@@ -125,7 +125,7 @@ const ABANDON_REASON_MESSAGES: Record<string, string[]> = {
         'Hola 👋 Si te queda más cómodo, podés elegir *retiro en sucursal*: pagás recién cuando vas a buscarlo. ¿Te tomamos los datos? 📦',
     ],
     hesitation: [
-        '¡Hola! 😊 Sin apuro. El envío tarda *7 a 10 días hábiles* por Correo Argentino. ¿Avanzamos cuando quieras?',
+        '¡Hola! 😊 Sin apuro. El envío tarda *7 a 10 días hábiles* por Correo Argentino, y más rápido —6 a 7— si lo pagás por adelantado. ¿Avanzamos cuando quieras?',
         'Hola 👋 Si te quedó alguna duda para decidir, contame y te ayudo. Y si querés, te lo puedo agendar para la fecha que te quede cómoda 😊',
     ],
     objection: [
@@ -1016,7 +1016,7 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
         if (mpReminderStage === 2 && minsSince >= 1440) {
             const linkUrl = (state as any).mpPaymentLinkUrl;
             const linkLine = linkUrl ? `\n\nAcá te dejo el link otra vez:\n${linkUrl}` : '';
-            const msg = `¡Hola! ¿Cómo va? 😊\n\nVi que el pago con tarjeta quedó pendiente. Te recuerdo que los pedidos llegan en *7 a 10 días hábiles* desde la confirmación del pago.\n\nSi preferís, te lo puedo programar para una fecha más adelante (cuando cobres) y lo despacho recién ese día. ¿A partir de qué día te queda cómodo recibirlo?${linkLine}`;
+            const msg = `¡Hola! ¿Cómo va? 😊\n\nVi que el pago con tarjeta quedó pendiente. Te recuerdo que al pagar por adelantado el pedido sale enseguida y llega en *6 a 7 días hábiles* desde la confirmación del pago.\n\nSi preferís, te lo puedo programar para una fecha más adelante (cuando cobres) y lo despacho recién ese día. ¿A partir de qué día te queda cómodo recibirlo?${linkLine}`;
             try {
                 await sendMessageWithDelay(userId, msg);
                 _pushHistory(state, { role: 'bot', content: msg });

@@ -121,7 +121,7 @@ export async function handleWaitingPreference(
             4) EMOCIÓN Y SALUD: Si cuenta su historia de peso, problemas médicos (tiroides, operaciones) o inseguridades, REDACTÁ UN PÁRRAFO EMPÁTICO validando sus sentimientos ANTES de cerrar nada. goalMet=false.
             5) Si tiene GASTRITIS / úlcera / acidez: recomendá cápsulas o gotas (semillas pueden irritar — es una contraindicación real). goalMet=false hasta que confirme.
             6) Si pide "info de las 3", "precio de las 3" o "todas": dale un resumen breve de las 3 opciones con sus precios de 60 días (del knowledge). NO empujes ninguna. Después preguntá cuál prefiere.
-            7) Si pregunta por envío o medios de pago: envío gratis 7 a 10 días hábiles. 2 opciones: retiro en sucursal (paga total al retirar, sin anticipo) o domicilio (prepago por MP o transferencia). NUNCA menciones cuotas ni anticipo. Después preguntá con cuál producto avanzar.
+            7) Si pregunta por envío o medios de pago: envío gratis. 2 opciones: retiro en sucursal (paga total en efectivo al retirar, sin anticipo, 7 a 10 días hábiles) o domicilio prepago por tarjeta de crédito o transferencia (más rápido, 6 a 7 días hábiles). NUNCA menciones cuotas ni anticipo. Después preguntá con cuál producto avanzar.
             8) HORARIOS DE ENVÍO: si pregunta a qué hora llega o pide un horario, respondé que no controlamos al cartero del Correo Argentino, pero que avisamos si no lo encuentran. Después preguntá con cuál producto avanzar.`,
             history: currentState.history,
             summary: currentState.summary,
@@ -219,7 +219,7 @@ export async function handleWaitingPreference(
 7) Si tiene gastritis/úlcera/acidez: recomendá cápsulas o gotas (semillas pueden irritar). goalMet=false hasta que confirme.
 8) Si pide información o precios de "las 3", brindá explicación breve de las 3 formas con precios de 60 días (knowledge). Después preguntá cuál prefiere.
 9) Si pregunta si puede pagar/recibir un día concreto: dale el OK y volvé a la elección de producto.
-10) Si pregunta por envío o medios de pago: envío gratis 7 a 10 días hábiles, 2 opciones (retiro en sucursal sin anticipo / domicilio prepago MP o transfer). NUNCA menciones anticipo ni cuotas. Después preguntá producto.`,
+10) Si pregunta por envío o medios de pago: envío gratis, 2 opciones (retiro en sucursal sin anticipo, paga al retirar, 7 a 10 días hábiles / domicilio prepago por tarjeta de crédito o transferencia, más rápido 6 a 7 días hábiles). NUNCA menciones anticipo ni cuotas. Después preguntá producto.`,
             history: currentState.history,
             summary: currentState.summary,
             knowledge: knowledge,

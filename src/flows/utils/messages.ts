@@ -131,10 +131,12 @@ function _formatMessage(text: string | string[], state: any): string {
             formatted = formatted.replace(/{{PLAN_DETAIL}}/g, state.selectedPlan ? `${state.selectedPlan} días` : '60 días');
         }
         // Línea condicional postdatado vs entrega estándar (confirmación final).
-        // Modelo unificado may-2026: 7 a 10 días hábiles para todos los métodos.
+        // Modelo jun-2026: domicilio PREPAGO (tarjeta/transferencia) 6-7 días; retiro 7-10.
+        const _isRetiro = state.shippingChoice === 'retiro' || state.paymentMethod === 'contrarembolso';
+        const _entrega = _isRetiro ? '7 a 10 días hábiles' : '6 a 7 días hábiles';
         const postdatadoLine = state.postdatado
             ? `📅 Envío programado: ${state.postdatado}\n`
-            : `✔ Entrega estimada: 7 a 10 días hábiles desde la confirmación\n`;
+            : `✔ Entrega estimada: ${_entrega} desde la confirmación\n`;
         formatted = formatted.replace(/{{POSTDATADO_LINE}}/g, postdatadoLine);
         // Línea condicional saldo al cartero vs retiro en sucursal (confirmación COD).
         const isSucursal = state.pendingOrder?.calle?.toLowerCase() === 'a sucursal';
