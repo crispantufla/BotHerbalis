@@ -804,6 +804,17 @@ async function _handleRetiroData(
         } catch (e: any) {
             logger.warn(`[RETIRO-DATA] parseAddress falló para ${userId}: ${e.message}`);
         }
+        // Fallback CP: en retiro la calle no aplica, así que un número de 4 dígitos
+        // suelto es el código postal (caso "Merlo libertad 1716" → 1716, que el
+        // parser tomaba como altura de calle). 5491122475361.
+        if (!addr.cp) {
+            const cpMatch = text.match(/\b(\d{4})\b/);
+            if (cpMatch) {
+                addr.cp = cpMatch[1];
+                progressed = true;
+                logger.info(`[RETIRO-DATA] CP ${cpMatch[1]} extraído por fallback regex para ${userId}.`);
+            }
+        }
     }
 
     // Completo → armar la orden de retiro y pasar a confirmación final.
@@ -910,6 +921,30 @@ export async function handleWaitingData(
         // If neither yes/no/cp, clear the pending and continue normal flow
         currentState.pendingCPFromMaps = null;
     }
+
+    // 1c. "Un momento" / "ya me desocupo" — el cliente pide esperar un instante.
+    // NO lo apuramos ni re-pedimos datos: aflojamos y esperamos a que vuelva.
+    // (caso 5493735508638: la IA insistía con "falta nombre" justo después de que
+    // la clienta dijo "ya me desocupo y estoy con ud" → genera rechazo.)
+    const _BRIEF_WAIT = /\b(un (momento|momentito|segundo|segundito|minuto|minutito|toque|cachito|ratito)|dame (un|unos)|ya (me )?desocup|me desocup|ahora (vuelvo|vengo|sigo|te (escribo|hablo|contesto))|aguardame|esper[aá]me un|ya vuelvo|ya sigo|estoy con (ud|usted|vos)|enseguida (vuelvo|sigo|te))\b/i;
+    const _PURE_COURTESY = /^\s*(ok[\s,.!]*)?(muchas\s+|mil\s+)?(gracias|grac)([\s,.!]+muy\s+amable|[\s,.!]+igualmente)?[\s,.!]*$|^\s*(muy amable|buen[ií]simo|b[aá]rbaro)[\s,.!]*$/i;
+    if (_BRIEF_WAIT.test(normalizedText)) {
+        const { sendMessageWithDelay, saveState } = dependencies;
+        currentState.awaitingResume = true;
+        const waitMsg = 'Dale, tranqui, te espero 😊';
+        currentState.history.push({ role: 'bot', content: waitMsg, timestamp: Date.now() });
+        saveState(userId);
+        await sendMessageWithDelay(userId, waitMsg);
+        logger.info(`[WAITING_DATA] ${userId} pidió esperar ("${text.slice(0, 40)}") — aflojo, no re-pido datos.`);
+        return { matched: true };
+    }
+    // Si ya estaba esperando y solo agradece (sin datos), no lo apuramos de nuevo.
+    if (currentState.awaitingResume && _PURE_COURTESY.test(normalizedText) && !/\d/.test(text)) {
+        logger.info(`[WAITING_DATA] ${userId} agradece mientras espera — no re-pido datos.`);
+        return { matched: true };
+    }
+    // Cualquier otro mensaje sustantivo: el cliente volvió, retomamos normal.
+    if (currentState.awaitingResume) currentState.awaitingResume = false;
 
     // 2. Product/plan change detection
     await _handleProductPlanChange(userId, normalizedText, currentState, dependencies);

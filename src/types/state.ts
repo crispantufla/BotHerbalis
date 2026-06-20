@@ -86,6 +86,10 @@ export interface UserState {
     // Scheduler Flags
     staleAlerted?: boolean;
     reengagementSent?: boolean;
+    // El cliente pidió un momento ("un momento", "ya me desocupo", "estoy con ud").
+    // Mientras esté en true, no le re-pedimos datos ni lo apuramos: esperamos a que
+    // vuelva con contenido sustantivo. Se limpia al recibir datos/algo concreto.
+    awaitingResume?: boolean;
     cartRecovered?: boolean;
     secondFollowUpSent?: boolean;
     cashRetryShown?: boolean; // [LEGACY] flujo anticipo $10k (deprecated may-2026)
