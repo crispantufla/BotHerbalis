@@ -474,7 +474,7 @@ function _handleShipPaySwitch(
 // Se mantiene conservador (frases interrogativas, no palabras sueltas) para no
 // marcar afirmaciones como "te paso la calle cuando llegue".
 const _Q_STARTERS = /^\s*(como|cuanto|cuantos|cuantas|cuando|donde|que|cual|por que|sale|cuesta|tarda|tardan|demora|hay|tienen|tenes|puedo|se puede|funciona|sirve|me conviene)\b/i;
-const _Q_ANYWHERE = /\bcuanto\s+(tarda|tardan|sale|cuesta|vale|es|cobran|demora|demoran|seria)\b|\bcomo\s+(funciona|se toma|tomo|pago|se paga|lo pago|abono|recibo|llega|hago)\b|\bcuando\s+(llega|lo mandan|sale|me llega|recibo|lo recibo|despachan)\b|\bque\s+(precio|costo|metodo|metodos|forma de pago|formas de pago)\b|\bdonde\s+(retiro|esta|queda|lo retiro)\b|\bhacen\s+envios?\b/i;
+const _Q_ANYWHERE = /\bcuanto\s+(tarda|tardan|sale|cuesta|vale|es|cobran|demora|demoran|seria)\b|\bcomo\s+(funciona|se toma|tomo|pago|se paga|lo pago|abono|recibo|llega|hago)\b|\bcuando\s+(llega|lo mandan|sale|me llega|recibo|lo recibo|despachan)\b|\bque\s+(precio|costo|metodo|metodos|forma de pago|formas de pago)\b|\bdonde\s+(retiro|esta|queda|lo retiro)\b|\bhacen\s+envios?\b|\by\s+(las?\s+)?(semillas?|gotas?|c[aá]psulas?|pastillas?|infusion)\s*\??$/i;
 
 function _isInfoQuestion(text: string): boolean {
     const raw = (text || '').trim();
