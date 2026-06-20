@@ -8,6 +8,7 @@ import * as os from 'os';
 import * as crypto from 'crypto';
 import { UserState, HistoryMessage } from '../types/state';
 import { lookupSemanticCache, storeSemanticCache } from './semanticCache';
+import { _applyJuneDiscount } from '../flows/utils/pricing';
 
 // WhatsApp usa "*" para negrita, no "**" (markdown estándar). Si la IA devuelve
 // **bold** o ## heading, en WhatsApp se renderiza con los asteriscos literales:
@@ -229,9 +230,9 @@ async function _getPrices(): Promise<Record<string, any>> {
     const now = Date.now();
     if (_pricesCache && (now - _pricesCacheTime) < PRICES_CACHE_MS) return _pricesCache;
     let prices: Record<string, any> = {
-        'Cápsulas': { '60': '46.900', '120': '66.900' },
+        'Cápsulas': { '60': '49.900', '120': '62.900' },
         'Semillas': { '60': '36.900', '120': '49.900' },
-        'Gotas': { '60': '48.900', '120': '68.900' },
+        'Gotas': { '60': '49.900', '120': '62.900' },
         'costoLogistico': '18.000'
     };
     try {
@@ -240,6 +241,7 @@ async function _getPrices(): Promise<Record<string, any>> {
             prices = { ...prices, ...data };
         }
     } catch (e: any) { logger.error("Error reading prices for AI:", e.message); }
+    prices = _applyJuneDiscount(prices);  // ⏰ descuento junio — quitar 01/07 (ver pricing.ts)
     _pricesCache = prices;
     _pricesCacheTime = now;
     return prices;

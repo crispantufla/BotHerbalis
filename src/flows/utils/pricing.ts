@@ -51,11 +51,34 @@ function _loadPricesCache(): Record<string, any> {
 }
 
 const FALLBACK_PRICES: Record<string, any> = {
-    'Cápsulas': { '60': '46.900', '120': '66.900' },
+    'Cápsulas': { '60': '49.900', '120': '62.900' },
     'Semillas': { '60': '36.900', '120': '49.900' },
-    'Gotas': { '60': '48.900', '120': '68.900' },
+    'Gotas': { '60': '49.900', '120': '62.900' },
     'costoLogistico': '18.000'
 };
+
+// ⏰ DESCUENTO DE JUNIO 2026 — REVERTIR/QUITAR el 01/07/2026.
+// $10.000 off en Cápsulas y Gotas (Semillas sin descuento). Se aplica EN CÓDIGO
+// sobre el precio BASE del dashboard (DATA_DIR/prices.json): así no hay que editar
+// el dashboard ni restaurar precios a mano. Para terminar la promo: borrar este
+// bloque + las llamadas a _applyJuneDiscount (acá en _getPrices y en ai.ts _getPrices).
+const _JUNE_DISCOUNT = { products: ['Cápsulas', 'Gotas'], amount: 10000 };
+function _fmtThousands(n: number): string {
+    return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+function _applyJuneDiscount(prices: Record<string, any>): Record<string, any> {
+    const out: Record<string, any> = { ...prices };
+    for (const prod of _JUNE_DISCOUNT.products) {
+        if (!out[prod] || typeof out[prod] !== 'object') continue;
+        const discounted: Record<string, string> = {};
+        for (const [plan, val] of Object.entries(out[prod])) {
+            const base = parseInt(String(val).replace(/\./g, ''), 10);
+            discounted[plan] = isNaN(base) ? (val as string) : _fmtThousands(Math.max(0, base - _JUNE_DISCOUNT.amount));
+        }
+        out[prod] = discounted;
+    }
+    return out;
+}
 
 function _getCostoLogistico(): string {
     try {
@@ -66,10 +89,10 @@ function _getCostoLogistico(): string {
 
 function _getPrices(): Record<string, any> {
     try {
-        return _loadPricesCache();
+        return _applyJuneDiscount(_loadPricesCache());
     } catch (e) {
         logger.error('Error formatting prices:', e);
-        return FALLBACK_PRICES;
+        return _applyJuneDiscount(FALLBACK_PRICES);
     }
 }
 
@@ -98,5 +121,6 @@ export {
     _findPricesFile,
     _getCostoLogistico,
     _getPrices,
-    _getPrice
+    _getPrice,
+    _applyJuneDiscount
 };

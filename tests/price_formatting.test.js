@@ -83,14 +83,18 @@ describe('V3 Script — Price Centralization', () => {
         );
     });
 
-    test('Should show updated Cápsulas 60 price ($46.900)', async () => {
+    test('Should show the current Cápsulas 60 price (no placeholder)', async () => {
         userState[userId] = { step: 'waiting_preference', history: [] };
 
         // User picks capsulas => V3 shows prices directly in the preference response
         await processSalesFlow(userId, "capsulas", userState, knowledge, mockDependencies);
 
+        // Dinámico: refleja el precio del fixture + el descuento vigente (junio: -$10.000).
+        // Así no se rompe al corregir la base ni al revertir el descuento el 01/07.
+        const { _getPrice } = require('../src/flows/utils/pricing');
+        const expected = _getPrice('Cápsulas', '60');
         expect(mockSendMessage).toHaveBeenCalledWith(
-            userId, expect.stringMatching(/46\.900/)
+            userId, expect.stringMatching(new RegExp(expected.replace(/\./g, '\\.')))
         );
     });
 });
