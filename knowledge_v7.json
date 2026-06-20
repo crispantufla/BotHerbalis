@@ -96,7 +96,7 @@
         "payment_menu": {
             "step": "waiting_payment_method",
             "_note": "TEXTO 4 — Menú envío + medios de pago. Disparado por buildPaymentMessage. Modelo nuevo (may-2026): primero elige tipo de envío, después método. Retiro=contrarreembolso al retirar (sin anticipo). Domicilio=prepago (MP/Transfer).",
-            "response": "📦 El envío se realiza por Correo Argentino y demora entre 7 y 10 días hábiles.\n\nOpciones de envío:\n1️⃣ Retiro en sucursal → pagás al retirar, en efectivo\n2️⃣ Envío a domicilio → se abona antes (tarjeta de crédito o transferencia)\n\n👉 ¿Preferís retiro en sucursal y pagar al retirar, o envío a domicilio con pago anticipado?\n\n‼️ Ambos envíos son GRATIS ‼️",
+            "response": "📦 Te lo enviamos GRATIS por Correo Argentino (entre 7 y 10 días hábiles) 😊\n\n1️⃣ *Retiro en sucursal* (lo más cómodo) → no pagás nada por adelantado, abonás el total *en efectivo cuando lo retirás*. La sucursal te la asigna el Correo, la más cercana a tu casa.\n2️⃣ *Envío a domicilio* → lo pagás antes con *tarjeta de crédito* o transferencia.\n\n👉 ¿Preferís retiro en sucursal y pagar al retirar, o envío a domicilio?",
             "nextStep": "waiting_payment_method"
         },
         "payment_domicilio_choice": {
@@ -169,7 +169,7 @@
         "order_confirmation_cod": {
             "step": "waiting_admin_validation",
             "_note": "Confirmación de retiro en sucursal (modelo nuevo may-2026): cliente paga el TOTAL en efectivo al retirar. Sin anticipo. La sucursal de Correo Argentino se asigna automáticamente por el código postal.",
-            "response": "📦 CONFIRMACIÓN DE PEDIDO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal a pagar al retirar: *${{TOTAL}}*\n\n✔ Retiro en sucursal de Correo Argentino — se asigna automáticamente la más cercana a tu código postal.\n{{POSTDATADO_LINE}}\nImportante:\nTenés 72 hs para retirar desde que llega a la sucursal. Pasado ese plazo, el paquete vuelve y se genera un costo logístico de ${{COSTO_LOGISTICO}}."
+            "response": "📦 CONFIRMACIÓN DE PEDIDO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal a pagar al retirar: *${{TOTAL}}*\n\n✔ Retiro en sucursal de Correo Argentino — se asigna automáticamente la más cercana a tu código postal.\n{{POSTDATADO_LINE}}\nCuando llegue te avisamos y te pasamos el código de retiro. Tenés 72 hs para retirarlo; pasado ese plazo el paquete vuelve y se genera un costo de ${{COSTO_LOGISTICO}}.\n\nYa queda en curso tu pedido 🌱 ¡Gracias por confiar en Herbalis!"
         },
         "order_confirmation_fallback": {
             "step": "waiting_admin_validation",
