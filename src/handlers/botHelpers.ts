@@ -215,6 +215,26 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
     }
 
     const sendMessageWithDelay = async (chatId: string, content: string, startTime: number = Date.now()): Promise<void> => {
+        // 🛑 GUARD PREVENTIVO ANTI VENTA-FANTASMA (F1, caso 2954520621): si el bot va a
+        // decir que el pedido está listo/confirmado SIN orden registrada (sin pendingOrder
+        // y en un step que no es de cierre), NO mandamos ese cierre falso — el cliente
+        // quedaría creyendo que compró. Mandamos un mensaje neutral; el guard post-mortem
+        // de salesFlow se encarga de pausar + avisar al admin. El try/catch garantiza que
+        // el guard NUNCA rompa el pipeline de envío.
+        try {
+            const _gst: any = userState[chatId];
+            if (_gst && content) {
+                const { _isGhostClose } = require('../flows/utils/flowHelpers');
+                if (_isGhostClose(content, _gst.step, !!_gst.pendingOrder)) {
+                    logger.error(`[GHOST-CLOSE-PREVENT][${sellerId}] Cierre falso bloqueado a ${chatId} (step=${_gst.step}): "${(content || '').slice(0, 80)}"`);
+                    const hold = 'Dame un segundito que reviso bien tu pedido y te confirmo 🙏';
+                    logAndEmit(chatId, 'bot', hold, _gst.step);
+                    try { await client.sendMessage(chatId, hold); } catch (e: any) { logger.error(`[GHOST-CLOSE-PREVENT][${sellerId}] hold send fail: ${e.message}`); }
+                    return;
+                }
+            }
+        } catch (e: any) { logger.warn(`[GHOST-CLOSE-PREVENT][${sellerId}] guard error (sigo normal): ${e.message}`); }
+
         // Backstop anti-bucle: nunca reenviar el MISMO texto consecutivamente al
         // mismo chat. Si pasa, lo ignoramos y avisamos (el cliente ya lo tiene).
         const _prevSent = _lastBotMsgByChat.get(chatId);
