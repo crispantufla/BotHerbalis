@@ -280,6 +280,23 @@ async function _generateAndSendLink(
 ): Promise<void> {
     const { sendMessageWithDelay, saveState } = dependencies;
 
+    // GUARD DE COHERENCIA (caso 1131381951): nunca generar un link de pago si el
+    // producto elegido no está claro en el estado. Si selectedProduct quedó null
+    // y el cart vacío, calculateTotal/_getPrice defaultean silenciosamente a
+    // Semillas (pricing.ts) → el link sale con producto/precio EQUIVOCADO (la
+    // huella exacta del bug: "Semillas $36.900" cuando eligió Cápsulas). Mejor
+    // pausar y que un humano lo revise que cobrarle al cliente algo que no pidió.
+    const hasProduct = !!currentState.selectedProduct
+        || (Array.isArray(currentState.cart) && currentState.cart.length > 0);
+    if (!hasProduct) {
+        logger.error(`[MP_PAYMENT] ${userId} sin selectedProduct/cart al generar link — abortando para no cobrar el producto equivocado.`);
+        await _pauseAndAlert(
+            userId, currentState, dependencies, '',
+            '⚠️ COHERENCIA: se iba a generar un link de pago SIN producto elegido en el estado (riesgo de cobrar producto/precio equivocado, ej. default a Semillas). NO se envió link — revisá la elección del cliente y cargá el pedido a mano.'
+        );
+        return;
+    }
+
     const mpToken = process.env.MP_ACCESS_TOKEN;
     if (!mpToken) {
         logger.warn('[MP_PAYMENT] MP_ACCESS_TOKEN no configurado — fallback a contra reembolso');

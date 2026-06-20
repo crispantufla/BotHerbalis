@@ -81,8 +81,13 @@ function _getPrice(product: string | null | undefined, plan: string): string {
     } else if (product && product.includes('Gotas')) {
         result = prices['Gotas']?.[plan] || prices['Gotas']?.['60'];
     } else {
-        if (product && !product.includes('Semillas')) {
-            logger.warn(`[PRICING] _getPrice: unrecognized product "${product}", defaulting to Semillas`);
+        if (!product || !product.includes('Semillas')) {
+            // Footgun histórico: producto null/no-reconocido → default a Semillas
+            // (36.900/49.900). Fue la huella del link equivocado del caso 1131381951.
+            // El guard en stepWaitingMpPayment ya evita generar link sin producto;
+            // acá logueamos a ERROR para que cualquier otro path con producto null
+            // sea visible en prod en vez de cobrar Semillas en silencio.
+            logger.error(`[PRICING] _getPrice: producto null/no-reconocido ("${product}") → default a Semillas. Revisar el caller.`);
         }
         result = prices['Semillas']?.[plan] || prices['Semillas']?.['60'];
     }

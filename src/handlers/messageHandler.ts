@@ -10,6 +10,7 @@ const logger = require('../utils/logger');
 const { MessageMedia } = require('whatsapp-web.js');
 const { aiService } = require('../services/ai');
 const { parseAdminInput } = require('../services/adminService');
+const { redisConnection } = require('../services/queueService');
 
 const DEBOUNCE_MS = 10000;
 
@@ -98,26 +99,43 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
 
             let userId = msg.from;
 
-            // Resolve Meta @lid identifiers to real phone numbers
-            if (userId.includes('@lid')) {
+            // Resolve Meta @lid / proxy identifiers to real phone numbers — con
+            // resolución PEGAJOSA en Redis. getContact() es best-effort: puede
+            // resolver en un mensaje y FALLAR en el siguiente, lo que partía al
+            // MISMO cliente en DOS conversaciones (@lid y @c.us) con userState
+            // divergente → dos respuestas contradictorias y link con producto
+            // equivocado (caso real 1131381951, 2026-06-19). Con la cache, una vez
+            // que el @lid se resolvió a un teléfono, TODOS los mensajes siguientes
+            // mapean al mismo userId aunque getContact vuelva a fallar.
+            if (userId.includes('@lid') || userId.length > 18) {
+                const stickyKey = `lidmap:${sellerId}:${msg.from}`;
+                let resolved: string | null = null;
                 try {
                     const contact = await msg.getContact();
-                    if (contact && contact.number) {
-                        userId = `${contact.number}@c.us`;
-                        logger.info(`[LID-RESOLVE][${sellerId}] ${msg.from} → ${userId}`);
+                    if (userId.includes('@lid')) {
+                        if (contact && contact.number) resolved = `${contact.number}@c.us`;
+                    } else {
+                        const cleanName = (contact?.name || contact?.pushname || '').replace(/\D/g, '');
+                        if (cleanName.length >= 10 && cleanName.length <= 13) resolved = `${cleanName}@c.us`;
                     }
                 } catch (e: any) {
-                    logger.error(`[LID-RESOLVE][${sellerId}] Error:`, e.message);
+                    logger.warn(`[ID-RESOLVE][${sellerId}] getContact falló para ${msg.from}: ${e.message}`);
                 }
-            } else if (userId.length > 18) {
-                try {
-                    const contact = await msg.getContact();
-                    const cleanName = (contact?.name || contact?.pushname || '').replace(/\D/g, '');
-                    if (cleanName.length >= 10 && cleanName.length <= 13) {
-                        userId = `${cleanName}@c.us`;
-                        logger.info(`[PROXY-RESOLVE][${sellerId}] ${msg.from} → ${userId}`);
-                    }
-                } catch (e: any) { /* ignore */ }
+                if (resolved) {
+                    userId = resolved;
+                    logger.info(`[ID-RESOLVE][${sellerId}] ${msg.from} → ${userId}`);
+                    try { await redisConnection.set(stickyKey, userId, 'EX', 604800); } catch { /* noop */ }
+                } else {
+                    // No se pudo resolver ahora → reusar la última resolución conocida
+                    // para no abrir una segunda conversación bajo el id crudo.
+                    try {
+                        const cached = await redisConnection.get(stickyKey);
+                        if (cached) {
+                            userId = cached;
+                            logger.info(`[ID-STICKY][${sellerId}] ${msg.from} → ${userId} (cache)`);
+                        }
+                    } catch { /* noop */ }
+                }
             }
 
             const alertNumbers = (config.alertNumbers || []).map((n: string) => n.replace(/\D/g, ''));
@@ -183,6 +201,24 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
             }
 
             // --- USER MESSAGES ---
+
+            // Idempotencia entre procesadores (caso doble-bot): si OTRO procesador
+            // (deploy solapado, réplica, o reentrega del mismo mensaje físico) ya
+            // tomó este mensaje, lo descartamos. El id de WhatsApp (msg.id._serialized)
+            // es el MISMO en cloud y remoto, y Redis es compartido. Fail-open: si
+            // Redis no responde, procesamos igual (nunca perder un mensaje).
+            const _rawMsgId = msg.id?._serialized;
+            if (_rawMsgId && !String(_rawMsgId).startsWith('remote_')) {
+                try {
+                    const seen = await redisConnection.set(`msgseen:${sellerId}:${_rawMsgId}`, '1', 'EX', 600, 'NX');
+                    if (seen === null) {
+                        logger.warn(`[DEDUP][${sellerId}] msg ${_rawMsgId} ya procesado por otro processor — descarto`);
+                        return;
+                    }
+                } catch (e: any) {
+                    logger.warn(`[DEDUP][${sellerId}] Redis no disponible (${e.message}) — sigo sin dedup`);
+                }
+            }
 
             // Audio
             if (msg.type === 'ptt' || msg.type === 'audio') {

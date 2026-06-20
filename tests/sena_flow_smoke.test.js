@@ -250,9 +250,14 @@ describe('Renombre "Tarjeta de crédito" + poda de medios (corrección jun-2026)
         expect(resp).toMatch(/tarjeta de cr[ée]dito/i);
     });
 
-    test('FAQ de envío informa el costo de devolución de $18.000', () => {
+    test('FAQ de envío NO asusta con el recargo de $18.000 (se comunica al confirmar, no al preguntar la demora)', () => {
+        // Rev. 2026-06-20 (caso 1131381951): el recargo de devolución se sacó de la
+        // FAQ de demora (asustaba antes de cualquier compromiso) y se comunica en
+        // order_confirmation_cod, ya con el cliente decidido.
         const shipFaq = v7.faq.find(f => f.keywords.some(k => k === 'como lo recibo' || k === 'envio'));
         expect(shipFaq).toBeDefined();
-        expect(shipFaq.response).toMatch(/18\.000/);
+        expect(shipFaq.response).not.toMatch(/18\.000/);
+        // El recargo SIGUE comunicándose en la confirmación del pedido (retiro/COD).
+        expect(v7.flow.order_confirmation_cod.response).toMatch(/COSTO_LOGISTICO|18\.000/);
     });
 });
