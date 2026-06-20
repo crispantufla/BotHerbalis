@@ -120,15 +120,27 @@ const CorporateDashboard = () => {
             };
             const handleStatusChange = ({ status: newStatus, sellerId: evtSeller }) => {
                 if (evtSeller && viewedSellerId && evtSeller !== viewedSellerId) return;
-                if (newStatus === 'disconnected') {
+                // Estados de WhatsApp en minúscula (state.toLowerCase() del backend).
+                if (newStatus === 'connected' || newStatus === 'ready') {
+                    // (Re)conectado → ONLINE. En modo remoto un re-emparejado emite
+                    // 'connected' pero NO re-emite 'ready'; sin mapear esto, el
+                    // indicador quedaba pegado en OFFLINE hasta recargar la web.
+                    setStatus('ready');
+                    fetchConfig(); // refresca teléfono/config tras el (re)emparejado
+                } else if (
+                    newStatus === 'disconnected' || newStatus === 'unpaired' ||
+                    newStatus === 'auth_failure' || newStatus === 'qr_timeout' ||
+                    newStatus === 'reconnecting'
+                ) {
                     setStatus('scan_qr');
                     setQrData(null);
                     // Limpiar el teléfono mostrado — al reconectar con cuenta
-                    // nueva, el handleReady disparará fetchConfig y traerá el
-                    // nuevo desde DB. Sin esto quedaba el viejo pegado en pantalla.
+                    // nueva, handleReady/fetchConfig traerá el nuevo desde DB.
                     setConnectedPhone(null);
                 }
-                else setStatus(newStatus);
+                // 'opening' / 'pairing' / 'timeout': transitorios durante un
+                // re-emparejado — NO tocar status para no marcar OFFLINE falso
+                // (se recupera con el 'connected' que llega a continuación).
             };
             // Mantener config.globalPause sincronizado en vivo — sin esto, el
             // indicador "PAUSADO" en el header no se actualizaba cuando se
