@@ -650,7 +650,7 @@ async function _validateAndAssembleOrder(
             return { matched: true };
         }
         const plan = currentState.selectedPlan || "60";
-        const price = currentState.price || _getPrice(product, plan);
+        const price = _getPrice(product, plan); // F2: precio SIEMPRE coherente con el plan (no usar un currentState.price viejo)
         currentState.cart = [{ product, plan, price }];
     }
 
@@ -673,6 +673,11 @@ async function _validateAndAssembleOrder(
     const total = currentState.cart.reduce((sum: number, i: any) => sum + parseInt(i.price.toString().replace(/\./g, '')), 0);
     currentState.totalPrice = _formatPrice(total);
 
+    if (!_orderPriceCoherent(currentState)) {
+        logger.error(`[ORDER-COHERENCE] ${userId}: cart precio≠plan ${JSON.stringify(currentState.cart)} — pauso en vez de confirmar.`);
+        await _pauseAndAlert(userId, currentState, dependencies, text, '⚠️ Orden incoherente (plan/precio no coinciden). Revisión manual antes de confirmar.');
+        return { matched: true };
+    }
     const summaryMsg = buildConfirmationMessage(currentState, knowledge);
     currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
     await sendMessageWithDelay(userId, summaryMsg);
@@ -765,6 +770,19 @@ async function _askMissingFields(
     return { matched: true };
 }
 
+// F2: guard de coherencia de precio. Si el cart de UN solo ítem tiene un precio que
+// NO coincide con _getPrice(producto, plan) (ej: plan 120 con precio de 60), la
+// confirmación saldría incoherente ("Plan: 120 días / Total: $44.900"). No validamos
+// carts multi-ítem (descuentos por volumen). Caso 3446661083.
+function _orderPriceCoherent(state: UserState): boolean {
+    const cart: any[] = Array.isArray(state.cart) ? state.cart : [];
+    if (cart.length !== 1) return true;
+    const it = cart[0];
+    if (!it || !it.product || !it.plan || it.price == null) return true;
+    const norm = (v: any) => String(v).replace(/\./g, '');
+    return norm(it.price) === norm(_getPrice(it.product, it.plan));
+}
+
 // --- Helper: Retiro en sucursal — captura robusta de datos + armado de orden ---
 // El retiro solo necesita nombre + ciudad + CP (la calle no aplica: queda 'A
 // sucursal'). El flujo normal de waiting_data está pensado para domicilio y, si
@@ -822,7 +840,7 @@ async function _handleRetiroData(
         if (!currentState.cart || currentState.cart.length === 0) {
             const product = currentState.selectedProduct;
             const plan = currentState.selectedPlan || '60';
-            const price = currentState.price || _getPrice(product, plan);
+            const price = _getPrice(product, plan); // F2: precio SIEMPRE coherente con el plan (no usar un currentState.price viejo)
             currentState.cart = [{ product, plan, price } as any];
         }
         currentState.pendingOrder = {
@@ -835,6 +853,11 @@ async function _handleRetiroData(
         currentState.totalPrice = _formatPrice(total);
         currentState.partialAddress = {} as any;
         currentState.fieldReaskCount = {};
+        if (!_orderPriceCoherent(currentState)) {
+            logger.error(`[ORDER-COHERENCE] ${userId}: cart precio≠plan ${JSON.stringify(currentState.cart)} — pauso en vez de confirmar.`);
+            await _pauseAndAlert(userId, currentState, dependencies, text, '⚠️ Orden incoherente (plan/precio no coinciden). Revisión manual antes de confirmar.');
+            return { matched: true };
+        }
         const summaryMsg = buildConfirmationMessage(currentState, knowledge);
         currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
         _setStep(currentState, FlowStep.WAITING_FINAL_CONFIRMATION);
