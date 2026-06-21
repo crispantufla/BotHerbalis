@@ -103,6 +103,13 @@ function _getRelevantRules(userText: string): string[] {
     // confuso (que el keyword-match no captaría). Reporte Lidia (2026-06-04).
     activeRules.push(RULE_BASE.find(r => r.id === 'reaccion_adversa')!.text);
 
+    // Nota (jun-2026): se evaluó excluir la regla 'pago' cuando el módulo ya trae
+    // PAYMENT_POLICY (plan_choice/objection), para no duplicar el bloque de pago. El
+    // probe del LLM mostró que esa redundancia REFUERZA el guard "nunca decir Mercado
+    // Pago": al quitar una copia, el bot empezó a nombrar "Mercado Pago" en closing.
+    // Por eso se MANTIENE la regla 'pago' siempre que matchee — la reiteración del guard
+    // vale más que ahorrar tokens. NO re-excluir sin re-evaluar.
+
     // Contextually inject specific rules if keywords match
     for (const rule of RULE_BASE) {
         if (rule.keywords.length === 0) continue;
