@@ -268,7 +268,7 @@ describe('Renombre "Tarjeta de crédito" + poda de medios (corrección jun-2026)
         for (const key of ['order_confirmation_cod', 'order_confirmation_mp', 'order_confirmation_transfer', 'order_confirmation_fallback']) {
             const resp = v7.flow[key].response;
             expect(resp).not.toMatch(/¿\s*(me\s+confirm|te\s+confirmo|confirm[aá]s)/i); // sin pregunta de confirmación
-            expect(resp).toMatch(/confirmad/i);                                          // declara el pedido confirmado
+            expect(resp).toMatch(/en curso|confirmad/i);                                 // declara el pedido en curso/confirmado (cierre asumido estilo Horacio)
         }
     });
 });

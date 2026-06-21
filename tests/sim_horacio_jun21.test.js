@@ -111,7 +111,7 @@ describe('SIM V7 — el bot vende como Horacio (retiro, +10kg, cápsulas)', () =
 
     test('el mensaje de confirmación ES el cierre (declara confirmado, no pide "sí") + avisa al admin', () => {
         const lastBot = rig.transcript.filter(t => t.who === 'BOT').slice(-1)[0].text;
-        expect(lastBot).toMatch(/confirmad/i);        // declara el pedido confirmado
+        expect(lastBot).toMatch(/en curso/i);         // cierre asumido estilo Horacio ("ya queda en curso")
         expect(lastBot).not.toMatch(/¿.*confirm/i);   // NO pide el OK del cliente
         // Se le avisó al admin que se cerró una venta (alerta informativa, no de aprobación).
         expect(rig.deps.notifyAdmin).toHaveBeenCalled();
