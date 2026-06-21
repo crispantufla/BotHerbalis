@@ -30,7 +30,7 @@ const mockDependencies = {
     }
 };
 
-const knowledge = JSON.parse(fs.readFileSync(path.join(__dirname, '../archive/knowledge_v3.json'), 'utf8'));
+const knowledge = JSON.parse(fs.readFileSync(path.join(__dirname, '../knowledge_v7.json'), 'utf8'));
 
 jest.mock('../src/services/ai', () => ({ aiService: mockDependencies.aiService }));
 jest.mock('../safeWrite', () => ({ atomicWriteFile: jest.fn() }), { virtual: true });

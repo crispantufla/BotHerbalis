@@ -1,8 +1,8 @@
 /**
- * messageTemplates.ts — Shared message builders. Las plantillas viven en los
- * knowledge JSONs (`knowledge_v5.json` / `knowledge_v6.json`) bajo `flow.*` para
- * que el panel Guiones del dashboard las muestre. Estos builders leen el JSON
- * vía _loadDefaultKnowledge() (cacheado) y sustituyen placeholders con _formatMessage.
+ * messageTemplates.ts — Shared message builders. Las plantillas viven en el
+ * knowledge JSON activo (`knowledge_v7.json`) bajo `flow.*` para que el panel
+ * Guiones del dashboard las muestre. Estos builders leen el JSON vía
+ * _loadDefaultKnowledge() (cacheado) y sustituyen placeholders con _formatMessage.
  *
  * Si el caller tiene `knowledge` en mano (los step handlers la reciben como
  * parámetro), debería pasarla en el 2° argumento para evitar el load.
@@ -50,7 +50,7 @@ function _loadDefaultKnowledge(): any {
 
 /**
  * Lee `flow[key].response`. Si la knowledge provista no tiene la entrada,
- * recurre al knowledge default cacheado (knowledge_v6.json del disco). Esto
+ * recurre al knowledge default cacheado (knowledge_v7.json del disco). Esto
  * permite que callers con knowledge mock parcial (e.g. tests unitarios) sigan
  * obteniendo el copy correcto sin tener que duplicar todo el JSON.
  */

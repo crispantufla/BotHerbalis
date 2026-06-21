@@ -18,7 +18,7 @@ jest.mock('fs', () => {
     return {
         ...actualFs,
         existsSync: jest.fn((p) => {
-            if (typeof p === 'string' && (p.endsWith('prices.json') || p.endsWith('knowledge_v3.json'))) return true;
+            if (typeof p === 'string' && (p.endsWith('prices.json') || p.endsWith('knowledge_v7.json'))) return true;
             return actualFs.existsSync(p);
         }),
         readFileSync: jest.fn((p, opts) => {
@@ -30,8 +30,8 @@ jest.mock('fs', () => {
                     "adicionalMAX": "6.000"
                 });
             }
-            if (typeof p === 'string' && p.endsWith('knowledge_v3.json')) {
-                return actualFs.readFileSync(path.join(__dirname, '../archive/knowledge_v3.json'), opts);
+            if (typeof p === 'string' && p.endsWith('knowledge_v7.json')) {
+                return actualFs.readFileSync(path.join(__dirname, '../knowledge_v7.json'), opts);
             }
             return actualFs.readFileSync(p, opts);
         })
@@ -70,7 +70,7 @@ const mockDependencies = {
 };
 
 // Load knowledge
-const knowledge = JSON.parse(fs.readFileSync(path.join(__dirname, '../archive/knowledge_v3.json'), 'utf8'));
+const knowledge = JSON.parse(fs.readFileSync(path.join(__dirname, '../knowledge_v7.json'), 'utf8'));
 
 describe('Strategic Improvements', () => {
     let userState = {};

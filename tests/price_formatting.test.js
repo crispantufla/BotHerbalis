@@ -40,8 +40,8 @@ const mockDependencies = {
     aiService: require('../src/services/ai').aiService
 };
 
-// LOAD KNOWLEDGE V3 (Primary test target)
-const knowledge = JSON.parse(fs.readFileSync(path.join(__dirname, '../archive/knowledge_v3.json'), 'utf8'));
+// LOAD KNOWLEDGE V7 (Primary test target)
+const knowledge = JSON.parse(fs.readFileSync(path.join(__dirname, '../knowledge_v7.json'), 'utf8'));
 
 // MOCKS
 jest.mock('../src/services/ai', () => ({
@@ -57,7 +57,7 @@ jest.mock('../sheets_sync', () => ({ appendOrderToSheet: jest.fn() }), { virtual
 jest.mock('google-spreadsheet', () => ({}), { virtual: true });
 jest.mock('openai', () => { return jest.fn().mockImplementation(() => ({})); }, { virtual: true });
 
-describe('V3 Script — Price Centralization', () => {
+describe('V7 Script — Price Centralization', () => {
     let userState;
     const userId = 'test_price';
 
@@ -69,7 +69,7 @@ describe('V3 Script — Price Centralization', () => {
     test('Should replace {{PRICE_...}} placeholders with real values (Semillas via preference)', async () => {
         userState[userId] = { step: 'waiting_preference', history: [] };
 
-        // User picks semillas => V3 shows prices directly in the preference response
+        // User picks semillas => V7 shows prices directly in the preference response
         await processSalesFlow(userId, "semillas", userState, knowledge, mockDependencies);
 
         // Expect message to contain real numbers, NOT placeholders
@@ -86,7 +86,7 @@ describe('V3 Script — Price Centralization', () => {
     test('Should show the current Cápsulas 60 price (no placeholder)', async () => {
         userState[userId] = { step: 'waiting_preference', history: [] };
 
-        // User picks capsulas => V3 shows prices directly in the preference response
+        // User picks capsulas => V7 shows prices directly in the preference response
         await processSalesFlow(userId, "capsulas", userState, knowledge, mockDependencies);
 
         // Dinámico: refleja el precio del fixture + el descuento vigente (junio: -$10.000).
@@ -99,7 +99,7 @@ describe('V3 Script — Price Centralization', () => {
     });
 });
 
-describe('V3 Script — Contra Reembolso MAX', () => {
+describe('V7 Script — Contra Reembolso MAX', () => {
     let userState;
     const userId = 'test_crm';
 
@@ -142,7 +142,7 @@ describe('V3 Script — Contra Reembolso MAX', () => {
 
 });
 
-describe('V3 Script — FAQ Keywords', () => {
+describe('V7 Script — FAQ Keywords', () => {
     let userState;
     const userId = 'test_faq';
 
@@ -156,7 +156,7 @@ describe('V3 Script — FAQ Keywords', () => {
     test.skip('FAQ: trust concern with tarjeta mention triggers payment FAQ', async () => {
         userState[userId] = { step: 'waiting_weight', history: [] };
 
-        // "estafa" alone has no FAQ match in knowledge_v3.json (no trust/scam keyword)
+        // "estafa" alone has no FAQ match in knowledge_v7.json (no trust/scam keyword)
         // Combining with "tarjeta" triggers the payment FAQ which proves security via pago al recibir
         await processSalesFlow(userId, "esto es una estafa, aceptan tarjeta?", userState, knowledge, mockDependencies);
 
