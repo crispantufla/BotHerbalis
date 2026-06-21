@@ -270,8 +270,23 @@ client.on('disconnected', (reason) => {
 });
 
 // Entrantes (del cliente)
+// Dedup local: wwebjs a veces dispara 'message' 2-3 veces por el mismo mensaje físico
+// (confirmado en prod: [ID-RESOLVE] repetidos en Railway). Lo cortamos en ORIGEN para
+// no reenviar el frame duplicado por el WS (ahorra ancho de banda + RPCs del lado Railway).
+// Railway igual deduplica por msg-id (defensa en capas).
+const _seenIncoming = new Map(); // msgId → ts
+function _dupIncoming(id) {
+    if (!id) return false;
+    const now = Date.now();
+    for (const [k, t] of _seenIncoming) { if (now - t > 60000) _seenIncoming.delete(k); }
+    if (_seenIncoming.has(id)) return true;
+    _seenIncoming.set(id, now);
+    return false;
+}
 client.on('message', (m) => {
     const msg = serializeMsg(m);
+    const _id = msg.id && msg.id._serialized;
+    if (_dupIncoming(_id)) { log(`⊘ incoming duplicado ignorado: ${_id}`); return; }
     // from se deja tal cual (incluye @lid): es lo que enruta bien al enviar de vuelta.
     // La resolución a teléfono real, si hace falta, se hace del lado de Railway (resolveChatId).
     log(`◀ incoming de ${msg.from}: ${JSON.stringify(msg.body)}`);
