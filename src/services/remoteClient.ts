@@ -168,6 +168,16 @@ export class RemoteClient extends EventEmitter implements AgentSink {
         logger.info(`[REMOTE][${this.sellerId}] Agente online`);
         // No es 'ready' todavía: WA Web puede estar pidiendo QR. Esperamos el
         // frame `ready` o `qr` del agente para emitir el evento correspondiente.
+        //
+        // PERO: en una RECONEXIÓN del WS, wwebjs NO vuelve a disparar 'ready' (ya
+        // estaba logueado), así que el agente no manda 'ready' por su cuenta y el
+        // flag isConnected queda en false PARA SIEMPRE — el bot vende OK (fluyen los
+        // 'incoming') pero el dashboard queda OFFLINE y /chats vacío (caso 2026-06-21).
+        // Fix: pedimos un `sync`; el agente responde con un frame `ready` si WA está
+        // listo (agent.js case 'sync'), y ahí recién marcamos online. Si NO está listo,
+        // no responde 'ready' → seguimos offline (correcto). Fire-and-forget.
+        try { agentHub.send(this.sellerId, { t: 'sync' }); }
+        catch (e: any) { logger.warn(`[REMOTE][${this.sellerId}] sync on online falló: ${e.message}`); }
     }
 
     onAgentOffline(reason: string): void {
