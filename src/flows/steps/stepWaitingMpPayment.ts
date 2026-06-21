@@ -541,6 +541,7 @@ async function _finalizeOrderAndNotifyAdmin(
         precio: currentState.totalPrice || '0',
         postdatado: currentState.postdatado || null,
         paymentMethod: isSenaFlow ? 'contrarembolso' : 'mercadopago',
+        status: 'Confirmado', // el bot cierra la venta solo: el pago MP ya está confirmado acá
         ...(isSenaFlow ? { senaAmount: senaInt, senaPaid: true, cashRemainder } : {})
     };
     currentState.hasSoldBefore = true;
@@ -555,7 +556,7 @@ async function _finalizeOrderAndNotifyAdmin(
     const emailLabel = currentState.email ? `\n📧 Email: ${currentState.email}` : '';
     if (notifyAdmin) {
         await notifyAdmin(
-            `⌛ Pedido Requiere Aprobación`,
+            `✅ VENTA CERRADA por el bot (pago confirmado)`,
             userId,
             `Datos: ${addr.nombre}, ${addr.calle}\nCiudad: ${addr.ciudad} | CP: ${addr.cp}\nProvincia: ${addr.provincia || '?'}${emailLabel}\nItems: ${orderData.producto}\nTotal: $${currentState.totalPrice || '0'}${postdataLabel}${payLabel}`
         );
@@ -567,10 +568,10 @@ async function _finalizeOrderAndNotifyAdmin(
         config.scriptStats[_trackScript].completed++;
     }
 
-    _setStep(currentState, FlowStep.WAITING_ADMIN_VALIDATION);
+    _setStep(currentState, FlowStep.COMPLETED);
     const msg = isSenaFlow
-        ? `¡Perfecto, la seña fue confirmada y ya tengo tus datos! 🎉\n\nDespachamos en breve. El cartero te va a cobrar el saldo de *$${cashFmt}* en efectivo cuando reciba el paquete.\n\nAguardame un instante que verificamos todo ⏳`
-        : '¡Perfecto, el pago fue confirmado y ya tengo tus datos! 🎉\n\nAguardame un instante que verificamos todo y te confirmamos el ingreso ⏳';
+        ? `¡Listo! La seña fue confirmada y tu pedido quedó cerrado ✅🎉\n\nEl cartero te cobra el saldo de *$${cashFmt}* en efectivo cuando reciba el paquete. Apenas lo despachemos te pasamos el código de seguimiento.\n\n¡Gracias por confiar en Herbalis! 🌱`
+        : '¡Listo! Tu pago fue confirmado y tu pedido quedó cerrado ✅🎉\n\nApenas lo despachemos te pasamos el código de seguimiento.\n\n¡Gracias por confiar en Herbalis! 🌱';
     currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
     saveState(userId);
     await sendMessageWithDelay(userId, msg);

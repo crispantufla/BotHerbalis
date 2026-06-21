@@ -59,7 +59,8 @@ describe('F2 — coherencia plan/precio en la confirmación', () => {
         };
         const res = await handleWaitingData('f2b@c.us', 'listo', norm('listo'), state, { flow: {} }, deps);
         expect(res.matched).toBe(true);
-        expect(state.step).toBe('waiting_final_confirmation');
+        // El bot cierra la venta solo: coherente → cierra directo (no espera "sí" ni admin).
+        expect(state.step).toBe('completed');
         expect(state.cart[0].price).toBe(_getPrice('Cápsulas de nuez de la india', '120'));
         expect(deps.sharedState.pausedUsers.has('f2b@c.us')).toBe(false);
     });

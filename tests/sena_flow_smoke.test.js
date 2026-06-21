@@ -261,15 +261,14 @@ describe('Renombre "Tarjeta de crédito" + poda de medios (corrección jun-2026)
         expect(v7.flow.order_confirmation_cod.response).toMatch(/COSTO_LOGISTICO|18\.000/);
     });
 
-    test('INVARIANTE: todo resumen order_confirmation_* pide el OK (termina en pregunta) y NO declara el pedido hecho', () => {
-        // El mismo template es el RESUMEN previo a la confirmación del cliente. Si no
-        // termina pidiendo el "sí", o si dice "ya queda en curso", el cliente cree que
-        // ya compró y nunca confirma → saveOrderToLocal no corre (regresión 34621332862,
-        // jun-21). Blindamos los 4 templates.
+    test('INVARIANTE: order_confirmation_* es CIERRE de venta (no pide "sí" ni pregunta de confirmación)', () => {
+        // Cambio jun-2026: el bot cierra la venta solo. El mensaje de confirmación ES
+        // el cierre — NO debe pedir el OK del cliente ("¿me confirmás?", "¿te confirmo?")
+        // porque ya no se espera respuesta. Debe declarar el pedido confirmado.
         for (const key of ['order_confirmation_cod', 'order_confirmation_mp', 'order_confirmation_transfer', 'order_confirmation_fallback']) {
             const resp = v7.flow[key].response;
-            expect(resp).toMatch(/\?/);                       // termina/contiene una pregunta de confirmación
-            expect(resp).not.toMatch(/ya queda en curso/i);  // nunca lo da por cerrado antes del "sí"
+            expect(resp).not.toMatch(/¿\s*(me\s+confirm|te\s+confirmo|confirm[aá]s)/i); // sin pregunta de confirmación
+            expect(resp).toMatch(/confirmad/i);                                          // declara el pedido confirmado
         }
     });
 });

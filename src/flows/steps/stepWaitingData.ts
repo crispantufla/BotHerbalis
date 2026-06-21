@@ -1,7 +1,7 @@
 import { UserState, FlowStep } from '../../types/state';
 import { validateAddress, suggestCPByCity, lookupCPFromMaps } from '../../services/addressValidator';
 import { buildConfirmationMessage } from '../../utils/messageTemplates';
-import { _setStep, _pauseAndAlert, _detectProductPlanChange, _resolveNewProductPlan, _detectPostdatado, _handleShipPaySwitch } from '../utils/flowHelpers';
+import { _setStep, _pauseAndAlert, _detectProductPlanChange, _resolveNewProductPlan, _detectPostdatado, _handleShipPaySwitch, _closeSaleAndNotify } from '../utils/flowHelpers';
 import { _getPrice } from '../utils/pricing';
 import { _formatPrice, buildCartFromSelection, calculateTotal } from '../utils/cartHelpers';
 import { _isDuplicate } from '../utils/messages';
@@ -678,13 +678,22 @@ async function _validateAndAssembleOrder(
         await _pauseAndAlert(userId, currentState, dependencies, text, '⚠️ Orden incoherente (plan/precio no coinciden). Revisión manual antes de confirmar.');
         return { matched: true };
     }
-    const summaryMsg = buildConfirmationMessage(currentState, knowledge);
-    currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
-    await sendMessageWithDelay(userId, summaryMsg);
-
     currentState.fieldReaskCount = {};
     currentState.addressIssueType = null;
     currentState.addressIssueTries = 0;
+
+    // El bot CIERRA la venta solo (jun-2026). Retiro/COD no tiene pago anticipado
+    // que verificar → al tener los datos cerramos directo: guardamos 'Confirmado',
+    // avisamos al admin (informativo) y el mensaje de confirmación ES el cierre.
+    if (currentState.paymentMethod === 'contrarembolso') {
+        await _closeSaleAndNotify(userId, currentState, knowledge, dependencies);
+        return { matched: true };
+    }
+    // Defensivo (waiting_data hoy es solo retiro): si el pago NO es al retirar, no
+    // cerramos sin verificar — mandamos el resumen y esperamos.
+    const summaryMsg = buildConfirmationMessage(currentState, knowledge);
+    currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
+    await sendMessageWithDelay(userId, summaryMsg);
     _setStep(currentState, FlowStep.WAITING_FINAL_CONFIRMATION);
     saveState(userId);
     return { matched: true };
@@ -858,12 +867,9 @@ async function _handleRetiroData(
             await _pauseAndAlert(userId, currentState, dependencies, text, '⚠️ Orden incoherente (plan/precio no coinciden). Revisión manual antes de confirmar.');
             return { matched: true };
         }
-        const summaryMsg = buildConfirmationMessage(currentState, knowledge);
-        currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
-        _setStep(currentState, FlowStep.WAITING_FINAL_CONFIRMATION);
-        saveState(userId);
-        await sendMessageWithDelay(userId, summaryMsg);
-        logger.info(`[RETIRO-DATA] Orden de retiro armada para ${userId}: ${addr.nombre} / ${addr.ciudad} / CP ${addr.cp}.`);
+        // Retiro/COD: el bot cierra la venta solo (sin pago anticipado que verificar).
+        await _closeSaleAndNotify(userId, currentState, knowledge, dependencies);
+        logger.info(`[RETIRO-DATA] Venta de retiro CERRADA por el bot para ${userId}: ${addr.nombre} / ${addr.ciudad} / CP ${addr.cp}.`);
         return { matched: true };
     }
 

@@ -56,7 +56,8 @@ describe('Retiro — CP embebido en "localidad + número"', () => {
         expect(res.matched).toBe(true);
         expect(state.pendingOrder).toBeTruthy();
         expect(state.pendingOrder.cp).toBe('1716');
-        expect(state.step).toBe('waiting_final_confirmation');
+        // El bot cierra la venta solo (jun-2026): retiro con datos completos → 'completed'.
+        expect(state.step).toBe('completed');
     });
 });
 

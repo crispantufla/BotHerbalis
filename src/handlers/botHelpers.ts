@@ -145,7 +145,11 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
             const newOrderData = {
                 id: crypto.randomUUID(),
                 userPhone: cleanPhone || 'desconocido',
-                status: 'Pendiente',
+                // El bot cierra ventas solo (jun-2026): cuando arma la orden tras
+                // tener todo (retiro: datos; MP: pago confirmado) la guarda como
+                // 'Confirmado' directo, sin pasar por aprobación de admin. Los
+                // callers legacy que no pasan status siguen creando 'Pendiente'.
+                status: order.status || 'Pendiente',
                 products: normalizedProduct,
                 totalPrice: isNaN(priceNum) ? 0 : priceNum,
                 tracking: null,

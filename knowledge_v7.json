@@ -159,22 +159,22 @@
         "order_confirmation_mp": {
             "step": "waiting_admin_validation",
             "_note": "Confirmación tras pago completo por MP (envío a domicilio PREPAGO). Placeholders: {{PRODUCT_DETAIL}}, {{PLAN_DETAIL}}, {{TOTAL}}, {{POSTDATADO_LINE}} (domicilio prepago = 6 a 7 días hábiles; ver branch en messages.ts).",
-            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✅ Pago recibido (tarjeta de crédito)\n\n✔ Correo Argentino — envío a domicilio\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs para retirar.\n\n👉 ¿Me confirmás que podés retirarlo en sucursal dentro de las 72 hs si fuera necesario?"
+            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✅ Pago recibido (tarjeta de crédito)\n\n✔ Correo Argentino — envío a domicilio\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs para retirar.\n\n✅ ¡Tu pedido quedó confirmado! 🌱 Apenas lo despachemos te pasamos el código de seguimiento. ¡Gracias por confiar en Herbalis!"
         },
         "order_confirmation_transfer": {
             "step": "waiting_admin_validation",
             "_note": "Confirmación tras pago por transferencia bancaria (envío a domicilio).",
-            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✅ Pago recibido via Transferencia\n\n✔ Correo Argentino — envío a domicilio\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs para retirar.\n\n👉 ¿Me confirmás que podés retirarlo en sucursal dentro de las 72 hs si fuera necesario?"
+            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✅ Pago recibido via Transferencia\n\n✔ Correo Argentino — envío a domicilio\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs para retirar.\n\n✅ ¡Tu pedido quedó confirmado! 🌱 Apenas lo despachemos te pasamos el código de seguimiento. ¡Gracias por confiar en Herbalis!"
         },
         "order_confirmation_cod": {
             "step": "waiting_admin_validation",
             "_note": "Confirmación de retiro en sucursal (modelo nuevo may-2026): cliente paga el TOTAL en efectivo al retirar. Sin anticipo. La sucursal de Correo Argentino se asigna automáticamente por el código postal.",
-            "response": "📦 CONFIRMACIÓN DE PEDIDO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal a pagar al retirar: *${{TOTAL}}*\n\n✔ Retiro en sucursal de Correo Argentino — se asigna automáticamente la más cercana a tu código postal.\n{{POSTDATADO_LINE}}\nCuando llegue te avisamos y te pasamos el código de retiro. Tenés 72 hs para retirarlo; pasado ese plazo el paquete vuelve y se genera un costo de ${{COSTO_LOGISTICO}}.\n\n👉 ¿Te confirmo el pedido así y lo dejo en curso? 🌱"
+            "response": "📦 CONFIRMACIÓN DE PEDIDO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal a pagar al retirar: *${{TOTAL}}*\n\n✔ Retiro en sucursal de Correo Argentino — se asigna automáticamente la más cercana a tu código postal.\n{{POSTDATADO_LINE}}\nCuando llegue te avisamos y te pasamos el código de retiro. Tenés 72 hs para retirarlo; pasado ese plazo el paquete vuelve y se genera un costo de ${{COSTO_LOGISTICO}}.\n\n✅ ¡Tu pedido quedó confirmado! 🌱 Te avisamos apenas esté disponible para retirar y te pasamos el código de retiro. ¡Gracias por confiar en Herbalis!"
         },
         "order_confirmation_fallback": {
             "step": "waiting_admin_validation",
             "_note": "Fallback si el paymentMethod del state no matchea con ninguno conocido. Logueamos warn en código.",
-            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✔ Correo Argentino\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs.\n\n👉 ¿Te confirmo el pedido así?"
+            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✔ Correo Argentino\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs.\n\n✅ ¡Pedido confirmado! 🌱 Apenas lo despachemos te pasamos el seguimiento. ¡Gracias por confiar en Herbalis!"
         }
     },
     "faq": [

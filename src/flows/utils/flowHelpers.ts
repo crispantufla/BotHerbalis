@@ -484,9 +484,79 @@ function _isInfoQuestion(text: string): boolean {
     return _Q_STARTERS.test(t) || _Q_ANYWHERE.test(t);
 }
 
+/**
+ * _closeSaleAndNotify — CIERRE DE VENTA POR EL BOT (jun-2026).
+ *
+ * El bot cierra la venta él mismo, sin gate de aprobación del admin. Se llama
+ * cuando la venta ya está lista para cerrar: retiro/COD con todos los datos, o
+ * MP con el pago confirmado. Hace TODO el cierre en un solo lugar:
+ *   1. Guarda la orden como 'Confirmado' (entra directo a Ventas/Logística).
+ *   2. Manda una alerta INFORMATIVA al admin ("✅ VENTA CERRADA"), ya no de aprobación.
+ *   3. Envía el mensaje de confirmación (que ahora ES el cierre, sin "¿me confirmás?").
+ *   4. Pasa a 'completed' (post-venta: salesFlow auto-pausa los mensajes siguientes).
+ *
+ * orderExtra permite inyectar campos específicos (ej: seña de MP) sobre el orderData
+ * armado desde currentState.
+ */
+async function _closeSaleAndNotify(
+    userId: string,
+    currentState: any,
+    knowledge: any,
+    dependencies: any,
+    orderExtra: Record<string, any> = {}
+): Promise<void> {
+    const { sendMessageWithDelay, saveState, notifyAdmin, saveOrderToLocal, config, effectiveScript } = dependencies;
+    const { buildConfirmationMessage } = require('../../utils/messageTemplates');
+
+    const addr = currentState.partialAddress || {};
+    const o = currentState.pendingOrder || {
+        nombre: addr.nombre, calle: addr.calle, ciudad: addr.ciudad, cp: addr.cp, provincia: addr.provincia, calleOriginal: null
+    };
+    const cart = currentState.cart || [];
+    const phone = userId.split('@')[0];
+    const orderData = {
+        cliente: phone,
+        nombre: o.nombre, calle: o.calle, ciudad: o.ciudad, cp: o.cp, provincia: o.provincia,
+        calleOriginal: o.calleOriginal || null,
+        email: currentState.email || null,
+        producto: cart.map((i: any) => i.product).join(' + ') || currentState.selectedProduct || '',
+        plan: cart.map((i: any) => `${i.plan} días`).join(' + ') || `${currentState.selectedPlan || '60'} días`,
+        precio: currentState.totalPrice || '0',
+        postdatado: currentState.postdatado || null,
+        paymentMethod: currentState.paymentMethod || 'contrarembolso',
+        status: 'Confirmado',
+        ...orderExtra
+    };
+
+    currentState.hasSoldBefore = true;
+    if (saveOrderToLocal) saveOrderToLocal(orderData);
+
+    if (notifyAdmin) {
+        const postdataLabel = currentState.postdatado ? `\n📅 POSTDATADO: ${currentState.postdatado}` : '';
+        await notifyAdmin(
+            '✅ VENTA CERRADA por el bot',
+            userId,
+            `Cliente: ${o.nombre || '?'}\nCiudad: ${o.ciudad || '?'} | CP: ${o.cp || '?'}\nItems: ${orderData.producto} (${orderData.plan})\nTotal: $${currentState.totalPrice || '0'}\nPago: ${orderData.paymentMethod}${postdataLabel}`
+        );
+    }
+
+    const _track = effectiveScript || config?.activeScript;
+    if (config && config.scriptStats && _track && _track !== 'rotacion') {
+        if (!config.scriptStats[_track]) config.scriptStats[_track] = { started: 0, completed: 0 };
+        config.scriptStats[_track].completed++;
+    }
+
+    const closeMsg = buildConfirmationMessage(currentState, knowledge);
+    currentState.history.push({ role: 'bot', content: closeMsg, timestamp: Date.now() });
+    _setStep(currentState, 'completed');
+    saveState(userId);
+    await sendMessageWithDelay(userId, closeMsg);
+}
+
 export {
     _cleanPhone,
     _isInfoQuestion,
+    _closeSaleAndNotify,
     _setStep,
     _maybeUpsell,
     _detectPostdatado,

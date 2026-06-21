@@ -97,29 +97,25 @@ describe('SIM V7 — el bot vende como Horacio (retiro, +10kg, cápsulas)', () =
         expect(all).not.toMatch(/62\.900/);
     });
 
-    test('el RESUMEN pide confirmación (no cierra en falso) — armó la orden pero aún NO la guarda', () => {
-        const all = rig.transcript.map(t => t.text).join('\n');
+    test('el bot CIERRA la venta solo: guarda la orden (Confirmado) y pasa a completed, sin esperar "sí"', () => {
+        // Cambio jun-2026: el bot cierra ventas él mismo (sin gate de admin). Al tener
+        // los datos de retiro, guarda la orden como 'Confirmado' y pasa a 'completed'
+        // en el mismo turno — ya no espera la confirmación del cliente.
         expect(rig.userState[uid].pendingOrder).toBeTruthy();
-        // El resumen previo a la confirmación DEBE terminar pidiendo el OK del cliente
-        // (regla "cerrar siempre con pregunta"), nunca declarar el pedido como hecho:
-        // si dice "ya queda en curso", el cliente cree que compró y no manda el "sí"
-        // → saveOrderToLocal nunca corre (regresión 34621332862, jun-21).
-        expect(all).toMatch(/¿.*confirmo.*\?/i);
-        expect(all).not.toMatch(/ya queda en curso/i);
-        // Y como todavía no confirmó, la orden NO se debe haber guardado.
-        expect(rig.deps.saveOrderToLocal).not.toHaveBeenCalled();
-        expect(rig.userState[uid].step).toBe('waiting_final_confirmation');
-    });
-
-    test('tras el "sí" del cliente, la orden SÍ se guarda y pasa a validación de admin', async () => {
-        await rig.say(uid, 'si, dale');
-        // El "sí" dispara la persistencia real del pedido.
         expect(rig.deps.saveOrderToLocal).toHaveBeenCalledTimes(1);
         const saved = rig.deps.saveOrderToLocal.mock.calls[0][0];
+        expect(saved.status).toBe('Confirmado');
         expect(saved.precio).toMatch(/52\.900/);
-        expect(rig.userState[uid].step).toBe('waiting_admin_validation');
-        // Y se le avisa al cliente que quedó recibido (post-confirmación, no antes).
+        expect(rig.userState[uid].step).toBe('completed');
+    });
+
+    test('el mensaje de confirmación ES el cierre (declara confirmado, no pide "sí") + avisa al admin', () => {
         const lastBot = rig.transcript.filter(t => t.who === 'BOT').slice(-1)[0].text;
-        expect(lastBot).toMatch(/recibimos tu confirmaci[óo]n|verificamos/i);
+        expect(lastBot).toMatch(/confirmad/i);        // declara el pedido confirmado
+        expect(lastBot).not.toMatch(/¿.*confirm/i);   // NO pide el OK del cliente
+        // Se le avisó al admin que se cerró una venta (alerta informativa, no de aprobación).
+        expect(rig.deps.notifyAdmin).toHaveBeenCalled();
+        const reasons = rig.deps.notifyAdmin.mock.calls.map(c => c[0]).join(' ');
+        expect(reasons).toMatch(/venta cerrada/i);
     });
 });

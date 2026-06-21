@@ -117,7 +117,8 @@ describe('3. Retiro en sucursal — captura de datos', () => {
         const text = 'Regina B. Bode\nCiudad: Helvecia.\nCodigo P. 3003\nSucursal correo: San Martin 555\nNecesitas algo mas?';
         const res = await handleWaitingData('r1@c.us', text, norm(text), state, { flow: {} }, deps);
         expect(res.matched).toBe(true);
-        expect(state.step).toBe('waiting_final_confirmation');
+        // El bot cierra la venta solo (jun-2026): retiro con datos completos → 'completed'.
+        expect(state.step).toBe('completed');
         expect(state.pendingOrder).toBeTruthy();
         expect(state.pendingOrder.nombre).toBe('Regina B. Bode');
         expect(state.pendingOrder.calle).toBe('A sucursal');
