@@ -260,4 +260,16 @@ describe('Renombre "Tarjeta de crédito" + poda de medios (corrección jun-2026)
         // El recargo SIGUE comunicándose en la confirmación del pedido (retiro/COD).
         expect(v7.flow.order_confirmation_cod.response).toMatch(/COSTO_LOGISTICO|18\.000/);
     });
+
+    test('INVARIANTE: todo resumen order_confirmation_* pide el OK (termina en pregunta) y NO declara el pedido hecho', () => {
+        // El mismo template es el RESUMEN previo a la confirmación del cliente. Si no
+        // termina pidiendo el "sí", o si dice "ya queda en curso", el cliente cree que
+        // ya compró y nunca confirma → saveOrderToLocal no corre (regresión 34621332862,
+        // jun-21). Blindamos los 4 templates.
+        for (const key of ['order_confirmation_cod', 'order_confirmation_mp', 'order_confirmation_transfer', 'order_confirmation_fallback']) {
+            const resp = v7.flow[key].response;
+            expect(resp).toMatch(/\?/);                       // termina/contiene una pregunta de confirmación
+            expect(resp).not.toMatch(/ya queda en curso/i);  // nunca lo da por cerrado antes del "sí"
+        }
+    });
 });
