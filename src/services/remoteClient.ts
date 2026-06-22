@@ -64,7 +64,7 @@ export class RemoteClient extends EventEmitter implements AgentSink {
     }
 
     async destroy(): Promise<void> {
-        agentHub.unbind(this.sellerId);
+        agentHub.dispose(this.sellerId);
         this._rejectAllPending('client destroyed');
         this._ready = false;
     }
@@ -191,11 +191,18 @@ export class RemoteClient extends EventEmitter implements AgentSink {
             case 'qr':
                 this.emit('qr', frame.data);
                 break;
-            case 'ready':
-                this._info = { wid: { user: frame.phone || '' } };
+            case 'ready': {
+                const phone = frame.phone || '';
+                // Dedup: el agente reemite 'ready' por varias vías que coinciden al
+                // (re)conectar — el 'ready' espontáneo de ws.open con waReady + la
+                // respuesta al 'sync'. Sin esto se emitía doble "✅ WhatsApp ready!".
+                // Solo re-emitimos si cambió el número (re-emparejado real).
+                if (this._ready && this._info?.wid?.user === phone) break;
+                this._info = { wid: { user: phone } };
                 this._ready = true;
                 this.emit('ready');
                 break;
+            }
             case 'state':
                 this.emit('change_state', frame.state);
                 break;

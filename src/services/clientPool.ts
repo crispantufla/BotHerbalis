@@ -576,6 +576,15 @@ class ClientPool {
                 update: { status: 'disconnected', lastSeen: new Date() }
             }).catch(() => {});
 
+            // En modo remoto NO reinicializar acá: RemoteClient.initialize() es un
+            // re-bind no-op que NO recupera la sesión (vive en la PC del vendedor).
+            // El agente reconecta solo (agent.js scheduleReconnect) y al re-adjuntarse
+            // el AgentHub dispara onAgentOnline → sync → 'ready', que vuelve a marcar
+            // online. Entrar al ciclo safeInit/reconnect causaba flapping perpetuo
+            // (cada 'ready' reseteaba reconnectAttempts → nunca escalaba). Mismo
+            // criterio que el guard de change_state.
+            if (client instanceof RemoteClient) return;
+
             if (reason === 'LOGOUT' || reason === 'CONFLICT' || sharedState.manualDisconnect) {
                 sharedState.manualDisconnect = false;
                 instance.reconnectAttempts = 0;

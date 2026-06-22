@@ -30,6 +30,10 @@ export interface AgentSink {
 }
 
 const HB_TIMEOUT_MS = 45000; // sin heartbeat en 45s → agente considerado caído
+// Grace inicial tras conectar: el 1er hb del agente llega recién a +15s y, con la
+// PC/WA Web recién despertada, puede demorarse más. Armar el watchdog en 45s desde
+// el auth mataba sockets sanos (flapping). Damos margen solo para el primer latido.
+const HB_FIRST_TIMEOUT_MS = 75000;
 
 class AgentHub {
     private wss: WebSocketServer | null = null;
@@ -58,8 +62,22 @@ class AgentHub {
         if (this.sockets.has(sellerId)) sink.onAgentOnline();
     }
 
-    unbind(sellerId: string): void {
+    /**
+     * Cierra de verdad el socket del agente y limpia su watchdog, además de
+     * soltar el sink. Lo llama RemoteClient.destroy() en un stop deliberado
+     * (admin, shutdown, restart). Antes solo se soltaba el sink y el socket
+     * quedaba HUÉRFANO (vivo, latiendo) — al reconectar el seller disparaba
+     * doble-ready + hb-timeout (flapping). El agente reconecta solo después.
+     */
+    dispose(sellerId: string): void {
         this.sinks.delete(sellerId);
+        const ws = this.sockets.get(sellerId);
+        if (ws) {
+            this.sockets.delete(sellerId);
+            try { ws.close(4006, 'seller stopped'); } catch { /* noop */ }
+        }
+        const t = this.hbTimers.get(sellerId);
+        if (t) { clearTimeout(t); this.hbTimers.delete(sellerId); }
     }
 
     /** ¿Hay un agente conectado para este seller? */
@@ -137,7 +155,7 @@ class AgentHub {
         const prev = this.sockets.get(sellerId);
         if (prev && prev !== ws) { try { prev.close(4004, 'replaced'); } catch { /* noop */ } }
         this.sockets.set(sellerId, ws);
-        this._resetHb(sellerId, ws);
+        this._resetHb(sellerId, ws, HB_FIRST_TIMEOUT_MS);
         logger.info(`[AGENT][${sellerId}] Agente conectado`);
         const sink = this.sinks.get(sellerId);
         if (sink) sink.onAgentOnline();
@@ -154,14 +172,14 @@ class AgentHub {
         if (sink) sink.onAgentOffline(reason);
     }
 
-    private _resetHb(sellerId: string, ws: WebSocket): void {
+    private _resetHb(sellerId: string, ws: WebSocket, timeoutMs: number = HB_TIMEOUT_MS): void {
         const prev = this.hbTimers.get(sellerId);
         if (prev) clearTimeout(prev);
         this.hbTimers.set(sellerId, setTimeout(() => {
-            logger.warn(`[AGENT][${sellerId}] Sin heartbeat en ${HB_TIMEOUT_MS / 1000}s — cerrando socket`);
+            logger.warn(`[AGENT][${sellerId}] Sin heartbeat en ${timeoutMs / 1000}s — cerrando socket`);
             try { ws.close(4005, 'hb timeout'); } catch { /* noop */ }
             this._detachSocket(sellerId, ws, 'hb timeout');
-        }, HB_TIMEOUT_MS));
+        }, timeoutMs));
     }
 
     private _validToken(sellerId: string, token: string): boolean {
