@@ -165,10 +165,6 @@ class ClientPool {
     private io: any = null;
     private redlock: any = null;
     private watchdogInterval: ReturnType<typeof setInterval> | null = null;
-    private nightModeInterval: ReturnType<typeof setInterval> | null = null;
-    // Sellers que fueron detenidos por el night-mode — al salir de la ventana
-    // los re-arrancamos; los que paró un admin a mano NO se tocan.
-    private nightStoppedSellers: Set<string> = new Set();
 
     setIo(io: any) { this.io = io; }
     setRedlock(redlock: any) { this.redlock = redlock; }
@@ -744,7 +740,6 @@ class ClientPool {
 
     async stopAll(): Promise<void> {
         if (this.watchdogInterval) clearInterval(this.watchdogInterval);
-        if (this.nightModeInterval) { clearInterval(this.nightModeInterval); this.nightModeInterval = null; }
         await Promise.all(Array.from(this.instances.keys()).map(id => this.stopSeller(id)));
     }
 
@@ -757,75 +752,6 @@ class ClientPool {
         }
         // Start watchdog after IO is ready (all sellers registered by now)
         this.startWatchdog();
-        this.startNightMode();
-    }
-
-    /**
-     * Night-mode: apaga Chromium de 3 a 7 AM hora Argentina.
-     * A esa franja casi no entran mensajes; mantener 8 Chromiums prendidos
-     * cuesta ~4 GB de RAM para nada. Los reiniciamos a las 7 AM.
-     *
-     * No toca sellers que el admin haya detenido manualmente.
-     *
-     * Se puede deshabilitar con DISABLE_NIGHT_MODE=true.
-     */
-    private startNightMode(): void {
-        if (this.nightModeInterval) return;
-        if (process.env.DISABLE_NIGHT_MODE === 'true') {
-            logger.info('[NIGHT] Disabled via DISABLE_NIGHT_MODE=true');
-            return;
-        }
-        const CHECK_MS = 60 * 1000; // 1 min
-
-        const getArHour = (): number => {
-            // Intl es lo más simple y no trae dependencia nueva
-            const parts = new Intl.DateTimeFormat('en-US', {
-                timeZone: 'America/Argentina/Buenos_Aires',
-                hour: 'numeric',
-                hour12: false,
-            }).formatToParts(new Date());
-            const h = parts.find(p => p.type === 'hour')?.value ?? '0';
-            return parseInt(h, 10);
-        };
-
-        const isNightWindow = (): boolean => {
-            const h = getArHour();
-            return h >= 3 && h < 7; // [3:00, 7:00) AR
-        };
-
-        const tick = async () => {
-            try {
-                const night = isNightWindow();
-                if (night) {
-                    for (const [sellerId, instance] of this.instances) {
-                        if (this.nightStoppedSellers.has(sellerId)) continue;
-                        logger.info(`[NIGHT] Stopping ${sellerId} (3-7 AM AR window)`);
-                        this.nightStoppedSellers.add(sellerId);
-                        this.stopSeller(sellerId).catch(e =>
-                            logger.error(`[NIGHT] stopSeller(${sellerId}) failed: ${e.message}`)
-                        );
-                    }
-                } else if (this.nightStoppedSellers.size > 0) {
-                    const toWake = Array.from(this.nightStoppedSellers);
-                    this.nightStoppedSellers.clear();
-                    logger.info(`[NIGHT] Night window ended — waking ${toWake.length} seller(s)`);
-                    for (const sellerId of toWake) {
-                        if (!this.knownSellers.has(sellerId)) continue;
-                        // ensureStarted serializa los launches via initQueue
-                        this.ensureStarted(sellerId).catch(e =>
-                            logger.error(`[NIGHT] ensureStarted(${sellerId}) failed: ${e.message}`)
-                        );
-                    }
-                }
-            } catch (e: any) {
-                logger.error(`[NIGHT] tick error: ${e.message}`);
-            }
-        };
-
-        this.nightModeInterval = setInterval(tick, CHECK_MS);
-        logger.info('[NIGHT] Night-mode scheduler started (sleeps 3-7 AM AR)');
-        // Arranca un tick inmediato por si el proceso bootea dentro de la ventana
-        tick().catch(() => {});
     }
 
     /**
