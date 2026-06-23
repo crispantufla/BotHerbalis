@@ -79,6 +79,10 @@ export interface UserState {
 
     // Otros flags
     geoRejected?: boolean;
+    // El cliente se identificó como argentino (nombró Argentina/su provincia, o
+    // una localidad argentina). Una vez true, un "estoy en Europa" posterior —
+    // típico de un argentino de viaje que compra al volver — NO debe geo-rechazarlo.
+    argentineConfirmed?: boolean;
     stepEnteredAt: number;
     postdatado?: string | null;
     assignedScript?: string;

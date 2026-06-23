@@ -64,4 +64,44 @@ describe('GEO reject', () => {
         expect(s.geoRejected).toBe(false);                       // levantó el rechazo
         expect(deps.sharedState.pausedUsers.has('u3@c.us')).toBe(true); // derivó a humano
     });
+
+    // Caso Claromecó (jun-2026): clienta argentina del sur de prov. de Bs. As. que
+    // está temporalmente en Europa y compra al volver. El bot la geo-rechazó por la
+    // keyword "Europa", la bloqueó robóticamente ante "queda dentro de Argentina" y
+    // solo cedió tras "es Argentina te acabo de decir!!!" (ya enojada).
+    test('argentino que declaró su provincia queda inmunizado a un "estoy en Europa" posterior', async () => {
+        const { deps, sent } = makeDeps();
+        const s = baseState();
+        // M7: se identifica como argentina (sur de prov. de Bs. As.)
+        const m7 = 'cuando regrese a argentina te contacto para comprar. soy del sur de prov de bs as';
+        await handleSystemGlobals('u4@c.us', m7, norm(m7), s, deps);
+        expect(s.argentineConfirmed).toBe(true);
+        // M9: "ahora estoy en Europa, cuando llegue te compro" — NO debe rechazar
+        const m9 = 'prefiero las capsulas. ahora estoy en europa. cuando llegue te compro para 60 dias';
+        const r = await handleSystemGlobals('u4@c.us', m9, norm(m9), s, deps);
+        expect(s.geoRejected).toBeFalsy();
+        expect(sent.join(' ')).not.toMatch(/dentro de Argentina/i);
+        expect(r).toBeNull(); // no matcheó el global de geo → sigue el flujo normal
+    });
+
+    test('"queda dentro de Argentina" levanta un rechazo previo (no bloqueo robótico)', async () => {
+        const { deps } = makeDeps();
+        const s = baseState({ geoRejected: true, step: 'rejected_geo' });
+        const txt = 'mi localidad se llama claromeco y queda dentro de argentina, sobre el atlantico';
+        const r = await handleSystemGlobals('u5@c.us', txt, norm(txt), s, deps);
+        expect(r).toEqual({ matched: true });
+        expect(s.geoRejected).toBe(false);
+        expect(deps.sharedState.pausedUsers.has('u5@c.us')).toBe(true);
+    });
+
+    test('argentino de viaje (exterior + compra futura, sin nombrar Argentina) → pausa, no rechazo', async () => {
+        const { deps, sent } = makeDeps();
+        const s = baseState();
+        const txt = 'ahora estoy en europa de vacaciones, cuando vuelva te compro';
+        const r = await handleSystemGlobals('u6@c.us', txt, norm(txt), s, deps);
+        expect(r).toEqual({ matched: true });
+        expect(s.geoRejected).toBeFalsy();                       // no lo rechaza
+        expect(deps.sharedState.pausedUsers.has('u6@c.us')).toBe(true); // deriva a humano
+        expect(sent.join(' ')).not.toMatch(/dentro de Argentina/i);
+    });
 });
