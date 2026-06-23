@@ -118,6 +118,38 @@ export async function handleGreeting(
         return { matched: true };
     }
 
+    // --- GUARD ANTI RE-SALUDO ---
+    // Si el bot YA le habló a este cliente (hay ≥1 mensaje del bot en el historial),
+    // NUNCA volver a mandar el saludo frío "¡Hola! Soy Elena…": confunde —sobre todo
+    // a clientes mayores— y delata al bot. Pasa cuando el estado se resetea a
+    // 'greeting' a mitad de charla (caso Haidee: re-saludó tras un reset de estado).
+    // En vez de eso, la IA responde el último mensaje EN CONTEXTO y retoma donde
+    // quedaron. Fail-open: si la IA falla, cae al saludo normal de abajo.
+    const _priorBotMsgs = (currentState.history || []).filter(m => m.role === 'bot').length;
+    if (_priorBotMsgs >= 1 && _ai && typeof _ai.chat === 'function') {
+        try {
+            const reGoal = `El cliente YA viene conversando con vos (hay historial previo). 🛑 PROHIBIDO presentarte de nuevo o mandar el saludo de bienvenida — ya te conoce. Respondé su último mensaje ("${text}") EN CONTEXTO, cálido y breve, usando el historial y el knowledge. Retomá donde quedaron y cerrá con UNA sola pregunta que haga avanzar (producto, plan, datos o pago, lo que corresponda). NO inventes precios ni datos. 🛑 NO derives al médico.`;
+            const aiRe = await _ai.chat(text, {
+                step: 'greeting',
+                goal: reGoal,
+                history: currentState.history,
+                summary: currentState.summary,
+                knowledge,
+                userState: currentState,
+            });
+            if (aiRe.response) {
+                currentState.history.push({ role: 'bot', content: aiRe.response, timestamp: Date.now() });
+                await sendMessageWithDelay(userId, aiRe.response);
+                _setStep(currentState, knowledge.flow.greeting.nextStep);
+                saveState(userId);
+                logger.info(`[GREETING-GUARD] User ${userId} ya tenía conversación (${_priorBotMsgs} msg del bot) — IA respondió en contexto, sin re-saludar.`);
+                return { matched: true };
+            }
+        } catch (e: any) {
+            logger.warn(`[GREETING-GUARD] AI falló para ${userId}: ${e.message} — sigo al saludo normal.`);
+        }
+    }
+
     // 1. A/B variant selection — si knowledge.flow.greeting_variants existe y
     // tiene entradas, elegimos una variante deterministicamente por phone.
     // Persistimos la variante en state para que el mismo cliente no salte entre
