@@ -244,10 +244,11 @@ export async function handleSystemGlobals(
         return { matched: true };
     }
 
-    // Rolling summary: trigger earlier (>30) so each chunk stays small and
-    // token cost per AI call remains flat. checkAndSummarize self-guards
-    // with a cooldown so chatty users don't burn summaries every turn.
-    if (currentState.history && currentState.history.length > 30) {
+    // Rolling summary: solo cuando el history supera la ventana viva (SUMMARIZE_TRIGGER
+    // = MAX_HISTORY_LENGTH = 60 en ai.ts). checkAndSummarize igual se auto-protege
+    // (devuelve null si length <= SUMMARIZE_TRIGGER y con un cooldown), así que este
+    // gate es solo para no llamarla de gusto. Mantener en sync con ai.ts si cambia.
+    if (currentState.history && currentState.history.length > 60) {
         const summaryResult = await aiService.checkAndSummarize(
             currentState.history,
             currentState.summary,

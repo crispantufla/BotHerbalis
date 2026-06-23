@@ -187,14 +187,17 @@ const CLAUDE_AB_PERCENT = Math.max(0, Math.min(100, parseInt(process.env.CLAUDE_
 // cualquier motivo (incl. un 400 por turnos mal formados), _claudeChat devuelve null
 // y el caller cae automáticamente a OpenAI con el blob clásico — peor caso = hoy.
 const WA_STRUCTURED_TURNS = process.env.WA_STRUCTURED_TURNS !== '0' && process.env.WA_STRUCTURED_TURNS !== 'false';
-// History window: con el summary rolling (SUMMARIZE_TRIGGER=30) el contexto
-// viejo queda condensado, así que 30 mensajes vivos son suficientes. Antes
-// teníamos 50 — eso inflaba el prompt y subía latencia sin aporte real.
-const MAX_HISTORY_LENGTH = 30;
-// Trigger rolling summary once the active history exceeds this count. Lower
-// than MAX_HISTORY_LENGTH + safety margin so summaries happen earlier and
-// each chunk is small — cheaper per-call and the token budget stays flat.
-const SUMMARIZE_TRIGGER = 30;
+// History window (ENTRADAS de array, no turnos: ~2 entradas por turno, así que
+// 60 ≈ 25-30 turnos reales). Subido de 30→60 (jun-2026) junto con los turnos
+// estructurados + system cacheado (ver WA_STRUCTURED_TURNS): con el system
+// servido de cache, mandar una ventana más grande es barato y "hace 3 mensajes"
+// queda holgadamente dentro de la ventana viva. Sonnet 4.6 (1M ctx) no es el límite.
+const MAX_HISTORY_LENGTH = 60;
+// Trigger rolling summary una vez que el history supera la ventana viva. Igual a
+// MAX_HISTORY_LENGTH: el summary comprime SOLO lo que SALE de los últimos
+// MAX_HISTORY_LENGTH (olderSlice = slice(0, -MAX_HISTORY_LENGTH)), no lo que sigue
+// dentro de la ventana. checkAndSummarize se auto-protege con un cooldown.
+const SUMMARIZE_TRIGGER = 60;
 // Don't re-summarize more often than this (in ms). Prevents burning tokens
 // when a user sends many messages in quick succession.
 const SUMMARIZE_COOLDOWN_MS = 10 * 60 * 1000;
@@ -972,11 +975,12 @@ INSTRUCCIONES:
 3. PREGUNTAS DEL USUARIO(CRÍTICO): Si el usuario hace una pregunta, RESPONDELA SIEMPRE de forma clara.Nunca lo ignores.Luego de responder, y en un tono relajado y muy poco insistente(ej: "te tomo los datos o te ayudo con algo más?"), volvé a intentar encausar el objetivo del paso.EXCEPCIÓN: Si el usuario dice explícitamente "No gracias" o similar, o la etapa es post - venta y no quiere nada más, NO HAGAS NINGUNA PREGUNTA ADICIONAL.Si el usuario NO preguntó nada y tampoco cumplió el objetivo, volvé a preguntarle lo del objetivo pero de forma breve y amigable.
 4. Excepción a la Regla 3 (POSTERGACIÓN): Si el usuario dice que "no puede hablar ahora" o "está trabajando", SOLO confirmá con amabilidad ("Dale, tranqui. Avisame cuando puedas!"). Si TODAVÍA ESTÁ DECIDIENDO ("lo pienso", "después veo", "te confirmo", "lo charlo", "déjame pensarlo"): NO le empujes una fecha de envío ni preguntes "¿a partir de qué día te lo mando?" (da por hecho que ya compró y suena pusheado). Acompañá suave: "¡Dale! 😊 Cualquier duda para decidir, acá estoy", goalMet=false. SOLO si posterga por PLATA o TIEMPO ("en otro momento lo compro", "este mes no puedo", "cuando cobre", "no tengo plata ahora"): ofrecé POSTDATAR preguntando "¿A partir de qué día te queda cómodo recibirlo?". PROHIBIDO mencionar "congelar precio".
 5. Si el usuario dice algo EMOCIONAL o PERSONAL(hijos, salud, bullying, autoestima): mostrá EMPATÍA primero.NO USES "Entiendo, eso es difícil".Usá variaciones reales y genuinas.Después volvé suavemente al objetivo del paso.
-6. PROHIBIDO: No hables de pago, envío, precios, ni datos de envío si el OBJETIVO DEL PASO no lo menciona, a menos que el usuario lo haya preguntado explícitamente.Limitá tu respuesta al tema del objetivo.
+6. NO ADELANTES temas que el cliente todavía no tocó: no hables de pago, envío, precios ni datos de envío si el OBJETIVO DEL PASO no lo menciona, salvo que el cliente lo haya preguntado explícitamente. PERO si algo YA se acordó o se dijo antes en esta conversación (retiro en sucursal, una fecha postdatada, un plan o producto elegido, una objeción ya respondida, datos ya dados), MANTENELO y sé coherente: no lo contradigas ni lo vuelvas a preguntar como si no se hubiera hablado.
 7. MENORES DE EDAD: Si el mensaje menciona menores, VERIFICÁ EL HISTORIAL.Si ya se aclaró que la persona es mayor de 18, NO repitas la restricción.Confirmá que puede tomarla y seguí adelante.
 8. ANTI - REPETICIÓN: NUNCA repitas textualmente un mensaje que ya está en el historial.Si necesitás pedir los mismos datos, usá una frase DIFERENTE.
 9. RECHAZO EXPLÍCITO: Si el usuario dice "no quiero nada", "no me interesa", "callate", "dejame en paz" o cualquier rechazo claro del producto o la conversación: NO avances al siguiente paso, NO sigas ofreciendo productos.Respondé con una disculpa breve y respetuosa, sin hacer preguntas.goalMet=false, extractedData="NEED_ADMIN".
 10. PRECIOS Y TOTALES (CRÍTICO): Si el ESTADO DEL CLIENTE trae "TOTAL AUTORITATIVO A PAGAR", ESE es el ÚNICO número que podés cotizarle al cliente para el pedido armado. NUNCA reconstruyas un total sumando precios base del carrito o de la lista de precios — el total autoritativo ya incluye adicional MAX, descuentos por volumen, o bonificaciones de tarjeta/transferencia según corresponda. Si el cliente cambia de plan o producto y TODAVÍA NO se actualizó el total autoritativo en el estado, NO le des un número: respondé "Dale, sin problema, cambiamos el pedido" y terminá ahí, sin cotizar, para que el sistema recalcule. Los precios de la lista son SOLO referencia conceptual para presentar planes al inicio, nunca para cotizar pedidos en curso.
+11. CONTINUIDAD DEL HILO: antes de responder, leé el HISTORIAL y el ESTADO DEL CLIENTE y seguí DESDE DONDE QUEDARON. Respetá lo que el cliente ya eligió, ya dijo o ya se le prometió. Si ya dio su nombre, ubicación, producto, plan o ya planteó una objeción, NO se lo vuelvas a pedir ni se lo re-preguntes — usalo. (Esto NO te impide volver a EXPLICAR algo si el cliente lo re-pregunta: ahí sí respondé de nuevo con paciencia.)
 `;
 
         // Con historial embebido (path OpenAI + Claude no-estructurado): idéntico a antes.
