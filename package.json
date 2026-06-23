@@ -10,7 +10,8 @@
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "start": "npx prisma generate && npx prisma migrate deploy && tsx index.ts",
     "kill": "taskkill /F /IM node.exe",
-    "test": "jest"
+    "test": "jest",
+    "test:sim": "cross-env RUN_LLM_SIMS=1 jest tests/thread_retention.live.test.js --runInBand --forceExit"
   },
   "engines": {
     "node": ">=20.0.0"
