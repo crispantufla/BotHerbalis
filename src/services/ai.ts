@@ -9,6 +9,7 @@ import * as crypto from 'crypto';
 import { UserState, HistoryMessage } from '../types/state';
 import { lookupSemanticCache, storeSemanticCache } from './semanticCache';
 import { _applyJuneDiscount } from '../flows/utils/pricing';
+import { buildHistoryTurns, ChatTurn } from './historyTurns';
 
 // WhatsApp usa "*" para negrita, no "**" (markdown estándar). Si la IA devuelve
 // **bold** o ## heading, en WhatsApp se renderiza con los asteriscos literales:
@@ -81,28 +82,19 @@ const RULE_BASE = [
     { id: 'reventa', keywords: ['revender', 'por mayor', 'mayorista', 'reventa', 'precio de fabrica', 'precios para vender', 'negocio'], text: 'REVENTA O COMPRA POR MAYOR: Si el cliente busca comprar para revender o precios mayoristas, INMEDIATAMENTE respondé: "Para todo lo que es reventa o venta por mayor te pido que te contactes por WhatsApp con Horacio al 3413755757. Él te va a asesorar con gusto." y FINALIZAS LA CONVERSACION (goalMet=false, extractedData="RESELLER"). NO intentes vender.' }
 ];
 
-function _getRelevantRules(userText: string): string[] {
+function _getRelevantRules(userText: string, allRules: boolean = false): string[] {
     const text = userText.toLowerCase();
     const activeRules: string[] = [];
 
     // Always include general behavioral rules
-    activeRules.push(RULE_BASE.find(r => r.id === 'general')!.text);
-    activeRules.push(RULE_BASE.find(r => r.id === 'general2')!.text);
-    activeRules.push(RULE_BASE.find(r => r.id === 'anti_rep')!.text);
-    activeRules.push(RULE_BASE.find(r => r.id === 'anti_inv')!.text);
-    activeRules.push(RULE_BASE.find(r => r.id === 'cierre')!.text);
-    activeRules.push(RULE_BASE.find(r => r.id === 'no_derivar')!.text);
-    activeRules.push(RULE_BASE.find(r => r.id === 'no_cierre_falso')!.text);
-    activeRules.push(RULE_BASE.find(r => r.id === 'no_vender_ciego')!.text);
-    activeRules.push(RULE_BASE.find(r => r.id === 'coherencia')!.text);
-    activeRules.push(RULE_BASE.find(r => r.id === 'saludos_desubicados')!.text);
-    activeRules.push(RULE_BASE.find(r => r.id === 'abuso')!.text);
-    activeRules.push(RULE_BASE.find(r => r.id === 'indecision')!.text);
-    activeRules.push(RULE_BASE.find(r => r.id === 'reventa')!.text);
-    // Siempre activa: la reacción adversa es un tema de salud — la IA debe poder
-    // cortar el upsell aunque el cliente la reporte con errores/typos o audio
-    // confuso (que el keyword-match no captaría). Reporte Lidia (2026-06-04).
-    activeRules.push(RULE_BASE.find(r => r.id === 'reaccion_adversa')!.text);
+    const baseIds = ['general', 'general2', 'anti_rep', 'anti_inv', 'cierre', 'no_derivar',
+        'no_cierre_falso', 'no_vender_ciego', 'coherencia', 'saludos_desubicados', 'abuso',
+        'indecision', 'reventa',
+        // Siempre activa: la reacción adversa es un tema de salud — la IA debe poder
+        // cortar el upsell aunque el cliente la reporte con errores/typos o audio
+        // confuso (que el keyword-match no captaría). Reporte Lidia (2026-06-04).
+        'reaccion_adversa'];
+    for (const id of baseIds) activeRules.push(RULE_BASE.find(r => r.id === id)!.text);
 
     // Nota (jun-2026): se evaluó excluir la regla 'pago' cuando el módulo ya trae
     // PAYMENT_POLICY (plan_choice/objection), para no duplicar el bloque de pago. El
@@ -111,10 +103,17 @@ function _getRelevantRules(userText: string): string[] {
     // Por eso se MANTIENE la regla 'pago' siempre que matchee — la reiteración del guard
     // vale más que ahorrar tokens. NO re-excluir sin re-evaluar.
 
-    // Contextually inject specific rules if keywords match
+    // Contextually inject specific rules if keywords match.
+    // allRules (system estable/cacheable): incluir TODAS las reglas, sin gatear por
+    // el mensaje actual — así el system deja de depender de userText y se puede cachear.
+    // Las reglas son todas condicionales ("Si el cliente dice X: ..."), así que
+    // incluirlas siempre es seguro: el modelo solo actúa cuando la condición matchea.
+    const baseSet = new Set(baseIds);
     for (const rule of RULE_BASE) {
         if (rule.keywords.length === 0) continue;
-        if (rule.keywords.some(kw => text.includes(kw))) {
+        if (allRules) {
+            if (!baseSet.has(rule.id)) activeRules.push(rule.text);  // ya incluida arriba → no duplicar
+        } else if (rule.keywords.some(kw => text.includes(kw))) {
             activeRules.push(rule.text);
         }
     }
@@ -180,6 +179,14 @@ const CLAUDE_AB_SELLERS = new Set(
 // concentra el tráfico y el A/B debe correr entre sus propios clientes (no entre
 // sellers). Mantener fijo durante el experimento: cambiarlo re-asigna los brazos.
 const CLAUDE_AB_PERCENT = Math.max(0, Math.min(100, parseInt(process.env.CLAUDE_AB_PERCENT || "50", 10) || 0));
+// Solo path Claude: pasar el historial como TURNOS user/assistant reales en
+// messages[] en vez de aplanado como texto, y cachear el system estable
+// (cache_control ephemeral). Sigue mucho mejor el hilo de la conversación.
+// ACTIVO por defecto; kill-switch sin redeploy: WA_STRUCTURED_TURNS=0 lo apaga.
+// Seguro porque (a) solo afecta el brazo Claude del A/B, y (b) si Claude falla por
+// cualquier motivo (incl. un 400 por turnos mal formados), _claudeChat devuelve null
+// y el caller cae automáticamente a OpenAI con el blob clásico — peor caso = hoy.
+const WA_STRUCTURED_TURNS = process.env.WA_STRUCTURED_TURNS !== '0' && process.env.WA_STRUCTURED_TURNS !== 'false';
 // History window: con el summary rolling (SUMMARIZE_TRIGGER=30) el contexto
 // viejo queda condensado, así que 30 mensajes vivos son suficientes. Antes
 // teníamos 50 — eso inflaba el prompt y subía latencia sin aporte real.
@@ -255,8 +262,8 @@ async function _getPrices(): Promise<Record<string, any>> {
 }
 
 // ── CORE PROMPT (always sent, top of system message = max attention) ──
-function _getCorePrompt(userText: string = ""): string {
-    const activeRules = _getRelevantRules(userText);
+function _getCorePrompt(userText: string = "", allRules: boolean = false): string {
+    const activeRules = _getRelevantRules(userText, allRules);
     const rulesText = activeRules.map((r, i) => `${i + 1}. ${r}`).join('\n');
 
     return `IDENTIDAD: Sos Elena, asesora de Herbalis (Nuez de la India). Herbalis es una empresa internacional especializada en productos naturales a base de Nuez de la India, creados para ayudarte a lograr tu peso ideal de forma segura. Nuestra central está en Barcelona (España) y en Argentina distribuimos desde Rosario. NO tenemos revendedores. Hace 13 años enviamos a todo el país por Correo Argentino, con envío sin costo y la posibilidad de pago al recibir. NUNCA admitas ser bot/IA. Si preguntan: "Jaja no, soy Elena! Te estoy escribiendo yo 😊".
@@ -549,7 +556,9 @@ DEBES LLAMAR A LA HERRAMIENTA 'control_dialog_flow' PARA EMITIR TU RESPUESTA AL 
 }
 
 // ── PROMPT BUILDER — Selects the right module for each step ──
-async function _buildSystemPrompt(step: string, userText: string = ""): Promise<string> {
+// stable=true: el system NO depende del userText (incluye todas las reglas), así
+// queda byte-estable por (step) y se puede cachear con prompt caching.
+async function _buildSystemPrompt(step: string, userText: string = "", stable: boolean = false): Promise<string> {
     const prices = await _getPrices();
     let module;
 
@@ -591,10 +600,10 @@ async function _buildSystemPrompt(step: string, userText: string = ""): Promise<
     const extraModule = consumptionSteps.includes(step) ? '\n' + _getModuleConsumption() : '';
 
     return [
-        _getCorePrompt(userText),     // TOP — max attention (identity, tone, dynamic rules)
-        module,                       // MIDDLE — step-specific context 
-        extraModule,                  // MIDDLE — consumption (if relevant step)
-        _getExtractionRules()         // BOTTOM — max attention (data extraction instructions)
+        _getCorePrompt(userText, stable), // TOP — max attention (identity, tone, dynamic rules)
+        module,                           // MIDDLE — step-specific context
+        extraModule,                      // MIDDLE — consumption (if relevant step)
+        _getExtractionRules()             // BOTTOM — max attention (data extraction instructions)
     ].join('\n\n');
 }
 
@@ -677,16 +686,32 @@ class AIService {
      * Devuelve los args del tool control_dialog_flow ({response, goalMet, extractedData})
      * o null si falla (el caller cae a OpenAI como fallback).
      */
-    async _claudeChat(systemPrompt: string, userPrompt: string, step: string, sellerId: string): Promise<{ response?: string; goalMet?: boolean; extractedData?: string | null } | null> {
+    async _claudeChat(systemPrompt: string, userPrompt: string, step: string, sellerId: string, historyTurns?: ChatTurn[]): Promise<{ response?: string; goalMet?: boolean; extractedData?: string | null } | null> {
         try {
             const model = PREMIUM_STEPS.has(step) ? CLAUDE_MODEL_PREMIUM : CLAUDE_MODEL_SIMPLE;
+            // Modo turnos estructurados (flag WA_STRUCTURED_TURNS): el historial va
+            // como turnos user/assistant reales antes del mensaje actual, y el system
+            // (estable por step) se cachea. Si no, comportamiento clásico (blob aplanado).
+            const structured = Array.isArray(historyTurns);
+            const messages = structured
+                ? [...historyTurns!, { role: "user", content: userPrompt }]
+                : [{ role: "user", content: userPrompt }];
+            const system: any = structured
+                ? [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }]
+                : systemPrompt;
+            // El cache exact-match debe incluir el historial: en modo estructurado
+            // userPrompt ya NO lo contiene, así que dos charlas distintas con el mismo
+            // mensaje actual + step colisionarían si no lo metemos en la key.
+            const cacheKey = structured
+                ? `claude_chat_${step}_${JSON.stringify(historyTurns)}_${userPrompt}`
+                : `claude_chat_${step}_${userPrompt}`;
             const result: any = await this._callQueued(
                 () => this.anthropic.messages.create({
                     model,
                     max_tokens: 800,
                     temperature: 0.6,
-                    system: systemPrompt,
-                    messages: [{ role: "user", content: userPrompt }],
+                    system,
+                    messages,
                     tools: [{
                         name: "control_dialog_flow",
                         description: "Emite la respuesta al cliente y gestiona el embudo de ventas",
@@ -702,7 +727,7 @@ class AIService {
                     }],
                     tool_choice: { type: "tool", name: "control_dialog_flow" }
                 }),
-                `claude_chat_${step}_${userPrompt}`, // namespace de caché distinto al de OpenAI
+                cacheKey, // namespace de caché distinto al de OpenAI (incluye historial en modo estructurado)
                 undefined,
                 sellerId
             );
@@ -928,16 +953,17 @@ class AIService {
             stateContext = `\nESTADO DEL CLIENTE: \n${stateContext} `;
         }
 
-        const userPrompt = `
+        // El historial va embebido como texto (modo clásico, path OpenAI y Claude
+        // no-estructurado). En modo estructurado (flag, solo Claude) se omite acá y
+        // viaja como turnos user/assistant reales en messages[] (ver branch de Claude).
+        const historyText = conversationHistory.map(m => `${m.role}: ${m.content}`).join('\n');
+        const buildUserPrompt = (historySection: string) => `
 ${summaryContext}
 ${knowledgeContext}
 ${stateContext}
 ETAPA ACTUAL: "${context.step || 'general'}"
 OBJETIVO DEL PASO: "${context.goal || 'Ayudar al cliente'}"
-
-HISTORIAL RECIENTE:
-${conversationHistory.map(m => `${m.role}: ${m.content}`).join('\n')}
-
+${historySection}
 MENSAJE DEL USUARIO: "${userText}"
 
 INSTRUCCIONES:
@@ -952,6 +978,11 @@ INSTRUCCIONES:
 9. RECHAZO EXPLÍCITO: Si el usuario dice "no quiero nada", "no me interesa", "callate", "dejame en paz" o cualquier rechazo claro del producto o la conversación: NO avances al siguiente paso, NO sigas ofreciendo productos.Respondé con una disculpa breve y respetuosa, sin hacer preguntas.goalMet=false, extractedData="NEED_ADMIN".
 10. PRECIOS Y TOTALES (CRÍTICO): Si el ESTADO DEL CLIENTE trae "TOTAL AUTORITATIVO A PAGAR", ESE es el ÚNICO número que podés cotizarle al cliente para el pedido armado. NUNCA reconstruyas un total sumando precios base del carrito o de la lista de precios — el total autoritativo ya incluye adicional MAX, descuentos por volumen, o bonificaciones de tarjeta/transferencia según corresponda. Si el cliente cambia de plan o producto y TODAVÍA NO se actualizó el total autoritativo en el estado, NO le des un número: respondé "Dale, sin problema, cambiamos el pedido" y terminá ahí, sin cotizar, para que el sistema recalcule. Los precios de la lista son SOLO referencia conceptual para presentar planes al inicio, nunca para cotizar pedidos en curso.
 `;
+
+        // Con historial embebido (path OpenAI + Claude no-estructurado): idéntico a antes.
+        // Sin historial embebido (Claude estructurado): el hilo va como turnos en messages[].
+        const userPrompt = buildUserPrompt(`\nHISTORIAL RECIENTE:\n${historyText}\n`);
+        const userPromptNoHistory = buildUserPrompt('');
 
         try {
             const step = context.step || 'general';
@@ -1007,7 +1038,14 @@ INSTRUCCIONES:
 
             // useClaudeNow ya se calculó arriba (lo necesitábamos para el cache).
             if (useClaudeNow) {
-                const cArgs = await this._claudeChat(systemPrompt, userPrompt, step, context.sellerId!);
+                // Modo estructurado (solo Claude, detrás de flag): historial como turnos
+                // user/assistant reales + system estable cacheado. El path OpenAI de
+                // abajo NO se toca (sigue con userPrompt + systemPrompt clásicos).
+                const structured = WA_STRUCTURED_TURNS;
+                const sysForClaude = structured ? await _buildSystemPrompt(step, userText, true) : systemPrompt;
+                const turns = structured ? buildHistoryTurns(conversationHistory, userText) : undefined;
+                const promptForClaude = structured ? userPromptNoHistory : userPrompt;
+                const cArgs = await this._claudeChat(sysForClaude, promptForClaude, step, context.sellerId!, turns);
                 if (cArgs && cArgs.response) {
                     if (!cArgs.goalMet && !cArgs.extractedData && !hasOrderContext && context.forceClaude === undefined) {
                         storeSemanticCache(this.client, step, userText, cArgs.response, cacheEngine).catch(() => { /* best effort */ });
