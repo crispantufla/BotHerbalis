@@ -129,20 +129,61 @@ export async function handleSystemGlobals(
         return { matched: true }; // Silent block if they keep insulting
     }
 
+    // 2.6 PAGO FANTASMA / CONFUSIÓN DE PAGO
+    // El cliente dice que YA pagó / mandó comprobante, PERO el bot todavía no lo
+    // llevó a ningún paso de pago (nunca le dio link ni alias). En los pasos de
+    // pago "ya pagué" es esperado y lo maneja el step; FUERA de ellos es señal de
+    // confusión o de ESTAFA de un tercero que se hizo pasar por nosotros y le sacó
+    // plata (caso Haidee: pagó a un alias ajeno, sin orden registrada). El bot NO
+    // debe seguir vendiendo ni insistir con el menú de pago: corta, le pide que NO
+    // avance con más pagos, y avisa URGENTE a un humano.
+    const CLAIMS_PAID_REGEX = /\b(ya (lo )?pague|ya (lo )?abone|ya transferi|ya hice (la )?transferencia|hice (la )?transferencia|ya esta pag[oa]|ya lo deposite|te pase el comprobante|te mande el comprobante|pague por mercado pago|ya hice el pago|ya pague todo)\b/;
+    const PAYMENT_STEPS = ['waiting_mp_payment', 'waiting_transfer_confirmation', 'waiting_admin_validation', 'completed'];
+    if (CLAIMS_PAID_REGEX.test(normalizedText) && !PAYMENT_STEPS.includes(currentState.step)) {
+        logger.warn(`[PAGO-CONFUSO] User ${userId} dice que ya pagó pero NO está en un paso de pago (step=${currentState.step}) — posible estafa/confusión. Pauso + alerto.`);
+        const msg = 'Pará un toque que reviso bien tu caso 🙏 Dejame chequearlo con el equipo y enseguida te escribo. Por las dudas, NO hagas ningún otro pago hasta que te confirme, ¿dale? 😊';
+        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        await sendMessageWithDelay(userId, msg);
+        await _pauseAndAlert(userId, currentState, dependencies, text, '⚠️ PAGO CONFUSO: el cliente dice que YA PAGÓ / mandó comprobante pero el bot nunca le dio un medio de pago (no hay orden). Posible ESTAFA de un tercero o confusión. Revisar URGENTE: ¿a qué alias/cuenta pagó?');
+        saveState(userId);
+        return { matched: true };
+    }
+
     // 3. GEO REJECT
     // Skip when collecting address (waiting_data) — street names like "Avenida España", "Calle Chile" etc.
     // would false-positive. Google Maps in stepWaitingData validates the country instead.
     const GEO_REGEX = /\b(espana|españa|mexico|méxico|chile|colombia|peru|perú|uruguay|bolivia|paraguay|ecuador|venezuela|brasil|panama|panamá|costa rica|eeuu|ee\.?\s?uu\.?|estados unidos|europa|fuera del pais|fuera de argentina|otro pais|no estoy en argentina|vivo en el exterior|desde afuera|no soy de argentina)\b/i;
-    // Excepción: lugares ARGENTINOS que contienen el nombre de un país, o aclaraciones
-    // de que el cliente SÍ está en Argentina. Concepción del Uruguay y Río Uruguay
-    // están en Entre Ríos. Sin esto, un cliente de "Concepción del Uruguay" quedaba
-    // geo-rechazado y NO podía salir del bloqueo aunque aclarara que es Argentina
-    // (reporte 5493442409792, jun-2026: el bot lo rechazó 4 veces, intervino el admin).
-    const GEO_AR_EXCEPTION = /\b(concepcion del?\s+uruguay|rio uruguay|paso del?\s+uruguay|entre rios|soy de argentina|estoy en argentina|vivo en argentina|si soy de (aca|argentina)|aca en argentina|es (en )?argentina|de entre rios)\b/i;
+    // Negaciones explícitas de pertenencia — éstas SÍ son extranjero real, NO una
+    // aclaración (evita que "no estoy en argentina" cuente como señal argentina).
+    const GEO_NEG_AR = /\b(no estoy en argentina|fuera de argentina|no soy de argentina|no es argentina)\b/i;
+    // Señal de identidad ARGENTINA: nombra Argentina / su provincia, o una localidad
+    // argentina ambigua que contiene un nombre de país (Concepción del Uruguay, Río
+    // Uruguay = Entre Ríos). NO se enumeran localidades sueltas (sería whack-a-mole,
+    // ej: Claromecó): basta con que el cliente mencione "argentina"/su provincia en
+    // positivo. Cubre tanto la aclaración tras un rechazo ("queda dentro de Argentina")
+    // como la identificación temprana ("soy del sur de prov. de Bs. As.") que debe
+    // inmunizar contra un "estoy en Europa" posterior.
+    // (reporte 5493442409792 Concepción del Uruguay + caso Claromecó, jun-2026.)
+    const GEO_AR_IDENTITY = /\b(concepcion del?\s+uruguay|rio uruguay|paso del?\s+uruguay|entre rios|buenos aires|bs\.?\s?as|provincia|argentin[ao])\b/i;
+    // Marco de "argentino de viaje": menciona el exterior PERO con regreso o compra a
+    // futuro. No es un extranjero — ante la duda pausamos en vez de rechazar.
+    const TRAVEL_FRAME = /\b(cuando (vuelv|regres|lleg|retorn|baj)|al volver|al regresar|de vacaciones|de viaje|estoy de paso|me vuelvo)\w*/i;
     const isCollectingAddress = currentState.step === 'waiting_data';
-    const clarifiesArgentina = GEO_AR_EXCEPTION.test(normalizedText);
+    const clarifiesArgentina = GEO_AR_IDENTITY.test(normalizedText) && !GEO_NEG_AR.test(normalizedText);
 
-    if (GEO_REGEX.test(normalizedText) && !clarifiesArgentina && !currentState.geoRejected && !isCollectingAddress) {
+    // Una vez que el cliente se identifica como argentino queda inmunizado: las
+    // keywords de exterior posteriores (de viaje, compra al volver) no lo rechazan.
+    if (clarifiesArgentina) currentState.argentineConfirmed = true;
+
+    if (GEO_REGEX.test(normalizedText) && !clarifiesArgentina && !currentState.argentineConfirmed && !currentState.geoRejected && !isCollectingAddress) {
+        // Argentino de viaje (menciona exterior + regreso/compra futura): no es un
+        // extranjero. Pausamos y derivamos a un humano en vez de rechazar y perder la venta.
+        if (TRAVEL_FRAME.test(normalizedText)) {
+            logger.info(`[GEO REJECT] User ${userId} menciona exterior con marco de viaje/compra futura → pauso en vez de rechazar: "${text}"`);
+            await _pauseAndAlert(userId, currentState, dependencies, text, '✈️ Menciona estar en el exterior pero con marco de viaje / compra al volver. Posible argentino de viaje — revisar y continuar la venta a mano.');
+            saveState(userId);
+            return { matched: true };
+        }
         logger.info(`[GEO REJECT] User ${userId} is outside Argentina: "${text}"`);
         currentState.geoRejected = true;
         const msg = 'Lamentablemente solo hacemos envíos dentro de Argentina 😔 Si en algún momento necesitás para alguien de acá, ¡con gusto te ayudamos!';
@@ -154,13 +195,13 @@ export async function handleSystemGlobals(
     }
     if (currentState.geoRejected || currentState.step === 'rejected_geo') {
         // Recuperación de falso positivo: si el cliente aclara que SÍ está en Argentina
-        // (ej: "es Concepción del Uruguay, Entre Ríos"), levantamos el rechazo y lo
-        // derivamos a un humano en vez de seguir bloqueando robóticamente.
-        if (clarifiesArgentina) {
+        // (ej: "es Concepción del Uruguay, Entre Ríos" / "queda dentro de Argentina"),
+        // levantamos el rechazo y lo derivamos a un humano en vez de seguir bloqueando.
+        if (clarifiesArgentina || currentState.argentineConfirmed) {
             logger.info(`[GEO REJECT] User ${userId} aclara que está en Argentina ("${text}") → levanto geoRejected y derivo a admin.`);
             currentState.geoRejected = false;
             _setStep(currentState, 'greeting');
-            await _pauseAndAlert(userId, currentState, dependencies, text, '📍 Cliente geo-rechazado que aclara estar en Argentina (posible falso positivo, ej: Concepción del Uruguay / Entre Ríos). Revisar y continuar la venta a mano.');
+            await _pauseAndAlert(userId, currentState, dependencies, text, '📍 Cliente geo-rechazado que aclara estar en Argentina (posible falso positivo, ej: Concepción del Uruguay / Claromecó). Revisar y continuar la venta a mano.');
             saveState(userId);
             return { matched: true };
         }
