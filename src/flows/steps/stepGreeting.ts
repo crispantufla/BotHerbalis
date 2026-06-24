@@ -71,7 +71,7 @@ export async function handleGreeting(
     const _hasWeightInOpening = /\b\d{1,3}\s*(?:kg?s?|kilos?|kilogramos?)\b/i.test(text) || /\b(?:bajar|perder)\s+\d{1,3}/i.test(text);
     const _substantiveOpening = !_isAdTrigger && !_hasWeightInOpening && (
         /\?/.test(text) ||
-        /\b(cuanto (sale|cuesta|vale|es)|que precio|el precio|precios?|estudios?|anmat|cientific|chamuyo|estafa|trucho|mentira|sirve|funciona de verdad|es seguro|seguro que|contraindicaci|hace mal|da[ñn]in|garant[ií]a|devuelven|devoluci[oó]n|reembolso|sos un bot|sos real|sos human|sos una maquina|es real esto|de donde son|donde estan|tienen local)\b/i.test(_norm)
+        /\b(cuanto (sale|cuesta|vale|es)|que precio|el precio|precios?|estudios?|anmat|cientific|chamuyo|estafa|trucho|mentira|sirve|funciona de verdad|es seguro|seguro que|contraindicaci|hace mal|da[ñn]in|garant[ií]a|devuelven|devoluci[oó]n|reembolso|sos un bot|sos real|sos human|sos una maquina|es real esto|de donde son|donde estan|tienen local|consulta|pregunta|contiene|ingredientes|componentes|de que esta hecho|iodo|yodo|gluten|azucar|diabetes|diabetica|diabetico|hipertension|hipertensa|hipertenso|tiroides|colesterol|embarazo|embarazada|amamantando|amamanta|lactancia|puedo tomar|me sirve|como se toma|como tomar|como lo tomo|indicaciones|dosis)\b/i.test(_norm)
     );
     const _ai = (dependencies as any).aiService;
     if (_substantiveOpening && _ai && typeof _ai.chat === 'function') {
