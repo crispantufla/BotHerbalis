@@ -451,6 +451,31 @@ function scheduleReconnect() {
 function startHeartbeat() { stopHeartbeat(); hbTimer = setInterval(() => send({ t: 'hb' }), HB_INTERVAL_MS); }
 function stopHeartbeat() { if (hbTimer) { clearInterval(hbTimer); hbTimer = null; } }
 
+// ── Anti-sleep (Windows) ─────────────────────────────────────────────────────
+// Si la PC del vendedor se SUSPENDE, el proceso Node se congela: deja de mandar
+// heartbeats y el gateway lo da por caído a los 45s (es el flapping nocturno). No
+// hay arreglo posible desde el heartbeat — un proceso suspendido no puede enviar
+// nada, y WhatsApp tampoco corre con la PC dormida. La única solución real es
+// impedir que la PC se duerma mientras el agente vive. Le pedimos a Windows que
+// mantenga el SISTEMA despierto (no la pantalla) vía SetThreadExecutionState,
+// sostenido por un PowerShell hijo. Best-effort / fail-open: si algo falla, el
+// agente sigue igual (a lo sumo vuelve el flapping si la PC se duerme).
+let keepAwakeProc = null;
+function startKeepAwake() {
+    if (process.platform !== 'win32' || keepAwakeProc) return;
+    // ES_CONTINUOUS (0x80000000) | ES_SYSTEM_REQUIRED (0x1) = 2147483649. NO usamos
+    // ES_DISPLAY_REQUIRED: la pantalla puede apagarse; solo evitamos el suspend.
+    const ps = `$sig='[DllImport("kernel32.dll")] public static extern uint SetThreadExecutionState(uint esFlags);';$t=Add-Type -MemberDefinition $sig -Name Power -Namespace Win32Agent -PassThru;while($true){$t::SetThreadExecutionState([uint32]2147483649)|Out-Null;Start-Sleep -Seconds 60}`;
+    try {
+        const { spawn } = require('child_process');
+        keepAwakeProc = spawn('powershell', ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', ps], { windowsHide: true, stdio: 'ignore' });
+        keepAwakeProc.on('error', (e) => { log('keep-awake no disponible:', e.message); keepAwakeProc = null; });
+        keepAwakeProc.on('exit', () => { keepAwakeProc = null; });
+        log('keep-awake activado: la PC no se va a suspender mientras corra el agente');
+    } catch (e) { log('keep-awake falló (sigo igual):', e.message); keepAwakeProc = null; }
+}
+function stopKeepAwake() { if (keepAwakeProc) { try { keepAwakeProc.kill(); } catch { /* noop */ } keepAwakeProc = null; } }
+
 // ── Arranque ─────────────────────────────────────────────────────────────────
 (async () => {
     log(`iniciando agente para seller "${cfg.sellerId}"…`);
@@ -463,6 +488,7 @@ function stopHeartbeat() { if (hbTimer) { clearInterval(hbTimer); hbTimer = null
             process.exit(99);
         }
     } catch (e) { log('updater falló (sigo con la versión actual):', e.message); }
+    startKeepAwake();   // evitar que la PC se suspenda y tire el agente (flapping)
     connectGateway();
     client.initialize().catch((e) => fail(`no pude iniciar WhatsApp: ${e.message}`));
 
@@ -482,4 +508,5 @@ process.on('uncaughtException', (e) => {
     log('uncaughtException (ignorado):', (e && e.message) || String(e));
 });
 
-process.on('SIGINT', async () => { log('cerrando…'); try { await client.destroy(); } catch {} process.exit(0); });
+process.on('exit', stopKeepAwake);   // no dejar el PowerShell de keep-awake colgado
+process.on('SIGINT', async () => { log('cerrando…'); stopKeepAwake(); try { await client.destroy(); } catch {} process.exit(0); });
