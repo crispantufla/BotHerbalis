@@ -98,9 +98,15 @@ class AgentHub {
         }
     }
 
-    private _onConnection(ws: WebSocket, _req: IncomingMessage): void {
+    private _onConnection(ws: WebSocket, req: IncomingMessage): void {
         let sellerId: string | null = null;
         let authed = false;
+        // IP de origen para diagnóstico (Railway está detrás de proxy → x-forwarded-for).
+        // Sirve para detectar si las reconexiones de madrugada vienen de la MISMA PC del
+        // vendedor (sleep/wake) o de OTRA máquina (segunda instancia del agente).
+        const originIp = String(
+            (req.headers['x-forwarded-for'] as string) || req.socket?.remoteAddress || '?'
+        ).split(',')[0].trim();
 
         // Timeout de auth — si no se autentica en 10s, cerrar.
         const authTimer = setTimeout(() => {
@@ -125,6 +131,7 @@ class AgentHub {
                 authed = true;
                 sellerId = frame.sellerId;
                 clearTimeout(authTimer);
+                logger.info(`[AGENT][${sellerId}] WS autenticado desde IP ${originIp}`);
                 this._attachSocket(sellerId, ws);
                 return;
             }
