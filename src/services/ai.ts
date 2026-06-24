@@ -380,7 +380,7 @@ const PAYMENT_POLICY = `MEDIOS DE PAGO (modelo jun-2026 — 2 tipos de envío):
 - NUNCA mencionar "adicional de $6.000" — esa política ya no existe.
 - NUNCA inventes urgencia/escasez FALSA ("última unidad", "se acaba hoy", "precio de hoy"). La ÚNICA promo real es el DESCUENTO DE JUNIO en cápsulas y gotas (ver bloque DESCUENTO DE JUNIO arriba) — esa sí podés mencionarla para cerrar.
 - 🛑 "PAGO AL RECIBIR" CON MEDIO PREPAGO: si el cliente dice que quiere pagar "al recibir", "al cartero" o "contra entrega" CON tarjeta de crédito o transferencia, ACLARALE que esos medios se pagan ANTES del envío (online), NO al cartero. Pagar al recibir en EFECTIVO es SOLO retiro en sucursal. No lo mandes al link de MP sin aclarar esto primero; después pedile que elija retiro o domicilio.
-- El envío siempre es gratis (ambos tipos). Tiempos: *retiro en sucursal* (paga en efectivo al retirar) → *7 a 10 días hábiles*; *envío a domicilio PREPAGO* (tarjeta de crédito o transferencia) → despacha más rápido, *6 a 7 días hábiles*. PALANCA DE VENTA: si el cliente duda entre prepagar o no, recordale que al pagar por adelantado el pedido sale antes y llega más rápido (6-7 días).`;
+- El envío siempre es gratis (ambos tipos). Tiempos: *retiro en sucursal* (paga en efectivo al retirar) → *7 a 10 días hábiles*; *envío a domicilio PREPAGO* (tarjeta de crédito o transferencia) → despacha más rápido, *4 días hábiles*. PALANCA DE VENTA: si el cliente duda entre prepagar o no, recordale que al pagar por adelantado el pedido sale antes y llega más rápido (4 días hábiles).`;
 
 // ── STEP MODULES (only one is sent per call, positioned in the middle) ──
 
@@ -391,7 +391,7 @@ PRODUCTOS Y PRECIOS (las 3 son igual de efectivas; ofrecelas, pero si el cliente
 - Semillas: $${prices['Semillas']['60']} (60d) / $${prices['Semillas']['120']} (120d). Forma 100% natural — ritual nocturno de infusión.
 - Gotas: $${prices['Gotas']['60']} (60d) / $${prices['Gotas']['120']} (120d). Forma líquida — suaves al estómago.
 - DOSIS (días) según los kilos a bajar: hasta 10 kg → plan 60d; 10-20 kg → plan 120d (puede sobrar, sirve de mantenimiento); más de 20 kg → plan 120d (es lo que el cuerpo necesita).
-- Envío GRATIS por Correo Argentino. Dos opciones: retiro en sucursal (pago en efectivo al retirar, 7 a 10 días hábiles) o envío a domicilio prepago con tarjeta de crédito o transferencia (más rápido, 6 a 7 días hábiles).
+- Envío GRATIS por Correo Argentino. Dos opciones: retiro en sucursal (pago en efectivo al retirar, 7 a 10 días hábiles) o envío a domicilio prepago con tarjeta de crédito o transferencia (más rápido, 4 días hábiles).
 - Sin efecto rebote (100% natural).
 
 CONTRAINDICACIONES: SOLO embarazo y lactancia.
@@ -433,7 +433,7 @@ DESCUENTOS POR VOLUMEN (SOLO si preguntan por varias unidades):
 - 3er producto al 50% OFF (puede ser combinado, ej: 60 gotas + 60 cápsulas + 1 extra). NO hay escalada para 4ta/5ta — siempre el 3ro más barato al 50%.
 - NO ofrezcas descuentos si no preguntaron.
 
-ENVÍO: Gratis por Correo Argentino. *Retiro en sucursal* (paga al retirar): *7 a 10 días hábiles*. *Envío a domicilio PREPAGO* (tarjeta de crédito o transferencia): despacha antes, *6 a 7 días hábiles*. Usá esto como argumento: si paga por adelantado, le llega más rápido.
+ENVÍO: Gratis por Correo Argentino. *Retiro en sucursal* (paga al retirar): *7 a 10 días hábiles*. *Envío a domicilio PREPAGO* (tarjeta de crédito o transferencia): despacha antes, *4 días hábiles*. Usá esto como argumento: si paga por adelantado, le llega más rápido.
 
 ${PAYMENT_POLICY}
 
@@ -528,8 +528,8 @@ function _getModulePostSale(): string {
 Este cliente YA COMPRÓ.Sos un asistente post - venta amable.
         REGLAS:
     1. Si saluda: respondé breve.
-2. Si pregunta por envío / demora: *retiro en sucursal* (paga al retirar) *7 a 10 días hábiles*; *envío a domicilio prepago* (tarjeta de crédito o transferencia) más rápido, *6 a 7 días hábiles*.
-3. Si pide postergar ENVÍO a fecha futura: Si la fecha cae dentro de ~10 días hábiles desde hoy: "Los envíos tardan 7 a 10 días hábiles (6 a 7 si fue a domicilio prepago), así que llega justo para esa fecha, no hay problema". Si pide MÁS adelante que eso: aceptá, confirmá y extraé POSTDATE: [fecha].
+2. Si pregunta por envío / demora: *retiro en sucursal* (paga al retirar) *7 a 10 días hábiles*; *envío a domicilio prepago* (tarjeta de crédito o transferencia) más rápido, *4 días hábiles*.
+3. Si pide postergar ENVÍO a fecha futura: Si la fecha cae dentro de ~10 días hábiles desde hoy: "Los envíos tardan 7 a 10 días hábiles (4 si fue a domicilio prepago), así que llega justo para esa fecha, no hay problema". Si pide MÁS adelante que eso: aceptá, confirmá y extraé POSTDATE: [fecha].
 4. Si tiene reclamo / duda compleja: extractedData = "NEED_ADMIN".
 5. Si quiere VOLVER A COMPRAR: extractedData = "RE_PURCHASE" y preguntale qué quiere.
 6. ANTI - INSISTENCIA(CRÍTICO): NUNCA repitas "¿Te puedo ayudar con algo más?" si ya lo dijiste hace poco.Si el cliente dice "No gracias" o indica que no necesita más nada, RESPONDÉ SIMPLEMENTE "¡Perfecto! Que tengas un lindo día 😊" y NO HAGAS NINGUNA PREGUNTA MÁS.
@@ -916,7 +916,7 @@ class AIService {
                 knowledgeContext += `- Gastritis/úlcera/acidez: cápsulas o gotas (semillas pueden irritar). Es la única razón médica para descartar una forma.\n`;
                 knowledgeContext += `- Contraindicaciones: solo embarazo y lactancia.NO menores de edad.\n`;
                 knowledgeContext += `- PRECIOS (COTIZÁ EN CONTEXTO): Si YA recomendaste un producto o el cliente ya mostró interés/eligió uno (ej cápsulas) y pregunta el precio, dale SOLO los 2 planes (60 y 120 días) de ESE producto con el ahorro ("antes $X, este mes $Y") — NO la lista de los 3. La lista completa SOLO si todavía no hay un producto en foco, o si piden "precio de todos"/"lista de precios". Si no hay foco y preguntan "precio" a secas, decí el rango "$${priceSem60} a $${priceGotas120}". Datos de precios (elegí el producto que corresponda): ${anclaPrecios}.\n`;
-                knowledgeContext += `- ENVÍO Y PAGO: Envío gratis por Correo Argentino. 2 opciones: retiro en sucursal (paga en efectivo al retirar, 7 a 10 días hábiles) o envío a domicilio prepago con tarjeta de crédito o transferencia (más rápido, 6 a 7 días hábiles). NUNCA menciones cuotas ni anticipo.\n`;
+                knowledgeContext += `- ENVÍO Y PAGO: Envío gratis por Correo Argentino. 2 opciones: retiro en sucursal (paga en efectivo al retirar, 7 a 10 días hábiles) o envío a domicilio prepago con tarjeta de crédito o transferencia (más rápido, 4 días hábiles). NUNCA menciones cuotas ni anticipo.\n`;
             } else if (step === 'waiting_price_confirmation') {
                 knowledgeContext += `- El usuario todavía NO vio precios.Tu trabajo es convencerlo de que quiera verlos.\n`;
                 knowledgeContext += `- Contraindicaciones: solo embarazo y lactancia.NO menores de edad.\n`;
@@ -925,7 +925,7 @@ class AIService {
                 knowledgeContext += `- PRECIOS (mostrá el ahorro "antes $X, este mes $Y" en cápsulas/gotas): ${anclaPrecios} \n`;
                 knowledgeContext += `- POLÍTICA DE ENVÍO Y PAGO (modelo jun-2026): 2 opciones — (1) *Retiro en sucursal* → contrarrembolso, paga el TOTAL en efectivo al retirar en una sucursal de Correo Argentino (sin anticipo); (2) *Envío a domicilio* → prepago con *tarjeta de crédito* (link de pago) o *transferencia bancaria* al alias HERBALIS.TIENDA (BIO ORIGEN S.A.S.). De cara al cliente el medio online se llama "Tarjeta de crédito" (NUNCA "Mercado Pago", débito, Pago Fácil ni Rapipago). Aplica a TODOS los planes. NUNCA menciones cuotas ni anticipo de $10.000.\n`;
                 knowledgeContext += `- NO mencionar 'adicional de $6.000' (esa política ya no existe). NO decir 'envío gratis solo en plan 120'.\n`;
-                knowledgeContext += `- Envío gratis por Correo Argentino. *Retiro en sucursal* (paga al retirar): *7 a 10 días hábiles*. *Envío a domicilio PREPAGO* (tarjeta de crédito/transferencia): más rápido, *6 a 7 días hábiles* — usalo como argumento para cerrar el prepago.\n`;
+                knowledgeContext += `- Envío gratis por Correo Argentino. *Retiro en sucursal* (paga al retirar): *7 a 10 días hábiles*. *Envío a domicilio PREPAGO* (tarjeta de crédito/transferencia): más rápido, *4 días hábiles* — usalo como argumento para cerrar el prepago.\n`;
             } else if (step === 'waiting_data') {
                 knowledgeContext += `- Necesitamos: nombre completo, calle y número, ciudad, código postal\n`;
                 knowledgeContext += `- PROHIBIDO PEDIR NÚMERO DE TELÉFONO.Ya estamos hablando por WhatsApp, ¡ya tenemos su número! Nunca pidas este dato.\n`;

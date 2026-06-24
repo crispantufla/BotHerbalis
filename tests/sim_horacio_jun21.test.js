@@ -78,10 +78,10 @@ describe('SIM V7 — el bot vende como Horacio (retiro, +10kg, cápsulas)', () =
         expect(rig.transcript.filter(t => t.who === 'BOT').length).toBeGreaterThan(4);
     });
 
-    test('menú de envío lidera con RETIRO y vende velocidad del prepago (6 a 7)', () => {
+    test('menú de envío lidera con RETIRO y vende velocidad del prepago (4 días)', () => {
         const all = rig.transcript.map(t => t.text).join('\n');
         expect(all).toMatch(/Retiro en sucursal/i);
-        expect(all).toMatch(/6 a 7 días/);
+        expect(all).toMatch(/4 días/);
     });
 
     test('al elegir retiro pide SOLO localidad/CP — NO calle ni DNI ni teléfono', () => {
