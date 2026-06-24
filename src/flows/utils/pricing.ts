@@ -61,7 +61,9 @@ const FALLBACK_PRICES: Record<string, any> = {
 // $10.000 off en Cápsulas y Gotas (Semillas sin descuento). Se aplica EN CÓDIGO
 // sobre el precio BASE del dashboard (DATA_DIR/prices.json): así no hay que editar
 // el dashboard ni restaurar precios a mano. Para terminar la promo: borrar este
-// bloque + las llamadas a _applyJuneDiscount (acá en _getPrices y en ai.ts _getPrices).
+// bloque + las llamadas a _applyJuneDiscount (acá en _getPrices y en ai.ts _getPrices)
+// + el ANCLA de oferta en ai.ts (import _JUNE_DISCOUNT, anclaPrecios y la regla del
+// prompt "antes→este mes"). Atajo seguro: seteá amount=0 y el ancla se auto-desactiva.
 const _JUNE_DISCOUNT = { products: ['Cápsulas', 'Gotas'], amount: 10000 };
 function _fmtThousands(n: number): string {
     return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
@@ -122,5 +124,6 @@ export {
     _getCostoLogistico,
     _getPrices,
     _getPrice,
-    _applyJuneDiscount
+    _applyJuneDiscount,
+    _JUNE_DISCOUNT   // ⏰ lo usa ai.ts para anclar la oferta (antes→ahora). Quitar junto el 01/07.
 };

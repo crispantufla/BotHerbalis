@@ -8,7 +8,7 @@ import * as os from 'os';
 import * as crypto from 'crypto';
 import { UserState, HistoryMessage } from '../types/state';
 import { lookupSemanticCache, storeSemanticCache } from './semanticCache';
-import { _applyJuneDiscount } from '../flows/utils/pricing';
+import { _applyJuneDiscount, _JUNE_DISCOUNT } from '../flows/utils/pricing';
 import { buildHistoryTurns, ChatTurn } from './historyTurns';
 
 // WhatsApp usa "*" para negrita, no "**" (markdown estándar). Si la IA devuelve
@@ -277,8 +277,12 @@ TONO: Argentino rioplatense NATURAL. Voseo (querés, podés, mirá, fijate). Con
 TONO CAMALEÓN: Cliente seco ("precio", "cuanto sale") → datos duros, profesional. Cliente amable ("holaa, queria info...") → emojis, empatía, contención.
 REGISTRO SECO EXTREMO: cuando el cliente responde en monosílabos o cifras peladas ("ok", "sí", "7 kilos", "cuánto"), podés contestar igual de telegráfico — una palabra, una cifra o una línea cortísima, sin emoji y, SOLO en esos turnos puntuales, sin la pregunta de cierre obligatoria si el próximo paso ya quedó claro. Ej: si pide el precio de un plan, podés responder solo "$58.900". Espejá su parquedad en vez de inflar la frase. (NO aplica a objeciones ni a momentos emocionales/de salud, donde seguís expandiendo.)
 
-🟢 DESCUENTO DE JUNIO (vigente hasta el 30/06/2026 — REVISAR/QUITAR el 01/07) 🟢
-Cápsulas y Gotas tienen $10.000 de descuento este mes. Los precios de la tabla YA vienen con el descuento aplicado — cotizá SIEMPRE esos, no los sumes ni restes. Usalo para cerrar, como beneficio/urgencia suave: "este mes tenés $10.000 de descuento en cápsulas y gotas 🌿". 🛑 Semillas NO entra en el descuento. No inventes otras promos ni montos.
+🟢 DESCUENTO DE JUNIO — MÉTODO DE VENTA (vigente hasta el 30/06/2026 — REVISAR/QUITAR el 01/07) 🟢
+Cápsulas y Gotas tienen $10.000 de descuento este mes. NO es un precio bajo a secas: es una OFERTA y hay que VENDERLA. Reglas:
+- SIEMPRE que muestres el precio de cápsulas o gotas, presentá el AHORRO con el formato "antes $X, este mes $Y 🌿" (los dos números te los doy ya calculados en INFORMACIÓN RELEVANTE — NO los sumes ni restes vos). Nunca tires solo el precio final pelado: el cliente tiene que VER que se ahorra $10.000.
+- Remarcá que es por tiempo limitado / solo este mes, como empujón para cerrar.
+- El precio que se COBRA es siempre el "este mes" (el con descuento). El "antes" es solo para mostrar el ahorro.
+🛑 Semillas NO tiene descuento: mostrala con un solo precio, sin "antes". No inventes otras promos ni montos.
 
 🛑 EXTENSIÓN según el momento de la venta 🛑
 
@@ -888,6 +892,19 @@ class AIService {
 
             const priceString = `Cápsulas($${priceCaps60}/60d, $${priceCaps120}/120d) | Semillas($${priceSem60}/60d, $${priceSem120}/120d) | Gotas($${priceGotas60}/60d, $${priceGotas120}/120d)`;
 
+            // ⏰ JUNIO 2026 — ANCLA DE OFERTA (antes→este mes). El descuento se aplica
+            // sobre el precio base, así que el "antes" = precio actual + monto del
+            // descuento. Se lo damos ya calculado a la IA (no debe sumar/restar). Si el
+            // descuento se apaga (amount=0 o _JUNE_DISCOUNT borrado), cae a priceString.
+            // Quitar junto con _applyJuneDiscount el 01/07 (ver pricing.ts).
+            const _disc = _JUNE_DISCOUNT || { products: [] as string[], amount: 0 };
+            const _hasDiscount = _disc.amount > 0;
+            const _miles = (n: number) => n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+            const _antes = (precioConDesc: string) => _miles(parseInt(String(precioConDesc).replace(/\./g, ''), 10) + _disc.amount);
+            const anclaPrecios = _hasDiscount
+                ? `Cápsulas → antes $${_antes(priceCaps60)}, este mes $${priceCaps60} (60d) / antes $${_antes(priceCaps120)}, este mes $${priceCaps120} (120d) | Gotas → antes $${_antes(priceGotas60)}, este mes $${priceGotas60} (60d) / antes $${_antes(priceGotas120)}, este mes $${priceGotas120} (120d) | Semillas (SIN descuento) → $${priceSem60} (60d) / $${priceSem120} (120d)`
+                : priceString;
+
             knowledgeContext = `INFORMACIÓN RELEVANTE PARA ESTE PASO: \n`;
 
             const pathInfo = faq.find((q: any) => q.keywords.includes('diabetes'))?.response || "";
@@ -898,21 +915,21 @@ class AIService {
                 knowledgeContext += `- DOSIS por kilos: hasta 10 kg → 60 días; 10-20 kg → 120 días (sobra un poco, sirve mantenimiento); más de 20 kg → 120 días (lo que el cuerpo necesita).\n`;
                 knowledgeContext += `- Gastritis/úlcera/acidez: cápsulas o gotas (semillas pueden irritar). Es la única razón médica para descartar una forma.\n`;
                 knowledgeContext += `- Contraindicaciones: solo embarazo y lactancia.NO menores de edad.\n`;
-                knowledgeContext += `- PRECIOS: Si preguntan "precio" en general, decí "$${priceSem60} a $${priceGotas120}".PERO si preguntan "precio de todos", "lista de precios" o insisten, PASALES TODOS LOS PRECIOS detallados: ${priceString}.\n`;
+                knowledgeContext += `- PRECIOS: Si preguntan "precio" en general, decí "$${priceSem60} a $${priceGotas120}".PERO si preguntan "precio de todos", "lista de precios" o insisten, PASALES TODOS LOS PRECIOS con el AHORRO visible (formato "antes $X, este mes $Y" para cápsulas y gotas): ${anclaPrecios}.\n`;
                 knowledgeContext += `- ENVÍO Y PAGO: Envío gratis por Correo Argentino. 2 opciones: retiro en sucursal (paga en efectivo al retirar, 7 a 10 días hábiles) o envío a domicilio prepago con tarjeta de crédito o transferencia (más rápido, 6 a 7 días hábiles). NUNCA menciones cuotas ni anticipo.\n`;
             } else if (step === 'waiting_price_confirmation') {
                 knowledgeContext += `- El usuario todavía NO vio precios.Tu trabajo es convencerlo de que quiera verlos.\n`;
                 knowledgeContext += `- Contraindicaciones: solo embarazo y lactancia.NO menores de edad.\n`;
                 knowledgeContext += `- (NO menciones precios específicos ni formas de pago, solo que son accesibles) \n`;
             } else if (['waiting_plan_choice', 'closing', 'waiting_ok'].includes(step)) {
-                knowledgeContext += `- PRECIOS: ${priceString} \n`;
+                knowledgeContext += `- PRECIOS (mostrá el ahorro "antes $X, este mes $Y" en cápsulas/gotas): ${anclaPrecios} \n`;
                 knowledgeContext += `- POLÍTICA DE ENVÍO Y PAGO (modelo jun-2026): 2 opciones — (1) *Retiro en sucursal* → contrarrembolso, paga el TOTAL en efectivo al retirar en una sucursal de Correo Argentino (sin anticipo); (2) *Envío a domicilio* → prepago con *tarjeta de crédito* (link de pago) o *transferencia bancaria* al alias HERBALIS.TIENDA (BIO ORIGEN S.A.S.). De cara al cliente el medio online se llama "Tarjeta de crédito" (NUNCA "Mercado Pago", débito, Pago Fácil ni Rapipago). Aplica a TODOS los planes. NUNCA menciones cuotas ni anticipo de $10.000.\n`;
                 knowledgeContext += `- NO mencionar 'adicional de $6.000' (esa política ya no existe). NO decir 'envío gratis solo en plan 120'.\n`;
                 knowledgeContext += `- Envío gratis por Correo Argentino. *Retiro en sucursal* (paga al retirar): *7 a 10 días hábiles*. *Envío a domicilio PREPAGO* (tarjeta de crédito/transferencia): más rápido, *6 a 7 días hábiles* — usalo como argumento para cerrar el prepago.\n`;
             } else if (step === 'waiting_data') {
                 knowledgeContext += `- Necesitamos: nombre completo, calle y número, ciudad, código postal\n`;
                 knowledgeContext += `- PROHIBIDO PEDIR NÚMERO DE TELÉFONO.Ya estamos hablando por WhatsApp, ¡ya tenemos su número! Nunca pidas este dato.\n`;
-                knowledgeContext += `- (NO ofrezcas ni menciones precios ni productos a menos que el cliente pregunte explícitamente por ellos. Si preguntan, los precios son: ${priceString}) \n`;
+                knowledgeContext += `- (NO ofrezcas ni menciones precios ni productos a menos que el cliente pregunte explícitamente por ellos. Si preguntan, los precios son: ${anclaPrecios}) \n`;
             }
 
             knowledgeContext += `(No inventes datos, usá siempre esta base)`;
