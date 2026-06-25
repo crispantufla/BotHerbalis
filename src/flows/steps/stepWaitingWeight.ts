@@ -46,7 +46,17 @@ async function _sendTierRecommendation(
     let tierMsg: string | null = null;
     if (aiService && typeof aiService.chat === 'function') {
         try {
-            const recGoal = `El cliente acaba de decirte cuánto quiere bajar (último mensaje: "${userText}"). Tu tarea: recomendarle el plan de *${planDays} días* y presentarle las TRES presentaciones para que elija. REGLAS:\n(1) Arrancá reaccionando con calidez y de forma NATURAL a lo que dijo (sin asumir ni mencionar un número exacto de kilos si no lo dio).\n(2) Recomendá el plan de *${planDays} días*.\n(3) Listá las 3 opciones EXACTAS, una por línea con su número:\n"1️⃣ *Cápsulas* — 1 al día, 30 min antes del almuerzo o la cena.\n2️⃣ *Gotas* — 10 gotas al día, 30 min antes del almuerzo o la cena.\n3️⃣ *Semillas* — una infusión antes de dormir (lleva una preparación simple)."\n(4) Aclarar que las tres son 100% naturales y funcionan igual para bajar de peso.\n(5) 🛑 PROHIBIDO mencionar precios o cualquier monto de plata (van en el mensaje siguiente, aparte).\n(6) NO inventes nada fuera de esto. Cerrá con la pregunta EXACTA: *¿Qué opción preferís?* — NO uses "¿cuál te llama más?", "¿cuál te gusta más?" ni otras variantes. goalMet=true.`;
+            // Si el cliente eligió por NÚMERO DE OPCIÓN del menú ("1️⃣ Hasta 10 kg /
+            // 2️⃣ Más de 10 kg"), ese número NO es una cantidad de kilos. Sin esto, la
+            // IA leía "2" como "2 kilos" y respondía "Con 2 kilos…" (caso 5493436463086,
+            // 25-jun). Le pasamos la CATEGORÍA del tier y se lo aclaramos explícito.
+            const isTwoTierRec = !!(knowledge?.flow?.recommendation_1 && !knowledge?.flow?.recommendation_3);
+            const bareMenuPick = /^\s*[123]\s*(?:️?⃣)?\s*$/.test((userText || '').trim());
+            const tierCategoria = tier === '1' ? 'hasta 10 kg' : tier === '2' ? (isTwoTierRec ? 'más de 10 kg' : 'entre 10 y 20 kg') : 'más de 20 kg';
+            const clienteDijo = bareMenuPick
+                ? `eligió la opción "${(userText || '').trim()}" del menú de kilos — o sea quiere bajar ${tierCategoria}. ⚠️ Ese número es la OPCIÓN del menú, NO una cantidad de kilos: NUNCA digas "con ${(userText || '').trim()} kilos" ni lo interpretes como kilos`
+                : `acaba de decirte cuánto quiere bajar (último mensaje: "${userText}")`;
+            const recGoal = `El cliente ${clienteDijo}. Tu tarea: recomendarle el plan de *${planDays} días* y presentarle las TRES presentaciones para que elija. REGLAS:\n(1) Arrancá reaccionando con calidez y de forma NATURAL a lo que dijo (sin asumir ni mencionar un número exacto de kilos si no lo dio).\n(2) Recomendá el plan de *${planDays} días*.\n(3) Listá las 3 opciones EXACTAS, una por línea con su número:\n"1️⃣ *Cápsulas* — 1 al día, 30 min antes del almuerzo o la cena.\n2️⃣ *Gotas* — 10 gotas al día, 30 min antes del almuerzo o la cena.\n3️⃣ *Semillas* — una infusión antes de dormir (lleva una preparación simple)."\n(4) Aclarar que las tres son 100% naturales y funcionan igual para bajar de peso.\n(5) 🛑 PROHIBIDO mencionar precios o cualquier monto de plata (van en el mensaje siguiente, aparte).\n(6) NO inventes nada fuera de esto. Cerrá con la pregunta EXACTA: *¿Qué opción preferís?* — NO uses "¿cuál te llama más?", "¿cuál te gusta más?" ni otras variantes. goalMet=true.`;
             const aiRec = await aiService.chat(userText || 'dale', {
                 step: FlowStep.WAITING_WEIGHT,
                 goal: recGoal,
