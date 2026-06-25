@@ -94,10 +94,28 @@ export async function handleSystemGlobals(
     const MEDICAL_REJECT_REGEX = /\b(embarazada|embarazo|lactancia|lactar|amamantar|amamantando|dando la teta|dando el pecho|8[0-9]\s*a[ñn]os|9[0-9]\s*a[ñn]os)\b/i;
     if ((MEDICAL_REJECT_REGEX.test(normalizedText) && !isNegative) || currentState.step === 'rejected_medical') {
         logger.info(`[MEDICAL REJECT] User ${userId} mentioned contraindicated condition or is already rejected.`);
-        const msg = 'Lamentablemente, por estricta precaución, no recomendamos ni permitimos el uso de la Nuez de la India durante el embarazo, la lactancia o en personas mayores de 80 años. Priorizamos tu salud por encima de todo. 🌿😊\n\nPor este motivo, damos por finalizada la consulta y no podremos avanzar con el envío. ¡Cuidate mucho!';
+        const msg = 'Lamentablemente, por estricta precaución, no recomendamos ni permitimos el uso de la Nuez de la India durante el embarazo, la lactancia, en menores de 18 ni en personas mayores de 80 años. Priorizamos tu salud por encima de todo. 🌿😊\n\nPor este motivo, damos por finalizada la consulta y no podremos avanzar con el envío. ¡Cuidate mucho!';
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         await sendMessageWithDelay(userId, msg);
 
+        _setStep(currentState, 'rejected_medical');
+        saveState(userId);
+        return { matched: true };
+    }
+
+    // 2.1 MENOR DE EDAD (auto-revelado) — contraindicación, NO postergación.
+    // Caso 5493436463086 (25-jun): la clienta dijo "todavía no tengo los 18" y el bot
+    // respondió "dale, cuando estés lista" porque la lógica de POSTERGACIÓN del step la
+    // agarró antes — el gate médico de arriba no cubre menores. Esta rama (global, corre
+    // antes del step) lo intercepta. Falsos positivos cuidados (regex probada en node):
+    // "17 años de casada" / "bajar 17 kilos" / "ya tengo 18" / "no soy menor" NO gatillan.
+    const MINOR_REGEX = /(\bsoy menor de edad\b|\bes menor de edad\b|\bsoy menor\b|\btengo\s*1[0-7]\s*anos(?!\s+de\b)|\btiene\s*1[0-7]\s*anos(?!\s+de\b)|\bno tengo\s*(los\s*)?18\b|\btodavia no (tengo|cumpli)\s*(los\s*)?18\b|\baun no (tengo|cumpli)\s*(los\s*)?18\b|\bno cumpli\s*(los\s*)?18\b)/i;
+    const NOT_MINOR_REGEX = /\b(ya (tengo|cumpli)|mayor de edad|soy mayor|no soy menor)\b|(?<!no\s)\btengo\s*(1[89]|[2-9]\d)\s*anos\b/i;
+    if (MINOR_REGEX.test(normalizedText) && !NOT_MINOR_REGEX.test(normalizedText) && currentState.step !== 'rejected_medical') {
+        logger.info(`[MINOR REJECT] User ${userId} se identificó como menor de 18 años.`);
+        const msg = 'Por una cuestión de cuidado, la Nuez de la India no la recomendamos para menores de 18 años — el cuerpo todavía está en pleno crecimiento 🌿 Cuando cumplas los 18 te ayudamos con muchísimo gusto 😊';
+        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        await sendMessageWithDelay(userId, msg);
         _setStep(currentState, 'rejected_medical');
         saveState(userId);
         return { matched: true };
