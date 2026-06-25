@@ -125,18 +125,40 @@ export const useChat = (selectedChatId) => {
                     const isMe = data.sender === 'bot' || data.sender === 'admin';
                     const newMsg = { id: data.messageId || `socket-${timestamp}`, fromMe: isMe, body: data.text || '', type: 'chat', timestamp };
                     setMessages((prev) => {
-                        if (!Array.isArray(prev)) return [newMsg];
+                        const list = Array.isArray(prev) ? prev : [];
+
+                        // 1) Reemplazar el placeholder optimista (mensaje propio recién
+                        //    enviado desde el panel) por la versión confirmada.
                         if (isMe) {
-                            const pendingIndex = prev.findIndex(m => m.pending && m.body === newMsg.body && Math.abs(m.timestamp - timestamp) < 10000);
+                            const pendingIndex = list.findIndex(m => m.pending && m.body === newMsg.body && Math.abs(m.timestamp - timestamp) < 10000);
                             if (pendingIndex !== -1) {
-                                const updated = [...prev];
+                                const updated = [...list];
                                 updated[pendingIndex] = { ...newMsg, pending: false };
-                                return updated;
+                                return updated.sort((a, b) => a.timestamp - b.timestamp);
                             }
                         }
-                        const exists = prev.some(m => (m.id && m.id === newMsg.id) || (m.timestamp === timestamp && m.body === newMsg.body));
-                        if (exists) return prev;
-                        return [...prev, newMsg];
+
+                        // 2) De-dup con tolerancia — MISMO criterio que el merge del
+                        //    backend en GET /history (mismo emisor + body + ventana 60s).
+                        //    El backend loguea un mismo mensaje del bot por dos caminos
+                        //    (logAndEmit 'bot' + message_create 'admin' si el id no llegó
+                        //    a tiempo a botSentMessageIds — más probable con el agente
+                        //    remoto), y un admin global recibe cada evento dos veces
+                        //    (rooms seller + admin). Con el de-dup viejo (timestamp EXACTO)
+                        //    esos llegaban con ts distintos y se veían duplicados hasta
+                        //    recargar. La tolerancia los colapsa en vivo, igual que el refetch.
+                        const exists = list.some(m =>
+                            (m.id && m.id === newMsg.id) ||
+                            (m.fromMe === newMsg.fromMe && m.body === newMsg.body && Math.abs(m.timestamp - timestamp) <= 60000)
+                        );
+                        if (exists) return list;
+
+                        // 3) Insertar y reordenar por timestamp. Los eventos por socket
+                        //    llegan desordenados (delays humanizados del bot, latencia del
+                        //    bridge remoto, mensaje manual de Horacio desde el móvil); antes
+                        //    se appendeaban al final sin reordenar → "no salen en orden" y
+                        //    los manuales parecían faltar por caer en el lugar equivocado.
+                        return [...list, newMsg].sort((a, b) => a.timestamp - b.timestamp);
                     });
                 }
 
