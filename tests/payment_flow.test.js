@@ -223,6 +223,30 @@ describe('Aclaración "pago al recibir" con MP/domicilio', () => {
 // ════════════════════════════════════════════════════════════════════════════
 // BLOQUE 2: stepWaitingPaymentMethod — Retiro en sucursal (opción 1)
 // ════════════════════════════════════════════════════════════════════════════
+describe('Ambigüedad de envío — nombra LAS DOS opciones (caso 5493815010702)', () => {
+    const norm = (t) => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+    test('"Sucursal o abonar envío a domicilio" → NO asume, re-pregunta', async () => {
+        const state = makePaymentState('60');
+        mockSend.mockClear();
+        const txt = 'Sucursal o abonar envío a domicilio';
+        await handleWaitingPaymentMethod('amb1', txt, norm(txt), state, knowledge, deps);
+        // No debe asumir NINGUNA opción ni avanzar a pago/datos.
+        expect(state.shippingChoice).toBeFalsy();
+        expect(state.paymentMethod).toBeFalsy();
+        expect(state.step).toBe('waiting_payment_method');
+        // Debe re-preguntar cuál de las dos.
+        const sent = mockSend.mock.calls.map(c => c[1]).join('\n');
+        expect(sent).toMatch(/dos opciones|con cu[áa]l/i);
+    });
+
+    test('"sucursal" sola → retiro (no ambiguo, sigue funcionando)', async () => {
+        const state = makePaymentState('60');
+        await handleWaitingPaymentMethod('amb2', 'sucursal', norm('sucursal'), state, knowledge, deps);
+        expect(state.shippingChoice).toBe('retiro');
+    });
+});
+
 describe('Menú envío → Retiro en sucursal (opción 1)', () => {
 
     test('[2.1] "1" → retiro en sucursal (contrarrembolso, sin anticipo)', async () => {

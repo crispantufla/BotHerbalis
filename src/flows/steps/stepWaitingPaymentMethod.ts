@@ -15,7 +15,7 @@ const PICKUP_INTENT_PAY = /\b(voy\s+(?:yo|al?\s+local|a\s+(?:buscar|retirar))|pa
 const ROSARIO_INTENT_PAY = /\b(soy\s+de\s+rosario|estoy\s+en\s+rosario|vivo\s+en\s+rosario|de\s+rosario(?:\s+(?:capital|provincia|centro))?)\b/i;
 
 // Shipping choice keywords.
-const RETIRO_KEYWORDS = /\b(retiro|retir(?:ar|o)\s+en\s+sucursal|en\s+sucursal|a\s+sucursal|en\s+la\s+sucursal|sucursal\s+(?:de\s+)?correo|contra.?reembolso|contrarembolso)\b/i;
+const RETIRO_KEYWORDS = /\b(retiro|retir(?:ar|o)\s+en\s+sucursal|en\s+sucursal|a\s+sucursal|en\s+la\s+sucursal|sucursal\s+(?:de\s+)?correo|sucursal|contra.?reembolso|contrarembolso)\b/i;
 const DOMICILIO_KEYWORDS = /\b(domicilio|a\s+(?:mi\s+)?casa|a\s+mi\s+domicilio|env[ií]o\s+a\s+(?:mi\s+)?domicilio|env[ií]o\s+a\s+casa|envialo|envíalo|mandalo|que\s+lo\s+manden|me\s+lo\s+mand[aá]n|me\s+lo\s+mandan|a\s+mi\s+direcci[óo]n|en\s+mi\s+casa|directo\s+a\s+casa)\b/i;
 
 // "No puedo/tengo efectivo" — el cliente NIEGA poder pagar en efectivo → necesita
@@ -162,6 +162,22 @@ export async function handleWaitingPaymentMethod(
             `Cliente posterga decisión en waiting_payment_method (${currentState.postdatado ? 'postdatado ' + currentState.postdatado : 'sin fecha'}). Mensaje: "${text}". Pausado para que el admin retome cuando reescriba.`
         );
         logger.info(`[PAYMENT_METHOD] ${userId} → soft bailout detectado, pausado.`);
+        return { matched: true };
+    }
+
+    // ── Ambigüedad de envío: nombró LAS DOS opciones sin decidir ───────────────
+    // Caso 5493815010702 (error grave 25-jun): la clienta respondió "Sucursal o
+    // abonar envío a domicilio" y el bot ASUMIÓ domicilio y la mandó a transferir.
+    // Si menciona retiro/sucursal Y domicilio en el mismo mensaje (típico con un
+    // "o" en el medio) y NO mandó un número, NO asumimos ninguna: la hacemos elegir.
+    // Solo en la PRIMERA elección (sin shippingChoice todavía, no en el submenú).
+    if (!infoQuestion && !optionNum && !currentState.shippingChoice
+        && RETIRO_KEYWORDS.test(text) && DOMICILIO_KEYWORDS.test(text)) {
+        const msg = `Son dos opciones distintas 😊 ¿Con cuál vas?\n\n1️⃣ *Retiro en sucursal* → no pagás nada ahora, abonás el total *en efectivo cuando lo retirás*.\n2️⃣ *Envío a domicilio* → lo pagás antes (tarjeta de crédito o transferencia) y llega más rápido, en *4 días hábiles* 🚚`;
+        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        saveState(userId);
+        await sendMessageWithDelay(userId, msg);
+        logger.info(`[PAYMENT_METHOD] ${userId} → nombró AMBAS opciones (retiro + domicilio) sin decidir — re-pregunto en vez de asumir.`);
         return { matched: true };
     }
 
