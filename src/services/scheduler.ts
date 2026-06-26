@@ -803,6 +803,18 @@ function startScheduler(sharedState: SchedulerSharedState, dependencies: Schedul
         logger.info('[SCHEDULER] ✅ funnelDropoutSweep → cada 15 min (global)');
     }
 
+    // ── WEB ORDER RECONCILE: cada 15 min, registrado UNA vez globalmente ──
+    // Red de respaldo para los pedidos de la tienda web (Checkout Pro): si la
+    // clienta paga en MP y no vuelve al sitio, la orden queda 'pending'; acá la
+    // resolvemos consultando MP. Global porque WebOrder es del negocio, no per-seller.
+    if (process.env.MP_ACCESS_TOKEN && !(global as any).__webOrderReconcileRegistered) {
+        (global as any).__webOrderReconcileRegistered = true;
+        cron.schedule('*/15 * * * *', () => {
+            reconcileWebOrders();
+        }, { timezone: TIMEZONE });
+        logger.info('[SCHEDULER] ✅ reconcileWebOrders → cada 15 min (global)');
+    }
+
     // ── GRACEFUL RESTART: a las 8am Argentina ──
     // Registered ONCE globally (not per seller) to avoid 8 simultaneous process.kill() calls.
     if (!(global as any).__dailyRestartRegistered) {
@@ -1124,4 +1136,98 @@ async function refreshPendingPayments(sharedState: SchedulerSharedState): Promis
     }
 }
 
-export { startScheduler, checkStaleUsers, checkColdLeads, checkAbandonedCarts, autoApproveOrders, cleanStalePausedUsers, snapshotDailyStats, refreshPendingPayments, checkPendingMpPayments };
+/**
+ * reconcileWebOrders
+ * Red de respaldo para los pedidos de la TIENDA WEB (tabla WebOrder, que escribe
+ * web-v5). Con Checkout Pro, si la clienta paga en MercadoPago y NO vuelve al
+ * sitio, su orden queda 'pending' aunque se cobró. Acá barremos las órdenes
+ * pending/in_process (creadas hace 5 min–10 días), le preguntamos a MP el estado
+ * real y actualizamos la fila. Defensa de monto: NO aprobamos si lo cobrado no
+ * coincide con el total de la orden (despachamos producto físico). Global (no
+ * per-seller): los WebOrder son del negocio (instanceId 'default'), por eso se
+ * registra UNA sola vez. Mismo vocabulario de estado que web-v5.
+ */
+async function reconcileWebOrders(): Promise<void> {
+    if ((global as any).__webOrderReconcileRunning) return;
+    (global as any).__webOrderReconcileRunning = true;
+    try {
+        const mpToken = process.env.MP_ACCESS_TOKEN;
+        if (!mpToken) return;
+
+        const { prisma } = require('../../db');
+        const { MercadoPagoConfig, Payment } = require('mercadopago');
+        const mpClient = new MercadoPagoConfig({ accessToken: mpToken });
+        const mpPayment = new Payment(mpClient);
+
+        const now = Date.now();
+        const fiveMinAgo = new Date(now - 5 * 60 * 1000);          // no pisar checkouts en vuelo
+        const tenDaysAgo = new Date(now - 10 * 24 * 60 * 60 * 1000); // no rastrear historia vieja
+
+        const pending = await prisma.webOrder.findMany({
+            where: {
+                status: { in: ['pending', 'in_process'] },
+                createdAt: { lte: fiveMinAgo, gte: tenDaysAgo },
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 100,
+        });
+        if (pending.length === 0) return;
+        logger.info(`[SCHEDULER] Reconciliando ${pending.length} pedido(s) web pending/in_process...`);
+
+        // Normaliza el estado de MP al vocabulario de WebOrder (igual que web-v5).
+        const normalize = (s?: string): string =>
+            s === 'approved' ? 'approved'
+            : (s === 'in_process' || s === 'authorized') ? 'in_process'
+            : s === 'rejected' ? 'rejected'
+            : (s === 'cancelled' || s === 'refunded' || s === 'charged_back') ? 'cancelled'
+            : 'pending';
+
+        for (const order of pending) {
+            try {
+                // Estado real en MP: por mpPaymentId si lo tenemos, si no por external_reference.
+                let mp: any = null;
+                if (order.mpPaymentId) {
+                    mp = await mpPayment.get({ id: order.mpPaymentId });
+                } else {
+                    const result = await mpPayment.search({ options: { external_reference: order.externalRef } });
+                    const results = result?.results || [];
+                    mp = results.find((p: any) => p.status === 'approved') || results[0] || null;
+                }
+                if (!mp || !mp.status) continue;
+
+                const newStatus = normalize(mp.status);
+                if (newStatus === 'pending' || newStatus === order.status) continue;
+
+                // Defensa de monto: no aprobar si lo cobrado no coincide con la orden.
+                if (newStatus === 'approved') {
+                    const paid = Number(mp.transaction_amount);
+                    if (order.total != null && Number.isFinite(paid) && Math.abs(Number(order.total) - paid) > 0.5) {
+                        logger.error(`[SCHEDULER] WebOrder ${order.id}: MONTO NO COINCIDE esperado=${order.total} cobrado=${paid} — no se aprueba`);
+                        continue;
+                    }
+                }
+
+                await prisma.webOrder.update({
+                    where: { id: order.id },
+                    data: {
+                        status: newStatus,
+                        mpPaymentId: mp.id ? String(mp.id) : order.mpPaymentId,
+                        mpStatus: mp.status ?? null,
+                        mpStatusDetail: mp.status_detail ?? null,
+                        paidAt: newStatus === 'approved' ? new Date(mp.date_approved || Date.now()) : order.paidAt,
+                        updatedAt: new Date(),
+                    },
+                });
+                logger.info(`[SCHEDULER] WebOrder ${order.id.slice(0, 8)} reconciliada: ${order.status} → ${newStatus}`);
+            } catch (e: any) {
+                logger.error(`[SCHEDULER] Error reconciliando WebOrder ${order.id}: ${e?.message || e}`);
+            }
+        }
+    } catch (e: any) {
+        logger.error('[SCHEDULER] Error en reconcileWebOrders:', e.message);
+    } finally {
+        (global as any).__webOrderReconcileRunning = false;
+    }
+}
+
+export { startScheduler, checkStaleUsers, checkColdLeads, checkAbandonedCarts, autoApproveOrders, cleanStalePausedUsers, snapshotDailyStats, refreshPendingPayments, checkPendingMpPayments, reconcileWebOrders };
