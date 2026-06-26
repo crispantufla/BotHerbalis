@@ -47,6 +47,17 @@ const PAY_ON_DELIVERY = /\b(al recibir|al recibirlo|al recibirla|cuando (?:lo |l
 // En estos casos pausamos para que el admin retome — no insistimos con el menú.
 const SOFT_BAILOUT = /\b(gracias|voy a (ver|hacer|pensar|fijarme)|despu[eé]s te (escribo|aviso|hablo|digo|comunico)|me comunico|me fijo|lo pienso|lo veo|lo miro|estoy averiguando|solo (estoy )?averiguando|m[aá]s adelante|en un rato|en otro momento|cuando pueda|capaz despu[eé]s)\b/i;
 
+// Desconfianza del PAGO ANTICIPADO (transferencia/pago online). Caso 5492262484928
+// (26-jun): "Soy de pcia Bs As..no me gustan transferencias..he tenido problema".
+// El bot insistió con *tarjeta de crédito* (que TAMBIÉN es pago por adelantado) y
+// la vendedora a mano (Marta) tuvo que corregirlo: "podés pagar cuando recibís /
+// retiro en sucursal y pagás al retirar". Cuando el cliente desconfía de pagar por
+// adelantado, lo lógico es ofrecerle la opción SIN anticipo: retiro en sucursal,
+// efectivo al retirar. Sobre normalizedText (sin tildes).
+// OJO: nada de `\b` final tras "transferenci" — "transferencia(s)" sigue con
+// caracteres de palabra y el borde fallaría (no matchearía el plural).
+const DISTRUST_PREPAY = /no me gust\w*\s+(las?\s+)?transferenci|no me gusta\s+transferir|no (quiero|me animo a)\s+transferir|\bno confi[oa]\b|\bdesconfi[oa]\b|\bno me f[ií][oa]\b|\bme da (miedo|cosa|desconfianza)\b|\btengo miedo\b|\bmala experiencia\b|no me gusta\s+pagar\s+(por\s+)?(adelantad|anticipad|antes|online)|\bmiedo a (la\s+)?estafa\b|\bque sea (una\s+)?estafa\b/i;
+
 function _detectOptionNumber(text: string): '1' | '2' | null {
     const trimmed = text.trim();
     if (trimmed.length <= 25) {
@@ -162,6 +173,24 @@ export async function handleWaitingPaymentMethod(
             `Cliente posterga decisión en waiting_payment_method (${currentState.postdatado ? 'postdatado ' + currentState.postdatado : 'sin fecha'}). Mensaje: "${text}". Pausado para que el admin retome cuando reescriba.`
         );
         logger.info(`[PAYMENT_METHOD] ${userId} → soft bailout detectado, pausado.`);
+        return { matched: true };
+    }
+
+    // ── Desconfía del pago anticipado → liderar con RETIRO EN SUCURSAL ─────────
+    // (ver DISTRUST_PREPAY arriba). NO gateado por infoQuestion a propósito: el
+    // mensaje suele venir como un comentario que _isInfoQuestion marca como
+    // pregunta, y antes caía al AI fallback (que ofrecía tarjeta = otro prepago).
+    // Solo en la PRIMERA elección (no en el submenú) y si NO eligió ya tarjeta/MP
+    // (gana su elección) ni sucursal (lo maneja el path de retiro más abajo).
+    if (!alreadyPaidMp && !currentState.paymentSubChoiceAsked && !optionNum
+        && !currentState.shippingChoice
+        && !MP_KEYWORDS.test(text) && !RETIRO_KEYWORDS.test(text)
+        && DISTRUST_PREPAY.test(normalizedText)) {
+        const msg = `Te entiendo perfecto, las transferencias a veces son un lío 😊\n\nQuedate tranqui: *no hace falta que pagues nada por adelantado*. Con *retiro en sucursal* te lo enviamos a la sucursal de Correo Argentino más cercana a tu casa y *pagás el total ($${currentState.totalPrice || '?'}) en efectivo recién cuando lo retirás* 💵 — sin transferencias ni pagos online.\n\n¿Lo dejamos así, retiro en sucursal y pagás al retirar?`;
+        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        saveState(userId);
+        await sendMessageWithDelay(userId, msg);
+        logger.info(`[PAYMENT_METHOD] ${userId} → desconfía del pago anticipado → ofrecido RETIRO en sucursal (efectivo al retirar).`);
         return { matched: true };
     }
 
@@ -412,7 +441,7 @@ export async function handleWaitingPaymentMethod(
     // ── AI fallback ───────────────────────────────────────────────────────────
     const aiRes = await aiService.chat(text, {
         step: 'waiting_payment_method',
-        goal: `El cliente debe elegir TIPO DE ENVÍO antes que método de pago. Las 2 opciones son:\n\n1️⃣ *Retiro en sucursal* → paga el TOTAL en efectivo al retirar en una sucursal de Correo Argentino (contrarreembolso, sin anticipo previo). Un asesor coordina la sucursal más cercana al cliente.\n\n2️⃣ *Envío a domicilio* → se abona previamente. Después se elige el medio: *tarjeta de crédito* (link de pago protegido) o *transferencia bancaria* al alias *HERBALIS.TIENDA* (BIO ORIGEN S.A.S.). De cara al cliente el medio online se llama "Tarjeta de crédito" (NUNCA "Mercado Pago", débito, Pago Fácil ni Rapipago).\n\nAmbos envíos son GRATIS por Correo Argentino. Tiempos: *retiro en sucursal* (paga al retirar) 7 a 10 días hábiles; *envío a domicilio PREPAGO* (tarjeta de crédito o transferencia) más rápido, 4 días hábiles — usá la velocidad como argumento para el prepago.\n\nPROHIBICIONES ESTRICTAS:\n- NO mencionar anticipo de $10.000 (esa modalidad fue eliminada en mayo 2026)\n- NO ofrecer pago en efectivo al cartero a domicilio — el contrarreembolso ahora es solo en sucursal\n- NO mencionar cuotas\n- NO inventar aliases distintos al oficial\n\nSi el cliente responde con afirmativa genérica ("dale", "sí") sin aclarar, pedile que elija retiro o domicilio. NUNCA avances sin que confirme cuál de las 2 opciones de ENVÍO eligió.\n\nSi el cliente NIEGA poder pagar en efectivo ("no puedo efectivo", "no tengo efectivo", "no manejo efectivo"): NO lo mandes a retiro en sucursal (que es justamente pagar en efectivo al retirar). Ofrecé envío a DOMICILIO con pago anticipado por tarjeta de crédito o transferencia.\n\nSi el cliente PREGUNTA algo (cuánto tarda, cómo se paga, dónde retira, cuánto sale el envío, etc.) en vez de elegir: RESPONDÉ su pregunta reaclarando la info aunque YA se la hayas dicho antes (los clientes repreguntan y no se acuerdan — está bien repetir), y RECIÉN DESPUÉS re-preguntá si prefiere retiro o domicilio. NUNCA mandes el link de pago ni avances mientras el cliente siga preguntando.`,
+        goal: `El cliente debe elegir TIPO DE ENVÍO antes que método de pago. Las 2 opciones son:\n\n1️⃣ *Retiro en sucursal* → paga el TOTAL en efectivo al retirar en una sucursal de Correo Argentino (contrarreembolso, sin anticipo previo). Un asesor coordina la sucursal más cercana al cliente.\n\n2️⃣ *Envío a domicilio* → se abona previamente. Después se elige el medio: *tarjeta de crédito* (link de pago protegido) o *transferencia bancaria* al alias *HERBALIS.TIENDA* (BIO ORIGEN S.A.S.). De cara al cliente el medio online se llama "Tarjeta de crédito" (NUNCA "Mercado Pago", débito, Pago Fácil ni Rapipago).\n\nAmbos envíos son GRATIS por Correo Argentino. Tiempos: *retiro en sucursal* (paga al retirar) 7 a 10 días hábiles; *envío a domicilio PREPAGO* (tarjeta de crédito o transferencia) más rápido, 4 días hábiles — usá la velocidad como argumento para el prepago.\n\nPROHIBICIONES ESTRICTAS:\n- NO mencionar anticipo de $10.000 (esa modalidad fue eliminada en mayo 2026)\n- NO ofrecer pago en efectivo al cartero a domicilio — el contrarreembolso ahora es solo en sucursal\n- NO mencionar cuotas\n- NO inventar aliases distintos al oficial\n\nSi el cliente responde con afirmativa genérica ("dale", "sí") sin aclarar, pedile que elija retiro o domicilio. NUNCA avances sin que confirme cuál de las 2 opciones de ENVÍO eligió.\n\nSi el cliente NIEGA poder pagar en efectivo ("no puedo efectivo", "no tengo efectivo", "no manejo efectivo"): NO lo mandes a retiro en sucursal (que es justamente pagar en efectivo al retirar). Ofrecé envío a DOMICILIO con pago anticipado por tarjeta de crédito o transferencia.\n\nSi el cliente DESCONFÍA de pagar por adelantado o de las transferencias/pagos online ("no me gustan las transferencias", "he tenido problemas", "me da miedo pagar antes", "no confío en pagar online"): NO insistas con tarjeta de crédito — eso TAMBIÉN es pago anticipado y es justo lo que lo asusta. Ofrecé *retiro en sucursal*: NO paga nada por adelantado, abona el total en efectivo recién cuando lo retira en la sucursal de Correo Argentino. Es la opción sin riesgo para quien no quiere pagar online, y va alineado con cómo cierra el vendedor a mano.\n\nSi el cliente PREGUNTA algo (cuánto tarda, cómo se paga, dónde retira, cuánto sale el envío, etc.) en vez de elegir: RESPONDÉ su pregunta reaclarando la info aunque YA se la hayas dicho antes (los clientes repreguntan y no se acuerdan — está bien repetir), y RECIÉN DESPUÉS re-preguntá si prefiere retiro o domicilio. NUNCA mandes el link de pago ni avances mientras el cliente siga preguntando.`,
         history: currentState.history,
         summary: currentState.summary,
         knowledge,

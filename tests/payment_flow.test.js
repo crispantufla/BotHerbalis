@@ -247,6 +247,58 @@ describe('Ambigüedad de envío — nombra LAS DOS opciones (caso 5493815010702)
     });
 });
 
+// ════════════════════════════════════════════════════════════════════════════
+// BLOQUE 2b: desconfía del pago anticipado → liderar con RETIRO EN SUCURSAL
+// Caso 5492262484928 (26-jun): "Soy de pcia Bs As..no me gustan transferencias
+// ..he tenido problema". El bot insistía con tarjeta (otro prepago); la vendedora
+// a mano ofreció "pagás cuando retirás / sucursal". El bot debe hacer lo mismo.
+// ════════════════════════════════════════════════════════════════════════════
+describe('Desconfía del pago anticipado → ofrece retiro en sucursal (caso 5492262484928)', () => {
+    const norm = (t) => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+    test('"no me gustan transferencias, he tenido problema" → ofrece retiro, NO insiste con prepago', async () => {
+        const state = makePaymentState('60');
+        mockSend.mockClear();
+        const txt = 'Soy de pcia Bs As..no me gustan transferencias..he tenido problema';
+        await handleWaitingPaymentMethod('dp1', txt, norm(txt), state, knowledge, deps);
+        // No avanza a transferencia ni al submenú prepago.
+        expect(state.paymentMethod).toBeFalsy();
+        expect(state.paymentSubChoiceAsked).toBeFalsy();
+        expect(state.step).toBe('waiting_payment_method');
+        const sent = mockSend.mock.calls.map(([, m]) => m).join(' ');
+        expect(sent).toMatch(/retiro en sucursal/i);
+        expect(sent).toMatch(/al retir[áa]s|cuando lo retir[áa]s|efectivo/i);
+        expect(sent).toMatch(/no .*por adelantado|sin transferencias/i);
+    });
+
+    test('"me da miedo pagar por adelantado" → ofrece retiro en sucursal', async () => {
+        const state = makePaymentState('60');
+        mockSend.mockClear();
+        const txt = 'me da miedo pagar por adelantado';
+        await handleWaitingPaymentMethod('dp2', txt, norm(txt), state, knowledge, deps);
+        expect(state.paymentMethod).toBeFalsy();
+        const sent = mockSend.mock.calls.map(([, m]) => m).join(' ');
+        expect(sent).toMatch(/retiro en sucursal/i);
+    });
+
+    test('"prefiero sucursal, no me gustan las transferencias" → va a RETIRO (no intercepta el guard)', async () => {
+        const state = makePaymentState('60');
+        const txt = 'prefiero sucursal, no me gustan las transferencias';
+        await handleWaitingPaymentMethod('dp3', txt, norm(txt), state, knowledge, deps);
+        expect(state.shippingChoice).toBe('retiro');
+        expect(state.paymentMethod).toBe('contrarembolso');
+    });
+
+    test('"no me gustan las transferencias, pago con tarjeta" → respeta la tarjeta (no fuerza sucursal)', async () => {
+        const state = makePaymentState('60');
+        const txt = 'no me gustan las transferencias, pago con tarjeta';
+        await handleWaitingPaymentMethod('dp4', txt, norm(txt), state, knowledge, deps);
+        // Eligió tarjeta → MP, el guard de desconfianza NO debe interceptar.
+        expect(state.paymentMethod).toBe('mercadopago');
+        expect(state.step).toBe('waiting_mp_payment');
+    });
+});
+
 describe('Menú envío → Retiro en sucursal (opción 1)', () => {
 
     test('[2.1] "1" → retiro en sucursal (contrarrembolso, sin anticipo)', async () => {
