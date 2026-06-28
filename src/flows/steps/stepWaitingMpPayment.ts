@@ -157,6 +157,14 @@ export async function handleWaitingMpPayment(
         currentState.senaPaid = false;
         currentState.shippingChoice = 'retiro';
 
+        // Salir de waiting_mp_payment (igual que el branch de transferencia): si
+        // nos quedamos acá, el scheduler lo sigue tratando como "MP pendiente" y,
+        // si una pausa se pierde en un restart, le dispara los nudges de "pago con
+        // tarjeta pendiente" días después — aunque ya pasó a contrarembolso/retiro.
+        // mpReminderStage=99 es el sentinel para apagar los recordatorios de MP.
+        (currentState as any).mpReminderStage = 99;
+        _setStep(currentState, FlowStep.WAITING_TRANSFER_CONFIRMATION);
+
         const tpl = getFlowTemplate('payment_retiro_confirm', knowledge) ||
             `¡Perfecto! Lo dejamos para retiro en sucursal 📦\n\nVas a pagar el total *${'$'}{{TOTAL}}* en efectivo cuando lo retirés.\n\nUn asesor te contacta enseguida para coordinar la sucursal más cercana 😊`;
         const msg = _formatMessage(tpl, currentState);

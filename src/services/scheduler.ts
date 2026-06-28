@@ -937,6 +937,14 @@ async function snapshotDailyStats(sharedState?: SchedulerSharedState) {
  */
 async function checkPendingMpPayments(sharedState: SchedulerSharedState, dependencies: SchedulerDependencies): Promise<void> {
     const { userState, pausedUsers } = sharedState;
+    const { config } = sharedState as SchedulerSharedState & { config?: any };
+    // Mismo gate que checkAbandonedCarts: si el seller apagó "Seguimiento
+    // automático", NO mandamos NINGÚN nudge proactivo — tampoco los de MP
+    // pendiente. Antes este job ignoraba el toggle y seguía mensajeando "el pago
+    // con tarjeta quedó pendiente" aunque el cliente ya hubiera pasado a otro
+    // método (ej: retiro en sucursal) días antes — confundiendo al cliente y
+    // marcando como spam a los números nuevos (que es justo para lo que se apaga).
+    if (config?.proactiveFollowUps === false) return;
     const { sendMessageWithDelay, saveState, notifyAdmin } = dependencies;
     const now = Date.now();
 
