@@ -113,8 +113,11 @@ describe('Modelo nuevo — FAQ en V5 y V6', () => {
         const estafaFaq = guion.faq.find(f => f.keywords.some(k => k === 'estafa'));
         expect(estafaFaq).toBeDefined();
         expect(estafaFaq.response).toMatch(/13 años/i);
-        // Acepta "50.000" o "50 mil" — la forma conversacional es más humana.
-        expect(estafaFaq.response).toMatch(/50\.000|50 mil/);
+        // Verifica que lidere con el trust signal de cantidad de clientes.
+        // Acepta "70.000" o "70 mil" (cifra actual del guion) — la forma
+        // conversacional con "mil" es más humana. Si se vuelve a subir el
+        // número, actualizar acá.
+        expect(estafaFaq.response).toMatch(/70\.000|70 mil/);
         expect(estafaFaq.response).not.toMatch(/riesgo cero/i);
         // No menciona anticipo
         expect(estafaFaq.response).not.toMatch(/anticipo\s+de\s+\$?10/i);
