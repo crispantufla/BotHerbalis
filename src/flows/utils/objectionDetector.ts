@@ -181,8 +181,8 @@ const REBUTTALS: Record<ObjectionMatch['type'], string[]> = {
 // "vas a comprar más adelante" y "no vas a estar en casa". Prohibido prometer
 // congelar precio (copy V7). Para tier 2/3 se reusan los de `postergar`.
 const DEFERRAL_REBUTTAL: string[] = [
-    '¡Tranqui, no hace falta que lo resuelvas ahora! 😊 Si querés *te lo dejo agendado*: me decís desde qué día te queda cómodo recibirlo —ya sea porque lo encarás cuando cobres o porque estos días no vas a estar en casa— y lo despacho recién esa fecha. ¿Te lo agendo así? 📅',
-    'Dale, no hay drama 🙌 Lo podemos *programar para más adelante*: vos me decís a partir de qué día te queda cómodo y te lo despacho recién ahí (sirve igual si lo comprás cuando cobres como si andás de viaje o no vas a estar en casa). ¿Te lo dejo agendado para esa fecha?',
+    '¡Eso lo resolvemos sin que pierdas la compra! 😊 *Te lo dejo agendado*: me decís a partir de qué día te queda cómodo recibirlo —ya sea porque lo encarás cuando cobres o porque estos días no vas a estar en casa— te tomo los datos ahora y lo despacho recién esa fecha. ¿Arrancamos? 📅',
+    'Dale, lo dejamos *programado y cerrado* así no lo perdés: vos me decís a partir de qué día te queda cómodo recibirlo (te sirve igual si lo comprás cuando cobres o si andás de viaje), te cargo el pedido ahora y lo despacho recién esa fecha. ¿Te tomo los datos así te lo dejo listo? 😊',
 ];
 
 // ── Tier 2: Rebuttal ESCALADO con OFERTA CONCRETA ──────────────────────────

@@ -93,6 +93,10 @@ describe('detectObjection — el diferimiento se enruta como postergar con ofert
         // El rebuttal dedicado lidera con agendar/programar (no rechaza, no congela precio)
         expect(m.response).toMatch(/agend|program/i);
         expect(m.response).not.toMatch(/congel/i);
+        // CIERRA: empuja a tomar datos / fecha, no afloja la venta (feedback dueño 29-jun:
+        // "no hace falta que lo resuelvas ahora" sobra, hay que cerrarla).
+        expect(m.response).toMatch(/dato|cargo el pedido|qué día|que dia|recibirlo/i);
+        expect(m.response).not.toMatch(/no hace falta que lo resuelvas/i);
     });
 
     test('una categoría explícita (consultar) gana sobre el diferimiento', () => {
