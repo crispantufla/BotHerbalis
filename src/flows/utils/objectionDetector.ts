@@ -88,6 +88,62 @@ const PATTERNS: { type: ObjectionMatch['type']; regex: RegExp }[] = [
     },
 ];
 
+// ── Detector de "diferir la compra a futuro" (postdatado proactivo) ─────────
+// El regex de `postergar` (arriba) tiene una lista de keywords acotada y se le
+// escapan los casos que el dueño reportó: "te vuelvo a hablar la semana que
+// viene", "te vuelvo a hablar la semana que viene, que cobro", "cuando cobre te
+// aviso", "me voy de viaje, lo pido cuando vuelva". En todos ellos el cliente
+// NO rechaza: difiere por plata, por ausencia, o pateando la conversación a una
+// fecha futura — y el bot debería OFRECER agendar/postdatar el envío.
+//
+// Calibrado contra una batería de 90 frases rioplatenses verificada de forma
+// adversarial (ver tests/postpone_deferral.test.js). Reglas que la batería
+// dejó en claro (clave para NO volverse un bot insistente):
+//   • Hace falta un ANCLA FUTURA real. "mas tarde", "en un rato", "esta noche",
+//     "mañana" o "despues" SUELTOS NO cuentan (son brush-offs intra-día).
+//   • "te aviso / te confirmo" SIN ancla futura = cortesía (NEITHER), no dispara.
+//   • Excluir compra/recepción YA: "mandámelo... así me llega", "que me llegue
+//     el lunes", "lo quiero ya", "ya cobré", "dale cerralo", dar una dirección.
+//   • El MISMO ancla ("la semana que viene", "el 10 de julio") es fecha de
+//     ENTREGA (cerrar hoy) o diferimiento (postdatar) según el VERBO: recibir vs
+//     cobrar/avisar. Por eso las exclusiones de "recepción YA" van primero.
+export function detectPostponeDeferral(normalizedText: string): boolean {
+    const t = (normalizedText || '').trim();
+    if (t.length < 6) return false;
+
+    // 0) Quiere comprar/recibir YA, da una dirección, o ya cobró → NO difiere.
+    //    Tiene prioridad: si está cerrando, no es postergación.
+    if (/\b(lo quiero ya|lo quiero|mandalo nomas|manda nomas|hacemoslo|dale cerralo|cerralo|me lo pueden recibir|aunque viaje|a esta direccion|a que direccion|que me llegue|que llegue|q llegue|necesito que|necesito q|lo necesito|lo tengo que tener|lo tengo q tener|antes de irme|antes de viajar|antes de salir|ya cobre|ya tengo (la )?plata)\b/.test(t)) {
+        return false;
+    }
+
+    // 1) Diferimiento por PLATA (compra atada a un ingreso futuro)
+    const pay =
+        /\b(cuando|apenas|recien|en cuanto)\b[^.]*\b(cobr[eo]|me paguen|me depositen|me deposite|tenga (la )?plata|junte|consiga|me entre)\b/.test(t) ||
+        /\b(el (lunes|martes|miercoles|jueves|viernes|sabado|domingo)( que viene)?|la semana que viene|la proxima|el \d{1,2})\b[^.]*\bcobr[oe]\b/.test(t) ||
+        /\bcobr[oe]\b[^.]*\b(y (ahi |asi )?(te|lo)\b|asi que)/.test(t) ||
+        /\bel \d{1,2}\b[^.]*\bme depositan\b/.test(t) ||
+        /\b(no tengo (la )?plata|sin (la )?plata|ando seco|sin un mango|corto de guita|no me da el bolsillo|no llego con la plata|esperando que me paguen|ahi tengo (la )?plata|el aguinaldo|la quincena|la plata del laburo|recien lo voy a poder pagar|no me alcanza)\b/.test(t);
+    if (pay) return true;
+
+    // 2) Diferimiento por AUSENCIA / mudanza ("no voy a estar", "cuando vuelva")
+    if (/\b(me voy de (viaje|vacaciones)|me voy (al|a) |me voy unos dias|ando viajando|de vacaciones|no voy a estar|no llego a recibirlo|fuera de la ciudad|me mudo|la mudanza|cuando vuelva|cuando este de vuelta|cuando me instale|antes no estoy|me desocupo|salir de viaje|me agarra de viaje|donde voy a estar|unas semanas|vuelvo en )\b/.test(t)) {
+        return true;
+    }
+
+    // 3) Soft-exit ("te vuelvo a hablar / te aviso") + ANCLA FUTURA real
+    const deferVerb = /\b(te (vuelvo a (hablar|escribir)|escribo|aviso|hablo|confirmo)|vuelvo a (hablar|escribir)|lo (charlo|consulto|pienso|encargo|pido|saco)|ahi vemos|lo vemos|ahi te (escribo|compro)|me lo pido|despues retomo|lo retomo)\b/.test(t);
+    const futureAnchor = /\b(la semana que viene|la proxima semana|el mes que viene|proximo mes|otro dia|mas adelante|dame unos dias|unas semanas|a fin de mes|fin de mes|cuando (cobre|vuelva|pueda|me instale|tenga|me desocupe))\b/.test(t);
+    if (deferVerb && futureAnchor) return true;
+
+    // 4) Pedido explícito de agendar / despachar en fecha lejana
+    if (/\b(agendam|agendalo|agenda(me)?lo|postdat|despues del \d{1,2}|mandalo recien|despachalo el \d)/.test(t)) {
+        return true;
+    }
+
+    return false;
+}
+
 // ── Tier 1: Rebuttal estándar ──────────────────────────────────────────────
 // Tono: argentino rioplatense, calmado, sin insistir, siempre cerrando con
 // una pregunta que retoma el paso.
@@ -118,6 +174,16 @@ const REBUTTALS: Record<ObjectionMatch['type'], string[]> = {
         '¡Dale, sin apuro! 🙌 Te lo puedo dejar reservado a tu nombre para que no pierdas el precio de hoy. Vos lo pensás y cuando me decís, lo mandamos. ¿Te parece?',
     ],
 };
+
+// Rebuttal de 1er tier para la familia "diferir a futuro" (la detecta
+// detectPostponeDeferral, NO el regex de keywords de `postergar`). Lidera con la
+// OFERTA de agendar/postdatar cubriendo las dos razones que pidió el dueño:
+// "vas a comprar más adelante" y "no vas a estar en casa". Prohibido prometer
+// congelar precio (copy V7). Para tier 2/3 se reusan los de `postergar`.
+const DEFERRAL_REBUTTAL: string[] = [
+    '¡Tranqui, no hace falta que lo resuelvas ahora! 😊 Si querés *te lo dejo agendado*: me decís desde qué día te queda cómodo recibirlo —ya sea porque lo encarás cuando cobres o porque estos días no vas a estar en casa— y lo despacho recién esa fecha. ¿Te lo agendo así? 📅',
+    'Dale, no hay drama 🙌 Lo podemos *programar para más adelante*: vos me decís a partir de qué día te queda cómodo y te lo despacho recién ahí (sirve igual si lo comprás cuando cobres como si andás de viaje o no vas a estar en casa). ¿Te lo dejo agendado para esa fecha?',
+];
 
 // ── Tier 2: Rebuttal ESCALADO con OFERTA CONCRETA ──────────────────────────
 // Cuando la primera respuesta no funcionó, subimos la apuesta con una
@@ -188,35 +254,45 @@ export function detectObjection(
     // not objections. The step handlers own that decision.
     if (/^(si|no|dale|ok|listo|bueno)\.?$/i.test(normalizedText.trim())) return null;
 
+    let matchedType: ObjectionMatch['type'] | null = null;
     for (const { type, regex } of PATTERNS) {
-        if (!regex.test(normalizedText)) continue;
-
-        const handled = state.objectionsHandled || {};
-        const count = handled[type] || 0;
-        if (count >= MAX_HANDLED_PER_TYPE) {
-            // Después de 3 escaladas (standard + escalated + pause), AI retoma.
-            return null;
-        }
-
-        let response: string;
-        let tier: ObjectionMatch['tier'];
-        let pauseAfter = false;
-
-        if (count === 0) {
-            response = _pick(REBUTTALS[type]);
-            tier = 'standard';
-        } else if (count === 1) {
-            response = _pick(ESCALATED_REBUTTALS[type]);
-            tier = 'escalated';
-        } else {
-            // count === 2 → tier pause
-            response = PAUSE_MESSAGES[type];
-            tier = 'pause';
-            pauseAfter = true;
-        }
-
-        state.objectionsHandled = { ...handled, [type]: count + 1 };
-        return { type, response, handled: true, tier, pauseAfter };
+        if (regex.test(normalizedText)) { matchedType = type; break; }
     }
-    return null;
+
+    // Familia "diferir la compra a futuro" (te vuelvo a hablar la semana que
+    // viene / cuando cobre te aviso / me voy de viaje). Se trata como 'postergar'
+    // para reusar el escalado por tier, pero SOLO si ninguna categoría explícita
+    // (caro/consultar/etc.) matcheó antes — esas tienen mejor rebuttal propio.
+    const viaDeferral = !matchedType && detectPostponeDeferral(normalizedText);
+    if (viaDeferral) matchedType = 'postergar';
+    if (!matchedType) return null;
+
+    const handled = state.objectionsHandled || {};
+    const count = handled[matchedType] || 0;
+    if (count >= MAX_HANDLED_PER_TYPE) {
+        // Después de 3 escaladas (standard + escalated + pause), AI retoma.
+        return null;
+    }
+
+    let response: string;
+    let tier: ObjectionMatch['tier'];
+    let pauseAfter = false;
+
+    if (count === 0) {
+        // Para el diferimiento usamos el rebuttal dedicado (lidera con la oferta
+        // de agendar). Para tier 2/3 se reusan los de 'postergar'.
+        response = viaDeferral ? _pick(DEFERRAL_REBUTTAL) : _pick(REBUTTALS[matchedType]);
+        tier = 'standard';
+    } else if (count === 1) {
+        response = _pick(ESCALATED_REBUTTALS[matchedType]);
+        tier = 'escalated';
+    } else {
+        // count === 2 → tier pause
+        response = PAUSE_MESSAGES[matchedType];
+        tier = 'pause';
+        pauseAfter = true;
+    }
+
+    state.objectionsHandled = { ...handled, [matchedType]: count + 1 };
+    return { type: matchedType, response, handled: true, tier, pauseAfter };
 }

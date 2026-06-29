@@ -82,7 +82,11 @@ function _detectPostdatado(normalizedText: string): string | null {
     // Must have delivery/payment action context. Incluye keywords de "juntar"
     // y "conseguir" plata/efectivo — son objeciones económicas claras donde el
     // cliente quiere postponer el pago hasta tener el dinero.
-    const hasActionContext = /\b(recibir|recibirlo|llega|llegue|enviar|enviame|envialo|enviamela|enviamelo|mandalo|mandame|mandamela|mandamelo|entregar|cobro|depositan|sueldo|pago|puedo|pueden|venir|mandar|comprar|no tengo|para el|a partir|no puedo ahora|no puedo comprar|juntar|junte|junto|consigo|consiga|conseguir|ahorre|ahorrar|cuente con|me alcance|me alcance la plata|mucho inter[eé]s|cuotas|me comunico|aviso cuando|cuando tenga)\b/i.test(normalizedText);
+    // NOTA: incluir `cobre`/`cobrar` además de `cobro` — sin ellos el gate
+    // bloqueaba "cuando cobre" / "apenas cobre" aunque los patrones de extracción
+    // de abajo SÍ los manejan (quedaba devolviendo null por el gate, no por falta
+    // de patrón). Caso: el cliente confirma "dale, cuando cobre" tras la oferta.
+    const hasActionContext = /\b(recibir|recibirlo|llega|llegue|enviar|enviame|envialo|enviamela|enviamelo|mandalo|mandame|mandamela|mandamelo|entregar|cobro|cobre|cobrar|depositan|sueldo|pago|puedo|pueden|venir|mandar|comprar|no tengo|para el|a partir|no puedo ahora|no puedo comprar|juntar|junte|junto|consigo|consiga|conseguir|ahorre|ahorrar|cuente con|me alcance|me alcance la plata|mucho inter[eé]s|cuotas|me comunico|aviso cuando|cuando tenga)\b/i.test(normalizedText);
     if (!hasActionContext) return null;
 
     // FECHAS CERCANAS = NO postdatar (regla del dueño, caso 1131381951): el envío
