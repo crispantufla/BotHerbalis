@@ -209,7 +209,7 @@ export interface SharedState {
     reloadKnowledge: (scriptName?: string | null) => void;
     availableScripts: string[];
     handleAdminCommand: (targetChatId: string | null, commandText: string, isApi?: boolean) => Promise<string>;
-    logAndEmit: (chatId: string, sender: string, text: string, step?: string) => void;
+    logAndEmit: (chatId: string, sender: string, text: string, step?: string, messageId?: string | null, overrideTimestamp?: number) => void;
     io: any;
     requestPairingCode?: (phone: string) => Promise<string>;
 }

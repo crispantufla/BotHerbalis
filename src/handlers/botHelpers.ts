@@ -21,7 +21,7 @@ export interface BotHelpersContext {
 }
 
 export interface BotHelpers {
-    logAndEmit: (chatId: string, sender: string, text: string, step?: string, messageId?: string | null) => void;
+    logAndEmit: (chatId: string, sender: string, text: string, step?: string, messageId?: string | null, overrideTimestamp?: number) => void;
     saveOrderToLocal: (order: Record<string, any>) => void;
     cancelLatestOrder: (userId: string) => Promise<{ success: boolean; order?: any; reason?: string; currentStatus?: string }>;
     sendMessageWithDelay: (chatId: string, content: string, startTime?: number) => Promise<void>;
@@ -54,8 +54,15 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
         return `${baseType} (${duration} días)`;
     }
 
-    function logAndEmit(chatId: string, sender: string, text: string, step?: string, messageId: string | null = null): void {
+    function logAndEmit(chatId: string, sender: string, text: string, step?: string, messageId: string | null = null, overrideTimestamp?: number): void {
         logger.logMessage(chatId, sender, text, step);
+
+        // Hora del evento. Se captura SINCRÓNICAMENTE acá (no se delega al
+        // @default(now()) de la DB, que corre después del await del upsert) para
+        // que DB y socket compartan exactamente el mismo timestamp. Si el caller
+        // pasa overrideTimestamp (ej: mensaje manual desde el móvil con la hora
+        // real de envío del dispositivo), lo respetamos; si no, ahora().
+        const eventTs = (typeof overrideTimestamp === 'number' && overrideTimestamp > 0) ? new Date(overrideTimestamp) : new Date();
 
         // Async DB write
         (async () => {
@@ -71,7 +78,7 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
                 }).catch((e: any) => { if (e?.code !== 'P2002') throw e; });
 
                 await prisma.chatLog.create({
-                    data: { userPhone: cleanPhone, role: sender, content: text, instanceId: sellerId }
+                    data: { userPhone: cleanPhone, role: sender, content: text, instanceId: sellerId, timestamp: eventTs }
                 });
             } catch (e: any) {
                 logger.error(`[DB][${sellerId}] Error saving chat log:`, e.message);
@@ -81,7 +88,7 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
         if (sharedState.io) {
             // Emit to seller-specific room + admin room
             const payload = {
-                timestamp: new Date(),
+                timestamp: eventTs,
                 chatId,
                 sender,
                 text,
@@ -97,24 +104,25 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
 
     function saveOrderToLocal(order: Record<string, any>): void {
         const cleanPhone = (order.cliente || '').replace('@c.us', '').replace(/\D/g, '');
+        // Anclamos el aviso de error al momento en que se INTENTA guardar (no al
+        // momento del fallo async, que puede llegar segundos después tras esperar
+        // el lock). Así el "⚠️ ERROR" queda junto a la confirmación que lo originó
+        // y no flotando varios segundos más abajo. Un único timestamp para ambos
+        // rooms (antes cada emit hacía su propio Date.now()).
+        const attemptTs = Date.now();
         _saveOrderAsync(order, cleanPhone).catch((e: any) => {
             logger.error(`[ORDER][${sellerId}] CRITICAL: Order save failed for ${cleanPhone}. Data may be lost:`, e.message);
             // Notify admin so lost orders are visible
             if (sharedState.io) {
-                sharedState.io.to(sellerId).emit('new_log', {
+                const errorPayload = {
                     chatId: order.cliente || cleanPhone,
-                    role: 'system',
+                    sender: 'system',
                     text: `⚠️ ERROR: No se pudo guardar el pedido en la base de datos. Revisar logs.`,
-                    timestamp: Date.now(),
+                    timestamp: attemptTs,
                     sellerId
-                });
-                sharedState.io.to('admin').emit('new_log', {
-                    chatId: order.cliente || cleanPhone,
-                    role: 'system',
-                    text: `⚠️ ERROR: No se pudo guardar el pedido en la base de datos. Revisar logs.`,
-                    timestamp: Date.now(),
-                    sellerId
-                });
+                };
+                sharedState.io.to(sellerId).emit('new_log', errorPayload);
+                sharedState.io.to('admin').emit('new_log', errorPayload);
             }
         });
     }
@@ -256,8 +264,6 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
 
         logger.info(`[DELAY][${sellerId}] AI took ${elapsedSinceStart / 1000}s. Waiting ${remainingDelay / 1000}s more.`);
 
-        logAndEmit(chatId, 'bot', content, userState[chatId]?.step);
-
         // Fire-and-forget typing indicator — don't block the message pipeline with 2 Puppeteer calls
         client.getChatById(chatId)
             .then((chat: any) => chat?.sendStateTyping())
@@ -276,6 +282,15 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
 
         try {
             await client.sendMessage(chatId, content);
+            // Log + emit DESPUÉS del envío real: así el timestamp del ChatLog y
+            // del evento socket en vivo coinciden con la hora de envío que
+            // devuelve el fetch de WhatsApp en GET /history. Antes se logueaba
+            // ANTES del delay de 4-8s, con lo que el MISMO mensaje tenía hora de
+            // "decisión" en vivo/DB y hora de "envío" tras refrescar → el
+            // dashboard reordenaba los mensajes al recargar. Además, si la pausa
+            // de arriba abortaba el envío, ya no queda un log "fantasma" de un
+            // mensaje que el cliente nunca recibió.
+            logAndEmit(chatId, 'bot', content, userState[chatId]?.step);
             logger.info(`[SENT][${sellerId}] Message sent to ${chatId}`);
         } catch (e: any) {
             logger.error(`[ERROR][${sellerId}] Failed to send message:`, e.message);

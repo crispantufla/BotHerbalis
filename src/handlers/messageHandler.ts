@@ -23,7 +23,7 @@ export interface MessageHandlerContext {
     pausedUsers: Set<string>;
     pendingMessages: Map<string, { messages: { text: string; timestamp: number }[]; timer: ReturnType<typeof setTimeout>; startTime: number }>;
     botQueue: any;      // BullMQ Queue for this seller
-    logAndEmit: (chatId: string, sender: string, text: string, step?: string, messageId?: string | null) => void;
+    logAndEmit: (chatId: string, sender: string, text: string, step?: string, messageId?: string | null, overrideTimestamp?: number) => void;
     notifyAdmin: (reason: string, userPhone: string, details?: string | null) => Promise<any>;
     handleAdminCommand: (targetChatId: string | null, commandText: string, isApi?: boolean, alertSelector?: string | null) => Promise<any>;
     saveState: (userId?: string | null) => void;
@@ -402,7 +402,7 @@ export function createOutgoingMessageHandler(ctx: {
     pausedUsers: Set<string>;
     sharedState: any;
     botSentMessageIds: Set<string>;
-    logAndEmit: (chatId: string, sender: string, text: string, step?: string, messageId?: string | null) => void;
+    logAndEmit: (chatId: string, sender: string, text: string, step?: string, messageId?: string | null, overrideTimestamp?: number) => void;
 }): (msg: any) => Promise<void> {
     const { sellerId, userState, pausedUsers, sharedState, botSentMessageIds, logAndEmit } = ctx;
     const { dismissAlertsForUser } = require('../services/adminService');
@@ -446,7 +446,14 @@ export function createOutgoingMessageHandler(ctx: {
                     else if (msg.type === 'document') logText = '📄 Documento enviado';
                     else logText = '[archivo enviado]';
                 }
-                if (logText) logAndEmit(targetId, 'admin', logText, userState[targetId]?.step, msgId);
+                // Hora REAL de envío del dispositivo (msg.timestamp viene en
+                // segundos desde whatsapp-web.js). Sin esto el mensaje manual se
+                // registraba con la hora del handler (con la latencia del bridge
+                // Puppeteer + los 100ms de defer de arriba), y se intercalaba mal
+                // con los mensajes del bot → un correctivo escrito a mano podía
+                // aparecer DEBAJO del mensaje del bot al que respondía.
+                const deviceTs = (typeof msg.timestamp === 'number' && msg.timestamp > 0) ? msg.timestamp * 1000 : undefined;
+                if (logText) logAndEmit(targetId, 'admin', logText, userState[targetId]?.step, msgId, deviceTs);
             } catch (e: any) {
                 logger.warn(`[MANUAL-CHAT][${sellerId}] No se pudo registrar mensaje manual a ${targetId}: ${e?.message}`);
             }

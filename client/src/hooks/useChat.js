@@ -89,9 +89,43 @@ export const useChat = (selectedChatId) => {
     });
 
     const [messages, setMessages] = useState([]);
+    // Chat al que pertenece el array `messages` actual. Sirve para distinguir un
+    // REFETCH del mismo chat (hay que mergear) de un CAMBIO de chat (hay que
+    // reemplazar). Se actualiza inline acá, no en un effect aparte, para no
+    // depender del orden de ejecución de effects.
+    const messagesChatIdRef = useRef(selectedChatId);
     useEffect(() => {
-        if (messagesData) setMessages(messagesData);
-        else setMessages([]);
+        // Cambio de chat → descartamos lo viejo. messagesData puede venir
+        // undefined un instante (query nueva sin keepPreviousData); limpiamos
+        // para no mezclar mensajes de dos conversaciones.
+        if (messagesChatIdRef.current !== selectedChatId) {
+            messagesChatIdRef.current = selectedChatId;
+            setMessages(messagesData || []);
+            return;
+        }
+        if (!messagesData) {
+            setMessages([]);
+            return;
+        }
+        // Mismo chat: el refetch del historial NO debe pisar mensajes que
+        // llegaron por socket (ni placeholders optimistas) mientras la query
+        // estaba en vuelo. Merge: server primero + los locales que el server
+        // todavía no refleja (dedup por id, o por mismo emisor+texto dentro de
+        // 60s — mismo criterio que el backend), reordenado por timestamp.
+        setMessages(prev => {
+            if (!Array.isArray(prev) || prev.length === 0) return messagesData;
+            const serverIds = new Set(messagesData.map(m => m.id).filter(Boolean));
+            const extras = prev.filter(m => {
+                if (m.id && serverIds.has(m.id)) return false;
+                return !messagesData.some(sm =>
+                    sm.fromMe === m.fromMe &&
+                    sm.body === m.body &&
+                    Math.abs((sm.timestamp || 0) - (m.timestamp || 0)) <= 60000
+                );
+            });
+            if (extras.length === 0) return messagesData;
+            return [...messagesData, ...extras].sort((a, b) => a.timestamp - b.timestamp);
+        });
     }, [messagesData, selectedChatId]);
 
     const selectedChatIdRef = useRef(selectedChatId);
@@ -130,7 +164,12 @@ export const useChat = (selectedChatId) => {
                         // 1) Reemplazar el placeholder optimista (mensaje propio recién
                         //    enviado desde el panel) por la versión confirmada.
                         if (isMe) {
-                            const pendingIndex = list.findIndex(m => m.pending && m.body === newMsg.body && Math.abs(m.timestamp - timestamp) < 10000);
+                            // Ventana 65s (no 10s): la confirmación por socket puede tardar
+                            // si la red está congestionada o el bridge remoto va lento; con 10s
+                            // el placeholder no se reemplazaba y quedaba duplicado hasta el
+                            // siguiente refetch. 65s cubre la ventana del staleTime y coincide
+                            // con la tolerancia de de-dup de 60s del resto del flujo.
+                            const pendingIndex = list.findIndex(m => m.pending && m.body === newMsg.body && Math.abs(m.timestamp - timestamp) < 65000);
                             if (pendingIndex !== -1) {
                                 const updated = [...list];
                                 updated[pendingIndex] = { ...newMsg, pending: false };
@@ -166,23 +205,31 @@ export const useChat = (selectedChatId) => {
                     if (!Array.isArray(prev)) return [];
                     const existingChat = prev.find(c => c.id === data.chatId || (incomingPhone && c.id.replace(/\D/g, '').endsWith(incomingPhone.slice(-10))));
 
+                    let updated;
                     if (existingChat) {
-                        return prev.map((c) => c.id === existingChat.id ? {
+                        updated = prev.map((c) => c.id === existingChat.id ? {
                             ...c,
                             lastMessage: { body: data.text || '', timestamp },
                             unreadCount: currentSelectedId === existingChat.id ? 0 : (c.unreadCount || 0) + 1,
                             time: new Date(timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' }),
                             assignedScript: data.assignedScript || c.assignedScript
                         } : c);
+                    } else {
+                        updated = [{
+                            id: data.chatId,
+                            name: data.chatId,
+                            unreadCount: currentSelectedId === data.chatId ? 0 : 1,
+                            lastMessage: { body: data.text || '', timestamp },
+                            time: new Date(timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' }),
+                            assignedScript: data.assignedScript
+                        }, ...prev];
                     }
-                    return [{
-                        id: data.chatId,
-                        name: data.chatId,
-                        unreadCount: currentSelectedId === data.chatId ? 0 : 1,
-                        lastMessage: { body: data.text || '', timestamp },
-                        time: new Date(timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' }),
-                        assignedScript: data.assignedScript
-                    }, ...prev];
+
+                    // Reordenar por actividad reciente (último mensaje primero). Sin
+                    // esto el sidebar quedaba en orden de llegada de eventos socket
+                    // y un chat recién activo no subía al tope. lastMessage.timestamp
+                    // está en ms tanto desde el server como desde el socket.
+                    return [...updated].sort((a, b) => (b.lastMessage?.timestamp || 0) - (a.lastMessage?.timestamp || 0));
                 });
             } catch (err) { console.error('[useChat] Error handling socket message:', err); }
         };
