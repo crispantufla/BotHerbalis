@@ -281,18 +281,29 @@ export async function handleWaitingPlanChoice(
         } else {
             logger.info(`[AI-FALLBACK] waiting_plan_choice: No plan number detected for ${userId}`);
 
+            // Anti-repetición de cierre en consulta: el steer genérico no alcanza —
+            // Claude a veces repite textual la misma pregunta de plan dos turnos
+            // seguidos (queja admin 2026-06-13). Le pasamos su cierre anterior como
+            // frase PROHIBIDA explícita, que sí respeta.
+            let _antiRepeat = '';
+            {
+                const _lastBot = [...currentState.history].reverse().find((h) => h.role === 'bot' && typeof h.content === 'string');
+                const _m = _lastBot && _lastBot.content.match(/([^?\n]*\b(?:60|120)\b[^?\n]*\?)\s*$/i);
+                if (_m) _antiRepeat = `\n\n🚫 ANTI-REPETICIÓN: tu cierre anterior fue exactamente "${_m[1].trim()}". PROHIBIDO cerrar este mensaje con esa misma frase o una casi idéntica — usá una formulación claramente distinta (o, si ya preguntaste el plan hace poco, cerrá con una válvula suave sin plan).`;
+            }
+
             const planAI = await aiService.chat(text, {
                 step: 'waiting_plan_choice',
                 goal: `El usuario debe elegir un plan (60 o 120 días).
 RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.
-1) SI EL USUARIO HACE PREGUNTAS (ej: "cómo se toma", "tiene contraindicaciones", sobre su salud, o pide info de otro producto): TÓMATE TODO EL ESPACIO NECESARIO. Respóndele con párrafos detallados y con muchísima empatía. Explayate sobre los efectos del producto, dietas o garantías si lo piden. ETAPA DE CONSULTA — VARIÁ EL CIERRE, NO LO REPITAS TEXTUAL: respondé la duda con calidez y cerrá invitando a elegir plan, PERO cambiá la frase en CADA turno. NUNCA repitas palabra por palabra "¿te gustaría avanzar con el plan de 60 o 120 días?" en mensajes seguidos — suena a copy-paste robótico (queja real del admin 2026-06-13). Alterná formas humanas y naturales: "entonces, ¿qué plan te tienta, el de 60 o el de 120?", "¿lo armamos por 60 o por 120?", "¿con cuál te quedás?", y cada tanto una válvula suave sin plan ("¿alguna otra duda antes de seguir? 😊"). Que se sienta una charla, no un machaque. goalMet=false.
+1) SI EL USUARIO HACE PREGUNTAS (ej: "cómo se toma", "tiene contraindicaciones", sobre su salud, o pide info de otro producto): TÓMATE TODO EL ESPACIO NECESARIO. Respóndele con párrafos detallados y con muchísima empatía. Explayate sobre los efectos del producto, dietas o garantías si lo piden. ETAPA DE CONSULTA — VARIÁ EL CIERRE, NO LO REPITAS TEXTUAL: respondé la duda con calidez y cerrá invitando a elegir plan, PERO cambiá la frase en CADA turno. NUNCA repitas palabra por palabra "¿te gustaría avanzar con el plan de 60 o 120 días?" en mensajes seguidos — suena a copy-paste robótico (queja real del admin 2026-06-13). Alterná formas humanas y naturales: "entonces, ¿qué plan te tienta, el de 60 o el de 120?", "¿lo armamos por 60 o por 120?", "¿con cuál te quedás?", y cada tanto una válvula suave sin plan ("¿alguna otra duda antes de seguir? 😊"). MIRÁ TU CIERRE ANTERIOR en el historial: si tu último mensaje ya cerró con una de esas frases, usá una DISTINTA ahora — NUNCA repitas la misma fórmula de cierre dos turnos seguidos. Que se sienta una charla, no un machaque. goalMet=false.
 2) SI PREGUNTA CUÁNTOS KILOS BAJARÁ o pide garantías: Respondé textualmente "Cada cuerpo tiene su ritmo. Quienes tienen más kilos para bajar suelen notar cambios más visibles al inicio, y quienes necesitan bajar menos ven descensos más progresivos. Lo importante es que el descenso sea natural y sostenido." Luego preguntale con cuál plan quiere avanzar. goalMet=false.
 3) CAMBIO DE PRODUCTO: Si el usuario dice "quiero semillas" o "gotas", confirmá el cambio usando extractedData="CHANGE_PRODUCT: [Producto]" (SIN preguntarle de nuevo) y dale los precios de ese nuevo producto para que elija el plan. goalMet=false.
 4) Si el usuario confirma explícitamente un plan (ej: "el de 60" o "120") en su mensaje y también pregunta algo: respondé su pregunta explayándote todo lo necesario, PERO OBLIGATORIAMENTE DEBES PONER el número de plan en "extractedData" (ej: "60" o "120") y establecer goalMet=true. NUNCA pongas goalMet=true si en extractedData devuelves null.
 5) COBRO/SUELDO CERCANO ("cobro el viernes", "cobro el lunes", "me depositan el jueves"): Si el usuario dice que cobra en los próximos días, NO es excusa para postdatar. El envío tarda *7 a 10 días hábiles* por Correo Argentino (4 días hábiles si lo pagás antes, a domicilio). Además, si elige *retiro en sucursal* paga recién cuando lo retira — le da tiempo de sobra para cobrar. Tranquilizalo y preguntale con cuál plan quiere avanzar. goalMet=false, NO extraigas POSTDATADO.
 6) EXCUSAS TEMPORALES LEJANAS ("recién el mes que viene", "no tengo ahora", "a fin de mes", "cobro el 15", "después te aviso"): Si la fecha es a más de 10 días, ofrecé POSTDATAR directo. Respondé: "¡Tranqui! Te lo agendamos para la fecha que vos me digas y lo despacho recién ese día. ¿A partir de qué día te queda cómodo recibirlo?". Si dicen SÍ o dan fecha → extraé POSTDATADO: [fecha] y preguntá con cuál plan avanzar. Si insisten en NO definitivamente, recién ahí aceptá. PROHIBIDO mencionar "congelar precio" / "congelar promo".
 7) OBJECCIÓN DE ENVÍO O CONVENIENCIA (ej: "el de 60 no me conviene por el envío", "es caro el envío"): Respondé con mucha empatía explicando que el costo del envío en el plan de 60 es por el servicio de pago en destino que cobra el correo, y recalca que por eso el de 120 es la opción más elegida ya que tiene el ENVÍO GRATIS y rinde el doble. Intentá que elija el de 120 pero sé amable si insiste en el de 60. goalMet=false.
-8) HORARIO DE ENVÍO: Si pregunta cuándo o a qué hora llega, aclará que Correo Argentino maneja su propia logística y no podemos asegurar el horario, pero que avisamos si hay que retirar. Luego volvé al plan. goalMet=false.`,
+8) HORARIO DE ENVÍO: Si pregunta cuándo o a qué hora llega, aclará que Correo Argentino maneja su propia logística y no podemos asegurar el horario, pero que avisamos si hay que retirar. Luego volvé al plan. goalMet=false.${_antiRepeat}`,
                 history: currentState.history,
                 summary: currentState.summary,
                 knowledge: knowledge,
