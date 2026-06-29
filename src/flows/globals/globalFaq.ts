@@ -51,6 +51,7 @@ export async function handleFaq(
     // Buscar el FAQ cuyo keyword más largo matchea (más específico gana).
     let bestEntry: any = null;
     let bestLen = 0;
+    let bestKw = '';
     for (const entry of knowledge.faq) {
         if (!entry?.keywords || !entry?.response) continue;
         for (const kw of entry.keywords) {
@@ -59,11 +60,29 @@ export async function handleFaq(
             if (norm.includes(nkw) && nkw.length > bestLen) {
                 bestEntry = entry;
                 bestLen = nkw.length;
+                bestKw = nkw;
             }
         }
     }
 
     if (!bestEntry) return null;
+
+    // "tarda" / "demora" / "tiempo" son ambiguas: pueden referirse al tiempo del ENVÍO
+    // o a cuánto TARDA EN BAJAR DE PESO. Si la pregunta es sobre el ritmo de descenso,
+    // NO dispares la FAQ de envío — que la responda el paso/IA (ej. "4 a 6 kg el primer
+    // mes"). Reporte admin 2026-06-19 (5493425380805): "Demora mucho en bajar eso kilo?"
+    // → el bot soltó el menú de envío y no respondió lo que preguntaba.
+    const _timingKw = new Set(['tarda', 'demora', 'tiempo', 'cuanto tarda']);
+    const _weightLossTiming =
+        /\bbaj/.test(norm)                       // bajar / baja / bajo / bajando
+        || /\bperder\b|\bpierd/.test(norm)       // perder / pierdo (NO "perdón")
+        || /\badelgaz/.test(norm)                // adelgazar
+        || /\bdescenso\b|\bdescend/.test(norm)   // descenso / descender
+        || /\bkilo/.test(norm);                  // kilo / kilos
+    if (_timingKw.has(bestKw) && _weightLossTiming) {
+        logger.info(`[FAQ] Skip FAQ envío — "${trimmed.slice(0, 50)}" pregunta por ritmo de descenso, no por el envío`);
+        return null;
+    }
 
     // Skip FAQs cuyo triggerStep ya fue superado por el cliente — evita
     // re-preguntar datos ya capturados (caso típico: FAQ de precio que reasea
