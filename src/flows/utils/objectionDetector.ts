@@ -132,8 +132,12 @@ export function detectPostponeDeferral(normalizedText: string): boolean {
     }
 
     // 3) Soft-exit ("te vuelvo a hablar / te aviso") + ANCLA FUTURA real
-    const deferVerb = /\b(te (vuelvo a (hablar|escribir)|escribo|aviso|hablo|confirmo)|vuelvo a (hablar|escribir)|lo (charlo|consulto|pienso|encargo|pido|saco)|ahi vemos|lo vemos|ahi te (escribo|compro)|me lo pido|despues retomo|lo retomo)\b/.test(t);
-    const futureAnchor = /\b(la semana que viene|la proxima semana|el mes que viene|proximo mes|otro dia|mas adelante|dame unos dias|unas semanas|a fin de mes|fin de mes|cuando (cobre|vuelva|pueda|me instale|tenga|me desocupe))\b/.test(t);
+    const deferVerb = /\b(te (vuelvo a (hablar|escribir)|escribo|aviso|hablo|confirmo|contacto)|vuelvo a (hablar|escribir|contactar)|me comunico|(nos )?hablamos|nos (vemos|comunicamos)|lo (charlo|consulto|pienso|encargo|pido|saco)|ahi vemos|lo vemos|ahi te (escribo|compro)|me lo pido|despues retomo|lo retomo)\b/.test(t);
+    // Ancla futura: además de "la semana que viene / el mes que viene", cubrir
+    // "en 2 semanas", "en una semana", "en un mes", "en 15 dias", "dentro de X".
+    // Caso reportado por el dueño: "te hablo en 2 semanas" → el bot aflojaba con
+    // "tranqui cuando quieras" en vez de ofrecer agendar.
+    const futureAnchor = /\b(la semana que viene|la proxima semana|el mes que viene|proximo mes|otro dia|mas adelante|dame unos dias|unas semanas|a fin de mes|fin de mes|(en|dentro de) (un par de|par de|unos|unas|un|una|dos|tres|cuatro|cinco|seis|\d{1,2}) (dia|dias|semana|semanas|mes|meses)|cuando (cobre|vuelva|pueda|me instale|tenga|me desocupe))\b/.test(t);
     if (deferVerb && futureAnchor) return true;
 
     // 4) Pedido explícito de agendar / despachar en fecha lejana

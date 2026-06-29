@@ -45,6 +45,13 @@ const SHOULD_OFFER = [
     'me voy al sur 15 dias, dejalo para cuando vuelva porfa',
     'agendamelo para el primero de agosto',
     'dale, mandalo despues del 20 de julio',
+    // Reporte dueño: "te hablo en 2 semanas" → el bot aflojaba con "tranqui cuando quieras".
+    'te hablo en 2 semanas',
+    'te escribo en una semana',
+    'nos hablamos en 2 semanas',
+    'hablamos en un par de semanas',
+    'te aviso en 15 dias',
+    'en un mes te hablo',
 ];
 
 // NO debe disparar (compra/recepción YA, fecha de entrega, dato, afirmación):
