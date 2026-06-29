@@ -94,8 +94,15 @@ export async function handleWaitingPlanChoice(
     }
 
     const products = [
+        // OJO: se corre sobre normalizedText (sin acentos). El alternante `t[ée]`
+        // (para "té"/infusión) matcheaba la palabra ubicua "te" → cualquier
+        // "te puedo pagar", "te las encargo", etc. seteaba producto=Semillas. Eso
+        // pisó la elección real de Cápsulas y generó links/cobros del producto
+        // equivocado (caso 5491131381951: "Con tarjeta te puedo pagar 60" → Semillas
+        // $36.900 en vez de Cápsulas $49.900). Sin acentos "té" y "te" son iguales,
+        // así que ese alternante es imposible de usar sin falsos positivos: se quita.
         { match: /c[áa]psula|pastilla/i, name: 'Cápsulas' },
-        { match: /semilla|infusi[óo]n|t[ée]|yuyo/i, name: 'Semillas' },
+        { match: /semilla|infusi[óo]n|yuyo/i, name: 'Semillas' },
         { match: /gota/i, name: 'Gotas' },
         { match: /nuez|nueces/i, name: 'Semillas' }
     ];
@@ -113,7 +120,10 @@ export async function handleWaitingPlanChoice(
         let p = null;
         let pl = null;
 
-        for (const prod of products) if (prod.match.test(part)) p = prod.name;
+        // Gana el PRIMER match (más específico primero: Cápsulas antes que el
+        // catch-all "nuez"→Semillas). Sin el break ganaba el último, así que
+        // "cápsulas de nuez" caía a Semillas igual que el bug del `t[ée]`.
+        for (const prod of products) if (prod.match.test(part)) { p = prod.name; break; }
         for (const plan of plans) if (plan.match.test(part)) pl = plan.id;
 
         if (p && pl) {
