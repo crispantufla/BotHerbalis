@@ -221,6 +221,65 @@ describe('Aclaración "pago al recibir" con MP/domicilio', () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
+// BLOQUE 1c: malentendido "lo pago en mi domicilio" / "pago en casa"
+// Caso real 5492915126300 (30-jun): respondió "Lo pago en mi domicilio" al menú de
+// envío. El bot vio "domicilio" y la mandó al submenú prepago; ella eligió
+// transferencia creyendo que pagaba al llegar el paquete → venta fantasma. Quería
+// PAGAR AL RECIBIR EN SU CASA (contrareembolso a domicilio, eliminado may-2026).
+// El bot debe aclarar que pagar al recibir en efectivo es SOLO retiro en sucursal.
+// ════════════════════════════════════════════════════════════════════════════
+describe('Aclaración "pago en mi domicilio / en casa" (caso 5492915126300)', () => {
+    const norm = (t) => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+    test('"Lo pago en mi domicilio" → aclara retiro en sucursal, NO asume domicilio ni muestra submenú', async () => {
+        const state = makePaymentState('60');
+        mockSend.mockClear();
+        const txt = 'Lo pago en mi domicilio';
+        await handleWaitingPaymentMethod('ph1', txt, norm(txt), state, knowledge, deps);
+        // No debe tomarlo como elección de domicilio ni abrir el submenú prepago.
+        expect(state.shippingChoice).toBeFalsy();
+        expect(state.paymentSubChoiceAsked).toBeFalsy();
+        expect(state.paymentMethod).toBeFalsy();
+        expect(state.step).toBe('waiting_payment_method');
+        const sent = mockSend.mock.calls.map(([, m]) => m).join(' ');
+        expect(sent).toMatch(/retiro en sucursal/i);
+        expect(sent).toMatch(/al cartero.*no se le paga|en la puerta de tu casa/i);
+        // No debe haber mandado el submenú "lo mandamos a tu domicilio".
+        expect(sent).not.toMatch(/lo mandamos a tu domicilio/i);
+    });
+
+    test('"pago en casa" → misma aclaración', async () => {
+        const state = makePaymentState('60');
+        mockSend.mockClear();
+        const txt = 'pago en casa';
+        await handleWaitingPaymentMethod('ph2', txt, norm(txt), state, knowledge, deps);
+        expect(state.paymentSubChoiceAsked).toBeFalsy();
+        const sent = mockSend.mock.calls.map(([, m]) => m).join(' ');
+        expect(sent).toMatch(/retiro en sucursal/i);
+        expect(sent).toMatch(/efectivo/i);
+    });
+
+    test('"lo pago en mi domicilio con tarjeta" → NO dispara la aclaración (nombró prepago, sigue como domicilio)', async () => {
+        const state = makePaymentState('60');
+        mockSend.mockClear();
+        const txt = 'lo pago en mi domicilio con tarjeta';
+        await handleWaitingPaymentMethod('ph3', txt, norm(txt), state, knowledge, deps);
+        // Nombró tarjeta → entiende el prepago: el guard NO debe interceptar con la
+        // aclaración de "pago al recibir". Sigue el camino normal de domicilio.
+        expect(state.shippingChoice).toBe('domicilio');
+        const sent = mockSend.mock.calls.map(([, m]) => m).join(' ');
+        expect(sent).not.toMatch(/al cartero.*no se le paga|en la puerta de tu casa/i);
+    });
+
+    test('regresión: "domicilio" solo (sin verbo de pago) SIGUE yendo al submenú', async () => {
+        const state = makePaymentState('60');
+        await handleWaitingPaymentMethod('ph4', 'domicilio', norm('domicilio'), state, knowledge, deps);
+        expect(state.shippingChoice).toBe('domicilio');
+        expect(state.paymentSubChoiceAsked).toBe(true);
+    });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
 // BLOQUE 2: stepWaitingPaymentMethod — Retiro en sucursal (opción 1)
 // ════════════════════════════════════════════════════════════════════════════
 describe('Ambigüedad de envío — nombra LAS DOS opciones (caso 5493815010702)', () => {

@@ -41,6 +41,17 @@ const STANDALONE_NUM_WORD = /^\s*(?:la\s+|el\s+|opci[óo]n\s+)?(uno|dos|primer[o
 // en sucursal. Si NO mencionó retiro/sucursal, hay que aclararlo antes de avanzar.
 const PAY_ON_DELIVERY = /\b(al recibir|al recibirlo|al recibirla|cuando (?:lo |la |me )?reciba|cuando (?:me )?llegue|cuando me lo traigan|cuando me lo entreguen|contra ?entrega|al cartero|al recibir el (?:paquete|producto|pedido))\b/i;
 
+// Malentendido "lo pago en mi domicilio" / "pago en casa" (caso real 5492915126300,
+// 2026-06-30). La clienta NO está eligiendo "envío a domicilio": quiere PAGAR AL
+// RECIBIR EN SU CASA (contrarreembolso a domicilio), modalidad eliminada en mayo
+// 2026. El bot vio "domicilio" y la mandó al submenú prepago; ella eligió
+// transferencia creyendo que pagaba al llegar el paquete → venta fantasma y un
+// asesor tuvo que corregir a mano. El marcador que lo distingue de "envío a
+// domicilio" es el VERBO DE PAGO (pago/abono/...) pegado a "en/a (mi) casa/domicilio".
+// Sobre normalizedText (sin tildes). El gap acotado .{0,15} cubre "lo pago en mi
+// domicilio", "pago a domicilio", "abono en casa", "pago el pedido en mi domicilio".
+const PAY_AT_HOME = /\b(?:lo\s+|la\s+|me\s+)?(?:pagar[ií]a|pagarl[oa]|pagar|pago|abonar[ií]a|abonarl[oa]|abonar|abono|cancelo)\b.{0,15}?\b(?:en|a)\s+(?:mi\s+|el\s+|la\s+|su\s+|tu\s+)?(?:domicilio|casa)\b/i;
+
 // Despedida suave / dilación / "lo veo después" (reportes 2026-05-29 5493751416938
 // + 5491150190999 + 5492604649413). El cliente no elige opción de envío, dice
 // algo tipo "voy a ver", "gracias", "me comunico", "ahora estoy averiguando".
@@ -125,6 +136,27 @@ export async function handleWaitingPaymentMethod(
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
         logger.info(`[PAYMENT_METHOD] ${userId} → malentendido "pago al recibir" con medio prepago/domicilio. Aclarado, re-preguntando.`);
+        return { matched: true };
+    }
+
+    // ── Malentendido: "lo pago en mi domicilio" / "pago en casa" ───────────────
+    // (ver PAY_AT_HOME arriba.) La clienta quiere PAGAR AL RECIBIR EN SU CASA, que
+    // ya no existe. Se distingue de "envío a domicilio" por el verbo de pago pegado
+    // a "casa/domicilio". Si NO nombró un medio prepago (tarjeta/transferencia) ni
+    // retiro, aclaramos que pagar al recibir en efectivo es SOLO retiro en sucursal
+    // y re-preguntamos — SIN tomarlo como elección de domicilio.
+    if (!alreadyPaidMpClar
+        && PAY_AT_HOME.test(normalizedText)
+        && !RETIRO_KEYWORDS.test(text)
+        && !MP_KEYWORDS.test(text)
+        && !TRANSFER_KEYWORDS.test(normalizedText)) {
+        currentState.paymentSubChoiceAsked = false;
+        currentState.shippingChoice = null;
+        const msg = `¡Ojo, te aclaro así no hay malentendidos! 😊\n\nPagar *al recibir, en efectivo* solo se puede con *retiro en sucursal*: el paquete llega a la sucursal de Correo Argentino más cercana a tu casa y pagás el total *$${currentState.totalPrice || '?'}* recién cuando lo retirás 💵 — al cartero, en la puerta de tu casa, no se le paga.\n\nSi preferís recibirlo *en tu domicilio*, el pago va *antes* del envío (tarjeta de crédito o transferencia).\n\n¿Cómo preferís?\n1️⃣ *Retiro en sucursal* (pagás al retirar, en efectivo)\n2️⃣ *Envío a tu casa* (pagás ahora con tarjeta de crédito o transferencia)`;
+        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        saveState(userId);
+        await sendMessageWithDelay(userId, msg);
+        logger.info(`[PAYMENT_METHOD] ${userId} → malentendido "pago al recibir en domicilio/casa". Aclarado COD = retiro en sucursal, re-preguntando.`);
         return { matched: true };
     }
 
