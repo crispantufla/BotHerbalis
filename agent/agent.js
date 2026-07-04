@@ -103,6 +103,72 @@ const client = new Client({
     },
 });
 
+// ── Recuperación del perfil bloqueado (Windows) ──────────────────────────────
+// Chromium implementa un ProcessSingleton POR user-data-dir: si queda un
+// chrome.exe VIVO usando session-<seller> (porque un restart anterior —watchdog,
+// update, cierre de ventana con la X, crash— mató el Node sin cerrar el browser),
+// el próximo launch hace "handover" y sale, y puppeteer tira "The browser is
+// already running for <dir>" → fail() → exit(1) → run.bat relanza → MISMO zombie
+// → loop infinito (reporte real de horacio, jul-2026). Dos defensas, ambas
+// fail-open (si algo falla, se loguea y se sigue):
+//   1) cleanupStaleProfile(): ANTES de initialize mata SOLO los procesos cuyo
+//      command line apunta a la ruta ABSOLUTA de NUESTRO perfil — no toca el
+//      Chrome personal del vendedor ni otras sesiones. Rompe el loop y auto-cura.
+//   2) killBrowserSync(): en cada salida con el browser vivo (watchdog/update)
+//      mata el árbol del browser para no DEJAR el zombie. Corta el problema de raíz.
+const PROFILE_DIR = path.join(__dirname, '.wwebjs_auth', 'session-' + cfg.sellerId);
+let browserPid = null;
+
+function cleanupStaleProfile() {
+    if (process.platform !== 'win32') return;
+    try {
+        const { execFileSync } = require('child_process');
+        // Matamos SOLO el chrome.exe del browser cuyo argumento --user-data-dir es
+        // EXACTAMENTE nuestro perfil. Tres cuidados (los tres verificados con una
+        // revisión adversarial + prueba empírica en Windows):
+        //   • Name -eq 'chrome.exe': sin esto, -match sobre CommandLine tumbaría
+        //     CUALQUIER proceso que lleve la ruta del perfil en su línea de comando
+        //     (un antivirus escaneándola, un editor/shell del vendedor, etc.).
+        //   • [regex]::Escape(...): la ruta puede traer [ ] . ( ) y espacios ("Bot
+        //     Whatsapp") — escaparla evita tanto falsos negativos como sobre-match.
+        //   • Ancla final (?:"|\s|$): sin ella, session-horacio matchearía el Chrome
+        //     SANO de session-horacio2 (otro seller en la misma PC) por prefijo.
+        // El '--user-data-dir=' + comilla/espacio de cierre encuadran el valor exacto.
+        const dirLit = PROFILE_DIR.replace(/'/g, "''"); // literal PS single-quoted
+        // Regex: --user-data-dir="?<perfil>(?:"|\s|$)
+        //   • "? tras el '=' cubre las dos formas de quoting: node spawnea el proceso
+        //     browser como "--user-data-dir=<path>" (comilla afuera) y Chromium spawnea
+        //     los hijos como --user-data-dir="<path>" (comilla adentro).
+        //   • el ancla final evita que session-horacio matchee session-horacio2.
+        const psScript = `Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'chrome.exe' -and $_.CommandLine -match ([regex]::Escape('--user-data-dir=') + '"?' + [regex]::Escape('${dirLit}') + '(?:"|\\s|$)') } | ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch {} }`;
+        // -EncodedCommand (base64 UTF-16LE): el script lleva comillas, $_ y una regex
+        // con "|\s|$ — pasarlo como -Command a través del quoting de Node→powershell
+        // los corrompe. El base64 no tiene nada que cmd/PS puedan malinterpretar.
+        const encoded = Buffer.from(psScript, 'utf16le').toString('base64');
+        execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-EncodedCommand', encoded], { stdio: 'ignore', timeout: 15000, windowsHide: true });
+        log(`perfil: limpié cualquier Chromium previo de session-${cfg.sellerId} (si había alguno)`);
+    } catch (e) { log('cleanup de perfil (ignorado):', (e && e.message) || String(e)); }
+}
+
+// Mata sincrónicamente el árbol del browser de ESTA corrida. Se llama antes de
+// process.exit() en las salidas con browser vivo, para no dejar el zombie que
+// bloquea el próximo arranque.
+function killBrowserSync() {
+    let pid = browserPid;
+    try {
+        const p = client.pupBrowser && typeof client.pupBrowser.process === 'function' ? client.pupBrowser.process() : null;
+        if (p && p.pid) pid = p.pid;
+    } catch { /* noop */ }
+    if (!pid) return;
+    try {
+        if (process.platform === 'win32') {
+            require('child_process').execFileSync('taskkill', ['/F', '/T', '/PID', String(pid)], { stdio: 'ignore', timeout: 10000 });
+        } else {
+            process.kill(pid);
+        }
+    } catch { /* best-effort: si falla, el próximo cleanupStaleProfile lo agarra */ }
+}
+
 let waReady = false;
 let exposed = false;
 
@@ -127,7 +193,7 @@ function startFrameWatchdog() {
         } catch (e) {
             watchdogStrikes++;
             log(`frame health-check falló (${watchdogStrikes}/2):`, e.message);
-            if (watchdogStrikes >= 2) { log('frame zombie — saliendo para que run.bat relance'); process.exit(1); }
+            if (watchdogStrikes >= 2) { log('frame zombie — matando el browser y saliendo para que run.bat relance'); killBrowserSync(); process.exit(1); }
         }
     }, 60000);
 }
@@ -174,6 +240,7 @@ client.on('authenticated', () => log('autenticado'));
 client.on('auth_failure', (m) => { log('auth_failure:', m); send({ t: 'auth_failure', message: m }); });
 client.on('ready', async () => {
     waReady = true;
+    try { const p = client.pupBrowser && client.pupBrowser.process(); if (p && p.pid) browserPid = p.pid; } catch { /* noop */ }
     const phone = client.info && client.info.wid ? client.info.wid.user : '';
     log('✅ WhatsApp listo. Número:', phone);
     send({ t: 'ready', phone });
@@ -395,7 +462,7 @@ async function handleCommand(frame) {
                 ack(id, true, { updated });
                 if (updated) {
                     log('✓ actualizado — reiniciando');
-                    setTimeout(() => process.exit(99), 500); // deja salir el ack por el WS
+                    setTimeout(() => { killBrowserSync(); process.exit(99); }, 500); // deja salir el ack por el WS
                 }
                 return;
             }
@@ -490,11 +557,19 @@ function stopKeepAwake() { if (keepAwakeProc) { try { keepAwakeProc.kill(); } ca
     } catch (e) { log('updater falló (sigo con la versión actual):', e.message); }
     startKeepAwake();   // evitar que la PC se suspenda y tire el agente (flapping)
     connectGateway();
+    // Matar cualquier Chromium zombie que haya quedado con el perfil bloqueado —
+    // si no, initialize() tira "The browser is already running" y entramos en el
+    // loop de reinicio (ver cleanupStaleProfile). Sincrónico y fail-open.
+    cleanupStaleProfile();
     client.initialize().catch((e) => fail(`no pude iniciar WhatsApp: ${e.message}`));
 
     // Apenas exista la ventana de Chrome (antes del QR/ready), abrir el dashboard al lado.
     const dashTimer = setInterval(() => {
-        if (client.pupBrowser && client.pupPage) { clearInterval(dashTimer); openDashboardTab(); }
+        if (client.pupBrowser && client.pupPage) {
+            clearInterval(dashTimer);
+            try { const p = client.pupBrowser.process(); if (p && p.pid) browserPid = p.pid; } catch { /* noop */ }
+            openDashboardTab();
+        }
     }, 700);
 })();
 
@@ -509,4 +584,4 @@ process.on('uncaughtException', (e) => {
 });
 
 process.on('exit', stopKeepAwake);   // no dejar el PowerShell de keep-awake colgado
-process.on('SIGINT', async () => { log('cerrando…'); stopKeepAwake(); try { await client.destroy(); } catch {} process.exit(0); });
+process.on('SIGINT', async () => { log('cerrando…'); stopKeepAwake(); try { await client.destroy(); } catch {} killBrowserSync(); process.exit(0); });
