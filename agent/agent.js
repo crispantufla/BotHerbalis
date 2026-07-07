@@ -171,6 +171,10 @@ function killBrowserSync() {
 
 let waReady = false;
 let exposed = false;
+// Estamos mostrando un QR y esperando que el vendedor lo escanee: en ese estado
+// NO estar "ready" es normal (puede tardar minutos), así que el stuck-watchdog de
+// más abajo se pausa para no relanzar en plena cara del vendedor mientras escanea.
+let awaitingQr = false;
 
 // Health-check del frame: tras una suspensión de la PC + recarga de WA Web, el
 // pupPage de wwebjs puede quedar apuntando a un frame DETACHED — el bot deja de
@@ -196,6 +200,35 @@ function startFrameWatchdog() {
             if (watchdogStrikes >= 2) { log('frame zombie — matando el browser y saliendo para que run.bat relance'); killBrowserSync(); process.exit(1); }
         }
     }, 60000);
+}
+
+// Watchdog "conectado pero nunca llegó a ready". Si el gateway está conectado y
+// WA Web no alcanzó 'ready' en STUCK_LIMIT_MS —y NO estamos esperando el escaneo
+// de un QR— es que wwebjs quedó colgado (re-pair a medias, loading screen trabado,
+// frame que no engancha, perfil recién re-emparejado). Nadie lo cura solo: el
+// server manda 'sync' UNA sola vez al (re)conectar el agente y, si waReady está en
+// false, el frame 'ready' no sale nunca → el dashboard queda OFFLINE para siempre
+// (caso horacio jul-2026: vinculó un número nuevo, quedó offline 3 h tras un
+// restart del server). Relanzamos limpio: run.bat re-corre cleanupStaleProfile +
+// initialize — el mismo remedio que el reinicio manual, pero automático. Umbral
+// conservador (5 min consecutivos) y el reset ante waReady/awaitingQr/gateway-caído
+// evitan relanzar durante un boot normal, un escaneo de QR o una caída de red.
+const STUCK_CHECK_MS = 60000;
+const STUCK_LIMIT_MS = 300000; // 5 min conectado-sin-ready ⇒ colgado
+let stuckTimer = null;
+let notReadyStreak = 0;
+function startStuckWatchdog() {
+    if (stuckTimer) return;
+    stuckTimer = setInterval(() => {
+        // Ready, esperando QR, o gateway caído → no es un cuelgue: reiniciar la cuenta.
+        if (waReady || awaitingQr || !ws || ws.readyState !== WebSocket.OPEN) { notReadyStreak = 0; return; }
+        notReadyStreak++;
+        if (notReadyStreak * STUCK_CHECK_MS >= STUCK_LIMIT_MS) {
+            log(`WhatsApp no llegó a "ready" en ${STUCK_LIMIT_MS / 60000} min con el gateway conectado — relanzando limpio para re-enganchar`);
+            killBrowserSync();
+            process.exit(1); // run.bat relanza → cleanupStaleProfile + initialize fresco
+        }
+    }, STUCK_CHECK_MS);
 }
 
 // Abre el dashboard de Railway en una segunda pestaña del mismo Chrome.
@@ -231,15 +264,17 @@ function serializeMsg(m) {
 }
 
 client.on('qr', (qr) => {
+    awaitingQr = true; // esperando escaneo humano → pausa el stuck-watchdog
     log('escaneá este QR con el WhatsApp del vendedor (en ESTA ventana, no en el dashboard):');
     qrcode.generate(qr, { small: true });
     // NO se reenvía al dashboard: el QR se escanea acá, en la ventana del agente.
     // (El dashboard ya no muestra QR para un vendedor remoto.)
 });
-client.on('authenticated', () => log('autenticado'));
+client.on('authenticated', () => { awaitingQr = false; log('autenticado'); }); // ya escaneó/reconectó: ahora 'ready' debe llegar solo
 client.on('auth_failure', (m) => { log('auth_failure:', m); send({ t: 'auth_failure', message: m }); });
 client.on('ready', async () => {
     waReady = true;
+    awaitingQr = false;
     try { const p = client.pupBrowser && client.pupBrowser.process(); if (p && p.pid) browserPid = p.pid; } catch { /* noop */ }
     const phone = client.info && client.info.wid ? client.info.wid.user : '';
     log('✅ WhatsApp listo. Número:', phone);
@@ -457,12 +492,16 @@ async function handleCommand(frame) {
             case 'update': {
                 // Push remoto: POST /api/agent/update → gateway → acá. Baja los
                 // archivos nuevos de /agent-dist y sale con 99 (run.bat relanza).
-                log('update remoto solicitado por el gateway…');
+                // frame.force=true relanza AUNQUE no haya versión nueva — palanca del
+                // admin para descolgar en el acto un agente "conectado pero no ready".
+                log(frame.force ? 'relaunch remoto FORZADO por el gateway…' : 'update remoto solicitado por el gateway…');
                 const updated = await checkAndUpdate(cfg);
-                ack(id, true, { updated });
-                if (updated) {
-                    log('✓ actualizado — reiniciando');
-                    setTimeout(() => { killBrowserSync(); process.exit(99); }, 500); // deja salir el ack por el WS
+                ack(id, true, { updated, forced: !!frame.force });
+                if (updated || frame.force) {
+                    log(updated ? '✓ actualizado — reiniciando' : '✓ relanzando (forzado, sin cambio de versión)');
+                    // exit 99 = convención "actualizado"; si es solo force, exit 1
+                    // igual relanza (run.bat loopea ante cualquier código ≠ 0).
+                    setTimeout(() => { killBrowserSync(); process.exit(updated ? 99 : 1); }, 500); // deja salir el ack por el WS
                 }
                 return;
             }
@@ -562,6 +601,7 @@ function stopKeepAwake() { if (keepAwakeProc) { try { keepAwakeProc.kill(); } ca
     // loop de reinicio (ver cleanupStaleProfile). Sincrónico y fail-open.
     cleanupStaleProfile();
     client.initialize().catch((e) => fail(`no pude iniciar WhatsApp: ${e.message}`));
+    startStuckWatchdog();   // vigila "gateway conectado pero WA nunca ready" y relanza si se cuelga
 
     // Apenas exista la ventana de Chrome (antes del QR/ready), abrir el dashboard al lado.
     const dashTimer = setInterval(() => {

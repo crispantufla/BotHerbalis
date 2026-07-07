@@ -163,15 +163,19 @@ module.exports = (clientPool) => {
     // POST /agent/update — empuja {t:'update'} al agente remoto del seller (PC del
     // vendedor). El agente baja los archivos nuevos de /agent-dist y se relanza
     // (exit 99 → run.bat). Uso típico tras deployar un cambio de agent/sidebar.js:
-    //   POST /api/agent/update?sellerId=horacio  (con JWT de admin)
+    //   POST /api/agent/update?sellerId=horacio           (con JWT de admin)
+    //   POST /api/agent/update?sellerId=horacio&force=1    → relanza AUNQUE no haya
+    //     versión nueva. Palanca para descolgar en el acto un agente "conectado pero
+    //     nunca ready" (WA Web trabado) sin pedirle al vendedor que reinicie a mano.
     router.post('/agent/update', ...withSeller(clientPool), requireAdmin, (req, res) => {
         const { agentHub } = require('../../services/agentBridge');
         const sellerId = req.sellerId;
         if (!sellerId) return res.status(400).json({ error: 'sellerId requerido (?sellerId=… para admins)' });
         if (!agentHub.isOnline(sellerId)) return res.status(404).json({ error: `Agente de ${sellerId} no conectado` });
-        const sent = agentHub.send(sellerId, { t: 'update' });
-        logger.info(`[AGENT-DIST] Push de update a ${sellerId}: ${sent ? 'enviado' : 'falló'}`);
-        res.json({ ok: sent });
+        const force = req.query.force === '1' || req.query.force === 'true' || req.body?.force === true;
+        const sent = agentHub.send(sellerId, { t: 'update', force });
+        logger.info(`[AGENT-DIST] Push de ${force ? 'relaunch (force)' : 'update'} a ${sellerId}: ${sent ? 'enviado' : 'falló'}`);
+        res.json({ ok: sent, force });
     });
 
     // GET /agent/installer — genera el instalador del agente para el seller y lo
