@@ -169,6 +169,72 @@ function killBrowserSync() {
     } catch { /* best-effort: si falla, el próximo cleanupStaleProfile lo agarra */ }
 }
 
+// ── Instancia única (anti doble-launch) ──────────────────────────────────────
+// DOS agentes del mismo seller en la misma PC (doble-click al lanzador) es un
+// desastre: se pelean el socket del gateway (flap de reconexión cada ~3s) y cada
+// boot le mata el Chromium al otro (cleanupStaleProfile matchea el mismo perfil)
+// → "se reinicia solo cada minuto" + envíos que fallan por frame detached (caso
+// horacio jul-2026). Candado: un named pipe (Windows) / unix socket (posix) que el
+// OS LIBERA solo al morir el proceso — sin PID files ni staleness (que sufren reuse
+// de PID). El 2º agente no puede escuchar el mismo pipe → se cierra limpio (exit 0
+// → run.bat NO relanza). Fail-open: ante un error raro del candado arrancamos igual
+// (mejor correr sin protección que quedar mudo). Va ANTES de checkAndUpdate/Chromium
+// para que el duplicado salga sin tocarle el perfil al que ya anda.
+// Tradeoff conocido: si el que ya corre queda "colgado-pero-vivo", retiene el pipe y
+// un doble-click del vendedor para "reiniciar" se cierra en silencio; se auto-cura vía
+// el stuck/frame-watchdog (≤5 min). No lo resolvemos con un canal de control por el
+// pipe a propósito: haría que un doble-click accidental rebote una sesión SANA.
+let singleInstanceServer = null;
+function _lockName() {
+    return process.platform === 'win32'
+        ? `\\\\.\\pipe\\herbalis-agent-${cfg.sellerId}`
+        : path.join(require('os').tmpdir(), `herbalis-agent-${cfg.sellerId}.sock`);
+}
+function _tryListen(name) {
+    const net = require('net');
+    return new Promise((resolve) => {
+        const srv = net.createServer((sock) => sock.destroy()); // no atendemos: solo marcamos presencia
+        srv.once('error', (err) => resolve({ ok: false, err }));
+        srv.listen(name, () => resolve({ ok: true, srv }));
+    });
+}
+async function acquireSingleInstanceLock() {
+    const name = _lockName();
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        const r = await _tryListen(name);
+        if (r.ok) { singleInstanceServer = r.srv; return true; }
+        if (r.err && r.err.code === 'EADDRINUSE') {
+            // POSIX (solo dev): un .sock huérfano (crash sin cerrar) da EADDRINUSE
+            // aunque no haya dueño vivo. Probamos conectar; si nadie atiende, está
+            // stale. En Windows el kernel libera el pipe al morir el proceso, así que
+            // ahí un EADDRINUSE = dueño vivo de verdad (esta rama no corre en prod).
+            if (process.platform !== 'win32') {
+                const alive = await new Promise((res) => {
+                    const c = require('net').connect(name)
+                        .once('connect', () => { c.destroy(); res(true); })
+                        .once('error', () => res(false));
+                });
+                if (!alive) {
+                    // Stale: intentamos tomarlo (unlink + relisten), pero SIN dueño vivo
+                    // arrancamos igual pase lo que pase (fail-open) — nunca quedar mudos
+                    // por un .sock que nadie usa aunque el unlink falle (permisos, RO-FS).
+                    try { fs.unlinkSync(name); } catch { /* noop */ }
+                    const r2 = await _tryListen(name);
+                    if (r2.ok) singleInstanceServer = r2.srv;
+                    return true;
+                }
+            }
+            // Dueño vivo (o Windows). Un reintento corto cubre la carrera con un
+            // relaunch de run.bat (el proceso viejo libera el pipe recién al salir).
+            if (attempt < 3) { await new Promise((res) => setTimeout(res, 500)); continue; }
+            return false;
+        }
+        log('candado de instancia única no disponible (sigo igual):', (r.err && r.err.message) || 'error desconocido');
+        return true; // fail-open
+    }
+    return false;
+}
+
 let waReady = false;
 let exposed = false;
 // Estamos mostrando un QR y esperando que el vendedor lo escanee: en ese estado
@@ -585,6 +651,12 @@ function stopKeepAwake() { if (keepAwakeProc) { try { keepAwakeProc.kill(); } ca
 // ── Arranque ─────────────────────────────────────────────────────────────────
 (async () => {
     log(`iniciando agente para seller "${cfg.sellerId}"…`);
+    // Instancia única ANTES de tocar nada (update, Chromium): si ya hay otro agente
+    // de este seller corriendo, cerramos limpio en vez de flapear y matarle el Chrome.
+    if (!(await acquireSingleInstanceLock())) {
+        log('⛔ Ya hay otro "Bot Herbalis" de este vendedor abierto — cerrá esta ventana. Me cierro para no duplicar.');
+        process.exit(0);
+    }
     // Auto-update ANTES de lanzar Chromium: si hay versión nueva en Railway, se
     // baja y se sale con 99 — run.bat relanza con el código nuevo. Fail-open: un
     // updater caído (Railway deployando, sin internet) nunca bloquea el boot.
@@ -624,4 +696,4 @@ process.on('uncaughtException', (e) => {
 });
 
 process.on('exit', stopKeepAwake);   // no dejar el PowerShell de keep-awake colgado
-process.on('SIGINT', async () => { log('cerrando…'); stopKeepAwake(); try { await client.destroy(); } catch {} killBrowserSync(); process.exit(0); });
+process.on('SIGINT', async () => { log('cerrando…'); stopKeepAwake(); try { singleInstanceServer && singleInstanceServer.close(); } catch {} try { await client.destroy(); } catch {} killBrowserSync(); process.exit(0); });
