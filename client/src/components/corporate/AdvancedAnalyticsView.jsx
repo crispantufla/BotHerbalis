@@ -11,8 +11,6 @@ import {
 import api from '../../config/axios';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
-import { useSeller } from '../../context/SellerContext';
-import { capitalize } from '../../utils/format';
 import {
     Card, Button, IconButton, Badge, KpiCard, EmptyState, cn
 } from '../ui';
@@ -49,11 +47,8 @@ const SectionHeader = ({ children }) => (
 const AdvancedAnalyticsView = () => {
     const { isDark } = useTheme();
     const { isAdmin } = useAuth();
-    const { sellers } = useSeller();
     const [loading, setLoading] = useState(true);
     const [daysAgoToFetch, setDaysAgoToFetch] = useState(30);
-    // Filtro local solo para admin global. "all" = agregado.
-    const [analyticsSellerFilter, setAnalyticsSellerFilter] = useState('all');
     const [data, setData] = useState({
         overview: null,
         products: { popularity: [], duration: [] },
@@ -66,9 +61,9 @@ const AdvancedAnalyticsView = () => {
         try {
             setLoading(true);
             const headers = {};
-            if (isAdmin) {
-                headers['x-seller-id'] = analyticsSellerFilter === 'all' ? '' : analyticsSellerFilter;
-            }
+            // Setup de un solo vendedor: el admin ve siempre el agregado general
+            // (x-seller-id vacío = todas las instancias). Sin filtro por vendedor.
+            if (isAdmin) headers['x-seller-id'] = '';
             const opts = { headers };
             const [overviewRes, productsRes, demoRes, chartsRes, adPerfRes] = await Promise.all([
                 api.get(`/api/analytics/overview?days=${daysAgoToFetch}`, opts),
@@ -94,7 +89,7 @@ const AdvancedAnalyticsView = () => {
     useEffect(() => {
         fetchAllData();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [daysAgoToFetch, analyticsSellerFilter]);
+    }, [daysAgoToFetch]);
 
     // Custom tooltip — usa los colores del Card primitive
     const CustomTooltip = ({ active, payload, label }) => {
@@ -175,38 +170,6 @@ const AdvancedAnalyticsView = () => {
                             </button>
                         ))}
                     </div>
-
-                    {isAdmin && sellers.length > 0 && (
-                        <div className="flex p-1 rounded-control bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 overflow-x-auto">
-                            <button
-                                type="button"
-                                onClick={() => setAnalyticsSellerFilter('all')}
-                                className={cn(
-                                    'flex-shrink-0 px-3 py-1.5 rounded-[0.5rem] text-xs font-medium transition-colors',
-                                    analyticsSellerFilter === 'all'
-                                        ? 'bg-accent-100 text-accent-700 dark:bg-accent-900/40 dark:text-accent-300'
-                                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
-                                )}
-                            >
-                                Todos
-                            </button>
-                            {sellers.map(s => (
-                                <button
-                                    key={s.sellerId}
-                                    type="button"
-                                    onClick={() => setAnalyticsSellerFilter(s.sellerId)}
-                                    className={cn(
-                                        'flex-shrink-0 px-3 py-1.5 rounded-[0.5rem] text-xs font-medium transition-colors whitespace-nowrap',
-                                        analyticsSellerFilter === s.sellerId
-                                            ? 'bg-accent-100 text-accent-700 dark:bg-accent-900/40 dark:text-accent-300'
-                                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
-                                    )}
-                                >
-                                    {capitalize(s.name)}
-                                </button>
-                            ))}
-                        </div>
-                    )}
 
                     <IconButton
                         label="Actualizar datos"

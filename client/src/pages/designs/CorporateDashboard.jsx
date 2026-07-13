@@ -22,7 +22,6 @@ import AccountsView from '../../components/admin/AccountsView';
 import AccountStatsView from '../../components/admin/AccountStatsView';
 import FunnelAnalyticsView from '../../components/admin/FunnelAnalyticsView';
 import RescueQueueView from '../../components/admin/RescueQueueView';
-import SellerSelector from '../../components/admin/SellerSelector';
 import ManualOrderEntryModal from '../../components/corporate/components/ManualOrderEntryModal';
 
 import { Wifi, MessageCircle, ShoppingCart, Settings, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Bell, AlertTriangle, BookOpen, MoreHorizontal, CreditCard, Users, LifeBuoy, MessagesSquare, FlaskConical, Package } from 'lucide-react';
@@ -483,9 +482,6 @@ const CorporateDashboard = () => {
                     </div>
 
                     <div className="flex items-center gap-2 lg:gap-4 ml-auto">
-                        {/* Seller Selector — any admin, to supervise/intercede in other sellers */}
-                        {isAdmin && <div className="hidden md:block"><SellerSelector /></div>}
-
                         {/* Notifications Bell */}
                         <div className="relative" ref={notifRef}>
                             <button 
