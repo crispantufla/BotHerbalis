@@ -30,6 +30,16 @@ const PAYMENT_TONE = {
 };
 const paymentMeta = (m) => PAYMENT_TONE[m] || { tone: 'warning', label: 'Contra reembolso' };
 
+// Tipo de envío — el Order no tiene campo dedicado. El flujo marca el retiro
+// seteando `calle = "A sucursal"` (el pago suele quedar en contrarembolso).
+// Ver src/flows/utils/messages.ts:135. Todo lo demás es envío a domicilio (prepago).
+const isSucursal = (order) =>
+    String(order.calle || '').trim().toLowerCase() === 'a sucursal' ||
+    order.paymentMethod === 'contrarembolso';
+const shippingMeta = (order) => isSucursal(order)
+    ? { tone: 'accent', label: 'Sucursal',  Icon: Package }
+    : { tone: 'info',   label: 'Domicilio', Icon: MapPin };
+
 const STATUS_OPTIONS = ['Pendiente', 'Confirmado', 'En sistema', 'Enviado', 'Entregado', 'Cancelado'];
 
 // Date formatter — manejo legacy strings y ISO. Ojo: el calendario "DD/MM/YYYY
@@ -199,11 +209,11 @@ const SalesView = ({ onGoToChat, initialSearch = '' }) => {
 
     const handleExportCSV = () => {
         if (orders.length === 0) return;
-        const headers = ['Fecha', 'Cliente', 'Nombre', 'Producto', 'Plan', 'Precio', 'Postdatado', 'Estado', 'Tracking', 'Ciudad', 'Calle', 'CP'];
+        const headers = ['Fecha', 'Cliente', 'Nombre', 'Producto', 'Plan', 'Precio', 'Postdatado', 'Estado', 'Envío', 'Tracking', 'Ciudad', 'Calle', 'CP'];
         const rows = orders.map(o => [
             o.createdAt ? new Date(o.createdAt).toLocaleDateString() : '',
             o.cliente || '', o.nombre || '', o.producto || '', o.plan || '', o.precio || '',
-            o.postdatado || '', o.status || '', o.tracking || '', o.ciudad || '', o.calle || '', o.cp || ''
+            o.postdatado || '', o.status || '', shippingMeta(o).label, o.tracking || '', o.ciudad || '', o.calle || '', o.cp || ''
         ]);
         const csvContent = [headers.join(','), ...rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','))].join('\n');
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -399,6 +409,7 @@ CP: ${order.cp || '—'}`;
                                 <th className="px-4 py-3.5 w-full">Cliente</th>
                                 <th className="px-4 py-3.5">Teléfono</th>
                                 <th className="px-4 py-3.5 text-center">Vendedor</th>
+                                <th className="px-4 py-3.5 text-center">Envío</th>
                                 <th className="px-4 py-3.5 text-center">Estado</th>
                                 <th className="px-4 py-3.5 text-right">Acciones</th>
                             </tr>
@@ -412,11 +423,12 @@ CP: ${order.cp || '—'}`;
                                         <td className="px-4 py-3"><div className="h-3 bg-slate-200 dark:bg-slate-700/50 rounded w-24" /></td>
                                         <td className="px-4 py-3 text-center"><div className="h-3 bg-slate-200 dark:bg-slate-700/50 rounded w-16 mx-auto" /></td>
                                         <td className="px-4 py-3 text-center"><div className="h-5 bg-slate-200 dark:bg-slate-700/50 rounded-full w-20 mx-auto" /></td>
+                                        <td className="px-4 py-3 text-center"><div className="h-5 bg-slate-200 dark:bg-slate-700/50 rounded-full w-20 mx-auto" /></td>
                                         <td className="px-4 py-3"><div className="flex gap-2 justify-end"><div className="w-8 h-8 rounded bg-slate-200 dark:bg-slate-700/50" /><div className="w-8 h-8 rounded bg-slate-200 dark:bg-slate-700/50" /></div></td>
                                     </tr>
                                 ))
                             ) : filteredOrders.length === 0 ? (
-                                <tr><td colSpan="6">
+                                <tr><td colSpan="7">
                                     <EmptyState
                                         icon={Inbox}
                                         title="No se encontraron pedidos"
@@ -426,6 +438,7 @@ CP: ${order.cp || '—'}`;
                             ) : (
                                 filteredOrders.map(order => {
                                     const statusMeta = STATUS_TONE[order.status] || STATUS_TONE['Pendiente'];
+                                    const shipMeta = shippingMeta(order);
                                     const dt = formatDateBA(order.createdAt);
                                     const [datePart, timePart] = typeof dt === 'string' && dt.includes(',')
                                         ? dt.split(',').map(s => s.trim())
@@ -475,6 +488,12 @@ CP: ${order.cp || '—'}`;
                                                 ) : <span className="text-sm text-slate-400">—</span>}
                                             </td>
                                             <td className="px-4 py-3.5 text-center">
+                                                <Badge tone={shipMeta.tone} size="md">
+                                                    <shipMeta.Icon className="w-3 h-3" />
+                                                    {shipMeta.label}
+                                                </Badge>
+                                            </td>
+                                            <td className="px-4 py-3.5 text-center">
                                                 <Badge tone={statusMeta.tone} dot={statusMeta.dot} size="lg">
                                                     {statusMeta.label}
                                                 </Badge>
@@ -519,6 +538,7 @@ CP: ${order.cp || '—'}`;
                         ) : (
                             filteredOrders.map(order => {
                                 const statusMeta = STATUS_TONE[order.status] || STATUS_TONE['Pendiente'];
+                                const shipMeta = shippingMeta(order);
                                 const dt = formatDateBA(order.createdAt);
                                 const [datePart] = typeof dt === 'string' && dt.includes(',')
                                     ? dt.split(',').map(s => s.trim())
@@ -537,6 +557,10 @@ CP: ${order.cp || '—'}`;
                                             <div className="flex flex-col items-end gap-1 flex-shrink-0">
                                                 <Badge tone={statusMeta.tone} dot={statusMeta.dot} size="md">
                                                     {statusMeta.label}
+                                                </Badge>
+                                                <Badge tone={shipMeta.tone} size="sm">
+                                                    <shipMeta.Icon className="w-2.5 h-2.5" />
+                                                    {shipMeta.label}
                                                 </Badge>
                                                 <span className="text-xs text-slate-500 dark:text-slate-400 tabular-nums">
                                                     {datePart}

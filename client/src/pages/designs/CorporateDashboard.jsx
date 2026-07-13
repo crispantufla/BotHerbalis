@@ -25,7 +25,7 @@ import RescueQueueView from '../../components/admin/RescueQueueView';
 import SellerSelector from '../../components/admin/SellerSelector';
 import ManualOrderEntryModal from '../../components/corporate/components/ManualOrderEntryModal';
 
-import { Wifi, MessageCircle, Database, Settings, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Bell, AlertTriangle, BookOpen, MoreHorizontal, CreditCard, Users, LifeBuoy, MessagesSquare, FlaskConical, Package } from 'lucide-react';
+import { Wifi, MessageCircle, ShoppingCart, Settings, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Bell, AlertTriangle, BookOpen, MoreHorizontal, CreditCard, Users, LifeBuoy, MessagesSquare, FlaskConical, Package } from 'lucide-react';
 
 const CorporateDashboard = () => {
     const { socket } = useSocket();
@@ -383,7 +383,7 @@ const CorporateDashboard = () => {
                     <NavItem tab="dashboard" icon={Wifi} label="Inicio" />
                     <NavItem tab="comms" icon={MessageCircle} label="Chat & Atención" />
                     <NavItem tab="rescue-queue" icon={LifeBuoy} label="Cola de rescate" />
-                    <NavItem tab="logistics" icon={Database} label="Ventas & Logística" />
+                    <NavItem tab="logistics" icon={ShoppingCart} label="Ventas & Logística" />
                     <NavItem tab="statistics" icon={BarChart2} label="Estadísticas" />
                     <NavItem tab="payments" icon={CreditCard} label="Pagos MP" />
                     <NavItem tab="web-orders" icon={Package} label="Pedidos web" />
@@ -581,7 +581,7 @@ const CorporateDashboard = () => {
                     {[
                         { tab: 'dashboard',  icon: Wifi,           label: 'Inicio'  },
                         { tab: 'comms',      icon: MessageCircle,  label: 'Chat'    },
-                        { tab: 'logistics',  icon: Database,       label: 'Ventas'  },
+                        { tab: 'logistics',  icon: ShoppingCart,   label: 'Ventas'  },
                         { tab: 'statistics', icon: BarChart2,      label: 'Stats'   },
                         { tab: '__more__',   icon: MoreHorizontal, label: 'Más'     },
                     ].map(({ tab, icon: Icon, label }) => {
