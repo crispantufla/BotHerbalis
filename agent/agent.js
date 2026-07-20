@@ -245,9 +245,14 @@ let awaitingQr = false;
 // Health-check del frame: tras una suspensión de la PC + recarga de WA Web, el
 // pupPage de wwebjs puede quedar apuntando a un frame DETACHED — el bot deja de
 // enviar/recibir SIN avisar (el WS al gateway sigue vivo, Railway lo cree ready).
-// Si evaluate cuelga o falla 2 veces seguidas → salir con código ≠0; run.bat lo
-// relanza y wwebjs re-engancha un frame fresco. 2 strikes porque un fallo aislado
-// es normal mientras WA Web se está recargando.
+// Se chequea client.getState() (NO un evaluate('1+1') pelado): getState pasa por
+// el binding del Store de WA Web, que es exactamente lo que muere en el estado
+// zombie "página viva pero WA colgado" (caso horacio 20-jul-2026: waReady=true,
+// heartbeats OK, cero eventos de mensajes por más de 1 h — el evaluate trivial
+// pasaba y ningún watchdog disparaba). Strike si getState cuelga, tira, o devuelve
+// algo ≠ CONNECTED. 3 strikes consecutivos (~3 min) → salir con código ≠0; run.bat
+// relanza y wwebjs re-engancha limpio. 3 y no 1 porque OPENING/PAIRING transitorios
+// son normales durante una reconexión sana de WA Web.
 let watchdogTimer = null;
 let watchdogStrikes = 0;
 function startFrameWatchdog() {
@@ -255,15 +260,16 @@ function startFrameWatchdog() {
     watchdogTimer = setInterval(async () => {
         if (!waReady || !client.pupPage) return;
         try {
-            await Promise.race([
-                client.pupPage.evaluate('1+1'),
+            const st = await Promise.race([
+                client.getState(),
                 new Promise((_, rej) => setTimeout(() => rej(new Error('timeout 10s')), 10000)),
             ]);
+            if (st !== 'CONNECTED') throw new Error(`estado ${st || 'null'}`);
             watchdogStrikes = 0;
         } catch (e) {
             watchdogStrikes++;
-            log(`frame health-check falló (${watchdogStrikes}/2):`, e.message);
-            if (watchdogStrikes >= 2) { log('frame zombie — matando el browser y saliendo para que run.bat relance'); killBrowserSync(); process.exit(1); }
+            log(`frame health-check falló (${watchdogStrikes}/3):`, e.message);
+            if (watchdogStrikes >= 3) { log('frame zombie — matando el browser y saliendo para que run.bat relance'); killBrowserSync(); process.exit(1); }
         }
     }, 60000);
 }
@@ -315,9 +321,26 @@ async function openDashboardTab() {
     } catch (e) { dashOpened = false; log('no pude abrir el dashboard:', e.message); }
 }
 
+// Id del mensaje para el frame. wwebjs a veces entrega un MessageId SIN _serialized
+// (reentregas tras reconexión de WA Web). El viejo fallback String(m.id) producía
+// "[object Object]" — TODOS esos mensajes compartían la misma key de dedup en
+// Railway y se descartaban entre sí (mensajes REALES sin responder, jul-2026).
+// Fallbacks: componer el formato canónico fromMe_remote_id (estable entre
+// reentregas); si ni eso se puede, un id único con prefijo remote_ — Railway
+// saltea el dedup por id para esos (fail-open: mejor un posible doble que un mudo).
+function _msgId(m) {
+    if (m.id && typeof m.id._serialized === 'string' && m.id._serialized) return m.id._serialized;
+    if (m.id && typeof m.id === 'object' && m.id.id) {
+        const remote = (m.id.remote && (m.id.remote._serialized || m.id.remote)) || m.from || '?';
+        return `${m.id.fromMe ? 'true' : 'false'}_${remote}_${m.id.id}`;
+    }
+    if (typeof m.id === 'string' && m.id) return m.id;
+    return `remote_noid_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
 function serializeMsg(m) {
     return {
-        id: { _serialized: (m.id && m.id._serialized) || String(m.id) },
+        id: { _serialized: _msgId(m) },
         from: m.from,
         to: m.to,
         body: m.body || '',

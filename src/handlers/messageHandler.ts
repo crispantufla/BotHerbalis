@@ -92,15 +92,25 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
             if (msg.from === 'status@broadcast') return;
             // Short-circuit groups/broadcast before Puppeteer bridge call (avoids expensive getChat)
             if (msg.from.endsWith('@g.us') || msg.from.endsWith('@broadcast')) return;
-            if (sharedState.connectedAt && msg.timestamp && msg.timestamp < sharedState.connectedAt) return;
+            if (sharedState.connectedAt && msg.timestamp && msg.timestamp < sharedState.connectedAt) {
+                // Antes esto descartaba SIN log — durante un flap del agente, los
+                // mensajes reentregados de la ventana caída desaparecían sin rastro.
+                logger.info(`[SKIP-OLD][${sellerId}] msg de ${msg.from} (ts=${msg.timestamp} < connectedAt=${sharedState.connectedAt}) — ignorado como historial`);
+                return;
+            }
 
             // Idempotencia (caso doble-bot / reentrega del mismo mensaje físico): si
             // este id ya fue tomado (Redis compartido), lo descartamos ACÁ — ANTES de
             // gastar los RPCs getChat()/getContact() al agente (en remoto la reentrega
             // disparaba 2-3 getContact por mensaje, ver [ID-RESOLVE] repetidos). El id
             // de WhatsApp es el mismo en cloud y remoto. Fail-open: si Redis falla, sigo.
-            const _rawMsgId = msg.id?._serialized;
-            if (_rawMsgId && !String(_rawMsgId).startsWith('remote_')) {
+            // Solo dedupear con un id string REAL: agentes viejos serializaban un
+            // MessageId sin _serialized como "[object Object]" — todos esos mensajes
+            // colisionaban en la MISMA key de Redis y se descartaban entre sí (mensajes
+            // nuevos y distintos sin responder, 20-jul-2026). Ante id inutilizable,
+            // mejor sin dedup que mudo.
+            const _rawMsgId = typeof msg.id?._serialized === 'string' ? msg.id._serialized : null;
+            if (_rawMsgId && !_rawMsgId.startsWith('remote_') && _rawMsgId !== '[object Object]') {
                 try {
                     const seen = await redisConnection.set(`msgseen:${sellerId}:${_rawMsgId}`, '1', 'EX', 600, 'NX');
                     if (seen === null) {
