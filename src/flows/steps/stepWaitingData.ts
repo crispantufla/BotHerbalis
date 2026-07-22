@@ -799,7 +799,9 @@ function _orderPriceCoherent(state: UserState): boolean {
 // libre, la clasificación lo manda a la IA y los datos NO se persisten: el bot los
 // "lee" pero el estado queda vacío y al mensaje siguiente vuelve a pedirlos
 // (caso real 5493405456106). Acá los capturamos y armamos la orden sí o sí.
-async function _handleRetiroData(
+// Exportada: stepWaitingPaymentMethod la reutiliza para cerrar directo cuando
+// el cliente ya dejó todos los datos en el historial (caso 5492215731759).
+export async function _handleRetiroData(
     userId: string, text: string, normalizedText: string,
     currentState: UserState, knowledge: any, dependencies: any
 ): Promise<{ matched: boolean } | null> {
@@ -999,7 +1001,15 @@ export async function handleWaitingData(
     let didTryToParse = false;
     let hasValidAddressData = false;
 
-    if (classification.looksLikeAddress || (classification.isVeryLongMessage && !classification.explicitQuestionKeywords) || (!classification.isDataQuestionOrEmotion)) {
+    // Señales FUERTES de datos: multilínea o número de 4 dígitos (CP). Fuerzan el
+    // intento de parseo aunque la clasificación haya marcado el mensaje como
+    // pregunta — un bloque de datos con una pregunta pegada ("...\n1925 cuánto
+    // tarda en llegar?") mataba looksLikeAddress vía explicitQuestionKeywords y
+    // los datos se perdían en el AI fallback (variante domicilio del caso
+    // 5492215731759; la variante retiro la cubre _handleRetiroData en 3.5).
+    const hasStrongDataSignals = /\n/.test(text) || /\b\d{4}\b/.test(text);
+
+    if (classification.looksLikeAddress || hasStrongDataSignals || (classification.isVeryLongMessage && !classification.explicitQuestionKeywords) || (!classification.isDataQuestionOrEmotion)) {
         extractedData = await (dependencies.mockAiService || aiService).parseAddress(textToAnalyze);
         didTryToParse = true;
         if (extractedData && !extractedData._error && (extractedData.calle || extractedData.ciudad || extractedData.cp || extractedData.nombre)) {

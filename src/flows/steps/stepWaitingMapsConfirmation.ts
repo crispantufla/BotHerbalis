@@ -1,5 +1,5 @@
 import { UserState, FlowStep } from '../../types/state';
-import { _setStep, _pauseAndAlert } from '../utils/flowHelpers';
+import { _setStep, _pauseAndAlert, _startsAffirmative } from '../utils/flowHelpers';
 import { validateWithGoogleMaps } from '../../services/addressValidator';
 import { buildConfirmationMessage } from '../../utils/messageTemplates';
 import { _getPrice } from '../utils/pricing';
@@ -26,7 +26,18 @@ export async function handleWaitingMapsConfirmation(
 ): Promise<{ matched: boolean }> {
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
 
-    const isConfirmation = /^(si|sí|sisi|ok|dale|bueno|joya|de una|perfecto|correcto|esta bien|está bien|esa es|asi es|así es)[\s\?\!\.]*$/i.test(normalizedText);
+    const looksLikeAddress = text.length > 5 && (
+        /\d/.test(text) ||
+        /\b(calle|av|avenida|barrio|mz|lote|piso|dpto|depto|departamento|casa|block|manzana|localidad|provincia|pcia|código postal)\b/i.test(text)
+    );
+
+    const isConfirmation = /^(si|sí|sisi|ok|dale|bueno|joya|de una|perfecto|correcto|esta bien|está bien|esa es|asi es|así es)[\s\?\!\.]*$/i.test(normalizedText)
+        // "Sí" al frente + cola de texto (típicamente una pregunta que globalFaq
+        // ya respondió vía passthrough): "Si, es correcta ¿cuánto tarda en
+        // llegar?". No cuenta si trae corrección ("pero...") o pinta de
+        // dirección — esos van al re-parseo de abajo. _startsAffirmative
+        // descarta el "si" condicional ("y si tarda mucho?").
+        || (_startsAffirmative(text) && !looksLikeAddress && !/\bpero\b/.test(normalizedText));
     const isNegation = /^(no|nop|nope|nel|na|negativo)[\s\?\!\.]*$/i.test(normalizedText);
 
     if (isConfirmation) {
@@ -70,11 +81,6 @@ export async function handleWaitingMapsConfirmation(
     }
 
     // The client sent something else — try to parse it as a corrected address
-    const looksLikeAddress = text.length > 5 && (
-        /\d/.test(text) ||
-        /\b(calle|av|avenida|barrio|mz|lote|piso|dpto|depto|departamento|casa|block|manzana|localidad|provincia|pcia|código postal)\b/i.test(text)
-    );
-
     if (looksLikeAddress) {
         // Try to parse as a new address and re-validate with Maps
         logger.info(`[MAPS-CONFIRM] User ${userId} sent what looks like a corrected address: "${text}"`);

@@ -44,6 +44,21 @@ export function parseProfile(extractedData: string | null | undefined): string |
 }
 
 /**
+ * "ENVIO: retiro" | "ENVIO: domicilio" → 'retiro' | 'domicilio' (o null).
+ * Lo emite el AI fallback de waiting_payment_method cuando el cliente eligió
+ * tipo de envío en un mensaje que la clasificación desvió al fallback — permite
+ * que la máquina de estados transicione igual (caso real 5492215731759).
+ */
+export function parseShippingChoice(extractedData: string | null | undefined): 'retiro' | 'domicilio' | null {
+    if (!extractedData) return null;
+    // ENV[IÍ]O: el goal prima la grafía acentuada ("TIPO DE ENVÍO") y el modelo
+    // escribe español — si emite "ENVÍO: retiro" con tilde, el tag tiene que
+    // matchear igual (si no, la falla es silenciosa y reproduce el bug original).
+    const m = String(extractedData).match(/ENV[IÍ]O:\s*(retiro|domicilio)/i);
+    return m ? (m[1].toLowerCase() as 'retiro' | 'domicilio') : null;
+}
+
+/**
  * Cambio de producto/plan. Tolera "CAMBIO_PRODUCTO: Gotas PLAN: 120" y
  * "CHANGE_PRODUCT: Gotas". Devuelve { product, plan } (plan puede ser null).
  */

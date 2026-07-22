@@ -6,7 +6,10 @@ import { _formatMessage } from '../utils/messages';
 import { randomUUID } from 'crypto';
 import logger from '../../utils/logger';
 
-const PAID_KEYWORDS = /\b(listo|pague|pagu[eé]|pago hecho|hice el pago|ya pague|ya pagu[eé]|realice|realic[eé]|confirmo|listo el pago|pago listo|lo hice|hecho|ok listo)\b/i;
+// Exportada: globalFaq la usa para NO tragarse un aviso de pago que venga con
+// una pregunta pegada ("Ya pagué ¿me confirmás?") — debe ver exactamente los
+// mismos claims que este step.
+export const PAID_KEYWORDS = /\b(listo|pague|pagu[eé]|pago hecho|hice el pago|ya pague|ya pagu[eé]|realice|realic[eé]|confirmo|listo el pago|pago listo|lo hice|hecho|ok listo)\b/i;
 // Numeración del menú actual (1=MP, 2=Transferencia, 3=Contra reembolso).
 // Quitamos "segund[oa]|segunda" porque aparecen en direcciones (calles tipo
 // "Segunda Junta", "entre segundo sombra y corbalán"). El "2" suelto solo se

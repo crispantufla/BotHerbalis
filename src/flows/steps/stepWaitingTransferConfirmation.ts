@@ -2,7 +2,10 @@ import { UserState, FlowStep } from '../../types/state';
 import { _setStep, _pauseAndAlert } from '../utils/flowHelpers';
 import logger from '../../utils/logger';
 
-const PAID_KEYWORDS = /\b(listo|pague|pagu[eé]|transferi|transferido|transfer[ií]|ya transferi|ya transfer[ií]|realice|realic[eé]|hice la transferencia|hecho|ok listo|lo hice|envi[eé] la transferencia|ya la hice)\b/i;
+// Exportada: globalFaq la usa para NO tragarse un aviso de pago que venga con
+// una pregunta pegada ("Ya hice la transferencia ¿me confirmás?") — debe ver
+// exactamente los mismos claims que este step.
+export const PAID_KEYWORDS = /\b(listo|pague|pagu[eé]|transferi|transferido|transfer[ií]|ya transferi|ya transfer[ií]|realice|realic[eé]|hice la transferencia|hecho|ok listo|lo hice|envi[eé] la transferencia|ya la hice)\b/i;
 const MP_KEYWORDS = /\b(mercadopago|mercado.?pago|mp|link|online|digital|qr|tarjeta|credito|debito|2|segundo|pago online|pago digital)\b/i;
 // Cambio a RETIRO EN SUCURSAL / pago al retirar. En el modelo nuevo,
 // contrarreembolso = retiro en sucursal. Incluye "retiro"/"sucursal"/"retirar"

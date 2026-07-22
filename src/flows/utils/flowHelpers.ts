@@ -488,6 +488,33 @@ function _isInfoQuestion(text: string): boolean {
     return _Q_STARTERS.test(t) || _Q_ANYWHERE.test(t);
 }
 
+// ── "Sí" afirmativo al inicio vs "si" condicional ───────────────────────────
+// Para mensajes que ARRANCAN confirmando y siguen con más texto (típicamente
+// una pregunta): "Si, es correcta ¿cuánto tarda?" confirma; "y si tarda mucho?"
+// o "si llega tarde no lo quiero" son condicionales y NO confirman nada. Los
+// isConfirmation anclados de los steps (mensaje entero = token) no cubren esto.
+// Trabaja sobre el texto CRUDO: la tilde de "sí" es inequívoca (el condicional
+// nunca la lleva) y se pierde al normalizar.
+function _startsAffirmative(text: string): boolean {
+    const raw = (text || '').trim();
+    if (!raw) return false;
+    // "Sí ..." con tilde: afirmativo siempre. Cortamos antes de otra letra
+    // para no matchear "síntoma" / "sígueme". NO se strippean "¿¡" iniciales:
+    // "¿Si es correcta...?" es una PREGUNTA, no una afirmación.
+    if (/^s[íÍ](?![a-záéíóúñü])/i.test(raw)) return true;
+    const norm = raw.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    // "si" sin tilde: solo con puntuación pegada ("Si, es correcta") o seguido
+    // de una frase confirmatoria explícita. "si tarda mucho" queda afuera.
+    if (/^si\s*[,.!;:]/.test(norm)) return true;
+    if (/^si\s+(es\s+)?(correcta|correcto|esa\s+es|asi\s+es)\b/.test(norm)) return true;
+    if (/^si\s+esta\s+bien\b/.test(norm)) return true;
+    // Arranques confirmatorios sin la ambigüedad del "si". "claro que no" niega.
+    if (/^(dale|ok|okey|listo|perfecto|exacto|correcto|correcta)\b/.test(norm)) return true;
+    if (/^claro\b(?!\s+que\s+no)/.test(norm)) return true;
+    if (/^(esta\s+bien|asi\s+es|esa\s+es|es\s+correcta|es\s+correcto|es\s+esa)\b/.test(norm)) return true;
+    return false;
+}
+
 /**
  * _closeSaleAndNotify — CIERRE DE VENTA POR EL BOT (jun-2026).
  *
@@ -560,6 +587,7 @@ async function _closeSaleAndNotify(
 export {
     _cleanPhone,
     _isInfoQuestion,
+    _startsAffirmative,
     _closeSaleAndNotify,
     _setStep,
     _maybeUpsell,

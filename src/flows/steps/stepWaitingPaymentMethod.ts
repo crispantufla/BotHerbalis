@@ -1,8 +1,10 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _setStep, _pauseAndAlert, _detectPostdatado, _isInfoQuestion } from '../utils/flowHelpers';
+import { parseShippingChoice } from '../utils/extractedData';
 import { getFlowTemplate } from '../../utils/messageTemplates';
 import { calculateTotal } from '../utils/cartHelpers';
 import { _formatMessage, _isDuplicate } from '../utils/messages';
+import { _handleRetiroData } from './stepWaitingData';
 import logger from '../../utils/logger';
 
 // Modelo nuevo de pago (may-2026): el menú pregunta primero TIPO DE ENVÍO.
@@ -29,6 +31,21 @@ const NO_CASH = /\bno\s+(?:puedo|tengo|manejo|uso|cuento\s+con|dispongo\s+de|me\
 // y se canalizan por el link de tarjeta de crédito, pero el bot ya NO las ofrece.
 const MP_KEYWORDS = /\b(mercadopago|mercado.?pago|\bmp\b|online|digital|qr|tarjeta|d[ée]bito|cr[ée]dito|pago online|pago digital|pago ahora|por mp|con mp|por mercadopago|aplicaci[óo]n|rapipago|pago\s*f[áa]cil|pagof[áa]cil)\b/i;
 const TRANSFER_KEYWORDS = /\b(transfer[ei]ncia|transf\b|transferir|alias|dep[óo]sito|deposito|banco|bancaria|cbu|cvu|por transferencia)\b/i;
+
+// Verbos de decisión que convierten una frase con opción de envío en ELECCIÓN
+// aunque _isInfoQuestion la lea como pregunta. Caso real 5492215731759 (21-jul):
+// "Me conviene ir a la sucursal del correo y abonar ahí" — "me conviene" es
+// arranque interrogativo válido ("¿me conviene X?"), así que _isInfoQuestion lo
+// marcaba como pregunta, TODOS los paths determinísticos quedaban gateados y el
+// mensaje caía al AI fallback: la IA "avanzaba" en el texto (pedía el nombre)
+// pero el step no transicionaba, y los datos que la clienta mandó después se
+// perdieron en este step. Sobre normalizedText (sin tildes).
+const DECISIVE_CHOICE = /\b(me conviene|prefiero|preferiria|elijo|me quedo con|voy con|me viene mejor|me queda (mas\s+)?(comodo|cerca|facil)|quiero(?!\s+(saber|preguntar|consultar|entender)))\b/i;
+
+// Bloqueadores del override: aunque haya verbo de decisión, si la frase arranca
+// con interrogativo ("Cuánto tarda si elijo retiro"), compara con "cuál", o tiene
+// un " o " suelto entre alternativas ("me conviene retiro o envío"), ES pregunta.
+const DECISIVE_BLOCKERS = /^\s*(cuanto|cuantos|cuantas|como|cuando|donde|que|cual|cuales|por\s+que|sale|cuesta|tarda|tardan|demora)\b|\bcual(es)?\b|\s+o\s+/i;
 
 // Option-number picker para mensajes cortos ("1", "la 1", "opcion 2", "uno"/"dos").
 const OPTION_PICKER = /(^|\s)(?:opci[óo]n\s+|la\s+|el\s+|n[uú]mero\s+|\#)?(\d)\s*[\.\)]?\s*$/i;
@@ -87,6 +104,59 @@ function _detectOptionNumber(text: string): '1' | '2' | null {
     return null;
 }
 
+// ── Prefill de datos de retiro desde el historial reciente ───────────────────
+// Mensajes del usuario enviados DESPUÉS de entrar a este step: si una mala
+// clasificación mandó la elección al AI fallback, la IA suele pedir los datos
+// ("¿tu nombre completo?") sin que el step avance, y el cliente los manda
+// mientras el step sigue acá. Cuando el path de retiro por fin matchea, esos
+// datos ya están en el historial — los parseamos para no re-pedirlos de cero
+// (caso real 5492215731759: nombre y CP dados 2 veces y re-pedidos igual).
+async function _prefillRetiroFromHistory(
+    userId: string, currentText: string, currentState: UserState, dependencies: any
+): Promise<void> {
+    const { aiService } = dependencies;
+    const addr: any = currentState.partialAddress;
+    if (addr.nombre && addr.ciudad && addr.cp) return;
+
+    // Sin stepEnteredAt (estados legacy) la ventana sería TODA la conversación
+    // (pesos, alturas, montos → falsos positivos). Mejor no prefillear.
+    if (!currentState.stepEnteredAt) return;
+    const since = currentState.stepEnteredAt;
+    const recent = (currentState.history || [])
+        .filter((h: any) => h.role === 'user' && (h.timestamp || 0) >= since && h.content && h.content !== currentText)
+        .map((h: any) => h.content)
+        .slice(-6);
+    if (recent.length === 0) return;
+
+    const block = recent.join('\n');
+    // Solo gastar el parse si el bloque tiene pinta de datos (números o ≥2 palabras).
+    if (!/\d/.test(block) && block.trim().split(/\s+/).length < 2) return;
+
+    try {
+        const parsed = await (dependencies.mockAiService || aiService).parseAddress(block);
+        if (parsed && !parsed._error) {
+            if (parsed.nombre && !addr.nombre) {
+                addr.nombre = parsed.nombre;
+                if (!currentState.userName) currentState.userName = parsed.nombre;
+            }
+            if (parsed.ciudad && !addr.ciudad) addr.ciudad = parsed.ciudad;
+            if (parsed.provincia && !addr.provincia) addr.provincia = parsed.provincia;
+            if (parsed.cp && !addr.cp) addr.cp = parsed.cp;
+        }
+    } catch (e: any) {
+        logger.warn(`[PAYMENT_METHOD] prefill retiro: parseAddress falló para ${userId}: ${e.message}`);
+    }
+    // Fallback CP: en retiro no hay calle, así que un número de 4 dígitos suelto
+    // es el código postal (mismo criterio que _handleRetiroData).
+    if (!addr.cp) {
+        const cpMatch = block.match(/\b(\d{4})\b/);
+        if (cpMatch) addr.cp = cpMatch[1];
+    }
+    if (addr.nombre || addr.ciudad || addr.cp) {
+        logger.info(`[PAYMENT_METHOD] ${userId} → prefill retiro desde historial: nombre=${addr.nombre || '-'} ciudad=${addr.ciudad || '-'} cp=${addr.cp || '-'}`);
+    }
+}
+
 export async function handleWaitingPaymentMethod(
     userId: string,
     text: string,
@@ -105,7 +175,17 @@ export async function handleWaitingPaymentMethod(
     // "tarjeta" y mandó el link en vez de decir "7 a 10 días". (El submenú de
     // domicilio tiene su propio manejo de preguntas más abajo, así que no lo
     // tocamos acá.)
-    const infoQuestion = !currentState.paymentSubChoiceAsked && _isInfoQuestion(text);
+    // Excepción: elección DECISIVA aunque parezca pregunta (ver DECISIVE_CHOICE
+    // arriba). Sin "?", con verbo de decisión, sin bloqueadores interrogativos, y
+    // con UNA sola opción de envío nombrada (o un número de opción, ej: "me
+    // conviene la 1"), es una elección — no la gateamos como pregunta.
+    const _retiroKw = RETIRO_KEYWORDS.test(text);
+    const _domicilioKw = DOMICILIO_KEYWORDS.test(text);
+    const decisiveShippingChoice = !/[?¿]/.test(text)
+        && DECISIVE_CHOICE.test(normalizedText)
+        && !DECISIVE_BLOCKERS.test(normalizedText)
+        && ((_retiroKw !== _domicilioKw) || _detectOptionNumber(text) !== null);
+    const infoQuestion = !currentState.paymentSubChoiceAsked && !decisiveShippingChoice && _isInfoQuestion(text);
 
     // ── Cliente quiere ir al local físico ──────────────────────────────────────
     // Distinto de "retiro en sucursal" del Correo. Pausamos.
@@ -409,12 +489,33 @@ export async function handleWaitingPaymentMethod(
         if (!currentState.partialAddress) currentState.partialAddress = {};
         currentState.partialAddress.calle = 'A sucursal';
 
-        const msg = `¡Listo! Lo dejamos para retiro en sucursal 📦\n\nVas a pagar el total *$${currentState.totalPrice || '?'}* en efectivo cuando lo retirés.\n\nNo necesito tu dirección exacta — con tu *localidad y código postal* te asigno la sucursal de Correo Argentino que te corresponde. Pasame:\n\nNombre completo:\nLocalidad / Ciudad:\nCódigo postal:`;
+        // Si el cliente ya dejó datos MIENTRAS el step seguía acá (una mala
+        // clasificación previa lo tiene contestando "¿tu nombre?" desde el AI
+        // fallback sin transicionar — caso real 5492215731759), rescatarlos del
+        // historial para no re-pedirle todo de cero.
+        await _prefillRetiroFromHistory(userId, text, currentState, dependencies);
+
+        const _addr = currentState.partialAddress;
+        if (_addr.nombre && _addr.ciudad && _addr.cp) {
+            // Ya está todo → cerrar por el mismo camino que usa waiting_data para
+            // retiro (arma pendingOrder + confirmación + orden 'Confirmado').
+            _setStep(currentState, FlowStep.WAITING_DATA);
+            saveState(userId);
+            logger.info(`[PAYMENT_METHOD] ${userId} → RETIRO con datos completos desde historial — cierro directo.`);
+            const closed = await _handleRetiroData(userId, text, normalizedText, currentState, knowledge, dependencies);
+            if (closed) return closed;
+        }
+
+        const _faltan: string[] = [];
+        if (!_addr.nombre) _faltan.push('Nombre completo:');
+        if (!_addr.ciudad) _faltan.push('Localidad / Ciudad:');
+        if (!_addr.cp) _faltan.push('Código postal:');
+        const msg = `¡Listo! Lo dejamos para retiro en sucursal 📦\n\nVas a pagar el total *$${currentState.totalPrice || '?'}* en efectivo cuando lo retirés.\n\nNo necesito tu dirección exacta — con tu *localidad y código postal* te asigno la sucursal de Correo Argentino que te corresponde. Pasame:\n\n${_faltan.join('\n')}`;
         _setStep(currentState, FlowStep.WAITING_DATA);
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
-        logger.info(`[PAYMENT_METHOD] ${userId} → RETIRO EN SUCURSAL — pidiendo datos para buscar sucursal cercana`);
+        logger.info(`[PAYMENT_METHOD] ${userId} → RETIRO EN SUCURSAL — pidiendo datos para buscar sucursal cercana (faltan: ${_faltan.length})`);
         return { matched: true };
     }
 
@@ -473,7 +574,9 @@ export async function handleWaitingPaymentMethod(
     // ── AI fallback ───────────────────────────────────────────────────────────
     const aiRes = await aiService.chat(text, {
         step: 'waiting_payment_method',
-        goal: `El cliente debe elegir TIPO DE ENVÍO antes que método de pago. Las 2 opciones son:\n\n1️⃣ *Retiro en sucursal* → paga el TOTAL en efectivo al retirar en una sucursal de Correo Argentino (contrarreembolso, sin anticipo previo). Un asesor coordina la sucursal más cercana al cliente.\n\n2️⃣ *Envío a domicilio* → se abona previamente. Después se elige el medio: *tarjeta de crédito* (link de pago protegido) o *transferencia bancaria* al alias *HERBALIS.TIENDA* (BIO ORIGEN S.A.S.). De cara al cliente el medio online se llama "Tarjeta de crédito" (NUNCA "Mercado Pago", débito, Pago Fácil ni Rapipago).\n\nAmbos envíos son GRATIS por Correo Argentino. Tiempos: *retiro en sucursal* (paga al retirar) 7 a 10 días hábiles; *envío a domicilio PREPAGO* (tarjeta de crédito o transferencia) más rápido, 4 días hábiles — usá la velocidad como argumento para el prepago.\n\nPROHIBICIONES ESTRICTAS:\n- NO mencionar anticipo de $10.000 (esa modalidad fue eliminada en mayo 2026)\n- NO ofrecer pago en efectivo al cartero a domicilio — el contrarreembolso ahora es solo en sucursal\n- NO mencionar cuotas\n- NO inventar aliases distintos al oficial\n\nSi el cliente responde con afirmativa genérica ("dale", "sí") sin aclarar, pedile que elija retiro o domicilio. NUNCA avances sin que confirme cuál de las 2 opciones de ENVÍO eligió.\n\nSi el cliente NIEGA poder pagar en efectivo ("no puedo efectivo", "no tengo efectivo", "no manejo efectivo"): NO lo mandes a retiro en sucursal (que es justamente pagar en efectivo al retirar). Ofrecé envío a DOMICILIO con pago anticipado por tarjeta de crédito o transferencia.\n\nSi el cliente DESCONFÍA de pagar por adelantado o de las transferencias/pagos online ("no me gustan las transferencias", "he tenido problemas", "me da miedo pagar antes", "no confío en pagar online"): NO insistas con tarjeta de crédito — eso TAMBIÉN es pago anticipado y es justo lo que lo asusta. Ofrecé *retiro en sucursal*: NO paga nada por adelantado, abona el total en efectivo recién cuando lo retira en la sucursal de Correo Argentino. Es la opción sin riesgo para quien no quiere pagar online, y va alineado con cómo cierra el vendedor a mano.\n\nSi el cliente PREGUNTA algo (cuánto tarda, cómo se paga, dónde retira, cuánto sale el envío, etc.) en vez de elegir: RESPONDÉ su pregunta reaclarando la info aunque YA se la hayas dicho antes (los clientes repreguntan y no se acuerdan — está bien repetir), y RECIÉN DESPUÉS re-preguntá si prefiere retiro o domicilio. NUNCA mandes el link de pago ni avances mientras el cliente siga preguntando.`,
+        goal: `El cliente debe elegir TIPO DE ENVÍO antes que método de pago. Las 2 opciones son:\n\n1️⃣ *Retiro en sucursal* → paga el TOTAL en efectivo al retirar en una sucursal de Correo Argentino (contrarreembolso, sin anticipo previo). Un asesor coordina la sucursal más cercana al cliente.\n\n2️⃣ *Envío a domicilio* → se abona previamente. Después se elige el medio: *tarjeta de crédito* (link de pago protegido) o *transferencia bancaria* al alias *HERBALIS.TIENDA* (BIO ORIGEN S.A.S.). De cara al cliente el medio online se llama "Tarjeta de crédito" (NUNCA "Mercado Pago", débito, Pago Fácil ni Rapipago).\n\nAmbos envíos son GRATIS por Correo Argentino. Tiempos: *retiro en sucursal* (paga al retirar) 7 a 10 días hábiles; *envío a domicilio PREPAGO* (tarjeta de crédito o transferencia) más rápido, 4 días hábiles — usá la velocidad como argumento para el prepago.\n\nPROHIBICIONES ESTRICTAS:\n- NO mencionar anticipo de $10.000 (esa modalidad fue eliminada en mayo 2026)\n- NO ofrecer pago en efectivo al cartero a domicilio — el contrarreembolso ahora es solo en sucursal\n- NO mencionar cuotas\n- NO inventar aliases distintos al oficial\n\nSi el cliente responde con afirmativa genérica ("dale", "sí") sin aclarar, pedile que elija retiro o domicilio. NUNCA avances sin que confirme cuál de las 2 opciones de ENVÍO eligió.\n\nSi el cliente NIEGA poder pagar en efectivo ("no puedo efectivo", "no tengo efectivo", "no manejo efectivo"): NO lo mandes a retiro en sucursal (que es justamente pagar en efectivo al retirar). Ofrecé envío a DOMICILIO con pago anticipado por tarjeta de crédito o transferencia.\n\nSi el cliente DESCONFÍA de pagar por adelantado o de las transferencias/pagos online ("no me gustan las transferencias", "he tenido problemas", "me da miedo pagar antes", "no confío en pagar online"): NO insistas con tarjeta de crédito — eso TAMBIÉN es pago anticipado y es justo lo que lo asusta. Ofrecé *retiro en sucursal*: NO paga nada por adelantado, abona el total en efectivo recién cuando lo retira en la sucursal de Correo Argentino. Es la opción sin riesgo para quien no quiere pagar online, y va alineado con cómo cierra el vendedor a mano.\n\nSi el cliente PREGUNTA algo (cuánto tarda, cómo se paga, dónde retira, cuánto sale el envío, etc.) en vez de elegir: RESPONDÉ su pregunta reaclarando la info aunque YA se la hayas dicho antes (los clientes repreguntan y no se acuerdan — está bien repetir), y RECIÉN DESPUÉS re-preguntá si prefiere retiro o domicilio. NUNCA mandes el link de pago ni avances mientras el cliente siga preguntando.
+
+TAG DE ELECCIÓN (para el sistema): si con este mensaje el cliente ELIGE claramente una de las dos opciones de envío — aunque lo diga como comentario y no como respuesta directa (ej: "me conviene ir a la sucursal del correo y abonar ahí" = retiro) — incluí en extractedData exactamente "ENVIO: retiro" o "ENVIO: domicilio" (sin tilde), y tu respuesta debe avanzar acorde: para retiro, confirmá y pedí Nombre completo, Localidad/Ciudad y Código postal; para domicilio, ofrecé 1️⃣ Tarjeta de crédito / 2️⃣ Transferencia bancaria. Emití el tag SOLO cuando tu propia respuesta esté avanzando con esa opción — si el cliente solo pregunta, compara o duda, respondé la duda, re-preguntá cuál prefiere y NO emitas el tag.`,
         history: currentState.history,
         summary: currentState.summary,
         knowledge,
@@ -481,9 +584,40 @@ export async function handleWaitingPaymentMethod(
     });
 
     if (aiRes.response) {
+        // Sincronizar la máquina de estados con lo que la IA concluyó (tag
+        // "ENVIO: retiro|domicilio" — ver goal). Sin esto, si la clasificación
+        // desvió una elección real al fallback, la IA avanzaba en el TEXTO
+        // ("dale, retiro — ¿tu nombre completo?") pero el step seguía acá: los
+        // datos que el cliente mandaba después caían en waiting_payment_method
+        // y se perdían (caso real 5492215731759, 21-jul — venta trabada).
+        const aiShipping = !alreadyPaidMp ? parseShippingChoice(aiRes.extractedData) : null;
+        // Retiro + "transferencia" en el mismo mensaje = combo especial (alias +
+        // verificación de comprobante por un asesor) — NO lo auto-seteamos como
+        // contrarembolso acá; el path determinístico del combo lo maneja cuando
+        // el cliente lo diga sin forma de pregunta.
+        if (aiShipping === 'retiro' && !TRANSFER_KEYWORDS.test(normalizedText)) {
+            currentState.paymentMethod = 'contrarembolso';
+            currentState.senaAmount = 0;
+            currentState.senaPaid = false;
+            currentState.shippingChoice = 'retiro';
+            if (!currentState.partialAddress) currentState.partialAddress = {};
+            currentState.partialAddress.calle = 'A sucursal';
+            // Rescatar datos ya dejados en el historial de este step (mismo
+            // criterio que el path determinístico de retiro).
+            await _prefillRetiroFromHistory(userId, text, currentState, dependencies);
+            _setStep(currentState, FlowStep.WAITING_DATA);
+            logger.info(`[PAYMENT_METHOD] ${userId} → RETIRO vía tag de IA (ENVIO: retiro) — step sincronizado a waiting_data.`);
+        } else if (aiShipping === 'domicilio') {
+            currentState.shippingChoice = 'domicilio';
+            currentState.paymentSubChoiceAsked = true;
+            logger.info(`[PAYMENT_METHOD] ${userId} → DOMICILIO vía tag de IA (ENVIO: domicilio) — submenú habilitado.`);
+        }
+        // saveState ANTES del send (delay humanizado 4-8s): si el proceso se cae
+        // en el medio, la transición ya quedó persistida — igual que los paths
+        // determinísticos del step.
         currentState.history.push({ role: 'bot', content: aiRes.response, timestamp: Date.now() });
-        await sendMessageWithDelay(userId, aiRes.response);
         saveState(userId);
+        await sendMessageWithDelay(userId, aiRes.response);
         return { matched: true };
     }
 

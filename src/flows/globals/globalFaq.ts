@@ -1,6 +1,12 @@
 import { UserState } from '../../types/state';
-import { _isInfoQuestion } from '../utils/flowHelpers';
+import { _isInfoQuestion, _startsAffirmative } from '../utils/flowHelpers';
+import { PAID_KEYWORDS as MP_PAID_KEYWORDS } from '../steps/stepWaitingMpPayment';
+import { PAID_KEYWORDS as TRANSFER_PAID_KEYWORDS } from '../steps/stepWaitingTransferConfirmation';
 import logger from '../../utils/logger';
+
+// Claims de pago que los PAID_KEYWORDS de los steps no cubren pero que también
+// significan "ya pagué" (el step los resuelve vía AI fallback con contexto).
+const PAYMENT_CLAIM_EXTRA = /\b(comprobante|acabo de (pagar|transferir|abonar)|ya (abone|transferi)|transferencia (hecha|realizada|enviada))\b/i;
 
 /**
  * FAQ keyword matcher — red de seguridad antes del AI.
@@ -99,9 +105,52 @@ export async function handleFaq(
         return null;
     }
 
-    logger.info(`[FAQ] ${userId} matched (keyword len=${bestLen}) → "${bestEntry.response.substring(0, 60)}..."`);
+    // ── Passthroughs POR STEP ────────────────────────────────────────────────
+    // Misma clase de bug en tres lugares: el cliente mete la pregunta EN EL
+    // MISMO mensaje que la señal operativa que el step espera (datos, "sí",
+    // aviso de pago). Si la FAQ devuelve matched, la señal nunca llega al step
+    // y la venta se traba. La señal es POR STEP — un passthrough genérico
+    // dejaría pasar preguntas puras y el step re-preguntaría arriba de la FAQ.
+
+    // waiting_mp_payment / waiting_transfer_confirmation (caso 22-jul): "Ya
+    // hice la transferencia ¿me confirmás?" — la keyword "transferencia"
+    // matcheaba la FAQ del alias y el bot RE-MANDABA las instrucciones de
+    // transferir a alguien que ya transfirió, y el step nunca veía el aviso.
+    // Con claim de pago NO mandamos la canned response (quedó desactualizada
+    // frente al claim — reenviarla contradice al paid-branch del step): salimos
+    // en silencio y el step responde lo justo ("recibimos tu aviso...").
+    const paymentClaim =
+        (currentState.step === 'waiting_mp_payment' || currentState.step === 'waiting_transfer_confirmation')
+        && (MP_PAID_KEYWORDS.test(norm) || TRANSFER_PAID_KEYWORDS.test(norm) || PAYMENT_CLAIM_EXTRA.test(norm));
+    if (paymentClaim) {
+        logger.info(`[FAQ] Skip FAQ en ${currentState.step} — "${trimmed.slice(0, 50)}" trae claim de pago; lo maneja el step`);
+        return null;
+    }
+
+    // waiting_data (caso real 5492215731759, 21-jul: "Quintana y bolivia...
+    // \nEnsenada\n1925 Cómo tomo las cápsulas" — la FAQ de posología respondía,
+    // devolvía matched y el step nunca veía los datos: el bot los re-pedía y la
+    // venta se trabó). Señales de datos: multilínea, o un número de 4+ dígitos
+    // (CP/teléfono). Respondemos la FAQ igual, pero devolvemos null para que el
+    // step procese el MISMO mensaje y persista los datos.
+    const dataBlockPassthrough = currentState.step === 'waiting_data'
+        && (/\n/.test(trimmed) || /\b\d{4,}\b/.test(trimmed));
+
+    // waiting_maps_confirmation (caso 22-jul): el bot pidió "respondé *sí*" y
+    // el cliente contestó "Si, es correcta ¿cuánto tarda en llegar?" — la FAQ
+    // de envíos se tragaba el "sí" y la orden no se armaba. Señal operativa:
+    // arranque afirmativo/negativo, o un CP de 4 dígitos (corrección de
+    // dirección), ADEMÁS de la pregunta. _startsAffirmative distingue el "sí"
+    // afirmativo del "si" condicional: "y si tarda mucho?" NO confirma nada y
+    // la FAQ la responde entera (matched), sin dejarla caer al step.
+    const mapsPassthrough = currentState.step === 'waiting_maps_confirmation'
+        && (_startsAffirmative(trimmed) || /^no\b/.test(norm) || /\b\d{4}\b/.test(trimmed));
+
+    const passthrough = dataBlockPassthrough || mapsPassthrough;
+    logger.info(`[FAQ] ${userId} matched (keyword len=${bestLen}) → "${bestEntry.response.substring(0, 60)}..."${passthrough ? ` [passthrough: señal operativa en ${currentState.step}]` : ''}`);
     currentState.history.push({ role: 'bot', content: bestEntry.response, timestamp: Date.now() });
     saveState(userId);
     await sendMessageWithDelay(userId, bestEntry.response);
+    if (passthrough) return null; // el step procesa el MISMO texto (la señal viene adentro)
     return { matched: true };
 }
