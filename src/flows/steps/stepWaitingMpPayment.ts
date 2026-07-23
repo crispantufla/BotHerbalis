@@ -54,39 +54,7 @@ export async function handleWaitingMpPayment(
         const verified = await _verifyPayment(currentState);
 
         if (verified === 'approved') {
-            // Marcamos senaPaid=true APENAS verificamos approved (sin importar
-            // si hay dirección o no). Antes solo se seteaba en el branch
-            // !hasAddress; si llegaba el address junto con el pago, el flag
-            // quedaba en false y la orden no reflejaba que la seña fue cobrada.
-            if (currentState.senaAmount && currentState.senaAmount > 0) {
-                currentState.senaPaid = true;
-            }
-            const addr = currentState.partialAddress || {};
-            const hasAddress = !!(addr.nombre && addr.calle && addr.ciudad);
-
-            if (hasAddress) {
-                await _finalizeOrderAndNotifyAdmin(userId, currentState, dependencies);
-            } else {
-                // Tomamos la copia de pedido de datos del knowledge — el panel Guiones
-                // muestra la entry `flow.closing` y los vendedores la editan ahí. Si
-                // por alguna razón no existe (mock parcial), usamos fallback fijo.
-                // Modelo nuevo (may-2026): seña $10k eliminada — sólo la mantenemos
-                // como compat para Orders pre-may-2026 con senaAmount>0. En ese caso
-                // el prefijo dice "seña confirmada" para no confundir al cliente.
-                const closingTpl = getFlowTemplate('closing', knowledge);
-                const dataMsg = closingTpl
-                    ? _formatMessage(closingTpl, currentState)
-                    : '¡Perfecto! 🎉 Ahora necesito los datos de envío:\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nEmail (opcional, para el comprobante de MP):';
-                const isSenaFlow = !!(currentState.senaAmount && currentState.senaAmount > 0);
-                const prefix = isSenaFlow
-                    ? '¡Perfecto, la seña fue confirmada! 🎉\n\n'
-                    : '¡Perfecto, el pago fue confirmado! 🎉\n\n';
-                const msg = prefix + dataMsg;
-                _setStep(currentState, FlowStep.WAITING_DATA);
-                currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
-                saveState(userId);
-                await sendMessageWithDelay(userId, msg);
-            }
+            await confirmApprovedMpPayment(userId, currentState, knowledge, dependencies);
             return { matched: true };
 
         } else if (verified === 'pending') {
@@ -213,8 +181,26 @@ export async function handleWaitingMpPayment(
                 const verified = await _verifyPayment(currentState);
                 const hasAddress = !!(pa.nombre && pa.calle && pa.ciudad);
 
-                if (verified === 'approved' && hasAddress) {
-                    await _finalizeOrderAndNotifyAdmin(userId, currentState, dependencies);
+                if (verified === 'approved') {
+                    if (currentState.step === FlowStep.WAITING_MP_PAYMENT) {
+                        // Con o SIN dirección completa: confirmApprovedMpPayment bifurca
+                        // solo (finaliza la orden, o confirma el pago y pide lo que
+                        // falte). Antes había un `&& hasAddress` acá y el caso
+                        // "pagó + dirección parcial" caía al ack de "avisame cuando
+                        // completes el pago" — a un cliente que YA pagó — y encima
+                        // _verifyPayment ya había flipeado la fila a approved,
+                        // apagando los 3 detectores push para siempre.
+                        await confirmApprovedMpPayment(userId, currentState, knowledge, dependencies);
+                        return { matched: true };
+                    }
+                    // El step cambió durante el await de parseAddress: el push
+                    // (webhook/cron) confirmó en el medio. Si dejó al cliente en
+                    // WAITING_DATA (confirmó sin dirección) y este mensaje la
+                    // completó, cerramos acá mismo — si no, el mensaje del push ya
+                    // respondió la situación y no duplicamos nada.
+                    if (currentState.step === FlowStep.WAITING_DATA && hasAddress) {
+                        await _finalizeOrderAndNotifyAdmin(userId, currentState, dependencies);
+                    }
                     return { matched: true };
                 }
 
@@ -275,6 +261,84 @@ export async function handleWaitingMpPayment(
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
+
+/**
+ * confirmApprovedMpPayment — cierre de la venta cuando el pago MP ya está APPROVED.
+ *
+ * Con dirección completa → finaliza la orden y avisa al admin. Sin dirección →
+ * confirma el pago y pide los datos de envío (WAITING_DATA).
+ *
+ * Exportada porque la llaman DOS caminos:
+ *   1. El "listo" del cliente en este step (pull, como siempre).
+ *   2. El push de mpPushConfirm cuando el webhook / cron / refresh del dashboard
+ *      detecta el approved — para no depender de que el cliente escriba "listo"
+ *      (caso Rosa 5492994553847: pagó, el bot le dijo "no veo el pago" y quedó
+ *      3 días sin confirmación).
+ *
+ * Guard anti doble-envío: webhook, cron y "listo" pueden coincidir en la misma
+ * ventana. El flag en memoria se setea SINCRÓNICO (Node single-thread) así el
+ * segundo caller sale antes de cualquier await. Con timestamp para auto-curarse
+ * si un crash lo dejara persistido en el estado.
+ */
+export async function confirmApprovedMpPayment(
+    userId: string,
+    currentState: UserState,
+    knowledge: any,
+    dependencies: any
+): Promise<void> {
+    const { sendMessageWithDelay, saveState } = dependencies;
+
+    const s: any = currentState;
+    // Si el step ya avanzó (otro caller confirmó primero mientras este esperaba
+    // un await, ej: push del webhook durante el _verifyPayment del "listo"),
+    // no hay nada que hacer — evita orden/mensaje duplicados.
+    if (currentState.step !== FlowStep.WAITING_MP_PAYMENT) {
+        logger.info(`[MP_PAYMENT] confirmApprovedMpPayment: ${userId} ya está en "${currentState.step}" — skip (ya confirmado por otro camino)`);
+        return;
+    }
+    if (s._mpConfirmInFlightAt && (Date.now() - s._mpConfirmInFlightAt) < 2 * 60 * 1000) {
+        logger.info(`[MP_PAYMENT] Confirmación ya en curso para ${userId} — skip (anti doble-envío)`);
+        return;
+    }
+    s._mpConfirmInFlightAt = Date.now();
+    try {
+        // Marcamos senaPaid=true APENAS verificamos approved (sin importar
+        // si hay dirección o no). Antes solo se seteaba en el branch
+        // !hasAddress; si llegaba el address junto con el pago, el flag
+        // quedaba en false y la orden no reflejaba que la seña fue cobrada.
+        if (currentState.senaAmount && currentState.senaAmount > 0) {
+            currentState.senaPaid = true;
+        }
+        const addr = currentState.partialAddress || {};
+        const hasAddress = !!(addr.nombre && addr.calle && addr.ciudad);
+
+        if (hasAddress) {
+            await _finalizeOrderAndNotifyAdmin(userId, currentState, dependencies);
+        } else {
+            // Tomamos la copia de pedido de datos del knowledge — el panel Guiones
+            // muestra la entry `flow.closing` y los vendedores la editan ahí. Si
+            // por alguna razón no existe (mock parcial), usamos fallback fijo.
+            // Modelo nuevo (may-2026): seña $10k eliminada — sólo la mantenemos
+            // como compat para Orders pre-may-2026 con senaAmount>0. En ese caso
+            // el prefijo dice "seña confirmada" para no confundir al cliente.
+            const closingTpl = getFlowTemplate('closing', knowledge);
+            const dataMsg = closingTpl
+                ? _formatMessage(closingTpl, currentState)
+                : '¡Perfecto! 🎉 Ahora necesito los datos de envío:\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nEmail (opcional, para el comprobante de MP):';
+            const isSenaFlow = !!(currentState.senaAmount && currentState.senaAmount > 0);
+            const prefix = isSenaFlow
+                ? '¡Perfecto, la seña fue confirmada! 🎉\n\n'
+                : '¡Perfecto, el pago fue confirmado! 🎉\n\n';
+            const msg = prefix + dataMsg;
+            _setStep(currentState, FlowStep.WAITING_DATA);
+            currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+            saveState(userId);
+            await sendMessageWithDelay(userId, msg);
+        }
+    } finally {
+        delete s._mpConfirmInFlightAt;
+    }
+}
 
 // Cuántos intentos hacemos al MP API antes de pausar. Cubre blips transitorios
 // (5xx, network glitches, rate limits cortos). El backoff entre intentos lo
@@ -474,7 +538,12 @@ async function _verifyPayment(currentState: UserState): Promise<'approved' | 'pe
         const { MercadoPagoConfig, Payment } = require('mercadopago');
         const mpClient = new MercadoPagoConfig({ accessToken: mpToken });
         const mpPayment = new Payment(mpClient);
-        const result = await mpPayment.search({ options: { filters: { external_reference: record.externalRef } } });
+        // OJO: el SDK serializa `options` DIRECTO como query params (no soporta
+        // `filters: {...}` anidado — eso mandaba `filters=[object Object]`, MP
+        // devolvía error y este fallback caía SIEMPRE a 'pending'; caso Rosa
+        // 5492994553847: pagó, dijo "listo" 39s después y el bot le dijo "no veo
+        // el pago"). Mismo shape que usan el webhook y el scheduler.
+        const result = await mpPayment.search({ options: { external_reference: record.externalRef } });
         const results = result?.results || [];
         if (results.length === 0) return 'pending';
 

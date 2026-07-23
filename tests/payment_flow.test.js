@@ -826,3 +826,268 @@ describe('Compat legacy — confirmación de pago en flujo seña pre-may-2026', 
         expect(adminMsg).toMatch(/36\.900/);
     });
 });
+
+// ════════════════════════════════════════════════════════════════════════════
+// BLOQUE 8: fix del fallback directo a MP en _verifyPayment (caso Rosa
+// 5492994553847, 20-jul): el SDK serializa options DIRECTO como query params —
+// el shape viejo { filters: { external_reference } } mandaba
+// filters=[object Object], MP fallaba y el "listo" del cliente caía SIEMPRE a
+// "no veo el pago" si el webhook aún no había marcado la fila.
+// ════════════════════════════════════════════════════════════════════════════
+describe('_verifyPayment — fallback directo a MP (fix caso Rosa 5492994553847)', () => {
+
+    test('[8.1] "listo" con fila pending pero MP ya approved → confirma (search con shape correcto)', async () => {
+        // La fila en DB sigue 'pending' (webhook no llegó todavía)…
+        mockPaymentLinkFindUnique.mockResolvedValueOnce({ id: 'pl-1', status: 'pending', externalRef: 'ref-rosa' });
+        // …pero MP ya tiene el pago approved.
+        mockPaymentSearch.mockResolvedValueOnce({
+            results: [{ status: 'approved', date_approved: '2026-07-20T18:36:04.000Z' }],
+        });
+        const state = makeMpState({
+            mpPaymentLinkId: 'pl-1',
+            mpPaymentLinkUrl: 'https://mp.com/x',
+            partialAddress: { nombre: 'Rosa Laura', calle: 'Los Jilgueros mza 6', ciudad: 'Neuquén', cp: '8300' },
+        });
+        await handleWaitingMpPayment('rosa1', 'Listo', 'listo', state, knowledge, deps);
+
+        // El search debe ir con external_reference PLANO (query param directo),
+        // nunca anidado en `filters` (eso mandaba filters=[object Object]).
+        expect(mockPaymentSearch).toHaveBeenCalledWith({ options: { external_reference: 'ref-rosa' } });
+
+        // Y la venta se cierra: fila marcada approved + venta confirmada al cliente.
+        expect(mockPaymentLinkUpdate).toHaveBeenCalledWith(expect.objectContaining({
+            where: { id: 'pl-1' },
+            data: expect.objectContaining({ status: 'approved' }),
+        }));
+        expect(state.step).toBe('completed');
+        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
+        expect(sent).toMatch(/pago fue confirmado|pedido quedó cerrado/i);
+        expect(sent).not.toMatch(/no veo el pago/i);
+    });
+
+    test('[8.2] "listo" con MP aún sin resultados → sigue diciendo que espera (no rompe el caso pending real)', async () => {
+        mockPaymentLinkFindUnique.mockResolvedValueOnce({ id: 'pl-1', status: 'pending', externalRef: 'ref-x' });
+        mockPaymentSearch.mockResolvedValueOnce({ results: [] });
+        const state = makeMpState({ mpPaymentLinkId: 'pl-1', mpPaymentLinkUrl: 'https://mp.com/x' });
+        await handleWaitingMpPayment('pend1', 'listo', 'listo', state, knowledge, deps);
+        expect(state.step).toBe('waiting_mp_payment');
+        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
+        expect(sent).toMatch(/no veo el pago/i);
+    });
+
+    test('[8.3] Dirección PARCIAL + pago approved → confirma el pago y pide lo que falta (nunca "avisame cuando completes el pago")', async () => {
+        // El cliente pagó y mandó nombre+calle sin ciudad. Antes el guard
+        // `&& hasAddress` descartaba el approved: el bot le decía "avisame
+        // cuando completes el pago" a alguien que YA pagó, y como _verifyPayment
+        // ya había flipeado la fila a approved, ningún detector push volvía a
+        // disparar (venta muda).
+        mockPaymentLinkFindUnique.mockResolvedValueOnce({ id: 'pl-1', status: 'approved' });
+        aiService.parseAddress.mockResolvedValueOnce({ nombre: 'Rosa Laura', calle: 'Los Jilgueros mza 6' });
+        const state = makeMpState({ mpPaymentLinkId: 'pl-1', mpPaymentLinkUrl: 'https://mp.com/x' });
+        await handleWaitingMpPayment('partial1', 'Rosa Laura, Los Jilgueros mza 6', 'rosa laura, los jilgueros mza 6', state, knowledge, deps);
+
+        expect(state.step).toBe('waiting_data');
+        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
+        expect(sent).toMatch(/pago fue confirmado/i);
+        expect(sent).not.toMatch(/avisame cuando completes el pago/i);
+    });
+
+    test('[8.4] Race: el push confirma DURANTE el parseAddress → la dirección completa cierra la venta igual (no se descarta)', async () => {
+        // El worker está esperando parseAddress cuando el webhook confirma sin
+        // dirección y mueve el step a waiting_data. Antes, al retomar, el guard
+        // de step descartaba el mensaje con la dirección completa en silencio y
+        // la orden nunca se creaba.
+        mockPaymentLinkFindUnique.mockResolvedValueOnce({ id: 'pl-1', status: 'approved' });
+        const state = makeMpState({ mpPaymentLinkId: 'pl-1', mpPaymentLinkUrl: 'https://mp.com/x' });
+        aiService.parseAddress.mockImplementationOnce(async () => {
+            // Simula el push ganando la carrera: confirmó sin dirección y movió el step.
+            state.step = 'waiting_data';
+            return { nombre: 'Rosa Laura', calle: 'Los Jilgueros mza 6', ciudad: 'Neuquén', cp: '8300' };
+        });
+        await handleWaitingMpPayment('race1', 'Rosa Laura, Los Jilgueros mza 6, Neuquén 8300', 'rosa laura, los jilgueros mza 6, neuquen 8300', state, knowledge, deps);
+
+        // La venta se finaliza con la dirección que llegó durante la carrera.
+        expect(state.step).toBe('completed');
+        const adminArgs = mockNotify.mock.calls.map(args => args.join(' ')).join(' ');
+        expect(adminArgs).toMatch(/VENTA CERRADA/i);
+    });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// BLOQUE 9: confirmación PUSH (mpPushConfirm.onPaymentLinkApproved)
+// El sistema detecta el approved (webhook / cron / refresh del dashboard) y
+// confirma la compra SIN esperar el "listo" del cliente. Antes no existía:
+// si el cliente pagaba y no escribía "listo", la venta quedaba muda (Rosa
+// estuvo 3 días preguntando "¿es real la compra?").
+// ════════════════════════════════════════════════════════════════════════════
+describe('mpPushConfirm — confirmación push al acreditarse el pago', () => {
+    const { onPaymentLinkApproved } = require('../src/services/mpPushConfirm');
+    const mockSaveOrder = jest.fn();
+
+    function makePushDeps(state, { paused = false, phone = '5492994553847' } = {}) {
+        const userId = `${phone}@c.us`;
+        const pausedUsers = new Set(paused ? [userId] : []);
+        return {
+            userId,
+            deps: {
+                sharedState: {
+                    sellerId: 'vendedor_test',
+                    userState: { [userId]: state },
+                    pausedUsers,
+                    knowledge,
+                    config: { alertNumbers: [] },
+                },
+                sendMessageWithDelay: mockSend,
+                notifyAdmin: mockNotify,
+                saveState: mockSave,
+                saveOrderToLocal: mockSaveOrder,
+            },
+        };
+    }
+
+    const record = (over = {}) => ({
+        id: 'pl-1', userPhone: '5492994553847', amount: 44900, status: 'approved', ...over,
+    });
+
+    beforeEach(() => { mockSaveOrder.mockClear(); });
+
+    test('[9.1] Pago acreditado + dirección completa → cierra la venta solo (caso Rosa)', async () => {
+        const state = makeMpState({
+            mpPaymentLinkId: 'pl-1',
+            mpPaymentLinkUrl: 'https://mp.com/x',
+            partialAddress: { nombre: 'Rosa Laura', calle: 'Los Jilgueros mza 6', ciudad: 'Neuquén', cp: '8300' },
+        });
+        const { deps: pushDeps } = makePushDeps(state);
+        await onPaymentLinkApproved(record(), pushDeps);
+
+        expect(state.step).toBe('completed');
+        expect(mockSaveOrder).toHaveBeenCalledTimes(1);
+        expect(mockSaveOrder.mock.calls[0][0]).toMatchObject({
+            paymentMethod: 'mercadopago',
+            status: 'Confirmado',
+        });
+        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
+        expect(sent).toMatch(/pago fue confirmado|pedido quedó cerrado/i);
+        const adminArgs = mockNotify.mock.calls.map(args => args.join(' ')).join(' ');
+        expect(adminArgs).toMatch(/VENTA CERRADA/i);
+    });
+
+    test('[9.2] Pago acreditado SIN dirección → confirma el pago y pide los datos', async () => {
+        const state = makeMpState({ mpPaymentLinkId: 'pl-1', mpPaymentLinkUrl: 'https://mp.com/x' });
+        const { deps: pushDeps } = makePushDeps(state);
+        await onPaymentLinkApproved(record(), pushDeps);
+
+        expect(state.step).toBe('waiting_data');
+        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
+        expect(sent).toMatch(/pago fue confirmado/i);
+    });
+
+    test('[9.3] Cliente PAUSADO → NO le mensajea, avisa al admin (pausas no se auto-liberan) y apaga nudges', async () => {
+        const state = makeMpState({
+            mpPaymentLinkId: 'pl-1',
+            mpPaymentLinkUrl: 'https://mp.com/x',
+            pauseReason: 'revisión manual',
+        });
+        const { deps: pushDeps } = makePushDeps(state, { paused: true });
+        await onPaymentLinkApproved(record(), pushDeps);
+
+        expect(mockSend).not.toHaveBeenCalled();
+        expect(state.step).toBe('waiting_mp_payment');
+        const adminArgs = mockNotify.mock.calls.map(args => args.join(' ')).join(' ');
+        expect(adminArgs).toMatch(/PAUSADO/i);
+        expect(adminArgs).toMatch(/revisión manual/);
+        // El pago ya está acreditado → los nudges de "pago pendiente" serían
+        // falsos. Sentinel 99 los apaga.
+        expect(state.mpReminderStage).toBe(99);
+        // Aviso único: el sweep reintenta cada 5 min — no debe spamear al admin.
+        mockNotify.mockClear();
+        await onPaymentLinkApproved(record(), pushDeps);
+        expect(mockNotify).not.toHaveBeenCalled();
+    });
+
+    test('[9.4] Link viejo (id distinto al del state) → NO confirma pero avisa al admin (plata acreditada sin trackear)', async () => {
+        const state = makeMpState({ mpPaymentLinkId: 'pl-NUEVO', mpPaymentLinkUrl: 'https://mp.com/x' });
+        const { deps: pushDeps } = makePushDeps(state);
+        await onPaymentLinkApproved(record({ id: 'pl-VIEJO' }), pushDeps);
+
+        expect(mockSend).not.toHaveBeenCalled();
+        expect(state.step).toBe('waiting_mp_payment');
+        const adminArgs = mockNotify.mock.calls.map(args => args.join(' ')).join(' ');
+        expect(adminArgs).toMatch(/link no vigente/i);
+        expect(adminArgs).toMatch(/pl-VIEJO/);
+        // Segunda llamada con el mismo record → sin re-aviso.
+        mockNotify.mockClear();
+        await onPaymentLinkApproved(record({ id: 'pl-VIEJO' }), pushDeps);
+        expect(mockNotify).not.toHaveBeenCalled();
+    });
+
+    test('[9.4b] Pausa GLOBAL → NO mensajea NI muta el step (el sweep confirma al levantarla), avisa al admin', async () => {
+        const state = makeMpState({ mpPaymentLinkId: 'pl-1', mpPaymentLinkUrl: 'https://mp.com/x' });
+        const { deps: pushDeps } = makePushDeps(state);
+        pushDeps.sharedState.config.globalPause = true;
+        await onPaymentLinkApproved(record(), pushDeps);
+
+        expect(mockSend).not.toHaveBeenCalled();
+        expect(mockSaveOrder).not.toHaveBeenCalled();
+        expect(state.step).toBe('waiting_mp_payment');
+        const adminArgs = mockNotify.mock.calls.map(args => args.join(' ')).join(' ');
+        expect(adminArgs).toMatch(/PAUSA GLOBAL/i);
+
+        // Al levantar la pausa, el mismo push (reintentado por el sweep) confirma.
+        pushDeps.sharedState.config.globalPause = false;
+        state.partialAddress = { nombre: 'Rosa Laura', calle: 'Los Jilgueros mza 6', ciudad: 'Neuquén', cp: '8300' };
+        await onPaymentLinkApproved(record(), pushDeps);
+        expect(state.step).toBe('completed');
+        expect(mockSaveOrder).toHaveBeenCalledTimes(1);
+    });
+
+    test('[9.4c] WhatsApp DESCONECTADO → NO muta el step (el sweep confirma al reconectar), avisa al admin', async () => {
+        const state = makeMpState({ mpPaymentLinkId: 'pl-1', mpPaymentLinkUrl: 'https://mp.com/x' });
+        const { deps: pushDeps } = makePushDeps(state);
+        pushDeps.sharedState.isConnected = false;
+        await onPaymentLinkApproved(record(), pushDeps);
+
+        expect(mockSend).not.toHaveBeenCalled();
+        expect(state.step).toBe('waiting_mp_payment');
+        const adminArgs = mockNotify.mock.calls.map(args => args.join(' ')).join(' ');
+        expect(adminArgs).toMatch(/DESCONECTADO/i);
+
+        pushDeps.sharedState.isConnected = true;
+        await onPaymentLinkApproved(record(), pushDeps);
+        expect(state.step).toBe('waiting_data'); // sin dirección → confirma y pide datos
+    });
+
+    test('[9.5] Cliente ya avanzó de step (cambió a transferencia) → no hace nada', async () => {
+        const state = makeMpState({ step: 'waiting_transfer_confirmation', mpPaymentLinkId: 'pl-1' });
+        const { deps: pushDeps } = makePushDeps(state);
+        await onPaymentLinkApproved(record(), pushDeps);
+
+        expect(mockSend).not.toHaveBeenCalled();
+        expect(mockNotify).not.toHaveBeenCalled();
+    });
+
+    test('[9.6] Link manual del dashboard (sin userPhone) → no hace nada', async () => {
+        const state = makeMpState({ mpPaymentLinkId: 'pl-1' });
+        const { deps: pushDeps } = makePushDeps(state);
+        await onPaymentLinkApproved(record({ userPhone: null }), pushDeps);
+        expect(mockSend).not.toHaveBeenCalled();
+    });
+
+    test('[9.7] Doble disparo (webhook + cron a la vez) → una sola confirmación', async () => {
+        const state = makeMpState({
+            mpPaymentLinkId: 'pl-1',
+            mpPaymentLinkUrl: 'https://mp.com/x',
+            partialAddress: { nombre: 'Rosa Laura', calle: 'Los Jilgueros mza 6', ciudad: 'Neuquén', cp: '8300' },
+        });
+        const { deps: pushDeps } = makePushDeps(state);
+        await Promise.all([
+            onPaymentLinkApproved(record(), pushDeps),
+            onPaymentLinkApproved(record(), pushDeps),
+        ]);
+
+        // Una sola orden y una sola notificación de venta cerrada.
+        expect(mockSaveOrder).toHaveBeenCalledTimes(1);
+        const closedCalls = mockNotify.mock.calls.filter(([title]) => /VENTA CERRADA/i.test(title));
+        expect(closedCalls.length).toBe(1);
+    });
+});

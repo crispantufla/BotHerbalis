@@ -24,7 +24,7 @@ export interface BotHelpers {
     logAndEmit: (chatId: string, sender: string, text: string, step?: string, messageId?: string | null, overrideTimestamp?: number) => void;
     saveOrderToLocal: (order: Record<string, any>) => void;
     cancelLatestOrder: (userId: string) => Promise<{ success: boolean; order?: any; reason?: string; currentStatus?: string }>;
-    sendMessageWithDelay: (chatId: string, content: string, startTime?: number) => Promise<void>;
+    sendMessageWithDelay: (chatId: string, content: string, startTime?: number, stillValid?: () => boolean) => Promise<boolean>;
     notifyAdmin: (reason: string, userPhone: string, details?: string | null) => Promise<any>;
 }
 
@@ -226,7 +226,14 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
         }
     }
 
-    const sendMessageWithDelay = async (chatId: string, content: string, startTime: number = Date.now()): Promise<void> => {
+    // stillValid (opcional): re-chequeo de la precondición del mensaje DESPUÉS
+    // del delay humanizado de 4-8s. Lo usan los nudges del scheduler: si el step
+    // del usuario cambió durante el delay (ej: un push de pago confirmó la venta),
+    // el recordatorio de "pago pendiente" ya es falso y se aborta.
+    // Devuelve true solo si el mensaje SALIÓ de verdad — los callers que mutan
+    // estado tras el envío (stages de recordatorio) deben chequearlo para no
+    // registrar mensajes fantasma cuando el envío se abortó/falló.
+    const sendMessageWithDelay = async (chatId: string, content: string, startTime: number = Date.now(), stillValid?: () => boolean): Promise<boolean> => {
         // 🛑 GUARD PREVENTIVO ANTI VENTA-FANTASMA (F1, caso 2954520621): si el bot va a
         // decir que el pedido está listo/confirmado SIN orden registrada (sin pendingOrder
         // y en un step que no es de cierre), NO mandamos ese cierre falso — el cliente
@@ -242,7 +249,7 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
                     const hold = 'Dame un segundito que reviso bien tu pedido y te confirmo 🙏';
                     logAndEmit(chatId, 'bot', hold, _gst.step);
                     try { await client.sendMessage(chatId, hold); } catch (e: any) { logger.error(`[GHOST-CLOSE-PREVENT][${sellerId}] hold send fail: ${e.message}`); }
-                    return;
+                    return false;
                 }
             }
         } catch (e: any) { logger.warn(`[GHOST-CLOSE-PREVENT][${sellerId}] guard error (sigo normal): ${e.message}`); }
@@ -252,7 +259,7 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
         const _prevSent = _lastBotMsgByChat.get(chatId);
         if (_prevSent !== undefined && _prevSent.trim() === (content || '').trim() && (content || '').trim().length > 0) {
             logger.warn(`[ANTI-DUP][${sellerId}] Mensaje idéntico al anterior — NO reenviado a ${chatId}: "${(content || '').slice(0, 70)}"`);
-            return;
+            return false;
         }
         _lastBotMsgByChat.set(chatId, content || '');
 
@@ -277,7 +284,11 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
         const isAdminChat = alertNums.some((n: string) => chatId.startsWith(n));
         if (pausedUsers.has(chatId) || (config.globalPause && !isAdminChat)) {
             logger.info(`[DELAY][${sellerId}] Aborted message to ${chatId}: paused during delay`);
-            return;
+            return false;
+        }
+        if (stillValid && !stillValid()) {
+            logger.info(`[DELAY][${sellerId}] Aborted message to ${chatId}: condición inválida tras el delay (step cambió)`);
+            return false;
         }
 
         try {
@@ -292,8 +303,10 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
             // mensaje que el cliente nunca recibió.
             logAndEmit(chatId, 'bot', content, userState[chatId]?.step);
             logger.info(`[SENT][${sellerId}] Message sent to ${chatId}`);
+            return true;
         } catch (e: any) {
             logger.error(`[ERROR][${sellerId}] Failed to send message:`, e.message);
+            return false;
         }
     };
 

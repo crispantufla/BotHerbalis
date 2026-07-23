@@ -64,18 +64,49 @@ module.exports = (clientPool) => {
                 : latest.status === 'cancelled' ? 'expired'
                 : 'pending';
 
-            const updated = await prisma.paymentLink.update({
-                where: { id: payment.id },
-                data: {
-                    status: newStatus,
-                    paidAt: newStatus === 'approved' ? new Date(latest.date_approved || Date.now()) : payment.paidAt,
-                }
-            });
+            // Flip a approved con CAS (mismo patrón que el webhook): solo el
+            // ganador de la transición dispara el push al chat.
+            let updated;
+            let wonApprovedFlip = false;
+            if (newStatus === 'approved') {
+                const paidAt = new Date(latest.date_approved || Date.now());
+                const casRes = await prisma.paymentLink.updateMany({
+                    where: { id: payment.id, status: { not: 'approved' } },
+                    data: { status: 'approved', paidAt },
+                });
+                wonApprovedFlip = casRes.count === 1;
+                updated = { ...payment, status: 'approved', paidAt: wonApprovedFlip ? paidAt : payment.paidAt };
+            } else {
+                updated = await prisma.paymentLink.update({
+                    where: { id: payment.id },
+                    data: { status: newStatus, paidAt: payment.paidAt }
+                });
+            }
 
             if (io) {
                 const sellerId = req.sellerId || payment.instanceId;
                 if (sellerId) io.to(sellerId).emit('payment_updated', updated);
                 io.to('admin').emit('payment_updated', { ...updated, sellerId });
+            }
+
+            // Mismo push que el webhook: si el refresh manual descubrió el approved,
+            // confirmarle la compra al cliente sin esperar el "listo". El dueño se
+            // resuelve por instanceId del link (no por req.sellerInstance: un admin
+            // global puede refrescar links de cualquier seller).
+            if (wonApprovedFlip) {
+                const ownerInstance = payment.instanceId ? clientPool.getSeller(payment.instanceId) : null;
+                if (ownerInstance) {
+                    const { onPaymentLinkApproved } = require('../../services/mpPushConfirm');
+                    onPaymentLinkApproved(updated, {
+                        sharedState: ownerInstance.sharedState,
+                        sendMessageWithDelay: ownerInstance.helpers.sendMessageWithDelay,
+                        notifyAdmin: ownerInstance.helpers.notifyAdmin,
+                        saveState: ownerInstance.sharedState.saveState,
+                        saveOrderToLocal: ownerInstance.helpers.saveOrderToLocal,
+                    }).catch((e) => logger.error('[PAYMENTS] push confirm error:', e?.message || e));
+                } else {
+                    logger.error(`[PAYMENTS] Pago ${payment.id} approved pero el seller ${payment.instanceId} no está en el pool — push diferido al sweep del scheduler.`);
+                }
             }
             res.json({ payment: updated, changed: updated.status !== payment.status });
         } catch (e) {
@@ -215,13 +246,26 @@ module.exports = (clientPool) => {
                 : mpData.status === 'cancelled' ? 'expired'
                 : 'pending';
 
-            const updated = await prisma.paymentLink.update({
-                where: { id: payment.id },
-                data: {
-                    status: newStatus,
-                    paidAt: newStatus === 'approved' ? new Date(mpData.date_approved || Date.now()) : payment.paidAt,
-                }
-            });
+            // Flip a approved con CAS (un solo ganador): webhook, cron y refresh
+            // manual pueden correr a la vez (o duplicarse tras un restart) — el
+            // updateMany condicionado garantiza que UNO solo vea la transición y
+            // dispare el push, sin depender de guards en memoria.
+            let updated;
+            let wonApprovedFlip = false;
+            if (newStatus === 'approved') {
+                const paidAt = new Date(mpData.date_approved || Date.now());
+                const res = await prisma.paymentLink.updateMany({
+                    where: { id: payment.id, status: { not: 'approved' } },
+                    data: { status: 'approved', paidAt },
+                });
+                wonApprovedFlip = res.count === 1;
+                updated = { ...payment, status: 'approved', paidAt: wonApprovedFlip ? paidAt : payment.paidAt };
+            } else {
+                updated = await prisma.paymentLink.update({
+                    where: { id: payment.id },
+                    data: { status: newStatus, paidAt: payment.paidAt }
+                });
+            }
 
             // Route the update to the seller that owns the payment link, plus admin room
             const sellerId = payment.instanceId;
@@ -232,6 +276,26 @@ module.exports = (clientPool) => {
                 io.to('admin').emit('payment_updated', { ...updated, sellerId });
             }
             logger.info(`[MP-WEBHOOK] Payment ${payment.id} updated to ${newStatus}`);
+
+            // Push al chat: si el dueño del link sigue en waiting_mp_payment,
+            // confirmarle la compra SIN esperar a que escriba "listo". Solo el
+            // ganador del CAS pushea (MP reintenta webhooks — sin re-trabajo;
+            // además onPaymentLinkApproved es idempotente por step/link).
+            if (wonApprovedFlip && ownerInstance) {
+                const { onPaymentLinkApproved } = require('../../services/mpPushConfirm');
+                onPaymentLinkApproved(updated, {
+                    sharedState: ownerInstance.sharedState,
+                    sendMessageWithDelay: ownerInstance.helpers.sendMessageWithDelay,
+                    notifyAdmin: ownerInstance.helpers.notifyAdmin,
+                    saveState: ownerInstance.sharedState.saveState,
+                    saveOrderToLocal: ownerInstance.helpers.saveOrderToLocal,
+                }).catch((e) => logger.error('[MP-WEBHOOK] push confirm error:', e?.message || e));
+            } else if (wonApprovedFlip && !ownerInstance) {
+                // El seller no está en el pool (restart del watchdog, boot). El
+                // sweep de refreshPendingPayments reconcilia esta fila approved
+                // cuando la instancia vuelva — acá solo dejamos rastro.
+                logger.error(`[MP-WEBHOOK] Pago ${payment.id} approved pero el seller ${sellerId} no está en el pool — push diferido al sweep del scheduler.`);
+            }
         } catch (e) {
             logger.error('[MP-WEBHOOK] Error processing webhook:', e);
         }
