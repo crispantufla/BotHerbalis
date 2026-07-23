@@ -169,6 +169,7 @@ const MAX_RETRIES = 3;
 // ANTHROPIC_API_KEY, el experimento queda OFF y todo corre igual que siempre.
 // El resto de las llamadas (whisper, embeddings, visión, summary, parseAddress)
 // se mantienen en OpenAI — Anthropic no tiene audio ni embeddings.
+// Excepción: parseAddress cae a Claude si OpenAI falla (ver _claudeParseAddress).
 const CLAUDE_MODEL_PREMIUM = process.env.CLAUDE_MODEL_PREMIUM || "claude-sonnet-4-6";
 const CLAUDE_MODEL_SIMPLE = process.env.CLAUDE_MODEL_SIMPLE || "claude-haiku-4-5-20251001";
 const CLAUDE_AB_SELLERS = new Set(
@@ -1378,7 +1379,64 @@ CRÍTICO: Usá la "Fecha Actual" provista arriba para calcular el día exacto y 
             return { _error: true };
         } catch (e: any) {
             logger.error("🔴 [AI] parseAddress Error:", e.message);
+            // OpenAI caído (429/outage): probamos Claude antes de rendirnos. Sin esto,
+            // el rescate de datos del manual-complete queda ciego justo cuando más se
+            // lo necesita (caso Pablo Martinez 23-jul: 429 x3 → modal vacío).
+            const viaClaude = await this._claudeParseAddress(prompt);
+            if (viaClaude) return viaClaude;
             return { _error: true };
+        }
+    }
+
+    /**
+     * Fallback de parseAddress sobre Claude (Anthropic Messages API + tool use).
+     * Llamada directa SIN _callQueued a propósito: el circuit breaker es por
+     * seller, no por proveedor, y cuando corre este fallback ya está abierto por
+     * los fallos de OpenAI — pasar por la cola lo haría fallar en seco.
+     */
+    async _claudeParseAddress(prompt: string): Promise<AIParsedResponse | null> {
+        if (!this.anthropic) return null;
+        try {
+            const result: any = await this.anthropic.messages.create({
+                model: CLAUDE_MODEL_PREMIUM,
+                max_tokens: 300,
+                temperature: 0,
+                system: "Sos un parser de datos de envío experto en geografía argentina. Extraé cada valor TAL CUAL lo escribió el cliente: no reformatees, no agregues puntuación ni abreviaturas, no recortes palabras (ej: 'av belgrano 45D' queda 'av belgrano 45D', no 'Av. Belgrano 45D'; 'cordoba capital' queda 'cordoba capital', no 'Córdoba').",
+                messages: [{ role: "user", content: prompt }],
+                tools: [{
+                    name: "extract_address",
+                    description: "Extrae los datos de direccion y nombre de la persona",
+                    input_schema: {
+                        type: "object",
+                        properties: {
+                            nombre: { type: "string", description: "Nombre y apellido de la persona, o null si no se proporcionó" },
+                            calle: { type: "string", description: "Calle, altura, vivienda, manzana, o null si no se proporcionó" },
+                            ciudad: { type: "string", description: "Ciudad o localidad, o null si no se proporcionó" },
+                            provincia: { type: "string", description: "Provincia argentina, o null si no se proporcionó" },
+                            cp: { type: "string", description: "Codigo postal, o null si no se proporcionó" },
+                            postdatado: { type: "string", description: "Fecha de postergacion futura, o null si no se proporcionó" }
+                        }
+                    }
+                }],
+                tool_choice: { type: "tool", name: "extract_address" }
+            });
+            const toolUse = (result?.content || []).find((c: any) => c.type === 'tool_use');
+            if (!toolUse?.input) return null;
+            // El schema declara strings, así que Claude puede emitir el literal "null".
+            const norm = (v: any) => (!v || v === 'null') ? null : v;
+            const args = toolUse.input;
+            logger.info("🟢 [AI] parseAddress rescatado vía Claude");
+            return {
+                nombre: norm(args.nombre),
+                calle: norm(args.calle),
+                ciudad: norm(args.ciudad),
+                provincia: norm(args.provincia),
+                cp: norm(args.cp),
+                postdatado: norm(args.postdatado)
+            };
+        } catch (e: any) {
+            logger.error("🔴 [AI] parseAddress fallback Claude también falló:", e.message);
+            return null;
         }
     }
 
