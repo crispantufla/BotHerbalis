@@ -174,6 +174,7 @@ module.exports = (clientPool) => {
                     senaAmount: o.senaAmount || null,
                     senaPaid: !!o.senaPaid,
                     cashRemainder: o.cashRemainder || null,
+                    paymentVerifiedAt: o.paymentVerifiedAt ? o.paymentVerifiedAt.toISOString() : null,
                     createdAt: o.createdAt.toISOString()
                 };
             });
@@ -250,6 +251,7 @@ module.exports = (clientPool) => {
                 senaAmount: updatedOrder.senaAmount || null,
                 senaPaid: !!updatedOrder.senaPaid,
                 cashRemainder: updatedOrder.cashRemainder || null,
+                paymentVerifiedAt: updatedOrder.paymentVerifiedAt ? updatedOrder.paymentVerifiedAt.toISOString() : null,
                 createdAt: updatedOrder.createdAt.toISOString()
             };
 
@@ -342,6 +344,7 @@ module.exports = (clientPool) => {
                 senaAmount: updatedOrder.senaAmount || null,
                 senaPaid: !!updatedOrder.senaPaid,
                 cashRemainder: updatedOrder.cashRemainder || null,
+                paymentVerifiedAt: updatedOrder.paymentVerifiedAt ? updatedOrder.paymentVerifiedAt.toISOString() : null,
                 createdAt: updatedOrder.createdAt.toISOString()
             };
 
@@ -407,6 +410,13 @@ module.exports = (clientPool) => {
             const sellerClient = req.sellerInstance?.client;
             const sellerSharedState = req.sellerInstance?.sharedState;
             const INSTANCE_ID = getInstanceId(req);
+            // prisma se requiere ACÁ ARRIBA a propósito: antes era `const` a mitad
+            // del handler (~L703) y el rescate desde ChatLog lo usaba antes de
+            // declararse — por la temporal dead zone tiraba ReferenceError que el
+            // try/catch se tragaba como "DB chatLog query failed" → el rescate desde
+            // DB NUNCA funcionó (mismo patrón que el bug de phoneNumeric de abajo;
+            // caso Pablo Martinez 23-jul).
+            const { prisma } = require('../../../db');
 
             const resolveChatIdLocal = async (id) => {
                 if (!id) return id;
@@ -559,6 +569,8 @@ module.exports = (clientPool) => {
             // de verificación; esos overrides pisan la detección automática.
             const shippingTypeReq = req.body?.shippingType;   // 'domicilio' | 'sucursal'
             const paymentMethodReq = req.body?.paymentMethod; // 'mercadopago' | 'transferencia' | 'contrarembolso'
+            // Checkbox "vi el comprobante" del modal (solo aplica a transferencia).
+            const paymentVerifiedReq = req.body?.paymentVerified === true;
             const detectedRetiro = retiroCommitted && !domicilioCommitted;
             const isRetiro = shippingTypeReq ? (shippingTypeReq === 'sucursal') : detectedRetiro;
 
@@ -698,9 +710,7 @@ module.exports = (clientPool) => {
                 });
             }
 
-            // phoneNumeric ya se declaró al inicio del handler (ver nota arriba).
-
-            const { prisma } = require('../../../db');
+            // phoneNumeric y prisma ya se declararon al inicio del handler (ver notas arriba).
 
             const seller = sellerClient?.info?.wid?.user || null;
 
@@ -765,6 +775,7 @@ module.exports = (clientPool) => {
                             ...(needsProductPatch && { products: product }),
                             ...(needsPricePatch && { totalPrice: total }),
                             paymentMethod: state.paymentMethod || existingOrder.paymentMethod || null,
+                            ...(paymentVerifiedReq && { paymentVerifiedAt: new Date() }),
                             ...stateSena,
                         }
                     });
@@ -786,6 +797,7 @@ module.exports = (clientPool) => {
                             cp: addr.cp || null,
                             seller: seller,
                             paymentMethod: state.paymentMethod || null,
+                            paymentVerifiedAt: paymentVerifiedReq ? new Date() : null,
                             ...stateSena,
                         }
                     });
@@ -841,6 +853,7 @@ module.exports = (clientPool) => {
                 senaAmount: order.senaAmount || null,
                 senaPaid: !!order.senaPaid,
                 cashRemainder: order.cashRemainder || null,
+                paymentVerifiedAt: order.paymentVerifiedAt ? order.paymentVerifiedAt.toISOString() : null,
                 createdAt: order.createdAt.toISOString()
             };
 

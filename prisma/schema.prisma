@@ -52,6 +52,11 @@ model Order {
   senaPaid      Boolean  @default(false)
   cashRemainder Int?
 
+  // Transferencias: momento en que el admin verificó el comprobante A MANO
+  // (checkbox del modal de carga). MP no lo usa: se verifica solo contra la
+  // API (PaymentLink.status='approved' + paidAt).
+  paymentVerifiedAt DateTime?
+
   nombre      String?
   email       String?  // Optional, captured during MP flow for receipt + payer pre-fill
   calle       String?

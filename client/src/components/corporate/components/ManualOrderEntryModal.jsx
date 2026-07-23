@@ -45,6 +45,7 @@ const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onC
         nombre: '', calle: '', ciudad: '', provincia: '', cp: '',
         shippingType: 'domicilio', paymentMethod: 'mercadopago',
         productType: '', plan: '60', discount: '',
+        paymentVerified: false,
     });
 
     const productDetected = !!prefill.productDetected;
@@ -68,6 +69,7 @@ const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onC
             productType: '',
             plan: prefill.plan || '60',
             discount: '',
+            paymentVerified: false,
         });
     }, [open, prefill]);
 
@@ -126,6 +128,7 @@ const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onC
             shippingType: data.shippingType,
             paymentMethod: data.paymentMethod,
             discount: discountNum,
+            paymentVerified: data.paymentMethod === 'transferencia' && data.paymentVerified,
             ...(productDetected ? {} : { productType: data.productType, plan: data.plan }),
         });
     };
@@ -207,6 +210,29 @@ const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onC
                                 />
                             ))}
                         </div>
+                        {data.paymentMethod === 'transferencia' && (
+                            <label className={`mt-2 flex items-start gap-2.5 px-3 py-2.5 rounded-xl border cursor-pointer transition-all ${
+                                data.paymentVerified
+                                    ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20'
+                                    : 'border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/15'
+                            }`}>
+                                <input
+                                    type="checkbox"
+                                    checked={data.paymentVerified}
+                                    onChange={e => handleField('paymentVerified', e.target.checked)}
+                                    disabled={submitting}
+                                    className="mt-0.5 w-4 h-4 accent-emerald-600 flex-shrink-0"
+                                />
+                                <span className="text-xs leading-snug">
+                                    <span className={`font-bold block ${data.paymentVerified ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}>
+                                        {data.paymentVerified ? 'Transferencia verificada ✓' : 'Transferencia SIN verificar'}
+                                    </span>
+                                    <span className="text-slate-500 dark:text-slate-400">
+                                        Marcalo solo si ya viste el comprobante y la plata está acreditada.
+                                    </span>
+                                </span>
+                            </label>
+                        )}
                     </div>
 
                     {/* Datos */}

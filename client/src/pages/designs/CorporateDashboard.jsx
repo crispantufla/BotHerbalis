@@ -256,11 +256,17 @@ const CorporateDashboard = () => {
 
     const [manualEntry, setManualEntry] = useState(null);
     const [submittingManual, setSubmittingManual] = useState(false);
-    const handleManualEntrySubmit = async (manualAddr) => {
+    // OJO: el modal manda un payload { manualAddr, shippingType, paymentMethod, ... },
+    // NO el manualAddr pelado. Antes se posteaba el payload entero como manualAddr
+    // → el backend no encontraba nombre/calle y descartaba lo tipeado.
+    const handleManualEntrySubmit = async ({ manualAddr, shippingType, paymentMethod, discount, productType, plan, paymentVerified }) => {
         if (!manualEntry) return;
         setSubmittingManual(true);
         try {
-            await api.post('/api/orders/manual-complete', { chatId: manualEntry.chatId, manualAddr });
+            await api.post('/api/orders/manual-complete', {
+                chatId: manualEntry.chatId,
+                manualAddr, shippingType, paymentMethod, discount, productType, plan, paymentVerified,
+            });
             setAlerts(prev => prev.filter(a => a.userPhone !== manualEntry.chatId));
             toast.success('Pedido registrado con datos manuales ✅');
             setManualEntry(null);

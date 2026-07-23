@@ -10,7 +10,7 @@ import {
 
 import {
     RefreshCw, Download, Search, Filter, ChevronLeft, ChevronRight, MessageCircle,
-    Edit2, Trash2, Save, Copy, Check, Package, Phone, MapPin, Inbox
+    Edit2, Trash2, Save, Copy, Check, Package, Phone, MapPin, Inbox, AlertTriangle
 } from 'lucide-react';
 
 // Mapeo único de status → tono semántico + dot. Antes había 6 strings con
@@ -29,6 +29,16 @@ const PAYMENT_TONE = {
     'transferencia': { tone: 'purple',  label: 'Transferencia' },
 };
 const paymentMeta = (m) => PAYMENT_TONE[m] || { tone: 'warning', label: 'Contra reembolso' };
+
+// Verificación de pago — solo aplica a transferencia (el admin mira el
+// comprobante a mano y lo marca en el modal de carga). MP se verifica solo
+// contra la API de MercadoPago; contrarembolso se cobra al entregar.
+const transferVerifiedMeta = (order) => {
+    if (order.paymentMethod !== 'transferencia') return null;
+    return order.paymentVerifiedAt
+        ? { tone: 'success', label: 'Pago verificado', Icon: Check }
+        : { tone: 'danger', label: 'Sin verificar', Icon: AlertTriangle };
+};
 
 // Tipo de envío — el Order no tiene campo dedicado. El flujo marca el retiro
 // seteando `calle = "A sucursal"` (el pago suele quedar en contrarembolso).
@@ -439,6 +449,7 @@ CP: ${order.cp || '—'}`;
                                 filteredOrders.map(order => {
                                     const statusMeta = STATUS_TONE[order.status] || STATUS_TONE['Pendiente'];
                                     const shipMeta = shippingMeta(order);
+                                    const payVer = transferVerifiedMeta(order);
                                     const dt = formatDateBA(order.createdAt);
                                     const [datePart, timePart] = typeof dt === 'string' && dt.includes(',')
                                         ? dt.split(',').map(s => s.trim())
@@ -488,10 +499,18 @@ CP: ${order.cp || '—'}`;
                                                 ) : <span className="text-sm text-slate-400">—</span>}
                                             </td>
                                             <td className="px-4 py-3.5 text-center">
-                                                <Badge tone={shipMeta.tone} size="md">
-                                                    <shipMeta.Icon className="w-3 h-3" />
-                                                    {shipMeta.label}
-                                                </Badge>
+                                                <div className="flex flex-col items-center gap-1">
+                                                    <Badge tone={shipMeta.tone} size="md">
+                                                        <shipMeta.Icon className="w-3 h-3" />
+                                                        {shipMeta.label}
+                                                    </Badge>
+                                                    {payVer && (
+                                                        <Badge tone={payVer.tone} size="sm">
+                                                            <payVer.Icon className="w-2.5 h-2.5" />
+                                                            {payVer.label}
+                                                        </Badge>
+                                                    )}
+                                                </div>
                                             </td>
                                             <td className="px-4 py-3.5 text-center">
                                                 <Badge tone={statusMeta.tone} dot={statusMeta.dot} size="lg">
@@ -539,6 +558,7 @@ CP: ${order.cp || '—'}`;
                             filteredOrders.map(order => {
                                 const statusMeta = STATUS_TONE[order.status] || STATUS_TONE['Pendiente'];
                                 const shipMeta = shippingMeta(order);
+                                const payVer = transferVerifiedMeta(order);
                                 const dt = formatDateBA(order.createdAt);
                                 const [datePart] = typeof dt === 'string' && dt.includes(',')
                                     ? dt.split(',').map(s => s.trim())
@@ -562,6 +582,12 @@ CP: ${order.cp || '—'}`;
                                                     <shipMeta.Icon className="w-2.5 h-2.5" />
                                                     {shipMeta.label}
                                                 </Badge>
+                                                {payVer && (
+                                                    <Badge tone={payVer.tone} size="sm">
+                                                        <payVer.Icon className="w-2.5 h-2.5" />
+                                                        {payVer.label}
+                                                    </Badge>
+                                                )}
                                                 <span className="text-xs text-slate-500 dark:text-slate-400 tabular-nums">
                                                     {datePart}
                                                 </span>
@@ -716,10 +742,17 @@ CP: ${order.cp || '—'}`;
                         {(() => {
                             const s = STATUS_TONE[viewingOrder.status] || STATUS_TONE['Pendiente'];
                             const p = paymentMeta(viewingOrder.paymentMethod);
+                            const pv = transferVerifiedMeta(viewingOrder);
                             return (
                                 <>
                                     <Badge tone={s.tone} dot={s.dot} size="md">{s.label}</Badge>
                                     <Badge tone={p.tone} size="md">{p.label}</Badge>
+                                    {pv && (
+                                        <Badge tone={pv.tone} size="md">
+                                            <pv.Icon className="w-3 h-3" />
+                                            {pv.label}
+                                        </Badge>
+                                    )}
                                     {viewingOrder.postdatado &&
                                         String(viewingOrder.postdatado).trim() !== '' &&
                                         !['no', 'false'].includes(String(viewingOrder.postdatado).toLowerCase()) && (
