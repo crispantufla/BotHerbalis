@@ -4,7 +4,21 @@ const { aiService } = require('../../services/ai');
 const { MessageMedia } = require('whatsapp-web.js');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const logger = require('../../utils/logger');
+
+// Nombre de archivo de audio NO adivinable y SIN el teléfono del cliente
+// (/media es estático sin auth — con <telefono>_<timestamp>.ogg cualquiera
+// podía enumerar y bajar audios de clientes). Determinístico por
+// (chatId, timestamp del mensaje WA) vía HMAC con el secreto del server:
+// mantiene la idempotencia del download en /history (si ya existe no se
+// re-baja) pero es imposible de adivinar sin JWT_SECRET. Los archivos viejos
+// <telefono>_<ts>.ogg ya escritos siguen sirviéndose por su URL guardada.
+function _audioFilename(chatId, waTimestamp, ext) {
+    const secret = process.env.JWT_SECRET || process.env.API_KEY || '';
+    const hash = crypto.createHmac('sha256', secret).update(`${chatId}:${waTimestamp}`).digest('hex').slice(0, 32);
+    return `aud_${waTimestamp}_${hash}.${ext}`;
+}
 
 // Per-seller LRU contact cache — prevents cross-tenant data bleeding
 const CONTACT_CACHE_MAX = 500;
@@ -148,6 +162,9 @@ module.exports = (clientPool) => {
 
     const resolveChatId = async (id, client, sellerId = 'default') => {
         if (!id) return id;
+        // Admin en vista agregada llega con req.sellerId=null — normalizamos
+        // para que la cache LRU no opere bajo la key literal `null`.
+        sellerId = sellerId || 'default';
         // Handle @lid format
         if (id.includes('@lid')) {
             const cached = _cacheGet(sellerId, id);
@@ -179,7 +196,7 @@ module.exports = (clientPool) => {
     router.get('/summarize/:chatId', ...withSeller(clientPool), async (req, res) => {
         try {
             const { client: cl, sharedState: ss } = req.sellerInstance || {};
-            const chatId = await resolveChatId(req.params.chatId, cl);
+            const chatId = await resolveChatId(req.params.chatId, cl, req.sellerId);
             const resetAt = ss?.chatResets?.[chatId] || 0;
             // Reusing history logic (simplified for summary - we need text)
             const localMessages = await getLocalHistory(chatId, resetAt, req.sellerId);
@@ -546,7 +563,7 @@ module.exports = (clientPool) => {
     router.post('/chats/:id/read', ...withSeller(clientPool), async (req, res) => {
         try {
             const cl = req.sellerInstance?.client;
-            const chatId = await resolveChatId(req.params.id, cl);
+            const chatId = await resolveChatId(req.params.id, cl, req.sellerId);
             const chat = await cl?.getChatById(chatId);
             await chat.sendSeen();
             res.json({ success: true });
@@ -562,7 +579,7 @@ module.exports = (clientPool) => {
     router.get('/chat-state/:id', ...withSeller(clientPool), async (req, res) => {
         try {
             const { client: cl, sharedState: ss } = req.sellerInstance || {};
-            const chatId = await resolveChatId(req.params.id, cl);
+            const chatId = await resolveChatId(req.params.id, cl, req.sellerId);
             const st = (ss?.userState && (ss.userState[chatId] || ss.userState[req.params.id])) || {};
             res.json({
                 selectedProduct: st.selectedProduct || null,
@@ -582,7 +599,7 @@ module.exports = (clientPool) => {
     router.get('/history/:id', ...withSeller(clientPool), async (req, res) => {
         try {
             const { client: cl, sharedState: ss } = req.sellerInstance || {};
-            const chatId = await resolveChatId(req.params.id, cl);
+            const chatId = await resolveChatId(req.params.id, cl, req.sellerId);
             const resetAt = ss?.chatResets?.[chatId] || 0;
             let messages = [];
 
@@ -622,7 +639,7 @@ module.exports = (clientPool) => {
                         if (m.type === 'audio' || m.type === 'ptt') {
                             // Check if already downloaded (idempotent using WA timestamp)
                             const ext = 'ogg';
-                            const audioFilename = `${chatId.replace('@c.us', '')}_${m.timestamp}.${ext}`;
+                            const audioFilename = _audioFilename(chatId, m.timestamp, ext);
                             const audioPath = path.join(audioDir, audioFilename);
                             if (fs.existsSync(audioPath)) {
                                 body = `MEDIA_AUDIO:/media/audio/${audioFilename}`;
@@ -634,7 +651,7 @@ module.exports = (clientPool) => {
                                     if (media) {
                                         if (!fs.existsSync(audioDir)) fs.mkdirSync(audioDir, { recursive: true });
                                         const realExt = media.mimetype?.includes('ogg') ? 'ogg' : 'mp3';
-                                        const realFilename = `${chatId.replace('@c.us', '')}_${m.timestamp}.${realExt}`;
+                                        const realFilename = _audioFilename(chatId, m.timestamp, realExt);
                                         const realPath = path.join(audioDir, realFilename);
                                         fs.writeFileSync(realPath, Buffer.from(media.data, 'base64'));
                                         body = `MEDIA_AUDIO:/media/audio/${realFilename}`;
@@ -772,7 +789,7 @@ module.exports = (clientPool) => {
                 return res.status(400).json({ error: 'Seleccioná un vendedor para enviar mensajes' });
             }
 
-            chatId = await resolveChatId(chatId, cl);
+            chatId = await resolveChatId(chatId, cl, req.sellerId);
             const ownErr = await _verifyChatOwnership(chatId, ss, INSTANCE_ID);
             if (ownErr) return res.status(ownErr.status).json(ownErr.body);
 
@@ -838,7 +855,7 @@ module.exports = (clientPool) => {
             if (!cl || !ss) {
                 return res.status(400).json({ error: 'Seleccioná un vendedor para enviar mensajes' });
             }
-            chatId = await resolveChatId(chatId, cl);
+            chatId = await resolveChatId(chatId, cl, req.sellerId);
             const ownErr = await _verifyChatOwnership(chatId, ss, INSTANCE_ID);
             if (ownErr) return res.status(ownErr.status).json(ownErr.body);
             if (!base64 || !mimetype) return res.status(400).json({ error: 'Missing base64 or mimetype' });
@@ -900,7 +917,7 @@ module.exports = (clientPool) => {
                 return res.status(400).json({ error: 'Seleccioná un vendedor antes de resetear chat' });
             }
             let { chatId } = req.body;
-            chatId = await resolveChatId(chatId, cl);
+            chatId = await resolveChatId(chatId, cl, req.sellerId);
 
             // Warn if there's an active order in progress (but don't block the reset)
             let warning = null;
@@ -949,7 +966,7 @@ module.exports = (clientPool) => {
             const originalChatId = req.body.chatId;
             const cl = req.sellerInstance?.client;
             let { chatId, paused } = req.body;
-            chatId = await resolveChatId(chatId, cl);
+            chatId = await resolveChatId(chatId, cl, req.sellerId);
 
             // Warn if LID resolution failed — pause key would mismatch message key
             if (chatId.includes('@lid')) {
@@ -1001,7 +1018,7 @@ module.exports = (clientPool) => {
         try {
             const cl = req.sellerInstance?.client;
             let { chatId, messageId } = req.body;
-            chatId = await resolveChatId(chatId, cl);
+            chatId = await resolveChatId(chatId, cl, req.sellerId);
 
             if (!chatId || !messageId) return res.status(400).json({ error: 'Missing parameters' });
 
@@ -1028,6 +1045,11 @@ module.exports = (clientPool) => {
     router.post('/ai-reports', ...withSeller(clientPool), async (req, res) => {
         try {
             const INSTANCE_ID = getInstanceId(req);
+            // Sin seller resuelto (admin en vista agregada), el create fallaría
+            // con PrismaClientValidationError por instanceId null.
+            if (!INSTANCE_ID) {
+                return res.status(400).json({ error: 'Seleccioná un vendedor antes de reportar el error' });
+            }
             const { userPhone, reportedMessage, conversation, correction } = req.body;
             if (!reportedMessage || !correction || !conversation) {
                 return res.status(400).json({ error: 'Missing required fields' });

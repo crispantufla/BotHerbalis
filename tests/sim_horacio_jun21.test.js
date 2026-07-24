@@ -2,10 +2,11 @@
  * SIMULACIÓN V7 — replica secuencias reales de clientes (de las ventas que Horacio
  * cerró a mano) a través del flujo real del bot y verifica que el bot responda con
  * los patrones de Horacio que bajamos al guion: retiro-first, datos = solo nombre+CP,
- * demora diferenciada (prepago 6-7), descuento de junio, cierre cálido y asumido.
+ * demora diferenciada (prepago 6-7), precios base, cierre cálido y asumido.
  *
  * La IA está mockeada (sin LLM): el happy-path V7 usa respuestas scripteadas, así que
- * no necesita el modelo. pricing.ts queda REAL → aplica el descuento de junio.
+ * no necesita el modelo. pricing.ts queda REAL → cotiza los precios base de prices.json
+ * (el descuento de junio venció y se quitó el 24-jul-2026).
  */
 jest.mock('../safeWrite', () => ({ atomicWriteFile: jest.fn() }));
 jest.mock('../db', () => ({
@@ -91,10 +92,10 @@ describe('SIM V7 — el bot vende como Horacio (retiro, +10kg, cápsulas)', () =
         expect(all).not.toMatch(/n[úu]mero de tel[ée]fono/);
     });
 
-    test('aplica el descuento de junio (cápsulas 120 = 52.900, no 62.900)', () => {
+    test('cotiza el precio base (cápsulas 120 = 62.900, sin el descuento vencido de junio)', () => {
         const all = rig.transcript.map(t => t.text).join('\n');
-        expect(all).toMatch(/52\.900/);
-        expect(all).not.toMatch(/62\.900/);
+        expect(all).toMatch(/62\.900/);
+        expect(all).not.toMatch(/52\.900/);
     });
 
     test('el bot CIERRA la venta solo: guarda la orden (Confirmado) y pasa a completed, sin esperar "sí"', () => {
@@ -105,7 +106,7 @@ describe('SIM V7 — el bot vende como Horacio (retiro, +10kg, cápsulas)', () =
         expect(rig.deps.saveOrderToLocal).toHaveBeenCalledTimes(1);
         const saved = rig.deps.saveOrderToLocal.mock.calls[0][0];
         expect(saved.status).toBe('Confirmado');
-        expect(saved.precio).toMatch(/52\.900/);
+        expect(saved.precio).toMatch(/62\.900/);
         expect(rig.userState[uid].step).toBe('completed');
     });
 

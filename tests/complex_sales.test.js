@@ -47,7 +47,9 @@ describe('Complex Sales Logic', () => {
         userState['u1'] = { step: 'waiting_data', selectedProduct: 'Capsulas', selectedPlan: '60', cart: [{ product: 'Capsulas', plan: '60', price: '45' }], partialAddress: { nombre: 'V' } };
         await runFlow('u1', 'Perdon voy a querer de 120 dias');
         expect(userState['u1'].selectedPlan).toBe('120');
-        expect(Object.keys(userState['u1'].partialAddress).length).toBe(0);
+        // El cambio de plan CONSERVA los datos de envío ya dados (antes los
+        // borraba y el bot re-pedía todo — inconsistente con waiting_plan_choice).
+        expect(userState['u1'].partialAddress.nombre).toBe('V');
     });
 
     test('2. Cambio de 120 a 60', async () => {

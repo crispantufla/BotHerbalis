@@ -75,7 +75,6 @@ export interface UserState {
     lastImageData?: string | null;
     lastImageContext?: string | null;
     profile?: string | null;
-    consultativeSale?: boolean;
 
     // Otros flags
     geoRejected?: boolean;

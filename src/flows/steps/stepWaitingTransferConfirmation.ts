@@ -14,7 +14,11 @@ const MP_KEYWORDS = /\b(mercadopago|mercado.?pago|mp|link|online|digital|qr|tarj
 // contrarreembolso = retiro en sucursal. Incluye "retiro"/"sucursal"/"retirar"
 // (faltaban: por eso "retiro en sucursal" no se detectaba y caía al AI, que
 // "confirmaba" sin crear la orden — venta fantasma, reporte 5493442465660).
-const RETIRO_OR_CASH_KEYWORDS = /\b(retiro|retirar|sucursal|contra.?reembolso|contrarembolso|efectivo|cash|1|primero|primera|al recibir|cartero|cuando llega)\b/i;
+// SIN "cuando llega" (es una pregunta de TIMING, no un cambio de método — hoy
+// la intercepta globalFaq, pero si la FAQ cambia no debe resetear el
+// paymentMethod de quien ya eligió transferencia) y SIN el "1" suelto (como
+// substring matcheaba montos/horas; solo cuenta como mensaje exacto, abajo).
+const RETIRO_OR_CASH_KEYWORDS = /\b(retiro|retirar|sucursal|contra.?reembolso|contrarembolso|efectivo|cash|primero|primera|al recibir|cartero)\b/i;
 
 export async function handleWaitingTransferConfirmation(
     userId: string,
@@ -66,7 +70,7 @@ export async function handleWaitingTransferConfirmation(
     // shippingChoice que quedaba en 'domicilio' (de la rama transferencia) → calle
     // real en vez de "A sucursal", y si faltaban datos el AI fallback charlaba sin
     // crear nada. Routear a payment_method unifica con la lógica buena.
-    if (RETIRO_OR_CASH_KEYWORDS.test(normalizedText)) {
+    if (RETIRO_OR_CASH_KEYWORDS.test(normalizedText) || /^\s*1\s*$/.test(normalizedText)) {
         logger.info(`[TRANSFER_CONFIRM] Cliente ${userId} cambió de transferencia a retiro en sucursal — reencaminando a payment_method`);
         currentState.paymentMethod = null;
         currentState.shippingChoice = null;

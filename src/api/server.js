@@ -120,8 +120,12 @@ function startServer(clientPool) {
     app.use('/api', playgroundRoutes());
     app.use('/api', apiTokensRoutes());
 
-    // SPA fallback
+    // SPA fallback. Los /api/* inexistentes devuelven 404 JSON — antes caían
+    // acá y recibían index.html con 200, enmascarando endpoints mal tipeados.
     app.use((req, res, next) => {
+        if (req.path.startsWith('/api')) {
+            return res.status(404).json({ error: `Not found: ${req.method} ${req.path}` });
+        }
         if (req.method !== 'GET') return next();
         const indexPath = path.join(clientDistPath, 'index.html');
         if (require('fs').existsSync(indexPath)) return res.sendFile(indexPath);
@@ -288,6 +292,14 @@ function startServer(clientPool) {
         // seller they default to on login; it doesn't lock them in.
         socket.on('switch-seller', (newSellerId) => {
             if (role !== 'admin') return;
+            // Solo rooms de sellers registrados en el pool. Sin esta validación,
+            // cualquier admin podía joinear un room arbitrario — incluso el room
+            // literal 'admin' (fire-hose cross-tenant completo). null/'' = vista
+            // agregada (sale de todos los rooms de seller), siempre permitido.
+            if (newSellerId && (typeof newSellerId !== 'string' || !clientPool.isKnown(newSellerId))) {
+                logger.warn(`[SOCKET] switch-seller rechazado: "${newSellerId}" no es un seller conocido`);
+                return;
+            }
             // Leave current seller rooms (but stay in 'admin')
             const rooms = Array.from(socket.rooms);
             rooms.filter(r => r !== socket.id && r !== 'admin').forEach(r => socket.leave(r));

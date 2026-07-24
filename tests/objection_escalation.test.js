@@ -44,8 +44,10 @@ describe('objectionDetector — escalado por tier', () => {
             const m = detectObjection('waiting_plan_choice', 'sigue siendo carisimo', state);
             expect(m.tier).toBe('escalated');
             expect(m.pauseAfter).toBe(false);
-            // El escalado de "caro" siempre menciona reserva/congelar precio
-            expect(m.response).toMatch(/reserv|congel|precio de hoy/i);
+            // El escalado de "caro" ofrece reservar/apartar el PEDIDO — nunca
+            // congelar/reservar el precio (modalidad prohibida, nada la honra).
+            expect(m.response).toMatch(/reserv|apartad/i);
+            expect(m.response).not.toMatch(/congel|precio de hoy/i);
             expect(state.objectionsHandled.caro).toBe(2);
         });
 

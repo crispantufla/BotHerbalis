@@ -6,6 +6,7 @@ import { UserState, SharedState, AlertEntry, AlertOrderData, BotConfig, QuickRep
 import { aiService } from './ai';
 import { _getQuickReplies } from '../flows/utils/messages';
 import { _setStep } from '../flows/utils/flowHelpers';
+import { getArgentinaMidnight } from './timeUtils';
 import logger from '../utils/logger';
 
 const { prisma } = require('../../db');
@@ -286,8 +287,9 @@ export async function handleAdminCommand(
         try {
             const { prisma } = require('../../db');
             const INSTANCE_ID = sharedState?.sellerId || process.env.INSTANCE_ID || 'default';
-            const startOfDay = new Date();
-            startOfDay.setHours(0, 0, 0, 0);
+            // Medianoche ARG real — setHours(0,0,0,0) opera en la TZ del server
+            // (UTC en prod) y corría la ventana 3 horas (ver timeUtils).
+            const startOfDay = getArgentinaMidnight();
 
             const [totalCount, todayStats, completedStats] = await Promise.all([
                 prisma.order.count({ where: { instanceId: INSTANCE_ID } }),
@@ -315,7 +317,8 @@ export async function handleAdminCommand(
     if (lowerMsg === '!pausados' || lowerMsg === '!espera') {
         try {
             const { getPausedUsersWithDetails } = require('./pauseService');
-            const paused = await getPausedUsersWithDetails();
+            const INSTANCE_ID = sharedState?.sellerId || process.env.INSTANCE_ID || 'default';
+            const paused = await getPausedUsersWithDetails(INSTANCE_ID);
             if (!paused || paused.length === 0) return '✅ No hay clientes pausados.';
 
             const lines = paused.map((u: any, i: number) => {
@@ -486,10 +489,16 @@ export async function handleAdminCommand(
             const prices = JSON.parse(fs.readFileSync(PRICES_FILE, 'utf8'));
             const lines: string[] = [];
             for (const [product, plans] of Object.entries(prices)) {
+                // Saltear keys escalares (ej: costoLogistico, un string): iterarlas
+                // con Object.entries las descomponía carácter por carácter.
+                if (!plans || typeof plans !== 'object') continue;
                 const planStr = Object.entries(plans as Record<string, string>)
                     .map(([days, price]) => `${days} días: $${price}`)
                     .join(' | ');
                 lines.push(`*${product}:* ${planStr}`);
+            }
+            if (prices.costoLogistico) {
+                lines.push(`*Costo logístico (rechazo/no retiro):* $${prices.costoLogistico}`);
             }
             return `💰 *Precios actuales:*\n\n${lines.join('\n')}`;
         } catch (e) {
@@ -512,7 +521,8 @@ export async function handleAdminCommand(
         try {
             const summary: string | null = await aiService.generateSuggestion(
                 'Hacé un resumen breve de esta conversación para el admin. Incluí: qué producto quiere, en qué paso está, si hay algún problema.',
-                historyText
+                historyText,
+                sharedState?.sellerId
             );
             return summary
                 ? `📝 *Resumen de ${state.userName || targetNum}:*\n\n${summary}`
@@ -660,7 +670,9 @@ export async function handleAdminCommand(
         }
 
         sharedState.config.activeScript = version;
-        if (sharedState.loadKnowledge) sharedState.loadKnowledge();
+        // loadKnowledge es async — sin el await, el "✅ Script cambiado" podía
+        // salir con el knowledge viejo todavía en memoria.
+        if (sharedState.loadKnowledge) await sharedState.loadKnowledge();
         _emitScoped(sharedState, 'script_changed', { active: version });
         if (sharedState.saveState) sharedState.saveState();
 
@@ -703,6 +715,10 @@ export async function handleAdminCommand(
                             sellerPhone,
                             source: 'whatsapp',
                             status: 'pending',
+                            // Sin esto quedaba con el default 'default' y el poll del
+                            // seller (refreshPendingPayments filtra por instanceId)
+                            // jamás lo refrescaba — solo el webhook lo veía.
+                            instanceId: sharedState?.sellerId || process.env.INSTANCE_ID || 'default',
                         }
                     });
                     _emitScoped(sharedState, 'payment_created', record);
@@ -849,7 +865,7 @@ export async function handleAdminCommand(
 
             const contextStr = `HISTORIAL DEL CHAT:\n${history}\n\nDATOS DEL PEDIDO ACTUAL (USALOS SI DEBÉS CONFIRMAR O ARMAR RESUMEN):\n- Productos: ${cartStr}\n- Total a pagar al recibir: ${totalStr}`;
 
-            const suggestion: string | null = await aiService.generateSuggestion(commandText, contextStr);
+            const suggestion: string | null = await aiService.generateSuggestion(commandText, contextStr, sharedState?.sellerId);
 
             if (suggestion) {
                 const label = _targetLabel(actualTarget);

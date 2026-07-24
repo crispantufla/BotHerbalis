@@ -81,11 +81,24 @@ const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onC
         setData(prev => {
             const allowed = PAY_OPTIONS[shippingType].map(o => o.value);
             const paymentMethod = allowed.includes(prev.paymentMethod) ? prev.paymentMethod : allowed[0];
-            return { ...prev, shippingType, paymentMethod };
+            return {
+                ...prev,
+                shippingType,
+                paymentMethod,
+                // Si el cambio de envío cambió el método, el tilde de verificación
+                // ya no aplica — resetear para que no quede marcado en silencio.
+                paymentVerified: paymentMethod === prev.paymentMethod ? prev.paymentVerified : false,
+            };
         });
     };
 
-    const handleField = (key, value) => setData(prev => ({ ...prev, [key]: value }));
+    const handleField = (key, value) => setData(prev => (
+        // Cambiar de método de pago invalida la verificación previa: sin este
+        // reset, transferencia→MP→transferencia dejaba el checkbox tildado.
+        key === 'paymentMethod'
+            ? { ...prev, paymentMethod: value, paymentVerified: false }
+            : { ...prev, [key]: value }
+    ));
 
     // Subtotal: detectado (prefill.total) o calculado desde la lista de precios
     // cuando el admin elige producto+plan a mano.

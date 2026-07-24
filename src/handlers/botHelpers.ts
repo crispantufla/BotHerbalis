@@ -7,6 +7,7 @@
 import crypto from 'crypto';
 const logger = require('../utils/logger');
 const { prisma } = require('../../db');
+const { _cleanPhone } = require('../flows/utils/flowHelpers');
 
 // logAndEmit, saveOrderToLocal, cancelLatestOrder, sendMessageWithDelay, notifyAdmin
 
@@ -67,7 +68,7 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
         // Async DB write
         (async () => {
             try {
-                const cleanPhone = chatId.replace('@c.us', '').replace(/\D/g, '');
+                const cleanPhone = _cleanPhone(chatId);
                 if (!cleanPhone) return;
 
                 // P2002 = concurrent upsert race — record was just created by another call, safe to ignore
@@ -103,7 +104,7 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
     }
 
     function saveOrderToLocal(order: Record<string, any>): void {
-        const cleanPhone = (order.cliente || '').replace('@c.us', '').replace(/\D/g, '');
+        const cleanPhone = _cleanPhone(order.cliente || '');
         // Anclamos el aviso de error al momento en que se INTENTA guardar (no al
         // momento del fallo async, que puede llegar segundos después tras esperar
         // el lock). Así el "⚠️ ERROR" queda junto a la confirmación que lo originó
@@ -179,7 +180,10 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
 
             await prisma.order.create({ data: newOrderData });
 
-            const legacyOrder = { ...order, id: newOrderData.id, createdAt: new Date().toISOString(), status: 'Pendiente', tracking: '' };
+            // status REAL de la orden creada (puede ser 'Confirmado' cuando el
+            // bot cierra solo) — antes se emitía 'Pendiente' hardcodeado y el
+            // dashboard mostraba estado viejo hasta recargar.
+            const legacyOrder = { ...order, id: newOrderData.id, createdAt: new Date().toISOString(), status: newOrderData.status, tracking: '' };
             if (sharedState.io) {
                 sharedState.io.to(sellerId).emit('new_order', legacyOrder);
                 sharedState.io.to('admin').emit('new_order', { ...legacyOrder, sellerId });
@@ -191,7 +195,7 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
 
     async function cancelLatestOrder(userId: string): Promise<{ success: boolean; order?: any; reason?: string; currentStatus?: string }> {
         let lock;
-        const phone = userId.split('@')[0].replace(/\D/g, '');
+        const phone = _cleanPhone(userId);
         const LOCK_TTL = 3000;
         const QUERY_TIMEOUT = 2500; // Must be < lock TTL to avoid expired-lock writes
         try {

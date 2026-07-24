@@ -95,7 +95,11 @@ export async function pauseUser(
  */
 export async function unpauseUser(userId: string, sharedState: { pausedUsers: Set<string>; sellerId?: string }, instanceId?: string): Promise<void> {
     sharedState.pausedUsers.delete(userId);
-    adminNotifiedAt.delete(userId);
+    // Misma key compuesta que usa pauseUser al escribir el debounce — con solo
+    // `userId` el delete nunca matcheaba y una re-pausa dentro de los 5 min se
+    // debounceaba en silencio (el admin no se enteraba).
+    const sellerId = instanceId || sharedState?.sellerId || 'default';
+    adminNotifiedAt.delete(`${sellerId}:${userId}`);
 
     try {
         const { prisma } = require('../../db');

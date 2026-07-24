@@ -6,11 +6,13 @@
 
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 const logger = require('../utils/logger');
 const { MessageMedia } = require('whatsapp-web.js');
 const { aiService } = require('../services/ai');
 const { parseAdminInput } = require('../services/adminService');
 const { redisConnection } = require('../services/queueService');
+const { _cleanPhone } = require('../flows/utils/flowHelpers');
 
 const DEBOUNCE_MS = 10000;
 
@@ -237,7 +239,12 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
                     const audioDir = path.join(dataDir, '..', 'public', 'media', 'audio');
                     await fs.promises.mkdir(audioDir, { recursive: true }).catch(() => {});
                     const ext = media.mimetype?.includes('ogg') ? 'ogg' : 'mp3';
-                    const audioFilename = `${userId.replace('@c.us', '')}_${Date.now()}.${ext}`;
+                    // Nombre NO adivinable y SIN el teléfono: /media es estático
+                    // sin auth — con <telefono>_<ts>.ogg cualquiera podía enumerar
+                    // y bajar audios de clientes. La URL queda persistida en el
+                    // ChatLog (logAndEmit de abajo), así que la reproducción en el
+                    // dashboard sigue funcionando igual.
+                    const audioFilename = `aud_${Date.now()}_${crypto.randomUUID()}.${ext}`;
                     await fs.promises.writeFile(path.join(audioDir, audioFilename), Buffer.from(media.data, 'base64'));
                     const audioUrl = `/media/audio/${audioFilename}`;
                     const transcription = await aiService.transcribeAudio(media.data, media.mimetype);
@@ -491,7 +498,7 @@ export function createOutgoingMessageHandler(ctx: {
             pausedUsers.add(targetId);
             try {
                 const { prisma } = require('../../db');
-                const cleanPhone = targetId.replace('@c.us', '').replace(/\D/g, '');
+                const cleanPhone = _cleanPhone(targetId);
                 const reason = wasBotActive
                     ? 'Vendedor tomó la conversación a mano (bot en pausa para no pisar)'
                     : 'Conversación iniciada manualmente por admin desde WhatsApp';

@@ -21,6 +21,7 @@ interface SalesFlowDependencies {
     effectiveScript?: string;
     connectedAt?: number; // Unix timestamp (seconds) of when the bot connected — used to detect pre-existing chats
     sellerId?: string; // seller identity for scoped DB queries
+    _recursionDepth?: number; // profundidad actual — la stashea processSalesFlow para que los steps que re-invocan (stepGreeting) la propaguen
 }
 
 // Ad source detection from pre-filled Click-to-WhatsApp messages (literal match)
@@ -51,6 +52,25 @@ export async function processSalesFlow(
 ): Promise<{ matched: boolean; paused?: boolean } | void> {
     const { saveState } = dependencies;
 
+    // Guard de profundidad para TODA re-entrada recursiva (staleReprocess y las
+    // llamadas internas de stepGreeting). Sin esto, el ciclo AD-RE-ENTRY \u2192
+    // greeting \u2192 waiting_weight \u2192 AD-RE-ENTRY recursaba infinito: handleGreeting
+    // re-invocaba processSalesFlow con la profundidad reseteada a 0 y el guard
+    // de staleReprocess nunca cortaba. Umbral > 2 = mismo tope efectivo que el
+    // guard de staleReprocess (que pausa al llegar a 2 antes de recursar a 3).
+    if (_recursionDepth > 2) {
+        const st = userState[userId];
+        logger.error(`[SAFETY] Max recursion depth (${_recursionDepth}) reached for ${userId} at step "${st?.step}". Pausing.`);
+        if (st) {
+            await _pauseAndAlert(userId, st, dependencies, text, `Recursion limit: el flujo re-entr\u00f3 ${_recursionDepth} veces sin resolverse (step "${st.step}").`);
+        }
+        return { matched: true, paused: true };
+    }
+
+    // Copia local con la profundidad actual: los steps que re-invocan
+    // processSalesFlow (stepGreeting) la leen de dependencies para propagarla.
+    dependencies = { ...dependencies, _recursionDepth };
+
     // Remove accents and lowercase
     const normalizedText = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
@@ -73,7 +93,6 @@ export async function processSalesFlow(
             postdatado: null,
             pendingOrder: null,
             currentWeight: undefined,
-            consultativeSale: false,
             lastActivityAt: Date.now(),
             adSource: _detectAdSource(text),
             // Freeze the A/B assignment on first message so subsequent messages

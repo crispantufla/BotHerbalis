@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     Search, Bot, Play, Pause, Trash2, FileText, Type, ShoppingCart, ChevronLeft,
     MessageCircle
@@ -23,14 +23,21 @@ import AlertBanner from './comms/AlertBanner';
 import OrdersDrawer from './comms/OrdersDrawer';
 import ScriptPanel from './comms/ScriptPanel';
 
-const CommsView = ({ initialChatId, onChatSelected, onChatOpened, initialSearch = '', alerts = [], onAlertAction }) => {
+const CommsView = ({ initialChatId, onChatSelected, onChatOpened, alerts = [], onAlertAction }) => {
     const { toast } = useToast();
     const { selectedSellerId } = useSeller();
 
     // UI state
-    const [selectedChat, setSelectedChat] = useState(null);
+    // Guardamos solo el ID seleccionado y derivamos el objeto del array `chats`
+    // (memo más abajo). Antes se guardaba una COPIA congelada del chat: si el
+    // bot se auto-pausaba server-side con el chat abierto, el header seguía
+    // "Auto-bot activo" y los guards decidían sobre `isPaused` viejo.
+    // `selectedChatFallback` cubre chats que todavía no están en la lista
+    // (resultado de búsqueda backend-only, link directo desde otra vista).
+    const [selectedChatId, setSelectedChatId] = useState(null);
+    const [selectedChatFallback, setSelectedChatFallback] = useState(null);
     const [input, setInput] = useState('');
-    const [searchTerm, setSearchTerm] = useState(initialSearch);
+    const [searchTerm, setSearchTerm] = useState('');
     const [showScriptPanel, setShowScriptPanel] = useState(false);
     const [showOrdersPanel, setShowOrdersPanel] = useState(false);
     const [showFontSlider, setShowFontSlider] = useState(false);
@@ -68,19 +75,29 @@ const CommsView = ({ initialChatId, onChatSelected, onChatOpened, initialSearch 
     const [mpLinkSuggestedAmount, setMpLinkSuggestedAmount] = useState('');
 
     const {
-        chats, messages, setMessages,
+        chats, setChats, messages, setMessages,
         isLoadingChats, isLoadingMessages,
         globalPause,
         sendMessage, sendMedia, deleteMessage, toggleBot, clearChat
-    } = useChat(selectedChat?.id);
+    } = useChat(selectedChatId);
+
+    // Objeto derivado: siempre la versión viva del array `chats` (los updates
+    // de bot_status_change / new_log fluyen al chat abierto). El fallback solo
+    // aplica mientras el chat no exista en la lista.
+    const selectedChat = useMemo(() => {
+        if (!selectedChatId) return null;
+        return chats.find(c => c.id === selectedChatId)
+            || (selectedChatFallback?.id === selectedChatId ? selectedChatFallback : { id: selectedChatId, name: selectedChatId });
+    }, [chats, selectedChatId, selectedChatFallback]);
 
     // Reset selected chat cuando un admin cambia de seller.
-    useEffect(() => { setSelectedChat(null); }, [selectedSellerId]);
+    useEffect(() => { setSelectedChatId(null); setSelectedChatFallback(null); }, [selectedSellerId]);
 
     // Wrapper que dispara `onChatOpened` (típicamente colapsa el sidebar
     // principal) sólo cuando un chat se selecciona — no al limpiar (null).
     const selectChat = (chat) => {
-        setSelectedChat(chat);
+        setSelectedChatId(chat?.id || null);
+        setSelectedChatFallback(chat || null);
         if (chat && onChatOpened) onChatOpened();
     };
 
@@ -155,9 +172,12 @@ const CommsView = ({ initialChatId, onChatSelected, onChatOpened, initialSearch 
         ? filteredChats[0].id : null;
     useEffect(() => {
         if (!autoSelectId) return;
-        if (selectedChat?.id === autoSelectId) return;
+        if (selectedChatId === autoSelectId) return;
         const target = filteredChats.find(c => c.id === autoSelectId);
-        if (target) setSelectedChat(target);
+        if (target) {
+            setSelectedChatId(target.id);
+            setSelectedChatFallback(target);
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [autoSelectId]);
 
@@ -168,8 +188,8 @@ const CommsView = ({ initialChatId, onChatSelected, onChatOpened, initialSearch 
     // initialChatId via prop (link directo desde otra vista)
     useEffect(() => {
         if (initialChatId && chats.length > 0) {
-            const chatToSelect = chats.find(c => c.id === initialChatId);
-            setSelectedChat(chatToSelect || { id: initialChatId, name: initialChatId });
+            setSelectedChatId(initialChatId);
+            setSelectedChatFallback({ id: initialChatId, name: initialChatId });
             if (onChatSelected) onChatSelected();
         }
     }, [initialChatId, chats, onChatSelected]);
@@ -216,18 +236,22 @@ const CommsView = ({ initialChatId, onChatSelected, onChatOpened, initialSearch 
     const formatScriptMessage = (text, chat = null) => {
         if (!text) return text;
         let result = text;
-        if (prices) {
-            const p = prices;
-            result = result
-                .replace(/{{PRICE_CAPSULAS_60}}/g, p['Cápsulas']?.['60'] || '46.900')
-                .replace(/{{PRICE_CAPSULAS_120}}/g, p['Cápsulas']?.['120'] || '66.900')
-                .replace(/{{PRICE_SEMILLAS_60}}/g, p['Semillas']?.['60'] || '36.900')
-                .replace(/{{PRICE_SEMILLAS_120}}/g, p['Semillas']?.['120'] || '49.900')
-                .replace(/{{PRICE_GOTAS_60}}/g, p['Gotas']?.['60'] || '48.900')
-                .replace(/{{PRICE_GOTAS_120}}/g, p['Gotas']?.['120'] || '68.900')
-                .replace(/{{ADICIONAL_MAX}}/g, p.adicionalMAX || '0')
-                .replace(/{{COSTO_LOGISTICO}}/g, p.costoLogistico || '18.000');
-        }
+        // Precios: SOLO desde /api/prices — NUNCA números inventados en código.
+        // Si un precio no cargó, el placeholder {{PRICE_*}} queda visible tal
+        // cual (el sweep final los preserva) para que el admin no mande un
+        // valor viejo/falso al cliente sin darse cuenta.
+        const p = prices || {};
+        const subPrice = (re, val) => {
+            if (val != null && val !== '') result = result.replace(re, String(val));
+        };
+        subPrice(/{{PRICE_CAPSULAS_60}}/g, p['Cápsulas']?.['60']);
+        subPrice(/{{PRICE_CAPSULAS_120}}/g, p['Cápsulas']?.['120']);
+        subPrice(/{{PRICE_SEMILLAS_60}}/g, p['Semillas']?.['60']);
+        subPrice(/{{PRICE_SEMILLAS_120}}/g, p['Semillas']?.['120']);
+        subPrice(/{{PRICE_GOTAS_60}}/g, p['Gotas']?.['60']);
+        subPrice(/{{PRICE_GOTAS_120}}/g, p['Gotas']?.['120']);
+        subPrice(/{{ADICIONAL_MAX}}/g, p.adicionalMAX);
+        subPrice(/{{COSTO_LOGISTICO}}/g, p.costoLogistico);
         const ctx = chat || selectedChat;
         const product = ctx?.selectedProduct || ctx?.cart?.[0]?.product || 'Producto';
         const plan = ctx?.selectedPlan || ctx?.cart?.[0]?.plan || '60';
@@ -259,27 +283,26 @@ const CommsView = ({ initialChatId, onChatSelected, onChatOpened, initialSearch 
         else if (w > 20) dosageReason = 'El plan de 120 días es el tiempo que tu cuerpo necesita para bajar tranqui, sin rebote.';
         result = result.replace(/{{DOSAGE_REASON}}/g, dosageReason);
 
-        // PRICE_60 / PRICE_120 genéricos según producto seleccionado.
+        // PRICE_60 / PRICE_120 genéricos según producto seleccionado. Igual que
+        // arriba: sin precio cargado, el placeholder queda visible.
         const productKey = product.includes('Gota') ? 'Gotas'
             : product.includes('Semilla') ? 'Semillas'
             : 'Cápsulas';
-        result = result
-            .replace(/{{PRICE_60}}/g, prices?.[productKey]?.['60'] || '')
-            .replace(/{{PRICE_120}}/g, prices?.[productKey]?.['120'] || '');
+        subPrice(/{{PRICE_60}}/g, p[productKey]?.['60']);
+        subPrice(/{{PRICE_120}}/g, p[productKey]?.['120']);
 
         // PRICE_PER_DAY_X_120 — para anclas de precio/día en V6 legacy. Calculo
         // como (precio plan 120 / 120) redondeado.
         const perDay = (priceStr) => {
-            if (!priceStr) return '';
+            if (!priceStr) return null;
             const n = parseInt(priceStr.replace(/\./g, ''), 10);
-            if (isNaN(n)) return '';
+            if (isNaN(n)) return null;
             return Math.round(n / 120).toLocaleString('es-AR');
         };
-        result = result
-            .replace(/{{PRICE_PER_DAY_CAPSULAS_120}}/g, perDay(prices?.['Cápsulas']?.['120']))
-            .replace(/{{PRICE_PER_DAY_SEMILLAS_120}}/g, perDay(prices?.['Semillas']?.['120']))
-            .replace(/{{PRICE_PER_DAY_GOTAS_120}}/g, perDay(prices?.['Gotas']?.['120']))
-            .replace(/{{PRICE_PER_DAY_120}}/g, perDay(prices?.[productKey]?.['120']));
+        subPrice(/{{PRICE_PER_DAY_CAPSULAS_120}}/g, perDay(p['Cápsulas']?.['120']));
+        subPrice(/{{PRICE_PER_DAY_SEMILLAS_120}}/g, perDay(p['Semillas']?.['120']));
+        subPrice(/{{PRICE_PER_DAY_GOTAS_120}}/g, perDay(p['Gotas']?.['120']));
+        subPrice(/{{PRICE_PER_DAY_120}}/g, perDay(p[productKey]?.['120']));
 
         // Constantes bancarias + entrega standard + saldo legacy seña.
         // POSTDATADO_LINE: muestra entrega standard (7-10 días). Para el preview
@@ -297,8 +320,11 @@ const CommsView = ({ initialChatId, onChatSelected, onChatOpened, initialSearch 
             .replace(/{{SALDO}}/g, '');
 
         // Sweep defensivo: cualquier {{X}} residual queda invisible en el preview
-        // (igual que hace el server-side _formatMessage antes de mandar al cliente).
-        result = result.replace(/\{\{\s*[A-Z_][A-Z0-9_]*\s*\}\}/g, '');
+        // (igual que hace el server-side _formatMessage antes de mandar al cliente)
+        // — EXCEPTO los de precios: esos quedan visibles tal cual para que un
+        // precio no cargado nunca se convierta en silencio o número inventado.
+        result = result.replace(/\{\{\s*([A-Z_][A-Z0-9_]*)\s*\}\}/g, (match, tag) =>
+            /^(PRICE_|ADICIONAL_MAX$|COSTO_LOGISTICO$)/.test(tag) ? match : '');
 
         return result;
     };
@@ -463,10 +489,18 @@ const CommsView = ({ initialChatId, onChatSelected, onChatOpened, initialSearch 
     };
 
     const handleToggleBot = async () => {
+        if (!selectedChat) return;
         const newStatus = !selectedChat.isPaused;
         try {
             await toggleBot({ chatId: selectedChat.id, paused: newStatus });
-            setSelectedChat(prev => ({ ...prev, isPaused: newStatus }));
+            // Update optimista sobre la fuente de verdad (el array `chats`);
+            // el evento bot_status_change del server lo confirma después.
+            setChats(prev => Array.isArray(prev)
+                ? prev.map(c => c.id === selectedChat.id ? { ...c, isPaused: newStatus } : c)
+                : prev);
+            setSelectedChatFallback(prev => prev && prev.id === selectedChat.id
+                ? { ...prev, isPaused: newStatus }
+                : prev);
             toast.success(newStatus ? 'Bot pausado' : 'Bot reactivado');
         } catch { toast.error('Error cambiando estado del bot'); }
     };
@@ -642,7 +676,7 @@ Teléfono: ${phoneDisplay}`;
                                     icon={ChevronLeft}
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => setSelectedChat(null)}
+                                    onClick={() => { setSelectedChatId(null); setSelectedChatFallback(null); }}
                                     className="md:hidden"
                                 />
 

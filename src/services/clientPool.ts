@@ -222,12 +222,6 @@ class ClientPool {
         return Array.from(this.instances.values());
     }
 
-    getSellerByPhone(phone: string): SellerInstance | undefined {
-        return Array.from(this.instances.values()).find(
-            i => i.client?.info?.wid?.user === phone
-        );
-    }
-
     async startSeller(sellerId: string): Promise<void> {
         if (this.instances.has(sellerId)) {
             logger.warn(`[POOL] Seller ${sellerId} already running`);
@@ -242,7 +236,9 @@ class ClientPool {
         // Per-seller state
         const stateManager = createStateManager(sellerId, dataDir);
         await stateManager.loadState();
-        stateManager.loadKnowledge();
+        // loadKnowledge es async (lee de disco) — sin el await había una ventana
+        // al boot en la que el seller arrancaba con knowledge vacío.
+        await stateManager.loadKnowledge();
 
         // Restore paused users for this specific seller
         await restorePausedUsersFromDB({ pausedUsers: stateManager.pausedUsers }, sellerId).catch((e: any) =>
@@ -434,6 +430,9 @@ class ClientPool {
             notifyAdmin: helpers.notifyAdmin,
             handleAdminCommand,
             saveState: stateManager.saveState.bind(stateManager),
+            // Snapshot al momento de crear el handler — el handler usa
+            // sharedState.knowledge (getter vivo) para el contenido actual;
+            // este param queda solo por compat de la firma.
             knowledge: sharedState.knowledge,
             dataDir
         });
@@ -470,7 +469,10 @@ class ClientPool {
                 instance.qrTimer = setTimeout(() => {
                     if (!sharedState.isConnected && sharedState.qrCodeData) {
                         logger.warn(`[POOL][${sellerId}] QR not scanned in ${QR_TIMEOUT_MS / 60000} min — stopping Chrome to free resources`);
-                        if (this.io) this.io.to(sellerId).emit('status_change', { status: 'qr_timeout', sellerId });
+                        if (this.io) {
+                            this.io.to(sellerId).emit('status_change', { status: 'qr_timeout', sellerId });
+                            this.io.to('admin').emit('status_change', { status: 'qr_timeout', sellerId });
+                        }
                         this.stopSeller(sellerId).catch(() => {});
                     }
                     instance.qrTimer = null;
@@ -553,7 +555,10 @@ class ClientPool {
         client.on('auth_failure', (msg: string) => {
             logger.error(`[POOL][${sellerId}] Auth failure: ${msg}`);
             sharedState.isConnected = false;
-            if (this.io) this.io.to(sellerId).emit('status_change', { status: 'auth_failure', sellerId });
+            if (this.io) {
+                this.io.to(sellerId).emit('status_change', { status: 'auth_failure', sellerId });
+                this.io.to('admin').emit('status_change', { status: 'auth_failure', sellerId });
+            }
             // Don't wipe session — it may be a transient issue during redeploy.
             // Just clean Chrome locks and retry. Manual wipe is available via /whatsapp-logout.
             cleanChromeLocks(authPath);
@@ -568,7 +573,10 @@ class ClientPool {
             logger.info(`[POOL][${sellerId}] Disconnected: ${reason}`);
             sharedState.isConnected = false;
             sharedState.qrCodeData = null;
-            if (this.io) this.io.to(sellerId).emit('status_change', { status: 'disconnected', sellerId });
+            if (this.io) {
+                this.io.to(sellerId).emit('status_change', { status: 'disconnected', sellerId });
+                this.io.to('admin').emit('status_change', { status: 'disconnected', sellerId });
+            }
 
             prisma.whatsAppSession.upsert({
                 where: { sellerId },
@@ -681,6 +689,11 @@ class ClientPool {
     }
 
     async stopSeller(sellerId: string): Promise<void> {
+        // Si hay un start en vuelo para este seller, esperarlo antes de parar:
+        // destruir el client (o borrar .wwebjs_auth desde wipeSessionAndRestart)
+        // debajo de un client.initialize() en curso deja Chrome zombie / sesión rota.
+        const starting = this.startingPromises.get(sellerId);
+        if (starting) await starting.catch(() => {});
         const instance = this.instances.get(sellerId);
         if (!instance) return;
         // Delete from map up-front so a concurrent stopSeller (e.g. watchdog
@@ -730,6 +743,11 @@ class ClientPool {
      * por eso el wipe debe dejar el perfil 100% virgen, no solo cerrar sesión.
      */
     async wipeSessionAndRestart(sellerId: string): Promise<void> {
+        // Esperar un start en vuelo ANTES de decidir si hay que parar: si el
+        // seller estaba arrancando, sin esto el wipe borraba .wwebjs_auth debajo
+        // del client.initialize() en curso.
+        const starting = this.startingPromises.get(sellerId);
+        if (starting) await starting.catch(() => {});
         if (this.instances.has(sellerId)) {
             await this.stopSeller(sellerId);
         }
@@ -791,7 +809,10 @@ class ClientPool {
                 } catch (e: any) {
                     logger.error(`[WATCHDOG] ${sellerId} health check failed: ${e.message} — restarting`);
                     instance.sharedState.isConnected = false;
-                    if (this.io) this.io.to(sellerId).emit('status_change', { status: 'reconnecting', sellerId });
+                    if (this.io) {
+                        this.io.to(sellerId).emit('status_change', { status: 'reconnecting', sellerId });
+                        this.io.to('admin').emit('status_change', { status: 'reconnecting', sellerId });
+                    }
                     this.restartSeller(sellerId).catch(err =>
                         logger.error(`[WATCHDOG] ${sellerId} restart failed:`, err.message)
                     );

@@ -8,7 +8,6 @@ import * as os from 'os';
 import * as crypto from 'crypto';
 import { UserState, HistoryMessage } from '../types/state';
 import { lookupSemanticCache, storeSemanticCache } from './semanticCache';
-import { _applyJuneDiscount, _JUNE_DISCOUNT } from '../flows/utils/pricing';
 import { buildHistoryTurns, ChatTurn } from './historyTurns';
 
 // WhatsApp usa "*" para negrita, no "**" (markdown estándar). Si la IA devuelve
@@ -231,7 +230,9 @@ const CACHE_TTL_SECONDS = 45 * 60; // 45 min cache for node-cache
 const CIRCUIT_BREAKER_THRESHOLD = 3;   // consecutive failures to open circuit
 const CIRCUIT_BREAKER_RESET_MS = 30_000; // 30s cooldown before retrying
 
-const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../../..');
+// __dirname = src/services → '../..' = raíz del repo (NO copiar el '../../..'
+// de pricing.ts, que vive un nivel más profundo en src/flows/utils).
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../..');
 const PRICES_PATH = path.join(DATA_DIR, 'prices.json');
 
 // ═══════════════════════════════════════════════════════
@@ -259,7 +260,6 @@ async function _getPrices(): Promise<Record<string, any>> {
             prices = { ...prices, ...data };
         }
     } catch (e: any) { logger.error("Error reading prices for AI:", e.message); }
-    prices = _applyJuneDiscount(prices);  // ⏰ descuento junio — quitar 01/07 (ver pricing.ts)
     _pricesCache = prices;
     _pricesCacheTime = now;
     return prices;
@@ -277,13 +277,6 @@ TONO: Argentino rioplatense NATURAL. Voseo (querés, podés, mirá, fijate). Con
 🛑 NO abuses del "che": como mucho UNA vez en toda la conversación, y NUNCA para arrancar un mensaje. Repetirlo suena forzado/caricaturesco. Por defecto, no lo uses.
 TONO CAMALEÓN: Cliente seco ("precio", "cuanto sale") → datos duros, profesional. Cliente amable ("holaa, queria info...") → emojis, empatía, contención.
 REGISTRO SECO EXTREMO: cuando el cliente responde en monosílabos o cifras peladas ("ok", "sí", "7 kilos", "cuánto"), podés contestar igual de telegráfico — una palabra, una cifra o una línea cortísima, sin emoji y, SOLO en esos turnos puntuales, sin la pregunta de cierre obligatoria si el próximo paso ya quedó claro. Ej: si pide el precio de un plan, podés responder solo "$58.900". Espejá su parquedad en vez de inflar la frase. (NO aplica a objeciones ni a momentos emocionales/de salud, donde seguís expandiendo.)
-
-🟢 DESCUENTO DE JUNIO — MÉTODO DE VENTA (vigente hasta el 30/06/2026 — REVISAR/QUITAR el 01/07) 🟢
-Cápsulas y Gotas tienen $10.000 de descuento este mes. NO es un precio bajo a secas: es una OFERTA y hay que VENDERLA. Reglas:
-- SIEMPRE que muestres el precio de cápsulas o gotas, presentá el AHORRO con el formato "antes $X, este mes $Y 🌿" (los dos números te los doy ya calculados en INFORMACIÓN RELEVANTE — NO los sumes ni restes vos). Nunca tires solo el precio final pelado: el cliente tiene que VER que se ahorra $10.000.
-- Remarcá que es por tiempo limitado / solo este mes, como empujón para cerrar.
-- El precio que se COBRA es siempre el "este mes" (el con descuento). El "antes" es solo para mostrar el ahorro.
-🛑 Semillas NO tiene descuento: mostrala con un solo precio, sin "antes". No inventes otras promos ni montos.
 
 🛑 EXTENSIÓN según el momento de la venta 🛑
 
@@ -379,7 +372,7 @@ const PAYMENT_POLICY = `MEDIOS DE PAGO (modelo jun-2026 — 2 tipos de envío):
 - NUNCA mencionar cuotas (el cliente verá lo que su tarjeta permita al abrir el link de MP, pero el bot NO promete ni menciona cuotas).
 - NUNCA mencionar "anticipo de $10.000" — esa modalidad fue eliminada en mayo 2026.
 - NUNCA mencionar "adicional de $6.000" — esa política ya no existe.
-- NUNCA inventes urgencia/escasez FALSA ("última unidad", "se acaba hoy", "precio de hoy"). La ÚNICA promo real es el DESCUENTO DE JUNIO en cápsulas y gotas (ver bloque DESCUENTO DE JUNIO arriba) — esa sí podés mencionarla para cerrar.
+- NUNCA inventes urgencia/escasez FALSA ("última unidad", "se acaba hoy", "precio de hoy") ni promos/descuentos que no existan — hoy NO hay ninguna promo vigente.
 - 🛑 "PAGO AL RECIBIR" CON MEDIO PREPAGO: si el cliente dice que quiere pagar "al recibir", "al cartero" o "contra entrega" CON tarjeta de crédito o transferencia, ACLARALE que esos medios se pagan ANTES del envío (online), NO al cartero. Pagar al recibir en EFECTIVO es SOLO retiro en sucursal. No lo mandes al link de MP sin aclarar esto primero; después pedile que elija retiro o domicilio.
 - El envío siempre es gratis (ambos tipos). Tiempos: *retiro en sucursal* (paga en efectivo al retirar) → *7 a 10 días hábiles*; *envío a domicilio PREPAGO* (tarjeta de crédito o transferencia) → despacha más rápido, *4 días hábiles*. PALANCA DE VENTA: si el cliente duda entre prepagar o no, recordale que al pagar por adelantado el pedido sale antes y llega más rápido (4 días hábiles).`;
 
@@ -804,9 +797,15 @@ class AIService {
                 const isRetryable = status === 429 || status === 500 || status === 502 || status === 503 || status === 529 || e.code === 'ETIMEDOUT' || e.code === 'ECONNRESET';
                 if (isRetryable) {
                     this.stats.retries++;
-                    const waitTime = Math.pow(2, attempt + 1) * 1000 + Math.floor(Math.random() * 1000);
-                    logger.warn(`⚠️[AI] Retryable error (${status || e.code}). Attempt ${attempt + 1}/${MAX_RETRIES}. Backing off ${waitTime / 1000}s...`);
-                    await new Promise(r => setTimeout(r, waitTime));
+                    // No dormir tras el ÚLTIMO intento: no hay reintento después,
+                    // solo sumaba ~9s de latencia antes de tirar Max Retries.
+                    if (attempt < MAX_RETRIES - 1) {
+                        const waitTime = Math.pow(2, attempt + 1) * 1000 + Math.floor(Math.random() * 1000);
+                        logger.warn(`⚠️[AI] Retryable error (${status || e.code}). Attempt ${attempt + 1}/${MAX_RETRIES}. Backing off ${waitTime / 1000}s...`);
+                        await new Promise(r => setTimeout(r, waitTime));
+                    } else {
+                        logger.warn(`⚠️[AI] Retryable error (${status || e.code}). Attempt ${attempt + 1}/${MAX_RETRIES} — no more retries.`);
+                    }
                 } else {
                     this.stats.errors++;
                     throw e;
@@ -893,19 +892,6 @@ class AIService {
 
             const priceString = `Cápsulas($${priceCaps60}/60d, $${priceCaps120}/120d) | Semillas($${priceSem60}/60d, $${priceSem120}/120d) | Gotas($${priceGotas60}/60d, $${priceGotas120}/120d)`;
 
-            // ⏰ JUNIO 2026 — ANCLA DE OFERTA (antes→este mes). El descuento se aplica
-            // sobre el precio base, así que el "antes" = precio actual + monto del
-            // descuento. Se lo damos ya calculado a la IA (no debe sumar/restar). Si el
-            // descuento se apaga (amount=0 o _JUNE_DISCOUNT borrado), cae a priceString.
-            // Quitar junto con _applyJuneDiscount el 01/07 (ver pricing.ts).
-            const _disc = _JUNE_DISCOUNT || { products: [] as string[], amount: 0 };
-            const _hasDiscount = _disc.amount > 0;
-            const _miles = (n: number) => n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-            const _antes = (precioConDesc: string) => _miles(parseInt(String(precioConDesc).replace(/\./g, ''), 10) + _disc.amount);
-            const anclaPrecios = _hasDiscount
-                ? `Cápsulas → antes $${_antes(priceCaps60)}, este mes $${priceCaps60} (60d) / antes $${_antes(priceCaps120)}, este mes $${priceCaps120} (120d) | Gotas → antes $${_antes(priceGotas60)}, este mes $${priceGotas60} (60d) / antes $${_antes(priceGotas120)}, este mes $${priceGotas120} (120d) | Semillas (SIN descuento) → $${priceSem60} (60d) / $${priceSem120} (120d)`
-                : priceString;
-
             knowledgeContext = `INFORMACIÓN RELEVANTE PARA ESTE PASO: \n`;
 
             const pathInfo = faq.find((q: any) => q.keywords.includes('diabetes'))?.response || "";
@@ -916,21 +902,21 @@ class AIService {
                 knowledgeContext += `- DOSIS por kilos: hasta 10 kg → 60 días; 10-20 kg → 120 días (sobra un poco, sirve mantenimiento); más de 20 kg → 120 días (lo que el cuerpo necesita).\n`;
                 knowledgeContext += `- Gastritis/úlcera/acidez: cápsulas o gotas (semillas pueden irritar). Es la única razón médica para descartar una forma.\n`;
                 knowledgeContext += `- Contraindicaciones: solo embarazo y lactancia.NO menores de edad.\n`;
-                knowledgeContext += `- PRECIOS (COTIZÁ EN CONTEXTO): Si YA recomendaste un producto o el cliente ya mostró interés/eligió uno (ej cápsulas) y pregunta el precio, dale SOLO los 2 planes (60 y 120 días) de ESE producto con el ahorro ("antes $X, este mes $Y") — NO la lista de los 3. La lista completa SOLO si todavía no hay un producto en foco, o si piden "precio de todos"/"lista de precios". Si no hay foco y preguntan "precio" a secas, decí el rango "$${priceSem60} a $${priceGotas120}". Datos de precios (elegí el producto que corresponda): ${anclaPrecios}.\n`;
+                knowledgeContext += `- PRECIOS (COTIZÁ EN CONTEXTO): Si YA recomendaste un producto o el cliente ya mostró interés/eligió uno (ej cápsulas) y pregunta el precio, dale SOLO los 2 planes (60 y 120 días) de ESE producto — NO la lista de los 3. La lista completa SOLO si todavía no hay un producto en foco, o si piden "precio de todos"/"lista de precios". Si no hay foco y preguntan "precio" a secas, decí el rango "$${priceSem60} a $${priceGotas120}". Datos de precios (elegí el producto que corresponda): ${priceString}.\n`;
                 knowledgeContext += `- ENVÍO Y PAGO: Envío gratis por Correo Argentino. 2 opciones: retiro en sucursal (paga en efectivo al retirar, 7 a 10 días hábiles) o envío a domicilio prepago con tarjeta de crédito o transferencia (más rápido, 4 días hábiles). NUNCA menciones cuotas ni anticipo.\n`;
             } else if (step === 'waiting_price_confirmation') {
                 knowledgeContext += `- El usuario todavía NO vio precios.Tu trabajo es convencerlo de que quiera verlos.\n`;
                 knowledgeContext += `- Contraindicaciones: solo embarazo y lactancia.NO menores de edad.\n`;
                 knowledgeContext += `- (NO menciones precios específicos ni formas de pago, solo que son accesibles) \n`;
             } else if (['waiting_plan_choice', 'closing', 'waiting_ok'].includes(step)) {
-                knowledgeContext += `- PRECIOS (mostrá el ahorro "antes $X, este mes $Y" en cápsulas/gotas): ${anclaPrecios} \n`;
+                knowledgeContext += `- PRECIOS: ${priceString} \n`;
                 knowledgeContext += `- POLÍTICA DE ENVÍO Y PAGO (modelo jun-2026): 2 opciones — (1) *Retiro en sucursal* → contrarrembolso, paga el TOTAL en efectivo al retirar en una sucursal de Correo Argentino (sin anticipo); (2) *Envío a domicilio* → prepago con *tarjeta de crédito* (link de pago) o *transferencia bancaria* al alias HERBALIS.TIENDA (BIO ORIGEN S.A.S.). De cara al cliente el medio online se llama "Tarjeta de crédito" (NUNCA "Mercado Pago", débito, Pago Fácil ni Rapipago). Aplica a TODOS los planes. NUNCA menciones cuotas ni anticipo de $10.000.\n`;
                 knowledgeContext += `- NO mencionar 'adicional de $6.000' (esa política ya no existe). NO decir 'envío gratis solo en plan 120'.\n`;
                 knowledgeContext += `- Envío gratis por Correo Argentino. *Retiro en sucursal* (paga al retirar): *7 a 10 días hábiles*. *Envío a domicilio PREPAGO* (tarjeta de crédito/transferencia): más rápido, *4 días hábiles* — usalo como argumento para cerrar el prepago.\n`;
             } else if (step === 'waiting_data') {
                 knowledgeContext += `- Necesitamos: nombre completo, calle y número, ciudad, código postal\n`;
                 knowledgeContext += `- PROHIBIDO PEDIR NÚMERO DE TELÉFONO.Ya estamos hablando por WhatsApp, ¡ya tenemos su número! Nunca pidas este dato.\n`;
-                knowledgeContext += `- (NO ofrezcas ni menciones precios ni productos a menos que el cliente pregunte explícitamente por ellos. Si preguntan, los precios son: ${anclaPrecios}) \n`;
+                knowledgeContext += `- (NO ofrezcas ni menciones precios ni productos a menos que el cliente pregunte explícitamente por ellos. Si preguntan, los precios son: ${priceString}) \n`;
             }
 
             knowledgeContext += `(No inventes datos, usá siempre esta base)`;
@@ -1111,7 +1097,13 @@ INSTRUCCIONES:
                     // innecesariamente largas que tardan más en generarse.
                     max_tokens: 800
                 }),
-                `chat_${step}_${userText}` // Caché activo para FAQs y etapas repetitivas
+                // Caché exact-match: la key DEBE incluir historial+estado (userPrompt
+                // los embebe), igual que el path Claude. Con solo step+userText, dos
+                // clientes que escriben lo mismo en el mismo step se cruzaban la
+                // respuesta cacheada (total/nombre del otro).
+                `chat_${step}_${userPrompt}`,
+                undefined,
+                context.sellerId || 'global'
             );
 
             const toolCalls = result.choices[0].message?.tool_calls;
@@ -1166,7 +1158,8 @@ INSTRUCCIONES:
     async checkAndSummarize(
         history: HistoryMessage[],
         previousSummary?: string | null,
-        lastSummarizedAt?: number | null
+        lastSummarizedAt?: number | null,
+        sellerId?: string
     ): Promise<{ summary: string; prunedHistory: HistoryMessage[]; lastSummarizedAt: number } | null> {
         if (!history || history.length <= SUMMARIZE_TRIGGER) return null;
 
@@ -1181,7 +1174,7 @@ INSTRUCCIONES:
 
         logger.info(`[AI] Rolling summary: ${history.length} msgs → pruning ${olderSlice.length}, keeping ${MAX_HISTORY_LENGTH} tail`);
 
-        const newSummary = await this._callQueuedSummarize(olderSlice, previousSummary || '');
+        const newSummary = await this._callQueuedSummarize(olderSlice, previousSummary || '', sellerId);
         if (!newSummary) return null;
 
         logger.info(`[AI] Summary updated: "${newSummary.substring(0, 60)}..."`);
@@ -1195,8 +1188,8 @@ INSTRUCCIONES:
     /**
      * Manual Summary Trigger (for API)
      */
-    async generateManualSummary(history: HistoryMessage[]): Promise<string | null> {
-        return await this._callQueuedSummarize(history);
+    async generateManualSummary(history: HistoryMessage[], sellerId?: string): Promise<string | null> {
+        return await this._callQueuedSummarize(history, '', sellerId);
     }
 
     /**
@@ -1206,7 +1199,7 @@ INSTRUCCIONES:
      * the existing summary with the new chunk so context from the start of
      * the conversation isn't lost across rolling summarizations.
      */
-    async _callQueuedSummarize(history: HistoryMessage[], previousSummary: string = ''): Promise<string | null> {
+    async _callQueuedSummarize(history: HistoryMessage[], previousSummary: string = '', sellerId?: string): Promise<string | null> {
         const conversationText = history.map(msg =>
             `${msg.role === 'user' ? 'Cliente' : 'Vendedor'}: ${msg.content} `
         ).join('\n');
@@ -1256,7 +1249,9 @@ RESUMEN:
                     temperature: 0.3,
                     max_tokens: 250
                 }),
-                cacheKey
+                cacheKey,
+                undefined,
+                sellerId
             );
             return result.choices[0].message?.content || "";
         } catch (e: any) {
@@ -1294,7 +1289,7 @@ RESUMEN:
     /**
      * Parse Address from Text
      */
-    async parseAddress(text: string): Promise<AIParsedResponse> {
+    async parseAddress(text: string, sellerId?: string): Promise<AIParsedResponse> {
         const prompt = `
         Analizá el siguiente texto y extraé datos de dirección postal de Argentina.
         El texto puede estar incompleto, ser solo un código postal, una provincia, o una dirección desordenada.
@@ -1361,7 +1356,8 @@ CRÍTICO: Usá la "Fecha Actual" provista arriba para calcular el día exacto y 
                     max_tokens: 200
                 }),
                 `addr_${crypto.createHash('sha256').update(text).digest('hex').substring(0, 24)}`, // Hashed cache key for full text deduplication
-                5 * 60 // 5 MINUTOS DE TTL para extracciones
+                5 * 60, // 5 MINUTOS DE TTL para extracciones
+                sellerId
             );
 
             const toolCalls = result.choices[0].message?.tool_calls;
@@ -1443,7 +1439,7 @@ CRÍTICO: Usá la "Fecha Actual" provista arriba para calcular el día exacto y 
     /**
      * Transcribe Audio — Uses OpenAI Whisper API
      */
-    async transcribeAudio(mediaData: string, mimeType: string): Promise<string | null> {
+    async transcribeAudio(mediaData: string, mimeType: string, sellerId?: string): Promise<string | null> {
         const buffer = Buffer.from(mediaData, 'base64');
         const ext = mimeType.includes('ogg') ? 'ogg' : mimeType.includes('mp4') ? 'mp4' : 'webm';
         const tmpPath = path.join(os.tmpdir(), `herbalis_audio_${Date.now()}.${ext}`);
@@ -1457,7 +1453,9 @@ CRÍTICO: Usá la "Fecha Actual" provista arriba para calcular el día exacto y 
                     file: fs.createReadStream(tmpPath),
                     language: "es"
                 }),
-                null
+                null,
+                undefined,
+                sellerId
             );
 
             return result.text || null;
@@ -1472,7 +1470,7 @@ CRÍTICO: Usá la "Fecha Actual" provista arriba para calcular el día exacto y 
     /**
      * Analyze Image — Uses OpenAI Vision to extract text or describe an image
      */
-    async analyzeImage(mediaData: string, mimeType: string, prompt: string): Promise<string | null> {
+    async analyzeImage(mediaData: string, mimeType: string, prompt: string, sellerId?: string): Promise<string | null> {
         try {
             const result = await this._callQueued(
                 () => this.client.chat.completions.create({
@@ -1494,7 +1492,9 @@ CRÍTICO: Usá la "Fecha Actual" provista arriba para calcular el día exacto y 
                     ],
                     max_tokens: 300
                 }),
-                null
+                null,
+                undefined,
+                sellerId
             );
             return result.choices[0].message?.content?.trim() || null;
         } catch (e: any) {
@@ -1506,7 +1506,7 @@ CRÍTICO: Usá la "Fecha Actual" provista arriba para calcular el día exacto y 
     /**
      * Helper for Admin Suggestions ("Yo me encargo")
      */
-    async generateSuggestion(instruction: string, conversationContext: string): Promise<string> {
+    async generateSuggestion(instruction: string, conversationContext: string, sellerId?: string): Promise<string> {
         const prompt = `
 SITUACION: El ADMINISTRADOR del negocio te da una instrucción DIRECTA para enviarle al cliente.
         La instrucción del admin tiene AUTORIDAD TOTAL — ANULÁ cualquier regla tuya que la contradiga.
@@ -1532,55 +1532,13 @@ SITUACION: El ADMINISTRADOR del negocio te da una instrucción DIRECTA para envi
                     temperature: 0.7,
                     max_tokens: 300
                 }),
-                null
+                null,
+                undefined,
+                sellerId
             );
             return result.choices[0].message?.content || instruction;
         } catch (e: any) {
             return instruction; // Fallback to raw instruction
-        }
-    }
-
-    /**
-     * Generates a short, highly empathetic or colloquial phrase to bridge the user's input
-     * before sending the hardcoded sales script.
-     * This makes the bot sound more human on the "happy path".
-     */
-    async generateContextualBridge(userMessage: string, context: string): Promise<string> {
-        const prompt = `
-        Actúa como Elena(vendedora / asesora argentina de 50 años).El usuario acaba de decir: "${userMessage}".
-        El contexto actual de la charla es: "${context}".
-
-        Tu tarea: Genera SOLO UNA frase corta(máximo 8 - 10 palabras) de empatía REAL o reacción natural ante lo que dijo el usuario.
-        Ejemplos de tono esperado: "Uy qué garrón", "Te re entiendo firme", "Olvidate, es un tema", "Ay sí a todas nos pasa", "Mirá vos, bueno tranqui", "Excelente, me re alegro".
-
-    REGLAS:
-1. NO hagas ninguna pregunta.
-        2. NO ofrezcas productos ni soluciones en esta frase.
-        3. NO suenes como bot ni como coach motivacional.Suena como una señora tomando mates.
-        4. Debe ser cortísima.
-        5. Devuelve SOLO el texto, sin comillas ni formato JSON.
-        `;
-
-        try {
-            const result = await this._callQueued(
-                () => this.client.chat.completions.create({
-                    model: "gpt-4o-mini",
-                    messages: [
-                        { role: "system", content: "Sos Elena, una vendedora argentina empática. Respondés cortísimo, orgánico y natural." },
-                        { role: "user", content: prompt }
-                    ],
-                    temperature: 0.8, // Slightly more creative for natural variability
-                    max_tokens: 40
-                }),
-                `bridge_${userMessage} `,
-                60 * 60 // 1 hour cache to avoid unnecessary calls for common phrases
-            );
-
-            const bridge = result.choices[0].message?.content?.trim() || "";
-            return bridge;
-        } catch (e: any) {
-            logger.error("🔴 [AI] Contextual Bridge Error:", e.message);
-            return ""; // Soft fail: if it fails, simply return empty so the main script continues unaffected
         }
     }
 

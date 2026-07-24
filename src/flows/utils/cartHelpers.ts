@@ -58,59 +58,6 @@ function buildCartFromSelection(product: string, plan: string, state: UserState)
 }
 
 /**
- * buildMultiProductCart
- * Builds a cart from multiple products (e.g. "1 caja de cápsulas y 2 de gotas").
- * Applies 50% discount on the cheapest unit when there are 3+ total units.
- *
- * @param items - Array of {product, units} where units is the number of 60-day units
- * @param state - UserState to update
- */
-function buildMultiProductCart(items: Array<{product: string; units: number}>, state: UserState): void {
-    if (items.length === 0) return;
-    const logger = require('../../utils/logger');
-
-    const totalUnits = items.reduce((sum, i) => sum + i.units, 0);
-
-    type ItemWithPrice = { product: string; units: number; base60: number; base120: number };
-    const itemPrices: ItemWithPrice[] = items.map(item => {
-        const raw60 = _getPrice(item.product, '60');
-        const raw120 = _getPrice(item.product, '120');
-        const base60 = parseInt((raw60 || '0').replace(/\./g, ''), 10);
-        const base120 = parseInt((raw120 || '0').replace(/\./g, ''), 10);
-        if (base60 === 0) {
-            logger.error(`[CART] buildMultiProductCart: invalid price for "${item.product}"`);
-        }
-        return { ...item, base60, base120 };
-    });
-
-    // Calculate subtotal per item using pair pricing
-    const cartPrices: number[] = itemPrices.map(item => {
-        const pairs = Math.floor(item.units / 2);
-        const remainder = item.units % 2;
-        return (pairs * item.base120) + (remainder * item.base60);
-    });
-
-    // Apply 50% discount on one unit of the cheapest product when 3+ total units
-    if (totalUnits >= 3) {
-        const sortedByBase60 = [...itemPrices].sort((a, b) => a.base60 - b.base60);
-        const cheapestProduct = sortedByBase60[0].product;
-        const discount = Math.round(sortedByBase60[0].base60 * 0.5);
-        const idx = itemPrices.findIndex(p => p.product === cheapestProduct);
-        if (idx >= 0) cartPrices[idx] -= discount;
-    }
-
-    state.cart = itemPrices.map((item, idx) => ({
-        product: item.product,
-        plan: (item.units * 60).toString(),
-        price: _formatPrice(cartPrices[idx])
-    }));
-
-    // selectedProduct/Plan = first item (for backward compat with single-product flows)
-    state.selectedProduct = items[0].product;
-    state.selectedPlan = (items[0].units * 60).toString();
-}
-
-/**
  * calculateTotal
  * Calculates the total price from cart items. Updates state.totalPrice with the
  * formatted string. (Política mayo 2026: el adicional por contra reembolso fue
@@ -134,6 +81,5 @@ function calculateTotal(state: UserState): string {
 export {
     _formatPrice,
     buildCartFromSelection,
-    buildMultiProductCart,
     calculateTotal
 };

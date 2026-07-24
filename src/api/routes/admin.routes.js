@@ -2,7 +2,6 @@ const logger = require('../../utils/logger');
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { prisma } = require('../../../db');
-const { authMiddleware } = require('../../middleware/auth');
 const validate = require('../../middleware/validate');
 const { configSchema } = require('../../schemas/admin.schema');
 const { adminCommandSchema } = require('../../schemas/system.schema');
@@ -44,12 +43,47 @@ module.exports = (clientPool) => {
 
     // POST /mp-link — generate MercadoPago payment link. Sellers can use it for their own chats.
     // If `sendToChat: true` and `userPhone` is provided, the link is also sent via WhatsApp.
+    // Tope sanity-check para links manuales — un typo del panel no debe crear
+    // una preferencia MP de monto absurdo.
+    const MP_LINK_MAX_AMOUNT = 2_000_000; // ARS
+
     router.post('/mp-link', ...withSeller(clientPool), async (req, res) => {
         const amount = parseFloat(req.body?.amount);
         const userPhone = req.body?.userPhone || null;
         const sendToChat = !!req.body?.sendToChat;
-        if (!amount || amount <= 0) return res.status(400).json({ error: 'Monto inválido' });
+        if (!Number.isFinite(amount) || amount <= 0 || amount > MP_LINK_MAX_AMOUNT) {
+            return res.status(400).json({ error: `Monto inválido (debe ser mayor a 0 y hasta $${MP_LINK_MAX_AMOUNT.toLocaleString('es-AR')})` });
+        }
         if (sendToChat && !userPhone) return res.status(400).json({ error: 'userPhone requerido para enviar al chat' });
+
+        // Guard ANTES de crear la preferencia en MP: sin seller resuelto, el
+        // create de paymentLink fallaría con instanceId null y quedaría una
+        // preferencia viva en MP sin registro local.
+        const instanceId = getInstanceId(req);
+        if (!instanceId) return res.status(400).json({ error: 'Seleccioná un vendedor antes de generar el link' });
+
+        // Ownership check (mismo criterio que _verifyChatOwnership de /send):
+        // un seller solo puede mandar links a contactos propios (en userState o
+        // en la tabla User de su instanceId). También ANTES de crear la
+        // preferencia, para no dejar preferencias huérfanas al rechazar.
+        if (sendToChat && req.account?.role !== 'admin') {
+            const chatIdCheck = userPhone.includes('@') ? userPhone : `${userPhone.replace(/\D/g, '')}@c.us`;
+            const phoneStr = chatIdCheck.replace(/@.*/, '');
+            let known = !!req.sellerInstance?.sharedState?.userState?.[chatIdCheck];
+            if (!known) {
+                try {
+                    const u = await prisma.user.findUnique({
+                        where: { phone_instanceId: { phone: phoneStr, instanceId } },
+                        select: { phone: true },
+                    });
+                    known = !!u;
+                } catch (_) { /* fail closed below if DB unreachable */ }
+            }
+            if (!known) {
+                logger.warn(`[MP] Rejected mp-link send to unknown contact: ${chatIdCheck} (seller=${instanceId})`);
+                return res.status(403).json({ error: 'Ese contacto no está asociado a este vendedor' });
+            }
+        }
 
         const mpToken = process.env.MP_ACCESS_TOKEN;
         if (!mpToken) return res.status(500).json({ error: 'MP_ACCESS_TOKEN no configurado' });
@@ -80,7 +114,7 @@ module.exports = (clientPool) => {
                     userPhone,
                     source: 'dashboard',
                     status: 'pending',
-                    instanceId: getInstanceId(req),
+                    instanceId,
                 }
             });
 
@@ -200,10 +234,17 @@ module.exports = (clientPool) => {
         try {
             // apiToken: JWT del seller para los botones del panel. 365d — si expira,
             // el panel deja de operar. Se firma con los datos reales del account.
+            // SOLO cuentas role='seller' activas: sin este filtro, si coexisten
+            // una cuenta seller y una admin con el mismo sellerId, la PC del
+            // vendedor podía recibir un token de admin (escalación), o resucitar
+            // una cuenta desactivada (jwtAuth no re-verifica isActive).
             const acc = await prisma.account.findFirst({
-                where: { sellerId }, select: { id: true, role: true, sellerId: true, name: true },
+                where: { sellerId, role: 'seller', isActive: true },
+                select: { id: true, role: true, sellerId: true, name: true },
             });
-            if (!acc) return res.status(404).json({ error: `No hay cuenta para el seller ${sellerId}` });
+            if (!acc) {
+                return res.status(404).json({ error: `No hay cuenta de vendedor (role=seller) activa para "${sellerId}". El instalador solo firma tokens de seller — creá/activá esa cuenta primero.` });
+            }
             const apiToken = jwt.sign(
                 { accountId: acc.id, role: acc.role, sellerId: acc.sellerId, name: acc.name },
                 secret, { expiresIn: '365d' },

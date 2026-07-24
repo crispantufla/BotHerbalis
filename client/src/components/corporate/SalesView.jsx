@@ -41,11 +41,11 @@ const transferVerifiedMeta = (order) => {
 };
 
 // Tipo de envío — el Order no tiene campo dedicado. El flujo marca el retiro
-// seteando `calle = "A sucursal"` (el pago suele quedar en contrarembolso).
-// Ver src/flows/utils/messages.ts:135. Todo lo demás es envío a domicilio (prepago).
+// seteando `calle = "A sucursal"` (ver src/flows/utils/messages.ts:135); esa es
+// la ÚNICA señal confiable. Ojo: paymentMethod === 'contrarembolso' NO implica
+// sucursal — el COD-con-seña entrega a domicilio con ese paymentMethod.
 const isSucursal = (order) =>
-    String(order.calle || '').trim().toLowerCase() === 'a sucursal' ||
-    order.paymentMethod === 'contrarembolso';
+    String(order.calle || '').trim().toLowerCase() === 'a sucursal';
 const shippingMeta = (order) => isSucursal(order)
     ? { tone: 'accent', label: 'Sucursal',  Icon: Package }
     : { tone: 'info',   label: 'Domicilio', Icon: MapPin };
@@ -116,20 +116,20 @@ function CopyRow({ label, value, editField, mono, editing }) {
     );
 }
 
-const SalesView = ({ onGoToChat, initialSearch = '' }) => {
+const SalesView = ({ onGoToChat }) => {
     const { toast, confirm } = useToast();
     const { isAdmin } = useAuth();
     const { sellers } = useSeller();
     const [page, setPage] = useState(1);
 
-    const [searchTerm, setSearchTerm] = useState(initialSearch);
+    const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('Todos');
     const [sellerFilter, setSellerFilter] = useState('Todos');
 
     // Debounce search — 350ms para no martillar la API en cada tecla. El valor
     // debounceado se manda al hook → API; así "Maria Elina" busca contra TODAS
     // las órdenes históricas, no solo la página actual.
-    const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
+    const [debouncedSearch, setDebouncedSearch] = useState('');
     useEffect(() => {
         const t = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 350);
         return () => clearTimeout(t);
@@ -217,20 +217,49 @@ const SalesView = ({ onGoToChat, initialSearch = '' }) => {
         }
     };
 
-    const handleExportCSV = () => {
-        if (orders.length === 0) return;
-        const headers = ['Fecha', 'Cliente', 'Nombre', 'Producto', 'Plan', 'Precio', 'Postdatado', 'Estado', 'Envío', 'Tracking', 'Ciudad', 'Calle', 'CP'];
-        const rows = orders.map(o => [
-            o.createdAt ? new Date(o.createdAt).toLocaleDateString() : '',
-            o.cliente || '', o.nombre || '', o.producto || '', o.plan || '', o.precio || '',
-            o.postdatado || '', o.status || '', shippingMeta(o).label, o.tracking || '', o.ciudad || '', o.calle || '', o.cp || ''
-        ]);
-        const csvContent = [headers.join(','), ...rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','))].join('\n');
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = `pedidos_${new Date().toISOString().split('T')[0]}.csv`; a.click();
-        URL.revokeObjectURL(url);
+    // Exporta hasta 500 filas (tope del backend) con los filtros activos, no
+    // solo la página visible. Mismo contrato que useOrders: filtros server-side
+    // + header x-seller-id vacío para vista agregada de admin.
+    const [exporting, setExporting] = useState(false);
+    const handleExportCSV = async () => {
+        if (exporting) return;
+        setExporting(true);
+        try {
+            const headers = isAdmin ? { 'x-seller-id': '' } : {};
+            const params = new URLSearchParams({ page: '1', limit: '500' });
+            if (debouncedSearch) params.set('search', debouncedSearch);
+            if (statusFilter && statusFilter !== 'Todos') params.set('status', statusFilter);
+            if (apiInstanceId && apiInstanceId !== 'Todos') params.set('instanceId', apiInstanceId);
+            const res = await api.get(`/api/orders?${params.toString()}`, { headers });
+            const exportOrders = res.data.data || res.data || [];
+            const total = res.data.pagination?.total ?? exportOrders.length;
+            if (exportOrders.length === 0) { toast.warning('No hay pedidos para exportar con estos filtros'); return; }
+
+            const csvHeaders = ['Fecha', 'Cliente', 'Nombre', 'Producto', 'Plan', 'Precio', 'Método pago', 'Verificación', 'Postdatado', 'Estado', 'Envío', 'Tracking', 'Ciudad', 'Calle', 'CP'];
+            const rows = exportOrders.map(o => [
+                o.createdAt ? new Date(o.createdAt).toLocaleDateString() : '',
+                o.cliente || '', o.nombre || '', o.producto || '', o.plan || '', o.precio || '',
+                paymentMeta(o.paymentMethod).label,
+                o.paymentMethod === 'transferencia' ? (o.paymentVerifiedAt ? 'Verificado' : 'Sin verificar') : '',
+                o.postdatado || '', o.status || '', shippingMeta(o).label, o.tracking || '', o.ciudad || '', o.calle || '', o.cp || ''
+            ]);
+            const csvContent = [csvHeaders.join(','), ...rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','))].join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const truncated = total > exportOrders.length;
+            if (truncated) {
+                toast.warning(`Se exportaron las ${exportOrders.length} filas más recientes de ${total}. Ajustá los filtros para acotar.`);
+            }
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `pedidos_${new Date().toISOString().split('T')[0]}${truncated ? `_primeras-${exportOrders.length}-de-${total}` : ''}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            toast.error('Error al exportar: ' + (e.response?.data?.error || e.message));
+        } finally {
+            setExporting(false);
+        }
     };
 
     const openEdit = (order) => {
@@ -358,6 +387,7 @@ CP: ${order.cp || '—'}`;
                         <Button
                             onClick={handleExportCSV}
                             disabled={orders.length === 0}
+                            loading={exporting}
                             leftIcon={Download}
                         >
                             <span className="hidden sm:inline">Exportar CSV</span>

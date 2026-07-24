@@ -103,7 +103,6 @@ export async function handleWaitingPreference(
 
             currentState.history.push({ role: 'bot', content: cmp2, timestamp: Date.now() });
             _setStep(currentState, FlowStep.WAITING_PREFERENCE);
-            currentState.consultativeSale = true;
             saveState(userId);
             await sendMessageWithDelay(userId, cmp2);
 
@@ -163,7 +162,6 @@ export async function handleWaitingPreference(
         } else if (aiRecommendation.response) {
             currentState.history.push({ role: 'bot', content: aiRecommendation.response, timestamp: Date.now() });
             await sendMessageWithDelay(userId, aiRecommendation.response);
-            currentState.consultativeSale = true;
             saveState(userId);
             return { matched: true };
         }

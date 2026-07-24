@@ -35,3 +35,16 @@ export function isDeepNight(): boolean {
 export function getArgentinaNow(): Date {
     return new Date();
 }
+
+/**
+ * Medianoche (00:00) del día ACTUAL en Argentina, como instante absoluto.
+ * NO usar `new Date().setHours(0,0,0,0)` ni `toZonedTime(...) + setHours`:
+ * ambos operan en la TZ del server (UTC en prod) → "medianoche" = 21:00 ARG
+ * del día anterior y las ventanas diarias quedan corridas 3 horas.
+ * Argentina no aplica DST (offset -03 fijo), así que construir el instante
+ * con el sufijo -03:00 es exacto.
+ */
+export function getArgentinaMidnight(): Date {
+    const day = formatInTimeZone(new Date(), ARG_TZ, 'yyyy-MM-dd');
+    return new Date(`${day}T00:00:00-03:00`);
+}

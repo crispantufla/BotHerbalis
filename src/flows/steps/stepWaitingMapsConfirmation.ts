@@ -50,7 +50,7 @@ export async function handleWaitingMapsConfirmation(
             const product = currentState.selectedProduct;
             if (product) {
                 const plan = currentState.selectedPlan || "60";
-                const price = currentState.price || _getPrice(product, plan);
+                const price = _getPrice(product, plan); // F2: precio SIEMPRE coherente con el plan (no usar un currentState.price viejo)
                 currentState.cart = [{ product, plan, price }];
             }
         }
@@ -108,7 +108,7 @@ export async function handleWaitingMapsConfirmation(
                     const product = currentState.selectedProduct;
                     if (product) {
                         const plan = currentState.selectedPlan || "60";
-                        const price = currentState.price || _getPrice(product, plan);
+                        const price = _getPrice(product, plan); // F2: precio SIEMPRE coherente con el plan (no usar un currentState.price viejo)
                         currentState.cart = [{ product, plan, price }];
                     }
                 }

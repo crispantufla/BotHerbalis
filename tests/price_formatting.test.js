@@ -89,8 +89,8 @@ describe('V7 Script — Price Centralization', () => {
         // User picks capsulas => V7 shows prices directly in the preference response
         await processSalesFlow(userId, "capsulas", userState, knowledge, mockDependencies);
 
-        // Dinámico: refleja el precio del fixture + el descuento vigente (junio: -$10.000).
-        // Así no se rompe al corregir la base ni al revertir el descuento el 01/07.
+        // Dinámico: refleja lo que _getPrice devuelva para el fixture (hoy precio
+        // base — el descuento de junio venció y se quitó). No se rompe al tocar la base.
         const { _getPrice } = require('../src/flows/utils/pricing');
         const expected = _getPrice('Cápsulas', '60');
         expect(mockSendMessage).toHaveBeenCalledWith(

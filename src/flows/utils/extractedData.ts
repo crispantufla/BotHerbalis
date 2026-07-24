@@ -36,13 +36,6 @@ export function parsePostdatado(extractedData: string | null | undefined): strin
     return m ? m[1].trim() : null;
 }
 
-/** "PROFILE: 44 años, diabetes" → "44 años, diabetes" (o null). */
-export function parseProfile(extractedData: string | null | undefined): string | null {
-    if (!extractedData) return null;
-    const m = String(extractedData).match(/PROFILE:\s*(.+)/i);
-    return m ? m[1].trim() : null;
-}
-
 /**
  * "ENVIO: retiro" | "ENVIO: domicilio" → 'retiro' | 'domicilio' (o null).
  * Lo emite el AI fallback de waiting_payment_method cuando el cliente eligió

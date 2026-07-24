@@ -11,9 +11,8 @@ import logger from '../utils/logger';
 //   cleanupOldUsers         -> 04:00 diario
 
 import cron from 'node-cron';
-import { isBusinessHours } from './timeUtils';
+import { isBusinessHours, getArgentinaMidnight } from './timeUtils';
 import { differenceInMinutes, differenceInHours, differenceInDays } from 'date-fns';
-import { toZonedTime } from 'date-fns-tz';
 
 import { buildConfirmationMessage } from '../utils/messageTemplates';
 import { UserState } from '../types/state';
@@ -37,7 +36,7 @@ interface SchedulerSharedState {
 
 interface SchedulerDependencies {
     notifyAdmin: (title: string, userId: string, msg: string) => Promise<void>;
-    sendMessageWithDelay: (userId: string, msg: string, startTime?: number, stillValid?: () => boolean) => Promise<void>;
+    sendMessageWithDelay: (userId: string, msg: string, startTime?: number, stillValid?: () => boolean) => Promise<boolean>;
     saveState: (userId?: string) => void;
     saveOrderToLocal?: (order: any) => void;
     [key: string]: any;
@@ -54,7 +53,6 @@ const RE_ENGAGEABLE_STEPS = new Set([
     'waiting_transfer_confirmation'
 ]);
 
-const STALE_THRESHOLD_MINS = 20;
 const COLD_LEAD_THRESHOLD_HOURS = 24;
 const ABANDONED_CART_MIN_HOURS = 4; // Cambiado para cubrir "más tarde en el mismo día"
 const ABANDONED_CART_MAX_HOURS = 24;
@@ -182,46 +180,9 @@ function _pickVariant(pool: string[]): { msg: string; variantIndex: number } {
     return { msg: pool[variantIndex], variantIndex };
 }
 
-const SECOND_FOLLOW_UP_MESSAGES = [
-    'Solo te aviso que tu consulta sigue activa. Cualquier cosa, escribime 😊',
-    '¡Hola! Tu consulta sigue abierta por si querés retomar. Sin compromiso 👋'
-];
-
 // ══════════════════════════════════════════════════════════════
 // TASK FUNCTIONS (unchanged logic, now called by cron instead of setInterval)
 // ══════════════════════════════════════════════════════════════
-
-/**
- * checkStaleUsers — P3 #3
- * Alerts admin if a user has been stuck on the same step for >20 min
- */
-function checkStaleUsers(sharedState: SchedulerSharedState, dependencies: SchedulerDependencies): void {
-    const { userState, pausedUsers } = sharedState;
-    const { notifyAdmin } = dependencies;
-    const now = Date.now();
-
-    for (const [userId, state] of Object.entries(userState)) {
-        if (!state.step || state.step === 'completed' || state.step === 'greeting') continue;
-        if (state.step === 'waiting_admin_ok') continue;
-        if (pausedUsers && pausedUsers.has(userId)) continue;
-        if (state.staleAlerted) continue;
-        if (!state.stepEnteredAt) continue;
-
-        const minutes = differenceInMinutes(now, state.stepEnteredAt);
-        if (minutes > STALE_THRESHOLD_MINS) {
-            logger.info(`[SCHEDULER] Stale user detected: ${userId} on step "${state.step}" for ${minutes} min`);
-
-            notifyAdmin(
-                `⏰ Cliente estancado ${minutes} min`,
-                userId,
-                `Paso: ${state.step}\nÚltima actividad: hace ${minutes} min\nProducto: ${state.selectedProduct || '?'}`
-            ).catch(e => logger.error('[SCHEDULER] notifyAdmin error:', e.message));
-
-            state.staleAlerted = true;
-            dependencies.saveState(userId);
-        }
-    }
-}
 
 /**
  * autoApproveOrders — P0 #1
@@ -416,47 +377,6 @@ async function checkAbandonedCarts(sharedState: SchedulerSharedState, dependenci
 }
 
 /**
- * checkSecondFollowUp — Soft second touch for users who got one follow-up but didn't respond (48-72h)
- */
-async function checkSecondFollowUp(sharedState: SchedulerSharedState, dependencies: SchedulerDependencies): Promise<void> {
-    // DESACTIVADO (jun-2026): apuntaba a 48-72h, MUY fuera de la ventana de 24h
-    // de WhatsApp → spam. Recuperación solo dentro de 24h (checkAbandonedCarts).
-    // Cron removido; función inerte por compatibilidad.
-    return;
-
-    const { userState, pausedUsers } = sharedState;
-    const { sendMessageWithDelay, saveState } = dependencies;
-    const now = Date.now();
-
-    for (const [userId, state] of Object.entries(userState)) {
-        if (!RE_ENGAGEABLE_STEPS.has(state.step)) continue;
-        if (!isBusinessHours()) continue;
-        if (pausedUsers && pausedUsers.has(userId)) continue;
-        if (state.secondFollowUpSent) continue;
-        // Only target users who already got a first follow-up
-        if (!state.reengagementSent && !state.cartRecovered) continue;
-
-        const lastActivity = state.lastActivityAt || state.stepEnteredAt;
-        if (!lastActivity) continue;
-
-        const hours = differenceInHours(now, lastActivity);
-        if (hours >= 48 && hours < 72) {
-            const rawMsg = SECOND_FOLLOW_UP_MESSAGES[Math.floor(Math.random() * SECOND_FOLLOW_UP_MESSAGES.length)];
-            const msg = _withName(rawMsg, state);
-            try {
-                await sendMessageWithDelay(userId, msg);
-                _pushHistory(state, { role: 'bot', content: msg });
-                state.secondFollowUpSent = true;
-                saveState(userId);
-                logger.info(`[SCHEDULER] Second follow-up sent to ${userId} (${hours}h inactive on "${state.step}")`);
-            } catch (e: any) {
-                logger.error(`[SCHEDULER] Failed to send second follow-up to ${userId}:`, e.message);
-            }
-        }
-    }
-}
-
-/**
  * cleanupOldUsers — Memory leak prevention
  * Removes users inactive for >30 days from userState
  */
@@ -572,7 +492,7 @@ function cleanStalePausedUsers(sharedState: SchedulerSharedState, dependencies: 
 /**
  * rollupRescueMetrics — Persists abandoned-cart rescue conversion metrics.
  *
- * The scheduler's existing checkAbandonedCarts/checkColdLeads/checkSecondFollowUp
+ * The scheduler's existing checkAbandonedCarts/checkColdLeads
  * jobs write `followUpData` into each user's state and rely on `_setStep` to
  * mark `converted: true` when the user advances. That data is only useful if
  * it's aggregated somewhere durable — otherwise dashboards only show a
@@ -642,7 +562,9 @@ async function checkAiBudget(dependencies: SchedulerDependencies): Promise<void>
         const fs = require('fs');
         const path = require('path');
         const { aiService } = require('./ai');
-        const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../../..');
+        // __dirname = src/services → '../..' = raíz del repo (el '../../..' venía
+        // copiado de pricing.ts, que vive un nivel más profundo, y apuntaba FUERA).
+        const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../..');
 
         const budget = Math.max(0, parseFloat(process.env.AI_MONTHLY_BUDGET_USD || '500') || 0);
         if (budget <= 0) return; // tope desactivado
@@ -862,10 +784,10 @@ async function snapshotDailyStats(sharedState?: SchedulerSharedState) {
     try {
         const { prisma } = require('../../db');
         const INSTANCE_ID = sharedState?.sellerId || process.env.INSTANCE_ID || 'default';
-        // Use Argentina timezone so the date is correct regardless of server location
-        const argNow = toZonedTime(new Date(), TIMEZONE);
-        const startOfDay = new Date(argNow);
-        startOfDay.setHours(0, 0, 0, 0);
+        // Medianoche ARG real. El combo anterior (toZonedTime + setHours) operaba
+        // en la TZ del server (UTC) → "medianoche" = 21:00 ARG del día anterior →
+        // ventana de 27h con doble conteo de 21:00-24:00 en DailyStats.
+        const startOfDay = getArgentinaMidnight();
 
         // "Chats" del día = PROSPECTOS que entraron al embudo (stepTo
         // greeting/waiting_weight), NO todo contacto nuevo. Los que el bot
@@ -1031,7 +953,13 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
                 if (sent && stillWaitingMp()) {
                     _pushHistory(state, { role: 'bot', content: msg });
                     (state as any).mpReminderStage = 2;
-                    pausedUsers.add(userId);
+                    // Pausa por el path canónico (pauseService): persiste en DB,
+                    // aparece en dashboard/!pausados y sobrevive restarts. El
+                    // pausedUsers.add() directo era una pausa fantasma en memoria.
+                    // Sin notifyAdmin en deps: la alerta la manda el notifyAdmin
+                    // explícito de abajo (mensaje más específico), evita duplicar.
+                    const { pauseUser } = require('./pauseService');
+                    await pauseUser(userId, '⏸️ Pausado automáticamente: cliente con MP pendiente >4h. Vendedor por favor contactar.', { sharedState: sharedState as any });
                     (state as any).pauseReason = '⏸️ Pausado automáticamente: cliente con MP pendiente >4h. Vendedor por favor contactar.';
                     (state as any).pausedAt = new Date();
                     saveState(userId);
@@ -1311,4 +1239,4 @@ async function reconcileWebOrders(): Promise<void> {
     }
 }
 
-export { startScheduler, checkStaleUsers, checkColdLeads, checkAbandonedCarts, autoApproveOrders, cleanStalePausedUsers, snapshotDailyStats, refreshPendingPayments, checkPendingMpPayments, reconcileWebOrders };
+export { startScheduler, checkColdLeads, checkAbandonedCarts, autoApproveOrders, refreshPendingPayments, checkPendingMpPayments };

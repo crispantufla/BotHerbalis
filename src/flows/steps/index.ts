@@ -78,8 +78,8 @@ export async function processStep(
             logger.info(`[STALE-STEP] User ${userId} has unknown step "${currentState.step}". Migrating...`);
             const stepMigrations: Record<string, string> = {
                 'waiting_legal_acceptance': 'waiting_final_confirmation',
-                'waiting_payment_method': 'waiting_payment_method', // already valid — just re-process
-                'waiting_mp_payment': 'waiting_payment_method',      // MP link likely expired — restart payment
+                // (waiting_payment_method / waiting_mp_payment tienen case propio en
+                // el switch — nunca caen al default, así que no van acá.)
                 // Steps legacy V5/V6 (eliminados en V7). Cualquier estado viejo que
                 // quede en DB se reencauza a waiting_preference (re-deriva producto/
                 // plan de forma segura, sin perder weightGoal). V7 nunca rutea acá.

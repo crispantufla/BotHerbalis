@@ -37,7 +37,7 @@ const PlaygroundView = () => {
     const [input, setInput] = useState('');
     const [sending, setSending] = useState(false);
     const [useDelay, setUseDelay] = useState(false);
-    const [model, setModel] = useState('gpt'); // 'gpt' | 'claude' — qué motor usa el bot en el playground
+    const [model, setModel] = useState('claude'); // 'gpt' | 'claude' — qué motor usa el bot en el playground (prod corre Claude)
     const [forceStep, setForceStep] = useState('');
     // Índice del mensaje del bot que el usuario quiere reportar como error de IA.
     // null = modal cerrado.
@@ -173,7 +173,7 @@ const PlaygroundView = () => {
                                 type="button"
                                 onClick={() => setModel('gpt')}
                                 className={`px-2.5 h-7 rounded-control transition-colors ${model === 'gpt' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
-                                title="Responder con GPT-4o (producción actual)"
+                                title="Responder con GPT-4o"
                             >
                                 GPT-4o
                             </button>
@@ -181,7 +181,7 @@ const PlaygroundView = () => {
                                 type="button"
                                 onClick={() => setModel('claude')}
                                 className={`px-2.5 h-7 rounded-control transition-colors ${model === 'claude' ? 'bg-white dark:bg-slate-700 text-accent-700 dark:text-accent-300 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
-                                title="Responder con Claude (Sonnet en pasos premium)"
+                                title="Responder con Claude (producción actual — Sonnet en pasos premium)"
                             >
                                 Claude
                             </button>

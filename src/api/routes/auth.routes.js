@@ -193,10 +193,18 @@ module.exports = (client, sharedState) => {
         const { id } = req.params;
         const { name, password, role, sellerId, isActive } = req.body;
 
+        // Mismas normalizaciones/validaciones que el POST de creación: name y
+        // sellerId siempre lowercase (el login busca por name.toLowerCase() —
+        // renombrar a "Horacio" dejaba la cuenta sin poder loguear), y role
+        // restringido al enum conocido.
+        if (role !== undefined && !['admin', 'seller'].includes(role)) {
+            return res.status(400).json({ error: 'role must be "admin" or "seller"' });
+        }
+
         const data = {};
-        if (name !== undefined) data.name = name;
+        if (name !== undefined) data.name = name.toLowerCase();
         if (role !== undefined) data.role = role;
-        if (sellerId !== undefined) data.sellerId = sellerId;
+        if (sellerId !== undefined) data.sellerId = sellerId ? sellerId.toLowerCase() : null;
         if (isActive !== undefined) data.isActive = isActive;
         if (password) data.password = await hashPassword(password);
 
@@ -295,11 +303,6 @@ module.exports = (client, sharedState) => {
         }
     });
 
-    // ─── POST /api/logout ───────────────────────────────────────────
-    router.post('/logout', (req, res) => {
-        res.json({ success: true });
-    });
-
     // ════════════════════════════════════════════════════════════════
     // STATS DE ACCOUNTS — horas trabajadas por vendedor
     // ════════════════════════════════════════════════════════════════
@@ -326,10 +329,13 @@ module.exports = (client, sharedState) => {
         const startMs = new Date(session.startedAt).getTime();
         const endMs = new Date(session.endedAt).getTime();
 
-        // Avanzamos hora por hora (en AR local)
+        // Avanzamos hora por hora (en AR local). AR local = UTC + offset
+        // (offset negativo): restar el offset invertía el signo y corría los
+        // buckets +6h (mismo patrón correcto que analytics abandonment-by-hour:
+        // (getUTCHours() - 3 + 24) % 24).
         let cursorMs = startMs;
         while (cursorMs < endMs) {
-            const arDate = new Date(cursorMs - AR_OFFSET_MIN * 60_000);
+            const arDate = new Date(cursorMs + AR_OFFSET_MIN * 60_000);
             const yyyy = arDate.getUTCFullYear();
             const mm = String(arDate.getUTCMonth() + 1).padStart(2, '0');
             const dd = String(arDate.getUTCDate()).padStart(2, '0');
@@ -338,10 +344,11 @@ module.exports = (client, sharedState) => {
             const dayKey = `${yyyy}-${mm}-${dd}`;
 
             // Fin de la hora en AR: agregamos 1h al arDate truncado.
+            // Vuelta a UTC: utcMs = arMs - offset.
             const hourStartUtcMs = cursorMs;
             const arHourEnd = new Date(arDate);
             arHourEnd.setUTCHours(hour + 1, 0, 0, 0);
-            const hourEndUtcMs = arHourEnd.getTime() + AR_OFFSET_MIN * 60_000;
+            const hourEndUtcMs = arHourEnd.getTime() - AR_OFFSET_MIN * 60_000;
 
             const chunkEnd = Math.min(hourEndUtcMs, endMs);
             const seconds = Math.floor((chunkEnd - hourStartUtcMs) / 1000);

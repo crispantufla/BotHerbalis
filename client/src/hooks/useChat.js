@@ -133,6 +133,13 @@ export const useChat = (selectedChatId) => {
         selectedChatIdRef.current = selectedChatId;
     }, [selectedChatId]);
 
+    // Ref del seller activo para el guard de eventos socket sin re-suscribir
+    // el listener en cada switch de seller (mismo patrón que selectedChatIdRef).
+    const selectedSellerIdRef = useRef(selectedSellerId);
+    useEffect(() => {
+        selectedSellerIdRef.current = selectedSellerId;
+    }, [selectedSellerId]);
+
     // WebSocket logic for updates
     useEffect(() => {
         if (!socket) return;
@@ -140,6 +147,12 @@ export const useChat = (selectedChatId) => {
         const handleNewLog = (data) => {
             try {
                 if (!data || !data.chatId) return;
+                // Un admin global recibe eventos de TODOS los sellers (room
+                // 'admin'). Si el evento trae sellerId y no es el seller que se
+                // está viendo, se ignora — sin esto se mezclan chats/mensajes
+                // de otro seller en la vista actual.
+                const currentSellerId = selectedSellerIdRef.current;
+                if (data.sellerId && currentSellerId && data.sellerId !== currentSellerId) return;
                 let timestamp = data.timestamp ? new Date(data.timestamp).getTime() : Date.now();
                 const currentSelectedId = selectedChatIdRef.current;
 
@@ -205,12 +218,19 @@ export const useChat = (selectedChatId) => {
                     if (!Array.isArray(prev)) return [];
                     const existingChat = prev.find(c => c.id === data.chatId || (incomingPhone && c.id.replace(/\D/g, '').endsWith(incomingPhone.slice(-10))));
 
+                    // No-leídos: solo cuentan mensajes DEL CLIENTE (sender 'user').
+                    // Los del bot/admin/system no son "sin leer" para el panel —
+                    // contarlos inflaba el badge.
+                    const isClientMsg = data.sender === 'user';
+
                     let updated;
                     if (existingChat) {
                         updated = prev.map((c) => c.id === existingChat.id ? {
                             ...c,
                             lastMessage: { body: data.text || '', timestamp },
-                            unreadCount: currentSelectedId === existingChat.id ? 0 : (c.unreadCount || 0) + 1,
+                            unreadCount: currentSelectedId === existingChat.id
+                                ? 0
+                                : (c.unreadCount || 0) + (isClientMsg ? 1 : 0),
                             time: new Date(timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' }),
                             assignedScript: data.assignedScript || c.assignedScript
                         } : c);
@@ -218,7 +238,7 @@ export const useChat = (selectedChatId) => {
                         updated = [{
                             id: data.chatId,
                             name: data.chatId,
-                            unreadCount: currentSelectedId === data.chatId ? 0 : 1,
+                            unreadCount: currentSelectedId === data.chatId || !isClientMsg ? 0 : 1,
                             lastMessage: { body: data.text || '', timestamp },
                             time: new Date(timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' }),
                             assignedScript: data.assignedScript

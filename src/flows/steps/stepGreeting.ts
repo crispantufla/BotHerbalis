@@ -13,6 +13,11 @@ interface GreetingDependencies {
     effectiveScript?: string;
     config?: { scriptStats?: Record<string, { started: number; completed: number }>; activeScript?: string };
     aiService?: any;
+    // Profundidad de recursión actual (la stashea processSalesFlow). SIEMPRE
+    // propagarla +1 en las re-invocaciones de processSalesFlow de este step:
+    // si se resetea a 0, el guard anti-recursión de salesFlow no puede cortar
+    // el ciclo AD-RE-ENTRY → greeting → waiting_weight → AD-RE-ENTRY.
+    _recursionDepth?: number;
 }
 
 export async function handleGreeting(
@@ -42,7 +47,7 @@ export async function handleGreeting(
 
         // Defer to salesFlow to avoid circular promise loops
         const fakeUserStateMap = { [userId]: currentState };
-        await processSalesFlow(userId, text, fakeUserStateMap, knowledge, dependencies);
+        await processSalesFlow(userId, text, fakeUserStateMap, knowledge, dependencies, (dependencies._recursionDepth ?? 0) + 1);
         return { matched: true };
     }
 
@@ -114,7 +119,7 @@ export async function handleGreeting(
         _setStep(currentState, knowledge.flow.greeting.nextStep);
         saveState(userId);
         const fakeUserStateMap = { [userId]: currentState };
-        await processSalesFlow(userId, text, fakeUserStateMap, knowledge, dependencies);
+        await processSalesFlow(userId, text, fakeUserStateMap, knowledge, dependencies, (dependencies._recursionDepth ?? 0) + 1);
         return { matched: true };
     }
 
@@ -186,26 +191,14 @@ export async function handleGreeting(
         logger.info(`[GREETING-AB] User ${userId} → variant "${variants[variantIdx].id}" (idx ${variantIdx})`);
     }
 
-    // 2. Send Text FIRST (Presentation part)
-    const rawGreetMsg: string = _formatMessage(chosenGreeting.response, currentState);
+    // 2. Send Text FIRST (mensaje único). El viejo split en 2 partes buscaba
+    // los marcadores "Para recomendarte bien:" / "¿Cuántos kilos" del copy
+    // V5/V6, que el saludo V7 ya no tiene — nunca matcheaba y el saludo salía
+    // como 1 mensaje igual. Simplificado a mensaje único sin el split.
+    const greetMsg: string = _formatMessage(chosenGreeting.response, currentState);
 
-    let greetingPart1 = rawGreetMsg;
-    let greetingPart2: string | null = null;
-
-    const splitIndex = rawGreetMsg.lastIndexOf('Para recomendarte bien:');
-    if (splitIndex !== -1) {
-        greetingPart1 = rawGreetMsg.substring(0, splitIndex).trim();
-        greetingPart2 = rawGreetMsg.substring(splitIndex).trim();
-    } else {
-        const splitIndexAlt = rawGreetMsg.lastIndexOf('¿Cuántos kilos');
-        if (splitIndexAlt !== -1) {
-            greetingPart1 = rawGreetMsg.substring(0, splitIndexAlt).trim();
-            greetingPart2 = rawGreetMsg.substring(splitIndexAlt).trim();
-        }
-    }
-
-    currentState.history.push({ role: 'bot', content: greetingPart1, timestamp: Date.now() });
-    await sendMessageWithDelay(userId, greetingPart1);
+    currentState.history.push({ role: 'bot', content: greetMsg, timestamp: Date.now() });
+    await sendMessageWithDelay(userId, greetMsg);
 
     // 2. Send Image SECOND (if configured)
     try {
@@ -234,13 +227,6 @@ export async function handleGreeting(
         }
     } catch (e: any) {
         logger.error('[GREETING] Failed to send image:', e.message);
-    }
-
-    // 4. Send Question Part (kilos) — el atajo de peso-en-saludo ya se manejó
-    // arriba (antes de la presentación), así que acá solo cae el saludo normal.
-    if (greetingPart2) {
-        currentState.history.push({ role: 'bot', content: greetingPart2, timestamp: Date.now() });
-        await sendMessageWithDelay(userId, greetingPart2);
     }
 
     _setStep(currentState, knowledge.flow.greeting.nextStep);

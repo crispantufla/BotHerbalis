@@ -1,7 +1,8 @@
 import { UserState, FlowStep } from '../../types/state';
-import { _setStep, _detectProductPlanChange, _resolveNewProductPlan, _handleShipPaySwitch } from '../utils/flowHelpers';
+import { _setStep, _cleanPhone, _detectProductPlanChange, _resolveNewProductPlan, _handleShipPaySwitch } from '../utils/flowHelpers';
 import { parsePostdatado, parseProductChange } from '../utils/extractedData';
-import { _getPrice, _getPrices } from '../utils/pricing';
+import { _getPrices } from '../utils/pricing';
+import { buildCartFromSelection } from '../utils/cartHelpers';
 import { _isAffirmative } from '../utils/validation';
 import logger from '../../utils/logger';
 
@@ -23,16 +24,19 @@ export async function handleWaitingFinalConfirmation(
         const newPlan = resolved.newPlan;
 
         if (newProduct !== currentState.selectedProduct || newPlan !== currentState.selectedPlan) {
-            currentState.selectedProduct = newProduct;
-            currentState.selectedPlan = newPlan;
+            // Cart + precio + label coherentes también para multi-unidad ("3 cajas"
+            // → plan 180): buildCartFromSelection aplica el pricing por pares + el
+            // descuento de 3+ unidades, igual que _handleProductPlanChange en
+            // stepWaitingData. Antes _getPrice caía al fallback de '60' y el bot
+            // decía "60 días" con precio de 60 para un pedido de 3 cajas.
+            buildCartFromSelection(newProduct, newPlan, currentState);
 
-            const priceStr = _getPrice(newProduct, newPlan);
-            const basePrice = parseInt(priceStr.replace(/\./g, ''));
-            currentState.cart = [{ product: newProduct, plan: newPlan, price: priceStr }];
-            currentState.totalPrice = basePrice.toLocaleString('es-AR').replace(/,/g, '.');
-
-            const planText = newPlan === "120" ? "120 días" : "60 días";
-            const changeMsg = `¡Dale, sin problema! 😊 Cambiamos el pedido a ${newProduct.split(' de ')[0].toLowerCase()} por ${planText}.`;
+            const planDaysNum = parseInt(newPlan, 10);
+            const unitsCount = Math.floor(planDaysNum / 60);
+            const planText = unitsCount > 1 ? `${unitsCount} unidades (${planDaysNum} días)` : `${planDaysNum} días`;
+            const changeMsg = unitsCount >= 3
+                ? `¡Excelente! 🎉 Cambiamos el pedido a ${planText} de ${newProduct.split(' de ')[0].toLowerCase()} con 50% de descuento en la unidad más barata.`
+                : `¡Dale, sin problema! 😊 Cambiamos el pedido a ${newProduct.split(' de ')[0].toLowerCase()} por ${planText}.`;
             currentState.history.push({ role: 'bot', content: changeMsg, timestamp: Date.now() });
             await sendMessageWithDelay(userId, changeMsg);
 
@@ -58,7 +62,7 @@ export async function handleWaitingFinalConfirmation(
             nombre: addr.nombre, calle: addr.calle, ciudad: addr.ciudad, cp: addr.cp, provincia: addr.provincia, calleOriginal: null as string | null
         };
 
-        const phone = userId.split('@')[0];
+        const phone = _cleanPhone(userId);
         return {
             cliente: phone, nombre: o.nombre, calle: o.calle, ciudad: o.ciudad, cp: o.cp, provincia: o.provincia,
             calleOriginal: o.calleOriginal || null,
@@ -112,7 +116,19 @@ export async function handleWaitingFinalConfirmation(
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);
         return { matched: true };
-    } else if (_isAffirmative(normalizedText) || /\b(si|dale|ok|listo|confirmo|correcto|acepto|bueno|joya|de una)\b/i.test(normalizedText)) {
+    } else if (_isAffirmative(normalizedText)) {
+        // SOLO el matcher ULTRA-STRICT confirma acá. El viejo `|| /\b(si|dale|...)\b/`
+        // sin anclar confirmaba pedidos con frases que NO confirman ("¿y si no
+        // estoy en casa ese día?", "no, mejor dale de baja") y hacía inalcanzable
+        // la rama de IA de abajo, que sí distingue preguntas de confirmaciones.
+        if (!currentState.pendingOrder) {
+            // Sin pendingOrder (ej. estado legacy migrado) no hay orden que crear ni
+            // notificación al admin: confirmar igual dejaría al cliente esperando un
+            // ingreso que nadie va a procesar.
+            const { _pauseAndAlert } = require('../utils/flowHelpers');
+            await _pauseAndAlert(userId, currentState, dependencies, text, `⚠️ Confirmación final SIN pendingOrder (estado inconsistente). Cliente dijo: "${text.substring(0, 100)}". Cargar el pedido a mano.`);
+            return { matched: true };
+        }
         const msg = "¡Perfecto! Recibimos tu confirmación.\n\nAguardame un instante que verificamos los datos y te confirmamos el ingreso ⏳";
         await sendMessageWithDelay(userId, msg);
 
@@ -157,6 +173,12 @@ export async function handleWaitingFinalConfirmation(
         });
 
         if (aiResponse.goalMet) {
+            if (!currentState.pendingOrder) {
+                // Mismo guard que la rama estricta: sin pendingOrder no se simula confirmación.
+                const { _pauseAndAlert } = require('../utils/flowHelpers');
+                await _pauseAndAlert(userId, currentState, dependencies, text, `⚠️ Confirmación final (IA) SIN pendingOrder (estado inconsistente). Cliente dijo: "${text.substring(0, 100)}". Cargar el pedido a mano.`);
+                return { matched: true };
+            }
             const msg = "¡Perfecto! Recibimos tu confirmación.\n\nAguardame un instante que verificamos los datos y te confirmamos el ingreso ⏳";
             await sendMessageWithDelay(userId, msg);
 
@@ -193,12 +215,9 @@ export async function handleWaitingFinalConfirmation(
                         _chg.plan || currentState.selectedPlan
                     );
                     if (resolved.newProduct !== currentState.selectedProduct || resolved.newPlan !== currentState.selectedPlan) {
-                        currentState.selectedProduct = resolved.newProduct;
-                        currentState.selectedPlan = resolved.newPlan;
-                        const priceStr = _getPrice(resolved.newProduct, resolved.newPlan);
-                        const basePrice = parseInt(priceStr.replace(/\./g, ''));
-                        currentState.cart = [{ product: resolved.newProduct, plan: resolved.newPlan, price: priceStr }];
-                        currentState.totalPrice = basePrice.toLocaleString('es-AR').replace(/,/g, '.');
+                        // Mismo criterio que el path determinístico de arriba:
+                        // cart/precio coherentes también para planes multi-unidad.
+                        buildCartFromSelection(resolved.newProduct, resolved.newPlan, currentState);
                         logger.info(`[FINAL_CONFIRM] AI detected product change for ${userId}: ${resolved.newProduct} plan ${resolved.newPlan} -> $${currentState.totalPrice}`);
                     }
                 }

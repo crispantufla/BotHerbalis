@@ -76,7 +76,11 @@ async function _handleProductPlanChange(
         currentState.selectedProduct = newProduct;
         currentState.selectedPlan = newPlan;
         currentState.pendingOrder = null;
-        currentState.partialAddress = {};
+        // Conservar partialAddress: un cambio de plan/producto NO invalida los
+        // datos de envío ya dados (nombre/ciudad/CP — o el marcador calle='A
+        // sucursal' del retiro, que si se pierde re-dispara el pedido de calle).
+        // Antes se borraba y el bot re-pedía todo, inconsistente con
+        // stepWaitingPlanChoice ("Ya tengo tus datos de envío de antes").
         currentState.addressAttempts = 0;
         currentState.fieldReaskCount = {};
         if (oldGoal) currentState.weightGoal = oldGoal;
@@ -995,6 +999,17 @@ export async function handleWaitingData(
 
     // 5. Image OCR
     const textToAnalyze = await _handleImageOCR(text, currentState, aiService);
+
+    // 5b. Ack corto puro ("si", "dale", "ok"): no aporta datos de dirección —
+    // cortocircuito ANTES del parseAddress para no gastar una llamada de IA por
+    // cada ack (y evitar que alucine campos sobre "si"). Solo si no vino OCR de
+    // imagen (textToAnalyze === text). Mismo destino que hoy tras un parse
+    // vacío: validar lo que ya hay / re-pedir lo que falta.
+    if (classification.isShortConfirmation && textToAnalyze === text && !/\d/.test(text)) {
+        const orderResult = await _validateAndAssembleOrder(userId, text, currentState, knowledge, dependencies, false);
+        if (orderResult) return orderResult;
+        return await _askMissingFields(userId, currentState, dependencies, false);
+    }
 
     // 6. Try to parse address if it looks like one
     let extractedData = null;

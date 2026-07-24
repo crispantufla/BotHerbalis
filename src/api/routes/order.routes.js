@@ -1,7 +1,4 @@
 const express = require('express');
-const fs = require('fs');
-const path = require('path');
-const { authMiddleware } = require('../../middleware/auth');
 const logger = require('../../utils/logger');
 const { z } = require('zod');
 const { _setStep } = require('../../flows/utils/flowHelpers');
@@ -30,6 +27,7 @@ const statusUpdateSchema = z.object({
 module.exports = (clientPool) => {
     const router = express.Router();
     const { withSeller, getInstanceId, isOwnerOrAdmin } = require('./routeHelpers');
+    const { requireAdmin } = require('../../middleware/jwtAuth');
 
     // Access io dynamically via the seller's sharedState
     const io = (req) => req.sellerInstance?.sharedState?.io || null;
@@ -49,7 +47,9 @@ module.exports = (clientPool) => {
     // Used by Logística filter to include "ghost" sellers (accounts deleted
     // but with preserved orders, e.g. denis post-hard-delete).
     // Excluimos namespaces "no-seller" (default + __legacy_import__).
-    router.get('/orders/sellers', ...withSeller(clientPool), async (req, res) => {
+    // Admin-only: lista instanceIds de TODOS los tenants (solo lo consume
+    // SalesView en vista admin) — un seller no tiene por qué verlos.
+    router.get('/orders/sellers', ...withSeller(clientPool), requireAdmin, async (req, res) => {
         try {
             const { prisma } = require('../../../db');
             const rows = await prisma.order.findMany({

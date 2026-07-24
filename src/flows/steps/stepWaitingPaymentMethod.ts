@@ -86,6 +86,26 @@ const SOFT_BAILOUT = /\b(gracias|voy a (ver|hacer|pensar|fijarme)|despu[eé]s te
 // caracteres de palabra y el borde fallaría (no matchearía el plural).
 const DISTRUST_PREPAY = /no me gust\w*\s+(las?\s+)?transferenci|no me gusta\s+transferir|no (quiero|me animo a)\s+transferir|\bno confi[oa]\b|\bdesconfi[oa]\b|\bno me f[ií][oa]\b|\bme da (miedo|cosa|desconfianza)\b|\btengo miedo\b|\bmala experiencia\b|no me gusta\s+pagar\s+(por\s+)?(adelantad|anticipad|antes|online)|\bmiedo a (la\s+)?estafa\b|\bque sea (una\s+)?estafa\b/i;
 
+// ── Negación dirigida a un medio de pago ─────────────────────────────────────
+// "no me gusta la transferencia" / "no quiero pagar con tarjeta": el keyword-match
+// pelado elegía la opción NEGADA y mandaba el alias/link — lo contrario de lo
+// pedido (DISTRUST_PREPAY no actúa dentro del submenú por su gate de
+// paymentSubChoiceAsked). Conservador a propósito, mismo criterio que
+// DISTRUST_PREPAY: el negador tiene que estar en la MISMA cláusula que el
+// keyword (sin puntuación en el medio), así "no hay problema, transferencia"
+// sigue eligiendo transferencia; y las muletillas benignas ("no hay problema",
+// "no pasa nada", "no importa") se descartan antes de evaluar. Al no elegir la
+// opción negada, el mensaje cae a la rama DISTRUST_PREPAY/IA que sabe manejar
+// la objeción. Sobre normalizedText (sin tildes).
+const BENIGN_NEGATION = /\bno\s+(?:hay|tengo)\s+(?:ning[uú]n\s+|ninguna\s+)?(?:problema|drama|tema|inconveniente)s?\b|\bno\s+pasa\s+nada\b|\bno\s+importa\b|\bno\s+te\s+preocupes\b/gi;
+function _negatesOption(normalizedText: string, optionKeywords: RegExp): boolean {
+    const cleaned = normalizedText.replace(BENIGN_NEGATION, ' ');
+    const kw = `(?:${optionKeywords.source})`;
+    const negBefore = new RegExp(`\\b(?:no|tampoco|nunca|ni)\\b[^.,;:!?¿¡]{0,30}?${kw}`, 'i');
+    const negAfter = new RegExp(`${kw}[^.,;:!?¿¡]{0,30}?\\b(?:no|tampoco|nunca|ni)\\b`, 'i');
+    return negBefore.test(cleaned) || negAfter.test(cleaned);
+}
+
 function _detectOptionNumber(text: string): '1' | '2' | null {
     const trimmed = text.trim();
     if (trimmed.length <= 25) {
@@ -263,6 +283,12 @@ export async function handleWaitingPaymentMethod(
 
     const optionNum = _detectOptionNumber(text);
 
+    // Negación dirigida a un medio de pago (ver _negatesOption arriba): la usan
+    // el submenú MP/Transferencia y el atajo de medio directo para NO elegir la
+    // opción que el cliente está rechazando.
+    const mpNegated = _negatesOption(normalizedText, MP_KEYWORDS);
+    const transferNegated = _negatesOption(normalizedText, TRANSFER_KEYWORDS);
+
     // ── Soft bailout / dilación (rev. 2026-05-30 reportes horacio) ─────────────
     // Cliente dice "gracias, voy a ver", "lo pienso", "me comunico", "ahora
     // averiguando", etc. SIN elegir opción de envío clara → no insistir, pausar.
@@ -335,8 +361,8 @@ export async function handleWaitingPaymentMethod(
             saveState(userId);
             // Caemos al path RETIRO normal sin return — el matchea por RETIRO_KEYWORDS abajo.
         } else {
-        const choseMp = (optionNum === '1') || MP_KEYWORDS.test(text);
-        const choseTransfer = (optionNum === '2') || TRANSFER_KEYWORDS.test(normalizedText);
+        const choseMp = (optionNum === '1') || (MP_KEYWORDS.test(text) && !mpNegated);
+        const choseTransfer = (optionNum === '2') || (TRANSFER_KEYWORDS.test(normalizedText) && !transferNegated);
 
         if (choseMp && !choseTransfer) {
             currentState.paymentMethod = 'mercadopago';
@@ -461,7 +487,9 @@ export async function handleWaitingPaymentMethod(
         // le damos el alias, pedimos los datos para asignar la sucursal y derivamos a
         // un asesor para coordinar y verificar la transferencia (no auto-confirmamos
         // porque el pago por transferencia requiere chequear el comprobante).
-        if (TRANSFER_KEYWORDS.test(normalizedText)) {
+        // "retiro, pero transferencia no" NO es el combo: es retiro estándar
+        // (efectivo al retirar) → cae al path normal de abajo.
+        if (TRANSFER_KEYWORDS.test(normalizedText) && !transferNegated) {
             currentState.shippingChoice = 'retiro';
             currentState.paymentMethod = 'transferencia';
             currentState.senaAmount = 0;
@@ -541,9 +569,11 @@ export async function handleWaitingPaymentMethod(
     // ── Atajo: cliente menciona medio de pago directo sin elegir envío ─────────
     // Asumimos DOMICILIO (es la única opción que admite estos medios). Si quería
     // retiro debería decirlo explícitamente; el modelo nuevo no usa anticipo.
-    if (!infoQuestion && (MP_KEYWORDS.test(text) || TRANSFER_KEYWORDS.test(normalizedText))) {
+    // Un medio NEGADO ("no quiero pagar con tarjeta") no cuenta como elección:
+    // cae al AI fallback, que sabe manejar la objeción.
+    if (!infoQuestion && ((MP_KEYWORDS.test(text) && !mpNegated) || (TRANSFER_KEYWORDS.test(normalizedText) && !transferNegated))) {
         currentState.shippingChoice = 'domicilio';
-        if (MP_KEYWORDS.test(text)) {
+        if (MP_KEYWORDS.test(text) && !mpNegated) {
             currentState.paymentMethod = 'mercadopago';
             currentState.senaAmount = null;
             currentState.senaPaid = false;

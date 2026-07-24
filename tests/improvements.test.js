@@ -111,19 +111,17 @@ describe('Strategic Improvements', () => {
         });
     });
 
-    test('1. Consultative Tagging: Should mark sales as consultative', async () => {
+    test('1. Consulta de indecisión: responde con la recomendación de la IA', async () => {
         // Setup state to waiting_preference
         userState[userId] = {
             step: 'waiting_preference',
-            history: [],
-            consultativeSale: false
+            history: []
         };
 
         // Trigger consultative logic (indecision)
+        // (el flag consultativeSale se eliminó — se seteaba y nadie lo leía)
         await processSalesFlow(userId, "Estoy entre gotas y semillas", userState, knowledge, mockDependencies);
 
-        // Verify consultativeSale flag is set to true
-        expect(userState[userId].consultativeSale).toBe(true);
         expect(mockDependencies.sendMessageWithDelay).toHaveBeenCalledWith(
             userId, "Te recomiendo gotas."
         );

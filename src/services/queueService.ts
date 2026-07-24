@@ -141,17 +141,3 @@ export async function shutdownRedis(): Promise<void> {
     workerConnections.clear();
     logger.info('[BULLMQ] All Redis connections closed.');
 }
-
-// --- BACKWARD COMPAT: Legacy singleton exports for existing code still using them ---
-const LEGACY_SELLER_ID = process.env.INSTANCE_ID || 'default';
-export const botQueue = createQueue(LEGACY_SELLER_ID);
-let _legacyWorker: Worker | null = null;
-export function initWorker(dependencies: any): Worker {
-    _legacyWorker = createWorker(LEGACY_SELLER_ID, dependencies);
-    return _legacyWorker;
-}
-export async function shutdownQueue(): Promise<void> {
-    if (_legacyWorker) { try { await _legacyWorker.close(); } catch (e: any) { /* ignore */ } }
-    await botQueue.close();
-    await shutdownRedis();
-}

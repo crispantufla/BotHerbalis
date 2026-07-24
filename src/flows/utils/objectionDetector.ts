@@ -16,8 +16,8 @@
  *
  * Escalation policy (per (userId, category) pair):
  *   1ra aparición  → rebuttal estándar
- *   2da aparición  → rebuttal "escalado" con OFERTA CONCRETA (postdatado con
- *                    precio congelado, reserva 48h, testimonios, etc.)
+ *   2da aparición  → rebuttal "escalado" con OFERTA CONCRETA (postdatado,
+ *                    reserva del pedido 48h, testimonios, etc.)
  *   3ra aparición  → mensaje de cierre suave + pausa + alert al admin
  *   4ta+           → null (AI toma el control)
  *
@@ -159,7 +159,7 @@ const REBUTTALS: Record<ObjectionMatch['type'], string[]> = {
     ],
     consultar: [
         '¡Dale, obvio! 😊 Mirá, podemos dejar el pedido reservado a tu nombre mientras lo charlás, y lo despacho cuando me des el OK. ¿Te parece que te lo aguarde así?',
-        'Totalmente entendible 🙌 Si querés, te dejo el pedido cargado con tus datos para que lo charles sin apuro y no pierdas el precio. ¿Te parece?',
+        'Totalmente entendible 🙌 Si querés, te dejo el pedido cargado con tus datos para que lo charles sin apuro, y cuando me confirmes lo despachamos. ¿Te parece?',
     ],
     miedo: [
         '¡Tranqui, te entiendo! 😊 Hace más de 13 años que distribuimos en todo el país, con más de 70 mil clientes satisfechos. El producto es 100% natural y lo único que podés notar los primeros días es un leve efecto laxante/diurético que se va tomando agua. ¿Qué duda puntual tenés?',
@@ -175,7 +175,7 @@ const REBUTTALS: Record<ObjectionMatch['type'], string[]> = {
     ],
     pensar: [
         '¡Obvio, pensalo tranqui! 😊 Si querés te dejo el pedido reservado con tu nombre, y lo despachamos cuando me des el visto bueno. ¿Te lo aguanto así?',
-        '¡Dale, sin apuro! 🙌 Te lo puedo dejar reservado a tu nombre para que no pierdas el precio de hoy. Vos lo pensás y cuando me decís, lo mandamos. ¿Te parece?',
+        '¡Dale, sin apuro! 🙌 Te lo puedo dejar reservado a tu nombre, sin compromiso. Vos lo pensás y cuando me decís, lo mandamos. ¿Te parece?',
     ],
 };
 
@@ -193,15 +193,17 @@ const DEFERRAL_REBUTTAL: string[] = [
 // Cuando la primera respuesta no funcionó, subimos la apuesta con una
 // propuesta puntual que el cliente puede aceptar o rechazar (no más
 // argumentos abstractos). Solo usa mecanismos que ya están en el código:
-// postdatado, reserva por 48h, captura de email para info, prueba social.
+// postdatado, reserva del pedido por 48h, captura de email para info, prueba
+// social. PROHIBIDO prometer congelar/reservar el PRECIO (nada lo honra) —
+// misma regla que DEFERRAL_REBUTTAL: se reserva el PEDIDO, no el precio.
 const ESCALATED_REBUTTALS: Record<ObjectionMatch['type'], string[]> = {
     caro: [
-        'Mirá, te propongo algo concreto: *te reservo el precio de hoy a tu nombre hasta el viernes* sin que tengas que adelantar nada. Si en esos días te organizás, lo confirmás. Si no, lo libero sin compromiso. ¿Te lo aguanto así? 😊',
-        'Te entiendo, y la verdad no quiero presionarte. Lo que sí puedo hacer es *fijarte el precio de hoy por 48hs* sin compromiso — vos lo evaluás tranqui y me decís. ¿Te parece?',
+        'Mirá, te propongo algo concreto: *te dejo el pedido reservado a tu nombre* sin que tengas que adelantar nada. Si en estos días te organizás, lo confirmás. Si no, lo libero sin compromiso. ¿Te lo aguanto así? 😊',
+        'Te entiendo, y la verdad no quiero presionarte. Lo que sí puedo hacer es *dejarte el pedido apartado 48hs a tu nombre* sin compromiso — vos lo evaluás tranqui y me decís. ¿Te parece?',
     ],
     consultar: [
         'Dale, te paso info concreta: *si me das tu mail* te mando un PDF con la composición, testimonios y los precios, así lo charlan con la info en la mano. ¿Me lo pasás?',
-        'Te entiendo. *Te dejo el pedido reservado por 48h a tu nombre*, lo charlás tranqui con quien tengas que charlar, y si en ese plazo me das el OK lo despachamos al precio de hoy. ¿Te parece?',
+        'Te entiendo. *Te dejo el pedido reservado por 48h a tu nombre*, lo charlás tranqui con quien tengas que charlar, y si en ese plazo me das el OK lo despachamos enseguida. ¿Te parece?',
     ],
     miedo: [
         'Te entiendo. *El pago con tarjeta de crédito tiene protección al comprador*: si el paquete no te llega, te devuelven el 100% del dinero. Es un pago protegido, no depende de nosotros. ¿Eso te da más tranquilidad?',
@@ -212,12 +214,12 @@ const ESCALATED_REBUTTALS: Record<ObjectionMatch['type'], string[]> = {
         'Dale, mirá: *te invito a buscar "Herbalis" en Google y en Instagram (@herbalis)* — vas a encontrar testimonios reales con foto. Si después de revisar no te convencen, no avanzamos. ¿Te parece justo?',
     ],
     postergar: [
-        'Mirá, te propongo concreto: *te reservo el precio de hoy y te lo agendo para la fecha que cobres*. Decime el día exacto (por ejemplo: 30/05 o "5 del mes que viene") y te lo despacho para que te llegue justo. ¿Te conviene así?',
+        'Mirá, te propongo concreto: *te lo agendo para la fecha que cobres*. Decime el día exacto (por ejemplo: 30/05 o "5 del mes que viene") y te lo despacho para que te llegue justo. ¿Te conviene así?',
         'Dale, *te lo programo postdatado* — me decís la fecha de cobro y el bot lo despacha justo para entonces. ¿Para qué día te conviene?',
     ],
     pensar: [
-        'Dale, *te reservo el pedido a tu nombre por 48 horas* con el precio de hoy. En ese plazo me decís si avanzamos, si no, lo libero sin compromiso. ¿Te parece?',
-        'Te entiendo. *Te lo dejo apartado 48hs*, vos te tomás el tiempo para decidirlo, y si me confirmás en ese plazo te lo despacho al precio de hoy. ¿Lo aguantamos así?',
+        'Dale, *te reservo el pedido a tu nombre por 48 horas*, sin que tengas que adelantar nada. En ese plazo me decís si avanzamos, si no, lo libero sin compromiso. ¿Te parece?',
+        'Te entiendo. *Te lo dejo apartado 48hs*, vos te tomás el tiempo para decidirlo, y si me confirmás en ese plazo te lo despacho enseguida. ¿Lo aguantamos así?',
     ],
 };
 

@@ -151,9 +151,9 @@ export default function ChatSidebarItem({ chat, isSelected, hasAlert, searchTerm
                             {chat.lastMessage?.body || 'Sin mensajes'}
                         </p>
                     )}
-                    {chat.unread > 0 && !isSelected && (
+                    {chat.unreadCount > 0 && !isSelected && (
                         <Badge tone="danger" size="sm" className="flex-shrink-0 !px-1.5 min-w-[1.25rem] justify-center">
-                            {chat.unread}
+                            {chat.unreadCount}
                         </Badge>
                     )}
                 </div>

@@ -58,8 +58,10 @@ export async function comparePassword(plain: string, hash: string): Promise<bool
  * Sets req.account = { id, role, sellerId, name } on success.
  */
 export function jwtAuthMiddleware(req: any, res: any, next: any) {
-    // Skip public routes
-    if (req.path === '/health') return next();
+    // Nota: el healthcheck público es el `/health` de server.js, montado ANTES
+    // de los routers con auth — nunca pasa por acá. El viejo skip de
+    // `req.path === '/health'` existía solo para un GET /api/health muerto
+    // (inalcanzable: el skip no seteaba req.account y sellerContext daba 401).
 
     // --- Try JWT first ---
     const authHeader = req.headers['authorization'];

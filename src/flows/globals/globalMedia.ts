@@ -76,7 +76,12 @@ export async function handleMediaGlobals(
             saveState(userId);
             // NO step redirect here — the AI will naturally re-ask if needed
         } else {
-            await sendMessageWithDelay(userId, 'Uh, justo no tengo fotos cargadas de ese producto en este momento. 😅');
+            // Loguear como cualquier otro mensaje enviado (invariante del dashboard:
+            // todo lo que sale queda en history) — antes se enviaba sin registrar.
+            const noPhotosMsg = 'Uh, justo no tengo fotos cargadas de ese producto en este momento. 😅';
+            currentState.history.push({ role: 'bot', content: noPhotosMsg, timestamp: Date.now() });
+            saveState(userId);
+            await sendMessageWithDelay(userId, noPhotosMsg);
         }
     } else {
         const msg = 'Tenemos fotos de Cápsulas, Semillas y Gotas. ¿De cuál te gustaría ver? 📸';

@@ -213,7 +213,6 @@ export async function handleWaitingPlanChoice(
     }
 
     if (planSelected) {
-        const closingNode = knowledge.flow.closing;
         const addr = currentState.partialAddress || {};
         const hasAddress = addr.nombre && addr.calle && addr.ciudad;
 
@@ -259,7 +258,6 @@ export async function handleWaitingPlanChoice(
             const product = currentState.selectedProduct || "Nuez de la India";
             buildCartFromSelection(product, '120', currentState);
 
-            const closingNode = knowledge.flow.closing;
             const addr = currentState.partialAddress || {};
             const hasAddress = addr.nombre && addr.calle && addr.ciudad;
 
@@ -322,9 +320,7 @@ RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.
                 _handleExtractedData(userId, extractedStr, currentState);
 
                 if (extractedStr.startsWith('POSTDATADO:') && currentState.selectedProduct) {
-                    const closingNode = knowledge.flow.closing;
-                    
-                    // The user might have specified the plan ALONG WITH the postdate 
+                    // The user might have specified the plan ALONG WITH the postdate
                     // (e.g., "espero al 27 y quiero el de 60")
                     let userChosePlan = extractedStr.match(/\b(60|120|180|240|300|360|420|480|540|600)\b/);
                     if (!userChosePlan) userChosePlan = normalizedText.match(/\b(60|120|180|240|300|360|420|480|540|600)\b/);
@@ -354,7 +350,6 @@ RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.
 
                     buildCartFromSelection(product, plan, currentState);
 
-                    const closingNode = knowledge.flow.closing;
                     const addr = currentState.partialAddress || {};
                     const hasAddress = addr.nombre && addr.calle && addr.ciudad;
 

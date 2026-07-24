@@ -156,16 +156,20 @@ const CorporateDashboard = () => {
             // Solo mantenemos la alerta más reciente por userPhone. Si entra una
             // nueva para un cliente que ya tenía alerta, la reemplazamos en lugar
             // de acumular (el backend ya hace la misma dedup sobre sessionAlerts).
-            socket.on('new_alert', (newAlert) => setAlerts(prev => [
+            const handleNewAlert = (newAlert) => setAlerts(prev => [
                 newAlert,
                 ...prev.filter(a => a.userPhone !== newAlert.userPhone),
-            ]));
-            socket.on('alerts_updated', (updated) => setAlerts(updated));
+            ]);
+            const handleAlertsUpdated = (updated) => setAlerts(updated);
+            socket.on('new_alert', handleNewAlert);
+            socket.on('alerts_updated', handleAlertsUpdated);
             return () => {
                 socket.off('qr', handleQr);
                 socket.off('ready', handleReady);
                 socket.off('status_change', handleStatusChange);
                 socket.off('global_pause_changed', handleGlobalPauseChanged);
+                socket.off('new_alert', handleNewAlert);
+                socket.off('alerts_updated', handleAlertsUpdated);
             };
         }
     }, [socket, fetchConfig, viewedSellerId]);
@@ -236,18 +240,21 @@ const CorporateDashboard = () => {
 
         try {
             if (action === 'confirmar') {
-                await api.post('/api/orders/manual-complete', { chatId });
+                // SIEMPRE preview → modal de verificación (mismo patrón que
+                // CommsView.handleManualCompletion). El post directo sin preview
+                // creaba la orden + mandaba WhatsApp salteando el modal, y una
+                // transferencia aprobada por alerta quedaba "Sin verificar".
+                // El prefill del backend trae prices/total/productDetected para
+                // que el modal muestre el total real. La orden se crea (y la
+                // alerta se descarta) recién al confirmar el modal.
+                const res = await api.post('/api/orders/manual-complete', { chatId, preview: true });
+                setManualEntry({ chatId, prefill: res.data?.prefill || {} });
             } else {
                 await api.post('/api/admin-command', { chatId, command: action });
+                setAlerts(prev => prev.filter(a => a.userPhone !== chatId));
+                toast.success(`Acción ejecutada: ${action}`);
             }
-            setAlerts(prev => prev.filter(a => a.userPhone !== chatId));
-            toast.success(`Acción ejecutada: ${action}`);
         } catch (e) {
-            // Si confirmar y backend no extrajo datos: abrimos el modal manual
-            if (action === 'confirmar' && e.response?.status === 422 && e.response?.data?.needsManualEntry) {
-                setManualEntry({ chatId, prefill: e.response.data.extracted || {} });
-                return;
-            }
             toast.error('Error ejecutando acción: ' + (e.response?.data?.error || e.message));
         } finally {
             setProcessingAction(null);

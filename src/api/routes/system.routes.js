@@ -4,7 +4,6 @@ const fs = require('fs');
 const path = require('path');
 const validate = require('../../middleware/validate');
 const { pricesSchema, scriptSwitchSchema, pairingCodeSchema } = require('../../schemas/system.schema');
-const { aiService } = require('../../../src/services/ai');
 
 module.exports = (clientPool) => {
     const router = express.Router();
@@ -35,26 +34,6 @@ module.exports = (clientPool) => {
         if (sellerId) socket.to(sellerId).emit(event, payload);
         socket.to('admin').emit(event, sellerId ? { ...payload, sellerId } : payload);
     };
-
-    // GET /health — Real system health check
-    router.get('/health', ...withSeller(clientPool), (req, res) => {
-        const { ss, userState, pausedUsers, sessionAlerts } = getCtx(req);
-        const memUsage = process.memoryUsage();
-        res.json({
-            status: ss?.isConnected ? 'ok' : 'degraded',
-            whatsapp: ss?.isConnected ? 'connected' : 'disconnected',
-            uptime: Math.round(process.uptime()),
-            activeUsers: Object.keys(userState).length,
-            pausedUsers: pausedUsers ? pausedUsers.size : 0,
-            pendingAlerts: sessionAlerts.length,
-            memory: {
-                heapUsedMB: Math.round(memUsage.heapUsed / 1024 / 1024),
-                rssMB: Math.round(memUsage.rss / 1024 / 1024)
-            },
-            ai: aiService.getStats(),
-            timestamp: new Date().toISOString()
-        });
-    });
 
     // GET /status
     //
@@ -108,37 +87,6 @@ module.exports = (clientPool) => {
             instanceId: sellerId,
             config
         });
-    });
-
-    // GET /scan - QR Page (requires auth)
-    router.get('/scan', ...withSeller(clientPool), (req, res) => {
-        const { ss } = getCtx(req);
-        const qrData = ss?.qrCodeData;
-        if (!qrData) return res.send('<h1>No QR Code active</h1><p>Bot is either connected or initializing. Check logs.</p>');
-
-        // Sanitize qrData using JSON.stringify for safe JavaScript embedding
-        const safeQrData = JSON.stringify(qrData);
-
-        const html = `
-            <html>
-                <head><title>Scan QR</title></head>
-                <body style="display:flex;justify-content:center;align-items:center;height:100vh;flex-direction:column;font-family:sans-serif;">
-                    <h1>Escaneá este código QR</h1>
-                    <div id="qrcode"></div>
-                    <p style="margin-top:20px;color:gray;">Actualiza la página si expira.</p>
-                    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-                    <script>
-                        new QRCode(document.getElementById("qrcode"), {
-                            text: ${safeQrData},
-                            width: 300,
-                            height: 300
-                        });
-                        setTimeout(() => location.reload(), 15000);
-                    </script>
-                </body>
-            </html>
-        `;
-        res.send(html);
     });
 
     // GET /alerts
@@ -464,7 +412,7 @@ module.exports = (clientPool) => {
     // POST /global-pause-all - Pausa/reactiva TODOS los sellers a la vez.
     // Permitido a: (a) admin global (sellerId=null), (b) Horacio (dueño
     // del proyecto — tenant admin con sellerId='horacio'). Body: { pause: true|false }.
-    router.post('/global-pause-all', requireAdmin, (req, res) => {
+    router.post('/global-pause-all', ...withSeller(clientPool), requireAdmin, (req, res) => {
         try {
             const accSellerId = (req.account?.sellerId || '').toLowerCase();
             const accName = (req.account?.name || '').toLowerCase();

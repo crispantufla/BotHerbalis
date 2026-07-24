@@ -1,4 +1,4 @@
-import React, { useState, useCallback, createContext, useContext } from 'react';
+import React, { useState, useCallback, useMemo, createContext, useContext } from 'react';
 import { createPortal } from 'react-dom';
 
 const ToastContext = createContext();
@@ -49,13 +49,15 @@ export const ToastProvider = ({ children }) => {
         setToasts(prev => prev.filter(t => t.id !== id));
     }, []);
 
-    const toast = {
+    // Memoizado: si `toast` se recrea en cada render, todo useCallback que lo
+    // tenga como dep se recrea y sus effects se re-disparan (loops de refetch).
+    const toast = useMemo(() => ({
         success: (msg, dur) => addToast(msg, 'success', dur),
         error: (msg, dur) => addToast(msg, 'error', dur),
         warning: (msg, dur) => addToast(msg, 'warning', dur),
         info: (msg, dur) => addToast(msg, 'info', dur),
         dismiss: (id) => removeToast(id),
-    };
+    }), [addToast, removeToast]);
 
     /**
      * Confirm dialog replacement for window.confirm().
@@ -131,8 +133,10 @@ export const ToastProvider = ({ children }) => {
         </div>
     );
 
+    const contextValue = useMemo(() => ({ toast, confirm }), [toast, confirm]);
+
     return (
-        <ToastContext.Provider value={{ toast, confirm }}>
+        <ToastContext.Provider value={contextValue}>
             {children}
             {typeof document !== 'undefined' ? createPortal(toastContainer, document.body) : null}
         </ToastContext.Provider>

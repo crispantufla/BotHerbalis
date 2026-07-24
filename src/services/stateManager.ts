@@ -41,7 +41,9 @@ export interface SellerStateManager {
     saveState: (changedUserId?: string | null) => void;
     flushState: () => Promise<void>;
     saveKnowledge: (scriptName?: string | null) => void;
-    loadKnowledge: (scriptName?: string | null) => void;
+    // Async de verdad (lee de disco): los callers deben awaitearla para no
+    // arrancar con knowledge vacío (ventana al boot / cambio de script).
+    loadKnowledge: (scriptName?: string | null) => Promise<void>;
     loadState: () => Promise<void>;
 }
 
@@ -169,7 +171,11 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
                 ? usersToProcess.map(id => [id, userState[id]]).filter(([, v]) => v)
                 : Object.entries(userState);
 
-            const userPromises = usersToSave.map(([phone, data]) => {
+            // Chunked: el save global (sin changedUserId) puede juntar hasta 5000
+            // users — un solo Promise.all con todos los upserts saturaba el pool
+            // de Prisma. Chunks en serie, upserts del chunk en paralelo.
+            const CHUNK_SIZE = 25;
+            const upsertUser = ([phone, data]: [string, any]) => {
                 const cleanPhone = (phone as string).replace('@c.us', '');
                 const lastSeenDate = (data as any)?.lastActivityAt ? new Date((data as any).lastActivityAt) : new Date();
                 return prisma.user.upsert({
@@ -177,17 +183,21 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
                     update: { profileData: JSON.stringify(data), lastSeen: lastSeenDate },
                     create: { phone: cleanPhone, instanceId: sellerId, profileData: JSON.stringify(data), lastSeen: lastSeenDate }
                 });
-            });
+            };
+            for (let i = 0; i < usersToSave.length; i += CHUNK_SIZE) {
+                await Promise.all(usersToSave.slice(i, i + CHUNK_SIZE).map(upsertUser));
+            }
 
-            const configPromises = Object.entries(config).map(([key, value]) =>
-                prisma.botConfig.upsert({
-                    where: { instanceId_key: { instanceId: sellerId, key } },
-                    update: { value: JSON.stringify(value) },
-                    create: { instanceId: sellerId, key, value: JSON.stringify(value) }
-                })
-            );
-
-            await Promise.all([...userPromises, ...configPromises]);
+            const configEntries = Object.entries(config);
+            for (let i = 0; i < configEntries.length; i += CHUNK_SIZE) {
+                await Promise.all(configEntries.slice(i, i + CHUNK_SIZE).map(([key, value]) =>
+                    prisma.botConfig.upsert({
+                        where: { instanceId_key: { instanceId: sellerId, key } },
+                        update: { value: JSON.stringify(value) },
+                        create: { instanceId: sellerId, key, value: JSON.stringify(value) }
+                    })
+                ));
+            }
         } catch (e: any) {
             logger.error(`[STATE][${sellerId}] Error saving state:`, e.message);
         }
@@ -220,6 +230,12 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
                 if (fs.existsSync(stateFile)) {
                     const data = JSON.parse(await fs.promises.readFile(stateFile, 'utf-8'));
                     Object.assign(config, data.config || {});
+                    // Restaurar también el estado transitorio (igual que el path
+                    // normal de abajo): sin esto, tras un outage de Postgres al
+                    // boot el bot les respondía a clientes pausados para
+                    // intervención manual.
+                    (data.pausedUsers || []).forEach((id: string) => pausedUsers.add(id));
+                    Object.assign(chatResets, data.chatResets || {});
                 }
                 return;
             }
