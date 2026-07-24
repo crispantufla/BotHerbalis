@@ -77,14 +77,17 @@ export async function handleWaitingMpPayment(
             // el cliente reintenta el link y la cobranza del saldo legacy se coordina
             // por admin via _pauseAndAlert (no por el bot).
             const tpl = getFlowTemplate('payment_mp_retry', knowledge);
-            const msg = tpl
+            let msg = tpl
                 ? _formatMessage(tpl, currentState)
                 : '⚠️ Hubo un problema con el pago — probá de nuevo con tu tarjeta de crédito, o decime si preferís transferencia o retiro en sucursal.';
-            // Mantenemos senaAmount si era flujo seña — para regenerar link por $10k.
-            currentState.mpPaymentLinkId = null;
-            currentState.mpPaymentLinkUrl = null;
-            // Seguimos en WAITING_MP_PAYMENT — el próximo mensaje del cliente
-            // generará un link nuevo automáticamente (entry sin link).
+            // El link se CONSERVA (no nullear + regenerar): la preferencia MP sigue
+            // vigente tras un rechazo y el reintento va por el mismo checkout. Si acá
+            // regeneráramos, el cliente suele pagar en la pestaña vieja → el pago
+            // acredita sobre un link que el estado ya no espera y el push lo descarta
+            // por mismatch ("link no vigente") en vez de confirmar la compra.
+            if (currentState.mpPaymentLinkUrl) {
+                msg += `\n\n👉 ${currentState.mpPaymentLinkUrl}`;
+            }
             currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
             saveState(userId);
             await sendMessageWithDelay(userId, msg);

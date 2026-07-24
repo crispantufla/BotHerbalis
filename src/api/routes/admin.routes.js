@@ -233,20 +233,21 @@ module.exports = (clientPool) => {
 
         try {
             // apiToken: JWT del seller para los botones del panel. 365d — si expira,
-            // el panel deja de operar. Se firma con los datos reales del account.
-            // SOLO cuentas role='seller' activas: sin este filtro, si coexisten
-            // una cuenta seller y una admin con el mismo sellerId, la PC del
-            // vendedor podía recibir un token de admin (escalación), o resucitar
-            // una cuenta desactivada (jwtAuth no re-verifica isActive).
+            // el panel deja de operar. El role del token se fuerza a 'seller' SIEMPRE:
+            // sellerId es @unique, así que la única cuenta del seller puede ser admin
+            // (caso horacio, mono-seller) — sin este downgrade la PC del vendedor
+            // recibía un token de admin (escalación). El panel solo usa endpoints de
+            // nivel seller, así que no pierde nada. isActive filtrado acá porque
+            // jwtAuth no re-verifica contra DB.
             const acc = await prisma.account.findFirst({
-                where: { sellerId, role: 'seller', isActive: true },
-                select: { id: true, role: true, sellerId: true, name: true },
+                where: { sellerId, isActive: true },
+                select: { id: true, sellerId: true, name: true },
             });
             if (!acc) {
-                return res.status(404).json({ error: `No hay cuenta de vendedor (role=seller) activa para "${sellerId}". El instalador solo firma tokens de seller — creá/activá esa cuenta primero.` });
+                return res.status(404).json({ error: `No hay cuenta activa para "${sellerId}". Creá/activá esa cuenta primero.` });
             }
             const apiToken = jwt.sign(
-                { accountId: acc.id, role: acc.role, sellerId: acc.sellerId, name: acc.name },
+                { accountId: acc.id, role: 'seller', sellerId: acc.sellerId, name: acc.name },
                 secret, { expiresIn: '365d' },
             );
 

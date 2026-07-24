@@ -875,6 +875,25 @@ describe('_verifyPayment — fallback directo a MP (fix caso Rosa 5492994553847)
         expect(sent).toMatch(/no veo el pago/i);
     });
 
+    test('[8.5] "listo" con pago rejected → CONSERVA el mismo link y lo re-manda (no regenera)', async () => {
+        // Fix 24-jul: al rechazarse un pago, la preferencia MP sigue vigente y el
+        // reintento va por el mismo checkout. Antes se nulleaba el link y se
+        // regeneraba otro → el cliente pagaba en la pestaña vieja y el push
+        // descartaba el pago por mismatch ("link no vigente").
+        mockPaymentLinkFindUnique.mockResolvedValueOnce({ id: 'pl-1', status: 'pending', externalRef: 'ref-r' });
+        mockPaymentSearch.mockResolvedValueOnce({ results: [{ status: 'rejected' }] });
+        mockPreferenceCreate.mockClear();
+        const state = makeMpState({ mpPaymentLinkId: 'pl-1', mpPaymentLinkUrl: 'https://mp.com/x' });
+        await handleWaitingMpPayment('rej1', 'listo', 'listo', state, knowledge, deps);
+
+        expect(state.step).toBe('waiting_mp_payment');
+        expect(state.mpPaymentLinkId).toBe('pl-1');
+        expect(state.mpPaymentLinkUrl).toBe('https://mp.com/x');
+        expect(mockPreferenceCreate).not.toHaveBeenCalled();
+        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
+        expect(sent).toMatch(/https:\/\/mp\.com\/x/);
+    });
+
     test('[8.3] Dirección PARCIAL + pago approved → confirma el pago y pide lo que falta (nunca "avisame cuando completes el pago")', async () => {
         // El cliente pagó y mandó nombre+calle sin ciudad. Antes el guard
         // `&& hasAddress` descartaba el approved: el bot le decía "avisame
