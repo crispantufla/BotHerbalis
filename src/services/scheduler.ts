@@ -615,14 +615,31 @@ async function checkAiBudget(dependencies: SchedulerDependencies): Promise<void>
 // CRON SCHEDULER — All times in Argentina (UTC-3)
 // ══════════════════════════════════════════════════════════════
 
-function startScheduler(sharedState: SchedulerSharedState, dependencies: SchedulerDependencies): void {
+/**
+ * Handle que devuelve startScheduler para poder frenar los crons per-seller.
+ * Sin esto, cada restartSeller (watchdog ante Chrome zombie, etc.) registraba
+ * OTRO juego completo de crons que seguía operando sobre el sharedState VIEJO:
+ * recordatorios de MP duplicados, auto-approve sobre snapshots desactualizados,
+ * y el stateManager viejo pisando estado fresco en Postgres.
+ */
+export interface SchedulerHandle {
+    stop: () => void;
+}
+
+function startScheduler(sharedState: SchedulerSharedState, dependencies: SchedulerDependencies): SchedulerHandle {
     logger.info(`[SCHEDULER] ⏰ Iniciando cron jobs (timezone: ${TIMEZONE})`);
+
+    // Los crons de ESTE seller se acumulan acá para que stopSeller pueda
+    // frenarlos. Los jobs globales (guard __xxxRegistered) NO entran: son del
+    // proceso, no del seller, y deben sobrevivir a los restarts per-seller.
+    const tasks: ReturnType<typeof cron.schedule>[] = [];
+    const bootTimers: ReturnType<typeof setTimeout>[] = [];
 
     // ── AUTO-APPROVE: cada 3 minutos de 9am a 11pm Argentina ──
     // Los pedidos no pueden esperar mucho — necesitamos checkear frecuente en horario activo.
-    cron.schedule('*/3 9-23 * * *', () => {
+    tasks.push(cron.schedule('*/3 9-23 * * *', () => {
         autoApproveOrders(sharedState, dependencies);
-    }, { timezone: TIMEZONE });
+    }, { timezone: TIMEZONE }));
     logger.info('[SCHEDULER] ✅ autoApproveOrders → cada 3 min (9-23h ARG)');
 
     // ── COLD LEADS (≥24h) y SECOND FOLLOW-UP (48-72h): DESACTIVADOS jun-2026 ──
@@ -632,46 +649,46 @@ function startScheduler(sharedState: SchedulerSharedState, dependencies: Schedul
     // ── ABANDONED CARTS: al inicio de cada hora, solo de 10 a 21hs Argentina ──
     // Único nudge de recuperación, SIEMPRE dentro de la ventana de 24h (4-22h sin
     // respuesta del cliente) y con throttle anti-ráfaga (tope por corrida + jitter).
-    cron.schedule('0 10-21 * * *', () => {
+    tasks.push(cron.schedule('0 10-21 * * *', () => {
         checkAbandonedCarts(sharedState, dependencies);
-    }, { timezone: TIMEZONE });
+    }, { timezone: TIMEZONE }));
     logger.info('[SCHEDULER] ✅ checkAbandonedCarts → cada hora de 10 a 21 ARG (solo dentro de 24h)');
 
     // ── RESCUE METRICS ROLLUP: a las 23:50 Argentina ──
     // Aggrega followUpData pendiente en config.rescueStats para métricas durables.
     // Corre justo antes del snapshot diario para que los números del día queden persistidos.
-    cron.schedule('50 23 * * *', () => {
+    tasks.push(cron.schedule('50 23 * * *', () => {
         rollupRescueMetrics(sharedState, dependencies);
-    }, { timezone: TIMEZONE });
+    }, { timezone: TIMEZONE }));
     logger.info('[SCHEDULER] ✅ rollupRescueMetrics → 23:50 ARG (diario)');
 
     // ── DAILY STATS SNAPSHOT: a las 23:55 Argentina ──
     // Guarda el total de chats en BD antes de perderlos por rotación.
-    cron.schedule('55 23 * * *', () => {
+    tasks.push(cron.schedule('55 23 * * *', () => {
         snapshotDailyStats(sharedState);
-    }, { timezone: TIMEZONE });
+    }, { timezone: TIMEZONE }));
     logger.info('[SCHEDULER] ✅ snapshotDailyStats → 23:55 ARG (diario)');
 
     // ── CLEANUP: a las 4am Argentina ──
     // Limpieza de memoria nocturna. Borra usuarios inactivos >30 días.
-    cron.schedule('0 4 * * *', () => {
+    tasks.push(cron.schedule('0 4 * * *', () => {
         cleanupOldUsers(sharedState, dependencies);
-    }, { timezone: TIMEZONE });
+    }, { timezone: TIMEZONE }));
     logger.info('[SCHEDULER] ✅ cleanupOldUsers → 04:00 ARG (diario)');
 
     // ── STALE PAUSE CLEANUP: a las 5am Argentina ──
     // Limpia pausas viejas (>7 días inactivos) para evitar acumulación infinita.
-    cron.schedule('0 5 * * *', () => {
+    tasks.push(cron.schedule('0 5 * * *', () => {
         cleanStalePausedUsers(sharedState, dependencies);
-    }, { timezone: TIMEZONE });
+    }, { timezone: TIMEZONE }));
     logger.info('[SCHEDULER] ✅ cleanStalePausedUsers → 05:00 ARG (diario)');
 
     // ── MP PAYMENT REFRESH: cada 5 minutos de 9-23h Argentina ──
     // Polls MercadoPago for pending payments and updates status automatically.
     if (process.env.MP_ACCESS_TOKEN) {
-        cron.schedule('*/5 9-23 * * *', () => {
+        tasks.push(cron.schedule('*/5 9-23 * * *', () => {
             refreshPendingPayments(sharedState, dependencies);
-        }, { timezone: TIMEZONE });
+        }, { timezone: TIMEZONE }));
         logger.info('[SCHEDULER] ✅ refreshPendingPayments → cada 5 min (9-23h ARG)');
     }
 
@@ -679,9 +696,9 @@ function startScheduler(sharedState: SchedulerSharedState, dependencies: Schedul
     // Mensajea al cliente si lleva 30min en waiting_mp_payment sin pagar (recordatorio
     // amable), o 4h (escalada al vendedor). Distinto de refreshPendingPayments —
     // ese solo actualiza estado en DB; este sí mensajea al cliente.
-    cron.schedule('*/10 10-21 * * *', () => {
+    tasks.push(cron.schedule('*/10 10-21 * * *', () => {
         checkPendingMpPayments(sharedState, dependencies);
-    }, { timezone: TIMEZONE });
+    }, { timezone: TIMEZONE }));
     logger.info('[SCHEDULER] ✅ checkPendingMpPayments → cada 10 min (10-21h ARG)');
 
     // ── DB CLEANUP: 1° de cada mes a las 3am Argentina ──
@@ -760,19 +777,31 @@ function startScheduler(sharedState: SchedulerSharedState, dependencies: Schedul
 
     // ── Run auto-approve once 10s after boot — only during business hours (9-23h ARG) ──
     // This prevents a spurious run at 4am on restart from double-firing with the 9am cron tick.
-    setTimeout(() => {
+    bootTimers.push(setTimeout(() => {
         const argHour = parseInt(new Date().toLocaleString('en-US', { timeZone: TIMEZONE, hour: 'numeric', hour12: false }), 10);
         if (argHour >= 9 && argHour < 23) {
             autoApproveOrders(sharedState, dependencies);
         } else {
             logger.info(`[SCHEDULER] Skipping boot-time autoApproveOrders (hour ${argHour} ARG, outside 9-23h)`);
         }
-    }, 10000);
+    }, 10000));
 
     // ── Run stale pause cleanup once 15s after boot ──
-    setTimeout(() => {
+    bootTimers.push(setTimeout(() => {
         cleanStalePausedUsers(sharedState, dependencies);
-    }, 15000);
+    }, 15000));
+
+    return {
+        stop() {
+            for (const t of tasks) {
+                // node-cron v4: stop() puede devolver Promise — tragar el reject
+                // para no tirar unhandled rejection en pleno teardown.
+                try { void Promise.resolve(t.stop()).catch(() => {}); } catch { /* ya frenado — fine */ }
+            }
+            for (const t of bootTimers) clearTimeout(t);
+            logger.info(`[SCHEDULER][${sharedState.sellerId || '?'}] ⏹️ ${tasks.length} cron job(s) per-seller detenidos`);
+        }
+    };
 }
 
 /**

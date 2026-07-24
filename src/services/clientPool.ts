@@ -97,6 +97,7 @@ export interface SellerInstance {
     pendingMessages: Map<string, any>;
     helpers: any;
     schedulerStarted: boolean;
+    schedulerHandle: { stop: () => void } | null;  // handle de startScheduler — stopSeller frena los crons per-seller para que un restart no acumule schedulers zombie sobre sharedState viejo
     reconnectAttempts: number;
     qrTimer: ReturnType<typeof setTimeout> | null;
     botSentMessageIds: Set<string>;  // IDs of messages sent via client.sendMessage — used to distinguish bot vs manual admin in 'message_create'
@@ -440,7 +441,7 @@ class ClientPool {
         const instance: SellerInstance = {
             sellerId, client, sharedState, stateManager,
             queue, worker, pendingMessages, helpers,
-            schedulerStarted: false, reconnectAttempts: 0,
+            schedulerStarted: false, schedulerHandle: null, reconnectAttempts: 0,
             qrTimer: null,
             botSentMessageIds,
             stop: async () => this.stopSeller(sellerId)
@@ -512,7 +513,7 @@ class ClientPool {
             }).catch(() => {});
 
             if (!instance.schedulerStarted) {
-                startScheduler(sharedState, {
+                instance.schedulerHandle = startScheduler(sharedState, {
                     notifyAdmin: helpers.notifyAdmin,
                     sendMessageWithDelay: helpers.sendMessageWithDelay,
                     saveState: stateManager.saveState.bind(stateManager),
@@ -667,6 +668,10 @@ class ClientPool {
             try { client.removeAllListeners(); } catch (e) { /* ignore */ }
             try { await Promise.race([client.destroy(), new Promise(r => setTimeout(r, 5000))]); } catch (e) { /* ignore */ }
             try { await shutdownSellerQueue(queue, worker, sellerId); } catch (e) { /* ignore */ }
+            // Si el seller llegó a estar 'ready' antes de morir, frenar sus crons
+            // — mismo motivo que en stopSeller (schedulers zombie tras recovery).
+            try { instance.schedulerHandle?.stop(); } catch (e) { /* ignore */ }
+            instance.schedulerHandle = null;
             pool.instances.delete(sellerId);
             // Schedule recovery — don't let seller stay dead forever
             if (pool.knownSellers.has(sellerId)) {
@@ -703,6 +708,11 @@ class ClientPool {
 
         logger.info(`[POOL] Stopping seller: ${sellerId}`);
         if (instance.qrTimer) { clearTimeout(instance.qrTimer); instance.qrTimer = null; }
+        // Frenar los crons ANTES del flush: un job que dispare a mitad del
+        // teardown mutaría estado que ya no se va a persistir (o pisaría el
+        // estado fresco de la instancia nueva tras un restartSeller).
+        try { instance.schedulerHandle?.stop(); } catch (e) { /* ignore */ }
+        instance.schedulerHandle = null;
         try { await instance.stateManager.flushState(); } catch (e) { /* ignore */ }
         // Remove all listeners before destroy to prevent stale reconnect handlers from firing
         try { instance.client.removeAllListeners(); } catch (e) { /* ignore */ }
