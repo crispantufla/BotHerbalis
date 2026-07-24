@@ -12,6 +12,12 @@
  */
 'use strict';
 
+// Silencia el warning DEP0040 ("punycode module is deprecated") que Node imprime
+// al arrancar por una dependencia transitiva (whatsapp-web.js/ws). Es puramente
+// cosmético — no afecta el funcionamiento — pero en la consola del vendedor se ve
+// como un error y asusta. Va ANTES de los require para atraparlo siempre.
+process.noDeprecation = true;
+
 const fs = require('fs');
 const path = require('path');
 const WebSocket = require('ws');
