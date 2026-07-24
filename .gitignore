@@ -107,3 +107,9 @@ test_yamilezequiel/
 test_correoAPI/
 test_gmuro/
 bot/
+
+# Datos de clientes / artefactos de sesiones de analisis (nunca commitear)
+ventas-horacio*.txt
+conversaciones-*.txt
+agent/cdp-eval.js
+docs/_render-*.js
