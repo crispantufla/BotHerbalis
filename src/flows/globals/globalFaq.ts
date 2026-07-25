@@ -2,6 +2,7 @@ import { UserState } from '../../types/state';
 import { _isInfoQuestion, _startsAffirmative } from '../utils/flowHelpers';
 import { PAID_KEYWORDS as MP_PAID_KEYWORDS } from '../steps/stepWaitingMpPayment';
 import { PAID_KEYWORDS as TRANSFER_PAID_KEYWORDS } from '../steps/stepWaitingTransferConfirmation';
+import { isMpEnabled } from '../utils/paymentOptions';
 import logger from '../../utils/logger';
 
 // Claims de pago que los PAID_KEYWORDS de los steps no cubren pero que también
@@ -146,11 +147,29 @@ export async function handleFaq(
     const mapsPassthrough = currentState.step === 'waiting_maps_confirmation'
         && (_startsAffirmative(trimmed) || /^no\b/.test(norm) || /\b\d{4}\b/.test(trimmed));
 
+    // ── Interruptor de MP apagado ────────────────────────────────────────────
+    // Las FAQ son canned: sin esto, "¿cómo pago?" seguiría ofreciendo el link de
+    // tarjeta con la cuenta bloqueada. Si el guion trae la variante sin tarjeta
+    // (`responseNoMp`), esa gana. Si NO la trae —el seller pudo editar la FAQ
+    // desde el panel Guiones y su copia no tiene el campo— y la respuesta nombra
+    // la tarjeta, salimos sin responder: prefiero que conteste la IA (que ya
+    // tiene la política vigente en el prompt) a mandar un medio que no podemos
+    // cobrar.
+    let faqResponse: string = bestEntry.response;
+    if (!isMpEnabled(dependencies.config)) {
+        if (bestEntry.responseNoMp) {
+            faqResponse = bestEntry.responseNoMp;
+        } else if (/tarjeta|mercado\s?pago|link de pago/i.test(bestEntry.response)) {
+            logger.info(`[FAQ] Skip FAQ — nombra la tarjeta y el pago con tarjeta está apagado; que la responda la IA (${userId})`);
+            return null;
+        }
+    }
+
     const passthrough = dataBlockPassthrough || mapsPassthrough;
-    logger.info(`[FAQ] ${userId} matched (keyword len=${bestLen}) → "${bestEntry.response.substring(0, 60)}..."${passthrough ? ` [passthrough: señal operativa en ${currentState.step}]` : ''}`);
-    currentState.history.push({ role: 'bot', content: bestEntry.response, timestamp: Date.now() });
+    logger.info(`[FAQ] ${userId} matched (keyword len=${bestLen}) → "${faqResponse.substring(0, 60)}..."${passthrough ? ` [passthrough: señal operativa en ${currentState.step}]` : ''}`);
+    currentState.history.push({ role: 'bot', content: faqResponse, timestamp: Date.now() });
     saveState(userId);
-    await sendMessageWithDelay(userId, bestEntry.response);
+    await sendMessageWithDelay(userId, faqResponse);
     if (passthrough) return null; // el step procesa el MISMO texto (la señal viene adentro)
     return { matched: true };
 }

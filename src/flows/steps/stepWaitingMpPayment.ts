@@ -3,6 +3,7 @@ import { _setStep, _pauseAndAlert, _cleanPhone } from '../utils/flowHelpers';
 import { calculateTotal } from '../utils/cartHelpers';
 import { getFlowTemplate } from '../../utils/messageTemplates';
 import { _formatMessage } from '../utils/messages';
+import { isMpEnabled } from '../utils/paymentOptions';
 import { randomUUID } from 'crypto';
 import logger from '../../utils/logger';
 
@@ -38,12 +39,38 @@ export async function handleWaitingMpPayment(
 ): Promise<{ matched: boolean }> {
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
 
+    // Interruptor de Mercado Pago (jul-2026, cuenta bloqueada). Apagado: no se
+    // generan links nuevos ni se reenvían los viejos. Los pagos YA hechos se
+    // siguen verificando normal (el branch de "listo" de abajo no se toca): si
+    // alguien pagó justo antes del bloqueo, su venta se cierra igual.
+    const mpOn = isMpEnabled(dependencies.config);
+
     // ── ENTRY: Sin link todavía — generar y mandar directo ────────────────────
     // Rev. 2026-05-27: ya no pedimos email antes del link (era fricción innecesaria).
     // El email se sigue capturando silenciosamente si el cliente lo deja caer en el
     // mensaje de datos de envío (ver stepWaitingData._DATA_EMAIL_RE). Sin email
     // MP igual genera el link — payer.email es opcional en la API de preferences.
     if (!currentState.mpPaymentLinkUrl) {
+        // Con el interruptor apagado el cliente llegó acá por un estado viejo o
+        // por un atajo que quedó en el camino: lo pasamos a transferencia con el
+        // alias. Si prefiere efectivo, waiting_transfer_confirmation lo reencauza
+        // a retiro en sucursal con sus keywords de siempre.
+        if (!mpOn) {
+            currentState.paymentMethod = 'transferencia';
+            currentState.mpPaymentLinkId = null;
+            (currentState as any).mpReminderStage = 99;
+            const transferTpl = getFlowTemplate('payment_transfer_alias', knowledge) ||
+                `¡Perfecto! Para transferir usá el alias *{{ALIAS}}* a nombre de *{{TITULAR}}* 🏦\n\nMonto: ${'$'}{{TOTAL}}\n\nUna vez que realices la transferencia, escribime *"listo"* y coordinamos el envío 😊`;
+            const msg = '¡Uy, justo el pago con tarjeta lo tenemos fuera de servicio en estos días! 🙈 Disculpá.\n\n'
+                + _formatMessage(transferTpl, currentState)
+                + '\n\nY si preferís no pagar por adelantado, lo mandamos a *retiro en sucursal* y abonás el total en efectivo cuando lo retirás 💵 Decime cuál te queda mejor.';
+            _setStep(currentState, FlowStep.WAITING_TRANSFER_CONFIRMATION);
+            currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+            saveState(userId);
+            await sendMessageWithDelay(userId, msg);
+            logger.info(`[MP_PAYMENT] ${userId} → MP APAGADO: no se generó link, derivado a transferencia/retiro.`);
+            return { matched: true };
+        }
         await _generateAndSendLink(userId, currentState, knowledge, dependencies);
         return { matched: true };
     }
@@ -76,7 +103,7 @@ export async function handleWaitingMpPayment(
             // Si state.senaAmount > 0 (Order legacy), el mensaje neutro sirve igual:
             // el cliente reintenta el link y la cobranza del saldo legacy se coordina
             // por admin via _pauseAndAlert (no por el bot).
-            const tpl = getFlowTemplate('payment_mp_retry', knowledge);
+            const tpl = getFlowTemplate('payment_mp_retry', knowledge, !mpOn);
             let msg = tpl
                 ? _formatMessage(tpl, currentState)
                 : '⚠️ Hubo un problema con el pago — probá de nuevo con tu tarjeta de crédito, o decime si preferís transferencia o retiro en sucursal.';
@@ -85,7 +112,9 @@ export async function handleWaitingMpPayment(
             // regeneráramos, el cliente suele pagar en la pestaña vieja → el pago
             // acredita sobre un link que el estado ya no espera y el push lo descarta
             // por mismatch ("link no vigente") en vez de confirmar la compra.
-            if (currentState.mpPaymentLinkUrl) {
+            // Con el interruptor apagado NO reenviamos el link: la cuenta está
+            // bloqueada, mandarlo de nuevo solo lo hace chocar contra el mismo error.
+            if (mpOn && currentState.mpPaymentLinkUrl) {
                 msg += `\n\n👉 ${currentState.mpPaymentLinkUrl}`;
             }
             currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
@@ -155,7 +184,7 @@ export async function handleWaitingMpPayment(
     }
 
     // ── Cliente pide que le reenvíen el link ───────────────────────────────────
-    if (/\b(link|enlace|reenv[ií]a|reenviar|de nuevo|el link|manda|m[áa]ndame)\b/i.test(text) && currentState.mpPaymentLinkUrl) {
+    if (mpOn && /\b(link|enlace|reenv[ií]a|reenviar|de nuevo|el link|manda|m[áa]ndame)\b/i.test(text) && currentState.mpPaymentLinkUrl) {
         const msg = `Acá está tu enlace de pago:\n\n${currentState.mpPaymentLinkUrl}\n\nCuando completes el pago escribime *"listo"* 👍`;
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         saveState(userId);
@@ -230,7 +259,9 @@ export async function handleWaitingMpPayment(
     // ── AI fallback ────────────────────────────────────────────────────────────
     const aiRes = await aiService.chat(text, {
         step: 'waiting_mp_payment',
-        goal: `El cliente tiene un enlace de pago de MercadoPago y debe completarlo. Enlace ya enviado: ${currentState.mpPaymentLinkUrl}\n\nSi tiene dudas, explicale que el link es para pagar con tarjeta de crédito (es online y 100% protegido).\n\nALTERNATIVAS si quiere cambiar de método (modelo nuevo may-2026):\n- Transferencia (envío a domicilio prepago): alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*\n- Retiro en sucursal (contrarrembolso): paga el TOTAL en efectivo al retirar en una sucursal de Correo Argentino. Sin anticipo previo.\n- NUNCA menciones anticipo de $10.000 (modalidad eliminada).\n\n🔴 OBJECIÓN ECONÓMICA / POSTERGAR PAGO (CRÍTICO):\nSi el cliente dice cosas como "veo después de juntar el efectivo", "cuando cobre", "cuando tenga plata", "cuando consiga el dinero", "es mucho interés", "ahora no puedo", "apenas tenga me comunico", "me alcance la plata", NO INTERPRETES eso como confirmación. Es una OBJECIÓN ECONÓMICA y debés ofrecer POSTDATADO:\n  → "¡Tranqui! ¿A partir de qué día te queda cómodo recibirlo? Te lo agendamos y lo despacho recién ese día." (PROHIBIDO mencionar "congelar precio")\n  → Si dice SÍ → goalMet=false, extractedData="POSTDATADO: [fecha o 'indefinido']", quedate en este step esperando el aviso.\n  → Si dice NO → goalMet=false, dejá el chat abierto sin presión.\n\nNUNCA reenvíes el link a menos que lo pida. NUNCA respondas con "Excelente decisión!" o frases de cierre cuando el cliente claramente está posponiendo. Esperá que confirme el pago con "listo" o "ya pagué".`,
+        goal: `${mpOn
+            ? `El cliente tiene un enlace de pago de MercadoPago y debe completarlo. Enlace ya enviado: ${currentState.mpPaymentLinkUrl}\n\nSi tiene dudas, explicale que el link es para pagar con tarjeta de crédito (es online y 100% protegido).`
+            : `🛑 EL PAGO CON TARJETA ESTÁ FUERA DE SERVICIO EN ESTOS DÍAS. Este cliente tiene un link viejo que ya NO sirve: NO se lo reenvíes, NO le pidas que lo intente de nuevo y NO menciones "tarjeta", "link de pago" ni "Mercado Pago" como opción. Si dice que ya pagó, tomale el dato y avisá que lo verificamos. Si no pagó, pasalo con calidez a una de las dos formas vivas: *transferencia* al alias (envío a domicilio) o *retiro en sucursal* (paga el total en efectivo al retirar). No inventes motivos ni prometas cuándo vuelve la tarjeta.`}\n\nALTERNATIVAS si quiere cambiar de método (modelo nuevo may-2026):\n- Transferencia (envío a domicilio prepago): alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*\n- Retiro en sucursal (contrarrembolso): paga el TOTAL en efectivo al retirar en una sucursal de Correo Argentino. Sin anticipo previo.\n- NUNCA menciones anticipo de $10.000 (modalidad eliminada).\n\n🔴 OBJECIÓN ECONÓMICA / POSTERGAR PAGO (CRÍTICO):\nSi el cliente dice cosas como "veo después de juntar el efectivo", "cuando cobre", "cuando tenga plata", "cuando consiga el dinero", "es mucho interés", "ahora no puedo", "apenas tenga me comunico", "me alcance la plata", NO INTERPRETES eso como confirmación. Es una OBJECIÓN ECONÓMICA y debés ofrecer POSTDATADO:\n  → "¡Tranqui! ¿A partir de qué día te queda cómodo recibirlo? Te lo agendamos y lo despacho recién ese día." (PROHIBIDO mencionar "congelar precio")\n  → Si dice SÍ → goalMet=false, extractedData="POSTDATADO: [fecha o 'indefinido']", quedate en este step esperando el aviso.\n  → Si dice NO → goalMet=false, dejá el chat abierto sin presión.\n\nNUNCA reenvíes el link a menos que lo pida. NUNCA respondas con "Excelente decisión!" o frases de cierre cuando el cliente claramente está posponiendo. Esperá que confirme el pago con "listo" o "ya pagué".`,
         history: currentState.history,
         summary: currentState.summary,
         knowledge,

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-    FileText, Power, Trash2, HardDrive, RefreshCw, KeyRound, RotateCcw, Lock, Download, Laptop, History, Send
+    FileText, Power, Trash2, HardDrive, RefreshCw, KeyRound, RotateCcw, Lock, Download, Laptop, History, Send, CreditCard
 } from 'lucide-react';
 import api from '../../config/axios';
 import { useSocket } from '../../context/SocketContext';
@@ -40,6 +40,9 @@ const SettingsView = ({ status }) => {
     const [proactiveFollowUps, setProactiveFollowUps] = useState(true);
     const [togglingFollowUps, setTogglingFollowUps] = useState(false);
 
+    const [mpEnabled, setMpEnabled] = useState(true);
+    const [togglingMp, setTogglingMp] = useState(false);
+
     useEffect(() => {
         (async () => {
             try {
@@ -55,6 +58,10 @@ const SettingsView = ({ status }) => {
                 const pfRes = await api.get('/api/config/proactive-follow-ups');
                 setProactiveFollowUps(pfRes.data.proactiveFollowUps !== false);
             } catch (e) { console.error('Error loading proactive-follow-ups:', e); }
+            try {
+                const mpRes = await api.get('/api/config/mercadopago');
+                setMpEnabled(mpRes.data.mpEnabled !== false);
+            } catch (e) { console.error('Error loading mercadopago config:', e); }
         })();
         fetchMemoryStats();
     }, []);
@@ -75,17 +82,20 @@ const SettingsView = ({ status }) => {
         const onStatsReset = (data) => { if (data?.stats) setScriptStats(data.stats); };
         const onRecoverChanged = (data) => { if (typeof data?.recoverOldChats === 'boolean') setRecoverOldChats(data.recoverOldChats); };
         const onFollowUpsChanged = (data) => { if (typeof data?.proactiveFollowUps === 'boolean') setProactiveFollowUps(data.proactiveFollowUps); };
+        const onMpChanged = (data) => { if (typeof data?.mpEnabled === 'boolean') setMpEnabled(data.mpEnabled); };
         socket.on('script_changed', onScriptChanged);
         socket.on('memory_reset', onMemoryReset);
         socket.on('script_stats_reset', onStatsReset);
         socket.on('recover_old_chats_changed', onRecoverChanged);
         socket.on('proactive_follow_ups_changed', onFollowUpsChanged);
+        socket.on('mercadopago_changed', onMpChanged);
         return () => {
             socket.off('script_changed', onScriptChanged);
             socket.off('memory_reset', onMemoryReset);
             socket.off('script_stats_reset', onStatsReset);
             socket.off('recover_old_chats_changed', onRecoverChanged);
             socket.off('proactive_follow_ups_changed', onFollowUpsChanged);
+            socket.off('mercadopago_changed', onMpChanged);
         };
     }, [socket]);
 
@@ -155,6 +165,24 @@ const SettingsView = ({ status }) => {
             toast.error(e.response?.data?.error || 'Error al cambiar el ajuste');
         }
         setTogglingFollowUps(false);
+    };
+
+    const handleToggleMp = async () => {
+        if (togglingMp) return;
+        const next = !mpEnabled;
+        setTogglingMp(true);
+        // Optimista: reflejamos el cambio ya; revertimos si el backend falla.
+        setMpEnabled(next);
+        try {
+            await api.post('/api/config/mercadopago', { enabled: next });
+            toast.success(next
+                ? 'Pago con tarjeta activado. El bot vuelve a ofrecer el link de pago.'
+                : 'Pago con tarjeta desactivado. El bot ofrece solo retiro en sucursal y transferencia.');
+        } catch (e) {
+            setMpEnabled(!next);
+            toast.error(e.response?.data?.error || 'Error al cambiar el ajuste');
+        }
+        setTogglingMp(false);
     };
 
     const handleResetMemory = async () => {
@@ -503,6 +531,57 @@ const SettingsView = ({ status }) => {
                             <span className={cn(
                                 'inline-block h-5 w-5 rounded-full bg-white shadow transition-transform mt-0.5',
                                 proactiveFollowUps ? 'translate-x-[22px]' : 'translate-x-0.5'
+                            )} />
+                        </button>
+                    </div>
+                </Card>
+
+                {/* Pago con tarjeta (Mercado Pago). Interruptor para cuando la
+                    cuenta de MP está bloqueada: el guion sigue vendiendo con las
+                    otras dos formas. */}
+                <Card padding="md" className="flex-1 flex flex-col">
+                    <div className="flex items-start gap-3 min-w-0 mb-3">
+                        <div className="w-10 h-10 rounded-control bg-violet-50 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 flex items-center justify-center flex-shrink-0">
+                            <CreditCard className="w-5 h-5" aria-hidden="true" />
+                        </div>
+                        <div className="min-w-0">
+                            <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm mb-1">
+                                Pago con tarjeta
+                            </h3>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                                Apagalo si la cuenta de <strong>Mercado Pago</strong> está bloqueada o caída.
+                                El bot deja de <strong>ofrecer y de generar links de pago</strong>: si un
+                                cliente pide tarjeta, le avisa que no está disponible y le ofrece
+                                <strong> retiro en sucursal</strong> (efectivo al retirar) o
+                                <strong> transferencia</strong> al alias. Los pagos ya hechos se siguen
+                                verificando normal.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="mt-auto flex items-center justify-between gap-3 pt-3 border-t border-slate-200/70 dark:border-slate-700/70">
+                        <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                            {mpEnabled ? 'Activado' : 'Desactivado'}
+                            <span className="text-[11px] text-slate-400 dark:text-slate-500 font-normal ml-1.5">
+                                (apagado = sin tarjeta en el guion)
+                            </span>
+                        </span>
+                        <button
+                            type="button"
+                            role="switch"
+                            aria-checked={mpEnabled}
+                            aria-label="Pago con tarjeta"
+                            onClick={handleToggleMp}
+                            disabled={togglingMp}
+                            className={cn(
+                                'relative inline-flex h-6 w-11 flex-shrink-0 rounded-full transition-colors',
+                                'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2',
+                                'disabled:opacity-50 disabled:cursor-not-allowed',
+                                mpEnabled ? 'bg-accent-500' : 'bg-slate-300 dark:bg-slate-600'
+                            )}
+                        >
+                            <span className={cn(
+                                'inline-block h-5 w-5 rounded-full bg-white shadow transition-transform mt-0.5',
+                                mpEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'
                             )} />
                         </button>
                     </div>

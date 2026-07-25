@@ -4,6 +4,7 @@ import { _setStep, _pauseAndAlert } from '../utils/flowHelpers';
 import { buildCartFromSelection, calculateTotal } from '../utils/cartHelpers';
 import { _isDuplicate } from '../utils/messages';
 import { buildPaymentMessage } from '../../utils/messageTemplates';
+import { isMpEnabled } from '../utils/paymentOptions';
 import logger from '../../utils/logger';
 
 // Detector de intención de retiro en persona / cliente de Rosario.
@@ -34,7 +35,7 @@ async function _handlePickupIntent(userId: string, text: string, currentState: U
     return true;
 }
 
-const _buildPaymentMsg = (state: UserState, knowledge?: any) => buildPaymentMessage(state, knowledge);
+const _buildPaymentMsg = (state: UserState, knowledge?: any, mpOff?: boolean) => buildPaymentMessage(state, knowledge, mpOff);
 
 function _handleExtractedData(userId: string, extractedData: string, currentState: UserState) {
     if (!extractedData || extractedData === 'null') return;
@@ -66,6 +67,9 @@ export async function handleWaitingPlanChoice(
     dependencies: any
 ): Promise<{ matched: boolean }> {
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
+    // Interruptor de MP apagado → el menú de pago se manda sin la opción de
+    // tarjeta (variante responseNoMp del guion). Ver flows/utils/paymentOptions.
+    const _mpOff = !isMpEnabled(dependencies.config);
 
     // ── Check temprano: cliente quiere ir al local / es de Rosario ──────
     if (_isPickupOrRosarioIntent(text)) {
@@ -146,7 +150,7 @@ export async function handleWaitingPlanChoice(
         }
         calculateTotal(currentState);
 
-        const paymentMsg = _buildPaymentMsg(currentState, knowledge);
+        const paymentMsg = _buildPaymentMsg(currentState, knowledge, _mpOff);
         currentState.history.push({ role: 'bot', content: paymentMsg, timestamp: Date.now() });
         _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
         saveState(userId);
@@ -218,12 +222,12 @@ export async function handleWaitingPlanChoice(
 
         if (hasAddress) {
             logger.info(`[FLOW-SKIP] Address already collected for ${userId}, asking payment method.`);
-            const paymentMsg = _buildPaymentMsg(currentState, knowledge);
+            const paymentMsg = _buildPaymentMsg(currentState, knowledge, _mpOff);
             currentState.history.push({ role: 'bot', content: paymentMsg, timestamp: Date.now() });
             await sendMessageWithDelay(userId, paymentMsg);
             _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
         } else {
-            const paymentMsg = _buildPaymentMsg(currentState, knowledge);
+            const paymentMsg = _buildPaymentMsg(currentState, knowledge, _mpOff);
             currentState.history.push({ role: 'bot', content: paymentMsg, timestamp: Date.now() });
             await sendMessageWithDelay(userId, paymentMsg);
             _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
@@ -263,12 +267,12 @@ export async function handleWaitingPlanChoice(
 
             if (hasAddress) {
                 logger.info(`[FLOW-SKIP] Address already collected for ${userId}, asking payment method after upsell.`);
-                const paymentMsg = `¡Genial! 😊 Entonces confirmamos el plan de 120 días. Ya tengo tus datos de envío de antes.\n\n` + _buildPaymentMsg(currentState, knowledge);
+                const paymentMsg = `¡Genial! 😊 Entonces confirmamos el plan de 120 días. Ya tengo tus datos de envío de antes.\n\n` + _buildPaymentMsg(currentState, knowledge, _mpOff);
                 currentState.history.push({ role: 'bot', content: paymentMsg, timestamp: Date.now() });
                 await sendMessageWithDelay(userId, paymentMsg);
                 _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
             } else {
-                const paymentMsg = `¡Genial! 😊 Entonces confirmamos el plan de 120 días.\n\n` + _buildPaymentMsg(currentState, knowledge);
+                const paymentMsg = `¡Genial! 😊 Entonces confirmamos el plan de 120 días.\n\n` + _buildPaymentMsg(currentState, knowledge, _mpOff);
                 currentState.history.push({ role: 'bot', content: paymentMsg, timestamp: Date.now() });
                 await sendMessageWithDelay(userId, paymentMsg);
                 _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
@@ -336,7 +340,7 @@ RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.
                         currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });
                         await sendMessageWithDelay(userId, planAI.response);
                     }
-                    const paymentMsgPost = _buildPaymentMsg(currentState, knowledge);
+                    const paymentMsgPost = _buildPaymentMsg(currentState, knowledge, _mpOff);
                     currentState.history.push({ role: 'bot', content: paymentMsgPost, timestamp: Date.now() });
                     await sendMessageWithDelay(userId, paymentMsgPost);
                     _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
@@ -359,7 +363,7 @@ RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.
                             currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });
                             await sendMessageWithDelay(userId, planAI.response);
                         }
-                        const paymentMsg = _buildPaymentMsg(currentState, knowledge);
+                        const paymentMsg = _buildPaymentMsg(currentState, knowledge, _mpOff);
                         currentState.history.push({ role: 'bot', content: paymentMsg, timestamp: Date.now() });
                         await sendMessageWithDelay(userId, paymentMsg);
                         _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
@@ -368,7 +372,7 @@ RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.
                             currentState.history.push({ role: 'bot', content: planAI.response, timestamp: Date.now() });
                             await sendMessageWithDelay(userId, planAI.response);
                         }
-                        const paymentMsgAI = _buildPaymentMsg(currentState, knowledge);
+                        const paymentMsgAI = _buildPaymentMsg(currentState, knowledge, _mpOff);
                         currentState.history.push({ role: 'bot', content: paymentMsgAI, timestamp: Date.now() });
                         await sendMessageWithDelay(userId, paymentMsgAI);
                         _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);

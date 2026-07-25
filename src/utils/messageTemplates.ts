@@ -53,8 +53,17 @@ function _loadDefaultKnowledge(): any {
  * recurre al knowledge default cacheado (knowledge_v7.json del disco). Esto
  * permite que callers con knowledge mock parcial (e.g. tests unitarios) sigan
  * obteniendo el copy correcto sin tener que duplicar todo el JSON.
+ *
+ * `mpOff` (interruptor de Mercado Pago apagado, ver flows/utils/paymentOptions):
+ * si el guion trae una variante `responseNoMp` para esa entrada, gana — así el
+ * copy sin tarjeta también se edita desde el panel Guiones y no queda hardcodeado.
  */
-function _getFlowResponse(knowledge: any, key: string): string | null {
+function _getFlowResponse(knowledge: any, key: string, mpOff?: boolean): string | null {
+    if (mpOff) {
+        const noMp = knowledge?.flow?.[key]?.responseNoMp
+            || _loadDefaultKnowledge()?.flow?.[key]?.responseNoMp;
+        if (noMp) return noMp;
+    }
     const direct = knowledge?.flow?.[key]?.response;
     if (direct) return direct;
     const fallback = _loadDefaultKnowledge();
@@ -71,7 +80,7 @@ function _getFlowResponse(knowledge: any, key: string): string | null {
  * Producto: usa state.selectedProduct si está, si no acepta override
  * (extraído del texto del cliente, ej: "que precio las cápsulas").
  */
-function buildPersonalizedPriceResponse(state: any, productOverride?: string | null): string {
+function buildPersonalizedPriceResponse(state: any, productOverride?: string | null, mpOff?: boolean): string {
     const product = productOverride || state.selectedProduct || 'Cápsulas de nuez de la india';
     const productKey = product.includes('Gota') ? 'Gotas' : product.includes('Semilla') ? 'Semillas' : 'Cápsulas';
     const productLabel = productKey === 'Cápsulas' ? 'cápsulas' : productKey === 'Gotas' ? 'gotas' : 'semillas';
@@ -83,7 +92,9 @@ function buildPersonalizedPriceResponse(state: any, productOverride?: string | n
 
     const priceStr = _getPrice(productKey, recommendedPlan);
 
-    const savingsLine = '\n\n💳 _Pagás con tarjeta de crédito o transferencia._';
+    const savingsLine = mpOff
+        ? '\n\n💳 _Pagás por transferencia, o en efectivo al retirar en sucursal._'
+        : '\n\n💳 _Pagás con tarjeta de crédito o transferencia._';
 
     let justification: string;
     if (weightGoal >= 20) {
@@ -119,9 +130,9 @@ function detectProductInText(text: string): string | null {
 /**
  * TEXTO 4 — Menú de las 3 opciones de pago. Plantilla: knowledge.flow.payment_menu.response.
  */
-function buildPaymentMessage(state: any, knowledge?: any): string {
+function buildPaymentMessage(state: any, knowledge?: any, mpOff?: boolean): string {
     const k = knowledge || _loadDefaultKnowledge();
-    const tpl = _getFlowResponse(k, 'payment_menu');
+    const tpl = _getFlowResponse(k, 'payment_menu', mpOff);
     if (!tpl) {
         logger.error('[messageTemplates] flow.payment_menu missing in knowledge — using empty fallback');
         return '¿Cómo preferís realizar el pago?';
@@ -166,8 +177,8 @@ function buildConfirmationMessage(state: any, knowledge?: any): string {
  * Resuelve un template del JSON conociendo `knowledge` o cayendo al default
  * cacheado. Export pública para que los step handlers también lean copy del JSON.
  */
-function getFlowTemplate(key: string, knowledge?: any): string | null {
-    return _getFlowResponse(knowledge, key);
+function getFlowTemplate(key: string, knowledge?: any, mpOff?: boolean): string | null {
+    return _getFlowResponse(knowledge, key, mpOff);
 }
 
 export {

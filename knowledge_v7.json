@@ -97,12 +97,16 @@
             "step": "waiting_payment_method",
             "_note": "TEXTO 4 — Menú envío + medios de pago. Disparado por buildPaymentMessage. Modelo nuevo (may-2026): primero elige tipo de envío, después método. Retiro=contrarreembolso al retirar (sin anticipo). Domicilio=prepago (MP/Transfer).",
             "response": "📦 Te lo enviamos GRATIS por Correo Argentino (entre 7 y 10 días hábiles, y más rápido —4 días— si lo pagás por adelantado) 😊\n\n1️⃣ *Retiro en sucursal* (lo más cómodo) → no pagás nada por adelantado, abonás el total *en efectivo cuando lo retirás*. La sucursal te la asigna el Correo, la más cercana a tu casa.\n2️⃣ *Envío a domicilio* → lo pagás antes con *tarjeta de crédito* o transferencia, y *al estar pago sale antes: llega en 4 días hábiles* 🚚\n\n👉 ¿Preferís retiro en sucursal y pagar al retirar, o envío a domicilio?",
+            "_noteNoMp": "Variante usada cuando el switch 'Pago con tarjeta' está APAGADO en Configuración (cuenta de MP bloqueada). Mismo menú de 2 envíos, sin el medio online.",
+            "responseNoMp": "📦 Te lo enviamos GRATIS por Correo Argentino (entre 7 y 10 días hábiles, y más rápido —4 días— si lo pagás por adelantado) 😊\n\n1️⃣ *Retiro en sucursal* (lo más cómodo) → no pagás nada por adelantado, abonás el total *en efectivo cuando lo retirás*. La sucursal te la asigna el Correo, la más cercana a tu casa.\n2️⃣ *Envío a domicilio* → lo abonás antes por *transferencia bancaria*, y *al estar pago sale antes: llega en 4 días hábiles* 🚚\n\n👉 ¿Preferís retiro en sucursal y pagar al retirar, o envío a domicilio?",
             "nextStep": "waiting_payment_method"
         },
         "payment_domicilio_choice": {
             "step": "waiting_payment_method",
             "_note": "Cliente eligió envío a domicilio. Submenú de medio de pago (prepago): tarjeta de crédito (link) o transferencia. NO se ofrecen débito, saldo en app, Pago Fácil ni Rapipago (decisión jun-2026).",
             "response": "Perfecto, lo mandamos a tu domicilio 🏠\n\nComo va prepago, al confirmar el pago el pedido sale enseguida y *te llega en 4 días hábiles* 🚚\n\n¿Cómo querés abonar?\n\n1️⃣ *Tarjeta de crédito* — te envío un *link de pago* seguro\n2️⃣ *Transferencia bancaria* — te paso el alias",
+            "_noteNoMp": "Con el switch 'Pago con tarjeta' APAGADO no hay submenú: domicilio = transferencia, y el bot manda el alias directo. Este texto solo aparece si el flujo llega al submenú por un estado viejo.",
+            "responseNoMp": "Perfecto, lo mandamos a tu domicilio 🏠\n\nComo va prepago, al confirmar el pago el pedido sale enseguida y *te llega en 4 días hábiles* 🚚\n\nEl pago va por *transferencia bancaria* — te paso el alias y coordinamos 😊",
             "nextStep": "waiting_payment_method"
         },
         "payment_retiro_confirm": {
@@ -130,7 +134,9 @@
         "payment_mp_retry": {
             "step": "waiting_mp_payment",
             "_note": "Mensaje cuando el pago con tarjeta es rechazado tras un intento. Se ofrece reintentar con la tarjeta, o cambiar a transferencia / retiro en sucursal.",
-            "response": "⚠️ Hubo un problema con el pago, pudo ser la tarjeta o un rechazo del banco.\n\nPodés:\n✅ Reintentar con tu *tarjeta de crédito* (te genero un nuevo link)\n✅ Pagar por *transferencia*\n✅ O *retiro en sucursal* y pagás en efectivo al retirar\n\n¿Cómo seguimos? 😊"
+            "response": "⚠️ Hubo un problema con el pago, pudo ser la tarjeta o un rechazo del banco.\n\nPodés:\n✅ Reintentar con tu *tarjeta de crédito* (te genero un nuevo link)\n✅ Pagar por *transferencia*\n✅ O *retiro en sucursal* y pagás en efectivo al retirar\n\n¿Cómo seguimos? 😊",
+            "_noteNoMp": "Con el switch 'Pago con tarjeta' APAGADO no se ofrece reintentar: el link ya no sirve. Solo las dos formas vivas.",
+            "responseNoMp": "⚠️ El pago con tarjeta lo tenemos fuera de servicio en estos días, así que ese link no va a andar 🙈 Disculpá.\n\nLo resolvemos por otro lado:\n✅ Pagar por *transferencia* (te paso el alias)\n✅ O *retiro en sucursal* y pagás el total en efectivo al retirar\n\n¿Cómo seguimos? 😊"
         },
         "transfer_received": {
             "step": "waiting_transfer_confirmation",
@@ -241,7 +247,9 @@
                 "cuotas"
             ],
             "_note": "Resumen del modelo (jun-2026): 2 tipos de envío con sus medios asociados. Domicilio = tarjeta de crédito o transferencia. Retiro = efectivo al retirar (y transferencia si el cliente lo pide). Si el cliente ya eligió, no responder esto.",
-            "response": "Tenemos 2 opciones de envío 📦\n\n1️⃣ *Retiro en sucursal* → pagás el total *en efectivo al retirar* (contrarreembolso)\n2️⃣ *Envío a domicilio* → se abona previamente con *tarjeta de crédito* o *transferencia bancaria*\n\n‼️ Ambos envíos son GRATIS ‼️\n\n¿Cuál te queda más cómoda?"
+            "response": "Tenemos 2 opciones de envío 📦\n\n1️⃣ *Retiro en sucursal* → pagás el total *en efectivo al retirar* (contrarreembolso)\n2️⃣ *Envío a domicilio* → se abona previamente con *tarjeta de crédito* o *transferencia bancaria*\n\n‼️ Ambos envíos son GRATIS ‼️\n\n¿Cuál te queda más cómoda?",
+            "_noteNoMp": "Variante usada cuando el switch 'Pago con tarjeta' está APAGADO en Configuración (cuenta de MP bloqueada).",
+            "responseNoMp": "Tenemos 2 opciones de envío 📦\n\n1️⃣ *Retiro en sucursal* → pagás el total *en efectivo al retirar* (contrarreembolso)\n2️⃣ *Envío a domicilio* → se abona previamente por *transferencia bancaria*\n\n‼️ Ambos envíos son GRATIS ‼️\n\n¿Cuál te queda más cómoda?"
         },
         {
             "keywords": [

@@ -905,6 +905,7 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
         if (state.step !== 'waiting_mp_payment') continue;
 
         const mpReminderStage = (state as any).mpReminderStage || 0;
+        const mpOn = config?.mpEnabled !== false;
 
         // Permitir que los stages 3 y 4 sigan mensajeando aunque el usuario
         // esté pausado, pero SOLO si la pausa la disparó este mismo flujo MP.
@@ -931,8 +932,32 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
         // del envío real.
         const stillWaitingMp = () => state.step === 'waiting_mp_payment' && ((state as any).mpReminderStage || 0) !== 99;
 
+        // ── Interruptor de MP apagado (cuenta bloqueada) ──────────────────────
+        // El link ya no sirve, así que NO corre ninguno de los nudges que lo
+        // reenvían (stages 1, 3 y 4 — gateados abajo con mpOn). Lo único útil
+        // para el que quedó esperando es la oferta de alternativas: la mandamos
+        // una vez y dejamos el stage en 1, para que el stage 2 lo escale al
+        // vendedor a las 4h si no contesta. (stage 99 = "no molestar más".)
+        if (!mpOn && mpReminderStage < 2 && mpReminderStage !== 99 && !(state as any).mpAlternativeOffered) {
+            const msg = `¡Hola! 👋 Te aviso que el *pago con tarjeta* lo tenemos fuera de servicio en estos días, así que ese link no te va a andar 🙈 Disculpá.\n\nLo resolvemos por otro lado:\n\n💸 *Transferencia bancaria* — al alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*\n🏪 *Retiro en sucursal* — lo retirás en una sucursal de Correo Argentino cerca tuyo y pagás el total en efectivo al retirar (sin adelantar nada)\n\n¿Cuál te queda más cómoda?`;
+            try {
+                const sent = await sendMessageWithDelay(userId, msg, undefined, stillWaitingMp);
+                if (sent) {
+                    _pushHistory(state, { role: 'bot', content: msg });
+                    (state as any).mpAlternativeOffered = true;
+                    (state as any).mpReminderStage = 1;
+                    saveState(userId);
+                    logger.info(`[SCHEDULER][${sharedState.sellerId || '?'}] MP APAGADO — alternativas ofrecidas a ${userId} (${minsSince}min esperando)`);
+                }
+            } catch (e: any) {
+                logger.error(`[SCHEDULER] Failed to send MP-off alternatives to ${userId}:`, e.message);
+            }
+            continue;
+        }
+
         // Stage 1: 30 minutos sin pagar — recordatorio amable.
-        if (mpReminderStage === 0 && minsSince >= 30) {
+        // Los stages que reenvían el link (1, 3 y 4) solo corren con MP encendido.
+        if (mpOn && mpReminderStage === 0 && minsSince >= 30) {
             const linkUrl = (state as any).mpPaymentLinkUrl;
             const linkLine = linkUrl ? `\n\nAcá te dejo el link de nuevo:\n${linkUrl}` : '';
             const msg = `¡Hola! 👋 ¿Pudiste con el pago con tarjeta de crédito? Cualquier duda la resolvemos 🙂 Acordate que es 100% protegido: si por algo no te llega, te devuelven la plata.${linkLine}`;
@@ -1005,7 +1030,7 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
 
         // Stage 3: 24 horas sin pagar — incentivo + opción de postdatar.
         // Solo dispara si el admin no destrabó al cliente con otra pausa.
-        if (mpReminderStage === 2 && minsSince >= 1440) {
+        if (mpOn && mpReminderStage === 2 && minsSince >= 1440) {
             const linkUrl = (state as any).mpPaymentLinkUrl;
             const linkLine = linkUrl ? `\n\nAcá te dejo el link otra vez:\n${linkUrl}` : '';
             const msg = `¡Hola! ¿Cómo va? 😊\n\nVi que el pago con tarjeta quedó pendiente. Te recuerdo que al pagar por adelantado el pedido sale enseguida y llega en *4 días hábiles* desde la confirmación del pago.\n\nSi preferís, te lo puedo programar para una fecha más adelante (cuando cobres) y lo despacho recién ese día. ¿A partir de qué día te queda cómodo recibirlo?${linkLine}`;
@@ -1024,7 +1049,7 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
         }
 
         // Stage 4: 72 horas sin pagar — última oportunidad.
-        if (mpReminderStage === 3 && minsSince >= 4320) {
+        if (mpOn && mpReminderStage === 3 && minsSince >= 4320) {
             const msg = `¡Hola! 🙂 Ya es el último mensaje que te mando por este pedido.\n\nSi querés podemos:\n\n📅 *Programarlo postdatado* — me decís la fecha y lo despacho ese día\n💳 *Retomar el pago de MP* hoy mismo\n\nSi no querés avanzar, ningún drama — me decís y lo cerramos. Te dejo elegir 😊`;
             try {
                 const sent = await sendMessageWithDelay(userId, msg, undefined, stillWaitingMp);

@@ -5,6 +5,7 @@ import { processGlobals } from './globals';
 import { processStep } from './steps';
 import { _pauseAndAlert, _setStep, _extractSilentVariables, _cleanPhone, _isGhostClose } from './utils/flowHelpers';
 import { detectObjection } from './utils/objectionDetector';
+import { isMpEnabled } from './utils/paymentOptions';
 import { parseControlTag } from './utils/extractedData';
 
 interface SalesFlowDependencies {
@@ -293,13 +294,19 @@ export async function processSalesFlow(
     // Envuelvo aiService.chat para inyectar sellerId/phone en APIContext y que
     // ai.ts pueda registrar cada llamada a AI contra el FunnelEvent abierto.
     // Se hace en una copia local de dependencies para NO contaminar al worker.
+    //
+    // También viaja acá el interruptor de Mercado Pago (mpEnabled): el prompt de
+    // ai.ts describe los medios de pago, así que si lo dejáramos librado a cada
+    // call site, el primer step que se olvidara de pasarlo volvería a ofrecer
+    // tarjeta con la cuenta bloqueada. Un solo punto de inyección = sin fugas.
     const origAi = dependencies.aiService;
     if (origAi && typeof origAi.chat === 'function') {
+        const _mpEnabled = isMpEnabled(dependencies.config);
         const wrappedAi = new Proxy(origAi, {
             get(target: any, prop: string) {
                 if (prop === 'chat') {
                     return async (text: string, context: any) => {
-                        const res = await target.chat(text, { ...context, sellerId: _ctx.sellerId, phone: _ctx.phone });
+                        const res = await target.chat(text, { ...context, sellerId: _ctx.sellerId, phone: _ctx.phone, mpEnabled: _mpEnabled });
                         // Routing robusto e independiente del modelo: Claude puede parafrasear
                         // la prosa, así que el control de flujo CRÍTICO (rechazo médico, abuso,
                         // cancelación, reventa) se rige por el TAG de extractedData, no por el
@@ -423,7 +430,7 @@ export async function processSalesFlow(
     //   standard  → rebuttal genérico (1ra vez)
     //   escalated → rebuttal + oferta concreta (2da vez, misma categoría)
     //   pause     → cierre suave + pausa al admin (3ra vez — bot se rinde)
-    const objection = detectObjection(currentState.step, normalizedText, currentState);
+    const objection = detectObjection(currentState.step, normalizedText, currentState, isMpEnabled(dependencies.config));
     if (objection) {
         logger.info(`[OBJECTION] Intercepted "${objection.type}" for ${userId} at step ${currentState.step} (tier=${objection.tier})`);
         currentState.history.push({ role: 'bot', content: objection.response, timestamp: Date.now() });

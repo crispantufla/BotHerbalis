@@ -1,5 +1,6 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _setStep, _pauseAndAlert } from '../utils/flowHelpers';
+import { isMpEnabled, cardUnavailableMessage } from '../utils/paymentOptions';
 import logger from '../../utils/logger';
 
 // Exportada: globalFaq la usa para NO tragarse un aviso de pago que venga con
@@ -55,6 +56,17 @@ export async function handleWaitingTransferConfirmation(
 
     // ── Cliente cambia a MercadoPago ───────────────────────────────────────────
     if (MP_KEYWORDS.test(text) && !/\btransfer/i.test(text)) {
+        // Interruptor de MP apagado (jul-2026): no lo reencauzamos a
+        // waiting_payment_method — iría a dar la vuelta para terminar diciéndole
+        // lo mismo. Se lo decimos acá y le dejamos las dos formas vivas.
+        if (!isMpEnabled(dependencies.config)) {
+            const msg = cardUnavailableMessage(currentState.totalPrice);
+            currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+            saveState(userId);
+            await sendMessageWithDelay(userId, msg);
+            logger.info(`[TRANSFER_CONFIRM] ${userId} pidió tarjeta con MP APAGADO — avisado, sigue en transferencia/retiro.`);
+            return { matched: true };
+        }
         logger.info(`[TRANSFER_CONFIRM] Cliente ${userId} cambió de transferencia a MercadoPago`);
         currentState.paymentMethod = null;
         _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
@@ -83,7 +95,7 @@ export async function handleWaitingTransferConfirmation(
     // ── AI fallback ────────────────────────────────────────────────────────────
     const aiRes = await aiService.chat(text, {
         step: 'waiting_transfer_confirmation',
-        goal: `El cliente ${isLegacyCodAnticipo ? '[LEGACY pre-may-2026] eligió pagar contra reembolso y debe enviar el *anticipo de $10.000* por transferencia' : 'eligió pagar por transferencia bancaria (envío a domicilio, prepago por el TOTAL)'} al alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*. Estás esperando que confirme que ${isLegacyCodAnticipo ? 'envió el anticipo' : 'realizó la transferencia'}.\n\nREGLAS:\n1. Si pregunta el alias, titular o monto de nuevo, recordáselo: alias *HERBALIS.TIENDA*, a nombre de *BIO ORIGEN S.A.S.*, monto ${isLegacyCodAnticipo ? '*$10.000* (anticipo — el resto en efectivo al cartero)' : `$${currentState.totalPrice || '0'}`}.\n2. Si dice que ya transfirió ("listo", "hecho", "ya hice la transferencia"), confirmá que verificás el pago.\n3. Si quiere cambiar a otro método, ofrecele las otras opciones (tarjeta de crédito para domicilio, o retiro en sucursal para pagar al retirar en efectivo).\n4. Si tiene dudas sobre cómo transferir, explicale que puede hacerlo desde su home banking o app del banco usando el alias.\n\nNUNCA inventes datos bancarios más allá del alias y titular oficiales. NUNCA menciones anticipo de $10.000 a clientes nuevos (modalidad eliminada en may-2026). Hablá siempre en primera persona como Elena, con calidez.`,
+        goal: `El cliente ${isLegacyCodAnticipo ? '[LEGACY pre-may-2026] eligió pagar contra reembolso y debe enviar el *anticipo de $10.000* por transferencia' : 'eligió pagar por transferencia bancaria (envío a domicilio, prepago por el TOTAL)'} al alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*. Estás esperando que confirme que ${isLegacyCodAnticipo ? 'envió el anticipo' : 'realizó la transferencia'}.\n\nREGLAS:\n1. Si pregunta el alias, titular o monto de nuevo, recordáselo: alias *HERBALIS.TIENDA*, a nombre de *BIO ORIGEN S.A.S.*, monto ${isLegacyCodAnticipo ? '*$10.000* (anticipo — el resto en efectivo al cartero)' : `$${currentState.totalPrice || '0'}`}.\n2. Si dice que ya transfirió ("listo", "hecho", "ya hice la transferencia"), confirmá que verificás el pago.\n3. Si quiere cambiar a otro método, ofrecele las otras opciones (${isMpEnabled(dependencies.config) ? 'tarjeta de crédito para domicilio, o retiro en sucursal para pagar al retirar en efectivo' : 'retiro en sucursal, para pagar el total al retirar en efectivo — el pago con tarjeta está fuera de servicio en estos días, NO lo ofrezcas ni lo menciones'}).\n4. Si tiene dudas sobre cómo transferir, explicale que puede hacerlo desde su home banking o app del banco usando el alias.\n\nNUNCA inventes datos bancarios más allá del alias y titular oficiales. NUNCA menciones anticipo de $10.000 a clientes nuevos (modalidad eliminada en may-2026). Hablá siempre en primera persona como Elena, con calidez.`,
         history: currentState.history,
         summary: currentState.summary,
         knowledge,

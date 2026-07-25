@@ -409,6 +409,34 @@ module.exports = (clientPool) => {
         }
     });
 
+    // GET /config/mercadopago - Estado del interruptor de Mercado Pago (pago con
+    // tarjeta). Default ENCENDIDO: solo está apagado si se guardó en false.
+    router.get('/config/mercadopago', ...withSeller(clientPool), (req, res) => {
+        const { config } = getCtx(req);
+        res.json({ mpEnabled: config.mpEnabled !== false });
+    });
+
+    // POST /config/mercadopago - Activa/desactiva el pago con tarjeta. Con OFF el
+    // bot deja de ofrecer y de generar links de MP: el guion queda con retiro en
+    // sucursal (efectivo al retirar) y transferencia (domicilio prepago). Se usa
+    // cuando la cuenta de MP está bloqueada. Body: { enabled: true|false }.
+    router.post('/config/mercadopago', ...withSeller(clientPool), (req, res) => {
+        try {
+            const { config, ss } = getCtx(req);
+            const enabled = req.body?.enabled === true;
+            config.mpEnabled = enabled;
+            if (ss?.saveState) ss.saveState();
+
+            emitScoped(req, 'mercadopago_changed', { mpEnabled: enabled });
+
+            logger.info(`[SYSTEM] mpEnabled=${enabled} (seller=${req.sellerId})`);
+            res.json({ success: true, mpEnabled: enabled });
+        } catch (e) {
+            logger.error('Error toggling mpEnabled:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     // POST /global-pause-all - Pausa/reactiva TODOS los sellers a la vez.
     // Permitido a: (a) admin global (sellerId=null), (b) Horacio (dueño
     // del proyecto — tenant admin con sellerId='horacio'). Body: { pause: true|false }.

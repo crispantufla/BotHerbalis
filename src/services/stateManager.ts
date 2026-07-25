@@ -26,6 +26,11 @@ interface BotConfig {
     // ENCENDIDO por default (no regresiona sellers existentes); se apaga en
     // números nuevos para no exhibir actividad proactiva ante Meta.
     proactiveFollowUps?: boolean;
+    // Interruptor de Mercado Pago (jul-2026): si está en false, el bot NO ofrece
+    // ni genera links de pago con tarjeta — el guion queda con retiro en sucursal
+    // (efectivo al retirar) y transferencia (domicilio prepago). Se apaga cuando
+    // la cuenta de MP está bloqueada. ENCENDIDO por default.
+    mpEnabled?: boolean;
     [key: string]: any;
 }
 
@@ -85,6 +90,7 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
         activeScript: 'v7',
         recoverOldChats: false,
         proactiveFollowUps: true,
+        mpEnabled: true,
         scriptStats: {
             v7: { started: 0, completed: 0 }
         }

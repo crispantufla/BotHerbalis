@@ -223,6 +223,40 @@ const ESCALATED_REBUTTALS: Record<ObjectionMatch['type'], string[]> = {
     ],
 };
 
+// ── Variantes sin tarjeta (interruptor de MP apagado) ──────────────────────
+// Varios rebuttals se apoyan en la "protección al comprador" del pago con
+// tarjeta. Con MP bloqueado ese argumento no existe, y prometerlo sería
+// venderle algo que no le vamos a poder dar. El reemplazo usa la palanca de
+// confianza que SÍ está viva —y que además convierte mejor—: retiro en
+// sucursal, donde no adelanta un peso hasta tener el paquete en la mano.
+// Solo se listan las entradas que nombran la tarjeta; el resto se reusa igual.
+const REBUTTALS_NO_MP: Partial<Record<ObjectionMatch['type'], string[]>> = {
+    caro: [
+        '¡Entiendo! 😊 Pensalo así: es menos que un café por día durante el tratamiento. Y si te queda más cómodo, también podemos coordinar *retiro en sucursal* — pagás el total en efectivo recién cuando lo retirás. ¿Te tiro los datos del plan que más te conviene?',
+        'Te re entiendo 🙌 Tenemos 2 opciones de envío: retiro en sucursal (pagás al retirar, en efectivo) o envío a domicilio abonando antes por transferencia. Es una inversión en vos, con más de 13 años de aval. ¿Te paso los datos para reservarlo?',
+        'Dale, escuchame bien: el de 120 días sale más conveniente por cápsula que el de 60, y si te queda más cómodo podés elegir retiro en sucursal (pagás al retirar). ¿Avanzamos con ese? 😊',
+    ],
+    miedo: [
+        '¡Tranqui, te entiendo! 😊 Hace más de 13 años que distribuimos en todo el país, con más de 70 mil clientes satisfechos. El producto es 100% natural y lo único que podés notar los primeros días es un leve efecto laxante/diurético que se va tomando agua. ¿Qué duda puntual tenés?',
+        'Es re entendible tener dudas la primera vez 🙌 Te cuento: es 100% natural, no tiene químicos. Y si querés máxima tranquilidad, lo mandamos a *retiro en sucursal*: no pagás un peso hasta que lo tenés en la mano. ¿Qué duda puntual tenés?',
+    ],
+    no_confio: [
+        '¡Te re entiendo, hay mucho trucho por ahí! 😊 Por eso te ofrezco la opción más segura para vos: *retiro en sucursal* — el paquete llega al Correo y recién ahí pagás, en efectivo. Si nunca llega, no perdiste nada. 13 años haciendo esto, más de 70 mil clientes. ¿Te tomo los datos?',
+        'Dale, es un miedo súper válido 🙌 Lo hacemos como te quede más tranquila: *retiro en sucursal* y pagás recién cuando lo retirás. Si querés, mientras tanto buscanos en Google o Instagram. ¿Seguimos con los datos?',
+    ],
+};
+
+const ESCALATED_REBUTTALS_NO_MP: Partial<Record<ObjectionMatch['type'], string[]>> = {
+    miedo: [
+        'Te entiendo. Te propongo lo más seguro para vos: *retiro en sucursal*. El paquete viaja al Correo, te avisamos cuando llega y pagás el total en efectivo recién cuando lo retirás — no adelantás nada. ¿Eso te da más tranquilidad?',
+        'Te re entiendo. Mirá, *podés googlear "Herbalis" y ver nuestro Instagram* (@herbalis) con clientas reales etiquetadas. Si después de eso seguís con dudas, no avanzamos y listo, cero compromiso. ¿Te parece?',
+    ],
+    no_confio: [
+        'Te entiendo perfectamente. *Lo más sólido que puedo ofrecerte es que no pagues nada por adelantado*: lo mandamos a retiro en sucursal y abonás el total en efectivo cuando lo retirás. Si el paquete no llega, no perdiste un peso. ¿Eso te alcanza para que probemos?',
+        'Dale, mirá: *te invito a buscar "Herbalis" en Google y en Instagram (@herbalis)* — vas a encontrar testimonios reales con foto. Si después de revisar no te convencen, no avanzamos. ¿Te parece justo?',
+    ],
+};
+
 // ── Tier 3: Mensaje de cierre suave antes de pausar ────────────────────────
 // Cuando ni el rebuttal estándar ni el escalado destrabaron al cliente,
 // admitimos que el bot no puede más y le pasamos un asesor humano. El
@@ -251,7 +285,8 @@ function _pick<T>(arr: T[]): T {
 export function detectObjection(
     step: string,
     normalizedText: string,
-    state: UserState
+    state: UserState,
+    mpOn: boolean = true
 ): ObjectionMatch | null {
     if (!ACTIVE_STEPS.has(step)) return null;
     if (!normalizedText || normalizedText.trim().length < 4) return null;
@@ -287,10 +322,11 @@ export function detectObjection(
     if (count === 0) {
         // Para el diferimiento usamos el rebuttal dedicado (lidera con la oferta
         // de agendar). Para tier 2/3 se reusan los de 'postergar'.
-        response = viaDeferral ? _pick(DEFERRAL_REBUTTAL) : _pick(REBUTTALS[matchedType]);
+        const pool = (!mpOn && REBUTTALS_NO_MP[matchedType]) || REBUTTALS[matchedType];
+        response = viaDeferral ? _pick(DEFERRAL_REBUTTAL) : _pick(pool);
         tier = 'standard';
     } else if (count === 1) {
-        response = _pick(ESCALATED_REBUTTALS[matchedType]);
+        response = _pick((!mpOn && ESCALATED_REBUTTALS_NO_MP[matchedType]) || ESCALATED_REBUTTALS[matchedType]);
         tier = 'escalated';
     } else {
         // count === 2 → tier pause

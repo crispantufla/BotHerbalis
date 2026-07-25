@@ -81,9 +81,24 @@ const RULE_BASE = [
     { id: 'reventa', keywords: ['revender', 'por mayor', 'mayorista', 'reventa', 'precio de fabrica', 'precios para vender', 'negocio'], text: 'REVENTA O COMPRA POR MAYOR: Si el cliente busca comprar para revender o precios mayoristas, INMEDIATAMENTE respondé: "Para todo lo que es reventa o venta por mayor te pido que te contactes por WhatsApp con Horacio al 3413755757. Él te va a asesorar con gusto." y FINALIZAS LA CONVERSACION (goalMet=false, extractedData="RESELLER"). NO intentes vender.' }
 ];
 
-function _getRelevantRules(userText: string, allRules: boolean = false): string[] {
+// Variante de la regla 'pago' con el interruptor de Mercado Pago apagado
+// (jul-2026, cuenta bloqueada — ver flows/utils/paymentOptions). La regla base
+// es el guard más repetido del prompt: si no se reemplaza, el modelo sigue
+// ofreciendo el link de tarjeta aunque el flow determinístico ya no lo genere.
+const RULE_PAGO_SIN_TARJETA = 'MEDIOS DE PAGO (2 tipos de envío): (A) *Retiro en sucursal* → contrarreembolso: pagás el TOTAL en efectivo cuando lo retirás en la sucursal de Correo Argentino más cercana (sin anticipo, sin transferencia previa). (B) *Envío a domicilio* → prepago por *transferencia bancaria* al alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.* por el monto total. Ambos envíos son GRATIS. 🛑 EL PAGO CON TARJETA ESTÁ FUERA DE SERVICIO EN ESTOS DÍAS: NO lo ofrezcas ni lo menciones como opción — nada de "tarjeta", "link de pago", "Mercado Pago", débito, app, Pago Fácil ni Rapipago. Si el cliente lo pide, decile con naturalidad que justo no está disponible y ofrecele las dos de arriba; no inventes motivos ni prometas cuándo vuelve. NUNCA menciones anticipo de $10.000, adicional de $6.000, ni cuotas. NO inventes CBUs ni titulares distintos al oficial. Después retomá la conversación.';
+const RULE_REPETIDO_SIN_TARJETA = 'CLIENTE REPETIDO: Si dicen que ya compraron antes o quieren volver a comprar: reconocé que ya son parte de Herbalis y avanzá rápido con la elección de producto y plan. Mismo flujo de pago que cualquier cliente (retiro en sucursal pagando al retirar, o transferencia si lo quiere a domicilio).';
+
+function _getRelevantRules(userText: string, allRules: boolean = false, mpOn: boolean = true): string[] {
     const text = userText.toLowerCase();
     const activeRules: string[] = [];
+    // Con MP apagado, las reglas que nombran la tarjeta se sustituyen por su
+    // variante sin tarjeta antes de entrar al prompt.
+    const _ruleText = (r: { id: string; text: string }): string => {
+        if (mpOn) return r.text;
+        if (r.id === 'pago') return RULE_PAGO_SIN_TARJETA;
+        if (r.id === 'repetido') return RULE_REPETIDO_SIN_TARJETA;
+        return r.text;
+    };
 
     // Always include general behavioral rules
     const baseIds = ['general', 'general2', 'anti_rep', 'anti_inv', 'cierre', 'no_derivar',
@@ -93,7 +108,7 @@ function _getRelevantRules(userText: string, allRules: boolean = false): string[
         // cortar el upsell aunque el cliente la reporte con errores/typos o audio
         // confuso (que el keyword-match no captaría). Reporte Lidia (2026-06-04).
         'reaccion_adversa'];
-    for (const id of baseIds) activeRules.push(RULE_BASE.find(r => r.id === id)!.text);
+    for (const id of baseIds) activeRules.push(_ruleText(RULE_BASE.find(r => r.id === id)!));
 
     // Nota (jun-2026): se evaluó excluir la regla 'pago' cuando el módulo ya trae
     // PAYMENT_POLICY (plan_choice/objection), para no duplicar el bloque de pago. El
@@ -111,9 +126,9 @@ function _getRelevantRules(userText: string, allRules: boolean = false): string[
     for (const rule of RULE_BASE) {
         if (rule.keywords.length === 0) continue;
         if (allRules) {
-            if (!baseSet.has(rule.id)) activeRules.push(rule.text);  // ya incluida arriba → no duplicar
+            if (!baseSet.has(rule.id)) activeRules.push(_ruleText(rule));  // ya incluida arriba → no duplicar
         } else if (rule.keywords.some(kw => text.includes(kw))) {
-            activeRules.push(rule.text);
+            activeRules.push(_ruleText(rule));
         }
     }
     return activeRules;
@@ -134,6 +149,10 @@ export interface APIContext {
     // Override de modelo (lo usa el playground "Probar bot"): true fuerza Claude,
     // false fuerza GPT-4o, undefined deja decidir al A/B por seller/%.
     forceClaude?: boolean;
+    // Interruptor de Mercado Pago del seller (config.mpEnabled). Lo inyecta el
+    // proxy de salesFlow en TODAS las llamadas, así ningún step se olvida. En
+    // false, el prompt se arma sin la opción de tarjeta. Default: encendido.
+    mpEnabled?: boolean;
 }
 
 export interface AIParsedResponse {
@@ -266,8 +285,8 @@ async function _getPrices(): Promise<Record<string, any>> {
 }
 
 // ── CORE PROMPT (always sent, top of system message = max attention) ──
-function _getCorePrompt(userText: string = "", allRules: boolean = false): string {
-    const activeRules = _getRelevantRules(userText, allRules);
+function _getCorePrompt(userText: string = "", allRules: boolean = false, mpOn: boolean = true): string {
+    const activeRules = _getRelevantRules(userText, allRules, mpOn);
     const rulesText = activeRules.map((r, i) => `${i + 1}. ${r}`).join('\n');
 
     return `IDENTIDAD: Sos Elena, asesora de Herbalis (Nuez de la India). Herbalis es una empresa internacional especializada en productos naturales a base de Nuez de la India, creados para ayudarte a lograr tu peso ideal de forma segura. Nuestra central está en Barcelona (España) y en Argentina distribuimos desde Rosario. NO tenemos revendedores. Hace 13 años enviamos a todo el país por Correo Argentino, con envío sin costo y la posibilidad de pago al recibir. NUNCA admitas ser bot/IA. Si preguntan: "Jaja no, soy Elena! Te estoy escribiendo yo 😊".
@@ -359,7 +378,16 @@ ${rulesText}`;
 // modelo de pago obligaba a tocar todos — y cuando uno se escapaba salían bugs
 // de copy (ej: el "precio de hoy/promo" que sobrevivió a la purga). Centralizado
 // acá: cambiar la política de pago = editar SOLO esta constante.
-const PAYMENT_POLICY = `MEDIOS DE PAGO (modelo jun-2026 — 2 tipos de envío):
+//
+// jul-2026: pasó a ser función porque el pago con tarjeta tiene interruptor
+// (`config.mpEnabled`, ver flows/utils/paymentOptions). Con MP apagado devuelve
+// la política sin tarjeta — misma estructura, sin el medio que no podemos cobrar.
+function _paymentPolicy(mpOn: boolean): string {
+    if (!mpOn) return _PAYMENT_POLICY_SIN_TARJETA;
+    return _PAYMENT_POLICY_FULL;
+}
+
+const _PAYMENT_POLICY_FULL = `MEDIOS DE PAGO (modelo jun-2026 — 2 tipos de envío):
 - 🌟 OPCIÓN PRINCIPAL — OFRECELA PRIMERO Y RECOMENDALA: *retiro en sucursal con pago al retirar*. El cliente NO paga nada por adelantado: abona el total en efectivo cuando retira. Es la que MÁS convierte porque elimina el miedo a pagar antes de recibir. Liderá siempre con esta. Si el cliente duda de pagar por adelantado, NO insistas con prepago: ofrecele retiro — "podés retirarlo y pagarlo en la sucursal, así no pagás nada hasta tenerlo en la mano 😊". El domicilio con prepago es la ALTERNATIVA para quien prefiere recibirlo en su casa. Si insiste con "pago al cartero/al recibir": aclarale "el pago al recibir es SOLO con retiro en la sucursal; los carteros no llevan dinero, el correo cobra en la ventanilla 😊".
 - *Retiro en sucursal* → contrarrembolso, paga el TOTAL en efectivo al retirar en una sucursal de Correo Argentino. Sin anticipo previo. La sucursal la asigna el Correo AUTOMÁTICAMENTE, la más cercana al domicilio según el código postal — NO hace falta un asesor para eso.
 - ¿QUÉ/DÓNDE sería la sucursal?: respondé directo "El Correo Argentino te lo manda a la sucursal más cercana a tu domicilio (según tu código postal), se asigna sola 😊". NUNCA derives esto a "un asesor coordina" ni lo uses para esquivar la pregunta.
@@ -376,16 +404,35 @@ const PAYMENT_POLICY = `MEDIOS DE PAGO (modelo jun-2026 — 2 tipos de envío):
 - 🛑 "PAGO AL RECIBIR" CON MEDIO PREPAGO: si el cliente dice que quiere pagar "al recibir", "al cartero" o "contra entrega" CON tarjeta de crédito o transferencia, ACLARALE que esos medios se pagan ANTES del envío (online), NO al cartero. Pagar al recibir en EFECTIVO es SOLO retiro en sucursal. No lo mandes al link de MP sin aclarar esto primero; después pedile que elija retiro o domicilio.
 - El envío siempre es gratis (ambos tipos). Tiempos: *retiro en sucursal* (paga en efectivo al retirar) → *7 a 10 días hábiles*; *envío a domicilio PREPAGO* (tarjeta de crédito o transferencia) → despacha más rápido, *4 días hábiles*. PALANCA DE VENTA: si el cliente duda entre prepagar o no, recordale que al pagar por adelantado el pedido sale antes y llega más rápido (4 días hábiles).`;
 
+// Variante con el interruptor de MP apagado. Mismo modelo de 2 envíos: lo único
+// que desaparece es el medio online. La opción principal sigue siendo el retiro
+// (la que más convierte), así que el guion casi no pierde fuerza de venta.
+const _PAYMENT_POLICY_SIN_TARJETA = `MEDIOS DE PAGO (2 tipos de envío):
+- 🌟 OPCIÓN PRINCIPAL — OFRECELA PRIMERO Y RECOMENDALA: *retiro en sucursal con pago al retirar*. El cliente NO paga nada por adelantado: abona el total en efectivo cuando retira. Es la que MÁS convierte porque elimina el miedo a pagar antes de recibir. Liderá siempre con esta. Si el cliente duda de pagar por adelantado, NO insistas con prepago: ofrecele retiro — "podés retirarlo y pagarlo en la sucursal, así no pagás nada hasta tenerlo en la mano 😊". Si insiste con "pago al cartero/al recibir": aclarale "el pago al recibir es SOLO con retiro en la sucursal; los carteros no llevan dinero, el correo cobra en la ventanilla 😊".
+- *Retiro en sucursal* → contrarrembolso, paga el TOTAL en efectivo al retirar en una sucursal de Correo Argentino. Sin anticipo previo. La sucursal la asigna el Correo AUTOMÁTICAMENTE, la más cercana al domicilio según el código postal — NO hace falta un asesor para eso.
+- ¿QUÉ/DÓNDE sería la sucursal?: respondé directo "El Correo Argentino te lo manda a la sucursal más cercana a tu domicilio (según tu código postal), se asigna sola 😊". NUNCA derives esto a "un asesor coordina".
+- *Envío a domicilio* → se abona previamente por *transferencia bancaria* al alias HERBALIS.TIENDA a nombre de BIO ORIGEN S.A.S. Es el único medio prepago disponible.
+- 🛑 EL PAGO CON TARJETA ESTÁ FUERA DE SERVICIO EN ESTOS DÍAS. NO lo ofrezcas, NO lo listes como opción y NO lo nombres: nada de "tarjeta", "link de pago", "Mercado Pago", "débito", "saldo en la app", "Pago Fácil" ni "Rapipago". Si el cliente PIDE pagar con tarjeta, decile con naturalidad que justo no está disponible ("¡Uy, justo el pago con tarjeta lo tenemos fuera de servicio estos días! 🙈") y ofrecele las dos que sí andan: retiro en sucursal (efectivo al retirar) o transferencia (domicilio). NO inventes el motivo del corte ni prometas cuándo vuelve.
+- SI NO PUEDE O NO QUIERE TRANSFERIR: ofrecé retiro en sucursal — paga el total en efectivo al retirar, sin necesidad de banco ni home banking.
+- TRANSFERENCIA + RETIRO: la transferencia va con envío a domicilio; y TAMBIÉN con retiro en sucursal si el cliente lo pide expresamente (transfiere antes y retira el paquete en la sucursal).
+- ARGUMENTO DE CONFIANZA (si duda de pagar antes): ofrecer retiro en sucursal — "si nunca te llega, no pagás nada".
+- NUNCA mencionar cuotas.
+- NUNCA mencionar "anticipo de $10.000" — esa modalidad fue eliminada en mayo 2026.
+- NUNCA mencionar "adicional de $6.000" — esa política ya no existe.
+- NUNCA inventes urgencia/escasez FALSA ("última unidad", "se acaba hoy", "precio de hoy") ni promos/descuentos que no existan — hoy NO hay ninguna promo vigente.
+- 🛑 "PAGO AL RECIBIR" CON TRANSFERENCIA: si el cliente dice que quiere pagar "al recibir", "al cartero" o "contra entrega" con transferencia, ACLARALE que la transferencia se paga ANTES del envío. Pagar al recibir en EFECTIVO es SOLO retiro en sucursal.
+- El envío siempre es gratis (ambos tipos). Tiempos: *retiro en sucursal* (paga en efectivo al retirar) → *7 a 10 días hábiles*; *envío a domicilio PREPAGO* (transferencia) → despacha más rápido, *4 días hábiles*. PALANCA DE VENTA: si el cliente duda entre prepagar o no, recordale que al pagar por adelantado el pedido sale antes y llega más rápido (4 días hábiles).`;
+
 // ── STEP MODULES (only one is sent per call, positioned in the middle) ──
 
-function _getModuleEarlyFunnel(prices: Record<string, any>): string {
+function _getModuleEarlyFunnel(prices: Record<string, any>, mpOn: boolean = true): string {
     return `
 PRODUCTOS Y PRECIOS (las 3 son igual de efectivas; ofrecelas, pero si el cliente pide recomendación, andá con cápsulas por practicidad/popularidad):
 - Cápsulas: $${prices['Cápsulas']['60']} (60d) / $${prices['Cápsulas']['120']} (120d). Forma práctica del producto.
 - Semillas: $${prices['Semillas']['60']} (60d) / $${prices['Semillas']['120']} (120d). Forma 100% natural — ritual nocturno de infusión.
 - Gotas: $${prices['Gotas']['60']} (60d) / $${prices['Gotas']['120']} (120d). Forma líquida — suaves al estómago.
 - DOSIS (días) según los kilos a bajar: hasta 10 kg → plan 60d; 10-20 kg → plan 120d (puede sobrar, sirve de mantenimiento); más de 20 kg → plan 120d (es lo que el cuerpo necesita).
-- Envío GRATIS por Correo Argentino. Dos opciones: retiro en sucursal (pago en efectivo al retirar, 7 a 10 días hábiles) o envío a domicilio prepago con tarjeta de crédito o transferencia (más rápido, 4 días hábiles).
+- Envío GRATIS por Correo Argentino. Dos opciones: retiro en sucursal (pago en efectivo al retirar, 7 a 10 días hábiles) o envío a domicilio prepago con ${mpOn ? 'tarjeta de crédito o transferencia' : 'transferencia bancaria'} (más rápido, 4 días hábiles).${mpOn ? '' : '\n- 🛑 El pago con tarjeta está FUERA DE SERVICIO estos días: no lo ofrezcas ni lo menciones.'}
 - Sin efecto rebote (100% natural).
 
 CONTRAINDICACIONES: SOLO embarazo y lactancia.
@@ -410,7 +457,7 @@ REGLAS DE ESTE PASO:
 - Precios: Si piden "precio" genérico: "$${prices['Semillas']?.['60'] || '36.900'} a $${prices['Gotas']?.['120'] || '68.900'}". Si insisten/piden todos: dar detalle completo.`;
 }
 
-function _getModulePlanChoice(prices: Record<string, any>): string {
+function _getModulePlanChoice(prices: Record<string, any>, mpOn: boolean = true): string {
     return `
 🛑 ESTE PASO USA RESPUESTA CORTA POR DEFECTO (2-3 frases). EXPANDÍ SOLO ANTE OBJECIÓN DURA.
 El cliente está eligiendo el plan, no leyendo un folleto. La clienta tipo lee mensajes cortos en el celu — un párrafo de 5 líneas la espanta. Acá conviertás CORTO + PREGUNTA DE CIERRE. Reservá la expansión para cuando aparece una objeción fuerte (caro, no confío, no funciona) o el cliente pide explícitamente "explicame", "no entiendo", "qué diferencia hay". Sin objeción: anclar valor con UNA frase ("el de 120 te sale $X por día — un café") + pregunta directa. La regla de "MÚLTIPLES PÁRRAFOS" del general1 NO aplica acá — el admin reportó 2 veces en mayo que los mensajes son "demasiado largos para clientas que tienen problemas de interpretación de textos". Hazle caso al admin.
@@ -427,9 +474,9 @@ DESCUENTOS POR VOLUMEN (SOLO si preguntan por varias unidades):
 - 3er producto al 50% OFF (puede ser combinado, ej: 60 gotas + 60 cápsulas + 1 extra). NO hay escalada para 4ta/5ta — siempre el 3ro más barato al 50%.
 - NO ofrezcas descuentos si no preguntaron.
 
-ENVÍO: Gratis por Correo Argentino. *Retiro en sucursal* (paga al retirar): *7 a 10 días hábiles*. *Envío a domicilio PREPAGO* (tarjeta de crédito o transferencia): despacha antes, *4 días hábiles*. Usá esto como argumento: si paga por adelantado, le llega más rápido.
+ENVÍO: Gratis por Correo Argentino. *Retiro en sucursal* (paga al retirar): *7 a 10 días hábiles*. *Envío a domicilio PREPAGO* (${mpOn ? 'tarjeta de crédito o transferencia' : 'transferencia'}): despacha antes, *4 días hábiles*. Usá esto como argumento: si paga por adelantado, le llega más rápido.
 
-${PAYMENT_POLICY}
+${_paymentPolicy(mpOn)}
 
 EFECTOS: Solo efecto laxante/diurético leve los primeros días. Normal y transitorio. Se va en la primera semana tomando agua.
 
@@ -467,11 +514,13 @@ REGLA ANTI - REPETICIÓN DE DATOS: Si ya pediste los datos de envío recientemen
 - GANCHO DE SEGUIMIENTO (cierre suave): después de tomar los datos podés cerrar sembrando una acción futura real — "Cuando esté todo listo te vamos avisando el código de seguimiento así seguís el envío 😊". Da continuidad y prueba de que es real. 🛑 NO digas que el pedido ya está confirmado/en curso/despachado (eso lo emite el sistema) ni presupongas que ya salió.`;
 }
 
-function _getModuleObjection(prices: Record<string, any>): string {
+function _getModuleObjection(prices: Record<string, any>, mpOn: boolean = true): string {
     return `
 OBJECIONES COMUNES:
     - "Es caro": "Pensalo así: es menos que una gaseosa por día. Y es una inversión que funciona de verdad."
-        - "No confío / Estafa": "Llevamos 13 años y casi 70.000 clientes nos avalan 😊 Si querés mayor tranquilidad podés pagar con tarjeta de crédito — el pago es protegido y vos quedás con el comprobante. O si preferís, retiro en sucursal de Correo Argentino: pagás el total en efectivo cuando lo retirás."
+        - "No confío / Estafa": ${mpOn
+        ? '"Llevamos 13 años y casi 70.000 clientes nos avalan 😊 Si querés mayor tranquilidad podés pagar con tarjeta de crédito — el pago es protegido y vos quedás con el comprobante. O si preferís, retiro en sucursal de Correo Argentino: pagás el total en efectivo cuando lo retirás."'
+        : '"Llevamos 13 años y casi 70.000 clientes nos avalan 😊 Y si querés máxima tranquilidad, lo mandamos a retiro en sucursal de Correo Argentino: no pagás un peso hasta tenerlo en la mano, abonás el total en efectivo cuando lo retirás."'}
             - "No funciona?": "100% natural, funciona con constancia."
                 - "Me da miedo / Efectos secundarios": "Producto natural líder mundial, 70 mil clientes, casos de 40kg. Si no sentís la seguridad para avanzar, lo dejamos acá. ¿Querés seguir?"
                     - "Mi marido/señora no quiere" / "tengo que consultar": "¡Entiendo! Si querés te lo dejo agendado y te lo envío cuando me confirmes. ¿A partir de qué día te queda cómodo recibirlo?" Si insiste: "Dale, avisame cuando lo charlen 😊" goalMet = false.
@@ -484,7 +533,7 @@ REENCUADRE "NO VOY A ESTAR EN CASA / no me encuentran": no postergues solamente 
 
 PROYECCIÓN DE RESULTADOS (dato AUTORIZADO por el dueño — excepción explícita a ANTI-INVENCIÓN): si preguntan "¿cuánto bajo / en cuánto tiempo?", podés dar ESTE rango aprobado y ningún otro: con ~30 kg de sobrepeso, 7 a 10 kg el primer mes; con ~10 kg de sobrepeso, 3 a 4 kg el primer mes. SIEMPRE aclarando "con constancia y tomando agua; cada cuerpo es distinto". NO inventes otras cifras ni garantices un número exacto.
 
-${PAYMENT_POLICY}
+${_paymentPolicy(mpOn)}
 
 PAGO Y ENVÍO — NOTAS DE ESTE PASO:
 - Si "llega" + "pago/abona/plata/cobran": ES PREGUNTA DE PAGO, no de entrega.
@@ -504,8 +553,8 @@ Si el cliente dice cosas como "esperando confirmación", "esperando aún", "ya s
 2. NO inventes que hay un pedido en marcha cuando no lo hay.
 3. NO repitas "ya tenés todo claro" o "todo está en marcha" si el cliente está pidiendo claridad — eso es exactamente lo opuesto a lo que necesita.
 
-🛑 POSTERGACIÓN EXPLÍCITA DE PAGO MP (no insistir) 🛑
-Si el cliente con link de MP pendiente escribe textualmente "te aviso cuando cobre", "yo te aviso cuando tenga la plata", "todavía no cobré", "no me han pagado todavía", "cuando me paguen te aviso" — extractedData="POSTPONE_INDEFINITE". Eso desactiva los recordatorios automáticos del scheduler. Confirmá una sola vez ("¡Tranqui! Cuando puedas, me escribís y retomamos 😊") y nada más. NO mandes recordatorios ni links cada media hora.`;
+🛑 POSTERGACIÓN EXPLÍCITA DE PAGO PENDIENTE (no insistir) 🛑
+Si el cliente con un pago pendiente escribe textualmente "te aviso cuando cobre", "yo te aviso cuando tenga la plata", "todavía no cobré", "no me han pagado todavía", "cuando me paguen te aviso" — extractedData="POSTPONE_INDEFINITE". Eso desactiva los recordatorios automáticos del scheduler. Confirmá una sola vez ("¡Tranqui! Cuando puedas, me escribís y retomamos 😊") y nada más. NO mandes recordatorios ni links cada media hora.`;
 }
 
 function _getModuleConsumption(): string {
@@ -517,12 +566,12 @@ INSTRUCCIONES DE CONSUMO(responder SOLO el producto preguntado):
 - GOTAS: Semana 1: 10 gotas antes de la comida principal con agua.Semana 2 +: antes del almuerzo o cena, ajustando según progreso.`;
 }
 
-function _getModulePostSale(): string {
+function _getModulePostSale(mpOn: boolean = true): string {
     return `
 Este cliente YA COMPRÓ.Sos un asistente post - venta amable.
         REGLAS:
     1. Si saluda: respondé breve.
-2. Si pregunta por envío / demora: *retiro en sucursal* (paga al retirar) *7 a 10 días hábiles*; *envío a domicilio prepago* (tarjeta de crédito o transferencia) más rápido, *4 días hábiles*.
+2. Si pregunta por envío / demora: *retiro en sucursal* (paga al retirar) *7 a 10 días hábiles*; *envío a domicilio prepago* (${mpOn ? 'tarjeta de crédito o transferencia' : 'transferencia'}) más rápido, *4 días hábiles*.
 3. Si pide postergar ENVÍO a fecha futura: Si la fecha cae dentro de ~10 días hábiles desde hoy: "Los envíos tardan 7 a 10 días hábiles (4 si fue a domicilio prepago), así que llega justo para esa fecha, no hay problema". Si pide MÁS adelante que eso: aceptá, confirmá y extraé POSTDATE: [fecha].
 4. Si tiene reclamo / duda compleja: extractedData = "NEED_ADMIN".
 5. Si quiere VOLVER A COMPRAR: extractedData = "RE_PURCHASE" y preguntale qué quiere.
@@ -559,7 +608,7 @@ DEBES LLAMAR A LA HERRAMIENTA 'control_dialog_flow' PARA EMITIR TU RESPUESTA AL 
 // ── PROMPT BUILDER — Selects the right module for each step ──
 // stable=true: el system NO depende del userText (incluye todas las reglas), así
 // queda byte-estable por (step) y se puede cachear con prompt caching.
-async function _buildSystemPrompt(step: string, userText: string = "", stable: boolean = false): Promise<string> {
+async function _buildSystemPrompt(step: string, userText: string = "", stable: boolean = false, mpOn: boolean = true): Promise<string> {
     const prices = await _getPrices();
     let module;
 
@@ -567,10 +616,10 @@ async function _buildSystemPrompt(step: string, userText: string = "", stable: b
         case 'waiting_weight':
         case 'waiting_preference':
         case 'waiting_preference_consultation':
-            module = _getModuleEarlyFunnel(prices);
+            module = _getModuleEarlyFunnel(prices, mpOn);
             break;
         case 'waiting_plan_choice':
-            module = _getModulePlanChoice(prices);
+            module = _getModulePlanChoice(prices, mpOn);
             break;
         case 'waiting_data':
             module = _getModuleDataCollection();
@@ -579,16 +628,16 @@ async function _buildSystemPrompt(step: string, userText: string = "", stable: b
         case 'waiting_ok':
         case 'waiting_final_confirmation':
         case 'closing':
-            module = _getModuleObjection(prices);
+            module = _getModuleObjection(prices, mpOn);
             break;
         case 'post_sale':
-            module = _getModulePostSale();
+            module = _getModulePostSale(mpOn);
             break;
         case 'safety_check':
             module = _getModuleSafety();
             break;
         default:
-            module = _getModuleObjection(prices);
+            module = _getModuleObjection(prices, mpOn);
             break;
     }
 
@@ -601,7 +650,7 @@ async function _buildSystemPrompt(step: string, userText: string = "", stable: b
     const extraModule = consumptionSteps.includes(step) ? '\n' + _getModuleConsumption() : '';
 
     return [
-        _getCorePrompt(userText, stable), // TOP — max attention (identity, tone, dynamic rules)
+        _getCorePrompt(userText, stable, mpOn), // TOP — max attention (identity, tone, dynamic rules)
         module,                           // MIDDLE — step-specific context
         extraModule,                      // MIDDLE — consumption (if relevant step)
         _getExtractionRules()             // BOTTOM — max attention (data extraction instructions)
@@ -866,6 +915,10 @@ class AIService {
      * Main Chat Function
      */
     async chat(userText: string, context: APIContext): Promise<AIParsedResponse> {
+        // Interruptor de Mercado Pago del seller (lo inyecta el proxy de salesFlow).
+        // Default encendido: si un caller no lo pasa, el prompt queda como siempre.
+        const mpOn = context.mpEnabled !== false;
+
         // Build dynamic history. MAX_HISTORY_LENGTH = 30 cubre conversación viva;
         // el rolling summary cubre lo anterior sin inflar el prompt.
         let conversationHistory = (context.history || []).slice(-MAX_HISTORY_LENGTH);
@@ -903,16 +956,18 @@ class AIService {
                 knowledgeContext += `- Gastritis/úlcera/acidez: cápsulas o gotas (semillas pueden irritar). Es la única razón médica para descartar una forma.\n`;
                 knowledgeContext += `- Contraindicaciones: solo embarazo y lactancia.NO menores de edad.\n`;
                 knowledgeContext += `- PRECIOS (COTIZÁ EN CONTEXTO): Si YA recomendaste un producto o el cliente ya mostró interés/eligió uno (ej cápsulas) y pregunta el precio, dale SOLO los 2 planes (60 y 120 días) de ESE producto — NO la lista de los 3. La lista completa SOLO si todavía no hay un producto en foco, o si piden "precio de todos"/"lista de precios". Si no hay foco y preguntan "precio" a secas, decí el rango "$${priceSem60} a $${priceGotas120}". Datos de precios (elegí el producto que corresponda): ${priceString}.\n`;
-                knowledgeContext += `- ENVÍO Y PAGO: Envío gratis por Correo Argentino. 2 opciones: retiro en sucursal (paga en efectivo al retirar, 7 a 10 días hábiles) o envío a domicilio prepago con tarjeta de crédito o transferencia (más rápido, 4 días hábiles). NUNCA menciones cuotas ni anticipo.\n`;
+                knowledgeContext += `- ENVÍO Y PAGO: Envío gratis por Correo Argentino. 2 opciones: retiro en sucursal (paga en efectivo al retirar, 7 a 10 días hábiles) o envío a domicilio prepago con ${mpOn ? 'tarjeta de crédito o transferencia' : 'transferencia bancaria (el pago con tarjeta está fuera de servicio: NO lo menciones)'} (más rápido, 4 días hábiles). NUNCA menciones cuotas ni anticipo.\n`;
             } else if (step === 'waiting_price_confirmation') {
                 knowledgeContext += `- El usuario todavía NO vio precios.Tu trabajo es convencerlo de que quiera verlos.\n`;
                 knowledgeContext += `- Contraindicaciones: solo embarazo y lactancia.NO menores de edad.\n`;
                 knowledgeContext += `- (NO menciones precios específicos ni formas de pago, solo que son accesibles) \n`;
             } else if (['waiting_plan_choice', 'closing', 'waiting_ok'].includes(step)) {
                 knowledgeContext += `- PRECIOS: ${priceString} \n`;
-                knowledgeContext += `- POLÍTICA DE ENVÍO Y PAGO (modelo jun-2026): 2 opciones — (1) *Retiro en sucursal* → contrarrembolso, paga el TOTAL en efectivo al retirar en una sucursal de Correo Argentino (sin anticipo); (2) *Envío a domicilio* → prepago con *tarjeta de crédito* (link de pago) o *transferencia bancaria* al alias HERBALIS.TIENDA (BIO ORIGEN S.A.S.). De cara al cliente el medio online se llama "Tarjeta de crédito" (NUNCA "Mercado Pago", débito, Pago Fácil ni Rapipago). Aplica a TODOS los planes. NUNCA menciones cuotas ni anticipo de $10.000.\n`;
+                knowledgeContext += mpOn
+                    ? `- POLÍTICA DE ENVÍO Y PAGO (modelo jun-2026): 2 opciones — (1) *Retiro en sucursal* → contrarrembolso, paga el TOTAL en efectivo al retirar en una sucursal de Correo Argentino (sin anticipo); (2) *Envío a domicilio* → prepago con *tarjeta de crédito* (link de pago) o *transferencia bancaria* al alias HERBALIS.TIENDA (BIO ORIGEN S.A.S.). De cara al cliente el medio online se llama "Tarjeta de crédito" (NUNCA "Mercado Pago", débito, Pago Fácil ni Rapipago). Aplica a TODOS los planes. NUNCA menciones cuotas ni anticipo de $10.000.\n`
+                    : `- POLÍTICA DE ENVÍO Y PAGO: 2 opciones — (1) *Retiro en sucursal* → contrarrembolso, paga el TOTAL en efectivo al retirar en una sucursal de Correo Argentino (sin anticipo); (2) *Envío a domicilio* → prepago por *transferencia bancaria* al alias HERBALIS.TIENDA (BIO ORIGEN S.A.S.). 🛑 El pago con TARJETA está fuera de servicio en estos días: NO lo ofrezcas ni lo menciones (ni "tarjeta", ni "link de pago", ni "Mercado Pago"). Aplica a TODOS los planes. NUNCA menciones cuotas ni anticipo de $10.000.\n`;
                 knowledgeContext += `- NO mencionar 'adicional de $6.000' (esa política ya no existe). NO decir 'envío gratis solo en plan 120'.\n`;
-                knowledgeContext += `- Envío gratis por Correo Argentino. *Retiro en sucursal* (paga al retirar): *7 a 10 días hábiles*. *Envío a domicilio PREPAGO* (tarjeta de crédito/transferencia): más rápido, *4 días hábiles* — usalo como argumento para cerrar el prepago.\n`;
+                knowledgeContext += `- Envío gratis por Correo Argentino. *Retiro en sucursal* (paga al retirar): *7 a 10 días hábiles*. *Envío a domicilio PREPAGO* (${mpOn ? 'tarjeta de crédito/transferencia' : 'transferencia'}): más rápido, *4 días hábiles* — usalo como argumento para cerrar el prepago.\n`;
             } else if (step === 'waiting_data') {
                 knowledgeContext += `- Necesitamos: nombre completo, calle y número, ciudad, código postal\n`;
                 knowledgeContext += `- PROHIBIDO PEDIR NÚMERO DE TELÉFONO.Ya estamos hablando por WhatsApp, ¡ya tenemos su número! Nunca pidas este dato.\n`;
@@ -1003,7 +1058,11 @@ INSTRUCCIONES:
             if (context.forceClaude === true) useClaudeNow = !!this.anthropic;
             else if (context.forceClaude === false) useClaudeNow = false;
             else useClaudeNow = this._useClaudeFor(context.sellerId, context.phone);
-            const cacheEngine = useClaudeNow ? 'claude' : 'openai';
+            // El namespace del semantic cache separa por engine Y por interruptor de
+            // MP: las respuestas cacheadas de los steps tempranos suelen incluir los
+            // medios de pago, así que una guardada con tarjeta no puede servirse
+            // cuando la tarjeta está apagada (ni al revés cuando vuelve).
+            const cacheEngine = (useClaudeNow ? 'claude' : 'openai') + (mpOn ? '' : ':nomp');
 
             // ── Semantic cache lookup (FAQs / paraphrased questions) ──
             // Only hits cacheable steps; skipped automatically otherwise.
@@ -1042,7 +1101,7 @@ INSTRUCCIONES:
             }
 
             const chatModel = _getModelForStep(step);
-            const systemPrompt = await _buildSystemPrompt(step, userText);
+            const systemPrompt = await _buildSystemPrompt(step, userText, false, mpOn);
 
             // useClaudeNow ya se calculó arriba (lo necesitábamos para el cache).
             if (useClaudeNow) {
@@ -1050,7 +1109,7 @@ INSTRUCCIONES:
                 // user/assistant reales + system estable cacheado. El path OpenAI de
                 // abajo NO se toca (sigue con userPrompt + systemPrompt clásicos).
                 const structured = WA_STRUCTURED_TURNS;
-                const sysForClaude = structured ? await _buildSystemPrompt(step, userText, true) : systemPrompt;
+                const sysForClaude = structured ? await _buildSystemPrompt(step, userText, true, mpOn) : systemPrompt;
                 const turns = structured ? buildHistoryTurns(conversationHistory, userText) : undefined;
                 const promptForClaude = structured ? userPromptNoHistory : userPrompt;
                 const cArgs = await this._claudeChat(sysForClaude, promptForClaude, step, context.sellerId!, turns);
@@ -1101,7 +1160,10 @@ INSTRUCCIONES:
                 // los embebe), igual que el path Claude. Con solo step+userText, dos
                 // clientes que escriben lo mismo en el mismo step se cruzaban la
                 // respuesta cacheada (total/nombre del otro).
-                `chat_${step}_${userPrompt}`,
+                // El sufijo de MP evita servir una respuesta cacheada con tarjeta
+                // después de apagar el interruptor (el userPrompt no siempre cambia:
+                // la política de pago vive en el system, no en el user).
+                `chat_${step}_${mpOn ? 'mp' : 'nomp'}_${userPrompt}`,
                 undefined,
                 context.sellerId || 'global'
             );

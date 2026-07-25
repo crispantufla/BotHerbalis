@@ -388,8 +388,9 @@ async function _maybeSendPaymentMenuV7(
 ): Promise<void> {
     if (nextStep !== 'waiting_payment_method') return;
     const { buildPaymentMessage } = require('../../utils/messageTemplates');
+    const { isMpEnabled } = require('./paymentOptions');
     const { sendMessageWithDelay, saveState } = dependencies;
-    const paymentMsg = buildPaymentMessage(currentState, knowledge);
+    const paymentMsg = buildPaymentMessage(currentState, knowledge, !isMpEnabled(dependencies.config));
     currentState.history.push({ role: 'bot', content: paymentMsg, timestamp: Date.now() });
     saveState(userId);
     await sendMessageWithDelay(userId, paymentMsg);
@@ -418,7 +419,8 @@ const _SHIPSWITCH_TRANSFER = /\b(transfer[ei]ncia|transferir|por transferencia|a
 
 function _detectShipPaySwitch(
     normalizedText: string,
-    currentState: any
+    currentState: any,
+    mpOn: boolean = true
 ): { shipping?: 'retiro' | 'domicilio'; payment?: 'mercadopago' | 'transferencia' } | null {
     if (!_SHIPSWITCH_MARKER.test(normalizedText)) return null;
     let shipping: 'retiro' | 'domicilio' | undefined;
@@ -426,7 +428,11 @@ function _detectShipPaySwitch(
     if (_SHIPSWITCH_RETIRO.test(normalizedText) && currentState.shippingChoice !== 'retiro') shipping = 'retiro';
     else if (_SHIPSWITCH_DOMICILIO.test(normalizedText) && currentState.shippingChoice !== 'domicilio') shipping = 'domicilio';
     if (_SHIPSWITCH_TRANSFER.test(normalizedText) && currentState.paymentMethod !== 'transferencia') payment = 'transferencia';
-    else if (_SHIPSWITCH_TARJETA.test(normalizedText) && currentState.paymentMethod !== 'mercadopago') payment = 'mercadopago';
+    // Con el interruptor de MP apagado, "mejor pago con tarjeta" NO es un cambio
+    // de medio aplicable: si lo tomáramos, reencauzaríamos a waiting_payment_method
+    // para terminar diciéndole que no está disponible. Lo dejamos pasar al step
+    // actual, que responde la objeción con las opciones vivas.
+    else if (mpOn && _SHIPSWITCH_TARJETA.test(normalizedText) && currentState.paymentMethod !== 'mercadopago') payment = 'mercadopago';
     if (!shipping && !payment) return null;
     return { shipping, payment };
 }
@@ -442,7 +448,8 @@ function _handleShipPaySwitch(
     currentState: any,
     dependencies: any
 ): { matched: boolean; staleReprocess?: boolean } | null {
-    const sw = _detectShipPaySwitch(normalizedText, currentState);
+    const { isMpEnabled } = require('./paymentOptions');
+    const sw = _detectShipPaySwitch(normalizedText, currentState, isMpEnabled(dependencies?.config));
     if (!sw) return null;
     if (sw.shipping) {
         currentState.shippingChoice = null;
