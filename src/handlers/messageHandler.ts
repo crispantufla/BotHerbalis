@@ -16,6 +16,15 @@ const { _cleanPhone } = require('../flows/utils/flowHelpers');
 
 const DEBOUNCE_MS = 10000;
 
+// Eventos que WhatsApp emite por el mismo canal que los mensajes pero que NO
+// son una persona escribiendo (rotación de claves, cambios de grupo, llamadas,
+// mensajes borrados o todavía sin desencriptar). No hay nada que contestar y no
+// deben ensuciar el chat del dashboard: se descartan, pero CON log.
+const WA_SYSTEM_TYPES = new Set([
+    'e2e_notification', 'notification', 'notification_template', 'protocol',
+    'gp2', 'group_notification', 'ciphertext', 'revoked', 'call_log'
+]);
+
 export interface MessageHandlerContext {
     sellerId: string;
     client: any;
@@ -40,6 +49,16 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
     } = ctx;
 
     const lastPausedUserAlerts = new Map<string, number>();
+    // Avisos de "no pude procesar este mensaje". Throttle por cliente igual que
+    // lastPausedUserAlerts: si el Chromium del agente se rompe, TODOS los
+    // mensajes fallan y sin esto el admin recibiría cientos de avisos.
+    const lastLostMsgAlerts = new Map<string, number>();
+    const _shouldAlertLost = (id: string): boolean => {
+        const now = Date.now();
+        if (now - (lastLostMsgAlerts.get(id) || 0) < 30 * 60 * 1000) return false;
+        lastLostMsgAlerts.set(id, now);
+        return true;
+    };
 
     async function _processDebounced(userId: string): Promise<void> {
         const pending = pendingMessages.get(userId);
@@ -154,7 +173,15 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
                 if (resolved) {
                     userId = resolved;
                     logger.info(`[ID-RESOLVE][${sellerId}] ${msg.from} → ${userId}`);
-                    try { await redisConnection.set(stickyKey, userId, 'EX', 604800); } catch { /* noop */ }
+                    // Además del mapa lid→teléfono guardamos el INVERSO: el panel
+                    // pide el historial por teléfono, pero en el store de WhatsApp
+                    // el chat de estos contactos ya vive bajo el @lid, así que
+                    // getChatById('549...@c.us') tira error y el chat se ve vacío.
+                    // Con esta key, /history puede reintentar con el @lid real.
+                    try {
+                        await redisConnection.set(stickyKey, userId, 'EX', 604800);
+                        await redisConnection.set(`lidmap:${sellerId}:phone:${userId}`, msg.from, 'EX', 604800);
+                    } catch { /* noop */ }
                 } else {
                     // No se pudo resolver ahora → reusar la última resolución conocida
                     // para no abrir una segunda conversación bajo el id crudo.
@@ -234,8 +261,29 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
 
             // Audio
             if (msg.type === 'ptt' || msg.type === 'audio') {
-                const media = await msg.downloadMedia();
-                if (media) {
+                // downloadMedia() es un RPC al Chromium del agente y puede tirar un
+                // error minificado ("r"). Antes ese throw subía al catch global y el
+                // audio se perdía ENTERO: sin ChatLog, sin aviso al admin y sin
+                // respuesta al cliente — él veía "enviado" y en el panel el chat
+                // quedaba vacío. Lo mismo pasaba con el `else { return }` mudo
+                // cuando media venía null (reporte de horacio, varias veces al día).
+                let media: any = null;
+                try {
+                    media = await msg.downloadMedia();
+                } catch (e: any) {
+                    logger.warn(`[AUDIO][${sellerId}] downloadMedia falló para ${userId}: ${e.message}`);
+                }
+                if (!media) {
+                    logAndEmit(userId, 'user', '🎤 Audio recibido (no se pudo descargar)', userState[userId]?.step || 'new');
+                    await client.sendMessage(userId, 'Disculpá, no pude escuchar bien el audio. ¿Me lo escribís?');
+                    return;
+                }
+
+                // La URL sirve para reproducirlo en el dashboard; si el guardado en
+                // disco falla igual seguimos con la transcripción (mejor un mensaje
+                // sin audio adjunto que un mensaje perdido).
+                let audioUrl: string | null = null;
+                try {
                     const audioDir = path.join(dataDir, '..', 'public', 'media', 'audio');
                     await fs.promises.mkdir(audioDir, { recursive: true }).catch(() => {});
                     const ext = media.mimetype?.includes('ogg') ? 'ogg' : 'mp3';
@@ -246,17 +294,27 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
                     // dashboard sigue funcionando igual.
                     const audioFilename = `aud_${Date.now()}_${crypto.randomUUID()}.${ext}`;
                     await fs.promises.writeFile(path.join(audioDir, audioFilename), Buffer.from(media.data, 'base64'));
-                    const audioUrl = `/media/audio/${audioFilename}`;
-                    const transcription = await aiService.transcribeAudio(media.data, media.mimetype);
-                    if (transcription) {
-                        logAndEmit(userId, 'user', `MEDIA_AUDIO:${audioUrl}|TRANSCRIPTION:${transcription}`, userState[userId]?.step || 'new');
-                        msgText = transcription;
-                    } else {
-                        logAndEmit(userId, 'user', `MEDIA_AUDIO:${audioUrl}`, userState[userId]?.step || 'new');
-                        await client.sendMessage(userId, 'Disculpá, no pude escuchar bien el audio. ¿Me lo escribís?');
-                        return;
-                    }
-                } else { return; }
+                    audioUrl = `/media/audio/${audioFilename}`;
+                } catch (e: any) {
+                    logger.warn(`[AUDIO][${sellerId}] no pude guardar el audio de ${userId}: ${e.message}`);
+                }
+
+                let transcription: string | null = null;
+                try {
+                    transcription = await aiService.transcribeAudio(media.data, media.mimetype);
+                } catch (e: any) {
+                    logger.warn(`[AUDIO][${sellerId}] transcripción falló para ${userId}: ${e.message}`);
+                }
+
+                const audioLog = audioUrl ? `MEDIA_AUDIO:${audioUrl}` : '🎤 Audio recibido';
+                if (transcription) {
+                    logAndEmit(userId, 'user', `${audioLog}|TRANSCRIPTION:${transcription}`, userState[userId]?.step || 'new');
+                    msgText = transcription;
+                } else {
+                    logAndEmit(userId, 'user', audioLog, userState[userId]?.step || 'new');
+                    await client.sendMessage(userId, 'Disculpá, no pude escuchar bien el audio. ¿Me lo escribís?');
+                    return;
+                }
             }
 
             // Image/Sticker
@@ -317,7 +375,21 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
                 // mientras el bot tenía su contacto guardado.
                 if (msg.type === 'chat' || msg.type === 'template_button_reply') {
                     msgText = 'Hola! (Vengo de un anuncio)';
+                } else if (WA_SYSTEM_TYPES.has(msg.type)) {
+                    logger.info(`[SKIP-SYSTEM][${sellerId}] evento '${msg.type}' de ${msg.from} — no es un mensaje, ignorado`);
+                    return;
                 } else {
+                    // Persona real mandando algo que el flujo no sabe leer (video,
+                    // ubicación, contacto, encuesta...). Antes salía por acá SIN
+                    // ninguna traza: ni log, ni ChatLog, ni aviso — el cliente veía
+                    // "enviado" y en el panel el chat aparecía vacío. Es el caso que
+                    // horacio reportaba varias veces al día. Ahora queda registrado
+                    // en el chat y se le avisa para que conteste a mano.
+                    logger.warn(`[MSG-UNSUPPORTED][${sellerId}] ${msg.from} mandó tipo '${msg.type}' sin texto — el bot no puede procesarlo`);
+                    logAndEmit(userId, 'user', `📎 Mensaje que el bot no puede leer (${msg.type})`, userState[userId]?.step || 'new');
+                    if (_shouldAlertLost(userId)) {
+                        await notifyAdmin('📎 Mensaje que el bot no puede leer', userId, `El cliente mandó un mensaje de tipo "${msg.type}" (sin texto). El bot no sabe interpretarlo y no le respondió — miralo en WhatsApp y contestale vos.`);
+                    }
                     return;
                 }
             }
@@ -393,7 +465,17 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
                 });
             }
         } catch (err: any) {
-            logger.error(`[MESSAGE-HANDLER][${sellerId}] Error:`, err.message);
+            // Un throw acá = un mensaje de un cliente que se perdió entero. El log
+            // decía solo "Error: r" (error minificado del Chromium del agente), sin
+            // decir de quién era: imposible de rastrear. Ahora identifica el chat y
+            // le avisa al admin para que pueda contestar a mano.
+            const preview = (msg?.body || '').slice(0, 80);
+            logger.error(`[MESSAGE-HANDLER][${sellerId}] Error procesando msg de ${msg?.from} (type=${msg?.type}, body="${preview}"): ${err.message}`);
+            try {
+                if (msg?.from && !msg.fromMe && _shouldAlertLost(msg.from)) {
+                    await notifyAdmin('⚠️ Mensaje perdido', msg.from, `El bot falló al procesar un mensaje de este cliente y NO le respondió.\n\nTipo: ${msg.type}\nTexto: "${preview}"\nError: ${err.message}\n\nContestale a mano.`);
+                }
+            } catch { /* noop: si el cliente de WA está roto, el aviso tampoco sale */ }
         }
     };
 }
