@@ -6,22 +6,6 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const logger = require('../../utils/logger');
-const { redisConnection } = require('../../services/queueService');
-
-// WhatsApp migró parte de los contactos a @lid: el chat ya NO existe en su
-// store bajo <telefono>@c.us, así que getChatById(telefono) tira un error
-// minificado ("r") y el historial en vivo se cae al fallback de DB — chat
-// vacío en el panel aunque en el celular la conversación esté (reporte de
-// horacio, 09-ago-2026). messageHandler guarda el inverso teléfono→lid en
-// Redis al resolver cada entrante; acá lo usamos para reintentar.
-async function _lidForPhone(sellerId, chatId) {
-    if (!sellerId || !chatId || !chatId.endsWith('@c.us')) return null;
-    try {
-        return await redisConnection.get(`lidmap:${sellerId}:phone:${chatId}`);
-    } catch (e) {
-        return null;
-    }
-}
 
 // Nombre de archivo de audio NO adivinable y SIN el teléfono del cliente
 // (/media es estático sin auth — con <telefono>_<timestamp>.ogg cualquiera
@@ -641,14 +625,8 @@ module.exports = (clientPool) => {
                         const chat = await withTimeout(cl?.getChatById(chatId), 4000, 'Timeout getting chat history');
                         waMessages = await withTimeout(chat?.fetchMessages({ limit: 20 }), 6000, 'Timeout fetching history messages');
                     } catch (retryErr) {
-                        // Un solo reintento con el @lid del contacto (ver _lidForPhone).
-                        // Si no hay lid conocido, throw para que el catch externo
-                        // lo maneje (loguea y cae a DB).
-                        const lid = await _lidForPhone(req.sellerId, chatId);
-                        if (!lid) throw retryErr;
-                        logger.info(`[HISTORY] ${chatId} falló (${retryErr.message}) — reintento con ${lid}`);
-                        const chat = await withTimeout(cl?.getChatById(lid), 4000, 'Timeout getting chat history (lid)');
-                        waMessages = await withTimeout(chat?.fetchMessages({ limit: 20 }), 6000, 'Timeout fetching history messages (lid)');
+                        // Throw para que el catch externo lo maneje (loguea y cae a DB).
+                        throw retryErr;
                     }
                 }
                 const filtered = (waMessages || []).filter(m => m.timestamp >= resetAt);

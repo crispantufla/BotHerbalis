@@ -173,15 +173,7 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
                 if (resolved) {
                     userId = resolved;
                     logger.info(`[ID-RESOLVE][${sellerId}] ${msg.from} → ${userId}`);
-                    // Además del mapa lid→teléfono guardamos el INVERSO: el panel
-                    // pide el historial por teléfono, pero en el store de WhatsApp
-                    // el chat de estos contactos ya vive bajo el @lid, así que
-                    // getChatById('549...@c.us') tira error y el chat se ve vacío.
-                    // Con esta key, /history puede reintentar con el @lid real.
-                    try {
-                        await redisConnection.set(stickyKey, userId, 'EX', 604800);
-                        await redisConnection.set(`lidmap:${sellerId}:phone:${userId}`, msg.from, 'EX', 604800);
-                    } catch { /* noop */ }
+                    try { await redisConnection.set(stickyKey, userId, 'EX', 604800); } catch { /* noop */ }
                 } else {
                     // No se pudo resolver ahora → reusar la última resolución conocida
                     // para no abrir una segunda conversación bajo el id crudo.
