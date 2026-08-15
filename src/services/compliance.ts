@@ -84,8 +84,15 @@ const RULES: Rule[] = [
     {
         // Claims terapéuticos: frontera con medicamento.
         id: 'claim-medico',
-        pattern: /\b(cura|curar|sana|sanar|trata|tratar|elimina)\s+(el|la|los|las)\s+\w+|\bmilagro\w*\b|\bgarantiza\w*\s+resultados?\b|\bsin\s+efecto\s+rebote\b|\bdesintoxica\b|\bdetox\b/i,
-        hint: 'Sin promesas terapéuticas, milagros, garantías ni "detox". Verbos blandos: acompaña, ayuda a, favorece.',
+        // "efecto rebote" va SIN el "sin" delante a propósito. La regla pedía
+        // la fórmula exacta "sin efecto rebote" y se le colaba "No hay efecto
+        // rebote", que es la misma promesa dicha de otra manera: estuvo en la
+        // FAQ del guion desde el fork y esta auditoría la daba por buena. Da
+        // igual cómo se enuncie — decir que no lo hay es prometer un resultado
+        // sostenido en el tiempo, y eso no se puede afirmar ni siquiera para
+        // tranquilizar a quien lo pregunta.
+        pattern: /\b(cura|curar|sana|sanar|trata|tratar|elimina)\s+(el|la|los|las)\s+\w+|\bmilagro\w*\b|\bgarantiza\w*\s+resultados?\b|\befecto\s+rebote\b|\bdesintoxica\b|\bdetox\b/i,
+        hint: 'Sin promesas terapéuticas, milagros, garantías ni "detox". Y nada de "efecto rebote", ni para negarlo. Verbos blandos: acompaña, ayuda a, favorece.',
     },
     {
         // Un testimonio inventado es publicidad engañosa (Directiva UE

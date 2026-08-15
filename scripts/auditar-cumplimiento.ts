@@ -99,12 +99,24 @@ function auditarFuente(): Hallazgo[] {
     return out;
 }
 
+/**
+ * Ramas del guion que NO son texto que emitimos, sino texto que RECIBIMOS.
+ *
+ * `keywords` son las palabras que escribe el cliente para que salte una FAQ, y
+ * ahí tiene que estar "efecto rebote" precisamente para poder responder a quien
+ * lo pregunta. Auditarlas es confundir lo que decimos con lo que nos dicen: la
+ * ley limita lo primero, no lo segundo. Si algún día hay más ramas así, van
+ * aquí.
+ */
+const RAMAS_DE_ENTRADA = /\.keywords(\[\d+\])?$/;
+
 /** Cada texto del guion, recorriendo el JSON entero. */
 function auditarGuion(): Hallazgo[] {
     const out: Hallazgo[] = [];
     const knowledge = JSON.parse(fs.readFileSync(GUION, 'utf8'));
 
     (function recorrer(nodo: any, ruta: string) {
+        if (RAMAS_DE_ENTRADA.test(ruta)) return;
         if (typeof nodo === 'string') {
             const issues = checkCompliance([nodo]);
             if (issues.length) {
