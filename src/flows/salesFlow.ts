@@ -24,16 +24,36 @@ interface SalesFlowDependencies {
     _recursionDepth?: number; // profundidad actual — la stashea processSalesFlow para que los steps que re-invocan (stepGreeting) la propaguen
 }
 
-// Ad source detection from pre-filled Click-to-WhatsApp messages (literal match)
-const AD_SOURCES: { text: string; name: string }[] = [
+// Detección de fuente por el mensaje prellenado del enlace wa.me.
+//
+// CADA SUPERFICIE Y CADA CAMPAÑA TIENE SU TEXTO PROPIO, y esa es toda la
+// atribución que existe: los anuncios click-to-WhatsApp en la UE llegan sin
+// datos de conversión (degradados por normativa), así que el único rastro de
+// "¿de dónde vino esta venta?" es la primera frase que trae puesta el cliente.
+// Un dato que no se recoge en este instante no se recupera nunca.
+//
+// Regla de mantenimiento: ANTES de lanzar una campaña nueva en Meta, añadir
+// aquí una línea con su texto prellenado (distinto de los demás). El panel de
+// Herbalis Social agrupa coste y ventas por este `name`.
+//
+// `prefijo: true` = basta con que el mensaje EMPIECE así (la gente a veces
+// escribe algo detrás del texto prellenado antes de enviar). Los textos
+// legados de anuncio_1/2 se comparan exactos, como siempre.
+const AD_SOURCES: { text: string; name: string; prefijo?: boolean }[] = [
     { text: '¡Hola! Quiero más información', name: 'anuncio_1' },
-    { text: '¡Hola! Me gustaría conseguir más información sobre esto.', name: 'anuncio_2' }
+    { text: '¡Hola! Me gustaría conseguir más información sobre esto.', name: 'anuncio_2' },
+    // El enlace de la biografía de @herbalis.europa.
+    { text: 'Hola, quiero info sobre Herbalis', name: 'bio_instagram', prefijo: true },
+    // El privado que manda el respondedor de comentarios de Instagram.
+    { text: 'Hola, vengo de un comentario en Instagram', name: 'ig_comentarios', prefijo: true },
+    // El enlace del pie de las publicaciones de la página de Facebook.
+    { text: 'Hola, vengo de Facebook', name: 'facebook_post', prefijo: true },
 ];
 
 function _detectAdSource(text: string): string | null {
     const trimmed = text.trim();
     for (const ad of AD_SOURCES) {
-        if (trimmed === ad.text) return ad.name;
+        if (ad.prefijo ? trimmed.startsWith(ad.text) : trimmed === ad.text) return ad.name;
     }
     return null;
 }
