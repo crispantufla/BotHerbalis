@@ -7,38 +7,38 @@ const MANUALS = [
     {
         id: 'comandos',
         title: 'Comandos WhatsApp',
-        description: 'Guia completa para controlar el bot desde WhatsApp. Alertas, pedidos, clientes, tracking, estadisticas y configuracion.',
+        description: 'Guía completa para controlar el bot desde WhatsApp. Alertas, pedidos, clientes, seguimiento, estadísticas y configuración.',
         icon: Terminal,
         color: 'indigo',
         sections: [
             {
-                title: 'Como funciona',
+                title: 'Cómo funciona',
                 icon: HelpCircle,
-                content: `Podes controlar **todo el bot** desde WhatsApp. Cada comando empieza con **!** y podes mandarlo como texto o audio.\n\nCuando llegan alertas de pedidos, cada una tiene un **numero** (#1, #2, #3...). Para responder a una especifica, ponele el numero adelante: **1 ok**, **2 me encargo**.`
+                content: `Puedes controlar **todo el bot** desde WhatsApp. Cada comando empieza con **!** y puedes mandarlo como texto o como audio.\n\nCuando llegan alertas de pedidos, cada una tiene un **número** (#1, #2, #3...). Para responder a una en concreto, ponle el número delante: **1 ok**, **2 me encargo**.`
             },
             {
                 title: 'Confirmar un pedido',
                 icon: CheckCircle,
-                content: `Manda el **numero de alerta + ok** para aprobar.`,
+                content: `Manda el **número de alerta + ok** para aprobarlo.`,
                 table: {
-                    headers: ['Escribis', 'Que hace'],
+                    headers: ['Escribes', 'Qué hace'],
                     rows: [
                         ['1 ok', 'Confirma el pedido de la alerta #1'],
                         ['2 ok', 'Confirma la alerta #2'],
-                        ['1 dale / 1 si', 'Igual que "1 ok"'],
-                        ['ok', 'Confirma la alerta mas reciente'],
+                        ['1 si / 1 confirmar', 'Igual que "1 ok"'],
+                        ['ok', 'Confirma la alerta más reciente'],
                     ]
                 },
             },
             {
-                title: 'Tomar control ("Me encargo")',
+                title: 'Tomar el control ("Me encargo")',
                 icon: Hand,
-                content: `Pausa el bot para un cliente y lo atendes vos directamente.`,
+                content: `Pausa el bot para un cliente y lo atiendes tú directamente.`,
                 table: {
-                    headers: ['Escribis', 'Que hace'],
+                    headers: ['Escribes', 'Qué hace'],
                     rows: [
-                        ['1 me encargo', 'Pausa el bot para cliente #1'],
-                        ['me encargo', 'Pausa la alerta mas reciente'],
+                        ['1 me encargo', 'Pausa el bot para el cliente #1'],
+                        ['me encargo', 'Pausa la alerta más reciente'],
                     ]
                 },
                 extra: `Cuando termines, usa **!despauser [tel]** para reactivar el bot.`
@@ -47,157 +47,157 @@ const MANUALS = [
                 title: 'Alertas activas',
                 icon: List,
                 content: `Manda **!alertas** para ver la cola numerada.`,
-                codeBlock: `Alertas activas (3):\n\n#1 -- Juan (5491155551234) -- Kit Herbalis -- hace 2 min\n#2 -- Maria (5491166662345) -- Pack Premium -- hace 30 seg\n#3 -- Carlos (5491177773456) -- Kit Basico -- hace 10 seg`
+                codeBlock: `Alertas activas (3):\n\n#1 -- Juan (34612345678) -- Cápsulas 120 días -- hace 2 min\n#2 -- María (34622334455) -- Gotas 60 días -- hace 30 seg\n#3 -- Carlos (34655667788) -- Semillas 120 días -- hace 10 seg`
             },
             {
-                title: 'Respuestas rapidas contextuales',
+                title: 'Respuestas rápidas contextuales',
                 icon: Zap,
-                content: `Cada alerta incluye **3 respuestas rapidas** sugeridas segun el contexto. El bot analiza el paso del cliente y su ultimo mensaje para sugerir las mejores respuestas.`,
+                content: `Cada alerta incluye **3 respuestas rápidas** sugeridas según el contexto. El bot analiza el paso en el que está el cliente y su último mensaje para sugerir las mejores respuestas.`,
                 table: {
-                    headers: ['Escribis', 'Que hace'],
+                    headers: ['Escribes', 'Qué hace'],
                     rows: [
-                        ['1r1', 'Envia respuesta rapida 1 al cliente de alerta #1'],
-                        ['1r2', 'Envia respuesta rapida 2 al cliente de alerta #1'],
-                        ['2r3', 'Envia respuesta rapida 3 al cliente de alerta #2'],
-                        ['r1', 'Envia respuesta rapida 1 a la alerta mas reciente'],
+                        ['1r1', 'Envía la respuesta rápida 1 al cliente de la alerta #1'],
+                        ['1r2', 'Envía la respuesta rápida 2 al cliente de la alerta #1'],
+                        ['2r3', 'Envía la respuesta rápida 3 al cliente de la alerta #2'],
+                        ['r1', 'Envía la respuesta rápida 1 a la alerta más reciente'],
                     ]
                 },
-                extra: `Las sugerencias cambian segun: **paso del cliente** (datos, precio, confirmacion) y **lo que escribio** (dudas, desconfianza, rechazo).`
+                extra: `Las sugerencias cambian según: **el paso del cliente** (datos, precio, confirmación) y **lo que ha escrito** (dudas, desconfianza, rechazo).`
             },
             {
                 title: 'Instrucciones por IA',
                 icon: Sparkles,
-                content: `El bot genera un mensaje a partir de tu instruccion y se lo envia al cliente.`,
+                content: `El bot genera un mensaje a partir de tu instrucción y se lo envía al cliente.`,
                 table: {
-                    headers: ['Escribis', 'Que hace'],
+                    headers: ['Escribes', 'Qué hace'],
                     rows: [
-                        ['1 decile que el envio tarda 48hs', 'Mensaje IA para cliente #1'],
-                        ['2 preguntale si prefiere otro', 'Mensaje IA para cliente #2'],
+                        ['1 dile que el envío tarda 3 a 5 días laborables', 'Mensaje IA para el cliente #1'],
+                        ['2 pregúntale si prefiere otro formato', 'Mensaje IA para el cliente #2'],
                     ]
                 },
             },
             {
-                title: 'Gestion de clientes',
+                title: 'Gestión de clientes',
                 icon: Users,
                 table: {
-                    headers: ['Escribis', 'Que hace'],
+                    headers: ['Escribes', 'Qué hace'],
                     rows: [
-                        ['!pausados', 'Ver clientes con el bot pausado'],
+                        ['!pausados', 'Ver los clientes con el bot pausado'],
                         ['!despauser [tel]', 'Reactivar el bot para un cliente'],
-                        ['!reset [tel]', 'Reiniciar estado de un cliente'],
-                        ['!historial [tel]', 'Resumen IA de la conversacion'],
+                        ['!reset [tel]', 'Reiniciar el estado de un cliente'],
+                        ['!historial [tel]', 'Resumen IA de la conversación'],
                         ['!enviar [tel] [msg]', 'Mensaje directo sin IA'],
                     ]
                 },
             },
             {
-                title: 'Pedidos y tracking',
+                title: 'Pedidos y seguimiento',
                 icon: Package,
                 table: {
-                    headers: ['Escribis', 'Que hace'],
+                    headers: ['Escribes', 'Qué hace'],
                     rows: [
-                        ['!pedidos', 'Ultimos 5 pedidos de todos'],
+                        ['!pedidos', 'Últimos 5 pedidos de todos'],
                         ['!pedido [tel]', 'Pedidos de un cliente'],
-                        ['!tracking [tel] [cod]', 'Cargar codigo de seguimiento y avisar al cliente'],
+                        ['!tracking [tel] [cod]', 'Cargar el localizador de Correos y avisar al cliente'],
                     ]
                 },
-                extra: `**!tracking** envia automaticamente el codigo al cliente por WhatsApp.`
+                extra: `**!tracking** envía automáticamente el localizador al cliente por WhatsApp.`
             },
             {
-                title: 'Estado y estadisticas',
+                title: 'Estado y estadísticas',
                 icon: BarChart3,
                 table: {
-                    headers: ['Escribis', 'Que hace'],
+                    headers: ['Escribes', 'Qué hace'],
                     rows: [
-                        ['!status', 'Conexion, memoria, sesiones, alertas'],
-                        ['!stats', 'Ventas del dia, revenue, conversion'],
+                        ['!status', 'Conexión, memoria, sesiones, alertas'],
+                        ['!stats', 'Ventas del día, ingresos, conversión'],
                         ['!precios', 'Precios actuales de todos los productos'],
-                        ['!resumen', 'Reporte diario completo'],
+                        ['!resumen', 'Informe diario completo'],
                     ]
                 },
             },
             {
-                title: 'Analytics y funnel',
+                title: 'Analítica y embudo',
                 icon: BarChart3,
-                content: `Visualiza el embudo de ventas y analiza abandonos con testing A/B automatico.`,
+                content: `Muestra el embudo de ventas y analiza los abandonos con test A/B automático.`,
                 table: {
-                    headers: ['Escribis', 'Que hace'],
+                    headers: ['Escribes', 'Qué hace'],
                     rows: [
                         ['!funnel', 'Embudo paso a paso con tasas de abandono'],
-                        ['!abandonos', 'Motivos de abandono + rendimiento A/B de mensajes de seguimiento'],
+                        ['!abandonos', 'Motivos de abandono + rendimiento A/B de los mensajes de seguimiento'],
                     ]
                 },
-                extra: `El sistema envia automaticamente mensajes de re-engagement probando diferentes variantes. Con **!abandonos** ves cual funciona mejor.`
+                extra: `El sistema envía automáticamente mensajes de recuperación probando distintas variantes. Con **!abandonos** ves cuál funciona mejor.`
             },
             {
-                title: 'Configuracion del bot',
+                title: 'Configuración del bot',
                 icon: Settings,
                 table: {
-                    headers: ['Escribis', 'Que hace'],
+                    headers: ['Escribes', 'Qué hace'],
                     rows: [
                         ['!pausa-global on/off', 'Pausar o reanudar todo el bot'],
-                        ['!script', 'Ver script activo y disponibles'],
-                        ['!script v3', 'Cambiar a script v3'],
-                        ['!admin list', 'Ver numeros que reciben alertas'],
-                        ['!admin add [tel]', 'Agregar numero a alertas'],
-                        ['!admin remove [tel]', 'Quitar numero de alertas'],
+                        ['!script', 'Ver el guion activo y los disponibles'],
+                        ['!script v7', 'Cambiar al guion v7 (hoy es el único)'],
+                        ['!admin list', 'Ver los números que reciben alertas'],
+                        ['!admin add [tel]', 'Añadir un número a las alertas'],
+                        ['!admin remove [tel]', 'Quitar un número de las alertas'],
                     ]
                 },
             },
             {
-                title: 'Ejemplo: 2 alertas + tracking',
+                title: 'Ejemplo: 2 alertas + seguimiento',
                 icon: Zap,
                 steps: [
-                    { label: 'Llegan 2 alertas', detail: 'Juan (#2) y Maria (#1, mas reciente)' },
+                    { label: 'Llegan 2 alertas', detail: 'Juan (#2) y María (#1, la más reciente)' },
                     { label: 'Confirmas a Juan', detail: 'Mandas: 2 ok' },
-                    { label: 'Tomas control de Maria', detail: 'Mandas: 1 me encargo' },
-                    { label: 'Le hablas a Maria directo', detail: 'Conversas por WhatsApp normal' },
-                    { label: 'Reactivas el bot', detail: 'Mandas: !despauser 5491166662345' },
-                    { label: 'Cargas tracking de Juan', detail: 'Mandas: !tracking 5491155551234 OC123AR' },
-                    { label: 'Verificas todo', detail: 'Mandas: !status' },
+                    { label: 'Tomas el control de María', detail: 'Mandas: 1 me encargo' },
+                    { label: 'Hablas con María directamente', detail: 'Conversas por WhatsApp normal' },
+                    { label: 'Reactivas el bot', detail: 'Mandas: !despauser 34622334455' },
+                    { label: 'Cargas el seguimiento de Juan', detail: 'Mandas: !tracking 34612345678 PQ1234567890ES' },
+                    { label: 'Lo compruebas todo', detail: 'Mandas: !status' },
                 ],
             },
             {
                 title: 'Reglas importantes',
                 icon: AlertTriangle,
                 bullets: [
-                    'El numero de alerta puede cambiar. Usa !alertas para verificar.',
-                    'Sin numero = la mas reciente.',
-                    '"Me encargo" pausa el bot. Usa !despauser para reactivar.',
-                    'Podes mandar audios. Se transcriben automaticamente.',
+                    'El número de alerta puede cambiar. Usa !alertas para comprobarlo.',
+                    'Sin número = la más reciente.',
+                    '"Me encargo" pausa el bot. Usa !despauser para reactivarlo.',
+                    'Puedes mandar audios. Se transcriben automáticamente.',
                     '!pausa-global detiene el bot para TODOS los clientes.',
-                    'Maximo 50 alertas activas.',
+                    'Máximo 50 alertas activas.',
                 ],
             },
         ],
         quickRef: [
             { cmd: '!alertas', desc: 'Cola de alertas' },
             { cmd: '1 ok', desc: 'Confirmar #1' },
-            { cmd: '1 me encargo', desc: 'Tomar control #1' },
-            { cmd: '1r1 / 1r2 / 1r3', desc: 'Respuesta rapida a #1' },
+            { cmd: '1 me encargo', desc: 'Tomar el control de #1' },
+            { cmd: '1r1 / 1r2 / 1r3', desc: 'Respuesta rápida a #1' },
             { cmd: '!pausados', desc: 'Clientes pausados' },
             { cmd: '!despauser [tel]', desc: 'Reactivar cliente' },
-            { cmd: '!pedidos', desc: 'Ultimos pedidos' },
-            { cmd: '!tracking [tel] [cod]', desc: 'Cargar tracking' },
+            { cmd: '!pedidos', desc: 'Últimos pedidos' },
+            { cmd: '!tracking [tel] [cod]', desc: 'Cargar seguimiento' },
             { cmd: '!funnel', desc: 'Embudo de ventas' },
             { cmd: '!abandonos', desc: 'Abandonos + A/B' },
             { cmd: '!status', desc: 'Estado del bot' },
-            { cmd: '!stats', desc: 'Ventas del dia' },
+            { cmd: '!stats', desc: 'Ventas del día' },
             { cmd: '!precios', desc: 'Ver precios' },
             { cmd: '!pausa-global', desc: 'Pausar todo' },
             { cmd: '!enviar [tel] [msg]', desc: 'Mensaje directo' },
             { cmd: '!historial [tel]', desc: 'Resumen IA' },
             { cmd: '!reset [tel]', desc: 'Reiniciar cliente' },
-            { cmd: '!script', desc: 'Ver/cambiar script' },
+            { cmd: '!script', desc: 'Ver/cambiar guion' },
             { cmd: '!admin list', desc: 'Ver admins' },
-            { cmd: '!resumen', desc: 'Reporte diario' },
-            { cmd: '!ayuda', desc: 'Menu de comandos' },
+            { cmd: '!resumen', desc: 'Informe diario' },
+            { cmd: '!ayuda', desc: 'Menú de comandos' },
         ],
     },
     {
         id: 'panel-alertas',
         title: 'Panel Principal & Alertas',
-        description: 'Como leer el estado del bot, gestionar alertas de pedidos y entender los indicadores del panel de inicio.',
+        description: 'Cómo leer el estado del bot, gestionar las alertas de pedidos y entender los indicadores del panel de inicio.',
         icon: Bell,
         color: 'indigo',
         sections: [
@@ -209,7 +209,7 @@ const MANUALS = [
             {
                 title: 'Indicador de estado (ONLINE / OFFLINE)',
                 icon: CheckCircle,
-                content: `En la barra superior hay un punto de color con el texto **ONLINE** o **OFFLINE**.\n\n- 🟢 **ONLINE** — el bot está conectado y funcionando\n- 🔴 **OFFLINE** — el bot se desconectó, nadie está siendo atendido\n\nSi aparece OFFLINE, revisá la sección **Configuración** → Estado del Sistema para ver el motivo. Normalmente se resuelve solo en unos minutos.`,
+                content: `En la barra superior hay un punto de color con el texto **ONLINE** o **OFFLINE**.\n\n- 🟢 **ONLINE** — el bot está conectado y funcionando\n- 🔴 **OFFLINE** — el bot se ha desconectado, no se está atendiendo a nadie\n\nSi aparece OFFLINE, revisa la sección **Configuración** → Estado del Sistema para ver el motivo. Normalmente se resuelve solo en unos minutos.`,
             },
             {
                 title: 'Alertas: qué son y cómo funcionan',
@@ -218,10 +218,10 @@ const MANUALS = [
                 table: {
                     headers: ['Tipo de alerta', 'Qué significa'],
                     rows: [
-                        ['Pedido listo para confirmar', 'El cliente completó todos sus datos y espera confirmación'],
-                        ['Cliente con dudas', 'El bot detectó resistencia o preguntas que no pudo resolver'],
-                        ['Dirección problemática', 'El bot no pudo validar la dirección del cliente'],
-                        ['Modo noche', 'Un mensaje llegó fuera del horario de atención'],
+                        ['Pedido listo para confirmar', 'El cliente ha completado todos sus datos y espera la confirmación'],
+                        ['Cliente con dudas', 'El bot ha detectado resistencia o preguntas que no ha sabido resolver'],
+                        ['Dirección problemática', 'El bot no ha podido validar la dirección del cliente'],
+                        ['Modo noche', 'Ha llegado un mensaje fuera del horario de atención'],
                     ]
                 },
             },
@@ -229,30 +229,30 @@ const MANUALS = [
                 title: 'Acciones rápidas desde una alerta',
                 icon: Zap,
                 steps: [
-                    { label: 'Confirmar pedido', detail: 'Click en el botón verde "Confirmar" — el bot cierra la venta automáticamente.' },
-                    { label: 'Ir al chat', detail: 'Click en el ícono de chat — te lleva directamente a la conversación.' },
-                    { label: 'Descartar', detail: 'Click en la X roja — elimina la alerta sin hacer nada (el bot sigue activo).' },
+                    { label: 'Confirmar pedido', detail: 'Haz clic en el botón verde "Confirmar" — el bot cierra la venta automáticamente.' },
+                    { label: 'Ir al chat', detail: 'Haz clic en el icono de chat — te lleva directamente a la conversación.' },
+                    { label: 'Descartar', detail: 'Haz clic en la X roja — elimina la alerta sin hacer nada (el bot sigue activo).' },
                 ],
-                extra: `También podés gestionar alertas desde WhatsApp con los comandos **1 ok**, **1 me encargo**, etc. Ver manual "Comandos WhatsApp".`
+                extra: `También puedes gestionar las alertas desde WhatsApp con los comandos **1 ok**, **1 me encargo**, etc. Ver el manual "Comandos WhatsApp".`
             },
             {
                 title: 'Clientes esperando',
                 icon: Users,
-                content: `El bloque **"Clientes Esperando"** muestra usuarios que tienen el bot **pausado manualmente**.\n\nEsto pasa cuando:\n- Vos pausaste el bot desde el chat para atenderlos\n- El bot se pausó automáticamente por una situación especial\n\nPara reactivar el bot a un cliente, andá al chat y clickeá el botón naranja/verde de pausa.`,
+                content: `El bloque **"Clientes Esperando"** muestra los usuarios que tienen el bot **pausado manualmente**.\n\nEsto pasa cuando:\n- Has pausado el bot desde el chat para atenderlos tú\n- El bot se ha pausado automáticamente por una situación especial\n\nPara reactivar el bot a un cliente, ve al chat y pulsa el botón naranja/verde de pausa.`,
             },
             {
                 title: 'Notificaciones (campana)',
                 icon: Bell,
-                content: `El ícono de campana en la barra superior muestra las alertas pendientes. El número en rojo indica cuántas hay.\n\nClickeá la campana para ver el listado sin salir del panel. Clickeá una alerta para ir directo al chat del cliente.`,
+                content: `El icono de campana de la barra superior muestra las alertas pendientes. El número en rojo indica cuántas hay.\n\nPulsa la campana para ver el listado sin salir del panel. Pulsa una alerta para ir directo al chat del cliente.`,
             },
             {
                 title: 'Reglas importantes',
                 icon: Shield,
                 bullets: [
-                    'Las alertas nuevas suenan en tiempo real — el número en la campana se actualiza automáticamente.',
-                    'Confirmar un pedido desde el panel tiene el mismo efecto que confirmar por WhatsApp.',
+                    'Las alertas nuevas suenan en tiempo real — el número de la campana se actualiza automáticamente.',
+                    'Confirmar un pedido desde el panel tiene el mismo efecto que confirmarlo por WhatsApp.',
                     'Descartar una alerta NO pausa ni afecta al cliente, solo limpia tu lista.',
-                    'Si el bot dice OFFLINE más de 5 minutos, revisá Configuración → Estado del Sistema.',
+                    'Si el bot lleva más de 5 minutos en OFFLINE, revisa Configuración → Estado del Sistema.',
                 ],
             },
         ],
@@ -260,7 +260,7 @@ const MANUALS = [
     {
         id: 'chat-atencion',
         title: 'Chat & Atención',
-        description: 'Como leer conversaciones, pausar/reactivar el bot, enviar mensajes manuales, reiniciar chats y usar el resumen de IA.',
+        description: 'Cómo leer las conversaciones, pausar o reactivar el bot, enviar mensajes manuales, reiniciar chats y usar el resumen de IA.',
         icon: MessageCircle,
         color: 'indigo',
         sections: [
@@ -273,7 +273,7 @@ const MANUALS = [
                     rows: [
                         ['Punto rojo parpadeando', 'Alerta activa — requiere tu atención'],
                         ['Punto naranja', 'Bot pausado para ese cliente'],
-                        ['Badge "Cliente"', 'Ya compró antes (cliente recurrente)'],
+                        ['Etiqueta "Cliente"', 'Ya ha comprado antes (cliente recurrente)'],
                         ['Número en gris', 'Mensajes sin leer'],
                     ]
                 },
@@ -283,51 +283,51 @@ const MANUALS = [
                 icon: PauseCircle,
                 content: `En la barra superior del chat abierto hay un botón naranja/verde:`,
                 steps: [
-                    { label: 'Bot activo (botón naranja)', detail: 'Clickealo para pausarlo. El bot deja de responder a ese cliente.' },
-                    { label: 'Bot pausado (botón verde)', detail: 'Clickealo para reactivarlo. El bot retoma la conversación.' },
+                    { label: 'Bot activo (botón naranja)', detail: 'Púlsalo para pausarlo. El bot deja de responder a ese cliente.' },
+                    { label: 'Bot pausado (botón verde)', detail: 'Púlsalo para reactivarlo. El bot retoma la conversación.' },
                 ],
-                extra: `Cuando pausás el bot, el cliente queda en tu lista de "Clientes Esperando" del panel principal. Recordá siempre reactivarlo cuando terminés.`
+                extra: `Cuando pausas el bot, el cliente aparece en la lista de "Clientes Esperando" del panel principal. Acuérdate de reactivarlo siempre que termines.`
             },
             {
                 title: 'Enviar mensajes manuales',
                 icon: Send,
-                content: `Con el bot pausado (o activo), podés escribir en la caja de texto abajo y enviar mensajes directamente.\n\n**El bot se pausa automáticamente** cuando enviás un mensaje manual, para que no se pisen las respuestas.`,
+                content: `Con el bot pausado (o activo), puedes escribir en el cuadro de texto de abajo y enviar mensajes directamente.\n\n**El bot se pausa automáticamente** cuando envías un mensaje manual, para que no se pisen las respuestas.`,
                 steps: [
-                    { label: 'Escribí tu mensaje en la caja de texto', detail: 'En la parte inferior del chat.' },
-                    { label: 'Presioná Enter o el botón de enviar', detail: 'El mensaje se envía como si fuera el bot.' },
-                    { label: 'Reactivá el bot cuando termines', detail: 'Con el botón verde de la barra superior.' },
+                    { label: 'Escribe tu mensaje en el cuadro de texto', detail: 'En la parte inferior del chat.' },
+                    { label: 'Pulsa Intro o el botón de enviar', detail: 'El mensaje se envía como si fuera el bot.' },
+                    { label: 'Reactiva el bot cuando termines', detail: 'Con el botón verde de la barra superior.' },
                 ],
             },
             {
                 title: 'Enviar imágenes',
                 icon: ImageIcon,
-                content: `Podés enviar imágenes directamente desde el panel. Clickeá el ícono de imagen en la barra de mensajes, seleccioná el archivo y opcionalmente agregá un texto.`,
+                content: `Puedes enviar imágenes directamente desde el panel. Pulsa el icono de imagen de la barra de mensajes, elige el archivo y, si quieres, añade un texto.`,
                 extra: `Las imágenes de la galería también se pueden enviar desde la sección **Galería de Medios**.`
             },
             {
                 title: 'Reiniciar un chat',
                 icon: RotateCcw,
-                content: `El botón rojo de la papelera/reset en la barra superior **borra el historial y reinicia el estado** del cliente. Usalo cuando:\n\n- El cliente quiere empezar desde cero\n- Hubo un error grave en el flujo\n- Querés que el bot lo salude de nuevo`,
+                content: `El botón rojo de la papelera/reinicio de la barra superior **borra el historial y reinicia el estado** del cliente. Úsalo cuando:\n\n- El cliente quiere empezar desde cero\n- Ha habido un error grave en el flujo\n- Quieres que el bot lo salude de nuevo`,
                 extra: `⚠️ Esta acción es irreversible. El historial de WhatsApp y la memoria del bot se pierden.`
             },
             {
                 title: 'Resumen inteligente (IA)',
                 icon: Sparkles,
-                content: `El botón azul con el ícono de rayo genera un **resumen de la conversación** usando IA. En segundos te muestra:\n\n- Qué quiere el cliente\n- En qué paso del proceso está\n- Si hay algún bloqueo o duda pendiente\n\nÚtil para ponerse al día rápido sin leer todo el historial.`,
+                content: `El botón azul con el icono de rayo genera un **resumen de la conversación** con IA. En segundos te muestra:\n\n- Qué quiere el cliente\n- En qué paso del proceso está\n- Si hay algún bloqueo o duda pendiente\n\nÚtil para ponerte al día rápido sin leer todo el historial.`,
             },
             {
-                title: 'Ver historial de compras',
+                title: 'Ver el historial de compras',
                 icon: ShoppingCart,
-                content: `El ícono de carrito en la barra superior muestra todos los pedidos anteriores del cliente:\n\n- Producto, plan y precio de cada compra\n- Estado del envío y tracking\n- Fecha de cada pedido`,
+                content: `El icono del carrito de la barra superior muestra todos los pedidos anteriores del cliente:\n\n- Producto, plan y precio de cada compra\n- Estado del envío y localizador de Correos\n- Fecha de cada pedido`,
             },
             {
                 title: 'Reglas importantes',
                 icon: Shield,
                 bullets: [
-                    'Pausar el bot no notifica al cliente — la conversación queda igual para él.',
-                    'Siempre reactivá el bot cuando termines de atender manualmente.',
-                    'El resumen IA toma los últimos 50 mensajes del chat.',
-                    'Reiniciar el chat no cancela pedidos ya registrados en la base de datos.',
+                    'Pausar el bot no avisa al cliente — la conversación se ve igual desde su lado.',
+                    'Reactiva siempre el bot cuando termines de atender a mano.',
+                    'El resumen de IA coge los últimos 50 mensajes del chat.',
+                    'Reiniciar el chat no cancela los pedidos ya registrados en la base de datos.',
                 ],
             },
         ],
@@ -335,14 +335,14 @@ const MANUALS = [
     {
         id: 'ventas-logistica',
         title: 'Ventas & Logística',
-        description: 'Como ver y filtrar pedidos, cambiar estados y cargar tracking.',
+        description: 'Cómo ver y filtrar pedidos, cambiar estados y cargar el localizador de Correos.',
         icon: ShoppingCart,
         color: 'indigo',
         sections: [
             {
                 title: '¿Qué muestra esta sección?',
                 icon: HelpCircle,
-                content: `La sección **Ventas & Logística** lista todos los pedidos registrados por el bot y el panel. Desde acá podés ver el estado de cada venta, actualizar datos y gestionar envíos.`,
+                content: `La sección **Ventas & Logística** lista todos los pedidos registrados por el bot y por el panel. Desde aquí puedes ver el estado de cada venta, actualizar datos y gestionar los envíos.`,
             },
             {
                 title: 'Estados de un pedido',
@@ -350,25 +350,26 @@ const MANUALS = [
                 table: {
                     headers: ['Estado', 'Significado'],
                     rows: [
-                        ['Pendiente', 'El bot tomó los datos pero aún no fue confirmado'],
+                        ['Pendiente', 'El bot ha cogido los datos pero todavía no está confirmado'],
                         ['Confirmado', 'Aprobado — a preparar el paquete'],
-                        ['En sistema', 'Ingresado al sistema de despacho'],
-                        ['Enviado', 'Despachado con número de tracking'],
-                        ['Entregado', 'El cliente recibió el paquete'],
+                        ['En sistema', 'Dado de alta en el sistema de envíos de Correos'],
+                        ['Enviado', 'Entregado a Correos, con localizador'],
+                        ['Entregado', 'El cliente ha recibido el paquete y lo ha pagado'],
                         ['Cancelado', 'Venta cancelada'],
                     ]
                 },
+                extra: `Todos los pedidos son **contra reembolso**: el cliente paga cuando recibe el paquete, así que "Entregado" es también el momento del cobro.`
             },
             {
                 title: 'Filtrar y buscar pedidos',
                 icon: Filter,
-                content: `Usá la barra de búsqueda y los filtros de la parte superior para encontrar pedidos rápido.`,
+                content: `Usa la barra de búsqueda y los filtros de la parte superior para encontrar pedidos rápido.`,
                 table: {
                     headers: ['Filtro', 'Para qué sirve'],
                     rows: [
-                        ['Barra de búsqueda', 'Buscar por nombre, teléfono o código de tracking'],
+                        ['Barra de búsqueda', 'Buscar por nombre, teléfono o localizador de envío'],
                         ['Filtro de estado', 'Ver solo "Enviados", "Pendientes", etc.'],
-                        ['Filtro de vendedor', 'Ver pedidos de un número de WhatsApp específico'],
+                        ['Filtro de vendedor', 'Ver los pedidos de un número de WhatsApp concreto'],
                     ]
                 },
             },
@@ -376,21 +377,21 @@ const MANUALS = [
                 title: 'Cambiar el estado de un pedido',
                 icon: Edit2,
                 steps: [
-                    { label: 'Buscá el pedido en la lista', detail: 'Usá la barra de búsqueda o filtrá por estado.' },
-                    { label: 'Click en el ícono de edición (lápiz)', detail: 'Aparece un panel de edición.' },
-                    { label: 'Seleccioná el nuevo estado', detail: 'Usá el selector desplegable.' },
-                    { label: 'Guardá los cambios', detail: 'Click en "Guardar".' },
+                    { label: 'Busca el pedido en la lista', detail: 'Usa la barra de búsqueda o filtra por estado.' },
+                    { label: 'Haz clic en el icono de edición (lápiz)', detail: 'Aparece un panel de edición.' },
+                    { label: 'Elige el nuevo estado', detail: 'Con el desplegable.' },
+                    { label: 'Guarda los cambios', detail: 'Haz clic en "Guardar".' },
                 ],
             },
             {
-                title: 'Cargar número de tracking',
+                title: 'Cargar el localizador de Correos',
                 icon: Package,
                 steps: [
-                    { label: 'Abrí el pedido (ícono de lápiz)', detail: 'En la fila del pedido.' },
-                    { label: 'Ingresá el código de tracking', detail: 'En el campo "Tracking".' },
-                    { label: 'Guardá', detail: 'El cliente recibe automáticamente un WhatsApp con el código.' },
+                    { label: 'Abre el pedido (icono de lápiz)', detail: 'En la fila del pedido.' },
+                    { label: 'Escribe el localizador del envío', detail: 'En el campo "Tracking".' },
+                    { label: 'Guarda', detail: 'El cliente recibe automáticamente un WhatsApp con el localizador.' },
                 ],
-                extra: `También podés cargar tracking por WhatsApp con **!tracking [tel] [codigo]**.`
+                extra: `También puedes cargarlo por WhatsApp con **!tracking [tel] [localizador]**.`
             },
             {
                 title: 'Ir al chat desde un pedido',
@@ -801,7 +802,7 @@ function SectionCard({ section }) {
             )}
 
             {section.codeBlock && (
-                <pre className="bg-slate-900 text-emerald-400 text-xs rounded-control p-3 mb-3 overflow-x-auto font-mono leading-relaxed">
+                <pre className="bg-slate-900 text-success-400 text-xs rounded-control p-3 mb-3 overflow-x-auto font-mono leading-relaxed">
                     {section.codeBlock}
                 </pre>
             )}

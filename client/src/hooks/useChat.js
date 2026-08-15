@@ -33,7 +33,7 @@ export const useChat = (selectedChatId) => {
 
             const chatsWithTime = chatsRes.data.map(c => ({
                 ...c,
-                time: c.lastMessage?.timestamp ? new Date(c.lastMessage.timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' }) : ''
+                time: c.lastMessage?.timestamp ? new Date(c.lastMessage.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Madrid' }) : ''
             }));
 
             setGlobalPause(!!statsRes.data.globalPause);
@@ -231,7 +231,7 @@ export const useChat = (selectedChatId) => {
                             unreadCount: currentSelectedId === existingChat.id
                                 ? 0
                                 : (c.unreadCount || 0) + (isClientMsg ? 1 : 0),
-                            time: new Date(timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' }),
+                            time: new Date(timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Madrid' }),
                             assignedScript: data.assignedScript || c.assignedScript
                         } : c);
                     } else {
@@ -240,7 +240,7 @@ export const useChat = (selectedChatId) => {
                             name: data.chatId,
                             unreadCount: currentSelectedId === data.chatId || !isClientMsg ? 0 : 1,
                             lastMessage: { body: data.text || '', timestamp },
-                            time: new Date(timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' }),
+                            time: new Date(timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Madrid' }),
                             assignedScript: data.assignedScript
                         }, ...prev];
                     }

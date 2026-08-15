@@ -21,10 +21,10 @@ const FILTERS = [
 ];
 
 const formatArs = (amount) =>
-    new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(amount || 0);
+    new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2 }).format(amount || 0);
 
 const fullDate = (d) =>
-    new Date(d).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+    new Date(d).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
 
 function OrderCard({ order, onShip }) {
     const [copied, setCopied] = useState(false);
@@ -59,7 +59,7 @@ function OrderCard({ order, onShip }) {
             {/* Encabezado: total + fecha + estado */}
             <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-control bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-500 flex items-center justify-center flex-shrink-0">
+                    <div className="w-10 h-10 rounded-control bg-success-50 dark:bg-success-900/30 text-success-600 dark:text-success-500 flex items-center justify-center flex-shrink-0">
                         <Package className="w-5 h-5" aria-hidden="true" />
                     </div>
                     <div>
@@ -118,7 +118,7 @@ function OrderCard({ order, onShip }) {
                     <button
                         type="button"
                         onClick={() => onShip(order.id, false)}
-                        className="ml-auto text-xs font-medium text-slate-500 hover:text-rose-600 dark:hover:text-rose-400"
+                        className="ml-auto text-xs font-medium text-slate-500 hover:text-danger-600 dark:hover:text-danger-400"
                     >
                         Desmarcar
                     </button>
@@ -130,7 +130,7 @@ function OrderCard({ order, onShip }) {
                             value={tracking}
                             onChange={e => setTracking(e.target.value)}
                             onKeyDown={e => e.key === 'Enter' && doShip()}
-                            placeholder="N° de seguimiento (opcional)"
+                            placeholder="N.º de seguimiento (opcional)"
                             aria-label="Número de seguimiento"
                         />
                     </div>
@@ -209,7 +209,7 @@ const WebOrdersView = () => {
                 <div>
                     <h1 className="text-display text-slate-900 dark:text-slate-100">Pedidos web</h1>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                        Compras desde la tienda online, con datos de envío y despacho.
+                        Compras desde la tienda online, con los datos de envío y su estado.
                     </p>
                 </div>
                 <Button variant="secondary" leftIcon={RefreshCw} onClick={() => { setLoading(true); fetchOrders(); }}>
@@ -281,7 +281,7 @@ const WebOrdersView = () => {
                     <EmptyState
                         icon={AlertCircle}
                         title={onlyToShip ? 'No hay pedidos por enviar' : `No hay pedidos web${filter !== 'all' ? ` "${FILTERS.find(f => f.key === filter)?.label}"` : ''}`}
-                        description="Las compras hechas en la tienda online aparecerán acá."
+                        description="Las compras hechas en la tienda online aparecerán aquí."
                     />
                 </Card>
             ) : (

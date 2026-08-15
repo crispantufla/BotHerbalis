@@ -24,7 +24,7 @@ const mockDependencies = {
         }),
         checkAndSummarize: jest.fn().mockResolvedValue(null),
         parseAddress: jest.fn().mockImplementation(async (text) => {
-            if (text.length > 10 && /calle|av/i.test(text)) return { nombre: 'Test', calle: 'C1', ciudad: 'CABA', cp: '1425' };
+            if (text.length > 10 && /calle|av/i.test(text)) return { nombre: 'Test', calle: 'Gran Via 1', ciudad: 'Madrid', cp: '28013' };
             return null;
         })
     }
@@ -76,7 +76,7 @@ describe('Complex Sales Logic', () => {
         userState['u5'] = { step: 'waiting_data', selectedProduct: 'Capsulas', selectedPlan: '60', cart: [], partialAddress: {}, addressAttempts: 0 };
         await runFlow('u5', 'Vero Ovejero');
         expect(userState['u5'].addressAttempts).toBe(1);
-        await runFlow('u5', 'calle falsa 123 CABA');
+        await runFlow('u5', 'Calle Gran Via 123, Madrid, 28013');
         expect(userState['u5'].step).toBe('waiting_final_confirmation');
     });
 });

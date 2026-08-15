@@ -6,7 +6,7 @@ import { UserState, SharedState, AlertEntry, AlertOrderData, BotConfig, QuickRep
 import { aiService } from './ai';
 import { _getQuickReplies } from '../flows/utils/messages';
 import { _setStep } from '../flows/utils/flowHelpers';
-import { getArgentinaMidnight } from './timeUtils';
+import { getLocalMidnight } from './timeUtils';
 import logger from '../utils/logger';
 
 const { prisma } = require('../../db');
@@ -289,7 +289,7 @@ export async function handleAdminCommand(
             const INSTANCE_ID = sharedState?.sellerId || process.env.INSTANCE_ID || 'default';
             // Medianoche ARG real — setHours(0,0,0,0) opera en la TZ del server
             // (UTC en prod) y corría la ventana 3 horas (ver timeUtils).
-            const startOfDay = getArgentinaMidnight();
+            const startOfDay = getLocalMidnight();
 
             const [totalCount, todayStats, completedStats] = await Promise.all([
                 prisma.order.count({ where: { instanceId: INSTANCE_ID } }),
@@ -307,7 +307,7 @@ export async function handleAdminCommand(
             const activeSessions = Object.keys(sharedState.userState || {}).length;
             const convRate = activeSessions > 0 ? Math.round((completedStats / activeSessions) * 100) : 0;
 
-            return `📈 *Estadisticas del dia*\n\n*Pedidos hoy:* ${todayStats._count}\n*Revenue hoy:* $${Math.round(revenue).toLocaleString('es-AR')}\n*Pedidos totales:* ${totalCount}\n*Conversion:* ${convRate}%\n*Sesiones activas:* ${activeSessions}`;
+            return `📈 *Estadisticas del dia*\n\n*Pedidos hoy:* ${todayStats._count}\n*Revenue hoy:* $${Math.round(revenue).toLocaleString('es-ES')}\n*Pedidos totales:* ${totalCount}\n*Conversion:* ${convRate}%\n*Sesiones activas:* ${activeSessions}`;
         } catch (e) {
             return '⚠️ Error obteniendo estadísticas.';
         }
@@ -373,9 +373,9 @@ export async function handleAdminCommand(
             if (orders.length === 0) return phoneArg ? `⚠️ No hay pedidos para ${phoneArg}.` : '⚠️ No hay pedidos recientes.';
 
             const lines = orders.map((o: any, i: number) => {
-                const date = new Date(o.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
+                const date = new Date(o.createdAt).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
                 const track = o.tracking ? ` | 📦 ${o.tracking}` : '';
-                return `*${i + 1}.* ${o.nombre || o.userPhone} — ${o.products || '?'} — $${Math.round(o.totalPrice || 0).toLocaleString('es-AR')} — _${o.status}_${track} — ${date}`;
+                return `*${i + 1}.* ${o.nombre || o.userPhone} — ${o.products || '?'} — $${Math.round(o.totalPrice || 0).toLocaleString('es-ES')} — _${o.status}_${track} — ${date}`;
             });
 
             const title = phoneArg ? `Pedidos de ${phoneArg}` : 'Ultimos pedidos';

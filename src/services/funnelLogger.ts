@@ -41,8 +41,6 @@ const STEP_ORDER: string[] = [
     'waiting_price_confirmation',
     'waiting_ok',
     'waiting_payment_method',
-    'waiting_mp_payment',
-    'waiting_transfer_confirmation',
     'waiting_final_confirmation',
     'waiting_admin_ok',
     'waiting_admin_validation',

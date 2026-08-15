@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-    FileText, Power, Trash2, HardDrive, RefreshCw, KeyRound, RotateCcw, Lock, Download, Laptop, History, Send, CreditCard
+    FileText, Power, Trash2, HardDrive, RefreshCw, KeyRound, RotateCcw, Lock, Download, Laptop, History, Send
 } from 'lucide-react';
 import api from '../../config/axios';
 import { useSocket } from '../../context/SocketContext';
@@ -40,8 +40,6 @@ const SettingsView = ({ status }) => {
     const [proactiveFollowUps, setProactiveFollowUps] = useState(true);
     const [togglingFollowUps, setTogglingFollowUps] = useState(false);
 
-    const [mpEnabled, setMpEnabled] = useState(true);
-    const [togglingMp, setTogglingMp] = useState(false);
 
     useEffect(() => {
         (async () => {
@@ -58,10 +56,6 @@ const SettingsView = ({ status }) => {
                 const pfRes = await api.get('/api/config/proactive-follow-ups');
                 setProactiveFollowUps(pfRes.data.proactiveFollowUps !== false);
             } catch (e) { console.error('Error loading proactive-follow-ups:', e); }
-            try {
-                const mpRes = await api.get('/api/config/mercadopago');
-                setMpEnabled(mpRes.data.mpEnabled !== false);
-            } catch (e) { console.error('Error loading mercadopago config:', e); }
         })();
         fetchMemoryStats();
     }, []);
@@ -82,20 +76,17 @@ const SettingsView = ({ status }) => {
         const onStatsReset = (data) => { if (data?.stats) setScriptStats(data.stats); };
         const onRecoverChanged = (data) => { if (typeof data?.recoverOldChats === 'boolean') setRecoverOldChats(data.recoverOldChats); };
         const onFollowUpsChanged = (data) => { if (typeof data?.proactiveFollowUps === 'boolean') setProactiveFollowUps(data.proactiveFollowUps); };
-        const onMpChanged = (data) => { if (typeof data?.mpEnabled === 'boolean') setMpEnabled(data.mpEnabled); };
         socket.on('script_changed', onScriptChanged);
         socket.on('memory_reset', onMemoryReset);
         socket.on('script_stats_reset', onStatsReset);
         socket.on('recover_old_chats_changed', onRecoverChanged);
         socket.on('proactive_follow_ups_changed', onFollowUpsChanged);
-        socket.on('mercadopago_changed', onMpChanged);
         return () => {
             socket.off('script_changed', onScriptChanged);
             socket.off('memory_reset', onMemoryReset);
             socket.off('script_stats_reset', onStatsReset);
             socket.off('recover_old_chats_changed', onRecoverChanged);
             socket.off('proactive_follow_ups_changed', onFollowUpsChanged);
-            socket.off('mercadopago_changed', onMpChanged);
         };
     }, [socket]);
 
@@ -104,7 +95,7 @@ const SettingsView = ({ status }) => {
         if (!ok) return;
         try {
             await api.post('/api/whatsapp-logout');
-            toast.success('Sesión cerrada. Escaneá el QR para reconectar.');
+            toast.success('Sesión cerrada. Escanea el QR para reconectar.');
         } catch { toast.error('Error al cerrar sesión'); }
     };
 
@@ -122,7 +113,7 @@ const SettingsView = ({ status }) => {
             const a = document.createElement('a');
             a.href = url; a.download = filename; a.click();
             URL.revokeObjectURL(url);
-            toast.success('Instalador descargado. Copialo a la PC del vendedor y hacé doble click.');
+            toast.success('Instalador descargado. Cópialo al ordenador del vendedor y haz doble clic.');
         } catch (e) {
             let msg = 'Error al generar el instalador';
             try { const t = await e.response?.data?.text?.(); if (t) msg = JSON.parse(t).error || msg; } catch { /* blob no-json */ }
@@ -167,23 +158,6 @@ const SettingsView = ({ status }) => {
         setTogglingFollowUps(false);
     };
 
-    const handleToggleMp = async () => {
-        if (togglingMp) return;
-        const next = !mpEnabled;
-        setTogglingMp(true);
-        // Optimista: reflejamos el cambio ya; revertimos si el backend falla.
-        setMpEnabled(next);
-        try {
-            await api.post('/api/config/mercadopago', { enabled: next });
-            toast.success(next
-                ? 'Pago con tarjeta activado. El bot vuelve a ofrecer el link de pago.'
-                : 'Pago con tarjeta desactivado. El bot ofrece solo retiro en sucursal y transferencia.');
-        } catch (e) {
-            setMpEnabled(!next);
-            toast.error(e.response?.data?.error || 'Error al cambiar el ajuste');
-        }
-        setTogglingMp(false);
-    };
 
     const handleResetMemory = async () => {
         const ok = await confirm('¿Limpiar historial de usuarios inactivos?\n\nBorra mensajes y datos extraídos por IA de quienes no compraron y no interactuaron en las últimas 48h. Los usuarios siguen en la base, las ventas no se tocan.');
@@ -319,7 +293,7 @@ const SettingsView = ({ status }) => {
                 <Card padding="md">
                     <div className="flex items-center justify-between gap-3 mb-4">
                         <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-10 h-10 rounded-control bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center flex-shrink-0">
+                            <div className="w-10 h-10 rounded-control bg-albero-50 dark:bg-albero-900/30 text-albero-600 dark:text-albero-400 flex items-center justify-center flex-shrink-0">
                                 <FileText className="w-5 h-5" aria-hidden="true" />
                             </div>
                             <div className="min-w-0">
@@ -335,7 +309,7 @@ const SettingsView = ({ status }) => {
                             disabled={resettingStats}
                             className={resettingStats ? '[&_svg]:animate-spin' : ''}
                         >
-                            <span className="hidden sm:inline">Reiniciar conteo</span>
+                            <span className="hidden sm:inline">Reiniciar contadores</span>
                         </Button>
                     </div>
 
@@ -442,7 +416,7 @@ const SettingsView = ({ status }) => {
                     contraseña" lo rellena la card de seguimiento (flex-1) de abajo. */}
                 <Card padding="md" className="flex flex-col">
                     <div className="flex items-start gap-3 min-w-0 mb-3">
-                        <div className="w-10 h-10 rounded-control bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0">
+                        <div className="w-10 h-10 rounded-control bg-warning-50 dark:bg-warning-900/30 text-warning-600 dark:text-warning-400 flex items-center justify-center flex-shrink-0">
                             <History className="w-5 h-5" aria-hidden="true" />
                         </div>
                         <div className="min-w-0">
@@ -491,7 +465,7 @@ const SettingsView = ({ status }) => {
                     rellenar el hueco que queda bajo "Cambiar contraseña". */}
                 <Card padding="md" className="flex-1 flex flex-col">
                     <div className="flex items-start gap-3 min-w-0 mb-3">
-                        <div className="w-10 h-10 rounded-control bg-sky-50 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400 flex items-center justify-center flex-shrink-0">
+                        <div className="w-10 h-10 rounded-control bg-info-50 dark:bg-info-900/30 text-info-600 dark:text-info-400 flex items-center justify-center flex-shrink-0">
                             <Send className="w-5 h-5" aria-hidden="true" />
                         </div>
                         <div className="min-w-0">
@@ -499,7 +473,7 @@ const SettingsView = ({ status }) => {
                                 Seguimiento automático
                             </h3>
                             <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                                Cuando está activado, el bot le <strong>vuelve a escribir solo</strong> a los
+                                Cuando está activado, el bot les <strong>vuelve a escribir solo</strong> a los
                                 clientes que quedaron a mitad de la charla (dentro de las 24h) para reengancharlos.
                                 En números nuevos conviene <strong>apagarlo</strong>: mensajear de forma proactiva
                                 a quien no respondió es lo que más rápido marca una cuenta sin reputación. El bot
@@ -536,56 +510,6 @@ const SettingsView = ({ status }) => {
                     </div>
                 </Card>
 
-                {/* Pago con tarjeta (Mercado Pago). Interruptor para cuando la
-                    cuenta de MP está bloqueada: el guion sigue vendiendo con las
-                    otras dos formas. */}
-                <Card padding="md" className="flex-1 flex flex-col">
-                    <div className="flex items-start gap-3 min-w-0 mb-3">
-                        <div className="w-10 h-10 rounded-control bg-violet-50 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 flex items-center justify-center flex-shrink-0">
-                            <CreditCard className="w-5 h-5" aria-hidden="true" />
-                        </div>
-                        <div className="min-w-0">
-                            <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm mb-1">
-                                Pago con tarjeta
-                            </h3>
-                            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                                Apagalo si la cuenta de <strong>Mercado Pago</strong> está bloqueada o caída.
-                                El bot deja de <strong>ofrecer y de generar links de pago</strong>: si un
-                                cliente pide tarjeta, le avisa que no está disponible y le ofrece
-                                <strong> retiro en sucursal</strong> (efectivo al retirar) o
-                                <strong> transferencia</strong> al alias. Los pagos ya hechos se siguen
-                                verificando normal.
-                            </p>
-                        </div>
-                    </div>
-                    <div className="mt-auto flex items-center justify-between gap-3 pt-3 border-t border-slate-200/70 dark:border-slate-700/70">
-                        <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                            {mpEnabled ? 'Activado' : 'Desactivado'}
-                            <span className="text-[11px] text-slate-400 dark:text-slate-500 font-normal ml-1.5">
-                                (apagado = sin tarjeta en el guion)
-                            </span>
-                        </span>
-                        <button
-                            type="button"
-                            role="switch"
-                            aria-checked={mpEnabled}
-                            aria-label="Pago con tarjeta"
-                            onClick={handleToggleMp}
-                            disabled={togglingMp}
-                            className={cn(
-                                'relative inline-flex h-6 w-11 flex-shrink-0 rounded-full transition-colors',
-                                'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2',
-                                'disabled:opacity-50 disabled:cursor-not-allowed',
-                                mpEnabled ? 'bg-accent-500' : 'bg-slate-300 dark:bg-slate-600'
-                            )}
-                        >
-                            <span className={cn(
-                                'inline-block h-5 w-5 rounded-full bg-white shadow transition-transform mt-0.5',
-                                mpEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'
-                            )} />
-                        </button>
-                    </div>
-                </Card>
                 </div>
                 {/* /Col 2 stack */}
 
@@ -602,11 +526,11 @@ const SettingsView = ({ status }) => {
                         </div>
                         <div className="flex-1 min-w-0 flex flex-col">
                             <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm mb-1">
-                                Cliente del bot (PC del vendedor)
+                                Cliente del bot (ordenador del vendedor)
                             </h3>
                             <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed mb-4 max-w-md">
-                                Descargá el instalador y copialo a la PC del vendedor. Con un doble click deja
-                                todo listo: instala lo necesario, conecta con el servidor y crea el acceso
+                                Descarga el instalador y cópialo al ordenador del vendedor. Con un doble clic
+                                deja todo listo: instala lo necesario, conecta con el servidor y crea el acceso
                                 directo en el escritorio. Después se actualiza solo.
                             </p>
                             <div className="mt-auto">

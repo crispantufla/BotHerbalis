@@ -27,8 +27,8 @@ function formatDate(ymd) {
 // Paleta rotativa hex literal — usada por bars/leyenda en estilos inline (las
 // clases Tailwind dinámicas no se purgan correctamente).
 const PALETTE = [
-    '#6366f1', '#10b981', '#f59e0b', '#f43f5e',
-    '#0ea5e9', '#a855f7', '#14b8a6', '#f97316',
+    '#1e5ea8', '#4d8b31', '#e0a526', '#c8102e',
+    '#0284c7', '#9a6417', '#3176bd', '#c1851a',
 ];
 const colorFor = (i) => PALETTE[i % PALETTE.length];
 

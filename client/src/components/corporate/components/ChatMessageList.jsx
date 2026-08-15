@@ -22,7 +22,7 @@ const formatDateSeparator = (date) => {
         return 'Ayer';
     } else {
         // Formato dd/mm/yyyy
-        return targetDate.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        return targetDate.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
     }
 };
 
@@ -70,7 +70,7 @@ const ChatMessageList = ({ messages, isLoading, chatFontSize, handleDeleteMessag
                             <audio
                                 controls
                                 preload="metadata"
-                                className="w-full h-10 drop-shadow-sm [&::-webkit-media-controls-panel]:bg-emerald-50 [&::-webkit-media-controls-play-button]:bg-emerald-500 [&::-webkit-media-controls-play-button]:rounded-full [&::-webkit-media-controls-current-time-display]:text-emerald-700 [&::-webkit-media-controls-time-remaining-display]:text-emerald-700 pl-1"
+                                className="w-full h-10 drop-shadow-sm [&::-webkit-media-controls-panel]:bg-success-50 [&::-webkit-media-controls-play-button]:bg-success-500 [&::-webkit-media-controls-play-button]:rounded-full [&::-webkit-media-controls-current-time-display]:text-success-700 [&::-webkit-media-controls-time-remaining-display]:text-success-700 pl-1"
                                 src={`${API_URL}${audioUrl}`}
                             >
                                 Tu navegador no soporta el elemento de audio.
@@ -84,7 +84,7 @@ const ChatMessageList = ({ messages, isLoading, chatFontSize, handleDeleteMessag
                     )}
                     {transcription && transcription !== 'PENDING' && (
                         <div className="bg-slate-50 dark:bg-slate-800/40 p-3 rounded-xl text-xs flex items-start gap-2 text-slate-700 dark:text-slate-300 font-medium border border-slate-200 dark:border-slate-700/50">
-                            <span className="text-emerald-600 mt-0.5">📝</span>
+                            <span className="text-success-600 mt-0.5">📝</span>
                             <span className="italic leading-relaxed flex-1">"{transcription}"</span>
                         </div>
                     )}
@@ -182,23 +182,23 @@ const ChatMessageList = ({ messages, isLoading, chatFontSize, handleDeleteMessag
                             )}
 
                             <div className={`flex ${msg.fromMe ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[75%] p-4 leading-relaxed shadow-sm relative group ${msg.fromMe ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-3xl rounded-tr-sm shadow-indigo-500/20' : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-3xl rounded-tl-sm border border-slate-100 dark:border-slate-700'}`} style={{ fontSize: `${chatFontSize}px` }}>
+                                <div className={`max-w-[75%] p-4 leading-relaxed shadow-sm relative group ${msg.fromMe ? 'bg-gradient-to-br from-accent-600 to-accent-700 text-white rounded-3xl rounded-tr-sm shadow-accent-500/20' : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-3xl rounded-tl-sm border border-slate-100 dark:border-slate-700'}`} style={{ fontSize: `${chatFontSize}px` }}>
                                     {renderMessageBody(msg)}
-                                    <span className={`text-[10px] block text-right mt-2 font-mono font-bold ${msg.fromMe ? 'text-indigo-200' : 'text-slate-400'}`}>
-                                        {new Date(msg.timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' })}
+                                    <span className={`text-[10px] block text-right mt-2 font-mono font-bold ${msg.fromMe ? 'text-accent-200' : 'text-slate-400'}`}>
+                                        {new Date(msg.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Madrid' })}
                                     </span>
                                     {msg.fromMe && (
                                         <div className="absolute -left-16 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); if (typeof handleReportMessage === 'function') handleReportMessage(msg.id); }}
-                                                className="p-1.5 text-amber-500 hover:text-white hover:bg-amber-500 rounded-full transition-all shadow-sm"
+                                                className="p-1.5 text-warning-500 hover:text-white hover:bg-warning-500 rounded-full transition-all shadow-sm"
                                                 title="Reportar mensaje incorrecto a la IA"
                                             >
                                                 <AlertTriangle className="w-4 h-4" />
                                             </button>
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); handleDeleteMessage(msg.id); }}
-                                                className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all shadow-sm"
+                                                className="p-1.5 text-slate-400 hover:text-danger-500 hover:bg-danger-50 rounded-full transition-all shadow-sm"
                                                 title="Eliminar mensaje para todos"
                                             >
                                                 <Trash className="w-4 h-4" />

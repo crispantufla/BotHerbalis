@@ -16,7 +16,6 @@ import ChatMessageList from './components/ChatMessageList';
 import ChatInputArea from './components/ChatInputArea';
 import AiCorrectionModal from './components/AiCorrectionModal';
 import ManualOrderEntryModal from './components/ManualOrderEntryModal';
-import ManualMpLinkModal from './components/ManualMpLinkModal';
 
 import ChatSidebarItem from './comms/ChatSidebarItem';
 import AlertBanner from './comms/AlertBanner';
@@ -70,9 +69,6 @@ const CommsView = ({ initialChatId, onChatSelected, onChatOpened, alerts = [], o
     const [showConfirmFillModal, setShowConfirmFillModal] = useState(false);
     const [confirmFillTemplate, setConfirmFillTemplate] = useState('');
     const [confirmFillData, setConfirmFillData] = useState({ product: '', plan: '60', total: '' });
-    const [showMpLinkModal, setShowMpLinkModal] = useState(false);
-    const [mpLinkTemplate, setMpLinkTemplate] = useState('');
-    const [mpLinkSuggestedAmount, setMpLinkSuggestedAmount] = useState('');
 
     const {
         chats, setChats, messages, setMessages,
@@ -259,7 +255,7 @@ const CommsView = ({ initialChatId, onChatSelected, onChatOpened, alerts = [], o
         if (!total && ctx?.cart?.length > 0) {
             total = ctx.cart
                 .reduce((s, i) => s + parseInt((i.price || '0').toString().replace(/\D/g, '')), 0)
-                .toLocaleString('es-AR');
+                .toLocaleString('es-ES');
         }
         result = result
             .replace(/{{PRODUCT}}/g, product)
@@ -278,9 +274,9 @@ const CommsView = ({ initialChatId, onChatSelected, onChatOpened, alerts = [], o
             ? ctx.weightGoal
             : parseInt(String(ctx?.weightGoal || 0), 10) || 0;
         let dosageReason = '';
-        if (w > 0 && w <= 10) dosageReason = 'Con el plan de 60 días te alcanza para tu objetivo.';
-        else if (w > 10 && w <= 20) dosageReason = 'Con el plan de 120 días te puede sobrar un poco; muchas clientas usan el sobrante como mantenimiento.';
-        else if (w > 20) dosageReason = 'El plan de 120 días es el tiempo que tu cuerpo necesita para bajar tranqui, sin rebote.';
+        if (w > 0 && w <= 10) dosageReason = 'Con el plan de 60 días tienes dos meses completos de rutina.';
+        else if (w > 10 && w <= 20) dosageReason = 'Con el plan de 120 días te puede sobrar un poco; muchas clientas usan lo que sobra para mantener la rutina.';
+        else if (w > 20) dosageReason = 'El plan de 120 días es el que permite sostener la rutina con calma, sin prisas.';
         result = result.replace(/{{DOSAGE_REASON}}/g, dosageReason);
 
         // PRICE_60 / PRICE_120 genéricos según producto seleccionado. Igual que
@@ -297,27 +293,24 @@ const CommsView = ({ initialChatId, onChatSelected, onChatOpened, alerts = [], o
             if (!priceStr) return null;
             const n = parseInt(priceStr.replace(/\./g, ''), 10);
             if (isNaN(n)) return null;
-            return Math.round(n / 120).toLocaleString('es-AR');
+            return Math.round(n / 120).toLocaleString('es-ES');
         };
         subPrice(/{{PRICE_PER_DAY_CAPSULAS_120}}/g, perDay(p['Cápsulas']?.['120']));
         subPrice(/{{PRICE_PER_DAY_SEMILLAS_120}}/g, perDay(p['Semillas']?.['120']));
         subPrice(/{{PRICE_PER_DAY_GOTAS_120}}/g, perDay(p['Gotas']?.['120']));
         subPrice(/{{PRICE_PER_DAY_120}}/g, perDay(p[productKey]?.['120']));
 
-        // Constantes bancarias + entrega standard + saldo legacy seña.
-        // POSTDATADO_LINE: muestra entrega standard (7-10 días). Para el preview
-        // no contamos con state.postdatado — el server lo resuelve en runtime.
+        // Entrega estimada. En España todo es contrarreembolso: no hay datos
+        // bancarios, ni anticipo, ni link de pago que mostrar, así que los
+        // placeholders del flujo argentino ({{ALIAS}}, {{TITULAR}}, {{ANTICIPO}},
+        // {{LINK}}, {{SENA_*}}, {{SALDO}}) ya no existen en V7 — si alguno
+        // sobreviviera en una plantilla vieja, el sweep de abajo lo borra en vez
+        // de rellenarlo con datos que no valen aquí.
+        // POSTDATADO_LINE replica el plazo de MARKET.deliveryDaysHome; el envío
+        // programado lo resuelve el server en runtime (no tenemos state.postdatado).
         result = result
-            .replace(/{{ALIAS}}/g, 'HERBALIS.TIENDA')
-            .replace(/{{TITULAR}}/g, 'BIO ORIGEN S.A.S.')
-            .replace(/{{ANTICIPO}}/g, '10.000')
-            .replace(/{{POSTDATADO_LINE}}/g, '✔ Entrega estimada: 7 a 10 días hábiles desde la confirmación\n')
-            .replace(/{{CARTO_LINE}}/g, '')
-            .replace(/{{LINK}}/g, '(link se genera al confirmar el pago)')
-            .replace(/{{SENA_AMOUNT}}/g, '10.000')
-            .replace(/{{SENA_AMOUNT_FMT}}/g, '10.000')
-            .replace(/{{SENA_REMAINDER}}/g, '')
-            .replace(/{{SALDO}}/g, '');
+            .replace(/{{POSTDATADO_LINE}}/g, '✔ Entrega estimada: 3 a 5 días laborables desde la confirmación\n')
+            .replace(/{{CARTO_LINE}}/g, '');
 
         // Sweep defensivo: cualquier {{X}} residual queda invisible en el preview
         // (igual que hace el server-side _formatMessage antes de mandar al cliente)
@@ -365,10 +358,12 @@ const CommsView = ({ initialChatId, onChatSelected, onChatOpened, alerts = [], o
 
     const buildConfirmMessage = (template, { product, plan, total }) => {
         // Construimos un "fake chat" con los valores del modal para reusar
-        // formatScriptMessage (cubre PRODUCT/PLAN/TOTAL + ALIAS, TITULAR,
-        // POSTDATADO_LINE, PRODUCT_DETAIL, PLAN_DETAIL, etc.). Sin esto algunos
-        // placeholders del order_confirmation_* quedaban literales.
-        const totalClean = String(total || '').replace(/^\$+/, '').trim();
+        // formatScriptMessage (cubre PRODUCT/PLAN/TOTAL + POSTDATADO_LINE,
+        // PRODUCT_DETAIL, PLAN_DETAIL, etc.). Sin esto algunos placeholders del
+        // order_confirmation_* quedaban literales.
+        // El € se saca del importe: las plantillas ya lo escriben ellas
+        // ("Total: {{TOTAL}} €"), así que pegar "51,90 €" duplicaría el símbolo.
+        const totalClean = String(total || '').replace(/€/g, '').trim();
         const fakeChat = {
             selectedProduct: product || 'Producto',
             selectedPlan: plan || '60',
@@ -395,13 +390,13 @@ const CommsView = ({ initialChatId, onChatSelected, onChatOpened, alerts = [], o
             toast.warning('No hay mensajes para descargar');
             return;
         }
-        let txtContent = `Analiza esta conversacion:\n\n`;
+        let txtContent = `Analiza esta conversación:\n\n`;
         messages.forEach(msg => {
             let dateStr = '';
             try {
                 const d = new Date(msg.timestamp);
                 if (!isNaN(d.getTime())) {
-                    dateStr = `[${d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' })}, ${d.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })}] `;
+                    dateStr = `[${d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Madrid' })}, ${d.toLocaleDateString('es-ES', { timeZone: 'Europe/Madrid' })}] `;
                 }
             } catch { /* */ }
             const sender = msg.fromMe ? 'Herbalis' : (selectedChat.name || selectedChat.id).split('@')[0];
@@ -468,7 +463,7 @@ const CommsView = ({ initialChatId, onChatSelected, onChatOpened, alerts = [], o
                 silent: manualEntry.silent,
                 manualAddr, shippingType, paymentMethod, discount, productType, plan, paymentVerified,
             });
-            toast.success(manualEntry.silent ? 'Venta registrada (sin mensaje)' : 'Pedido ingresado y confirmación enviada');
+            toast.success(manualEntry.silent ? 'Venta registrada (sin mensaje)' : 'Pedido registrado y confirmación enviada');
             setManualEntry(null);
             setInput('');
         } catch (e) {
@@ -547,7 +542,7 @@ const CommsView = ({ initialChatId, onChatSelected, onChatOpened, alerts = [], o
 Dirección: ${order.calle}, ${order.ciudad} (CP: ${order.cp})
 Producto: ${order.producto}
 Plan: ${order.plan || '120'} Días
-A pagar: $${order.precio || '0'}
+A pagar al recibir: ${order.precio || '0'} €
 Teléfono: ${phoneDisplay}`;
         navigator.clipboard.writeText(text)
             .then(() => toast.success('Venta copiada al portapapeles'))
@@ -573,19 +568,6 @@ Teléfono: ${phoneDisplay}`;
     };
 
     const handlePickScriptStep = (stepKey, scriptResponse) => {
-        // payment_mp_link → necesita un link real de MP. Abrimos modal que pide
-        // el monto, crea la preferencia en MP, y sustituye {{LINK}} con la URL real.
-        if (stepKey === 'payment_mp_link') {
-            // Sugerimos el total del chat seleccionado si existe.
-            const suggested = selectedChat?.totalPrice
-                || selectedChat?.cart?.reduce((s, i) => s + parseInt((i.price || '0').toString().replace(/\D/g, '') || 0, 10), 0)
-                || '';
-            setMpLinkSuggestedAmount(String(suggested).replace(/\./g, '') || '');
-            setMpLinkTemplate(scriptResponse);
-            setShowMpLinkModal(true);
-            return;
-        }
-
         // order_confirmation_* → si el extractor detecta product+plan+total, se inserta
         // directo. Si falta algo, abrimos el modal con selector para completar.
         if (stepKey.startsWith('order_confirmation_') || stepKey === 'confirmation') {
@@ -854,7 +836,7 @@ Teléfono: ${phoneDisplay}`;
                         <EmptyState
                             icon={MessageCircle}
                             title="Inbox de mensajes"
-                            description="Seleccioná un chat del sidebar para empezar a responder."
+                            description="Selecciona un chat de la lista para empezar a responder."
                         />
                     </div>
                 )}
@@ -905,12 +887,12 @@ Teléfono: ${phoneDisplay}`;
                             <option value="120">120 días</option>
                         </Select>
                         <Input
-                            label="Total a pagar"
+                            label="Total a pagar al recibir"
                             type="text"
                             value={confirmFillData.total}
                             onChange={e => setConfirmFillData(d => ({ ...d, total: e.target.value }))}
-                            placeholder="46.900"
-                            leftIcon={() => <span className="text-slate-400 font-medium">$</span>}
+                            placeholder="51,90"
+                            leftIcon={() => <span className="text-slate-400 font-medium">€</span>}
                         />
 
                         {(confirmFillData.product || confirmFillData.total) && (
@@ -930,8 +912,8 @@ Teléfono: ${phoneDisplay}`;
                     </Button>
                     <Button
                         onClick={() => {
-                            if (!confirmFillData.product) { toast.warning('Elegí el producto'); return; }
-                            if (!confirmFillData.total) { toast.warning('Ingresá el total'); return; }
+                            if (!confirmFillData.product) { toast.warning('Elige el producto'); return; }
+                            if (!confirmFillData.total) { toast.warning('Introduce el total'); return; }
                             if (!selectedChat.isPaused) handleToggleBot();
                             setInput(buildConfirmMessage(confirmFillTemplate, confirmFillData));
                             setShowConfirmFillModal(false);
@@ -941,25 +923,6 @@ Teléfono: ${phoneDisplay}`;
                     </Button>
                 </Modal.Footer>
             </Modal>
-
-            {/* Manual MP Link Modal — abre cuando hacen click en payment_mp_link.
-                Pide monto, crea preferencia MP real, y sustituye {{LINK}} en el template. */}
-            <ManualMpLinkModal
-                isOpen={showMpLinkModal}
-                onClose={() => setShowMpLinkModal(false)}
-                template={mpLinkTemplate}
-                suggestedAmount={mpLinkSuggestedAmount}
-                formatTemplate={(text, { link }) => {
-                    const filled = formatScriptMessage(text, selectedChat);
-                    return filled.replace(/\(link se genera al confirmar el pago\)/g, link)
-                                 .replace(/{{LINK}}/g, link);
-                }}
-                onLinkReady={(finalMsg) => {
-                    if (selectedChat && !selectedChat.isPaused) handleToggleBot();
-                    setInput(finalMsg);
-                    setShowMpLinkModal(false);
-                }}
-            />
 
             {/* AI Correction Modal — su propio sub-componente */}
             <AiCorrectionModal

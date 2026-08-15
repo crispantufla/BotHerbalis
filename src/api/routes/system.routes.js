@@ -121,7 +121,7 @@ module.exports = (clientPool) => {
             // segun la hora del server. Calculamos el inicio del dia AR.
             const startOfDay = (() => {
                 const parts = new Intl.DateTimeFormat('en-CA', {
-                    timeZone: 'America/Argentina/Buenos_Aires',
+                    timeZone: 'Europe/Madrid',
                     year: 'numeric', month: '2-digit', day: '2-digit',
                 }).formatToParts(new Date());
                 const y = parts.find(p => p.type === 'year').value;
@@ -274,7 +274,7 @@ module.exports = (clientPool) => {
             for (let i = 0; i < 30; i++) {
                 const d = new Date();
                 d.setDate(d.getDate() - i);
-                const dateStr = d.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', month: 'short', day: 'numeric' });
+                const dateStr = d.toLocaleDateString('es-ES', { timeZone: 'Europe/Madrid', month: 'short', day: 'numeric' });
                 dailyData[dateStr] = { date: dateStr, orders: 0, revenue: 0, chats: 0, sortKey: d.getTime() };
             }
 
@@ -283,7 +283,7 @@ module.exports = (clientPool) => {
                 const dateObj = new Date(stat.date);
                 // Compensar el UTC para que coincida exactamente con el dashboard
                 dateObj.setMinutes(dateObj.getMinutes() + dateObj.getTimezoneOffset());
-                const dateStr = dateObj.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', month: 'short', day: 'numeric' });
+                const dateStr = dateObj.toLocaleDateString('es-ES', { timeZone: 'Europe/Madrid', month: 'short', day: 'numeric' });
                 if (dailyData[dateStr]) {
                     dailyData[dateStr].chats = Math.max(dailyData[dateStr].chats, stat.totalChats || 0);
                 }
@@ -292,7 +292,7 @@ module.exports = (clientPool) => {
             // Populate data from orders
             orders.forEach(order => {
                 const dateObj = new Date(order.createdAt);
-                const dateStr = dateObj.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', month: 'short', day: 'numeric' });
+                const dateStr = dateObj.toLocaleDateString('es-ES', { timeZone: 'Europe/Madrid', month: 'short', day: 'numeric' });
 
                 if (dailyData[dateStr]) {
                     dailyData[dateStr].orders += 1;
@@ -405,34 +405,6 @@ module.exports = (clientPool) => {
             res.json({ success: true, proactiveFollowUps: enabled });
         } catch (e) {
             logger.error('Error toggling proactiveFollowUps:', e);
-            res.status(500).json({ error: e.message });
-        }
-    });
-
-    // GET /config/mercadopago - Estado del interruptor de Mercado Pago (pago con
-    // tarjeta). Default ENCENDIDO: solo está apagado si se guardó en false.
-    router.get('/config/mercadopago', ...withSeller(clientPool), (req, res) => {
-        const { config } = getCtx(req);
-        res.json({ mpEnabled: config.mpEnabled !== false });
-    });
-
-    // POST /config/mercadopago - Activa/desactiva el pago con tarjeta. Con OFF el
-    // bot deja de ofrecer y de generar links de MP: el guion queda con retiro en
-    // sucursal (efectivo al retirar) y transferencia (domicilio prepago). Se usa
-    // cuando la cuenta de MP está bloqueada. Body: { enabled: true|false }.
-    router.post('/config/mercadopago', ...withSeller(clientPool), (req, res) => {
-        try {
-            const { config, ss } = getCtx(req);
-            const enabled = req.body?.enabled === true;
-            config.mpEnabled = enabled;
-            if (ss?.saveState) ss.saveState();
-
-            emitScoped(req, 'mercadopago_changed', { mpEnabled: enabled });
-
-            logger.info(`[SYSTEM] mpEnabled=${enabled} (seller=${req.sellerId})`);
-            res.json({ success: true, mpEnabled: enabled });
-        } catch (e) {
-            logger.error('Error toggling mpEnabled:', e);
             res.status(500).json({ error: e.message });
         }
     });

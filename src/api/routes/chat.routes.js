@@ -70,7 +70,7 @@ function _mapOrderToLegacy(o) {
         status: o.status,
         producto: o.products,
         plan: inferredPlan,
-        precio: Math.round(o.totalPrice).toLocaleString('es-AR'),
+        precio: Math.round(o.totalPrice).toLocaleString('es-ES'),
         tracking: o.tracking || '',
         postdatado: o.postdated || '',
         ciudad: o.ciudad || '',

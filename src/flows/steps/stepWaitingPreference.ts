@@ -1,7 +1,7 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _formatMessage } from '../utils/messages';
 import { _setStep, _maybeUpsell, _detectPostdatado, _assignProductAndPlanByTier, _maybeSendPaymentMenuV7 } from '../utils/flowHelpers';
-import { isMpEnabled, prepayMeans } from '../utils/paymentOptions';
+import { MARKET } from '../../config/market';
 import logger from '../../utils/logger';
 
 export async function handleWaitingPreference(
@@ -114,15 +114,15 @@ export async function handleWaitingPreference(
 
         const aiRecommendation = await aiService.chat(text, {
             step: FlowStep.WAITING_PREF_CONSULT,
-            goal: `El usuario está indeciso entre productos o pide recomendaciones. Modelo V5 (rev. 2026-05-26): las 3 opciones (Cápsulas / Gotas / Semillas) se ofrecen IGUALES — no empujes una en particular. REGLAS:
+            goal: `El usuario está indeciso entre productos o pide recomendaciones. Modelo V5 (rev. 2026-05-26): las 3 opciones (Cápsulas / Gotas / Semillas) se ofrecen IGUALES — no empujes una en particular. Escribes en español de España con tuteo peninsular (tú, tienes, puedes, quieres): nada de voseo argentino ni de léxico rioplatense. REGLAS:
             1) Si el usuario MENCIONÓ EXPLÍCITAMENTE un producto (ej: "capsulas", "gotas", "semillas"), goalMet=true con extractedData del producto que dijo.
-            2) Si el usuario está aceptando con un genérico ("dale", "bueno", "ok") SIN nombrar producto, NO ASUMAS — goalMet=false y re-preguntá "¿con cuál vas, cápsulas, gotas o semillas?".
-            3) Si pide "lo más efectivo/mejor/rápido", "cualquiera" o "elegí vos": el cliente está DELEGANDO. Asumí Cápsulas (forma más práctica) PERO sin decir que son "más efectivas" — decí "Te traigo cápsulas que es la forma más práctica, las 3 funcionan igual". goalMet=true, extractedData="Cápsulas de nuez de la india".
-            4) EMOCIÓN Y SALUD: Si cuenta su historia de peso, problemas médicos (tiroides, operaciones) o inseguridades, REDACTÁ UN PÁRRAFO EMPÁTICO validando sus sentimientos ANTES de cerrar nada. goalMet=false.
-            5) Si tiene GASTRITIS / úlcera / acidez: recomendá cápsulas o gotas (semillas pueden irritar — es una contraindicación real). goalMet=false hasta que confirme.
-            6) Si pide "info de las 3", "precio de las 3" o "todas": dale un resumen breve de las 3 opciones con sus precios de 60 días (del knowledge). NO empujes ninguna. Después preguntá cuál prefiere.
-            7) Si pregunta por envío o medios de pago: envío gratis. 2 opciones: retiro en sucursal (paga total en efectivo al retirar, sin anticipo, 7 a 10 días hábiles) o domicilio prepago por ${prepayMeans(isMpEnabled(dependencies.config))} (más rápido, 4 días hábiles).${isMpEnabled(dependencies.config) ? '' : ' 🛑 El pago con tarjeta está fuera de servicio en estos días: NO lo ofrezcas ni lo menciones.'} NUNCA menciones cuotas ni anticipo. Después preguntá con cuál producto avanzar.
-            8) HORARIOS DE ENVÍO: si pregunta a qué hora llega o pide un horario, respondé que no controlamos al cartero del Correo Argentino, pero que avisamos si no lo encuentran. Después preguntá con cuál producto avanzar.`,
+            2) Si el usuario está aceptando con un genérico ("vale", "bueno", "ok", "dale") SIN nombrar producto, NO ASUMAS — goalMet=false y vuelve a preguntar "¿con cuál te quedas: cápsulas, gotas o semillas?".
+            3) Si pide "lo más efectivo/mejor/rápido", "cualquiera" o "elige tú": el cliente está DELEGANDO. Asume Cápsulas (formato más cómodo) PERO sin decir que son "más efectivas" ni "más rápidas" — di "Te traigo las cápsulas, que son el formato más cómodo; una al día y listo, las 3 se toman igual de bien". goalMet=true, extractedData="Cápsulas de nuez de la india".
+            4) EMOCIÓN Y SALUD: Si cuenta su situación personal, problemas médicos (tiroides, operaciones) o inseguridades, escribe un párrafo empático y cercano validando lo que siente ANTES de cerrar nada. Acompaña sin comentar su cuerpo: NO repitas kilos ni tallas, no menciones partes del cuerpo, no prometas resultados ni plazos y no digas que el producto actúa sobre el peso, la grasa ni el metabolismo. goalMet=false.
+            5) Si tiene GASTRITIS / úlcera / acidez: recomienda cápsulas o gotas (semillas pueden irritar — es una contraindicación real). goalMet=false hasta que confirme.
+            6) Si pide "info de las 3", "precio de las 3" o "todas": dale un resumen breve de las 3 opciones con sus precios de 60 días (del knowledge). NO empujes ninguna. Después pregunta cuál prefiere.
+            7) Si pregunta por el envío o cómo se paga: el envío es GRATIS y todo es CONTRA REEMBOLSO (paga al recibirlo, no adelanta nada). Dos formas: se lo llevan a casa y paga al repartidor, o lo recoge en su ${MARKET.pickupPointName} y paga allí. Tarda ${MARKET.deliveryDaysHome}. NUNCA ofrezcas tarjeta, transferencia, Bizum ni ningún pago por adelantado: no existen. Después pregunta con qué producto seguir.
+            8) HORARIOS DE ENTREGA: si pregunta a qué hora llega o pide una hora concreta, responde que ${MARKET.carrier} gestiona su propio reparto y no podemos fijar la hora, pero que si no está en casa se lo dejan en su ${MARKET.pickupPointName}. Después pregunta con qué producto seguir.`,
             history: currentState.history,
             summary: currentState.summary,
             knowledge: knowledge,
@@ -209,16 +209,16 @@ export async function handleWaitingPreference(
         const aiPref = await aiService.chat(text, {
             step: FlowStep.WAITING_PREFERENCE,
             goal: `Determinar qué producto prefiere el usuario: Cápsulas, Gotas o Semillas. Modelo V5 (rev. 2026-05-26): las 3 opciones se ofrecen IGUALES — no empujes una en particular.
-1) EMOCIÓN Y SALUD: Si hace un descargo sobre su peso, operaciones o inseguridades médicas, REDACTÁ MÚLTIPLES PÁRRAFOS demostrando altísima empatía y contención. Tono explayado y compasivo antes de cerrar nada.
-2) Usá muletillas argentinas naturales ("dale", "tranqui", "te cuento") sin exagerar.
+1) EMOCIÓN Y SALUD: Si se abre y cuenta su situación personal, operaciones o inseguridades médicas, redacta una respuesta empática y de contención (uno o dos párrafos), con tono cercano antes de cerrar nada. Acompaña sin comentar su cuerpo: NO repitas kilos ni tallas, no menciones partes del cuerpo, no prometas resultados ni plazos y no digas que el producto actúa sobre el peso, la grasa ni el metabolismo.
+2) Escribe en español de España con tuteo peninsular (tú, tienes, puedes, quieres) y muletillas naturales de aquí ("vale", "genial", "te cuento") sin exagerar. Nada de voseo argentino ni de léxico rioplatense.
 3) Si MENCIONA explícitamente un producto ("capsulas", "gotas", "semillas"), goalMet=true, extractedData con el producto.
-4) Si solo dice "dale"/"si"/"bueno" SIN nombrar producto, NO asumas — goalMet=false y re-preguntá "¿con cuál te gustaría avanzar: cápsulas, gotas o semillas?".
-5) Si pide "lo más efectivo/mejor/rápido", "cualquiera" o "elegí vos": el cliente delega. Asumí cápsulas (forma más práctica) PERO aclarando que las 3 funcionan igual. extractedData="PRODUCTO: Cápsulas de nuez de la india".
-6) Si habla en PASADO ("yo tomaba semillas"): preguntá si quiere repetir o probar otra forma — no le impongas cápsulas.
-7) Si tiene gastritis/úlcera/acidez: recomendá cápsulas o gotas (semillas pueden irritar). goalMet=false hasta que confirme.
-8) Si pide información o precios de "las 3", brindá explicación breve de las 3 formas con precios de 60 días (knowledge). Después preguntá cuál prefiere.
-9) Si pregunta si puede pagar/recibir un día concreto: dale el OK y volvé a la elección de producto.
-10) Si pregunta por envío o medios de pago: envío gratis, 2 opciones (retiro en sucursal sin anticipo, paga al retirar, 7 a 10 días hábiles / domicilio prepago por ${prepayMeans(isMpEnabled(dependencies.config))}, más rápido 4 días hábiles).${isMpEnabled(dependencies.config) ? '' : ' 🛑 El pago con tarjeta está fuera de servicio en estos días: NO lo ofrezcas ni lo menciones.'} NUNCA menciones anticipo ni cuotas. Después preguntá producto.`,
+4) Si solo dice "vale"/"si"/"bueno"/"dale" SIN nombrar producto, NO asumas — goalMet=false y vuelve a preguntar "¿con cuál te gustaría avanzar: cápsulas, gotas o semillas?".
+5) Si pide "lo más efectivo/mejor/rápido", "cualquiera" o "elige tú": el cliente delega. Asume cápsulas (formato más cómodo) PERO aclarando que las 3 se toman igual de bien, sin decir que sean más efectivas ni más rápidas. extractedData="PRODUCTO: Cápsulas de nuez de la india".
+6) Si habla en PASADO ("yo tomaba semillas"): pregunta si quiere repetir o probar otra forma — no le impongas cápsulas.
+7) Si tiene gastritis/úlcera/acidez: recomienda cápsulas o gotas (semillas pueden irritar). goalMet=false hasta que confirme.
+8) Si pide información o precios de "las 3", da una explicación breve de las 3 formas con precios de 60 días (knowledge). Después pregunta cuál prefiere.
+9) Si pregunta si puede pagar/recibir un día concreto: dale el OK y vuelve a la elección de producto.
+10) Si pregunta por el envío o cómo se paga: envío GRATIS y todo CONTRA REEMBOLSO (paga al recibirlo). Dos formas: en casa pagando al repartidor, o recogiéndolo en su ${MARKET.pickupPointName} y pagando allí. Tarda ${MARKET.deliveryDaysHome}. NUNCA ofrezcas tarjeta, transferencia ni ningún pago por adelantado. Después pregunta producto.`,
             history: currentState.history,
             summary: currentState.summary,
             knowledge: knowledge,

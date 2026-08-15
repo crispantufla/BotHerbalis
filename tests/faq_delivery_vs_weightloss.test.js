@@ -51,7 +51,7 @@ describe('globalFaq — envío vs. ritmo de descenso', () => {
         for (const t of ['cuanto tarda en llegar?', 'como lo recibo?', 'cuanto demora el envio?']) {
             const { res, sent } = await run(t);
             expect(res).toEqual({ matched: true });
-            expect(sent.join(' ')).toMatch(/Correo Argentino/i);
+            expect(sent.join(' ')).toMatch(/Correos/i);
         }
     });
 });

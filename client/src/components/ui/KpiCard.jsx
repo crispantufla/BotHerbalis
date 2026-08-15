@@ -11,7 +11,7 @@ const TONES = {
     warning: { bg: 'bg-warning-50 dark:bg-warning-900/30', fg: 'text-warning-600 dark:text-warning-500' },
     danger:  { bg: 'bg-danger-50 dark:bg-danger-900/30',   fg: 'text-danger-600 dark:text-danger-500' },
     info:    { bg: 'bg-info-50 dark:bg-info-900/30',       fg: 'text-info-600 dark:text-info-500' },
-    purple:  { bg: 'bg-purple-50 dark:bg-purple-900/30',   fg: 'text-purple-600 dark:text-purple-400' },
+    purple:  { bg: 'bg-albero-50 dark:bg-albero-900/30',   fg: 'text-albero-600 dark:text-albero-400' },
     neutral: { bg: 'bg-slate-100 dark:bg-slate-800',       fg: 'text-slate-600 dark:text-slate-300' },
 };
 

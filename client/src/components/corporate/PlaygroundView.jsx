@@ -132,7 +132,7 @@ const PlaygroundView = () => {
                         Probar bot
                     </h1>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                        Chateá con el bot real (mismo flow que producción). La sesión es efímera — no genera pedidos, FunnelEvents ni mensajes a WhatsApp.
+                        Chatea con el bot real (mismo flow que producción). La sesión es efímera — no genera pedidos, FunnelEvents ni mensajes a WhatsApp.
                     </p>
                 </div>
             </header>
@@ -145,7 +145,7 @@ const PlaygroundView = () => {
                         size="sm"
                         onClick={handleReset}
                         disabled={!sessionId}
-                        title="Borra el state y arranca una conversación de cero"
+                        title="Borra el state y empieza una conversación de cero"
                     >
                         <RotateCcw className="w-4 h-4 mr-1" />
                         Reset
@@ -225,7 +225,7 @@ const PlaygroundView = () => {
                             <div className="h-full flex items-center justify-center text-center text-sm text-slate-400 dark:text-slate-500 px-8">
                                 <div>
                                     <FlaskConical className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                                    <p>Escribí un mensaje para arrancar.</p>
+                                    <p>Escribe un mensaje para empezar.</p>
                                     <p className="text-xs mt-1">Ej: "Hola, quiero bajar 8 kilos"</p>
                                 </div>
                             </div>
@@ -253,7 +253,7 @@ const PlaygroundView = () => {
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
                                 onKeyDown={handleKeyDown}
-                                placeholder="Escribí un mensaje… (Enter para enviar, Shift+Enter para nueva línea)"
+                                placeholder="Escribe un mensaje… (Enter para enviar, Shift+Enter para nueva línea)"
                                 rows={2}
                                 disabled={sending || !sessionId}
                                 className="flex-1 resize-none px-3 py-2 text-sm rounded-control bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-accent-500 disabled:opacity-50"
@@ -324,7 +324,7 @@ function MessageBubble({ message, onReport }) {
                     type="button"
                     onClick={onReport}
                     title="Reportar como error de IA"
-                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 focus:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-amber-400 self-center"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md text-warning-500 hover:text-warning-600 hover:bg-warning-50 dark:hover:bg-warning-900/20 focus:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-warning-400 self-center"
                 >
                     <AlertTriangle className="w-3.5 h-3.5" />
                 </button>
@@ -339,7 +339,7 @@ function StatePanel({ state }) {
         return (
             <Card padding="md" className="h-fit">
                 <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-2">State del cliente</h3>
-                <p className="text-xs text-slate-400 dark:text-slate-500">Mandá un mensaje para inicializar el state.</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500">Manda un mensaje para inicializar el state.</p>
             </Card>
         );
     }
@@ -349,7 +349,7 @@ function StatePanel({ state }) {
         { label: 'Weight goal', value: state.weightGoal ? `${state.weightGoal} kg` : null },
         { label: 'Producto', value: state.selectedProduct },
         { label: 'Plan', value: state.selectedPlan ? `${state.selectedPlan} días` : null },
-        { label: 'Total', value: state.totalPrice ? `$${state.totalPrice}` : null },
+        { label: 'Total', value: state.totalPrice ? `${state.totalPrice} €` : null },
         { label: 'Método pago', value: state.paymentMethod },
         { label: 'Shipping', value: state.shippingChoice },
         { label: 'Script', value: state.assignedScript, mono: true },
@@ -396,7 +396,7 @@ function StatePanel({ state }) {
                         {state.cart.map((item, i) => (
                             <div key={i} className="flex justify-between gap-2">
                                 <span className="text-slate-800 dark:text-slate-200">{item.product} × {item.plan}d</span>
-                                <span className="text-slate-500">${item.price}</span>
+                                <span className="text-slate-500">{item.price} €</span>
                             </div>
                         ))}
                     </div>

@@ -1,20 +1,19 @@
 import { Address } from '../types/state';
+import { MARKET } from '../config/market';
 import logger from '../utils/logger';
 
 /**
- * addressValidator.ts — Address validation service
+ * addressValidator.ts — validación de direcciones (España)
  *
- * Features:
- * 1. CP format validation (4 digits, valid Argentine range)
- * 2. Province auto-detection from CP
- * 3. Google Maps Geocoding (optional — enabled when GOOGLE_MAPS_KEY is in .env)
+ * 1. Formato de CP (5 dígitos; los 2 primeros son el código de provincia)
+ * 2. Provincia deducida del CP
+ * 3. Geocoding con Google Maps (opcional — se activa con GOOGLE_MAPS_KEY)
+ *
+ * Diferencia con el bot argentino: allá el CP eran 4 dígitos con rangos
+ * solapados ("3700-3899 = Chaco / Corrientes"). Aquí el mapeo es exacto: los
+ * dos primeros dígitos son la provincia, sin ambigüedad. Por eso esto quedó
+ * más simple, no porque falte cobertura.
  */
-
-interface CPRange {
-    min: number;
-    max: number;
-    province: string;
-}
 
 interface CPValidationResult {
     valid: boolean;
@@ -37,61 +36,67 @@ interface AddressValidationResult {
     mapsValid: boolean | null;
     mapsFormatted: string | null;
     warnings: string[];
-    notArgentina?: boolean;  // true when Maps confirms address is outside Argentina
+    outsideSpain?: boolean;  // true cuando Maps confirma que la dirección no está en España
 }
 
-// Argentine CP → Province mapping (official ranges - more granular)
-const CP_PROVINCES: CPRange[] = [
-    { min: 1000, max: 1999, province: 'Buenos Aires / CABA' },
-    { min: 2000, max: 2999, province: 'Santa Fe' },
-    { min: 3000, max: 3299, province: 'Santa Fe / Entre Ríos' },
-    { min: 3300, max: 3399, province: 'Misiones' },
-    { min: 3400, max: 3499, province: 'Corrientes' },
-    { min: 3500, max: 3599, province: 'Chaco' },
-    { min: 3600, max: 3699, province: 'Formosa' },
-    { min: 3700, max: 3899, province: 'Chaco / Corrientes' },
-    { min: 3900, max: 3999, province: 'N/A' },
-    { min: 4000, max: 4199, province: 'Tucumán' },
-    { min: 4200, max: 4399, province: 'Santiago del Estero' },
-    { min: 4400, max: 4499, province: 'Salta' },
-    { min: 4500, max: 4699, province: 'Jujuy' },
-    { min: 4700, max: 4799, province: 'Catamarca' },
-    { min: 4800, max: 4999, province: 'Catamarca / La Rioja' },
-    { min: 5000, max: 5299, province: 'Córdoba' },
-    { min: 5300, max: 5399, province: 'La Rioja' },
-    { min: 5400, max: 5499, province: 'San Juan' },
-    { min: 5500, max: 5699, province: 'Mendoza' },
-    { min: 5700, max: 5799, province: 'San Luis' },
-    { min: 5800, max: 5999, province: 'Córdoba' },
-    { min: 6000, max: 6999, province: 'Buenos Aires / La Pampa' },
-    { min: 7000, max: 7999, province: 'Buenos Aires (Costa / Sur)' },
-    { min: 8000, max: 8399, province: 'Buenos Aires (Sur) / Neuquén / Río Negro' },
-    { min: 8400, max: 8999, province: 'Río Negro' },
-    { min: 9000, max: 9399, province: 'Chubut / Santa Cruz' },
-    { min: 9400, max: 9499, province: 'Tierra del Fuego / Santa Cruz' },
-];
+// Código de provincia (2 primeros dígitos del CP) → nombre. Las 50 provincias
+// + Ceuta (51) y Melilla (52).
+const CP_PROVINCES: Record<string, string> = {
+    '01': 'Álava', '02': 'Albacete', '03': 'Alicante', '04': 'Almería', '05': 'Ávila',
+    '06': 'Badajoz', '07': 'Islas Baleares', '08': 'Barcelona', '09': 'Burgos', '10': 'Cáceres',
+    '11': 'Cádiz', '12': 'Castellón', '13': 'Ciudad Real', '14': 'Córdoba', '15': 'A Coruña',
+    '16': 'Cuenca', '17': 'Girona', '18': 'Granada', '19': 'Guadalajara', '20': 'Gipuzkoa',
+    '21': 'Huelva', '22': 'Huesca', '23': 'Jaén', '24': 'León', '25': 'Lleida',
+    '26': 'La Rioja', '27': 'Lugo', '28': 'Madrid', '29': 'Málaga', '30': 'Murcia',
+    '31': 'Navarra', '32': 'Ourense', '33': 'Asturias', '34': 'Palencia', '35': 'Las Palmas',
+    '36': 'Pontevedra', '37': 'Salamanca', '38': 'Santa Cruz de Tenerife', '39': 'Cantabria', '40': 'Segovia',
+    '41': 'Sevilla', '42': 'Soria', '43': 'Tarragona', '44': 'Teruel', '45': 'Toledo',
+    '46': 'Valencia', '47': 'Valladolid', '48': 'Bizkaia', '49': 'Zamora', '50': 'Zaragoza',
+    '51': 'Ceuta', '52': 'Melilla',
+};
 
-// Common Argentine cities → CP lookup (top ~50 cities by population)
+// Población → CP orientativo (casco urbano). Sirve para sugerirle el CP al
+// cliente que solo dice el nombre del pueblo, no para calcular envíos.
+// Las claves van sin tildes: se comparan contra el texto ya normalizado.
 const CITY_CP_MAP: Record<string, string> = {
-    'caba': '1000', 'capital federal': '1000', 'buenos aires': '1000', 'ciudad de buenos aires': '1000',
-    'la plata': '1900', 'mar del plata': '7600', 'bahia blanca': '8000', 'tandil': '7000', 'quilmes': '1878', 'lomas de zamora': '1832', 'avellaneda': '1870', 'lanus': '1824', 'moron': '1708', 'san isidro': '1642', 'tigre': '1648',
-    'cordoba': '5000', 'villa carlos paz': '5152', 'rio cuarto': '5800',
-    'rosario': '2000', 'santa fe': '3000', 'rafaela': '2300', 'venado tuerto': '2600',
-    'mendoza': '5500', 'san rafael': '5600', 'godoy cruz': '5501',
-    'tucuman': '4000', 'san miguel de tucuman': '4000',
-    'salta': '4400', 'san salvador de jujuy': '4600', 'jujuy': '4600',
-    'neuquen': '8300', 'san carlos de bariloche': '8400', 'bariloche': '8400',
-    'comodoro rivadavia': '9000', 'trelew': '9100', 'rawson': '9103',
-    'rio gallegos': '9400', 'ushuaia': '9410',
-    'posadas': '3300', 'resistencia': '3500', 'corrientes': '3400', 'formosa': '3600',
-    'parana': '3100', 'concordia': '3200',
-    'san juan': '5400', 'san luis': '5700', 'la rioja': '5300', 'catamarca': '4700',
-    'santiago del estero': '4200', 'santa rosa': '6300', 'viedma': '8500',
-    'rio grande': '9420', 'cipolletti': '8324', 'general roca': '8332',
+    'madrid': '28001', 'barcelona': '08001', 'valencia': '46001', 'sevilla': '41001',
+    'zaragoza': '50001', 'malaga': '29001', 'murcia': '30001', 'palma': '07001',
+    'palma de mallorca': '07001', 'las palmas': '35001', 'las palmas de gran canaria': '35001',
+    'bilbao': '48001', 'alicante': '03001', 'cordoba': '14001', 'valladolid': '47001',
+    'vigo': '36201', 'gijon': '33201', 'hospitalet': '08901', 'hospitalet de llobregat': '08901',
+    'vitoria': '01001', 'vitoria-gasteiz': '01001', 'a coruna': '15001', 'la coruna': '15001',
+    'coruna': '15001', 'granada': '18001', 'elche': '03201', 'oviedo': '33001',
+    'badalona': '08911', 'cartagena': '30201', 'terrassa': '08221', 'jerez': '11401',
+    'jerez de la frontera': '11401', 'sabadell': '08201', 'mostoles': '28931',
+    'santa cruz de tenerife': '38001', 'tenerife': '38001', 'pamplona': '31001',
+    'almeria': '04001', 'alcala de henares': '28801', 'fuenlabrada': '28941',
+    'leganes': '28911', 'san sebastian': '20001', 'donostia': '20001', 'getafe': '28901',
+    'burgos': '09001', 'santander': '39001', 'castellon': '12001',
+    'castellon de la plana': '12001', 'albacete': '02001', 'alcorcon': '28921',
+    'la laguna': '38201', 'san cristobal de la laguna': '38201', 'logrono': '26001',
+    'badajoz': '06001', 'salamanca': '37001', 'huelva': '21001', 'marbella': '29601',
+    'lleida': '25001', 'lerida': '25001', 'tarragona': '43001', 'dos hermanas': '41700',
+    'torrejon de ardoz': '28850', 'parla': '28980', 'mataro': '08301', 'algeciras': '11201',
+    'leon': '24001', 'cadiz': '11001', 'jaen': '23001', 'ourense': '32001', 'orense': '32001',
+    'reus': '43201', 'telde': '35200', 'girona': '17001', 'gerona': '17001',
+    'lugo': '27001', 'caceres': '10001', 'santiago de compostela': '15701', 'santiago': '15701',
+    'lorca': '30800', 'coslada': '28820', 'talavera de la reina': '45600',
+    'el puerto de santa maria': '11500', 'cornella': '08940', 'aviles': '33400',
+    'palencia': '34001', 'guadalajara': '19001', 'toledo': '45001', 'pontevedra': '36001',
+    'ceuta': '51001', 'melilla': '52001', 'soria': '42001', 'cuenca': '16001',
+    'segovia': '40001', 'avila': '05001', 'zamora': '49001', 'teruel': '44001',
+    'huesca': '22001', 'benidorm': '03500', 'torrevieja': '03180', 'roquetas de mar': '04740',
+    'sant cugat': '08172', 'rubi': '08191', 'manresa': '08240', 'vilanova i la geltru': '08800',
+    'arrecife': '35500', 'ibiza': '07800', 'eivissa': '07800', 'mahon': '07701',
+    'ferrol': '15401', 'siero': '33510', 'torrent': '46900', 'gandia': '46700',
+    'sagunto': '46500', 'paterna': '46980', 'alcoy': '03801', 'elda': '03600',
+    'estepona': '29680', 'fuengirola': '29640', 'mijas': '29650', 'velez-malaga': '29700',
+    'utrera': '41710', 'alcala de guadaira': '41500', 'sanlucar de barrameda': '11540',
+    'chiclana': '11130', 'el ejido': '04700', 'linares': '23700', 'motril': '18600',
 };
 
 /**
- * Suggest a CP based on city name. Returns null if city not found in lookup.
+ * Sugiere un CP a partir del nombre de la población. null si no la conocemos.
  */
 export function suggestCPByCity(city: string | null | undefined): string | null {
     if (!city) return null;
@@ -104,22 +109,24 @@ export function validateCP(cp: string | number | null | undefined): CPValidation
 
     const cleaned = String(cp).replace(/[^0-9]/g, '');
 
-    if (cleaned.length !== 4) {
-        return { valid: false, province: null, error: `El CP debe tener 4 dígitos (recibí: "${cp}")` };
+    // Un CP español lleva 5 dígitos y el cero inicial es significativo
+    // ("08001" ≠ "8001"). Si llegan 4 dígitos lo rellenamos: las provincias
+    // 01-09 (Barcelona, Álava, Baleares, Cáceres…) pierden el cero cada vez
+    // que alguien copia el CP desde una hoja de cálculo, y rechazarlo sería
+    // pedirle al cliente que reescriba un dato que ya dio bien.
+    const padded = cleaned.length === 4 ? `0${cleaned}` : cleaned;
+
+    if (padded.length !== 5) {
+        return { valid: false, province: null, error: `El CP debe tener 5 dígitos (recibí: "${cp}")` };
     }
 
-    const num = parseInt(cleaned, 10);
-    if (num < 1000 || num > 9999) {
-        return { valid: false, province: null, error: `CP fuera de rango: ${num}` };
+    const provinceCode = padded.slice(0, 2);
+    const province = CP_PROVINCES[provinceCode];
+    if (!province) {
+        return { valid: false, province: null, error: `CP fuera de rango: ${padded} (no corresponde a ninguna provincia)` };
     }
 
-    const match = CP_PROVINCES.find(r => num >= r.min && num <= r.max);
-    return {
-        valid: true,
-        cp: cleaned,
-        province: match ? match.province : 'Desconocida',
-        error: null
-    };
+    return { valid: true, cp: padded, province, error: null };
 }
 
 export async function validateWithGoogleMaps(address: string): Promise<MapsValidationResult> {
@@ -129,8 +136,8 @@ export async function validateWithGoogleMaps(address: string): Promise<MapsValid
     }
 
     try {
-        const query = encodeURIComponent(`${address}, Argentina`);
-        const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${query}&key=${apiKey}&region=ar&language=es`;
+        const query = encodeURIComponent(`${address}, ${MARKET.countryName}`);
+        const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${query}&key=${apiKey}&region=es&language=es`;
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10_000);
@@ -142,16 +149,16 @@ export async function validateWithGoogleMaps(address: string): Promise<MapsValid
             const result = data.results[0];
             const location = result.geometry?.location ?? null;
 
-            const isArgentina = result.address_components?.some(
-                (c: any) => c.short_name === 'AR' && c.types.includes('country')
+            const isSpain = result.address_components?.some(
+                (c: any) => c.short_name === 'ES' && c.types.includes('country')
             );
 
-            if (!isArgentina) {
+            if (!isSpain) {
                 return {
                     valid: false,
                     formatted: result.formatted_address,
                     location,
-                    error: 'La dirección no parece estar en Argentina'
+                    error: 'La dirección no parece estar en España'
                 };
             }
 
@@ -170,16 +177,16 @@ export async function validateWithGoogleMaps(address: string): Promise<MapsValid
 
 /**
  * lookupCPFromMaps
- * Uses Google Maps Geocoding to find the postal code for a street + city.
- * Returns the CP string (4 digits) or null if not found.
+ * Busca el código postal de una calle + población con Google Maps.
+ * Devuelve el CP (5 dígitos) o null si no lo encuentra.
  */
 export async function lookupCPFromMaps(calle: string, ciudad: string): Promise<string | null> {
     const apiKey = process.env.GOOGLE_MAPS_KEY;
     if (!apiKey) return null;
 
     try {
-        const query = encodeURIComponent(`${calle}, ${ciudad}, Argentina`);
-        const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${query}&key=${apiKey}&region=ar&language=es`;
+        const query = encodeURIComponent(`${calle}, ${ciudad}, ${MARKET.countryName}`);
+        const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${query}&key=${apiKey}&region=es&language=es`;
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10_000);
@@ -190,19 +197,17 @@ export async function lookupCPFromMaps(calle: string, ciudad: string): Promise<s
         if (data.status === 'OK' && data.results && data.results.length > 0) {
             const result = data.results[0];
 
-            // Verify it's in Argentina
-            const isArgentina = result.address_components?.some(
-                (c: any) => c.short_name === 'AR' && c.types.includes('country')
+            const isSpain = result.address_components?.some(
+                (c: any) => c.short_name === 'ES' && c.types.includes('country')
             );
-            if (!isArgentina) return null;
+            if (!isSpain) return null;
 
-            // Extract postal_code from address_components
             const postalComponent = result.address_components?.find(
                 (c: any) => c.types.includes('postal_code')
             );
             if (postalComponent) {
                 const cp = postalComponent.long_name.replace(/[^0-9]/g, '');
-                if (cp.length === 4) {
+                if (cp.length === 5) {
                     logger.info(`[MAPS] Found CP ${cp} for "${calle}, ${ciudad}"`);
                     return cp;
                 }
@@ -226,7 +231,7 @@ export async function validateAddress(addr: Address): Promise<AddressValidationR
         warnings: []
     };
 
-    // 1. CP Validation
+    // 1. Validación del CP
     if (addr.cp) {
         const cpResult = validateCP(addr.cp);
         result.cpValid = cpResult.valid;
@@ -239,9 +244,9 @@ export async function validateAddress(addr: Address): Promise<AddressValidationR
         result.warnings.push('⚠️ Falta código postal');
     }
 
-    // 2. Google Maps validation (optional)
+    // 2. Validación por Google Maps (opcional)
     if (addr.calle && addr.ciudad) {
-        const fullAddress = `${addr.calle}, ${addr.ciudad}${addr.cp ? `, ${addr.cp}` : ''}, Argentina`;
+        const fullAddress = `${addr.calle}, ${addr.ciudad}${addr.cp ? `, ${addr.cp}` : ''}, ${MARKET.countryName}`;
         const mapsResult = await validateWithGoogleMaps(fullAddress);
 
         if (mapsResult.valid === true) {
@@ -250,14 +255,12 @@ export async function validateAddress(addr: Address): Promise<AddressValidationR
         } else if (mapsResult.valid === false) {
             result.mapsValid = false;
             result.warnings.push(`📍 ${mapsResult.error}`);
-            if (mapsResult.error?.includes('Argentina')) {
-                result.notArgentina = true;
+            if (mapsResult.error?.includes('España')) {
+                result.outsideSpain = true;
             }
         }
-        // If valid === null, Maps is not configured or errored — skip silently
+        // Si valid === null, Maps no está configurado o falló — seguimos sin validar
     }
 
     return result;
 }
-
-// Functions exported inline above

@@ -57,7 +57,7 @@ export async function handleMediaGlobals(
         );
 
         if (productImages.length > 0) {
-            const introMsg = `Acá tenés fotos de nuestras ${targetCategory} 👇`;
+            const introMsg = `Aquí tienes fotos de nuestras ${targetCategory} 👇`;
             currentState.history.push({ role: 'bot', content: introMsg, timestamp: Date.now() });
             await sendMessageWithDelay(userId, introMsg);
 

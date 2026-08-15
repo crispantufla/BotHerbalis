@@ -39,7 +39,7 @@ model Order {
   tracking    String?
   postdated   String?
   seller      String?  // Phone number of the WhatsApp session that created the order
-  paymentMethod String? // mercadopago | contrarembolso | transferencia
+  paymentMethod String? // contrarembolso (unico medio en Espana)
 
   // Seña / anticipo para flujo COD (mayo 2026):
   //   senaAmount       = monto del anticipo ya pagado (típicamente $10.000)
@@ -284,7 +284,7 @@ model WebOrder {
   subtotal       Float
   shipping       Float     @default(0)
   total          Float
-  currency       String    @default("ARS")
+  currency       String    @default("EUR")
 
   nombre         String?
   apellido       String?
@@ -332,3 +332,7 @@ model AiSemanticCache {
   @@index([step])
   @@index([lastHit])
 }
+
+// (El modelo MarketingPiece vivía aquí. Se movió al proyecto "Herbalis Social"
+// (D:\Herbalis Social), que gestiona las redes sociales y tiene su propia base
+// de datos. El bot no publica nada: solo recibe a quien llega por WhatsApp.)

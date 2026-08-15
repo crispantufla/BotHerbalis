@@ -57,7 +57,7 @@ export function _detectScheduleRequest(text: string): boolean {
 // cápsulas a la noche") no es pedido de horario de envío. El detector ya es
 // bastante específico, pero esto suma seguridad.
 const STEPS_RELEVANT = new Set<string>([
-    'waiting_payment_method', 'waiting_mp_payment', 'waiting_transfer_confirmation',
+    'waiting_payment_method',
     'waiting_data', 'waiting_maps_confirmation', 'waiting_final_confirmation',
     'waiting_admin_validation', 'completed', 'post_sale',
 ]);
@@ -77,11 +77,11 @@ export async function handleScheduleRequest(
 
     const reply =
         'No puedo asegurarte un horario específico — el envío lo hace el ' +
-        'Correo Argentino y no tenemos forma de coordinar la hora exacta del ' +
+        'Correos y no tenemos forma de fijar la hora exacta del ' +
         'cartero 😔\n\n' +
         'Lo que sí podemos hacer es programar la fecha de despacho o avisarte ' +
-        'cuando llegue al correo de tu zona para que lo retires en sucursal.\n\n' +
-        'Te derivo con un asesor para coordinar esto manualmente, ¿dale? 😊';
+        'si no estás en casa, te dejan aviso y lo recoges en tu oficina de Correos.\n\n' +
+        'Te paso con un compañero para coordinarlo a mano, ¿te parece? 😊';
 
     currentState.history.push({ role: 'bot', content: reply, timestamp: Date.now() });
     if (typeof dependencies.sendMessageWithDelay === 'function') {
@@ -90,7 +90,7 @@ export async function handleScheduleRequest(
 
     await _pauseAndAlert(
         userId, currentState, dependencies, text,
-        'Cliente pidió un horario específico de entrega (Correo Argentino no permite agendar horario). Coordinar manualmente.',
+        'Cliente pidió una hora concreta de entrega (Correos no permite fijar horario). Coordinar a mano.',
     );
 
     return { matched: true, paused: true };

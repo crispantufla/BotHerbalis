@@ -14,11 +14,14 @@ import { useAuth } from '../../context/AuthContext';
 import {
     Card, Button, IconButton, Badge, KpiCard, EmptyState, cn
 } from '../ui';
+import { formatEUR, formatEURShort } from '../../utils/format';
 
-// Paleta de los gráficos — mantenemos hex literal porque recharts no consume
-// CSS custom properties / tokens Tailwind (las clases se evaluarían client-side
-// antes del re-render del SVG).
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
+// Paleta de los gráficos — hex literal porque recharts no consume CSS custom
+// properties ni tokens de Tailwind (las clases se evaluarían client-side
+// después del render del SVG). Son los mismos colores del tema
+// (tailwind.config.js): azulejo, albero, oliva, mar y carmesí. Si cambia la
+// paleta hay que tocar los dos sitios — no hay forma de derivarlos.
+const COLORS = ['#1e5ea8', '#e0a526', '#4d8b31', '#0284c7', '#c8102e'];
 
 const DAY_RANGES = [
     { days: 7,   label: '7 días',     short: '7D' },
@@ -107,7 +110,7 @@ const AdvancedAnalyticsView = () => {
                         <span className="text-xs font-semibold tabular-nums">
                             {entry.name === 'Ingresos' || entry.dataKey?.includes('revenue') || entry.name === 'Ticket Prom.'
                                 || (entry.value > 1000 && !String(entry.name).includes('count') && !String(entry.name).includes('Pedidos'))
-                                ? `$${entry.value.toLocaleString('es-AR')}`
+                                ? formatEURShort(entry.value)
                                 : entry.value}
                         </span>
                     </div>
@@ -187,9 +190,9 @@ const AdvancedAnalyticsView = () => {
                     <EmptyState
                         icon={Activity}
                         title="Sin datos para este período"
-                        description={`No hay órdenes ni ingresos registrados en los últimos ${
+                        description={`No hay pedidos ni ingresos registrados en los últimos ${
                             daysAgoToFetch === 90 ? '3 meses' : daysAgoToFetch === 365 ? '12 meses' : `${daysAgoToFetch} días`
-                        }. Probá con un rango más amplio.`}
+                        }. Prueba con un rango más amplio.`}
                         action={
                             <div className="flex gap-2">
                                 {[7, 30].map(days => (
@@ -215,24 +218,24 @@ const AdvancedAnalyticsView = () => {
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                         <KpiCard
                             label="Ingresos brutos"
-                            value={`$${data.overview?.revenue?.value?.toLocaleString('es-AR') || 0}`}
+                            value={formatEURShort(data.overview?.revenue?.value)}
                             subtext={data.overview && <GrowthBadge value={data.overview.revenue.growth} />}
                             icon={DollarSign}
                             tone="success"
                         />
                         <KpiCard
-                            label="Órdenes cerradas"
-                            value={data.overview?.orders?.value?.toLocaleString('es-AR') || 0}
+                            label="Pedidos cerrados"
+                            value={data.overview?.orders?.value?.toLocaleString('es-ES') || 0}
                             subtext={data.overview && <GrowthBadge value={data.overview.orders.growth} />}
                             icon={ShoppingCart}
                             tone="accent"
                         />
                         <KpiCard
-                            label="Ticket promedio"
-                            value={`$${data.overview?.aov?.value?.toLocaleString('es-AR') || 0}`}
+                            label="Ticket medio"
+                            value={formatEUR(data.overview?.aov?.value)}
                             subtext={data.overview && <GrowthBadge value={data.overview.aov.growth} />}
                             icon={Activity}
-                            tone="purple"
+                            tone="albero"
                         />
                         <KpiCard
                             label="Conversión general"
@@ -284,12 +287,12 @@ const AdvancedAnalyticsView = () => {
                                         dy={10}
                                     />
                                     <YAxis yAxisId="left" stroke={axisTextColor} fontSize={11} tickLine={false} axisLine={false} dx={-10} />
-                                    <YAxis yAxisId="right" orientation="right" stroke="#ec4899" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} dx={10} />
+                                    <YAxis yAxisId="right" orientation="right" stroke="#c1851a" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} dx={10} />
                                     <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: isDark ? '#334155' : '#f1f5f9' }} />
                                     <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px', color: axisTextColor, fontWeight: '500' }} />
                                     <Bar yAxisId="left" dataKey="chats"  name="Nuevos chats" fill="url(#colorChats)"  radius={[4, 4, 0, 0]} barSize={12} />
                                     <Bar yAxisId="left" dataKey="orders" name="Pedidos"      fill="url(#colorOrders)" radius={[4, 4, 0, 0]} barSize={12} />
-                                    <Line yAxisId="right" type="monotone" dataKey="rate" name="Tasa de cierre (%)" stroke="#ec4899" strokeWidth={2.5} dot={{ r: 3, fill: '#ec4899', strokeWidth: 2, stroke: isDark ? '#1e293b' : '#ffffff' }} activeDot={{ r: 6 }} />
+                                    <Line yAxisId="right" type="monotone" dataKey="rate" name="Tasa de cierre (%)" stroke="#c1851a" strokeWidth={2.5} dot={{ r: 3, fill: '#c1851a', strokeWidth: 2, stroke: isDark ? '#1e293b' : '#ffffff' }} activeDot={{ r: 6 }} />
                                 </ComposedChart>
                             </ResponsiveContainer>
                         </div>
@@ -331,7 +334,7 @@ const AdvancedAnalyticsView = () => {
                                         </div>
                                         <div className="w-16 text-right text-xs text-slate-600 dark:text-slate-400 relative z-10 flex-shrink-0 tabular-nums">{prov.orders}</div>
                                         <div className="w-28 text-right text-sm font-semibold text-success-600 dark:text-success-500 relative z-10 flex-shrink-0 tabular-nums">
-                                            ${prov.revenue.toLocaleString('es-AR')}
+                                            {formatEURShort(prov.revenue)}
                                         </div>
                                     </div>
                                 );
@@ -378,7 +381,7 @@ const AdvancedAnalyticsView = () => {
                         <Card padding="md">
                             <div className="mb-4">
                                 <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                                    <Package className="w-4 h-4 text-purple-500" aria-hidden="true" />
+                                    <Package className="w-4 h-4 text-albero-500" aria-hidden="true" />
                                     Mix de productos
                                 </h3>
                                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -422,7 +425,7 @@ const AdvancedAnalyticsView = () => {
                                     Patrón de duración
                                 </h3>
                                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                                    Tamaño del plan elegido (60/120/180 días).
+                                    Tamaño del plan elegido (60 o 120 días).
                                 </p>
                             </div>
                             <div className="h-56 w-full relative mt-2">

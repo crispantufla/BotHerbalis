@@ -12,10 +12,13 @@ const STEP_LABELS = {
     'waiting_admin_validation':   'Esperando validación admin',
     'waiting_final_confirmation': 'Confirmación final',
     'waiting_maps_confirmation':  'Confirmación de dirección',
-    'waiting_data':               'Cargando datos de envío',
-    'waiting_transfer_confirmation': 'Esperando transferencia',
-    'waiting_mp_payment':         'Pago MercadoPago pendiente',
-    'waiting_payment_method':     'Eligiendo método de pago',
+    'waiting_data':               'Rellenando datos de envío',
+    // Los dos pasos de pago por adelantado (transferencia y pasarela) ya no
+    // existen en el flujo: aquí todo se cobra contra reembolso. Se conservan
+    // las etiquetas por si queda algún lead antiguo con ese paso guardado.
+    'waiting_transfer_confirmation': 'Transferencia (ya no se usa)',
+    'waiting_mp_payment':         'Pago online (ya no se usa)',
+    'waiting_payment_method':     'Eligiendo entrega (casa u oficina)',
     'waiting_plan_choice':        'Eligiendo plan (60 vs 120)',
     'waiting_ok':                 'Confirmación intermedia',
     'waiting_preference':         'Eligiendo producto',
@@ -212,7 +215,7 @@ const RescueQueueView = ({ onGoToChat }) => {
                     <AlertCircle className="w-4 h-4 text-warning-600 dark:text-warning-500 flex-shrink-0 mt-0.5" aria-hidden="true" />
                     <p className="text-xs text-warning-700 dark:text-warning-500">
                         Mostrando <strong>{filteredLeads.length}</strong> de <strong>{leads.length}</strong> leads.
-                        {generatedAt && ` Última actualización: ${new Date(generatedAt).toLocaleTimeString('es-AR')}.`}
+                        {generatedAt && ` Última actualización: ${new Date(generatedAt).toLocaleTimeString('es-ES')}.`}
                     </p>
                 </div>
             )}
@@ -275,7 +278,7 @@ const RescueQueueView = ({ onGoToChat }) => {
                                         </td>
                                         <td className="px-4 py-2.5 text-xs text-slate-700 dark:text-slate-300">
                                             {l.cartTotal
-                                                ? <span className="font-semibold tabular-nums">${l.cartTotal}</span>
+                                                ? <span className="font-semibold tabular-nums">{l.cartTotal} €</span>
                                                 : <span className="text-slate-400 dark:text-slate-500">—</span>}
                                         </td>
                                         <td className="px-4 py-2.5">
@@ -287,7 +290,7 @@ const RescueQueueView = ({ onGoToChat }) => {
                                                     </Badge>
                                                 )}
                                                 {l.secondFollowUpSent && (
-                                                    <Badge tone="purple" size="sm" title="Segundo recordatorio enviado">
+                                                    <Badge tone="albero" size="sm" title="Segundo recordatorio enviado">
                                                         <Send className="w-2.5 h-2.5" />
                                                         2°
                                                     </Badge>
@@ -316,7 +319,7 @@ const RescueQueueView = ({ onGoToChat }) => {
             </Card>
 
             <p className="text-xs text-slate-500 dark:text-slate-400 text-center">
-                "Tomar control" abre el chat del cliente y pausa el bot para que respondas vos manualmente.
+                "Tomar control" abre el chat del cliente y pausa el bot para que respondas tú manualmente.
             </p>
         </div>
     );

@@ -1,11 +1,11 @@
 import { UserState, FlowStep } from '../../types/state';
 import { validateAddress, suggestCPByCity, lookupCPFromMaps } from '../../services/addressValidator';
 import { buildConfirmationMessage } from '../../utils/messageTemplates';
-import { _setStep, _pauseAndAlert, _detectProductPlanChange, _resolveNewProductPlan, _detectPostdatado, _handleShipPaySwitch, _closeSaleAndNotify } from '../utils/flowHelpers';
+import { _setStep, _pauseAndAlert, _detectProductPlanChange, _resolveNewProductPlan, _detectPostdatado, _handleShipPaySwitch, _closeSaleAndNotify, PICKUP_STREET, _isPickupAddress } from '../utils/flowHelpers';
 import { _getPrice } from '../utils/pricing';
-import { _formatPrice, buildCartFromSelection, calculateTotal } from '../utils/cartHelpers';
+import { _formatPrice, _parsePrice, buildCartFromSelection, calculateTotal } from '../utils/cartHelpers';
 import { _isDuplicate } from '../utils/messages';
-import { isMpEnabled, prepayMeans } from '../utils/paymentOptions';
+import { MARKET } from '../../config/market';
 import logger from '../../utils/logger';
 
 // --- Helper types ---
@@ -22,6 +22,45 @@ interface MessageClassification {
     isShortConfirmation: boolean;
 }
 
+/**
+ * ¿El cliente ha dado piso, puerta, escalera o similar? En España es la
+ * diferencia entre que el repartidor entregue o devuelva el paquete.
+ */
+function _llevaPisoOPuerta(calle: string | null | undefined): boolean {
+    if (!calle) return false;
+    return /\b(\d{1,3}\s*[ºªo°]\s*[a-zA-Z]?|bajo|entresuelo|principal|[áa]tico|(?:piso|pta|puerta|esc|escalera|portal|bloque|blq|urb)\.?\s*\w)/i.test(calle);
+}
+
+/**
+ * Decide qué calle va en la etiqueta de envío.
+ *
+ * Google devuelve la dirección troceada por comas, y en España el número de
+ * portal viaja en SU PROPIO trozo: "C. Mayor, 12, 28013 Madrid, España". Aquí
+ * se cogía solo el primero — lo que en Argentina funcionaba, porque allí Google
+ * devuelve "Av. Santa Fe 1234, ..." con el número pegado a la calle. Traído a
+ * España tal cual, el pedido salía a "Calle Mayor" sin número: no se entrega.
+ *
+ * Encima Google nunca devuelve el piso ni la puerta. Por eso, cuando el cliente
+ * los ha escrito, su texto manda: es más completo que la versión normalizada.
+ */
+function _calleParaLaEtiqueta(mapsFormatted: string, calleCliente: string | null | undefined): string {
+    const partes = mapsFormatted.split(',').map(p => p.trim()).filter(Boolean);
+    if (!partes.length) return calleCliente || '';
+
+    // El segundo trozo es el número si son solo dígitos (con letra opcional,
+    // "12B") o el "s/n" de las casas sin numerar.
+    const calleMaps = (partes[1] && /^(\d{1,4}\s*[a-zA-Z]?|s\/n)$/i.test(partes[1]))
+        ? `${partes[0]}, ${partes[1]}`
+        : partes[0];
+
+    if (_llevaPisoOPuerta(calleCliente)) return calleCliente as string;
+
+    // Última red: nunca cambiar la dirección del cliente por una MENOS precisa.
+    if (!/\d/.test(calleMaps) && /\d/.test(calleCliente || '')) return calleCliente as string;
+
+    return calleMaps;
+}
+
 // --- Helper: Guards for missing product/plan ---
 async function _checkGuards(
     userId: string, currentState: UserState, knowledge: any, dependencies: any
@@ -30,7 +69,7 @@ async function _checkGuards(
 
     if (!currentState.selectedProduct) {
         logger.info(`[GUARD] waiting_data: No product selected for ${userId}, redirecting to preference`);
-        const skipMsg = "Antes de los datos de envío, necesito saber qué producto te interesa 😊\n\nTenemos:\n1️⃣ Cápsulas\n2️⃣ Semillas/Infusión\n3️⃣ Gotas\n\n¿Cuál preferís?";
+        const skipMsg = "Antes de los datos de envío, necesito saber qué producto te interesa 😊\n\nTenemos:\n1️⃣ Cápsulas\n2️⃣ Semillas/Infusión\n3️⃣ Gotas\n\n¿Cuál prefieres?";
         _setStep(currentState, FlowStep.WAITING_PREFERENCE);
         currentState.history.push({ role: 'bot', content: skipMsg, timestamp: Date.now() });
         saveState(userId);
@@ -98,8 +137,8 @@ async function _handleProductPlanChange(
         const planText = unitsCount > 1 ? `${unitsCount} unidades (${planDaysNum} días)` : `${planDaysNum} días`;
         calculateTotal(currentState);
         const changeMsg = unitsCount >= 3
-            ? `¡Excelente! 🎉 Anotamos ${planText} de ${newProduct.split(' de ')[0].toLowerCase()} con 50% de descuento en la unidad más barata. Total: $${currentState.totalPrice}.`
-            : `¡Dale, sin problema! 😊 Cambiamos a ${newProduct.split(' de ')[0].toLowerCase()} por ${planText}, tienen un valor de $${currentState.totalPrice}.`;
+            ? `¡Estupendo! 🎉 Anotamos ${planText} de ${newProduct.split(' de ')[0].toLowerCase()} con un 50% de descuento en la unidad más barata. Total: ${currentState.totalPrice} €.`
+            : `¡Sin problema! 😊 Cambiamos a ${newProduct.split(' de ')[0].toLowerCase()} por ${planText}, son ${currentState.totalPrice} €.`;
         currentState.history.push({ role: 'bot', content: changeMsg, timestamp: Date.now() });
         await sendMessageWithDelay(userId, changeMsg);
 
@@ -123,34 +162,34 @@ async function _handleProductPlanChange(
     }
 }
 
-// --- Helper: Detect sucursal/pickup intent ---
-async function _handleSucursalIntent(
+// --- Helper: el cliente dice que prefiere recogerlo él ---
+async function _handlePickupIntent(
     userId: string, normalizedText: string, currentState: UserState, dependencies: any
 ): Promise<{ matched: boolean } | null> {
     const { sendMessageWithDelay, saveState } = dependencies;
 
-    const isSucursalIntent = /\b(voy al correo|voy yo al correo|retiro en sucursal|lo retiro|lo busco|busco yo|paso por el correo|paso yo por|sucursal|sucursal del correo|retiro yo|voy a buscarlo|voy a retirarlo|lo paso a buscar|paso a buscar|paso a retirar|voy a retirar|no tengo direcci[oó]n exacta|vivo en.{0,20}(distrito|paraje|ruta|campo|zona rural))\b/i.test(normalizedText)
+    const isPickupIntent = /\b(voy a correos|paso por correos|en correos|oficina de correos|lo recojo|la recojo|prefiero recogerlo|recogida|paso a recogerlo|paso a por el|voy a por el|voy a recogerlo|punto de recogida|no tengo direcci[oó]n exacta|vivo en.{0,20}(diseminado|aldea|pedan[ií]a|campo|zona rural))\b/i.test(normalizedText)
         && !/\b(cuanto|cuánto|precio|costo|sale|cuesta|valor|tarda|llega|contraindicacion)\b/i.test(normalizedText);
 
-    if (!isSucursalIntent || currentState.partialAddress?.calle) return null;
+    if (!isPickupIntent || currentState.partialAddress?.calle) return null;
 
-    logger.info(`[SUCURSAL] Detected sucursal pickup intent for ${userId}`);
+    logger.info(`[RECOGIDA] Detected pickup intent for ${userId}`);
     if (!currentState.partialAddress) currentState.partialAddress = {};
-    currentState.partialAddress.calle = 'A sucursal';
+    currentState.partialAddress.calle = PICKUP_STREET;
     currentState.addressIssueType = null;
     currentState.addressIssueTries = 0;
 
     const addr = currentState.partialAddress;
     const stillMissing = [];
-    if (!addr.nombre) stillMissing.push('Nombre y Apellido');
-    if (!addr.ciudad) stillMissing.push('Localidad/Ciudad');
-    if (!addr.cp) stillMissing.push('Código Postal');
+    if (!addr.nombre) stillMissing.push('Nombre y apellidos');
+    if (!addr.ciudad) stillMissing.push('Población');
+    if (!addr.cp) stillMissing.push('Código postal');
 
     let ackMsg: string;
     if (stillMissing.length > 0) {
-        ackMsg = `¡Dale, perfecto! Lo enviamos a la sucursal de Correo Argentino más cercana a tu zona 📦\n\nSolo necesito: *${stillMissing.join(', ')}* para armar la etiqueta 🙌`;
+        ackMsg = `¡Perfecto! Lo mandamos a la ${MARKET.pickupPointName} que te corresponda 📮\n\nSolo necesito: *${stillMissing.join(', ')}* para preparar la etiqueta 🙌`;
     } else {
-        ackMsg = `¡Dale, perfecto! Lo enviamos a la sucursal de Correo Argentino más cercana a tu zona 📦`;
+        ackMsg = `¡Perfecto! Lo mandamos a la ${MARKET.pickupPointName} que te corresponda 📮`;
     }
     currentState.history.push({ role: 'bot', content: ackMsg, timestamp: Date.now() });
     saveState(userId);
@@ -243,13 +282,13 @@ async function _handleAiFallback(
 
     let aiGoal = "";
     if (classification.isPaymentTiming) {
-        aiGoal = `El cliente dice que todavía no cobró, que está esperando su sueldo, o que va a esperar a cobrar para escribirte. DEBES INSISTIR y ofrecerle postdatar el envío. Respondé directo: "¡No hace falta que esperes! 😊 Te lo agendamos y lo despacho la fecha que vos me digas. ¿A partir de qué día te queda cómodo recibirlo?". NO aceptes un "te escribo después" sin antes ofrecer postdatar. PROHIBIDO mencionar "congelar precio" / "congelar promo" — el mensaje debe ser directo sin urgencia falsa.`;
+        aiGoal = `El cliente dice que todavía no ha cobrado, que está esperando la nómina, o que te escribirá cuando cobre. DEBES INSISTIR y ofrecerle aplazar el envío a la fecha que le venga bien. Responde directo: "¡No hace falta que esperes! 😊 Te lo dejo anotado y lo mandamos el día que me digas. ¿A partir de qué día te viene bien recibirlo?". Recuérdale además que paga al recibirlo, así que no tiene que adelantar nada ahora. NO aceptes un "ya te digo" sin antes ofrecer aplazar el envío. PROHIBIDO hablar de "congelar el precio" o de ofertas que caducan — nada de urgencia falsa.`;
     } else if (classification.isHesitation) {
-        aiGoal = `El cliente dice que ahora no puede, que la semana que viene, que no tiene plata, o alguna variación de "todavía no". IMPORTANTE: El envío tarda *7 a 10 días hábiles* y existe la opción de *retiro en sucursal* (paga el total en efectivo cuando va a buscar el paquete a la sucursal de Correo Argentino, sin anticipo previo). Respondé con MUCHA empatía y mencioná estos dos puntos: (1) "El envío tarda 7 a 10 días hábiles, así que para cuando te llegue ya vas a poder" y (2) "Tenés la opción de retiro en sucursal: pagás el total cuando lo retirás, no necesitás pagar nada ahora". Si aún así dice que no puede, ofrecé postdatar: "Si preferís, podemos agendar el envío para la fecha que te quede mejor, por ejemplo principio de mes. ¿Qué te parece?". NO aceptes un rechazo directo sin antes explicarle la opción de retiro en sucursal y ofrecer postdatar.`;
+        aiGoal = `El cliente dice que ahora no puede, que la semana que viene, que no tiene dinero, o alguna variación de "todavía no". IMPORTANTE: el pedido es CONTRA REEMBOLSO (paga al recibirlo, no adelanta nada) y el envío tarda ${MARKET.deliveryDaysHome}. Responde con MUCHA empatía y menciona los dos puntos: (1) "No pagas nada ahora: pagas cuando lo tengas en la mano" y (2) "Además tarda ${MARKET.deliveryDaysHome} en llegar, así que hay margen". Si aun así dice que no puede, ofrécele aplazarlo: "Si lo prefieres, lo dejamos anotado para la fecha que mejor te venga, por ejemplo a principios de mes. ¿Qué te parece?". NO aceptes un rechazo directo sin antes explicarle que no paga nada por adelantado y ofrecer aplazar el envío.`;
     } else if (classification.isObjectionOrComment) {
-        aiGoal = `El usuario hizo un comentario sobre probar el producto primero, o expresó dudas sobre los resultados (ej: "si me da resultado compro más"). Respondé validando su decisión con extrema seguridad y empatía. A continuación, VOLVÉ a pedir sutilmente los datos de envío que estaban pendientes (Nombre, Dirección, Ciudad). NO ofrezcas otros productos.`;
+        aiGoal = `El usuario ha comentado que quiere probar el producto primero, o ha expresado dudas (ej: "si me va bien compro más"). Responde validando su decisión con empatía y naturalidad, SIN prometerle nada. PROHIBIDO ABSOLUTAMENTE: garantizar o insinuar un resultado, hablar de kilos o tallas, de adelgazar o perder peso, de plazos para notar algo, del "efecto rebote" o de que "funciona seguro". Si insiste, dile que es un complemento alimenticio que acompaña sus hábitos y su rutina, y que le acompañas por WhatsApp durante todo el plan. Apóyate en lo concreto: paga al recibirlo, el envío es gratis y no adelanta nada. A continuación, VUELVE a pedirle con suavidad los datos de envío pendientes (nombre y apellidos, dirección, población). NO le ofrezcas otros productos.`;
     } else {
-        aiGoal = `El usuario tiene una duda o expresa una preocupación en plena toma de datos (ej: pregunta cómo se paga, cuándo llega, si le entregan en el trabajo, o cuenta un largo problema personal). DEBES RESPONDER SU TEXTO DIRECTAMENTE de forma EXTENSA Y MUY EMPÁTICA usando el Knowledge. Si expresa miedos sobre demoras o recepción, redactá un párrafo largo brindando tranquilidad absoluta. Si pregunta si puede recibir en su TRABAJO, responde sus opciones. Si pregunta sobre la función del producto o qué hace: "La Nuez de la India ayuda a acompañar el proceso natural del cuerpo para eliminar excesos. Muchas personas notan menos hinchazón, más liviandad y un descenso progresivo de peso. Es un apoyo natural para sentirte mejor sin métodos agresivos.". Si pregunta sobre dieta/comidas: "La Nuez de la India puede utilizarse sin hacer dietas estrictas...". Si pregunta dónde queda la oficina/local: "Somos Herbalis...". Si pregunta formas de pago: "Tenemos 2 opciones de envío: retiro en sucursal (pagás el total en efectivo al retirar, 7 a 10 días hábiles) o envío a domicilio prepago con ${prepayMeans(isMpEnabled(dependencies.config))} (más rápido, 4 días hábiles). Ambos gratis."${isMpEnabled(dependencies.config) ? '' : ' 🛑 El pago con tarjeta está fuera de servicio en estos días: NO lo ofrezcas ni lo menciones.'}. Si pregunta tiempos: "Los envíos se realizan cuanto antes. Si retirás en sucursal, 7 a 10 días hábiles; si lo pagás antes (a domicilio), sale más rápido y llega en 4 días hábiles.". Si pregunta contraindicaciones: "Es un producto 100% natural...". Nunca lo obligues a dar los datos bruscamente, respondé su duda con muchísima calidez, y cerrá sutilmente preguntando: "¿Te parece que lo dejemos anotado?" o "¿Te tomo los datos?".\n\nEXCEPCIÓN CRÍTICA - HESITACIÓN TIPO "TE AVISO": Si el cliente dice "luego te escribo", "te confirmo después", o "lo pienso y te aviso": NO LO ACEPTES A LA PRIMERA. Respondé directo ofreciendo postdatar: "¡Dale! Igual, si querés te lo dejamos agendado para la fecha que vos prefieras y lo despacho ese día. ¿A partir de qué día te queda cómodo recibirlo?". PROHIBIDO mencionar "congelar precio" / "congelar promo".`;
+        aiGoal = `El usuario tiene una duda o expresa una preocupación en plena toma de datos (ej: pregunta cómo se paga, cuándo llega, si se lo pueden dejar en el trabajo, o te cuenta un problema personal largo). DEBES RESPONDER SU TEXTO DIRECTAMENTE de forma EXTENSA Y MUY EMPÁTICA usando el Knowledge. Si expresa miedo a retrasos o a no poder recogerlo, escribe un párrafo largo dándole tranquilidad. Si pregunta si puede recibirlo en el TRABAJO, explícale sus opciones. Si pregunta qué hace el producto: "La Nuez de la India es un complemento alimenticio que acompaña tus hábitos y tu rutina del día a día. Muchas personas la toman para sentirse más ligeras y cuidar su bienestar digestivo. Es un formato muy cómodo de tomar, y te acompaño por aquí durante todo el plan.". PROHIBIDO decir o insinuar que adelgaza, que hace perder peso, que quema o elimina grasa, excesos o toxinas, o que actúa sobre el metabolismo; PROHIBIDO dar kilos, tallas, plazos para notar algo o garantías de resultado. Si pregunta por dietas o comidas: "La Nuez de la India se puede tomar sin hacer dietas estrictas: acompaña tus hábitos, y lo importante es la constancia y una rutina que puedas sostener...". Si pregunta dónde estamos: "Somos Herbalis...". Si pregunta cómo se paga: "Es contra reembolso: pagas al recibir el pedido, no adelantas nada. Puedes recibirlo en casa (pagas al repartidor) o recogerlo en tu ${MARKET.pickupPointName} (pagas al recogerlo). El envío es gratis en las dos." Si pregunta plazos: "Los pedidos salen cuanto antes y llegan en ${MARKET.deliveryDaysHome}.". Si pregunta por contraindicaciones: "Es un producto 100% natural...". Nunca le exijas los datos de forma brusca: responde su duda con muchísima calidez y cierra con suavidad preguntando "¿Te lo dejo anotado?" o "¿Te tomo los datos?".\n\nEXCEPCIÓN CRÍTICA - HESITACIÓN TIPO "YA TE DIGO": si el cliente dice "luego te escribo", "te confirmo después" o "me lo pienso y te digo": NO LO ACEPTES A LA PRIMERA. Responde ofreciéndole aplazar el envío: "¡Claro! De todas formas, si quieres te lo dejo anotado para el día que prefieras y lo mandamos ese día. ¿A partir de cuándo te viene bien recibirlo?". PROHIBIDO hablar de "congelar el precio" o de ofertas que caducan.`;
     }
 
     const aiData = await aiService.chat(text, {
@@ -331,7 +370,7 @@ async function _processAddressData(
             currentState.partialAddress.ciudad = null;
             currentState.partialAddress.provincia = null;
             currentState.partialAddress.cp = null;
-            const clarifyMsg = `Mmm, los datos me quedaron un poco confusos 🤔\n\n¿Me aclarás tu *Localidad*, *Ciudad* y *Provincia*? Así armo bien la etiqueta del envío 📦`;
+            const clarifyMsg = `Mmm, los datos me han quedado un poco confusos 🤔\n\n¿Me aclaras tu *población*, *provincia* y *código postal*? Así preparo bien la etiqueta del envío 📦`;
             currentState.history.push({ role: 'bot', content: clarifyMsg, timestamp: Date.now() });
             saveState(userId);
             await sendMessageWithDelay(userId, clarifyMsg);
@@ -349,8 +388,8 @@ async function _processAddressData(
             if (!currentState.postdatado) {
                 const postponedAcks = [
                     `¡No hay problema! 😊 Entiendo perfecto. Podemos dejarlo anotado de forma posdatada para esa fecha. ¿Te gustaría que ya mismo tomemos todos los datos y lo dejamos agendado para cuando lo necesites?`,
-                    `¡Dale, ningún problema! Podemos dejar el paquete listo y posdatado para enviarlo cuando te quede mejor a vos. ¿A partir de qué fecha te conviene recibirlo exactamente? Así lo anoto en la etiqueta. 📦`,
-                    `Super entendible 🙌. Lo que hacemos en estos casos es agendar el envío de forma "posdatada" para la fecha que indiques, así reservas la promo de hoy. ¿Te parece bien si armamos la etiqueta ahora y lo despachamos en la fecha que vos me digas?`
+                    `¡Sin ningún problema! Podemos dejar el paquete preparado y mandarlo cuando a ti te venga bien. ¿A partir de qué fecha te va bien recibirlo? Así lo anoto en la etiqueta 📦`,
+                    `Te entiendo perfectamente 🙌 Lo que hacemos en estos casos es dejar el envío programado para la fecha que nos digas. ¿Te parece si preparamos la etiqueta ahora y lo mandamos el día que tú me digas?`
                 ];
                 const ackMsg = postponedAcks[Math.floor(Math.random() * postponedAcks.length)];
                 currentState.history.push({ role: 'bot', content: ackMsg, timestamp: Date.now() });
@@ -424,7 +463,7 @@ async function _processAddressData(
             if (isIntersection || endsIn00) {
                 const attempts = _bumpIssue('intersection');
                 if (attempts === 1) {
-                    const cornerMsg = `¡Ojo! El Correo Argentino no nos permite enviar a esquinas o intersecciones 📦\n\nNecesito la *calle y el número exacto* donde está tu casa. Ej: "Belgrano 350"\n\n¿Me lo pasás? 🙏`;
+                    const cornerMsg = `¡Ojo! ${MARKET.carrier} no nos deja enviar a un cruce de calles 📦\n\nNecesito la *calle y el número exacto* de tu casa. Ej: "Gran Vía 35, 2º B"\n\n¿Me lo pasas? 🙏`;
                     currentState.history.push({ role: 'bot', content: cornerMsg, timestamp: Date.now() });
                     saveState(userId);
                     await sendMessageWithDelay(userId, cornerMsg);
@@ -438,7 +477,7 @@ async function _processAddressData(
             if (!hasNumber && !hasSN) {
                 const attempts = _bumpIssue('no_number');
                 if (attempts === 1) {
-                    const noNumMsg = `¡Uy! No me llegó el número de la calle 😅\n\nEl Correo Argentino no nos deja enviar sin número. ¿Me lo podés agregar?\n\nEj: "San Martín 1425". Si no tenés número, escribí *S/N* 🙏`;
+                    const noNumMsg = `¡Vaya! No me ha llegado el número de la calle 😅\n\n${MARKET.carrier} no nos deja enviar sin número. ¿Me lo añades?\n\nEj: "Gran Vía 35, 2º B". Si no tiene número, escribe *S/N* 🙏`;
                     currentState.history.push({ role: 'bot', content: noNumMsg, timestamp: Date.now() });
                     saveState(userId);
                     await sendMessageWithDelay(userId, noNumMsg);
@@ -484,7 +523,7 @@ async function _handleSafetyNet(
     if (currentState.addressAttempts < 2 || hasAddressPatterns) return null;
 
     logger.info(`[AI-SAFETY-NET] waiting_data: Message doesn't look like address for ${userId}: "${text}". Trying AI fallback before pausing.`);
-    const safetyGoal = `El usuario NO está dando datos de envío, sino que hace una pregunta o comentario. Respondé su pregunta con empatía usando el Knowledge. Si pregunta sobre la función del producto o qué hace: "La Nuez de la India ayuda a acompañar el proceso natural del cuerpo para eliminar excesos. Muchas personas notan menos hinchazón, más liviandad y un descenso progresivo de peso. Es un apoyo natural para sentirte mejor sin métodos agresivos." Si pregunta sobre dieta/comidas/si tiene que cuidarse: "La Nuez de la India puede utilizarse sin hacer dietas estrictas, porque ayuda a acompañar el proceso natural del metabolismo. Obviamente, si además cuidás un poco la alimentación o sumás algo de movimiento, los resultados suelen verse más rápido." Si pregunta dónde queda la oficina/local/de dónde son: "Somos Herbalis, una empresa internacional especializada en productos naturales a base de Nuez de la India. Nuestra central está en Barcelona (España) y en Argentina distribuimos desde Rosario. NO tenemos revendedores. Hace 13 años enviamos a todo el país por Correo Argentino, con envío sin costo y la posibilidad de pago al recibir." Si pregunta por contraindicaciones: "Es 100% natural. Las únicas contraindicaciones son embarazo y lactancia." Si pregunta sobre envíos o si tienen día especial: "Los envíos se realizan cuanto antes, sin día especial. Si retirás en sucursal, tardan 7 a 10 días hábiles; si lo pagás antes (a domicilio), sale más rápido y llega en 4 días hábiles." Si pregunta formas de pago: "Depende de cómo lo recibís: si lo retirás en una sucursal del Correo, pagás el total en efectivo al retirar (el Correo solo acepta efectivo, 7 a 10 días hábiles); si lo querés a domicilio, se abona antes con ${prepayMeans(isMpEnabled(dependencies.config))} y al estar pago llega más rápido, en 4 días hábiles. Los dos envíos son gratis."${isMpEnabled(dependencies.config) ? '' : ' 🛑 El pago con tarjeta está fuera de servicio en estos días: NO lo ofrezcas ni lo menciones.'} Para CUALQUIER OTRA pregunta, respondé con naturalidad usando el Knowledge. Al final, cerrá sutilmente retomando los datos de envío: "¿Te paso a tomar los datos para el envío?" o "¿Me pasás los datos de envío?".`;
+    const safetyGoal = `El usuario NO está dando datos de envío, sino que hace una pregunta o un comentario. Responde su pregunta con empatía usando el Knowledge. Si pregunta qué hace el producto: "La Nuez de la India es un complemento alimenticio que acompaña tus hábitos y tu rutina del día a día. Muchas personas la toman para sentirse más ligeras y cuidar su bienestar digestivo. Es un formato muy cómodo de tomar, y te acompaño por aquí durante todo el plan." Si pregunta por dietas o si tiene que cuidarse: "La Nuez de la India se puede tomar sin hacer dietas estrictas: acompaña tus hábitos, no los sustituye. Lo importante es la constancia y una rutina que puedas sostener; si además cuidas un poco la alimentación o te mueves algo, todo ayuda a mantenerla." PROHIBIDO decir o insinuar que adelgaza, que hace perder peso, que quema o elimina grasa, excesos o toxinas, o que actúa sobre el metabolismo; PROHIBIDO dar kilos, tallas, plazos para notar algo o garantías de resultado. Si pregunta dónde estamos o de dónde somos: "Somos Herbalis, una empresa especializada en productos naturales a base de Nuez de la India. NO tenemos revendedores. Llevamos 13 años enviando a toda España por ${MARKET.carrier}, con envío gratis y pago contra reembolso." Si pregunta por contraindicaciones: "Es 100% natural. Las únicas contraindicaciones son embarazo y lactancia." Si pregunta por los plazos o si hay un día concreto de envío: "Los pedidos salen cuanto antes, sin día fijo, y llegan en ${MARKET.deliveryDaysHome}." Si pregunta cómo se paga: "Es contra reembolso: pagas al recibirlo, no adelantas nada. Puedes recibirlo en casa y pagar al repartidor, o recogerlo en tu ${MARKET.pickupPointName} y pagar al recogerlo. El envío es gratis en las dos opciones." Para CUALQUIER OTRA pregunta, responde con naturalidad usando el Knowledge. Al final, cierra con suavidad retomando los datos de envío: "¿Te tomo los datos para el envío?" o "¿Me pasas los datos de envío?".`;
     try {
         const safetyAiData = await aiService.chat(text, {
             step: FlowStep.WAITING_DATA,
@@ -518,8 +557,8 @@ async function _validateAndAssembleOrder(
 
     // Auto-suggest CP from city (static table first, then Google Maps).
     // Rev 2026-06-05 (reporte Bela / Bernardo de Yrigoyen): el lookup de Maps ya NO
-    // exige tener la calle. En RETIRO en sucursal no hay calle, y la ciudad sola
-    // alcanza para geocodificar el CP ("ciudad, Argentina"). Sin esto, si la ciudad
+    // exige tener la calle. En RECOGIDA en oficina no hay calle, y la población sola
+    // alcanza para geocodificar el CP ("población, España"). Sin esto, si la población
     // no estaba en la tabla estática y el cliente no sabía el CP, el bot repetía la
     // misma pregunta del CP en loop.
     if (addr.ciudad && !addr.cp) {
@@ -532,7 +571,7 @@ async function _validateAndAssembleOrder(
             const mapsCP = await lookupCPFromMaps(addr.calle || '', addr.ciudad);
             if (mapsCP) {
                 currentState.pendingCPFromMaps = mapsCP;
-                const cpMsg = `Encontré que tu código postal podría ser *${mapsCP}*. ¿Es correcto? 😊`;
+                const cpMsg = `He encontrado que tu código postal podría ser *${mapsCP}*. ¿Es correcto? 😊`;
                 currentState.history.push({ role: 'bot', content: cpMsg, timestamp: Date.now() });
                 await sendMessageWithDelay(userId, cpMsg);
                 saveState(userId);
@@ -542,11 +581,11 @@ async function _validateAndAssembleOrder(
     }
 
     const missingTier1 = [];
-    if (!addr.nombre) missingTier1.push('Nombre y Apellido');
-    if (!addr.calle) missingTier1.push('Dirección (Calle y Número)');
+    if (!addr.nombre) missingTier1.push('Nombre y apellidos');
+    if (!addr.calle) missingTier1.push('Dirección (calle, número y piso)');
 
     const missingTier2 = [];
-    if (!addr.ciudad) missingTier2.push('Localidad/Ciudad');
+    if (!addr.ciudad) missingTier2.push('Población');
     if (!addr.cp) missingTier2.push('Código postal');
 
     const missing: string[] = [];
@@ -560,9 +599,9 @@ async function _validateAndAssembleOrder(
 
     // Almost complete — check critical missing fields with re-ask counter
     const criticalMissing = [];
-    if (!addr.nombre) criticalMissing.push('Nombre completo');
+    if (!addr.nombre) criticalMissing.push('Nombre y apellidos');
     if (!addr.calle) criticalMissing.push('Calle y número');
-    if (!addr.ciudad) criticalMissing.push('Ciudad');
+    if (!addr.ciudad) criticalMissing.push('Población');
     if (!addr.cp) criticalMissing.push('Código postal');
 
     if (criticalMissing.length > 0) {
@@ -587,19 +626,19 @@ async function _validateAndAssembleOrder(
 
     // Address complete — validate
     let validation: any = { cpValid: true };
-    const isSucursalAddress = addr.calle?.toLowerCase() === 'a sucursal';
+    const isPickup = _isPickupAddress(addr.calle);
     try {
-        if (!isSucursalAddress) {
+        if (!isPickup) {
             validation = await validateAddress(addr);
         }
     } catch (e: any) {
         logger.warn(`[ADDRESS] validateAddress failed for ${userId}, proceeding without validation: ${e.message}`);
     }
 
-    // Non-Argentina supersedes everything else (checked before cpValid)
-    if (validation.notArgentina) {
-        logger.info(`[MAPS] Non-Argentina address detected for ${userId}. Rejecting.`);
-        const geoMsg = `Lo lamento, solo realizamos envíos dentro de Argentina 😔\n\n¿Tenés una dirección en Argentina? Si es así, pasámela y con gusto seguimos.`;
+    // Fuera de España manda sobre todo lo demás (se comprueba antes que cpValid)
+    if (validation.outsideSpain) {
+        logger.info(`[MAPS] Address outside Spain for ${userId}. Rejecting.`);
+        const geoMsg = `Lo siento, solo hacemos envíos dentro de España 😔\n\n¿Tienes una dirección en España? Si es así, pásamela y seguimos encantados.`;
         currentState.history.push({ role: 'bot', content: geoMsg, timestamp: Date.now() });
         await sendMessageWithDelay(userId, geoMsg);
         // Preservar el nombre — solo limpiamos los campos de dirección. Si lo
@@ -611,7 +650,7 @@ async function _validateAndAssembleOrder(
     }
 
     if (addr.cp && !validation.cpValid) {
-        const cpMsg = `El código postal "${addr.cp}" no parece válido 🤔\nDebe ser de 4 dígitos (ej: 1425, 5000). ¿Me lo corregís?`;
+        const cpMsg = `El código postal "${addr.cp}" no parece válido 🤔\nTiene que ser de 5 dígitos (ej: 28001, 08015). ¿Me lo corriges?`;
         currentState.history.push({ role: 'bot', content: cpMsg, timestamp: Date.now() });
         await sendMessageWithDelay(userId, cpMsg);
         currentState.partialAddress.cp = null;
@@ -628,7 +667,7 @@ async function _validateAndAssembleOrder(
     } else if (validation.mapsValid === false) {
         logger.info(`[MAPS] Address NOT found for ${userId}. Asking for confirmation.`);
         const addrStr = `${addr.calle}, ${addr.ciudad}${addr.cp ? `, CP ${addr.cp}` : ''}`;
-        const mapsMsg = `No pude verificar tu dirección en el mapa 🤔\n\n¿Está bien escrita así?:\n📍 *${addrStr}*\n\nSi es correcta, respondé *sí*. Si no, pasame la dirección corregida 🙏`;
+        const mapsMsg = `No he podido verificar tu dirección en el mapa 🤔\n\n¿Está bien escrita así?:\n📍 *${addrStr}*\n\nSi es correcta, responde *sí*. Si no, pásame la dirección corregida 🙏`;
         currentState.mapsFormattedAddress = null;
         currentState.history.push({ role: 'bot', content: mapsMsg, timestamp: Date.now() });
         _setStep(currentState, FlowStep.WAITING_MAPS_CONFIRMATION);
@@ -637,13 +676,10 @@ async function _validateAndAssembleOrder(
         return { matched: true };
     }
 
-    // Save original address before Maps formatting
+    // Guardamos lo que escribió el cliente antes de tocar nada.
     const calleOriginal = addr.calle;
     if (currentState.mapsFormattedAddress) {
-        const mapsParts = currentState.mapsFormattedAddress.split(',');
-        if (mapsParts.length >= 2) {
-            addr.calle = mapsParts[0].trim();
-        }
+        addr.calle = _calleParaLaEtiqueta(currentState.mapsFormattedAddress, calleOriginal);
     }
 
     // Build cart if empty
@@ -659,15 +695,15 @@ async function _validateAndAssembleOrder(
         currentState.cart = [{ product, plan, price }];
     }
 
-    // Si el cliente eligió retiro en sucursal: la dirección que pasó es solo
-    // para asignar la sucursal de Correo Argentino más cercana. En el pendingOrder
-    // y en la venta final, la calle figura como "A sucursal" (calleOriginal conserva
-    // la calle real para que el admin sepa la zona). Rev. 2026-05-30 horacio.
+    // Si el cliente eligió recogida en oficina: la dirección que dio sirve solo
+    // para asignar la oficina que le corresponde. En el pendingOrder y en la
+    // venta final la calle lleva el centinela PICKUP_STREET (calleOriginal
+    // conserva la calle real para que el admin sepa la zona).
     if (currentState.shippingChoice === 'retiro') {
         currentState.pendingOrder = {
             ...addr,
             calleOriginal: addr.calle || calleOriginal,
-            calle: 'A sucursal',
+            calle: PICKUP_STREET,
             cart: currentState.cart,
         };
     } else {
@@ -675,7 +711,7 @@ async function _validateAndAssembleOrder(
     }
     currentState.partialAddress = {} as any;
 
-    const total = currentState.cart.reduce((sum: number, i: any) => sum + parseInt(i.price.toString().replace(/\./g, '')), 0);
+    const total = currentState.cart.reduce((sum: number, i: any) => sum + _parsePrice(i.price), 0);
     currentState.totalPrice = _formatPrice(total);
 
     if (!_orderPriceCoherent(currentState)) {
@@ -687,15 +723,16 @@ async function _validateAndAssembleOrder(
     currentState.addressIssueType = null;
     currentState.addressIssueTries = 0;
 
-    // El bot CIERRA la venta solo (jun-2026). Retiro/COD no tiene pago anticipado
+    // El bot CIERRA la venta solo. El contra reembolso no tiene pago anticipado
     // que verificar → al tener los datos cerramos directo: guardamos 'Confirmado',
     // avisamos al admin (informativo) y el mensaje de confirmación ES el cierre.
     if (currentState.paymentMethod === 'contrarembolso') {
         await _closeSaleAndNotify(userId, currentState, knowledge, dependencies);
         return { matched: true };
     }
-    // Defensivo (waiting_data hoy es solo retiro): si el pago NO es al retirar, no
-    // cerramos sin verificar — mandamos el resumen y esperamos.
+    // Defensivo: aquí TODO es contra reembolso, así que llegar sin ese
+    // paymentMethod significa estado corrupto. No cerramos a ciegas — mandamos
+    // el resumen y que lo confirme el cliente.
     const summaryMsg = buildConfirmationMessage(currentState, knowledge);
     currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
     await sendMessageWithDelay(userId, summaryMsg);
@@ -713,10 +750,10 @@ async function _askMissingFields(
     const addr = currentState.partialAddress;
 
     const missingTier1 = [];
-    if (!addr.nombre) missingTier1.push('Nombre y Apellido');
-    if (!addr.calle) missingTier1.push('Dirección (Calle y Número)');
+    if (!addr.nombre) missingTier1.push('Nombre y apellidos');
+    if (!addr.calle) missingTier1.push('Dirección (calle, número y piso)');
     const missingTier2 = [];
-    if (!addr.ciudad) missingTier2.push('Localidad/Ciudad');
+    if (!addr.ciudad) missingTier2.push('Población');
     if (!addr.cp) missingTier2.push('Código postal');
     const missing: string[] = [];
     if (missingTier1.length > 0) missing.push(...missingTier1);
@@ -724,14 +761,15 @@ async function _askMissingFields(
 
     let msg;
     // Los mensajes "intro" piden Nombre + Dirección. NO los usamos si la calle ya
-    // está resuelta (retiro en sucursal la fija como 'A sucursal'): ahí pedimos por
-    // lista de faltantes (nombre/ciudad/CP) sin mencionar una "Dirección" inexistente.
+    // está resuelta (la recogida en oficina la fija con PICKUP_STREET): ahí
+    // pedimos la lista de faltantes (nombre/población/CP) sin mencionar una
+    // "Dirección" que no existe.
     if (!addr.calle && ((missingTier1.length === 2 && missingTier2.length === 2) || (missingTier1.length > 0 && !madeProgress))) {
         const intros = [
-            `¿Me pasás tu *Nombre y Apellido* y tú *Dirección* para armar la etiqueta? 😉`,
-            `¡Dale! Pasame tu *Nombre completo* y la *Calle y Número* de tu casa 👇`,
-            `Necesito un par de datitos para el envío: *Nombre* y *Dirección* literal (calle y número) 📦`,
-            `Para prepararte paquete necesito: *Nombre y apellido* y a qué *Dirección* enviarlo 🙌`
+            `¿Me pasas tu *nombre y apellidos* y tu *dirección* para preparar la etiqueta? 😉`,
+            `¡Genial! Pásame tu *nombre completo* y la *calle, número y piso* de tu casa 👇`,
+            `Necesito un par de datos para el envío: *nombre* y *dirección* completa (calle, número y piso) 📦`,
+            `Para prepararte el paquete necesito: *nombre y apellidos* y a qué *dirección* lo enviamos 🙌`
         ];
         msg = intros[Math.floor(Math.random() * intros.length)];
         const lastMsg = currentState.lastAddressMsg || "";
@@ -741,9 +779,9 @@ async function _askMissingFields(
         }
     } else if (madeProgress) {
         const acks = [
-            `¡Perfecto! Ya agendé esos datos. 👌\n\nSolo me falta: *${missing.join(', ')}*. ¿Me los pasás?`,
-            `Buenísimo. Me queda pendiente: *${missing.join(', ')}*.`,
-            `¡Dale! Ya casi estamos. Me faltaría: *${missing.join(', ')}*.`
+            `¡Perfecto! Ya tengo esos datos anotados 👌\n\nSolo me falta: *${missing.join(', ')}*. ¿Me los pasas?`,
+            `¡Estupendo! Me queda pendiente: *${missing.join(', ')}*.`,
+            `¡Genial! Ya casi está. Me falta: *${missing.join(', ')}*.`
         ];
         msg = acks[Math.floor(Math.random() * acks.length)];
         const lastMsg = currentState.lastAddressMsg || "";
@@ -753,8 +791,8 @@ async function _askMissingFields(
         }
     } else if (currentState.addressAttempts > 2) {
         const frustrated = [
-            `Me falta: *${missing.join(', ')}*. ¿Me lo pasás? 🙏`,
-            `Aún necesito: *${missing.join(', ')}* para avanzar con tu envío.`,
+            `Me falta: *${missing.join(', ')}*. ¿Me lo pasas? 🙏`,
+            `Aún necesito: *${missing.join(', ')}* para seguir con tu envío.`,
             `Solo me falta que me pases: *${missing.join(', ')}* 😅`
         ];
         msg = frustrated[Math.floor(Math.random() * frustrated.length)];
@@ -765,9 +803,9 @@ async function _askMissingFields(
         }
     } else {
         const shorts = [
-            `Gracias! Ya tengo algunos datos. Solo me falta: *${missing.join(', ')}*. ¿Me los pasás?`,
-            `Tengo casi todo. Me falta indicarte: *${missing.join(', ')}*.`,
-            `Solo me estaría faltando: *${missing.join(', ')}*.`
+            `¡Gracias! Ya tengo algunos datos. Solo me falta: *${missing.join(', ')}*. ¿Me los pasas?`,
+            `Tengo casi todo. Me falta: *${missing.join(', ')}*.`,
+            `Solo me faltaría: *${missing.join(', ')}*.`
         ];
         msg = shorts[Math.floor(Math.random() * shorts.length)];
         const lastMsg = currentState.lastAddressMsg || "";
@@ -793,32 +831,31 @@ function _orderPriceCoherent(state: UserState): boolean {
     if (cart.length !== 1) return true;
     const it = cart[0];
     if (!it || !it.product || !it.plan || it.price == null) return true;
-    const norm = (v: any) => String(v).replace(/\./g, '');
-    return norm(it.price) === norm(_getPrice(it.product, it.plan));
+    return _parsePrice(it.price) === _parsePrice(_getPrice(it.product, it.plan));
 }
 
-// --- Helper: Retiro en sucursal — captura robusta de datos + armado de orden ---
-// El retiro solo necesita nombre + ciudad + CP (la calle no aplica: queda 'A
-// sucursal'). El flujo normal de waiting_data está pensado para domicilio y, si
-// el bloque de datos viene con una pregunta ("¿necesitás algo más?") o en formato
-// libre, la clasificación lo manda a la IA y los datos NO se persisten: el bot los
-// "lee" pero el estado queda vacío y al mensaje siguiente vuelve a pedirlos
-// (caso real 5493405456106). Acá los capturamos y armamos la orden sí o sí.
+// --- Helper: recogida en oficina — captura robusta de datos + armado de orden ---
+// La recogida solo necesita nombre + población + CP (la calle no aplica: queda
+// el centinela PICKUP_STREET). El flujo normal de waiting_data está pensado
+// para domicilio y, si el bloque de datos viene con una pregunta ("¿necesitas
+// algo más?") o en formato libre, la clasificación lo manda a la IA y los datos
+// NO se persisten: el bot los "lee" pero el estado queda vacío y al mensaje
+// siguiente vuelve a pedirlos. Aquí los capturamos y armamos la orden sí o sí.
 // Exportada: stepWaitingPaymentMethod la reutiliza para cerrar directo cuando
-// el cliente ya dejó todos los datos en el historial (caso 5492215731759).
-export async function _handleRetiroData(
+// el cliente ya dejó todos los datos en el historial.
+export async function _handlePickupData(
     userId: string, text: string, normalizedText: string,
     currentState: UserState, knowledge: any, dependencies: any
 ): Promise<{ matched: boolean } | null> {
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
 
-    const isRetiro = currentState.shippingChoice === 'retiro'
-        || (currentState.partialAddress?.calle || '').toLowerCase() === 'a sucursal';
-    if (!isRetiro) return null;
+    const isPickup = currentState.shippingChoice === 'retiro'
+        || _isPickupAddress(currentState.partialAddress?.calle);
+    if (!isPickup) return null;
 
     if (!currentState.partialAddress) currentState.partialAddress = {};
     const addr = currentState.partialAddress;
-    addr.calle = 'A sucursal'; // retiro: la calle no aplica, la fijamos siempre
+    addr.calle = PICKUP_STREET; // recogida: la calle no aplica, la fijamos siempre
 
     const already = !!(addr.nombre && addr.ciudad && addr.cp);
 
@@ -836,22 +873,22 @@ export async function _handleRetiroData(
                 if (parsed.provincia && !addr.provincia) { addr.provincia = parsed.provincia; progressed = true; }
             }
         } catch (e: any) {
-            logger.warn(`[RETIRO-DATA] parseAddress falló para ${userId}: ${e.message}`);
+            logger.warn(`[RECOGIDA-DATA] parseAddress falló para ${userId}: ${e.message}`);
         }
-        // Fallback CP: en retiro la calle no aplica, así que un número de 4 dígitos
-        // suelto es el código postal (caso "Merlo libertad 1716" → 1716, que el
-        // parser tomaba como altura de calle). 5491122475361.
+        // Fallback CP: en recogida la calle no aplica, así que un número de 5
+        // dígitos suelto es el código postal (el parser de direcciones lo suele
+        // leer como número de portal).
         if (!addr.cp) {
-            const cpMatch = text.match(/\b(\d{4})\b/);
+            const cpMatch = text.match(/\b(\d{5})\b/);
             if (cpMatch) {
                 addr.cp = cpMatch[1];
                 progressed = true;
-                logger.info(`[RETIRO-DATA] CP ${cpMatch[1]} extraído por fallback regex para ${userId}.`);
+                logger.info(`[RECOGIDA-DATA] CP ${cpMatch[1]} extraído por fallback regex para ${userId}.`);
             }
         }
     }
 
-    // Completo → armar la orden de retiro y pasar a confirmación final.
+    // Completo → armar la orden de recogida y pasar a confirmación final.
     if (addr.nombre && addr.ciudad && addr.cp) {
         if (!currentState.cart || currentState.cart.length === 0) {
             const product = currentState.selectedProduct;
@@ -861,11 +898,11 @@ export async function _handleRetiroData(
         }
         currentState.pendingOrder = {
             ...addr,
-            calle: 'A sucursal',
+            calle: PICKUP_STREET,
             calleOriginal: (addr as any).calleOriginal || null,
             cart: currentState.cart,
         } as any;
-        const total = currentState.cart.reduce((sum: number, i: any) => sum + parseInt(i.price.toString().replace(/\./g, '')), 0);
+        const total = currentState.cart.reduce((sum: number, i: any) => sum + _parsePrice(i.price), 0);
         currentState.totalPrice = _formatPrice(total);
         currentState.partialAddress = {} as any;
         currentState.fieldReaskCount = {};
@@ -874,20 +911,20 @@ export async function _handleRetiroData(
             await _pauseAndAlert(userId, currentState, dependencies, text, '⚠️ Orden incoherente (plan/precio no coinciden). Revisión manual antes de confirmar.');
             return { matched: true };
         }
-        // Retiro/COD: el bot cierra la venta solo (sin pago anticipado que verificar).
+        // Contra reembolso: el bot cierra la venta solo (no hay pago que verificar).
         await _closeSaleAndNotify(userId, currentState, knowledge, dependencies);
-        logger.info(`[RETIRO-DATA] Venta de retiro CERRADA por el bot para ${userId}: ${addr.nombre} / ${addr.ciudad} / CP ${addr.cp}.`);
+        logger.info(`[RECOGIDA-DATA] Venta de recogida CERRADA por el bot para ${userId}: ${addr.nombre} / ${addr.ciudad} / CP ${addr.cp}.`);
         return { matched: true };
     }
 
     // Capturó algo pero falta → pedir SOLO lo que falta (nunca calle/dirección).
     if (progressed) {
         const missing: string[] = [];
-        if (!addr.nombre) missing.push('Nombre y apellido');
-        if (!addr.ciudad) missing.push('Localidad/Ciudad');
+        if (!addr.nombre) missing.push('Nombre y apellidos');
+        if (!addr.ciudad) missing.push('Población');
         if (!addr.cp) missing.push('Código postal');
         saveState(userId);
-        const msg = `¡Genial! Para el retiro en sucursal me falta: *${missing.join(', ')}* 🙌`;
+        const msg = `¡Genial! Para la recogida en ${MARKET.pickupPointName} me falta: *${missing.join(', ')}* 🙌`;
         currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
         await sendMessageWithDelay(userId, msg);
         return { matched: true };
@@ -914,10 +951,10 @@ export async function handleWaitingData(
     const guardResult = await _checkGuards(userId, currentState, knowledge, dependencies);
     if (guardResult) return guardResult;
 
-    // 1a. Cambio de idea sobre envío/pago (jun-2026): si el cliente que ya eligió
-    // pide EXPLÍCITAMENTE otro envío/medio ("mejor lo retiro", "mejor con tarjeta"),
-    // reencauzamos a waiting_payment_method (única fuente de verdad que aplica la
-    // elección). Detección estricta → no se dispara con direcciones normales.
+    // 1a. Cambio de idea sobre la entrega: si el cliente que ya eligió pide
+    // EXPLÍCITAMENTE la otra modalidad ("mejor lo recojo yo"), reencauzamos a
+    // waiting_payment_method (única fuente de verdad que aplica la elección).
+    // Detección estricta → no se dispara con direcciones normales.
     const switchResult = _handleShipPaySwitch(userId, normalizedText, currentState, dependencies);
     if (switchResult) return switchResult as any;
 
@@ -926,7 +963,7 @@ export async function handleWaitingData(
         const { sendMessageWithDelay, saveState } = dependencies;
         const isNo = /\b(no|nop|nope|negativo|incorrecto|mal|ese no|otro)\b/i.test(normalizedText);
         const isYes = !isNo && /\b(si|sí|sep|sip|claro|correcto|exacto|ese|eso|ok|dale|afirmativo)\b/i.test(normalizedText);
-        const cpFromMessage = normalizedText.match(/\b(\d{4})\b/);
+        const cpFromMessage = normalizedText.match(/\b(\d{5})\b/);
 
         if (isYes) {
             currentState.partialAddress.cp = currentState.pendingCPFromMaps;
@@ -948,7 +985,7 @@ export async function handleWaitingData(
             return await _askMissingFields(userId, currentState, dependencies, true);
         } else if (isNo) {
             currentState.pendingCPFromMaps = null;
-            const askCPMsg = `No hay problema. ¿Me pasás tu código postal? 😊`;
+            const askCPMsg = `No hay problema. ¿Me pasas tu código postal? 😊`;
             currentState.history.push({ role: 'bot', content: askCPMsg, timestamp: Date.now() });
             await sendMessageWithDelay(userId, askCPMsg);
             saveState(userId);
@@ -967,7 +1004,7 @@ export async function handleWaitingData(
     if (_BRIEF_WAIT.test(normalizedText)) {
         const { sendMessageWithDelay, saveState } = dependencies;
         currentState.awaitingResume = true;
-        const waitMsg = 'Dale, tranqui, te espero 😊';
+        const waitMsg = 'Claro, sin prisa, te espero 😊';
         currentState.history.push({ role: 'bot', content: waitMsg, timestamp: Date.now() });
         saveState(userId);
         await sendMessageWithDelay(userId, waitMsg);
@@ -985,15 +1022,15 @@ export async function handleWaitingData(
     // 2. Product/plan change detection
     await _handleProductPlanChange(userId, normalizedText, currentState, dependencies);
 
-    // 3. Sucursal intent
-    const sucursalResult = await _handleSucursalIntent(userId, normalizedText, currentState, dependencies);
-    if (sucursalResult) return sucursalResult;
+    // 3. El cliente dice que prefiere recogerlo él
+    const pickupResult = await _handlePickupIntent(userId, normalizedText, currentState, dependencies);
+    if (pickupResult) return pickupResult;
 
-    // 3.5 Retiro en sucursal: captura robusta de datos (nombre+ciudad+CP) y armado
-    // de la orden, sin depender de la clasificación de domicilio (que perdía los
-    // datos cuando venían con una pregunta o en formato libre — caso 5493405456106).
-    const retiroResult = await _handleRetiroData(userId, text, normalizedText, currentState, knowledge, dependencies);
-    if (retiroResult) return retiroResult;
+    // 3.5 Recogida en oficina: captura robusta de datos (nombre+población+CP) y
+    // armado de la orden, sin depender de la clasificación de domicilio (que
+    // perdía los datos cuando venían con una pregunta o en formato libre).
+    const pickupDataResult = await _handlePickupData(userId, text, normalizedText, currentState, knowledge, dependencies);
+    if (pickupDataResult) return pickupDataResult;
 
     // 4. Classify message
     const classification = _classifyMessage(text, normalizedText);
@@ -1017,13 +1054,13 @@ export async function handleWaitingData(
     let didTryToParse = false;
     let hasValidAddressData = false;
 
-    // Señales FUERTES de datos: multilínea o número de 4 dígitos (CP). Fuerzan el
+    // Señales FUERTES de datos: multilínea o número de 5 dígitos (CP). Fuerzan el
     // intento de parseo aunque la clasificación haya marcado el mensaje como
-    // pregunta — un bloque de datos con una pregunta pegada ("...\n1925 cuánto
+    // pregunta — un bloque de datos con una pregunta pegada ("...\n28015 ¿cuánto
     // tarda en llegar?") mataba looksLikeAddress vía explicitQuestionKeywords y
-    // los datos se perdían en el AI fallback (variante domicilio del caso
-    // 5492215731759; la variante retiro la cubre _handleRetiroData en 3.5).
-    const hasStrongDataSignals = /\n/.test(text) || /\b\d{4}\b/.test(text);
+    // los datos se perdían en el AI fallback (la variante de recogida la cubre
+    // _handlePickupData en el punto 3.5).
+    const hasStrongDataSignals = /\n/.test(text) || /\b\d{5}\b/.test(text);
 
     if (classification.looksLikeAddress || hasStrongDataSignals || (classification.isVeryLongMessage && !classification.explicitQuestionKeywords) || (!classification.isDataQuestionOrEmotion)) {
         extractedData = await (dependencies.mockAiService || aiService).parseAddress(textToAnalyze);
@@ -1036,7 +1073,7 @@ export async function handleWaitingData(
     // 6b. Hard rejection — client explicitly says they were just browsing or don't want to buy
     if (classification.isHardRejection) {
         logger.info(`[HARD_REJECTION] User ${userId} explicitly declined purchase during waiting_data: "${text}"`);
-        const closeMsg = `¡Entendido perfectamente! 😊 No hay ningún problema. Si en algún momento te interesa o tenés alguna consulta, escribinos sin compromiso. ¡Que tengas un excelente día! 🙌`;
+        const closeMsg = `¡Entendido perfectamente! 😊 No hay ningún problema. Si en algún momento te interesa o tienes cualquier duda, escríbenos sin compromiso. ¡Que tengas un buen día! 🙌`;
         currentState.history.push({ role: 'bot', content: closeMsg, timestamp: Date.now() });
         await dependencies.sendMessageWithDelay(userId, closeMsg);
         await _pauseAndAlert(userId, currentState, dependencies, text, `Cliente desistió del pedido. Dijo: "${text}"`);
@@ -1096,7 +1133,7 @@ export async function handleWaitingData(
     const textWordCount = text.split(/\s+/).length;
     const isExplicitTargetingStreet = !currentState.partialAddress?.calle && /\d/.test(text) && textWordCount >= 3 && !classification.isDataQuestionOrEmotion;
     if (!madeProgress && isExplicitTargetingStreet && currentState.addressAttempts < 2) {
-        const reAskMsg = 'Perdoná, no me quedó clara la dirección 🙈 ¿Me pasás la *calle y la altura* (número)? Si es esquina o no tiene número, contame cómo llegar 😊';
+        const reAskMsg = 'Perdona, no me ha quedado clara la dirección 🙈 ¿Me pasas la *calle y el número*? Si no tiene número, cuéntame cómo llegar 😊';
         currentState.history.push({ role: 'bot', content: reAskMsg, timestamp: Date.now() });
         dependencies.saveState(userId);
         await dependencies.sendMessageWithDelay(userId, reAskMsg);

@@ -13,7 +13,6 @@ import SettingsView from '../../components/corporate/SettingsView';
 import GalleryView from '../../components/corporate/GalleryView';
 import AdvancedAnalyticsView from '../../components/corporate/AdvancedAnalyticsView';
 import ManualsView from '../../components/corporate/ManualsView';
-import PaymentsView from '../../components/corporate/PaymentsView';
 import WebOrdersView from '../../components/corporate/WebOrdersView';
 import AiReportsView from '../../components/corporate/AiReportsView';
 import GuionView from '../../components/corporate/GuionView';
@@ -24,7 +23,7 @@ import FunnelAnalyticsView from '../../components/admin/FunnelAnalyticsView';
 import RescueQueueView from '../../components/admin/RescueQueueView';
 import ManualOrderEntryModal from '../../components/corporate/components/ManualOrderEntryModal';
 
-import { Wifi, MessageCircle, ShoppingCart, Settings, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Bell, AlertTriangle, BookOpen, MoreHorizontal, CreditCard, Users, LifeBuoy, MessagesSquare, FlaskConical, Package } from 'lucide-react';
+import { Wifi, MessageCircle, ShoppingCart, Settings, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Bell, AlertTriangle, BookOpen, MoreHorizontal, CreditCard, Users, LifeBuoy, MessagesSquare, FlaskConical, Package, Megaphone } from 'lucide-react';
 
 const CorporateDashboard = () => {
     const { socket } = useSocket();
@@ -213,7 +212,7 @@ const CorporateDashboard = () => {
                     // Only block if we have both values perfectly and they differ
                     if (!cleanedSeller.endsWith(cleanedConnected) && !cleanedConnected.endsWith(cleanedSeller)) {
                         toast.dismiss(toastId);
-                        toast.warning('Esta venta se hizo desde otro \u00fanumero.');
+                        toast.warning('Esta venta se hizo desde otro n\u00famero.');
                         return; // Prevent redirecting
                     }
                 }
@@ -293,11 +292,6 @@ const CorporateDashboard = () => {
             case 'gallery': return <GalleryView />;
             case 'manuals': return <ManualsView />;
             case 'settings': return <SettingsView status={status} />;
-            case 'payments': return (
-                <div className="p-6 md:p-8 w-full">
-                    <PaymentsView onGoToChat={(chatId) => handleQuickAction(chatId, 'chat')} />
-                </div>
-            );
             case 'web-orders': return (
                 <div className="p-6 md:p-8 w-full">
                     <WebOrdersView />
@@ -325,8 +319,8 @@ const CorporateDashboard = () => {
                 onClick={() => { setActiveTab(tab); if (isMobile) setMobileMenuOpen(false); }}
                 className={`w-full flex items-center ${(sidebarCollapsed && !isMobile) ? 'justify-center px-0' : 'px-4'} py-3 mb-2 rounded-xl transition-all duration-300 group
                 ${isActive
-                        ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md shadow-indigo-500/30 border border-transparent'
-                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-indigo-600 dark:hover:text-white hover:shadow-sm border border-transparent'}`}
+                        ? 'bg-gradient-to-r from-accent-500 to-accent-700 text-white shadow-md shadow-accent-500/30 border border-transparent'
+                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-accent-600 dark:hover:text-white hover:shadow-sm border border-transparent'}`}
                 title={(sidebarCollapsed && !isMobile) ? label : ''}
             >
                 <div className={`${(sidebarCollapsed && !isMobile) ? '' : 'mr-4'} transition-transform duration-300 group-hover:scale-110`}>
@@ -338,7 +332,7 @@ const CorporateDashboard = () => {
     };
 
     return (
-        <div className="flex flex-col lg:flex-row h-screen overflow-hidden bg-slate-50 dark:bg-slate-900 font-sans text-slate-800 dark:text-slate-100 selection:bg-indigo-100 dark:selection:bg-indigo-900/50 selection:text-indigo-900 dark:selection:text-indigo-100 relative transition-colors duration-300">
+        <div className="flex flex-col lg:flex-row h-screen overflow-hidden bg-slate-50 dark:bg-slate-900 font-sans text-slate-800 dark:text-slate-100 selection:bg-accent-100 dark:selection:bg-accent-900/50 selection:text-accent-900 dark:selection:text-accent-100 relative transition-colors duration-300">
 
             {/* Overlay para fondo oscurecido en Mobile al abrir el menú */}
             {isMobile && mobileMenuOpen && (
@@ -361,12 +355,12 @@ const CorporateDashboard = () => {
                     {(!sidebarCollapsed || isMobile) && (
                         <div className="flex items-center gap-3 animate-fade-in w-full justify-between lg:justify-start">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 shadow-lg shadow-indigo-500/30 flex items-center justify-center">
+                                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-accent-500 to-accent-700 shadow-lg shadow-accent-500/30 flex items-center justify-center">
                                     <span className="text-white font-bold text-lg">H</span>
                                 </div>
                                 <div>
                                     <h1 className="font-bold text-slate-800 dark:text-slate-100 leading-tight">Herbalis</h1>
-                                    <p className="text-[10px] font-semibold tracking-widest text-indigo-500 dark:text-indigo-400 uppercase">Workspace</p>
+                                    <p className="text-[10px] font-semibold tracking-widest text-accent-500 dark:text-accent-400 uppercase">Workspace</p>
                                 </div>
                             </div>
                             {isMobile && (
@@ -377,14 +371,14 @@ const CorporateDashboard = () => {
                         </div>
                     )}
                     {sidebarCollapsed && !isMobile && (
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 shadow-lg shadow-indigo-500/30 flex items-center justify-center mx-auto animate-fade-in">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-accent-500 to-accent-700 shadow-lg shadow-accent-500/30 flex items-center justify-center mx-auto animate-fade-in">
                             <span className="text-white font-bold text-lg">H</span>
                         </div>
                     )}
                     {!isMobile && (
                         <button
                             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                            className={`p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ${sidebarCollapsed ? 'hidden' : 'block'}`}
+                            className={`p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-accent-600 dark:hover:text-accent-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ${sidebarCollapsed ? 'hidden' : 'block'}`}
                         >
                             <Menu className="w-5 h-5" />
                         </button>
@@ -397,7 +391,6 @@ const CorporateDashboard = () => {
                     <NavItem tab="rescue-queue" icon={LifeBuoy} label="Cola de rescate" />
                     <NavItem tab="logistics" icon={ShoppingCart} label="Ventas & Logística" />
                     <NavItem tab="statistics" icon={BarChart2} label="Estadísticas" />
-                    <NavItem tab="payments" icon={CreditCard} label="Pagos MP" />
                     <NavItem tab="web-orders" icon={Package} label="Pedidos web" />
                     <NavItem tab="guion" icon={MessagesSquare} label="Guiones (notas)" />
                     <NavItem tab="playground" icon={FlaskConical} label="Probar bot" />
@@ -419,10 +412,10 @@ const CorporateDashboard = () => {
                     {/* Theme Toggle */}
                     <button
                         onClick={toggleTheme}
-                        className={`w-full flex items-center ${(sidebarCollapsed && !isMobile) ? 'justify-center p-2' : 'px-4 py-3'} mb-2 rounded-xl transition-all duration-300 border border-transparent hover:border-indigo-200 dark:hover:border-indigo-800/50 group
+                        className={`w-full flex items-center ${(sidebarCollapsed && !isMobile) ? 'justify-center p-2' : 'px-4 py-3'} mb-2 rounded-xl transition-all duration-300 border border-transparent hover:border-accent-200 dark:hover:border-accent-800/50 group
                             ${isDark
-                                ? 'bg-gradient-to-r from-indigo-500/10 to-purple-500/10 text-amber-400 hover:from-indigo-500/20 hover:to-purple-500/20'
-                                : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-indigo-600 dark:hover:text-indigo-400'
+                                ? 'bg-gradient-to-r from-accent-500/10 to-albero-500/10 text-warning-400 hover:from-accent-500/20 hover:to-albero-500/20'
+                                : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-accent-600 dark:hover:text-accent-400'
                             }`}
                         title={(sidebarCollapsed && !isMobile) ? (isDark ? 'Modo Claro' : 'Modo Oscuro') : ''}
                     >
@@ -433,7 +426,7 @@ const CorporateDashboard = () => {
                     </button>
                     <button
                         onClick={() => { logout(); if (isMobile) setMobileMenuOpen(false); }}
-                        className={`w-full flex items-center ${(sidebarCollapsed && !isMobile) ? 'justify-center p-2' : 'px-4 py-3'} rounded-xl hover:bg-rose-50 dark:hover:bg-rose-900/20 text-rose-600 dark:text-rose-400 transition-all duration-300 border border-transparent hover:border-rose-200 dark:hover:border-rose-800/50 group`}
+                        className={`w-full flex items-center ${(sidebarCollapsed && !isMobile) ? 'justify-center p-2' : 'px-4 py-3'} rounded-xl hover:bg-danger-50 dark:hover:bg-danger-900/20 text-danger-600 dark:text-danger-400 transition-all duration-300 border border-transparent hover:border-danger-200 dark:hover:border-danger-800/50 group`}
                         title={(sidebarCollapsed && !isMobile) ? "Cerrar Sesión" : ""}
                     >
                         <div className={`${(sidebarCollapsed && !isMobile) ? '' : 'mr-3'} group-hover:scale-110 transition-transform`}>
@@ -445,20 +438,20 @@ const CorporateDashboard = () => {
             </aside>
 
             {/* 2. MAIN CONTENT AREA V2 */}
-            <div className={`flex-1 flex flex-col overflow-hidden bg-gradient-to-br from-slate-50 dark:from-slate-900 to-blue-50/30 dark:to-indigo-900/10 w-full relative transition-all duration-300 ${!isMobile && !sidebarCollapsed ? '' : ''}`}>
+            <div className={`flex-1 flex flex-col overflow-hidden bg-gradient-to-br from-slate-50 dark:from-slate-900 to-accent-50/30 dark:to-accent-900/10 w-full relative transition-all duration-300 ${!isMobile && !sidebarCollapsed ? '' : ''}`}>
                 {/* Header Superior V2 */}
                 <header className="flex-shrink-0 h-14 bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border-b border-slate-200/60 dark:border-slate-800 flex justify-between items-center px-3 sm:px-4 lg:px-8 z-10 shadow-sm shadow-slate-200/20 dark:shadow-black/20">
                     <div className="flex items-center gap-3 w-full lg:w-auto">
                         <button
                             onClick={() => isMobile ? setMobileMenuOpen(true) : setSidebarCollapsed(false)}
-                            className={`p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-800 shadow-sm transition-colors border border-slate-200/50 dark:border-slate-700/50 block lg:hidden`}
+                            className={`p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-accent-600 dark:hover:text-accent-400 hover:bg-white dark:hover:bg-slate-800 shadow-sm transition-colors border border-slate-200/50 dark:border-slate-700/50 block lg:hidden`}
                         >
                             <Menu className="w-5 h-5" />
                         </button>
                         {!isMobile && sidebarCollapsed && (
                             <button
                                 onClick={() => setSidebarCollapsed(false)}
-                                className={`p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-800 shadow-sm transition-colors border border-slate-200/50 dark:border-slate-700/50 block`}
+                                className={`p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-accent-600 dark:hover:text-accent-400 hover:bg-white dark:hover:bg-slate-800 shadow-sm transition-colors border border-slate-200/50 dark:border-slate-700/50 block`}
                             >
                                 <Menu className="w-5 h-5" />
                             </button>
@@ -474,10 +467,10 @@ const CorporateDashboard = () => {
                             const isReady = status === 'ready';
                             const isPaused = isReady && !!config?.globalPause;
                             const tone = isPaused
-                                ? { bg: 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700/60 shadow-sm shadow-amber-500/10', dot: 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.55)] animate-pulse', text: 'text-amber-700 dark:text-amber-400', label: 'PAUSADO' }
+                                ? { bg: 'bg-warning-50 dark:bg-warning-900/20 border-warning-300 dark:border-warning-700/60 shadow-sm shadow-warning-500/10', dot: 'bg-warning-500 shadow-[0_0_10px_rgba(245,158,11,0.55)] animate-pulse', text: 'text-warning-700 dark:text-warning-400', label: 'PAUSADO' }
                                 : isReady
-                                ? { bg: 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50', dot: 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]', text: 'text-emerald-700 dark:text-emerald-400', label: 'ONLINE' }
-                                : { bg: 'bg-rose-50 dark:bg-rose-900/30 border-rose-300 dark:border-rose-700 shadow-md shadow-rose-500/20 animate-pulse', dot: 'bg-rose-500 shadow-[0_0_10px_rgba(239,68,68,0.6)]', text: 'text-rose-700 dark:text-rose-300', label: 'OFFLINE' };
+                                ? { bg: 'bg-success-50 dark:bg-success-900/20 border-success-200 dark:border-success-800/50', dot: 'bg-success-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]', text: 'text-success-700 dark:text-success-400', label: 'ONLINE' }
+                                : { bg: 'bg-danger-50 dark:bg-danger-900/30 border-danger-300 dark:border-danger-700 shadow-md shadow-danger-500/20 animate-pulse', dot: 'bg-danger-500 shadow-[0_0_10px_rgba(239,68,68,0.6)]', text: 'text-danger-700 dark:text-danger-300', label: 'OFFLINE' };
                             return (
                                 <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border transition-all ${tone.bg}`}>
                                     <div className={`w-2 h-2 rounded-full flex-shrink-0 ${tone.dot}`}></div>
@@ -499,11 +492,11 @@ const CorporateDashboard = () => {
                         <div className="relative" ref={notifRef}>
                             <button 
                                 onClick={() => setShowNotifications(!showNotifications)}
-                                className="relative p-2 rounded-xl text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-sm cursor-pointer"
+                                className="relative p-2 rounded-xl text-slate-500 hover:text-accent-600 dark:text-slate-400 dark:hover:text-accent-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-sm cursor-pointer"
                             >
                                 <Bell className="w-5 h-5 lg:w-6 lg:h-6" />
                                 {alerts.length > 0 && (
-                                    <span className="absolute top-0 right-0 -mt-1 -mr-1 flex items-center justify-center w-5 h-5 text-[10px] font-bold text-white bg-rose-500 border-2 border-white dark:border-slate-900 rounded-full leading-none shadow-sm">
+                                    <span className="absolute top-0 right-0 -mt-1 -mr-1 flex items-center justify-center w-5 h-5 text-[10px] font-bold text-white bg-danger-500 border-2 border-white dark:border-slate-900 rounded-full leading-none shadow-sm">
                                         {alerts.length > 9 ? '9+' : alerts.length}
                                     </span>
                                 )}
@@ -515,7 +508,7 @@ const CorporateDashboard = () => {
                                     <div className="p-4 border-b border-slate-100 dark:border-slate-700/50 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50">
                                         <h3 className="font-extrabold text-slate-800 dark:text-slate-100 text-sm">Notificaciones</h3>
                                         {alerts.length > 0 && (
-                                            <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/40 px-2 py-1 rounded-lg uppercase tracking-wider">{alerts.length} Novedades</span>
+                                            <span className="text-[10px] font-bold text-accent-600 dark:text-accent-400 bg-accent-50 dark:bg-accent-900/40 px-2 py-1 rounded-lg uppercase tracking-wider">{alerts.length} Novedades</span>
                                         )}
                                     </div>
                                     <div className="max-h-[60vh] overflow-y-auto custom-scrollbar">
@@ -538,12 +531,12 @@ const CorporateDashboard = () => {
                                                             handleQuickAction(alert.userPhone, 'chat'); 
                                                         }}
                                                     >
-                                                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                                                        <div className="w-10 h-10 rounded-full bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
+                                                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-danger-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                                        <div className="w-10 h-10 rounded-full bg-danger-100 dark:bg-danger-900/30 text-danger-600 dark:text-danger-400 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
                                                             <AlertTriangle className="w-5 h-5" />
                                                         </div>
                                                         <div className="min-w-0 pr-2">
-                                                            <p className="text-sm font-bold text-slate-800 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors line-clamp-2 leading-tight mb-1">{alert.reason}</p>
+                                                            <p className="text-sm font-bold text-slate-800 dark:text-slate-200 group-hover:text-accent-600 dark:group-hover:text-accent-400 transition-colors line-clamp-2 leading-tight mb-1">{alert.reason}</p>
                                                             <p className="text-xs text-slate-500 dark:text-slate-400 font-medium font-mono">{alert.userPhone ? alert.userPhone.split('@')[0] : 'Desconocido'}</p>
                                                             {alert.details && (
                                                                 <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1.5 truncate italic border-l-2 border-slate-200 dark:border-slate-600 pl-2">"{alert.details}"</p>
@@ -563,7 +556,7 @@ const CorporateDashboard = () => {
                                 <p className="text-sm font-bold text-slate-800 dark:text-slate-100 capitalize">{user?.name || 'Usuario'}</p>
                                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium capitalize">{user?.role || 'seller'}</p>
                             </div>
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-md border border-white/20 ${isAdmin ? 'bg-gradient-to-br from-amber-500 to-orange-500 shadow-amber-500/30' : 'bg-gradient-to-br from-indigo-600 to-purple-600 shadow-indigo-500/30'}`}>
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-md border border-white/20 ${isAdmin ? 'bg-gradient-to-br from-albero-500 to-albero-700 shadow-albero-500/30' : 'bg-gradient-to-br from-accent-600 to-albero-600 shadow-accent-500/30'}`}>
                                 <span className="text-white font-bold text-sm">
                                     {(user?.name || 'U').charAt(0).toUpperCase()}
                                 </span>

@@ -40,21 +40,24 @@ const transferVerifiedMeta = (order) => {
         : { tone: 'danger', label: 'Sin verificar', Icon: AlertTriangle };
 };
 
-// Tipo de envío — el Order no tiene campo dedicado. El flujo marca el retiro
-// seteando `calle = "A sucursal"` (ver src/flows/utils/messages.ts:135); esa es
-// la ÚNICA señal confiable. Ojo: paymentMethod === 'contrarembolso' NO implica
-// sucursal — el COD-con-seña entrega a domicilio con ese paymentMethod.
+// Tipo de envío — el Order no tiene campo dedicado. La recogida se marca
+// poniendo un centinela en `calle`; esa es la ÚNICA señal confiable. Hay dos
+// centinelas vivos en esta DB: el bot escribe "A oficina de Correos"
+// (PICKUP_STREET en src/flows/utils/flowHelpers.ts) y la carga manual del
+// panel escribe "A sucursal" (src/api/routes/order.routes.js). Aceptamos los
+// dos: si solo miráramos uno, media tabla se etiquetaría como domicilio.
+const PICKUP_SENTINELS = ['a oficina de correos', 'a sucursal'];
 const isSucursal = (order) =>
-    String(order.calle || '').trim().toLowerCase() === 'a sucursal';
+    PICKUP_SENTINELS.includes(String(order.calle || '').trim().toLowerCase());
 const shippingMeta = (order) => isSucursal(order)
-    ? { tone: 'accent', label: 'Sucursal',  Icon: Package }
-    : { tone: 'info',   label: 'Domicilio', Icon: MapPin };
+    ? { tone: 'accent', label: 'Oficina de Correos', Icon: Package }
+    : { tone: 'info',   label: 'Domicilio',          Icon: MapPin };
 
 const STATUS_OPTIONS = ['Pendiente', 'Confirmado', 'En sistema', 'Enviado', 'Entregado', 'Cancelado'];
 
 // Date formatter — manejo legacy strings y ISO. Ojo: el calendario "DD/MM/YYYY
 // HH:mm" sin coma rompe la pieza original (`dt.includes(',')`); por eso se
-// fuerza `dateStyle/timeStyle` que siempre incluye coma en es-AR.
+// fuerza `dateStyle/timeStyle` que siempre incluye coma en es-ES.
 const formatDateBA = (dateStr) => {
     if (!dateStr) return '—';
     try {
@@ -66,8 +69,8 @@ const formatDateBA = (dateStr) => {
             }
         }
         if (isNaN(d.getTime())) return 'Invalid Date';
-        return d.toLocaleString('es-AR', {
-            timeZone: 'America/Argentina/Buenos_Aires',
+        return d.toLocaleString('es-ES', {
+            timeZone: 'Europe/Madrid',
             year: 'numeric', month: '2-digit', day: '2-digit',
             hour: '2-digit', minute: '2-digit'
         });
@@ -248,7 +251,7 @@ const SalesView = ({ onGoToChat }) => {
             const url = URL.createObjectURL(blob);
             const truncated = total > exportOrders.length;
             if (truncated) {
-                toast.warning(`Se exportaron las ${exportOrders.length} filas más recientes de ${total}. Ajustá los filtros para acotar.`);
+                toast.warning(`Se exportaron las ${exportOrders.length} filas más recientes de ${total}. Ajusta los filtros para acotar.`);
             }
             const a = document.createElement('a');
             a.href = url;
@@ -338,7 +341,7 @@ const SalesView = ({ onGoToChat }) => {
         const text = `Nombre: ${order.nombre || 'Cliente'}
 Teléfono: ${phoneDisplay}
 Producto: ${order.producto}
-Total: $${order.precio}
+Total: ${order.precio} €
 Pago: ${pm.label}
 Dirección: ${order.calle || '—'}
 Ciudad: ${order.ciudad || '—'}
@@ -472,7 +475,7 @@ CP: ${order.cp || '—'}`;
                                     <EmptyState
                                         icon={Inbox}
                                         title="No se encontraron pedidos"
-                                        description="Intentá ajustar los filtros de búsqueda."
+                                        description="Prueba a ajustar los filtros de búsqueda."
                                     />
                                 </td></tr>
                             ) : (
@@ -582,7 +585,7 @@ CP: ${order.cp || '—'}`;
                             <EmptyState
                                 icon={Inbox}
                                 title="No se encontraron pedidos"
-                                description="Intentá ajustar los filtros de búsqueda."
+                                description="Prueba a ajustar los filtros de búsqueda."
                             />
                         ) : (
                             filteredOrders.map(order => {
@@ -712,7 +715,7 @@ CP: ${order.cp || '—'}`;
                                 <div className="flex items-center justify-between gap-2">
                                     <Badge tone="accent" size="md">{editingOrder.producto}</Badge>
                                     <span className="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">
-                                        ${editingOrder.precio}
+                                        {editingOrder.precio} €
                                     </span>
                                 </div>
                             </div>
@@ -732,7 +735,7 @@ CP: ${order.cp || '—'}`;
                                     type="text"
                                     value={editTracking}
                                     onChange={(e) => setEditTracking(e.target.value)}
-                                    placeholder="Ej: CP123456789AR"
+                                    placeholder="Ej: PQ1234567890ES"
                                     className="font-mono"
                                 />
                             </div>
@@ -835,7 +838,7 @@ CP: ${order.cp || '—'}`;
                                         <CopyRow editing={isDetailEditing} label="Nombre" value={viewingOrder.nombre || 'Sin nombre'} editField={editInput('nombre', 'Nombre completo')} />
                                         <CopyRow editing={isDetailEditing} label="Teléfono" value={phoneDisplay} mono />
                                         <CopyRow editing={isDetailEditing} label="Producto" value={viewingOrder.producto || 'Sin producto'} editField={editInput('producto', 'Producto')} />
-                                        <CopyRow editing={isDetailEditing} label="Total" value={`$${viewingOrder.precio}`} editField={editInput('precio', 'Precio')} />
+                                        <CopyRow editing={isDetailEditing} label="Total" value={`${viewingOrder.precio} €`} editField={editInput('precio', 'Precio')} />
 
                                         {/* Seña pagada — el cartero NO cobra el total, solo el saldo restante */}
                                         {viewingOrder.senaPaid && viewingOrder.senaAmount > 0 && (
@@ -845,7 +848,7 @@ CP: ${order.cp || '—'}`;
                                                         Seña pagada
                                                     </span>
                                                     <span className="text-sm font-semibold tabular-nums text-warning-700 dark:text-warning-500">
-                                                        ${Number(viewingOrder.senaAmount).toLocaleString('es-AR')} por MP
+                                                        ${Number(viewingOrder.senaAmount).toLocaleString('es-ES')} por MP
                                                     </span>
                                                 </div>
                                                 <div className="flex items-center justify-between gap-2 mt-1.5">
@@ -853,7 +856,7 @@ CP: ${order.cp || '—'}`;
                                                         Cobrar al cartero
                                                     </span>
                                                     <span className="text-base font-semibold tabular-nums text-success-700 dark:text-success-500">
-                                                        ${Number(viewingOrder.cashRemainder || 0).toLocaleString('es-AR')}
+                                                        ${Number(viewingOrder.cashRemainder || 0).toLocaleString('es-ES')}
                                                     </span>
                                                 </div>
                                             </div>

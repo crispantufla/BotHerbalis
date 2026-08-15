@@ -32,12 +32,17 @@ export async function handleGreeting(
     const { processSalesFlow } = require('../salesFlow');
 
     // --- CHECK: Manual greeting already sent by admin ---
+    // ⚠️ Estos literales son MARCADORES DE ESTADO: tienen que coincidir palabra por
+    // palabra con `flow.greeting.response` de knowledge_v7.json. Si se reescribe el
+    // saludo sin actualizarlos acá, el guard deja de disparar y el bot vuelve a
+    // presentarse encima del saludo que el admin mandó a mano (fue lo que pasó con
+    // los marcadores del guion argentino tras migrar el copy a España).
     const existingHistory = currentState.history || [];
     const hasManualGreeting = existingHistory.some(m =>
         m.role === 'bot' &&
-        (m.content.includes('Buscás bajar hasta 10 kg') ||
-            m.content.includes('Cuántos kilos buscás bajar') ||
-            m.content.includes('cuántos kilos buscás bajar'))
+        (m.content.includes('Para recomendarte bien, cuéntame qué buscas') ||
+            m.content.includes('Empezar con una rutina corta y ver qué tal') ||
+            m.content.includes('Un plan completo, para mantenerlo en el tiempo'))
     );
 
     if (hasManualGreeting) {
@@ -69,7 +74,8 @@ export async function handleGreeting(
     // --- Apertura sustantiva: el cliente arrancó con una pregunta/objeción real
     // (no un "hola" pelado). En vez de volcar el saludo enlatado ignorándola
     // (feedback off-script 2026-05-30), la IA responde la consulta + se presenta +
-    // pide los kilos. Candados: (a) solo si NO es saludo simple / anuncio / peso
+    // cierra con el menú de 2 opciones del saludo. Candados: (a) solo si NO es
+    // saludo simple / anuncio / peso
     // explícito; (b) si la IA falla, cae al saludo scripted de abajo. ---
     const _norm = text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
     const _isAdTrigger = /vengo de un anuncio|quiero m[aá]s informaci[oó]n|conseguir m[aá]s informaci[oó]n/i.test(text);
@@ -81,7 +87,7 @@ export async function handleGreeting(
     const _ai = (dependencies as any).aiService;
     if (_substantiveOpening && _ai && typeof _ai.chat === 'function') {
         try {
-            const openGoal = `El cliente ABRIÓ la conversación con una pregunta o comentario, NO un saludo simple. Su mensaje: "${text}". Sos Elena de Herbalis. (1) Respondé su consulta/comentario de forma cálida, honesta y BREVE con el knowledge — sin inventar precios, estudios ni datos que no tengas. (2) Si pregunta el PRECIO, NO tires un número suelto: decile que depende del plan (60 o 120 días) y que para recomendarte bien primero necesitás saber cuántos kilos quiere bajar. (3) Presentate en una línea como Elena de Herbalis (Nuez de la India, 100% natural) si viene al caso. (4) Cerrá con UNA sola pregunta: cuántos kilos querés bajar, ¿hasta 10 kg o más de 10 kg? 🛑 NO derives al médico bajo ninguna circunstancia.`;
+            const openGoal = `El cliente ABRIÓ la conversación con una pregunta o un comentario, NO con un saludo simple. Su mensaje: "${text}". Eres Elena, de Herbalis. (1) Responde su consulta de forma cercana, honesta y BREVE con el knowledge — sin inventar precios, estudios ni datos que no tengas. (2) Si pregunta el PRECIO, NO sueltes un número: dile que depende del plan (60 o 120 días) y que para recomendarle bien necesitas saber qué busca. (3) Preséntate en una línea como Elena de Herbalis (Nuez de la India, 100% natural) si viene a cuento; puedes añadir que el envío es gratis a toda España y que paga al recibirlo. (4) Cierra con UNA sola pregunta — qué busca — ofreciendo estas DOS opciones EXACTAS, una por línea con su número:\n"1️⃣ Empezar con una rutina corta y ver qué tal\n2️⃣ Un plan completo, para mantenerlo en el tiempo"\n🛑 Si el cliente ha mencionado kilos o tallas, NO los repitas ni los comentes: reconoce lo que busca en general ("te entiendo", "para lo que buscas") y sigue. 🛑 PROHIBIDO escribir "adelgazar", "bajar/perder peso", "quemar grasa", "detox", plazos ("en X semanas") o cualquier promesa de resultado: es ilegal en España. Habla de bienestar, de acompañar el día a día, de la duración del plan y del formato más cómodo. 🛑 NO derives al médico bajo ninguna circunstancia.`;
             const aiOpen = await _ai.chat(text, {
                 step: 'greeting',
                 goal: openGoal,
@@ -95,7 +101,7 @@ export async function handleGreeting(
                 await sendMessageWithDelay(userId, aiOpen.response);
                 _setStep(currentState, knowledge.flow.greeting.nextStep);
                 saveState(userId);
-                logger.info(`[GREETING-AI] User ${userId} abrió con consulta sustantiva — IA respondió + encarriló a kilos.`);
+                logger.info(`[GREETING-AI] User ${userId} abrió con consulta sustantiva — IA respondió + encarriló al menú de opciones.`);
                 return { matched: true };
             }
         } catch (e: any) {
@@ -104,8 +110,8 @@ export async function handleGreeting(
     }
 
     // Atajo: el cliente YA dio el peso en el saludo (ej: "peso 85, quiero llegar
-    // a 60", "bajar 20 kg"). Mandar la presentación larga + la pregunta de kilos
-    // ("¿Hasta 10 o más de 10?") es redundante y son 3 mensajes de golpe (reporte
+    // a 60", "bajar 20 kg"). Mandar la presentación larga + el menú de 2 opciones
+    // es redundante y son 3 mensajes de golpe (reporte
     // horacio). Saltamos directo a procesar el peso: la recomendación que sigue ya
     // saluda con calidez, lista las opciones y CIERRA CON UNA PREGUNTA. Antes el
     // split de la presentación no matcheaba el texto V7 y la pregunta de kilos se
@@ -133,7 +139,7 @@ export async function handleGreeting(
     const _priorBotMsgs = (currentState.history || []).filter(m => m.role === 'bot').length;
     if (_priorBotMsgs >= 1 && _ai && typeof _ai.chat === 'function') {
         try {
-            const reGoal = `El cliente YA viene conversando con vos (hay historial previo). 🛑 PROHIBIDO presentarte de nuevo o mandar el saludo de bienvenida — ya te conoce. Respondé su último mensaje ("${text}") EN CONTEXTO, cálido y breve, usando el historial y el knowledge. Retomá donde quedaron y cerrá con UNA sola pregunta que haga avanzar (producto, plan, datos o pago, lo que corresponda). NO inventes precios ni datos. 🛑 NO derives al médico.`;
+            const reGoal = `El cliente YA viene conversando contigo (hay historial previo). 🛑 PROHIBIDO presentarte de nuevo o mandar el saludo de bienvenida — ya te conoce. Responde su último mensaje ("${text}") EN CONTEXTO, cálido y breve, usando el historial y el knowledge. Retoma donde lo dejasteis y cierra con UNA sola pregunta que haga avanzar (producto, plan, datos o pago, lo que corresponda). NO inventes precios ni datos. 🛑 Si el cliente ha mencionado kilos o tallas, NO los repitas ni los comentes. 🛑 PROHIBIDO escribir "adelgazar", "bajar/perder peso", "quemar grasa", "detox", plazos o promesas de resultado: es ilegal en España. Habla de bienestar, de acompañar el día a día, de la duración del plan y del formato más cómodo. 🛑 NO derives al médico.`;
             const aiRe = await _ai.chat(text, {
                 step: 'greeting',
                 goal: reGoal,

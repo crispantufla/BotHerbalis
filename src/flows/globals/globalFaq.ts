@@ -1,13 +1,6 @@
 import { UserState } from '../../types/state';
 import { _isInfoQuestion, _startsAffirmative } from '../utils/flowHelpers';
-import { PAID_KEYWORDS as MP_PAID_KEYWORDS } from '../steps/stepWaitingMpPayment';
-import { PAID_KEYWORDS as TRANSFER_PAID_KEYWORDS } from '../steps/stepWaitingTransferConfirmation';
-import { isMpEnabled } from '../utils/paymentOptions';
 import logger from '../../utils/logger';
-
-// Claims de pago que los PAID_KEYWORDS de los steps no cubren pero que también
-// significan "ya pagué" (el step los resuelve vía AI fallback con contexto).
-const PAYMENT_CLAIM_EXTRA = /\b(comprobante|acabo de (pagar|transferir|abonar)|ya (abone|transferi)|transferencia (hecha|realizada|enviada))\b/i;
 
 /**
  * FAQ keyword matcher — red de seguridad antes del AI.
@@ -75,9 +68,12 @@ export async function handleFaq(
     if (!bestEntry) return null;
 
     // "tarda" / "demora" / "tiempo" son ambiguas: pueden referirse al tiempo del ENVÍO
-    // o a cuánto TARDA EN BAJAR DE PESO. Si la pregunta es sobre el ritmo de descenso,
-    // NO dispares la FAQ de envío — que la responda el paso/IA (ej. "4 a 6 kg el primer
-    // mes"). Reporte admin 2026-06-19 (5493425380805): "Demora mucho en bajar eso kilo?"
+    // o al tiempo en notar cambios. Si la pregunta NO es sobre el envío, no dispares la
+    // FAQ de envío — que la responda el paso/IA, que sabe encuadrarlo como acompañamiento
+    // y constancia. La respuesta NUNCA lleva cifras de kilos ni plazos para lograr un
+    // resultado (Reglamento CE 1924/2006): se habla de control del peso, hábitos y de que
+    // el plan dure lo suficiente para sostener la rutina.
+    // Reporte admin 2026-06-19 (5493425380805): "Demora mucho en bajar eso kilo?"
     // → el bot soltó el menú de envío y no respondió lo que preguntaba.
     const _timingKw = new Set(['tarda', 'demora', 'tiempo', 'cuanto tarda']);
     const _weightLossTiming =
@@ -97,8 +93,7 @@ export async function handleFaq(
     const STEPS_PAST_WEIGHT = new Set<string>([
         'waiting_preference', 'waiting_preference_consultation',
         'waiting_plan_choice', 'waiting_price_confirmation', 'waiting_ok',
-        'waiting_payment_method', 'waiting_mp_payment',
-        'waiting_transfer_confirmation', 'waiting_data',
+        'waiting_payment_method', 'waiting_data',
         'waiting_maps_confirmation', 'waiting_final_confirmation',
     ]);
     if (bestEntry.triggerStep === 'waiting_weight' && STEPS_PAST_WEIGHT.has(currentState.step as string)) {
@@ -113,20 +108,9 @@ export async function handleFaq(
     // y la venta se traba. La señal es POR STEP — un passthrough genérico
     // dejaría pasar preguntas puras y el step re-preguntaría arriba de la FAQ.
 
-    // waiting_mp_payment / waiting_transfer_confirmation (caso 22-jul): "Ya
-    // hice la transferencia ¿me confirmás?" — la keyword "transferencia"
-    // matcheaba la FAQ del alias y el bot RE-MANDABA las instrucciones de
-    // transferir a alguien que ya transfirió, y el step nunca veía el aviso.
-    // Con claim de pago NO mandamos la canned response (quedó desactualizada
-    // frente al claim — reenviarla contradice al paid-branch del step): salimos
-    // en silencio y el step responde lo justo ("recibimos tu aviso...").
-    const paymentClaim =
-        (currentState.step === 'waiting_mp_payment' || currentState.step === 'waiting_transfer_confirmation')
-        && (MP_PAID_KEYWORDS.test(norm) || TRANSFER_PAID_KEYWORDS.test(norm) || PAYMENT_CLAIM_EXTRA.test(norm));
-    if (paymentClaim) {
-        logger.info(`[FAQ] Skip FAQ en ${currentState.step} — "${trimmed.slice(0, 50)}" trae claim de pago; lo maneja el step`);
-        return null;
-    }
+    // (El passthrough de "ya pagué" que tenía el bot argentino murió con el
+    // prepago: aquí nadie paga antes de recibir, así que no hay aviso de pago
+    // que proteger de la FAQ.)
 
     // waiting_data (caso real 5492215731759, 21-jul: "Quintana y bolivia...
     // \nEnsenada\n1925 Cómo tomo las cápsulas" — la FAQ de posología respondía,
@@ -137,32 +121,25 @@ export async function handleFaq(
     const dataBlockPassthrough = currentState.step === 'waiting_data'
         && (/\n/.test(trimmed) || /\b\d{4,}\b/.test(trimmed));
 
-    // waiting_maps_confirmation (caso 22-jul): el bot pidió "respondé *sí*" y
-    // el cliente contestó "Si, es correcta ¿cuánto tarda en llegar?" — la FAQ
-    // de envíos se tragaba el "sí" y la orden no se armaba. Señal operativa:
-    // arranque afirmativo/negativo, o un CP de 4 dígitos (corrección de
-    // dirección), ADEMÁS de la pregunta. _startsAffirmative distingue el "sí"
-    // afirmativo del "si" condicional: "y si tarda mucho?" NO confirma nada y
-    // la FAQ la responde entera (matched), sin dejarla caer al step.
+    // waiting_maps_confirmation: el bot pidió "responde *sí*" y el cliente
+    // contestó "Sí, es correcta ¿cuánto tarda en llegar?" — la FAQ de envíos se
+    // tragaba el "sí" y la orden no se armaba. Señal operativa: arranque
+    // afirmativo/negativo, o un CP de 5 dígitos (corrección de dirección),
+    // ADEMÁS de la pregunta. _startsAffirmative distingue el "sí" afirmativo
+    // del "si" condicional: "¿y si tarda mucho?" NO confirma nada y la FAQ la
+    // responde entera (matched), sin dejarla caer al step.
     const mapsPassthrough = currentState.step === 'waiting_maps_confirmation'
-        && (_startsAffirmative(trimmed) || /^no\b/.test(norm) || /\b\d{4}\b/.test(trimmed));
+        && (_startsAffirmative(trimmed) || /^no\b/.test(norm) || /\b\d{5}\b/.test(trimmed));
 
-    // ── Interruptor de MP apagado ────────────────────────────────────────────
-    // Las FAQ son canned: sin esto, "¿cómo pago?" seguiría ofreciendo el link de
-    // tarjeta con la cuenta bloqueada. Si el guion trae la variante sin tarjeta
-    // (`responseNoMp`), esa gana. Si NO la trae —el seller pudo editar la FAQ
-    // desde el panel Guiones y su copia no tiene el campo— y la respuesta nombra
-    // la tarjeta, salimos sin responder: prefiero que conteste la IA (que ya
-    // tiene la política vigente en el prompt) a mandar un medio que no podemos
-    // cobrar.
-    let faqResponse: string = bestEntry.response;
-    if (!isMpEnabled(dependencies.config)) {
-        if (bestEntry.responseNoMp) {
-            faqResponse = bestEntry.responseNoMp;
-        } else if (/tarjeta|mercado\s?pago|link de pago/i.test(bestEntry.response)) {
-            logger.info(`[FAQ] Skip FAQ — nombra la tarjeta y el pago con tarjeta está apagado; que la responda la IA (${userId})`);
-            return null;
-        }
+    // Guardia contra guiones desactualizados: las FAQ son canned y el vendedor
+    // las edita desde el panel Guiones. Si alguna copia vieja todavía ofrece
+    // pagar por adelantado (tarjeta, transferencia, link), NO la mandamos: aquí
+    // solo se cobra contrarreembolso, y prometer otra cosa cuesta la venta.
+    // Preferimos que conteste la IA, que sí tiene la política vigente.
+    const faqResponse: string = bestEntry.response;
+    if (/tarjeta|link de pago|transferencia|mercado\s?pago/i.test(faqResponse)) {
+        logger.warn(`[FAQ] Skip FAQ — la respuesta del guion menciona pago anticipado y aquí todo es contrarreembolso. Revisar el guion. (${userId})`);
+        return null;
     }
 
     const passthrough = dataBlockPassthrough || mapsPassthrough;

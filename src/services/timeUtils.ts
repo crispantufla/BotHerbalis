@@ -1,50 +1,55 @@
-import { formatInTimeZone } from 'date-fns-tz';
+import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
+import { MARKET } from '../config/market';
 
-const ARG_TZ = 'America/Argentina/Buenos_Aires';
-export const BUSINESS_START = 9;     // 9:00 AM
-export const BUSINESS_END = 21;      // 9:00 PM
+const TZ = MARKET.timezone;         // Europe/Madrid
+export const BUSINESS_START = 9;    // 9:00
+export const BUSINESS_END = 21;     // 21:00
 
 /**
- * Get current hour in Argentina timezone (0-23)
+ * Hora actual en la zona del mercado (0-23).
  */
-export function getArgentinaHour(): number {
+export function getLocalHour(): number {
     const now = new Date();
-    // formatInTimeZone ensures daylight saving times and true offsets are respected cleanly
-    return parseInt(formatInTimeZone(now, ARG_TZ, 'HH'), 10);
+    // formatInTimeZone respeta el horario de verano y los offsets reales
+    return parseInt(formatInTimeZone(now, TZ, 'HH'), 10);
 }
 
 /**
- * Check if current time is within business hours (9-21h Argentina)
+ * ¿Estamos en horario comercial (9-21h)?
  */
 export function isBusinessHours(): boolean {
-    const hour = getArgentinaHour();
+    const hour = getLocalHour();
     return hour >= BUSINESS_START && hour < BUSINESS_END;
 }
 
 /**
- * Check if it's "deep night" (0-7h Argentina)
+ * ¿Es de madrugada (0-7h)?
  */
 export function isDeepNight(): boolean {
-    const hour = getArgentinaHour();
+    const hour = getLocalHour();
     return hour >= 0 && hour < 7;
 }
 
 /**
- * Helper to get the current date in Argentina timezone natively
+ * Fecha actual. Se mantiene como helper para que los callers no construyan
+ * `new Date()` a mano y sea un único punto si algún día hay que mockearlo.
  */
-export function getArgentinaNow(): Date {
+export function getLocalNow(): Date {
     return new Date();
 }
 
 /**
- * Medianoche (00:00) del día ACTUAL en Argentina, como instante absoluto.
- * NO usar `new Date().setHours(0,0,0,0)` ni `toZonedTime(...) + setHours`:
- * ambos operan en la TZ del server (UTC en prod) → "medianoche" = 21:00 ARG
- * del día anterior y las ventanas diarias quedan corridas 3 horas.
- * Argentina no aplica DST (offset -03 fijo), así que construir el instante
- * con el sufijo -03:00 es exacto.
+ * Medianoche (00:00) del día ACTUAL en España, como instante absoluto.
+ * NO usar `new Date().setHours(0,0,0,0)`: eso opera en la TZ del server (UTC
+ * en producción) y corre las ventanas diarias.
+ *
+ * Ojo con la diferencia respecto al bot argentino: allá el instante se
+ * construía concatenando el sufijo fijo "-03:00" porque Argentina no cambia
+ * la hora. España SÍ aplica horario de verano (+01:00 en invierno, +02:00 en
+ * verano), así que un offset hardcodeado rompería la ventana media parte del
+ * año. Por eso aquí va fromZonedTime, que resuelve el offset del día concreto.
  */
-export function getArgentinaMidnight(): Date {
-    const day = formatInTimeZone(new Date(), ARG_TZ, 'yyyy-MM-dd');
-    return new Date(`${day}T00:00:00-03:00`);
+export function getLocalMidnight(): Date {
+    const day = formatInTimeZone(new Date(), TZ, 'yyyy-MM-dd');
+    return fromZonedTime(`${day}T00:00:00`, TZ);
 }

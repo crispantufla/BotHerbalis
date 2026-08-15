@@ -7,42 +7,71 @@ export default {
     ],
     theme: {
         extend: {
-            // Tokens semánticos: en vez de inventar gradientes y rgba arbitrarios
-            // en cada vista, las primitives `ui/*` consumen estos tokens.
+            // ── Paleta España (azulejo + albero) ───────────────────────────
+            // El bot argentino usa índigo; este usa el azul de la cerámica
+            // española como acento y el ocre albero como color secundario.
+            //
+            // Las escalas van COMPLETAS (50-900) a propósito: las vistas usan
+            // tonos intermedios (-300, -400, -800) y, con escalas parciales,
+            // esas clases se compilaban a nada y el elemento quedaba sin color.
+            //
+            // Regla de uso: el rojo es SOLO para error/peligro. Por eso el
+            // acento es azul y no el rojo de la bandera — en un panel lleno de
+            // alertas, un botón primario rojo se lee como "algo va mal".
             colors: {
-                // Acento primario — sigue siendo indigo para no romper marca,
-                // pero ahora hay UNA escala canónica en lugar de "indigo a veces
-                // / blue a veces / purple a veces".
+                // Azulejo — acento primario (botones, enlaces, barra lateral).
                 accent: {
-                    50:  '#eef2ff',
-                    100: '#e0e7ff',
-                    200: '#c7d2fe',
-                    300: '#a5b4fc',
-                    400: '#818cf8',
-                    500: '#6366f1',
-                    600: '#4f46e5',
-                    700: '#4338ca',
-                    800: '#3730a3',
-                    900: '#312e81',
+                    50:  '#f0f6fc',
+                    100: '#dbeafa',
+                    200: '#b9d5f3',
+                    300: '#8bb9e8',
+                    400: '#5695d8',
+                    500: '#3176bd',
+                    600: '#1e5ea8',
+                    700: '#1a4d89',
+                    800: '#1a4171',
+                    900: '#17375e',
                 },
-                // Semánticos — mismas escalas Tailwind, renombrados por intención.
-                // Resultado: las vistas dicen `text-success-600` en lugar de
-                // adivinar "¿emerald o teal o green?".
+                // Albero — ocre del ruedo. Secundario: KPIs, gráficos y realces
+                // decorativos. NO usar para avisos (eso es `warning`).
+                albero: {
+                    50:  '#fdf8ec',
+                    100: '#faeecd',
+                    200: '#f4dc9c',
+                    300: '#ecc463',
+                    400: '#e5b03a',
+                    500: '#e0a526',
+                    600: '#c1851a',
+                    700: '#9a6417',
+                    800: '#7d521a',
+                    900: '#684318',
+                },
+                // Semánticos — renombrados por intención. Las vistas dicen
+                // `text-success-600` en lugar de adivinar "¿emerald o green?".
                 success: {
-                    50:  '#ecfdf5', 100: '#d1fae5', 500: '#10b981',
-                    600: '#059669', 700: '#047857', 900: '#064e3b',
+                    50:  '#f3f9ee', 100: '#e1f0d4', 200: '#c6e2ae',
+                    300: '#a3ce82', 400: '#7fb457', 500: '#4d8b31',
+                    600: '#3f7328', 700: '#335c21', 800: '#2a4a1d',
+                    900: '#1f3a14',
                 },
                 warning: {
-                    50:  '#fffbeb', 100: '#fef3c7', 500: '#f59e0b',
-                    600: '#d97706', 700: '#b45309', 900: '#78350f',
+                    50:  '#fffbeb', 100: '#fef3c7', 200: '#fde68a',
+                    300: '#fcd34d', 400: '#fbbf24', 500: '#f59e0b',
+                    600: '#d97706', 700: '#b45309', 800: '#92400e',
+                    900: '#78350f',
                 },
+                // Carmesí — reservado a errores, cancelaciones y destructivo.
                 danger: {
-                    50:  '#fff1f2', 100: '#ffe4e6', 500: '#f43f5e',
-                    600: '#e11d48', 700: '#be123c', 900: '#881337',
+                    50:  '#fdf2f4', 100: '#fbe0e5', 200: '#f6bfc9',
+                    300: '#ee92a4', 400: '#e05f78', 500: '#c8102e',
+                    600: '#a80c26', 700: '#8a0b20', 800: '#6d0919',
+                    900: '#55060f',
                 },
                 info: {
-                    50:  '#f0f9ff', 100: '#e0f2fe', 500: '#0ea5e9',
-                    600: '#0284c7', 700: '#0369a1', 900: '#0c4a6e',
+                    50:  '#f0f9ff', 100: '#e0f2fe', 200: '#bae6fd',
+                    300: '#7dd3fc', 400: '#38bdf8', 500: '#0ea5e9',
+                    600: '#0284c7', 700: '#0369a1', 800: '#075985',
+                    900: '#0c4a6e',
                 },
             },
             // Radii consistentes. Quitamos `rounded-3xl` (24px) y
@@ -58,8 +87,8 @@ export default {
                 'card':         '0 1px 3px 0 rgb(15 23 42 / 0.04), 0 1px 2px -1px rgb(15 23 42 / 0.04)',
                 'card-hover':   '0 4px 12px -2px rgb(15 23 42 / 0.08), 0 2px 6px -1px rgb(15 23 42 / 0.04)',
                 'elevated':     '0 12px 32px -8px rgb(15 23 42 / 0.12), 0 4px 8px -2px rgb(15 23 42 / 0.06)',
-                'focus':        '0 0 0 3px rgb(99 102 241 / 0.25)',
-                'focus-danger': '0 0 0 3px rgb(244 63 94 / 0.25)',
+                'focus':        '0 0 0 3px rgb(30 94 168 / 0.25)',
+                'focus-danger': '0 0 0 3px rgb(200 16 46 / 0.25)',
             },
             fontFamily: {
                 sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],

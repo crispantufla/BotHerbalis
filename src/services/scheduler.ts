@@ -1,25 +1,25 @@
 import logger from '../utils/logger';
 // scheduler.ts - Cron-based periodic checks for stale users, cold leads, and auto-approval
 //
-// Uses node-cron with America/Argentina/Buenos_Aires timezone so schedules
-// always run at Argentina time regardless of server location (Europe/Railway).
+// Usa node-cron con la zona horaria del mercado (Europe/Madrid) para que los
+// horarios sean los del cliente, no los del servidor donde corra el proceso.
 //
-// CRON SCHEDULE (all times Argentina UTC-3):
+// CRON SCHEDULE (hora de España):
 //   autoApproveOrders       -> cada 3 min de 9-23h
-//   refreshPendingPayments  -> cada 5 min de 9-23h (si MP_ACCESS_TOKEN está seteado)
 //   checkColdLeads          -> 10:00 y 18:00
 //   cleanupOldUsers         -> 04:00 diario
 
 import cron from 'node-cron';
-import { isBusinessHours, getArgentinaMidnight } from './timeUtils';
+import { isBusinessHours, getLocalMidnight } from './timeUtils';
 import { differenceInMinutes, differenceInHours, differenceInDays } from 'date-fns';
 
 import { buildConfirmationMessage } from '../utils/messageTemplates';
 import { UserState } from '../types/state';
 import { _setStep, _pushHistory } from '../flows/utils/flowHelpers';
+import { MARKET } from '../config/market';
 
 // ── Constants ──
-const TIMEZONE = 'America/Argentina/Buenos_Aires';
+const TIMEZONE = MARKET.timezone;
 
 // ── Mutex flags (prevent concurrent executions from cron + boot overlap) ──
 // Per-seller, stored on each SharedState so one seller's long-running job
@@ -48,9 +48,7 @@ const RE_ENGAGEABLE_STEPS = new Set([
     'waiting_price_confirmation',
     'waiting_plan_choice',
     'waiting_ok',
-    'waiting_data',
-    'waiting_mp_payment',
-    'waiting_transfer_confirmation'
+    'waiting_data'
 ]);
 
 const COLD_LEAD_THRESHOLD_HOURS = 24;
@@ -119,57 +117,57 @@ function _withName(msg: string, state: UserState): string {
 /** Contextual messages by abandon reason (for abandoned cart + cold lead recovery) */
 const ABANDON_REASON_MESSAGES: Record<string, string[]> = {
     payment_timing: [
-        '¡Hola! 😊 Una cosa importante: tenemos retiro en sucursal — dejás el paquete en una sucursal de Correo Argentino cerca tuyo y pagás el total *en efectivo cuando lo retirás*. No pagás nada por adelantado. ¿Seguimos?',
-        'Hola 👋 Si te queda más cómodo, podés elegir *retiro en sucursal*: pagás recién cuando vas a buscarlo. ¿Te tomamos los datos? 📦',
+        `¡Hola! 😊 Una cosa importante: es *contra reembolso*, así que no pagas nada ahora. Pagas cuando tengas el paquete en la mano, ni un euro antes. ¿Seguimos?`,
+        `Hola 👋 Recuerda que no adelantas nada: pagas al recibirlo, en casa o al recogerlo en tu ${MARKET.pickupPointName}. ¿Te tomo los datos? 📦`,
     ],
     hesitation: [
-        '¡Hola! 😊 Sin apuro. El envío tarda *7 a 10 días hábiles* por Correo Argentino, y más rápido —4 días— si lo pagás por adelantado. ¿Avanzamos cuando quieras?',
-        'Hola 👋 Si te quedó alguna duda para decidir, contame y te ayudo. Y si querés, te lo puedo agendar para la fecha que te quede cómoda 😊',
+        `¡Hola! 😊 Sin prisa. El envío es gratis, tarda ${MARKET.deliveryDaysHome} y lo pagas al recibirlo. ¿Seguimos cuando quieras?`,
+        'Hola 👋 Si te ha quedado alguna duda para decidirte, cuéntame y te ayudo. Y si quieres, te lo dejo anotado para la fecha que mejor te venga 😊',
     ],
     objection: [
-        '¡Hola! 😊 ¿Quedó alguna duda sobre el producto? Hace más de 13 años que distribuimos a todo el país, con más de 70 mil clientes satisfechos y casos de más de 40 kilos perdidos. Si tenés alguna pregunta te la respondo con gusto 💪',
-        'Hola 👋 Más de 13 años enviando a todo el país. Si quedó alguna pregunta, escribime con confianza y te respondo todo 😊',
+        '¡Hola! 😊 ¿Te quedó alguna duda sobre el producto? Llevamos más de 13 años y más de 70.000 clientes. Además el envío es gratis y lo pagas al recibirlo, no adelantas nada. Si tienes cualquier pregunta te la respondo encantada 💪',
+        'Hola 👋 Más de 13 años trabajando con esto. Si te quedó alguna pregunta, escríbeme con confianza y te lo cuento todo 😊',
     ],
     address_issue: [
-        '¡Hola! 😊 Quedamos trabados con los datos de envío. ¿Me pasás nombre, dirección y ciudad así lo termino de cargar? 📦',
-        'Hola 👋 Solo falta tu dirección para despachar el pedido. ¿Me la pasás cuando puedas? 😊',
+        '¡Hola! 😊 Nos quedamos a medias con los datos de envío. ¿Me pasas nombre, dirección y población para terminar de prepararlo? 📦',
+        'Hola 👋 Solo falta tu dirección para mandar el pedido. ¿Me la pasas cuando puedas? 😊',
     ],
     generic: [
-        '¡Hola! 😊 Quedaste a un paso. ¿Te puedo ayudar con algo para terminar? 📦',
-        'Hola 👋 ¿Todo bien? Avisame si querés retomar tu consulta de Herbalis 😊',
+        '¡Hola! 😊 Te quedaste a un paso. ¿Te ayudo a terminarlo? 📦',
+        'Hola 👋 ¿Todo bien? Dime si quieres retomar tu consulta de Herbalis 😊',
     ],
 };
 
 const CONTEXTUAL_FOLLOW_UPS: Record<string, string[]> = {
     'waiting_weight': [
-        '¡Hola! 😊 Quedó pendiente saber cuántos kilos te gustaría bajar para recomendarte lo mejor. ¿Estás por ahí?',
-        '¡Hola! Vi que consultaste. Seguimos acá para ayudarte. ¿Cuántos kilos buscás bajar más o menos?'
+        '¡Hola! 😊 Me quedó pendiente saber qué prefieres para recomendarte lo que mejor te encaje: ¿una rutina corta para empezar o un plan completo? ¿Sigues por ahí?',
+        '¡Hola! Vi tu consulta y sigo por aquí para ayudarte. ¿Prefieres empezar con una rutina corta o ir a por un plan completo? El envío es gratis y lo pagas al recibirlo.'
     ],
     'waiting_preference': [
-        '¡Hola! 😊 ¿Pudiste pensar con cuál preferís arrancar, cápsulas o semillas? Acordate que el envío es gratis.',
-        'Hola 👋 Vi que estabas viendo las opciones. Cualquier duda que tengas sobre cuál es mejor para vos, decime y te ayudo.'
+        '¡Hola! 😊 ¿Has podido pensar con cuál prefieres empezar, cápsulas o semillas? Recuerda que el envío es gratis.',
+        'Hola 👋 Vi que estabas mirando las opciones. Cualquier duda sobre cuál te viene mejor, dímelo y te ayudo.'
     ],
     'waiting_price_confirmation': [
-        '¡Hola! 😊 Quedaste a un pasito de ver los precios. ¿Querés que te los pase así los vas mirando?',
-        'Hola 👋 Si querés te paso los precios sin compromiso para que los tengas. ¿Te los mando?'
+        '¡Hola! 😊 Te quedaste a un paso de ver los precios. ¿Quieres que te los pase para irlos mirando?',
+        'Hola 👋 Si quieres te paso los precios sin compromiso, para que los tengas. ¿Te los mando?'
     ],
     'waiting_plan_choice': [
-        '¡Hola! 😊 ¿Pudiste revisar los tratamientos? Avisame si querés arrancar con el de 60 o el de 120 días.',
-        'Hola 👋 Te escribo cortito por si te quedó alguna duda con los planes. ¿Con cuál te gustaría avanzar?'
+        '¡Hola! 😊 ¿Has podido mirar los tratamientos? Dime si prefieres empezar con el de 60 o el de 120 días.',
+        'Hola 👋 Te escribo rapidito por si te quedó alguna duda con los planes. ¿Con cuál te gustaría seguir?'
     ],
     'waiting_ok': [
-        '¡Hola! 😊 Tengo anotado tu producto pero me faltó tu confirmación para armar el pedido. ¿Avanzamos?',
-        'Hola 👋 ¿Todo bien? Avisame si confirmamos tu pedido de Herbalis así ya te lo preparamos 📦'
+        '¡Hola! 😊 Tengo tu producto anotado pero me faltó tu confirmación para preparar el pedido. ¿Seguimos?',
+        'Hola 👋 ¿Todo bien? Dime si confirmamos tu pedido de Herbalis y te lo preparamos 📦'
     ],
     'waiting_data': [
-        '¡Hola! 😊 Solo me faltaban tus datitos de envío (nombre, dirección, ciudad, CP) para prepararte el paquete. ¿Me los pasás?',
-        'Hola 👋 Vi que nos faltó completar los datos para el envío gratis. Cuando tengas un segundito pasamelos así ya te lo despacho 📦'
+        '¡Hola! 😊 Solo me faltaban tus datos de envío (nombre, dirección, población y código postal) para prepararte el paquete. ¿Me los pasas?',
+        'Hola 👋 Nos quedó pendiente completar los datos para el envío gratis. Cuando tengas un momento me los pasas y te lo mando 📦'
     ]
 };
 
 const GENERIC_FOLLOW_UPS = [
-    '¡Hola! 😊 Quedó algo pendiente de tu consulta. ¿Querés que te ayude a terminar?',
-    '¡Hola! Vi que quedaste a medio camino. ¿Te puedo ayudar con algo? 😊'
+    '¡Hola! 😊 Se quedó algo pendiente de tu consulta. ¿Quieres que te ayude a terminarlo?',
+    '¡Hola! Vi que te quedaste a medio camino. ¿Te puedo ayudar con algo? 😊'
 ];
 
 // ── A/B variant index helper ────────────────────────────────
@@ -589,7 +587,7 @@ async function checkAiBudget(dependencies: SchedulerDependencies): Promise<void>
             await dependencies.notifyAdmin(
                 '🔴 Presupuesto de IA SUPERADO',
                 'sistema-costos',
-                `El gasto de IA del mes (${monthKey}) llegó a $${acc.totalUSD.toFixed(2)} sobre el tope de $${budget}.\n\n⚠️ Si Anthropic corta por saldo, Claude empieza a fallar y el bot cae a GPT-4o solo. Revisá la cuenta o subí el tope.`
+                `El gasto de IA del mes (${monthKey}) llegó a $${acc.totalUSD.toFixed(2)} sobre el tope de $${budget}.\n\n⚠️ Si Anthropic corta por saldo, Claude empieza a fallar y el bot cae a GPT-4o solo. Revisa la cuenta o sube el tope.`
             ).catch(() => {});
         } else if (!acc.alerted80 && acc.totalUSD >= budget * 0.8) {
             acc.alerted80 = true;
@@ -612,7 +610,7 @@ async function checkAiBudget(dependencies: SchedulerDependencies): Promise<void>
 }
 
 // ══════════════════════════════════════════════════════════════
-// CRON SCHEDULER — All times in Argentina (UTC-3)
+// CRON SCHEDULER — Todas las horas en España (Europe/Madrid)
 // ══════════════════════════════════════════════════════════════
 
 /**
@@ -635,73 +633,56 @@ function startScheduler(sharedState: SchedulerSharedState, dependencies: Schedul
     const tasks: ReturnType<typeof cron.schedule>[] = [];
     const bootTimers: ReturnType<typeof setTimeout>[] = [];
 
-    // ── AUTO-APPROVE: cada 3 minutos de 9am a 11pm Argentina ──
+    // ── AUTO-APPROVE: cada 3 minutos de 9am a 11pm España ──
     // Los pedidos no pueden esperar mucho — necesitamos checkear frecuente en horario activo.
     tasks.push(cron.schedule('*/3 9-23 * * *', () => {
         autoApproveOrders(sharedState, dependencies);
     }, { timezone: TIMEZONE }));
-    logger.info('[SCHEDULER] ✅ autoApproveOrders → cada 3 min (9-23h ARG)');
+    logger.info('[SCHEDULER] ✅ autoApproveOrders → cada 3 min (9-23h ES)');
 
     // ── COLD LEADS (≥24h) y SECOND FOLLOW-UP (48-72h): DESACTIVADOS jun-2026 ──
     // Quedaban FUERA de la ventana de servicio de 24h de WhatsApp (spam/ban).
     // La recuperación ahora es ÚNICAMENTE dentro de 24h (checkAbandonedCarts).
 
-    // ── ABANDONED CARTS: al inicio de cada hora, solo de 10 a 21hs Argentina ──
+    // ── ABANDONED CARTS: al inicio de cada hora, solo de 10 a 21hs España ──
     // Único nudge de recuperación, SIEMPRE dentro de la ventana de 24h (4-22h sin
     // respuesta del cliente) y con throttle anti-ráfaga (tope por corrida + jitter).
     tasks.push(cron.schedule('0 10-21 * * *', () => {
         checkAbandonedCarts(sharedState, dependencies);
     }, { timezone: TIMEZONE }));
-    logger.info('[SCHEDULER] ✅ checkAbandonedCarts → cada hora de 10 a 21 ARG (solo dentro de 24h)');
+    logger.info('[SCHEDULER] ✅ checkAbandonedCarts → cada hora de 10 a 21 (hora ES) (solo dentro de 24h)');
 
-    // ── RESCUE METRICS ROLLUP: a las 23:50 Argentina ──
+    // ── RESCUE METRICS ROLLUP: a las 23:50 España ──
     // Aggrega followUpData pendiente en config.rescueStats para métricas durables.
     // Corre justo antes del snapshot diario para que los números del día queden persistidos.
     tasks.push(cron.schedule('50 23 * * *', () => {
         rollupRescueMetrics(sharedState, dependencies);
     }, { timezone: TIMEZONE }));
-    logger.info('[SCHEDULER] ✅ rollupRescueMetrics → 23:50 ARG (diario)');
+    logger.info('[SCHEDULER] ✅ rollupRescueMetrics → 23:50 (hora ES) (diario)');
 
-    // ── DAILY STATS SNAPSHOT: a las 23:55 Argentina ──
+    // ── DAILY STATS SNAPSHOT: a las 23:55 España ──
     // Guarda el total de chats en BD antes de perderlos por rotación.
     tasks.push(cron.schedule('55 23 * * *', () => {
         snapshotDailyStats(sharedState);
     }, { timezone: TIMEZONE }));
-    logger.info('[SCHEDULER] ✅ snapshotDailyStats → 23:55 ARG (diario)');
+    logger.info('[SCHEDULER] ✅ snapshotDailyStats → 23:55 (hora ES) (diario)');
 
-    // ── CLEANUP: a las 4am Argentina ──
+    // ── CLEANUP: a las 4am España ──
     // Limpieza de memoria nocturna. Borra usuarios inactivos >30 días.
     tasks.push(cron.schedule('0 4 * * *', () => {
         cleanupOldUsers(sharedState, dependencies);
     }, { timezone: TIMEZONE }));
-    logger.info('[SCHEDULER] ✅ cleanupOldUsers → 04:00 ARG (diario)');
+    logger.info('[SCHEDULER] ✅ cleanupOldUsers → 04:00 (hora ES) (diario)');
 
-    // ── STALE PAUSE CLEANUP: a las 5am Argentina ──
+    // ── STALE PAUSE CLEANUP: a las 5am España ──
     // Limpia pausas viejas (>7 días inactivos) para evitar acumulación infinita.
     tasks.push(cron.schedule('0 5 * * *', () => {
         cleanStalePausedUsers(sharedState, dependencies);
     }, { timezone: TIMEZONE }));
-    logger.info('[SCHEDULER] ✅ cleanStalePausedUsers → 05:00 ARG (diario)');
+    logger.info('[SCHEDULER] ✅ cleanStalePausedUsers → 05:00 (hora ES) (diario)');
 
-    // ── MP PAYMENT REFRESH: cada 5 minutos de 9-23h Argentina ──
-    // Polls MercadoPago for pending payments and updates status automatically.
-    if (process.env.MP_ACCESS_TOKEN) {
-        tasks.push(cron.schedule('*/5 9-23 * * *', () => {
-            refreshPendingPayments(sharedState, dependencies);
-        }, { timezone: TIMEZONE }));
-        logger.info('[SCHEDULER] ✅ refreshPendingPayments → cada 5 min (9-23h ARG)');
-    }
 
-    // ── MP PAYMENT REMINDERS: cada 10 minutos de 10-21h Argentina ──
-    // Mensajea al cliente si lleva 30min en waiting_mp_payment sin pagar (recordatorio
-    // amable), o 4h (escalada al vendedor). Distinto de refreshPendingPayments —
-    // ese solo actualiza estado en DB; este sí mensajea al cliente.
-    tasks.push(cron.schedule('*/10 10-21 * * *', () => {
-        checkPendingMpPayments(sharedState, dependencies);
-    }, { timezone: TIMEZONE }));
-    logger.info('[SCHEDULER] ✅ checkPendingMpPayments → cada 10 min (10-21h ARG)');
-
-    // ── DB CLEANUP: 1° de cada mes a las 3am Argentina ──
+    // ── DB CLEANUP: 1° de cada mes a las 3am España ──
     // Borra ChatLog rows >90 días que NO pertenecen a un comprador. Global
     // porque la tabla es compartida. Sin esto, las queries de chatLog por
     // usuario (en cada mensaje de bot) se degradan al crecer la tabla.
@@ -742,19 +723,8 @@ function startScheduler(sharedState: SchedulerSharedState, dependencies: Schedul
         logger.info('[SCHEDULER] ✅ funnelDropoutSweep → cada 15 min (global)');
     }
 
-    // ── WEB ORDER RECONCILE: cada 15 min, registrado UNA vez globalmente ──
-    // Red de respaldo para los pedidos de la tienda web (Checkout Pro): si la
-    // clienta paga en MP y no vuelve al sitio, la orden queda 'pending'; acá la
-    // resolvemos consultando MP. Global porque WebOrder es del negocio, no per-seller.
-    if (process.env.MP_ACCESS_TOKEN && !(global as any).__webOrderReconcileRegistered) {
-        (global as any).__webOrderReconcileRegistered = true;
-        cron.schedule('*/15 * * * *', () => {
-            reconcileWebOrders();
-        }, { timezone: TIMEZONE });
-        logger.info('[SCHEDULER] ✅ reconcileWebOrders → cada 15 min (global)');
-    }
 
-    // ── GRACEFUL RESTART: a las 8am Argentina ──
+    // ── GRACEFUL RESTART: a las 8am España ──
     // Registered ONCE globally (not per seller) to avoid 8 simultaneous process.kill() calls.
     if (!(global as any).__dailyRestartRegistered) {
         (global as any).__dailyRestartRegistered = true;
@@ -772,10 +742,10 @@ function startScheduler(sharedState: SchedulerSharedState, dependencies: Schedul
                 process.kill(process.pid, 'SIGUSR2');
             }
         }, { timezone: TIMEZONE });
-        logger.info('[SCHEDULER] ✅ Reinicio Preventivo Diario → 08:00 ARG (diario, registrado 1 vez)');
+        logger.info('[SCHEDULER] ✅ Reinicio Preventivo Diario → 08:00 (hora ES) (diario, registrado 1 vez)');
     }
 
-    // ── Run auto-approve once 10s after boot — only during business hours (9-23h ARG) ──
+    // ── Run auto-approve once 10s after boot — only during business hours (9-23h ES) ──
     // This prevents a spurious run at 4am on restart from double-firing with the 9am cron tick.
     bootTimers.push(setTimeout(() => {
         const argHour = parseInt(new Date().toLocaleString('en-US', { timeZone: TIMEZONE, hour: 'numeric', hour12: false }), 10);
@@ -816,7 +786,7 @@ async function snapshotDailyStats(sharedState?: SchedulerSharedState) {
         // Medianoche ARG real. El combo anterior (toZonedTime + setHours) operaba
         // en la TZ del server (UTC) → "medianoche" = 21:00 ARG del día anterior →
         // ventana de 27h con doble conteo de 21:00-24:00 en DailyStats.
-        const startOfDay = getArgentinaMidnight();
+        const startOfDay = getLocalMidnight();
 
         // "Chats" del día = PROSPECTOS que entraron al embudo (stepTo
         // greeting/waiting_weight), NO todo contacto nuevo. Los que el bot
@@ -871,426 +841,6 @@ async function snapshotDailyStats(sharedState?: SchedulerSharedState) {
     }
 }
 
-/**
- * checkPendingMpPayments — recordatorios para clientes que eligieron MP pero no completaron.
- * Stages:
- *   1) 30min  — recordatorio amable con link de nuevo
- *   2) 4h     — escalada al vendedor (alert + pausa)
- *   3) 24h    — incentivo: aviso de plazo + opción de postdatar
- *   4) 72h    — última oportunidad: reservar precio o liberar carrito
- *
- * Stages 3 y 4 corren sobre clientes que el bot pausó en stage 2 — el
- * `pauseReason` los marca como pausa MP-inducida. Si el admin destrabó al
- * cliente con otra pauseReason, también seguimos nudgeando hasta 72h.
- *
- * Distinto de refreshPendingPayments (que solo actualiza el estado en DB).
- * Acá MENSAJEAMOS al cliente.
- */
-async function checkPendingMpPayments(sharedState: SchedulerSharedState, dependencies: SchedulerDependencies): Promise<void> {
-    const { userState, pausedUsers } = sharedState;
-    const { config } = sharedState as SchedulerSharedState & { config?: any };
-    // Mismo gate que checkAbandonedCarts: si el seller apagó "Seguimiento
-    // automático", NO mandamos NINGÚN nudge proactivo — tampoco los de MP
-    // pendiente. Antes este job ignoraba el toggle y seguía mensajeando "el pago
-    // con tarjeta quedó pendiente" aunque el cliente ya hubiera pasado a otro
-    // método (ej: retiro en sucursal) días antes — confundiendo al cliente y
-    // marcando como spam a los números nuevos (que es justo para lo que se apaga).
-    if (config?.proactiveFollowUps === false) return;
-    const { sendMessageWithDelay, saveState, notifyAdmin } = dependencies;
-    const now = Date.now();
 
-    if (!isBusinessHours()) return;
 
-    for (const [userId, state] of Object.entries(userState)) {
-        if (state.step !== 'waiting_mp_payment') continue;
-
-        const mpReminderStage = (state as any).mpReminderStage || 0;
-        const mpOn = config?.mpEnabled !== false;
-
-        // Permitir que los stages 3 y 4 sigan mensajeando aunque el usuario
-        // esté pausado, pero SOLO si la pausa la disparó este mismo flujo MP.
-        // Si el admin pausó manualmente con otra razón, respetamos.
-        if (pausedUsers && pausedUsers.has(userId)) {
-            const pauseReason = (state as any).pauseReason || '';
-            const isMpInducedPause = pauseReason.includes('MP pendiente');
-            const isFollowupStage = mpReminderStage >= 2;  // 2 ya fue el que pausó
-            if (!isMpInducedPause || !isFollowupStage) continue;
-        }
-
-        const enteredRaw = (state as any).stepEnteredAt || (state as any).lastActivityAt;
-        if (!enteredRaw) continue;
-        // Normalizar: en memoria son números (Date.now()) pero después de
-        // hidratar desde Postgres pueden venir como ISO strings.
-        const enteredAt = typeof enteredRaw === 'number' ? enteredRaw : new Date(enteredRaw).getTime();
-        if (!Number.isFinite(enteredAt)) continue;
-
-        const minsSince = differenceInMinutes(now, enteredAt);
-
-        // Los nudges compiten con el push de confirmación (webhook/cron): si el
-        // pago se confirma DURANTE el delay de 4-8s del envío, el recordatorio
-        // de "pago pendiente" ya es falso. stillValid lo aborta en el momento
-        // del envío real.
-        const stillWaitingMp = () => state.step === 'waiting_mp_payment' && ((state as any).mpReminderStage || 0) !== 99;
-
-        // ── Interruptor de MP apagado (cuenta bloqueada) ──────────────────────
-        // El link ya no sirve, así que NO corre ninguno de los nudges que lo
-        // reenvían (stages 1, 3 y 4 — gateados abajo con mpOn). Lo único útil
-        // para el que quedó esperando es la oferta de alternativas: la mandamos
-        // una vez y dejamos el stage en 1, para que el stage 2 lo escale al
-        // vendedor a las 4h si no contesta. (stage 99 = "no molestar más".)
-        if (!mpOn && mpReminderStage < 2 && mpReminderStage !== 99 && !(state as any).mpAlternativeOffered) {
-            const msg = `¡Hola! 👋 Te aviso que el *pago con tarjeta* lo tenemos fuera de servicio en estos días, así que ese link no te va a andar 🙈 Disculpá.\n\nLo resolvemos por otro lado:\n\n💸 *Transferencia bancaria* — al alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*\n🏪 *Retiro en sucursal* — lo retirás en una sucursal de Correo Argentino cerca tuyo y pagás el total en efectivo al retirar (sin adelantar nada)\n\n¿Cuál te queda más cómoda?`;
-            try {
-                const sent = await sendMessageWithDelay(userId, msg, undefined, stillWaitingMp);
-                if (sent) {
-                    _pushHistory(state, { role: 'bot', content: msg });
-                    (state as any).mpAlternativeOffered = true;
-                    (state as any).mpReminderStage = 1;
-                    saveState(userId);
-                    logger.info(`[SCHEDULER][${sharedState.sellerId || '?'}] MP APAGADO — alternativas ofrecidas a ${userId} (${minsSince}min esperando)`);
-                }
-            } catch (e: any) {
-                logger.error(`[SCHEDULER] Failed to send MP-off alternatives to ${userId}:`, e.message);
-            }
-            continue;
-        }
-
-        // Stage 1: 30 minutos sin pagar — recordatorio amable.
-        // Los stages que reenvían el link (1, 3 y 4) solo corren con MP encendido.
-        if (mpOn && mpReminderStage === 0 && minsSince >= 30) {
-            const linkUrl = (state as any).mpPaymentLinkUrl;
-            const linkLine = linkUrl ? `\n\nAcá te dejo el link de nuevo:\n${linkUrl}` : '';
-            const msg = `¡Hola! 👋 ¿Pudiste con el pago con tarjeta de crédito? Cualquier duda la resolvemos 🙂 Acordate que es 100% protegido: si por algo no te llega, te devuelven la plata.${linkLine}`;
-            try {
-                const sent = await sendMessageWithDelay(userId, msg, undefined, stillWaitingMp);
-                if (sent) {
-                    _pushHistory(state, { role: 'bot', content: msg });
-                    (state as any).mpReminderStage = 1;
-                    (state as any).mpReminderSentAt = Date.now();
-                    saveState(userId);
-                    logger.info(`[SCHEDULER][${sharedState.sellerId || '?'}] MP reminder #1 sent to ${userId} (${minsSince}min waiting)`);
-                }
-            } catch (e: any) {
-                logger.error(`[SCHEDULER] Failed to send MP reminder to ${userId}:`, e.message);
-            }
-            continue;
-        }
-
-        // Stage 1.5: 90 minutos sin pagar — ofrecer alternativas (transferencia/COD)
-        // antes de escalar a vendedor a las 4h. Idea: rescatar la venta de quien
-        // no completó MP por razones técnicas (no tiene tarjeta a mano, problema
-        // con el link, etc.). Una sola vez vía flag mpAlternativeOffered.
-        if (mpReminderStage === 1 && !(state as any).mpAlternativeOffered && minsSince >= 90) {
-            const msg = `¡Hola! 👋 Si tuviste alguna dificultad con el link de pago, no hay drama 😊\n\nTenés dos alternativas:\n\n💸 *Transferencia bancaria* — al alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*\n🏪 *Retiro en sucursal* — lo retirás en una sucursal de Correo Argentino cerca tuyo y pagás el total en efectivo al retirar (sin anticipo previo)\n\n¿Te queda más cómoda alguna de estas, o seguimos con la tarjeta de crédito?`;
-            try {
-                const sent = await sendMessageWithDelay(userId, msg, undefined, stillWaitingMp);
-                if (sent) {
-                    _pushHistory(state, { role: 'bot', content: msg });
-                    (state as any).mpAlternativeOffered = true;
-                    saveState(userId);
-                    logger.info(`[SCHEDULER][${sharedState.sellerId || '?'}] MP alternative offer sent to ${userId} (${minsSince}min waiting)`);
-                }
-            } catch (e: any) {
-                logger.error(`[SCHEDULER] Failed to send MP alternative to ${userId}:`, e.message);
-            }
-            continue;
-        }
-
-        // Stage 2: 4 horas sin pagar — último recordatorio + escalar al vendedor
-        if (mpReminderStage === 1 && minsSince >= 240) {
-            const msg = `¡Hola! Veo que el pago aún no se concretó 🙂 Te paso a un asesor para que te ayude con cualquier inconveniente. ¡Hasta enseguida!`;
-            try {
-                const sent = await sendMessageWithDelay(userId, msg, undefined, stillWaitingMp);
-                // Re-chequeo post-envío: si el push de pago confirmó la venta en
-                // el medio, NO pausamos a un cliente que acaba de comprar ni
-                // avisamos "no completó el pago" (sería falso).
-                if (sent && stillWaitingMp()) {
-                    _pushHistory(state, { role: 'bot', content: msg });
-                    (state as any).mpReminderStage = 2;
-                    // Pausa por el path canónico (pauseService): persiste en DB,
-                    // aparece en dashboard/!pausados y sobrevive restarts. El
-                    // pausedUsers.add() directo era una pausa fantasma en memoria.
-                    // Sin notifyAdmin en deps: la alerta la manda el notifyAdmin
-                    // explícito de abajo (mensaje más específico), evita duplicar.
-                    const { pauseUser } = require('./pauseService');
-                    await pauseUser(userId, '⏸️ Pausado automáticamente: cliente con MP pendiente >4h. Vendedor por favor contactar.', { sharedState: sharedState as any });
-                    (state as any).pauseReason = '⏸️ Pausado automáticamente: cliente con MP pendiente >4h. Vendedor por favor contactar.';
-                    (state as any).pausedAt = new Date();
-                    saveState(userId);
-                    if (notifyAdmin) {
-                        await notifyAdmin('MP pendiente >4h', userId, `Cliente eligió MercadoPago pero no completó el pago en 4h. Contactar manualmente.`);
-                    }
-                    logger.info(`[SCHEDULER][${sharedState.sellerId || '?'}] MP escalated to seller: ${userId} (${minsSince}min waiting)`);
-                }
-            } catch (e: any) {
-                logger.error(`[SCHEDULER] Failed to escalate MP timeout for ${userId}:`, e.message);
-            }
-            continue;
-        }
-
-        // Stage 3: 24 horas sin pagar — incentivo + opción de postdatar.
-        // Solo dispara si el admin no destrabó al cliente con otra pausa.
-        if (mpOn && mpReminderStage === 2 && minsSince >= 1440) {
-            const linkUrl = (state as any).mpPaymentLinkUrl;
-            const linkLine = linkUrl ? `\n\nAcá te dejo el link otra vez:\n${linkUrl}` : '';
-            const msg = `¡Hola! ¿Cómo va? 😊\n\nVi que el pago con tarjeta quedó pendiente. Te recuerdo que al pagar por adelantado el pedido sale enseguida y llega en *4 días hábiles* desde la confirmación del pago.\n\nSi preferís, te lo puedo programar para una fecha más adelante (cuando cobres) y lo despacho recién ese día. ¿A partir de qué día te queda cómodo recibirlo?${linkLine}`;
-            try {
-                const sent = await sendMessageWithDelay(userId, msg, undefined, stillWaitingMp);
-                if (sent) {
-                    _pushHistory(state, { role: 'bot', content: msg });
-                    (state as any).mpReminderStage = 3;
-                    saveState(userId);
-                    logger.info(`[SCHEDULER][${sharedState.sellerId || '?'}] MP reminder #3 (24h) sent to ${userId}`);
-                }
-            } catch (e: any) {
-                logger.error(`[SCHEDULER] Failed to send MP reminder #3 to ${userId}:`, e.message);
-            }
-            continue;
-        }
-
-        // Stage 4: 72 horas sin pagar — última oportunidad.
-        if (mpOn && mpReminderStage === 3 && minsSince >= 4320) {
-            const msg = `¡Hola! 🙂 Ya es el último mensaje que te mando por este pedido.\n\nSi querés podemos:\n\n📅 *Programarlo postdatado* — me decís la fecha y lo despacho ese día\n💳 *Retomar el pago de MP* hoy mismo\n\nSi no querés avanzar, ningún drama — me decís y lo cerramos. Te dejo elegir 😊`;
-            try {
-                const sent = await sendMessageWithDelay(userId, msg, undefined, stillWaitingMp);
-                if (sent) {
-                    _pushHistory(state, { role: 'bot', content: msg });
-                    (state as any).mpReminderStage = 4;
-                    saveState(userId);
-                    if (notifyAdmin) {
-                        await notifyAdmin('MP pendiente >72h', userId, 'Cliente con MP pendiente 72h. Última nudge enviada — si no responde en 24h considerar carrito abandonado.');
-                    }
-                    logger.info(`[SCHEDULER][${sharedState.sellerId || '?'}] MP reminder #4 (72h) sent to ${userId}`);
-                }
-            } catch (e: any) {
-                logger.error(`[SCHEDULER] Failed to send MP reminder #4 to ${userId}:`, e.message);
-            }
-        }
-    }
-}
-
-/**
- * refreshPendingPayments
- * Polls MercadoPago for any PaymentLink still in 'pending' status (created < 48h ago)
- * and updates the DB + emits socket if the status changed. Si el flip es a
- * 'approved' y tenemos dependencies, además confirma la compra al cliente por
- * push (mpPushConfirm) — red de respaldo por si el webhook no llegó.
- */
-async function refreshPendingPayments(sharedState: SchedulerSharedState, dependencies?: SchedulerDependencies): Promise<void> {
-    if (sharedState._refreshPaymentsRunning) return;
-    sharedState._refreshPaymentsRunning = true;
-    try {
-        const mpToken = process.env.MP_ACCESS_TOKEN;
-        if (!mpToken) return;
-
-        const { prisma } = require('../../db');
-        const { MercadoPagoConfig, Payment } = require('mercadopago');
-        const mpClient = new MercadoPagoConfig({ accessToken: mpToken });
-        const mpPayment = new Payment(mpClient);
-
-        // Only check payments created in the last 48h to avoid polling ancient ones
-        const since = new Date();
-        since.setHours(since.getHours() - 48);
-
-        // Multi-tenant scoping: only this seller's payment links
-        const sellerId = sharedState.sellerId;
-        const pending = await prisma.paymentLink.findMany({
-            where: {
-                status: 'pending',
-                createdAt: { gte: since },
-                ...(sellerId ? { instanceId: sellerId } : {}),
-            },
-            take: 50,
-        });
-
-        // ── Sweep de reconciliación: filas YA approved cuyo dueño sigue en
-        // waiting_mp_payment esperando ESE link. Cubre pushes perdidos: webhook
-        // llegado con el seller fuera del pool (restart), crash entre el flip y
-        // el send, pausa global levantada, sesión reconectada. onPaymentLinkApproved
-        // es idempotente (guard de step/link + notifyOnce), así que reintentarlo
-        // cada 5 min es inocuo. El pre-filtro por mpPaymentLinkId evita falsas
-        // alarmas con pagos approved de compras ANTERIORES del mismo cliente.
-        if (dependencies) {
-            const approvedRecent = await prisma.paymentLink.findMany({
-                where: {
-                    status: 'approved',
-                    createdAt: { gte: since },
-                    userPhone: { not: null },
-                    ...(sellerId ? { instanceId: sellerId } : {}),
-                },
-                take: 50,
-            });
-            for (const row of approvedRecent) {
-                const st: any = sharedState.userState?.[`${row.userPhone}@c.us`];
-                if (!st || st.step !== 'waiting_mp_payment') continue;
-                if (st.mpPaymentLinkId !== row.id) continue;
-                try {
-                    const { onPaymentLinkApproved } = require('./mpPushConfirm');
-                    await onPaymentLinkApproved(row, {
-                        sharedState,
-                        sendMessageWithDelay: dependencies.sendMessageWithDelay,
-                        notifyAdmin: dependencies.notifyAdmin,
-                        saveState: dependencies.saveState,
-                        saveOrderToLocal: dependencies.saveOrderToLocal,
-                    });
-                } catch (e: any) {
-                    logger.error(`[SCHEDULER] Error reconciliando pago approved ${row.id}: ${e?.message || e}`);
-                }
-            }
-        }
-
-        if (pending.length === 0) return;
-        logger.info(`[SCHEDULER] Refreshing ${pending.length} pending MP payment(s)...`);
-
-        for (const payment of pending) {
-            try {
-                const result = await mpPayment.search({
-                    options: { external_reference: payment.externalRef }
-                });
-                const results = result?.results || [];
-                if (results.length === 0) continue;
-
-                const approved = results.find((p: any) => p.status === 'approved');
-                const latest = approved || results[0];
-                const newStatus = latest.status === 'approved' ? 'approved'
-                    : latest.status === 'rejected' ? 'rejected'
-                    : latest.status === 'cancelled' ? 'expired'
-                    : 'pending';
-
-                if (newStatus === payment.status) continue;
-
-                // Flip con CAS (un solo ganador): el webhook, el refresh manual o
-                // un scheduler duplicado tras restart pueden estar flipeando la
-                // misma fila — solo quien gana el updateMany condicionado emite y
-                // pushea. Si count=0, otro detector ya la tomó: no hacemos nada.
-                const paidAt = newStatus === 'approved' ? new Date(latest.date_approved || Date.now()) : payment.paidAt;
-                const casRes = await prisma.paymentLink.updateMany({
-                    where: { id: payment.id, status: 'pending' },
-                    data: { status: newStatus, paidAt },
-                });
-                if (casRes.count === 0) continue;
-                const updated = { ...payment, status: newStatus, paidAt };
-
-                if (sharedState.io) {
-                    if (sellerId) sharedState.io.to(sellerId).emit('payment_updated', updated);
-                    sharedState.io.to('admin').emit('payment_updated', { ...updated, sellerId });
-                }
-                logger.info(`[SCHEDULER][${sellerId || '?'}] Payment ${payment.id} updated: pending → ${newStatus}`);
-
-                // Push de confirmación al chat (mismo camino que el webhook).
-                if (newStatus === 'approved' && dependencies) {
-                    const { onPaymentLinkApproved } = require('./mpPushConfirm');
-                    await onPaymentLinkApproved(updated, {
-                        sharedState,
-                        sendMessageWithDelay: dependencies.sendMessageWithDelay,
-                        notifyAdmin: dependencies.notifyAdmin,
-                        saveState: dependencies.saveState,
-                        saveOrderToLocal: dependencies.saveOrderToLocal,
-                    });
-                }
-            } catch (e: any) {
-                logger.error(`[SCHEDULER] Error refreshing payment ${payment.id}: ${e?.message || e}`);
-            }
-        }
-    } catch (e: any) {
-        logger.error('[SCHEDULER] Error in refreshPendingPayments:', e.message);
-    } finally {
-        sharedState._refreshPaymentsRunning = false;
-    }
-}
-
-/**
- * reconcileWebOrders
- * Red de respaldo para los pedidos de la TIENDA WEB (tabla WebOrder, que escribe
- * web-v5). Con Checkout Pro, si la clienta paga en MercadoPago y NO vuelve al
- * sitio, su orden queda 'pending' aunque se cobró. Acá barremos las órdenes
- * pending/in_process (creadas hace 5 min–10 días), le preguntamos a MP el estado
- * real y actualizamos la fila. Defensa de monto: NO aprobamos si lo cobrado no
- * coincide con el total de la orden (despachamos producto físico). Global (no
- * per-seller): los WebOrder son del negocio (instanceId 'default'), por eso se
- * registra UNA sola vez. Mismo vocabulario de estado que web-v5.
- */
-async function reconcileWebOrders(): Promise<void> {
-    if ((global as any).__webOrderReconcileRunning) return;
-    (global as any).__webOrderReconcileRunning = true;
-    try {
-        const mpToken = process.env.MP_ACCESS_TOKEN;
-        if (!mpToken) return;
-
-        const { prisma } = require('../../db');
-        const { MercadoPagoConfig, Payment } = require('mercadopago');
-        const mpClient = new MercadoPagoConfig({ accessToken: mpToken });
-        const mpPayment = new Payment(mpClient);
-
-        const now = Date.now();
-        const fiveMinAgo = new Date(now - 5 * 60 * 1000);          // no pisar checkouts en vuelo
-        const tenDaysAgo = new Date(now - 10 * 24 * 60 * 60 * 1000); // no rastrear historia vieja
-
-        const pending = await prisma.webOrder.findMany({
-            where: {
-                status: { in: ['pending', 'in_process'] },
-                createdAt: { lte: fiveMinAgo, gte: tenDaysAgo },
-            },
-            orderBy: { createdAt: 'desc' },
-            take: 100,
-        });
-        if (pending.length === 0) return;
-        logger.info(`[SCHEDULER] Reconciliando ${pending.length} pedido(s) web pending/in_process...`);
-
-        // Normaliza el estado de MP al vocabulario de WebOrder (igual que web-v5).
-        const normalize = (s?: string): string =>
-            s === 'approved' ? 'approved'
-            : (s === 'in_process' || s === 'authorized') ? 'in_process'
-            : s === 'rejected' ? 'rejected'
-            : (s === 'cancelled' || s === 'refunded' || s === 'charged_back') ? 'cancelled'
-            : 'pending';
-
-        for (const order of pending) {
-            try {
-                // Estado real en MP: por mpPaymentId si lo tenemos, si no por external_reference.
-                let mp: any = null;
-                if (order.mpPaymentId) {
-                    mp = await mpPayment.get({ id: order.mpPaymentId });
-                } else {
-                    const result = await mpPayment.search({ options: { external_reference: order.externalRef } });
-                    const results = result?.results || [];
-                    mp = results.find((p: any) => p.status === 'approved') || results[0] || null;
-                }
-                if (!mp || !mp.status) continue;
-
-                const newStatus = normalize(mp.status);
-                if (newStatus === 'pending' || newStatus === order.status) continue;
-
-                // Defensa de monto: no aprobar si lo cobrado no coincide con la orden.
-                if (newStatus === 'approved') {
-                    const paid = Number(mp.transaction_amount);
-                    if (order.total != null && Number.isFinite(paid) && Math.abs(Number(order.total) - paid) > 0.5) {
-                        logger.error(`[SCHEDULER] WebOrder ${order.id}: MONTO NO COINCIDE esperado=${order.total} cobrado=${paid} — no se aprueba`);
-                        continue;
-                    }
-                }
-
-                await prisma.webOrder.update({
-                    where: { id: order.id },
-                    data: {
-                        status: newStatus,
-                        mpPaymentId: mp.id ? String(mp.id) : order.mpPaymentId,
-                        mpStatus: mp.status ?? null,
-                        mpStatusDetail: mp.status_detail ?? null,
-                        paidAt: newStatus === 'approved' ? new Date(mp.date_approved || Date.now()) : order.paidAt,
-                        updatedAt: new Date(),
-                    },
-                });
-                logger.info(`[SCHEDULER] WebOrder ${order.id.slice(0, 8)} reconciliada: ${order.status} → ${newStatus}`);
-            } catch (e: any) {
-                logger.error(`[SCHEDULER] Error reconciliando WebOrder ${order.id}: ${e?.message || e}`);
-            }
-        }
-    } catch (e: any) {
-        logger.error('[SCHEDULER] Error en reconcileWebOrders:', e.message);
-    } finally {
-        (global as any).__webOrderReconcileRunning = false;
-    }
-}
-
-export { startScheduler, checkColdLeads, checkAbandonedCarts, autoApproveOrders, refreshPendingPayments, checkPendingMpPayments };
+export { startScheduler, checkColdLeads, checkAbandonedCarts, autoApproveOrders };

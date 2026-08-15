@@ -14,7 +14,6 @@ const analyticsRoutes = require('./routes/analytics.routes');
 const apiTokensRoutes = require('./routes/apiTokens.routes');
 const authRoutes = require('./routes/auth.routes');
 const galleryRoutes = require('./routes/gallery.routes');
-const paymentRoutes = require('./routes/payment.routes');
 const webOrderRoutes = require('./routes/webOrder.routes');
 const sellersRoutes = require('./routes/sellers.routes');
 const quickRepliesRoutes = require('./routes/quickReplies.routes');
@@ -88,6 +87,17 @@ function startServer(clientPool) {
     }
     app.use('/media', express.static(path.join(__dirname, '../../public/media')));
 
+    // Piezas de marketing. Van en DATA_DIR (el volumen persistente) y no en
+    // public/, que vive dentro de la imagen y se pierde en cada despliegue.
+    // Además tienen que ser públicas: la API de Instagram no acepta subida
+    // binaria de imágenes, se las descarga ella desde una URL abierta.
+    const marketingMediaPath = path.join(process.env.DATA_DIR || path.join(__dirname, '../..'), 'marketing');
+    app.use('/marketing-media', express.static(marketingMediaPath, {
+        maxAge: '7d',
+        // Solo se sirven las imágenes generadas; nada más de esa carpeta.
+        setHeaders: (res) => res.setHeader('Cache-Control', 'public, max-age=604800'),
+    }));
+
     // --- PUBLIC HEALTHCHECK ---
     app.get('/health', async (req, res) => {
         const checks = { database: 'unknown', redis: 'unknown' };
@@ -103,7 +113,7 @@ function startServer(clientPool) {
 
     // --- MOUNT API ROUTES ---
     // Auth routes (login, accounts CRUD) — no sellerContext needed
-    app.use('/api', authRoutes(null, null));
+    app.use('/api', authRoutes(null, null, clientPool));
 
     // All other routes receive clientPool; sellerContext is applied inside each router
     app.use('/api', chatRoutes(clientPool));
@@ -112,7 +122,6 @@ function startServer(clientPool) {
     app.use('/api', systemRoutes(clientPool));
     app.use('/api', analyticsRoutes(clientPool));
     app.use('/api', galleryRoutes(clientPool));
-    app.use('/api', paymentRoutes(clientPool));
     app.use('/api', webOrderRoutes(clientPool));
     app.use('/api', sellersRoutes(clientPool));
     app.use('/api', quickRepliesRoutes(clientPool));

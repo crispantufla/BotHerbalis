@@ -234,7 +234,7 @@ const AccountsView = () => {
                             {sellerAccounts.length === 0 && (
                                 <Card padding="md" className="border-dashed">
                                     <p className="text-center text-sm text-slate-500 dark:text-slate-400">
-                                        No hay vendedores. Creá uno con "Nueva cuenta".
+                                        No hay vendedores. Crea uno con "Nueva cuenta".
                                     </p>
                                 </Card>
                             )}
@@ -320,7 +320,7 @@ const AccountsView = () => {
                                 placeholder={form.role === 'admin' ? 'ej: denise_bot (vacío = sin WhatsApp)' : 'ej: alejandra_bot'}
                                 required={form.role === 'seller'}
                                 className="font-mono"
-                                helperText={form.role === 'seller' ? 'Auto-generado — podés editarlo.' : 'Sin ID el admin no tendrá WhatsApp.'}
+                                helperText={form.role === 'seller' ? 'Auto-generado — puedes editarlo.' : 'Sin ID el admin no tendrá WhatsApp.'}
                             />
                         </div>
                     </Modal.Body>
@@ -559,7 +559,7 @@ function ApiTokensSection() {
     };
 
     const fmtDate = (d) => d
-        ? new Date(d).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })
+        ? new Date(d).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })
         : '—';
 
     return (
@@ -613,7 +613,7 @@ function ApiTokensSection() {
                                 Token creado: <span className="font-mono">{justCreated.name}</span>
                             </p>
                             <p className="text-xs text-success-700/80 dark:text-success-500/80 mt-1">
-                                Copialo ahora — no vas a poder verlo de nuevo. Si lo perdés, hay que generar uno nuevo.
+                                Cópialo ahora — no podrás verlo de nuevo. Si lo pierdes, hay que generar uno nuevo.
                             </p>
                         </div>
                         <IconButton

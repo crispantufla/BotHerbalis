@@ -8,6 +8,7 @@ import api from '../../config/axios';
 import {
     Card, Button, IconButton, Badge, Select, KpiCard as UiKpiCard, EmptyState, useToast, cn
 } from '../ui';
+import { formatEURShort } from '../../utils/format';
 
 const STEP_LABELS = {
     greeting: 'Saludo', general: 'General',
@@ -15,8 +16,7 @@ const STEP_LABELS = {
     waiting_preference_consultation: 'Consulta pref.',
     waiting_plan_choice: 'Plan', waiting_price_confirmation: 'Confirm. precio',
     waiting_ok: 'OK', waiting_data: 'Datos',
-    waiting_maps_confirmation: 'Maps', waiting_payment_method: 'Pago',
-    waiting_mp_payment: 'MP', waiting_transfer_confirmation: 'Transferencia',
+    waiting_maps_confirmation: 'Maps', waiting_payment_method: 'Entrega',
     waiting_final_confirmation: 'Conf. final',
     waiting_admin_ok: 'Admin OK', waiting_admin_validation: 'Admin valid.',
     closing: 'Cierre', completed: 'Completado', post_sale: 'Post-venta',
@@ -28,8 +28,8 @@ const STEP_ORDER = [
     'greeting', 'general', 'waiting_weight', 'waiting_preference',
     'waiting_preference_consultation', 'waiting_plan_choice',
     'waiting_price_confirmation', 'waiting_ok', 'waiting_data',
-    'waiting_maps_confirmation', 'waiting_payment_method', 'waiting_mp_payment',
-    'waiting_transfer_confirmation', 'waiting_final_confirmation',
+    'waiting_maps_confirmation', 'waiting_payment_method',
+    'waiting_final_confirmation',
     'waiting_admin_ok', 'waiting_admin_validation', 'closing', 'completed',
 ];
 
@@ -61,9 +61,7 @@ const STEP_EXPLAIN = {
     waiting_ok: 'Ya pasó toda la info y espera "sí quiero" antes de pedir datos.',
     waiting_data: 'Pidiendo nombre, dirección, ciudad, código postal.',
     waiting_maps_confirmation: 'Validando la dirección contra Google Maps.',
-    waiting_payment_method: 'Eligiendo forma de pago.',
-    waiting_mp_payment: 'Esperando que pague por MercadoPago.',
-    waiting_transfer_confirmation: 'Esperando comprobante de transferencia.',
+    waiting_payment_method: 'Eligiendo entrega: en casa o recogida en su oficina de Correos. En las dos paga al recibir el pedido.',
     waiting_final_confirmation: 'Confirmación final del pedido.',
     waiting_admin_ok: 'Admin validando antes de cerrar.',
     waiting_admin_validation: 'Espera OK manual del admin.',
@@ -73,7 +71,7 @@ const STEP_EXPLAIN = {
     safety_check: 'Chequeo de seguridad antes de vender.',
     rejected_medical: 'Rechazado por contraindicación médica.',
     rejected_abusive: 'Rechazado por abuso/insultos.',
-    rejected_geo: 'Fuera de Argentina.',
+    rejected_geo: 'Fuera de España.',
 };
 
 // InfoBox: callout tonal (info | tip). Usado en muchas secciones.
@@ -202,7 +200,7 @@ const FunnelAnalyticsView = () => {
                         <div className="text-sm text-slate-700 dark:text-slate-300 space-y-2">
                             <p>
                                 <strong className="text-slate-900 dark:text-slate-100">Qué es el embudo.</strong>{' '}
-                                Una conversación con el bot pasa por varios <em>steps</em>: saluda → pregunta el peso → elige producto → elige plan → da datos → paga → cierra. Cada vez que el cliente avanza, lo registramos.
+                                Una conversación con el bot pasa por varios <em>steps</em>: saluda → pregunta el peso → elige producto → elige plan → da datos → elige entrega (casa u oficina de Correos) → cierra. Cada vez que el cliente avanza, lo registramos. El cobro no es un paso del embudo: todo es contrarreembolso y se paga al recibir el pedido.
                             </p>
                             <p>
                                 <strong className="text-slate-900 dark:text-slate-100">Qué significa "se traba".</strong>{' '}
@@ -495,9 +493,9 @@ function ConversionTab({ ttc, priceObj, abandonment }) {
 
             {abandonment && abandonment.total > 0 && (
                 <Card padding="md">
-                    <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-1">Abandonos por hora (Argentina)</h3>
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-1">Abandonos por hora del día</h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-                        Hora del último mensaje antes de nunca más responder. Total: <strong>{abandonment.total}</strong>
+                        Hora del último mensaje antes de dejar de responder. Total: <strong>{abandonment.total}</strong>
                     </p>
                     <div className="flex items-end gap-1 h-32">
                         {abandonment.byHour.map(h => {
@@ -522,7 +520,7 @@ function ConversionTab({ ttc, priceObj, abandonment }) {
                 <Card padding="md">
                     <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-1">Objeciones de precio por step</h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-                        Mensajes que contuvieron palabras tipo "caro", "descuento", "no tengo plata", agrupado por step.
+                        Mensajes que contuvieron palabras tipo "caro", "descuento", "no puedo pagarlo", agrupado por step.
                     </p>
                     <div className="space-y-2">
                         {priceObj.byStep.map(s => (
@@ -674,8 +672,8 @@ function ProductTab({ mix }) {
             <Card padding="lg">
                 <EmptyState
                     icon={Package}
-                    title="Sin órdenes"
-                    description="No hay órdenes cerradas en el rango seleccionado."
+                    title="Sin pedidos"
+                    description="No hay pedidos cerrados en el rango seleccionado."
                 />
             </Card>
         );
@@ -684,10 +682,10 @@ function ProductTab({ mix }) {
     const paymentLabel = (p) => ({
         mercadopago: 'MercadoPago',
         transferencia: 'Transferencia',
-        contrarembolso: 'Contrareembolso',
+        contrarembolso: 'Contrarreembolso',
     }[p] || p);
 
-    const formatArs = (n) => `$${Math.round(n).toLocaleString('es-AR').replace(/,/g, '.')}`;
+    const formatArs = (n) => formatEURShort(n);
 
     const byProduct = mix.mix.reduce((acc, r) => {
         if (!acc[r.product]) acc[r.product] = { count: 0, revenue: 0 };
@@ -700,11 +698,11 @@ function ProductTab({ mix }) {
         <div className="space-y-4">
             <InfoBox>
                 <p><strong>Qué estás viendo.</strong> Qué productos, en qué plan, y con qué método de pago se están vendiendo de verdad. No incluye ventas canceladas.</p>
-                <p><strong>Ticket promedio.</strong> Precio promedio de una venta en esa combinación (incluye adicional MAX si aplica).</p>
+                <p><strong>Ticket medio.</strong> Precio medio de una venta en esa combinación. El envío va gratis y no hay recargos, así que es el precio del producto.</p>
             </InfoBox>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <UiKpiCard label="Órdenes totales" value={mix.total} subtext="Ventas cerradas en el rango" tone="success" />
+                <UiKpiCard label="Pedidos totales" value={mix.total} subtext="Ventas cerradas en el rango" tone="success" />
                 {Object.entries(byProduct).slice(0, 3).map(([prod, g]) => (
                     <UiKpiCard
                         key={prod}
@@ -720,7 +718,7 @@ function ProductTab({ mix }) {
                 <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700">
                     <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Mix de producto × plan × pago</h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                        Ordenado por cantidad de órdenes.
+                        Ordenado por cantidad de pedidos.
                     </p>
                 </div>
                 <div className="overflow-x-auto">
@@ -730,9 +728,9 @@ function ProductTab({ mix }) {
                                 <th className="text-left px-4 py-2.5">Producto</th>
                                 <th className="text-left px-4 py-2.5">Plan</th>
                                 <th className="text-left px-4 py-2.5">Pago</th>
-                                <th className="text-right px-4 py-2.5">Órdenes</th>
+                                <th className="text-right px-4 py-2.5">Pedidos</th>
                                 <th className="text-right px-4 py-2.5">Share</th>
-                                <th className="text-right px-4 py-2.5">Ticket prom.</th>
+                                <th className="text-right px-4 py-2.5">Ticket medio</th>
                                 <th className="text-right px-4 py-2.5">Ingreso</th>
                             </tr>
                         </thead>

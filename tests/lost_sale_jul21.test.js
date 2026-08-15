@@ -83,7 +83,7 @@ describe('waiting_payment_method — elección decisiva aunque parezca pregunta'
         expect(state.shippingChoice).toBe('retiro');
         expect(state.paymentMethod).toBe('contrarembolso');
         expect(state.step).toBe('waiting_data');
-        expect(state.partialAddress.calle).toBe('A sucursal');
+        expect(state.partialAddress.calle).toBe('A oficina de Correos');
         // No debe haber caído al AI fallback
         expect(deps.aiService.chat).not.toHaveBeenCalled();
         expect(sent.join(' ')).toMatch(/retiro en sucursal/i);
@@ -170,7 +170,7 @@ describe('waiting_payment_method — sync vía extractedData del AI fallback', (
         expect(state.step).toBe('waiting_data');
         expect(state.shippingChoice).toBe('retiro');
         expect(state.paymentMethod).toBe('contrarembolso');
-        expect(state.partialAddress.calle).toBe('A sucursal');
+        expect(state.partialAddress.calle).toBe('A oficina de Correos');
     });
 
     test('IA responde con "ENVIO: domicilio" → submenú habilitado', async () => {
@@ -242,7 +242,7 @@ describe('waiting_payment_method — retiro rescata datos del historial reciente
         expect(state.pendingOrder.nombre).toBe('Calderón Andrea');
         expect(state.pendingOrder.ciudad).toBe('Ensenada');
         expect(state.pendingOrder.cp).toBe('1925');
-        expect(state.pendingOrder.calle).toBe('A sucursal');
+        expect(state.pendingOrder.calle).toBe('A oficina de Correos');
     });
 
     test('sin historial previo en el step → mensaje idéntico al de siempre (3 campos)', async () => {
@@ -318,7 +318,7 @@ describe('globalFaq — bloque de datos + pregunta no se traga los datos', () =>
         selectedPlan: '120',
         totalPrice: PRICE_120,
         cart: [{ product: 'Cápsulas de nuez de la india', plan: '120', price: PRICE_120 }],
-        partialAddress: { calle: 'A sucursal' },
+        partialAddress: { calle: 'A oficina de Correos' },
         history: [],
         summary: '',
         stepEnteredAt: 1000,

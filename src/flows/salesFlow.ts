@@ -5,7 +5,6 @@ import { processGlobals } from './globals';
 import { processStep } from './steps';
 import { _pauseAndAlert, _setStep, _extractSilentVariables, _cleanPhone, _isGhostClose } from './utils/flowHelpers';
 import { detectObjection } from './utils/objectionDetector';
-import { isMpEnabled } from './utils/paymentOptions';
 import { parseControlTag } from './utils/extractedData';
 
 interface SalesFlowDependencies {
@@ -131,7 +130,7 @@ export async function processSalesFlow(
                     // Mensaje al cliente: avisarle que se lo deriva a una oficial de
                     // atención (no dejarlo en visto). Después se pausa para que lo tome
                     // un humano (rev 2026-06-04).
-                    const derivMsg = 'Teniendo en cuenta que ya sos cliente, te derivo con una oficial de atención al cliente que te va a ayudar enseguida 😊';
+                    const derivMsg = 'Como ya eres cliente, te paso con una compañera de atención al cliente que te ayuda enseguida 😊';
                     if (!userState[userId].history) userState[userId].history = [];
                     userState[userId].history.push({ role: 'bot', content: derivMsg, timestamp: Date.now() });
                     await dependencies.sendMessageWithDelay(userId, derivMsg);
@@ -215,7 +214,7 @@ export async function processSalesFlow(
                                             userId,
                                             '📋 Conversación pre-existente (anterior al bot)',
                                             { sharedState: dependencies.sharedState, notifyAdmin: dependencies.notifyAdmin },
-                                            `Conversación iniciada antes de que el bot se conectara. Último mensaje: ${new Date(lastTs * 1000).toLocaleString('es-AR')}`
+                                            `Conversación iniciada antes de que el bot se conectara. Último mensaje: ${new Date(lastTs * 1000).toLocaleString('es-ES')}`
                                         );
                                         return { matched: true, paused: true };
                                     }
@@ -294,19 +293,13 @@ export async function processSalesFlow(
     // Envuelvo aiService.chat para inyectar sellerId/phone en APIContext y que
     // ai.ts pueda registrar cada llamada a AI contra el FunnelEvent abierto.
     // Se hace en una copia local de dependencies para NO contaminar al worker.
-    //
-    // También viaja acá el interruptor de Mercado Pago (mpEnabled): el prompt de
-    // ai.ts describe los medios de pago, así que si lo dejáramos librado a cada
-    // call site, el primer step que se olvidara de pasarlo volvería a ofrecer
-    // tarjeta con la cuenta bloqueada. Un solo punto de inyección = sin fugas.
     const origAi = dependencies.aiService;
     if (origAi && typeof origAi.chat === 'function') {
-        const _mpEnabled = isMpEnabled(dependencies.config);
         const wrappedAi = new Proxy(origAi, {
             get(target: any, prop: string) {
                 if (prop === 'chat') {
                     return async (text: string, context: any) => {
-                        const res = await target.chat(text, { ...context, sellerId: _ctx.sellerId, phone: _ctx.phone, mpEnabled: _mpEnabled });
+                        const res = await target.chat(text, { ...context, sellerId: _ctx.sellerId, phone: _ctx.phone });
                         // Routing robusto e independiente del modelo: Claude puede parafrasear
                         // la prosa, así que el control de flujo CRÍTICO (rechazo médico, abuso,
                         // cancelación, reventa) se rige por el TAG de extractedData, no por el
@@ -380,7 +373,7 @@ export async function processSalesFlow(
             // We just ACK and repeat the state's main question if it was merely a correction
             if (extraction.isSolelyCorrection) {
                 logger.info(`[GLOBAL EXTRACTION] Intercepted sole correction for ${userId}. Age:${extraction.ageUpdated ?? false}, Weight:${extraction.weightUpdated ?? false}`);
-                let ackMsg = "¡Anotado! 😊\n\nEntonces, decime...";
+                let ackMsg = "¡Anotado! 😊\n\nEntonces, cuéntame...";
 
                 // Customize the re-prompt based on the step we are stalled in
                 switch (currentState.step) {
@@ -430,7 +423,7 @@ export async function processSalesFlow(
     //   standard  → rebuttal genérico (1ra vez)
     //   escalated → rebuttal + oferta concreta (2da vez, misma categoría)
     //   pause     → cierre suave + pausa al admin (3ra vez — bot se rinde)
-    const objection = detectObjection(currentState.step, normalizedText, currentState, isMpEnabled(dependencies.config));
+    const objection = detectObjection(currentState.step, normalizedText, currentState);
     if (objection) {
         logger.info(`[OBJECTION] Intercepted "${objection.type}" for ${userId} at step ${currentState.step} (tier=${objection.tier})`);
         currentState.history.push({ role: 'bot', content: objection.response, timestamp: Date.now() });
@@ -586,7 +579,7 @@ export async function processSalesFlow(
             // silencio, pausamos + avisamos al admin para que la cargue/contacte.
             if (_isGhostClose(botMsg, currentState.step, !!(currentState as any).pendingOrder)) {
                 logger.warn(`[GHOST-CLOSE] User ${userId}: el bot dio por cerrada la venta en step "${currentState.step}" SIN orden generada (sin pendingOrder). Pausando + alertando.`);
-                await _pauseAndAlert(userId, currentState, dependencies, text, '⚠️ VENTA FANTASMA: el bot dio por confirmado/listo un pedido pero el sistema NO lo registró (sin orden). Revisá la conversación y cargá/contactá al cliente manualmente.');
+                await _pauseAndAlert(userId, currentState, dependencies, text, '⚠️ VENTA FANTASMA: el bot dio por confirmado/listo un pedido pero el sistema NO lo registró (sin orden). Revisa la conversación y carga/contacta al cliente manualmente.');
                 saveState(userId);
             }
         }

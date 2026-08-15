@@ -135,8 +135,8 @@ export default function ChatSidebarItem({ chat, isSelected, hasAlert, searchTerm
                                         <mark className={cn(
                                             'rounded px-0.5',
                                             isSelected
-                                                ? 'bg-yellow-300/40 text-white'
-                                                : 'bg-yellow-200 dark:bg-yellow-700/60 text-slate-900 dark:text-yellow-100'
+                                                ? 'bg-albero-300/40 text-white'
+                                                : 'bg-albero-200 dark:bg-albero-700/60 text-slate-900 dark:text-albero-100'
                                         )}>{h.match}</mark>
                                         {h.after}
                                     </>

@@ -50,11 +50,14 @@ function _loadPricesCache(): Record<string, any> {
     }
 }
 
+// Red de seguridad por si prices.json no aparece o está corrupto. Euros,
+// formato español (ver _parsePrice en cartHelpers). Mantener en sync con
+// data/prices.json: si divergen, el bot cotiza distinto según de dónde lea.
 const FALLBACK_PRICES: Record<string, any> = {
-    'Cápsulas': { '60': '49.900', '120': '62.900' },
-    'Semillas': { '60': '36.900', '120': '49.900' },
-    'Gotas': { '60': '49.900', '120': '62.900' },
-    'costoLogistico': '18.000'
+    'Cápsulas': { '60': '39,90', '120': '49,90' },
+    'Semillas': { '60': '29,90', '120': '39,90' },
+    'Gotas': { '60': '39,90', '120': '49,90' },
+    'costoLogistico': '15,00'
 };
 
 function _getPrices(): Record<string, any> {

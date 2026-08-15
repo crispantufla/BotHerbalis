@@ -86,13 +86,13 @@ const QuickRepliesPanel = ({ onSelect, onClose }) => {
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-700">
                 <div className="flex items-center gap-2">
-                    <Zap className="w-4 h-4 text-indigo-500" />
+                    <Zap className="w-4 h-4 text-accent-500" />
                     <span className="font-semibold text-sm text-slate-700 dark:text-slate-200">Respuestas rápidas</span>
                 </div>
                 <div className="flex items-center gap-1">
                     <button
                         onClick={() => { setShowForm(v => !v); setError(''); }}
-                        className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors font-medium"
+                        className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg bg-accent-50 dark:bg-accent-900/40 text-accent-600 dark:text-accent-400 hover:bg-accent-100 dark:hover:bg-accent-900/60 transition-colors font-medium"
                     >
                         {showForm ? <ChevronUp className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
                         {showForm ? 'Cancelar' : 'Nueva'}
@@ -108,7 +108,7 @@ const QuickRepliesPanel = ({ onSelect, onClose }) => {
 
             {/* Error */}
             {error && (
-                <div className="mx-3 mt-2 px-3 py-2 text-xs text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/30 rounded-lg">
+                <div className="mx-3 mt-2 px-3 py-2 text-xs text-danger-600 dark:text-danger-400 bg-danger-50 dark:bg-danger-900/30 rounded-lg">
                     {error}
                 </div>
             )}
@@ -123,7 +123,7 @@ const QuickRepliesPanel = ({ onSelect, onClose }) => {
                         value={newTitle}
                         onChange={e => setNewTitle(e.target.value)}
                         maxLength={80}
-                        className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 placeholder:text-slate-400"
+                        className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-accent-400 placeholder:text-slate-400"
                     />
                     <textarea
                         placeholder="Texto del mensaje..."
@@ -131,12 +131,12 @@ const QuickRepliesPanel = ({ onSelect, onClose }) => {
                         onChange={e => setNewMessage(e.target.value)}
                         rows={3}
                         maxLength={1000}
-                        className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none placeholder:text-slate-400"
+                        className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-accent-400 resize-none placeholder:text-slate-400"
                     />
                     <button
                         type="submit"
                         disabled={saving || !newTitle.trim() || !newMessage.trim()}
-                        className="w-full py-2 text-sm font-semibold rounded-xl bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white transition-colors flex items-center justify-center gap-2"
+                        className="w-full py-2 text-sm font-semibold rounded-xl bg-accent-500 hover:bg-accent-600 disabled:opacity-50 text-white transition-colors flex items-center justify-center gap-2"
                     >
                         {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                         Guardar
@@ -148,19 +148,19 @@ const QuickRepliesPanel = ({ onSelect, onClose }) => {
             <div className="max-h-72 overflow-y-auto divide-y divide-slate-50 dark:divide-slate-700/50">
                 {loading ? (
                     <div className="flex items-center justify-center py-8">
-                        <Loader2 className="w-5 h-5 animate-spin text-indigo-400" />
+                        <Loader2 className="w-5 h-5 animate-spin text-accent-400" />
                     </div>
                 ) : replies.length === 0 ? (
                     <div className="py-8 px-4 text-center text-sm text-slate-400 dark:text-slate-500">
                         <Zap className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                        Aún no tenés respuestas rápidas.<br />
-                        <span className="text-indigo-500 cursor-pointer hover:underline" onClick={() => setShowForm(true)}>Creá la primera</span>
+                        Aún no tienes respuestas rápidas.<br />
+                        <span className="text-accent-500 cursor-pointer hover:underline" onClick={() => setShowForm(true)}>Crea la primera</span>
                     </div>
                 ) : (
                     replies.map(reply => (
                         <div
                             key={reply.id}
-                            className="flex items-center gap-2 px-3 py-2.5 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 group transition-colors"
+                            className="flex items-center gap-2 px-3 py-2.5 hover:bg-accent-50 dark:hover:bg-accent-900/20 group transition-colors"
                         >
                             <button
                                 className="flex-1 text-left min-w-0"
@@ -172,7 +172,7 @@ const QuickRepliesPanel = ({ onSelect, onClose }) => {
                             <button
                                 onClick={() => handleDelete(reply.id)}
                                 disabled={deletingId === reply.id}
-                                className="shrink-0 p-1.5 rounded-lg text-slate-300 dark:text-slate-600 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 opacity-0 group-hover:opacity-100 transition-all disabled:opacity-50"
+                                className="shrink-0 p-1.5 rounded-lg text-slate-300 dark:text-slate-600 hover:text-danger-500 dark:hover:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-900/30 opacity-0 group-hover:opacity-100 transition-all disabled:opacity-50"
                             >
                                 {deletingId === reply.id
                                     ? <Loader2 className="w-3.5 h-3.5 animate-spin" />

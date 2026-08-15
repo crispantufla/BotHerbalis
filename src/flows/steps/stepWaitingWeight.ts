@@ -52,12 +52,15 @@ async function _sendTierRecommendation(
             // 25-jun). Le pasamos la CATEGORÍA del tier y se lo aclaramos explícito.
             const isTwoTierRec = !!(knowledge?.flow?.recommendation_1 && !knowledge?.flow?.recommendation_3);
             const bareMenuPick = /^\s*[123]\s*(?:️?⃣)?\s*$/.test((userText || '').trim());
-            const tierCategoria = tier === '1' ? 'hasta 10 kg' : tier === '2' ? (isTwoTierRec ? 'más de 10 kg' : 'entre 10 y 20 kg') : 'más de 20 kg';
+            // El tramo se describe por el TIPO DE PLAN, no por kilos: lo que se
+            // le cuenta a la IA acaba en el mensaje al cliente, y una cifra de
+            // peso ahí es una declaración prohibida.
+            const tierCategoria = tier === '1' ? 'una rutina para empezar' : tier === '2' ? (isTwoTierRec ? 'un plan completo' : 'un plan de varios meses') : 'el tratamiento más largo';
             const clienteDijo = bareMenuPick
-                ? `eligió la opción "${(userText || '').trim()}" del menú de kilos — o sea quiere bajar ${tierCategoria}. ⚠️ Ese número es la OPCIÓN del menú, NO una cantidad de kilos: NUNCA digas "con ${(userText || '').trim()} kilos" ni lo interpretes como kilos`
-                : `acaba de decirte cuánto quiere bajar (último mensaje: "${userText}")`;
-            const recGoal = `El cliente ${clienteDijo}. Tu tarea: recomendarle el plan de *${planDays} días* y presentarle las TRES presentaciones para que elija. REGLAS:\n(1) Arrancá reaccionando con calidez y de forma NATURAL a lo que dijo (sin asumir ni mencionar un número exacto de kilos si no lo dio).\n(2) Recomendá el plan de *${planDays} días*.\n(3) Listá las 3 opciones EXACTAS, una por línea con su número:\n"1️⃣ *Cápsulas* — 1 al día, 30 min antes del almuerzo o la cena.\n2️⃣ *Gotas* — 10 gotas al día, 30 min antes del almuerzo o la cena.\n3️⃣ *Semillas* — una infusión antes de dormir (lleva una preparación simple)."\n(4) Aclarar que las tres son 100% naturales y funcionan igual para bajar de peso.\n(5) 🛑 PROHIBIDO mencionar precios o cualquier monto de plata (van en el mensaje siguiente, aparte).\n(6) NO inventes nada fuera de esto. Cerrá con la pregunta EXACTA: *¿Qué opción preferís?* — NO uses "¿cuál te llama más?", "¿cuál te gusta más?" ni otras variantes. goalMet=true.`;
-            const aiRec = await aiService.chat(userText || 'dale', {
+                ? `eligió la opción "${(userText || '').trim()}" del menú — o sea busca ${tierCategoria}. ⚠️ Ese número es la OPCIÓN del menú, NO una cantidad: NUNCA lo interpretes como kilos ni como nada numérico`
+                : `acaba de contarte qué busca (último mensaje: "${userText}")`;
+            const recGoal = `El cliente ${clienteDijo}. Tu tarea: recomendarle el plan de *${planDays} días* y presentarle los TRES formatos para que elija. REGLAS:\n(1) Empieza reaccionando con calidez y de forma NATURAL a lo que dijo. 🛑 Si el cliente ha mencionado kilos, NO los repitas ni los comentes: reconoce su objetivo en general ("te entiendo", "para lo que buscas") y sigue.\n(2) Recomienda el plan de *${planDays} días*.\n(3) Lista las 3 opciones EXACTAS, una por línea con su número:\n"1️⃣ *Cápsulas* — 1 al día, 30 min antes de comer o cenar.\n2️⃣ *Gotas* — 10 gotas al día, 30 min antes de comer o cenar.\n3️⃣ *Semillas* — una infusión antes de dormir (lleva una preparación sencilla)."\n(4) Aclara que los tres son 100% naturales y acompañan igual de bien el día a día. 🛑 NO digas "para bajar de peso", "adelgazar" ni nada parecido: es ilegal en España.\n(5) 🛑 PROHIBIDO mencionar precios ni ningún importe (van en el mensaje siguiente, aparte).\n(6) NO inventes nada fuera de esto. Cierra con la pregunta EXACTA: *¿Qué opción prefieres?* — NO uses "¿cuál te llama más?", "¿cuál te gusta más?" ni otras variantes. goalMet=true.`;
+            const aiRec = await aiService.chat(userText || 'vale', {
                 step: FlowStep.WAITING_WEIGHT,
                 goal: recGoal,
                 history: currentState.history,
@@ -125,9 +128,11 @@ export async function handleWaitingWeight(
     if (isEmptyAffirmative && !currentState.weightGoal && !(currentState as any).suggestedProduct) {
         // V7 (sin rec_3): 2 tiers. V5/V6: 3 tiers. Adaptamos el reask al script.
         const isTwoTier = !!(knowledge?.flow?.recommendation_1 && !knowledge?.flow?.recommendation_3);
+        // Se repregunta por el TIPO DE PLAN, no por kilos: el bot no puede
+        // escribir cifras de peso (ver el límite legal del prompt de sistema).
         const reaskMsg = isTwoTier
-            ? '¡Genial! 😊 ¿Cuántos kilos querés bajar?\n\n1️⃣ Hasta 10 kg\n2️⃣ Más de 10 kg'
-            : '¡Genial! 😊 ¿Cuántos kilos querés bajar?\n\n1️⃣ Pocos (hasta 10 kg)\n2️⃣ Bastante (10 a 20)\n3️⃣ Mucho (más de 20)';
+            ? '¡Genial! 😊 ¿Qué buscas?\n\n1️⃣ Empezar con una rutina corta y ver qué tal\n2️⃣ Un plan completo, para mantenerlo en el tiempo'
+            : '¡Genial! 😊 ¿Qué buscas?\n\n1️⃣ Empezar y ver qué tal\n2️⃣ Un plan de varios meses\n3️⃣ El tratamiento más largo';
         currentState.history.push({ role: 'bot', content: reaskMsg, timestamp: Date.now() });
         saveState(userId);
         await sendMessageWithDelay(userId, reaskMsg);
@@ -243,7 +248,7 @@ export async function handleWaitingWeight(
         const extracted = _extractWeightGoal();
         if (extracted != null) currentState.weightGoal = extracted;
         logger.info(`[LOGIC] User ${userId} gave weight (${currentState.weightGoal}kg) AND asked a question. Responding to both.`);
-        const dualGoal = `El usuario dijo cuántos kilos quiere bajar (${currentState.weightGoal} kg) PERO TAMBIÉN hizo una pregunta sobre salud, contraindicaciones o el producto. DEBES responder su pregunta con MUCHA empatía y detalle PRIMERO. Si pregunta si es dañino/seguro para alguna condición de salud (riñón, presión, diabetes, etc.): "No hay ninguna contraindicación para tu condición. Es un producto 100% natural, las únicas contraindicaciones son embarazo y lactancia." Después confirmá su objetivo de peso y preguntá qué formato prefiere: "Perfecto, ${currentState.weightGoal} kg es un objetivo totalmente alcanzable 👌 ¿Preferís algo súper práctico (cápsulas o gotas) o más natural (semillas)?"."`;
+        const dualGoal = `El usuario ya te ha contado lo que busca PERO TAMBIÉN hizo una pregunta sobre salud, contraindicaciones o el producto. DEBES responder su pregunta con MUCHA empatía y detalle PRIMERO. 🛑 Si ha mencionado kilos o su peso, NO los repitas ni los comentes: reconoce lo que busca en general y sigue. Si pregunta si es dañino/seguro para alguna condición de salud (riñón, presión, diabetes, etc.): "Es un complemento alimenticio 100% natural. No está recomendado en embarazo ni lactancia, y si estás con medicación o en tratamiento médico, lo mejor es que se lo comentes a tu médico antes de empezar 😊" — NUNCA le prometas que es seguro para su condición concreta ni des garantías absolutas. Después pasa al formato: "Perfecto 👌 ¿Prefieres algo súper práctico (cápsulas o gotas) o más natural (semillas)?". 🛑 PROHIBIDO hablar de adelgazar, bajar de peso, quemar grasa, plazos o resultados garantizados: es ilegal en España.`;
         const aiDual = await aiService.chat(text, {
             step: FlowStep.WAITING_WEIGHT,
             goal: dualGoal,
@@ -277,7 +282,7 @@ export async function handleWaitingWeight(
         const isTwoTierScriptForGuard = !!(knowledge?.flow?.recommendation_1 && !knowledge?.flow?.recommendation_3);
         const bareThree = /^\s*3\s*[\.\)°]?\s*$/.test(text);
         if (isTwoTierScriptForGuard && bareThree) {
-            const reaskMsg = 'Mmm, solo tengo 2 opciones acá 😅\n\n1️⃣ Hasta 10 kg\n2️⃣ Más de 10 kg\n\n¿Cuál es lo tuyo?';
+            const reaskMsg = 'Mmm, solo tengo 2 opciones 😅\n\n1️⃣ Empezar con una rutina corta y ver qué tal\n2️⃣ Un plan completo, para mantenerlo en el tiempo\n\n¿Cuál te encaja más?';
             currentState.history.push({ role: 'bot', content: reaskMsg, timestamp: Date.now() });
             saveState(userId);
             await sendMessageWithDelay(userId, reaskMsg);
@@ -388,8 +393,8 @@ export async function handleWaitingWeight(
         if (isHardRejection || isPriceCheckDecline) {
             logger.info(`[REJECTION] User ${userId} ${isPriceCheckDecline ? 'declinó la compra (solo preguntaba precio / por ahora no)' : 'rechazó la conversación'} en waiting_weight. Back-off + pausa.`);
             const rejectMsg = isPriceCheckDecline
-                ? '¡Dale, sin problema! 😊 Cualquier cosa que necesites, acá estoy. ¡Que tengas un lindo día! 🌿'
-                : '¡Disculpá la molestia! Si en algún momento necesitás algo, acá estamos 😊';
+                ? '¡Sin problema! 😊 Cualquier cosa que necesites, aquí estoy. ¡Que tengas buen día! 🌿'
+                : '¡Disculpa la molestia! Si en algún momento necesitas algo, aquí estamos 😊';
             currentState.history.push({ role: 'bot', content: rejectMsg, timestamp: Date.now() });
             saveState(userId);
             await sendMessageWithDelay(userId, rejectMsg);
@@ -401,7 +406,7 @@ export async function handleWaitingWeight(
 
         if (isRefusal || (currentState as any).weightRefusals > 2) {
             logger.info(`[LOGIC] User ${userId} refused/failed weight question too many times (${(currentState as any).weightRefusals}). Skipping to preference.`);
-            const skipMsg = "¡Entiendo, no hay problema! 👌 Pasemos directo a ver qué forma del producto preferís.\n\nTenemos 3 opciones:\n1️⃣ *Cápsulas* (forma práctica — una al día)\n2️⃣ *Gotas* (forma líquida — suave al estómago)\n3️⃣ *Semillas* (100% natural — ritual de infusión nocturna)\n\n¿Con cuál vas?";
+            const skipMsg = "¡Entiendo, no hay problema! 👌 Pasemos directo a ver qué formato del producto prefieres.\n\nTenemos 3 opciones:\n1️⃣ *Cápsulas* (lo más cómodo — una al día)\n2️⃣ *Gotas* (formato líquido — suave con el estómago)\n3️⃣ *Semillas* (100% natural — infusión antes de dormir)\n\n¿Con cuál te quedas?";
 
             _setStep(currentState, FlowStep.WAITING_PREFERENCE);
             currentState.history.push({ role: 'bot', content: skipMsg, timestamp: Date.now() });
@@ -412,7 +417,7 @@ export async function handleWaitingWeight(
             logger.info(`[AI-FALLBACK] waiting_weight: No number detected for ${userId}`);
             const aiWeight = await aiService.chat(text, {
                 step: FlowStep.WAITING_WEIGHT,
-                goal: 'El usuario NO te dijo cuántos kilos quiere bajar. Tu único objetivo: re-preguntar el rango de kilos de forma natural y BREVE. REGLAS DURAS: (a) Máx 1-2 frases cortas, total ~150 caracteres. (b) PROHIBIDO repetir info ya dada (que enviamos a todo el país, que las cápsulas son efectivas, etc). (c) Una sola pregunta al final, NUNCA dos. (d) PROHIBIDO comentar sobre la provincia/ciudad del cliente ("qué lindo X", "tengo familia ahí", etc.) — son comentarios obsecuentes que el admin reportó. Ignorá el dato de ubicación y andá directo a la pregunta. (e) Si dijo no saberlo, ofrecé estimación rápida. (f) Terminá con: "¿Cuántos kilos querés bajar?" o variante natural — UNA pregunta sola.',
+                goal: 'El usuario todavía NO te ha dicho qué tipo de plan busca. Tu único objetivo: volver a preguntárselo de forma natural y BREVE. 🛑 PROHIBIDO hablar de kilos, peso, tallas, adelgazar, bajar de peso o resultados: es ilegal en España; si el cliente ha mencionado kilos, NO los repitas. REGLAS DURAS: (a) Máx. 1-2 frases cortas, unos 150 caracteres en total. (b) PROHIBIDO repetir información ya dada (que enviamos a toda España, que las cápsulas son cómodas, etc.). (c) Una sola pregunta al final, NUNCA dos. (d) PROHIBIDO comentar la provincia o el pueblo del cliente ("qué bonito X", "tengo familia allí", etc.) — son comentarios pelotas. Ignora el dato de ubicación y ve directa a la pregunta. (e) Si dice que no lo tiene claro, sugiérele el plan completo, que da más margen para coger la rutina con calma. 🛑 No menciones precios ni importes: van más adelante. (f) Termina SIEMPRE con estas dos opciones numeradas, en este orden y en líneas separadas:\n"¿Qué prefieres?\n1️⃣ Empezar con una rutina corta y ver qué tal\n2️⃣ Un plan completo, para mantenerlo en el tiempo"\n— UNA sola pregunta. (g) Si por lo que ya dijo está clarísimo qué busca, pon goalMet=true y devuelve en extractedData SOLO el número 8 (si busca la rutina corta, opción 1) o SOLO el número 15 (si busca el plan completo, opción 2). Es un código interno de plan: NO escribas ese número en tu respuesta al cliente y no incluyas ninguna otra cifra en extractedData.',
                 history: currentState.history,
                 summary: currentState.summary,
                 knowledge: knowledge,

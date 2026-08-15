@@ -7,8 +7,6 @@ import { handleWaitingData } from './stepWaitingData';
 import { handleWaitingFinalConfirmation } from './stepWaitingFinalConfirmation';
 import { handleWaitingMapsConfirmation } from './stepWaitingMapsConfirmation';
 import { handleWaitingPaymentMethod } from './stepWaitingPaymentMethod';
-import { handleWaitingMpPayment } from './stepWaitingMpPayment';
-import { handleWaitingTransferConfirmation } from './stepWaitingTransferConfirmation';
 import { handleAdminSteps } from './stepAdmin';
 import logger from '../../utils/logger';
 
@@ -48,12 +46,6 @@ export async function processStep(
         case 'waiting_payment_method':
             result = await handleWaitingPaymentMethod(userId, text, normalizedText, currentState, knowledge, dependencies);
             break;
-        case 'waiting_mp_payment':
-            result = await handleWaitingMpPayment(userId, text, normalizedText, currentState, knowledge, dependencies);
-            break;
-        case 'waiting_transfer_confirmation':
-            result = await handleWaitingTransferConfirmation(userId, text, normalizedText, currentState, knowledge, dependencies);
-            break;
         case 'waiting_admin_ok':
         case 'waiting_admin_validation':
             result = await handleAdminSteps(userId, text, normalizedText, currentState, knowledge, dependencies);
@@ -78,13 +70,18 @@ export async function processStep(
             logger.info(`[STALE-STEP] User ${userId} has unknown step "${currentState.step}". Migrating...`);
             const stepMigrations: Record<string, string> = {
                 'waiting_legal_acceptance': 'waiting_final_confirmation',
-                // (waiting_payment_method / waiting_mp_payment tienen case propio en
-                // el switch — nunca caen al default, así que no van acá.)
+                // (waiting_payment_method tiene case propio en el switch — nunca
+                // cae al default, así que no va acá.)
                 // Steps legacy V5/V6 (eliminados en V7). Cualquier estado viejo que
                 // quede en DB se reencauza a waiting_preference (re-deriva producto/
                 // plan de forma segura, sin perder weightGoal). V7 nunca rutea acá.
                 'waiting_ok': 'waiting_preference',
                 'waiting_price_confirmation': 'waiting_preference',
+                // Steps del modelo argentino de prepago, que en España no existen:
+                // aquí todo es contrarreembolso. Si un estado viejo los trae, el
+                // cliente vuelve a elegir cómo quiere recibir el pedido.
+                'waiting_mp_payment': 'waiting_payment_method',
+                'waiting_transfer_confirmation': 'waiting_payment_method',
             };
             const migratedStep = stepMigrations[currentState.step];
 

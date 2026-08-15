@@ -31,8 +31,14 @@ describe('Address Extraction AI Tests', () => {
             expectedContains: { calle: "calle falsa 123 esquina siempre viva" }
         },
         {
-            input: "12 de octubre 456, entre rios, parana",
-            expectedContains: { calle: "12 de octubre 456", provincia: "entre rios", ciudad: "parana" }
+            // Antes este caso era "12 de octubre 456, entre rios, parana" y
+            // esperaba que se extrajera como dirección válida. En el bot de
+            // España es al revés: Entre Ríos y Paraná son geografía argentina y
+            // el parser debe devolver CONFLICT, que es justo lo que hacía
+            // "fallar" el test. Se cambia por una dirección española con el
+            // mismo patrón (calle con número + provincia + población).
+            input: "12 de octubre 456, valencia, gandia",
+            expectedContains: { calle: "12 de octubre 456", provincia: "valencia", ciudad: "gandia" }
         }
     ];
 

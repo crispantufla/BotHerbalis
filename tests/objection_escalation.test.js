@@ -65,8 +65,8 @@ describe('objectionDetector — escalado por tier', () => {
             const m = detectObjection('waiting_plan_choice', 'no, demasiado caro', state);
             expect(m.tier).toBe('pause');
             expect(m.pauseAfter).toBe(true);
-            // El mensaje de pausa menciona explícitamente que pasa a un asesor
-            expect(m.response).toMatch(/asesor/i);
+            // El mensaje de pausa dice explícitamente que lo pasa a una persona
+            expect(m.response).toMatch(/compañero|asesor/i);
             expect(state.objectionsHandled.caro).toBe(3);
         });
     });

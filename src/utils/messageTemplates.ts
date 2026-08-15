@@ -53,17 +53,8 @@ function _loadDefaultKnowledge(): any {
  * recurre al knowledge default cacheado (knowledge_v7.json del disco). Esto
  * permite que callers con knowledge mock parcial (e.g. tests unitarios) sigan
  * obteniendo el copy correcto sin tener que duplicar todo el JSON.
- *
- * `mpOff` (interruptor de Mercado Pago apagado, ver flows/utils/paymentOptions):
- * si el guion trae una variante `responseNoMp` para esa entrada, gana — así el
- * copy sin tarjeta también se edita desde el panel Guiones y no queda hardcodeado.
  */
-function _getFlowResponse(knowledge: any, key: string, mpOff?: boolean): string | null {
-    if (mpOff) {
-        const noMp = knowledge?.flow?.[key]?.responseNoMp
-            || _loadDefaultKnowledge()?.flow?.[key]?.responseNoMp;
-        if (noMp) return noMp;
-    }
+function _getFlowResponse(knowledge: any, key: string): string | null {
     const direct = knowledge?.flow?.[key]?.response;
     if (direct) return direct;
     const fallback = _loadDefaultKnowledge();
@@ -80,11 +71,15 @@ function _getFlowResponse(knowledge: any, key: string, mpOff?: boolean): string 
  * Producto: usa state.selectedProduct si está, si no acepta override
  * (extraído del texto del cliente, ej: "que precio las cápsulas").
  */
-function buildPersonalizedPriceResponse(state: any, productOverride?: string | null, mpOff?: boolean): string {
+function buildPersonalizedPriceResponse(state: any, productOverride?: string | null): string {
     const product = productOverride || state.selectedProduct || 'Cápsulas de nuez de la india';
     const productKey = product.includes('Gota') ? 'Gotas' : product.includes('Semilla') ? 'Semillas' : 'Cápsulas';
     const productLabel = productKey === 'Cápsulas' ? 'cápsulas' : productKey === 'Gotas' ? 'gotas' : 'semillas';
 
+    // weightGoal se sigue usando para ELEGIR el plan, pero nunca se dice en voz
+    // alta: si el cliente menciona kilos, eso son sus palabras; que el bot se
+    // los repita convierte el mensaje en una declaración prohibida sobre la
+    // magnitud de la pérdida de peso (Reg. CE 1924/2006, art. 12b).
     const weightGoal = typeof state.weightGoal === 'number' ? state.weightGoal : parseInt(String(state.weightGoal || 0), 10) || 0;
     const recommendsLong = weightGoal >= 15;
     const recommendedPlan = recommendsLong ? '120' : '60';
@@ -92,28 +87,13 @@ function buildPersonalizedPriceResponse(state: any, productOverride?: string | n
 
     const priceStr = _getPrice(productKey, recommendedPlan);
 
-    const savingsLine = mpOff
-        ? '\n\n💳 _Pagás por transferencia, o en efectivo al retirar en sucursal._'
-        : '\n\n💳 _Pagás con tarjeta de crédito o transferencia._';
+    const justification = recommendsLong
+        ? `es el plan completo, el que te deja mantener la rutina sin cortes ni recompras`
+        : `son ideales para empezar con calma y coger el hábito, sin comprometerte a más de entrada`;
 
-    let justification: string;
-    if (weightGoal >= 20) {
-        justification = `cubren los 4 meses que el cuerpo necesita para un descenso sostenido de +20 kg, sin rebote`;
-    } else if (weightGoal >= 15) {
-        justification = `son las que mejor andan para tu objetivo — el descenso es progresivo y sostenido`;
-    } else if (weightGoal > 0) {
-        justification = `son ideales para empezar y ver cómo te va, antes de extender el tratamiento si lo necesitás`;
-    } else {
-        justification = `son las que más recomiendan nuestros clientes`;
-    }
-
-    const objetivoFrase = weightGoal > 0
-        ? `Para tu objetivo (${weightGoal >= 20 ? '+20 kg' : weightGoal >= 15 ? `~${weightGoal} kg` : `hasta ${weightGoal} kg`})`
-        : 'Para tu caso';
-
-    return `${objetivoFrase}, las ${productLabel} en plan de *${recommendedPlan} días* son las que mejor andan — ${justification}.\n\n` +
-        `Sale *$${priceStr}*.${savingsLine}\n\n` +
-        `¿Avanzamos con ese, o te cuento del de ${altPlan} días primero?`;
+    return `Para lo que me cuentas, las ${productLabel} en plan de *${recommendedPlan} días* son la opción que mejor te encaja — ${justification}.\n\n` +
+        `Sale *${priceStr} €*, con envío gratis a toda España.\n\n💵 _Pagas al recibirlo, contra reembolso._\n\n` +
+        `¿Seguimos con ese, o te cuento el de ${altPlan} días primero?`;
 }
 
 /**
@@ -128,47 +108,47 @@ function detectProductInText(text: string): string | null {
 }
 
 /**
- * TEXTO 4 — Menú de las 3 opciones de pago. Plantilla: knowledge.flow.payment_menu.response.
+ * TEXTO 4 — Menú de las 2 formas de recibir el pedido (ambas contrarreembolso).
+ * Plantilla: knowledge.flow.payment_menu.response.
  */
-function buildPaymentMessage(state: any, knowledge?: any, mpOff?: boolean): string {
+function buildPaymentMessage(state: any, knowledge?: any): string {
     const k = knowledge || _loadDefaultKnowledge();
-    const tpl = _getFlowResponse(k, 'payment_menu', mpOff);
+    const tpl = _getFlowResponse(k, 'payment_menu');
     if (!tpl) {
         logger.error('[messageTemplates] flow.payment_menu missing in knowledge — using empty fallback');
-        return '¿Cómo preferís realizar el pago?';
+        return '¿Cómo prefieres recibir el pedido, en casa o en tu oficina de Correos?';
     }
     return _formatMessage(tpl, state);
 }
 
 /**
  * Build the order confirmation message sent to the client.
- * Plantilla: knowledge.flow.order_confirmation_{mp|transfer|cod|fallback}.response.
+ * Plantilla: knowledge.flow.order_confirmation_{cod|fallback}.response.
  * Used by both handleAdminCommand (manual approval) and autoApproveOrders (scheduler).
+ *
+ * Aquí solo se cobra contrarreembolso, así que hay una sola plantilla buena.
+ * El fallback existe para el estado corrupto: si un pedido llega sin
+ * paymentMethod, mejor un texto genérico que una plantilla que prometa algo
+ * que no es.
  */
 function buildConfirmationMessage(state: any, knowledge?: any): string {
     const k = knowledge || _loadDefaultKnowledge();
 
     let key: string;
-    if (state.paymentMethod === 'mercadopago') {
-        key = 'order_confirmation_mp';
-    } else if (state.paymentMethod === 'transferencia') {
-        key = 'order_confirmation_transfer';
-    } else if (state.paymentMethod === 'contrarembolso') {
-        // Modelo nuevo (may-2026): contrarrembolso = retiro en sucursal, paga total al retirar.
-        // Modelo legacy (pre-may-2026): contrarrembolso = seña $10k + saldo al cartero.
-        // En ambos casos se usa la misma plantilla 'order_confirmation_cod' (el texto fue
-        // reescrito para el modelo nuevo; senaAmount=0 en retiro hace que {{CARTO_LINE}}
-        // quede vacío).
-        key = 'order_confirmation_cod';
+    if (state.paymentMethod === 'contrarembolso') {
+        // Mismo pago (contra reembolso) pero dos despedidas: al de casa se le
+        // habla del repartidor, al de recogida de su oficina. Con una sola
+        // plantilla, la mitad de los pedidos se cerraban con el texto ajeno.
+        key = state.shippingChoice === 'retiro' ? 'order_confirmation_pickup' : 'order_confirmation_cod';
     } else {
-        logger.warn(`[CONFIRMATION] paymentMethod inesperado: "${state.paymentMethod}" (senaPaid=${state.senaPaid}, senaAmount=${state.senaAmount}) — usando fallback`);
+        logger.warn(`[CONFIRMATION] paymentMethod inesperado: "${state.paymentMethod}" — usando fallback`);
         key = 'order_confirmation_fallback';
     }
 
     const tpl = _getFlowResponse(k, key);
     if (!tpl) {
         logger.error(`[messageTemplates] flow.${key} missing in knowledge — usando fallback hardcoded`);
-        return `📦 CONFIRMACIÓN DE ENVÍO\n\nTotal: $${state.totalPrice || '0'}\n\n¿Me confirmás que podés retirar en sucursal si fuera necesario?`;
+        return `📦 CONFIRMACIÓN DE ENVÍO\n\nTotal: ${state.totalPrice || '0'} € — lo pagas al recibirlo.\n\n¿Me confirmas que los datos están bien?`;
     }
     return _formatMessage(tpl, state);
 }
@@ -177,8 +157,8 @@ function buildConfirmationMessage(state: any, knowledge?: any): string {
  * Resuelve un template del JSON conociendo `knowledge` o cayendo al default
  * cacheado. Export pública para que los step handlers también lean copy del JSON.
  */
-function getFlowTemplate(key: string, knowledge?: any, mpOff?: boolean): string | null {
-    return _getFlowResponse(knowledge, key, mpOff);
+function getFlowTemplate(key: string, knowledge?: any): string | null {
+    return _getFlowResponse(knowledge, key);
 }
 
 export {

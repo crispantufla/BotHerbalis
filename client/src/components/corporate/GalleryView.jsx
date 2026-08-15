@@ -195,7 +195,7 @@ const GalleryView = () => {
                                     <div className="flex items-center justify-between gap-2">
                                         <Badge tone="accent" size="sm">{img.category}</Badge>
                                         <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 tabular-nums">
-                                            {new Date(img.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })}
+                                            {new Date(img.createdAt).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })}
                                         </span>
                                     </div>
 

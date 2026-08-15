@@ -283,13 +283,13 @@ describe('Cart and Price Calculations', () => {
         // Mock parseAddress to return a complete address
         aiService.parseAddress.mockResolvedValueOnce({
             nombre: 'Maria Garcia',
-            calle: 'Av Corrientes 1234',
-            ciudad: 'CABA',
-            cp: '1043',
-            provincia: 'Buenos Aires'
+            calle: 'Gran Via 35, 2 B',
+            ciudad: 'Madrid',
+            cp: '28013',
+            provincia: 'Madrid'
         });
 
-        await runFlow('cart1', 'Maria Garcia, Av Corrientes 1234, CABA, 1043');
+        await runFlow('cart1', 'Maria Garcia, Gran Via 35 2 B, Madrid, 28013');
 
         // Cart should have been built
         const state = userState['cart1'];

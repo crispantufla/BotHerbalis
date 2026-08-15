@@ -23,7 +23,10 @@ function _safeEqual(a, b) {
     return crypto.timingSafeEqual(aBuf, bBuf);
 }
 
-module.exports = (client, sharedState) => {
+// `client` y `sharedState` son legado de cuando esto era mono-vendedor y ya no
+// se usan; `clientPool` sí: al crear una cuenta de vendedor hay que darlo de
+// alta en el pool que ya está corriendo (ver POST /accounts).
+module.exports = (client, sharedState, clientPool) => {
     const router = express.Router();
 
     // ─── POST /api/login ────────────────────────────────────────────
@@ -169,12 +172,25 @@ module.exports = (client, sharedState) => {
                 select: { id: true, name: true, role: true, sellerId: true, isActive: true },
             });
 
-            if (effectiveRole === 'seller' && sellerId) {
+            if (effectiveRole === 'seller' && account.sellerId) {
+                // OJO: con account.sellerId (ya en minúsculas), no con el del body.
+                // Si el admin escribe "Horacio_Bot", la cuenta queda como
+                // "horacio_bot" y la sesión colgaría de otro id: el arranque
+                // buscaría sesión para uno y la encontraría bajo el otro.
                 await prisma.whatsAppSession.upsert({
-                    where: { sellerId },
-                    create: { sellerId },
+                    where: { sellerId: account.sellerId },
+                    create: { sellerId: account.sellerId },
                     update: {},
                 });
+
+                // El pool solo lee la lista de vendedores al arrancar. Sin esta
+                // línea, el recién creado no existe para el proceso vivo: al
+                // entrar al panel no se le arranca Chrome (se queda sin QR) y
+                // switch-seller lo rechaza con "no es un seller conocido" hasta
+                // el siguiente despliegue.
+                if (clientPool && !clientPool.isKnown(account.sellerId)) {
+                    clientPool.registerSeller(account.sellerId);
+                }
             }
 
             logger.info(`[AUTH] Account created: ${name} (${effectiveRole}) by ${req.account.name}`);

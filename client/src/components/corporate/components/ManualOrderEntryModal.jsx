@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Home, Store, CreditCard, Banknote, Send, Pill, Droplet, Leaf } from 'lucide-react';
+import { X, Save, Home, Store, Banknote, Send, Pill, Droplet, Leaf } from 'lucide-react';
+import { formatEUR } from '../../../utils/format';
 
 /**
  * Modal de verificación / carga de pedido.
@@ -9,20 +10,26 @@ import { X, Save, Home, Store, CreditCard, Banknote, Send, Pill, Droplet, Leaf }
  * crea la orden.
  *
  * Reglas de negocio (acopladas):
- *   - Envío a DOMICILIO  → pago: Mercado Pago o Transferencia. Pide dirección completa.
- *   - Retiro en SUCURSAL → pago: Efectivo al retirar. Pide ciudad + CP + provincia.
- *   (Nombre y apellido se pide siempre — la orden lo necesita.)
+ *   - Envío a CASA               → contra reembolso: paga al repartidor. Pide dirección completa.
+ *   - Recogida en OFICINA        → contra reembolso: paga al recogerlo. Pide ciudad + CP + provincia.
+ *   En España no hay pago por adelantado: no existe tarjeta, link de pago,
+ *   transferencia ni anticipo, así que las dos modalidades comparten el mismo
+ *   `paymentMethod` ('contrarembolso') y solo cambia dónde se cobra.
+ *   (Nombre y apellidos se piden siempre — la orden lo necesita.)
  *   - Si el bot NO detectó el producto, el admin lo elige (producto + plan) y el
  *     precio sale de la lista oficial.
  *   - Descuento opcional: resta al total final.
  */
+// Las claves ('domicilio' / 'sucursal') y los `value` viajan al backend tal
+// cual — no se tocan. Lo que cambia respecto al bot argentino es la oferta:
+// aquí solo hay contra reembolso, y la única diferencia entre las dos es el
+// momento del cobro (al repartidor o en la oficina de Correos).
 const PAY_OPTIONS = {
     domicilio: [
-        { value: 'mercadopago', label: 'Mercado Pago', icon: CreditCard },
-        { value: 'transferencia', label: 'Transferencia', icon: Banknote },
+        { value: 'contrarembolso', label: 'Contra reembolso (al repartidor)', icon: Banknote },
     ],
     sucursal: [
-        { value: 'contrarembolso', label: 'Efectivo al retirar', icon: Banknote },
+        { value: 'contrarembolso', label: 'Contra reembolso (al recogerlo)', icon: Banknote },
     ],
 };
 
@@ -38,12 +45,12 @@ const PLAN_OPTIONS = [
 ];
 
 const onlyDigits = (s) => (s || '').toString().replace(/\D/g, '');
-const fmt = (n) => Number(n || 0).toLocaleString('es-AR');
+const fmt = (n) => formatEUR(n);
 
 const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onClose, onSubmit, submitting = false }) => {
     const [data, setData] = useState({
         nombre: '', calle: '', ciudad: '', provincia: '', cp: '',
-        shippingType: 'domicilio', paymentMethod: 'mercadopago',
+        shippingType: 'domicilio', paymentMethod: 'contrarembolso',
         productType: '', plan: '60', discount: '',
         paymentVerified: false,
     });
@@ -85,16 +92,16 @@ const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onC
                 ...prev,
                 shippingType,
                 paymentMethod,
-                // Si el cambio de envío cambió el método, el tilde de verificación
-                // ya no aplica — resetear para que no quede marcado en silencio.
+                // Con contra reembolso no hay nada que verificar a mano (cobra
+                // Correos), pero el campo sigue viajando al backend: lo dejamos
+                // siempre en false salvo que el método no haya cambiado.
                 paymentVerified: paymentMethod === prev.paymentMethod ? prev.paymentVerified : false,
             };
         });
     };
 
     const handleField = (key, value) => setData(prev => (
-        // Cambiar de método de pago invalida la verificación previa: sin este
-        // reset, transferencia→MP→transferencia dejaba el checkbox tildado.
+        // Cambiar de método de pago invalida cualquier verificación previa.
         key === 'paymentMethod'
             ? { ...prev, paymentMethod: value, paymentVerified: false }
             : { ...prev, [key]: value }
@@ -149,14 +156,14 @@ const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onC
     return (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}>
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md p-6 relative max-h-[92vh] overflow-y-auto custom-scrollbar" onClick={e => e.stopPropagation()}>
-                <button onClick={onClose} className="absolute top-3 right-3 p-1.5 text-slate-400 hover:text-rose-500 transition-colors" disabled={submitting}>
+                <button onClick={onClose} className="absolute top-3 right-3 p-1.5 text-slate-400 hover:text-danger-500 transition-colors" disabled={submitting}>
                     <X className="w-5 h-5" />
                 </button>
 
                 <div className="mb-4">
                     <h3 className="text-lg font-extrabold text-slate-800 dark:text-slate-100">Verificar pedido</h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                        Revisá los datos antes de confirmar. Ajustá lo que haga falta.
+                        Revisa los datos antes de confirmar. Ajusta lo que haga falta.
                         {chatId && <span className="block mt-1 font-mono text-[11px] text-slate-400">+{chatId.split('@')[0]}</span>}
                     </p>
                 </div>
@@ -171,7 +178,7 @@ const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onC
                             </div>
                         ) : (
                             <>
-                                <p className="text-[11px] text-amber-600 dark:text-amber-400 mb-1.5">El bot no detectó el producto — elegilo:</p>
+                                <p className="text-[11px] text-warning-600 dark:text-warning-400 mb-1.5">El bot no ha detectado el producto — elígelo:</p>
                                 <div className="grid grid-cols-3 gap-2">
                                     {PRODUCT_OPTIONS.map(opt => (
                                         <SelectorButton
@@ -201,10 +208,10 @@ const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onC
 
                     {/* Tipo de envío */}
                     <div>
-                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Tipo de envío</label>
+                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Cómo lo recibe</label>
                         <div className="grid grid-cols-2 gap-2">
-                            <SelectorButton active={!isSucursal} icon={Home} label="A domicilio" onClick={() => setShipping('domicilio')} disabled={submitting} />
-                            <SelectorButton active={isSucursal} icon={Store} label="Retiro en sucursal" onClick={() => setShipping('sucursal')} disabled={submitting} />
+                            <SelectorButton active={!isSucursal} icon={Home} label="En casa" onClick={() => setShipping('domicilio')} disabled={submitting} />
+                            <SelectorButton active={isSucursal} icon={Store} label="Oficina de Correos" onClick={() => setShipping('sucursal')} disabled={submitting} />
                         </div>
                     </div>
 
@@ -223,49 +230,29 @@ const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onC
                                 />
                             ))}
                         </div>
-                        {data.paymentMethod === 'transferencia' && (
-                            <label className={`mt-2 flex items-start gap-2.5 px-3 py-2.5 rounded-xl border cursor-pointer transition-all ${
-                                data.paymentVerified
-                                    ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20'
-                                    : 'border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/15'
-                            }`}>
-                                <input
-                                    type="checkbox"
-                                    checked={data.paymentVerified}
-                                    onChange={e => handleField('paymentVerified', e.target.checked)}
-                                    disabled={submitting}
-                                    className="mt-0.5 w-4 h-4 accent-emerald-600 flex-shrink-0"
-                                />
-                                <span className="text-xs leading-snug">
-                                    <span className={`font-bold block ${data.paymentVerified ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}>
-                                        {data.paymentVerified ? 'Transferencia verificada ✓' : 'Transferencia SIN verificar'}
-                                    </span>
-                                    <span className="text-slate-500 dark:text-slate-400">
-                                        Marcalo solo si ya viste el comprobante y la plata está acreditada.
-                                    </span>
-                                </span>
-                            </label>
-                        )}
+                        <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">
+                            No se cobra nada por adelantado: el cliente paga el total al recibir el pedido.
+                        </p>
                     </div>
 
                     {/* Datos */}
                     <div className="space-y-3 pt-1">
-                        <Field label="Nombre y apellido *" value={data.nombre} onChange={v => handleField('nombre', v)} placeholder="María Pérez" />
+                        <Field label="Nombre y apellidos *" value={data.nombre} onChange={v => handleField('nombre', v)} placeholder="María García Ruiz" />
 
                         {!isSucursal && (
-                            <Field label="Calle y número *" value={data.calle} onChange={v => handleField('calle', v)} placeholder="Av. Belgrano 1234" />
+                            <Field label="Calle y número *" value={data.calle} onChange={v => handleField('calle', v)} placeholder="Calle Mayor 12, 3.º B" />
                         )}
 
                         <div className="grid grid-cols-2 gap-3">
-                            <Field label="Ciudad *" value={data.ciudad} onChange={v => handleField('ciudad', v)} placeholder="Rosario" />
-                            <Field label={isSucursal ? 'CP *' : 'CP'} value={data.cp} onChange={v => handleField('cp', v)} placeholder="2000" />
+                            <Field label="Ciudad *" value={data.ciudad} onChange={v => handleField('ciudad', v)} placeholder="Valencia" />
+                            <Field label={isSucursal ? 'Código postal *' : 'Código postal'} value={data.cp} onChange={v => handleField('cp', v)} placeholder="46001" />
                         </div>
 
-                        <Field label="Provincia" value={data.provincia} onChange={v => handleField('provincia', v)} placeholder="Santa Fe" />
+                        <Field label="Provincia" value={data.provincia} onChange={v => handleField('provincia', v)} placeholder="Valencia" />
 
                         {isSucursal && (
                             <p className="text-[11px] text-slate-400 dark:text-slate-500">
-                                Con la ciudad y el CP, el Correo asigna la sucursal más cercana. No hace falta la calle.
+                                Con la ciudad y el código postal, Correos asigna la oficina que le corresponde. No hace falta la calle.
                             </p>
                         )}
                     </div>
@@ -274,7 +261,7 @@ const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onC
                     <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-3 space-y-2">
                         <div className="flex items-center justify-between text-sm">
                             <span className="text-slate-500 dark:text-slate-400">Subtotal</span>
-                            <span className="font-semibold text-slate-700 dark:text-slate-200">{baseTotal ? `$${fmt(baseTotal)}` : '—'}</span>
+                            <span className="font-semibold text-slate-700 dark:text-slate-200">{baseTotal ? fmt(baseTotal) : '—'}</span>
                         </div>
                         <div className="flex items-center justify-between gap-3">
                             <label className="text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">Descuento</label>
@@ -286,13 +273,13 @@ const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onC
                                     value={data.discount}
                                     onChange={e => handleField('discount', onlyDigits(e.target.value))}
                                     placeholder="0"
-                                    className="w-full pl-6 pr-2 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-right text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-300"
+                                    className="w-full pl-6 pr-2 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-right text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-300"
                                 />
                             </div>
                         </div>
                         <div className="flex items-center justify-between border-t border-slate-200 dark:border-slate-700 pt-2">
                             <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Total final</span>
-                            <span className="text-base font-extrabold text-emerald-600 dark:text-emerald-400">{baseTotal ? `$${fmt(finalTotal)}` : '—'}</span>
+                            <span className="text-base font-extrabold text-success-600 dark:text-success-400">{baseTotal ? fmt(finalTotal) : '—'}</span>
                         </div>
                     </div>
 
@@ -308,7 +295,7 @@ const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onC
                         <button
                             type="submit"
                             disabled={!isValid || submitting}
-                            className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold text-sm shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                            className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-accent-600 to-accent-700 text-white font-bold text-sm shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
                         >
                             {submitting ? (
                                 <>
@@ -344,7 +331,7 @@ const SelectorButton = ({ active, icon: Icon, label, onClick, disabled }) => (
         disabled={disabled}
         className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-bold transition-all disabled:opacity-50 ${
             active
-                ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 ring-2 ring-indigo-500/20'
+                ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 ring-2 ring-accent-500/20'
                 : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
         }`}
     >
@@ -361,7 +348,7 @@ const Field = ({ label, value, onChange, placeholder }) => (
             value={value}
             onChange={e => onChange(e.target.value)}
             placeholder={placeholder}
-            className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-300 transition-all placeholder:text-slate-400"
+            className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-300 transition-all placeholder:text-slate-400"
         />
     </div>
 );

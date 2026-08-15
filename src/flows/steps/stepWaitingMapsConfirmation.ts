@@ -3,6 +3,7 @@ import { _setStep, _pauseAndAlert, _startsAffirmative } from '../utils/flowHelpe
 import { validateWithGoogleMaps } from '../../services/addressValidator';
 import { buildConfirmationMessage } from '../../utils/messageTemplates';
 import { _getPrice } from '../utils/pricing';
+import { calculateTotal } from '../utils/cartHelpers';
 import { _isDuplicate } from '../utils/messages';
 import logger from '../../utils/logger';
 
@@ -10,7 +11,7 @@ import logger from '../../utils/logger';
  * WAITING_MAPS_CONFIRMATION step
  * 
  * Triggered when Google Maps could NOT verify the client's address.
- * The bot asked: "¿Está bien escrita así? [address]. Respondé sí o pasame la corrección."
+ * The bot asked: "¿La dirección que te he puesto es correcta? Responde *sí* si está bien, o pásame la corregida."
  * 
  * - Client says "sí" → pause + alert admin to verify manually
  * - Client corrects the address → re-parse and re-validate via Maps
@@ -57,8 +58,11 @@ export async function handleWaitingMapsConfirmation(
 
         currentState.pendingOrder = { ...addr, calleOriginal: addr.calleOriginal || addr.calle, cart: currentState.cart };
 
-        const total = currentState.cart.reduce((sum: number, i: any) => sum + parseInt(i.price.toString().replace(/\./g, '')), 0);
-        currentState.totalPrice = total.toLocaleString('es-AR').replace(/,/g, '.');
+        // El total lo suma calculateTotal (céntimos por dentro, euros al salir).
+        // La cuenta a mano que había aquí quitaba los puntos y hacía parseInt:
+        // con pesos "49.900" daba 49900, pero con euros "49,90" da 49 — el bot
+        // cobraba cuarenta y nueve euros pelados.
+        currentState.totalPrice = calculateTotal(currentState);
 
         await _pauseAndAlert(userId, currentState, dependencies, text,
             `📍 Dirección NO verificada en Google Maps, pero el cliente confirma que es correcta.\n` +
@@ -71,7 +75,7 @@ export async function handleWaitingMapsConfirmation(
 
     if (isNegation) {
         // Client says "no", go back to waiting_data to collect corrected address
-        const goBackMsg = `¡Dale! Pasame la dirección corregida entonces 📝`;
+        const goBackMsg = `¡Vale! Pásame entonces la dirección corregida 📝`;
         currentState.history.push({ role: 'bot', content: goBackMsg, timestamp: Date.now() });
         currentState.partialAddress.calle = null;
         _setStep(currentState, FlowStep.WAITING_DATA);
@@ -94,7 +98,7 @@ export async function handleWaitingMapsConfirmation(
             if (data.nombre) currentState.partialAddress.nombre = data.nombre;
 
             const addr = currentState.partialAddress;
-            const fullAddress = `${addr.calle}, ${addr.ciudad}${addr.cp ? `, ${addr.cp}` : ''}, Argentina`;
+            const fullAddress = `${addr.calle}, ${addr.ciudad}${addr.cp ? `, ${addr.cp}` : ''}, España`;
 
             // Re-validate with Maps
             const mapsResult = await validateWithGoogleMaps(fullAddress);
@@ -116,8 +120,7 @@ export async function handleWaitingMapsConfirmation(
                 currentState.pendingOrder = { ...addr, calleOriginal: addr.calleOriginal || addr.calle, cart: currentState.cart };
                 currentState.partialAddress = {} as any;
 
-                const total = currentState.cart.reduce((sum: number, i: any) => sum + parseInt(i.price.toString().replace(/\./g, '')), 0);
-                currentState.totalPrice = total.toLocaleString('es-AR').replace(/,/g, '.');
+                currentState.totalPrice = calculateTotal(currentState);
 
                 const summaryMsg = buildConfirmationMessage(currentState, knowledge);
                 currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
@@ -142,7 +145,7 @@ export async function handleWaitingMapsConfirmation(
                     return { matched: true };
                 }
 
-                const retryMsg = `Seguimos sin poder verificar esa dirección 🤔\n\n¿Me la podés pasar de nuevo con todos los datos? Nombre de calle, número, localidad y código postal 📍`;
+                const retryMsg = `Seguimos sin poder verificar esa dirección 🤔\n\n¿Me la puedes pasar otra vez con todos los datos? Calle, número, piso, población y código postal 📍`;
                 currentState.history.push({ role: 'bot', content: retryMsg, timestamp: Date.now() });
                 saveState(userId);
                 await sendMessageWithDelay(userId, retryMsg);
@@ -152,7 +155,7 @@ export async function handleWaitingMapsConfirmation(
     }
 
     // Fallback: unrecognized input — ask to confirm or correct
-    const fallbackMsg = `¿La dirección que te pasé es correcta? Respondé *sí* si está bien, o pasame la dirección corregida 🙏`;
+    const fallbackMsg = `¿La dirección que te he puesto es correcta? Responde *sí* si está bien, o pásame la corregida 🙏`;
     currentState.history.push({ role: 'bot', content: fallbackMsg, timestamp: Date.now() });
     saveState(userId);
     await sendMessageWithDelay(userId, fallbackMsg);

@@ -8,6 +8,8 @@ import crypto from 'crypto';
 const logger = require('../utils/logger');
 const { prisma } = require('../../db');
 const { _cleanPhone } = require('../flows/utils/flowHelpers');
+const { _parsePrice } = require('../flows/utils/cartHelpers');
+const { _getPrice } = require('../flows/utils/pricing');
 
 // logAndEmit, saveOrderToLocal, cancelLatestOrder, sendMessageWithDelay, notifyAdmin
 
@@ -38,7 +40,8 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
     // instancia), en memoria, sólo bloquea duplicados CONSECUTIVOS.
     const _lastBotMsgByChat = new Map<string, string>();
 
-    function normalizeProductName(rawProduct: string, rawPlan: string, price: number): string {
+    /** @param priceCents importe del pedido en céntimos (ver cartHelpers). */
+    function normalizeProductName(rawProduct: string, rawPlan: string, priceCents: number): string {
         const lower = (rawProduct || '').toLowerCase();
         let baseType = '';
         if (lower.includes('capsul') || lower.includes('cápsul')) baseType = 'Cápsulas';
@@ -48,9 +51,12 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
         const planMatch = (rawPlan || '').match(/(\d+)/);
         let duration = planMatch ? parseInt(planMatch[1]) : 0;
         if (!duration || duration % 60 !== 0) {
-            if (baseType === 'Cápsulas') duration = price >= 66900 ? 120 : 60;
-            else if (baseType === 'Gotas') duration = price >= 68900 ? 120 : 60;
-            else if (baseType === 'Semillas') duration = price >= 49900 ? 120 : 60;
+            // Sin plan legible, lo deducimos del importe contra la tarifa real.
+            // El original comparaba contra umbrales de pesos escritos a mano, que
+            // se quedaban viejos en cuanto alguien tocaba los precios; leerlos de
+            // pricing.ts hace que esto siga funcionando tras cada cambio de tarifa.
+            const p120 = _parsePrice(_getPrice(baseType, '120'));
+            duration = (p120 && priceCents >= p120) ? 120 : 60;
         }
         return `${baseType} (${duration} días)`;
     }
@@ -133,12 +139,14 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
         try {
             lock = await redlock.acquire([`order_lock:${cleanPhone}:${sellerId}`], 3000);
 
-            let priceNum = 0;
-            if (order.precio) {
-                priceNum = parseInt(order.precio.toString().replace(/\./g, '').replace(/[^\d]/g, ''), 10);
-            }
+            // Frontera de unidades: el flujo trabaja en céntimos (ver cartHelpers),
+            // pero Order.totalPrice es un Float en EUROS — es lo que suman todos
+            // los _sum del panel y lo que un humano espera leer en la DB. La
+            // conversión pasa acá y en ningún otro sitio.
+            const priceCents = _parsePrice(order.precio);
+            const priceEuros = priceCents / 100;
 
-            const normalizedProduct = normalizeProductName(order.producto || '', order.plan || '', priceNum);
+            const normalizedProduct = normalizeProductName(order.producto || '', order.plan || '', priceCents);
 
             // Campos de seña (flujo COD con anticipo MP/transferencia):
             //   senaAmount       = monto del anticipo ya pagado ($10k típico)
@@ -160,7 +168,7 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
                 // callers legacy que no pasan status siguen creando 'Pendiente'.
                 status: order.status || 'Pendiente',
                 products: normalizedProduct,
-                totalPrice: isNaN(priceNum) ? 0 : priceNum,
+                totalPrice: priceEuros,
                 tracking: null,
                 postdated: order.postdatado || null,
                 nombre: order.nombre || null,

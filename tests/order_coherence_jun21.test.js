@@ -38,7 +38,7 @@ describe('F2 — coherencia plan/precio en la confirmación', () => {
         const state = {
             step: 'waiting_data', shippingChoice: 'retiro', paymentMethod: 'contrarembolso',
             selectedProduct: 'Cápsulas de nuez de la india', selectedPlan: '120',
-            partialAddress: { calle: 'A sucursal', nombre: 'Maria Jose', ciudad: 'Merlo', cp: '1716' },
+            partialAddress: { calle: 'A oficina de Correos', nombre: 'Maria Jose', ciudad: 'Merlo', cp: '1716' },
             cart: [{ product: 'Cápsulas de nuez de la india', plan: '120', price: '44.900' }], // ✗ 120 a precio de 60
             history: [],
         };
@@ -54,7 +54,7 @@ describe('F2 — coherencia plan/precio en la confirmación', () => {
         const state = {
             step: 'waiting_data', shippingChoice: 'retiro', paymentMethod: 'contrarembolso',
             selectedProduct: 'Cápsulas de nuez de la india', selectedPlan: '120',
-            partialAddress: { calle: 'A sucursal', nombre: 'Maria Jose', ciudad: 'Merlo', cp: '1716' },
+            partialAddress: { calle: 'A oficina de Correos', nombre: 'Maria Jose', ciudad: 'Merlo', cp: '1716' },
             cart: [], history: [], // sin cart → el flujo lo arma con _getPrice
         };
         const res = await handleWaitingData('f2b@c.us', 'listo', norm('listo'), state, { flow: {} }, deps);

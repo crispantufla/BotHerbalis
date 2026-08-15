@@ -16,9 +16,11 @@ export enum FlowStep {
     CLOSING = "closing",
     COMPLETED = "completed",
     WAITING_MAPS_CONFIRMATION = "waiting_maps_confirmation",
+    // Elección de modalidad de entrega. Conserva el id histórico
+    // `waiting_payment_method` porque es la clave del embudo y las analíticas;
+    // aquí no se elige medio de pago (todo es contra reembolso), solo si lo
+    // recibe en casa o lo recoge en la oficina.
     WAITING_PAYMENT_METHOD = "waiting_payment_method",
-    WAITING_MP_PAYMENT = "waiting_mp_payment",
-    WAITING_TRANSFER_CONFIRMATION = "waiting_transfer_confirmation",
     REJECTED_MEDICAL = "rejected_medical",
     REJECTED_ABUSIVE = "rejected_abusive",
     REJECTED_GEO = "rejected_geo"
@@ -78,10 +80,10 @@ export interface UserState {
 
     // Otros flags
     geoRejected?: boolean;
-    // El cliente se identificó como argentino (nombró Argentina/su provincia, o
-    // una localidad argentina). Una vez true, un "estoy en Europa" posterior —
-    // típico de un argentino de viaje que compra al volver — NO debe geo-rechazarlo.
-    argentineConfirmed?: boolean;
+    // El cliente se identificó como residente en España (nombró España, su
+    // provincia o una población española). Una vez true, un "ahora estoy de
+    // viaje fuera" posterior NO debe geo-rechazarlo.
+    spainConfirmed?: boolean;
     stepEnteredAt: number;
     postdatado?: string | null;
     assignedScript?: string;

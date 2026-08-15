@@ -8,6 +8,10 @@ orders.json
 ai-cost-*.json
 logs/
 public/media/
+
+# Piezas de Instagram generadas: se recrean solas y en producción viven en el
+# volumen, no en el repo.
+data/marketing/
 *.log
 google-credentials.json
 backups/

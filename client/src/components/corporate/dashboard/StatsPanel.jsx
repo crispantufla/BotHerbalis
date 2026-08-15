@@ -1,6 +1,7 @@
 import React from 'react';
 import { DollarSign as Dollar, Users, AlertCircle as Alert, Activity } from 'lucide-react';
 import { KpiCard } from '../../ui';
+import { formatEURShort } from '../../../utils/format';
 
 const StatsPanel = ({ stats, loadingStats, alertsCount = 0 }) => {
     if (loadingStats) {
@@ -15,7 +16,7 @@ const StatsPanel = ({ stats, loadingStats, alertsCount = 0 }) => {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <KpiCard
                 label="Ventas Hoy"
-                value={`$${stats?.todayRevenue?.toLocaleString('es-AR') || '0'}`}
+                value={formatEURShort(stats?.todayRevenue)}
                 subtext={`${stats?.todayOrders || 0} pedidos hoy · ${stats?.totalOrders || 0} totales`}
                 icon={Dollar}
                 tone="success"

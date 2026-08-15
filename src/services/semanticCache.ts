@@ -38,7 +38,7 @@ const MEMORY_TTL_SECONDS = 10 * 60; // in-memory LRU for candidate rows
 const WRITE_MIN_USER_CHARS = 6; // don't cache ultra-short noise like "ok", "??"
 
 // Steps where FAQ-style repetition is common. Steps that collect data
-// (waiting_data, waiting_mp_payment, waiting_final_confirmation) are excluded
+// (waiting_data, waiting_payment_method, waiting_final_confirmation) are excluded
 // because answers there are conversation-specific and can leak across users.
 const CACHEABLE_STEPS = new Set([
     'waiting_weight',

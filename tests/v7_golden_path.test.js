@@ -119,7 +119,7 @@ describe('V7 golden path — greeting → weight → preference → menú de pag
         const allSent = sent.join(' \n ');
         expect(allSent).toMatch(/60 d[íi]as/i);   // muestra el plan 60
         expect(allSent).toMatch(/120 d[íi]as/i);  // y el plan 120
-        expect(allSent).toMatch(/¿Con cu[áa]l vas/i);
+        expect(allSent).toMatch(/¿Cu[áa]l prefieres/i);
     });
 
     test('+10 kg → tier 2 → muestra ambos planes + upsell al 120 → waiting_plan_choice', async () => {

@@ -77,7 +77,7 @@ export default function AlertBanner({ alert, expanded, onToggle, onAlertAction, 
                                         {alert.orderData.product}
                                     </Badge>
                                 )}
-                                {alert.orderData.plan && <Badge tone="purple" size="md">{alert.orderData.plan} días</Badge>}
+                                {alert.orderData.plan && <Badge tone="albero" size="md">{alert.orderData.plan} días</Badge>}
                                 {alert.orderData.price && <Badge tone="success" size="md">${alert.orderData.price}</Badge>}
                                 {alert.orderData.step && (
                                     <Badge tone="neutral" size="md">

@@ -87,13 +87,27 @@ describe('1. Falso abuso por modismos', () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-// 2. CÁPSULAS = QUEMADOR DE GRASA (guion)
+// 2. CÁPSULAS — cómo se presentan
+//
+// Este bloque comprobaba lo contrario: que la respuesta dijera "quemagrasa".
+// Venía del guion argentino y en España ese claim es ilegal (Reglamento CE
+// 1924/2006; presentar el complemento como adelgazante lo convierte en
+// medicamento sin autorización, precedente AEMPS 13/2012 sobre este mismo
+// producto). El test se invierte: ahora fija que NO aparezca, y que las
+// cápsulas se sigan vendiendo por lo que sí se puede decir — la comodidad.
 // ════════════════════════════════════════════════════════════════════════════
-describe('2. Cápsulas como quemador de grasa', () => {
-    test('la respuesta de cápsulas menciona "quemador de grasa"', () => {
-        const k = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'knowledge_v7.json'), 'utf8'));
-        const resp = k.flow.preference_capsulas.response;
-        expect(resp.toLowerCase()).toContain('quemador de grasa');
+describe('2. Cápsulas — presentación conforme', () => {
+    const knowledge = () => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'knowledge_v7.json'), 'utf8'));
+
+    test('la respuesta de cápsulas NO usa claims prohibidos', () => {
+        const resp = knowledge().flow.preference_capsulas.response;
+        const { checkCompliance } = require('../src/services/compliance');
+        expect(checkCompliance([resp])).toEqual([]);
+    });
+
+    test('sigue posicionando las cápsulas por su comodidad', () => {
+        const resp = knowledge().flow.preference_capsulas.response.toLowerCase();
+        expect(resp).toMatch(/c[óo]modo|una al d[íi]a/);
     });
 });
 
@@ -112,7 +126,7 @@ describe('3. Retiro en sucursal — captura de datos', () => {
         const state = {
             step: 'waiting_data', shippingChoice: 'retiro', paymentMethod: 'contrarembolso',
             selectedProduct: 'Cápsulas de nuez de la india', selectedPlan: '120',
-            partialAddress: { calle: 'A sucursal' }, cart: [], history: [],
+            partialAddress: { calle: 'A oficina de Correos' }, cart: [], history: [],
         };
         const text = 'Regina B. Bode\nCiudad: Helvecia.\nCodigo P. 3003\nSucursal correo: San Martin 555\nNecesitas algo mas?';
         const res = await handleWaitingData('r1@c.us', text, norm(text), state, { flow: {} }, deps);
@@ -121,57 +135,12 @@ describe('3. Retiro en sucursal — captura de datos', () => {
         expect(state.step).toBe('completed');
         expect(state.pendingOrder).toBeTruthy();
         expect(state.pendingOrder.nombre).toBe('Regina B. Bode');
-        expect(state.pendingOrder.calle).toBe('A sucursal');
+        expect(state.pendingOrder.calle).toBe('A oficina de Correos');
         expect(state.pendingOrder.cp).toBe('3003');
         // No volvió a pedir "dirección/calle"
         const all = sent.join(' ').toLowerCase();
         expect(all).not.toContain('a qué dirección');
         expect(all).not.toMatch(/calle y n[uú]mero/);
-    });
-});
-
-// ════════════════════════════════════════════════════════════════════════════
-// 4. SUBMENÚ DE PAGO — sin bucle (5491156581277)
-// ════════════════════════════════════════════════════════════════════════════
-describe('4. Submenú de pago no entra en bucle', () => {
-    const makeState = () => ({
-        step: 'waiting_payment_method', shippingChoice: 'domicilio', paymentSubChoiceAsked: true,
-        selectedProduct: 'Cápsulas de nuez de la india', selectedPlan: '120',
-        cart: [{ product: 'Cápsulas', plan: '120', price: '66.900' }], totalPrice: '66.900', history: [],
-    });
-    const makeDeps = (aiResp) => ({
-        sendMessageWithDelay: jest.fn().mockResolvedValue(undefined),
-        saveState: jest.fn(),
-        aiService: { chat: jest.fn().mockResolvedValue({ response: aiResp || 'Respuesta IA', goalMet: false }) },
-        notifyAdmin: jest.fn().mockResolvedValue(undefined),
-        sharedState: { pausedUsers: new Set(), io: null },
-    });
-
-    test('"sería al contado" → aclara retiro en sucursal', async () => {
-        const deps = makeDeps();
-        const state = makeState();
-        await handleWaitingPaymentMethod('p1@c.us', 'Sería al contado', 'seria al contado', state, { flow: {} }, deps);
-        const sent = deps.sendMessageWithDelay.mock.calls.map(([, m]) => m).join(' ');
-        expect(sent.toLowerCase()).toContain('sucursal');
-        expect(sent.toLowerCase()).toContain('retiro');
-        expect(state.paymentSubChoiceAsked).toBe(false);
-    });
-
-    test('"no me pasaste el precio" → responde el precio', async () => {
-        const deps = makeDeps();
-        const state = makeState();
-        await handleWaitingPaymentMethod('p2@c.us', 'no me pasastes el precio', 'no me pasastes el precio', state, { flow: {} }, deps);
-        const sent = deps.sendMessageWithDelay.mock.calls.map(([, m]) => m).join(' ');
-        expect(sent).toMatch(/66\.900/);
-    });
-
-    test('duda ambigua → responde con IA (no repite el menú)', async () => {
-        const deps = makeDeps('Te explico: a domicilio es prepago...');
-        const state = makeState();
-        await handleWaitingPaymentMethod('p3@c.us', 'no entiendo nada', 'no entiendo nada', state, { flow: {} }, deps);
-        expect(deps.aiService.chat).toHaveBeenCalled();
-        const sent = deps.sendMessageWithDelay.mock.calls.map(([, m]) => m).join(' ');
-        expect(sent).toContain('a domicilio es prepago');
     });
 });
 

@@ -4,6 +4,24 @@ import logger from '../../utils/logger';
 import { logStepTransition, markExit } from '../../services/funnelLogger';
 
 /**
+ * Centinela que va en `calle` cuando el cliente elige RECOGIDA EN OFICINA: en
+ * esa modalidad no hay dirección de entrega, solo población y CP, y con eso
+ * Correos asigna la oficina que le toca. La dirección que el cliente hubiera
+ * escrito igualmente queda en `calleOriginal`.
+ *
+ * Es un valor comparado en varios sitios (steps, orden, panel), así que vive
+ * en una constante: cuando estaba escrito a mano en cada archivo, bastaba una
+ * diferencia de mayúsculas para que un pedido de recogida se tratara como
+ * envío a domicilio.
+ */
+const PICKUP_STREET = 'A oficina de Correos';
+
+/** ¿Este pedido es de recogida en oficina? (compara el centinela sin case). */
+function _isPickupAddress(calle: string | null | undefined): boolean {
+    return String(calle || '').trim().toLowerCase() === PICKUP_STREET.toLowerCase();
+}
+
+/**
  * _cleanPhone
  * Extracts the raw phone number from a WhatsApp userId (e.g. "5491155551234@c.us" → "5491155551234").
  */
@@ -51,7 +69,7 @@ function _setStep(state: any, newStep: string) {
 async function _maybeUpsell(currentState: UserState, sendMessageWithDelay: Function, userId: string, saveStateFn?: Function) {
     // Aquí validamos que currentState es tipado (e.g alertaría si pones currentState.peso instead of weightGoal)
     if (currentState.weightGoal && Number(currentState.weightGoal) > 10) {
-        const upsell = "Personalmente yo te recomendaría el de 120 días debido al peso que esperas perder 👌";
+        const upsell = "Personalmente yo te recomendaría el de 120 días 👌 Son cuatro meses seguidos, es el formato más cómodo y te permite sostener la rutina sin cortes.";
         currentState.history.push({ role: 'bot', content: upsell, timestamp: Date.now() });
         if (saveStateFn) saveStateFn(userId);
         await sendMessageWithDelay(userId, upsell);
@@ -158,7 +176,7 @@ async function _pauseAndAlert(userId: string, currentState: UserState, dependenc
 
     // NIGHT MODE: Send polite night message
     if (!duringBusinessHours) {
-        const nightMsg = "Necesito consultar esto con mi compañero, pero entenderás que por la hora me es imposible. Apenas pueda te respondo, ¡quedate tranquilo/a! 😊🌙";
+        const nightMsg = "Necesito consultarlo con un compañero, pero entenderás que a estas horas no puedo. En cuanto pueda te contesto, ¡tú tranquila! 😊🌙";
         currentState.history.push({ role: 'bot', content: nightMsg, timestamp: Date.now() });
         await sendMessageWithDelay(userId, nightMsg);
     }
@@ -388,59 +406,50 @@ async function _maybeSendPaymentMenuV7(
 ): Promise<void> {
     if (nextStep !== 'waiting_payment_method') return;
     const { buildPaymentMessage } = require('../../utils/messageTemplates');
-    const { isMpEnabled } = require('./paymentOptions');
     const { sendMessageWithDelay, saveState } = dependencies;
-    const paymentMsg = buildPaymentMessage(currentState, knowledge, !isMpEnabled(dependencies.config));
+    const paymentMsg = buildPaymentMessage(currentState, knowledge);
     currentState.history.push({ role: 'bot', content: paymentMsg, timestamp: Date.now() });
     saveState(userId);
     await sendMessageWithDelay(userId, paymentMsg);
     logger.info(`[V7-AUTO-PAYMENT] User ${userId} → payment_menu enviado tras confirmar producto.`);
 }
 
-// ── Cambio de opinión de envío/pago en steps posteriores (jun-2026) ──────────
-// Un cliente que YA pasó por waiting_payment_method puede cambiar de idea sobre el
-// TIPO DE ENVÍO o el MEDIO DE PAGO en pasos donde antes no se detectaba
-// (waiting_data, waiting_final_confirmation) → caía a IA/parser de dirección y se
-// confundía (raíz común de varios bugs de may/jun-2026).
+// ── Cambio de opinión sobre la ENTREGA en steps posteriores ──────────────────
+// Un cliente que YA eligió cómo recibirlo puede cambiar de idea en pasos donde
+// antes no se detectaba (waiting_data, waiting_final_confirmation) → caía a
+// IA/parser de dirección y se confundía.
 //
-// Única fuente de verdad para APLICAR la elección de envío/pago = handleWaitingPaymentMethod.
-// Acá SOLO detectamos el cambio EXPLÍCITO y reencauzamos al step de pago (vía
-// staleReprocess), igual que ya hace stepWaitingTransferConfirmation. No armamos
-// mensajes: el reproceso por payment_method re-deriva todo del texto original.
+// Única fuente de verdad para APLICAR la elección = handleWaitingPaymentMethod.
+// Aquí SOLO detectamos el cambio EXPLÍCITO y reencauzamos a ese step (vía
+// staleReprocess). No armamos mensajes: el reproceso re-deriva todo del texto.
 //
-// Detección ESTRICTA a propósito: exige un MARCADOR de cambio ("mejor", "prefiero",
-// "cambié", "en realidad"...) para NO dispararse con direcciones normales que
-// mencionan "domicilio" o un número. Además solo cuenta si DIFIERE de lo ya elegido.
-const _SHIPSWITCH_MARKER = /\b(mejor|prefiero|prefer[ií]a|en realidad|en vez|en lugar|cambi[ée]|cambiar|quiero cambiar|me conviene|recapacit|me arrepent)\b/i;
-const _SHIPSWITCH_RETIRO = /\b(retiro|retir(?:ar|o)|en sucursal|a sucursal|sucursal del? correo|contra.?re?embolso)\b/i;
-const _SHIPSWITCH_DOMICILIO = /\b(a domicilio|a mi casa|a mi domicilio|en mi casa|que me lo manden|env[íi]o a domicilio|a la direcci[óo]n)\b/i;
-const _SHIPSWITCH_TARJETA = /\b(tarjeta|cr[ée]dito|mercado.?pago|link de pago|pago online)\b/i;
-const _SHIPSWITCH_TRANSFER = /\b(transfer[ei]ncia|transferir|por transferencia|al alias)\b/i;
+// Detección ESTRICTA a propósito: exige un MARCADOR de cambio ("mejor",
+// "prefiero", "en realidad"…) para NO dispararse con direcciones normales que
+// mencionan "domicilio". Además solo cuenta si DIFIERE de lo ya elegido.
+//
+// A diferencia del bot argentino, aquí no hay medio de pago que cambiar: todo
+// es contrarreembolso, así que el detector solo mira la MODALIDAD DE ENTREGA.
+const _SHIPSWITCH_MARKER = /\b(mejor|prefiero|prefer[ií]a|en realidad|en vez|en lugar|cambi[ée]|cambiar|quiero cambiar|me viene mejor|me va mejor|pensandolo mejor|me arrepent)\b/i;
+const _SHIPSWITCH_OFICINA = /\b(recoger|recogida|recogerlo|lo recojo|paso a por el|en (la )?oficina|oficina de correos|en correos|punto de recogida)\b/i;
+const _SHIPSWITCH_DOMICILIO = /\b(a domicilio|a mi casa|a mi domicilio|en mi casa|que me lo manden|que me lo traigan|env[íi]o a domicilio|a la direcci[óo]n|me lo traen)\b/i;
 
 function _detectShipPaySwitch(
     normalizedText: string,
-    currentState: any,
-    mpOn: boolean = true
-): { shipping?: 'retiro' | 'domicilio'; payment?: 'mercadopago' | 'transferencia' } | null {
+    currentState: any
+): { shipping?: 'retiro' | 'domicilio' } | null {
     if (!_SHIPSWITCH_MARKER.test(normalizedText)) return null;
     let shipping: 'retiro' | 'domicilio' | undefined;
-    let payment: 'mercadopago' | 'transferencia' | undefined;
-    if (_SHIPSWITCH_RETIRO.test(normalizedText) && currentState.shippingChoice !== 'retiro') shipping = 'retiro';
+    if (_SHIPSWITCH_OFICINA.test(normalizedText) && currentState.shippingChoice !== 'retiro') shipping = 'retiro';
     else if (_SHIPSWITCH_DOMICILIO.test(normalizedText) && currentState.shippingChoice !== 'domicilio') shipping = 'domicilio';
-    if (_SHIPSWITCH_TRANSFER.test(normalizedText) && currentState.paymentMethod !== 'transferencia') payment = 'transferencia';
-    // Con el interruptor de MP apagado, "mejor pago con tarjeta" NO es un cambio
-    // de medio aplicable: si lo tomáramos, reencauzaríamos a waiting_payment_method
-    // para terminar diciéndole que no está disponible. Lo dejamos pasar al step
-    // actual, que responde la objeción con las opciones vivas.
-    else if (mpOn && _SHIPSWITCH_TARJETA.test(normalizedText) && currentState.paymentMethod !== 'mercadopago') payment = 'mercadopago';
-    if (!shipping && !payment) return null;
-    return { shipping, payment };
+    if (!shipping) return null;
+    return { shipping };
 }
 
 /**
- * Si el cliente cambió de idea sobre envío/pago en un step posterior, resetea los
- * flags acoplados y reencauza a waiting_payment_method. Devuelve un resultado
- * staleReprocess listo para retornar, o null si no hubo cambio.
+ * Si el cliente cambió de idea sobre cómo recibir el pedido en un step
+ * posterior, resetea los flags acoplados y reencauza a waiting_payment_method.
+ * Devuelve un resultado staleReprocess listo para retornar, o null si no hubo
+ * cambio.
  */
 function _handleShipPaySwitch(
     userId: string,
@@ -448,25 +457,18 @@ function _handleShipPaySwitch(
     currentState: any,
     dependencies: any
 ): { matched: boolean; staleReprocess?: boolean } | null {
-    const { isMpEnabled } = require('./paymentOptions');
-    const sw = _detectShipPaySwitch(normalizedText, currentState, isMpEnabled(dependencies?.config));
+    const sw = _detectShipPaySwitch(normalizedText, currentState);
     if (!sw) return null;
-    if (sw.shipping) {
-        currentState.shippingChoice = null;
-        currentState.paymentMethod = null;
-        currentState.paymentSubChoiceAsked = false;
-        // Venía de retiro: la calle estaba pre-seteada a "A sucursal". La limpiamos
-        // para que un cambio a domicilio vuelva a pedir la dirección real.
-        if (currentState.partialAddress && currentState.partialAddress.calle === 'A sucursal') {
-            currentState.partialAddress.calle = undefined;
-        }
-    } else if (sw.payment) {
-        currentState.paymentMethod = null;
-        currentState.paymentSubChoiceAsked = false;
+    currentState.shippingChoice = null;
+    currentState.paymentMethod = null;
+    // Venía de recogida: la calle estaba pre-seteada a "A oficina". La limpiamos
+    // para que un cambio a domicilio vuelva a pedir la dirección real.
+    if (currentState.partialAddress && currentState.partialAddress.calle === PICKUP_STREET) {
+        currentState.partialAddress.calle = undefined;
     }
     _setStep(currentState, 'waiting_payment_method');
     if (dependencies && typeof dependencies.saveState === 'function') dependencies.saveState(userId);
-    logger.info(`[SHIP-PAY-SWITCH] ${userId} cambió de idea (${JSON.stringify(sw)}) → reencauzado a waiting_payment_method.`);
+    logger.info(`[SHIP-SWITCH] ${userId} cambió de idea (${JSON.stringify(sw)}) → reencauzado a waiting_payment_method.`);
     return { matched: false, staleReprocess: true };
 }
 
@@ -587,6 +589,8 @@ async function _closeSaleAndNotify(
 }
 
 export {
+    PICKUP_STREET,
+    _isPickupAddress,
     _cleanPhone,
     _isInfoQuestion,
     _startsAffirmative,

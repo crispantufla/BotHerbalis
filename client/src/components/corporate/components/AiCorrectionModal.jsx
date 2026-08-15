@@ -59,7 +59,7 @@ const AiCorrectionModal = ({ isOpen, onClose, messages = [], reportedMsgId, sele
                     toast.success('Reporte guardado, pero falló eliminar el mensaje del cliente.');
                 }
             } else {
-                toast.success('Reporte guardado ✅ Lo podés ver en la sección "Errores de IA".');
+                toast.success('Reporte guardado ✅ Lo puedes ver en la sección "Errores de IA".');
             }
 
             onClose();
@@ -77,14 +77,14 @@ const AiCorrectionModal = ({ isOpen, onClose, messages = [], reportedMsgId, sele
             <div className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl overflow-hidden relative z-10 animate-fade-in flex flex-col max-h-[90vh]">
 
                 {/* Header */}
-                <div className="p-5 sm:p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-amber-50 dark:bg-amber-900/20">
+                <div className="p-5 sm:p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-warning-50 dark:bg-warning-900/20">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-600 flex items-center justify-center">
+                        <div className="w-10 h-10 rounded-full bg-warning-100 dark:bg-warning-900/40 text-warning-600 flex items-center justify-center">
                             <AlertTriangle className="w-5 h-5" />
                         </div>
                         <div>
                             <h2 className="text-xl font-extrabold text-slate-800 dark:text-slate-100">Reportar Error de IA</h2>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Ayudá a mejorar las respuestas del bot (+{selectedChat?.id?.split('@')[0]})</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Ayuda a mejorar las respuestas del bot (+{selectedChat?.id?.split('@')[0]})</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors">
@@ -98,7 +98,7 @@ const AiCorrectionModal = ({ isOpen, onClose, messages = [], reportedMsgId, sele
                     {/* Reported message */}
                     <div>
                         <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm tracking-wide uppercase mb-3">Estás reportando este mensaje</h3>
-                        <div className="p-4 rounded-2xl text-[13px] leading-relaxed bg-rose-100 dark:bg-rose-900/30 text-rose-800 dark:text-rose-200 border-2 border-rose-400 break-words">
+                        <div className="p-4 rounded-2xl text-[13px] leading-relaxed bg-danger-100 dark:bg-danger-900/30 text-danger-800 dark:text-danger-200 border-2 border-danger-400 break-words">
                             <span className="font-bold block text-[10px] opacity-60 uppercase mb-1">Bot</span>
                             {reportedMsg?.body || '[Media Oculta]'}
                         </div>
@@ -107,14 +107,14 @@ const AiCorrectionModal = ({ isOpen, onClose, messages = [], reportedMsgId, sele
                     {/* Correction */}
                     <div>
                         <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm tracking-wide mb-3 flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-amber-500 outline outline-2 outline-amber-200"></span>
+                            <span className="w-2 h-2 rounded-full bg-warning-500 outline outline-2 outline-warning-200"></span>
                             ¿Qué hizo mal o qué debería haber dicho?
                         </h3>
                         <textarea
                             value={correctionText}
                             onChange={(e) => setCorrectionText(e.target.value)}
-                            placeholder="Ej: Acá asumió que no teníamos stock, pero sí tenemos. Debería haberle ofrecido el pack de 60 días."
-                            className="w-full h-32 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-2xl p-4 text-sm focus:outline-none focus:border-amber-400 focus:ring-4 focus:ring-amber-500/10 transition-all text-slate-800 dark:text-slate-100 resize-none"
+                            placeholder="Ej: Aquí dio por hecho que no teníamos stock, pero sí tenemos. Debería haberle ofrecido el pack de 60 días."
+                            className="w-full h-32 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-2xl p-4 text-sm focus:outline-none focus:border-warning-400 focus:ring-4 focus:ring-warning-500/10 transition-all text-slate-800 dark:text-slate-100 resize-none"
                             autoFocus
                         ></textarea>
                     </div>
@@ -123,20 +123,20 @@ const AiCorrectionModal = ({ isOpen, onClose, messages = [], reportedMsgId, sele
                         En el playground no aplica: la conversación es efímera y no hay
                         mensaje real en WhatsApp para eliminar. */}
                     {typeof onDeleteMessage === 'function' && (
-                        <label className="flex items-start gap-3 p-4 rounded-2xl border-2 border-slate-200 dark:border-slate-700 hover:border-rose-400 dark:hover:border-rose-500 transition-colors cursor-pointer bg-slate-50 dark:bg-slate-800/40">
+                        <label className="flex items-start gap-3 p-4 rounded-2xl border-2 border-slate-200 dark:border-slate-700 hover:border-danger-400 dark:hover:border-danger-500 transition-colors cursor-pointer bg-slate-50 dark:bg-slate-800/40">
                             <input
                                 type="checkbox"
                                 checked={alsoDelete}
                                 onChange={(e) => setAlsoDelete(e.target.checked)}
-                                className="mt-0.5 w-5 h-5 rounded text-rose-600 border-slate-300 focus:ring-2 focus:ring-rose-400 cursor-pointer"
+                                className="mt-0.5 w-5 h-5 rounded text-danger-600 border-slate-300 focus:ring-2 focus:ring-danger-400 cursor-pointer"
                             />
                             <div className="flex-1">
                                 <div className="flex items-center gap-2 font-bold text-slate-800 dark:text-slate-100 text-sm">
-                                    <Trash2 className="w-4 h-4 text-rose-500" />
+                                    <Trash2 className="w-4 h-4 text-danger-500" />
                                     Eliminar también el mensaje del WhatsApp del cliente
                                 </div>
                                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-snug">
-                                    Borra el mensaje para todos (vos y el cliente). Solo funciona si el mensaje fue enviado hace menos de ~2 horas.
+                                    Borra el mensaje para todos (tú y el cliente). Solo funciona si el mensaje se envió hace menos de ~2 horas.
                                 </p>
                             </div>
                         </label>
@@ -152,7 +152,7 @@ const AiCorrectionModal = ({ isOpen, onClose, messages = [], reportedMsgId, sele
                         <button
                             onClick={handleSubmit}
                             disabled={loading}
-                            className="px-6 py-2.5 rounded-xl font-bold text-white bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-md shadow-amber-500/20 hover:shadow-lg transition-all flex items-center gap-2 transform active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                            className="px-6 py-2.5 rounded-xl font-bold text-white bg-gradient-to-r from-warning-500 to-albero-600 hover:from-warning-600 hover:to-albero-700 shadow-md shadow-warning-500/20 hover:shadow-lg transition-all flex items-center gap-2 transform active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
                         >
                             {loading
                                 ? <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />

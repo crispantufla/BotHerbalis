@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Pause, Play, CreditCard, Copy, Check, Smartphone, Clock } from 'lucide-react';
+import { Pause, Play, Smartphone, Clock } from 'lucide-react';
 import api from '../../config/axios';
 import { useToast } from '../ui/Toast';
 import { useAuth } from '../../context/AuthContext';
-import { Button, Card, Input, IconButton } from '../ui';
+import { Button, Card, Input } from '../ui';
 
 import StatsPanel from './dashboard/StatsPanel';
 import AlertsPanel from './dashboard/AlertsPanel';
@@ -52,14 +52,14 @@ const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData 
     const handleAddPhone = async (phoneInput) => {
         const cleaned = phoneInput.replace(/\D/g, '');
         if (!cleaned || cleaned.length < 8) {
-            toast.warning('Ingresá un número válido con código de país (ej: 5493411234567)');
+            toast.warning('Introduce un número válido con código de país (ej: 34612345678)');
             return;
         }
         try {
             await api.post('/api/config', { action: 'add', number: cleaned });
-            toast.success(`Número ${cleaned} agregado`);
+            toast.success(`Número ${cleaned} añadido`);
             window.dispatchEvent(new Event('config-updated'));
-        } catch (e) { toast.error('Error agregando número'); }
+        } catch (e) { toast.error('Error al añadir el número'); }
     };
 
     const handleRemovePhone = async (num) => {
@@ -69,7 +69,7 @@ const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData 
             await api.post('/api/config', { action: 'remove', number: num });
             toast.success(`Número ${num} eliminado`);
             window.dispatchEvent(new Event('config-updated'));
-        } catch (e) { toast.error('Error eliminando número'); }
+        } catch (e) { toast.error('Error al eliminar el número'); }
     };
 
     const handleAdminCommand = async (alert, command) => {
@@ -83,7 +83,7 @@ const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData 
     const handleRequestPairingCode = async () => {
         const cleaned = pairingPhone.replace(/\D/g, '');
         if (!cleaned || cleaned.length < 8) {
-            toast.warning('Ingresa un número válido con código de país (ej: 5493411234567)');
+            toast.warning('Introduce un número válido con código de país (ej: 34612345678)');
             return;
         }
         setLoadingPairing(true);
@@ -119,32 +119,9 @@ const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData 
         }
     };
 
-    // MercadoPago link generator
-    const [mpAmount, setMpAmount] = useState('');
-    const [mpLink, setMpLink] = useState('');
-    const [mpLoading, setMpLoading] = useState(false);
-    const [mpCopied, setMpCopied] = useState(false);
-
-    const handleGenerateMpLink = async () => {
-        const amount = parseFloat(mpAmount.replace(',', '.'));
-        if (!amount || amount <= 0) { toast.warning('Ingresá un monto válido'); return; }
-        setMpLoading(true);
-        setMpLink('');
-        try {
-            const res = await api.post('/api/mp-link', { amount });
-            setMpLink(res.data.link);
-        } catch (e) {
-            toast.error(e.response?.data?.error || 'Error generando enlace');
-        } finally {
-            setMpLoading(false);
-        }
-    };
-
-    const handleCopyMpLink = () => {
-        navigator.clipboard.writeText(mpLink);
-        setMpCopied(true);
-        setTimeout(() => setMpCopied(false), 2000);
-    };
+    // El generador de enlaces de pago (Mercado Pago) se eliminó: en España se
+    // cobra siempre contra reembolso — no hay links de pago ni cobros por
+    // adelantado — y el endpoint /api/mp-link ya no existe en el backend.
 
     const adminNumbers = config?.alertNumbers || (config?.alertNumber ? [config.alertNumber] : []);
 
@@ -164,7 +141,7 @@ const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData 
 
     // Pausa TODOS los bots (todos los sellers activos). Solo admin global.
     const handlePauseAll = async () => {
-        const ok = await confirm('¿Pausar el bot de TODOS los vendedores?\n\nEsta acción afecta a todos los sellers activos. Para reactivar, repetí la operación o destrabá cada uno individualmente.');
+        const ok = await confirm('¿Pausar el bot de TODOS los vendedores?\n\nEsta acción afecta a todos los sellers activos. Para reactivar, repite la operación o desbloquea cada uno individualmente.');
         if (!ok) return;
         setPausingAll(true);
         try {
@@ -229,7 +206,7 @@ const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData 
                     </div>
                     <h2 className="text-h2 text-slate-900 dark:text-slate-100 mb-1">Vincular dispositivo</h2>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">
-                        Abrí WhatsApp → Dispositivos vinculados
+                        Abre WhatsApp → Dispositivos vinculados
                     </p>
 
                     {pairingCode ? (
@@ -241,7 +218,7 @@ const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData 
                                 {pairingCode}
                             </div>
                             <p className="text-xs text-slate-500 dark:text-slate-400 mt-3">
-                                Ingresá este código en tu celular cuando llegue la notificación.
+                                Introduce este código en tu móvil cuando llegue la notificación.
                             </p>
                             <Button
                                 variant="ghost"
@@ -259,13 +236,13 @@ const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData 
                             </div>
                             <div className="pt-5 border-t border-slate-200 dark:border-slate-700/70">
                                 <p className="text-sm text-slate-600 dark:text-slate-300 mb-3 font-medium">
-                                    ¿No podés escanear el QR?
+                                    ¿No puedes escanear el QR?
                                 </p>
                                 <div className="flex gap-2">
                                     <Input
                                         value={pairingPhone}
                                         onChange={(e) => setPairingPhone(e.target.value)}
-                                        placeholder="Ej: 5493415555555"
+                                        placeholder="Ej: 34612345678"
                                         aria-label="Teléfono para código de vinculación"
                                     />
                                     <Button
@@ -300,7 +277,7 @@ const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData 
                     </div>
                     <p className="text-sm font-semibold text-warning-700 dark:text-warning-500">QR expirado</p>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 max-w-sm mx-auto">
-                        El código no fue escaneado a tiempo. Presioná "Regenerar QR" para volver a generar uno nuevo.
+                        El código no se escaneó a tiempo. Pulsa "Regenerar QR" para generar uno nuevo.
                     </p>
                 </Card>
             )}
@@ -322,58 +299,6 @@ const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData 
                         onRemovePhone={handleRemovePhone}
                         onRegenerateQR={handleRegenerateQR}
                     />
-
-                    {/* MercadoPago Link Generator */}
-                    <Card padding="md">
-                        <div className="flex items-center gap-2 mb-3">
-                            <div className="w-8 h-8 rounded-control bg-info-50 dark:bg-info-900/30 text-info-600 dark:text-info-500 flex items-center justify-center flex-shrink-0">
-                                <CreditCard className="w-4 h-4" aria-hidden="true" />
-                            </div>
-                            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                                Enlace de pago — MP
-                            </h3>
-                        </div>
-                        <div className="flex gap-2">
-                            <Input
-                                type="number"
-                                min="1"
-                                placeholder="Monto"
-                                value={mpAmount}
-                                onChange={e => { setMpAmount(e.target.value); setMpLink(''); }}
-                                onKeyDown={e => e.key === 'Enter' && handleGenerateMpLink()}
-                                aria-label="Monto en pesos"
-                                leftIcon={() => <span className="text-slate-400 font-medium">$</span>}
-                            />
-                            <Button
-                                onClick={handleGenerateMpLink}
-                                loading={mpLoading}
-                                disabled={!mpAmount}
-                                className="flex-shrink-0"
-                            >
-                                Generar
-                            </Button>
-                        </div>
-                        {mpLink && (
-                            <div className="mt-3 flex items-center gap-2 bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700/70 rounded-control px-3 py-2">
-                                <a
-                                    href={mpLink}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex-1 text-info-600 dark:text-info-500 text-xs font-medium truncate hover:underline"
-                                >
-                                    {mpLink}
-                                </a>
-                                <IconButton
-                                    label={mpCopied ? 'Copiado' : 'Copiar enlace'}
-                                    icon={mpCopied ? Check : Copy}
-                                    variant={mpCopied ? 'subtle' : 'ghost'}
-                                    size="sm"
-                                    onClick={handleCopyMpLink}
-                                    className={mpCopied ? '!bg-success-50 dark:!bg-success-900/30 !text-success-600 dark:!text-success-500' : ''}
-                                />
-                            </div>
-                        )}
-                    </Card>
                 </div>
             </div>
         </div>

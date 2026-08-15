@@ -262,48 +262,21 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
             // Image/Sticker
             if (msg.type === 'image' || msg.type === 'sticker') {
                 logAndEmit(userId, 'user', `📷 ${msg.type === 'sticker' ? 'Sticker' : 'Imagen'} recibida${msg.body ? ': ' + msg.body : ''}`, userState[userId]?.step || 'new');
-                // FIX (caso real Romina 19-may): si el cliente está en flujo de
-                // pago (waiting_mp_payment o waiting_transfer_confirmation) y
-                // manda una imagen, probablemente sea un comprobante. Pausar y
-                // alertar al admin para verificación manual.
-                const stepNow = userState[userId]?.step;
-                if (msg.type === 'image' && (stepNow === 'waiting_mp_payment' || stepNow === 'waiting_transfer_confirmation')) {
-                    try {
-                        await client.sendMessage(userId, '¡Recibí la imagen del comprobante! 📸 Un asesor lo verifica enseguida y te confirma el envío.');
-                        const { pauseUser } = require('../services/pauseService');
-                        await pauseUser(userId, 'Cliente envió comprobante (imagen) durante pago. Verificación manual requerida.', { sharedState });
-                        await notifyAdmin('💸 Comprobante recibido (imagen)', userId, `Cliente mandó una imagen estando en ${stepNow}. Probable comprobante de pago — verificar y confirmar pedido.`);
-                    } catch (e: any) {
-                        logger.warn(`[COMPROBANTE-IMG] Error procesando imagen: ${e.message}`);
-                    }
-                    return;
-                }
+                // (El bot argentino interceptaba aquí las imágenes de
+                // comprobantes de pago. Aquí no hay pagos por adelantado, así
+                // que una imagen es una imagen: sigue el flujo normal.)
                 if (msg.type === 'image' && msg.body) {
                     msgText = `[Imagen enviada por el usuario] ${msg.body}`;
                 } else { return; }
             }
 
-            // Document/PDF — típicamente comprobante de pago. Si el cliente
-            // está en flujo de pago, pausamos y alertamos al admin para
-            // verificación manual. Sin esto, el bot le contestaba genérico y
-            // dejaba al cliente en limbo (caso real Romina 19-may).
+            // Document/PDF — lo registramos en el chat para que el vendedor lo
+            // vea, pero el bot no lo procesa: aquí no hay justificantes de pago
+            // que verificar (todo es contra reembolso) y no sabemos qué hacer
+            // con un adjunto cualquiera.
             if (msg.type === 'document') {
                 const filename = (msg as any)._data?.filename || msg.body || 'documento.pdf';
                 logAndEmit(userId, 'user', `📄 Documento recibido: ${filename}`, userState[userId]?.step || 'new');
-                const stepNow = userState[userId]?.step;
-                if (stepNow === 'waiting_mp_payment' || stepNow === 'waiting_transfer_confirmation') {
-                    try {
-                        await client.sendMessage(userId, '¡Recibí el comprobante! 📄 Un asesor lo verifica enseguida y te confirma el envío.');
-                        const { pauseUser } = require('../services/pauseService');
-                        await pauseUser(userId, 'Cliente envió comprobante (PDF) durante pago. Verificación manual requerida.', { sharedState });
-                        await notifyAdmin('💸 Comprobante recibido (PDF)', userId, `Cliente mandó "${filename}" estando en ${stepNow}. Verificar pago y confirmar pedido manualmente.`);
-                    } catch (e: any) {
-                        logger.warn(`[COMPROBANTE-DOC] Error procesando documento: ${e.message}`);
-                    }
-                    return;
-                }
-                // Fuera de los steps de pago, ignoramos el documento (no
-                // sabemos qué hacer con él) — el bot sigue con el flow normal.
                 return;
             }
 

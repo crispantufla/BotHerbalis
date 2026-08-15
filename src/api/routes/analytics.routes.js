@@ -3,7 +3,7 @@ const logger = require('../../utils/logger');
 const { prisma } = require('../../../db');
 const { toZonedTime } = require('date-fns-tz');
 
-const AR_TZ = 'America/Argentina/Buenos_Aires';
+const AR_TZ = 'Europe/Madrid';
 
 module.exports = (clientPool) => {
     const router = express.Router();

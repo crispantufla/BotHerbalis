@@ -61,14 +61,14 @@ const PriceEditor = () => {
     return (
         <div className="bg-transparent p-6 h-full transition-colors duration-300">
             <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-6 flex items-center gap-2">
-                <span className="text-emerald-500">💰</span> Editor de Precios
+                <span className="text-success-500">💰</span> Editor de Precios
             </h2>
 
             <div className="space-y-6">
                 {!prices || Object.keys(prices).length === 0 ? (
                     <div className="text-center py-8 text-slate-400 dark:text-slate-500">
                         <p>No se pudieron cargar los precios.</p>
-                        <button onClick={fetchPrices} className="mt-2 text-emerald-600 dark:text-emerald-400 underline hover:text-emerald-700 dark:hover:text-emerald-300">Reintentar</button>
+                        <button onClick={fetchPrices} className="mt-2 text-success-600 dark:text-success-400 underline hover:text-success-700 dark:hover:text-success-300">Reintentar</button>
                     </div>
                 ) : (
                     <>
@@ -77,7 +77,7 @@ const PriceEditor = () => {
                             .filter(([_, value]) => typeof value === 'object' && value !== null)
                             .map(([product, plans]) => (
                                 <div key={product} className="pb-4 border-b border-slate-100 dark:border-slate-700 last:border-0">
-                                    <h3 className="text-emerald-600 dark:text-emerald-400 font-semibold mb-3">{product}</h3>
+                                    <h3 className="text-success-600 dark:text-success-400 font-semibold mb-3">{product}</h3>
                                     <div className="grid grid-cols-2 gap-4">
                                         {Object.keys(plans).map(plan => (
                                             <div key={plan}>
@@ -88,7 +88,7 @@ const PriceEditor = () => {
                                                     <span className="absolute left-3 top-2 text-slate-400 dark:text-slate-500">$</span>
                                                     <input
                                                         type="text"
-                                                        className="w-full pl-7 pr-3 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                                                        className="w-full pl-7 pr-3 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 rounded-md focus:ring-2 focus:ring-success-500 focus:border-transparent outline-none transition-all"
                                                         value={plans[plan]}
                                                         onChange={(e) => handleChange(product, plan, e.target.value)}
                                                     />
@@ -102,7 +102,7 @@ const PriceEditor = () => {
                         {/* Render Global Config (Strings) */}
                         <div className="pt-6 mt-2 border-t border-slate-200 dark:border-slate-700">
                             <h3 className="text-slate-800 dark:text-slate-100 font-bold mb-4 flex items-center gap-2">
-                                <span className="text-emerald-500">⚙️</span> Configuración Adicional
+                                <span className="text-success-500">⚙️</span> Configuración Adicional
                             </h3>
                             <div className="grid grid-cols-1 gap-4">
                                 {/* Costo Logístico */}
@@ -114,7 +114,7 @@ const PriceEditor = () => {
                                         <span className="absolute left-3 top-2 text-slate-400 dark:text-slate-500">$</span>
                                         <input
                                             type="text"
-                                            className="w-full pl-7 pr-3 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                                            className="w-full pl-7 pr-3 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 rounded-md focus:ring-2 focus:ring-success-500 focus:border-transparent outline-none transition-all"
                                             value={prices.costoLogistico || ''}
                                             onChange={(e) => setPrices(prev => ({ ...prev, costoLogistico: e.target.value }))}
                                             placeholder="18.000"
@@ -129,12 +129,12 @@ const PriceEditor = () => {
             </div>
 
             <div className="mt-6 flex justify-between items-center pt-4 border-t border-slate-100 dark:border-slate-700">
-                <span className={`text-sm font-medium ${message.includes('Error') ? 'text-red-500 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                <span className={`text-sm font-medium ${message.includes('Error') ? 'text-danger-500 dark:text-danger-400' : 'text-success-600 dark:text-success-400'}`}>
                     {message}
                 </span>
                 <button
                     onClick={savePrices}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-md font-medium transition-colors shadow-sm"
+                    className="bg-success-600 hover:bg-success-700 text-white px-6 py-2 rounded-md font-medium transition-colors shadow-sm"
                 >
                     Guardar Cambios
                 </button>
