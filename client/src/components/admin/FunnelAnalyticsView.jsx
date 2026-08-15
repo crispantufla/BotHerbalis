@@ -65,7 +65,7 @@ const STEP_EXPLAIN = {
     waiting_final_confirmation: 'Confirmación final del pedido.',
     waiting_admin_ok: 'Admin validando antes de cerrar.',
     waiting_admin_validation: 'Espera OK manual del admin.',
-    closing: 'Cierre: armando el mensaje final con totales.',
+    closing: 'Cierre: preparando el mensaje final con totales.',
     completed: 'Venta cerrada. Cliente derivado a post-venta.',
     post_sale: 'Cliente que ya compró. Preguntas post-entrega.',
     safety_check: 'Chequeo de seguridad antes de vender.',
@@ -204,10 +204,10 @@ const FunnelAnalyticsView = () => {
                             </p>
                             <p>
                                 <strong className="text-slate-900 dark:text-slate-100">Qué significa "se traba".</strong>{' '}
-                                Si de 100 clientes que llegaron a "Datos" solo 60 pasaron al siguiente, hay 40 que se cayeron ahí — un <strong>40% de drop</strong>. Ver <em>qué step</em> tiene más drop es donde conviene arreglar.
+                                Si de 100 clientes que llegaron a "Datos" solo 60 pasaron al siguiente, hay 40 que se cayeron ahí — un <strong>40% de drop</strong>. El step con <em>más drop</em> es donde conviene meter mano.
                             </p>
                             <p>
-                                <strong className="text-slate-900 dark:text-slate-100">De dónde sale la data.</strong>{' '}
+                                <strong className="text-slate-900 dark:text-slate-100">De dónde salen los datos.</strong>{' '}
                                 Solo conversaciones nuevas desde que esta función se activó. Los números crecen con el tiempo. El rango de fechas define qué período mirar.
                             </p>
                         </div>

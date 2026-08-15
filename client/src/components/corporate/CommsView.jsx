@@ -748,7 +748,7 @@ Teléfono: ${phoneDisplay}`;
                                     )}
                                 </div>
                                 <IconButton
-                                    label="Panel de guión"
+                                    label="Panel de guion"
                                     icon={FileText}
                                     variant="subtle"
                                     size="sm"

@@ -266,14 +266,14 @@ const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onC
                         <div className="flex items-center justify-between gap-3">
                             <label className="text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">Descuento</label>
                             <div className="relative w-32">
-                                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">€</span>
                                 <input
                                     type="text"
                                     inputMode="numeric"
                                     value={data.discount}
                                     onChange={e => handleField('discount', onlyDigits(e.target.value))}
                                     placeholder="0"
-                                    className="w-full pl-6 pr-2 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-right text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-300"
+                                    className="w-full pl-2 pr-6 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-right text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-300"
                                 />
                             </div>
                         </div>

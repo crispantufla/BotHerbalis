@@ -402,93 +402,93 @@ const MANUALS = [
     },
     {
         id: 'pagos-mp',
-        title: 'Pagos MercadoPago',
-        description: 'Como generar links de pago, enviárselos a clientes, verificar el estado y entender los plazos de acreditación.',
+        title: 'Cobro contra reembolso',
+        description: 'Cómo se cobra aquí: el cliente paga al recibir el pedido. Dónde paga, cómo se sigue el cobro y qué no hay que pedirle nunca.',
         icon: CreditCard,
         color: 'amber',
         sections: [
             {
-                title: '¿Para qué sirve esta sección?',
+                title: '¿Cómo se cobra?',
                 icon: HelpCircle,
-                content: `La sección **Pagos MP** te permite generar links de pago de MercadoPago y enviárselos a clientes que quieran pagar por adelantado.\n\nTodos los pagos se rastrean automáticamente — el sistema revisa cada 5 minutos si fueron pagados y actualiza el estado.`,
+                content: `Todas las ventas son **contra reembolso**: el cliente **no paga nada por adelantado**. Paga el importe completo cuando recibe el paquete.\n\nNo hay pago con tarjeta, ni enlaces de pago, ni transferencias, ni señas ni anticipos. El bot no los ofrece y el cliente no los espera.`,
             },
             {
-                title: 'Generar un link de pago',
-                icon: CreditCard,
-                steps: [
-                    { label: 'Click en "Nuevo Link de Pago"', detail: 'Botón morado en la parte superior.' },
-                    { label: 'Ingresá el monto', detail: 'En pesos argentinos, sin puntos ni comas.' },
-                    { label: 'Ingresá el teléfono del cliente (opcional)', detail: 'Para poder ir al chat desde el listado.' },
-                    { label: 'Click en "Generar"', detail: 'El link se crea en MercadoPago y aparece en la lista.' },
-                ],
+                title: 'Dónde paga el cliente',
+                icon: Package,
+                table: {
+                    headers: ['Dónde', 'Cómo paga'],
+                    rows: [
+                        ['En casa', 'Le paga al repartidor de Correos cuando le entrega el paquete'],
+                        ['En su oficina de Correos', 'Si no estaba en casa, recoge el paquete y lo paga allí'],
+                    ]
+                },
+                extra: `El envío es **gratis** y tarda de **3 a 5 días laborables**. El cliente solo paga el precio del producto, sin gastos añadidos.`
             },
             {
-                title: 'Enviar el link al cliente',
-                icon: Send,
-                steps: [
-                    { label: 'Encontrá el pago en la lista', detail: 'Aparece inmediatamente tras generarlo.' },
-                    { label: 'Click en el ícono de copiar', detail: 'Copia el link al portapapeles.' },
-                    { label: 'Pegalo en el chat del cliente', detail: 'Desde la sección Chat & Atención o WhatsApp directo.' },
-                ],
-                extra: `También podés hacer click en el ícono externo para abrirlo en MercadoPago y verificar los detalles.`
+                title: 'Dónde se sigue el cobro',
+                icon: Eye,
+                content: `No hay una pantalla de pagos aparte: el cobro va pegado al pedido. Lo sigues desde **Ventas & Logística**, mirando el estado de cada pedido y su localizador de Correos.`,
+                extra: `Con el localizador puedes comprobar la entrega en la web de Correos. Entregado = cobrado.`
             },
             {
-                title: 'Estados de un pago',
+                title: 'Qué significa cada estado para el cobro',
                 icon: CheckCircle,
                 table: {
-                    headers: ['Estado', 'Significado'],
+                    headers: ['Estado del pedido', 'Qué significa para el dinero'],
                     rows: [
-                        ['Pendiente', 'El link fue creado pero el cliente aún no pagó'],
-                        ['Aprobado', 'El pago fue acreditado exitosamente'],
-                        ['Rechazado', 'El pago fue rechazado por MercadoPago'],
-                        ['Expirado', 'El link venció sin ser usado'],
+                        ['Pendiente', 'Todavía no hay nada que cobrar — falta confirmarlo'],
+                        ['Confirmado', 'A preparar el paquete. Sigue sin haber cobro'],
+                        ['Enviado', 'En camino con Correos, pendiente de cobro'],
+                        ['Entregado', 'El cliente ha recibido el paquete y lo ha pagado'],
+                        ['Cancelado', 'No se cobra nada'],
                     ]
                 },
             },
             {
-                title: 'Verificar si ya pagó',
-                icon: Eye,
-                content: `El sistema actualiza los estados automáticamente cada **5 minutos** de 9 a 23hs.\n\nSi necesitás verificar inmediatamente, clickeá el ícono de **recargar** en la fila del pago. También podés usar el botón **"Actualizar todos"** para refrescar todos los pendientes de una vez.`,
+                title: 'Cuándo llega el dinero',
+                icon: AlertTriangle,
+                content: `El repartidor cobra al cliente, pero el dinero no aparece en tu cuenta el mismo día: Correos ingresa el importe de los reembolsos al remitente unos días después de la entrega, según las condiciones de tu contrato de reembolso.\n\nPor eso un pedido puede figurar como **Entregado** antes de que veas el ingreso en el banco. Los plazos y las comisiones se consultan con Correos, no desde este panel.`,
             },
             {
-                title: 'Plazos de acreditación',
-                icon: AlertTriangle,
-                content: `El dinero no se acredita en tu cuenta al instante. MercadoPago tiene plazos según la comisión elegida:\n\n- **Inmediato** — comisión más alta (~6.29% + IVA)\n- **14 días** — comisión media\n- **35 días** — comisión más baja (~1.49% + IVA)\n\nEsto se configura en tu cuenta de MercadoPago en **Tu negocio → Costos y cuotas**, no desde el sistema.`,
+                title: 'Si el cliente quiere pagar antes',
+                icon: Send,
+                content: `Pasa a menudo, y la respuesta es siempre la misma: **no hace falta**. Se paga al recibir, y eso juega a favor — el cliente no arriesga nada.\n\nNunca le des un número de cuenta ni le pidas una transferencia, aunque insista: no hay forma de cuadrar ese dinero con el pedido y el paquete se envía igual contra reembolso.`,
             },
             {
                 title: 'Reglas importantes',
                 icon: Shield,
                 bullets: [
-                    'Cada link es de un solo uso — si el cliente necesita pagar de nuevo, generá uno nuevo.',
-                    'Los links de MercadoPago vencen a los 30 días si no se usan.',
-                    'El estado "Aprobado" no significa que el dinero está en tu cuenta — depende del plazo de acreditación configurado.',
-                    'Si un pago figura como Pendiente pero el cliente dice que pagó, usá el botón de recarga individual.',
+                    'El cliente no paga nada por adelantado: paga el importe completo al recibir el paquete.',
+                    'No pidas nunca tarjeta, transferencia, señas ni anticipos.',
+                    'Los importes van en euros (ej.: 51,90 €). El precio que ve el cliente es el que paga al repartidor.',
+                    'Confirma la dirección y el teléfono antes de dar el pedido por bueno: un dato mal cogido es un paquete devuelto.',
+                    'Si el cliente no está en casa, Correos le deja aviso y puede recogerlo y pagarlo en su oficina.',
+                    'Un pedido no está cobrado hasta que figura como "Entregado".',
                 ],
             },
         ],
     },
     {
         id: 'guion-prompts',
-        title: 'Guión & Prompts',
-        description: 'Como ver y editar el guion del bot, cambiar entre versiones y gestionar las respuestas frecuentes (FAQ).',
+        title: 'Guion & Prompts',
+        description: 'Cómo ver y editar el guion del bot, cambiar de versión y gestionar las respuestas frecuentes (FAQ).',
         icon: FileText,
         color: 'indigo',
         sections: [
             {
-                title: '¿Qué es el guión?',
+                title: '¿Qué es el guion?',
                 icon: HelpCircle,
-                content: `El **guión** es el texto que le dice a la IA cómo comportarse en cada paso de la conversación. Define:\n\n- Qué decir en el saludo inicial\n- Cómo preguntar el peso del cliente\n- Cómo presentar los planes y precios\n- Cómo manejar objeciones y cerrar la venta`,
+                content: `El **guion** es el texto que le dice a la IA cómo comportarse en cada paso de la conversación. Define:\n\n- Qué decir en el saludo inicial\n- Cómo preguntar qué tipo de plan busca el cliente\n- Cómo presentar los planes y precios\n- Cómo manejar objeciones y cerrar la venta`,
             },
             {
-                title: 'Versiones del guión',
+                title: 'Versiones del guion',
                 icon: List,
-                content: `Hay múltiples versiones del guión (v3, v4, v5). Cada una tiene un enfoque distinto:`,
+                content: `Hoy solo hay **una versión viva, la v7**. Las anteriores se archivaron y ya no se usan:`,
                 table: {
                     headers: ['Versión', 'Enfoque'],
                     rows: [
-                        ['v3', 'Guión original — flujo clásico de ventas, pago contra reembolso'],
-                        ['v4', 'Variante mejorada — mismo flujo con copy optimizado'],
-                        ['v5 (MP First)', 'Prioriza el pago con MercadoPago antes que el contra reembolso'],
+                        ['v7 (activa)', 'Persona Elena. Dos tramos (rutina corta / plan completo) y todo contra reembolso'],
+                        ['v3 – v6', 'Archivadas — guiones antiguos, ya no se pueden asignar'],
                     ]
                 },
                 extra: `La versión activa tiene un punto verde parpadeante al lado. Solo una versión puede estar activa a la vez.`
@@ -497,29 +497,29 @@ const MANUALS = [
                 title: 'Cambiar la versión activa',
                 icon: Zap,
                 steps: [
-                    { label: 'Clickeá en el nombre de la versión', detail: 'En la barra superior (ej: "V3", "V4", "V5").' },
-                    { label: 'Confirmá el cambio', detail: 'El bot empieza a usar la nueva versión en todas las conversaciones nuevas.' },
+                    { label: 'Pulsa el nombre de la versión', detail: 'En la barra superior (hoy solo aparece "V7").' },
+                    { label: 'Confirma el cambio', detail: 'El bot empieza a usar la nueva versión en todas las conversaciones nuevas.' },
                 ],
-                extra: `Las conversaciones en curso no se ven afectadas — siguen con el guión asignado al inicio.`
+                extra: `Las conversaciones en curso no se ven afectadas — siguen con el guion que tenían asignado al empezar.`
             },
             {
-                title: 'Editar el guión (pestaña "Flujo")',
+                title: 'Editar el guion (pestaña "Flujo")',
                 icon: FileText,
                 steps: [
-                    { label: 'Seleccioná la versión a editar', detail: 'Con los botones V3, V4, V5 de la barra.' },
-                    { label: 'Andá a la pestaña "Flujo"', detail: 'Muestra cada paso de la conversación.' },
-                    { label: 'Editá el texto del paso que querés cambiar', detail: 'El campo de texto es editable directamente.' },
-                    { label: 'Click en "Guardar Cambios"', detail: 'Los cambios se aplican al instante.' },
+                    { label: 'Selecciona la versión a editar', detail: 'Con los botones de versión de la barra (hoy solo V7).' },
+                    { label: 'Ve a la pestaña "Flujo"', detail: 'Muestra cada paso de la conversación.' },
+                    { label: 'Edita el texto del paso que quieras cambiar', detail: 'El campo de texto se edita directamente.' },
+                    { label: 'Pulsa "Guardar Cambios"', detail: 'Los cambios se aplican al instante.' },
                 ],
-                extra: `⚠️ Cambiá una cosa a la vez y probá antes de guardar. Un error en el guión puede romper el flujo de ventas.`
+                extra: `⚠️ Cambia una cosa cada vez y pruébala antes de guardar. Un error en el guion puede romper el flujo de ventas. Los precios no se tocan aquí: el bot los coge de la lista de precios.`
             },
             {
                 title: 'Editar FAQ (respuestas frecuentes)',
                 icon: HelpCircle,
-                content: `La pestaña **"FAQ"** contiene respuestas a preguntas frecuentes que el bot detecta por palabras clave (ej: "garantía", "muestras", "devolución").\n\nPodés:\n- Editar la respuesta de una pregunta existente\n- Agregar nuevas palabras clave a una pregunta\n- Eliminar una pregunta completa`,
+                content: `La pestaña **"FAQ"** contiene respuestas a preguntas frecuentes que el bot detecta por palabras clave (ej.: "garantía", "muestras", "devolución").\n\nPuedes:\n- Editar la respuesta de una pregunta existente\n- Añadir nuevas palabras clave a una pregunta\n- Eliminar una pregunta entera`,
             },
             {
-                title: 'Mapa del guión',
+                title: 'Mapa del guion',
                 icon: Eye,
                 content: `La pestaña **"Mapa"** muestra visualmente el flujo completo de la conversación: desde el saludo hasta el cierre. Útil para entender en qué punto está cada cliente y cuál es el camino esperado.`,
             },
@@ -527,10 +527,10 @@ const MANUALS = [
                 title: 'Reglas importantes',
                 icon: Shield,
                 bullets: [
-                    'Siempre guardá los cambios antes de cambiar de versión — se perderán si no.',
-                    'Probá los cambios mandando un mensaje de prueba al bot antes de dejarlo con clientes reales.',
-                    'Si algo se rompe, recargá el guión con el botón de recarga — restaura la última versión guardada.',
-                    'Cambios en el guión no afectan conversaciones ya iniciadas, solo las nuevas.',
+                    'Guarda siempre los cambios antes de cambiar de versión — si no, se pierden.',
+                    'Prueba los cambios mandándole un mensaje al bot antes de dejarlo con clientes reales.',
+                    'Si algo se rompe, recarga el guion con el botón de recarga — restaura la última versión guardada.',
+                    'Los cambios en el guion no afectan a las conversaciones ya empezadas, solo a las nuevas.',
                 ],
             },
         ],
@@ -538,19 +538,19 @@ const MANUALS = [
     {
         id: 'estadisticas',
         title: 'Estadísticas',
-        description: 'Como leer el embudo de ventas, métricas de conversión, actividad por hora y rendimiento de anuncios.',
+        description: 'Cómo leer el embudo de ventas, las métricas de conversión, la actividad por hora y el rendimiento de los anuncios.',
         icon: BarChart3,
         color: 'indigo',
         sections: [
             {
                 title: '¿Qué muestra esta sección?',
                 icon: HelpCircle,
-                content: `La sección de **Estadísticas** muestra el rendimiento histórico del bot en 4 áreas:\n\n- **Embudo de ventas** — cuántos clientes avanzan en cada paso\n- **Actividad por hora** — cuándo se generan más ventas\n- **Origen de clientes** — si vienen de anuncios o tráfico orgánico\n- **Tendencias diarias** — evolución de ventas y revenue`,
+                content: `La sección de **Estadísticas** muestra el rendimiento histórico del bot en 4 áreas:\n\n- **Embudo de ventas** — cuántos clientes avanzan en cada paso\n- **Actividad por hora** — cuándo se generan más ventas\n- **Origen de clientes** — si vienen de anuncios o tráfico orgánico\n- **Tendencias diarias** — evolución de ventas e ingresos`,
             },
             {
                 title: 'Embudo de ventas',
                 icon: TrendingUp,
-                content: `El embudo muestra cuántos usuarios llegan a cada paso del flujo:\n\n**Saludo → Peso → Preferencia → Plan → Datos → Confirmación → Completado**\n\nLa diferencia entre pasos es el **abandono**. Si hay mucho abandono entre "Plan" y "Datos", por ejemplo, el problema está en ese paso del guión.`,
+                content: `El embudo muestra cuántos usuarios llegan a cada paso del flujo:\n\n**Saludo → Peso → Preferencia → Plan → Datos → Confirmación → Completado**\n\nLa diferencia entre pasos es el **abandono**. Si hay mucho abandono entre "Plan" y "Datos", por ejemplo, el problema está en ese paso del guion.`,
                 table: {
                     headers: ['Paso', 'Alta tasa de abandono significa...'],
                     rows: [
@@ -563,23 +563,23 @@ const MANUALS = [
             {
                 title: 'Actividad por hora',
                 icon: BarChart3,
-                content: `El gráfico de barras muestra **en qué horarios se cierran más ventas**.\n\nUsá este dato para:\n- Saber cuándo estar más atento a las alertas\n- Planificar el horario de tus anuncios\n- Entender si hay horas muertas donde conviene ajustar el bot`,
+                content: `El gráfico de barras muestra **a qué horas se cierran más ventas**.\n\nUsa este dato para:\n- Saber cuándo estar más atento a las alertas\n- Planificar el horario de tus anuncios\n- Ver si hay horas muertas en las que conviene ajustar el bot`,
             },
             {
                 title: 'Origen de clientes (anuncios)',
                 icon: Zap,
-                content: `Si usás anuncios de Click-to-WhatsApp, el sistema detecta automáticamente si el cliente viene de un anuncio o de forma orgánica.\n\nVes el rendimiento de cada fuente:\n- Cuántos iniciaron conversación\n- Cuántos llegaron hasta la confirmación\n- Tasa de conversión por fuente`,
-                extra: `Si no ves datos de anuncios, verificá que los mensajes pre-llenados de tus anuncios coincidan con los configurados en el sistema.`
+                content: `Si usas anuncios de Click-to-WhatsApp, el sistema detecta automáticamente si el cliente viene de un anuncio o de forma orgánica.\n\nVes el rendimiento de cada fuente:\n- Cuántos han iniciado conversación\n- Cuántos han llegado hasta la confirmación\n- Tasa de conversión por fuente`,
+                extra: `Si no ves datos de anuncios, comprueba que los mensajes predefinidos de tus anuncios coincidan con los configurados en el sistema.`
             },
             {
-                title: 'Métricas clave a monitorear',
+                title: 'Métricas clave que vigilar',
                 icon: CheckCircle,
                 table: {
                     headers: ['Métrica', 'Qué indica', 'Señal de alerta'],
                     rows: [
-                        ['Tasa de conversión', '% de chats que terminan en venta', 'Menor al 5%'],
-                        ['Abandono en datos', '% que no completa la dirección', 'Mayor al 40%'],
-                        ['Revenue del día', 'Total facturado', 'Caída brusca respecto al día anterior'],
+                        ['Tasa de conversión', '% de chats que acaban en venta', 'Por debajo del 5%'],
+                        ['Abandono en datos', '% que no completa la dirección', 'Por encima del 40%'],
+                        ['Ingresos del día', 'Total facturado en euros', 'Caída brusca respecto al día anterior'],
                     ]
                 },
             },
@@ -587,10 +587,10 @@ const MANUALS = [
                 title: 'Reglas importantes',
                 icon: Shield,
                 bullets: [
-                    'Las estadísticas se calculan sobre el período visible — por defecto los últimos 7 días.',
+                    'Las estadísticas se calculan sobre el periodo visible — por defecto, los últimos 7 días.',
                     'Un día con 0 ventas puede indicar un problema en el bot, no necesariamente poca demanda.',
-                    'El embudo solo cuenta conversaciones del bot activo — las atendidas manualmente no se contabilizan.',
-                    'Los datos se actualizan diariamente a las 4am hora Argentina.',
+                    'El embudo solo cuenta conversaciones del bot activo — las atendidas a mano no se contabilizan.',
+                    'Los datos se actualizan a diario a las 4 de la mañana (hora peninsular).',
                 ],
             },
         ],
@@ -598,79 +598,79 @@ const MANUALS = [
     {
         id: 'galeria',
         title: 'Galería de Medios',
-        description: 'Como subir, organizar y enviar imágenes desde el panel.',
+        description: 'Cómo subir, organizar y enviar imágenes desde el panel.',
         icon: ImageIcon,
         color: 'indigo',
         sections: [
             {
                 title: '¿Para qué sirve la galería?',
                 icon: HelpCircle,
-                content: `La **Galería de Medios** almacena imágenes que el bot puede enviar automáticamente o que vos enviás manualmente desde el chat.\n\nIdeal para:\n- Fotos del producto\n- Imágenes de resultados de clientes\n- Flyers de promociones`,
+                content: `La **Galería de Medios** guarda las imágenes que el bot puede enviar automáticamente o que envías tú a mano desde el chat.\n\nIdeal para:\n- Fotos del producto\n- Imágenes de resultados de clientes\n- Carteles de promociones`,
             },
             {
                 title: 'Subir una imagen',
                 icon: ImageIcon,
                 steps: [
-                    { label: 'Ir a "Galería de Medios"', detail: 'En el menú lateral, ícono de imagen.' },
-                    { label: 'Click en "Subir imagen"', detail: 'Se abre el selector de archivo.' },
-                    { label: 'Seleccioná el archivo', detail: 'Formatos soportados: JPG, PNG, WebP.' },
-                    { label: 'Esperá la confirmación', detail: 'La imagen aparece en la galería.' },
+                    { label: 'Ir a "Galería de Medios"', detail: 'En el menú lateral, icono de imagen.' },
+                    { label: 'Pulsa "Subir imagen"', detail: 'Se abre el selector de archivos.' },
+                    { label: 'Selecciona el archivo', detail: 'Formatos admitidos: JPG, PNG, WebP.' },
+                    { label: 'Espera la confirmación', detail: 'La imagen aparece en la galería.' },
                 ],
             },
             {
                 title: 'Enviar una imagen a un cliente',
                 icon: Send,
                 steps: [
-                    { label: 'Andá a la galería y copiá el nombre de la imagen', detail: 'O recordá su nombre.' },
-                    { label: 'Abrí el chat del cliente en "Chat & Atención"', detail: 'Buscá al cliente.' },
-                    { label: 'Usá el ícono de imagen en la barra de mensajes', detail: 'También podés arrastrar y soltar.' },
+                    { label: 'Ve a la galería y copia el nombre de la imagen', detail: 'O quédate con su nombre.' },
+                    { label: 'Abre el chat del cliente en "Chat & Atención"', detail: 'Busca al cliente.' },
+                    { label: 'Usa el icono de imagen de la barra de mensajes', detail: 'También puedes arrastrar y soltar.' },
                 ],
             },
             {
                 title: 'Eliminar una imagen',
                 icon: Trash2,
-                content: `Clickeá el ícono de basura sobre la imagen. Esta acción es irreversible — si el bot estaba usando esa imagen en el guión, puede dejar de funcionar correctamente.`,
-                extra: `Antes de eliminar, verificá que la imagen no esté referenciada en el guión del bot.`
+                content: `Pulsa el icono de papelera sobre la imagen. Esta acción es irreversible — si el bot estaba usando esa imagen en el guion, puede dejar de funcionar bien.`,
+                extra: `Antes de borrarla, comprueba que la imagen no esté referenciada en el guion del bot.`
             },
         ],
     },
     {
         id: 'configuracion',
         title: 'Configuración',
-        description: 'Como agregar números de alerta, pausar el bot globalmente y monitorear el estado del sistema.',
+        description: 'Cómo añadir números de alerta, pausar el bot para todos y vigilar el estado del sistema.',
         icon: Settings,
         color: 'indigo',
         sections: [
             {
-                title: '¿Qué se configura acá?',
+                title: '¿Qué se configura aquí?',
                 icon: HelpCircle,
-                content: `La sección **Configuración** tiene tres bloques:\n\n- **Números de alerta** — quiénes reciben las alertas de pedidos por WhatsApp\n- **Estado del sistema** — memoria, conexiones y salud del bot\n- **Pausa global** — detener el bot para todos los clientes`,
+                content: `La sección **Configuración** tiene tres bloques:\n\n- **Números de alerta** — quiénes reciben las alertas de pedidos por WhatsApp\n- **Estado del sistema** — memoria, conexiones y salud del bot\n- **Pausa global** — parar el bot para todos los clientes`,
             },
             {
-                title: 'Agregar un número de alerta',
+                title: 'Añadir un número de alerta',
                 icon: Bell,
                 steps: [
-                    { label: 'Ir a Configuración', detail: 'En el menú lateral, ícono de engranaje.' },
+                    { label: 'Ir a Configuración', detail: 'En el menú lateral, icono de engranaje.' },
                     { label: 'Sección "Números de Alerta"', detail: 'Muestra los números que reciben alertas.' },
-                    { label: 'Ingresá el número completo', detail: 'Con código de país, sin espacios (ej: 5491155551234).' },
-                    { label: 'Click en "Agregar"', detail: 'El número empieza a recibir alertas de inmediato.' },
+                    { label: 'Escribe el número completo', detail: 'Con prefijo de país y sin espacios (ej.: 34612345678).' },
+                    { label: 'Pulsa "Agregar"', detail: 'El número empieza a recibir alertas al momento.' },
                 ],
-                extra: `También podés hacerlo por WhatsApp con **!admin add 5491155551234**.`
+                extra: `También puedes hacerlo por WhatsApp con **!admin add 34612345678**.`
             },
             {
                 title: 'Quitar un número de alerta',
                 icon: Trash2,
-                content: `En la lista de números de alerta, clickeá la X al lado del número que querés eliminar. Ese número dejará de recibir alertas.\n\n⚠️ Asegurate de que siempre haya al menos un número activo, o los pedidos no se notificarán.`,
+                content: `En la lista de números de alerta, pulsa la X que hay al lado del número que quieras quitar. Ese número dejará de recibir alertas.\n\n⚠️ Asegúrate de que siempre quede al menos un número activo, o los pedidos no se notificarán a nadie.`,
             },
             {
                 title: 'Pausa global del bot',
                 icon: PauseCircle,
-                content: `La **pausa global** detiene el bot para **todos** los clientes al mismo tiempo. Usala cuando:\n\n- Necesitás hacer mantenimiento\n- Hay un problema con los precios o el stock\n- El equipo no puede atender alertas por un período`,
+                content: `La **pausa global** para el bot para **todos** los clientes a la vez. Úsala cuando:\n\n- Tengas que hacer mantenimiento\n- Haya un problema con los precios o con el stock\n- El equipo no pueda atender las alertas durante un rato`,
                 steps: [
-                    { label: 'Activar pausa global', detail: 'Click en "Pausar Todo" en Configuración. O mandá !pausa-global on por WhatsApp.' },
-                    { label: 'Desactivar pausa global', detail: 'Click en "Reanudar" o mandá !pausa-global off.' },
+                    { label: 'Activar la pausa global', detail: 'Pulsa "Pausar Todo" en Configuración, o manda !pausa-global on por WhatsApp.' },
+                    { label: 'Desactivar la pausa global', detail: 'Pulsa "Reanudar" o manda !pausa-global off.' },
                 ],
-                extra: `⚠️ Durante la pausa global, los clientes que escriban no reciben respuesta. Avisales si va a ser prolongada.`
+                extra: `⚠️ Durante la pausa global, los clientes que escriban no reciben respuesta. Avísales si va a durar mucho.`
             },
             {
                 title: 'Estado del sistema',
@@ -681,20 +681,20 @@ const MANUALS = [
                     rows: [
                         ['Usuarios en RAM', 'Conversaciones activas en memoria (normal: < 200)'],
                         ['Base de Datos', 'Total de clientes históricos'],
-                        ['Heap Usada', 'Memoria del servidor (alerta si supera 500 MB)'],
+                        ['Heap Usada', 'Memoria del servidor (aviso si pasa de 500 MB)'],
                         ['Activos Ahora', 'Clientes con conversación en curso'],
                     ]
                 },
-                extra: `Si el heap supera 500 MB de forma sostenida, el bot puede volverse lento. Contactá soporte técnico.`
+                extra: `Si el heap se mantiene por encima de 500 MB, el bot puede volverse lento. Ponte en contacto con soporte técnico.`
             },
             {
                 title: 'Reglas importantes',
                 icon: Shield,
                 bullets: [
-                    'Siempre dejá al menos un número de alerta activo.',
-                    'La pausa global afecta a todos los clientes, incluso los que están en medio de una compra.',
-                    'Cambios en la configuración se aplican en tiempo real, sin necesidad de reiniciar.',
-                    'El número de alerta debe ser el mismo que tiene la cuenta de WhatsApp del administrador.',
+                    'Deja siempre al menos un número de alerta activo.',
+                    'La pausa global afecta a todos los clientes, incluso a los que están en mitad de una compra.',
+                    'Los cambios de configuración se aplican al momento, sin reiniciar nada.',
+                    'El número de alerta tiene que ser el mismo que el de la cuenta de WhatsApp del administrador.',
                 ],
             },
         ],
@@ -702,56 +702,56 @@ const MANUALS = [
     {
         id: 'reporte-ia',
         title: 'Reportar Error de IA',
-        description: 'Como marcar una respuesta incorrecta del bot, guardar el contexto y leer los reportes desde el panel.',
+        description: 'Cómo marcar una respuesta incorrecta del bot, guardar el contexto y leer los reportes desde el panel.',
         icon: AlertTriangle,
         color: 'amber',
         sections: [
             {
-                title: '¿Para que sirve?',
+                title: '¿Para qué sirve?',
                 icon: HelpCircle,
-                content: `Cuando el bot responde algo **incorrecto, confuso o fuera de contexto**, podés reportarlo en segundos.\n\nEl reporte guarda la conversacion completa y tu correccion en la base de datos. Desde la seccion **"Errores de IA"** del panel podes leerlos todos y usarlos para mejorar el guion del bot.`,
+                content: `Cuando el bot responde algo **incorrecto, confuso o fuera de contexto**, puedes reportarlo en segundos.\n\nEl reporte guarda la conversación completa y tu corrección en la base de datos. Desde la sección **"Errores de IA"** del panel puedes leerlos todos y usarlos para mejorar el guion del bot.`,
             },
             {
-                title: 'Paso 1: Abrí el chat',
+                title: 'Paso 1: Abre el chat',
                 icon: MousePointerClick,
-                content: `Anda a la seccion **Chat & Atencion** y abri la conversacion donde el bot se equivoco.`,
+                content: `Ve a la sección **Chat & Atención** y abre la conversación en la que el bot se equivocó.`,
                 steps: [
-                    { label: 'Ir a "Chat & Atencion"', detail: 'En el menu lateral, segundo icono.' },
-                    { label: 'Buscar al cliente', detail: 'Por nombre o numero de telefono.' },
-                    { label: 'Abrir la conversacion', detail: 'Hacer click en el chat.' },
+                    { label: 'Ir a "Chat & Atención"', detail: 'En el menú lateral, segundo icono.' },
+                    { label: 'Buscar al cliente', detail: 'Por nombre o número de teléfono.' },
+                    { label: 'Abrir la conversación', detail: 'Haz clic en el chat.' },
                 ],
             },
             {
                 title: 'Paso 2: Marcar el mensaje erróneo',
                 icon: AlertTriangle,
-                content: `Posate sobre el **mensaje del bot** que esta mal. Aparece un boton naranja con el texto **"Reportar Error de IA"**.`,
+                content: `Pon el ratón encima del **mensaje del bot** que está mal. Aparece un botón naranja con el texto **"Reportar Error de IA"**.`,
                 steps: [
-                    { label: 'Pasar el mouse sobre el mensaje', detail: 'El mensaje del bot se resalta.' },
-                    { label: 'Click en "Reportar Error de IA"', detail: 'Se abre el modal de reporte.' },
+                    { label: 'Pasar el ratón por encima del mensaje', detail: 'El mensaje del bot se resalta.' },
+                    { label: 'Pulsar "Reportar Error de IA"', detail: 'Se abre la ventana del reporte.' },
                 ],
-                extra: `El boton solo aparece en mensajes del **bot** (burbuja derecha/violeta), no en los del cliente.`
+                extra: `El botón solo aparece en los mensajes del **bot** (burbuja de la derecha, morada), no en los del cliente.`
             },
             {
-                title: 'Paso 3: Completar el reporte',
+                title: 'Paso 3: Rellenar el reporte',
                 icon: Send,
-                content: `El modal muestra las **ultimas 4 mensajes** del chat con el erroneo resaltado en rojo.\n\nPodés cargar más contexto con el botón **"Cargar más"** si necesitas mostrar más antecedentes.`,
+                content: `La ventana muestra los **últimos 4 mensajes** del chat, con el erróneo resaltado en rojo.\n\nPuedes cargar más contexto con el botón **"Cargar más"** si hace falta enseñar más antecedentes.`,
                 steps: [
-                    { label: 'Revisar el contexto', detail: 'Las burbujas muestran quien dijo que. La roja es el mensaje erroneo.' },
-                    { label: 'Cargar mas contexto (opcional)', detail: 'Click en "Cargar mas" para ver mensajes anteriores.' },
-                    { label: 'Escribir la correccion', detail: 'Explicar que hizo mal o que deberia haber respondido.' },
-                    { label: 'Click en "Guardar Reporte"', detail: 'Se guarda en la base de datos y aparece confirmacion.' },
+                    { label: 'Revisar el contexto', detail: 'Las burbujas muestran quién dijo qué. La roja es el mensaje erróneo.' },
+                    { label: 'Cargar más contexto (opcional)', detail: 'Pulsa "Cargar más" para ver mensajes anteriores.' },
+                    { label: 'Escribir la corrección', detail: 'Explica qué hizo mal o qué debería haber respondido.' },
+                    { label: 'Pulsar "Guardar Reporte"', detail: 'Se guarda en la base de datos y aparece la confirmación.' },
                 ],
             },
             {
                 title: 'Ejemplo de buena corrección',
                 icon: CheckCircle,
-                content: `Al escribir la correccion, cuanto mas especifica mejor. Algunos ejemplos:`,
+                content: `Al escribir la corrección, cuanto más concreta, mejor. Algunos ejemplos:`,
                 table: {
-                    headers: ['Mala correccion', 'Buena correccion'],
+                    headers: ['Mala corrección', 'Buena corrección'],
                     rows: [
-                        ['Esta mal', 'Asumio que no teniamos stock de capsulas de 60 dias, pero si tenemos. Deberia haber ofrecido ese plan.'],
-                        ['No debio decir eso', 'La cliente dijo que esta amamantando. El bot igual intento venderle. Deberia haber cerrado la conversacion.'],
-                        ['Respuesta incorrecta', 'Confundio "Nuez de Brasil" con "Nuez de la India". Son productos distintos. Deberia haber aclarado la diferencia.'],
+                        ['Está mal', 'Ha dado por hecho que no teníamos existencias de cápsulas de 60 días, y sí las tenemos. Debería haber ofrecido ese plan.'],
+                        ['No debió decir eso', 'La clienta dijo que está dando el pecho y el bot intentó venderle igual. Debería haber cerrado la conversación.'],
+                        ['Respuesta incorrecta', 'Confundió "Nuez de Brasil" con "Nuez de la India". Son productos distintos. Debería haber aclarado la diferencia.'],
                     ]
                 },
             },
@@ -760,10 +760,10 @@ const MANUALS = [
                 icon: Shield,
                 bullets: [
                     'Reporta solo mensajes del bot, no respuestas del cliente.',
-                    'Sé especifico en la correccion: que estuvo mal y que deberia haber dicho.',
-                    'Podes cargar hasta la conversacion entera con "Cargar mas".',
-                    'Los reportes quedan guardados permanentemente hasta que los borres.',
-                    'Usa los reportes para actualizar el guion del bot en la seccion "Guion & Prompts".',
+                    'Sé concreto en la corrección: qué estuvo mal y qué debería haber dicho.',
+                    'Puedes cargar hasta la conversación entera con "Cargar más".',
+                    'Los reportes se guardan para siempre hasta que los borres.',
+                    'Usa los reportes para actualizar el guion del bot en la sección "Guion & Prompts".',
                 ],
             },
         ],

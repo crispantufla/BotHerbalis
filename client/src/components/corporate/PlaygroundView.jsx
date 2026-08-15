@@ -5,13 +5,15 @@ import { Card, Button, IconButton, Badge, useToast } from '../ui';
 import AiCorrectionModal from './components/AiCorrectionModal';
 
 // Steps del flow real (orden cosmético para el dropdown "Forzar step").
+// No se listan `waiting_mp_payment` ni `waiting_transfer_confirmation`: eran
+// los pasos de pago por adelantado del guion argentino y aquí no existen
+// (todo se cobra contra reembolso). Forzarlos no llevaba a ningún sitio —
+// el flow los migra a `waiting_payment_method` en cuanto los ve.
 const FORCE_STEPS = [
     'greeting',
     'waiting_weight',
     'waiting_preference',
     'waiting_payment_method',
-    'waiting_mp_payment',
-    'waiting_transfer_confirmation',
     'waiting_data',
     'waiting_maps_confirmation',
     'waiting_final_confirmation',

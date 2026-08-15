@@ -18,7 +18,7 @@ const STEP_LABELS = {
     // las etiquetas por si queda algún lead antiguo con ese paso guardado.
     'waiting_transfer_confirmation': 'Transferencia (ya no se usa)',
     'waiting_mp_payment':         'Pago online (ya no se usa)',
-    'waiting_payment_method':     'Eligiendo entrega (casa u oficina)',
+    'waiting_payment_method':     'Eligiendo entrega (casa u oficina de Correos)',
     'waiting_plan_choice':        'Eligiendo plan (60 vs 120)',
     'waiting_ok':                 'Confirmación intermedia',
     'waiting_preference':         'Eligiendo producto',
@@ -34,8 +34,8 @@ const STEP_TONE = {
     'waiting_transfer_confirmation': 'info',
     'waiting_mp_payment':          'info',
     'waiting_payment_method':      'accent',
-    'waiting_plan_choice':         'purple',
-    'waiting_ok':                  'purple',
+    'waiting_plan_choice':         'albero',
+    'waiting_ok':                  'albero',
     'waiting_preference':          'danger',
     'waiting_weight':              'warning',
 };
@@ -148,7 +148,7 @@ const RescueQueueView = ({ onGoToChat }) => {
                     <div className="text-sm text-slate-700 dark:text-slate-300 space-y-2">
                         <p>
                             Esta vista lista los <strong>leads atascados</strong>: clientes que llegaron a algún paso pero no respondieron en los últimos 60+ minutos.
-                            Están ordenados por <strong>cercanía al cierre</strong>: primero los que están en confirmación final, luego los que eligieron método de pago, etc.
+                            Están ordenados por <strong>cercanía al cierre</strong>: primero los que están en confirmación final, luego los que ya eligieron cómo recibir el pedido, etc.
                         </p>
                         <p>
                             El bot ya envía recordatorios automáticos a las 4h, 24h y 48-72h. Esta vista te permite <strong>tomar control proactivamente</strong> sin esperar al cron.

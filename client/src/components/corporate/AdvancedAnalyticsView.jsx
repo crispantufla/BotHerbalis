@@ -349,7 +349,7 @@ const AdvancedAnalyticsView = () => {
                             <div className="mb-4">
                                 <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                                     <Clock className="w-4 h-4 text-warning-500" aria-hidden="true" />
-                                    Horarios pico
+                                    Horas punta
                                 </h3>
                                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                                     Actividad de cierre de ventas por hora.

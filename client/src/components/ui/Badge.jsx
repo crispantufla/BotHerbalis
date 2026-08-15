@@ -43,7 +43,7 @@ export default function Badge({ tone = 'neutral', size = 'md', dot = false, clas
                             warning: 'bg-warning-500',
                             danger:  'bg-danger-500',
                             info:    'bg-info-500',
-                            purple:  'bg-albero-500',
+                            albero:  'bg-albero-500',
                         }[tone]
                     )}
                 />

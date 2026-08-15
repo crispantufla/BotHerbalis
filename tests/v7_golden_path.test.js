@@ -7,21 +7,18 @@
  * 120) y manda a waiting_plan_choice; el menú de pago llega recién tras elegir plan.
  * Es determinista: usa las rutas por número/keyword, así que NO depende de la IA
  * (el stub de aiService devuelve response:null para forzar el fallback scripted).
- * El tramo de pago en sí (retiro / domicilio / MP / transferencia) lo cubre
- * payment_flow.test.js.
+ * El tramo de entrega (a casa / recogida en oficina de Correos) lo cubre
+ * sena_flow_smoke.test.js. Aquí no hay tramo de "método de pago": todo se cobra
+ * contra reembolso.
  */
 
 const path = require('path');
 const fs = require('fs');
 
 // Mocks de infra para que el require transitivo de salesFlow/steps no toque
-// servicios reales (DB / MercadoPago) al importar.
+// la DB al importar. (El mock de 'mercadopago' que había aquí se fue con el
+// fork: el paquete ya no es dependencia y aquí no hay pasarela de pago.)
 jest.mock('../safeWrite', () => ({ atomicWriteFile: jest.fn() }), { virtual: true });
-jest.mock('mercadopago', () => ({
-    MercadoPagoConfig: jest.fn(() => ({})),
-    Preference: jest.fn(() => ({ create: jest.fn() })),
-    Payment: jest.fn(() => ({ search: jest.fn() })),
-}), { virtual: true });
 jest.mock('../db', () => ({
     prisma: {
         order: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({}) },

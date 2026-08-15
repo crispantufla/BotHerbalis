@@ -141,7 +141,7 @@ const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData 
 
     // Pausa TODOS los bots (todos los sellers activos). Solo admin global.
     const handlePauseAll = async () => {
-        const ok = await confirm('¿Pausar el bot de TODOS los vendedores?\n\nEsta acción afecta a todos los sellers activos. Para reactivar, repite la operación o desbloquea cada uno individualmente.');
+        const ok = await confirm('¿Pausar el bot de TODOS los vendedores?\n\nEsta acción afecta a todos los vendedores activos. Para reactivar, repite la operación o desbloquea cada uno individualmente.');
         if (!ok) return;
         setPausingAll(true);
         try {

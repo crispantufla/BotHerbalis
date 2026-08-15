@@ -160,14 +160,14 @@ const SettingsView = ({ status }) => {
 
 
     const handleResetMemory = async () => {
-        const ok = await confirm('¿Limpiar historial de usuarios inactivos?\n\nBorra mensajes y datos extraídos por IA de quienes no compraron y no interactuaron en las últimas 48h. Los usuarios siguen en la base, las ventas no se tocan.');
+        const ok = await confirm('¿Limpiar historial de usuarios inactivos?\n\nBorra mensajes y datos extraídos por IA de quienes no han comprado y no han interactuado en las últimas 48h. Los usuarios siguen en la base, las ventas no se tocan.');
         if (!ok) return;
         setResetting(true);
         try {
             const res = await api.post('/api/reset-memory');
             const msg = res.data.deletedChats > 0
                 ? `${res.data.deletedChats} mensajes archivados · ${res.data.protected48h} usuarios activos protegidos`
-                : `Sin nada para limpiar · ${res.data.protected48h} usuarios activos`;
+                : `Sin nada que limpiar · ${res.data.protected48h} usuarios activos`;
             toast.success(msg);
             fetchMemoryStats();
         } catch { toast.error('Error al limpiar el historial'); }
@@ -179,7 +179,7 @@ const SettingsView = ({ status }) => {
     // el handler — está en el historial git.
 
     const handleResetScriptStats = async () => {
-        const ok = await confirm('¿Reiniciar contadores de conversión del guion?\n\nEmpiezan de cero. Útil cuando los guiones cambiaron y los números viejos ya no son comparables. No afecta ventas ni pedidos.');
+        const ok = await confirm('¿Reiniciar contadores de conversión del guion?\n\nEmpiezan de cero. Útil cuando los guiones han cambiado y los números antiguos ya no son comparables. No afecta ventas ni pedidos.');
         if (!ok) return;
         setResettingStats(true);
         try {
@@ -199,7 +199,7 @@ const SettingsView = ({ status }) => {
             await api.post('/api/script/switch', { script: scriptKey });
             setActiveScript(scriptKey);
             toast.success('Modelo cambiado correctamente.');
-        } catch { toast.error('Error al cambiar el guión'); }
+        } catch { toast.error('Error al cambiar el guion'); }
         setSwitchingScript(false);
     };
 
@@ -474,10 +474,10 @@ const SettingsView = ({ status }) => {
                             </h3>
                             <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
                                 Cuando está activado, el bot les <strong>vuelve a escribir solo</strong> a los
-                                clientes que quedaron a mitad de la charla (dentro de las 24h) para reengancharlos.
-                                En números nuevos conviene <strong>apagarlo</strong>: mensajear de forma proactiva
-                                a quien no respondió es lo que más rápido marca una cuenta sin reputación. El bot
-                                sigue respondiendo normal a quien escribe.
+                                clientes que se quedaron a mitad de la conversación (dentro de las 24h) para
+                                reengancharlos. En números nuevos conviene <strong>apagarlo</strong>: escribir de
+                                forma proactiva a quien no ha contestado es lo que más rápido marca una cuenta sin
+                                reputación. El bot sigue respondiendo con normalidad a quien escribe.
                             </p>
                         </div>
                     </div>
@@ -560,7 +560,7 @@ const SettingsView = ({ status }) => {
                             </h3>
                             <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed mb-4 max-w-md">
                                 Cerrar la sesión desconecta inmediatamente el dispositivo vinculado de WhatsApp.
-                                Ningún mensaje será respondido luego de esta acción.
+                                Después de esta acción no se responderá ningún mensaje.
                             </p>
                             <div className="mt-auto">
                                 <Button variant="danger" leftIcon={Power} onClick={handleLogout}>

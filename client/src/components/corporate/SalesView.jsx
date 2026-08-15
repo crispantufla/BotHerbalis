@@ -238,7 +238,7 @@ const SalesView = ({ onGoToChat }) => {
             const total = res.data.pagination?.total ?? exportOrders.length;
             if (exportOrders.length === 0) { toast.warning('No hay pedidos para exportar con estos filtros'); return; }
 
-            const csvHeaders = ['Fecha', 'Cliente', 'Nombre', 'Producto', 'Plan', 'Precio', 'Método pago', 'Verificación', 'Postdatado', 'Estado', 'Envío', 'Tracking', 'Ciudad', 'Calle', 'CP'];
+            const csvHeaders = ['Fecha', 'Cliente', 'Nombre', 'Producto', 'Plan', 'Precio', 'Método de pago', 'Verificación', 'Envío programado', 'Estado', 'Envío', 'Tracking', 'Ciudad', 'Calle', 'CP'];
             const rows = exportOrders.map(o => [
                 o.createdAt ? new Date(o.createdAt).toLocaleDateString() : '',
                 o.cliente || '', o.nombre || '', o.producto || '', o.plan || '', o.precio || '',
@@ -840,23 +840,25 @@ CP: ${order.cp || '—'}`;
                                         <CopyRow editing={isDetailEditing} label="Producto" value={viewingOrder.producto || 'Sin producto'} editField={editInput('producto', 'Producto')} />
                                         <CopyRow editing={isDetailEditing} label="Total" value={`${viewingOrder.precio} €`} editField={editInput('precio', 'Precio')} />
 
-                                        {/* Seña pagada — el cartero NO cobra el total, solo el saldo restante */}
+                                        {/* Aquí todo es contra reembolso: se cobra el total al entregar. Este
+                                            bloque solo aparece si un pedido trae un importe ya pagado (dato
+                                            heredado del bot argentino); entonces Correos cobra solo el resto. */}
                                         {viewingOrder.senaPaid && viewingOrder.senaAmount > 0 && (
                                             <div className="px-5 py-3 border-b border-warning-100 dark:border-warning-900/40 bg-warning-50 dark:bg-warning-900/20">
                                                 <div className="flex items-center justify-between gap-2">
                                                     <span className="text-[11px] font-medium uppercase tracking-wide text-warning-700 dark:text-warning-500">
-                                                        Seña pagada
+                                                        Ya pagado
                                                     </span>
                                                     <span className="text-sm font-semibold tabular-nums text-warning-700 dark:text-warning-500">
-                                                        ${Number(viewingOrder.senaAmount).toLocaleString('es-ES')} por MP
+                                                        {Number(viewingOrder.senaAmount).toLocaleString('es-ES')} €
                                                     </span>
                                                 </div>
                                                 <div className="flex items-center justify-between gap-2 mt-1.5">
                                                     <span className="text-[11px] font-medium uppercase tracking-wide text-success-700 dark:text-success-500">
-                                                        Cobrar al cartero
+                                                        Cobrar al entregar
                                                     </span>
                                                     <span className="text-base font-semibold tabular-nums text-success-700 dark:text-success-500">
-                                                        ${Number(viewingOrder.cashRemainder || 0).toLocaleString('es-ES')}
+                                                        {Number(viewingOrder.cashRemainder || 0).toLocaleString('es-ES')} €
                                                     </span>
                                                 </div>
                                             </div>

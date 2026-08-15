@@ -71,7 +71,7 @@ const AiReportsView = () => {
                     <EmptyState
                         icon={MessageSquare}
                         title="No hay reportes todavía"
-                        description="Cuando marques un mensaje del bot como erróneo, aparecerá acá."
+                        description="Cuando marques un mensaje del bot como erróneo, aparecerá aquí."
                     />
                 </Card>
             ) : (
