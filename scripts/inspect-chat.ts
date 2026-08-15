@@ -47,7 +47,7 @@ async function main() {
             console.log('  (sin mensajes en la ventana)');
         } else {
             logs.forEach((l: any) => {
-                const t = l.timestamp.toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
+                const t = l.timestamp.toLocaleString('es-ES', { timeZone: 'Europe/Madrid' });
                 const who = l.role === 'bot' ? '🤖 BOT' : l.role === 'admin' ? '👨 ADMIN' : '👤 USER';
                 const content = (l.content || '').replace(/\n/g, '\n         ');
                 console.log(`\n[${t}] ${who}`);
@@ -66,8 +66,8 @@ async function main() {
             console.log('  (sin eventos en la ventana)');
         } else {
             evs.forEach((e: any) => {
-                const t = e.enteredAt.toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
-                const exit = e.exitedAt ? ` → exit=${e.exitType || '?'} a las ${e.exitedAt.toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })}` : ' (abierto)';
+                const t = e.enteredAt.toLocaleString('es-ES', { timeZone: 'Europe/Madrid' });
+                const exit = e.exitedAt ? ` → exit=${e.exitType || '?'} a las ${e.exitedAt.toLocaleString('es-ES', { timeZone: 'Europe/Madrid' })}` : ' (abierto)';
                 console.log(`  [${t}] ${e.stepFrom || '∅'} → ${e.stepTo}  | msgs=${e.messageCount} aiCalls=${e.aiCallCount}${exit}`);
             });
         }

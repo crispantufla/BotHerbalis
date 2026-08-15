@@ -25,7 +25,7 @@ async function main() {
         console.log(`\n━━━ ${section} ━━━`);
         list.forEach((c: any) => {
             const status = c.resolved ? '✓ RESUELTO' : '○';
-            console.log(`\n  ${status} [${c.type}] ${c.authorName} · ${new Date(c.createdAt).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })}`);
+            console.log(`\n  ${status} [${c.type}] ${c.authorName} · ${new Date(c.createdAt).toLocaleString('es-ES', { timeZone: 'Europe/Madrid' })}`);
             console.log(`  ${c.content.split('\n').map((l: string) => '  ' + l).join('\n')}`);
             if (c.suggestedText) {
                 console.log(`\n  💡 Sugerido:`);

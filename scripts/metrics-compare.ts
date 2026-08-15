@@ -121,7 +121,7 @@ function pad(s: string | number, n: number, align: 'l' | 'r' = 'l'): string {
 }
 
 function fmtPct(n: number): string { return n.toFixed(1) + '%'; }
-function fmtNum(n: number): string { return n.toLocaleString('es-AR'); }
+function fmtNum(n: number): string { return n.toLocaleString('es-ES'); }
 
 function delta(a: number, b: number): string {
     if (a === 0 && b === 0) return '—';
@@ -139,7 +139,7 @@ function bar(pct: number, max: number = 100, width: number = 20): string {
 async function main() {
     console.log(`\n╔════════════════════════════════════════════════════════════════════════╗`);
     console.log(`║  COMPARACIÓN PROMPT VIEJO vs NUEVO  (commit 80bdd82)`);
-    console.log(`║  Generado: ${new Date().toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })} ART`);
+    console.log(`║  Generado: ${new Date().toLocaleString('es-ES', { timeZone: 'Europe/Madrid' })} ART`);
     console.log(`╚════════════════════════════════════════════════════════════════════════╝\n`);
 
     const [a, b] = await Promise.all([metricsFor(baseline), metricsFor(postChange)]);

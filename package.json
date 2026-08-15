@@ -1,17 +1,19 @@
 {
-  "name": "bot-whatsapp",
+  "name": "bot-whatsapp-es",
   "version": "1.0.0",
-  "description": "",
+  "description": "Bot de WhatsApp para ventas en Espana (fork del bot argentino). Todo contra reembolso.",
   "main": "index.ts",
   "scripts": {
     "dev:server": "tsx index.ts",
     "dev:ts": "tsx watch index.ts",
     "dev:client": "npm run dev --prefix client",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "start": "npx prisma generate && npx prisma migrate deploy && tsx index.ts",
+    "start": "npx prisma generate && npx prisma migrate deploy && tsx prisma/bootstrap-admin.ts && tsx index.ts",
     "kill": "taskkill /F /IM node.exe",
     "test": "jest",
-    "test:sim": "cross-env RUN_LLM_SIMS=1 jest tests/thread_retention.live.test.js --runInBand --forceExit"
+    "test:sim": "cross-env RUN_LLM_SIMS=1 jest tests/thread_retention.live.test.js --runInBand --forceExit",
+    "auditar": "tsx scripts/auditar-cumplimiento.ts",
+    "venta:prueba": "tsx scripts/venta-de-prueba.ts"
   },
   "engines": {
     "node": ">=20.0.0"
@@ -37,7 +39,6 @@
     "helmet": "^8.1.0",
     "ioredis": "^5.10.0",
     "jsonwebtoken": "^9.0.3",
-    "mercadopago": "^2.12.0",
     "node-cache": "^5.1.2",
     "node-cron": "^4.2.1",
     "openai": "^6.25.0",

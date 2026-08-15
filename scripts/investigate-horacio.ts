@@ -120,12 +120,12 @@ async function metricsFor(w: Window) {
 }
 
 function fmtPct(n: number): string { return n.toFixed(1) + '%'; }
-function fmtMoney(n: number): string { return '$' + Math.round(n).toLocaleString('es-AR'); }
+function fmtMoney(n: number): string { return '$' + Math.round(n).toLocaleString('es-ES'); }
 
 async function main() {
     console.log(`\n╔════════════════════════════════════════════════════════════════════════╗`);
     console.log(`║  HORACIO — Evolución de conversión (único vendedor en marzo)`);
-    console.log(`║  ${new Date().toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })} ART`);
+    console.log(`║  ${new Date().toLocaleString('es-ES', { timeZone: 'Europe/Madrid' })} ART`);
     console.log(`╚════════════════════════════════════════════════════════════════════════╝\n`);
 
     const results = [];

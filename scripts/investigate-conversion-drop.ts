@@ -134,7 +134,7 @@ function fmtPct(n: number): string { return n.toFixed(1) + '%'; }
 async function main() {
     console.log(`\n╔════════════════════════════════════════════════════════════════════════╗`);
     console.log(`║  INVESTIGACIÓN: ¿Por qué bajó la conversión?`);
-    console.log(`║  Generado: ${new Date().toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })} ART`);
+    console.log(`║  Generado: ${new Date().toLocaleString('es-ES', { timeZone: 'Europe/Madrid' })} ART`);
     console.log(`╚════════════════════════════════════════════════════════════════════════╝\n`);
 
     const results = [];

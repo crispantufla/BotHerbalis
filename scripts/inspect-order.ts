@@ -37,7 +37,7 @@ async function main() {
         if (o.calleOriginal && o.calleOriginal !== o.calle) {
             console.log(`  Original (cliente escribió):  ${o.calleOriginal}`);
         }
-        console.log(`  Creada:         ${o.createdAt.toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })}`);
+        console.log(`  Creada:         ${o.createdAt.toLocaleString('es-ES', { timeZone: 'Europe/Madrid' })}`);
     });
 
     // Buscar info del seller

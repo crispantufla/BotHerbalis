@@ -6,7 +6,7 @@ const { prisma } = require('../db');
 
 function startOfTodayAR(): Date {
     const fmt = new Intl.DateTimeFormat('en-US', {
-        timeZone: 'America/Argentina/Buenos_Aires',
+        timeZone: 'Europe/Madrid',
         year: 'numeric', month: '2-digit', day: '2-digit',
     });
     const parts = fmt.formatToParts(new Date());
@@ -17,15 +17,15 @@ function startOfTodayAR(): Date {
 }
 
 function fmtMoney(n: number): string {
-    return '$' + Math.round(n).toLocaleString('es-AR');
+    return '$' + Math.round(n).toLocaleString('es-ES');
 }
 
 async function main() {
     const startOfDay = startOfTodayAR();
     const now = new Date();
     console.log(`\n╔══════════════════════════════════════════════════════════════════════╗`);
-    console.log(`║  Métricas — ${now.toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })} (ART)`);
-    console.log(`║  Ventana: desde ${startOfDay.toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })} ART`);
+    console.log(`║  Métricas — ${now.toLocaleString('es-ES', { timeZone: 'Europe/Madrid' })} (ART)`);
+    console.log(`║  Ventana: desde ${startOfDay.toLocaleString('es-ES', { timeZone: 'Europe/Madrid' })} ART`);
     console.log(`╚══════════════════════════════════════════════════════════════════════╝\n`);
 
     // ── 1. ÓRDENES (todas, no canceladas, canceladas) ──────────────────────────
@@ -189,8 +189,8 @@ async function main() {
     // ── 7. PEDIDOS POR HORA ─────────────────────────────────────────────────────
     const byHour: Record<string, number> = {};
     nonCancelled.forEach(o => {
-        const h = new Date(o.createdAt).toLocaleString('es-AR', {
-            timeZone: 'America/Argentina/Buenos_Aires',
+        const h = new Date(o.createdAt).toLocaleString('es-ES', {
+            timeZone: 'Europe/Madrid',
             hour: '2-digit', hour12: false,
         });
         byHour[h] = (byHour[h] || 0) + 1;

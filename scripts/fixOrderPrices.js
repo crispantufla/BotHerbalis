@@ -35,7 +35,7 @@ async function main() {
         const newPrice = Math.round(oldPrice * 1000);
 
         console.log(`  📦 ${order.id} | ${order.nombre || 'Sin nombre'} | ${order.products}`);
-        console.log(`     $${oldPrice} → $${newPrice.toLocaleString('es-AR')}`);
+        console.log(`     $${oldPrice} → $${newPrice.toLocaleString('es-ES')}`);
 
         if (!dryRun) {
             await prisma.order.update({

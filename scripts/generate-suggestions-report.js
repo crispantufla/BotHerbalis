@@ -9,7 +9,7 @@ const fs = require('fs');
 
 puppeteer.use(StealthPlugin());
 
-const today = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' });
+const today = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' });
 
 const html = `
 <!DOCTYPE html>

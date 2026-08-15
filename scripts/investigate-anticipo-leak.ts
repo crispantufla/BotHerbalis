@@ -42,7 +42,7 @@ async function main() {
     // Por fecha — agrupar
     console.log('\n═══ AGREGADO POR DIA ═══');
     const grouped = await q(
-        `SELECT DATE("timestamp" AT TIME ZONE 'America/Argentina/Buenos_Aires') AS day,
+        `SELECT DATE("timestamp" AT TIME ZONE 'Europe/Madrid') AS day,
                 "instanceId",
                 COUNT(*)::int AS c
          FROM "ChatLog"

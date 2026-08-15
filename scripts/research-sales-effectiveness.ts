@@ -448,7 +448,7 @@ async function main() {
     txt.push(`╔════════════════════════════════════════════════════════════════════════════╗`);
     txt.push(`║  INVESTIGACIÓN DE EFECTIVIDAD DE VENTAS                                    ║`);
     txt.push(`║  Período: 2026-05-13 → ${NOW.toISOString().slice(0, 10).padEnd(50)}║`);
-    txt.push(`║  Generado: ${new Date().toLocaleString('es-AR').padEnd(63)}║`);
+    txt.push(`║  Generado: ${new Date().toLocaleString('es-ES').padEnd(63)}║`);
     txt.push(`╚════════════════════════════════════════════════════════════════════════════╝`);
     txt.push('');
     sections.forEach(s => {
