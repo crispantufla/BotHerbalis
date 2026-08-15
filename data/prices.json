@@ -1,15 +1,16 @@
 {
+    "_nota": "Precios reales de España en euros, formato español (coma decimal). Tomados del material gráfico de la marca (piezas con precios en € del 29-05-2026) y confirmados por el vendedor el 15-08-2026. costoLogistico = lo que se le reclama al cliente que rechaza el paquete (gastos de envío + retorno). Se editan desde el panel; no tocar a mano en producción.",
     "Cápsulas": {
-        "60": "49.900",
-        "120": "62.900"
+        "60": "39,90",
+        "120": "51,90"
     },
     "Semillas": {
-        "60": "36.900",
-        "120": "49.900"
+        "60": "37,90",
+        "120": "44,90"
     },
     "Gotas": {
-        "60": "49.900",
-        "120": "62.900"
+        "60": "39,90",
+        "120": "51,90"
     },
-    "costoLogistico": "18.000"
+    "costoLogistico": "15,00"
 }
