@@ -8,8 +8,40 @@ import { logStepTransition, markExit } from '../../services/funnelLogger';
  * Extracts the raw phone number from a WhatsApp userId (e.g. "5491155551234@c.us" → "5491155551234").
  */
 function _cleanPhone(userId: string): string {
-    return userId.split('@')[0].replace(/\D/g, '');
+    return (userId || '').split('@')[0].replace(/\D/g, '');
 }
+
+/**
+ * _isPhoneMatch
+ * Compares two phone numbers safely, handling Argentine '9' prefix variations and local vs international format.
+ */
+function _isPhoneMatch(phoneA: string | null | undefined, phoneB: string | null | undefined): boolean {
+    if (!phoneA || !phoneB) return false;
+    const a = _cleanPhone(phoneA);
+    const b = _cleanPhone(phoneB);
+    if (!a || !b || a.length < 8 || b.length < 8) return false;
+    if (a === b) return true;
+    // Strip 9 from 549... (e.g. 5491155551234 -> 541155551234)
+    const normA = a.startsWith('549') ? '54' + a.slice(3) : a;
+    const normB = b.startsWith('549') ? '54' + b.slice(3) : b;
+    if (normA === normB) return true;
+    // Handle suffix match for local numbers with at least 10 digits
+    if (a.endsWith(b) || b.endsWith(a)) {
+        const shorter = a.length < b.length ? a : b;
+        return shorter.length >= 10;
+    }
+    return false;
+}
+
+/**
+ * _isAdminPhone
+ * Checks if a given userId/phone matches any number in alertNumbers safely.
+ */
+function _isAdminPhone(userId: string | null | undefined, alertNumbers: string[] | undefined): boolean {
+    if (!userId || !alertNumbers || !Array.isArray(alertNumbers)) return false;
+    return alertNumbers.some(adminNum => _isPhoneMatch(userId, adminNum));
+}
+
 
 /**
  * _setStep
@@ -573,8 +605,8 @@ async function _closeSaleAndNotify(
         );
     }
 
-    const _track = effectiveScript || config?.activeScript;
-    if (config && config.scriptStats && _track && _track !== 'rotacion') {
+    const _track = 'v7';
+    if (config && config.scriptStats) {
         if (!config.scriptStats[_track]) config.scriptStats[_track] = { started: 0, completed: 0 };
         config.scriptStats[_track].completed++;
     }
@@ -588,6 +620,8 @@ async function _closeSaleAndNotify(
 
 export {
     _cleanPhone,
+    _isPhoneMatch,
+    _isAdminPhone,
     _isInfoQuestion,
     _startsAffirmative,
     _closeSaleAndNotify,
@@ -605,3 +639,4 @@ export {
     _detectShipPaySwitch,
     _handleShipPaySwitch
 };
+

@@ -552,14 +552,12 @@ module.exports = (clientPool) => {
         });
     });
 
-    // POST /script/stats/reset — reset conversion counters for V5/V6 (admin only).
-    // Útil después de cambios sustanciales en los guiones para empezar a medir de cero.
+    // POST /script/stats/reset — reset conversion counters for V7 (admin only).
     router.post('/script/stats/reset', ...withSeller(clientPool), requireAdmin, (req, res) => {
         try {
             const { config, ss } = getCtx(req);
             config.scriptStats = {
-                v5: { started: 0, completed: 0 },
-                v6: { started: 0, completed: 0 }
+                v7: { started: 0, completed: 0 }
             };
             if (ss?.saveState) ss.saveState();
             emitScoped(req, 'script_stats_reset', { stats: config.scriptStats });
@@ -578,9 +576,9 @@ module.exports = (clientPool) => {
             const { script } = req.body;
             if (!script) return res.status(400).json({ error: 'Falta el campo "script"' });
 
-            const available = ss?.availableScripts || ['v5', 'v6'];
-            if (!available.includes(script) && script !== 'rotacion') {
-                return res.status(400).json({ error: `Script "${script}" no existe. Disponibles: ${available.join(', ')} y rotacion` });
+            const available = ss?.availableScripts || ['v7'];
+            if (!available.includes(script)) {
+                return res.status(400).json({ error: `Script "${script}" no existe. Solo v7 está disponible.` });
             }
 
             config.activeScript = script;

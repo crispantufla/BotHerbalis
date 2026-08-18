@@ -142,14 +142,28 @@ function cleanChromeLocks(authPath: string): void {
         let cleared = 0;
         const checkDir = (dir: string) => {
             if (!fs.existsSync(dir)) return;
-            for (const entry of fs.readdirSync(dir)) {
-                const fullPath = path.join(dir, entry);
-                if (lockPatterns.some(p => entry.includes(p))) {
-                    try { fs.rmSync(fullPath, { force: true }); cleared++; } catch (e) { /* ignore */ }
-                } else if (fs.statSync(fullPath).isDirectory()) {
-                    checkDir(fullPath);
+            try {
+                for (const entry of fs.readdirSync(dir)) {
+                    const fullPath = path.join(dir, entry);
+                    if (lockPatterns.some(p => entry.includes(p))) {
+                        for (let attempt = 0; attempt < 3; attempt++) {
+                            try {
+                                if (fs.existsSync(fullPath)) {
+                                    fs.rmSync(fullPath, { force: true, maxRetries: 3, retryDelay: 100 });
+                                    cleared++;
+                                }
+                                break;
+                            } catch (e) { /* retry */ }
+                        }
+                    } else {
+                        try {
+                            if (fs.statSync(fullPath).isDirectory()) {
+                                checkDir(fullPath);
+                            }
+                        } catch { /* ignore stat error */ }
+                    }
                 }
-            }
+            } catch { /* ignore dir read error */ }
         };
         checkDir(authPath);
         if (cleared > 0) logger.info(`[POOL] Cleared ${cleared} stale Chrome lock(s) for ${authPath}`);

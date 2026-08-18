@@ -263,7 +263,13 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
                 try {
                     const data = JSON.parse(await fs.promises.readFile(stateFile, 'utf-8'));
                     (data.pausedUsers || []).forEach((id: string) => pausedUsers.add(id));
-                    Object.assign(chatResets, data.chatResets || {});
+                    const nowSec = Math.floor(Date.now() / 1000);
+                    const rawResets = data.chatResets || {};
+                    for (const [k, ts] of Object.entries(rawResets)) {
+                        if (typeof ts === 'number' && (nowSec - ts) < 30 * 86400) {
+                            chatResets[k] = ts;
+                        }
+                    }
                 } catch (e) { /* ignore corrupt file */ }
             }
 
@@ -274,14 +280,11 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
             }
             if (!config.alertNumbers) config.alertNumbers = [];
 
-            // Migrate legacy activeScript values (v1..v6 + rotacion fueron archivados may-2026).
-            // V7 es el único script activo. Si la DB todavía tiene un valor archivado,
-            // lo migramos a v7. scriptStats viejas quedan como histórico, no se tocan.
-            const legacyScripts = ['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'rotacion'];
-            if (config.activeScript && legacyScripts.includes(config.activeScript)) {
-                logger.warn(`[STATE][${sellerId}] activeScript="${config.activeScript}" archivado → migrando a "v7"`);
+            // V7 es el único script activo.
+            if (config.activeScript !== 'v7') {
                 config.activeScript = 'v7';
             }
+
 
             logger.info(`[STATE][${sellerId}] Loaded ${dbUsers.length} users, config synced`);
         } catch (e: any) {

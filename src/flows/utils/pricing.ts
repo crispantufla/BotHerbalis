@@ -69,12 +69,13 @@ function _getPrices(): Record<string, any> {
 function _getPrice(product: string | null | undefined, plan: string): string {
     const prices = _getPrices();
     let result: string | undefined;
-    if (product && product.includes('Cápsulas')) {
+    const norm = (product || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (norm.includes('capsul')) {
         result = prices['Cápsulas']?.[plan] || prices['Cápsulas']?.['60'];
-    } else if (product && product.includes('Gotas')) {
+    } else if (norm.includes('gota')) {
         result = prices['Gotas']?.[plan] || prices['Gotas']?.['60'];
     } else {
-        if (!product || !product.includes('Semillas')) {
+        if (!norm.includes('semilla')) {
             // Footgun histórico: producto null/no-reconocido → default a Semillas
             // (36.900/49.900). Fue la huella del link equivocado del caso 1131381951.
             // El guard en stepWaitingMpPayment ya evita generar link sin producto;

@@ -7,7 +7,7 @@
 import crypto from 'crypto';
 const logger = require('../utils/logger');
 const { prisma } = require('../../db');
-const { _cleanPhone } = require('../flows/utils/flowHelpers');
+const { _cleanPhone, _isAdminPhone } = require('../flows/utils/flowHelpers');
 
 // logAndEmit, saveOrderToLocal, cancelLatestOrder, sendMessageWithDelay, notifyAdmin
 
@@ -131,7 +131,7 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
     async function _saveOrderAsync(order: Record<string, any>, cleanPhone: string): Promise<void> {
         let lock;
         try {
-            lock = await redlock.acquire([`order_lock:${cleanPhone}:${sellerId}`], 3000);
+            lock = await redlock.acquire([`order_lock:${cleanPhone}:${sellerId}`], 8000);
 
             let priceNum = 0;
             if (order.precio) {
@@ -196,8 +196,8 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
     async function cancelLatestOrder(userId: string): Promise<{ success: boolean; order?: any; reason?: string; currentStatus?: string }> {
         let lock;
         const phone = _cleanPhone(userId);
-        const LOCK_TTL = 3000;
-        const QUERY_TIMEOUT = 2500; // Must be < lock TTL to avoid expired-lock writes
+        const LOCK_TTL = 8000;
+        const QUERY_TIMEOUT = 7000; // Must be < lock TTL to avoid expired-lock writes
         try {
             lock = await redlock.acquire([`order_lock:${phone}:${sellerId}`], LOCK_TTL);
 
@@ -265,6 +265,10 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
             logger.warn(`[ANTI-DUP][${sellerId}] Mensaje idéntico al anterior — NO reenviado a ${chatId}: "${(content || '').slice(0, 70)}"`);
             return false;
         }
+        if (_lastBotMsgByChat.size > 2000) {
+            const firstKey = _lastBotMsgByChat.keys().next().value;
+            if (firstKey) _lastBotMsgByChat.delete(firstKey);
+        }
         _lastBotMsgByChat.set(chatId, content || '');
 
         const minDelay = 4000;
@@ -284,8 +288,7 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
             await new Promise(resolve => setTimeout(resolve, remainingDelay));
         }
 
-        const alertNums = (config.alertNumbers || []).map((n: string) => n.replace(/\D/g, ''));
-        const isAdminChat = alertNums.some((n: string) => chatId.startsWith(n));
+        const isAdminChat = _isAdminPhone(chatId, config.alertNumbers);
         if (pausedUsers.has(chatId) || (config.globalPause && !isAdminChat)) {
             logger.info(`[DELAY][${sellerId}] Aborted message to ${chatId}: paused during delay`);
             return false;
