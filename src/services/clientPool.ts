@@ -136,19 +136,42 @@ function getDataDir(sellerId: string): string {
     return dir;
 }
 
-function cleanChromeLocks(authPath: string): void {
+function cleanChromeLocks(authPath: string, maxRetries = 3, retryDelay = 100): void {
     try {
         const lockPatterns = ['SingletonLock', 'SingletonCookie', 'SingletonSocket'];
         let cleared = 0;
+
+        const removeWithRetry = (fullPath: string) => {
+            for (let attempt = 0; attempt <= maxRetries; attempt++) {
+                try {
+                    fs.rmSync(fullPath, { force: true, maxRetries: 3, retryDelay: 100 });
+                    cleared++;
+                    return;
+                } catch (err: any) {
+                    if (attempt < maxRetries) {
+                        const waitMs = retryDelay * Math.pow(2, attempt);
+                        const start = Date.now();
+                        while (Date.now() - start < waitMs) {
+                            // Synchronous backoff for Windows EBUSY file locks
+                        }
+                    } else {
+                        logger.warn(`[POOL] Failed to remove lock file ${fullPath} after ${maxRetries} retries: ${err.message}`);
+                    }
+                }
+            }
+        };
+
         const checkDir = (dir: string) => {
             if (!fs.existsSync(dir)) return;
             for (const entry of fs.readdirSync(dir)) {
                 const fullPath = path.join(dir, entry);
-                if (lockPatterns.some(p => entry.includes(p))) {
-                    try { fs.rmSync(fullPath, { force: true }); cleared++; } catch (e) { /* ignore */ }
-                } else if (fs.statSync(fullPath).isDirectory()) {
-                    checkDir(fullPath);
-                }
+                try {
+                    if (lockPatterns.some(p => entry.includes(p))) {
+                        removeWithRetry(fullPath);
+                    } else if (fs.statSync(fullPath).isDirectory()) {
+                        checkDir(fullPath);
+                    }
+                } catch { /* ignore */ }
             }
         };
         checkDir(authPath);

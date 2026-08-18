@@ -200,3 +200,41 @@ describe('V7 Script — FAQ Keywords', () => {
         );
     });
 });
+
+describe('Pricing & Phone matching helpers', () => {
+    const { _getPrice } = require('../src/flows/utils/pricing');
+    const { _normalizeSpanishPhone, _isPhoneMatch, _isAdminPhone } = require('../src/flows/utils/flowHelpers');
+
+    test('Pricing: should normalize accents in product names', () => {
+        expect(_getPrice('Capsulas', '60')).toBe('46.900');
+        expect(_getPrice('capsulas', '120')).toBe('79.900');
+        expect(_getPrice('cápsulas de nuez', '60')).toBe('46.900');
+        expect(_getPrice('Gotas', '60')).toBe('40.900');
+        expect(_getPrice('gotas', '120')).toBe('70.900');
+        expect(_getPrice('Semillas', '60')).toBe('36.900');
+        expect(_getPrice('semillas de nuez', '120')).toBe('49.900');
+    });
+
+    test('Phone matching: should correctly match Spanish numbers', () => {
+        expect(_isPhoneMatch('34612345678@c.us', '34612345678')).toBe(true);
+        expect(_isPhoneMatch('34612345678@c.us', '+34 612 34 56 78')).toBe(true);
+        expect(_isPhoneMatch('34612345678@c.us', '612345678')).toBe(true);
+        expect(_isPhoneMatch('612345678@c.us', '34612345678')).toBe(true);
+
+        // Should reject empty or short prefixes (anti-exploit)
+        expect(_isPhoneMatch('34612345678@c.us', '')).toBe(false);
+        expect(_isPhoneMatch('34612345678@c.us', '34')).toBe(false);
+        expect(_isPhoneMatch('34612345678@c.us', '3461')).toBe(false);
+        expect(_isPhoneMatch('34699999999@c.us', '34612345678')).toBe(false);
+    });
+
+    test('Admin check: should safely validate alertNumbers list', () => {
+        const configAlerts = ['', null, undefined, '+34 612 34 56 78'];
+        expect(_isAdminPhone('34612345678@c.us', configAlerts)).toBe(true);
+        expect(_isAdminPhone('34699999999@c.us', configAlerts)).toBe(false);
+        expect(_isAdminPhone('34699999999@c.us', [''])).toBe(false);
+        expect(_isAdminPhone('34699999999@c.us', [])).toBe(false);
+        expect(_isAdminPhone('', configAlerts)).toBe(false);
+    });
+});
+

@@ -12,7 +12,7 @@ const { MessageMedia } = require('whatsapp-web.js');
 const { aiService } = require('../services/ai');
 const { parseAdminInput } = require('../services/adminService');
 const { redisConnection } = require('../services/queueService');
-const { _cleanPhone } = require('../flows/utils/flowHelpers');
+const { _cleanPhone, _isAdminPhone } = require('../flows/utils/flowHelpers');
 
 const DEBOUNCE_MS = 10000;
 
@@ -45,8 +45,7 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
         const pending = pendingMessages.get(userId);
         if (!pending) return;
 
-        const alertNums = (config.alertNumbers || []).map((n: string) => n.replace(/\D/g, ''));
-        const isAdminUser = alertNums.some((n: string) => userId.startsWith(n));
+        const isAdminUser = _isAdminPhone(userId, config?.alertNumbers);
         if (pausedUsers.has(userId) || (config.globalPause && !isAdminUser)) {
             logger.info(`[DEBOUNCE][${sellerId}] Skipping ${userId}: paused during debounce`);
             pendingMessages.delete(userId);
@@ -62,22 +61,10 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
 
         try {
             // V7 es el único script activo (may-2026). v1..v6 + rotacion fueron archivados.
-            // Si la DB devuelve un valor legacy, lo coercemos a v7.
-            const legacyScripts = ['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'rotacion'];
-            let effectiveScript = userState[userId]?.assignedScript;
-            if (effectiveScript && legacyScripts.includes(effectiveScript)) {
-                effectiveScript = 'v7';
-                if (userState[userId]) {
-                    userState[userId].assignedScript = effectiveScript;
-                    saveState(userId);
-                }
-            }
-            if (!effectiveScript) {
-                effectiveScript = 'v7';
-                if (userState[userId]) {
-                    userState[userId].assignedScript = effectiveScript;
-                    saveState(userId);
-                }
+            const effectiveScript = 'v7';
+            if (userState[userId] && userState[userId].assignedScript !== 'v7') {
+                userState[userId].assignedScript = 'v7';
+                saveState(userId);
             }
 
             await botQueue.add('process-message', { userId, combinedText, effectiveScript, startTime }, {
@@ -168,8 +155,7 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
                 }
             }
 
-            const alertNumbers = (config.alertNumbers || []).map((n: string) => n.replace(/\D/g, ''));
-            const isAdmin = msg.fromMe || alertNumbers.some(n => userId.startsWith(n));
+            const isAdmin = msg.fromMe || _isAdminPhone(userId, config?.alertNumbers);
             let msgText = (msg.body || '').trim();
 
             // WhatsApp placeholder fix

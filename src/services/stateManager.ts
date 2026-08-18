@@ -165,8 +165,19 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
         }
     }
 
+    function pruneStaleChatResets(resets: Record<string, number>): void {
+        if (!resets || typeof resets !== 'object') return;
+        const cutoffSec = Math.floor(Date.now() / 1000) - (30 * 24 * 60 * 60);
+        for (const [chatId, ts] of Object.entries(resets)) {
+            if (typeof ts === 'number' && ts < cutoffSec) {
+                delete resets[chatId];
+            }
+        }
+    }
+
     async function _doPersist(): Promise<void> {
         try {
+            pruneStaleChatResets(chatResets);
             const snapshot = { userState, chatResets, pausedUsers: Array.from(pausedUsers), config };
             await atomicWriteFile(stateFile, JSON.stringify(snapshot, null, 2));
 
@@ -266,6 +277,7 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
                     Object.assign(chatResets, data.chatResets || {});
                 } catch (e) { /* ignore corrupt file */ }
             }
+            pruneStaleChatResets(chatResets);
 
             // Migrate legacy single alertNumber
             if (config.alertNumber && !config.alertNumbers) {
@@ -274,12 +286,9 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
             }
             if (!config.alertNumbers) config.alertNumbers = [];
 
-            // Migrate legacy activeScript values (v1..v6 + rotacion fueron archivados may-2026).
-            // V7 es el único script activo. Si la DB todavía tiene un valor archivado,
-            // lo migramos a v7. scriptStats viejas quedan como histórico, no se tocan.
-            const legacyScripts = ['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'rotacion'];
-            if (config.activeScript && legacyScripts.includes(config.activeScript)) {
-                logger.warn(`[STATE][${sellerId}] activeScript="${config.activeScript}" archivado → migrando a "v7"`);
+            // V7 es el único script activo.
+            if (config.activeScript !== 'v7') {
+                logger.warn(`[STATE][${sellerId}] activeScript="${config.activeScript}" archivado/inválido → migrando a "v7"`);
                 config.activeScript = 'v7';
             }
 

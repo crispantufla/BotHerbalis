@@ -30,6 +30,47 @@ function _cleanPhone(userId: string): string {
 }
 
 /**
+ * Normaliza un número o ID de WhatsApp al formato nacional de España (9 dígitos)
+ * o devuelve los dígitos limpios si es internacional.
+ */
+function _normalizeSpanishPhone(input: string | null | undefined): string {
+    if (!input || typeof input !== 'string') return '';
+    const digits = input.split('@')[0].replace(/\D/g, '');
+    // Si empieza con prefijo España 34 y tiene 11 dígitos (34 + 9 dígitos)
+    if (digits.startsWith('34') && digits.length === 11) {
+        return digits.slice(2);
+    }
+    // Si tiene 9 dígitos exactos
+    if (digits.length === 9) {
+        return digits;
+    }
+    return digits;
+}
+
+/**
+ * Compara de forma segura si dos números de teléfono corresponden a la misma persona/admin en España.
+ * Requiere que ambos tengan al menos 9 dígitos y coincidan en sus 9 dígitos nacionales (o exactos si son internacionales).
+ */
+function _isPhoneMatch(targetId: string | null | undefined, alertNum: string | null | undefined): boolean {
+    if (!targetId || !alertNum || typeof targetId !== 'string' || typeof alertNum !== 'string') return false;
+    const targetNorm = _normalizeSpanishPhone(targetId);
+    const alertNorm = _normalizeSpanishPhone(alertNum);
+    if (!targetNorm || !alertNorm) return false;
+    // Evitar falsos positivos si los dígitos son demasiado cortos (< 9 dígitos)
+    if (targetNorm.length < 9 || alertNorm.length < 9) return false;
+    return targetNorm === alertNorm;
+}
+
+/**
+ * Valida de forma segura si un usuario o chat es un administrador según config.alertNumbers.
+ */
+function _isAdminPhone(userOrChatId: string | null | undefined, alertNumbers: (string | null | undefined)[] | null | undefined): boolean {
+    if (!userOrChatId || !Array.isArray(alertNumbers)) return false;
+    const cleanAlerts = alertNumbers.filter(Boolean) as string[];
+    return cleanAlerts.some(n => _isPhoneMatch(userOrChatId, n));
+}
+
+/**
  * _setStep
  * Helper to update the conversation step with timestamp tracking.
  * Resets staleAlerted and reengagementSent flags when step changes.
@@ -592,6 +633,9 @@ export {
     PICKUP_STREET,
     _isPickupAddress,
     _cleanPhone,
+    _normalizeSpanishPhone,
+    _isPhoneMatch,
+    _isAdminPhone,
     _isInfoQuestion,
     _startsAffirmative,
     _closeSaleAndNotify,

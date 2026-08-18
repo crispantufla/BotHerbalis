@@ -71,20 +71,18 @@ function _getPrices(): Record<string, any> {
 
 function _getPrice(product: string | null | undefined, plan: string): string {
     const prices = _getPrices();
+    const normalized = (product || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     let result: string | undefined;
-    if (product && product.includes('Cápsulas')) {
+
+    if (normalized.includes('capsul')) {
         result = prices['Cápsulas']?.[plan] || prices['Cápsulas']?.['60'];
-    } else if (product && product.includes('Gotas')) {
+    } else if (normalized.includes('gota')) {
         result = prices['Gotas']?.[plan] || prices['Gotas']?.['60'];
+    } else if (normalized.includes('semilla')) {
+        result = prices['Semillas']?.[plan] || prices['Semillas']?.['60'];
     } else {
-        if (!product || !product.includes('Semillas')) {
-            // Footgun histórico: producto null/no-reconocido → default a Semillas
-            // (36.900/49.900). Fue la huella del link equivocado del caso 1131381951.
-            // El guard en stepWaitingMpPayment ya evita generar link sin producto;
-            // acá logueamos a ERROR para que cualquier otro path con producto null
-            // sea visible en prod en vez de cobrar Semillas en silencio.
-            logger.error(`[PRICING] _getPrice: producto null/no-reconocido ("${product}") → default a Semillas. Revisar el caller.`);
-        }
+        // Footgun histórico: producto null/no-reconocido → default a Semillas
+        logger.error(`[PRICING] _getPrice: producto null/no-reconocido ("${product}") → default a Semillas. Revisar el caller.`);
         result = prices['Semillas']?.[plan] || prices['Semillas']?.['60'];
     }
     return result || FALLBACK_PRICES['Semillas']['60'];

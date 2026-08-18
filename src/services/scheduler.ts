@@ -446,7 +446,7 @@ function cleanStalePausedUsers(sharedState: SchedulerSharedState, dependencies: 
     const { saveState } = dependencies;
     const now = Date.now();
     const STALE_PAUSE_DAYS = 7;
-    let cleaned = 0;
+    const cleanedPhones: string[] = [];
 
     // Active steps that should NOT be auto-unpaused (admin may still be handling them)
     const ACTIVE_STEPS = new Set([
@@ -455,11 +455,12 @@ function cleanStalePausedUsers(sharedState: SchedulerSharedState, dependencies: 
 
     for (const userId of Array.from(pausedUsers)) {
         const state = userState[userId];
+        const cleanPhone = userId.split('@')[0].replace(/\D/g, '');
 
         // If no state exists at all, this user was cleaned up but pause persisted — remove it
         if (!state) {
             pausedUsers.delete(userId);
-            cleaned++;
+            if (cleanPhone) cleanedPhones.push(cleanPhone);
             continue;
         }
 
@@ -471,19 +472,38 @@ function cleanStalePausedUsers(sharedState: SchedulerSharedState, dependencies: 
             // No timestamp at all — treat as stale and clean up
             logger.info(`[SCHEDULER] Removing stale pause for ${userId} (no activity timestamp, step: ${state.step})`);
             pausedUsers.delete(userId);
-            cleaned++;
+            if (cleanPhone) cleanedPhones.push(cleanPhone);
             continue;
         }
         if (differenceInDays(now, lastActivity) > STALE_PAUSE_DAYS) {
             logger.info(`[SCHEDULER] Removing stale pause for ${userId} (inactive ${differenceInDays(now, lastActivity)} days, step: ${state.step})`);
             pausedUsers.delete(userId);
-            cleaned++;
+            if (cleanPhone) cleanedPhones.push(cleanPhone);
         }
     }
 
-    if (cleaned > 0) {
-        logger.info(`[SCHEDULER] ✅ Cleaned ${cleaned} stale paused user(s) (>7 days inactive)`);
+    if (cleanedPhones.length > 0) {
+        logger.info(`[SCHEDULER] ✅ Cleaned ${cleanedPhones.length} stale paused user(s) (>7 days inactive)`);
         saveState();
+
+        try {
+            const { prisma } = require('../../db');
+            const instanceId = sharedState.sellerId || process.env.INSTANCE_ID || 'default';
+            prisma.user.updateMany({
+                where: {
+                    phone: { in: cleanedPhones },
+                    instanceId: instanceId
+                },
+                data: {
+                    pausedAt: null,
+                    pauseReason: null
+                }
+            }).catch((err: any) => {
+                logger.error('[SCHEDULER] Error updating pausedAt in DB for stale paused users:', err.message);
+            });
+        } catch (e: any) {
+            logger.error('[SCHEDULER] Failed to initiate DB update for stale paused users:', e.message);
+        }
     }
 }
 

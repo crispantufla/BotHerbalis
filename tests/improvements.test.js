@@ -172,7 +172,7 @@ describe('Strategic Improvements', () => {
         // Verify response acknowledges receipt (any of the randomized messages)
         // acks = ["¡Perfecto! Ya agendé...", "Buenísimo. Me queda pendiente...", "¡Dale! Ya casi estamos..."]
         expect(mockDependencies.sendMessageWithDelay).toHaveBeenCalledWith(
-            userId, expect.stringMatching(/Ya agendé|pendiente|Ya casi estamos/i)
+            userId, expect.stringMatching(/anotados|pendiente|Ya casi/i)
         );
 
         // Verify attempts reset to 0 (because progress was made)
