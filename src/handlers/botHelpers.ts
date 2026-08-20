@@ -131,7 +131,13 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
     async function _saveOrderAsync(order: Record<string, any>, cleanPhone: string): Promise<void> {
         let lock;
         try {
-            lock = await redlock.acquire([`order_lock:${cleanPhone}:${sellerId}`], 8000);
+            // TTL acoplado al presupuesto de reintentos de redlock (index.ts:
+            // retryCount 10 × retryDelay 200ms ≈ 2-4s de espera máxima). Si el TTL
+            // supera esa ventana, un lock huérfano (proceso caído a mitad) ya no se
+            // puede esperar: el acquire tira, no hay catch acá, y saveOrderToLocal
+            // solo alcanza a loguear "CRITICAL: Order save failed" → pedido perdido.
+            // Para subir este número hay que subir retryCount en index.ts primero.
+            lock = await redlock.acquire([`order_lock:${cleanPhone}:${sellerId}`], 3000);
 
             let priceNum = 0;
             if (order.precio) {
@@ -196,8 +202,8 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
     async function cancelLatestOrder(userId: string): Promise<{ success: boolean; order?: any; reason?: string; currentStatus?: string }> {
         let lock;
         const phone = _cleanPhone(userId);
-        const LOCK_TTL = 8000;
-        const QUERY_TIMEOUT = 7000; // Must be < lock TTL to avoid expired-lock writes
+        const LOCK_TTL = 3000;       // Ver nota en _saveOrderAsync: acoplado a retryCount de redlock
+        const QUERY_TIMEOUT = 2500;  // Must be < lock TTL to avoid expired-lock writes
         try {
             lock = await redlock.acquire([`order_lock:${phone}:${sellerId}`], LOCK_TTL);
 

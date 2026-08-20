@@ -263,13 +263,13 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
                 try {
                     const data = JSON.parse(await fs.promises.readFile(stateFile, 'utf-8'));
                     (data.pausedUsers || []).forEach((id: string) => pausedUsers.add(id));
-                    const nowSec = Math.floor(Date.now() / 1000);
-                    const rawResets = data.chatResets || {};
-                    for (const [k, ts] of Object.entries(rawResets)) {
-                        if (typeof ts === 'number' && (nowSec - ts) < 30 * 86400) {
-                            chatResets[k] = ts;
-                        }
-                    }
+                    // NO podar chatResets por antigüedad: el marcador es lo único
+                    // que recuerda que el admin borró ese chat. Si se descarta,
+                    // resetAt vuelve a 0, getLocalHistory consulta desde epoch y
+                    // el historial borrado reaparece en el panel — y de forma
+                    // permanente, porque el próximo save persiste el mapa podado.
+                    // Solo crece con resets manuales, así que no hace falta acotarlo.
+                    Object.assign(chatResets, data.chatResets || {});
                 } catch (e) { /* ignore corrupt file */ }
             }
 

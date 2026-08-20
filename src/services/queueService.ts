@@ -8,6 +8,7 @@
 import { Queue, Worker, Job } from 'bullmq';
 import Redis from 'ioredis';
 const logger = require('../utils/logger');
+const { _isAdminPhone } = require('../flows/utils/flowHelpers');
 
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 const connectionParams = { maxRetriesPerRequest: null, keepAlive: 10000, enableOfflineQueue: false };
@@ -51,8 +52,9 @@ export function createWorker(sellerId: string, dependencies: any): Worker {
         const { userId, combinedText, effectiveScript, startTime } = job.data;
         logger.info(`[BULLMQ][${sellerId}] 🚀 Processing Job ${job.id} for ${userId}`);
 
-        const alertNums = (config.alertNumbers || []).map((n: string) => n.replace(/\D/g, ''));
-        const isAdminUser = alertNums.some((n: string) => userId.startsWith(n));
+        // Mismo criterio que messageHandler/botHelpers: si acá se usa otra regla,
+        // el mensaje del admin se encola y después el worker lo tira en silencio.
+        const isAdminUser = _isAdminPhone(userId, config.alertNumbers);
         if (sharedState.pausedUsers.has(userId) || (sharedState.config?.globalPause && !isAdminUser)) {
             logger.info(`[BULLMQ][${sellerId}] ⏸️ Skipped Job ${job.id} — ${userId} is paused`);
             return;

@@ -488,7 +488,15 @@ function cleanStalePausedUsers(sharedState: SchedulerSharedState, dependencies: 
         logger.info(`[SCHEDULER] ✅ Cleaned ${cleanedUsers.length} stale paused user(s) (>7 days inactive)`);
         saveState();
 
-        // Also persist unpause to DB so they don't resurrect on restart
+        // Also persist unpause to DB so they don't resurrect on restart.
+        // El filtro por `pausedAt < cutoff` NO es opcional: la rama `!state` de
+        // arriba despausa sin mirar antigüedad, y un usuario pausado hace 10
+        // minutos puede no tener state en memoria (pauseUser crea la fila sin
+        // profileData → loadState no la hidrata; el cache además expira a 7 días).
+        // Sin el filtro le borrábamos la pausa en DB para siempre y el bot le
+        // volvía a hablar a un cliente frenado a propósito. Mismo cutoff que usa
+        // restorePausedUsersFromDB, así ambos caminos coinciden.
+        const staleCutoff = new Date(now - STALE_PAUSE_DAYS * 24 * 60 * 60 * 1000);
         (async () => {
             try {
                 const { prisma } = require('../../db');
@@ -497,7 +505,7 @@ function cleanStalePausedUsers(sharedState: SchedulerSharedState, dependencies: 
                     const clean = _cleanPhone(userId);
                     if (clean) {
                         await prisma.user.updateMany({
-                            where: { phone: clean, instanceId: sellerId },
+                            where: { phone: clean, instanceId: sellerId, pausedAt: { lt: staleCutoff } },
                             data: { pausedAt: null, pauseReason: null }
                         });
                     }
