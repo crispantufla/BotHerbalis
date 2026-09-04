@@ -52,17 +52,66 @@ export interface SellerStateManager {
     loadState: () => Promise<void>;
 }
 
+// Tope de states hot en memoria por seller y tamaño del desalojo cuando se toca.
+const USER_CACHE_MAX_KEYS = 5000;
+const USER_CACHE_EVICT_BATCH = Math.max(1, Math.floor(USER_CACHE_MAX_KEYS * 0.1));
+// Cuántos users hidrata el boot. Antes se traía TODOS los que tuvieran
+// profileData; con 5003 filas el cache quedaba lleno antes del primer mensaje
+// y `loadState` abortaba a mitad de camino (el ECACHEFULL saltaba al catch
+// externo, salteándose la carga de pausedUsers/alertNumbers de más abajo).
+// Con un tope nos quedan slots libres para las conversaciones del día.
+const HYDRATE_LIMIT = 2000;
+
 export function createStateManager(sellerId: string, dataDir: string): SellerStateManager {
     const stateFile = path.join(dataDir, `persistence_${sellerId}.json`);
 
     // Per-seller NodeCache (7-day TTL, capped size, no cloning).
     // 30 days × thousands of users × 8 sellers se iba de RAM sin razón —
-    // el cliente que no escribe en una semana no necesita estar hot en memoria,
-    // se rehidrata desde Postgres al próximo mensaje.
-    const userCache = new NodeCache({ stdTTL: 604800, checkperiod: 3600, useClones: false, maxKeys: 5000 });
+    // el cliente que no escribe en una semana no necesita estar hot en memoria.
+    const userCache = new NodeCache({ stdTTL: 604800, checkperiod: 3600, useClones: false, maxKeys: USER_CACHE_MAX_KEYS });
     userCache.on('expired', (key: string) => {
         logger.info(`[CACHE][${sellerId}] User state expired for ${key}`);
     });
+
+    // node-cache NO desaloja: al tocar maxKeys, `set` TIRA ECACHEFULL — y chequea
+    // el tope ANTES de mirar si la key ya existía, así que con el cache lleno
+    // fallan hasta los updates de un cliente ya cacheado. En prod (sep-2026) eso
+    // dejó al bot MUDO: horacio cruzó los 5003 users con profileData, loadState
+    // llenaba el cache en el boot y desde ahí cada `userState[x] = ...` tiraba,
+    // el job moría ("Job N failed permanently: Cache max keys amount exceeded")
+    // y la conversación quedaba a la mitad sin una sola línea de respuesta.
+    // Acá desalojamos los states más fríos y reintentamos: perder de memoria a un
+    // cliente que no escribe hace días es recuperable, quedarse mudo no.
+    function _evictColdest(): number {
+        const keys = userCache.keys();
+        if (keys.length === 0) return 0;
+        // TTL uniforme ⇒ el que expira primero es el que se escribió primero.
+        const victims = keys
+            .map((k): [string, number] => [k, userCache.getTtl(k) || 0])
+            .sort((a, b) => a[1] - b[1])
+            .slice(0, USER_CACHE_EVICT_BATCH)
+            .map(([k]) => k);
+        userCache.del(victims);
+        logger.warn(`[CACHE][${sellerId}] Cache lleno (${keys.length}/${USER_CACHE_MAX_KEYS}) — desalojados ${victims.length} states fríos`);
+        return victims.length;
+    }
+
+    function _cacheSet(key: string, value: any): boolean {
+        try {
+            return userCache.set(key, value);
+        } catch (e: any) {
+            if (e?.errorcode !== 'ECACHEFULL') throw e;
+            _evictColdest();
+            try {
+                return userCache.set(key, value);
+            } catch (e2: any) {
+                // Ni con el desalojo entró: preferimos seguir vendiendo con el
+                // state en memoria perdido antes que tumbar el job del mensaje.
+                logger.error(`[CACHE][${sellerId}] No se pudo cachear el state de ${key}: ${e2.message}`);
+                return true;
+            }
+        }
+    }
 
     // Proxy over cache — same API as before
     const userState = new Proxy({}, {
@@ -72,7 +121,7 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
         },
         set: (_t, prop: string | symbol, value: any) => {
             if (typeof prop === 'symbol') return true;
-            return userCache.set(prop as string, value);
+            return _cacheSet(prop as string, value);
         },
         deleteProperty: (_t, prop) => userCache.del(prop as string) > 0,
         has: (_t, prop) => userCache.has(prop as string),
@@ -228,7 +277,11 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
 
             try {
                 [dbUsers, dbConfig] = await Promise.all([
-                    prisma.user.findMany({ where: { instanceId: sellerId } }),
+                    prisma.user.findMany({
+                        where: { instanceId: sellerId, profileData: { not: null } },
+                        orderBy: { lastSeen: 'desc' },
+                        take: HYDRATE_LIMIT
+                    }),
                     prisma.botConfig.findMany({ where: { instanceId: sellerId } })
                 ]);
             } catch (dbErr: any) {
@@ -286,7 +339,7 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
             }
 
 
-            logger.info(`[STATE][${sellerId}] Loaded ${dbUsers.length} users, config synced`);
+            logger.info(`[STATE][${sellerId}] Loaded ${dbUsers.length} users (tope ${HYDRATE_LIMIT}, más recientes por lastSeen), config synced`);
         } catch (e: any) {
             logger.error(`[STATE][${sellerId}] Error loading state:`, e.message);
         }

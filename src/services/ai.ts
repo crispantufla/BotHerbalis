@@ -899,12 +899,20 @@ class AIService {
             }
         }
 
-        // Cache the result
+        // Cache the result. El `set` de node-cache TIRA ECACHEFULL al tocar maxKeys
+        // (no desaloja), y acá estaría tirando DESPUÉS de que la llamada al proveedor
+        // ya salió bien: sin este catch, el cache lleno convertía una respuesta válida
+        // en un error del step. Guardar en cache es best-effort — el TTL de 45min lo
+        // vacía solo.
         if (cacheKey && result) {
-            if (customTTL) {
-                this.cache.set(cacheKey, result, customTTL);
-            } else {
-                this.cache.set(cacheKey, result);
+            try {
+                if (customTTL) {
+                    this.cache.set(cacheKey, result, customTTL);
+                } else {
+                    this.cache.set(cacheKey, result);
+                }
+            } catch (e: any) {
+                logger.warn(`[AI] No se pudo cachear la respuesta: ${e?.message || e}`);
             }
         }
 
