@@ -449,17 +449,16 @@ function cleanStalePausedUsers(sharedState: SchedulerSharedState, dependencies: 
     const sellerId = (sharedState as any).sellerId || process.env.INSTANCE_ID || 'default';
     const now = Date.now();
     const STALE_PAUSE_DAYS = 7;
-    const cleanedUsers: string[] = [];
-    // Pausados SIN state en memoria. NO se despausan acá: que falte el state no
-    // dice nada sobre la antigüedad de la pausa — pasa cuando `pauseUser` creó la
-    // fila sin profileData, cuando el cache expiró el state, cuando el boot ya no
-    // hidrata a ese cliente (tope HYDRATE_LIMIT) o cuando el cache estaba lleno y
-    // ningún `userState[x] = ...` llegó a escribir. Borrarlos de la Set en memoria
-    // era la causa de "el bot interviene en chats ya pausados": la DB conservaba
-    // la pausa (esa query sí filtra por antigüedad) pero el messageHandler mira
-    // ESTA Set, así que el bot volvía a hablarle a un cliente frenado a propósito
-    // hasta el próximo reinicio. Ahora los decide la DB, abajo.
-    const noStateUsers: string[] = [];
+    // Candidatos a despausar. NADA se despausa acá en memoria: la Set es lo que
+    // mira el messageHandler, y borrar de ella sin confirmar contra la DB era la
+    // causa de "el bot interviene en chats ya pausados" — la DB conservaba la
+    // pausa (esa query sí filtra por antigüedad) pero el bot le volvía a hablar
+    // al cliente frenado a propósito hasta el próximo reinicio. Que falte el
+    // state no dice nada sobre la antigüedad de la pausa: pasa cuando `pauseUser`
+    // creó la fila sin profileData, cuando el cache expiró el state, cuando el
+    // boot ya no hidrata a ese cliente (tope HYDRATE_LIMIT) o cuando el cache
+    // estaba lleno y ningún `userState[x] = ...` llegó a escribir.
+    const candidates: string[] = [];
 
     // Active steps that should NOT be auto-unpaused (admin may still be handling them)
     const ACTIVE_STEPS = new Set([
@@ -470,76 +469,59 @@ function cleanStalePausedUsers(sharedState: SchedulerSharedState, dependencies: 
         const state = userState[userId];
 
         if (!state) {
-            noStateUsers.push(userId);
+            candidates.push(userId);
             continue;
         }
 
         // Don't auto-unpause users in active admin-managed steps
         if (ACTIVE_STEPS.has(state.step)) continue;
 
+        // Con state, `lastActivityAt` solo PRE-filtra candidatos. Tampoco decide
+        // solo: ese timestamp puede estar congelado (durante el apagón del cache
+        // ninguna escritura de state entró, y al reiniciar 36 pausas puestas hace
+        // días figuraban como "inactivas hace semanas" y se borraban de memoria).
         const lastActivity = state.lastActivityAt || state.stepEnteredAt;
-        if (!lastActivity) {
-            // No timestamp at all — treat as stale and clean up
-            logger.info(`[SCHEDULER] Removing stale pause for ${userId} (no activity timestamp, step: ${state.step})`);
-            pausedUsers.delete(userId);
-            cleanedUsers.push(userId);
-            continue;
-        }
-        if (differenceInDays(now, lastActivity) > STALE_PAUSE_DAYS) {
-            logger.info(`[SCHEDULER] Removing stale pause for ${userId} (inactive ${differenceInDays(now, lastActivity)} days, step: ${state.step})`);
-            pausedUsers.delete(userId);
-            cleanedUsers.push(userId);
+        if (!lastActivity || differenceInDays(now, lastActivity) > STALE_PAUSE_DAYS) {
+            candidates.push(userId);
         }
     }
 
-    if (cleanedUsers.length > 0) {
-        logger.info(`[SCHEDULER] ✅ Cleaned ${cleanedUsers.length} stale paused user(s) (>7 days inactive)`);
-        saveState();
-    }
+    if (candidates.length === 0) return;
 
-    // El filtro por `pausedAt < cutoff` NO es opcional — mismo cutoff que usa
-    // restorePausedUsersFromDB, así ambos caminos coinciden. Para los que no
-    // tienen state en memoria la DB es la única fuente de verdad: solo si el
-    // updateMany matcheó (la pausa era vieja de verdad) los sacamos de la Set.
-    if (cleanedUsers.length > 0 || noStateUsers.length > 0) {
-        const staleCutoff = new Date(now - STALE_PAUSE_DAYS * 24 * 60 * 60 * 1000);
-        (async () => {
-            try {
-                const { prisma } = require('../../db');
-                const { _cleanPhone } = require('../flows/utils/flowHelpers');
-                let clearedByDb = 0;
-                for (const userId of cleanedUsers) {
-                    const clean = _cleanPhone(userId);
-                    if (!clean) continue;
-                    await prisma.user.updateMany({
-                        where: { phone: clean, instanceId: sellerId, pausedAt: { lt: staleCutoff } },
-                        data: { pausedAt: null, pauseReason: null }
-                    });
+    // La DB es la única fuente de verdad sobre la antigüedad de la pausa. El
+    // filtro por `pausedAt < cutoff` NO es opcional — mismo cutoff que usa
+    // restorePausedUsersFromDB, así ambos caminos coinciden — y solo si el
+    // updateMany matcheó (la pausa era vieja de verdad) sacamos al cliente de
+    // la Set en memoria. Un candidato con pausa reciente en DB queda pausado.
+    const staleCutoff = new Date(now - STALE_PAUSE_DAYS * 24 * 60 * 60 * 1000);
+    (async () => {
+        try {
+            const { prisma } = require('../../db');
+            const { _cleanPhone } = require('../flows/utils/flowHelpers');
+            let cleared = 0;
+            for (const userId of candidates) {
+                const clean = _cleanPhone(userId);
+                if (!clean) continue;
+                const { count } = await prisma.user.updateMany({
+                    where: { phone: clean, instanceId: sellerId, pausedAt: { lt: staleCutoff } },
+                    data: { pausedAt: null, pauseReason: null }
+                });
+                if (count > 0) {
+                    pausedUsers.delete(userId);
+                    cleared++;
                 }
-                for (const userId of noStateUsers) {
-                    const clean = _cleanPhone(userId);
-                    if (!clean) continue;
-                    const { count } = await prisma.user.updateMany({
-                        where: { phone: clean, instanceId: sellerId, pausedAt: { lt: staleCutoff } },
-                        data: { pausedAt: null, pauseReason: null }
-                    });
-                    if (count > 0) {
-                        pausedUsers.delete(userId);
-                        clearedByDb++;
-                    }
-                }
-                if (clearedByDb > 0) {
-                    logger.info(`[SCHEDULER] ✅ Cleaned ${clearedByDb} stale paused user(s) sin state en memoria (pausa >${STALE_PAUSE_DAYS}d según DB)`);
-                    saveState();
-                }
-                if (noStateUsers.length > clearedByDb) {
-                    logger.info(`[SCHEDULER] ${noStateUsers.length - clearedByDb} pausado(s) sin state siguen pausados (pausa reciente según DB) — no se tocan`);
-                }
-            } catch (e: any) {
-                logger.error(`[SCHEDULER] Error clearing pausedAt in DB for stale users:`, e.message);
             }
-        })();
-    }
+            if (cleared > 0) {
+                logger.info(`[SCHEDULER] ✅ Cleaned ${cleared} stale paused user(s) (pausa >${STALE_PAUSE_DAYS}d según DB)`);
+                saveState();
+            }
+            if (candidates.length > cleared) {
+                logger.info(`[SCHEDULER] ${candidates.length - cleared} pausado(s) inactivos o sin state siguen pausados (pausa reciente según DB) — no se tocan`);
+            }
+        } catch (e: any) {
+            logger.error(`[SCHEDULER] Error clearing pausedAt in DB for stale users:`, e.message);
+        }
+    })();
 }
 
 
