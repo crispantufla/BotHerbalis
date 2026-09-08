@@ -291,9 +291,9 @@ async function _getPrices(): Promise<Record<string, any>> {
     const now = Date.now();
     if (_pricesCache && (now - _pricesCacheTime) < PRICES_CACHE_MS) return _pricesCache;
     let prices: Record<string, any> = {
-        'Cápsulas': { '60': '49.900', '120': '62.900' },
+        'Cápsulas': { '60': '54.900', '120': '68.900' },
         'Semillas': { '60': '36.900', '120': '49.900' },
-        'Gotas': { '60': '49.900', '120': '62.900' },
+        'Gotas': { '60': '54.900', '120': '68.900' },
         'costoLogistico': '18.000'
     };
     try {
@@ -390,6 +390,9 @@ QUÉ HACER EN SU LUGAR: respondé directamente con la info que tenemos:
 - "Es 100% natural. Las únicas contraindicaciones son embarazo, lactancia, menores de 18 y mayores de 80. Para el resto no hay restricción."
 - Si hay condición específica que matchea contraindicación real (embarazo / lactancia / gastritis severa con semillas / menor / mayor 80): explicá la restricción concreta, sin derivar a médico.
 - Si tenés dudas reales sobre un caso particular: pausá y avisá al admin con _pauseAndAlert. NUNCA inventes ni derives al médico para "cubrirte".
+
+🛑 REGLA CRÍTICA — PROHIBIDO PROMETER RESULTADOS O INVENTAR CIFRAS 🛑
+NUNCA digas cuántos kilos va a bajar el cliente ni en cuánto tiempo ("en el primer mes bajás 3 o 4 kilos", "en 60 días perdés 10"), ni garantices resultados. NUNCA inventes cifras de clientes, ventas, estudios o años que no estén en estas instrucciones. Si preguntan cuánto o cuán rápido van a bajar, respondé EXACTAMENTE: "Cada cuerpo tiene su ritmo. Quienes tienen más kilos para bajar suelen notar cambios más visibles al inicio, y quienes necesitan bajar menos ven descensos más progresivos. Lo importante es que el descenso sea natural y sostenido." y seguí con el objetivo del paso.
 
 REGLAS ACTIVAS APLICABLES A ESTE CONTEXTO:
 ${rulesText}`;
@@ -1009,11 +1012,11 @@ class AIService {
             const priceData = await _getPrices();
             // Política mayo 2026 (rev 2): ya no hay adicional $6.000 ni seña/anticipo.
             // Contrarrembolso = retiro en sucursal, paga total al retirar (sin anticipo previo).
-            const priceCaps60 = priceData['Cápsulas']?.['60'] || '46.900';
-            const priceCaps120 = priceData['Cápsulas']?.['120'] || '66.900';
+            const priceCaps60 = priceData['Cápsulas']?.['60'] || '54.900';
+            const priceCaps120 = priceData['Cápsulas']?.['120'] || '68.900';
             const priceSem60 = priceData['Semillas']?.['60'] || '36.900';
             const priceSem120 = priceData['Semillas']?.['120'] || '49.900';
-            const priceGotas60 = priceData['Gotas']?.['60'] || '48.900';
+            const priceGotas60 = priceData['Gotas']?.['60'] || '54.900';
             const priceGotas120 = priceData['Gotas']?.['120'] || '68.900';
 
             const priceString = `Cápsulas($${priceCaps60}/60d, $${priceCaps120}/120d) | Semillas($${priceSem60}/60d, $${priceSem120}/120d) | Gotas($${priceGotas60}/60d, $${priceGotas120}/120d)`;
@@ -1092,6 +1095,15 @@ class AIService {
         // no-estructurado). En modo estructurado (flag, solo Claude) se omite acá y
         // viaja como turnos user/assistant reales en messages[] (ver branch de Claude).
         const historyText = conversationHistory.map(m => `${m.role}: ${m.content}`).join('\n');
+        // Anti-repetición explícita: Claude respeta mucho mejor "no repitas ESTA frase"
+        // que el steer genérico (el replay de sep-2026 mostró calcos casi textuales del
+        // mensaje anterior en envío/pago y en cierres de plan). Va en el turno user
+        // (contenido dinámico), así no toca el prefijo cacheado del system.
+        const lastBotMsg = [...conversationHistory].reverse().find(m => m.role !== 'user' && typeof m.content === 'string' && m.content.trim());
+        const lastBotContext = lastBotMsg
+            ? `TU ÚLTIMO MENSAJE (PROHIBIDO repetirlo textual o casi textual — si tenés que volver a decir lo mismo, reformulalo con otras palabras y sumá algo nuevo): "${lastBotMsg.content.replace(/\s+/g, ' ').slice(0, 400)}"
+`
+            : '';
         const buildUserPrompt = (historySection: string, withInstructions: boolean) => `
 ${summaryContext}
 ${knowledgeContext}
@@ -1099,7 +1111,7 @@ ${stateContext}
 ETAPA ACTUAL: "${context.step || 'general'}"
 OBJETIVO DEL PASO: "${context.goal || 'Ayudar al cliente'}"
 ${historySection}
-MENSAJE DEL USUARIO: "${userText}"
+${lastBotContext}MENSAJE DEL USUARIO: "${userText}"
 ${withInstructions ? '\n' + RESPONSE_INSTRUCTIONS + '\n' : '\nAplicá las INSTRUCCIONES DE RESPUESTA del system.\n'}`;
 
         // Con historial embebido (path OpenAI + Claude no-estructurado): idéntico a antes.

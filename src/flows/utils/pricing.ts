@@ -51,9 +51,9 @@ function _loadPricesCache(): Record<string, any> {
 }
 
 const FALLBACK_PRICES: Record<string, any> = {
-    'Cápsulas': { '60': '49.900', '120': '62.900' },
+    'Cápsulas': { '60': '54.900', '120': '68.900' },
     'Semillas': { '60': '36.900', '120': '49.900' },
-    'Gotas': { '60': '49.900', '120': '62.900' },
+    'Gotas': { '60': '54.900', '120': '68.900' },
     'costoLogistico': '18.000'
 };
 

@@ -92,9 +92,12 @@ describe('SIM V7 — el bot vende como Horacio (retiro, +10kg, cápsulas)', () =
         expect(all).not.toMatch(/n[úu]mero de tel[ée]fono/);
     });
 
-    test('cotiza el precio base (cápsulas 120 = 62.900, sin el descuento vencido de junio)', () => {
+    test('cotiza el precio base de prices.json (cápsulas 120), sin el descuento vencido de junio', () => {
+        // Dinámico: data/prices.json es la fuente (sep-2026: 68.900). Antes el test
+        // fijaba 62.900 y se rompía cada vez que se actualizaban los precios reales.
+        const { _getPrice } = require('../src/flows/utils/pricing');
         const all = rig.transcript.map(t => t.text).join('\n');
-        expect(all).toMatch(/62\.900/);
+        expect(all).toContain(_getPrice('Cápsulas', '120'));
         expect(all).not.toMatch(/52\.900/);
     });
 
@@ -106,7 +109,7 @@ describe('SIM V7 — el bot vende como Horacio (retiro, +10kg, cápsulas)', () =
         expect(rig.deps.saveOrderToLocal).toHaveBeenCalledTimes(1);
         const saved = rig.deps.saveOrderToLocal.mock.calls[0][0];
         expect(saved.status).toBe('Confirmado');
-        expect(saved.precio).toMatch(/62\.900/);
+        expect(saved.precio).toContain(require('../src/flows/utils/pricing')._getPrice('Cápsulas', '120'));
         expect(rig.userState[uid].step).toBe('completed');
     });
 
