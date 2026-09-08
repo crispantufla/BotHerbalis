@@ -206,6 +206,29 @@ const CLAUDE_AB_PERCENT = Math.max(0, Math.min(100, parseInt(process.env.CLAUDE_
 // cualquier motivo (incl. un 400 por turnos mal formados), _claudeChat devuelve null
 // y el caller cae automáticamente a OpenAI con el blob clásico — peor caso = hoy.
 const WA_STRUCTURED_TURNS = process.env.WA_STRUCTURED_TURNS !== '0' && process.env.WA_STRUCTURED_TURNS !== 'false';
+// TTL del prompt cache de Anthropic para los bloques del system (path Claude).
+// Medido sobre 14 días de prod (sep-2026): las llamadas que comparten prefijo llegan
+// con gaps de 10-40 min, así que con el TTL default (5 min) el hit-rate era 3-39% y
+// en los steps Sonnet la escritura a 1.25x salía MÁS cara que no cachear. Con 1h
+// (escritura 2x, lectura 0.1x) el bloque CORE compartido pega ~96% en Haiku y ~74%
+// en Sonnet. Verificable en logs: `[AI][usage] ... cache_w=… cache_r=…`.
+const CLAUDE_CACHE_CONTROL = { type: "ephemeral", ttl: "1h" } as const;
+
+// Tool que obliga la respuesta estructurada del chat (path Claude). Va ANTES del
+// system en el prefijo cacheado, así que también tiene que ser byte-estable.
+const CLAUDE_DIALOG_TOOL = {
+    name: "control_dialog_flow",
+    description: "Emite la respuesta al cliente y gestiona el embudo de ventas",
+    input_schema: {
+        type: "object",
+        properties: {
+            response: { type: "string", description: "Tu respuesta para el cliente. Proporcional al mensaje: corta si es una pregunta rápida, extensa y empática solo en momentos emocionales/objeciones." },
+            goalMet: { type: "boolean", description: "Si el cliente cumplió el objetivo del paso actual" },
+            extractedData: { type: "string", description: "Datos extraídos de la intención del usuario (producto, quejas, edad, tags), o vacío" }
+        },
+        required: ["response", "goalMet"]
+    }
+};
 // History window (ENTRADAS de array, no turnos: ~2 entradas por turno, así que
 // 60 ≈ 25-30 turnos reales). Subido de 30→60 (jun-2026) junto con los turnos
 // estructurados + system cacheado (ver WA_STRUCTURED_TURNS): con el system
@@ -608,8 +631,9 @@ DEBES LLAMAR A LA HERRAMIENTA 'control_dialog_flow' PARA EMITIR TU RESPUESTA AL 
 // ── PROMPT BUILDER — Selects the right module for each step ──
 // stable=true: el system NO depende del userText (incluye todas las reglas), así
 // queda byte-estable por (step) y se puede cachear con prompt caching.
-async function _buildSystemPrompt(step: string, userText: string = "", stable: boolean = false, mpOn: boolean = true): Promise<string> {
-    const prices = await _getPrices();
+// Módulo del step + info de consumo (si aplica). Estable por step: solo depende de
+// prices.json y de mpOn, nunca del mensaje actual.
+function _getStepModule(step: string, prices: Record<string, any>, mpOn: boolean): string {
     let module;
 
     switch (step) {
@@ -648,12 +672,51 @@ async function _buildSystemPrompt(step: string, userText: string = "", stable: b
         'waiting_admin_ok', 'waiting_admin_validation', 'post_sale'
     ];
     const extraModule = consumptionSteps.includes(step) ? '\n' + _getModuleConsumption() : '';
+    return [module, extraModule].join('\n\n');
+}
 
+// Instrucciones de respuesta (estáticas, idénticas en todos los steps). Antes viajaban
+// al final del turno user en CADA llamada (~1.3K tokens que nunca se cacheaban); en el
+// path Claude ahora van dentro del bloque CORE del system, que sí se cachea. El path
+// OpenAI (fallback) las sigue recibiendo en el turno user, como siempre (ver chat()).
+const RESPONSE_INSTRUCTIONS = `INSTRUCCIONES:
+1. Fijate si el usuario CUMPLIÓ el objetivo del paso(ej: dio un número, eligió un plan).
+2. Si lo cumplió: goalMet = true.
+3. PREGUNTAS DEL USUARIO(CRÍTICO): Si el usuario hace una pregunta, RESPONDELA SIEMPRE de forma clara.Nunca lo ignores.Luego de responder, y en un tono relajado y muy poco insistente(ej: "te tomo los datos o te ayudo con algo más?"), volvé a intentar encausar el objetivo del paso.EXCEPCIÓN: Si el usuario dice explícitamente "No gracias" o similar, o la etapa es post - venta y no quiere nada más, NO HAGAS NINGUNA PREGUNTA ADICIONAL.Si el usuario NO preguntó nada y tampoco cumplió el objetivo, volvé a preguntarle lo del objetivo pero de forma breve y amigable.
+4. Excepción a la Regla 3 (POSTERGACIÓN): Si el usuario dice que "no puede hablar ahora" o "está trabajando", SOLO confirmá con amabilidad ("Dale, tranqui. Avisame cuando puedas!"). Si TODAVÍA ESTÁ DECIDIENDO ("lo pienso", "después veo", "te confirmo", "lo charlo", "déjame pensarlo"): NO le empujes una fecha de envío ni preguntes "¿a partir de qué día te lo mando?" (da por hecho que ya compró y suena pusheado). Acompañá suave: "¡Dale! 😊 Cualquier duda para decidir, acá estoy", goalMet=false. SOLO si posterga por PLATA o TIEMPO ("en otro momento lo compro", "este mes no puedo", "cuando cobre", "no tengo plata ahora"): ofrecé POSTDATAR preguntando "¿A partir de qué día te queda cómodo recibirlo?". PROHIBIDO mencionar "congelar precio".
+5. Si el usuario dice algo EMOCIONAL o PERSONAL(hijos, salud, bullying, autoestima): mostrá EMPATÍA primero.NO USES "Entiendo, eso es difícil".Usá variaciones reales y genuinas.Después volvé suavemente al objetivo del paso.
+6. NO ADELANTES temas que el cliente todavía no tocó: no hables de pago, envío, precios ni datos de envío si el OBJETIVO DEL PASO no lo menciona, salvo que el cliente lo haya preguntado explícitamente. PERO si algo YA se acordó o se dijo antes en esta conversación (retiro en sucursal, una fecha postdatada, un plan o producto elegido, una objeción ya respondida, datos ya dados), MANTENELO y sé coherente: no lo contradigas ni lo vuelvas a preguntar como si no se hubiera hablado.
+7. MENORES DE EDAD: Si el mensaje menciona menores, VERIFICÁ EL HISTORIAL.Si ya se aclaró que la persona es mayor de 18, NO repitas la restricción.Confirmá que puede tomarla y seguí adelante.
+8. ANTI - REPETICIÓN: NUNCA repitas textualmente un mensaje que ya está en el historial.Si necesitás pedir los mismos datos, usá una frase DIFERENTE.
+9. RECHAZO EXPLÍCITO: Si el usuario dice "no quiero nada", "no me interesa", "callate", "dejame en paz" o cualquier rechazo claro del producto o la conversación: NO avances al siguiente paso, NO sigas ofreciendo productos.Respondé con una disculpa breve y respetuosa, sin hacer preguntas.goalMet=false, extractedData="NEED_ADMIN".
+10. PRECIOS Y TOTALES (CRÍTICO): Si el ESTADO DEL CLIENTE trae "TOTAL AUTORITATIVO A PAGAR", ESE es el ÚNICO número que podés cotizarle al cliente para el pedido armado. NUNCA reconstruyas un total sumando precios base del carrito o de la lista de precios — el total autoritativo ya incluye adicional MAX, descuentos por volumen, o bonificaciones de tarjeta/transferencia según corresponda. Si el cliente cambia de plan o producto y TODAVÍA NO se actualizó el total autoritativo en el estado, NO le des un número: respondé "Dale, sin problema, cambiamos el pedido" y terminá ahí, sin cotizar, para que el sistema recalcule. Los precios de la lista son SOLO referencia conceptual para presentar planes al inicio, nunca para cotizar pedidos en curso.
+11. CONTINUIDAD DEL HILO: antes de responder, leé el HISTORIAL y el ESTADO DEL CLIENTE y seguí DESDE DONDE QUEDARON. Respetá lo que el cliente ya eligió, ya dijo o ya se le prometió. Si ya dio su nombre, ubicación, producto, plan o ya planteó una objeción, NO se lo vuelvas a pedir ni se lo re-preguntes — usalo. (Esto NO te impide volver a EXPLICAR algo si el cliente lo re-pregunta: ahí sí respondé de nuevo con paciencia.)`;
+
+// Bloques del system para el path Claude estructurado, ordenados de más a menos
+// estable. El prompt cache de Anthropic es match de PREFIJO exacto y cada bloque lleva
+// su breakpoint (ver _claudeChat / CLAUDE_CACHE_CONTROL):
+//   [0] CORE + instrucciones de respuesta — byte-idéntico para TODOS los steps (solo
+//       depende de mpOn y de prices.json). Es ~75% del prompt y al ser compartido
+//       entre steps concentra los hits de caché.
+//   [1] módulo del step + consumo + reglas de extracción — estable por step.
+// 🛑 NADA que dependa del mensaje actual, del cliente o de la hora puede entrar acá:
+// rompería el prefijo para todas las llamadas. Eso va en el turno user (chat()).
+async function _buildSystemBlocks(step: string, mpOn: boolean = true): Promise<string[]> {
+    const prices = await _getPrices();
+    return [
+        [_getCorePrompt('', true, mpOn), RESPONSE_INSTRUCTIONS].join('\n\n'),
+        [_getStepModule(step, prices, mpOn), _getExtractionRules()].join('\n\n'),
+    ];
+}
+
+// System clásico en un solo string (path OpenAI y Claude no estructurado). Las
+// instrucciones de respuesta NO van acá porque en ese path viajan en el turno user.
+async function _buildSystemPrompt(step: string, userText: string = "", stable: boolean = false, mpOn: boolean = true): Promise<string> {
+    const prices = await _getPrices();
     return [
         _getCorePrompt(userText, stable, mpOn), // TOP — max attention (identity, tone, dynamic rules)
-        module,                           // MIDDLE — step-specific context
-        extraModule,                      // MIDDLE — consumption (if relevant step)
-        _getExtractionRules()             // BOTTOM — max attention (data extraction instructions)
+        _getStepModule(step, prices, mpOn),     // MIDDLE — step-specific context (+ consumption if relevant)
+        _getExtractionRules()                   // BOTTOM — max attention (data extraction instructions)
     ].join('\n\n');
 }
 
@@ -736,7 +799,7 @@ class AIService {
      * Devuelve los args del tool control_dialog_flow ({response, goalMet, extractedData})
      * o null si falla (el caller cae a OpenAI como fallback).
      */
-    async _claudeChat(systemPrompt: string, userPrompt: string, step: string, sellerId: string, historyTurns?: ChatTurn[]): Promise<{ response?: string; goalMet?: boolean; extractedData?: string | null } | null> {
+    async _claudeChat(systemPrompt: string | string[], userPrompt: string, step: string, sellerId: string, historyTurns?: ChatTurn[]): Promise<{ response?: string; goalMet?: boolean; extractedData?: string | null } | null> {
         try {
             const model = PREMIUM_STEPS.has(step) ? CLAUDE_MODEL_PREMIUM : CLAUDE_MODEL_SIMPLE;
             // Modo turnos estructurados (flag WA_STRUCTURED_TURNS): el historial va
@@ -746,9 +809,12 @@ class AIService {
             const messages = structured
                 ? [...historyTurns!, { role: "user", content: userPrompt }]
                 : [{ role: "user", content: userPrompt }];
+            // Un bloque por nivel de estabilidad, cada uno con su breakpoint de caché (ver
+            // _buildSystemBlocks). Si llega un string (playground, tests) va como bloque único.
+            const sysBlocks = Array.isArray(systemPrompt) ? systemPrompt : [systemPrompt];
             const system: any = structured
-                ? [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }]
-                : systemPrompt;
+                ? sysBlocks.map(text => ({ type: "text", text, cache_control: CLAUDE_CACHE_CONTROL }))
+                : sysBlocks.join('\n\n');
             // El cache exact-match debe incluir el historial: en modo estructurado
             // userPrompt ya NO lo contiene, así que dos charlas distintas con el mismo
             // mensaje actual + step colisionarían si no lo metemos en la key.
@@ -762,19 +828,7 @@ class AIService {
                     temperature: 0.6,
                     system,
                     messages,
-                    tools: [{
-                        name: "control_dialog_flow",
-                        description: "Emite la respuesta al cliente y gestiona el embudo de ventas",
-                        input_schema: {
-                            type: "object",
-                            properties: {
-                                response: { type: "string", description: "Tu respuesta para el cliente. Proporcional al mensaje: corta si es una pregunta rápida, extensa y empática solo en momentos emocionales/objeciones." },
-                                goalMet: { type: "boolean", description: "Si el cliente cumplió el objetivo del paso actual" },
-                                extractedData: { type: "string", description: "Datos extraídos de la intención del usuario (producto, quejas, edad, tags), o vacío" }
-                            },
-                            required: ["response", "goalMet"]
-                        }
-                    }],
+                    tools: [CLAUDE_DIALOG_TOOL],
                     tool_choice: { type: "tool", name: "control_dialog_flow" }
                 }),
                 cacheKey, // namespace de caché distinto al de OpenAI (incluye historial en modo estructurado)
@@ -879,15 +933,26 @@ class AIService {
         if (usage) {
             const model = (result as any)?.model || '';
             if (model.startsWith('claude')) {
-                // Anthropic usa input_tokens/output_tokens. Sonnet ~$3/$15 por M; Haiku ~$0.80/$4.
+                // Anthropic: input_tokens son SOLO los no cacheados; los de caché vienen
+                // aparte. Tarifas: Sonnet 4.6 $3/$15 por M, Haiku 4.5 $1/$5. Escritura de
+                // caché = 2x input (TTL 1h) o 1.25x (5m); lectura = 0.1x. Antes se ignoraban
+                // los tokens de caché y el costo estimado quedaba por debajo del real.
                 const inTok = usage.input_tokens || 0;
                 const outTok = usage.output_tokens || 0;
+                const cacheR = usage.cache_read_input_tokens || 0;
+                const cacheW = usage.cache_creation_input_tokens || 0;
+                const cacheW1h = usage.cache_creation?.ephemeral_1h_input_tokens ?? cacheW;
+                const cacheW5m = usage.cache_creation?.ephemeral_5m_input_tokens ?? 0;
                 const isBig = model.includes('sonnet') || model.includes('opus');
-                const inputRate  = isBig ? 0.000003 : 0.0000008;
-                const outputRate = isBig ? 0.000015 : 0.000004;
-                this.stats.promptTokens += inTok;
+                const inputRate  = isBig ? 0.000003 : 0.000001;
+                const outputRate = isBig ? 0.000015 : 0.000005;
+                const cost = (inTok + cacheW1h * 2 + cacheW5m * 1.25 + cacheR * 0.1) * inputRate + outTok * outputRate;
+                this.stats.promptTokens += inTok + cacheW + cacheR;
                 this.stats.completionTokens += outTok;
-                this.stats.estimatedCostUSD += (inTok * inputRate) + (outTok * outputRate);
+                this.stats.estimatedCostUSD += cost;
+                // Una línea por llamada: es la única forma de ver el hit-rate real del
+                // prompt cache en prod (railway logs | grep "\[AI\]\[usage\]").
+                logger.info(`[AI][usage] ${model} in=${inTok} cache_w=${cacheW} cache_r=${cacheR} out=${outTok} ≈$${cost.toFixed(4)} seller=${sellerId}`);
             } else {
                 // OpenAI: prompt_tokens/completion_tokens
                 const isPremium = model.startsWith('gpt-4o') && !model.includes('mini');
@@ -1027,7 +1092,7 @@ class AIService {
         // no-estructurado). En modo estructurado (flag, solo Claude) se omite acá y
         // viaja como turnos user/assistant reales en messages[] (ver branch de Claude).
         const historyText = conversationHistory.map(m => `${m.role}: ${m.content}`).join('\n');
-        const buildUserPrompt = (historySection: string) => `
+        const buildUserPrompt = (historySection: string, withInstructions: boolean) => `
 ${summaryContext}
 ${knowledgeContext}
 ${stateContext}
@@ -1035,25 +1100,12 @@ ETAPA ACTUAL: "${context.step || 'general'}"
 OBJETIVO DEL PASO: "${context.goal || 'Ayudar al cliente'}"
 ${historySection}
 MENSAJE DEL USUARIO: "${userText}"
-
-INSTRUCCIONES:
-1. Fijate si el usuario CUMPLIÓ el objetivo del paso(ej: dio un número, eligió un plan).
-2. Si lo cumplió: goalMet = true.
-3. PREGUNTAS DEL USUARIO(CRÍTICO): Si el usuario hace una pregunta, RESPONDELA SIEMPRE de forma clara.Nunca lo ignores.Luego de responder, y en un tono relajado y muy poco insistente(ej: "te tomo los datos o te ayudo con algo más?"), volvé a intentar encausar el objetivo del paso.EXCEPCIÓN: Si el usuario dice explícitamente "No gracias" o similar, o la etapa es post - venta y no quiere nada más, NO HAGAS NINGUNA PREGUNTA ADICIONAL.Si el usuario NO preguntó nada y tampoco cumplió el objetivo, volvé a preguntarle lo del objetivo pero de forma breve y amigable.
-4. Excepción a la Regla 3 (POSTERGACIÓN): Si el usuario dice que "no puede hablar ahora" o "está trabajando", SOLO confirmá con amabilidad ("Dale, tranqui. Avisame cuando puedas!"). Si TODAVÍA ESTÁ DECIDIENDO ("lo pienso", "después veo", "te confirmo", "lo charlo", "déjame pensarlo"): NO le empujes una fecha de envío ni preguntes "¿a partir de qué día te lo mando?" (da por hecho que ya compró y suena pusheado). Acompañá suave: "¡Dale! 😊 Cualquier duda para decidir, acá estoy", goalMet=false. SOLO si posterga por PLATA o TIEMPO ("en otro momento lo compro", "este mes no puedo", "cuando cobre", "no tengo plata ahora"): ofrecé POSTDATAR preguntando "¿A partir de qué día te queda cómodo recibirlo?". PROHIBIDO mencionar "congelar precio".
-5. Si el usuario dice algo EMOCIONAL o PERSONAL(hijos, salud, bullying, autoestima): mostrá EMPATÍA primero.NO USES "Entiendo, eso es difícil".Usá variaciones reales y genuinas.Después volvé suavemente al objetivo del paso.
-6. NO ADELANTES temas que el cliente todavía no tocó: no hables de pago, envío, precios ni datos de envío si el OBJETIVO DEL PASO no lo menciona, salvo que el cliente lo haya preguntado explícitamente. PERO si algo YA se acordó o se dijo antes en esta conversación (retiro en sucursal, una fecha postdatada, un plan o producto elegido, una objeción ya respondida, datos ya dados), MANTENELO y sé coherente: no lo contradigas ni lo vuelvas a preguntar como si no se hubiera hablado.
-7. MENORES DE EDAD: Si el mensaje menciona menores, VERIFICÁ EL HISTORIAL.Si ya se aclaró que la persona es mayor de 18, NO repitas la restricción.Confirmá que puede tomarla y seguí adelante.
-8. ANTI - REPETICIÓN: NUNCA repitas textualmente un mensaje que ya está en el historial.Si necesitás pedir los mismos datos, usá una frase DIFERENTE.
-9. RECHAZO EXPLÍCITO: Si el usuario dice "no quiero nada", "no me interesa", "callate", "dejame en paz" o cualquier rechazo claro del producto o la conversación: NO avances al siguiente paso, NO sigas ofreciendo productos.Respondé con una disculpa breve y respetuosa, sin hacer preguntas.goalMet=false, extractedData="NEED_ADMIN".
-10. PRECIOS Y TOTALES (CRÍTICO): Si el ESTADO DEL CLIENTE trae "TOTAL AUTORITATIVO A PAGAR", ESE es el ÚNICO número que podés cotizarle al cliente para el pedido armado. NUNCA reconstruyas un total sumando precios base del carrito o de la lista de precios — el total autoritativo ya incluye adicional MAX, descuentos por volumen, o bonificaciones de tarjeta/transferencia según corresponda. Si el cliente cambia de plan o producto y TODAVÍA NO se actualizó el total autoritativo en el estado, NO le des un número: respondé "Dale, sin problema, cambiamos el pedido" y terminá ahí, sin cotizar, para que el sistema recalcule. Los precios de la lista son SOLO referencia conceptual para presentar planes al inicio, nunca para cotizar pedidos en curso.
-11. CONTINUIDAD DEL HILO: antes de responder, leé el HISTORIAL y el ESTADO DEL CLIENTE y seguí DESDE DONDE QUEDARON. Respetá lo que el cliente ya eligió, ya dijo o ya se le prometió. Si ya dio su nombre, ubicación, producto, plan o ya planteó una objeción, NO se lo vuelvas a pedir ni se lo re-preguntes — usalo. (Esto NO te impide volver a EXPLICAR algo si el cliente lo re-pregunta: ahí sí respondé de nuevo con paciencia.)
-`;
+${withInstructions ? '\n' + RESPONSE_INSTRUCTIONS + '\n' : '\nAplicá las INSTRUCCIONES DE RESPUESTA del system.\n'}`;
 
         // Con historial embebido (path OpenAI + Claude no-estructurado): idéntico a antes.
         // Sin historial embebido (Claude estructurado): el hilo va como turnos en messages[].
-        const userPrompt = buildUserPrompt(`\nHISTORIAL RECIENTE:\n${historyText}\n`);
-        const userPromptNoHistory = buildUserPrompt('');
+        const userPrompt = buildUserPrompt(`\nHISTORIAL RECIENTE:\n${historyText}\n`, true);
+        const userPromptNoHistory = buildUserPrompt('', false);
 
         try {
             const step = context.step || 'general';
@@ -1117,7 +1169,7 @@ INSTRUCCIONES:
                 // user/assistant reales + system estable cacheado. El path OpenAI de
                 // abajo NO se toca (sigue con userPrompt + systemPrompt clásicos).
                 const structured = WA_STRUCTURED_TURNS;
-                const sysForClaude = structured ? await _buildSystemPrompt(step, userText, true, mpOn) : systemPrompt;
+                const sysForClaude = structured ? await _buildSystemBlocks(step, mpOn) : systemPrompt;
                 const turns = structured ? buildHistoryTurns(conversationHistory, userText) : undefined;
                 const promptForClaude = structured ? userPromptNoHistory : userPrompt;
                 const cArgs = await this._claudeChat(sysForClaude, promptForClaude, step, context.sellerId!, turns);
@@ -1641,3 +1693,6 @@ SITUACION: El ADMINISTRADOR del negocio te da una instrucción DIRECTA para envi
 // Singleton Instance
 const aiService = new AIService();
 export { aiService };
+
+// Exportados para tests y para scripts/ai-cache-probe.ts. El runtime no los usa desde afuera.
+export { _buildSystemBlocks, _buildSystemPrompt, CLAUDE_CACHE_CONTROL, CLAUDE_DIALOG_TOOL };
