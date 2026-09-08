@@ -1,11 +1,12 @@
 FROM node:20-bullseye
 
 # Install Chrome dependencies for Puppeteer
-# Debian Bullseye salió de soporte (LTS) el 2026-08-31: el archivo Release de
-# bullseye-security venció y `apt-get update` falla con "Release file ... is
-# expired" (deploys caídos el 2026-09-08). Check-Valid-Until=false hace que apt
-# acepte el repo vencido. Pendiente: migrar la imagen base a node:20-bookworm.
-RUN apt-get -o Acquire::Check-Valid-Until=false update \
+# Debian Bullseye salió de soporte (LTS) el 2026-08-31: el repo bullseye-security
+# quedó muerto (Release vencido y los .deb dan 404; archive.debian.org todavía no
+# lo tiene). Deploys caídos el 2026-09-08. Se quita ese repo: las mismas libs se
+# instalan desde bullseye main. Pendiente: migrar la imagen base a node:20-bookworm.
+RUN sed -i '/bullseye-security/d' /etc/apt/sources.list \
+  && apt-get -o Acquire::Check-Valid-Until=false update \
   && apt-get install -y wget gnupg \
   && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
   && sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list' \
