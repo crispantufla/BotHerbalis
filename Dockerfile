@@ -1,16 +1,16 @@
-FROM node:20-bullseye
+# Debian 12 (bookworm), con soporte hasta 2028. Bullseye salió de LTS el
+# 2026-08-31 y su repo de seguridad quedó muerto (deploys caídos el 2026-09-08).
+FROM node:20-bookworm
 
-# Install Chrome dependencies for Puppeteer
-# Debian Bullseye salió de soporte (LTS) el 2026-08-31: el repo bullseye-security
-# quedó muerto (Release vencido y los .deb dan 404; archive.debian.org todavía no
-# lo tiene). Deploys caídos el 2026-09-08. Se quita ese repo: las mismas libs se
-# instalan desde bullseye main. Pendiente: migrar la imagen base a node:20-bookworm.
-RUN sed -i '/bullseye-security/d' /etc/apt/sources.list \
-  && apt-get -o Acquire::Check-Valid-Until=false update \
-  && apt-get install -y wget gnupg \
-  && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
-  && sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list' \
-  && apt-get -o Acquire::Check-Valid-Until=false update \
+# Install Chrome dependencies for Puppeteer.
+# En bookworm `apt-key` está deprecado: la clave de Google va a un keyring propio
+# y el repo la referencia con signed-by.
+RUN apt-get update \
+  && apt-get install -y wget gnupg ca-certificates \
+  && install -d -m 0755 /etc/apt/keyrings \
+  && wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /etc/apt/keyrings/google-chrome.gpg \
+  && echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
+  && apt-get update \
   && apt-get install -y google-chrome-stable fonts-ipafont-gothic fonts-wqy-zenhei fonts-thai-tlwg fonts-kacst fonts-freefont-ttf libxss1 \
   --no-install-recommends \
   && rm -rf /var/lib/apt/lists/*
