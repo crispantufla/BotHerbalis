@@ -19,7 +19,7 @@ const { processSalesFlow } = require('../flows/salesFlow');
 const { aiService } = require('./ai');
 const { startScheduler } = require('./scheduler');
 const { restorePausedUsersFromDB } = require('./pauseService');
-const { handleAdminCommand: handleAdminCommandCtrl } = require('./adminService');
+const { handleAdminCommand: handleAdminCommandCtrl } = require('./adminCommands');
 const { buildConfirmationMessage } = require('../utils/messageTemplates');
 import { RemoteClient } from './remoteClient';
 
