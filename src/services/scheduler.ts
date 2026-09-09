@@ -1130,12 +1130,19 @@ async function refreshPendingPayments(sharedState: SchedulerSharedState, depende
 
         // Multi-tenant scoping: only this seller's payment links
         const sellerId = sharedState.sellerId;
-        const pending = await prisma.paymentLink.findMany({
+        // NO solo 'pending': un link rechazado puede terminar pagado sobre el
+        // MISMO link. Caso real (8-sep-2026): amex rechazada 18:07 → la fila
+        // quedo 'rejected'; 18:11 el cliente reintento con dinero en cuenta y MP
+        // acredito. Como el cron solo miraba 'pending', nadie volvio a mirar esa
+        // fila nunca y la venta quedo muda. Todo lo que no este 'approved' sigue
+        // siendo re-consultable dentro de la ventana de 48h.
+        const unresolved = await prisma.paymentLink.findMany({
             where: {
-                status: 'pending',
+                status: { not: 'approved' },
                 createdAt: { gte: since },
                 ...(sellerId ? { instanceId: sellerId } : {}),
             },
+            orderBy: { createdAt: 'desc' },
             take: 50,
         });
 
@@ -1175,10 +1182,10 @@ async function refreshPendingPayments(sharedState: SchedulerSharedState, depende
             }
         }
 
-        if (pending.length === 0) return;
-        logger.info(`[SCHEDULER] Refreshing ${pending.length} pending MP payment(s)...`);
+        if (unresolved.length === 0) return;
+        logger.info(`[SCHEDULER] Refreshing ${unresolved.length} unresolved MP payment(s)...`);
 
-        for (const payment of pending) {
+        for (const payment of unresolved) {
             try {
                 const result = await mpPayment.search({
                     options: { external_reference: payment.externalRef }
@@ -1186,8 +1193,14 @@ async function refreshPendingPayments(sharedState: SchedulerSharedState, depende
                 const results = result?.results || [];
                 if (results.length === 0) continue;
 
+                // approved manda; si no hay, el intento MAS RECIENTE. El orden
+                // que devuelve MP no esta garantizado, y ahora que re-consultamos
+                // filas no-approved un results[0] arbitrario haria flapear la fila
+                // entre 'rejected' y 'pending' en cada tick.
                 const approved = results.find((p: any) => p.status === 'approved');
-                const latest = approved || results[0];
+                const latest = approved || [...results].sort((a: any, b: any) =>
+                    new Date(b.date_created || 0).getTime() - new Date(a.date_created || 0).getTime()
+                )[0];
                 const newStatus = latest.status === 'approved' ? 'approved'
                     : latest.status === 'rejected' ? 'rejected'
                     : latest.status === 'cancelled' ? 'expired'
@@ -1201,7 +1214,7 @@ async function refreshPendingPayments(sharedState: SchedulerSharedState, depende
                 // pushea. Si count=0, otro detector ya la tomó: no hacemos nada.
                 const paidAt = newStatus === 'approved' ? new Date(latest.date_approved || Date.now()) : payment.paidAt;
                 const casRes = await prisma.paymentLink.updateMany({
-                    where: { id: payment.id, status: 'pending' },
+                    where: { id: payment.id, status: { not: 'approved' } },
                     data: { status: newStatus, paidAt },
                 });
                 if (casRes.count === 0) continue;
@@ -1211,7 +1224,7 @@ async function refreshPendingPayments(sharedState: SchedulerSharedState, depende
                     if (sellerId) sharedState.io.to(sellerId).emit('payment_updated', updated);
                     sharedState.io.to('admin').emit('payment_updated', { ...updated, sellerId });
                 }
-                logger.info(`[SCHEDULER][${sellerId || '?'}] Payment ${payment.id} updated: pending → ${newStatus}`);
+                logger.info(`[SCHEDULER][${sellerId || '?'}] Payment ${payment.id} updated: ${payment.status} → ${newStatus}`);
 
                 // Push de confirmación al chat (mismo camino que el webhook).
                 if (newStatus === 'approved' && dependencies) {
