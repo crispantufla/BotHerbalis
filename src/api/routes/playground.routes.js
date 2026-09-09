@@ -166,24 +166,10 @@ module.exports = () => {
         const userId = `playground_${sessionId}`;
 
         if (!session.userState[userId]) {
-            session.userState[userId] = {
-                step,
-                history: [],
-                cart: [],
-                summary: '',
-                partialAddress: {},
-                selectedProduct: null,
-                selectedPlan: null,
-                geoRejected: false,
-                stepEnteredAt: Date.now(),
-                addressAttempts: 0,
-                fieldReaskCount: {},
-                lastAddressMsg: null,
-                postdatado: null,
-                pendingOrder: null,
-                lastActivityAt: Date.now(),
-                assignedScript: 'v7',
-            };
+            // Misma fábrica que usa el flujo real: si acá se copiaba el objeto a
+            // mano, cada campo nuevo de UserState quedaba faltando en el playground.
+            const { createInitialUserState } = require('../../flows/leadClassifier');
+            session.userState[userId] = createInitialUserState({ step, assignedScript: 'v7' });
         } else {
             session.userState[userId].step = step;
             session.userState[userId].stepEnteredAt = Date.now();

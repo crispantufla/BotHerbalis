@@ -7,6 +7,7 @@ import { _pauseAndAlert, _setStep, _extractSilentVariables, _cleanPhone, _isGhos
 import { detectObjection } from './utils/objectionDetector';
 import { isMpEnabled } from './utils/paymentOptions';
 import { parseControlTag } from './utils/extractedData';
+import { classifyNewLead, createInitialUserState } from './leadClassifier';
 
 interface SalesFlowDependencies {
     saveState: (userId?: string) => void;
@@ -38,10 +39,6 @@ function _detectAdSource(text: string): string | null {
     }
     return null;
 }
-
-// Keywords that signal clear purchase intent — if present, don't auto-pause
-// Note: normalizedText is accent-stripped, so only unaccented variants are needed
-const PURCHASE_INTENT_KEYWORDS = /\b(comprar|quiero comprar|quiero pedir|me interesa|precio|precios|cuanto sale|cuanto cuesta|quiero encargar|necesito comprar|hagan envios|hacen envios|quisiera pedir|quisiera comprar|quiero adquirir|quiero ordenar|tienen capsulas|tienen semillas|tienen gotas|nuez de la india|la direccion|mi direccion|te paso mis datos|mis datos|los datos|te paso la direccion|informacion|quiero saber|quiero mas info|bajar|adelgazar|kilos|kilo|capsulas|semillas|cemillas|semilla|gotas|gota|peso|perder peso|bajar de peso|10 kg|20 kg|mas de 20)\b/i;
 
 export async function processSalesFlow(
     userId: string,
@@ -78,201 +75,16 @@ export async function processSalesFlow(
     // 1. Initialization
     if (!userState[userId]) {
         logger.info(`[STATE] Initializing new internal state for user ${userId}`);
-        userState[userId] = {
+        userState[userId] = createInitialUserState({
             step: knowledge.flow.greeting ? 'greeting' : 'completed',
-            history: [],
-            cart: [],
-            summary: "",
-            partialAddress: {},
-            selectedProduct: null,
-            selectedPlan: null,
-            geoRejected: false,
-            stepEnteredAt: Date.now(),
-            addressAttempts: 0,
-            fieldReaskCount: {},
-            lastAddressMsg: null,
-            postdatado: null,
-            pendingOrder: null,
-            currentWeight: undefined,
-            lastActivityAt: Date.now(),
             adSource: _detectAdSource(text),
-            // Freeze the A/B assignment on first message so subsequent messages
-            // don't re-roll the variant mid-conversation under 'rotacion' mode.
-            assignedScript: dependencies.effectiveScript
-        };
+            assignedScript: dependencies.effectiveScript,
+        });
 
-        // --- CHECK 1: Cross-reference against Orders DB ---
-        // Si el phone tiene Order en este seller O en el namespace legacy
-        // (__legacy_import__ — clientes históricos importados desde Clientes_AR.txt),
-        // es un cliente conocido → ruta post-sale para que el bot no le hable.
-        try {
-            const { prisma } = require('../../db');
-            const cleanPhone = _cleanPhone(userId);
-            const instanceId = dependencies.sellerId || dependencies.sharedState?.sellerId || process.env.INSTANCE_ID || 'default';
-            const existingOrder = await prisma.order.findFirst({
-                where: {
-                    userPhone: cleanPhone,
-                    instanceId: { in: [instanceId, '__legacy_import__'] },
-                },
-                orderBy: { createdAt: 'desc' }
-            });
-
-            if (existingOrder) {
-                const isLegacy = existingOrder.instanceId === '__legacy_import__';
-                if (isLegacy) {
-                    // Contacto del padrón histórico importado (Clientes_AR.txt,
-                    // __legacy_import__): es un CLIENTE VIEJO, no un lead nuevo. El bot
-                    // NO lo atiende (ni saludo ni flujo de venta): se PAUSA y se alerta
-                    // al admin para que lo tome un humano. (rev 2026-06-04, reporte
-                    // 5493564578992 — antes el match amplio de PURCHASE_INTENT_KEYWORDS
-                    // lo mandaba a waiting_weight y la IA respondía "de nuevo, ¿cuántos
-                    // kilos?" en vez de derivarlo.)
-                    logger.info(`[ORDER-CHECK] User ${userId} es cliente del padrón histórico (import legacy) → mensaje de derivación + pausa + alerta admin.`);
-                    // Mensaje al cliente: avisarle que se lo deriva a una oficial de
-                    // atención (no dejarlo en visto). Después se pausa para que lo tome
-                    // un humano (rev 2026-06-04).
-                    const derivMsg = 'Teniendo en cuenta que ya sos cliente, te derivo con una oficial de atención al cliente que te va a ayudar enseguida 😊';
-                    if (!userState[userId].history) userState[userId].history = [];
-                    userState[userId].history.push({ role: 'bot', content: derivMsg, timestamp: Date.now() });
-                    await dependencies.sendMessageWithDelay(userId, derivMsg);
-                    await pauseUser(
-                        userId,
-                        '📇 Cliente del padrón histórico (import)',
-                        { sharedState: dependencies.sharedState, notifyAdmin: dependencies.notifyAdmin },
-                        `Teléfono del import histórico (Clientes_AR.txt). Volvió a escribir: "${text.substring(0, 100)}". Se le avisó la derivación y se pausó para atención humana.`
-                    );
-                    return { matched: true, paused: true };
-                } else {
-                    const showsPurchaseIntent = PURCHASE_INTENT_KEYWORDS.test(normalizedText);
-                    if (showsPurchaseIntent) {
-                        // Comprador real que VUELVE con intención de compra (pidió precio,
-                        // quiere comprar, etc.): NO lo pausamos como post-venta — es el
-                        // lead más tibio que hay. Lo atendemos como recompra pero SIN la
-                        // presentación (ya nos conoce): saltamos el greeting yendo directo
-                        // a waiting_weight, y el step responde su consulta.
-                        logger.info(`[ORDER-CHECK] User ${userId} es comprador real y muestra intención de compra → atender como recompra (sin presentación).`);
-                        _setStep(userState[userId], FlowStep.WAITING_WEIGHT);
-                        (userState[userId] as any).isReturningClient = true;
-                        saveState(userId);
-                        // Don't return — continúa el flujo normal de venta.
-                    } else {
-                        logger.info(`[ORDER-CHECK] User ${userId} has existing order (status: ${existingOrder.status}). Routing to post-sale.`);
-                        _setStep(userState[userId], FlowStep.COMPLETED);
-                        userState[userId].selectedProduct = existingOrder.products;
-                        saveState(userId);
-                        // Don't return — let the flow continue into stepCompleted handler below
-                    }
-                }
-            }
-        } catch (err: any) {
-            logger.error(`[ORDER-CHECK] Failed to query orders for ${userId}:`, err.message);
-        }
-
-        // --- CHECK 2: WhatsApp Chat History Detection ---
-        // Only run this if we didn't already route to post-sale via Orders
-        if (userState[userId].step !== 'completed') {
-            try {
-                const { prisma } = require('../../db');
-                const INSTANCE_ID = dependencies.sellerId || dependencies.sharedState?.sellerId || process.env.INSTANCE_ID || 'default';
-                const cleanPhone = _cleanPhone(userId);
-
-                // Grab the last 15 messages from DB for this seller
-                let dbMessages = await prisma.chatLog.findMany({
-                    where: { userPhone: cleanPhone, instanceId: INSTANCE_ID },
-                    orderBy: { timestamp: 'desc' },
-                    take: 15
-                });
-
-                // Fallback to WhatsApp's native API if local DB has NO history
-                if (dbMessages.length === 0 && dependencies.client) {
-                    try {
-                        const chat = await dependencies.client.getChatById(userId);
-                        if (chat) {
-                            const waMsgs = await chat.fetchMessages({ limit: 15 });
-                            const waMapped = waMsgs.map((wm: any) => ({
-                                id: wm.id._serialized,
-                                userPhone: cleanPhone,
-                                instanceId: INSTANCE_ID,
-                                role: wm.fromMe ? 'bot' : 'user',
-                                content: wm.body || '',
-                                timestamp: new Date(wm.timestamp * 1000)
-                            }));
-                            // Reverse to match DB descending order (latest first)
-                            dbMessages = waMapped.reverse();
-                            logger.info(`[SMART-DETECT] DB vacío para ${userId}. Recuperados ${waMapped.length} msjs nativos de WhatsApp.`);
-
-                            // --- CHECK 2b: Pre-existing chat detection ---
-                            // whatsapp-web.js does NOT sync old message bodies on a fresh session,
-                            // so fetchMessages() returns [] for old chats until the chat is opened manually.
-                            // However, chat.lastMessage.timestamp IS available immediately (it's metadata).
-                            // If that timestamp predates our bot's connection → pre-existing conversation → pause.
-                            if (waMsgs.length === 0 && dependencies.connectedAt) {
-                                try {
-                                    const lastTs: number | undefined = chat?.lastMessage?.timestamp; // Unix seconds
-                                    if (lastTs && lastTs < dependencies.connectedAt) {
-                                        logger.info(`[PRE-EXISTING] User ${userId}: last chat msg at ${new Date(lastTs * 1000).toISOString()}, bot connected at ${new Date(dependencies.connectedAt * 1000).toISOString()}. Auto-pausing.`);
-                                        await pauseUser(
-                                            userId,
-                                            '📋 Conversación pre-existente (anterior al bot)',
-                                            { sharedState: dependencies.sharedState, notifyAdmin: dependencies.notifyAdmin },
-                                            `Conversación iniciada antes de que el bot se conectara. Último mensaje: ${new Date(lastTs * 1000).toLocaleString('es-AR')}`
-                                        );
-                                        return { matched: true, paused: true };
-                                    }
-                                } catch (metaErr: any) {
-                                    logger.warn(`[PRE-EXISTING] Could not read chat metadata for ${userId}: ${metaErr.message}`);
-                                }
-                            }
-                        }
-                    } catch (waErr: any) {
-                        logger.warn(`[SMART-DETECT] Error recuperando historial nativo WA de ${userId}: ${waErr.message}`);
-                    }
-                }
-
-                // Check for existence of any prior post-sale outgoing message
-                const outgoingMessages = dbMessages.filter((m: any) => m.role === 'bot' || m.role === 'admin' || m.role === 'system');
-                const hasPostSaleMessage = outgoingMessages.some((m: any) => {
-                    const body = (m.content || '').trim().toUpperCase();
-                    if (body.includes('MENSAJE DE HERBALIS')) return true;
-                    if (body.includes('CONFIRMACIÓN DE ENVÍO') || body.includes('CONFIRMACION DE ENVIO')) return true;
-                    if (body.includes('PEDIDO INGRESADO')) return true;
-                    if (/^CO\d{9}$/i.test(body)) return true;
-                    return false;
-                });
-
-                if (hasPostSaleMessage) {
-                    logger.info(`[POST-SALE] User ${userId} has post-sale messages in local DB. Auto-pausing.`);
-                    await pauseUser(userId, '📦 Cliente post-venta (historial en DB)', { sharedState: dependencies.sharedState, notifyAdmin: dependencies.notifyAdmin }, `El usuario tiene mensajes post-venta en el historial. No ha iniciado conversación nueva.`);
-                    return { matched: true, paused: true };
-                }
-
-                // If no post-sale message exists, let's see if there's extensive prior interaction
-                // 1-4 outgoing = likely bots replying to ads. 5+ means extensive interaction history.
-                const hasSignificantHistory = outgoingMessages.length >= 5;
-
-                if (hasSignificantHistory) {
-                    const showsPurchaseIntent = PURCHASE_INTENT_KEYWORDS.test(normalizedText);
-
-                    if (showsPurchaseIntent) {
-                        logger.info(`[SMART-DETECT] User ${userId} has prior history (outgoing bot: ${outgoingMessages.length}) but shows purchase intent. Allowing sales flow.`);
-                    } else {
-                        const reason = `😴 Cliente con historial extenso (${outgoingMessages.length}+ mensajes)`;
-                        logger.info(`[SMART-DETECT] User ${userId}: has ${outgoingMessages.length} msgs and NO purchase intent. Auto-pausing.`);
-                        await pauseUser(
-                            userId,
-                            reason,
-                            { sharedState: dependencies.sharedState, notifyAdmin: dependencies.notifyAdmin },
-                            `${outgoingMessages.length} mensajes previos. Volvió a escribir: "${text.substring(0, 100)}"`
-                        );
-                        return { matched: true, paused: true };
-                    }
-                } else if (outgoingMessages.length > 0) {
-                    logger.info(`[SMART-DETECT] User ${userId} has ${outgoingMessages.length} prior message(s) (< 10 threshold) in DB. Treating as active prospect.`);
-                }
-            } catch (err: any) {
-                logger.error(`[SMART-DETECT] Failed to fetch local chat history DB for ${userId}:`, err.message);
-            }
-        }
+        // ¿Ya nos compró? ¿Ya venía hablando? Los dos checks y sus pausas viven
+        // en leadClassifier.ts.
+        const { stop } = await classifyNewLead(userId, text, normalizedText, userState[userId], dependencies, saveState);
+        if (stop) return { matched: true, paused: true };
     }
     saveState(userId);
 
