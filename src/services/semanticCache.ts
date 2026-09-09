@@ -196,26 +196,3 @@ export async function storeSemanticCache(
     }
 }
 
-/**
- * Testing/debug helper — exposed so admin endpoints can show cache stats.
- */
-export async function getSemanticCacheStats(): Promise<{
-    total: number;
-    perStep: Record<string, { count: number; hits: number }>;
-}> {
-    try {
-        const { prisma } = require('../../db');
-        const rows = await prisma.aiSemanticCache.findMany({
-            select: { step: true, hits: true },
-        });
-        const perStep: Record<string, { count: number; hits: number }> = {};
-        for (const r of rows) {
-            if (!perStep[r.step]) perStep[r.step] = { count: 0, hits: 0 };
-            perStep[r.step].count++;
-            perStep[r.step].hits += r.hits;
-        }
-        return { total: rows.length, perStep };
-    } catch {
-        return { total: 0, perStep: {} };
-    }
-}

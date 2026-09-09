@@ -14,11 +14,6 @@ const pairingCodeSchema = z.object({
     phoneNumber: z.string().min(8, "Se requiere un número de teléfono válido")
 });
 
-const toggleBotSchema = z.object({
-    chatId: z.string().min(5, "Se requiere el ID del chat"),
-    paused: z.boolean()
-});
-
 const adminCommandSchema = z.object({
     chatId: z.string().min(5, "Se requiere el ID del chat"),
     command: z.string().min(1, "El comando no puede estar vacío")
@@ -28,6 +23,5 @@ module.exports = {
     pricesSchema,
     scriptSwitchSchema,
     pairingCodeSchema,
-    toggleBotSchema,
     adminCommandSchema
 };

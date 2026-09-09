@@ -14,13 +14,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 /**
- * Detector compartido de "preguntas de precio" — si matchea, el caller debería
- * usar buildPersonalizedPriceResponse en lugar de delegar a IA.
- */
-const PRICE_QUESTION_RE = /\b(cu[aá]nto|que precio|qu[eé] precio|cuesta|sale|costo|valor|vale|precio)\b/i;
-function isPriceQuestion(text: string): boolean {
-    return PRICE_QUESTION_RE.test(text || '');
-}
 
 /**
  * Cache del knowledge default (v7) leído del disco. mtime check para invalidar
@@ -70,62 +63,7 @@ function _getFlowResponse(knowledge: any, key: string, mpOff?: boolean): string 
     return fallback?.flow?.[key]?.response || null;
 }
 
-/**
- * Build a contextualized price response. Sustituye el rango genérico
- * "$37.000 a $69.000" por una recomendación específica al objetivo del cliente.
- *
- * Decisión por kilos: weightGoal >= 15 → recomienda plan 120 (4 meses sostenidos),
- * <15 → plan 60. Si no hay weightGoal, fallback genérico al producto.
- *
- * Producto: usa state.selectedProduct si está, si no acepta override
- * (extraído del texto del cliente, ej: "que precio las cápsulas").
- */
-function buildPersonalizedPriceResponse(state: any, productOverride?: string | null, mpOff?: boolean): string {
-    const product = productOverride || state.selectedProduct || 'Cápsulas de nuez de la india';
-    const productKey = product.includes('Gota') ? 'Gotas' : product.includes('Semilla') ? 'Semillas' : 'Cápsulas';
-    const productLabel = productKey === 'Cápsulas' ? 'cápsulas' : productKey === 'Gotas' ? 'gotas' : 'semillas';
 
-    const weightGoal = typeof state.weightGoal === 'number' ? state.weightGoal : parseInt(String(state.weightGoal || 0), 10) || 0;
-    const recommendsLong = weightGoal >= 15;
-    const recommendedPlan = recommendsLong ? '120' : '60';
-    const altPlan = recommendsLong ? '60' : '120';
-
-    const priceStr = _getPrice(productKey, recommendedPlan);
-
-    const savingsLine = mpOff
-        ? '\n\n💳 _Pagás por transferencia, o en efectivo al retirar en sucursal._'
-        : '\n\n💳 _Pagás con tarjeta de crédito o transferencia._';
-
-    let justification: string;
-    if (weightGoal >= 20) {
-        justification = `cubren los 4 meses que el cuerpo necesita para un descenso sostenido de +20 kg, sin rebote`;
-    } else if (weightGoal >= 15) {
-        justification = `son las que mejor andan para tu objetivo — el descenso es progresivo y sostenido`;
-    } else if (weightGoal > 0) {
-        justification = `son ideales para empezar y ver cómo te va, antes de extender el tratamiento si lo necesitás`;
-    } else {
-        justification = `son las que más recomiendan nuestros clientes`;
-    }
-
-    const objetivoFrase = weightGoal > 0
-        ? `Para tu objetivo (${weightGoal >= 20 ? '+20 kg' : weightGoal >= 15 ? `~${weightGoal} kg` : `hasta ${weightGoal} kg`})`
-        : 'Para tu caso';
-
-    return `${objetivoFrase}, las ${productLabel} en plan de *${recommendedPlan} días* son las que mejor andan — ${justification}.\n\n` +
-        `Sale *$${priceStr}*.${savingsLine}\n\n` +
-        `¿Avanzamos con ese, o te cuento del de ${altPlan} días primero?`;
-}
-
-/**
- * Detecta si el cliente menciona un producto específico en su pregunta de precio.
- */
-function detectProductInText(text: string): string | null {
-    const t = (text || '').toLowerCase();
-    if (/\bc[aá]psulas?\b|\bpastillas?\b/.test(t)) return 'Cápsulas de nuez de la india';
-    if (/\bgotas?\b/.test(t)) return 'Gotas de nuez de la india';
-    if (/\bsemillas?\b|\binfusi[oó]n\b/.test(t)) return 'Semillas de nuez de la india';
-    return null;
-}
 
 /**
  * TEXTO 4 — Menú de las 3 opciones de pago. Plantilla: knowledge.flow.payment_menu.response.
@@ -184,8 +122,5 @@ function getFlowTemplate(key: string, knowledge?: any, mpOff?: boolean): string 
 export {
     buildConfirmationMessage,
     buildPaymentMessage,
-    buildPersonalizedPriceResponse,
-    isPriceQuestion,
-    detectProductInText,
     getFlowTemplate,
 };

@@ -620,7 +620,6 @@ async function _closeSaleAndNotify(
 
 export {
     _cleanPhone,
-    _isPhoneMatch,
     _isAdminPhone,
     _isInfoQuestion,
     _startsAffirmative,

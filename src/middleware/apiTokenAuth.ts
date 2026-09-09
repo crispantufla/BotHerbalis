@@ -26,7 +26,7 @@ export function generateRawToken(): { raw: string; prefix: string; hash: string 
     return { raw, prefix, hash };
 }
 
-export function hashToken(raw: string): string {
+function hashToken(raw: string): string {
     return crypto.createHash('sha256').update(raw).digest('hex');
 }
 
@@ -39,7 +39,7 @@ export function hashToken(raw: string): string {
  *
  * Use `requireScope('analytics:read')` after this to enforce scope.
  */
-export async function apiTokenAuthMiddleware(req: any, res: any, next: any) {
+async function apiTokenAuthMiddleware(req: any, res: any, next: any) {
     const authHeader = req.headers['authorization'];
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ error: 'Missing Bearer token' });
@@ -86,7 +86,7 @@ export async function apiTokenAuthMiddleware(req: any, res: any, next: any) {
 }
 
 /** Require a specific scope on the active API token. Use AFTER apiTokenAuthMiddleware. */
-export function requireScope(scope: string) {
+function requireScope(scope: string) {
     return (req: any, res: any, next: any) => {
         if (!req.apiToken || !req.apiToken.scopes.includes(scope)) {
             return res.status(403).json({ error: `Scope "${scope}" required` });

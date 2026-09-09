@@ -99,7 +99,7 @@ export function suggestCPByCity(city: string | null | undefined): string | null 
     return CITY_CP_MAP[normalized] || null;
 }
 
-export function validateCP(cp: string | number | null | undefined): CPValidationResult {
+function validateCP(cp: string | number | null | undefined): CPValidationResult {
     if (!cp) return { valid: false, province: null, error: 'No se proporcionó código postal' };
 
     const cleaned = String(cp).replace(/[^0-9]/g, '');

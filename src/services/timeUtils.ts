@@ -1,13 +1,13 @@
 import { formatInTimeZone } from 'date-fns-tz';
 
 const ARG_TZ = 'America/Argentina/Buenos_Aires';
-export const BUSINESS_START = 9;     // 9:00 AM
-export const BUSINESS_END = 21;      // 9:00 PM
+const BUSINESS_START = 9;     // 9:00 AM
+const BUSINESS_END = 21;      // 9:00 PM
 
 /**
  * Get current hour in Argentina timezone (0-23)
  */
-export function getArgentinaHour(): number {
+function getArgentinaHour(): number {
     const now = new Date();
     // formatInTimeZone ensures daylight saving times and true offsets are respected cleanly
     return parseInt(formatInTimeZone(now, ARG_TZ, 'HH'), 10);
@@ -21,20 +21,6 @@ export function isBusinessHours(): boolean {
     return hour >= BUSINESS_START && hour < BUSINESS_END;
 }
 
-/**
- * Check if it's "deep night" (0-7h Argentina)
- */
-export function isDeepNight(): boolean {
-    const hour = getArgentinaHour();
-    return hour >= 0 && hour < 7;
-}
-
-/**
- * Helper to get the current date in Argentina timezone natively
- */
-export function getArgentinaNow(): Date {
-    return new Date();
-}
 
 /**
  * Medianoche (00:00) del día ACTUAL en Argentina, como instante absoluto.
