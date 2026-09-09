@@ -563,7 +563,14 @@ async function _verifyPayment(currentState: UserState): Promise<'approved' | 'pe
 
         // Webhook ya actualizó el estado
         if (record.status === 'approved') return 'approved';
-        if (record.status === 'rejected' || record.status === 'expired') return 'rejected';
+        // OJO: 'rejected'/'expired' NO cortan acá. El reintento va por el MISMO
+        // link (ver el branch de rechazo más arriba: la preferencia sigue vigente
+        // y a propósito no se regenera), así que una fila rechazada puede tener
+        // encima un pago approved. Cortar acá le contestaba el template de retry
+        // —"hubo un problema con el pago, probá de nuevo"— a alguien que acababa
+        // de pagar, con el link todavía abierto: riesgo de pago duplicado.
+        // Caemos siempre a la consulta en vivo, que prioriza approved y reescribe
+        // el estado; si MP solo tiene el rechazo, devuelve 'rejected' igual.
 
         // Consultar MP directamente
         const mpToken = process.env.MP_ACCESS_TOKEN;
