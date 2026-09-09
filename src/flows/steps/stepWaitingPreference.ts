@@ -1,6 +1,6 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _formatMessage } from '../utils/messages';
-import { _setStep, _maybeUpsell, _detectPostdatado, _assignProductAndPlanByTier, _maybeSendPaymentMenuV7 } from '../utils/flowHelpers';
+import { _setStep, _maybeUpsell, _detectPostdatado, _assignProductAndPlanByTier, _maybeSendPaymentMenuV7, _pushHistory } from '../utils/flowHelpers';
 import { isMpEnabled, prepayMeans } from '../utils/paymentOptions';
 import logger from '../../utils/logger';
 
@@ -86,7 +86,7 @@ export async function handleWaitingPreference(
             const priceNode = knowledge.flow.preference_capsulas;
             const msg = _formatMessage(priceNode.response, currentState);
             _setStep(currentState, priceNode.nextStep);
-            currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+            _pushHistory(currentState, { role: 'bot', content: msg });
             saveState(userId);
             await sendMessageWithDelay(userId, msg);
             await _maybeSendPaymentMenuV7(userId, priceNode.nextStep, currentState, knowledge, dependencies);
@@ -99,10 +99,10 @@ export async function handleWaitingPreference(
             const cmp1 = "Las dos formas funcionan igual de bien 🌿";
             const cmp2 = "Las *cápsulas* son la forma más práctica — una al día y listo.\nLas *gotas* son líquidas y un poco más suaves al estómago.\n\n👉 ¿Con cuál vas?";
 
-            currentState.history.push({ role: 'bot', content: cmp1, timestamp: Date.now() });
+            _pushHistory(currentState, { role: 'bot', content: cmp1 });
             await sendMessageWithDelay(userId, cmp1);
 
-            currentState.history.push({ role: 'bot', content: cmp2, timestamp: Date.now() });
+            _pushHistory(currentState, { role: 'bot', content: cmp2 });
             _setStep(currentState, FlowStep.WAITING_PREFERENCE);
             saveState(userId);
             await sendMessageWithDelay(userId, cmp2);
@@ -132,7 +132,7 @@ export async function handleWaitingPreference(
         if (aiRecommendation.goalMet && aiRecommendation.extractedData) {
             // First send the AI's natural response if it exists (e.g., to answer a health question)
             if (aiRecommendation.response) {
-                currentState.history.push({ role: 'bot', content: aiRecommendation.response, timestamp: Date.now() });
+                _pushHistory(currentState, { role: 'bot', content: aiRecommendation.response });
                 await sendMessageWithDelay(userId, aiRecommendation.response);
             }
 
@@ -152,7 +152,7 @@ export async function handleWaitingPreference(
             if (priceNode) {
                 const msg = _formatMessage(priceNode.response, currentState);
                 _setStep(currentState, priceNode.nextStep);
-                currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+                _pushHistory(currentState, { role: 'bot', content: msg });
                 saveState(userId);
                 await sendMessageWithDelay(userId, msg);
 
@@ -161,7 +161,7 @@ export async function handleWaitingPreference(
                 return { matched: true };
             }
         } else if (aiRecommendation.response) {
-            currentState.history.push({ role: 'bot', content: aiRecommendation.response, timestamp: Date.now() });
+            _pushHistory(currentState, { role: 'bot', content: aiRecommendation.response });
             await sendMessageWithDelay(userId, aiRecommendation.response);
             saveState(userId);
             return { matched: true };
@@ -174,7 +174,7 @@ export async function handleWaitingPreference(
         const msg = _formatMessage(node.response, currentState);
 
         _setStep(currentState, node.nextStep);
-        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: msg });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
         await _maybeSendPaymentMenuV7(userId, node.nextStep, currentState, knowledge, dependencies);
@@ -186,7 +186,7 @@ export async function handleWaitingPreference(
         const msg = _formatMessage(node.response, currentState);
 
         _setStep(currentState, node.nextStep);
-        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: msg });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
         await _maybeSendPaymentMenuV7(userId, node.nextStep, currentState, knowledge, dependencies);
@@ -198,7 +198,7 @@ export async function handleWaitingPreference(
         const msg = _formatMessage(node.response, currentState);
 
         _setStep(currentState, node.nextStep);
-        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: msg });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
         await _maybeSendPaymentMenuV7(userId, node.nextStep, currentState, knowledge, dependencies);
@@ -228,7 +228,7 @@ export async function handleWaitingPreference(
         if (aiPref.goalMet && aiPref.extractedData) {
             // First send the AI's natural response if it exists (e.g., to answer a health question)
             if (aiPref.response) {
-                currentState.history.push({ role: 'bot', content: aiPref.response, timestamp: Date.now() });
+                _pushHistory(currentState, { role: 'bot', content: aiPref.response });
                 await sendMessageWithDelay(userId, aiPref.response);
             }
 
@@ -248,7 +248,7 @@ export async function handleWaitingPreference(
             if (priceNode) {
                 const msg = _formatMessage(priceNode.response, currentState);
                 _setStep(currentState, priceNode.nextStep);
-                currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+                _pushHistory(currentState, { role: 'bot', content: msg });
                 saveState(userId);
                 await sendMessageWithDelay(userId, msg);
 
@@ -259,7 +259,7 @@ export async function handleWaitingPreference(
         }
 
         if (aiPref.response) {
-            currentState.history.push({ role: 'bot', content: aiPref.response, timestamp: Date.now() });
+            _pushHistory(currentState, { role: 'bot', content: aiPref.response });
             await sendMessageWithDelay(userId, aiPref.response);
             saveState(userId);
             return { matched: true };

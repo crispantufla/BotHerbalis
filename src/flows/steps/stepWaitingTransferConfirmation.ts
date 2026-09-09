@@ -1,5 +1,5 @@
 import { UserState, FlowStep } from '../../types/state';
-import { _setStep, _pauseAndAlert } from '../utils/flowHelpers';
+import { _setStep, _pauseAndAlert, _pushHistory } from '../utils/flowHelpers';
 import { isMpEnabled, cardUnavailableMessage } from '../utils/paymentOptions';
 import logger from '../../utils/logger';
 
@@ -44,7 +44,7 @@ export async function handleWaitingTransferConfirmation(
         const msg = paidTpl
             ? _fmt(paidTpl, currentState)
             : '¡Perfecto! Recibimos tu aviso. Verificamos la transferencia y te confirmamos el envío en breve ⏳';
-        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: msg });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
         const adminMsg = isLegacyCodAnticipo
@@ -61,7 +61,7 @@ export async function handleWaitingTransferConfirmation(
         // lo mismo. Se lo decimos acá y le dejamos las dos formas vivas.
         if (!isMpEnabled(dependencies.config)) {
             const msg = cardUnavailableMessage(currentState.totalPrice);
-            currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+            _pushHistory(currentState, { role: 'bot', content: msg });
             saveState(userId);
             await sendMessageWithDelay(userId, msg);
             logger.info(`[TRANSFER_CONFIRM] ${userId} pidió tarjeta con MP APAGADO — avisado, sigue en transferencia/retiro.`);
@@ -103,7 +103,7 @@ export async function handleWaitingTransferConfirmation(
     });
 
     if (aiRes.response) {
-        currentState.history.push({ role: 'bot', content: aiRes.response, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: aiRes.response });
         await sendMessageWithDelay(userId, aiRes.response);
         saveState(userId);
         return { matched: true };

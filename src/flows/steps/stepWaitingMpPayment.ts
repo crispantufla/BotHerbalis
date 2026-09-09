@@ -1,5 +1,5 @@
 import { UserState, FlowStep } from '../../types/state';
-import { _setStep, _pauseAndAlert, _cleanPhone } from '../utils/flowHelpers';
+import { _setStep, _pauseAndAlert, _cleanPhone, _pushHistory } from '../utils/flowHelpers';
 import { calculateTotal } from '../utils/cartHelpers';
 import { getFlowTemplate } from '../../utils/messageTemplates';
 import { _formatMessage } from '../utils/messages';
@@ -65,7 +65,7 @@ export async function handleWaitingMpPayment(
                 + _formatMessage(transferTpl, currentState)
                 + '\n\nY si preferís no pagar por adelantado, lo mandamos a *retiro en sucursal* y abonás el total en efectivo cuando lo retirás 💵 Decime cuál te queda mejor.';
             _setStep(currentState, FlowStep.WAITING_TRANSFER_CONFIRMATION);
-            currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+            _pushHistory(currentState, { role: 'bot', content: msg });
             saveState(userId);
             await sendMessageWithDelay(userId, msg);
             logger.info(`[MP_PAYMENT] ${userId} → MP APAGADO: no se generó link, derivado a transferencia/retiro.`);
@@ -86,7 +86,7 @@ export async function handleWaitingMpPayment(
 
         } else if (verified === 'pending') {
             const msg = '⏳ Todavía no veo el pago confirmado en el sistema.\n\nEsperá unos minutos y escribime *"listo"* cuando esté acreditado. Los pagos con tarjeta de crédito pueden demorar hasta 5 minutos.';
-            currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+            _pushHistory(currentState, { role: 'bot', content: msg });
             saveState(userId);
             await sendMessageWithDelay(userId, msg);
             return { matched: true };
@@ -117,7 +117,7 @@ export async function handleWaitingMpPayment(
             if (mpOn && currentState.mpPaymentLinkUrl) {
                 msg += `\n\n👉 ${currentState.mpPaymentLinkUrl}`;
             }
-            currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+            _pushHistory(currentState, { role: 'bot', content: msg });
             saveState(userId);
             await sendMessageWithDelay(userId, msg);
             return { matched: true };
@@ -141,7 +141,7 @@ export async function handleWaitingMpPayment(
         // Avanzar al step correcto. Antes quedaba en waiting_mp_payment y, si admin
         // despausaba al cliente, el siguiente mensaje volvía a generar link MP.
         _setStep(currentState, FlowStep.WAITING_TRANSFER_CONFIRMATION);
-        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: msg });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
         await _pauseAndAlert(userId, currentState, dependencies, text, 'Cliente cambió de MP a transferencia. Alias enviado, esperando confirmación.');
@@ -171,7 +171,7 @@ export async function handleWaitingMpPayment(
         const tpl = getFlowTemplate('payment_retiro_confirm', knowledge) ||
             `¡Perfecto! Lo dejamos para retiro en sucursal 📦\n\nVas a pagar el total *${'$'}{{TOTAL}}* en efectivo cuando lo retirés.\n\nUn asesor te contacta enseguida para coordinar la sucursal más cercana 😊`;
         const msg = _formatMessage(tpl, currentState);
-        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: msg });
         await sendMessageWithDelay(userId, msg);
 
         const addr: any = currentState.partialAddress || {};
@@ -186,7 +186,7 @@ export async function handleWaitingMpPayment(
     // ── Cliente pide que le reenvíen el link ───────────────────────────────────
     if (mpOn && /\b(link|enlace|reenv[ií]a|reenviar|de nuevo|el link|manda|m[áa]ndame)\b/i.test(text) && currentState.mpPaymentLinkUrl) {
         const msg = `Acá está tu enlace de pago:\n\n${currentState.mpPaymentLinkUrl}\n\nCuando completes el pago escribime *"listo"* 👍`;
-        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: msg });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
         return { matched: true };
@@ -246,7 +246,7 @@ export async function handleWaitingMpPayment(
                 const ackMsg = missing.length > 0
                     ? `¡Gracias! Ya tengo tus datos. Me faltaría:\n\n${missing.map(m => `• ${m}`).join('\n')}\n\nY avisame cuando completes el pago 💳`
                     : `¡Perfecto! Ya tengo todos los datos de envío anotados 📦\n\nEn cuanto se acredite el pago armo el pedido. Avisame con *"listo"* cuando completes el pago 💳`;
-                currentState.history.push({ role: 'bot', content: ackMsg, timestamp: Date.now() });
+                _pushHistory(currentState, { role: 'bot', content: ackMsg });
                 saveState(userId);
                 await sendMessageWithDelay(userId, ackMsg);
                 return { matched: true };
@@ -269,7 +269,7 @@ export async function handleWaitingMpPayment(
     });
 
     if (aiRes.response) {
-        currentState.history.push({ role: 'bot', content: aiRes.response, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: aiRes.response });
         await sendMessageWithDelay(userId, aiRes.response);
         saveState(userId);
 
@@ -365,7 +365,7 @@ export async function confirmApprovedMpPayment(
                 : '¡Perfecto, el pago fue confirmado! 🎉\n\n';
             const msg = prefix + dataMsg;
             _setStep(currentState, FlowStep.WAITING_DATA);
-            currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+            _pushHistory(currentState, { role: 'bot', content: msg });
             saveState(userId);
             await sendMessageWithDelay(userId, msg);
         }
@@ -413,7 +413,7 @@ async function _generateAndSendLink(
         calculateTotal(currentState);
         const msg = _getClosingMsg(knowledge);
         _setStep(currentState, FlowStep.WAITING_DATA);
-        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: msg });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
         return;
@@ -443,7 +443,7 @@ async function _generateAndSendLink(
     const failedTpl = getFlowTemplate('payment_mp_failed', knowledge) ||
         `Tuve un problema técnico generando el link de pago 😕\n\nEn un momento te contacta un asesor para resolverlo. Disculpá la molestia 🙏`;
     const msg = _formatMessage(failedTpl, currentState);
-    currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+    _pushHistory(currentState, { role: 'bot', content: msg });
     saveState(userId);
     await sendMessageWithDelay(userId, msg);
     await _pauseAndAlert(
@@ -548,7 +548,7 @@ async function _tryCreateAndSendMpLink(
     // Inyectamos productName en state efímero para que {{PRODUCT}} muestre el cart concatenado.
     const stateForFmt = { ...currentState, selectedProduct: productName };
     const msg = _formatMessage(linkTpl, stateForFmt);
-    currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+    _pushHistory(currentState, { role: 'bot', content: msg });
     await sendMessageWithDelay(userId, msg);
     logger.info(`[MP_PAYMENT] Link ${isSena ? 'SEÑA' : ''} creado para ${userId} — $${amount} ARS — ${link}`);
 }
@@ -693,7 +693,7 @@ async function _finalizeOrderAndNotifyAdmin(
     const msg = isSenaFlow
         ? `¡Listo! La seña fue confirmada y tu pedido quedó cerrado ✅🎉\n\nEl cartero te cobra el saldo de *$${cashFmt}* en efectivo cuando reciba el paquete. Apenas lo despachemos te pasamos el código de seguimiento.\n\n¡Gracias por confiar en Herbalis! 🌱`
         : '¡Listo! Tu pago fue confirmado y tu pedido quedó cerrado ✅🎉\n\nApenas lo despachemos te pasamos el código de seguimiento.\n\n¡Gracias por confiar en Herbalis! 🌱';
-    currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+    _pushHistory(currentState, { role: 'bot', content: msg });
     saveState(userId);
     await sendMessageWithDelay(userId, msg);
 }

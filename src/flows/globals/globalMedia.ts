@@ -3,6 +3,7 @@ import fs from 'fs';
 import { UserState } from '../../types/state';
 import { MessageMedia } from 'whatsapp-web.js';
 import { _getGallery } from '../utils/gallery';
+import { _pushHistory } from '../utils/flowHelpers';
 import logger from '../../utils/logger';
 
 interface GalleryImage {
@@ -58,7 +59,7 @@ export async function handleMediaGlobals(
 
         if (productImages.length > 0) {
             const introMsg = `Acá tenés fotos de nuestras ${targetCategory} 👇`;
-            currentState.history.push({ role: 'bot', content: introMsg, timestamp: Date.now() });
+            _pushHistory(currentState, { role: 'bot', content: introMsg });
             await sendMessageWithDelay(userId, introMsg);
 
             const shuffled = productImages.sort(() => 0.5 - Math.random()).slice(0, 3);
@@ -69,7 +70,7 @@ export async function handleMediaGlobals(
                     if (fs.existsSync(localPath)) {
                         const media = MessageMedia.fromFilePath(localPath);
                         await client.sendMessage(userId, media);
-                        currentState.history.push({ role: 'bot', content: `[Imagen adjunta: ${targetCategory}]`, timestamp: Date.now() });
+                        _pushHistory(currentState, { role: 'bot', content: `[Imagen adjunta: ${targetCategory}]` });
                     }
                 } catch (e) { logger.error('Error sending gallery image:', e); }
             }
@@ -79,13 +80,13 @@ export async function handleMediaGlobals(
             // Loguear como cualquier otro mensaje enviado (invariante del dashboard:
             // todo lo que sale queda en history) — antes se enviaba sin registrar.
             const noPhotosMsg = 'Uh, justo no tengo fotos cargadas de ese producto en este momento. 😅';
-            currentState.history.push({ role: 'bot', content: noPhotosMsg, timestamp: Date.now() });
+            _pushHistory(currentState, { role: 'bot', content: noPhotosMsg });
             saveState(userId);
             await sendMessageWithDelay(userId, noPhotosMsg);
         }
     } else {
         const msg = 'Tenemos fotos de Cápsulas, Semillas y Gotas. ¿De cuál te gustaría ver? 📸';
-        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: msg });
         await sendMessageWithDelay(userId, msg);
     }
 

@@ -21,7 +21,7 @@
 import { randomUUID } from 'crypto';
 import { UserState, SharedState, AlertEntry } from '../types/state';
 import { aiService } from './ai';
-import { _setStep } from '../flows/utils/flowHelpers';
+import { _setStep, _pushHistory } from '../flows/utils/flowHelpers';
 import { _getPrices } from '../flows/utils/pricing';
 import { getArgentinaMidnight } from './timeUtils';
 import logger from '../utils/logger';
@@ -652,7 +652,7 @@ export async function handleAdminCommand(
         const clientState = sharedState.userState[actualTarget];
         if (clientState) {
             clientState.history = clientState.history || [];
-            clientState.history.push({ role: 'bot', content: qr.message, timestamp: Date.now() });
+            _pushHistory(clientState, { role: 'bot', content: qr.message });
         }
         if (sharedState.logAndEmit) sharedState.logAndEmit(actualTarget, 'bot', qr.message, clientState?.step);
         if (sharedState.saveState) sharedState.saveState();
@@ -675,7 +675,7 @@ export async function handleAdminCommand(
             // _setStep para mantener tracking de funnel + reset de flags (cashRetryShown, etc.)
             _setStep(clientState, 'waiting_final_confirmation');
             clientState.history = clientState.history || [];
-            clientState.history.push({ role: 'bot', content: summary, timestamp: Date.now() });
+            _pushHistory(clientState, { role: 'bot', content: summary });
             if (sharedState.saveState) sharedState.saveState();
 
             _dismissAlert(actualTarget, sharedState);
@@ -704,7 +704,7 @@ export async function handleAdminCommand(
                     _setStep(sharedState.userState[actualTarget], 'completed');
                     sharedState.userState[actualTarget].hasSoldBefore = true;
                     sharedState.userState[actualTarget].history = sharedState.userState[actualTarget].history || [];
-                    sharedState.userState[actualTarget].history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+                    _pushHistory(sharedState.userState[actualTarget], { role: 'bot', content: msg });
                     if (sharedState.saveState) sharedState.saveState();
                 }
 

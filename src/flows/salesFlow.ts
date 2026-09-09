@@ -3,7 +3,7 @@ import { pauseUser } from '../services/pauseService';
 import logger from '../utils/logger';
 import { processGlobals } from './globals';
 import { processStep } from './steps';
-import { _pauseAndAlert, _setStep, _extractSilentVariables, _cleanPhone, _isGhostClose } from './utils/flowHelpers';
+import { _pauseAndAlert, _setStep, _extractSilentVariables, _cleanPhone, _isGhostClose, _pushHistory } from './utils/flowHelpers';
 import { detectObjection } from './utils/objectionDetector';
 import { isMpEnabled } from './utils/paymentOptions';
 import { parseControlTag } from './utils/extractedData';
@@ -210,7 +210,7 @@ export async function processSalesFlow(
                         break;
                 }
 
-                currentState.history.push({ role: 'bot', content: ackMsg, timestamp: Date.now() });
+                _pushHistory(currentState, { role: 'bot', content: ackMsg });
                 if (dependencies.sendMessageWithDelay) {
                     await dependencies.sendMessageWithDelay(userId, ackMsg);
                 }
@@ -245,7 +245,7 @@ export async function processSalesFlow(
     const objection = detectObjection(currentState.step, normalizedText, currentState, isMpEnabled(dependencies.config));
     if (objection) {
         logger.info(`[OBJECTION] Intercepted "${objection.type}" for ${userId} at step ${currentState.step} (tier=${objection.tier})`);
-        currentState.history.push({ role: 'bot', content: objection.response, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: objection.response });
         if (dependencies.sendMessageWithDelay) {
             await dependencies.sendMessageWithDelay(userId, objection.response);
         }

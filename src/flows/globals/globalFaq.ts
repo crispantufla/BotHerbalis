@@ -1,5 +1,5 @@
 import { UserState } from '../../types/state';
-import { _isInfoQuestion, _startsAffirmative } from '../utils/flowHelpers';
+import { _isInfoQuestion, _startsAffirmative, _pushHistory } from '../utils/flowHelpers';
 import { PAID_KEYWORDS as MP_PAID_KEYWORDS } from '../steps/stepWaitingMpPayment';
 import { PAID_KEYWORDS as TRANSFER_PAID_KEYWORDS } from '../steps/stepWaitingTransferConfirmation';
 import { isMpEnabled } from '../utils/paymentOptions';
@@ -167,7 +167,7 @@ export async function handleFaq(
 
     const passthrough = dataBlockPassthrough || mapsPassthrough;
     logger.info(`[FAQ] ${userId} matched (keyword len=${bestLen}) → "${faqResponse.substring(0, 60)}..."${passthrough ? ` [passthrough: señal operativa en ${currentState.step}]` : ''}`);
-    currentState.history.push({ role: 'bot', content: faqResponse, timestamp: Date.now() });
+    _pushHistory(currentState, { role: 'bot', content: faqResponse });
     saveState(userId);
     await sendMessageWithDelay(userId, faqResponse);
     if (passthrough) return null; // el step procesa el MISMO texto (la señal viene adentro)

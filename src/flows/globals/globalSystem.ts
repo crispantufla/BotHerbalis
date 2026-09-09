@@ -1,6 +1,6 @@
 import { UserState } from '../../types/state';
 import { _isNegative } from '../utils/validation';
-import { _pauseAndAlert, _setStep } from '../utils/flowHelpers';
+import { _pauseAndAlert, _setStep, _pushHistory } from '../utils/flowHelpers';
 import logger from '../../utils/logger';
 
 interface SystemDependencies {
@@ -34,7 +34,7 @@ export async function handleSystemGlobals(
         if (confirmYes) {
             currentState.pendingCancelConfirm = false;
             const byeMsg = 'Entendido, lamentamos no poder ayudarte en esta oportunidad 😔 ¡Si en algún momento nos necesitás, acá estamos!';
-            currentState.history.push({ role: 'bot', content: byeMsg, timestamp: Date.now() });
+            _pushHistory(currentState, { role: 'bot', content: byeMsg });
             await sendMessageWithDelay(userId, byeMsg);
             saveState(userId);
             await _pauseAndAlert(userId, currentState, dependencies, text, '🚫 Cancelación confirmada por el cliente durante el proceso de venta.');
@@ -59,14 +59,14 @@ export async function handleSystemGlobals(
             const continueMsg = resumePrompt
                 ? `¡Perfecto, seguimos! 😊\n\n${resumePrompt}`
                 : '¡Qué bien, seguimos! 😊 ¿Avanzamos con el pedido?';
-            currentState.history.push({ role: 'bot', content: continueMsg, timestamp: Date.now() });
+            _pushHistory(currentState, { role: 'bot', content: continueMsg });
             await sendMessageWithDelay(userId, continueMsg);
             saveState(userId);
             return { matched: true };
         } else {
             // Ambiguous — ask again
             const askMsg = 'Perdoname, ¿confirmás que querés cancelar? Respondé *sí* o *no* 😊';
-            currentState.history.push({ role: 'bot', content: askMsg, timestamp: Date.now() });
+            _pushHistory(currentState, { role: 'bot', content: askMsg });
             await sendMessageWithDelay(userId, askMsg);
             saveState(userId);
             return { matched: true };
@@ -84,7 +84,7 @@ export async function handleSystemGlobals(
         logger.info(`[GLOBAL] User ${userId} requested cancellation.`);
         currentState.pendingCancelConfirm = true;
         const msg = '¿Estás seguro/a de que no querés continuar? Antes de decidir, puedo responder cualquier duda que tengas 😊\n\nRespondé *sí* para cancelar o *no* para seguir.';
-        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: msg });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
         return { matched: true };
@@ -95,7 +95,7 @@ export async function handleSystemGlobals(
     if ((MEDICAL_REJECT_REGEX.test(normalizedText) && !isNegative) || currentState.step === 'rejected_medical') {
         logger.info(`[MEDICAL REJECT] User ${userId} mentioned contraindicated condition or is already rejected.`);
         const msg = 'Lamentablemente, por estricta precaución, no recomendamos ni permitimos el uso de la Nuez de la India durante el embarazo, la lactancia, en menores de 18 ni en personas mayores de 80 años. Priorizamos tu salud por encima de todo. 🌿😊\n\nPor este motivo, damos por finalizada la consulta y no podremos avanzar con el envío. ¡Cuidate mucho!';
-        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: msg });
         await sendMessageWithDelay(userId, msg);
 
         _setStep(currentState, 'rejected_medical');
@@ -114,7 +114,7 @@ export async function handleSystemGlobals(
     if (MINOR_REGEX.test(normalizedText) && !NOT_MINOR_REGEX.test(normalizedText) && currentState.step !== 'rejected_medical') {
         logger.info(`[MINOR REJECT] User ${userId} se identificó como menor de 18 años.`);
         const msg = 'Por una cuestión de cuidado, la Nuez de la India no la recomendamos para menores de 18 años — el cuerpo todavía está en pleno crecimiento 🌿 Cuando cumplas los 18 te ayudamos con muchísimo gusto 😊';
-        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: msg });
         await sendMessageWithDelay(userId, msg);
         _setStep(currentState, 'rejected_medical');
         saveState(userId);
@@ -135,7 +135,7 @@ export async function handleSystemGlobals(
     if (ABUSIVE_REGEX.test(normWithoutIdioms) && currentState.step !== 'rejected_abusive') {
         logger.info(`[ABUSIVE REJECT] User ${userId} used aggressive language.`);
         const msg = 'Lamento mucho que te sientas de esta manera. Voy a suspender la interacción automática para que un asesor humano atienda y analice tu caso a la brevedad.';
-        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: msg });
         await sendMessageWithDelay(userId, msg);
 
         _setStep(currentState, 'rejected_abusive');
@@ -160,7 +160,7 @@ export async function handleSystemGlobals(
     if (CLAIMS_PAID_REGEX.test(normalizedText) && !PAYMENT_STEPS.includes(currentState.step)) {
         logger.warn(`[PAGO-CONFUSO] User ${userId} dice que ya pagó pero NO está en un paso de pago (step=${currentState.step}) — posible estafa/confusión. Pauso + alerto.`);
         const msg = 'Pará un toque que reviso bien tu caso 🙏 Dejame chequearlo con el equipo y enseguida te escribo. Por las dudas, NO hagas ningún otro pago hasta que te confirme, ¿dale? 😊';
-        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: msg });
         await sendMessageWithDelay(userId, msg);
         await _pauseAndAlert(userId, currentState, dependencies, text, '⚠️ PAGO CONFUSO: el cliente dice que YA PAGÓ / mandó comprobante pero el bot nunca le dio un medio de pago (no hay orden). Posible ESTAFA de un tercero o confusión. Revisar URGENTE: ¿a qué alias/cuenta pagó?');
         saveState(userId);
@@ -205,7 +205,7 @@ export async function handleSystemGlobals(
         logger.info(`[GEO REJECT] User ${userId} is outside Argentina: "${text}"`);
         currentState.geoRejected = true;
         const msg = 'Lamentablemente solo hacemos envíos dentro de Argentina 😔 Si en algún momento necesitás para alguien de acá, ¡con gusto te ayudamos!';
-        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: msg });
         await sendMessageWithDelay(userId, msg);
         _setStep(currentState, 'rejected_geo');
         saveState(userId);
@@ -225,7 +225,7 @@ export async function handleSystemGlobals(
         }
         logger.info(`[GEO REJECT] User ${userId} already geo-rejected, blocking.`);
         const msg = 'Como te comenté, lamentablemente solo realizamos envíos dentro de Argentina 😔';
-        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: msg });
         await sendMessageWithDelay(userId, msg);
         return { matched: true };
     }
@@ -254,7 +254,7 @@ export async function handleSystemGlobals(
         currentState.selectedPlan = null;
 
         const msg = '¡Ningún problema! 😊 Volvamos a elegir. ¿Qué te gustaría llevar entonces? (Cápsulas, Semillas, Gotas)';
-        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: msg });
         await sendMessageWithDelay(userId, msg);
 
         _setStep(currentState, 'waiting_preference');

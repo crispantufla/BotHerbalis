@@ -60,6 +60,7 @@ Máquina de estados lineal con fallbacks a IA. Orden típico:
 
 - **`_cleanPhone(userId)`** en `flowHelpers.ts` es la forma canónica de extraer teléfono. Usar siempre en vez de `userId.split('@')[0]` manual.
 - **`_setStep(state, FlowStep.X)`** — NO asignar `state.step` directamente. Esto resetea flags (`staleAlerted`, `reengagementSent`, etc.) y loguea transición al funnel.
+- **`_pushHistory(state, { role, content })`** — NO hacer `state.history.push({...})` a mano. El helper inicializa `history` si falta y aplica el cap (250 → se queda con los 150 más recientes). Hasta el 2026-09-09 había 141 pushes crudos y el cap solo corría en `salesFlow`, así que todo lo que no re-entra al flujo (scheduler, comandos del admin, rutas) hacía crecer el historial sin techo — y un historial sin techo es una de las formas de llenar el cache de states y dejar al bot mudo. Cubierto por `tests/push_history.test.js`.
 - **`_pauseAndAlert(...)`** — cuando el bot no sabe qué hacer, pausa al user y notifica al admin. No intentar "auto-recovery" silenciosos.
 - **Pausas NO se auto-liberan**. Un user pausado con `pauseReason` requiere intervención manual del admin. Si un outage (ej: OpenAI 429) pausa users, hay que despausarlos a mano.
 - **Pricing**: siempre leer con `_getPrice/_getPrices/_getAdicionalMAX` de `pricing.ts`. NUNCA inventar precios en código ni en prompts de IA. Tampoco umbrales derivados de precios: para deducir el plan (60/120) de un monto usar `_inferPlanFromPrice`, y para el nombre canónico del producto `_normalizeProductName` (ambos en `pricing.ts`). Hasta el 2026-09-09 esa lógica estaba duplicada con umbrales hardcodeados en `botHelpers.ts` y `order.routes.js` (ver `stepWaitingFinalConfirmation.ts` para el patrón: se inyecta `pricingContext` en el prompt).
@@ -82,7 +83,7 @@ Máquina de estados lineal con fallbacks a IA. Orden típico:
 - `npm run dev` — concurrente server (tsx watch en index.ts) + client (vite)
 - `npm run dev:server` — solo server (sin watch)
 - `npm start` — producción: `prisma generate && migrate deploy && tsx index.ts`
-- `npm test` — Jest. Suite verde (32 suites, 358 tests; 1 suite skipped es la `.live`). Corre contra la DB de prod (`DATABASE_URL` del `.env` apunta a Railway) pero **solo lee**: ninguna suite escribe. **Solo V7**: las suites acopladas a `archive/knowledge_v3.json`/v4 (simulaciones, recommendation, multi_product, salesFlow, etc.) se retiraron el 2026-05-31 — testeaban un guion muerto. Cobertura de flujo V7: `sena_flow_smoke.test.js` + `payment_flow.test.js`; el resto cubre utilidades (address, pricing, objection escalation, order flow). Pendiente: rehacer un harness de simulación contra V7.
+- `npm test` — Jest. Suite verde (33 suites, 363 tests; 1 suite skipped es la `.live`). Corre contra la DB de prod (`DATABASE_URL` del `.env` apunta a Railway) pero **solo lee**: ninguna suite escribe. **Solo V7**: las suites acopladas a `archive/knowledge_v3.json`/v4 (simulaciones, recommendation, multi_product, salesFlow, etc.) se retiraron el 2026-05-31 — testeaban un guion muerto. Cobertura de flujo V7: `sena_flow_smoke.test.js` + `payment_flow.test.js`; el resto cubre utilidades (address, pricing, objection escalation, order flow). Pendiente: rehacer un harness de simulación contra V7.
 - `npx prisma migrate dev --name <x>` — nueva migración
 - `railway logs --lines 300` — logs de producción
 

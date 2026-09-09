@@ -1,4 +1,5 @@
 import { UserState } from '../../types/state';
+import { _pushHistory } from '../utils/flowHelpers';
 import logger from '../../utils/logger';
 
 interface SafetyDependencies {
@@ -46,7 +47,7 @@ export async function handleSafetyCheck(
         });
 
         if (safetyCheck.response) {
-            currentState.history.push({ role: 'bot', content: safetyCheck.response, timestamp: Date.now() });
+            _pushHistory(currentState, { role: 'bot', content: safetyCheck.response });
             await sendMessageWithDelay(userId, safetyCheck.response);
             return { matched: true };
         }

@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const logger = require('../../utils/logger');
+const { _pushHistory } = require('../../flows/utils/flowHelpers');
 
 // Nombre de archivo de audio NO adivinable y SIN el teléfono del cliente
 // (/media es estático sin auth — con <telefono>_<timestamp>.ogg cualquiera
@@ -742,7 +743,7 @@ module.exports = (clientPool) => {
                 stepEnteredAt: Date.now(), lastActivityAt: Date.now(), lastInteraction: Date.now()
             };
         }
-        userState[chatId].history.push({ role: 'bot', content: text, timestamp: Date.now() });
+        _pushHistory(userState[chatId], { role: 'bot', content: text });
         userState[chatId].lastActivityAt = Date.now();
         userState[chatId].staleAlerted = false;
         if (ss?.saveState) ss.saveState();

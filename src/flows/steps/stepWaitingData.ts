@@ -1,7 +1,7 @@
 import { UserState, FlowStep } from '../../types/state';
 import { validateAddress, suggestCPByCity, lookupCPFromMaps } from '../../services/addressValidator';
 import { buildConfirmationMessage } from '../../utils/messageTemplates';
-import { _setStep, _pauseAndAlert, _detectProductPlanChange, _resolveNewProductPlan, _detectPostdatado, _handleShipPaySwitch, _closeSaleAndNotify } from '../utils/flowHelpers';
+import { _setStep, _pauseAndAlert, _detectProductPlanChange, _resolveNewProductPlan, _detectPostdatado, _handleShipPaySwitch, _closeSaleAndNotify, _pushHistory } from '../utils/flowHelpers';
 import { _getPrice } from '../utils/pricing';
 import { _formatPrice, buildCartFromSelection, calculateTotal } from '../utils/cartHelpers';
 import { _isDuplicate } from '../utils/messages';
@@ -32,7 +32,7 @@ async function _checkGuards(
         logger.info(`[GUARD] waiting_data: No product selected for ${userId}, redirecting to preference`);
         const skipMsg = "Antes de los datos de envío, necesito saber qué producto te interesa 😊\n\nTenemos:\n1️⃣ Cápsulas\n2️⃣ Semillas/Infusión\n3️⃣ Gotas\n\n¿Cuál preferís?";
         _setStep(currentState, FlowStep.WAITING_PREFERENCE);
-        currentState.history.push({ role: 'bot', content: skipMsg, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: skipMsg });
         saveState(userId);
         await sendMessageWithDelay(userId, skipMsg);
         return { matched: true };
@@ -48,7 +48,7 @@ async function _checkGuards(
         const { _formatMessage } = require('../utils/messages');
         const msg = _formatMessage(priceNode.response, currentState);
         _setStep(currentState, FlowStep.WAITING_PLAN_CHOICE);
-        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: msg });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
         return { matched: true };
@@ -100,12 +100,12 @@ async function _handleProductPlanChange(
         const changeMsg = unitsCount >= 3
             ? `¡Excelente! 🎉 Anotamos ${planText} de ${newProduct.split(' de ')[0].toLowerCase()} con 50% de descuento en la unidad más barata. Total: $${currentState.totalPrice}.`
             : `¡Dale, sin problema! 😊 Cambiamos a ${newProduct.split(' de ')[0].toLowerCase()} por ${planText}, tienen un valor de $${currentState.totalPrice}.`;
-        currentState.history.push({ role: 'bot', content: changeMsg, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: changeMsg });
         await sendMessageWithDelay(userId, changeMsg);
 
         let prefix = currentState.postdatado ? `Anotado para enviarlo en esa fecha 📅.` : ``;
         if (prefix) {
-            currentState.history.push({ role: 'bot', content: prefix, timestamp: Date.now() });
+            _pushHistory(currentState, { role: 'bot', content: prefix });
             await sendMessageWithDelay(userId, prefix);
         }
 
@@ -117,7 +117,7 @@ async function _handleProductPlanChange(
             currentState.postdatado = postdatadoResult2;
             prefixIterated += `Anotado para enviarlo ${postdatadoResult2} 📅. `;
         }
-        currentState.history.push({ role: 'bot', content: prefixIterated, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: prefixIterated });
         saveState(userId);
         await sendMessageWithDelay(userId, prefixIterated);
     }
@@ -152,7 +152,7 @@ async function _handleSucursalIntent(
     } else {
         ackMsg = `¡Dale, perfecto! Lo enviamos a la sucursal de Correo Argentino más cercana a tu zona 📦`;
     }
-    currentState.history.push({ role: 'bot', content: ackMsg, timestamp: Date.now() });
+    _pushHistory(currentState, { role: 'bot', content: ackMsg });
     saveState(userId);
     await sendMessageWithDelay(userId, ackMsg);
     return { matched: true };
@@ -262,7 +262,7 @@ async function _handleAiFallback(
     });
 
     if (aiData.response && !_isDuplicate(aiData.response, currentState.history)) {
-        currentState.history.push({ role: 'bot', content: aiData.response, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: aiData.response });
         saveState(userId);
         await sendMessageWithDelay(userId, aiData.response);
 
@@ -332,7 +332,7 @@ async function _processAddressData(
             currentState.partialAddress.provincia = null;
             currentState.partialAddress.cp = null;
             const clarifyMsg = `Mmm, los datos me quedaron un poco confusos 🤔\n\n¿Me aclarás tu *Localidad*, *Ciudad* y *Provincia*? Así armo bien la etiqueta del envío 📦`;
-            currentState.history.push({ role: 'bot', content: clarifyMsg, timestamp: Date.now() });
+            _pushHistory(currentState, { role: 'bot', content: clarifyMsg });
             saveState(userId);
             await sendMessageWithDelay(userId, clarifyMsg);
             return { madeProgress: false, earlyReturn: { matched: true } };
@@ -353,7 +353,7 @@ async function _processAddressData(
                     `Super entendible 🙌. Lo que hacemos en estos casos es agendar el envío de forma "posdatada" para la fecha que indiques, así reservas la promo de hoy. ¿Te parece bien si armamos la etiqueta ahora y lo despachamos en la fecha que vos me digas?`
                 ];
                 const ackMsg = postponedAcks[Math.floor(Math.random() * postponedAcks.length)];
-                currentState.history.push({ role: 'bot', content: ackMsg, timestamp: Date.now() });
+                _pushHistory(currentState, { role: 'bot', content: ackMsg });
                 await dependencies.sendMessageWithDelay(userId, ackMsg);
             }
             currentState.postdatado = data.postdatado;
@@ -425,7 +425,7 @@ async function _processAddressData(
                 const attempts = _bumpIssue('intersection');
                 if (attempts === 1) {
                     const cornerMsg = `¡Ojo! El Correo Argentino no nos permite enviar a esquinas o intersecciones 📦\n\nNecesito la *calle y el número exacto* donde está tu casa. Ej: "Belgrano 350"\n\n¿Me lo pasás? 🙏`;
-                    currentState.history.push({ role: 'bot', content: cornerMsg, timestamp: Date.now() });
+                    _pushHistory(currentState, { role: 'bot', content: cornerMsg });
                     saveState(userId);
                     await sendMessageWithDelay(userId, cornerMsg);
                     return { madeProgress: false, earlyReturn: { matched: true } };
@@ -439,7 +439,7 @@ async function _processAddressData(
                 const attempts = _bumpIssue('no_number');
                 if (attempts === 1) {
                     const noNumMsg = `¡Uy! No me llegó el número de la calle 😅\n\nEl Correo Argentino no nos deja enviar sin número. ¿Me lo podés agregar?\n\nEj: "San Martín 1425". Si no tenés número, escribí *S/N* 🙏`;
-                    currentState.history.push({ role: 'bot', content: noNumMsg, timestamp: Date.now() });
+                    _pushHistory(currentState, { role: 'bot', content: noNumMsg });
                     saveState(userId);
                     await sendMessageWithDelay(userId, noNumMsg);
                     return { madeProgress: false, earlyReturn: { matched: true } };
@@ -496,7 +496,7 @@ async function _handleSafetyNet(
         });
         if (safetyAiData.response && !_isDuplicate(safetyAiData.response, currentState.history)) {
             currentState.addressAttempts = 0;
-            currentState.history.push({ role: 'bot', content: safetyAiData.response, timestamp: Date.now() });
+            _pushHistory(currentState, { role: 'bot', content: safetyAiData.response });
             saveState(userId);
             await sendMessageWithDelay(userId, safetyAiData.response);
             return { matched: true };
@@ -533,7 +533,7 @@ async function _validateAndAssembleOrder(
             if (mapsCP) {
                 currentState.pendingCPFromMaps = mapsCP;
                 const cpMsg = `Encontré que tu código postal podría ser *${mapsCP}*. ¿Es correcto? 😊`;
-                currentState.history.push({ role: 'bot', content: cpMsg, timestamp: Date.now() });
+                _pushHistory(currentState, { role: 'bot', content: cpMsg });
                 await sendMessageWithDelay(userId, cpMsg);
                 saveState(userId);
                 return { matched: true };
@@ -580,7 +580,7 @@ async function _validateAndAssembleOrder(
         }
 
         const askMsg = `¡Perfecto! Ya tengo la primera parte anotada ✍️\n\nPara terminar la etiqueta me faltaría: *${criticalMissing.join(' y ')}* 🙏`;
-        currentState.history.push({ role: 'bot', content: askMsg, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: askMsg });
         await sendMessageWithDelay(userId, askMsg);
         return { matched: true };
     }
@@ -600,7 +600,7 @@ async function _validateAndAssembleOrder(
     if (validation.notArgentina) {
         logger.info(`[MAPS] Non-Argentina address detected for ${userId}. Rejecting.`);
         const geoMsg = `Lo lamento, solo realizamos envíos dentro de Argentina 😔\n\n¿Tenés una dirección en Argentina? Si es así, pasámela y con gusto seguimos.`;
-        currentState.history.push({ role: 'bot', content: geoMsg, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: geoMsg });
         await sendMessageWithDelay(userId, geoMsg);
         // Preservar el nombre — solo limpiamos los campos de dirección. Si lo
         // borramos, el cliente tiene que volver a presentarse desde cero.
@@ -612,7 +612,7 @@ async function _validateAndAssembleOrder(
 
     if (addr.cp && !validation.cpValid) {
         const cpMsg = `El código postal "${addr.cp}" no parece válido 🤔\nDebe ser de 4 dígitos (ej: 1425, 5000). ¿Me lo corregís?`;
-        currentState.history.push({ role: 'bot', content: cpMsg, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: cpMsg });
         await sendMessageWithDelay(userId, cpMsg);
         currentState.partialAddress.cp = null;
         return { matched: true };
@@ -630,7 +630,7 @@ async function _validateAndAssembleOrder(
         const addrStr = `${addr.calle}, ${addr.ciudad}${addr.cp ? `, CP ${addr.cp}` : ''}`;
         const mapsMsg = `No pude verificar tu dirección en el mapa 🤔\n\n¿Está bien escrita así?:\n📍 *${addrStr}*\n\nSi es correcta, respondé *sí*. Si no, pasame la dirección corregida 🙏`;
         currentState.mapsFormattedAddress = null;
-        currentState.history.push({ role: 'bot', content: mapsMsg, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: mapsMsg });
         _setStep(currentState, FlowStep.WAITING_MAPS_CONFIRMATION);
         saveState(userId);
         await sendMessageWithDelay(userId, mapsMsg);
@@ -697,7 +697,7 @@ async function _validateAndAssembleOrder(
     // Defensivo (waiting_data hoy es solo retiro): si el pago NO es al retirar, no
     // cerramos sin verificar — mandamos el resumen y esperamos.
     const summaryMsg = buildConfirmationMessage(currentState, knowledge);
-    currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
+    _pushHistory(currentState, { role: 'bot', content: summaryMsg });
     await sendMessageWithDelay(userId, summaryMsg);
     _setStep(currentState, FlowStep.WAITING_FINAL_CONFIRMATION);
     saveState(userId);
@@ -779,7 +779,7 @@ async function _askMissingFields(
 
     await sendMessageWithDelay(userId, msg);
     currentState.lastAddressMsg = msg;
-    currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+    _pushHistory(currentState, { role: 'bot', content: msg });
     saveState(userId);
     return { matched: true };
 }
@@ -888,7 +888,7 @@ export async function _handleRetiroData(
         if (!addr.cp) missing.push('Código postal');
         saveState(userId);
         const msg = `¡Genial! Para el retiro en sucursal me falta: *${missing.join(', ')}* 🙌`;
-        currentState.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: msg });
         await sendMessageWithDelay(userId, msg);
         return { matched: true };
     }
@@ -949,7 +949,7 @@ export async function handleWaitingData(
         } else if (isNo) {
             currentState.pendingCPFromMaps = null;
             const askCPMsg = `No hay problema. ¿Me pasás tu código postal? 😊`;
-            currentState.history.push({ role: 'bot', content: askCPMsg, timestamp: Date.now() });
+            _pushHistory(currentState, { role: 'bot', content: askCPMsg });
             await sendMessageWithDelay(userId, askCPMsg);
             saveState(userId);
             return { matched: true };
@@ -968,7 +968,7 @@ export async function handleWaitingData(
         const { sendMessageWithDelay, saveState } = dependencies;
         currentState.awaitingResume = true;
         const waitMsg = 'Dale, tranqui, te espero 😊';
-        currentState.history.push({ role: 'bot', content: waitMsg, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: waitMsg });
         saveState(userId);
         await sendMessageWithDelay(userId, waitMsg);
         logger.info(`[WAITING_DATA] ${userId} pidió esperar ("${text.slice(0, 40)}") — aflojo, no re-pido datos.`);
@@ -1037,7 +1037,7 @@ export async function handleWaitingData(
     if (classification.isHardRejection) {
         logger.info(`[HARD_REJECTION] User ${userId} explicitly declined purchase during waiting_data: "${text}"`);
         const closeMsg = `¡Entendido perfectamente! 😊 No hay ningún problema. Si en algún momento te interesa o tenés alguna consulta, escribinos sin compromiso. ¡Que tengas un excelente día! 🙌`;
-        currentState.history.push({ role: 'bot', content: closeMsg, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: closeMsg });
         await dependencies.sendMessageWithDelay(userId, closeMsg);
         await _pauseAndAlert(userId, currentState, dependencies, text, `Cliente desistió del pedido. Dijo: "${text}"`);
         return { matched: true };
@@ -1097,7 +1097,7 @@ export async function handleWaitingData(
     const isExplicitTargetingStreet = !currentState.partialAddress?.calle && /\d/.test(text) && textWordCount >= 3 && !classification.isDataQuestionOrEmotion;
     if (!madeProgress && isExplicitTargetingStreet && currentState.addressAttempts < 2) {
         const reAskMsg = 'Perdoná, no me quedó clara la dirección 🙈 ¿Me pasás la *calle y la altura* (número)? Si es esquina o no tiene número, contame cómo llegar 😊';
-        currentState.history.push({ role: 'bot', content: reAskMsg, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: reAskMsg });
         dependencies.saveState(userId);
         await dependencies.sendMessageWithDelay(userId, reAskMsg);
         return { matched: true };

@@ -1,7 +1,7 @@
 const express = require('express');
 const logger = require('../../utils/logger');
 const { z } = require('zod');
-const { _setStep } = require('../../flows/utils/flowHelpers');
+const { _setStep, _pushHistory } = require('../../flows/utils/flowHelpers');
 
 // --- Input validation schemas ---
 const uuidSchema = z.string().uuid('ID de orden inválido');
@@ -315,7 +315,7 @@ module.exports = (clientPool) => {
                     if (ss?.userState && ss.userState[targetPhone]) {
                         _setStep(ss.userState[targetPhone], 'completed');
                         ss.userState[targetPhone].history = ss.userState[targetPhone].history || [];
-                        ss.userState[targetPhone].history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+                        _pushHistory(ss.userState[targetPhone], { role: 'bot', content: msg });
                         if (ss.saveState) { try { ss.saveState(targetPhone); } catch (e) { ss.saveState(); } }
                     }
                     if (ss?.logAndEmit) ss.logAndEmit(targetPhone, 'bot', msg, 'completed');
@@ -807,7 +807,7 @@ module.exports = (clientPool) => {
 
                     if (state) {
                         state.history = state.history || [];
-                        state.history.push({ role: 'bot', content: msg, timestamp: Date.now() });
+                        _pushHistory(state, { role: 'bot', content: msg });
                     }
                     if (sellerSharedState?.logAndEmit) sellerSharedState.logAndEmit(chatId, 'bot', msg, 'completed');
                 } catch (e) {

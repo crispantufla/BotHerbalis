@@ -1,5 +1,5 @@
 import { UserState, FlowStep } from '../../types/state';
-import { _setStep, _pauseAndAlert, _startsAffirmative } from '../utils/flowHelpers';
+import { _setStep, _pauseAndAlert, _startsAffirmative, _pushHistory } from '../utils/flowHelpers';
 import { validateWithGoogleMaps } from '../../services/addressValidator';
 import { buildConfirmationMessage } from '../../utils/messageTemplates';
 import { _getPrice } from '../utils/pricing';
@@ -72,7 +72,7 @@ export async function handleWaitingMapsConfirmation(
     if (isNegation) {
         // Client says "no", go back to waiting_data to collect corrected address
         const goBackMsg = `¡Dale! Pasame la dirección corregida entonces 📝`;
-        currentState.history.push({ role: 'bot', content: goBackMsg, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: goBackMsg });
         currentState.partialAddress.calle = null;
         _setStep(currentState, FlowStep.WAITING_DATA);
         saveState(userId);
@@ -120,7 +120,7 @@ export async function handleWaitingMapsConfirmation(
                 currentState.totalPrice = total.toLocaleString('es-AR').replace(/,/g, '.');
 
                 const summaryMsg = buildConfirmationMessage(currentState, knowledge);
-                currentState.history.push({ role: 'bot', content: summaryMsg, timestamp: Date.now() });
+                _pushHistory(currentState, { role: 'bot', content: summaryMsg });
                 currentState.fieldReaskCount = {};
                 currentState.addressIssueType = null;
                 currentState.addressIssueTries = 0;
@@ -143,7 +143,7 @@ export async function handleWaitingMapsConfirmation(
                 }
 
                 const retryMsg = `Seguimos sin poder verificar esa dirección 🤔\n\n¿Me la podés pasar de nuevo con todos los datos? Nombre de calle, número, localidad y código postal 📍`;
-                currentState.history.push({ role: 'bot', content: retryMsg, timestamp: Date.now() });
+                _pushHistory(currentState, { role: 'bot', content: retryMsg });
                 saveState(userId);
                 await sendMessageWithDelay(userId, retryMsg);
                 return { matched: true };
@@ -153,7 +153,7 @@ export async function handleWaitingMapsConfirmation(
 
     // Fallback: unrecognized input — ask to confirm or correct
     const fallbackMsg = `¿La dirección que te pasé es correcta? Respondé *sí* si está bien, o pasame la dirección corregida 🙏`;
-    currentState.history.push({ role: 'bot', content: fallbackMsg, timestamp: Date.now() });
+    _pushHistory(currentState, { role: 'bot', content: fallbackMsg });
     saveState(userId);
     await sendMessageWithDelay(userId, fallbackMsg);
     return { matched: true };

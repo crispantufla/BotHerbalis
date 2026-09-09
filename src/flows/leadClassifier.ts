@@ -20,7 +20,7 @@
 
 import { UserState, FlowStep } from '../types/state';
 import { pauseUser } from '../services/pauseService';
-import { _setStep, _cleanPhone } from './utils/flowHelpers';
+import { _setStep, _cleanPhone, _pushHistory } from './utils/flowHelpers';
 import logger from '../utils/logger';
 
 const { prisma } = require('../../db');
@@ -106,8 +106,7 @@ async function _checkExistingOrders(
             // atención (no dejarlo en visto). Después se pausa para que lo tome
             // un humano (rev 2026-06-04).
             const derivMsg = 'Teniendo en cuenta que ya sos cliente, te derivo con una oficial de atención al cliente que te va a ayudar enseguida 😊';
-            if (!state.history) state.history = [];
-            state.history.push({ role: 'bot', content: derivMsg, timestamp: Date.now() });
+            _pushHistory(state, { role: 'bot', content: derivMsg });
             await dependencies.sendMessageWithDelay(userId, derivMsg);
             await pauseUser(
                 userId,

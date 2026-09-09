@@ -84,7 +84,7 @@ async function _maybeUpsell(currentState: UserState, sendMessageWithDelay: Funct
     // Aquí validamos que currentState es tipado (e.g alertaría si pones currentState.peso instead of weightGoal)
     if (currentState.weightGoal && Number(currentState.weightGoal) > 10) {
         const upsell = "Personalmente yo te recomendaría el de 120 días debido al peso que esperas perder 👌";
-        currentState.history.push({ role: 'bot', content: upsell, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: upsell });
         if (saveStateFn) saveStateFn(userId);
         await sendMessageWithDelay(userId, upsell);
     }
@@ -191,7 +191,7 @@ async function _pauseAndAlert(userId: string, currentState: UserState, dependenc
     // NIGHT MODE: Send polite night message
     if (!duringBusinessHours) {
         const nightMsg = "Necesito consultar esto con mi compañero, pero entenderás que por la hora me es imposible. Apenas pueda te respondo, ¡quedate tranquilo/a! 😊🌙";
-        currentState.history.push({ role: 'bot', content: nightMsg, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'bot', content: nightMsg });
         await sendMessageWithDelay(userId, nightMsg);
     }
 
@@ -423,7 +423,7 @@ async function _maybeSendPaymentMenuV7(
     const { isMpEnabled } = require('./paymentOptions');
     const { sendMessageWithDelay, saveState } = dependencies;
     const paymentMsg = buildPaymentMessage(currentState, knowledge, !isMpEnabled(dependencies.config));
-    currentState.history.push({ role: 'bot', content: paymentMsg, timestamp: Date.now() });
+    _pushHistory(currentState, { role: 'bot', content: paymentMsg });
     saveState(userId);
     await sendMessageWithDelay(userId, paymentMsg);
     logger.info(`[V7-AUTO-PAYMENT] User ${userId} → payment_menu enviado tras confirmar producto.`);
@@ -612,7 +612,7 @@ async function _closeSaleAndNotify(
     }
 
     const closeMsg = buildConfirmationMessage(currentState, knowledge);
-    currentState.history.push({ role: 'bot', content: closeMsg, timestamp: Date.now() });
+    _pushHistory(currentState, { role: 'bot', content: closeMsg });
     _setStep(currentState, 'completed');
     saveState(userId);
     await sendMessageWithDelay(userId, closeMsg);
