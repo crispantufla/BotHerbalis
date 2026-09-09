@@ -88,7 +88,7 @@ Máquina de estados lineal con fallbacks a IA. Orden típico:
 - `npm run dev` — concurrente server (tsx watch en index.ts) + client (vite)
 - `npm run dev:server` — solo server (sin watch)
 - `npm start` — producción: `prisma generate && migrate deploy && tsx index.ts`
-- `npm test` — Jest. Suite verde (34 suites, 371 tests; 1 suite skipped es la `.live`). Corre contra la DB de prod (`DATABASE_URL` del `.env` apunta a Railway) pero **solo lee**: ninguna suite escribe. **Solo V7**: las suites acopladas a `archive/knowledge_v3.json`/v4 (simulaciones, recommendation, multi_product, salesFlow, etc.) se retiraron el 2026-05-31 — testeaban un guion muerto. Cobertura de flujo V7: `sena_flow_smoke.test.js` + `payment_flow.test.js`; el resto cubre utilidades (address, pricing, objection escalation, order flow). Pendiente: rehacer un harness de simulación contra V7.
+- `npm test` — Jest. Suite verde (35 suites, 399 tests; 1 suite skipped es la `.live`). Corre contra la DB de prod (`DATABASE_URL` del `.env` apunta a Railway) pero **solo lee**: ninguna suite escribe. **Solo V7**: las suites acopladas a `archive/knowledge_v3.json`/v4 (simulaciones, recommendation, multi_product, salesFlow, etc.) se retiraron el 2026-05-31 — testeaban un guion muerto. Cobertura de flujo V7: `sena_flow_smoke.test.js` + `payment_flow.test.js`; el resto cubre utilidades (address, pricing, objection escalation, order flow). Pendiente: rehacer un harness de simulación contra V7.
 - `npx prisma migrate dev --name <x>` — nueva migración
 - `railway logs --lines 300` — logs de producción
 
@@ -112,6 +112,7 @@ Máquina de estados lineal con fallbacks a IA. Orden típico:
 - [src/flows/leadClassifier.ts](src/flows/leadClassifier.ts) — ruteo del lead nuevo + estado inicial
 - [src/services/aiPrompts.ts](src/services/aiPrompts.ts) — texto de los prompts (ai.ts = runtime)
 - [src/services/adminCommands.ts](src/services/adminCommands.ts) — comandos `!` del admin
+- [src/api/routes/manualComplete.js](src/api/routes/manualComplete.js) — pasos de la carga manual de pedidos
 - [prisma/schema.prisma](prisma/schema.prisma) — schema completo
 - [src/api/server.js](src/api/server.js) — montaje Express/Socket.IO
 - [src/api/routes/](src/api/routes/) — endpoints REST (todos pasan por `sellerContext`)
@@ -131,9 +132,10 @@ y `wipe-semantic-cache`). Todo recuperable del historial de git.
 - `npx tsc --noEmit` pasa limpio (exit 0). Los TS errors de `ioredis`/`bullmq` y `@types/jest`
   que decía esta sección ya no existen.
 - Funciones que siguen siendo grandes (≥300 líneas): `clientPool.startSeller`,
-  `order.routes.js /orders/manual-complete`, `messageHandler.createMessageHandler`,
-  `server.js startServer`. Las tres `create*` son factories: su largo incluye los helpers
-  anidados que devuelven, así que pesan menos de lo que dice el número.
+  `messageHandler.createMessageHandler`, `server.js startServer`. Las tres son factories:
+  su largo incluye los helpers anidados que devuelven, así que pesan menos de lo que dice
+  el número. Partirlas implica recablear cómo se arma `sharedState` — mucho movimiento en
+  el arranque para poca ganancia de lectura.
 - Admins globales (`sellerId=null`) vs tenant admins distinción reciente — verificar scoping cuando se agregan rutas nuevas.
 
 ## Agent skills

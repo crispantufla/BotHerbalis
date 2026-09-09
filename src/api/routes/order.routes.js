@@ -2,6 +2,7 @@ const express = require('express');
 const logger = require('../../utils/logger');
 const { z } = require('zod');
 const { _setStep, _pushHistory } = require('../../flows/utils/flowHelpers');
+const mc = require('./manualComplete');
 
 // --- Input validation schemas ---
 const uuidSchema = z.string().uuid('ID de orden inválido');
@@ -26,7 +27,7 @@ const statusUpdateSchema = z.object({
 
 module.exports = (clientPool) => {
     const router = express.Router();
-    const { withSeller, getInstanceId, isOwnerOrAdmin } = require('./routeHelpers');
+    const { withSeller, getInstanceId, isOwnerOrAdmin, toLegacyOrder } = require('./routeHelpers');
     const { requireAdmin } = require('../../middleware/jwtAuth');
 
     // Access io dynamically via the seller's sharedState
@@ -232,28 +233,7 @@ module.exports = (clientPool) => {
                 data: dataToUpdate
             });
 
-            const legacyOrder = {
-                id: updatedOrder.id,
-                cliente: updatedOrder.userPhone,
-                status: updatedOrder.status,
-                producto: updatedOrder.products,
-                precio: Math.round(updatedOrder.totalPrice).toLocaleString('es-AR'),
-                tracking: updatedOrder.tracking || '',
-                postdatado: updatedOrder.postdated || '',
-                nombre: updatedOrder.nombre || '',
-                calle: updatedOrder.calle || '',
-                calleOriginal: updatedOrder.calleOriginal || '',
-                ciudad: updatedOrder.ciudad || '',
-                provincia: updatedOrder.provincia || '',
-                cp: updatedOrder.cp || '',
-                paymentMethod: updatedOrder.paymentMethod || null,
-                seller: updatedOrder.seller || '',
-                senaAmount: updatedOrder.senaAmount || null,
-                senaPaid: !!updatedOrder.senaPaid,
-                cashRemainder: updatedOrder.cashRemainder || null,
-                paymentVerifiedAt: updatedOrder.paymentVerifiedAt ? updatedOrder.paymentVerifiedAt.toISOString() : null,
-                createdAt: updatedOrder.createdAt.toISOString()
-            };
+            const legacyOrder = toLegacyOrder(updatedOrder);
 
             emitScoped(req, 'order_update', legacyOrder);
             res.json({ success: true, order: legacyOrder });
@@ -325,28 +305,7 @@ module.exports = (clientPool) => {
             }
 
             // Format for dashboard and Sheets
-            const legacyOrder = {
-                id: updatedOrder.id,
-                cliente: updatedOrder.userPhone,
-                status: updatedOrder.status,
-                producto: updatedOrder.products,
-                precio: Math.round(updatedOrder.totalPrice).toLocaleString('es-AR'),
-                tracking: updatedOrder.tracking || '',
-                postdatado: updatedOrder.postdated || '',
-                nombre: updatedOrder.nombre || '',
-                calle: updatedOrder.calle || '',
-                calleOriginal: updatedOrder.calleOriginal || '',
-                ciudad: updatedOrder.ciudad || '',
-                provincia: updatedOrder.provincia || '',
-                cp: updatedOrder.cp || '',
-                paymentMethod: updatedOrder.paymentMethod || null,
-                seller: updatedOrder.seller || '',
-                senaAmount: updatedOrder.senaAmount || null,
-                senaPaid: !!updatedOrder.senaPaid,
-                cashRemainder: updatedOrder.cashRemainder || null,
-                paymentVerifiedAt: updatedOrder.paymentVerifiedAt ? updatedOrder.paymentVerifiedAt.toISOString() : null,
-                createdAt: updatedOrder.createdAt.toISOString()
-            };
+            const legacyOrder = toLegacyOrder(updatedOrder);
 
 
             emitScoped(req, 'order_update', legacyOrder);
@@ -411,180 +370,39 @@ module.exports = (clientPool) => {
             const sellerSharedState = req.sellerInstance?.sharedState;
             const INSTANCE_ID = getInstanceId(req);
             // prisma se requiere ACÁ ARRIBA a propósito: antes era `const` a mitad
-            // del handler (~L703) y el rescate desde ChatLog lo usaba antes de
-            // declararse — por la temporal dead zone tiraba ReferenceError que el
-            // try/catch se tragaba como "DB chatLog query failed" → el rescate desde
-            // DB NUNCA funcionó (mismo patrón que el bug de phoneNumeric de abajo;
-            // caso Pablo Martinez 23-jul).
+            // del handler y el rescate desde ChatLog lo usaba antes de declararse —
+            // por la temporal dead zone tiraba ReferenceError que el try/catch se
+            // tragaba como "DB chatLog query failed" → el rescate desde DB NUNCA
+            // funcionó (caso Pablo Martinez 23-jul).
             const { prisma } = require('../../../db');
 
-            const resolveChatIdLocal = async (id) => {
-                if (!id) return id;
-                if (id.includes('@lid')) {
-                    try { const c = await sellerClient?.getContactById(id); if (c?.number) return `${c.number}@c.us`; } catch (e) { /* ignore */ }
-                    return id;
-                }
-                if (!id.includes('@')) return `${id.replace(/\D/g, '')}@c.us`;
-                return id;
-            };
-
-            chatId = await resolveChatIdLocal(chatId);
+            chatId = await mc.resolveChatId(chatId, sellerClient);
             logger.info(`[MANUAL-COMPLETE] Resolved chatId: ${chatId}`);
-
-            // phoneNumeric se declara ACÁ ARRIBA a propósito. Antes era `const` al
-            // final (~L590) y el bloque de rescate desde ChatLog lo usaba antes de
-            // declararse: por la temporal dead zone tiraba ReferenceError que el
-            // try/catch se tragaba como "DB chatLog query failed" → el rescate desde
-            // la DB NUNCA funcionaba (caso Nora Aguirre 06-jun).
             const phoneNumeric = chatId.split('@')[0];
 
-            const userState = sellerSharedState?.userState;
-            const state = userState?.[chatId];
-
+            const state = sellerSharedState?.userState?.[chatId];
             if (!state) {
-                logger.info(`[MANUAL-COMPLETE] No state found for ${chatId}. Available keys sample:`, Object.keys(userState || {}).slice(0, 5));
+                const keys = Object.keys(sellerSharedState?.userState || {}).slice(0, 5);
+                logger.info(`[MANUAL-COMPLETE] No state found for ${chatId}. Available keys sample:`, keys);
                 return res.status(404).json({ error: 'No hay estado de conversación para este chat' });
             }
 
             const cart = state.cart && state.cart.length ? state.cart : (state.pendingOrder?.cart || []);
-            // Prefer pendingOrder (post Maps-validation, source of truth) over partialAddress.
-            // partialAddress can get cleared by step transitions / globals while pendingOrder survives,
-            // so reading partialAddress alone produced empty orders in production (caso Elvira 27/04/2026).
-            const pending = state.pendingOrder || {};
-            const partial = state.partialAddress || {};
-            let addr = {
-                nombre:        pending.nombre        || partial.nombre        || null,
-                calle:         pending.calle         || partial.calle         || null,
-                ciudad:        pending.ciudad        || partial.ciudad        || null,
-                provincia:     pending.provincia     || partial.provincia     || null,
-                cp:            pending.cp            || partial.cp            || null,
-                calleOriginal: pending.calleOriginal || partial.calleOriginal || null,
-            };
 
-            // FALLBACK DATA RESCUE: el state se puede haber pausado/limpiado.
-            // Buscamos mensajes del usuario en (a) state.history y (b) ChatLog en DB
-            // como fuente de verdad. Esto es lo que evita que el manual-complete
-            // cree ordenes con nombre/calle/ciudad=null cuando el bot pauso por
-            // "La IA fallo en extraer la calle".
-            if (!addr.nombre || !addr.calle || !addr.ciudad) {
-                logger.info(`[MANUAL-COMPLETE] Datos de envío incompletos. Intentando rescatarlos para ${chatId}...`);
-
-                // Combinar mensajes del state (memoria) + ChatLog (DB) — el state
-                // se trunca cuando hay summary, ChatLog tiene todo el historial.
-                const stateMsgs = (state.history || []).filter(m => m.role === 'user').map(m => m.content || '');
-                let dbMsgs = [];
-                try {
-                    const dbLogs = await prisma.chatLog.findMany({
-                        where: { userPhone: phoneNumeric, instanceId: INSTANCE_ID, role: 'user' },
-                        orderBy: { timestamp: 'desc' },
-                        take: 20,
-                        select: { content: true }
-                    });
-                    dbMsgs = dbLogs.map(l => l.content || '').reverse();
-                } catch (e) {
-                    logger.warn('[MANUAL-COMPLETE] DB chatLog query failed:', e.message);
-                }
-
-                // Dedup conservando orden cronológico (DB tiene más historial)
-                const seen = new Set();
-                const allMsgs = [...dbMsgs, ...stateMsgs].filter(m => {
-                    if (!m || seen.has(m)) return false;
-                    seen.add(m);
-                    return true;
-                }).slice(-15); // últimos 15 únicos
-
-                if (allMsgs.length > 0) {
-                    const textToAnalyze = allMsgs.join(" | ");
-
-                    try {
-                        const { aiService } = require('../../services/ai');
-                        const extracted = await aiService.parseAddress(textToAnalyze);
-
-                        if (!extracted._error) {
-                            logger.info(`[MANUAL-COMPLETE] Extracción AI exitosa:`, extracted);
-                            addr = {
-                                nombre: extracted.nombre || addr.nombre,
-                                calle: extracted.calle || addr.calle,
-                                ciudad: extracted.ciudad || addr.ciudad,
-                                provincia: extracted.provincia || addr.provincia,
-                                cp: extracted.cp || addr.cp,
-                                calleOriginal: addr.calleOriginal || extracted.calle || null
-                            };
-
-                            // Save rescued data to state
-                            state.partialAddress = addr;
-                        }
-                    } catch (extError) {
-                        logger.error(`[MANUAL-COMPLETE] Error en extracción AI de rescate:`, extError.message);
-                    }
-                }
-            }
-
-            // OVERRIDE MANUAL: el admin abrió el modal de entrada manual y nos
-            // mandó los datos a mano. Estos pisan lo que se haya logrado extraer.
+            // 1. Dirección: state → rescate por IA si falta algo → override del modal.
+            let addr = mc.collectAddress(state);
+            addr = await mc.rescueAddress({ addr, state, phoneNumeric, instanceId: INSTANCE_ID, prisma, chatId });
             const manualAddr = req.body?.manualAddr;
-            if (manualAddr && typeof manualAddr === 'object') {
-                addr = {
-                    nombre:        manualAddr.nombre        || addr.nombre        || null,
-                    calle:         manualAddr.calle         || addr.calle         || null,
-                    ciudad:        manualAddr.ciudad        || addr.ciudad        || null,
-                    provincia:     manualAddr.provincia     || addr.provincia     || null,
-                    cp:            manualAddr.cp            || addr.cp            || null,
-                    calleOriginal: manualAddr.calle         || addr.calleOriginal || null,
-                };
-                state.partialAddress = addr;
-                logger.info(`[MANUAL-COMPLETE] Address override from admin form for ${chatId}: ${addr.nombre} / ${addr.calle}`);
-            }
+            addr = mc.applyManualOverride({ addr, manualAddr, state, chatId });
 
-            // RETIRO EN SUCURSAL: no tiene calle (con localidad + CP el Correo
-            // asigna la sucursal). Si no lo detectamos, el gate de abajo exige
-            // calle y rechaza pedidos de retiro con datos completos (nombre +
-            // localidad + CP) forzando carga manual. Caso real Nora Aguirre 06-jun:
-            // dio nombre + "San Miguel de Tucumán" + CP 4000 y el botón no los tomó
-            // porque "faltaba la calle".
-            const _lc = (s) => (s || '').toLowerCase();
-            const botHistText = (state.history || [])
-                .filter(m => m.role === 'bot' || m.role === 'admin')
-                .map(m => _lc(m.content)).join(' ');
-            // Domicilio ya comprometido (prepago) → NO es retiro. Excluye falsos
-            // positivos: el menú menciona "retiro en sucursal" para TODOS.
-            // OJO: frases de COMPROMISO, no de explicación. El bot menciona el
-            // alias "herbalis.tienda" al explicar opciones aunque el cliente NO
-            // elija transferencia (falso positivo real en el caso Nora Aguirre).
-            const domicilioCommitted =
-                state.shippingChoice === 'domicilio'
-                || state.paymentMethod === 'mercadopago'
-                || state.paymentMethod === 'transferencia'
-                || !!state.mpPaymentLinkUrl
-                || /lo mandamos a tu domicilio|para transferir us[áa] el alias|te dejo el link para pagar con mercado pago/.test(botHistText);
-            // Retiro comprometido: frases de COMPROMISO del bot/admin (no la mera
-            // línea de oferta del menú), o señales explícitas del state/dirección.
-            const retiroCommitted =
-                state.shippingChoice === 'retiro'
-                || state.paymentMethod === 'contrarembolso'
-                || /\bsucursal\b/.test(_lc(addr.calle))
-                || /(dejamos|armamos|vamos con|entonces vamos|confirmamos).{0,80}retiro en sucursal/.test(botHistText)
-                || /pag[áa]s? el total.{0,40}(al retirar|cuando lo retir)/.test(botHistText);
-            // El admin puede forzar tipo de envío y método de pago desde el modal
-            // de verificación; esos overrides pisan la detección automática.
+            // 2. Tipo de envío: detección automática, salvo override del modal.
             const shippingTypeReq = req.body?.shippingType;   // 'domicilio' | 'sucursal'
             const paymentMethodReq = req.body?.paymentMethod; // 'mercadopago' | 'transferencia' | 'contrarembolso'
-            // Checkbox "vi el comprobante" del modal (solo aplica a transferencia).
-            const paymentVerifiedReq = req.body?.paymentVerified === true;
-            const detectedRetiro = retiroCommitted && !domicilioCommitted;
-            const isRetiro = shippingTypeReq ? (shippingTypeReq === 'sucursal') : detectedRetiro;
+            const paymentVerifiedReq = req.body?.paymentVerified === true; // checkbox "vi el comprobante"
+            const isRetiro = shippingTypeReq ? (shippingTypeReq === 'sucursal') : mc.detectRetiro({ state, addr });
+            if (isRetiro) addr = mc.applyRetiroAddress({ addr, state });
 
-            if (isRetiro) {
-                // Retiro en sucursal: la calle no aplica. Conservamos la calle real
-                // (si la había) en calleOriginal para referencia del admin.
-                if (addr.calle && _lc(addr.calle) !== 'a sucursal' && !addr.calleOriginal) {
-                    addr.calleOriginal = addr.calle;
-                }
-                addr.calle = 'A sucursal';
-                state.partialAddress = addr;
-            }
-
-            // Método de pago: override explícito del modal, o default según envío.
+            // 3. Método de pago: override explícito del modal, o default según envío.
             if (paymentMethodReq) {
                 state.paymentMethod = paymentMethodReq;
             } else if (isRetiro && !state.paymentMethod) {
@@ -593,10 +411,10 @@ module.exports = (clientPool) => {
             const paymentMethodDefault = state.paymentMethod || (isRetiro ? 'contrarembolso' : 'mercadopago');
             logger.info(`[MANUAL-COMPLETE] ${chatId} envío=${isRetiro ? 'sucursal' : 'domicilio'} pago=${paymentMethodDefault} (shippingTypeReq=${shippingTypeReq || 'auto'})`);
 
-            // GATE: no creamos órdenes incompletas. Domicilio exige
-            // nombre+calle+ciudad; retiro en sucursal exige nombre+ciudad+CP (la
-            // calle no aplica). En modo preview NO bloqueamos: el modal de
-            // verificación se abre igual con lo que se haya podido extraer.
+            // 4. GATE: no creamos órdenes incompletas. Domicilio exige
+            // nombre+calle+ciudad; retiro exige nombre+ciudad+CP (la calle no
+            // aplica). En preview NO bloqueamos: el modal se abre igual con lo
+            // que se haya podido extraer.
             const preview = req.body?.preview === true;
             const allowEmpty = req.body?.allowEmpty === true;
             const missingEssential = isRetiro
@@ -611,70 +429,17 @@ module.exports = (clientPool) => {
                     extracted: addr  // pre-rellena el modal con lo que sí pudimos extraer
                 });
             }
-            // FALLBACK PRODUCT/PLAN/PRICE RESCUE: scan bot messages in history for the confirmation template
-            // This handles manually-managed conversations where the bot flow never set cart/selectedProduct.
-            let rescuedProduct = null, rescuedPlan = null, rescuedTotal = null;
-            if (cart.length === 0 && !state.selectedProduct) {
-                const history = state.history || [];
-                const botMessages = history.filter(m => m.role === 'bot').map(m => m.content || '').join('\n');
-                // Match "Producto: Cápsulas de Nuez de la India" style lines
-                const productMatch = botMessages.match(/Producto:\s*(.+?)(?:\n|Plan:|$)/i);
-                if (productMatch) rescuedProduct = productMatch[1].trim();
-                // Match "Plan: 60 días" or "Plan: 120 días"
-                const planMatch = botMessages.match(/Plan:\s*(\d+)/i);
-                if (planMatch) rescuedPlan = planMatch[1];
-                // Match "Total a pagar al recibir:\n$46.900" or "Total a abonar al recibir: $36.900"
-                const totalMatch = botMessages.match(/[Tt]otal[^:]*:\s*\$?\s*([\d.,]+)/);
-                if (totalMatch) rescuedTotal = parseInt(totalMatch[1].replace(/\./g, '').replace(',', '')) || null;
-                if (rescuedProduct || rescuedTotal) {
-                    logger.info(`[MANUAL-COMPLETE] Rescate de producto desde historial: ${rescuedProduct} / ${rescuedPlan} días / $${rescuedTotal}`);
-                }
-            }
 
-            // El admin puede elegir producto+plan a mano desde el modal cuando el
-            // bot no los detectó. En ese caso el precio sale de la lista oficial.
-            const productTypeReq = req.body?.productType; // 'Cápsulas' | 'Gotas' | 'Semillas'
-            const planReq = req.body?.plan;               // '60' | '120'
+            // 5. Producto, plan y total.
+            const rescued = mc.rescueProductFromHistory({ state, cart });
+            const { plan, total, product } = mc.resolveProductAndTotal({ body: req.body, state, cart, rescued, chatId });
 
-            const plan = planReq || state.selectedPlan || cart[0]?.plan || rescuedPlan || '60';
-            // Prefer state.totalPrice (refleja el último cambio de plan).
-            // Fall back to recalculating from cart only if totalPrice is missing.
-            let total;
-            if (productTypeReq) {
-                const { _getPrice } = require('../../flows/utils/pricing');
-                total = parseInt(String(_getPrice(productTypeReq, plan)).replace(/\./g, ''), 10) || 0;
-            } else if (state.totalPrice) {
-                total = parseInt(state.totalPrice.toString().replace(/\./g, '').replace(/[^\d]/g, '')) || 0;
-            } else if (rescuedTotal) {
-                total = rescuedTotal;
-            } else {
-                total = cart.reduce((sum, i) => sum + parseInt((i.price || '0').toString().replace(/\D/g, '')), 0);
-            }
-
-            // Descuento manual del admin: resta al total final. (El bot nunca
-            // descuenta solo; esto es una acción manual desde el panel.)
-            const discountReq = Math.max(0, parseInt(String(req.body?.discount || '0').replace(/[^\d]/g, ''), 10) || 0);
-            if (discountReq > 0) {
-                total = Math.max(0, total - discountReq);
-                logger.info(`[MANUAL-COMPLETE] Descuento manual para ${chatId}: -$${discountReq} → total $${total}`);
-            }
-
-            // Formato canónico "Cápsulas (120 días)". Compartido con botHelpers.ts
-            // — vive en pricing.ts porque la duración se deduce de los precios reales.
-            const { _normalizeProductName } = require('../../flows/utils/pricing');
-
-            const rawProduct = productTypeReq || cart.map(i => i.product).join(' + ') || state.selectedProduct || rescuedProduct || 'Producto';
-            const rawPlan = productTypeReq ? `${plan} días` : (cart.map(i => `${i.plan} días`).join(' + ') || `${plan} días`);
-            const product = _normalizeProductName(rawProduct, rawPlan, total);
-
-            // PREVIEW: el panel SIEMPRE abre el modal de verificación antes de
-            // confirmar (con mensaje o sin). Devolvemos lo detectado (datos + envío
-            // + pago + producto) SIN crear la orden. La orden se crea recién cuando
-            // el admin confirma el modal (request sin preview, con manualAddr +
-            // shippingType + paymentMethod).
+            // 6. PREVIEW: el panel SIEMPRE abre el modal de verificación antes de
+            // confirmar (con mensaje o sin). Devolvemos lo detectado SIN crear la
+            // orden; se crea recién cuando el admin confirma el modal (request sin
+            // preview, con manualAddr + shippingType + paymentMethod).
             if (preview) {
                 const { _getPrices } = require('../../flows/utils/pricing');
-                const productDetected = /Cápsulas|Gotas|Semillas/.test(product);
                 return res.json({
                     preview: true,
                     prefill: {
@@ -690,125 +455,31 @@ module.exports = (clientPool) => {
                         product,
                         plan: String(plan),
                         total,
-                        productDetected,
+                        productDetected: /Cápsulas|Gotas|Semillas/.test(product),
                         prices: _getPrices(),
                     }
                 });
             }
 
-            // phoneNumeric y prisma ya se declararon al inicio del handler (ver notas arriba).
-
-            const seller = sellerClient?.info?.wid?.user || null;
-
-            // Atomic transaction: upsert user + find/create order to prevent duplicates
-            const order = await prisma.$transaction(async (tx) => {
-                await tx.user.upsert({
-                    where: { phone_instanceId: { phone: phoneNumeric, instanceId: INSTANCE_ID } },
-                    update: { name: addr.nombre || null },
-                    create: { phone: phoneNumeric, instanceId: INSTANCE_ID, name: addr.nombre || null }
-                });
-
-                // Idempotencia: si el admin doble-clickeo "Manual Complete" en pocos segundos,
-                // ya hay un Confirmado fresco para este telefono. Devolvelo sin crear duplicado
-                // (no se crea otra orden, asi nunca aparece ruido en el panel).
-                const recentConfirmed = await tx.order.findFirst({
-                    where: {
-                        userPhone: phoneNumeric,
-                        status: { in: ['Confirmado', 'Pendiente'] },
-                        instanceId: INSTANCE_ID,
-                        createdAt: { gte: new Date(Date.now() - 60 * 1000) }
-                    },
-                    orderBy: { createdAt: 'desc' }
-                });
-                if (recentConfirmed) {
-                    logger.info(`[MANUAL-COMPLETE] Duplicate click detected — returning existing order ${recentConfirmed.id} (created ${Math.round((Date.now() - recentConfirmed.createdAt.getTime()) / 1000)}s ago, status=${recentConfirmed.status})`);
-                    return recentConfirmed;
-                }
-
-                const existingOrder = await tx.order.findFirst({
-                    where: { userPhone: phoneNumeric, status: 'Pendiente', instanceId: INSTANCE_ID },
-                    orderBy: { createdAt: 'desc' }
-                });
-
-                // Campos de seña (flujo COD con anticipo): si el state los tiene,
-                // los persistimos. Sin esto, la confirmación manual desde panel
-                // perdía la info de seña ya cobrada (caso real Romina 19-may:
-                // pagó $10k MP pero la orden quedó con totalPrice=$46.900 COD).
-                const stateSena = state && state.senaAmount && state.senaAmount > 0
-                    ? {
-                        senaAmount: state.senaAmount,
-                        senaPaid: !!state.senaPaid,
-                        cashRemainder: Math.max(0, (total || 0) - state.senaAmount),
-                    }
-                    : {};
-
-                if (existingOrder) {
-                    logger.info(`[MANUAL-COMPLETE] Found existing Pendiente order ${existingOrder.id}, updating to Confirmado...`);
-                    // Also patch products/totalPrice if the existing order has placeholder values
-                    const needsProductPatch = product !== 'Desconocido' && (!existingOrder.products || existingOrder.products === 'Producto' || existingOrder.products === 'Desconocido');
-                    const needsPricePatch = total > 0 && (!existingOrder.totalPrice || existingOrder.totalPrice === 0);
-                    return await tx.order.update({
-                        where: { id: existingOrder.id },
-                        data: {
-                            status: 'Confirmado',
-                            seller: seller,
-                            nombre: addr.nombre || existingOrder.nombre,
-                            calle: addr.calle || existingOrder.calle,
-                            calleOriginal: addr.calleOriginal || existingOrder.calleOriginal || addr.calle || existingOrder.calle,
-                            ciudad: addr.ciudad || existingOrder.ciudad,
-                            provincia: addr.provincia || existingOrder.provincia,
-                            cp: addr.cp || existingOrder.cp,
-                            ...(needsProductPatch && { products: product }),
-                            ...(needsPricePatch && { totalPrice: total }),
-                            paymentMethod: state.paymentMethod || existingOrder.paymentMethod || null,
-                            ...(paymentVerifiedReq && { paymentVerifiedAt: new Date() }),
-                            ...stateSena,
-                        }
-                    });
-                } else {
-                    logger.info(`[MANUAL-COMPLETE] No existing order found, creating new Confirmado order...`);
-                    return await tx.order.create({
-                        data: {
-                            instanceId: INSTANCE_ID,
-                            userPhone: phoneNumeric,
-                            status: 'Confirmado',
-                            products: product,
-                            totalPrice: total,
-                            postdated: state.postdatado || null,
-                            nombre: addr.nombre || null,
-                            calle: addr.calle || null,
-                            calleOriginal: addr.calleOriginal || addr.calle || null,
-                            ciudad: addr.ciudad || null,
-                            provincia: addr.provincia || null,
-                            cp: addr.cp || null,
-                            seller: seller,
-                            paymentMethod: state.paymentMethod || null,
-                            paymentVerifiedAt: paymentVerifiedReq ? new Date() : null,
-                            ...stateSena,
-                        }
-                    });
-                }
+            // 7. Crear/confirmar la orden.
+            const order = await mc.persistOrder({
+                prisma, phoneNumeric, instanceId: INSTANCE_ID, addr, state, product, total,
+                seller: sellerClient?.info?.wid?.user || null,
+                paymentVerifiedReq,
             });
 
+            _setStep(state, 'completed');
 
-
-            // Set user state to completed
-            if (state) {
-                _setStep(state, 'completed');
-            }
-
-            // Send confirmation message unless silent mode
+            // 8. Avisarle al cliente, salvo modo silencioso.
             if (!silent) {
                 const msg = "Pedido confirmado ✅\n\n¡Muchas gracias por confiar en Herbalis 🌱!\n\nApenas tengamos el código de seguimiento te lo pasamos.";
                 try {
                     const targetPhone = `${phoneNumeric}@c.us`;
                     logger.info(`[MANUAL-COMPLETE] Enviando WhatsApp de confirmación a ${targetPhone}...`);
                     if (sellerClient) await sellerClient.sendMessage(targetPhone, msg);
-
-                    if (state) {
-                        state.history = state.history || [];
-                        _pushHistory(state, { role: 'bot', content: msg });
-                    }
+                    // Envío directo (no pasa por sendMessageWithDelay), así que el
+                    // history se anota acá — ver la convención en CLAUDE.md.
+                    _pushHistory(state, { role: 'bot', content: msg });
                     if (sellerSharedState?.logAndEmit) sellerSharedState.logAndEmit(chatId, 'bot', msg, 'completed');
                 } catch (e) {
                     logger.error(`[MANUAL-COMPLETE] Error enviando WhatsApp:`, e.message);
@@ -817,36 +488,13 @@ module.exports = (clientPool) => {
                 logger.info(`[MANUAL-COMPLETE] silent=true, omitiendo mensaje de confirmación a ${phoneNumeric}`);
             }
 
-            if (state && sellerSharedState?.saveState) {
+            if (sellerSharedState?.saveState) {
                 try { sellerSharedState.saveState(chatId); } catch (e) { sellerSharedState.saveState(); }
             }
 
-            const legacyOrder = {
-                id: order.id,
-                cliente: order.userPhone,
-                status: order.status,
-                producto: order.products,
-                precio: Math.round(order.totalPrice).toLocaleString('es-AR'),
-                tracking: order.tracking || '',
-                postdatado: order.postdated || '',
-                nombre: order.nombre || '',
-                calle: order.calle || '',
-                calleOriginal: order.calleOriginal || '',
-                ciudad: order.ciudad || '',
-                provincia: order.provincia || '',
-                cp: order.cp || '',
-                paymentMethod: order.paymentMethod || null,
-                senaAmount: order.senaAmount || null,
-                senaPaid: !!order.senaPaid,
-                cashRemainder: order.cashRemainder || null,
-                paymentVerifiedAt: order.paymentVerifiedAt ? order.paymentVerifiedAt.toISOString() : null,
-                createdAt: order.createdAt.toISOString()
-            };
+            // 9. Avisar al panel y sacar la alerta de la cola.
+            emitScoped(req, 'order_update', { action: 'created', order: toLegacyOrder(order) });
 
-            // Emit socket event for real-time dashboard update
-            emitScoped(req, 'order_update', { action: 'created', order: legacyOrder });
-
-            // Clear the alert from sessionAlerts so it doesn't reappear on reload
             const alerts = sellerSharedState?.sessionAlerts;
             if (alerts) {
                 const alertIndex = alerts.findIndex(a => a.userPhone === phoneNumeric || a.userPhone === chatId);

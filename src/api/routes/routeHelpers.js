@@ -63,7 +63,39 @@ function applyNonSellerExclusion(where) {
     return { ...where, instanceId: { notIn: NON_SELLER_INSTANCE_IDS } };
 }
 
+/**
+ * Forma "legacy" de una orden: la que espera el dashboard (campos en castellano,
+ * precio ya formateado, fechas en ISO). Estaba copiada en tres rutas de
+ * order.routes.js; la tercera (manual-complete) se había quedado sin `seller`,
+ * así que un pedido recién creado llegaba al panel por socket sin vendedor y no
+ * aparecía en el filtro por vendedor hasta recargar.
+ */
+function toLegacyOrder(o) {
+    return {
+        id: o.id,
+        cliente: o.userPhone,
+        status: o.status,
+        producto: o.products,
+        precio: Math.round(o.totalPrice).toLocaleString('es-AR'),
+        tracking: o.tracking || '',
+        postdatado: o.postdated || '',
+        nombre: o.nombre || '',
+        calle: o.calle || '',
+        calleOriginal: o.calleOriginal || '',
+        ciudad: o.ciudad || '',
+        provincia: o.provincia || '',
+        cp: o.cp || '',
+        paymentMethod: o.paymentMethod || null,
+        seller: o.seller || '',
+        senaAmount: o.senaAmount || null,
+        senaPaid: !!o.senaPaid,
+        cashRemainder: o.cashRemainder || null,
+        paymentVerifiedAt: o.paymentVerifiedAt ? o.paymentVerifiedAt.toISOString() : null,
+        createdAt: o.createdAt.toISOString(),
+    };
+}
+
 module.exports = {
     withSeller, requireSellerInstance, getInstanceId, isOwnerOrAdmin,
-    NON_SELLER_INSTANCE_IDS, applyNonSellerExclusion,
+    NON_SELLER_INSTANCE_IDS, applyNonSellerExclusion, toLegacyOrder,
 };
