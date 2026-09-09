@@ -91,7 +91,6 @@ export async function handleGreeting(
                 userState: currentState,
             });
             if (aiOpen.response) {
-                _pushHistory(currentState, { role: 'bot', content: aiOpen.response });
                 await sendMessageWithDelay(userId, aiOpen.response);
                 _setStep(currentState, knowledge.flow.greeting.nextStep);
                 saveState(userId);
@@ -143,7 +142,6 @@ export async function handleGreeting(
                 userState: currentState,
             });
             if (aiRe.response) {
-                _pushHistory(currentState, { role: 'bot', content: aiRe.response });
                 await sendMessageWithDelay(userId, aiRe.response);
                 _setStep(currentState, knowledge.flow.greeting.nextStep);
                 saveState(userId);
@@ -197,7 +195,6 @@ export async function handleGreeting(
     // como 1 mensaje igual. Simplificado a mensaje único sin el split.
     const greetMsg: string = _formatMessage(chosenGreeting.response, currentState);
 
-    _pushHistory(currentState, { role: 'bot', content: greetMsg });
     await sendMessageWithDelay(userId, greetMsg);
 
     // 2. Send Image SECOND (if configured)

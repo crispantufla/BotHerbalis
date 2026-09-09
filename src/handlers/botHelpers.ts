@@ -7,7 +7,7 @@
 import crypto from 'crypto';
 const logger = require('../utils/logger');
 const { prisma } = require('../../db');
-const { _cleanPhone, _isAdminPhone } = require('../flows/utils/flowHelpers');
+const { _cleanPhone, _isAdminPhone, _pushHistory } = require('../flows/utils/flowHelpers');
 const { _normalizeProductName } = require('../flows/utils/pricing');
 
 // logAndEmit, saveOrderToLocal, cancelLatestOrder, sendMessageWithDelay, notifyAdmin
@@ -243,6 +243,9 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
                     const hold = 'Dame un segundito que reviso bien tu pedido y te confirmo 🙏';
                     logAndEmit(chatId, 'bot', hold, _gst.step);
                     try { await client.sendMessage(chatId, hold); } catch (e: any) { logger.error(`[GHOST-CLOSE-PREVENT][${sellerId}] hold send fail: ${e.message}`); }
+                    // Al history va el hold, que es lo que el cliente leyó — NO el
+                    // cierre falso que bloqueamos.
+                    _pushHistory(_gst, { role: 'bot', content: hold });
                     return false;
                 }
             }
@@ -299,6 +302,13 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
             // de arriba abortaba el envío, ya no queda un log "fantasma" de un
             // mensaje que el cliente nunca recibió.
             logAndEmit(chatId, 'bot', content, userState[chatId]?.step);
+            // Mismo criterio para el history que ve la IA: se anota lo que
+            // REALMENTE salió. Antes lo empujaba cada call site antes de llamar
+            // acá, así que los cinco caminos que abortan el envío (ghost-close,
+            // anti-dup, pausa durante el delay, stillValid, excepción) dejaban en
+            // el historial un mensaje que el cliente nunca recibió — y la IA
+            // arrancaba el turno siguiente creyendo que ya lo había dicho.
+            if (userState[chatId]) _pushHistory(userState[chatId], { role: 'bot', content });
             logger.info(`[SENT][${sellerId}] Message sent to ${chatId}`);
             return true;
         } catch (e: any) {

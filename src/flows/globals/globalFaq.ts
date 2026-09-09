@@ -167,7 +167,6 @@ export async function handleFaq(
 
     const passthrough = dataBlockPassthrough || mapsPassthrough;
     logger.info(`[FAQ] ${userId} matched (keyword len=${bestLen}) → "${faqResponse.substring(0, 60)}..."${passthrough ? ` [passthrough: señal operativa en ${currentState.step}]` : ''}`);
-    _pushHistory(currentState, { role: 'bot', content: faqResponse });
     saveState(userId);
     await sendMessageWithDelay(userId, faqResponse);
     if (passthrough) return null; // el step procesa el MISMO texto (la señal viene adentro)

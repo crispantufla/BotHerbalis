@@ -197,7 +197,6 @@ async function _sendTransferAliasAndAdvance(
         `¡Perfecto! Para transferir usá el alias *{{ALIAS}}* a nombre de *{{TITULAR}}* 🏦\n\nMonto: ${'$'}{{TOTAL}}\n\nUna vez que realices la transferencia, escribime *"listo"* y coordinamos el envío 😊`;
     const msg = prefix + _formatMessage(tpl, currentState);
     _setStep(currentState, FlowStep.WAITING_TRANSFER_CONFIRMATION);
-    _pushHistory(currentState, { role: 'bot', content: msg });
     saveState(userId);
     await sendMessageWithDelay(userId, msg);
 }
@@ -243,7 +242,6 @@ export async function handleWaitingPaymentMethod(
     const alreadyPaidMp = currentState.paymentMethod === 'mercadopago' && (currentState as any).mpStatus === 'approved';
     if (!alreadyPaidMp && (PICKUP_INTENT_PAY.test(text) || ROSARIO_INTENT_PAY.test(text))) {
         const reply = 'Te aviso: no tenemos local de venta al público — todos los pedidos van por Correo Argentino con envío gratis 📦\n\nUn asesor te va a contactar enseguida para coordinar la mejor opción (retiro en sucursal cerca tuyo o entrega a domicilio) 😊';
-        _pushHistory(currentState, { role: 'bot', content: reply });
         saveState(userId);
         await sendMessageWithDelay(userId, reply);
         await _pauseAndAlert(userId, currentState, dependencies, text, 'Cliente quiere retirar en persona / es de Rosario en waiting_payment_method. Admin coordinar logística.');
@@ -263,7 +261,6 @@ export async function handleWaitingPaymentMethod(
         currentState.paymentSubChoiceAsked = false;
         currentState.shippingChoice = null;
         const msg = `¡Ojo, te aclaro así no hay malentendidos! 😊\n\nCon *${prepayMeans(mpOn)}* el pago es *antes* del envío (online) — al cartero no se le paga.\n\nPara *pagar al recibir, en efectivo*, la opción es *retiro en sucursal*: te llega a una sucursal de Correo Argentino cerca tuyo y pagás el total recién cuando lo retirás 💵\n\n¿Cómo preferís?\n1️⃣ *Retiro en sucursal* (pagás al retirar, en efectivo)\n2️⃣ *Envío a tu casa* (pagás ahora con ${prepayMeans(mpOn)})`;
-        _pushHistory(currentState, { role: 'bot', content: msg });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
         logger.info(`[PAYMENT_METHOD] ${userId} → malentendido "pago al recibir" con medio prepago/domicilio. Aclarado, re-preguntando.`);
@@ -284,7 +281,6 @@ export async function handleWaitingPaymentMethod(
         currentState.paymentSubChoiceAsked = false;
         currentState.shippingChoice = null;
         const msg = `¡Ojo, te aclaro así no hay malentendidos! 😊\n\nPagar *al recibir, en efectivo* solo se puede con *retiro en sucursal*: el paquete llega a la sucursal de Correo Argentino más cercana a tu casa y pagás el total *$${currentState.totalPrice || '?'}* recién cuando lo retirás 💵 — al cartero, en la puerta de tu casa, no se le paga.\n\nSi preferís recibirlo *en tu domicilio*, el pago va *antes* del envío (${prepayMeans(mpOn)}).\n\n¿Cómo preferís?\n1️⃣ *Retiro en sucursal* (pagás al retirar, en efectivo)\n2️⃣ *Envío a tu casa* (pagás ahora con ${prepayMeans(mpOn)})`;
-        _pushHistory(currentState, { role: 'bot', content: msg });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
         logger.info(`[PAYMENT_METHOD] ${userId} → malentendido "pago al recibir en domicilio/casa". Aclarado COD = retiro en sucursal, re-preguntando.`);
@@ -334,7 +330,6 @@ export async function handleWaitingPaymentMethod(
         const ackMsg = currentState.postdatado
             ? `¡Dale, te lo dejo anotado para *${currentState.postdatado}* 📅\n\nCuando estés lista, escribime y lo despachamos 😊`
             : `¡Dale, sin problema! Cuando estés lista, escribime y avanzamos 😊`;
-        _pushHistory(currentState, { role: 'bot', content: ackMsg });
         saveState(userId);
         await sendMessageWithDelay(userId, ackMsg);
         await _pauseAndAlert(
@@ -356,7 +351,6 @@ export async function handleWaitingPaymentMethod(
         && !MP_KEYWORDS.test(text) && !RETIRO_KEYWORDS.test(text)
         && DISTRUST_PREPAY.test(normalizedText)) {
         const msg = `Te entiendo perfecto, las transferencias a veces son un lío 😊\n\nQuedate tranqui: *no hace falta que pagues nada por adelantado*. Con *retiro en sucursal* te lo enviamos a la sucursal de Correo Argentino más cercana a tu casa y *pagás el total ($${currentState.totalPrice || '?'}) en efectivo recién cuando lo retirás* 💵 — sin transferencias ni pagos online.\n\n¿Lo dejamos así, retiro en sucursal y pagás al retirar?`;
-        _pushHistory(currentState, { role: 'bot', content: msg });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
         logger.info(`[PAYMENT_METHOD] ${userId} → desconfía del pago anticipado → ofrecido RETIRO en sucursal (efectivo al retirar).`);
@@ -372,7 +366,6 @@ export async function handleWaitingPaymentMethod(
     if (!infoQuestion && !optionNum && !currentState.shippingChoice
         && RETIRO_KEYWORDS.test(text) && DOMICILIO_KEYWORDS.test(text)) {
         const msg = `Son dos opciones distintas 😊 ¿Con cuál vas?\n\n1️⃣ *Retiro en sucursal* → no pagás nada ahora, abonás el total *en efectivo cuando lo retirás*.\n2️⃣ *Envío a domicilio* → lo pagás antes (${prepayMeans(mpOn)}) y llega más rápido, en *4 días hábiles* 🚚`;
-        _pushHistory(currentState, { role: 'bot', content: msg });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
         logger.info(`[PAYMENT_METHOD] ${userId} → nombró AMBAS opciones (retiro + domicilio) sin decidir — re-pregunto en vez de asumir.`);
@@ -403,7 +396,6 @@ export async function handleWaitingPaymentMethod(
             currentState.paymentSubChoiceAsked = false;
             currentState.shippingChoice = null;
             const msg = cardUnavailableMessage(currentState.totalPrice);
-            _pushHistory(currentState, { role: 'bot', content: msg });
             saveState(userId);
             await sendMessageWithDelay(userId, msg);
             logger.info(`[PAYMENT_METHOD] ${userId} → pidió tarjeta en el submenú con MP APAGADO — avisado y re-preguntando envío.`);
@@ -419,7 +411,6 @@ export async function handleWaitingPaymentMethod(
             // cuando el cliente pidió por tarjeta de crédito explícito: deja
             // claro que el cobro va a salir vía MP sin que se sienta abrupto.
             const ackMsg = 'Ok, te paso el link de pago 👇';
-            _pushHistory(currentState, { role: 'bot', content: ackMsg });
             saveState(userId);
             await sendMessageWithDelay(userId, ackMsg);
             logger.info(`[PAYMENT_METHOD] ${userId} → DOMICILIO + MP`);
@@ -443,7 +434,6 @@ export async function handleWaitingPaymentMethod(
             currentState.paymentSubChoiceAsked = false;
             currentState.shippingChoice = null;
             const msg = `¡Te aclaro! 😊 A *domicilio* el pago es *anticipado* (${prepayMeans(mpOn)}) — al cartero no se le paga.\n\nSi querés *pagar al recibir en efectivo*, lo mandamos a la *sucursal de Correo Argentino* más cercana a tu casa y pagás el total *$${currentState.totalPrice || '?'}* cuando lo retirás 💵\n\n¿Cómo preferís?\n1️⃣ *Retiro en sucursal* (pagás al retirar, en efectivo)\n2️⃣ *Envío a tu casa* (pagás ahora con ${prepayMeans(mpOn)})`;
-            _pushHistory(currentState, { role: 'bot', content: msg });
             saveState(userId);
             await sendMessageWithDelay(userId, msg);
             logger.info(`[PAYMENT_METHOD] ${userId} → submenú: pidió pagar en efectivo/domicilio. Aclarado COD = retiro en sucursal.`);
@@ -456,7 +446,6 @@ export async function handleWaitingPaymentMethod(
             const prod = currentState.selectedProduct ? currentState.selectedProduct.split(' de ')[0] : 'el tratamiento';
             const planTxt = currentState.selectedPlan ? ` ${currentState.selectedPlan} días` : '';
             const msg = `El total es *$${currentState.totalPrice || '?'}* (${prod}${planTxt}) con *envío gratis* 📦\n\nAl ir prepago, apenas se acredita el pago el pedido sale y *llega en 4 días hábiles* 🚚\n\n¿Cómo querés abonar?\n${prepayMenu(mpOn)}`;
-            _pushHistory(currentState, { role: 'bot', content: msg });
             saveState(userId);
             await sendMessageWithDelay(userId, msg);
             logger.info(`[PAYMENT_METHOD] ${userId} → submenú: preguntó precio. Respondido + re-ofrecido medio de pago.`);
@@ -475,7 +464,6 @@ export async function handleWaitingPaymentMethod(
             userState: currentState
         });
         if (aiSub.response && !_isDuplicate(aiSub.response, currentState.history)) {
-            _pushHistory(currentState, { role: 'bot', content: aiSub.response });
             saveState(userId);
             await sendMessageWithDelay(userId, aiSub.response);
             return { matched: true };
@@ -490,7 +478,6 @@ export async function handleWaitingPaymentMethod(
             await _pauseAndAlert(userId, currentState, dependencies, text, 'Cliente en submenú de pago (domicilio) sin elegir MP/transferencia tras varios intentos. Evito bucle — derivar a humano.');
             return { matched: true };
         }
-        _pushHistory(currentState, { role: 'bot', content: msg });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
         return { matched: true };
@@ -516,7 +503,6 @@ export async function handleWaitingPaymentMethod(
         }
         currentState.paymentSubChoiceAsked = true;
         const msg = `¡Tranqui! Para envío a domicilio el pago es *anticipado* con *${prepayMeans(mpOn)}* — no hace falta efectivo 😊\n\nY al estar pago, el pedido sale enseguida: *te llega en 4 días hábiles* 🚚\n\n¿Cómo preferís abonar?\n${prepayMenu(mpOn)}`;
-        _pushHistory(currentState, { role: 'bot', content: msg });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
         logger.info(`[PAYMENT_METHOD] ${userId} → negó efectivo, encauzado a DOMICILIO prepago (submenú).`);
@@ -546,7 +532,6 @@ export async function handleWaitingPaymentMethod(
             if (!currentState.partialAddress) currentState.partialAddress = {};
             currentState.partialAddress.calle = 'A sucursal';
             const msg = `¡Dale! Lo dejamos para *retiro en sucursal* y lo abonás por *transferencia* 📦\n\nPara transferir usá el alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.* — monto *$${currentState.totalPrice || '?'}*.\n\nPasame también, así te asigno la sucursal más cercana:\nNombre completo:\nLocalidad / Ciudad:\nCódigo postal:\n\nCuando hagas la transferencia, escribime *"listo"* con el comprobante 😊`;
-            _pushHistory(currentState, { role: 'bot', content: msg });
             saveState(userId);
             await sendMessageWithDelay(userId, msg);
             await _pauseAndAlert(userId, currentState, dependencies, text, `Combo retiro en sucursal + transferencia (lo pidió el cliente). Coordinar la sucursal de Correo Argentino más cercana y verificar la transferencia ($${currentState.totalPrice || '?'}) cuando mande el comprobante.`);
@@ -589,7 +574,6 @@ export async function handleWaitingPaymentMethod(
         if (!_addr.cp) _faltan.push('Código postal:');
         const msg = `¡Listo! Lo dejamos para retiro en sucursal 📦\n\nVas a pagar el total *$${currentState.totalPrice || '?'}* en efectivo cuando lo retirés.\n\nNo necesito tu dirección exacta — con tu *localidad y código postal* te asigno la sucursal de Correo Argentino que te corresponde. Pasame:\n\n${_faltan.join('\n')}`;
         _setStep(currentState, FlowStep.WAITING_DATA);
-        _pushHistory(currentState, { role: 'bot', content: msg });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
         logger.info(`[PAYMENT_METHOD] ${userId} → RETIRO EN SUCURSAL — pidiendo datos para buscar sucursal cercana (faltan: ${_faltan.length})`);
@@ -619,7 +603,6 @@ export async function handleWaitingPaymentMethod(
         const tpl = getFlowTemplate('payment_domicilio_choice', knowledge) ||
             `Perfecto, lo mandamos a tu domicilio 🏠\n\n¿Cómo querés abonar?\n\n1️⃣ *Tarjeta de crédito*\n2️⃣ *Transferencia bancaria*`;
         const msg = postdatePrefix + _formatMessage(tpl, currentState);
-        _pushHistory(currentState, { role: 'bot', content: msg });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
         logger.info(`[PAYMENT_METHOD] ${userId} → DOMICILIO — submenú prepago presentado (postdatado: ${currentState.postdatado || 'no'})`);
@@ -638,7 +621,6 @@ export async function handleWaitingPaymentMethod(
         if (!mpOn && MP_KEYWORDS.test(text) && !mpNegated
             && !(TRANSFER_KEYWORDS.test(normalizedText) && !transferNegated)) {
             const msg = cardUnavailableMessage(currentState.totalPrice);
-            _pushHistory(currentState, { role: 'bot', content: msg });
             saveState(userId);
             await sendMessageWithDelay(userId, msg);
             logger.info(`[PAYMENT_METHOD] ${userId} → pidió tarjeta con MP APAGADO — avisado, ofrecidas transferencia y retiro.`);
@@ -653,7 +635,6 @@ export async function handleWaitingPaymentMethod(
             // Ack corto antes de que el step MP genere el link — cubre el caso
             // "tarjeta de crédito" donde el cliente espera respuesta inmediata.
             const ackMsg = 'Ok, te paso el link de pago 👇';
-            _pushHistory(currentState, { role: 'bot', content: ackMsg });
             saveState(userId);
             await sendMessageWithDelay(userId, ackMsg);
             logger.info(`[PAYMENT_METHOD] ${userId} → DOMICILIO + MP (atajo)`);
@@ -722,7 +703,6 @@ TAG DE ELECCIÓN (para el sistema): si con este mensaje el cliente ELIGE clarame
         // saveState ANTES del send (delay humanizado 4-8s): si el proceso se cae
         // en el medio, la transición ya quedó persistida — igual que los paths
         // determinísticos del step.
-        _pushHistory(currentState, { role: 'bot', content: aiRes.response });
         saveState(userId);
         await sendMessageWithDelay(userId, aiRes.response);
         return { matched: true };

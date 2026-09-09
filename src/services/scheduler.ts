@@ -220,7 +220,6 @@ async function autoApproveOrders(sharedState: SchedulerSharedState, dependencies
                     logger.error(`[AUTO-APPROVE] Failed to send confirmation to ${userId}:`, e.message);
                     continue;
                 }
-                _pushHistory(state, { role: 'bot', content: confirmMsg });
 
                 if (state.pendingOrder) {
                     const o = state.pendingOrder;
@@ -292,7 +291,6 @@ async function checkColdLeads(sharedState: SchedulerSharedState, dependencies: S
 
             try {
                 await sendMessageWithDelay(userId, msg);
-                _pushHistory(state, { role: 'bot', content: msg });
                 state.reengagementSent = true;
                 // A/B tracking
                 state.followUpData = {
@@ -354,7 +352,6 @@ async function checkAbandonedCarts(sharedState: SchedulerSharedState, dependenci
         const msg = _withName(rawMsg, state);
         try {
             await sendMessageWithDelay(userId, msg);
-            _pushHistory(state, { role: 'bot', content: msg });
             state.cartRecovered = true;
             // A/B tracking
             state.followUpData = {
@@ -979,7 +976,6 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
             try {
                 const sent = await sendMessageWithDelay(userId, msg, undefined, stillWaitingMp);
                 if (sent) {
-                    _pushHistory(state, { role: 'bot', content: msg });
                     (state as any).mpAlternativeOffered = true;
                     (state as any).mpReminderStage = 1;
                     saveState(userId);
@@ -1000,7 +996,6 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
             try {
                 const sent = await sendMessageWithDelay(userId, msg, undefined, stillWaitingMp);
                 if (sent) {
-                    _pushHistory(state, { role: 'bot', content: msg });
                     (state as any).mpReminderStage = 1;
                     (state as any).mpReminderSentAt = Date.now();
                     saveState(userId);
@@ -1021,7 +1016,6 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
             try {
                 const sent = await sendMessageWithDelay(userId, msg, undefined, stillWaitingMp);
                 if (sent) {
-                    _pushHistory(state, { role: 'bot', content: msg });
                     (state as any).mpAlternativeOffered = true;
                     saveState(userId);
                     logger.info(`[SCHEDULER][${sharedState.sellerId || '?'}] MP alternative offer sent to ${userId} (${minsSince}min waiting)`);
@@ -1041,7 +1035,6 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
                 // el medio, NO pausamos a un cliente que acaba de comprar ni
                 // avisamos "no completó el pago" (sería falso).
                 if (sent && stillWaitingMp()) {
-                    _pushHistory(state, { role: 'bot', content: msg });
                     (state as any).mpReminderStage = 2;
                     // Pausa por el path canónico (pauseService): persiste en DB,
                     // aparece en dashboard/!pausados y sobrevive restarts. El
@@ -1073,7 +1066,6 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
             try {
                 const sent = await sendMessageWithDelay(userId, msg, undefined, stillWaitingMp);
                 if (sent) {
-                    _pushHistory(state, { role: 'bot', content: msg });
                     (state as any).mpReminderStage = 3;
                     saveState(userId);
                     logger.info(`[SCHEDULER][${sharedState.sellerId || '?'}] MP reminder #3 (24h) sent to ${userId}`);
@@ -1090,7 +1082,6 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
             try {
                 const sent = await sendMessageWithDelay(userId, msg, undefined, stillWaitingMp);
                 if (sent) {
-                    _pushHistory(state, { role: 'bot', content: msg });
                     (state as any).mpReminderStage = 4;
                     saveState(userId);
                     if (notifyAdmin) {

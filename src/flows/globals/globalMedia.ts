@@ -59,7 +59,6 @@ export async function handleMediaGlobals(
 
         if (productImages.length > 0) {
             const introMsg = `Acá tenés fotos de nuestras ${targetCategory} 👇`;
-            _pushHistory(currentState, { role: 'bot', content: introMsg });
             await sendMessageWithDelay(userId, introMsg);
 
             const shuffled = productImages.sort(() => 0.5 - Math.random()).slice(0, 3);
@@ -80,13 +79,11 @@ export async function handleMediaGlobals(
             // Loguear como cualquier otro mensaje enviado (invariante del dashboard:
             // todo lo que sale queda en history) — antes se enviaba sin registrar.
             const noPhotosMsg = 'Uh, justo no tengo fotos cargadas de ese producto en este momento. 😅';
-            _pushHistory(currentState, { role: 'bot', content: noPhotosMsg });
             saveState(userId);
             await sendMessageWithDelay(userId, noPhotosMsg);
         }
     } else {
         const msg = 'Tenemos fotos de Cápsulas, Semillas y Gotas. ¿De cuál te gustaría ver? 📸';
-        _pushHistory(currentState, { role: 'bot', content: msg });
         await sendMessageWithDelay(userId, msg);
     }
 

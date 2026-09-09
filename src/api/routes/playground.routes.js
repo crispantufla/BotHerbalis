@@ -58,7 +58,7 @@ function _getOrCreateSession(sessionId) {
     return session;
 }
 
-function _buildDependencies(replies, useDelay, model) {
+function _buildDependencies(replies, useDelay, model, userState, userId) {
     // aiService real — el playground usa la misma IA que producción.
     const { aiService } = require('../../services/ai');
 
@@ -85,6 +85,14 @@ function _buildDependencies(replies, useDelay, model) {
                 await new Promise(r => setTimeout(r, delay));
             }
             replies.push({ role: 'bot', content: msg, timestamp: Date.now() });
+            // El sendMessageWithDelay real (botHelpers) anota el mensaje en el
+            // history al enviarlo; los steps ya no lo hacen. Este stub tiene que
+            // replicarlo o el playground pierde las respuestas del bot.
+            if (userState && userState[userId]) {
+                const { _pushHistory } = require('../../flows/utils/flowHelpers');
+                _pushHistory(userState[userId], { role: 'bot', content: msg });
+            }
+            return true;
         },
         notifyAdmin: async () => {},
         aiService: wrappedAi,
@@ -132,7 +140,7 @@ module.exports = () => {
             _pushHistory(session.userState[userId], { role: 'user', content: message });
         }
 
-        const deps = _buildDependencies(replies, !!useDelay, model);
+        const deps = _buildDependencies(replies, !!useDelay, model, session.userState, userId);
 
         try {
             await processSalesFlow(userId, message, session.userState, knowledge, deps);

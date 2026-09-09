@@ -203,7 +203,6 @@ export async function processSalesFlow(
                         break;
                 }
 
-                _pushHistory(currentState, { role: 'bot', content: ackMsg });
                 if (dependencies.sendMessageWithDelay) {
                     await dependencies.sendMessageWithDelay(userId, ackMsg);
                 }
@@ -238,7 +237,6 @@ export async function processSalesFlow(
     const objection = detectObjection(currentState.step, normalizedText, currentState, isMpEnabled(dependencies.config));
     if (objection) {
         logger.info(`[OBJECTION] Intercepted "${objection.type}" for ${userId} at step ${currentState.step} (tier=${objection.tier})`);
-        _pushHistory(currentState, { role: 'bot', content: objection.response });
         if (dependencies.sendMessageWithDelay) {
             await dependencies.sendMessageWithDelay(userId, objection.response);
         }

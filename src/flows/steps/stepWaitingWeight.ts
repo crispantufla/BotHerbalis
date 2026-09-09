@@ -73,7 +73,6 @@ async function _sendTierRecommendation(
     if (!tierMsg) tierMsg = _formatMessage(tierNode.response, currentState); // fallback scripted
 
     _setStep(currentState, tierNode.nextStep || FlowStep.WAITING_PREFERENCE);
-    _pushHistory(currentState, { role: 'bot', content: tierMsg });
     saveState(userId);
     await sendMessageWithDelay(userId, tierMsg);
 
@@ -128,7 +127,6 @@ export async function handleWaitingWeight(
         const reaskMsg = isTwoTier
             ? '¡Genial! 😊 ¿Cuántos kilos querés bajar?\n\n1️⃣ Hasta 10 kg\n2️⃣ Más de 10 kg'
             : '¡Genial! 😊 ¿Cuántos kilos querés bajar?\n\n1️⃣ Pocos (hasta 10 kg)\n2️⃣ Bastante (10 a 20)\n3️⃣ Mucho (más de 20)';
-        _pushHistory(currentState, { role: 'bot', content: reaskMsg });
         saveState(userId);
         await sendMessageWithDelay(userId, reaskMsg);
         return { matched: true };
@@ -257,7 +255,6 @@ export async function handleWaitingWeight(
             // disparamos el tier-routing (rec_X + prices_X auto V7) para no perder
             // ese paso. Antes este branch caía a knowledge.flow.recommendation
             // genérico, sin auto-prices ni tier — bug detectado en review V7.
-            _pushHistory(currentState, { role: 'bot', content: aiDual.response });
             saveState(userId);
             await sendMessageWithDelay(userId, aiDual.response);
             await _sendTierRecommendation(userId, currentState, knowledge, dependencies, text);
@@ -278,7 +275,6 @@ export async function handleWaitingWeight(
         const bareThree = /^\s*3\s*[\.\)°]?\s*$/.test(text);
         if (isTwoTierScriptForGuard && bareThree) {
             const reaskMsg = 'Mmm, solo tengo 2 opciones acá 😅\n\n1️⃣ Hasta 10 kg\n2️⃣ Más de 10 kg\n\n¿Cuál es lo tuyo?';
-            _pushHistory(currentState, { role: 'bot', content: reaskMsg });
             saveState(userId);
             await sendMessageWithDelay(userId, reaskMsg);
             logger.info(`[V7-GUARD] User ${userId} respondió "3" en script de 2 tiers — re-preguntando opciones válidas.`);
@@ -332,7 +328,6 @@ export async function handleWaitingWeight(
                     : knowledge.flow.preference_semillas;
                 const pmsg = _formatMessage(priceNode.response, currentState);
                 _setStep(currentState, priceNode.nextStep);
-                _pushHistory(currentState, { role: 'bot', content: pmsg });
                 saveState(userId);
                 await sendMessageWithDelay(userId, pmsg);
                 await _maybeSendPaymentMenuV7(userId, priceNode.nextStep, currentState, knowledge, dependencies);
@@ -364,7 +359,6 @@ export async function handleWaitingWeight(
 
             const msg = _formatMessage(priceNode.response, currentState);
             _setStep(currentState, priceNode.nextStep);
-            _pushHistory(currentState, { role: 'bot', content: msg });
             saveState(userId);
             await sendMessageWithDelay(userId, msg);
 
@@ -390,7 +384,6 @@ export async function handleWaitingWeight(
             const rejectMsg = isPriceCheckDecline
                 ? '¡Dale, sin problema! 😊 Cualquier cosa que necesites, acá estoy. ¡Que tengas un lindo día! 🌿'
                 : '¡Disculpá la molestia! Si en algún momento necesitás algo, acá estamos 😊';
-            _pushHistory(currentState, { role: 'bot', content: rejectMsg });
             saveState(userId);
             await sendMessageWithDelay(userId, rejectMsg);
             await _pauseAndAlert(userId, currentState, dependencies, text, isPriceCheckDecline
@@ -404,7 +397,6 @@ export async function handleWaitingWeight(
             const skipMsg = "¡Entiendo, no hay problema! 👌 Pasemos directo a ver qué forma del producto preferís.\n\nTenemos 3 opciones:\n1️⃣ *Cápsulas* (forma práctica — una al día)\n2️⃣ *Gotas* (forma líquida — suave al estómago)\n3️⃣ *Semillas* (100% natural — ritual de infusión nocturna)\n\n¿Con cuál vas?";
 
             _setStep(currentState, FlowStep.WAITING_PREFERENCE);
-            _pushHistory(currentState, { role: 'bot', content: skipMsg });
             saveState(userId);
             await sendMessageWithDelay(userId, skipMsg);
             return { matched: true };
@@ -441,7 +433,6 @@ export async function handleWaitingWeight(
 
                     const msg = _formatMessage(priceNode.response, currentState);
                     _setStep(currentState, priceNode.nextStep);
-                    _pushHistory(currentState, { role: 'bot', content: msg });
                     saveState(userId);
                     await sendMessageWithDelay(userId, msg);
 
@@ -455,7 +446,6 @@ export async function handleWaitingWeight(
                     return { matched: true };
                 }
             } else if (aiWeight.response) {
-                _pushHistory(currentState, { role: 'bot', content: aiWeight.response });
                 await sendMessageWithDelay(userId, aiWeight.response);
                 saveState(userId);
                 return { matched: true };

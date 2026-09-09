@@ -83,7 +83,6 @@ export async function handleScheduleRequest(
         'cuando llegue al correo de tu zona para que lo retires en sucursal.\n\n' +
         'Te derivo con un asesor para coordinar esto manualmente, ¿dale? 😊';
 
-    _pushHistory(currentState, { role: 'bot', content: reply });
     if (typeof dependencies.sendMessageWithDelay === 'function') {
         await dependencies.sendMessageWithDelay(userId, reply);
     }

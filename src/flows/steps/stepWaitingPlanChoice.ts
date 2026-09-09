@@ -28,7 +28,6 @@ async function _handlePickupIntent(userId: string, text: string, currentState: U
 
     const { sendMessageWithDelay, saveState } = dependencies;
     const reply = 'Te aviso: no tenemos local de venta al público — todos los pedidos van por Correo Argentino con envío gratis 📦\n\nUn asesor te va a contactar enseguida para coordinar la mejor opción (sucursal cerca tuyo o entrega a domicilio) 😊';
-    _pushHistory(currentState, { role: 'bot', content: reply });
     saveState(userId);
     await sendMessageWithDelay(userId, reply);
     await _pauseAndAlert(userId, currentState, dependencies, text, 'Cliente quiere retirar en persona / es de Rosario. No tenemos local público — admin debe coordinar logística (sucursal Correo o domicilio).');
@@ -151,7 +150,6 @@ export async function handleWaitingPlanChoice(
         calculateTotal(currentState);
 
         const paymentMsg = _buildPaymentMsg(currentState, knowledge, _mpOff);
-        _pushHistory(currentState, { role: 'bot', content: paymentMsg });
         _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
         saveState(userId);
         await sendMessageWithDelay(userId, paymentMsg);
@@ -223,12 +221,10 @@ export async function handleWaitingPlanChoice(
         if (hasAddress) {
             logger.info(`[FLOW-SKIP] Address already collected for ${userId}, asking payment method.`);
             const paymentMsg = _buildPaymentMsg(currentState, knowledge, _mpOff);
-            _pushHistory(currentState, { role: 'bot', content: paymentMsg });
             await sendMessageWithDelay(userId, paymentMsg);
             _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
         } else {
             const paymentMsg = _buildPaymentMsg(currentState, knowledge, _mpOff);
-            _pushHistory(currentState, { role: 'bot', content: paymentMsg });
             await sendMessageWithDelay(userId, paymentMsg);
             _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
         }
@@ -268,12 +264,10 @@ export async function handleWaitingPlanChoice(
             if (hasAddress) {
                 logger.info(`[FLOW-SKIP] Address already collected for ${userId}, asking payment method after upsell.`);
                 const paymentMsg = `¡Genial! 😊 Entonces confirmamos el plan de 120 días. Ya tengo tus datos de envío de antes.\n\n` + _buildPaymentMsg(currentState, knowledge, _mpOff);
-                _pushHistory(currentState, { role: 'bot', content: paymentMsg });
                 await sendMessageWithDelay(userId, paymentMsg);
                 _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
             } else {
                 const paymentMsg = `¡Genial! 😊 Entonces confirmamos el plan de 120 días.\n\n` + _buildPaymentMsg(currentState, knowledge, _mpOff);
-                _pushHistory(currentState, { role: 'bot', content: paymentMsg });
                 await sendMessageWithDelay(userId, paymentMsg);
                 _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
             }
@@ -337,11 +331,9 @@ RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.
                     }
 
                     if (planAI.response) {
-                        _pushHistory(currentState, { role: 'bot', content: planAI.response });
                         await sendMessageWithDelay(userId, planAI.response);
                     }
                     const paymentMsgPost = _buildPaymentMsg(currentState, knowledge, _mpOff);
-                    _pushHistory(currentState, { role: 'bot', content: paymentMsgPost });
                     await sendMessageWithDelay(userId, paymentMsgPost);
                     _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
                     saveState(userId);
@@ -360,20 +352,16 @@ RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.
                     if (hasAddress) {
                         logger.info(`[FLOW-SKIP] Address already collected for ${userId}, asking payment method after AI plan.`);
                         if (planAI.response) {
-                            _pushHistory(currentState, { role: 'bot', content: planAI.response });
                             await sendMessageWithDelay(userId, planAI.response);
                         }
                         const paymentMsg = _buildPaymentMsg(currentState, knowledge, _mpOff);
-                        _pushHistory(currentState, { role: 'bot', content: paymentMsg });
                         await sendMessageWithDelay(userId, paymentMsg);
                         _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
                     } else {
                         if (planAI.response) {
-                            _pushHistory(currentState, { role: 'bot', content: planAI.response });
                             await sendMessageWithDelay(userId, planAI.response);
                         }
                         const paymentMsgAI = _buildPaymentMsg(currentState, knowledge, _mpOff);
-                        _pushHistory(currentState, { role: 'bot', content: paymentMsgAI });
                         await sendMessageWithDelay(userId, paymentMsgAI);
                         _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
                     }
@@ -383,7 +371,6 @@ RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.
                 } else {
                     logger.warn(`[AI-SAFEGUARD] waiting_plan_choice: AI returned goalMet=true but no 60/120/180/240 etc in extractedData (${extractedStr}). Downgrading to false.`);
                     if (planAI.response) {
-                        _pushHistory(currentState, { role: 'bot', content: planAI.response });
                         await sendMessageWithDelay(userId, planAI.response);
                         saveState(userId);
                         return { matched: true };
@@ -394,14 +381,12 @@ RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.
                 if (_isDuplicate(planAI.response, currentState.history)) {
                     logger.info(`[ANTI-DUP] Skipping duplicate AI response for ${userId} in plan_choice`);
                     const fallbackMsg = "¡Dale! Quedo a tu disposición para cuando puedas avisarme. 😊";
-                    _pushHistory(currentState, { role: 'bot', content: fallbackMsg });
                     await sendMessageWithDelay(userId, fallbackMsg);
                     saveState(userId);
                     return { matched: true };
                 }
 
                 if (planAI.extractedData) _handleExtractedData(userId, planAI.extractedData, currentState);
-                _pushHistory(currentState, { role: 'bot', content: planAI.response });
                 await sendMessageWithDelay(userId, planAI.response);
                 saveState(userId);
 

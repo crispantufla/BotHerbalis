@@ -37,11 +37,9 @@ export async function handleWaitingFinalConfirmation(
             const changeMsg = unitsCount >= 3
                 ? `¡Excelente! 🎉 Cambiamos el pedido a ${planText} de ${newProduct.split(' de ')[0].toLowerCase()} con 50% de descuento en la unidad más barata.`
                 : `¡Dale, sin problema! 😊 Cambiamos el pedido a ${newProduct.split(' de ')[0].toLowerCase()} por ${planText}.`;
-            _pushHistory(currentState, { role: 'bot', content: changeMsg });
             await sendMessageWithDelay(userId, changeMsg);
 
             const summaryMsg = `Tendría un valor de $${currentState.totalPrice}.\n\n👉 Confirmame que podrás recibir o retirar el pedido sin inconvenientes.`;
-            _pushHistory(currentState, { role: 'bot', content: summaryMsg });
             await sendMessageWithDelay(userId, summaryMsg);
 
             saveState(userId);
@@ -113,7 +111,6 @@ export async function handleWaitingFinalConfirmation(
         }
 
         _setStep(currentState, FlowStep.WAITING_ADMIN_VALIDATION);
-        _pushHistory(currentState, { role: 'bot', content: msg });
         saveState(userId);
         return { matched: true };
     } else if (_isAffirmative(normalizedText)) {
@@ -149,7 +146,6 @@ export async function handleWaitingFinalConfirmation(
         }
 
         _setStep(currentState, FlowStep.WAITING_ADMIN_VALIDATION);
-        _pushHistory(currentState, { role: 'bot', content: msg });
         saveState(userId);
         return { matched: true };
     } else {
@@ -199,7 +195,6 @@ export async function handleWaitingFinalConfirmation(
             }
 
             _setStep(currentState, FlowStep.WAITING_ADMIN_VALIDATION);
-            _pushHistory(currentState, { role: 'bot', content: msg });
             saveState(userId);
             return { matched: true };
         } else if (aiResponse.response) {
@@ -222,7 +217,6 @@ export async function handleWaitingFinalConfirmation(
                     }
                 }
             }
-            _pushHistory(currentState, { role: 'bot', content: aiResponse.response });
             await sendMessageWithDelay(userId, aiResponse.response);
             saveState(userId);
             return { matched: true };

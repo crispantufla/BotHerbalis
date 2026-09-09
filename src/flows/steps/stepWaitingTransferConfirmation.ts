@@ -44,7 +44,6 @@ export async function handleWaitingTransferConfirmation(
         const msg = paidTpl
             ? _fmt(paidTpl, currentState)
             : '¡Perfecto! Recibimos tu aviso. Verificamos la transferencia y te confirmamos el envío en breve ⏳';
-        _pushHistory(currentState, { role: 'bot', content: msg });
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
         const adminMsg = isLegacyCodAnticipo
@@ -61,7 +60,6 @@ export async function handleWaitingTransferConfirmation(
         // lo mismo. Se lo decimos acá y le dejamos las dos formas vivas.
         if (!isMpEnabled(dependencies.config)) {
             const msg = cardUnavailableMessage(currentState.totalPrice);
-            _pushHistory(currentState, { role: 'bot', content: msg });
             saveState(userId);
             await sendMessageWithDelay(userId, msg);
             logger.info(`[TRANSFER_CONFIRM] ${userId} pidió tarjeta con MP APAGADO — avisado, sigue en transferencia/retiro.`);
@@ -103,7 +101,6 @@ export async function handleWaitingTransferConfirmation(
     });
 
     if (aiRes.response) {
-        _pushHistory(currentState, { role: 'bot', content: aiRes.response });
         await sendMessageWithDelay(userId, aiRes.response);
         saveState(userId);
         return { matched: true };

@@ -106,7 +106,6 @@ async function _checkExistingOrders(
             // atención (no dejarlo en visto). Después se pausa para que lo tome
             // un humano (rev 2026-06-04).
             const derivMsg = 'Teniendo en cuenta que ya sos cliente, te derivo con una oficial de atención al cliente que te va a ayudar enseguida 😊';
-            _pushHistory(state, { role: 'bot', content: derivMsg });
             await dependencies.sendMessageWithDelay(userId, derivMsg);
             await pauseUser(
                 userId,

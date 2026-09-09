@@ -47,7 +47,6 @@ export async function handleSafetyCheck(
         });
 
         if (safetyCheck.response) {
-            _pushHistory(currentState, { role: 'bot', content: safetyCheck.response });
             await sendMessageWithDelay(userId, safetyCheck.response);
             return { matched: true };
         }
