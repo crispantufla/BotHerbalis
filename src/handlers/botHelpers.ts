@@ -8,6 +8,7 @@ import crypto from 'crypto';
 const logger = require('../utils/logger');
 const { prisma } = require('../../db');
 const { _cleanPhone, _isAdminPhone } = require('../flows/utils/flowHelpers');
+const { _normalizeProductName } = require('../flows/utils/pricing');
 
 // logAndEmit, saveOrderToLocal, cancelLatestOrder, sendMessageWithDelay, notifyAdmin
 
@@ -37,23 +38,6 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
     // ignoran al cliente — caso 5491156581277). Por seller (este closure es por
     // instancia), en memoria, sólo bloquea duplicados CONSECUTIVOS.
     const _lastBotMsgByChat = new Map<string, string>();
-
-    function normalizeProductName(rawProduct: string, rawPlan: string, price: number): string {
-        const lower = (rawProduct || '').toLowerCase();
-        let baseType = '';
-        if (lower.includes('capsul') || lower.includes('cápsul')) baseType = 'Cápsulas';
-        else if (lower.includes('gota')) baseType = 'Gotas';
-        else if (lower.includes('semilla')) baseType = 'Semillas';
-        if (!baseType) return rawProduct || 'Desconocido';
-        const planMatch = (rawPlan || '').match(/(\d+)/);
-        let duration = planMatch ? parseInt(planMatch[1]) : 0;
-        if (!duration || duration % 60 !== 0) {
-            if (baseType === 'Cápsulas') duration = price >= 66900 ? 120 : 60;
-            else if (baseType === 'Gotas') duration = price >= 68900 ? 120 : 60;
-            else if (baseType === 'Semillas') duration = price >= 49900 ? 120 : 60;
-        }
-        return `${baseType} (${duration} días)`;
-    }
 
     function logAndEmit(chatId: string, sender: string, text: string, step?: string, messageId: string | null = null, overrideTimestamp?: number): void {
         logger.logMessage(chatId, sender, text, step);
@@ -144,7 +128,7 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
                 priceNum = parseInt(order.precio.toString().replace(/\./g, '').replace(/[^\d]/g, ''), 10);
             }
 
-            const normalizedProduct = normalizeProductName(order.producto || '', order.plan || '', priceNum);
+            const normalizedProduct = _normalizeProductName(order.producto || '', order.plan || '', priceNum);
 
             // Campos de seña (flujo COD con anticipo MP/transferencia):
             //   senaAmount       = monto del anticipo ya pagado ($10k típico)

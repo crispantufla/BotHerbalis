@@ -88,8 +88,52 @@ function _getPrice(product: string | null | undefined, plan: string): string {
     return result || FALLBACK_PRICES['Semillas']['60'];
 }
 
+// "54.900" / "$ 54.900" / 54900 → 54900
+function _parseAmount(raw: string | number | null | undefined): number {
+    if (typeof raw === 'number') return raw;
+    return parseInt(String(raw || '').replace(/\D/g, ''), 10) || 0;
+}
+
+/**
+ * Deduce el plan (60 o 120 días) a partir del precio cobrado, cuando el string
+ * de plan no lo dice. Compara contra los precios REALES del editor
+ * (data/prices.json) usando el punto medio entre ambos planes.
+ *
+ * Antes esto vivía duplicado en botHelpers.ts y order.routes.js con umbrales
+ * hardcodeados (66900/68900/49900). Funcionaban de casualidad: eran iguales o
+ * casi iguales al precio de 120 días vigente en ese momento, así que el primer
+ * aumento que subiera el plan de 60 por encima del umbral viejo iba a empezar a
+ * registrar pedidos de 60 días como si fueran de 120.
+ */
+function _inferPlanFromPrice(product: string | null | undefined, price: number): number {
+    const p60 = _parseAmount(_getPrice(product, '60'));
+    const p120 = _parseAmount(_getPrice(product, '120'));
+    if (!p60 || !p120 || p120 <= p60) return 60;
+    return price >= (p60 + p120) / 2 ? 120 : 60;
+}
+
+/**
+ * Lleva producto + plan al formato canónico "Cápsulas (120 días)".
+ * Si el plan no trae una duración usable, la deduce del precio.
+ */
+function _normalizeProductName(rawProduct: string, rawPlan: string, price: number): string {
+    const lower = (rawProduct || '').toLowerCase();
+    let baseType = '';
+    if (lower.includes('capsul') || lower.includes('cápsul')) baseType = 'Cápsulas';
+    else if (lower.includes('gota')) baseType = 'Gotas';
+    else if (lower.includes('semilla')) baseType = 'Semillas';
+    if (!baseType) return rawProduct || 'Desconocido';
+
+    const planMatch = (rawPlan || '').match(/(\d+)/);
+    let duration = planMatch ? parseInt(planMatch[1]) : 0;
+    if (!duration || duration % 60 !== 0) duration = _inferPlanFromPrice(baseType, price);
+
+    return `${baseType} (${duration} días)`;
+}
+
 export {
-    _findPricesFile,
     _getPrices,
-    _getPrice
+    _getPrice,
+    _inferPlanFromPrice,
+    _normalizeProductName
 };

@@ -659,27 +659,13 @@ module.exports = (clientPool) => {
                 logger.info(`[MANUAL-COMPLETE] Descuento manual para ${chatId}: -$${discountReq} → total $${total}`);
             }
 
-            // Normalize product name to standard format: "Cápsulas (120 días)"
-            const normalizeProductName = (rawProduct, rawPlan, price) => {
-                const lower = (rawProduct || '').toLowerCase();
-                let baseType = '';
-                if (lower.includes('capsul') || lower.includes('cápsul')) baseType = 'Cápsulas';
-                else if (lower.includes('gota')) baseType = 'Gotas';
-                else if (lower.includes('semilla')) baseType = 'Semillas';
-                if (!baseType) return rawProduct || 'Desconocido';
-                const planMatch = (rawPlan || '').match(/(\d+)/);
-                let duration = planMatch ? parseInt(planMatch[1]) : 0;
-                if (!duration || duration % 60 !== 0) {
-                    if (baseType === 'Cápsulas') duration = price >= 66900 ? 120 : 60;
-                    else if (baseType === 'Gotas') duration = price >= 68900 ? 120 : 60;
-                    else if (baseType === 'Semillas') duration = price >= 49900 ? 120 : 60;
-                }
-                return `${baseType} (${duration} días)`;
-            };
+            // Formato canónico "Cápsulas (120 días)". Compartido con botHelpers.ts
+            // — vive en pricing.ts porque la duración se deduce de los precios reales.
+            const { _normalizeProductName } = require('../../flows/utils/pricing');
 
             const rawProduct = productTypeReq || cart.map(i => i.product).join(' + ') || state.selectedProduct || rescuedProduct || 'Producto';
             const rawPlan = productTypeReq ? `${plan} días` : (cart.map(i => `${i.plan} días`).join(' + ') || `${plan} días`);
-            const product = normalizeProductName(rawProduct, rawPlan, total);
+            const product = _normalizeProductName(rawProduct, rawPlan, total);
 
             // PREVIEW: el panel SIEMPRE abre el modal de verificación antes de
             // confirmar (con mensaje o sin). Devolvemos lo detectado (datos + envío
