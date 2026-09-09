@@ -128,10 +128,8 @@ module.exports = () => {
         // processSalesFlow inicializa el state si no existe — pero queremos persistir history
         // entre llamadas, así que si ya hay state, le agregamos el mensaje del user antes.
         if (session.userState[userId]) {
-            session.userState[userId].history = session.userState[userId].history || [];
-            session.userState[userId].history.push({
-                role: 'user', content: message, timestamp: Date.now()
-            });
+            const { _pushHistory } = require('../../flows/utils/flowHelpers');
+            _pushHistory(session.userState[userId], { role: 'user', content: message });
         }
 
         const deps = _buildDependencies(replies, !!useDelay, model);

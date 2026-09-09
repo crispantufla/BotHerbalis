@@ -146,8 +146,7 @@ export async function processSalesFlow(
         const isAlreadyPaused = dependencies.sharedState?.pausedUsers?.has(userId);
 
         // Save User message in history regardless
-        if (!currentState.history) currentState.history = [];
-        currentState.history.push({ role: 'user', content: text, timestamp: Date.now() });
+        _pushHistory(currentState, { role: 'user', content: text });
         saveState(userId);
 
         if (!isAlreadyPaused && currentState.step === 'completed') {
@@ -164,16 +163,10 @@ export async function processSalesFlow(
         return { matched: true, paused: true };
     }
 
-    // Safety fallback for empty history
-    if (!currentState.history) currentState.history = [];
-
-    // Defensive cap: prevent unbounded history growth (keep last 150 for AI context)
-    if (currentState.history.length > 250) {
-        currentState.history = currentState.history.slice(-150);
-    }
-
-    // Save User message and update activity timestamp
-    currentState.history.push({ role: 'user', content: text, timestamp: Date.now() });
+    // Save User message and update activity timestamp. El cap defensivo del
+    // history (250 → 150) vive en _pushHistory, no acá: antes estaba duplicado
+    // y solo cubría a quien re-entraba al flujo.
+    _pushHistory(currentState, { role: 'user', content: text });
     currentState.lastActivityAt = Date.now();
     saveState(userId);
 
