@@ -1,10 +1,34 @@
+# El Dockerfile hace `COPY . .`, así que todo lo que no se excluya acá viaja al
+# daemon en cada build Y queda dentro de la imagen.
+#
+# Ojo con lo que NO se puede excluir (se sirve en runtime):
+#   agent/*            → agentDist.routes.js lo distribuye a la PC del vendedor
+#   archive/*.json     → system.routes.js GET /script/:version sirve v1..v6
+#   data/*.json        → el Dockerfile copia prices.json a /app/config
+#   public/, client/   → express.static
+
+# Dependencias (se reinstalan con npm ci en el build)
 node_modules
-client/node_modules
-.git
-.env
-.wwebjs_auth
-.wwebjs_cache
+**/node_modules
+
+# Sesiones de Chromium y caché de whatsapp-web.js: cientos de MB de estado
+# local que además es basura para la imagen (en prod vive en el volumen).
+**/.wwebjs_auth
+**/.wwebjs_cache
+
+# Salidas de runtime y trabajo local
 logs
+**/logs
 backups
+reports
 debug_log.txt
 npm-debug.log
+*.log
+
+# No se usan en runtime
+tests
+docs
+.claude
+.agents
+.git
+.env

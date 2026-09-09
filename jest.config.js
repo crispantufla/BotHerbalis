@@ -1,5 +1,5 @@
 module.exports = {
     testEnvironment: 'node',
     setupFiles: ['<rootDir>/jest.setup.js'],
-    testPathIgnorePatterns: ['/node_modules/', '/dist/', '/mobile-app/', '/\\.claude/'],
+    testPathIgnorePatterns: ['/node_modules/', '/dist/', '/\\.claude/'],
 };

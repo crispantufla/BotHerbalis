@@ -1,7 +1,12 @@
 # ADR-0001: Cliente remoto vía extensión Chrome (cerebro en Railway, brazo en la PC del vendedor)
 
 **Fecha**: 2026-06-08
-**Estado**: Propuesta (Fase 1 implementada en rama `feature/remote-client-bridge`)
+**Estado**: **Superada** (2026-09-09). La decisión de separar cerebro/brazo se mantiene y
+está viva en `src/services/remoteClient.ts` + `src/services/agentBridge.ts`, pero el brazo
+NO terminó siendo una extensión de Chrome: es una app Node (`agent/`) que corre en la PC
+del vendedor y se distribuye por `/agent-dist` (ver `src/api/routes/agentDist.routes.js`).
+El directorio `extension/` que describe este documento se borró el 2026-09-09; lo de abajo
+queda como registro del diseño original.
 
 ## Contexto
 
