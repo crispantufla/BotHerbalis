@@ -10,7 +10,8 @@ import {
 
 import {
     RefreshCw, Download, Search, Filter, ChevronLeft, ChevronRight, MessageCircle,
-    Edit2, Trash2, Save, Copy, Check, Package, Phone, MapPin, Inbox, AlertTriangle
+    Edit2, Trash2, Save, Copy, Check, Package, Phone, MapPin, Inbox, AlertTriangle,
+    Send, Loader2
 } from 'lucide-react';
 
 // Mapeo único de status → tono semántico + dot. Antes había 6 strings con
@@ -141,7 +142,7 @@ const SalesView = ({ onGoToChat }) => {
 
     const {
         orders, pagination, isLoading, isFetching,
-        updateDetails, updateStatus, deleteOrder, refetch
+        updateDetails, updateStatus, deleteOrder, pushToSistema, refetch
     } = useOrders(page, 50, debouncedSearch, statusFilter, apiInstanceId);
 
     // instanceIds históricos — incluye sellers borrados como `denis` cuyas
@@ -291,6 +292,29 @@ const SalesView = ({ onGoToChat }) => {
             toast.success('Pedido eliminado');
         } catch {
             toast.error('Error eliminando pedido');
+        }
+    };
+
+    // Carga la venta en el panel de ventas (ventas-app) de una sola vez: crea
+    // el cliente si no existe, la dirección y el pedido. El backend guarda el
+    // número que devolvió el panel en `sistemaOrderId` y pasa el estado a
+    // "En sistema", así que una venta ya cargada no se puede volver a mandar.
+    const [sendingToSistemaId, setSendingToSistemaId] = useState(null);
+
+    const handleSendToSistema = async (order) => {
+        if (!order || order.sistemaOrderId || sendingToSistemaId) return;
+        setSendingToSistemaId(order.id);
+        try {
+            const res = await pushToSistema(order.id);
+            // El modal de detalle tiene su propia copia de la orden.
+            setViewingOrder(prev => (prev && prev.id === order.id ? { ...prev, ...res.order } : prev));
+            toast.success(res.alreadySynced
+                ? `Ya estaba cargado en el sistema como pedido #${res.sistemaOrderId}`
+                : `Cargado en el sistema como pedido #${res.sistemaOrderId}`);
+        } catch (e) {
+            toast.error('No se pudo cargar en el sistema: ' + (e.response?.data?.error || e.message));
+        } finally {
+            setSendingToSistemaId(null);
         }
     };
 
@@ -550,6 +574,19 @@ CP: ${order.cp || '—'}`;
                                             <td className="px-4 py-3.5 text-right">
                                                 <div className="flex justify-end gap-1.5">
                                                     <IconButton
+                                                        label={order.sistemaOrderId
+                                                            ? `Ya está en el sistema (pedido #${order.sistemaOrderId})`
+                                                            : 'Enviar a sistema'}
+                                                        icon={order.sistemaOrderId
+                                                            ? Check
+                                                            : (sendingToSistemaId === order.id ? Loader2 : Send)}
+                                                        variant={order.sistemaOrderId ? 'ghost' : 'accent'}
+                                                        size="md"
+                                                        disabled={!!order.sistemaOrderId || sendingToSistemaId === order.id}
+                                                        className={sendingToSistemaId === order.id ? '[&_svg]:animate-spin' : undefined}
+                                                        onClick={(e) => { e.stopPropagation(); handleSendToSistema(order); }}
+                                                    />
+                                                    <IconButton
                                                         label="Ir al chat"
                                                         icon={MessageCircle}
                                                         variant="ghost"
@@ -638,6 +675,19 @@ CP: ${order.cp || '—'}`;
                                             >
                                                 Detalles
                                             </Button>
+                                            <IconButton
+                                                label={order.sistemaOrderId
+                                                    ? `Ya está en el sistema (pedido #${order.sistemaOrderId})`
+                                                    : 'Enviar a sistema'}
+                                                icon={order.sistemaOrderId
+                                                    ? Check
+                                                    : (sendingToSistemaId === order.id ? Loader2 : Send)}
+                                                variant={order.sistemaOrderId ? 'subtle' : 'accent'}
+                                                size="sm"
+                                                disabled={!!order.sistemaOrderId || sendingToSistemaId === order.id}
+                                                className={sendingToSistemaId === order.id ? '[&_svg]:animate-spin' : undefined}
+                                                onClick={() => handleSendToSistema(order)}
+                                            />
                                             <IconButton
                                                 label="Ir al chat"
                                                 icon={MessageCircle}
@@ -787,6 +837,12 @@ CP: ${order.cp || '—'}`;
                                         String(viewingOrder.postdatado).trim() !== '' &&
                                         !['no', 'false'].includes(String(viewingOrder.postdatado).toLowerCase()) && (
                                         <Badge tone="warning" dot size="md">{viewingOrder.postdatado}</Badge>
+                                    )}
+                                    {viewingOrder.sistemaOrderId && (
+                                        <Badge tone="success" size="md">
+                                            <Check className="w-3 h-3" />
+                                            Sistema #{viewingOrder.sistemaOrderId}
+                                        </Badge>
                                     )}
                                 </>
                             );
@@ -983,7 +1039,18 @@ CP: ${order.cp || '—'}`;
                                     >
                                         Copiar todo
                                     </Button>
-                                    <Button onClick={() => { setViewingOrder(null); cancelDetailEdit(); }}>
+                                    <Button
+                                        variant={viewingOrder.sistemaOrderId ? 'secondary' : 'primary'}
+                                        leftIcon={viewingOrder.sistemaOrderId ? Check : Send}
+                                        loading={sendingToSistemaId === viewingOrder.id}
+                                        disabled={!!viewingOrder.sistemaOrderId}
+                                        onClick={() => handleSendToSistema(viewingOrder)}
+                                    >
+                                        {viewingOrder.sistemaOrderId
+                                            ? `En el sistema (#${viewingOrder.sistemaOrderId})`
+                                            : 'Enviar a sistema'}
+                                    </Button>
+                                    <Button variant="ghost" onClick={() => { setViewingOrder(null); cancelDetailEdit(); }}>
                                         Cerrar
                                     </Button>
                                 </>

@@ -24,6 +24,11 @@ const env = cleanEnv(process.env, {
     // API Key legacy (backward compat con dashboard antiguo)
     API_KEY: str({ default: '', desc: 'Clave interna legacy para autenticación del dashboard' }),
 
+    // Panel de ventas (ventas-app) — botón "Enviar a sistema".
+    // Con cualquiera de las dos vacía el botón queda deshabilitado.
+    SISTEMA_URL: str({ default: '', desc: 'URL base del panel de ventas, ej https://herbalis-app-production.up.railway.app' }),
+    SISTEMA_TOKEN: str({ default: '', desc: 'Bearer token del panel de ventas (su INTEGRATION_TOKEN)' }),
+
     // Legacy fallback — mantenidos para no romper instancias viejas
     ADMIN_USER: str({ default: '' }),
     ADMIN_PASSWORD: str({ default: '' }),

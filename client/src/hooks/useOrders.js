@@ -68,6 +68,16 @@ export const useOrders = (page = 1, limit = 50, search = '', status = '', instan
         onSuccess: () => queryClient.invalidateQueries(['orders'])
     });
 
+    // Mutate: cargar la venta en el panel de ventas (ventas-app).
+    // El token del panel vive en el servidor: acá solo se pide el push.
+    const pushToSistemaMutation = useMutation({
+        mutationFn: async (id) => {
+            const res = await api.post(`/api/orders/${id}/sistema`);
+            return res.data;
+        },
+        onSuccess: () => queryClient.invalidateQueries(['orders'])
+    });
+
     // Mutate: Delete Order
     const deleteOrderMutation = useMutation({
         mutationFn: async (id) => {
@@ -83,6 +93,8 @@ export const useOrders = (page = 1, limit = 50, search = '', status = '', instan
         updateDetails: updateDetailsMutation.mutateAsync,
         updateStatus: updateStatusMutation.mutateAsync,
         deleteOrder: deleteOrderMutation.mutateAsync,
-        isMutating: updateDetailsMutation.isPending || updateStatusMutation.isPending || deleteOrderMutation.isPending
+        pushToSistema: pushToSistemaMutation.mutateAsync,
+        isMutating: updateDetailsMutation.isPending || updateStatusMutation.isPending
+            || deleteOrderMutation.isPending || pushToSistemaMutation.isPending
     };
 };

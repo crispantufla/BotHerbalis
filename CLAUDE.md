@@ -74,6 +74,13 @@ Máquina de estados lineal con fallbacks a IA. Orden típico:
 - **DB upserts bajo race**: código P2002 de Prisma = concurrent upsert race. Ignorar (ver `botHelpers.ts:65`).
 - **Locks**: `order_lock:${phone}:${sellerId}` TTL 3000ms. Queries internas al lock deben tener timeout < TTL (ver `cancelLatestOrder` con 2500ms).
 - **Socket.IO rooms**: emitir siempre a `sellerId` room y a `admin` room (admins ven todo). Payload del admin debe incluir `sellerId`.
+- **Panel de ventas (ventas-app)**: el botón "Enviar a sistema" de SalesView pega contra
+  `POST /orders/:id/sistema`, que traduce el `Order` en `sistemaSync.ts` y lo postea al
+  panel (`D:\ventas-app`, otro repo, Mongo). El token (`SISTEMA_TOKEN`) vive solo en el
+  servidor — el navegador nunca lo ve. El panel es idempotente sobre
+  `(origen, externalId=Order.id)`: reenviar devuelve el pedido que ya creó, así que
+  `externalId` NO se puede recalcular ni derivar. Una venta cargada queda con
+  `sistemaOrderId` y status `En sistema`, y el botón se deshabilita.
 - **Prompt cache de Claude**: el system del `chat()` va en 2 bloques (`_buildSystemBlocks` en `aiPrompts.ts`): core compartido entre steps + módulo del step, cada uno con `cache_control` de 1h. NADA que dependa del mensaje, del cliente o de la hora puede entrar al system (rompe el prefijo para todas las llamadas); eso va al turno user. Verificar con `scripts/ai-cache-probe.ts` y con las líneas `[AI][usage]` de los logs (`cache_r` debe dominar a `in`).
 
 ## Multi-tenant scoping
@@ -116,6 +123,7 @@ Máquina de estados lineal con fallbacks a IA. Orden típico:
 - [prisma/schema.prisma](prisma/schema.prisma) — schema completo
 - [src/api/server.js](src/api/server.js) — montaje Express/Socket.IO
 - [src/api/routes/](src/api/routes/) — endpoints REST (todos pasan por `sellerContext`)
+- [src/services/sistemaSync.ts](src/services/sistemaSync.ts) — traducción y push de una venta al panel de ventas
 
 ## Estado actual / tech debt
 

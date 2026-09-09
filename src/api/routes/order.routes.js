@@ -302,6 +302,72 @@ module.exports = (clientPool) => {
         }
     });
 
+    // POST /orders/:id/sistema — carga la venta en el panel de ventas
+    // (ventas-app). Es el backend del botón "Enviar a sistema" de SalesView.
+    //
+    // El token del panel vive solo acá: el navegador nunca lo ve, solo pide
+    // que se empuje la orden. El panel es idempotente sobre (origen, id), así
+    // que un doble click devuelve el mismo pedido en vez de duplicarlo.
+    router.post('/orders/:id/sistema', ...withSeller(clientPool), async (req, res) => {
+        const idResult = uuidSchema.safeParse(req.params.id);
+        if (!idResult.success) return res.status(400).json({ error: idResult.error.issues[0].message });
+        const id = idResult.data;
+
+        try {
+            const { prisma } = require('../../../db');
+            const { pushOrderToSistema, isSistemaConfigured } = require('../../services/sistemaSync');
+
+            if (!isSistemaConfigured()) {
+                return res.status(503).json({ error: 'El panel de ventas no está configurado en este servidor' });
+            }
+
+            const order = await prisma.order.findUnique({ where: { id } });
+            if (!order) return res.status(404).json({ error: 'Orden no encontrada' });
+            if (!isOwnerOrAdmin(req, order.instanceId)) return res.status(403).json({ error: 'No autorizado' });
+
+            // Ya cargada: no volvemos a llamar al panel. El botón queda
+            // deshabilitado en la UI, pero esto cubre el request directo.
+            if (order.sistemaOrderId) {
+                return res.json({
+                    success: true,
+                    alreadySynced: true,
+                    sistemaOrderId: order.sistemaOrderId,
+                    order: toLegacyOrder(order),
+                });
+            }
+
+            const result = await pushOrderToSistema(order);
+
+            const data = {
+                sistemaOrderId: result.orderId,
+                sistemaSyncedAt: new Date(),
+            };
+
+            // El status del bot refleja dónde está la venta, y "En sistema" va
+            // ANTES de "Enviado"/"Entregado" en esa progresión. Cargar al panel
+            // un pedido que ya salió no puede hacerlo retroceder, así que solo
+            // movemos el status desde los dos estados previos.
+            if (['Pendiente', 'Confirmado'].includes(order.status)) {
+                data.status = 'En sistema';
+            }
+
+            const updatedOrder = await prisma.order.update({ where: { id }, data });
+
+            const legacyOrder = toLegacyOrder(updatedOrder);
+            emitScoped(req, 'order_update', legacyOrder);
+
+            res.json({
+                success: true,
+                alreadySynced: result.duplicate,
+                sistemaOrderId: result.orderId,
+                order: legacyOrder,
+            });
+        } catch (error) {
+            logger.error(`[SISTEMA] Error enviando la orden ${id} al panel: ${error.message}`);
+            res.status(502).json({ error: error.message });
+        }
+    });
+
     // DELETE /orders/:id (Delete order) - Authenticated
     router.delete('/orders/:id', ...withSeller(clientPool), async (req, res) => {
         const idResult = uuidSchema.safeParse(req.params.id);

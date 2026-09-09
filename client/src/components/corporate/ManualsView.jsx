@@ -352,12 +352,18 @@ const MANUALS = [
                     rows: [
                         ['Pendiente', 'El bot tomó los datos pero aún no fue confirmado'],
                         ['Confirmado', 'Aprobado — a preparar el paquete'],
-                        ['En sistema', 'Ingresado al sistema de despacho'],
+                        ['En sistema', 'Ya cargado en el panel de ventas (botón "Enviar a sistema")'],
                         ['Enviado', 'Despachado con número de tracking'],
                         ['Entregado', 'El cliente recibió el paquete'],
                         ['Cancelado', 'Venta cancelada'],
                     ]
                 },
+            },
+            {
+                title: 'Enviar una venta al sistema',
+                icon: Send,
+                content: `El botón con la **flecha** en la columna de acciones carga la venta en el panel de ventas: crea el cliente si no existe, guarda la dirección y da de alta el pedido, sin copiar nada a mano.\n\nCuando termina, el estado pasa a **En sistema** y el botón se convierte en un tilde con el número de pedido que asignó el panel.`,
+                extra: `Se puede apretar una sola vez por venta. Si lo apretás de nuevo (o dos personas lo hacen a la vez) el panel devuelve el pedido que ya existe en lugar de duplicarlo.`
             },
             {
                 title: 'Filtrar y buscar pedidos',

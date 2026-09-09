@@ -91,6 +91,8 @@ function toLegacyOrder(o) {
         senaPaid: !!o.senaPaid,
         cashRemainder: o.cashRemainder || null,
         paymentVerifiedAt: o.paymentVerifiedAt ? o.paymentVerifiedAt.toISOString() : null,
+        sistemaOrderId: o.sistemaOrderId ?? null,
+        sistemaSyncedAt: o.sistemaSyncedAt ? o.sistemaSyncedAt.toISOString() : null,
         createdAt: o.createdAt.toISOString(),
     };
 }

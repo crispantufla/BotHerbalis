@@ -65,6 +65,12 @@ model Order {
   provincia   String?
   cp          String?
 
+  // Carga en el panel de ventas (ventas-app) vía botón "Enviar a sistema".
+  // sistemaOrderId es el número de pedido que devolvió el panel; mientras sea
+  // null la venta todavía no está cargada ahí.
+  sistemaOrderId  Int?
+  sistemaSyncedAt DateTime?
+
   createdAt   DateTime @default(now())
 
   @@index([userPhone, instanceId])
