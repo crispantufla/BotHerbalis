@@ -155,28 +155,13 @@ module.exports = (clientPool) => {
             // a cobrar en efectivo en lugar del totalPrice (caso COD con anticipo).
             const legacyOrders = orders.map(o => {
                 const user = userMap.get(`${o.userPhone}_${o.instanceId}`);
+                // Mismo mapeo que el resto de las rutas, con dos agregados propios
+                // del listado: instanceId (columna de vendedor en SalesView) y el
+                // fallback al nombre del User cuando la orden no lo trae.
                 return {
-                    id: o.id,
+                    ...toLegacyOrder(o),
                     instanceId: o.instanceId,
-                    cliente: o.userPhone,
-                    status: o.status,
-                    producto: o.products,
-                    precio: Math.round(o.totalPrice).toLocaleString('es-AR'),
-                    tracking: o.tracking || '',
-                    postdatado: o.postdated || '',
                     nombre: o.nombre || user?.name || '',
-                    calle: o.calle || '',
-                    calleOriginal: o.calleOriginal || '',
-                    ciudad: o.ciudad || '',
-                    provincia: o.provincia || '',
-                    cp: o.cp || '',
-                    paymentMethod: o.paymentMethod || null,
-                    seller: o.seller || '',
-                    senaAmount: o.senaAmount || null,
-                    senaPaid: !!o.senaPaid,
-                    cashRemainder: o.cashRemainder || null,
-                    paymentVerifiedAt: o.paymentVerifiedAt ? o.paymentVerifiedAt.toISOString() : null,
-                    createdAt: o.createdAt.toISOString()
                 };
             });
 
