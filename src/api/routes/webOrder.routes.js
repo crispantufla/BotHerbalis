@@ -1,6 +1,16 @@
 const express = require('express');
+const crypto = require('crypto');
 const { prisma } = require('../../../db');
 const logger = require('../../utils/logger');
+const { notifyWebOrder } = require('../../services/webOrderNotify');
+
+/** Comparación en tiempo constante del token compartido con la web. */
+function _tokenMatches(given, expected) {
+    if (typeof given !== 'string' || !expected) return false;
+    const a = Buffer.from(given);
+    const b = Buffer.from(expected);
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
 
 /**
  * Pedidos generados desde la TIENDA WEB (proyecto web-v5). La tabla WebOrder la
@@ -45,6 +55,32 @@ module.exports = (clientPool) => {
         } catch (e) {
             if (e?.code === 'P2025') return res.status(404).json({ error: 'Pedido no encontrado' });
             logger.error('[WEB-ORDERS] Error marcando envío:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // POST /web-orders/:id/notify — confirmación por WhatsApp de un pedido web pago.
+    // La llama la tienda web (server-to-server) cuando MercadoPago aprueba el
+    // pago, así que NO hay sesión de usuario: auth propia por WEB_NOTIFY_TOKEN
+    // (header x-web-notify-token). Idempotente por WebOrder.whatsappNotifiedAt.
+    // Body opcional: { force: true } reenvía aunque ya se haya notificado;
+    //                { dryRun: true } resuelve número y mensajes sin enviar nada.
+    // Lógica en services/webOrderNotify.ts.
+    router.post('/web-orders/:id/notify', async (req, res) => {
+        const expected = process.env.WEB_NOTIFY_TOKEN;
+        if (!expected) return res.status(503).json({ error: 'WEB_NOTIFY_TOKEN no configurado' });
+        if (!_tokenMatches(req.headers['x-web-notify-token'], expected)) {
+            logger.warn(`[WEB-NOTIFY] token inválido desde ${req.ip}`);
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+        const force = req.body?.force === true;
+        const dryRun = req.body?.dryRun === true;
+        try {
+            const result = await notifyWebOrder({ orderId: req.params.id, clientPool, prisma, force, dryRun });
+            const { httpStatus, ...body } = result;
+            res.status(httpStatus || 200).json(body);
+        } catch (e) {
+            logger.error('[WEB-NOTIFY] error inesperado:', e);
             res.status(500).json({ error: e.message });
         }
     });

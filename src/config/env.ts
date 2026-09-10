@@ -29,6 +29,14 @@ const env = cleanEnv(process.env, {
     SISTEMA_URL: str({ default: '', desc: 'URL base del panel de ventas, ej https://herbalis-app-production.up.railway.app' }),
     SISTEMA_TOKEN: str({ default: '', desc: 'Bearer token del panel de ventas (su INTEGRATION_TOKEN)' }),
 
+    // Tienda web (web-v5) → confirmación por WhatsApp de pedidos pagos.
+    // La web llama POST /api/web-orders/:id/notify con este token en el header
+    // x-web-notify-token. Vacío = endpoint deshabilitado (503).
+    WEB_NOTIFY_TOKEN: str({ default: '', desc: 'Secreto compartido con la tienda web para /web-orders/:id/notify' }),
+    // Seller cuyo WhatsApp manda las confirmaciones web (ej. "horacio").
+    // Vacío = el primer seller conectado del pool.
+    WEB_ORDERS_SELLER: str({ default: '', desc: 'sellerId que envía las confirmaciones de pedidos web' }),
+
     // Legacy fallback — mantenidos para no romper instancias viejas
     ADMIN_USER: str({ default: '' }),
     ADMIN_PASSWORD: str({ default: '' }),

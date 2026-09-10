@@ -313,6 +313,11 @@ model WebOrder {
   tracking       String?
   shippedAt      DateTime?
 
+  // Confirmaciones post-pago. La web marca emailNotifiedAt al mandar el email;
+  // el bot marca whatsappNotifiedAt al mandar el WhatsApp (POST /web-orders/:id/notify).
+  emailNotifiedAt    DateTime?
+  whatsappNotifiedAt DateTime?
+
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @default(now())
 
