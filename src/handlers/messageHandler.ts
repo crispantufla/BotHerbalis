@@ -4,27 +4,13 @@
  * Replaces the single `client.on('message', ...)` handler in index.ts.
  */
 
-import fs from 'fs';
-import path from 'path';
-import crypto from 'crypto';
+import * as steps from './incomingSteps';
+import type { HandlerRuntime } from './incomingSteps';
 const logger = require('../utils/logger');
 const { MessageMedia } = require('whatsapp-web.js');
 const { aiService } = require('../services/ai');
-const { parseAdminInput } = require('../services/adminService');
-const { redisConnection } = require('../services/queueService');
 const { _cleanPhone, _isAdminPhone } = require('../flows/utils/flowHelpers');
 
-
-const DEBOUNCE_MS = 10000;
-
-// Eventos que WhatsApp emite por el mismo canal que los mensajes pero que NO
-// son una persona escribiendo (rotación de claves, cambios de grupo, llamadas,
-// mensajes borrados o todavía sin desencriptar). No hay nada que contestar y no
-// deben ensuciar el chat del dashboard: se descartan, pero CON log.
-const WA_SYSTEM_TYPES = new Set([
-    'e2e_notification', 'notification', 'notification_template', 'protocol',
-    'gp2', 'group_notification', 'ciphertext', 'revoked', 'call_log'
-]);
 
 export interface MessageHandlerContext {
     sellerId: string;
@@ -43,336 +29,59 @@ export interface MessageHandlerContext {
     dataDir: string;    // For audio file storage
 }
 
+/**
+ * El recorrido de cada mensaje entrante de un seller.
+ *
+ * Era una sola función de ~360 líneas. Los pasos viven en incomingSteps.ts con
+ * los cuerpos movidos tal cual; acá queda el orden, que es lo que importa leer.
+ * tests/message_handler.test.js fija el comportamiento: se escribió contra la
+ * versión anterior y da la misma traza de efectos contra esta.
+ */
 export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => Promise<void> {
     const {
         sellerId, client, sharedState, userState, config, pausedUsers, pendingMessages,
         botQueue, logAndEmit, notifyAdmin, handleAdminCommand, saveState, dataDir
     } = ctx;
 
-    const lastPausedUserAlerts = new Map<string, number>();
-    // Avisos de "no pude procesar este mensaje". Throttle por cliente igual que
-    // lastPausedUserAlerts: si el Chromium del agente se rompe, TODOS los
-    // mensajes fallan y sin esto el admin recibiría cientos de avisos.
-    const lastLostMsgAlerts = new Map<string, number>();
-    const _shouldAlertLost = (id: string): boolean => {
-        const now = Date.now();
-        if (now - (lastLostMsgAlerts.get(id) || 0) < 30 * 60 * 1000) return false;
-        lastLostMsgAlerts.set(id, now);
-        return true;
+    // El contexto del seller más el estado propio de este handler: los
+    // throttles de avisos al admin, que viven lo que vive el handler.
+    const rt: HandlerRuntime = {
+        sellerId, client, sharedState, userState, config, pausedUsers, pendingMessages,
+        botQueue, logAndEmit, notifyAdmin, handleAdminCommand, saveState, dataDir,
+        lastPausedUserAlerts: new Map<string, number>(),
+        lastLostMsgAlerts: new Map<string, number>(),
     };
-
-    async function _processDebounced(userId: string): Promise<void> {
-        const pending = pendingMessages.get(userId);
-        if (!pending) return;
-
-        const isAdminUser = _isAdminPhone(userId, config.alertNumbers);
-        if (pausedUsers.has(userId) || (config.globalPause && !isAdminUser)) {
-            logger.info(`[DEBOUNCE][${sellerId}] Skipping ${userId}: paused during debounce`);
-            pendingMessages.delete(userId);
-            return;
-        }
-
-        const sortedMessages = pending.messages.sort((a, b) => a.timestamp - b.timestamp);
-        const combinedText = sortedMessages.map(m => m.text).join(' ');
-        const startTime = pending.startTime;
-        pendingMessages.delete(userId);
-
-        logger.info(`[DEBOUNCE][${sellerId}] Processing ${sortedMessages.length} msg(s) from ${userId}: "${combinedText}"`);
-
-        try {
-            // V7 es el único script activo.
-            const effectiveScript = 'v7';
-            if (userState[userId] && userState[userId].assignedScript !== 'v7') {
-                userState[userId].assignedScript = 'v7';
-                saveState(userId);
-            }
-
-            await botQueue.add('process-message', { userId, combinedText, effectiveScript, startTime }, {
-                removeOnComplete: true,
-                removeOnFail: 100
-            });
-        } catch (err: any) {
-            logger.error(`[DEBOUNCE][${sellerId}] Error:`, err.message);
-        }
-    }
 
     return async function messageHandler(msg: any): Promise<void> {
         try {
-            if (msg.from === 'status@broadcast') return;
-            // Short-circuit groups/broadcast before Puppeteer bridge call (avoids expensive getChat)
-            if (msg.from.endsWith('@g.us') || msg.from.endsWith('@broadcast')) return;
-            if (sharedState.connectedAt && msg.timestamp && msg.timestamp < sharedState.connectedAt) {
-                // Antes esto descartaba SIN log — durante un flap del agente, los
-                // mensajes reentregados de la ventana caída desaparecían sin rastro.
-                logger.info(`[SKIP-OLD][${sellerId}] msg de ${msg.from} (ts=${msg.timestamp} < connectedAt=${sharedState.connectedAt}) — ignorado como historial`);
-                return;
-            }
-
-            // Idempotencia (caso doble-bot / reentrega del mismo mensaje físico): si
-            // este id ya fue tomado (Redis compartido), lo descartamos ACÁ — ANTES de
-            // gastar los RPCs getChat()/getContact() al agente (en remoto la reentrega
-            // disparaba 2-3 getContact por mensaje, ver [ID-RESOLVE] repetidos). El id
-            // de WhatsApp es el mismo en cloud y remoto. Fail-open: si Redis falla, sigo.
-            // Solo dedupear con un id string REAL: agentes viejos serializaban un
-            // MessageId sin _serialized como "[object Object]" — todos esos mensajes
-            // colisionaban en la MISMA key de Redis y se descartaban entre sí (mensajes
-            // nuevos y distintos sin responder, 20-jul-2026). Ante id inutilizable,
-            // mejor sin dedup que mudo.
-            const _rawMsgId = typeof msg.id?._serialized === 'string' ? msg.id._serialized : null;
-            if (_rawMsgId && !_rawMsgId.startsWith('remote_') && _rawMsgId !== '[object Object]') {
-                try {
-                    const seen = await redisConnection.set(`msgseen:${sellerId}:${_rawMsgId}`, '1', 'EX', 600, 'NX');
-                    if (seen === null) {
-                        logger.warn(`[DEDUP][${sellerId}] msg ${_rawMsgId} ya procesado/reentregado — descarto`);
-                        return;
-                    }
-                } catch (e: any) {
-                    logger.warn(`[DEDUP][${sellerId}] Redis no disponible (${e.message}) — sigo sin dedup`);
-                }
-            }
-
+            // 1. Lo que no es una conversación, o ya se procesó.
+            if (steps.isNotAConversation(msg, rt)) return;
+            if (await steps.isDuplicateDelivery(msg, rt)) return;
             const chat = await msg.getChat();
             if (chat.isGroup) return; // Belt-and-suspenders
 
-            let userId = msg.from;
-
-            // Resolve Meta @lid / proxy identifiers to real phone numbers — con
-            // resolución PEGAJOSA en Redis. getContact() es best-effort: puede
-            // resolver en un mensaje y FALLAR en el siguiente, lo que partía al
-            // MISMO cliente en DOS conversaciones (@lid y @c.us) con userState
-            // divergente → dos respuestas contradictorias y link con producto
-            // equivocado (caso real 1131381951, 2026-06-19). Con la cache, una vez
-            // que el @lid se resolvió a un teléfono, TODOS los mensajes siguientes
-            // mapean al mismo userId aunque getContact vuelva a fallar.
-            if (userId.includes('@lid') || userId.length > 18) {
-                const stickyKey = `lidmap:${sellerId}:${msg.from}`;
-                let resolved: string | null = null;
-                try {
-                    const contact = await msg.getContact();
-                    if (userId.includes('@lid')) {
-                        if (contact && contact.number) resolved = `${contact.number}@c.us`;
-                    } else {
-                        const cleanName = (contact?.name || contact?.pushname || '').replace(/\D/g, '');
-                        if (cleanName.length >= 10 && cleanName.length <= 13) resolved = `${cleanName}@c.us`;
-                    }
-                } catch (e: any) {
-                    logger.warn(`[ID-RESOLVE][${sellerId}] getContact falló para ${msg.from}: ${e.message}`);
-                }
-                if (resolved) {
-                    userId = resolved;
-                    logger.info(`[ID-RESOLVE][${sellerId}] ${msg.from} → ${userId}`);
-                    try { await redisConnection.set(stickyKey, userId, 'EX', 604800); } catch { /* noop */ }
-                } else {
-                    // No se pudo resolver ahora → reusar la última resolución conocida
-                    // para no abrir una segunda conversación bajo el id crudo.
-                    try {
-                        const cached = await redisConnection.get(stickyKey);
-                        if (cached) {
-                            userId = cached;
-                            logger.info(`[ID-STICKY][${sellerId}] ${msg.from} → ${userId} (cache)`);
-                        }
-                    } catch { /* noop */ }
-                }
-            }
-
+            // 2. Quién escribe.
+            const userId = await steps.resolveUserId(msg, rt);
             const isAdmin = msg.fromMe || _isAdminPhone(userId, config.alertNumbers);
-            let msgText = (msg.body || '').trim();
+            let msgText = steps.normalizeBody(msg.body);
 
-            // WhatsApp placeholder fix
-            const WA_PLACEHOLDERS = ['esperando el mensaje', 'waiting for this message', 'este mensaje estaba esperando', 'this message was waiting'];
-            if (WA_PLACEHOLDERS.some(p => msgText.toLowerCase().includes(p))) {
-                msgText = 'Hola';
-            }
+            // 3. El admin da órdenes: no entra al flujo de ventas.
+            if (isAdmin) return await steps.handleAdminMessage(msg, userId, msgText, rt);
 
-            // --- ADMIN COMMANDS ---
-            if (isAdmin) {
-                if (msg.type === 'ptt' || msg.type === 'audio') {
-                    const media = await msg.downloadMedia();
-                    if (media) {
-                        const transcription = await aiService.transcribeAudio(media.data, media.mimetype);
-                        if (transcription) {
-                            const { selector, command } = parseAdminInput(transcription);
-                            const result = await handleAdminCommand(null, command, false, selector);
-                            if (result) await client.sendMessage(msg.from, result);
-                        }
-                    }
-                    return;
-                }
-                if (!msgText) return;
-                logger.info(`[ADMIN][${sellerId}] ${userId}: ${msgText}`);
+            // 4. Audio, imagen o documento: se registran, y pueden cortar acá
+            //    (comprobante, sticker, audio ilegible) o convertirse en texto.
+            const content = await steps.handleNonTextContent(msg, userId, msgText, rt);
+            if (content === null) return;
+            msgText = content;
 
-                if (msgText.toLowerCase().startsWith('!saltear ')) {
-                    const parts = msgText.split(' ');
-                    const targetNumber = parts[1];
-                    const targetChatId = targetNumber.includes('@') ? targetNumber : `${targetNumber.replace(/\D/g, '')}@c.us`;
-                    if (!userState[targetChatId]) userState[targetChatId] = { step: 'greeting', partialAddress: {}, history: [] };
-                    // Usamos _setStep para mantener tracking de funnel + reset de flags.
-                    // V3/V4 tenían knowledge.flow.data_request; V5/V6 lo renombraron a
-                    // flow.closing (que también pide datos para la etiqueta). Si ninguno
-                    // existe, fallback a un mensaje fijo equivalente.
-                    const { _setStep } = require('../flows/utils/flowHelpers');
-                    _setStep(userState[targetChatId], 'waiting_data');
-                    saveState();
-                    const knowledge = sharedState.knowledge;
-                    const dataMsg = knowledge?.flow?.closing?.response
-                        || knowledge?.flow?.data_request?.response
-                        || '¡Dale! Pasame los datos para la etiqueta:\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:';
-                    await client.sendMessage(targetChatId, dataMsg);
-                    await client.sendMessage(msg.from, `✅ Usuario ${targetNumber} forzado a waiting_data.`);
-                    return;
-                }
-
-                if (msgText.toLowerCase() === '!ayuda') {
-                    const helpPart1 = `📋 *Comandos disponibles (1/2):*\n\n*Alertas y pedidos:*\n• !alertas — Cola de alertas activas\n• 1 ok / 2 dale — Confirmar pedido por #\n• 1 me encargo — Tomar control de cliente\n• 1r1 / 1r2 / 1r3 — Respuesta rápida a alerta\n• !pedidos — Últimos 5 pedidos\n• !pedido [tel] — Pedidos de un cliente\n• !tracking [tel] [cod] — Cargar código seguimiento\n\n*Clientes:*\n• !pausados — Ver clientes pausados\n• !despauser [tel] — Reactivar bot para cliente\n• !reset [tel] — Reiniciar estado de cliente\n• !historial [tel] — Resumen IA del chat\n• !enviar [tel] [msg] — Mensaje directo`;
-                    const helpPart2 = `📋 *Comandos (2/2):*\n\n*Analytics:*\n• !funnel — Embudo de ventas paso a paso\n• !abandonos — Motivos de abandono + A/B testing\n\n*Sistema:*\n• !status — Estado del bot\n• !stats — Ventas y métricas del día\n• !pausa-global on/off — Pausar todo el bot\n• !precios — Ver precios actuales\n• !script — Ver script activo (v7)\n• !admin add/remove [tel] — Gestionar admins\n\n*Otros:*\n• !resumen — Reporte diario\n• !saltear [tel] — Forzar paso de usuario\n• [texto libre] — Instrucción IA al cliente\n• !ayuda — Este menú`;
-                    await client.sendMessage(msg.from, helpPart1);
-                    await client.sendMessage(msg.from, helpPart2);
-                    return;
-                }
-
-                const { selector, command } = parseAdminInput(msgText);
-                const result = await handleAdminCommand(null, command, false, selector);
-                if (result) await client.sendMessage(msg.from, result);
-                return;
-            }
-
-            // --- USER MESSAGES ---
-
-            // Audio
-            if (msg.type === 'ptt' || msg.type === 'audio') {
-                // downloadMedia() es un RPC al Chromium del agente y puede tirar un
-                // error minificado ("r"). Antes ese throw subía al catch global y el
-                // audio se perdía ENTERO: sin ChatLog, sin aviso al admin y sin
-                // respuesta al cliente — él veía "enviado" y en el panel el chat
-                // quedaba vacío. Lo mismo pasaba con el `else { return }` mudo
-                // cuando media venía null (reporte de horacio, varias veces al día).
-                let media: any = null;
-                try {
-                    media = await msg.downloadMedia();
-                } catch (e: any) {
-                    logger.warn(`[AUDIO][${sellerId}] downloadMedia falló para ${userId}: ${e.message}`);
-                }
-                if (!media) {
-                    logAndEmit(userId, 'user', '🎤 Audio recibido (no se pudo descargar)', userState[userId]?.step || 'new');
-                    await client.sendMessage(userId, 'Disculpá, no pude escuchar bien el audio. ¿Me lo escribís?');
-                    return;
-                }
-
-                // La URL sirve para reproducirlo en el dashboard; si el guardado en
-                // disco falla igual seguimos con la transcripción (mejor un mensaje
-                // sin audio adjunto que un mensaje perdido).
-                let audioUrl: string | null = null;
-                try {
-                    const audioDir = path.join(dataDir, '..', 'public', 'media', 'audio');
-                    await fs.promises.mkdir(audioDir, { recursive: true }).catch(() => {});
-                    const ext = media.mimetype?.includes('ogg') ? 'ogg' : 'mp3';
-                    // Nombre NO adivinable y SIN el teléfono: /media es estático
-                    // sin auth — con <telefono>_<ts>.ogg cualquiera podía enumerar
-                    // y bajar audios de clientes. La URL queda persistida en el
-                    // ChatLog (logAndEmit de abajo), así que la reproducción en el
-                    // dashboard sigue funcionando igual.
-                    const audioFilename = `aud_${Date.now()}_${crypto.randomUUID()}.${ext}`;
-                    await fs.promises.writeFile(path.join(audioDir, audioFilename), Buffer.from(media.data, 'base64'));
-                    audioUrl = `/media/audio/${audioFilename}`;
-                } catch (e: any) {
-                    logger.warn(`[AUDIO][${sellerId}] no pude guardar el audio de ${userId}: ${e.message}`);
-                }
-
-                let transcription: string | null = null;
-                try {
-                    transcription = await aiService.transcribeAudio(media.data, media.mimetype);
-                } catch (e: any) {
-                    logger.warn(`[AUDIO][${sellerId}] transcripción falló para ${userId}: ${e.message}`);
-                }
-
-                const audioLog = audioUrl ? `MEDIA_AUDIO:${audioUrl}` : '🎤 Audio recibido';
-                if (transcription) {
-                    logAndEmit(userId, 'user', `${audioLog}|TRANSCRIPTION:${transcription}`, userState[userId]?.step || 'new');
-                    msgText = transcription;
-                } else {
-                    logAndEmit(userId, 'user', audioLog, userState[userId]?.step || 'new');
-                    await client.sendMessage(userId, 'Disculpá, no pude escuchar bien el audio. ¿Me lo escribís?');
-                    return;
-                }
-            }
-
-            // Image/Sticker
-            if (msg.type === 'image' || msg.type === 'sticker') {
-                logAndEmit(userId, 'user', `📷 ${msg.type === 'sticker' ? 'Sticker' : 'Imagen'} recibida${msg.body ? ': ' + msg.body : ''}`, userState[userId]?.step || 'new');
-                // FIX (caso real Romina 19-may): si el cliente está en flujo de
-                // pago (waiting_mp_payment o waiting_transfer_confirmation) y
-                // manda una imagen, probablemente sea un comprobante. Pausar y
-                // alertar al admin para verificación manual.
-                const stepNow = userState[userId]?.step;
-                if (msg.type === 'image' && (stepNow === 'waiting_mp_payment' || stepNow === 'waiting_transfer_confirmation')) {
-                    try {
-                        await client.sendMessage(userId, '¡Recibí la imagen del comprobante! 📸 Un asesor lo verifica enseguida y te confirma el envío.');
-                        const { pauseUser } = require('../services/pauseService');
-                        await pauseUser(userId, 'Cliente envió comprobante (imagen) durante pago. Verificación manual requerida.', { sharedState });
-                        await notifyAdmin('💸 Comprobante recibido (imagen)', userId, `Cliente mandó una imagen estando en ${stepNow}. Probable comprobante de pago — verificar y confirmar pedido.`);
-                    } catch (e: any) {
-                        logger.warn(`[COMPROBANTE-IMG] Error procesando imagen: ${e.message}`);
-                    }
-                    return;
-                }
-                if (msg.type === 'image' && msg.body) {
-                    msgText = `[Imagen enviada por el usuario] ${msg.body}`;
-                } else { return; }
-            }
-
-            // Document/PDF — típicamente comprobante de pago. Si el cliente
-            // está en flujo de pago, pausamos y alertamos al admin para
-            // verificación manual. Sin esto, el bot le contestaba genérico y
-            // dejaba al cliente en limbo (caso real Romina 19-may).
-            if (msg.type === 'document') {
-                const filename = (msg as any)._data?.filename || msg.body || 'documento.pdf';
-                logAndEmit(userId, 'user', `📄 Documento recibido: ${filename}`, userState[userId]?.step || 'new');
-                const stepNow = userState[userId]?.step;
-                if (stepNow === 'waiting_mp_payment' || stepNow === 'waiting_transfer_confirmation') {
-                    try {
-                        await client.sendMessage(userId, '¡Recibí el comprobante! 📄 Un asesor lo verifica enseguida y te confirma el envío.');
-                        const { pauseUser } = require('../services/pauseService');
-                        await pauseUser(userId, 'Cliente envió comprobante (PDF) durante pago. Verificación manual requerida.', { sharedState });
-                        await notifyAdmin('💸 Comprobante recibido (PDF)', userId, `Cliente mandó "${filename}" estando en ${stepNow}. Verificar pago y confirmar pedido manualmente.`);
-                    } catch (e: any) {
-                        logger.warn(`[COMPROBANTE-DOC] Error procesando documento: ${e.message}`);
-                    }
-                    return;
-                }
-                // Fuera de los steps de pago, ignoramos el documento (no
-                // sabemos qué hacer con él) — el bot sigue con el flow normal.
-                return;
-            }
-
-            // Empty message
+            // 5. Sin texto: clic en un anuncio, evento de sistema o algo ilegible.
             if (!msgText || msgText.trim() === '') {
-                // 'e2e_notification' es una system event de WhatsApp (cambio de
-                // clave de encriptación, re-instalación, nuevo dispositivo) que
-                // NO es un mensaje del usuario. Si la trataramos como ad click,
-                // gatillamos el saludo a clientes que nunca escribieron — este
-                // bug causaba cross-talk cuando el cliente rotaba sus claves
-                // mientras el bot tenía su contacto guardado.
-                if (msg.type === 'chat' || msg.type === 'template_button_reply') {
-                    msgText = 'Hola! (Vengo de un anuncio)';
-                } else if (WA_SYSTEM_TYPES.has(msg.type)) {
-                    logger.info(`[SKIP-SYSTEM][${sellerId}] evento '${msg.type}' de ${msg.from} — no es un mensaje, ignorado`);
-                    return;
-                } else {
-                    // Persona real mandando algo que el flujo no sabe leer (video,
-                    // ubicación, contacto, encuesta...). Antes salía por acá SIN
-                    // ninguna traza: ni log, ni ChatLog, ni aviso — el cliente veía
-                    // "enviado" y en el panel el chat aparecía vacío. Es el caso que
-                    // horacio reportaba varias veces al día. Ahora queda registrado
-                    // en el chat y se le avisa para que conteste a mano.
-                    logger.warn(`[MSG-UNSUPPORTED][${sellerId}] ${msg.from} mandó tipo '${msg.type}' sin texto — el bot no puede procesarlo`);
-                    logAndEmit(userId, 'user', `📎 Mensaje que el bot no puede leer (${msg.type})`, userState[userId]?.step || 'new');
-                    if (_shouldAlertLost(userId)) {
-                        await notifyAdmin('📎 Mensaje que el bot no puede leer', userId, `El cliente mandó un mensaje de tipo "${msg.type}" (sin texto). El bot no sabe interpretarlo y no le respondió — miralo en WhatsApp y contestale vos.`);
-                    }
-                    return;
-                }
+                const fromEmpty = await steps.handleEmptyMessage(msg, userId, rt);
+                if (fromEmpty === null) return;
+                msgText = fromEmpty;
             }
 
+            // 6. Al chat del panel (audio e imagen ya se registraron en el paso 4).
             if (msg.type !== 'ptt' && msg.type !== 'audio' && msg.type !== 'image') {
                 logAndEmit(userId, 'user', msgText, userState[userId]?.step || 'new');
             }
@@ -399,50 +108,15 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
                 return;
             }
 
-            // Global pause check
+            // 7. Pausas: global y por cliente.
             if (config.globalPause && !isAdmin) {
                 logger.info(`[PAUSED-GLOBAL][${sellerId}] Ignoring ${userId}`);
                 return;
             }
+            if (steps.handlePausedUser(msg, userId, msgText, rt)) return;
 
-            // Per-user pause
-            if (pausedUsers.has(userId) || (msg.from !== userId && pausedUsers.has(msg.from))) {
-                if (!pausedUsers.has(userId) && msg.from !== userId && pausedUsers.has(msg.from)) {
-                    pausedUsers.delete(msg.from);
-                    pausedUsers.add(userId);
-                }
-                const pendingEntry = pendingMessages.get(userId);
-                if (pendingEntry) { clearTimeout(pendingEntry.timer); pendingMessages.delete(userId); }
-
-                const now = Date.now();
-                const lastAlert = lastPausedUserAlerts.get(userId) || 0;
-                if (now - lastAlert > 30 * 60 * 1000) {
-                    lastPausedUserAlerts.set(userId, now);
-                    notifyAdmin('💬 Cliente en pausa te escribió', userId, `El cliente envió: "${msgText.substring(0, 100)}..."\n\nEl bot sigue pausado.`).catch(() => {});
-                }
-                return;
-            }
-
-            // Debounce
-            let currentDelay = DEBOUNCE_MS;
-            if (userState[userId]?.step === 'waiting_data') {
-                currentDelay = 25000;
-            }
-
-            const msgObj = { text: msgText, timestamp: msg.timestamp || Math.floor(Date.now() / 1000) };
-
-            if (pendingMessages.has(userId)) {
-                const pending = pendingMessages.get(userId)!;
-                pending.messages.push(msgObj);
-                clearTimeout(pending.timer);
-                pending.timer = setTimeout(() => _processDebounced(userId), currentDelay);
-            } else {
-                pendingMessages.set(userId, {
-                    messages: [msgObj],
-                    timer: setTimeout(() => _processDebounced(userId), currentDelay),
-                    startTime: Date.now()
-                });
-            }
+            // 8. A la cola: el flujo procesa todo junto cuando el cliente deja de escribir.
+            steps.enqueueDebounced(msg, userId, msgText, rt);
         } catch (err: any) {
             // Un throw acá = un mensaje de un cliente que se perdió entero. El log
             // decía solo "Error: r" (error minificado del Chromium del agente), sin
@@ -451,7 +125,7 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
             const preview = (msg?.body || '').slice(0, 80);
             logger.error(`[MESSAGE-HANDLER][${sellerId}] Error procesando msg de ${msg?.from} (type=${msg?.type}, body="${preview}"): ${err.message}`);
             try {
-                if (msg?.from && !msg.fromMe && _shouldAlertLost(msg.from)) {
+                if (msg?.from && !msg.fromMe && steps.shouldAlertLost(msg.from, rt)) {
                     await notifyAdmin('⚠️ Mensaje perdido', msg.from, `El bot falló al procesar un mensaje de este cliente y NO le respondió.\n\nTipo: ${msg.type}\nTexto: "${preview}"\nError: ${err.message}\n\nContestale a mano.`);
                 }
             } catch { /* noop: si el cliente de WA está roto, el aviso tampoco sale */ }
