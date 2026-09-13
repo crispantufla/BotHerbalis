@@ -13,8 +13,7 @@
  */
 
 import logger from '../utils/logger';
-import * as fs from 'fs';
-import * as path from 'path';
+import { _getPrices as _getFlowPrices, FALLBACK_PRICES } from '../flows/utils/pricing';
 
 // --- RAG RULE BASE ---
 const RULE_BASE = [
@@ -128,39 +127,27 @@ function _getRelevantRules(userText: string, allRules: boolean = false, mpOn: bo
     return activeRules;
 }
 
-// __dirname = src/services → '../..' = raíz del repo (NO copiar el '../../..'
-// de pricing.ts, que vive un nivel más profundo en src/flows/utils).
-const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../..');
-const PRICES_PATH = path.join(DATA_DIR, 'prices.json');
-
 // ═══════════════════════════════════════════════════════
 // MODULAR PROMPT SYSTEM — Organized for optimal model attention
 // Structure: CORE (always) + STEP MODULE (contextual) + EXTRACTION RULES (always, at end)
 // ═══════════════════════════════════════════════════════
 
-// Cache for prices — re-read from disk at most every 60s
-let _pricesCache: Record<string, any> | null = null;
-let _pricesCacheTime = 0;
-const PRICES_CACHE_MS = 60 * 1000;
-
+/**
+ * Precios para los prompts. Salen de pricing.ts, la misma fuente que usan el
+ * flujo del bot y el Editor de Precios.
+ *
+ * El merge sobre FALLBACK_PRICES conserva lo que hacía el lector propio que
+ * había acá: si al archivo le falta una clave (ej: costoLogistico) el prompt la
+ * completa, y las claves quedan en el mismo orden — el texto del prompt (y por
+ * lo tanto el prefijo del prompt cache) no cambia.
+ *
+ * Antes este archivo leía prices.json por su cuenta, solo desde DATA_DIR y con
+ * una caché de 60 s: después de cambiar un precio en el editor, los mensajes
+ * fijos del flujo ya usaban el nuevo y la IA seguía cotizando el anterior hasta
+ * un minuto.
+ */
 export async function _getPrices(): Promise<Record<string, any>> {
-    const now = Date.now();
-    if (_pricesCache && (now - _pricesCacheTime) < PRICES_CACHE_MS) return _pricesCache;
-    let prices: Record<string, any> = {
-        'Cápsulas': { '60': '54.900', '120': '68.900' },
-        'Semillas': { '60': '36.900', '120': '49.900' },
-        'Gotas': { '60': '54.900', '120': '68.900' },
-        'costoLogistico': '18.000'
-    };
-    try {
-        if (fs.existsSync(PRICES_PATH)) {
-            const data = JSON.parse(await fs.promises.readFile(PRICES_PATH, 'utf8'));
-            prices = { ...prices, ...data };
-        }
-    } catch (e: any) { logger.error("Error reading prices for AI:", e.message); }
-    _pricesCache = prices;
-    _pricesCacheTime = now;
-    return prices;
+    return { ...FALLBACK_PRICES, ..._getFlowPrices() };
 }
 
 // ── CORE PROMPT (always sent, top of system message = max attention) ──

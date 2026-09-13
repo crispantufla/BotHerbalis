@@ -4,6 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const validate = require('../../middleware/validate');
 const { pricesSchema, scriptSwitchSchema, pairingCodeSchema } = require('../../schemas/system.schema');
+const { atomicWriteFile } = require('../../../safeWrite');
+const { _getPrices } = require('../../flows/utils/pricing');
 
 module.exports = (clientPool) => {
     const router = express.Router();
@@ -637,25 +639,14 @@ module.exports = (clientPool) => {
     // --- PRICES API ---
     const PRICES_FILE = path.join(DATA_DIR, 'prices.json');
 
-    // GET /prices
+    // GET /prices — lo que muestra el Editor de Precios. Sale de pricing.ts, la
+    // misma fuente que usa el bot. Antes esta ruta leía el archivo por su cuenta
+    // y, si faltaba (volumen de Railway nuevo), devolvía una tabla escrita acá con
+    // precios VIEJOS (Cápsulas 46.900/66.900, Gotas 48.900). Como el editor guarda
+    // todos los campos juntos, tocar uno solo grababa los viejos en el resto.
     router.get('/prices', ...withSeller(clientPool), async (req, res) => {
         try {
-            try {
-                const data = await fs.promises.readFile(PRICES_FILE, 'utf-8');
-                res.json(JSON.parse(data));
-            } catch (readErr) {
-                if (readErr.code === 'ENOENT') {
-                    // Return default structure if file missing
-                    res.json({
-                        'Cápsulas': { '60': '46.900', '120': '66.900' },
-                        'Semillas': { '60': '36.900', '120': '49.900' },
-                        'Gotas': { '60': '48.900', '120': '68.900' },
-                        'costoLogistico': '18.000'
-                    });
-                } else {
-                    throw readErr;
-                }
-            }
+            res.json(_getPrices());
         } catch (e) {
             res.status(500).json({ error: e.message });
         }
@@ -676,7 +667,10 @@ module.exports = (clientPool) => {
             const dir = path.dirname(PRICES_FILE);
             await fs.promises.mkdir(dir, { recursive: true }).catch(() => {});
 
-            await fs.promises.writeFile(PRICES_FILE, JSON.stringify(newPrices, null, 2));
+            // Escritura atómica (tmp + rename): pricing.ts relee el archivo en cada
+            // mensaje, y un JSON a medio escribir lo haría caer a la tabla de respaldo.
+            const saved = await atomicWriteFile(PRICES_FILE, JSON.stringify(newPrices, null, 2));
+            if (!saved) return res.status(500).json({ error: 'No se pudo guardar prices.json' });
 
             // Notify clients via Socket (optional but good for realtime UI)
             if (io) io.emit('prices_updated', newPrices);

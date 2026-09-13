@@ -12,22 +12,26 @@ const PRICES_PATHS = [
     '/app/config/prices.json',                                // Docker safe copy (survives volume mount)
 ];
 
-// Cached resolved path to avoid searching 4 paths on every call
-let _resolvedPricesPath: string | null = null;
-
+// Qué prices.json usar: el primero de PRICES_PATHS que exista, en ese orden,
+// re-evaluado en cada lectura (a lo sumo 4 stat).
+//
+// Antes el path resuelto se cacheaba para siempre. En un volumen de Railway
+// recién creado DATA_DIR/prices.json no existe (el volumen tapa el data/ de la
+// imagen), así que se resolvía a un respaldo y quedaba pegado ahí: cuando el
+// Editor de Precios guardaba en DATA_DIR, el bot seguía cotizando el respaldo
+// hasta reiniciar.
 function _findPricesFile(): string | null {
-    if (_resolvedPricesPath && fs.existsSync(_resolvedPricesPath)) return _resolvedPricesPath;
     for (const p of PRICES_PATHS) {
-        if (fs.existsSync(p)) {
-            _resolvedPricesPath = p;
-            return p;
-        }
+        if (fs.existsSync(p)) return p;
     }
     return null;
 }
 
-// In-memory cache to avoid reading prices.json from disk on every call
+// Caché del JSON parseado, invalidada por archivo + mtime. El path es parte de
+// la clave porque el archivo activo puede cambiar (respaldo → DATA_DIR) y dos
+// archivos distintos pueden tener el mismo mtime.
 let _pricesCache: Record<string, any> | null = null;
+let _pricesCachePath: string | null = null;
 let _pricesCacheMtime: number = 0;
 
 function _loadPricesCache(): Record<string, any> {
@@ -35,22 +39,28 @@ function _loadPricesCache(): Record<string, any> {
     if (!pricesFile) throw new Error('prices.json not found in any location');
 
     try {
-        // Reload only if file was modified since last read
         const mtime = fs.statSync(pricesFile).mtimeMs;
-        if (_pricesCache && mtime === _pricesCacheMtime) return _pricesCache;
+        if (_pricesCache && pricesFile === _pricesCachePath && mtime === _pricesCacheMtime) return _pricesCache;
 
         _pricesCache = JSON.parse(fs.readFileSync(pricesFile, 'utf8'));
+        _pricesCachePath = pricesFile;
         _pricesCacheMtime = mtime;
         return _pricesCache!;
     } catch (err: any) {
         logger.error(`[PRICING] Failed to read/parse ${pricesFile}: ${err.message}`);
         _pricesCache = null;
+        _pricesCachePath = null;
         _pricesCacheMtime = 0;
         throw new Error(`prices.json corrupted or unreadable at ${pricesFile}: ${err.message}`);
     }
 }
 
-const FALLBACK_PRICES: Record<string, any> = {
+// Último recurso: solo se usa si no hay prices.json en NINGUNO de los 4 paths
+// (en producción la imagen siempre trae /app/config/prices.json). Es la ÚNICA
+// tabla de precios escrita en código — aiPrompts.ts y GET /prices leen a través
+// de este módulo — y tiene que coincidir con data/prices.json del repo, la copia
+// que viaja en la imagen (lo verifica tests/prices_single_source.test.js).
+export const FALLBACK_PRICES: Record<string, any> = {
     'Cápsulas': { '60': '54.900', '120': '68.900' },
     'Semillas': { '60': '36.900', '120': '49.900' },
     'Gotas': { '60': '54.900', '120': '68.900' },
