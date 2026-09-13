@@ -460,14 +460,15 @@ describe('errores', () => {
     });
 });
 
-describe('easter egg de audio', () => {
-    // aiService.generateAudio no existe en ningún lado del repo: este camino
-    // SIEMPRE termina en la disculpa. Se fija acá tal cual está hoy.
-    test('"marta mandame un audio" termina en la disculpa', async () => {
+describe('"marta mandame un audio"', () => {
+    // Era un easter egg que pedía aiService.generateAudio, un método que no
+    // existe en ningún lado del repo: siempre terminaba en "Uy, tuve un
+    // problemita con el audio". Se sacó el 2026-09-13; ahora es un mensaje más.
+    test('ya no es un comando: sigue como cualquier texto', async () => {
         const h = mkHarness();
         await h.handler(mkMsg({ body: 'marta mandame un audio' }));
-        expect(h.ctx.client.sendMessage).toHaveBeenCalledWith(CLIENTE, 'Uy, tuve un problemita con el audio, ¡perdoná!');
-        expect(h.ctx.pendingMessages.size).toBe(0);
+        expect(h.ctx.client.sendMessage).not.toHaveBeenCalled();
+        expect(h.ctx.pendingMessages.get(CLIENTE).messages.map(m => m.text)).toEqual(['marta mandame un audio']);
         record('easter egg audio', h);
     });
 });

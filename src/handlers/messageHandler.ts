@@ -7,8 +7,6 @@
 import * as steps from './incomingSteps';
 import type { HandlerRuntime } from './incomingSteps';
 const logger = require('../utils/logger');
-const { MessageMedia } = require('whatsapp-web.js');
-const { aiService } = require('../services/ai');
 const { _cleanPhone, _isAdminPhone } = require('../flows/utils/flowHelpers');
 
 
@@ -84,28 +82,6 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
             // 6. Al chat del panel (audio e imagen ya se registraron en el paso 4).
             if (msg.type !== 'ptt' && msg.type !== 'audio' && msg.type !== 'image') {
                 logAndEmit(userId, 'user', msgText, userState[userId]?.step || 'new');
-            }
-
-            // Special: audio request
-            if (msgText.toLowerCase() === 'marta mandame un audio') {
-                try {
-                    const chat2 = await msg.getChat();
-                    await chat2.sendStateRecording();
-                } catch (e) { /* ignore */ }
-                try {
-                    const audioText = '¡Hola! Acá Elena del equipo de Herbalis. Contame, ¿en qué te puedo ayudar hoy?';
-                    const base64Audio = await aiService.generateAudio(audioText);
-                    if (base64Audio) {
-                        const mediaMp3 = new MessageMedia('audio/mp3', base64Audio, 'audio.mp3');
-                        await client.sendMessage(userId, mediaMp3, { sendAudioAsVoice: true });
-                        logAndEmit(userId, 'bot', `AUDIO ENVIADO: "${audioText}"`, userState[userId]?.step);
-                    } else {
-                        await client.sendMessage(userId, 'Uh, perdoná, se me complicó mandar el audio ahora.');
-                    }
-                } catch (e: any) {
-                    await client.sendMessage(userId, 'Uy, tuve un problemita con el audio, ¡perdoná!');
-                }
-                return;
             }
 
             // 7. Pausas: global y por cliente.
