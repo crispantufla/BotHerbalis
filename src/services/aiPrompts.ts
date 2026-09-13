@@ -14,6 +14,8 @@
 
 import logger from '../utils/logger';
 import { _getPrices as _getFlowPrices, FALLBACK_PRICES } from '../flows/utils/pricing';
+import type { APIContext } from './ai';
+import type { HistoryMessage } from '../types/state';
 
 // --- RAG RULE BASE ---
 const RULE_BASE = [
@@ -323,7 +325,7 @@ REGLAS DE ESTE PASO:
 - 🛑 El empuje a cápsulas se justifica SOLO por practicidad/popularidad, NUNCA por ser "más potentes" o "más efectivas" (eso es invención prohibida — las 3 son igual de efectivas para bajar de peso).
 - Si tiene gastritis/úlcera/acidez: cápsulas o gotas (semillas pueden irritar — sí es una contraindicación real).
 - Habla en PASADO ("yo tomaba semillas"): NO es elección actual. "¡Qué bueno que las conocés! ¿Querés ir con semillas de nuevo o probás otra forma?"
-- Precios: Si piden "precio" genérico: "$${prices['Semillas']?.['60'] || '36.900'} a $${prices['Gotas']?.['120'] || '68.900'}". Si insisten/piden todos: dar detalle completo.`;
+- Precios: Si piden "precio" genérico: "$${prices['Semillas']?.['60'] || FALLBACK_PRICES['Semillas']['60']} a $${prices['Gotas']?.['120'] || FALLBACK_PRICES['Gotas']['120']}". Si insisten/piden todos: dar detalle completo.`;
 }
 
 function _getModulePlanChoice(prices: Record<string, any>, mpOn: boolean = true): string {
@@ -335,7 +337,7 @@ PRECIOS EXACTOS:
 - Cápsulas: $${prices['Cápsulas']['60']} (60d) / $${prices['Cápsulas']['120']} (120d)
 - Semillas: $${prices['Semillas']['60']} (60d) / $${prices['Semillas']['120']} (120d)
 - Gotas: $${prices['Gotas']['60']} (60d) / $${prices['Gotas']['120']} (120d)
-- Costo logístico por rechazo/no retiro: $${prices.costoLogistico || '18.000'}
+- Costo logístico por rechazo/no retiro: $${prices.costoLogistico || FALLBACK_PRICES.costoLogistico}
 
 ARGUMENTO 120 vs 60 (recomendá en 1ª persona y por SU caso, no como dato neutro): si tiene varios kilos para bajar o duda entre 60 y 120, tomá partido en una frase: "Para los kilos que querés bajar, yo te iría con el de 120 — es el tratamiento completo y la grasa no vuelve 👌". Anclá el porqué en lo que ÉL te dijo (los kilos, que es la primera vez, que lo quiere mantener). El de 60 es para quien ya lo hizo antes o quiere probar primero. Con autoridad, no un folleto comparativo.
 
@@ -409,7 +411,7 @@ PAGO Y ENVÍO — NOTAS DE ESTE PASO:
 - Correo Argentino NO abre sábados / domingos.NO controlamos día / hora exacta.
 - CONDICIÓN SÁBADO: Si el cliente dice "mejor si es sábado", "entreguen el sábado" o similar durante la confirmación: NO confirmes el pedido(goalMet = false).Respondé EXACTAMENTE: "Los carteros normalmente no trabajan los sabados, en caso de no poder entregartelo en persona podrias ir a buscarlo a la sucursal no?" y esperá su afirmación.
 - Si pide día específico: "No podemos garantizar porque depende del correo."
-- CIERRE DE RETIRO — PLAZO + COMPROMISO: cuando el cliente elige retiro en sucursal, fijá expectativa y compromiso en una frase: "Cuando llega te avisamos y te damos el código de retiro, tenés 3 días para retirarlo. Eso sí: si no lo retirás y el correo lo devuelve, queda a tu cargo el costo logístico de $${prices.costoLogistico || '18.000'} 😊". 🛑 Solo condiciones reales; NO declares el pedido confirmado.
+- CIERRE DE RETIRO — PLAZO + COMPROMISO: cuando el cliente elige retiro en sucursal, fijá expectativa y compromiso en una frase: "Cuando llega te avisamos y te damos el código de retiro, tenés 3 días para retirarlo. Eso sí: si no lo retirás y el correo lo devuelve, queda a tu cargo el costo logístico de $${prices.costoLogistico || FALLBACK_PRICES.costoLogistico} 😊". 🛑 Solo condiciones reales; NO declares el pedido confirmado.
         - RETIRO TERCEROS: Si preguntan si OTRA PERSONA puede recibir o ir a retirar al correo: "Sí, puede recibirlo o retirarlo en sucursal cualquier persona mayor de edad con tu DNI (o fotocopia) y una nota de autorización tuya."
 
     INDECISIÓN:
@@ -564,4 +566,148 @@ export async function _buildSystemPrompt(step: string, userText: string = "", st
         _getStepModule(step, prices, mpOn),     // MIDDLE — step-specific context (+ consumption if relevant)
         _getExtractionRules()                   // BOTTOM — max attention (data extraction instructions)
     ].join('\n\n');
+}
+
+// ── Turno user de chat() ──────────────────────────────────────────────────
+// Lo que cambia con cada mensaje: conocimiento del paso, estado del cliente,
+// historial y último mensaje del bot. Salió de AIService.chat(), donde estaba
+// inline. 🛑 Nada de esto puede ir al system (rompería el prefijo del prompt
+// cache para todas las llamadas): va siempre en el turno user.
+
+/** Conocimiento del paso para el turno user: precios, dosis, envío y pago según la etapa. */
+export async function _buildKnowledgeContext(context: APIContext, mpOn: boolean): Promise<string> {
+    let knowledgeContext = "";
+    if (context.knowledge && context.knowledge.flow) {
+        const faq = context.knowledge.faq || [];
+        const step = context.step || 'general';
+
+        const priceData = await _getPrices();
+        // Política mayo 2026 (rev 2): ya no hay adicional $6.000 ni seña/anticipo.
+        // Contrarrembolso = retiro en sucursal, paga total al retirar (sin anticipo previo).
+        const priceCaps60 = priceData['Cápsulas']?.['60'] || FALLBACK_PRICES['Cápsulas']['60'];
+        const priceCaps120 = priceData['Cápsulas']?.['120'] || FALLBACK_PRICES['Cápsulas']['120'];
+        const priceSem60 = priceData['Semillas']?.['60'] || FALLBACK_PRICES['Semillas']['60'];
+        const priceSem120 = priceData['Semillas']?.['120'] || FALLBACK_PRICES['Semillas']['120'];
+        const priceGotas60 = priceData['Gotas']?.['60'] || FALLBACK_PRICES['Gotas']['60'];
+        const priceGotas120 = priceData['Gotas']?.['120'] || FALLBACK_PRICES['Gotas']['120'];
+
+        const priceString = `Cápsulas($${priceCaps60}/60d, $${priceCaps120}/120d) | Semillas($${priceSem60}/60d, $${priceSem120}/120d) | Gotas($${priceGotas60}/60d, $${priceGotas120}/120d)`;
+
+        knowledgeContext = `INFORMACIÓN RELEVANTE PARA ESTE PASO: \n`;
+
+        const pathInfo = faq.find((q: any) => q.keywords.includes('diabetes'))?.response || "";
+        if (pathInfo) knowledgeContext += `- SOBRE PATOLOGÍAS: "${pathInfo}"\n`;
+
+        if (['waiting_weight', 'waiting_preference'].includes(step)) {
+            knowledgeContext += `- 3 OPCIONES DE PRODUCTO: Cápsulas (forma práctica), Gotas (forma líquida, suave al estómago), Semillas (forma 100% natural, ritual de infusión nocturna). Las 3 son igual de efectivas; si el cliente pide recomendación, andá con cápsulas por practicidad/popularidad (sin afirmar que es más efectiva).\n`;
+            knowledgeContext += `- DOSIS por kilos: hasta 10 kg → 60 días; 10-20 kg → 120 días (sobra un poco, sirve mantenimiento); más de 20 kg → 120 días (lo que el cuerpo necesita).\n`;
+            knowledgeContext += `- Gastritis/úlcera/acidez: cápsulas o gotas (semillas pueden irritar). Es la única razón médica para descartar una forma.\n`;
+            knowledgeContext += `- Contraindicaciones: solo embarazo y lactancia.NO menores de edad.\n`;
+            knowledgeContext += `- PRECIOS (COTIZÁ EN CONTEXTO): Si YA recomendaste un producto o el cliente ya mostró interés/eligió uno (ej cápsulas) y pregunta el precio, dale SOLO los 2 planes (60 y 120 días) de ESE producto — NO la lista de los 3. La lista completa SOLO si todavía no hay un producto en foco, o si piden "precio de todos"/"lista de precios". Si no hay foco y preguntan "precio" a secas, decí el rango "$${priceSem60} a $${priceGotas120}". Datos de precios (elegí el producto que corresponda): ${priceString}.\n`;
+            knowledgeContext += `- ENVÍO Y PAGO: Envío gratis por Correo Argentino. 2 opciones: retiro en sucursal (paga en efectivo al retirar, 7 a 10 días hábiles) o envío a domicilio prepago con ${mpOn ? 'tarjeta de crédito o transferencia' : 'transferencia bancaria (el pago con tarjeta está fuera de servicio: NO lo menciones)'} (más rápido, 4 días hábiles). NUNCA menciones cuotas ni anticipo.\n`;
+        } else if (step === 'waiting_price_confirmation') {
+            knowledgeContext += `- El usuario todavía NO vio precios.Tu trabajo es convencerlo de que quiera verlos.\n`;
+            knowledgeContext += `- Contraindicaciones: solo embarazo y lactancia.NO menores de edad.\n`;
+            knowledgeContext += `- (NO menciones precios específicos ni formas de pago, solo que son accesibles) \n`;
+        } else if (['waiting_plan_choice', 'closing', 'waiting_ok'].includes(step)) {
+            knowledgeContext += `- PRECIOS: ${priceString} \n`;
+            knowledgeContext += mpOn
+                ? `- POLÍTICA DE ENVÍO Y PAGO (modelo jun-2026): 2 opciones — (1) *Retiro en sucursal* → contrarrembolso, paga el TOTAL en efectivo al retirar en una sucursal de Correo Argentino (sin anticipo); (2) *Envío a domicilio* → prepago con *tarjeta de crédito* (link de pago) o *transferencia bancaria* al alias HERBALIS.TIENDA (BIO ORIGEN S.A.S.). De cara al cliente el medio online se llama "Tarjeta de crédito" (NUNCA "Mercado Pago", débito, Pago Fácil ni Rapipago). Aplica a TODOS los planes. NUNCA menciones cuotas ni anticipo de $10.000.\n`
+                : `- POLÍTICA DE ENVÍO Y PAGO: 2 opciones — (1) *Retiro en sucursal* → contrarrembolso, paga el TOTAL en efectivo al retirar en una sucursal de Correo Argentino (sin anticipo); (2) *Envío a domicilio* → prepago por *transferencia bancaria* al alias HERBALIS.TIENDA (BIO ORIGEN S.A.S.). 🛑 El pago con TARJETA está fuera de servicio en estos días: NO lo ofrezcas ni lo menciones (ni "tarjeta", ni "link de pago", ni "Mercado Pago"). Aplica a TODOS los planes. NUNCA menciones cuotas ni anticipo de $10.000.\n`;
+            knowledgeContext += `- NO mencionar 'adicional de $6.000' (esa política ya no existe). NO decir 'envío gratis solo en plan 120'.\n`;
+            knowledgeContext += `- Envío gratis por Correo Argentino. *Retiro en sucursal* (paga al retirar): *7 a 10 días hábiles*. *Envío a domicilio PREPAGO* (${mpOn ? 'tarjeta de crédito/transferencia' : 'transferencia'}): más rápido, *4 días hábiles* — usalo como argumento para cerrar el prepago.\n`;
+        } else if (step === 'waiting_data') {
+            knowledgeContext += `- Necesitamos: nombre completo, calle y número, ciudad, código postal\n`;
+            knowledgeContext += `- PROHIBIDO PEDIR NÚMERO DE TELÉFONO.Ya estamos hablando por WhatsApp, ¡ya tenemos su número! Nunca pidas este dato.\n`;
+            knowledgeContext += `- (NO ofrezcas ni menciones precios ni productos a menos que el cliente pregunte explícitamente por ellos. Si preguntan, los precios son: ${priceString}) \n`;
+        }
+
+        knowledgeContext += `(No inventes datos, usá siempre esta base)`;
+    }
+    return knowledgeContext;
+}
+
+/** Estado del cliente para el turno user: producto, carrito, total autoritativo, medio de pago, datos parciales. */
+export function _buildStateContext(context: APIContext): string {
+    // P2 #1: Add user state context (cart, product, address, authoritative total)
+    let stateContext = "";
+    if (context.userState) {
+        const s = context.userState;
+        if (s.selectedProduct) stateContext += `- Producto elegido: ${s.selectedProduct} \n`;
+        if (s.cart && s.cart.length > 0) {
+            stateContext += `- Carrito (precios base por ítem, NO son el total a pagar): ${s.cart.map(i => `${i.product} (${i.plan} días) $${i.price}`).join(', ')} \n`;
+        }
+        // Authoritative total — already includes adicional MAX / descuentos si aplican.
+        // Si el AI necesita cotizarle al cliente, DEBE usar este número y NO reconstruirlo.
+        if (s.totalPrice) {
+            stateContext += `- TOTAL AUTORITATIVO A PAGAR: $${s.totalPrice} (este es el ÚNICO total que podés cotizarle al cliente)\n`;
+        }
+        if (s.paymentMethod) {
+            const pmLabel = s.paymentMethod === 'mercadopago' ? 'Tarjeta de crédito (ya pagó online)'
+                : s.paymentMethod === 'transferencia' ? 'Transferencia bancaria'
+                : s.paymentMethod === 'contrarembolso' || s.paymentMethod === 'efectivo'
+                    ? (s.shippingChoice === 'retiro'
+                        ? 'Contrarrembolso — retiro en sucursal (paga total en efectivo al retirar)'
+                        // Legacy: state con senaAmount/senaPaid del flujo viejo. Solo se usa
+                        // para conversaciones pre-may-2026 que todavía estén abiertas.
+                        : (s.senaPaid && s.senaAmount
+                            ? `[Legacy] Contra reembolso con seña pagada ($${(s.senaAmount || 0).toLocaleString('es-AR').replace(/,/g, '.')} por MP, saldo al cartero)`
+                            : (s.senaAmount && s.senaAmount > 0
+                                ? `[Legacy] Contra reembolso (esperando seña de $${s.senaAmount.toLocaleString('es-AR').replace(/,/g, '.')})`
+                                : 'Contrarrembolso — retiro en sucursal (paga total en efectivo al retirar)')))
+                : s.paymentMethod;
+            stateContext += `- Método de pago elegido: ${pmLabel}\n`;
+        }
+        if (s.partialAddress && Object.keys(s.partialAddress).length > 0) {
+            const a = s.partialAddress;
+            stateContext += `- Datos parciales: ${a.nombre || '?'}, ${a.calle || '?'}, ${a.ciudad || '?'}, CP ${a.cp || '?'} \n`;
+        }
+    }
+    if (stateContext) {
+        stateContext = `\nESTADO DEL CLIENTE: \n${stateContext} `;
+    }
+    return stateContext;
+}
+
+/**
+ * El turno user en sus dos variantes: con el historial embebido como texto
+ * (path OpenAI y Claude no estructurado) y sin historial (Claude estructurado,
+ * donde el hilo viaja como turnos reales en messages[]).
+ */
+export function _buildChatUserPrompts(
+    userText: string,
+    context: APIContext,
+    conversationHistory: HistoryMessage[],
+    summaryContext: string,
+    knowledgeContext: string,
+    stateContext: string
+): { userPrompt: string; userPromptNoHistory: string } {
+    // El historial va embebido como texto (modo clásico, path OpenAI y Claude
+    // no-estructurado). En modo estructurado (flag, solo Claude) se omite acá y
+    // viaja como turnos user/assistant reales en messages[] (ver branch de Claude).
+    const historyText = conversationHistory.map(m => `${m.role}: ${m.content}`).join('\n');
+    // Anti-repetición explícita: Claude respeta mucho mejor "no repitas ESTA frase"
+    // que el steer genérico (el replay de sep-2026 mostró calcos casi textuales del
+    // mensaje anterior en envío/pago y en cierres de plan). Va en el turno user
+    // (contenido dinámico), así no toca el prefijo cacheado del system.
+    const lastBotMsg = [...conversationHistory].reverse().find(m => m.role !== 'user' && typeof m.content === 'string' && m.content.trim());
+    const lastBotContext = lastBotMsg
+        ? `TU ÚLTIMO MENSAJE (PROHIBIDO repetirlo textual o casi textual — si tenés que volver a decir lo mismo, reformulalo con otras palabras y sumá algo nuevo): "${lastBotMsg.content.replace(/\s+/g, ' ').slice(0, 400)}"
+`
+        : '';
+    const buildUserPrompt = (historySection: string, withInstructions: boolean) => `
+${summaryContext}
+${knowledgeContext}
+${stateContext}
+ETAPA ACTUAL: "${context.step || 'general'}"
+OBJETIVO DEL PASO: "${context.goal || 'Ayudar al cliente'}"
+${historySection}
+${lastBotContext}MENSAJE DEL USUARIO: "${userText}"
+${withInstructions ? '\n' + RESPONSE_INSTRUCTIONS + '\n' : '\nAplicá las INSTRUCCIONES DE RESPUESTA del system.\n'}`;
+
+    // Con historial embebido (path OpenAI + Claude no-estructurado): idéntico a antes.
+    // Sin historial embebido (Claude estructurado): el hilo va como turnos en messages[].
+    const userPrompt = buildUserPrompt(`\nHISTORIAL RECIENTE:\n${historyText}\n`, true);
+    const userPromptNoHistory = buildUserPrompt('', false);
+    return { userPrompt, userPromptNoHistory };
 }

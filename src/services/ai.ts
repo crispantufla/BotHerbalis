@@ -9,7 +9,7 @@ import * as crypto from 'crypto';
 import { UserState, HistoryMessage } from '../types/state';
 import { lookupSemanticCache, storeSemanticCache } from './semanticCache';
 import { buildHistoryTurns, ChatTurn } from './historyTurns';
-import { _buildSystemBlocks, _buildSystemPrompt, RESPONSE_INSTRUCTIONS, _getPrices } from './aiPrompts';
+import { _buildSystemBlocks, _buildSystemPrompt, _buildKnowledgeContext, _buildStateContext, _buildChatUserPrompts } from './aiPrompts';
 
 // WhatsApp usa "*" para negrita, no "**" (markdown estándar). Si la IA devuelve
 // **bold** o ## heading, en WhatsApp se renderiza con los asteriscos literales:
@@ -119,6 +119,25 @@ const CLAUDE_DIALOG_TOOL = {
         required: ["response", "goalMet"]
     }
 };
+
+// El mismo tool para el path OpenAI (formato function calling). Estaba escrito
+// inline dentro de la llamada en chat().
+const OPENAI_DIALOG_TOOL = {
+    type: "function",
+    function: {
+        name: "control_dialog_flow",
+        description: "Emite la respuesta al usuario y gestiona el embudo de ventas",
+        parameters: {
+            type: "object",
+            properties: {
+                response: { type: "string", description: "Tu respuesta para el cliente. DEBE SER PROPORCIONAL al mensaje del usuario. Si el usuario escribe mucho o se nota vulnerable, tu respuesta debe ser extensa, de varios párrafos si es necesario, súper empática. Si solo hace una pregunta rápida, responde rápido." },
+                goalMet: { type: "boolean", description: "Si el usuario o cliente cumplió el objetivo del paso actual" },
+                extractedData: { type: "string", description: "Datos extraidos de la intencion del usuario (ej: producto, quejas, edad), o vacio" }
+            },
+            required: ["response", "goalMet"]
+        }
+    }
+} as const;
 // History window (ENTRADAS de array, no turnos: ~2 entradas por turno, así que
 // 60 ≈ 25-30 turnos reales). Subido de 30→60 (jun-2026) junto con los turnos
 // estructurados + system cacheado (ver WA_STRUCTURED_TURNS): con el system
@@ -161,6 +180,20 @@ const CACHE_TTL_SECONDS = 45 * 60; // 45 min cache for node-cache
 // --- CIRCUIT BREAKER ---
 const CIRCUIT_BREAKER_THRESHOLD = 3;   // consecutive failures to open circuit
 const CIRCUIT_BREAKER_RESET_MS = 30_000; // 30s cooldown before retrying
+
+/**
+ * ¿La charla ya tiene números o datos propios (total, carrito, postdatado,
+ * dirección)? Entonces no se usa el cache semántico: una respuesta cacheada
+ * podría filtrarle a este cliente el pedido de otro.
+ */
+function _hasOrderContext(userStateSnap: UserState | undefined): boolean {
+    return !!(
+        userStateSnap?.totalPrice ||
+        (userStateSnap?.cart && userStateSnap.cart.length > 0) ||
+        userStateSnap?.postdatado ||
+        (userStateSnap?.partialAddress && Object.keys(userStateSnap.partialAddress).length > 0)
+    );
+}
 
 
 
@@ -444,120 +477,14 @@ class AIService {
             summaryContext = `RESUMEN PREVIO: \n"${context.summary}"\n\n`;
         }
 
-        let knowledgeContext = "";
-        if (context.knowledge && context.knowledge.flow) {
-            const faq = context.knowledge.faq || [];
-            const step = context.step || 'general';
-
-            const priceData = await _getPrices();
-            // Política mayo 2026 (rev 2): ya no hay adicional $6.000 ni seña/anticipo.
-            // Contrarrembolso = retiro en sucursal, paga total al retirar (sin anticipo previo).
-            const priceCaps60 = priceData['Cápsulas']?.['60'] || '54.900';
-            const priceCaps120 = priceData['Cápsulas']?.['120'] || '68.900';
-            const priceSem60 = priceData['Semillas']?.['60'] || '36.900';
-            const priceSem120 = priceData['Semillas']?.['120'] || '49.900';
-            const priceGotas60 = priceData['Gotas']?.['60'] || '54.900';
-            const priceGotas120 = priceData['Gotas']?.['120'] || '68.900';
-
-            const priceString = `Cápsulas($${priceCaps60}/60d, $${priceCaps120}/120d) | Semillas($${priceSem60}/60d, $${priceSem120}/120d) | Gotas($${priceGotas60}/60d, $${priceGotas120}/120d)`;
-
-            knowledgeContext = `INFORMACIÓN RELEVANTE PARA ESTE PASO: \n`;
-
-            const pathInfo = faq.find((q: any) => q.keywords.includes('diabetes'))?.response || "";
-            if (pathInfo) knowledgeContext += `- SOBRE PATOLOGÍAS: "${pathInfo}"\n`;
-
-            if (['waiting_weight', 'waiting_preference'].includes(step)) {
-                knowledgeContext += `- 3 OPCIONES DE PRODUCTO: Cápsulas (forma práctica), Gotas (forma líquida, suave al estómago), Semillas (forma 100% natural, ritual de infusión nocturna). Las 3 son igual de efectivas; si el cliente pide recomendación, andá con cápsulas por practicidad/popularidad (sin afirmar que es más efectiva).\n`;
-                knowledgeContext += `- DOSIS por kilos: hasta 10 kg → 60 días; 10-20 kg → 120 días (sobra un poco, sirve mantenimiento); más de 20 kg → 120 días (lo que el cuerpo necesita).\n`;
-                knowledgeContext += `- Gastritis/úlcera/acidez: cápsulas o gotas (semillas pueden irritar). Es la única razón médica para descartar una forma.\n`;
-                knowledgeContext += `- Contraindicaciones: solo embarazo y lactancia.NO menores de edad.\n`;
-                knowledgeContext += `- PRECIOS (COTIZÁ EN CONTEXTO): Si YA recomendaste un producto o el cliente ya mostró interés/eligió uno (ej cápsulas) y pregunta el precio, dale SOLO los 2 planes (60 y 120 días) de ESE producto — NO la lista de los 3. La lista completa SOLO si todavía no hay un producto en foco, o si piden "precio de todos"/"lista de precios". Si no hay foco y preguntan "precio" a secas, decí el rango "$${priceSem60} a $${priceGotas120}". Datos de precios (elegí el producto que corresponda): ${priceString}.\n`;
-                knowledgeContext += `- ENVÍO Y PAGO: Envío gratis por Correo Argentino. 2 opciones: retiro en sucursal (paga en efectivo al retirar, 7 a 10 días hábiles) o envío a domicilio prepago con ${mpOn ? 'tarjeta de crédito o transferencia' : 'transferencia bancaria (el pago con tarjeta está fuera de servicio: NO lo menciones)'} (más rápido, 4 días hábiles). NUNCA menciones cuotas ni anticipo.\n`;
-            } else if (step === 'waiting_price_confirmation') {
-                knowledgeContext += `- El usuario todavía NO vio precios.Tu trabajo es convencerlo de que quiera verlos.\n`;
-                knowledgeContext += `- Contraindicaciones: solo embarazo y lactancia.NO menores de edad.\n`;
-                knowledgeContext += `- (NO menciones precios específicos ni formas de pago, solo que son accesibles) \n`;
-            } else if (['waiting_plan_choice', 'closing', 'waiting_ok'].includes(step)) {
-                knowledgeContext += `- PRECIOS: ${priceString} \n`;
-                knowledgeContext += mpOn
-                    ? `- POLÍTICA DE ENVÍO Y PAGO (modelo jun-2026): 2 opciones — (1) *Retiro en sucursal* → contrarrembolso, paga el TOTAL en efectivo al retirar en una sucursal de Correo Argentino (sin anticipo); (2) *Envío a domicilio* → prepago con *tarjeta de crédito* (link de pago) o *transferencia bancaria* al alias HERBALIS.TIENDA (BIO ORIGEN S.A.S.). De cara al cliente el medio online se llama "Tarjeta de crédito" (NUNCA "Mercado Pago", débito, Pago Fácil ni Rapipago). Aplica a TODOS los planes. NUNCA menciones cuotas ni anticipo de $10.000.\n`
-                    : `- POLÍTICA DE ENVÍO Y PAGO: 2 opciones — (1) *Retiro en sucursal* → contrarrembolso, paga el TOTAL en efectivo al retirar en una sucursal de Correo Argentino (sin anticipo); (2) *Envío a domicilio* → prepago por *transferencia bancaria* al alias HERBALIS.TIENDA (BIO ORIGEN S.A.S.). 🛑 El pago con TARJETA está fuera de servicio en estos días: NO lo ofrezcas ni lo menciones (ni "tarjeta", ni "link de pago", ni "Mercado Pago"). Aplica a TODOS los planes. NUNCA menciones cuotas ni anticipo de $10.000.\n`;
-                knowledgeContext += `- NO mencionar 'adicional de $6.000' (esa política ya no existe). NO decir 'envío gratis solo en plan 120'.\n`;
-                knowledgeContext += `- Envío gratis por Correo Argentino. *Retiro en sucursal* (paga al retirar): *7 a 10 días hábiles*. *Envío a domicilio PREPAGO* (${mpOn ? 'tarjeta de crédito/transferencia' : 'transferencia'}): más rápido, *4 días hábiles* — usalo como argumento para cerrar el prepago.\n`;
-            } else if (step === 'waiting_data') {
-                knowledgeContext += `- Necesitamos: nombre completo, calle y número, ciudad, código postal\n`;
-                knowledgeContext += `- PROHIBIDO PEDIR NÚMERO DE TELÉFONO.Ya estamos hablando por WhatsApp, ¡ya tenemos su número! Nunca pidas este dato.\n`;
-                knowledgeContext += `- (NO ofrezcas ni menciones precios ni productos a menos que el cliente pregunte explícitamente por ellos. Si preguntan, los precios son: ${priceString}) \n`;
-            }
-
-            knowledgeContext += `(No inventes datos, usá siempre esta base)`;
-        }
-
-        // P2 #1: Add user state context (cart, product, address, authoritative total)
-        let stateContext = "";
-        if (context.userState) {
-            const s = context.userState;
-            if (s.selectedProduct) stateContext += `- Producto elegido: ${s.selectedProduct} \n`;
-            if (s.cart && s.cart.length > 0) {
-                stateContext += `- Carrito (precios base por ítem, NO son el total a pagar): ${s.cart.map(i => `${i.product} (${i.plan} días) $${i.price}`).join(', ')} \n`;
-            }
-            // Authoritative total — already includes adicional MAX / descuentos si aplican.
-            // Si el AI necesita cotizarle al cliente, DEBE usar este número y NO reconstruirlo.
-            if (s.totalPrice) {
-                stateContext += `- TOTAL AUTORITATIVO A PAGAR: $${s.totalPrice} (este es el ÚNICO total que podés cotizarle al cliente)\n`;
-            }
-            if (s.paymentMethod) {
-                const pmLabel = s.paymentMethod === 'mercadopago' ? 'Tarjeta de crédito (ya pagó online)'
-                    : s.paymentMethod === 'transferencia' ? 'Transferencia bancaria'
-                    : s.paymentMethod === 'contrarembolso' || s.paymentMethod === 'efectivo'
-                        ? (s.shippingChoice === 'retiro'
-                            ? 'Contrarrembolso — retiro en sucursal (paga total en efectivo al retirar)'
-                            // Legacy: state con senaAmount/senaPaid del flujo viejo. Solo se usa
-                            // para conversaciones pre-may-2026 que todavía estén abiertas.
-                            : (s.senaPaid && s.senaAmount
-                                ? `[Legacy] Contra reembolso con seña pagada ($${(s.senaAmount || 0).toLocaleString('es-AR').replace(/,/g, '.')} por MP, saldo al cartero)`
-                                : (s.senaAmount && s.senaAmount > 0
-                                    ? `[Legacy] Contra reembolso (esperando seña de $${s.senaAmount.toLocaleString('es-AR').replace(/,/g, '.')})`
-                                    : 'Contrarrembolso — retiro en sucursal (paga total en efectivo al retirar)')))
-                    : s.paymentMethod;
-                stateContext += `- Método de pago elegido: ${pmLabel}\n`;
-            }
-            if (s.partialAddress && Object.keys(s.partialAddress).length > 0) {
-                const a = s.partialAddress;
-                stateContext += `- Datos parciales: ${a.nombre || '?'}, ${a.calle || '?'}, ${a.ciudad || '?'}, CP ${a.cp || '?'} \n`;
-            }
-        }
-        if (stateContext) {
-            stateContext = `\nESTADO DEL CLIENTE: \n${stateContext} `;
-        }
-
-        // El historial va embebido como texto (modo clásico, path OpenAI y Claude
-        // no-estructurado). En modo estructurado (flag, solo Claude) se omite acá y
-        // viaja como turnos user/assistant reales en messages[] (ver branch de Claude).
-        const historyText = conversationHistory.map(m => `${m.role}: ${m.content}`).join('\n');
-        // Anti-repetición explícita: Claude respeta mucho mejor "no repitas ESTA frase"
-        // que el steer genérico (el replay de sep-2026 mostró calcos casi textuales del
-        // mensaje anterior en envío/pago y en cierres de plan). Va en el turno user
-        // (contenido dinámico), así no toca el prefijo cacheado del system.
-        const lastBotMsg = [...conversationHistory].reverse().find(m => m.role !== 'user' && typeof m.content === 'string' && m.content.trim());
-        const lastBotContext = lastBotMsg
-            ? `TU ÚLTIMO MENSAJE (PROHIBIDO repetirlo textual o casi textual — si tenés que volver a decir lo mismo, reformulalo con otras palabras y sumá algo nuevo): "${lastBotMsg.content.replace(/\s+/g, ' ').slice(0, 400)}"
-`
-            : '';
-        const buildUserPrompt = (historySection: string, withInstructions: boolean) => `
-${summaryContext}
-${knowledgeContext}
-${stateContext}
-ETAPA ACTUAL: "${context.step || 'general'}"
-OBJETIVO DEL PASO: "${context.goal || 'Ayudar al cliente'}"
-${historySection}
-${lastBotContext}MENSAJE DEL USUARIO: "${userText}"
-${withInstructions ? '\n' + RESPONSE_INSTRUCTIONS + '\n' : '\nAplicá las INSTRUCCIONES DE RESPUESTA del system.\n'}`;
-
-        // Con historial embebido (path OpenAI + Claude no-estructurado): idéntico a antes.
-        // Sin historial embebido (Claude estructurado): el hilo va como turnos en messages[].
-        const userPrompt = buildUserPrompt(`\nHISTORIAL RECIENTE:\n${historyText}\n`, true);
-        const userPromptNoHistory = buildUserPrompt('', false);
+        // Turno user (conocimiento del paso, estado del cliente, historial, último
+        // mensaje del bot): se arma en aiPrompts.ts con el resto del texto de los
+        // prompts. Nunca va al system, que tiene que quedar estable para el cache.
+        const knowledgeContext = await _buildKnowledgeContext(context, mpOn);
+        const stateContext = _buildStateContext(context);
+        const { userPrompt, userPromptNoHistory } = _buildChatUserPrompts(
+            userText, context, conversationHistory, summaryContext, knowledgeContext, stateContext
+        );
 
         try {
             const step = context.step || 'general';
@@ -581,13 +508,7 @@ ${withInstructions ? '\n' + RESPONSE_INSTRUCTIONS + '\n' : '\nAplicá las INSTRU
             // Respects conversation-specific state: if totalPrice, cart items,
             // or a postdatado are present, we skip the cache because a cached
             // reply could leak the wrong numbers/context into another chat.
-            const userStateSnap = context.userState;
-            const hasOrderContext = !!(
-                userStateSnap?.totalPrice ||
-                (userStateSnap?.cart && userStateSnap.cart.length > 0) ||
-                userStateSnap?.postdatado ||
-                (userStateSnap?.partialAddress && Object.keys(userStateSnap.partialAddress).length > 0)
-            );
+            const hasOrderContext = _hasOrderContext(context.userState);
             // En el playground (context.forceClaude definido) NO usamos el semantic
             // cache: si no, GPT y Claude devolverían la MISMA respuesta cacheada y no
             // se podrían comparar. Tampoco queremos contaminar el cache de prod con
@@ -645,22 +566,7 @@ ${withInstructions ? '\n' + RESPONSE_INSTRUCTIONS + '\n' : '\nAplicá las INSTRU
                         { role: "system", content: systemPrompt },
                         { role: "user", content: userPrompt }
                     ],
-                    tools: [{
-                        type: "function",
-                        function: {
-                            name: "control_dialog_flow",
-                            description: "Emite la respuesta al usuario y gestiona el embudo de ventas",
-                            parameters: {
-                                type: "object",
-                                properties: {
-                                    response: { type: "string", description: "Tu respuesta para el cliente. DEBE SER PROPORCIONAL al mensaje del usuario. Si el usuario escribe mucho o se nota vulnerable, tu respuesta debe ser extensa, de varios párrafos si es necesario, súper empática. Si solo hace una pregunta rápida, responde rápido." },
-                                    goalMet: { type: "boolean", description: "Si el usuario o cliente cumplió el objetivo del paso actual" },
-                                    extractedData: { type: "string", description: "Datos extraidos de la intencion del usuario (ej: producto, quejas, edad), o vacio" }
-                                },
-                                required: ["response", "goalMet"]
-                            }
-                        }
-                    }],
+                    tools: [OPENAI_DIALOG_TOOL],
                     tool_choice: { type: "function", function: { name: "control_dialog_flow" } },
                     temperature: 0.6,
                     // Cap a 800 — WhatsApp responses son cortas (~3 párrafos max).
