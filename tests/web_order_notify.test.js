@@ -4,6 +4,18 @@
  * llegar al formato de WhatsApp Argentina (549 + área + número).
  */
 require('dotenv').config();
+
+// notifyWebOrder deja a la clienta en pausa, y pauseUser persiste esa pausa en
+// la DB. Este test no mockeaba la DB y el .env apunta a PRODUCCIÓN, así que cada
+// corrida de la suite escribía la pausa en prod — pasó con 5493412619397, un
+// contacto real de horacio, que quedó pausado con motivo "Compra web
+// confirmada" sin haber comprado nada (detectado el 2026-09-13).
+jest.mock('../db', () => ({
+    prisma: {
+        user: { upsert: jest.fn().mockResolvedValue({}), update: jest.fn().mockResolvedValue({}) },
+    },
+}));
+
 const {
     phoneCandidates, buildCustomerMessage, buildAdminMessage, pickInstance,
     resolveWhatsappId, notifyWebOrder,
@@ -103,6 +115,10 @@ describe('notifyWebOrder', () => {
     const mkPool = (client) => ({
         getAllSellers: () => [{ sellerId: 'horacio', client, sharedState: { isConnected: true, config: { alertNumbers: ['5491100000000'] }, pausedUsers: new Set(), logAndEmit: jest.fn() } }],
     });
+    const mkSharedState = (extra = {}) => ({
+        isConnected: true, config: { alertNumbers: [] }, pausedUsers: new Set(), logAndEmit: jest.fn(), ...extra,
+    });
+    const poolWith = (client, ss) => ({ getAllSellers: () => [{ sellerId: 'horacio', client, sharedState: ss }] });
 
     test('envía a la clienta y a los admins, y reclama whatsappNotifiedAt', async () => {
         const client = { sendMessage: jest.fn(async () => ({ id: { _serialized: 'x' } })) };
@@ -141,5 +157,34 @@ describe('notifyWebOrder', () => {
         const r = await notifyWebOrder({ orderId: order.id, clientPool: mkPool(client), prisma });
         expect(r).toMatchObject({ ok: false, httpStatus: 502 });
         expect(prisma.webOrder.updateMany).toHaveBeenLastCalledWith(expect.objectContaining({ data: { whatsappNotifiedAt: null } }));
+    });
+
+    test('si la clienta ya tenía chat, la confirmación queda en el historial que lee la IA', async () => {
+        const client = { sendMessage: jest.fn(async () => ({})) };
+        const chat = { step: 'waiting_weight', history: [{ role: 'user', content: 'hola', timestamp: 1 }] };
+        const ss = mkSharedState({ userState: { '5493412619397@c.us': chat }, saveState: jest.fn() });
+        const r = await notifyWebOrder({ orderId: order.id, clientPool: poolWith(client, ss), prisma: mkPrisma(order) });
+        expect(r.ok).toBe(true);
+        const last = chat.history[chat.history.length - 1];
+        expect(last.role).toBe('bot');
+        expect(last.content).toContain('#153EECA8');
+        expect(ss.saveState).toHaveBeenCalledWith('5493412619397@c.us');
+        expect(ss.logAndEmit).toHaveBeenCalledWith('5493412619397@c.us', 'bot', expect.stringContaining('#153EECA8'), 'web_order_confirmation');
+    });
+    test('sin chat previo no inventa un state', async () => {
+        const client = { sendMessage: jest.fn(async () => ({})) };
+        const ss = mkSharedState({ userState: {} });
+        const r = await notifyWebOrder({ orderId: order.id, clientPool: poolWith(client, ss), prisma: mkPrisma(order) });
+        expect(r.ok).toBe(true);
+        expect(ss.userState).toEqual({});
+    });
+    test('pausa a la clienta sin escribir en la DB real', async () => {
+        const { prisma: db } = require('../db');
+        db.user.upsert.mockClear();
+        const client = { sendMessage: jest.fn(async () => ({})) };
+        const ss = mkSharedState();
+        await notifyWebOrder({ orderId: order.id, clientPool: poolWith(client, ss), prisma: mkPrisma(order) });
+        expect(ss.pausedUsers.has('5493412619397@c.us')).toBe(true);
+        expect(db.user.upsert).toHaveBeenCalledTimes(1);   // el mock, no Postgres
     });
 });

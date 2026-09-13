@@ -251,9 +251,21 @@ export async function notifyWebOrder(opts: { orderId: string; clientPool: any; p
     }
     logger.info(`[WEB-NOTIFY] confirmación enviada a ${target.chatId} (pedido ${shortId(orderId)}, seller=${sellerId}, verificado=${target.verified})`);
 
-    // Envío directo (no pasa por sendMessageWithDelay): el history se anota acá.
+    // Envío directo (no pasa por sendMessageWithDelay), así que las dos
+    // anotaciones van a mano: logAndEmit al chat del panel (ChatLog) y
+    // _pushHistory al historial que lee la IA. Antes solo se hacía la primera:
+    // si la clienta ya había chateado y después la despausaban, el bot retomaba
+    // sin saber que ya compró por la web.
     try { ss?.logAndEmit?.(target.chatId, 'bot', customerMessage, 'web_order_confirmation'); } catch (e: any) {
         logger.warn(`[WEB-NOTIFY] logAndEmit falló: ${e.message}`);
+    }
+    const chatState = ss?.userState?.[target.chatId];
+    if (chatState) {
+        const { _pushHistory } = require('../flows/utils/flowHelpers');
+        _pushHistory(chatState, { role: 'bot', content: customerMessage });
+        try { ss.saveState?.(target.chatId); } catch (e: any) {
+            logger.warn(`[WEB-NOTIFY] saveState falló: ${e.message}`);
+        }
     }
     // La compra ya está hecha: si responde, que la atienda una persona y no el flujo de ventas.
     try {
