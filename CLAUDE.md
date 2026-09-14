@@ -49,6 +49,9 @@ Módulos que se separaron en la limpieza de septiembre de 2026 para sacar funcio
   lo que no es charla, dedup, admin, audio/imagen/documento, pausa, debounce).
   `messageHandler.ts` quedó como orquestador de 8 pasos numerados. Cubierto por
   `tests/message_handler.test.js`.
+- Dashboard: `CommsView` delega en `client/src/components/corporate/comms/` (armado de los
+  textos del guion en `scriptTemplates.js`, búsqueda, encabezado, modales), `GuionView` en
+  `guion/` y los interruptores de `SettingsView` en `settings/`.
 
 Flujo de un mensaje: `client.on('message')` → `messageHandler` (debounce ~N segundos para agrupar mensajes consecutivos) → encola en BullMQ → worker pulls → `processSalesFlow` → step correspondiente en `src/flows/steps/` → `sendMessageWithDelay` (4-8s delay humanizado).
 
@@ -74,7 +77,7 @@ Máquina de estados lineal con fallbacks a IA. Orden típico:
   **Sí** se llama `_pushHistory(state, { role, content })` a mano en los caminos que envían por `client.sendMessage` directo (panel, comandos del admin) y para los marcadores que no son texto enviado (`[Imagen adjunta: X]`). Nunca `state.history.push({...})` crudo: el helper inicializa `history` si falta y aplica el cap (250 → deja los 150 más recientes), que antes solo corría en `salesFlow` y dejaba crecer sin techo todo lo que no re-entra al flujo. Cubierto por `tests/push_history.test.js`.
 - **`_pauseAndAlert(...)`** — cuando el bot no sabe qué hacer, pausa al user y notifica al admin. No intentar "auto-recovery" silenciosos.
 - **Pausas NO se auto-liberan**. Un user pausado con `pauseReason` requiere intervención manual del admin. Si un outage (ej: OpenAI 429) pausa users, hay que despausarlos a mano. Única excepción: al arrancar, `restorePausedUsersFromDB` borra las pausas de más de 7 días (`STALE_PAUSE_DAYS` en `pauseService.ts`).
-- **Pricing**: siempre leer con `_getPrice/_getPrices/_getAdicionalMAX` de `pricing.ts`. NUNCA inventar precios en código ni en prompts de IA. Tampoco umbrales derivados de precios: para deducir el plan (60/120) de un monto usar `_inferPlanFromPrice`, y para el nombre canónico del producto `_normalizeProductName` (ambos en `pricing.ts`). Hasta el 2026-09-09 esa lógica estaba duplicada con umbrales hardcodeados en `botHelpers.ts` y `order.routes.js` (ver `stepWaitingFinalConfirmation.ts` para el patrón: se inyecta `pricingContext` en el prompt). El respaldo si falta `data/prices.json` es `FALLBACK_PRICES` (también en `pricing.ts`) y tiene que igualar al JSON. `GET /prices`, los flujos y los prompts leen por la misma función, así que un cambio en el Editor de Precios se ve en la lectura siguiente (cubierto por `tests/prices_single_source.test.js`).
+- **Pricing**: siempre leer con `_getPrice/_getPrices/_getAdicionalMAX` de `pricing.ts`. NUNCA inventar precios en código ni en prompts de IA. Tampoco umbrales derivados de precios: para deducir el plan (60/120) de un monto usar `_inferPlanFromPrice`, y para el nombre canónico del producto `_normalizeProductName` (ambos en `pricing.ts`). Hasta el 2026-09-09 esa lógica estaba duplicada con umbrales hardcodeados en `botHelpers.ts` y `order.routes.js` (ver `stepWaitingFinalConfirmation.ts` para el patrón: se inyecta `pricingContext` en el prompt). El respaldo si falta `data/prices.json` es `FALLBACK_PRICES` (también en `pricing.ts`) y tiene que igualar al JSON. `GET /prices`, los flujos y los prompts leen por la misma función, así que un cambio en el Editor de Precios se ve en la lectura siguiente (cubierto por `tests/prices_single_source.test.js`). En el panel, los textos del guion con precios pasan por `fillPricePlaceholders` (`client/src/utils/scriptPlaceholders.js`) con lo que devuelve `/api/prices`: sin precios cargados, el placeholder queda visible.
 - **Interruptor de Mercado Pago**: `config.mpEnabled` (switch "Pago con tarjeta" en Configuración, default ON). En OFF el bot no ofrece ni genera links: domicilio ⇒ transferencia directa, y quien pida tarjeta recibe un aviso de "fuera de servicio". Leerlo SIEMPRE con `isMpEnabled(dependencies.config)` de `flows/utils/paymentOptions.ts`. Si agregás copy que nombre la tarjeta: en código usá `prepayMeans/prepayMenu`; en `knowledge_v7.json` agregá una variante `responseNoMp` (la eligen `getFlowTemplate(key, knowledge, mpOff)` y `globalFaq`). Los prompts de IA lo reciben vía `context.mpEnabled`, que inyecta el proxy de `salesFlow` — no hace falta pasarlo por call site.
 - **Adicional contrarembolso**: solo aplica a plan 60 + pagos en efectivo/contrarembolso. MP/transferencia lo exime. Recalcular tras cambios de plan/producto (no confiar en `isContraReembolsoMAX` previo).
 - **DB upserts bajo race**: código P2002 de Prisma = concurrent upsert race. Ignorar (ver `botHelpers.ts:65`).
@@ -154,10 +157,12 @@ y `wipe-semantic-cache`). Todo recuperable del historial de git.
   anidados que devuelven, así que pesan menos de lo que dice el número. Partirlas implica
   recablear cómo se arma `sharedState` — mucho movimiento en el arranque para poca ganancia
   de lectura. `createMessageHandler` se partió el 2026-09-13 (ver `incomingSteps.ts`).
-- Dashboard (`client/`): `npm run lint` deja 31 hallazgos (19 errores / 12 warnings), de las
-  reglas del React Compiler (que no se usa), `exhaustive-deps` y fast refresh. No son bugs
-  hoy; pesan si se adopta el compilador. El bundle es un solo chunk de ~1,5 MB: recharts y
-  emoji-picker se descargan aunque no se abra la vista que los usa.
+- Dashboard (`client/`): `npm run lint` da 0 errores y 1 warning (`@tanstack/react-virtual` no
+  es compatible con el React Compiler, que no se usa). Los effects que sincronizan con algo de
+  afuera (servidor, socket, localStorage, react-query) llevan
+  `eslint-disable-next-line react-hooks/set-state-in-effect` con el motivo: uno nuevo sin
+  motivo es error. recharts (Estadísticas) y emoji-picker van con `React.lazy` dentro de
+  `LazyBoundary`, y `main.jsx` recarga una vez si tras un deploy falta un chunk.
 - Admins globales (`sellerId=null`) vs tenant admins distinción reciente — verificar scoping cuando se agregan rutas nuevas.
 
 ## Agent skills
