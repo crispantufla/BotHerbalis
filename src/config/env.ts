@@ -22,7 +22,7 @@ const env = cleanEnv(process.env, {
     JWT_SECRET: str({ default: 'dev-jwt-secret-change-in-production', desc: 'Secreto JWT para tokens de sesión' }),
 
     // API Key legacy (backward compat con dashboard antiguo)
-    API_KEY: str({ default: '', desc: 'Clave interna legacy para autenticación del dashboard' }),
+    API_KEY: str({ default: '', desc: 'Respaldo del secreto JWT cuando falta JWT_SECRET (en prod no se usa)' }),
 
     // Panel de ventas (ventas-app) — botón "Enviar a sistema".
     // Con cualquiera de las dos vacía el botón queda deshabilitado.
