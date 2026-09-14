@@ -1002,18 +1002,6 @@ module.exports = (clientPool) => {
         }
     });
 
-    // GET /waiting-customers — returns paused users with their pause reason (for dashboard panel)
-    router.get('/waiting-customers', ...withSeller(clientPool), async (req, res) => {
-        try {
-            const { getPausedUsersWithDetails } = require('../../services/pauseService');
-            const paused = await getPausedUsersWithDetails(getInstanceId(req));
-            res.json({ customers: paused });
-        } catch (e) {
-            res.status(500).json({ error: e.message });
-        }
-    });
-
-
     // DELETE /messages (Delete for everyone)
     router.delete('/messages', ...withSeller(clientPool), async (req, res) => {
         try {
