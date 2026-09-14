@@ -5,6 +5,8 @@ import {
 import api from '../../config/axios';
 import { useSocket } from '../../context/SocketContext';
 import PriceEditor from '../PriceEditor';
+import SettingSwitchCard from './settings/SettingSwitchCard';
+import { useSettingSwitch } from './settings/useSettingSwitch';
 import {
     Button, IconButton, Card, Badge, Input, useToast, cn
 } from '../ui';
@@ -34,14 +36,26 @@ const SettingsView = ({ status }) => {
 
     const [downloadingAgent, setDownloadingAgent] = useState(false);
 
-    const [recoverOldChats, setRecoverOldChats] = useState(false);
-    const [togglingRecover, setTogglingRecover] = useState(false);
-
-    const [proactiveFollowUps, setProactiveFollowUps] = useState(true);
-    const [togglingFollowUps, setTogglingFollowUps] = useState(false);
-
-    const [mpEnabled, setMpEnabled] = useState(true);
-    const [togglingMp, setTogglingMp] = useState(false);
+    // Ajustes on/off: cada uno carga su valor, escucha su evento de socket y se
+    // cambia con update optimista (ver useSettingSwitch).
+    const recoverOldChats = useSettingSwitch({
+        endpoint: '/api/config/recover-old-chats', field: 'recoverOldChats',
+        socketEvent: 'recover_old_chats_changed', defaultValue: false,
+        onText: 'Recuperación de chats antiguos activada.',
+        offText: 'Recuperación de chats antiguos desactivada.',
+    });
+    const proactiveFollowUps = useSettingSwitch({
+        endpoint: '/api/config/proactive-follow-ups', field: 'proactiveFollowUps',
+        socketEvent: 'proactive_follow_ups_changed', defaultValue: true,
+        onText: 'Seguimiento automático activado.',
+        offText: 'Seguimiento automático desactivado.',
+    });
+    const mpEnabled = useSettingSwitch({
+        endpoint: '/api/config/mercadopago', field: 'mpEnabled',
+        socketEvent: 'mercadopago_changed', defaultValue: true,
+        onText: 'Pago con tarjeta activado. El bot vuelve a ofrecer el link de pago.',
+        offText: 'Pago con tarjeta desactivado. El bot ofrece solo retiro en sucursal y transferencia.',
+    });
 
     useEffect(() => {
         (async () => {
@@ -50,18 +64,6 @@ const SettingsView = ({ status }) => {
                 if (scriptRes.data.active) setActiveScript(scriptRes.data.active);
                 if (scriptRes.data.stats) setScriptStats(scriptRes.data.stats);
             } catch (e) { console.error('Error loading script info:', e); }
-            try {
-                const recRes = await api.get('/api/config/recover-old-chats');
-                setRecoverOldChats(!!recRes.data.recoverOldChats);
-            } catch (e) { console.error('Error loading recover-old-chats:', e); }
-            try {
-                const pfRes = await api.get('/api/config/proactive-follow-ups');
-                setProactiveFollowUps(pfRes.data.proactiveFollowUps !== false);
-            } catch (e) { console.error('Error loading proactive-follow-ups:', e); }
-            try {
-                const mpRes = await api.get('/api/config/mercadopago');
-                setMpEnabled(mpRes.data.mpEnabled !== false);
-            } catch (e) { console.error('Error loading mercadopago config:', e); }
         })();
         fetchMemoryStats();
     }, []);
@@ -80,22 +82,13 @@ const SettingsView = ({ status }) => {
         const onScriptChanged = (data) => { if (data.active) setActiveScript(data.active); };
         const onMemoryReset = () => fetchMemoryStats();
         const onStatsReset = (data) => { if (data?.stats) setScriptStats(data.stats); };
-        const onRecoverChanged = (data) => { if (typeof data?.recoverOldChats === 'boolean') setRecoverOldChats(data.recoverOldChats); };
-        const onFollowUpsChanged = (data) => { if (typeof data?.proactiveFollowUps === 'boolean') setProactiveFollowUps(data.proactiveFollowUps); };
-        const onMpChanged = (data) => { if (typeof data?.mpEnabled === 'boolean') setMpEnabled(data.mpEnabled); };
         socket.on('script_changed', onScriptChanged);
         socket.on('memory_reset', onMemoryReset);
         socket.on('script_stats_reset', onStatsReset);
-        socket.on('recover_old_chats_changed', onRecoverChanged);
-        socket.on('proactive_follow_ups_changed', onFollowUpsChanged);
-        socket.on('mercadopago_changed', onMpChanged);
         return () => {
             socket.off('script_changed', onScriptChanged);
             socket.off('memory_reset', onMemoryReset);
             socket.off('script_stats_reset', onStatsReset);
-            socket.off('recover_old_chats_changed', onRecoverChanged);
-            socket.off('proactive_follow_ups_changed', onFollowUpsChanged);
-            socket.off('mercadopago_changed', onMpChanged);
         };
     }, [socket]);
 
@@ -129,60 +122,6 @@ const SettingsView = ({ status }) => {
             toast.error(msg);
         }
         setDownloadingAgent(false);
-    };
-
-    const handleToggleRecover = async () => {
-        if (togglingRecover) return;
-        const next = !recoverOldChats;
-        setTogglingRecover(true);
-        // Optimista: reflejamos el cambio ya; revertimos si el backend falla.
-        setRecoverOldChats(next);
-        try {
-            await api.post('/api/config/recover-old-chats', { enabled: next });
-            toast.success(next
-                ? 'Recuperación de chats antiguos activada.'
-                : 'Recuperación de chats antiguos desactivada.');
-        } catch (e) {
-            setRecoverOldChats(!next);
-            toast.error(e.response?.data?.error || 'Error al cambiar el ajuste');
-        }
-        setTogglingRecover(false);
-    };
-
-    const handleToggleFollowUps = async () => {
-        if (togglingFollowUps) return;
-        const next = !proactiveFollowUps;
-        setTogglingFollowUps(true);
-        // Optimista: reflejamos el cambio ya; revertimos si el backend falla.
-        setProactiveFollowUps(next);
-        try {
-            await api.post('/api/config/proactive-follow-ups', { enabled: next });
-            toast.success(next
-                ? 'Seguimiento automático activado.'
-                : 'Seguimiento automático desactivado.');
-        } catch (e) {
-            setProactiveFollowUps(!next);
-            toast.error(e.response?.data?.error || 'Error al cambiar el ajuste');
-        }
-        setTogglingFollowUps(false);
-    };
-
-    const handleToggleMp = async () => {
-        if (togglingMp) return;
-        const next = !mpEnabled;
-        setTogglingMp(true);
-        // Optimista: reflejamos el cambio ya; revertimos si el backend falla.
-        setMpEnabled(next);
-        try {
-            await api.post('/api/config/mercadopago', { enabled: next });
-            toast.success(next
-                ? 'Pago con tarjeta activado. El bot vuelve a ofrecer el link de pago.'
-                : 'Pago con tarjeta desactivado. El bot ofrece solo retiro en sucursal y transferencia.');
-        } catch (e) {
-            setMpEnabled(!next);
-            toast.error(e.response?.data?.error || 'Error al cambiar el ajuste');
-        }
-        setTogglingMp(false);
     };
 
     const handleResetMemory = async () => {
@@ -440,152 +379,62 @@ const SettingsView = ({ status }) => {
                 {/* Recuperación de chats antiguos (anti-bloqueo Meta). Va dentro
                     del stack de la col 2. Altura natural; el hueco bajo "Cambiar
                     contraseña" lo rellena la card de seguimiento (flex-1) de abajo. */}
-                <Card padding="md" className="flex flex-col">
-                    <div className="flex items-start gap-3 min-w-0 mb-3">
-                        <div className="w-10 h-10 rounded-control bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0">
-                            <History className="w-5 h-5" aria-hidden="true" />
-                        </div>
-                        <div className="min-w-0">
-                            <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm mb-1">
-                                Recuperación de chats antiguos
-                            </h3>
-                            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                                Cuando está activada, el panel le pide a WhatsApp <strong>todo el historial
-                                de conversaciones</strong> del teléfono. En números nuevos esa lectura masiva
-                                puede hacer que Meta marque la cuenta. Con esta opción <strong>apagada</strong> el
-                                panel solo muestra los chats que el bot ya atendió; el bot sigue respondiendo
-                                normalmente a los mensajes nuevos.
-                            </p>
-                        </div>
-                    </div>
-                    <div className="mt-auto flex items-center justify-between gap-3 pt-3 border-t border-slate-200/70 dark:border-slate-700/70">
-                        <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                            {recoverOldChats ? 'Activada' : 'Desactivada'}
-                            <span className="text-[11px] text-slate-400 dark:text-slate-500 font-normal ml-1.5">
-                                (recomendado: apagada en números nuevos)
-                            </span>
-                        </span>
-                        <button
-                            type="button"
-                            role="switch"
-                            aria-checked={recoverOldChats}
-                            aria-label="Recuperación de chats antiguos"
-                            onClick={handleToggleRecover}
-                            disabled={togglingRecover}
-                            className={cn(
-                                'relative inline-flex h-6 w-11 flex-shrink-0 rounded-full transition-colors',
-                                'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2',
-                                'disabled:opacity-50 disabled:cursor-not-allowed',
-                                recoverOldChats ? 'bg-accent-500' : 'bg-slate-300 dark:bg-slate-600'
-                            )}
-                        >
-                            <span className={cn(
-                                'inline-block h-5 w-5 rounded-full bg-white shadow transition-transform mt-0.5',
-                                recoverOldChats ? 'translate-x-[22px]' : 'translate-x-0.5'
-                            )} />
-                        </button>
-                    </div>
-                </Card>
+                <SettingSwitchCard
+                    className="flex flex-col"
+                    icon={History}
+                    iconClassName="bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400"
+                    title="Recuperación de chats antiguos"
+                    onLabel="Activada"
+                    offLabel="Desactivada"
+                    hint="(recomendado: apagada en números nuevos)"
+                    setting={recoverOldChats}
+                >
+                    Cuando está activada, el panel le pide a WhatsApp <strong>todo el historial
+                    de conversaciones</strong> del teléfono. En números nuevos esa lectura masiva
+                    puede hacer que Meta marque la cuenta. Con esta opción <strong>apagada</strong> el
+                    panel solo muestra los chats que el bot ya atendió; el bot sigue respondiendo
+                    normalmente a los mensajes nuevos.
+                </SettingSwitchCard>
 
                 {/* Seguimiento automático (carrito abandonado). flex-1 para
                     rellenar el hueco que queda bajo "Cambiar contraseña". */}
-                <Card padding="md" className="flex-1 flex flex-col">
-                    <div className="flex items-start gap-3 min-w-0 mb-3">
-                        <div className="w-10 h-10 rounded-control bg-sky-50 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400 flex items-center justify-center flex-shrink-0">
-                            <Send className="w-5 h-5" aria-hidden="true" />
-                        </div>
-                        <div className="min-w-0">
-                            <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm mb-1">
-                                Seguimiento automático
-                            </h3>
-                            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                                Cuando está activado, el bot le <strong>vuelve a escribir solo</strong> a los
-                                clientes que quedaron a mitad de la charla (dentro de las 24h) para reengancharlos.
-                                En números nuevos conviene <strong>apagarlo</strong>: mensajear de forma proactiva
-                                a quien no respondió es lo que más rápido marca una cuenta sin reputación. El bot
-                                sigue respondiendo normal a quien escribe.
-                            </p>
-                        </div>
-                    </div>
-                    <div className="mt-auto flex items-center justify-between gap-3 pt-3 border-t border-slate-200/70 dark:border-slate-700/70">
-                        <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                            {proactiveFollowUps ? 'Activado' : 'Desactivado'}
-                            <span className="text-[11px] text-slate-400 dark:text-slate-500 font-normal ml-1.5">
-                                (recomendado: apagado en números nuevos)
-                            </span>
-                        </span>
-                        <button
-                            type="button"
-                            role="switch"
-                            aria-checked={proactiveFollowUps}
-                            aria-label="Seguimiento automático"
-                            onClick={handleToggleFollowUps}
-                            disabled={togglingFollowUps}
-                            className={cn(
-                                'relative inline-flex h-6 w-11 flex-shrink-0 rounded-full transition-colors',
-                                'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2',
-                                'disabled:opacity-50 disabled:cursor-not-allowed',
-                                proactiveFollowUps ? 'bg-accent-500' : 'bg-slate-300 dark:bg-slate-600'
-                            )}
-                        >
-                            <span className={cn(
-                                'inline-block h-5 w-5 rounded-full bg-white shadow transition-transform mt-0.5',
-                                proactiveFollowUps ? 'translate-x-[22px]' : 'translate-x-0.5'
-                            )} />
-                        </button>
-                    </div>
-                </Card>
+                <SettingSwitchCard
+                    className="flex-1 flex flex-col"
+                    icon={Send}
+                    iconClassName="bg-sky-50 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400"
+                    title="Seguimiento automático"
+                    onLabel="Activado"
+                    offLabel="Desactivado"
+                    hint="(recomendado: apagado en números nuevos)"
+                    setting={proactiveFollowUps}
+                >
+                    Cuando está activado, el bot le <strong>vuelve a escribir solo</strong> a los
+                    clientes que quedaron a mitad de la charla (dentro de las 24h) para reengancharlos.
+                    En números nuevos conviene <strong>apagarlo</strong>: mensajear de forma proactiva
+                    a quien no respondió es lo que más rápido marca una cuenta sin reputación. El bot
+                    sigue respondiendo normal a quien escribe.
+                </SettingSwitchCard>
 
                 {/* Pago con tarjeta (Mercado Pago). Interruptor para cuando la
                     cuenta de MP está bloqueada: el guion sigue vendiendo con las
                     otras dos formas. */}
-                <Card padding="md" className="flex-1 flex flex-col">
-                    <div className="flex items-start gap-3 min-w-0 mb-3">
-                        <div className="w-10 h-10 rounded-control bg-violet-50 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 flex items-center justify-center flex-shrink-0">
-                            <CreditCard className="w-5 h-5" aria-hidden="true" />
-                        </div>
-                        <div className="min-w-0">
-                            <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm mb-1">
-                                Pago con tarjeta
-                            </h3>
-                            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                                Apagalo si la cuenta de <strong>Mercado Pago</strong> está bloqueada o caída.
-                                El bot deja de <strong>ofrecer y de generar links de pago</strong>: si un
-                                cliente pide tarjeta, le avisa que no está disponible y le ofrece
-                                <strong> retiro en sucursal</strong> (efectivo al retirar) o
-                                <strong> transferencia</strong> al alias. Los pagos ya hechos se siguen
-                                verificando normal.
-                            </p>
-                        </div>
-                    </div>
-                    <div className="mt-auto flex items-center justify-between gap-3 pt-3 border-t border-slate-200/70 dark:border-slate-700/70">
-                        <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                            {mpEnabled ? 'Activado' : 'Desactivado'}
-                            <span className="text-[11px] text-slate-400 dark:text-slate-500 font-normal ml-1.5">
-                                (apagado = sin tarjeta en el guion)
-                            </span>
-                        </span>
-                        <button
-                            type="button"
-                            role="switch"
-                            aria-checked={mpEnabled}
-                            aria-label="Pago con tarjeta"
-                            onClick={handleToggleMp}
-                            disabled={togglingMp}
-                            className={cn(
-                                'relative inline-flex h-6 w-11 flex-shrink-0 rounded-full transition-colors',
-                                'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2',
-                                'disabled:opacity-50 disabled:cursor-not-allowed',
-                                mpEnabled ? 'bg-accent-500' : 'bg-slate-300 dark:bg-slate-600'
-                            )}
-                        >
-                            <span className={cn(
-                                'inline-block h-5 w-5 rounded-full bg-white shadow transition-transform mt-0.5',
-                                mpEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'
-                            )} />
-                        </button>
-                    </div>
-                </Card>
+                <SettingSwitchCard
+                    className="flex-1 flex flex-col"
+                    icon={CreditCard}
+                    iconClassName="bg-violet-50 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400"
+                    title="Pago con tarjeta"
+                    onLabel="Activado"
+                    offLabel="Desactivado"
+                    hint="(apagado = sin tarjeta en el guion)"
+                    setting={mpEnabled}
+                >
+                    Apagalo si la cuenta de <strong>Mercado Pago</strong> está bloqueada o caída.
+                    El bot deja de <strong>ofrecer y de generar links de pago</strong>: si un
+                    cliente pide tarjeta, le avisa que no está disponible y le ofrece
+                    <strong> retiro en sucursal</strong> (efectivo al retirar) o
+                    <strong> transferencia</strong> al alias. Los pagos ya hechos se siguen
+                    verificando normal.
+                </SettingSwitchCard>
                 </div>
                 {/* /Col 2 stack */}
 
