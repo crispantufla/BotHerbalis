@@ -1,4 +1,4 @@
-import React, { useRef, useLayoutEffect, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Trash2 as Trash, Play, AlertTriangle } from 'lucide-react';
 import { API_URL } from '../../../config/api';
@@ -26,7 +26,7 @@ const formatDateSeparator = (date) => {
     }
 };
 
-const ChatMessageList = ({ messages, isLoading, chatFontSize, handleDeleteMessage, handleReportMessage, onScrollBottom }) => {
+const ChatMessageList = ({ messages, isLoading, chatFontSize, handleDeleteMessage, handleReportMessage }) => {
     const parentRef = useRef(null);
 
     const rowVirtualizer = useVirtualizer({

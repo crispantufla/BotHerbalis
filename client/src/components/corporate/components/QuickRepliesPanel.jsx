@@ -38,7 +38,7 @@ const QuickRepliesPanel = ({ onSelect, onClose }) => {
             setLoading(true);
             const res = await api.get('/api/quick-replies');
             setReplies(res.data.replies || []);
-        } catch (e) {
+        } catch {
             setError('No se pudieron cargar las respuestas');
         } finally {
             setLoading(false);
@@ -71,7 +71,7 @@ const QuickRepliesPanel = ({ onSelect, onClose }) => {
             setDeletingId(id);
             await api.delete(`/api/quick-replies/${id}`);
             setReplies(prev => prev.filter(r => r.id !== id));
-        } catch (e) {
+        } catch {
             setError('Error al eliminar');
         } finally {
             setDeletingId(null);

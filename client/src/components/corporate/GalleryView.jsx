@@ -14,8 +14,6 @@ const GalleryView = () => {
     const [filter, setFilter] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('all');
 
-    useEffect(() => { fetchGallery(); }, []);
-
     const fetchGallery = async () => {
         try {
             const res = await api.get('/api/gallery');
@@ -23,6 +21,8 @@ const GalleryView = () => {
         } catch { toast.error('Error al cargar la galería'); }
         setLoading(false);
     };
+
+    useEffect(() => { fetchGallery(); }, []);
 
     // Upload via prompt() para categoría/tags — preservamos el flujo simple
     // (cambiar a modal sería otro PR; no es la prioridad de este refactor).

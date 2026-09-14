@@ -179,7 +179,7 @@ const WebOrdersView = () => {
         }
     }, [filter]);
 
-    useEffect(() => { fetchOrders(); /* eslint-disable-next-line */ }, []);
+    useEffect(() => { fetchOrders(); }, []); // eslint-disable-line react-hooks/exhaustive-deps -- solo al montar
 
     const handleFilter = (f) => {
         setFilter(f);

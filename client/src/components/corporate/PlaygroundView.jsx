@@ -94,7 +94,7 @@ const PlaygroundView = () => {
             await api.post('/api/playground/reset', { sessionId });
             await startNewSession();
             toast.success('Conversación reseteada');
-        } catch (e) {
+        } catch {
             toast.error('Error al resetear');
         }
     };

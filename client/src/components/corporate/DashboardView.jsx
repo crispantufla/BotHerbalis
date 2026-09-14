@@ -59,7 +59,7 @@ const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData 
             await api.post('/api/config', { action: 'add', number: cleaned });
             toast.success(`Número ${cleaned} agregado`);
             window.dispatchEvent(new Event('config-updated'));
-        } catch (e) { toast.error('Error agregando número'); }
+        } catch { toast.error('Error agregando número'); }
     };
 
     const handleRemovePhone = async (num) => {
@@ -69,7 +69,7 @@ const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData 
             await api.post('/api/config', { action: 'remove', number: num });
             toast.success(`Número ${num} eliminado`);
             window.dispatchEvent(new Event('config-updated'));
-        } catch (e) { toast.error('Error eliminando número'); }
+        } catch { toast.error('Error eliminando número'); }
     };
 
     const handleAdminCommand = async (alert, command) => {
@@ -77,7 +77,7 @@ const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData 
         try {
             const res = await api.post('/api/admin-command', { chatId: alert.userPhone, command });
             toast.success(res.data?.result || `Comando enviado a ${alert.userPhone}`);
-        } catch (e) { toast.error('Error enviando comando'); }
+        } catch { toast.error('Error enviando comando'); }
     };
 
     const handleRequestPairingCode = async () => {
@@ -109,13 +109,13 @@ const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData 
             try {
                 await api.post('/api/whatsapp-logout');
                 toast.success('Desconectado. Generando nuevo QR...');
-            } catch (e) { toast.error('Error al desconectar'); }
+            } catch { toast.error('Error al desconectar'); }
         } else {
             // Not connected — just trigger a fresh start
             try {
                 await api.post('/api/whatsapp-logout');
                 toast.success('Generando código QR...');
-            } catch (e) { toast.error('Error al generar QR'); }
+            } catch { toast.error('Error al generar QR'); }
         }
     };
 
@@ -157,7 +157,7 @@ const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData 
             const res = await api.post('/api/global-pause');
             setStats(prev => ({ ...prev, globalPause: res.data.globalPause }));
             toast.success(`Bot ${res.data.globalPause ? 'pausado' : 'reactivado'}`);
-        } catch (e) {
+        } catch {
             toast.error('Error cambiando el estado del bot');
         }
     };

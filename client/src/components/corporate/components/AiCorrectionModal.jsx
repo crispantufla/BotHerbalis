@@ -54,7 +54,7 @@ const AiCorrectionModal = ({ isOpen, onClose, messages = [], reportedMsgId, sele
                 try {
                     await onDeleteMessage(reportedMsgId);
                     toast.success('Reporte guardado y mensaje eliminado del chat ✅');
-                } catch (delErr) {
+                } catch {
                     // El error ya se mostró desde onDeleteMessage; el reporte sí se guardó.
                     toast.success('Reporte guardado, pero falló eliminar el mensaje del cliente.');
                 }

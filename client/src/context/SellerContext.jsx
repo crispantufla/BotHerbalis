@@ -77,8 +77,6 @@ export const SellerProvider = ({ children }) => {
         setSelectedSellerId(home ? user.sellerId : sellers[0].sellerId);
     }, [isAdmin, sellers, selectedSellerId, setSelectedSellerId, user?.sellerId]);
 
-    const selectedSeller = sellers.find(s => s.sellerId === selectedSellerId) || null;
-
     // Merge presence into sellers list for consumers
     // sellerPresence[sellerId] = 'online' | 'idle' | undefined (offline)
     const sellersWithPresence = sellers.map(s => ({

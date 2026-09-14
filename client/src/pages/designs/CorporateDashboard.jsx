@@ -95,7 +95,7 @@ const CorporateDashboard = () => {
             // si un re-pair se interrumpe). Limpiar siempre si ambos son null.
             const phone = res.data.phoneNumber || res.data.info?.wid?.user || null;
             setConnectedPhone(phone);
-        } catch (e) { }
+        } catch { /* si falla, queda lo último que se mostró */ }
     }, []);
 
     useEffect(() => {
@@ -188,7 +188,7 @@ const CorporateDashboard = () => {
                 if (statusRes.data.config) setConfig(statusRes.data.config);
                 const phone = statusRes.data.phoneNumber || statusRes.data.info?.wid?.user || null;
                 setConnectedPhone(phone);
-            } catch (e) { }
+            } catch { /* si falla, queda lo último que se mostró */ }
         };
         loadData();
 
@@ -217,7 +217,7 @@ const CorporateDashboard = () => {
                         return; // Prevent redirecting
                     }
                 }
-            } catch (e) {
+            } catch {
                 // non-fatal, proceed
             }
 
@@ -229,7 +229,7 @@ const CorporateDashboard = () => {
 
         if (action === 'descartar') {
             setAlerts(prev => prev.filter(a => a.userPhone !== chatId && a.userPhone !== `${chatId}@c.us`));
-            try { await api.delete(`/api/alerts/${chatId}`); } catch (e) { /* silent */ }
+            try { await api.delete(`/api/alerts/${chatId}`); } catch { /* silent */ }
             return;
         }
 

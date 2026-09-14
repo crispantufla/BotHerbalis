@@ -11,12 +11,15 @@ export const useChat = (selectedChatId) => {
 
     const [instanceId, setInstanceId] = useState('default');
     const [globalPause, setGlobalPause] = useState(false);
+    // We maintain chats locally to allow manual optimistic updates fast
+    const [chats, setChats] = useState([]);
+    const [messages, setMessages] = useState([]);
 
     // Reset local chat state when seller changes
     useEffect(() => {
         setChats([]);
         setMessages([]);
-    }, [selectedSellerId]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [selectedSellerId]);
 
     // Initial Metadata Fetching (Chats list, global status)
     const { data: metaData, isLoading: isLoadingChats } = useQuery({
@@ -46,8 +49,6 @@ export const useChat = (selectedChatId) => {
         staleTime: 5000 // Cache for 5 seconds to avoid spamming
     });
 
-    // We maintain chats locally to allow manual optimistic updates fast
-    const [chats, setChats] = useState([]);
     useEffect(() => {
         if (metaData?.chats) setChats(metaData.chats);
     }, [metaData]);
@@ -75,7 +76,7 @@ export const useChat = (selectedChatId) => {
             }
         })();
         return () => { cancelled = true; };
-    }, [metaData, selectedSellerId, queryClient]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [metaData, selectedSellerId, queryClient]);
 
     const { data: messagesData, isLoading: isLoadingMessages } = useQuery({
         queryKey: ['messages', selectedChatId, selectedSellerId],
@@ -88,7 +89,6 @@ export const useChat = (selectedChatId) => {
         staleTime: 60 * 1000, // consider cached result fresh for 1 min — re-opening same chat is instant
     });
 
-    const [messages, setMessages] = useState([]);
     // Chat al que pertenece el array `messages` actual. Sirve para distinguir un
     // REFETCH del mismo chat (hay que mergear) de un CAMBIO de chat (hay que
     // reemplazar). Se actualiza inline acá, no en un effect aparte, para no

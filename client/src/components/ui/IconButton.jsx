@@ -33,7 +33,6 @@ const IconButton = React.forwardRef(function IconButton(
     ref
 ) {
     if (!label && import.meta.env?.DEV) {
-        // eslint-disable-next-line no-console
         console.warn('[IconButton] missing required `label` prop (a11y)');
     }
 
