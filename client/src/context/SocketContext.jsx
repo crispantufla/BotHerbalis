@@ -15,19 +15,16 @@ export const SocketProvider = ({ children }) => {
     // Reconnect socket when user changes (login/logout)
     useEffect(() => {
         const token = localStorage.getItem('token');
-        const apiKey = import.meta.env.VITE_API_KEY;
 
-        // Don't connect if no auth available
-        if (!token && !apiKey) {
+        // Sin sesión no hay socket: el servidor solo acepta el JWT.
+        if (!token) {
             setSocket(null);
             setIsConnected(false);
             return;
         }
 
-        const auth = token ? { token } : { apiKey };
-
         const newSocket = io(API_URL, {
-            auth,
+            auth: { token },
             reconnection: true,
             reconnectionAttempts: Infinity,
             reconnectionDelay: 1000,
@@ -37,12 +34,10 @@ export const SocketProvider = ({ children }) => {
         });
 
         newSocket.on('connect', () => {
-            console.log('Socket connected');
             setIsConnected(true);
         });
 
         newSocket.on('disconnect', () => {
-            console.log('Socket disconnected');
             setIsConnected(false);
         });
 

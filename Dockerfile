@@ -42,8 +42,6 @@ RUN npx prisma generate
 RUN mkdir -p /app/config && cp /app/data/prices.json /app/config/prices.json 2>/dev/null || true
 
 # Build Client
-ARG VITE_API_KEY
-ENV VITE_API_KEY=$VITE_API_KEY
 RUN cd client && npm run build
 
 # Set production environment for runtime

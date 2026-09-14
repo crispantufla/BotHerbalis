@@ -11,13 +11,7 @@ const api = axios.create({
 // Inject JWT token and seller context into every request
 api.interceptors.request.use((config) => {
     const token = localStorage.getItem('token');
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-    } else {
-        // Legacy fallback for API_KEY during migration
-        const apiKey = import.meta.env.VITE_API_KEY;
-        if (apiKey) config.headers['x-api-key'] = apiKey;
-    }
+    if (token) config.headers.Authorization = `Bearer ${token}`;
 
     // Inject selected seller for admin multi-tenant context.
     // Only inject if not already explicitly set by the request (even to '' = "all sellers").
