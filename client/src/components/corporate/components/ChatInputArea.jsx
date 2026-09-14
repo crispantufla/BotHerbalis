@@ -1,4 +1,4 @@
-import React, { useRef, useState, lazy, Suspense } from 'react';
+import React, { useRef, useState, useLayoutEffect, lazy, Suspense } from 'react';
 import { Send, Paperclip, Smile, Zap, CreditCard, FileText } from 'lucide-react';
 import QuickRepliesPanel from './QuickRepliesPanel';
 import MpLinkPanel from './MpLinkPanel';
@@ -6,6 +6,9 @@ import LazyBoundary from '../../ui/LazyBoundary';
 
 // El selector de emojis (~300 KB con sus datos) se descarga la primera vez que se abre.
 const EmojiPicker = lazy(() => import('emoji-picker-react'));
+
+// Alto máximo de la caja de mensaje (igual a max-h-40); pasado eso, scrollea.
+const MAX_INPUT_HEIGHT = 160;
 
 const ChatInputArea = ({
     input,
@@ -18,9 +21,23 @@ const ChatInputArea = ({
     chatId
 }) => {
     const fileInputRef = useRef(null);
+    const textareaRef = useRef(null);
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [showQuickReplies, setShowQuickReplies] = useState(false);
     const [showMpLink, setShowMpLink] = useState(false);
+
+    // La caja crece con el texto: los pasos del guion tienen varias líneas.
+    useLayoutEffect(() => {
+        const el = textareaRef.current;
+        if (!el) return;
+        el.style.height = 'auto';
+        const borders = el.offsetHeight - el.clientHeight;
+        el.style.height = `${Math.min(el.scrollHeight + borders, MAX_INPUT_HEIGHT)}px`;
+    }, [input]);
+
+    // El mismo criterio que el botón de enviar: sin texto ni adjunto, o mientras
+    // sube un adjunto, Enter no manda nada (antes Ctrl+Enter podía mandar dos veces).
+    const canSend = (input.trim() || attachment) && !sendingMedia;
 
     const handleFileSelect = (e) => {
         const file = e.target.files[0];
@@ -110,7 +127,7 @@ const ChatInputArea = ({
                     <button type="button" onClick={() => setAttachment(null)} className="p-2 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-rose-100 dark:hover:bg-rose-900/50 hover:text-rose-600 dark:hover:text-rose-400 rounded-xl transition-colors shrink-0">✕</button>
                 </div>
             )}
-            <form onSubmit={attachment ? (e) => { e.preventDefault(); handleSendMedia(); } : handleSend} className="flex gap-1 sm:gap-3 items-center w-full">
+            <form onSubmit={attachment ? (e) => { e.preventDefault(); handleSendMedia(); } : handleSend} className="flex gap-1 sm:gap-3 items-end w-full">
                 <input ref={fileInputRef} type="file" accept="image/*,application/pdf" onChange={handleFileSelect} className="hidden" />
 
                 <button type="button" onClick={() => { setShowEmojiPicker(prev => !prev); setShowQuickReplies(false); }} className={`w-9 h-9 sm:w-12 sm:h-12 flex items-center justify-center shrink-0 rounded-xl sm:rounded-2xl border transition-all shadow-sm ${showEmojiPicker ? 'bg-indigo-50 dark:bg-slate-600 border-indigo-300 dark:border-indigo-500/50 text-indigo-600 dark:text-indigo-400' : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 hover:bg-indigo-50 dark:hover:bg-slate-600'}`}>
@@ -129,23 +146,28 @@ const ChatInputArea = ({
                     <Paperclip className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
 
-                <input
-                    type="text"
+                <textarea
+                    ref={textareaRef}
+                    rows={1}
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onFocus={() => { setShowEmojiPicker(false); setShowQuickReplies(false); setShowMpLink(false); }}
                     onKeyDown={(e) => {
                         if (e.key === 'Escape') { setShowEmojiPicker(false); }
-                        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                        // Enter envía; Shift+Enter agrega un salto de línea. Mientras un
+                        // teclado IME está componiendo, Enter confirma el carácter y no envía.
+                        if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                             e.preventDefault();
+                            if (!canSend) return;
                             if (attachment) handleSendMedia();
                             else handleSend(e);
                         }
                     }}
+                    enterKeyHint="send"
                     placeholder="Mensaje..."
-                    className="w-full min-w-0 flex-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl sm:rounded-2xl px-3 sm:px-6 py-2 sm:py-4 text-slate-800 dark:text-slate-200 font-medium focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-all shadow-inner placeholder:text-slate-400 dark:placeholder:text-slate-500 text-[15px] sm:text-base"
+                    className="block w-full min-w-0 flex-1 resize-none max-h-40 overflow-y-auto bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl sm:rounded-2xl px-3 sm:px-6 py-2 sm:py-4 text-slate-800 dark:text-slate-200 font-medium leading-snug focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-[border-color,box-shadow] shadow-inner placeholder:text-slate-400 dark:placeholder:text-slate-500 text-[15px] sm:text-base"
                 />
-                <button type="submit" disabled={(!input.trim() && !attachment) || sendingMedia} className="w-9 h-9 sm:w-12 sm:h-12 flex items-center justify-center shrink-0 rounded-xl sm:rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100">
+                <button type="submit" disabled={!canSend} className="w-9 h-9 sm:w-12 sm:h-12 flex items-center justify-center shrink-0 rounded-xl sm:rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100">
                     {sendingMedia ? <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <Send className="w-4 h-4 sm:w-5 sm:h-5" />}
                 </button>
             </form>
