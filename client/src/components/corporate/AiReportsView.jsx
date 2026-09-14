@@ -26,7 +26,7 @@ const AiReportsView = () => {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [toast]);
 
     useEffect(() => { fetchReports(); }, [fetchReports]);
 

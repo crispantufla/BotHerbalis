@@ -67,7 +67,7 @@ const AccountsView = () => {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [toast]);
 
     useEffect(() => { fetchData(); }, [fetchData]);
 

@@ -58,6 +58,7 @@ const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onC
         const paymentMethod = allowedPayments.includes(prefill.paymentMethod)
             ? prefill.paymentMethod
             : allowedPayments[0];
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- el formulario se rellena con el prefill cada vez que se abre el modal
         setData({
             nombre: prefill.nombre || '',
             calle: prefill.calle || '',

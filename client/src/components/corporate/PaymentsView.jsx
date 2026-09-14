@@ -183,9 +183,9 @@ const PaymentsView = ({ onGoToChat }) => {
         } finally {
             setLoading(false);
         }
-    }, [filter, sellerFilter, isAdmin]);
+    }, [filter, sellerFilter, isAdmin, toast]);
 
-    useEffect(() => { fetchPayments(); }, []);
+    useEffect(() => { fetchPayments(); }, []); // eslint-disable-line react-hooks/exhaustive-deps -- solo al montar: los filtros llaman a fetchPayments
     // Recargar al cambiar filtro de vendedor.
     useEffect(() => {
         if (!isAdmin) return;

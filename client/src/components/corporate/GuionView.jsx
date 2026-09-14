@@ -54,7 +54,7 @@ const GuionView = () => {
         } catch (e) {
             toast.error('Error cargando guiones: ' + (e.response?.data?.error || e.message));
         }
-    }, []);
+    }, [toast]);
 
     const fetchComments = useCallback(async (script) => {
         try {
@@ -63,7 +63,7 @@ const GuionView = () => {
         } catch {
             toast.error('Error cargando comentarios');
         }
-    }, []);
+    }, [toast]);
 
     const fetchCounts = useCallback(async () => {
         try {
@@ -88,11 +88,11 @@ const GuionView = () => {
             await fetchComments(activeScript);
             setLoading(false);
         })();
-    }, [fetchGuiones, fetchCounts, fetchPrices]);
+    }, [fetchGuiones, fetchCounts, fetchPrices, fetchComments, activeScript]);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- recarga los comentarios al cambiar de guion (el setState va después del await)
         fetchComments(activeScript);
-        setExpandedSection(null);
     }, [activeScript, fetchComments]);
 
     // Auto-expandir etapas que tengan comentarios pendientes. Solo cuando
@@ -101,6 +101,7 @@ const GuionView = () => {
     useEffect(() => {
         const pending = comments.filter(c => !c.resolved);
         if (pending.length === 0) return;
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- abre las etapas con comentarios pendientes cuando llegan, por fetch o por socket
         setExpandedStages(prev => {
             const next = new Set(prev);
             for (const group of STAGE_GROUPS) {
@@ -286,7 +287,7 @@ const GuionView = () => {
                         <button
                             key={scriptKey}
                             type="button"
-                            onClick={() => setActiveScript(scriptKey)}
+                            onClick={() => { if (scriptKey !== activeScript) setExpandedSection(null); setActiveScript(scriptKey); }}
                             className={cn(
                                 'inline-flex items-center gap-2 px-3 h-9 rounded-control text-xs font-semibold transition-colors',
                                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500',

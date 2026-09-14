@@ -18,6 +18,7 @@ export const AuthProvider = ({ children }) => {
         if (storedUser && storedToken) {
             try {
                 const parsed = JSON.parse(storedUser);
+                // eslint-disable-next-line react-hooks/set-state-in-effect -- restaura la sesión de localStorage al montar; los hijos no se pintan hasta terminar
                 setUser(parsed);
                 if (parsed.sellerId && !localStorage.getItem('selectedSellerId')) {
                     localStorage.setItem('selectedSellerId', parsed.sellerId);

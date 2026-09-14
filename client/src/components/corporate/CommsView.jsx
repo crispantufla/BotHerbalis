@@ -125,10 +125,11 @@ const CommsView = ({ initialChatId, onChatSelected, onChatOpened, alerts = [], o
         }
     }, [initialChatId, chats, onChatSelected]);
 
+    // Al cambiar de chat se borra el resumen del anterior.
     useEffect(() => {
-        if (!selectedChat) return;
+        if (!selectedChatId) return;
         setSummaryText(null);
-    }, [selectedChat?.id]);
+    }, [selectedChatId]);
 
     // ─── Handlers ──────────────────────────────────────────────────────────
 

@@ -177,7 +177,7 @@ const WebOrdersView = () => {
         } finally {
             setLoading(false);
         }
-    }, [filter]);
+    }, [filter, toast]);
 
     useEffect(() => { fetchOrders(); }, []); // eslint-disable-line react-hooks/exhaustive-deps -- solo al montar
 

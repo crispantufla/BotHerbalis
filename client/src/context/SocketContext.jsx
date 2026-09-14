@@ -18,6 +18,7 @@ export const SocketProvider = ({ children }) => {
 
         // Sin sesión no hay socket: el servidor solo acepta el JWT.
         if (!token) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- sin sesión se limpia el socket; el effect maneja el ciclo de vida de la conexión
             setSocket(null);
             setIsConnected(false);
             return;

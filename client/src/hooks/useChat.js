@@ -17,6 +17,7 @@ export const useChat = (selectedChatId) => {
 
     // Reset local chat state when seller changes
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- al cambiar de seller se vacía lo que se veía del anterior
         setChats([]);
         setMessages([]);
     }, [selectedSellerId]);
@@ -50,6 +51,7 @@ export const useChat = (selectedChatId) => {
     });
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- copia local de los chats de react-query, para los updates optimistas y del socket
         if (metaData?.chats) setChats(metaData.chats);
     }, [metaData]);
 
@@ -100,6 +102,7 @@ export const useChat = (selectedChatId) => {
         // para no mezclar mensajes de dos conversaciones.
         if (messagesChatIdRef.current !== selectedChatId) {
             messagesChatIdRef.current = selectedChatId;
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- une el historial de react-query con lo que llegó por socket mientras estaba en vuelo
             setMessages(messagesData || []);
             return;
         }

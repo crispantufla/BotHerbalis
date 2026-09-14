@@ -258,7 +258,7 @@ function DailySection({ daily }) {
 
 // ─── 3. HEATMAP 7 DÍAS × 24 HORAS ───────────────────────────────
 function HeatmapSection({ heatmap, selectedSeller, onSelectSeller }) {
-    const accounts = heatmap?.accounts || [];
+    const accounts = useMemo(() => heatmap?.accounts || [], [heatmap]);
 
     const displayMatrix = useMemo(() => {
         if (!accounts.length) return null;

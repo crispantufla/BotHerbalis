@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Upload, Search, Filter, Trash2, Maximize, Image as ImageIcon } from 'lucide-react';
 import api from '../../config/axios';
 import { API_URL } from '../../config/api';
@@ -14,15 +14,16 @@ const GalleryView = () => {
     const [filter, setFilter] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('all');
 
-    const fetchGallery = async () => {
+    const fetchGallery = useCallback(async () => {
         try {
             const res = await api.get('/api/gallery');
             setImages(res.data);
         } catch { toast.error('Error al cargar la galería'); }
         setLoading(false);
-    };
+    }, [toast]);
 
-    useEffect(() => { fetchGallery(); }, []);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial desde el servidor (el setState va después del await)
+    useEffect(() => { fetchGallery(); }, [fetchGallery]);
 
     // Upload via prompt() para categoría/tags — preservamos el flujo simple
     // (cambiar a modal sería otro PR; no es la prioridad de este refactor).

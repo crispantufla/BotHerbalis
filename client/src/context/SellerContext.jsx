@@ -39,6 +39,7 @@ export const SellerProvider = ({ children }) => {
         if (isAdmin) {
             // Any admin (with or without a home sellerId) can see all sellers
             // and switch between them. Home sellerId is just their default.
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- carga los sellers (admin) o fija el seller propio (vendedor) cuando cambia el usuario
             loadSellers();
         } else {
             // Regular seller: locked to their own sellerId.
@@ -74,6 +75,7 @@ export const SellerProvider = ({ children }) => {
         const current = sellers.find(s => s.sellerId === selectedSellerId);
         if (current) return;
         const home = user?.sellerId && sellers.find(s => s.sellerId === user.sellerId);
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- elige un seller por defecto cuando llega la lista
         setSelectedSellerId(home ? user.sellerId : sellers[0].sellerId);
     }, [isAdmin, sellers, selectedSellerId, setSelectedSellerId, user?.sellerId]);
 

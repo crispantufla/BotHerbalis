@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AlertTriangle, MessageCircle, Send, Package, MapPin, CheckCircle2, Sparkles, X } from 'lucide-react';
 import { Card, Button, IconButton, Badge, EmptyState } from '../../ui';
 
@@ -6,6 +6,13 @@ const AlertsPanel = ({ alerts, onCommand, onQuickAction }) => {
     const [adminInputs, setAdminInputs] = useState({});
     const [sendingCommand, setSendingCommand] = useState({});
     const [expandedCards, setExpandedCards] = useState({});
+    // Hora de referencia para los "hace 5m": se refresca sola cada minuto, así las
+    // alertas envejecen aunque no llegue nada nuevo.
+    const [now, setNow] = useState(() => Date.now());
+    useEffect(() => {
+        const id = setInterval(() => setNow(Date.now()), 60_000);
+        return () => clearInterval(id);
+    }, []);
 
     const handleSend = async (alert, command) => {
         if (!command.trim()) return;
@@ -18,7 +25,7 @@ const AlertsPanel = ({ alerts, onCommand, onQuickAction }) => {
     const toggleExpand = (id) => setExpandedCards(prev => ({ ...prev, [id]: !prev[id] }));
 
     const getTimeDiff = (timestamp) => {
-        const diff = Date.now() - new Date(timestamp).getTime();
+        const diff = now - new Date(timestamp).getTime();
         const mins = Math.floor(diff / 60000);
         if (mins < 1) return 'Ahora';
         if (mins < 60) return `${mins}m`;

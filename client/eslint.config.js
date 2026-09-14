@@ -26,6 +26,12 @@ export default defineConfig([
       // Mayúscula = componente. El core de ESLint no cuenta `<Icon />` como uso, así
       // que un `icon: Icon` desestructurado en los argumentos daba falso positivo.
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]', argsIgnorePattern: '^[A-Z_]' }],
+      // Cada contexto exporta su hook (useAuth, useToast…) junto al Provider: es el
+      // patrón de todo el panel y separarlos en otro archivo no aporta.
+      'react-refresh/only-export-components': ['error', {
+        allowConstantExport: true,
+        allowExportNames: ['useAuth', 'useSeller', 'useSocket', 'useTheme', 'useToast'],
+      }],
     },
   },
 ])
