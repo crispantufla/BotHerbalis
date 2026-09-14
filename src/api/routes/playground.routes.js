@@ -184,15 +184,6 @@ module.exports = () => {
         res.json({ ok: true, state: session.userState[userId] });
     });
 
-    // GET /playground/state — devuelve state actual (para refresh del panel lateral).
-    router.get('/playground/state', jwtAuthMiddleware, async (req, res) => {
-        const { sessionId } = req.query;
-        if (!sessionId) return res.status(400).json({ error: 'sessionId requerido' });
-        const session = sessions.get(sessionId);
-        const userId = `playground_${sessionId}`;
-        res.json({ state: session?.userState?.[userId] || null });
-    });
-
     // POST /playground/new-session — devuelve un sessionId fresco generado server-side.
     // El frontend lo puede pedir al cargar la vista.
     router.post('/playground/new-session', jwtAuthMiddleware, async (req, res) => {

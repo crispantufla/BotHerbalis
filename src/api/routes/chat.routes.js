@@ -560,19 +560,6 @@ module.exports = (clientPool) => {
         }
     });
 
-    // POST /chats/:id/read
-    router.post('/chats/:id/read', ...withSeller(clientPool), async (req, res) => {
-        try {
-            const cl = req.sellerInstance?.client;
-            const chatId = await resolveChatId(req.params.id, cl, req.sellerId);
-            const chat = await cl?.getChatById(chatId);
-            await chat.sendSeen();
-            res.json({ success: true });
-        } catch (e) {
-            res.status(500).json({ error: e.message });
-        }
-    });
-
     // GET /chat-state/:id — state liviano del cliente para resolver placeholders
     // del guion en el panel del agente ({{PRODUCT_DETAIL}}, {{PLAN_DETAIL}},
     // {{TOTAL}}, {{LINK}}…). Devuelve solo lo que el panel necesita; si el bot

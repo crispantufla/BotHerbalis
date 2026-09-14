@@ -48,33 +48,6 @@ module.exports = (clientPool) => {
         }
     });
 
-    // PUT /quick-replies/:id — update (ownership check)
-    router.put('/quick-replies/:id', ...withSeller(clientPool), async (req, res) => {
-        try {
-            const instanceId = getInstanceId(req);
-            const existing = await prisma.quickReply.findUnique({ where: { id: req.params.id } });
-            if (!existing) return res.status(404).json({ error: 'No encontrada' });
-            if (instanceId && existing.instanceId !== instanceId)
-                return res.status(403).json({ error: 'No autorizado' });
-
-            const { title, message } = req.body;
-            if (!title?.trim() || !message?.trim())
-                return res.status(400).json({ error: 'title y message son requeridos' });
-
-            const updated = await prisma.quickReply.update({
-                where: { id: req.params.id },
-                data: { title: title.trim(), message: message.trim() },
-            });
-            res.json({ reply: updated });
-        } catch (e) {
-            if (e.code === 'P2002') {
-                return res.status(409).json({ error: 'Ya existe una respuesta con ese título' });
-            }
-            logger.error('[QUICK-REPLIES] Error updating:', e);
-            res.status(500).json({ error: e.message });
-        }
-    });
-
     // DELETE /quick-replies/:id — delete (ownership check)
     router.delete('/quick-replies/:id', ...withSeller(clientPool), async (req, res) => {
         try {
