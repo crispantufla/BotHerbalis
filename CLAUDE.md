@@ -13,7 +13,7 @@ Bot de WhatsApp multi-tenant para ventas. Un único proceso Node corre N vendedo
 - **DB**: PostgreSQL via Prisma 7. Todas las tablas están particionadas por `instanceId` (= `sellerId`).
 - **Queue**: BullMQ sobre Redis. Una queue por seller: `whatsapp-messages-${sellerId}`.
 - **Locks**: Redlock sobre Redis, compartido entre sellers. Lock keys incluyen `sellerId`.
-- **AI**: OpenAI (GPT + embeddings). Circuit breaker con cooldown de 30s tras 3 fallos consecutivos (ver `src/services/ai.ts`).
+- **AI**: Claude (Sonnet/Haiku) conversa en prod. OpenAI queda para los embeddings del cache semántico, la transcripción de audios y el path GPT de `ai.ts`. Circuit breaker con cooldown de 30s tras 3 fallos consecutivos (ver `src/services/ai.ts`).
 - **Frontend**: React + Vite en `client/`. Servido estático por Express desde `client/dist/`.
 
 ## Arquitectura
@@ -29,7 +29,7 @@ index.ts                    # Boot: Redlock + clientPool + Express
        └─ messageHandler    # debounce + rutea a salesFlow
 ```
 
-Módulos que se separaron el 2026-09-09 para sacar funciones gigantes de encima:
+Módulos que se separaron en la limpieza de septiembre de 2026 para sacar funciones gigantes de encima:
 
 - `src/flows/leadClassifier.ts` — qué hacer con un teléfono del que no hay estado (los
   dos checks contra Orders y contra el historial de chat). Salió de `processSalesFlow`,
@@ -39,10 +39,16 @@ Módulos que se separaron el 2026-09-09 para sacar funciones gigantes de encima:
   (`BANG_COMMANDS`) en vez del if-chain de 659 líneas que era. Agregar un comando =
   agregar una entrada. `adminService.ts` NO lo re-exporta a propósito (sería un ciclo):
   los consumidores requieren `./adminCommands` directo.
-- `src/services/aiPrompts.ts` — todo el texto de los prompts y su ensamblado
-  (`_buildSystemBlocks`, `_buildSystemPrompt`). `ai.ts` se quedó con el runtime del
-  servicio. Cambiar algo acá mueve el prefijo del prompt cache: verificar con
-  `scripts/ai-cache-probe.ts`.
+- `src/services/aiPrompts.ts` — todo el texto de los prompts y su ensamblado: el system
+  (`_buildSystemBlocks`, `_buildSystemPrompt`) y el turno user de `chat()`
+  (`_buildKnowledgeContext`, `_buildStateContext`, `_buildChatUserPrompts`). `ai.ts` se
+  quedó con el runtime del servicio. Cambiar algo acá mueve el prefijo del prompt cache:
+  verificar con `scripts/ai-cache-probe.ts`. Los payloads exactos que `chat()` le manda a
+  Claude y a OpenAI están fijados en `tests/ai_chat_payloads.test.js`.
+- `src/handlers/incomingSteps.ts` — los pasos con nombre del handler de entrada (descartar
+  lo que no es charla, dedup, admin, audio/imagen/documento, pausa, debounce).
+  `messageHandler.ts` quedó como orquestador de 8 pasos numerados. Cubierto por
+  `tests/message_handler.test.js`.
 
 Flujo de un mensaje: `client.on('message')` → `messageHandler` (debounce ~N segundos para agrupar mensajes consecutivos) → encola en BullMQ → worker pulls → `processSalesFlow` → step correspondiente en `src/flows/steps/` → `sendMessageWithDelay` (4-8s delay humanizado).
 
@@ -67,13 +73,14 @@ Máquina de estados lineal con fallbacks a IA. Orden típico:
   El motivo: `sendMessageWithDelay` devuelve `false` sin enviar en cinco caminos (guard anti venta-fantasma, anti-duplicado, pausa durante el delay de 4-8s, `stillValid`, excepción del cliente). Mientras el push lo hacía cada call site, cualquiera de esos cinco dejaba en el historial un mensaje que el cliente nunca recibió, y la IA arrancaba el turno siguiente creyendo que ya lo había dicho — de 143 call sites solo 6 miraban el booleano. Es el mismo criterio por el que `logAndEmit` ya se había movido adentro (ver [[dashboard-message-ordering]]). Cubierto por `tests/phantom_history.test.js`.
   **Sí** se llama `_pushHistory(state, { role, content })` a mano en los caminos que envían por `client.sendMessage` directo (panel, comandos del admin) y para los marcadores que no son texto enviado (`[Imagen adjunta: X]`). Nunca `state.history.push({...})` crudo: el helper inicializa `history` si falta y aplica el cap (250 → deja los 150 más recientes), que antes solo corría en `salesFlow` y dejaba crecer sin techo todo lo que no re-entra al flujo. Cubierto por `tests/push_history.test.js`.
 - **`_pauseAndAlert(...)`** — cuando el bot no sabe qué hacer, pausa al user y notifica al admin. No intentar "auto-recovery" silenciosos.
-- **Pausas NO se auto-liberan**. Un user pausado con `pauseReason` requiere intervención manual del admin. Si un outage (ej: OpenAI 429) pausa users, hay que despausarlos a mano.
-- **Pricing**: siempre leer con `_getPrice/_getPrices/_getAdicionalMAX` de `pricing.ts`. NUNCA inventar precios en código ni en prompts de IA. Tampoco umbrales derivados de precios: para deducir el plan (60/120) de un monto usar `_inferPlanFromPrice`, y para el nombre canónico del producto `_normalizeProductName` (ambos en `pricing.ts`). Hasta el 2026-09-09 esa lógica estaba duplicada con umbrales hardcodeados en `botHelpers.ts` y `order.routes.js` (ver `stepWaitingFinalConfirmation.ts` para el patrón: se inyecta `pricingContext` en el prompt).
+- **Pausas NO se auto-liberan**. Un user pausado con `pauseReason` requiere intervención manual del admin. Si un outage (ej: OpenAI 429) pausa users, hay que despausarlos a mano. Única excepción: al arrancar, `restorePausedUsersFromDB` borra las pausas de más de 7 días (`STALE_PAUSE_DAYS` en `pauseService.ts`).
+- **Pricing**: siempre leer con `_getPrice/_getPrices/_getAdicionalMAX` de `pricing.ts`. NUNCA inventar precios en código ni en prompts de IA. Tampoco umbrales derivados de precios: para deducir el plan (60/120) de un monto usar `_inferPlanFromPrice`, y para el nombre canónico del producto `_normalizeProductName` (ambos en `pricing.ts`). Hasta el 2026-09-09 esa lógica estaba duplicada con umbrales hardcodeados en `botHelpers.ts` y `order.routes.js` (ver `stepWaitingFinalConfirmation.ts` para el patrón: se inyecta `pricingContext` en el prompt). El respaldo si falta `data/prices.json` es `FALLBACK_PRICES` (también en `pricing.ts`) y tiene que igualar al JSON. `GET /prices`, los flujos y los prompts leen por la misma función, así que un cambio en el Editor de Precios se ve en la lectura siguiente (cubierto por `tests/prices_single_source.test.js`).
 - **Interruptor de Mercado Pago**: `config.mpEnabled` (switch "Pago con tarjeta" en Configuración, default ON). En OFF el bot no ofrece ni genera links: domicilio ⇒ transferencia directa, y quien pida tarjeta recibe un aviso de "fuera de servicio". Leerlo SIEMPRE con `isMpEnabled(dependencies.config)` de `flows/utils/paymentOptions.ts`. Si agregás copy que nombre la tarjeta: en código usá `prepayMeans/prepayMenu`; en `knowledge_v7.json` agregá una variante `responseNoMp` (la eligen `getFlowTemplate(key, knowledge, mpOff)` y `globalFaq`). Los prompts de IA lo reciben vía `context.mpEnabled`, que inyecta el proxy de `salesFlow` — no hace falta pasarlo por call site.
 - **Adicional contrarembolso**: solo aplica a plan 60 + pagos en efectivo/contrarembolso. MP/transferencia lo exime. Recalcular tras cambios de plan/producto (no confiar en `isContraReembolsoMAX` previo).
 - **DB upserts bajo race**: código P2002 de Prisma = concurrent upsert race. Ignorar (ver `botHelpers.ts:65`).
 - **Locks**: `order_lock:${phone}:${sellerId}` TTL 3000ms. Queries internas al lock deben tener timeout < TTL (ver `cancelLatestOrder` con 2500ms).
 - **Socket.IO rooms**: emitir siempre a `sellerId` room y a `admin` room (admins ven todo). Payload del admin debe incluir `sellerId`.
+- **Auth: solo JWT**, en la API REST (`jwtAuthMiddleware`) y en el socket. El fallback `x-api-key` (API_KEY = admin global) se sacó el 2026-09-14 porque el dashboard mandaba la clave incrustada en el JS público. `API_KEY` sigue solo como respaldo del secreto JWT cuando falta `JWT_SECRET`. Nada secreto puede ir en una variable `VITE_*`: Vite la escribe en el bundle que baja cualquiera.
 - **Panel de ventas (ventas-app)**: el botón "Enviar a sistema" de SalesView pega contra
   `POST /orders/:id/sistema`, que traduce el `Order` en `sistemaSync.ts` y lo postea al
   panel (`D:\ventas-app`, otro repo, Mongo). El token (`SISTEMA_TOKEN`) vive solo en el
@@ -95,13 +102,13 @@ Máquina de estados lineal con fallbacks a IA. Orden típico:
 - `npm run dev` — concurrente server (tsx watch en index.ts) + client (vite)
 - `npm run dev:server` — solo server (sin watch)
 - `npm start` — producción: `prisma generate && migrate deploy && tsx index.ts`
-- `npm test` — Jest. Suite verde (35 suites, 399 tests; 1 suite skipped es la `.live`). Corre contra la DB de prod (`DATABASE_URL` del `.env` apunta a Railway) pero **solo lee**: ninguna suite escribe. **Solo V7**: las suites acopladas a `archive/knowledge_v3.json`/v4 (simulaciones, recommendation, multi_product, salesFlow, etc.) se retiraron el 2026-05-31 — testeaban un guion muerto. Cobertura de flujo V7: `sena_flow_smoke.test.js` + `payment_flow.test.js`; el resto cubre utilidades (address, pricing, objection escalation, order flow). Pendiente: rehacer un harness de simulación contra V7.
+- `npm test` — Jest. Suite verde (40 suites, 518 tests; 1 suite skipped es la `.live`). Corre contra la DB de prod (`DATABASE_URL` del `.env` apunta a Railway), así que **ninguna suite puede escribir**: si el código bajo test escribe, el test mockea `../db`. Hasta el 2026-09-13 `web_order_notify.test.js` no lo hacía y dejó una pausa real en prod. **Solo V7**: las suites acopladas a `archive/knowledge_v3.json`/v4 (simulaciones, recommendation, multi_product, salesFlow, etc.) se retiraron el 2026-05-31 — testeaban un guion muerto. Cobertura de flujo V7: `sena_flow_smoke.test.js` + `payment_flow.test.js`; el resto cubre utilidades (address, pricing, objection escalation, order flow). Pendiente: rehacer un harness de simulación contra V7. Para refactors hay tests de caracterización: `message_handler.test.js` y `ai_chat_payloads.test.js` graban una traza de efectos (`MH_TRACE_FILE` / `AI_TRACE_FILE`) para comparar byte a byte antes y después de mover código.
 - `npx prisma migrate dev --name <x>` — nueva migración
 - `railway logs --lines 300` — logs de producción
 
 ## Qué NO hacer
 
-- No mockear la DB en los tests — integración real con la DB.
+- No mockear la DB en los tests que solo leen — integración real. Si el código bajo test escribe, mockear `../db` es obligatorio: la DB es la de prod.
 - No añadir `console.log`; usar `logger` de `src/utils/logger.ts` (pino).
 - No tocar `index.ts` sin necesidad — es orquestador puro, la lógica vive en `clientPool` + handlers.
 - No añadir features/abstracciones más allá de lo pedido. Tres líneas similares son mejor que una abstracción prematura.
@@ -113,6 +120,7 @@ Máquina de estados lineal con fallbacks a IA. Orden típico:
 - [index.ts](index.ts) — boot + shutdown
 - [src/services/clientPool.ts](src/services/clientPool.ts) — orquestador multi-tenant
 - [src/handlers/messageHandler.ts](src/handlers/messageHandler.ts) — entrada de mensajes
+- [src/handlers/incomingSteps.ts](src/handlers/incomingSteps.ts) — los pasos de esa entrada
 - [src/flows/salesFlow.ts](src/flows/salesFlow.ts) — router de steps
 - [src/flows/utils/flowHelpers.ts](src/flows/utils/flowHelpers.ts) — `_cleanPhone`, `_setStep`, `_pauseAndAlert`
 - [src/flows/utils/pricing.ts](src/flows/utils/pricing.ts) — única fuente de precios
@@ -135,15 +143,21 @@ y 36 de los 39 one-offs de `scripts/` (quedaron `ai-cache-probe`, `audit-semanti
 y `wipe-semantic-cache`). Todo recuperable del historial de git.
 
 
-- Mezcla CommonJS + ES6 imports en utils (no unificado). ~80 `require()` inline dentro de
-  funciones: algunos son lazy loading legítimo, otros son parches de dependencia circular.
+- Mezcla CommonJS + ES6 imports en utils (no unificado). Hay ~65 `require()` inline dentro de
+  funciones en los `.ts`, y casi ninguno protege un ciclo real: solo `stepGreeting → salesFlow`
+  y `flowHelpers → pauseService`. Antes de subir otro a `import`, fijarse que no esté
+  difiriendo algo a propósito (carga pesada, orden de los mocks en los tests).
 - `npx tsc --noEmit` pasa limpio (exit 0). Los TS errors de `ioredis`/`bullmq` y `@types/jest`
   que decía esta sección ya no existen.
-- Funciones que siguen siendo grandes (≥300 líneas): `clientPool.startSeller`,
-  `messageHandler.createMessageHandler`, `server.js startServer`. Las tres son factories:
-  su largo incluye los helpers anidados que devuelven, así que pesan menos de lo que dice
-  el número. Partirlas implica recablear cómo se arma `sharedState` — mucho movimiento en
-  el arranque para poca ganancia de lectura.
+- Funciones que siguen siendo grandes: `clientPool.startSeller` (~470 líneas) y
+  `server.js startServer` (~325). Las dos son factories: su largo incluye los helpers
+  anidados que devuelven, así que pesan menos de lo que dice el número. Partirlas implica
+  recablear cómo se arma `sharedState` — mucho movimiento en el arranque para poca ganancia
+  de lectura. `createMessageHandler` se partió el 2026-09-13 (ver `incomingSteps.ts`).
+- Dashboard (`client/`): `npm run lint` deja 31 hallazgos (19 errores / 12 warnings), de las
+  reglas del React Compiler (que no se usa), `exhaustive-deps` y fast refresh. No son bugs
+  hoy; pesan si se adopta el compilador. El bundle es un solo chunk de ~1,5 MB: recharts y
+  emoji-picker se descargan aunque no se abra la vista que los usa.
 - Admins globales (`sellerId=null`) vs tenant admins distinción reciente — verificar scoping cuando se agregan rutas nuevas.
 
 ## Agent skills
