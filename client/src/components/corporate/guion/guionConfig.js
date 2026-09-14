@@ -3,6 +3,7 @@
 import {
     MessageSquare, HelpCircle, Edit3, ShoppingBag, DollarSign, CreditCard, CheckCircle2, MessageCircle, Hand,
 } from 'lucide-react';
+import { BANK_ALIAS, BANK_HOLDER, fillPricePlaceholders } from '../../../utils/scriptPlaceholders';
 
 export const SCRIPT_LABELS = {
     v7: { name: 'V7 · Elena', tone: '2 tiers (≤10 kg → 60d, +10 kg → 120d). Persona Elena, tono argentino cálido. Tras pedir kilos, manda recomendación + precios en mensajes seguidos.' },
@@ -104,34 +105,26 @@ export const STAGE_GROUPS = [
 // para reusar el mismo endpoint sin cambios en el backend.
 export const betweenPath = (prev, next) => `between:${prev}|${next}`;
 
-// Reemplaza placeholders {{X}} con valores ejemplo para que se vea como en
-// producción. El runtime los sustituye dinámicamente en `_formatMessage`; acá
-// usamos valores plausibles para que admins vean cómo queda el mensaje.
-// La preview asume MP (4-6d); en runtime real es 7-10d si transferencia/COD.
-const PLACEHOLDER_VALUES = {
-    PRICE_CAPSULAS_60: '46.900', PRICE_CAPSULAS_120: '66.900',
-    PRICE_SEMILLAS_60: '36.900', PRICE_SEMILLAS_120: '49.900',
-    PRICE_GOTAS_60: '48.900',    PRICE_GOTAS_120: '68.900',
-    PRICE_TOTAL_CAPSULAS_60: '46.900', PRICE_TOTAL_GOTAS_60: '48.900', PRICE_TOTAL_SEMILLAS_60: '36.900',
-    PRICE_PER_DAY_CAPSULAS_120: '558', PRICE_PER_DAY_SEMILLAS_120: '416', PRICE_PER_DAY_GOTAS_120: '574',
-    PRICE_60: '46.900', PRICE_120: '66.900',
-    ALIAS: 'HERBALIS.TIENDA', TITULAR: 'BIO ORIGEN S.A.S.',
-    ANTICIPO: '10.000', ADICIONAL_MAX: '0', COSTO_LOGISTICO: '18.000',
+// Valores de ejemplo para ver un texto como le llegaría al cliente: el bot los
+// sustituye en runtime (`_formatMessage`) con los datos de cada charla. La vista
+// previa asume Cápsulas × 120 días pagando con MP (4-6 días; en runtime son 7-10
+// si es transferencia o contrarreembolso). Los precios no están acá: salen del
+// Editor de Precios.
+const EXAMPLE_VALUES = {
+    ALIAS: BANK_ALIAS, TITULAR: BANK_HOLDER,
     PRODUCT: 'Cápsulas', PRODUCT_DETAIL: 'Cápsulas',
     PLAN: '120', PLAN_DETAIL: '120 días',
-    TOTAL: '66.900',
     LINK: 'https://mpago.la/example',
-    SALDO: '56.900',
-    SENA_AMOUNT: '10.000', SENA_AMOUNT_FMT: '10.000', SENA_REMAINDER: '56.900',
     POSTDATADO_LINE: '✔ Entrega estimada: 4 a 6 días hábiles desde la confirmación del pago\n',
-    CARTO_LINE: '✔ Saldo al cartero: *$56.900* en efectivo al recibir',
 };
 
-export function renderText(text) {
+export function renderText(text, prices) {
     if (!text) return '';
-    let r = String(text);
-    Object.entries(PLACEHOLDER_VALUES).forEach(([k, v]) => {
-        r = r.replace(new RegExp(`\\{\\{${k}\\}\\}`, 'g'), v);
+    let r = fillPricePlaceholders(String(text), prices);
+    // El total del ejemplo es Cápsulas 120 del Editor; sin precios, {{TOTAL}} queda visible.
+    const values = { ...EXAMPLE_VALUES, TOTAL: prices?.['Cápsulas']?.['120'] };
+    Object.entries(values).forEach(([k, v]) => {
+        if (v != null && v !== '') r = r.replace(new RegExp(`\\{\\{${k}\\}\\}`, 'g'), v);
     });
     r = r.replace(/\*([^*\n]+)\*/g, '<strong>$1</strong>');
     r = r.replace(/_([^_\n]+)_/g, '<em>$1</em>');

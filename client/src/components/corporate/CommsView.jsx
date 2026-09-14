@@ -909,7 +909,7 @@ Teléfono: ${phoneDisplay}`;
                             type="text"
                             value={confirmFillData.total}
                             onChange={e => setConfirmFillData(d => ({ ...d, total: e.target.value }))}
-                            placeholder="46.900"
+                            placeholder="0"
                             leftIcon={() => <span className="text-slate-400 font-medium">$</span>}
                         />
 

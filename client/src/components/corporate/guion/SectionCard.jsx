@@ -10,7 +10,7 @@ import { renderText, isNewComment } from './guionConfig';
 
 export default function SectionCard({
     sectionPath, label, text, note, keywords, isFaq,
-    comments, isExpanded, onToggle, actions,
+    comments, isExpanded, onToggle, actions, prices,
 }) {
     // En una sección, el texto sugerido solo acompaña a las correcciones.
     const form = useCommentDraft({
@@ -63,7 +63,7 @@ export default function SectionCard({
                         </p>
                         <div
                             className="text-sm text-slate-700 dark:text-slate-200 whitespace-pre-line leading-relaxed"
-                            dangerouslySetInnerHTML={{ __html: renderText(text) }}
+                            dangerouslySetInnerHTML={{ __html: renderText(text, prices) }}
                         />
                         {note && (
                             <p className="text-xs text-slate-500 dark:text-slate-400 italic mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">

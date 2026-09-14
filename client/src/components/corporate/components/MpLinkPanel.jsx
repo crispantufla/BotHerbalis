@@ -91,7 +91,7 @@ const MpLinkPanel = ({ chatId, onClose }) => {
                                 ref={amountRef}
                                 type="text"
                                 inputMode="decimal"
-                                placeholder="46.900"
+                                placeholder="0"
                                 value={amount}
                                 onChange={e => setAmount(e.target.value)}
                                 className="w-full pl-7 pr-3 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-400 placeholder:text-slate-400"

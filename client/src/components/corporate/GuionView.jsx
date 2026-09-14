@@ -20,6 +20,7 @@ const GuionView = () => {
     const [guiones, setGuiones] = useState([]);
     const [comments, setComments] = useState([]);
     const [counts, setCounts] = useState({ v7: 0 });
+    const [prices, setPrices] = useState(null);
     const [loading, setLoading] = useState(true);
     const [expandedSection, setExpandedSection] = useState(null);
     const [showResolved, setShowResolved] = useState(false);
@@ -71,14 +72,23 @@ const GuionView = () => {
         } catch { /* silencioso */ }
     }, []);
 
+    // Precios del Editor para la vista previa de los textos. Si fallan, los
+    // placeholders de precio quedan visibles (nunca un número inventado).
+    const fetchPrices = useCallback(async () => {
+        try {
+            const res = await api.get('/api/prices');
+            setPrices(res.data || null);
+        } catch { /* silencioso */ }
+    }, []);
+
     useEffect(() => {
         (async () => {
             setLoading(true);
-            await Promise.all([fetchGuiones(), fetchCounts()]);
+            await Promise.all([fetchGuiones(), fetchCounts(), fetchPrices()]);
             await fetchComments(activeScript);
             setLoading(false);
         })();
-    }, [fetchGuiones, fetchCounts]);
+    }, [fetchGuiones, fetchCounts, fetchPrices]);
 
     useEffect(() => {
         fetchComments(activeScript);
@@ -422,6 +432,7 @@ const GuionView = () => {
                                                         isExpanded={isExpanded}
                                                         onToggle={() => setExpandedSection(isExpanded ? null : section.path)}
                                                         actions={commentActions}
+                                                        prices={prices}
                                                     />
                                                     {showBetween && (
                                                         <BetweenSlot
