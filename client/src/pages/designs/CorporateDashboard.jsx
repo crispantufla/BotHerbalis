@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import api from '../../config/axios';
 import { useSocket } from '../../context/SocketContext';
 import { useAuth } from '../../context/AuthContext';
@@ -11,7 +11,6 @@ import CommsView from '../../components/corporate/CommsView';
 import SalesView from '../../components/corporate/SalesView';
 import SettingsView from '../../components/corporate/SettingsView';
 import GalleryView from '../../components/corporate/GalleryView';
-import AdvancedAnalyticsView from '../../components/corporate/AdvancedAnalyticsView';
 import ManualsView from '../../components/corporate/ManualsView';
 import PaymentsView from '../../components/corporate/PaymentsView';
 import WebOrdersView from '../../components/corporate/WebOrdersView';
@@ -23,8 +22,19 @@ import AccountStatsView from '../../components/admin/AccountStatsView';
 import FunnelAnalyticsView from '../../components/admin/FunnelAnalyticsView';
 import RescueQueueView from '../../components/admin/RescueQueueView';
 import ManualOrderEntryModal from '../../components/corporate/components/ManualOrderEntryModal';
+import LazyBoundary from '../../components/ui/LazyBoundary';
 
 import { Wifi, MessageCircle, ShoppingCart, Settings, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Bell, AlertTriangle, BookOpen, MoreHorizontal, CreditCard, Users, LifeBuoy, MessagesSquare, FlaskConical, Package } from 'lucide-react';
+
+// Estadísticas es la única vista con recharts (~400 KB): se descarga al abrir la
+// pestaña, no con el panel.
+const AdvancedAnalyticsView = lazy(() => import('../../components/corporate/AdvancedAnalyticsView'));
+
+const ViewSpinner = () => (
+    <div className="p-6 flex justify-center items-center min-h-[60vh]">
+        <div className="w-8 h-8 border-[3px] border-accent-200 dark:border-accent-900 border-t-accent-600 dark:border-t-accent-500 rounded-full animate-spin" />
+    </div>
+);
 
 const CorporateDashboard = () => {
     const { socket } = useSocket();
@@ -287,7 +297,13 @@ const CorporateDashboard = () => {
     const renderContent = () => {
         switch (activeTab) {
             case 'dashboard': return <DashboardView alerts={alerts} config={config} handleQuickAction={handleQuickAction} status={status} qrData={qrData} />;
-            case 'statistics': return <AdvancedAnalyticsView />;
+            case 'statistics': return (
+                <LazyBoundary fallback={<p className="p-6 text-sm text-slate-500 dark:text-slate-400">No se pudo cargar Estadísticas. Recargá la página.</p>}>
+                    <Suspense fallback={<ViewSpinner />}>
+                        <AdvancedAnalyticsView />
+                    </Suspense>
+                </LazyBoundary>
+            );
             case 'comms': return <CommsView initialChatId={targetChatId} onChatSelected={() => setTargetChatId(null)} onChatOpened={() => { if (!isMobile) setSidebarCollapsed(true); }} alerts={alerts} onAlertAction={handleQuickAction} />;
             case 'logistics': return <SalesView onGoToChat={(chatId) => handleQuickAction(chatId, 'chat')} />;
             case 'gallery': return <GalleryView />;

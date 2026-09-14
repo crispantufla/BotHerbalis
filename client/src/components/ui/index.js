@@ -7,6 +7,7 @@ export { default as Input } from './Input';
 export { default as Select } from './Select';
 export { default as KpiCard } from './KpiCard';
 export { default as EmptyState } from './EmptyState';
+export { default as LazyBoundary } from './LazyBoundary';
 export { cn } from './cn';
 // Toast ya existía — lo re-exportamos para que `from '../ui'` agarre todo.
 export { ToastProvider, useToast } from './Toast';

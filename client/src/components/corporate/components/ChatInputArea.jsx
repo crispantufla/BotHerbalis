@@ -1,8 +1,11 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, lazy, Suspense } from 'react';
 import { Send, Paperclip, Smile, Zap, CreditCard, FileText } from 'lucide-react';
-import EmojiPicker from 'emoji-picker-react';
 import QuickRepliesPanel from './QuickRepliesPanel';
 import MpLinkPanel from './MpLinkPanel';
+import LazyBoundary from '../../ui/LazyBoundary';
+
+// El selector de emojis (~300 KB con sus datos) se descarga la primera vez que se abre.
+const EmojiPicker = lazy(() => import('emoji-picker-react'));
 
 const ChatInputArea = ({
     input,
@@ -73,15 +76,19 @@ const ChatInputArea = ({
 
             {showEmojiPicker && (
                 <div className="absolute bottom-full left-4 sm:left-6 mb-2 z-50 shadow-2xl rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 animate-fade-in origin-bottom-left">
-                    <EmojiPicker
-                        onEmojiClick={onEmojiClick}
-                        autoFocusSearch={false}
-                        theme="auto"
-                        lazyLoadEmojis={true}
-                        searchPlaceHolder="Buscar emoji..."
-                        width={320}
-                        height={400}
-                    />
+                    <LazyBoundary fallback={<p className="w-[320px] p-4 text-xs text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-800">No se pudieron cargar los emojis. Recargá la página.</p>}>
+                        <Suspense fallback={<div className="w-[320px] h-[400px] bg-white dark:bg-slate-800" />}>
+                            <EmojiPicker
+                                onEmojiClick={onEmojiClick}
+                                autoFocusSearch={false}
+                                theme="auto"
+                                lazyLoadEmojis={true}
+                                searchPlaceHolder="Buscar emoji..."
+                                width={320}
+                                height={400}
+                            />
+                        </Suspense>
+                    </LazyBoundary>
                 </div>
             )}
 
