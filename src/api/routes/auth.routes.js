@@ -87,7 +87,7 @@ module.exports = (client, sharedState) => {
     // ─── GET /api/me ────────────────────────────────────────────────
     // Returns current authenticated user info
     router.get('/me', jwtAuthMiddleware, async (req, res) => {
-        if (req.account.id === 'legacy' || req.account.id === 'legacy-admin') {
+        if (req.account.id === 'legacy-admin') {
             const legacyName = process.env.ADMIN_USER || 'admin';
             return res.json({
                 id: req.account.id,
@@ -257,7 +257,7 @@ module.exports = (client, sharedState) => {
         if (newPassword.length < 8)
             return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 8 caracteres' });
 
-        if (req.account.id === 'legacy' || req.account.id === 'legacy-admin')
+        if (req.account.id === 'legacy-admin')
             return res.status(403).json({ error: 'Las cuentas legacy no pueden cambiar contraseña aquí' });
 
         try {

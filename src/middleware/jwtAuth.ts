@@ -54,7 +54,6 @@ export async function comparePassword(plain: string, hash: string): Promise<bool
 
 /**
  * Express middleware: authenticates via JWT Bearer token.
- * Falls back to legacy x-api-key for backward compatibility during migration.
  * Sets req.account = { id, role, sellerId, name } on success.
  */
 export function jwtAuthMiddleware(req: any, res: any, next: any) {
@@ -77,29 +76,13 @@ export function jwtAuthMiddleware(req: any, res: any, next: any) {
             };
             return next();
         } catch (err) {
-            // Invalid/expired JWT — fall through to legacy check
+            // Invalid/expired JWT — cae al 401 de abajo
         }
     }
 
-    // --- Legacy fallback: x-api-key ---
-    // Solo activado si LEGACY_API_KEY_ENABLED=true. Antes el fallback estaba
-    // siempre activo, lo que daba acceso global-admin permanente a cualquier
-    // holder de API_KEY (sin pasar por bcrypt ni isActive).
-    const legacyEnabled = process.env.LEGACY_API_KEY_ENABLED === 'true';
-    if (legacyEnabled) {
-        const API_KEY = process.env.API_KEY;
-        const apiKey = req.headers['x-api-key'];
-        if (API_KEY && apiKey && apiKey === API_KEY) {
-            req.account = {
-                id: 'legacy',
-                role: 'admin',
-                sellerId: null,
-                name: process.env.ADMIN_USER || 'admin',
-            };
-            return next();
-        }
-    }
-
+    // Sin JWT válido no hay acceso. El fallback `x-api-key` (API_KEY = admin global)
+    // se sacó el 2026-09-14: su último consumidor era el dashboard, que mandaba la
+    // clave incrustada en el JS público.
     logger.warn(`[AUTH] Unauthorized access attempt from ${req.ip} to ${req.path}`);
     return res.status(401).json({ error: 'Unauthorized' });
 }

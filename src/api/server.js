@@ -139,18 +139,16 @@ function startServer(clientPool) {
     });
 
     // --- SOCKET.IO AUTH ---
-    // Accepts JWT token (new) or API_KEY (legacy)
+    // Solo JWT, el mismo de la API REST (el fallback con API_KEY se sacó el 2026-09-14).
     io.use(async (socket, next) => {
         const token = socket.handshake.auth?.token;
-        const apiKey = socket.handshake.auth?.apiKey || socket.handshake.headers['x-api-key'];
-        const SOCKET_API_KEY = process.env.API_KEY;
 
         if (token) {
             try {
                 const decoded = verifyToken(token);
                 // Backfill name for older JWTs (pre-name-in-payload) so
                 // authorization checks that need the username still work.
-                if (!decoded.name && decoded.accountId && decoded.accountId !== 'legacy' && decoded.accountId !== 'legacy-admin') {
+                if (!decoded.name && decoded.accountId && decoded.accountId !== 'legacy-admin') {
                     try {
                         const { prisma } = require('../../db');
                         const acc = await prisma.account.findUnique({ where: { id: decoded.accountId }, select: { name: true } });
@@ -162,15 +160,8 @@ function startServer(clientPool) {
                 socket.data.account = decoded;
                 return next();
             } catch (e) {
-                // Fall through to API_KEY check
+                // Token inválido o vencido: cae al rechazo de abajo
             }
-        }
-
-        // Legacy API key fallback — solo activado con LEGACY_API_KEY_ENABLED=true
-        const legacyEnabled = process.env.LEGACY_API_KEY_ENABLED === 'true';
-        if (legacyEnabled && SOCKET_API_KEY && apiKey === SOCKET_API_KEY) {
-            socket.data.account = { role: 'admin', sellerId: null, accountId: 'legacy' };
-            return next();
         }
 
         logger.warn(`[SOCKET] Unauthorized from ${socket.handshake.address}`);
@@ -361,15 +352,6 @@ function startServer(clientPool) {
     const PORT = process.env.PORT || 3000;
     server.listen(PORT, () => {
         logger.info(`✅ Server running on http://localhost:${PORT}`);
-
-        // Auth posture warning: si API_KEY existe pero LEGACY_API_KEY_ENABLED
-        // no está activo, el fallback legacy está deshabilitado. Si algún
-        // cliente legacy (mobile app, integraciones) seguía dependiendo de
-        // x-api-key, dejará de autenticar. Esto es intencional — el flag se
-        // agregó como respuesta a una auditoría de seguridad.
-        if (process.env.API_KEY && process.env.LEGACY_API_KEY_ENABLED !== 'true') {
-            logger.warn('⚠️ [AUTH] API_KEY está seteada pero LEGACY_API_KEY_ENABLED!=true. Clientes legacy con x-api-key serán rechazados. Setear LEGACY_API_KEY_ENABLED=true si necesitás restaurar el fallback.');
-        }
     });
 
     return { io, app, server };

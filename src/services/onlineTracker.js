@@ -54,7 +54,7 @@ async function endSession(accountId) {
             },
         });
     } catch (e) {
-        // Legacy accounts (accountId === 'legacy') or deleted accounts will 404 — fine.
+        // The env-based admin (accountId === 'legacy-admin') or deleted accounts will 404 — fine.
         if (e?.code !== 'P2025') {
             logger.warn(`[ONLINE] Failed to persist session for ${accountId}: ${e.message}`);
         }
