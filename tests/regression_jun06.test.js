@@ -135,7 +135,7 @@ describe('3. Retiro en sucursal — captura de datos', () => {
 // ════════════════════════════════════════════════════════════════════════════
 describe('4. Submenú de pago no entra en bucle', () => {
     const makeState = () => ({
-        step: 'waiting_payment_method', shippingChoice: 'domicilio', paymentSubChoiceAsked: true,
+        step: 'waiting_payment_method', deliveryZone: 'out', shippingChoice: 'domicilio', paymentSubChoiceAsked: true,
         selectedProduct: 'Cápsulas de nuez de la india', selectedPlan: '120',
         cart: [{ product: 'Cápsulas', plan: '120', price: '66.900' }], totalPrice: '66.900', history: [],
     });
@@ -147,13 +147,13 @@ describe('4. Submenú de pago no entra en bucle', () => {
         sharedState: { pausedUsers: new Set(), io: null },
     });
 
-    test('"sería al contado" → aclara retiro en sucursal', async () => {
+    test('"sería al contado" → objeción de prepago (fuera de zona no hay efectivo)', async () => {
         const deps = makeDeps();
         const state = makeState();
         await handleWaitingPaymentMethod('p1@c.us', 'Sería al contado', 'seria al contado', state, { flow: {} }, deps);
         const sent = deps.sendMessageWithDelay.mock.calls.map(([, m]) => m).join(' ');
-        expect(sent.toLowerCase()).toContain('sucursal');
-        expect(sent.toLowerCase()).toContain('retiro');
+        expect(sent.toLowerCase()).toContain('pago anticipado');
+        expect(sent).toMatch(/13 años/);
         expect(state.paymentSubChoiceAsked).toBe(false);
     });
 

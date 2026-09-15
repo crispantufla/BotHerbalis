@@ -6,7 +6,7 @@ import {
 import { BANK_ALIAS, BANK_HOLDER, fillPricePlaceholders } from '../../../utils/scriptPlaceholders';
 
 export const SCRIPT_LABELS = {
-    v7: { name: 'V7 · Elena', tone: '2 tiers (≤10 kg → 60d, +10 kg → 120d). Persona Elena, tono argentino cálido. Tras pedir kilos, manda recomendación + precios en mensajes seguidos.' },
+    v7: { name: 'V8 · Elena · zona Rosario', tone: '2 tiers (≤10 kg → 60d, +10 kg → 120d). Persona Elena, tono argentino cálido. Tras elegir plan pregunta la localidad: Rosario y 60 km → reparto propio con pago al recibir; resto del país → Correo prepago (tarjeta o transferencia), a domicilio o sucursal.' },
 };
 
 export const SECTION_LABELS = {
@@ -21,10 +21,19 @@ export const SECTION_LABELS = {
     'flow.preference_capsulas': 'Cliente elige cápsulas',
     'flow.preference_gotas': 'Cliente elige gotas',
     'flow.preference_semillas': 'Cliente elige semillas',
-    'flow.closing': 'Cierre — pide datos de envío',
-    'flow.payment_menu': 'TEXTO 4 — Menú de pago (envío + medio)',
-    'flow.payment_domicilio_choice': 'Submenú: domicilio → MP o transferencia',
-    'flow.payment_retiro_confirm': 'Confirmación retiro en sucursal',
+    'flow.closing': 'Cierre — pide datos de envío (domicilio, ya pagado)',
+    'flow.closing_sucursal': 'Cierre — pide datos de sucursal (ya pagado)',
+    'flow.payment_menu': 'TEXTO 4 — Menú de pago (pregunta la localidad)',
+    'flow.zone_km': 'Zona: localidad desconocida → pregunta los km',
+    'flow.zone_reask': 'Zona: no se entendió la localidad',
+    'flow.zone_no_local': 'Zona: quiere venir a buscarlo (no hay local)',
+    'flow.zone_in': 'Dentro de zona → reparto propio, pide nombre y calle',
+    'flow.zone_out': 'Fuera de zona → Correo prepago, ¿casa o sucursal?',
+    'flow.payment_domicilio_choice': 'Submenú: domicilio → tarjeta o transferencia',
+    'flow.payment_sucursal_choice': 'Submenú: sucursal → tarjeta o transferencia',
+    'flow.prepay_objection': 'Fuera de zona pide contrarreembolso (1ª vez)',
+    'flow.prepay_refusal_close': 'Fuera de zona insiste → cierre + asesor',
+    'flow.payment_mp_link_sucursal': 'TEXTO 5a — link de tarjeta (retiro en sucursal)',
     'flow.payment_transfer_alias': 'TEXTO 5b — Transferencia (alias)',
     'flow.payment_cod_retry': 'TEXTO 5c — Contra reembolso (modalidad)',
     'flow.payment_cod_anticipo': 'TEXTO 5d — Confirmación COD (anticipo)',
@@ -37,7 +46,8 @@ export const SECTION_LABELS = {
     'flow.cod_received': 'Cliente avisó "listo" tras anticipo COD',
     'flow.order_confirmation_mp': 'Confirmación final · pago MP completo',
     'flow.order_confirmation_transfer': 'Confirmación final · transferencia',
-    'flow.order_confirmation_cod': 'Confirmación final · contra reembolso',
+    'flow.order_confirmation_reparto': 'Confirmación final · reparto propio (paga al recibir)',
+    'flow.order_confirmation_cod': 'Confirmación final · retiro contra reembolso (legacy)',
     'flow.order_confirmation_fallback': 'Confirmación final · fallback genérico',
 };
 
@@ -76,8 +86,10 @@ export const STAGE_GROUPS = [
         label: 'Pago',
         icon: CreditCard,
         sectionKeys: [
-            'payment_menu', 'payment_domicilio_choice', 'payment_retiro_confirm',
-            'payment_transfer_alias', 'payment_mp_link', 'payment_mp_link_sena',
+            'payment_menu', 'zone_km', 'zone_reask', 'zone_no_local', 'zone_in', 'zone_out',
+            'payment_domicilio_choice', 'payment_sucursal_choice',
+            'prepay_objection', 'prepay_refusal_close',
+            'payment_transfer_alias', 'payment_mp_link', 'payment_mp_link_sucursal', 'payment_mp_link_sena',
             'payment_mp_failed', 'payment_mp_retry', 'payment_mp_retry_sena',
             'payment_cod_retry', 'payment_cod_anticipo',
             'transfer_received', 'cod_received',
@@ -88,9 +100,9 @@ export const STAGE_GROUPS = [
         label: 'Cierre y confirmación',
         icon: CheckCircle2,
         sectionKeys: [
-            'closing',
+            'closing', 'closing_sucursal',
             'order_confirmation_mp', 'order_confirmation_transfer',
-            'order_confirmation_cod', 'order_confirmation_fallback',
+            'order_confirmation_reparto', 'order_confirmation_cod', 'order_confirmation_fallback',
         ],
     },
     {
@@ -115,7 +127,9 @@ const EXAMPLE_VALUES = {
     PRODUCT: 'Cápsulas', PRODUCT_DETAIL: 'Cápsulas',
     PLAN: '120', PLAN_DETAIL: '120 días',
     LINK: 'https://mpago.la/example',
-    POSTDATADO_LINE: '✔ Entrega estimada: 4 a 6 días hábiles desde la confirmación del pago\n',
+    LOCALIDAD: 'Funes',
+    ENVIO_LINE: '✔ Correo Argentino — envío a domicilio\n',
+    POSTDATADO_LINE: '✔ Entrega estimada: 4 días hábiles desde la confirmación\n',
 };
 
 export function renderText(text, prices) {

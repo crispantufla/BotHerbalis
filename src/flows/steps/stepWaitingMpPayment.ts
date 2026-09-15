@@ -62,8 +62,7 @@ export async function handleWaitingMpPayment(
             const transferTpl = getFlowTemplate('payment_transfer_alias', knowledge) ||
                 `¡Perfecto! Para transferir usá el alias *{{ALIAS}}* a nombre de *{{TITULAR}}* 🏦\n\nMonto: ${'$'}{{TOTAL}}\n\nUna vez que realices la transferencia, escribime *"listo"* y coordinamos el envío 😊`;
             const msg = '¡Uy, justo el pago con tarjeta lo tenemos fuera de servicio en estos días! 🙈 Disculpá.\n\n'
-                + _formatMessage(transferTpl, currentState)
-                + '\n\nY si preferís no pagar por adelantado, lo mandamos a *retiro en sucursal* y abonás el total en efectivo cuando lo retirás 💵 Decime cuál te queda mejor.';
+                + _formatMessage(transferTpl, currentState);
             _setStep(currentState, FlowStep.WAITING_TRANSFER_CONFIRMATION);
             saveState(userId);
             await sendMessageWithDelay(userId, msg);
@@ -104,7 +103,7 @@ export async function handleWaitingMpPayment(
             const tpl = getFlowTemplate('payment_mp_retry', knowledge, !mpOn);
             let msg = tpl
                 ? _formatMessage(tpl, currentState)
-                : '⚠️ Hubo un problema con el pago — probá de nuevo con tu tarjeta de crédito, o decime si preferís transferencia o retiro en sucursal.';
+                : '⚠️ Hubo un problema con el pago — probá de nuevo con tu tarjeta de crédito, o decime si preferís transferencia.';
             // El link se CONSERVA (no nullear + regenerar): la preferencia MP sigue
             // vigente tras un rechazo y el reintento va por el mismo checkout. Si acá
             // regeneráramos, el cliente suele pagar en la pestaña vieja → el pago
@@ -144,37 +143,32 @@ export async function handleWaitingMpPayment(
         return { matched: true };
     }
 
-    // ── Cliente quiere contra reembolso / retiro en sucursal ──────────────────
-    // Modelo nuevo (may-2026): contrarrembolso = retiro en sucursal, paga total
-    // al retirar (sin anticipo). Limpiamos el link MP y mandamos directo al
-    // payment_retiro_confirm + pausa para coordinación admin.
+    // ── Cliente quiere pagar al recibir / contrarreembolso ─────────────────────
+    // Modelo por zona (sep-2026): dentro de Rosario y 60 km sí existe (reparto
+    // propio, cobra el repartidor) → soltamos el link y pedimos nombre + calle.
+    // Fuera de zona no existe: se lo aclaramos y seguimos con el prepago.
     if (shortOption === '3' || CASH_FALLBACK_KEYWORDS.test(normalizedText)) {
-        currentState.paymentMethod = 'contrarembolso';
-        currentState.mpPaymentLinkId = null;
-        currentState.mpPaymentLinkUrl = null;
-        currentState.senaAmount = 0;
-        currentState.senaPaid = false;
-        currentState.shippingChoice = 'retiro';
-
-        // Salir de waiting_mp_payment (igual que el branch de transferencia): si
-        // nos quedamos acá, el scheduler lo sigue tratando como "MP pendiente" y,
-        // si una pausa se pierde en un restart, le dispara los nudges de "pago con
-        // tarjeta pendiente" días después — aunque ya pasó a contrarembolso/retiro.
-        // mpReminderStage=99 es el sentinel para apagar los recordatorios de MP.
-        (currentState as any).mpReminderStage = 99;
-        _setStep(currentState, FlowStep.WAITING_TRANSFER_CONFIRMATION);
-
-        const tpl = getFlowTemplate('payment_retiro_confirm', knowledge) ||
-            `¡Perfecto! Lo dejamos para retiro en sucursal 📦\n\nVas a pagar el total *${'$'}{{TOTAL}}* en efectivo cuando lo retirés.\n\nUn asesor te contacta enseguida para coordinar la sucursal más cercana 😊`;
-        const msg = _formatMessage(tpl, currentState);
+        if (currentState.deliveryZone === 'in') {
+            currentState.paymentMethod = 'contrarembolso';
+            currentState.mpPaymentLinkId = null;
+            currentState.mpPaymentLinkUrl = null;
+            currentState.senaAmount = 0;
+            currentState.senaPaid = false;
+            currentState.shippingChoice = 'reparto';
+            // mpReminderStage=99 apaga los recordatorios de "pago con tarjeta pendiente".
+            (currentState as any).mpReminderStage = 99;
+            const tpl = getFlowTemplate('zone_in', knowledge) ||
+                'Dale, te lo llevamos nosotros a tu casa sin costo y lo pagás al recibir 🚚\n\nPasame tu *nombre completo* y *calle y número* 🙌';
+            _setStep(currentState, FlowStep.WAITING_DATA);
+            saveState(userId);
+            await sendMessageWithDelay(userId, _formatMessage(tpl, currentState));
+            logger.info(`[MP_PAYMENT] ${userId} → cambió de MP a pago al recibir (zona de reparto propio).`);
+            return { matched: true };
+        }
+        const msg = `Fuera de Rosario y alrededores no tenemos pago al recibir: el Correo volvió ese servicio lento y muy caro, así que el pedido va prepago y, al estar pago, sale enseguida y llega en *4 días hábiles* 🚚\n\n¿Seguís con el link de tarjeta o preferís *transferencia*?`;
+        saveState(userId);
         await sendMessageWithDelay(userId, msg);
-
-        const addr: any = currentState.partialAddress || {};
-        const addrSummary = [addr.calle, addr.ciudad, addr.cp].filter(Boolean).join(', ') || 'sin dirección';
-        await _pauseAndAlert(
-            userId, currentState, dependencies, text,
-            `Cliente cambió de MP a RETIRO EN SUCURSAL. Coordinar sucursal de Correo Argentino más cercana a: ${addrSummary}. Paga el total $${currentState.totalPrice || '?'} en efectivo al retirar.`
-        );
+        logger.info(`[MP_PAYMENT] ${userId} → pidió pago al recibir fuera de zona; aclarado prepago.`);
         return { matched: true };
     }
 
@@ -254,7 +248,7 @@ export async function handleWaitingMpPayment(
         step: 'waiting_mp_payment',
         goal: `${mpOn
             ? `El cliente tiene un enlace de pago de MercadoPago y debe completarlo. Enlace ya enviado: ${currentState.mpPaymentLinkUrl}\n\nSi tiene dudas, explicale que el link es para pagar con tarjeta de crédito (es online y 100% protegido).`
-            : `🛑 EL PAGO CON TARJETA ESTÁ FUERA DE SERVICIO EN ESTOS DÍAS. Este cliente tiene un link viejo que ya NO sirve: NO se lo reenvíes, NO le pidas que lo intente de nuevo y NO menciones "tarjeta", "link de pago" ni "Mercado Pago" como opción. Si dice que ya pagó, tomale el dato y avisá que lo verificamos. Si no pagó, pasalo con calidez a una de las dos formas vivas: *transferencia* al alias (envío a domicilio) o *retiro en sucursal* (paga el total en efectivo al retirar). No inventes motivos ni prometas cuándo vuelve la tarjeta.`}\n\nALTERNATIVAS si quiere cambiar de método (modelo nuevo may-2026):\n- Transferencia (envío a domicilio prepago): alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*\n- Retiro en sucursal (contrarrembolso): paga el TOTAL en efectivo al retirar en una sucursal de Correo Argentino. Sin anticipo previo.\n- NUNCA menciones anticipo de $10.000 (modalidad eliminada).\n\n🔴 OBJECIÓN ECONÓMICA / POSTERGAR PAGO (CRÍTICO):\nSi el cliente dice cosas como "veo después de juntar el efectivo", "cuando cobre", "cuando tenga plata", "cuando consiga el dinero", "es mucho interés", "ahora no puedo", "apenas tenga me comunico", "me alcance la plata", NO INTERPRETES eso como confirmación. Es una OBJECIÓN ECONÓMICA y debés ofrecer POSTDATADO:\n  → "¡Tranqui! ¿A partir de qué día te queda cómodo recibirlo? Te lo agendamos y lo despacho recién ese día." (PROHIBIDO mencionar "congelar precio")\n  → Si dice SÍ → goalMet=false, extractedData="POSTDATADO: [fecha o 'indefinido']", quedate en este step esperando el aviso.\n  → Si dice NO → goalMet=false, dejá el chat abierto sin presión.\n\nNUNCA reenvíes el link a menos que lo pida. NUNCA respondas con "Excelente decisión!" o frases de cierre cuando el cliente claramente está posponiendo. Esperá que confirme el pago con "listo" o "ya pagué".`,
+            : `🛑 EL PAGO CON TARJETA ESTÁ FUERA DE SERVICIO EN ESTOS DÍAS. Este cliente tiene un link viejo que ya NO sirve: NO se lo reenvíes, NO le pidas que lo intente de nuevo y NO menciones "tarjeta", "link de pago" ni "Mercado Pago" como opción. Si dice que ya pagó, tomale el dato y avisá que lo verificamos. Si no pagó, pasalo con calidez a la *transferencia* al alias (fuera de Rosario y 60 km no hay pago al recibir). No inventes motivos ni prometas cuándo vuelve la tarjeta.`}\n\nALTERNATIVAS si quiere cambiar de método (modelo sep-2026): transferencia al alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.* (prepago, mismo envío por Correo, 4 días hábiles). Fuera de Rosario y 60 km NO existe pago al recibir ni contrarreembolso (el Correo lo volvió lento y caro): si lo pide, explicáselo con calidez y ofrecé ${mpOn ? 'tarjeta o transferencia' : 'transferencia'}. NUNCA menciones anticipo de $10.000 (modalidad eliminada).\n\n🔴 OBJECIÓN ECONÓMICA / POSTERGAR PAGO (CRÍTICO):\nSi el cliente dice cosas como "veo después de juntar el efectivo", "cuando cobre", "cuando tenga plata", "cuando consiga el dinero", "es mucho interés", "ahora no puedo", "apenas tenga me comunico", "me alcance la plata", NO INTERPRETES eso como confirmación. Es una OBJECIÓN ECONÓMICA y debés ofrecer POSTDATADO:\n  → "¡Tranqui! ¿A partir de qué día te queda cómodo recibirlo? Te lo agendamos y lo despacho recién ese día." (PROHIBIDO mencionar "congelar precio")\n  → Si dice SÍ → goalMet=false, extractedData="POSTDATADO: [fecha o 'indefinido']", quedate en este step esperando el aviso.\n  → Si dice NO → goalMet=false, dejá el chat abierto sin presión.\n\nNUNCA reenvíes el link a menos que lo pida. NUNCA respondas con "Excelente decisión!" o frases de cierre cuando el cliente claramente está posponiendo. Esperá que confirme el pago con "listo" o "ya pagué".`,
         history: currentState.history,
         summary: currentState.summary,
         knowledge,
@@ -347,7 +341,8 @@ export async function confirmApprovedMpPayment(
             // Modelo nuevo (may-2026): seña $10k eliminada — sólo la mantenemos
             // como compat para Orders pre-may-2026 con senaAmount>0. En ese caso
             // el prefijo dice "seña confirmada" para no confundir al cliente.
-            const closingTpl = getFlowTemplate('closing', knowledge);
+            const closingTpl = (currentState.shippingChoice === 'retiro' ? getFlowTemplate('closing_sucursal', knowledge) : null)
+                || getFlowTemplate('closing', knowledge);
             const dataMsg = closingTpl
                 ? _formatMessage(closingTpl, currentState)
                 : '¡Perfecto! 🎉 Ahora necesito los datos de envío:\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nEmail (opcional, para el comprobante de MP):';
@@ -532,7 +527,10 @@ async function _tryCreateAndSendMpLink(
     // fueron eliminadas de V5/V6. Si state.senaAmount > 0 (Order legacy), el bot
     // genera el link por ese monto igual (variable amount arriba), pero el mensaje
     // ya no menciona "seña/saldo al cartero" — el admin coordina por separado.
-    const linkTpl = getFlowTemplate('payment_mp_link', knowledge) ||
+    // Retiro en sucursal (prepago, sep-2026): mismo link, pero pide los datos de
+    // la sucursal (nombre, localidad, CP) en vez de la calle.
+    const linkTpl = (currentState.shippingChoice === 'retiro' ? getFlowTemplate('payment_mp_link_sucursal', knowledge) : null)
+        || getFlowTemplate('payment_mp_link', knowledge) ||
         `💳 *Pago con tarjeta de crédito*\n\nPedido: *{{PRODUCT}}* — Plan {{PLAN}} días\nTotal: *${'$'}{{TOTAL}}*\n\n{{LINK}}\n\nEscribime *"listo"* cuando termines.`;
     // Inyectamos productName en state efímero para que {{PRODUCT}} muestre el cart concatenado.
     const stateForFmt = { ...currentState, selectedProduct: productName };

@@ -59,7 +59,22 @@ Flujo de un mensaje: `client.on('message')` → `messageHandler` (debounce ~N se
 
 Máquina de estados lineal con fallbacks a IA. Orden típico:
 
-`greeting → waiting_weight → waiting_preference → waiting_plan_choice → waiting_ok → waiting_data → waiting_maps_confirmation → waiting_payment_method → [waiting_mp_payment] → waiting_price_confirmation → waiting_final_confirmation → waiting_admin_validation → completed`
+`greeting → waiting_weight → waiting_preference → waiting_plan_choice → waiting_zone → { dentro de zona: waiting_data → completed | fuera: waiting_payment_method → [waiting_mp_payment | waiting_transfer_confirmation] → waiting_data → waiting_final_confirmation → completed }`
+
+- **Modelo por zona (sep-2026)**: la publicidad apunta a Rosario y 60 km, así que el "menú de
+  pago" (`flow.payment_menu`) es una pregunta de LOCALIDAD y `waiting_zone`
+  (`src/flows/steps/stepWaitingZone.ts`) decide con `src/flows/utils/deliveryZone.ts`:
+  dentro → `shippingChoice='reparto'`, `paymentMethod='contrarembolso'`, reparto propio sin costo,
+  el repartidor cobra al recibir (efectivo, tarjeta o transferencia), se piden SOLO nombre y calle
+  y el bot cierra solo; fuera → `deliveryZone='out'`, Correo Argentino SIEMPRE prepago (tarjeta o
+  transferencia) a domicilio o a sucursal (`shippingChoice='retiro'`, calle `A sucursal`), 4 días
+  hábiles. El cliente nunca se clasifica solo; si la localidad no está en ninguna lista el bot
+  pregunta los km. Las listas viven en `knowledge.rules.repartoPropio` (las de borde, San Nicolás
+  o Cañada de Gómez, van por Correo: el radio es de 60 km en línea recta). Fuera de zona NO existe
+  contrarreembolso: al que lo pide se le manda `prepay_objection` y, si insiste,
+  `prepay_refusal_close` (texto del dueño) + pausa. "Soy de Rosario" ya NO pausa (lo hacía desde
+  may-2026). Entrar al paso siempre por `_startZoneStep`, que saltea la pregunta si el cliente ya
+  dijo de dónde es. Cubierto por `tests/zone_flow.test.js` y `tests/sim_horacio_jun21.test.js`.
 
 - `processGlobals` corre antes de cada step — maneja cancelaciones, seguimiento, cliente recurrente, etc.
 - Cada step devuelve `{ matched: boolean }`. Si no matchea, cae a IA vía `dependencies.aiService.chat()` con un `goal` específico al step.
@@ -76,10 +91,14 @@ Máquina de estados lineal con fallbacks a IA. Orden típico:
   El motivo: `sendMessageWithDelay` devuelve `false` sin enviar en cinco caminos (guard anti venta-fantasma, anti-duplicado, pausa durante el delay de 4-8s, `stillValid`, excepción del cliente). Mientras el push lo hacía cada call site, cualquiera de esos cinco dejaba en el historial un mensaje que el cliente nunca recibió, y la IA arrancaba el turno siguiente creyendo que ya lo había dicho — de 143 call sites solo 6 miraban el booleano. Es el mismo criterio por el que `logAndEmit` ya se había movido adentro (ver [[dashboard-message-ordering]]). Cubierto por `tests/phantom_history.test.js`.
   **Sí** se llama `_pushHistory(state, { role, content })` a mano en los caminos que envían por `client.sendMessage` directo (panel, comandos del admin) y para los marcadores que no son texto enviado (`[Imagen adjunta: X]`). Nunca `state.history.push({...})` crudo: el helper inicializa `history` si falta y aplica el cap (250 → deja los 150 más recientes), que antes solo corría en `salesFlow` y dejaba crecer sin techo todo lo que no re-entra al flujo. Cubierto por `tests/push_history.test.js`.
 - **`_pauseAndAlert(...)`** — cuando el bot no sabe qué hacer, pausa al user y notifica al admin. No intentar "auto-recovery" silenciosos.
+- **Guion guardado vs guion del repo**: `stateManager.loadKnowledge` prefiere la copia de
+  `DATA_DIR/knowledge_v7_<seller>.json` si existe; desde sep-2026, si `meta.version` del repo es
+  más nueva que la de la copia, gana el repo y la copia queda como `.bak`. Al cambiar el guion,
+  subir `meta.version`, o prod sigue con el viejo.
 - **Pausas NO se auto-liberan**. Un user pausado con `pauseReason` requiere intervención manual del admin. Si un outage (ej: OpenAI 429) pausa users, hay que despausarlos a mano. Única excepción: al arrancar, `restorePausedUsersFromDB` borra las pausas de más de 7 días (`STALE_PAUSE_DAYS` en `pauseService.ts`).
 - **Pricing**: siempre leer con `_getPrice/_getPrices/_getAdicionalMAX` de `pricing.ts`. NUNCA inventar precios en código ni en prompts de IA. Tampoco umbrales derivados de precios: para deducir el plan (60/120) de un monto usar `_inferPlanFromPrice`, y para el nombre canónico del producto `_normalizeProductName` (ambos en `pricing.ts`). Hasta el 2026-09-09 esa lógica estaba duplicada con umbrales hardcodeados en `botHelpers.ts` y `order.routes.js` (ver `stepWaitingFinalConfirmation.ts` para el patrón: se inyecta `pricingContext` en el prompt). El respaldo si falta `data/prices.json` es `FALLBACK_PRICES` (también en `pricing.ts`) y tiene que igualar al JSON. `GET /prices`, los flujos y los prompts leen por la misma función, así que un cambio en el Editor de Precios se ve en la lectura siguiente (cubierto por `tests/prices_single_source.test.js`). En el panel, los textos del guion con precios pasan por `fillPricePlaceholders` (`client/src/utils/scriptPlaceholders.js`) con lo que devuelve `/api/prices`: sin precios cargados, el placeholder queda visible.
-- **Interruptor de Mercado Pago**: `config.mpEnabled` (switch "Pago con tarjeta" en Configuración, default ON). En OFF el bot no ofrece ni genera links: domicilio ⇒ transferencia directa, y quien pida tarjeta recibe un aviso de "fuera de servicio". Leerlo SIEMPRE con `isMpEnabled(dependencies.config)` de `flows/utils/paymentOptions.ts`. Si agregás copy que nombre la tarjeta: en código usá `prepayMeans/prepayMenu`; en `knowledge_v7.json` agregá una variante `responseNoMp` (la eligen `getFlowTemplate(key, knowledge, mpOff)` y `globalFaq`). Los prompts de IA lo reciben vía `context.mpEnabled`, que inyecta el proxy de `salesFlow` — no hace falta pasarlo por call site.
-- **Adicional contrarembolso**: solo aplica a plan 60 + pagos en efectivo/contrarembolso. MP/transferencia lo exime. Recalcular tras cambios de plan/producto (no confiar en `isContraReembolsoMAX` previo).
+- **Interruptor de Mercado Pago**: `config.mpEnabled` (switch "Pago con tarjeta" en Configuración, default ON). En OFF el bot no ofrece ni genera links: fuera de zona domicilio y sucursal ⇒ transferencia directa, y quien pida tarjeta recibe un aviso de "fuera de servicio" (el reparto propio de Rosario cobra al recibir y no cambia). Leerlo SIEMPRE con `isMpEnabled(dependencies.config)` de `flows/utils/paymentOptions.ts`. Si agregás copy que nombre la tarjeta: en código usá `prepayMeans/prepayMenu`; en `knowledge_v7.json` agregá una variante `responseNoMp` (la eligen `getFlowTemplate(key, knowledge, mpOff)` y `globalFaq`). Los prompts de IA lo reciben vía `context.mpEnabled`, que inyecta el proxy de `salesFlow` — no hace falta pasarlo por call site.
+- **Adicional contrarembolso**: hoy es 0 (`rules.contraReembolsoMAX.adicional`). Si vuelve, solo aplica a plan 60 + pago al recibir; MP/transferencia lo exime. Recalcular tras cambios de plan/producto (no confiar en `isContraReembolsoMAX` previo).
 - **DB upserts bajo race**: código P2002 de Prisma = concurrent upsert race. Ignorar (ver `botHelpers.ts:65`).
 - **Locks**: `order_lock:${phone}:${sellerId}` TTL 3000ms. Queries internas al lock deben tener timeout < TTL (ver `cancelLatestOrder` con 2500ms).
 - **Socket.IO rooms**: emitir siempre a `sellerId` room y a `admin` room (admins ven todo). Payload del admin debe incluir `sellerId`.
@@ -91,6 +110,7 @@ Máquina de estados lineal con fallbacks a IA. Orden típico:
   `(origen, externalId=Order.id)`: reenviar devuelve el pedido que ya creó, así que
   `externalId` NO se puede recalcular ni derivar. Una venta cargada queda con
   `sistemaOrderId` y status `En sistema`, y el botón se deshabilita.
+- **Política de envío en los prompts**: una sola fuente, `shippingPolicyForPrompt` en `deliveryZone.ts` (va al system vía `_paymentPolicy`); lo que se sabe del cliente concreto (`zoneContextForPrompt`) va al turno user. No describir el modelo de envío a mano en un goal: usar esas dos.
 - **Prompt cache de Claude**: el system del `chat()` va en 2 bloques (`_buildSystemBlocks` en `aiPrompts.ts`): core compartido entre steps + módulo del step, cada uno con `cache_control` de 1h. NADA que dependa del mensaje, del cliente o de la hora puede entrar al system (rompe el prefijo para todas las llamadas); eso va al turno user. Verificar con `scripts/ai-cache-probe.ts` y con las líneas `[AI][usage]` de los logs (`cache_r` debe dominar a `in`).
 
 ## Multi-tenant scoping

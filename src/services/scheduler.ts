@@ -119,11 +119,11 @@ function _withName(msg: string, state: UserState): string {
 /** Contextual messages by abandon reason (for abandoned cart + cold lead recovery) */
 const ABANDON_REASON_MESSAGES: Record<string, string[]> = {
     payment_timing: [
-        '¡Hola! 😊 Una cosa importante: tenemos retiro en sucursal — dejás el paquete en una sucursal de Correo Argentino cerca tuyo y pagás el total *en efectivo cuando lo retirás*. No pagás nada por adelantado. ¿Seguimos?',
-        'Hola 👋 Si te queda más cómodo, podés elegir *retiro en sucursal*: pagás recién cuando vas a buscarlo. ¿Te tomamos los datos? 📦',
+        '¡Hola! 😊 Una cosa importante: si sos de Rosario o alrededores no pagás nada por adelantado, te lo llevamos nosotros y lo pagás *cuando lo recibís*. ¿Seguimos?',
+        'Hola 👋 Si te queda más cómodo, te lo agendo para la fecha que cobrás y lo despacho recién ese día. ¿Te tomamos los datos? 📦',
     ],
     hesitation: [
-        '¡Hola! 😊 Sin apuro. El envío tarda *7 a 10 días hábiles* por Correo Argentino, y más rápido —4 días— si lo pagás por adelantado. ¿Avanzamos cuando quieras?',
+        '¡Hola! 😊 Sin apuro. El envío es gratis a todo el país: en Rosario y alrededores te lo llevamos nosotros, y al resto va por Correo Argentino y llega en *4 días hábiles*. ¿Avanzamos cuando quieras?',
         'Hola 👋 Si te quedó alguna duda para decidir, contame y te ayudo. Y si querés, te lo puedo agendar para la fecha que te quede cómoda 😊',
     ],
     objection: [
@@ -972,7 +972,7 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
         // una vez y dejamos el stage en 1, para que el stage 2 lo escale al
         // vendedor a las 4h si no contesta. (stage 99 = "no molestar más".)
         if (!mpOn && mpReminderStage < 2 && mpReminderStage !== 99 && !(state as any).mpAlternativeOffered) {
-            const msg = `¡Hola! 👋 Te aviso que el *pago con tarjeta* lo tenemos fuera de servicio en estos días, así que ese link no te va a andar 🙈 Disculpá.\n\nLo resolvemos por otro lado:\n\n💸 *Transferencia bancaria* — al alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*\n🏪 *Retiro en sucursal* — lo retirás en una sucursal de Correo Argentino cerca tuyo y pagás el total en efectivo al retirar (sin adelantar nada)\n\n¿Cuál te queda más cómoda?`;
+            const msg = `¡Hola! 👋 Te aviso que el *pago con tarjeta* lo tenemos fuera de servicio en estos días, así que ese link no te va a andar 🙈 Disculpá.\n\nLo resolvemos por *transferencia bancaria*: alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*. Apenas se acredita, el pedido sale 📦\n\n¿Seguimos así?`;
             try {
                 const sent = await sendMessageWithDelay(userId, msg, undefined, stillWaitingMp);
                 if (sent) {
@@ -1007,12 +1007,12 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
             continue;
         }
 
-        // Stage 1.5: 90 minutos sin pagar — ofrecer alternativas (transferencia/COD)
+        // Stage 1.5: 90 minutos sin pagar — ofrecer la alternativa (transferencia)
         // antes de escalar a vendedor a las 4h. Idea: rescatar la venta de quien
         // no completó MP por razones técnicas (no tiene tarjeta a mano, problema
         // con el link, etc.). Una sola vez vía flag mpAlternativeOffered.
         if (mpReminderStage === 1 && !(state as any).mpAlternativeOffered && minsSince >= 90) {
-            const msg = `¡Hola! 👋 Si tuviste alguna dificultad con el link de pago, no hay drama 😊\n\nTenés dos alternativas:\n\n💸 *Transferencia bancaria* — al alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*\n🏪 *Retiro en sucursal* — lo retirás en una sucursal de Correo Argentino cerca tuyo y pagás el total en efectivo al retirar (sin anticipo previo)\n\n¿Te queda más cómoda alguna de estas, o seguimos con la tarjeta de crédito?`;
+            const msg = `¡Hola! 👋 Si tuviste alguna dificultad con el link de pago, no hay drama 😊\n\nPodés pagar por *transferencia bancaria* al alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*, y apenas se acredita sale el envío 📦\n\n¿Te queda más cómodo así, o seguimos con la tarjeta de crédito?`;
             try {
                 const sent = await sendMessageWithDelay(userId, msg, undefined, stillWaitingMp);
                 if (sent) {

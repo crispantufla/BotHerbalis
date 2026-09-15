@@ -17,39 +17,29 @@ const tpl = require('../src/utils/messageTemplates');
 // V5/V6 archivados en may-2026; V7 es el único guion activo.
 const v7 = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'knowledge_v7.json'), 'utf8'));
 
-describe('Modelo nuevo de pago — buildPaymentMessage (envío primero, sin anticipo)', () => {
-    const pm = tpl.buildPaymentMessage({ selectedPlan: '60', totalPrice: '46.900' });
+describe('Modelo por zona (sep-2026) — buildPaymentMessage pregunta la localidad', () => {
+    const pm = tpl.buildPaymentMessage({ selectedProduct: 'Cápsulas', selectedPlan: '60', totalPrice: '46.900' });
 
-    test('Pregunta tipo de envío: retiro en sucursal vs envío a domicilio', () => {
-        expect(pm).toMatch(/Retiro en sucursal/i);
-        expect(pm).toMatch(/Env[íi]o a domicilio/i);
+    test('Confirma producto, plan y total, y pregunta de qué localidad es', () => {
+        expect(pm).toMatch(/Cápsulas × 60 días/);
+        expect(pm).toMatch(/46\.900/);
+        expect(pm).toMatch(/de qué localidad sos/i);
     });
-    test('Vincula el retiro con pago al retirar (en efectivo)', () => {
-        expect(pm).toMatch(/al retirar/i);
-        expect(pm).toMatch(/efectivo/i);
-    });
-    test('Lista medios de pago para domicilio (tarjeta de crédito, transferencia)', () => {
-        expect(pm).toMatch(/tarjeta de cr[ée]dito/i);
-        expect(pm).toMatch(/transferencia/i);
+    test('NO le pide al cliente que se clasifique ni ofrece retiro/domicilio todavía', () => {
+        expect(pm).not.toMatch(/zona de influencia/i);
+        expect(pm).not.toMatch(/OPCI[ÓO]N/);
+        expect(pm).not.toMatch(/Retiro en sucursal/i);
     });
     test('Ya NO ofrece Mercado Pago / Pago Fácil / Rapipago al cliente (decisión jun-2026)', () => {
         expect(pm).not.toMatch(/mercado\s?pago/i);
         expect(pm).not.toMatch(/rapipago/i);
         expect(pm).not.toMatch(/pago\s?f[áa]cil/i);
     });
-    test('Promete envío gratis y 7 a 10 días hábiles', () => {
-        expect(pm).toMatch(/GRATIS/i);
-        expect(pm).toMatch(/7 y 10 d[íi]as/i);
-    });
-    test('NO menciona anticipo de $10.000 (modalidad eliminada)', () => {
+    test('NO menciona anticipo de $10.000, adicional de $6.000 ni cuotas', () => {
         expect(pm).not.toMatch(/10\.000/);
         expect(pm).not.toMatch(/anticipo/i);
-    });
-    test('NO menciona adicional de $6.000', () => {
         expect(pm).not.toMatch(/\$\s*6\.000/);
         expect(pm).not.toMatch(/adicional/i);
-    });
-    test('NO menciona cuotas', () => {
         expect(pm).not.toMatch(/cuotas/i);
     });
 });
@@ -67,17 +57,36 @@ describe('Modelo nuevo — payment_domicilio_choice (submenú prepago tras elegi
     });
 });
 
-describe('Modelo nuevo — payment_retiro_confirm (confirmación tras elegir retiro)', () => {
+describe('Modelo por zona — payment_sucursal_choice (retiro en sucursal PREPAGO)', () => {
     test.each([
         ['V7', v7],
-    ])('%s: existe la entry y aclara "total en efectivo al retirar"', (_n, guion) => {
-        const confirm = guion.flow.payment_retiro_confirm;
-        expect(confirm).toBeDefined();
-        expect(confirm.response).toMatch(/sucursal/i);
-        expect(confirm.response).toMatch(/efectivo/i);
-        // No menciona anticipo
-        expect(confirm.response).not.toMatch(/anticipo/i);
-        expect(confirm.response).not.toMatch(/10\.000/);
+    ])('%s: existe la entry, ofrece tarjeta + transferencia y NO habla de efectivo', (_n, guion) => {
+        const choice = guion.flow.payment_sucursal_choice;
+        expect(choice).toBeDefined();
+        expect(choice.response).toMatch(/sucursal/i);
+        expect(choice.response).toMatch(/Tarjeta de cr[ée]dito/i);
+        expect(choice.response).toMatch(/Transferencia/i);
+        expect(choice.response).not.toMatch(/efectivo/i);
+        expect(choice.response).not.toMatch(/anticipo/i);
+        expect(choice.response).not.toMatch(/10\.000/);
+        // El retiro contrarreembolso viejo ya no tiene texto que lo dispare.
+        expect(guion.flow.payment_retiro_confirm).toBeUndefined();
+    });
+
+    test('zone_in (reparto propio) pide solo nombre y calle, y paga al recibir', () => {
+        const z = v7.flow.zone_in.response;
+        expect(z).toMatch(/reparto propio/i);
+        expect(z).toMatch(/al recibirlo/i);
+        expect(z).toMatch(/nombre completo/i);
+        expect(z).toMatch(/calle y número/i);
+        expect(z).not.toMatch(/c[óo]digo postal|Correo/i);
+    });
+
+    test('prepay_refusal_close es el texto del dueño y prepay_objection lo resume en voz de Elena', () => {
+        expect(v7.flow.prepay_refusal_close.response).toMatch(/^Desde hace 13 años realizamos envíos por contrarreembolso/);
+        expect(v7.flow.prepay_refusal_close.response).toMatch(/Atentamente,\nHerbalis$/);
+        expect(v7.flow.prepay_objection.response).toMatch(/13 años/);
+        expect(v7.flow.prepay_objection.response).toMatch(/4 días hábiles/);
     });
 });
 
@@ -90,17 +99,17 @@ describe('Modelo nuevo — rules en V5 y V6', () => {
 
     test.each([
         ['V7', v7],
-    ])('%s: contraReembolsoMAX senaTransfer=0 (sin anticipo) + spontaneous + appliesTo=all', (_n, guion) => {
+    ])('%s: contraReembolsoMAX senaTransfer=0 (sin anticipo) + spontaneous + appliesTo=zone_in', (_n, guion) => {
         expect(guion.rules.contraReembolsoMAX.senaTransfer).toBe(0);
         expect(guion.rules.contraReembolsoMAX.spontaneous).toBe(true);
-        expect(guion.rules.contraReembolsoMAX.appliesTo).toBe('all');
+        expect(guion.rules.contraReembolsoMAX.appliesTo).toBe('zone_in');
         expect(guion.rules.contraReembolsoMAX.adicional).toBe(0);
     });
 
     test.each([
         ['V7', v7],
-    ])('%s: defaultPaymentMethod = shipping_first + bankAlias oficial', (_n, guion) => {
-        expect(guion.rules.defaultPaymentMethod).toBe('shipping_first');
+    ])('%s: defaultPaymentMethod = zone_first + bankAlias oficial', (_n, guion) => {
+        expect(guion.rules.defaultPaymentMethod).toBe('zone_first');
         expect(guion.rules.bankAlias.alias).toBe('HERBALIS.TIENDA');
         expect(guion.rules.bankAlias.titular).toBe('BIO ORIGEN S.A.S.');
     });
@@ -125,11 +134,12 @@ describe('Modelo nuevo — FAQ en V5 y V6', () => {
 
     test.each([
         ['V7', v7],
-    ])('%s: FAQ "contra reembolso" describe retiro en sucursal (sin anticipo)', (_n, guion) => {
+    ])('%s: FAQ "contra reembolso" lo acota a la zona de reparto propio (Rosario y 60 km)', (_n, guion) => {
         const codFaq = guion.faq.find(f => f.keywords.some(k => k === 'contra reembolso'));
         expect(codFaq).toBeDefined();
-        expect(codFaq.response).toMatch(/sucursal/i);
-        expect(codFaq.response).toMatch(/efectivo/i);
+        expect(codFaq.response).toMatch(/Rosario/);
+        expect(codFaq.response).toMatch(/al recibir/i);
+        expect(codFaq.response).toMatch(/Correo Argentino/);
         // No menciona anticipo ni $10.000
         expect(codFaq.response).not.toMatch(/anticipo/i);
         expect(codFaq.response).not.toMatch(/10\.000/);
@@ -146,12 +156,13 @@ describe('Modelo nuevo — FAQ en V5 y V6', () => {
 
     test.each([
         ['V7', v7],
-    ])('%s: FAQ "shipping" unifica 7 a 10 días hábiles + menciona ambas opciones de envío', (_n, guion) => {
+    ])('%s: FAQ "shipping" explica las dos zonas: reparto propio y Correo prepago en 4 días', (_n, guion) => {
         const shipFaq = guion.faq.find(f => f.keywords.some(k => k === 'como lo recibo' || k === 'envio'));
         expect(shipFaq).toBeDefined();
-        expect(shipFaq.response).toMatch(/7 a 10 d[íi]as/i);
-        expect(shipFaq.response).toMatch(/Retiro en sucursal/i);
-        expect(shipFaq.response).toMatch(/Env[íi]o a domicilio/i);
+        expect(shipFaq.response).toMatch(/4 d[íi]as h[áa]biles/i);
+        expect(shipFaq.response).toMatch(/Rosario y hasta 60 km/i);
+        expect(shipFaq.response).toMatch(/Correo Argentino/);
+        expect(shipFaq.response).not.toMatch(/7 a 10/);
         // No menciona el viejo split 4-6 / 7-10 hábiles ni el viejo 5 a 7
         expect(shipFaq.response).not.toMatch(/4 a 6/);
         expect(shipFaq.response).not.toMatch(/5 a 7/);

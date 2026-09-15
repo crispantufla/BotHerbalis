@@ -54,7 +54,7 @@ const SettingsView = ({ status }) => {
         endpoint: '/api/config/mercadopago', field: 'mpEnabled',
         socketEvent: 'mercadopago_changed', defaultValue: true,
         onText: 'Pago con tarjeta activado. El bot vuelve a ofrecer el link de pago.',
-        offText: 'Pago con tarjeta desactivado. El bot ofrece solo retiro en sucursal y transferencia.',
+        offText: 'Pago con tarjeta desactivado. Fuera de zona el bot ofrece solo transferencia; en Rosario y 60 km sigue el pago al recibir.',
     });
 
     useEffect(() => {
@@ -430,10 +430,9 @@ const SettingsView = ({ status }) => {
                 >
                     Apagalo si la cuenta de <strong>Mercado Pago</strong> está bloqueada o caída.
                     El bot deja de <strong>ofrecer y de generar links de pago</strong>: si un
-                    cliente pide tarjeta, le avisa que no está disponible y le ofrece
-                    <strong> retiro en sucursal</strong> (efectivo al retirar) o
-                    <strong> transferencia</strong> al alias. Los pagos ya hechos se siguen
-                    verificando normal.
+                    cliente de fuera de zona pide tarjeta, le avisa que no está disponible y le
+                    ofrece <strong>transferencia</strong> al alias. El reparto propio de Rosario
+                    (pago al recibir) no cambia. Los pagos ya hechos se siguen verificando normal.
                 </SettingSwitchCard>
                 </div>
                 {/* /Col 2 stack */}

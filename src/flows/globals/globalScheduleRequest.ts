@@ -57,7 +57,7 @@ export function _detectScheduleRequest(text: string): boolean {
 // cápsulas a la noche") no es pedido de horario de envío. El detector ya es
 // bastante específico, pero esto suma seguridad.
 const STEPS_RELEVANT = new Set<string>([
-    'waiting_payment_method', 'waiting_mp_payment', 'waiting_transfer_confirmation',
+    'waiting_zone', 'waiting_payment_method', 'waiting_mp_payment', 'waiting_transfer_confirmation',
     'waiting_data', 'waiting_maps_confirmation', 'waiting_final_confirmation',
     'waiting_admin_validation', 'completed', 'post_sale',
 ]);

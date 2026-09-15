@@ -1053,6 +1053,7 @@ module.exports = (clientPool) => {
                 'waiting_transfer_confirmation': 65,
                 'waiting_mp_payment': 60,
                 'waiting_payment_method': 55,
+                'waiting_zone': 50,
                 'waiting_plan_choice': 40,
                 'waiting_ok': 35,
                 'waiting_preference': 30,

@@ -1,8 +1,8 @@
 {
     "meta": {
-        "name": "Guión V7 — Elena · 2 tiers (60d / 120d)",
-        "description": "Guión simplificado may-2026: persona Elena (tono cálido argentino), 2 tiers (hasta 10 kg → plan 60 días; más de 10 kg → plan 120 días). Tras pedir kilos, el bot envía dos mensajes seguidos (recomendación + precios). Cuando el cliente elige producto, confirma el total y va directo al menú de pago. Modelo de pago nuevo: retiro en sucursal (paga total al retirar) o envío a domicilio (prepago MP/transferencia).",
-        "version": "7.0"
+        "name": "Guión V8 — Elena · zona Rosario (reparto propio / Correo prepago)",
+        "description": "Guión sep-2026 sobre la base V7 (persona Elena, 2 tiers 60d/120d). La publicidad apunta a Rosario y 60 km a la redonda, así que el menú de pago dejó de ser \"retiro vs domicilio\" y pasó a ser una pregunta de LOCALIDAD: dentro de la zona, reparto propio a domicilio sin costo y pago al recibir (efectivo, tarjeta o transferencia); fuera, Correo Argentino prepago (tarjeta o transferencia) a domicilio o a sucursal, 4 días hábiles. El bot clasifica la zona con rules.repartoPropio; el cliente nunca tiene que decir si está \"dentro de la zona de influencia\".",
+        "version": "8.0"
     },
     "flow": {
         "greeting": {
@@ -94,25 +94,67 @@
             "nextStep": "waiting_plan_choice"
         },
         "payment_menu": {
+            "step": "waiting_zone",
+            "_note": "TEXTO 4 — Menú de pago (sep-2026): en vez de ofrecer retiro/domicilio, pregunta la LOCALIDAD. Con eso el bot decide solo si entra en la zona de reparto propio (rules.repartoPropio) o va por Correo. Lo dispara buildPaymentMessage / _startZoneStep al confirmar producto y plan. Si el cliente ya dijo de dónde es antes (ej: \"soy de Funes\" en el saludo), este texto se saltea y va directo a zone_in / zone_out.",
+            "response": "¡Genial! 🙌 Vamos con *{{PRODUCT}} × {{PLAN}} días*, total *${{TOTAL}}* con envío gratis.\n\nContame de qué localidad sos, así te digo cómo te llega 📦",
+            "nextStep": "waiting_zone"
+        },
+        "zone_km": {
+            "step": "waiting_zone",
+            "_note": "La localidad que dijo el cliente no está en ninguna lista (ni zona ni lejos). En vez de adivinar, el bot pregunta los km como haría una vendedora que no conoce el pueblo. Hasta 60 km = reparto propio.",
+            "response": "¿Y eso queda cerca de Rosario? ¿A cuántos km, más o menos? 🙂"
+        },
+        "zone_reask": {
+            "step": "waiting_zone",
+            "_note": "El mensaje no traía ninguna localidad reconocible (ni un número de km cuando ya lo preguntamos). Se re-pregunta una vez; si sigue sin salir, cae a la IA.",
+            "response": "Perdoná, no me quedó claro 🙈 ¿De qué localidad sos? (ciudad o pueblo)"
+        },
+        "zone_no_local": {
+            "step": "waiting_zone",
+            "_note": "Cliente quiere venir a buscar el producto (\"voy a buscarlo\", \"tienen local\"). No hay local de venta al público: si es de la zona se lo llevamos con reparto propio; si no, va por Correo. Antes de sep-2026 esto PAUSABA al cliente y avisaba al admin; ahora sigue en el flujo.",
+            "response": "No tenemos local para retirar 🙈 Pero si sos de Rosario o alrededores te lo llevamos nosotros a tu casa sin costo y lo pagás al recibir 🚚\n\n¿De qué localidad sos?"
+        },
+        "zone_in": {
+            "step": "waiting_data",
+            "_note": "DENTRO de la zona (Rosario y hasta 60 km): reparto propio, sin costo, paga al recibir (efectivo, tarjeta o transferencia al repartidor). Pide SOLO nombre y calle y número — la localidad ya la dijo, no se vuelve a pedir; no hace falta CP. El bot cierra la venta solo cuando tiene los dos datos (orden Confirmado + aviso al admin), igual que hacía con el retiro. Placeholder {{LOCALIDAD}} = la localidad reconocida (si no hay, sale \"tu zona\").",
+            "response": "Dale, a *{{LOCALIDAD}}* llegamos con reparto propio 🚚\n\nTe lo llevamos a tu casa sin costo y lo pagás al recibirlo: efectivo, tarjeta o transferencia, como te quede cómodo. Antes te escribimos para acordar día y horario.\n\nPasame tu *nombre completo* y *calle y número* 🙌",
+            "nextStep": "waiting_data"
+        },
+        "zone_out": {
             "step": "waiting_payment_method",
-            "_note": "TEXTO 4 — Menú envío + medios de pago. Disparado por buildPaymentMessage. Modelo nuevo (may-2026): primero elige tipo de envío, después método. Retiro=contrarreembolso al retirar (sin anticipo). Domicilio=prepago (MP/Transfer).",
-            "response": "📦 Te lo enviamos GRATIS por Correo Argentino (entre 7 y 10 días hábiles, y más rápido —4 días— si lo pagás por adelantado) 😊\n\n1️⃣ *Retiro en sucursal* (lo más cómodo) → no pagás nada por adelantado, abonás el total *en efectivo cuando lo retirás*. La sucursal te la asigna el Correo, la más cercana a tu casa.\n2️⃣ *Envío a domicilio* → lo pagás antes con *tarjeta de crédito* o transferencia, y *al estar pago sale antes: llega en 4 días hábiles* 🚚\n\n👉 ¿Preferís retiro en sucursal y pagar al retirar, o envío a domicilio?",
-            "_noteNoMp": "Variante usada cuando el switch 'Pago con tarjeta' está APAGADO en Configuración (cuenta de MP bloqueada). Mismo menú de 2 envíos, sin el medio online.",
-            "responseNoMp": "📦 Te lo enviamos GRATIS por Correo Argentino (entre 7 y 10 días hábiles, y más rápido —4 días— si lo pagás por adelantado) 😊\n\n1️⃣ *Retiro en sucursal* (lo más cómodo) → no pagás nada por adelantado, abonás el total *en efectivo cuando lo retirás*. La sucursal te la asigna el Correo, la más cercana a tu casa.\n2️⃣ *Envío a domicilio* → lo abonás antes por *transferencia bancaria*, y *al estar pago sale antes: llega en 4 días hábiles* 🚚\n\n👉 ¿Preferís retiro en sucursal y pagar al retirar, o envío a domicilio?",
+            "_note": "FUERA de la zona: Correo Argentino sin costo, SIEMPRE prepago, a domicilio o a sucursal a elección. No se nombra el servicio del Correo (Paq.ar) a propósito: al cliente no le aporta. Cierra preguntando domicilio o sucursal; el submenú de tarjeta/transferencia viene después (payment_domicilio_choice / payment_sucursal_choice).",
+            "response": "Hasta ahí no llega nuestro reparto, así que va por *Correo Argentino* sin costo y llega en *4 días hábiles* 📦\n\nPodés recibirlo *en tu domicilio* o *retirarlo en la sucursal* más cercana, como prefieras. Como va prepago, lo abonás ahora con *tarjeta de crédito* o por *transferencia*.\n\n¿Lo querés en tu casa o en sucursal?",
+            "_noteNoMp": "Variante con el switch \"Pago con tarjeta\" APAGADO: mismo texto, solo transferencia.",
+            "responseNoMp": "Hasta ahí no llega nuestro reparto, así que va por *Correo Argentino* sin costo y llega en *4 días hábiles* 📦\n\nPodés recibirlo *en tu domicilio* o *retirarlo en la sucursal* más cercana, como prefieras. Como va prepago, lo abonás ahora por *transferencia*.\n\n¿Lo querés en tu casa o en sucursal?",
             "nextStep": "waiting_payment_method"
         },
         "payment_domicilio_choice": {
             "step": "waiting_payment_method",
-            "_note": "Cliente eligió envío a domicilio. Submenú de medio de pago (prepago): tarjeta de crédito (link) o transferencia. NO se ofrecen débito, saldo en app, Pago Fácil ni Rapipago (decisión jun-2026).",
-            "response": "Perfecto, lo mandamos a tu domicilio 🏠\n\nComo va prepago, al confirmar el pago el pedido sale enseguida y *te llega en 4 días hábiles* 🚚\n\n¿Cómo querés abonar?\n\n1️⃣ *Tarjeta de crédito* — te envío un *link de pago* seguro\n2️⃣ *Transferencia bancaria* — te paso el alias",
-            "_noteNoMp": "Con el switch 'Pago con tarjeta' APAGADO no hay submenú: domicilio = transferencia, y el bot manda el alias directo. Este texto solo aparece si el flujo llega al submenú por un estado viejo.",
-            "responseNoMp": "Perfecto, lo mandamos a tu domicilio 🏠\n\nComo va prepago, al confirmar el pago el pedido sale enseguida y *te llega en 4 días hábiles* 🚚\n\nEl pago va por *transferencia bancaria* — te paso el alias y coordinamos 😊",
+            "_note": "Fuera de zona, eligió domicilio. Submenú de medio prepago: tarjeta de crédito (link) o transferencia. NO se ofrecen débito, saldo en app, Pago Fácil ni Rapipago (decisión jun-2026).",
+            "response": "Perfecto, te lo mandamos a tu domicilio por Correo Argentino 🏠\n\nAl estar pago sale enseguida y *te llega en 4 días hábiles* 🚚\n\n¿Cómo querés abonar?\n\n1️⃣ *Tarjeta de crédito* — te envío un *link de pago* seguro\n2️⃣ *Transferencia bancaria* — te paso el alias",
+            "_noteNoMp": "Con el switch \"Pago con tarjeta\" APAGADO no hay submenú: domicilio = transferencia, y el bot manda el alias directo. Este texto solo aparece si el flujo llega al submenú por un estado viejo.",
+            "responseNoMp": "Perfecto, te lo mandamos a tu domicilio por Correo Argentino 🏠\n\nAl estar pago sale enseguida y *te llega en 4 días hábiles* 🚚\n\nEl pago va por *transferencia bancaria* — te paso el alias y coordinamos 😊",
             "nextStep": "waiting_payment_method"
         },
-        "payment_retiro_confirm": {
-            "step": "waiting_admin_validation",
-            "_note": "Cliente eligió retiro en sucursal. NO hay anticipo — paga el total en efectivo cuando retira. La sucursal se asigna automáticamente por el código postal del cliente.",
-            "response": "¡Listo! Lo dejamos para retiro en sucursal 📦\n\nVas a pagar el total *${{TOTAL}}* en efectivo cuando lo retires.\n\nLa sucursal de Correo Argentino se asigna sola, la más cercana a tu código postal 😊"
+        "payment_sucursal_choice": {
+            "step": "waiting_payment_method",
+            "_note": "Fuera de zona, eligió retiro en sucursal. Desde sep-2026 el retiro TAMBIÉN es prepago (el contrarreembolso del Correo se volvió lento y caro): mismo submenú de tarjeta/transferencia que el domicilio. La sucursal la asigna el Correo por el CP, que se pide junto con los datos después del pago.",
+            "response": "Dale, lo dejamos para *retiro en sucursal* 📦 El Correo te lo manda a la más cercana a tu código postal, y al estar pago *llega en 4 días hábiles*.\n\n¿Cómo querés abonar?\n\n1️⃣ *Tarjeta de crédito* — te envío un *link de pago* seguro\n2️⃣ *Transferencia bancaria* — te paso el alias",
+            "_noteNoMp": "Variante con el switch \"Pago con tarjeta\" APAGADO.",
+            "responseNoMp": "Dale, lo dejamos para *retiro en sucursal* 📦 El Correo te lo manda a la más cercana a tu código postal, y al estar pago *llega en 4 días hábiles*.\n\nEl pago va por *transferencia bancaria* — te paso el alias y coordinamos 😊",
+            "nextStep": "waiting_payment_method"
+        },
+        "prepay_objection": {
+            "step": "waiting_payment_method",
+            "_note": "Cliente FUERA de zona pide contrarreembolso / pagar al recibir / desconfía de pagar antes (primera vez). Es el argumento del dueño en voz de Elena: 13 años de contrarreembolso, el Correo lo volvió lento y caro, hoy fuera de Rosario y alrededores va prepago y llega en 4 días. Se manda UNA vez; si insiste, sale prepay_refusal_close y se deriva a un asesor.",
+            "response": "Te entiendo 😊 Durante 13 años mandamos todo por contrarreembolso, pero en el último tiempo el Correo Argentino tomó medidas que lo volvieron lento y muy caro para el cliente. Por eso, fuera de Rosario y alrededores hoy trabajamos solo con pago anticipado: apenas se acredita, sale y te llega en *4 días hábiles* 🚚\n\nCon *tarjeta de crédito* el pago va por link protegido (si algo pasa con el envío, te devuelven la plata), y si te queda más cómodo tenés la *transferencia*. ¿Con cuál avanzamos?",
+            "_noteNoMp": "Variante con el switch \"Pago con tarjeta\" APAGADO.",
+            "responseNoMp": "Te entiendo 😊 Durante 13 años mandamos todo por contrarreembolso, pero en el último tiempo el Correo Argentino tomó medidas que lo volvieron lento y muy caro para el cliente. Por eso, fuera de Rosario y alrededores hoy trabajamos solo con pago anticipado por *transferencia*: apenas se acredita, sale y te llega en *4 días hábiles* 🚚\n\n¿Te paso el alias?"
+        },
+        "prepay_refusal_close": {
+            "step": "waiting_payment_method",
+            "_note": "Cliente FUERA de zona que insiste con contrarreembolso después de prepay_objection. Texto del dueño (sep-2026), tal cual. Después de mandarlo el bot pausa al cliente y avisa al admin, por si quiere retomarlo a mano.",
+            "response": "Desde hace 13 años realizamos envíos por contrarreembolso. En los últimos tiempos el Correo Argentino ha tomado medidas que claramente atentan contra este servicio, haciéndolo lento y muy caro para el cliente.\n\nLamentamos si no te resulta cómodo realizar el pago anticipado para que el envío llegue a tu domicilio en 4 días.\n\nSeguramente encontrarás otras opciones en las redes.\n\nQuedamos a tu disposición para hacerte llegar nuestros productos con la seriedad y eficiencia de más de una década.\n\nAtentamente,\nHerbalis"
         },
         "payment_transfer_alias": {
             "step": "waiting_transfer_confirmation",
@@ -122,8 +164,14 @@
         },
         "payment_mp_link": {
             "step": "waiting_mp_payment",
-            "_note": "TEXTO 5a — Cliente eligió tarjeta de crédito. Le mandamos el link + detalle del pedido + pedido de datos en paralelo. Placeholders: {{PRODUCT}}, {{PLAN}}, {{TOTAL}}, {{LINK}}.",
+            "_note": "TEXTO 5a — Cliente (fuera de zona, domicilio) eligió tarjeta de crédito. Link + detalle del pedido + pedido de datos en paralelo. Placeholders: {{PRODUCT}}, {{PLAN}}, {{TOTAL}}, {{LINK}}. Para retiro en sucursal se usa payment_mp_link_sucursal.",
             "response": "💳 Te dejo el link para pagar con tarjeta de crédito:\n\n{{LINK}}\n\nTotal: ${{TOTAL}} — {{PRODUCT}} {{PLAN}} días\n\nEs 100% protegido: si por algo no te llega, te devuelven la plata 👌\n\nCuando termines, mandame \"listo\" y coordinamos el envío 😊\n\nMientras tanto, pasame los datos para la etiqueta:\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nEmail (opcional, para el comprobante de pago):",
+            "nextStep": "waiting_mp_payment"
+        },
+        "payment_mp_link_sucursal": {
+            "step": "waiting_mp_payment",
+            "_note": "Variante de payment_mp_link cuando el cliente eligió RETIRO EN SUCURSAL (prepago): mismos link y total, pero los datos que pide son los de la sucursal (nombre, localidad, CP), sin calle.",
+            "response": "💳 Te dejo el link para pagar con tarjeta de crédito:\n\n{{LINK}}\n\nTotal: ${{TOTAL}} — {{PRODUCT}} {{PLAN}} días\n\nEs 100% protegido: si por algo no te llega, te devuelven la plata 👌\n\nCuando termines, mandame \"listo\" y coordinamos el envío 😊\n\nMientras tanto, pasame los datos para asignar la sucursal:\nNombre completo:\nLocalidad:\nCódigo postal:\nEmail (opcional, para el comprobante de pago):",
             "nextStep": "waiting_mp_payment"
         },
         "payment_mp_failed": {
@@ -133,10 +181,10 @@
         },
         "payment_mp_retry": {
             "step": "waiting_mp_payment",
-            "_note": "Mensaje cuando el pago con tarjeta es rechazado tras un intento. Se ofrece reintentar con la tarjeta, o cambiar a transferencia / retiro en sucursal.",
-            "response": "⚠️ Hubo un problema con el pago, pudo ser la tarjeta o un rechazo del banco.\n\nPodés:\n✅ Reintentar con tu *tarjeta de crédito* (te genero un nuevo link)\n✅ Pagar por *transferencia*\n✅ O *retiro en sucursal* y pagás en efectivo al retirar\n\n¿Cómo seguimos? 😊",
-            "_noteNoMp": "Con el switch 'Pago con tarjeta' APAGADO no se ofrece reintentar: el link ya no sirve. Solo las dos formas vivas.",
-            "responseNoMp": "⚠️ El pago con tarjeta lo tenemos fuera de servicio en estos días, así que ese link no va a andar 🙈 Disculpá.\n\nLo resolvemos por otro lado:\n✅ Pagar por *transferencia* (te paso el alias)\n✅ O *retiro en sucursal* y pagás el total en efectivo al retirar\n\n¿Cómo seguimos? 😊"
+            "_note": "Pago con tarjeta rechazado tras un intento. Se ofrece reintentar con la tarjeta o pasar a transferencia. Ya no se ofrece retiro en efectivo (fuera de zona no existe pago al recibir).",
+            "response": "⚠️ Hubo un problema con el pago, pudo ser la tarjeta o un rechazo del banco.\n\nPodés:\n✅ Reintentar con tu *tarjeta de crédito* (te genero un nuevo link)\n✅ Pagar por *transferencia* (te paso el alias)\n\n¿Cómo seguimos? 😊",
+            "_noteNoMp": "Con el switch \"Pago con tarjeta\" APAGADO no se ofrece reintentar: el link ya no sirve.",
+            "responseNoMp": "⚠️ El pago con tarjeta lo tenemos fuera de servicio en estos días, así que ese link no va a andar 🙈 Disculpá.\n\nLo resolvemos por *transferencia*: te paso el alias y, apenas se acredita, sale el envío 😊\n\n¿Te lo paso?"
         },
         "transfer_received": {
             "step": "waiting_transfer_confirmation",
@@ -145,7 +193,7 @@
         },
         "closing": {
             "step": "waiting_data",
-            "_note": "Pedido de datos de envío. Se dispara DESPUÉS de que el cliente eligió método de pago y, en su caso, pagó (MP confirmado o transferencia avisada con 'listo'). Para retiro en sucursal: el bot pausa y el admin coordina, este texto no se usa.",
+            "_note": "Pedido de datos de envío a domicilio (fuera de zona). Se dispara DESPUÉS de que el cliente pagó (MP confirmado). Para retiro en sucursal se usa closing_sucursal; para la zona de reparto propio los datos se piden en zone_in.",
             "match": [
                 "si",
                 "sisi",
@@ -162,25 +210,36 @@
             "response": "¡Buenísimo! 🎉 Te sigo por acá durante todo el tratamiento.\n\nPasame los datos para la etiqueta:\n\nNombre completo:\nCalle y número:\nLocalidad:\nCódigo postal:\nEmail (opcional, para el comprobante de MP):\n\n(Que la dirección sea exacta, sin \"aprox\" ni S/N)",
             "nextStep": "waiting_data"
         },
+        "closing_sucursal": {
+            "step": "waiting_data",
+            "_note": "Variante de closing para RETIRO EN SUCURSAL (prepago, fuera de zona): solo nombre, localidad y CP. Con el CP el Correo asigna la sucursal.",
+            "response": "¡Buenísimo! 🎉 Te sigo por acá durante todo el tratamiento.\n\nPasame los datos para asignar la sucursal:\n\nNombre completo:\nLocalidad:\nCódigo postal:",
+            "nextStep": "waiting_data"
+        },
         "order_confirmation_mp": {
             "step": "waiting_admin_validation",
-            "_note": "Confirmación tras pago completo por MP (envío a domicilio PREPAGO). Placeholders: {{PRODUCT_DETAIL}}, {{PLAN_DETAIL}}, {{TOTAL}}, {{POSTDATADO_LINE}} (domicilio prepago = 4 días hábiles; ver branch en messages.ts).",
-            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✅ Pago recibido (tarjeta de crédito)\n\n✔ Correo Argentino — envío a domicilio\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs para retirar.\n\n✅ Ya queda en curso tu pedido 🌱 Apenas lo despachemos te pasamos el código de seguimiento. ¡Gracias por confiar en Herbalis!"
+            "_note": "Confirmación tras pago completo con tarjeta (fuera de zona, prepago). {{ENVIO_LINE}} la arma messages.ts según domicilio o sucursal (incluye la nota de las 72 hs). Placeholders: {{PRODUCT_DETAIL}}, {{PLAN_DETAIL}}, {{TOTAL}}, {{ENVIO_LINE}}, {{POSTDATADO_LINE}}.",
+            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✅ Pago recibido (tarjeta de crédito)\n\n{{ENVIO_LINE}}{{POSTDATADO_LINE}}\n✅ Ya queda en curso tu pedido 🌱 Apenas lo despachemos te pasamos el código de seguimiento. ¡Gracias por confiar en Herbalis!"
         },
         "order_confirmation_transfer": {
             "step": "waiting_admin_validation",
-            "_note": "Confirmación tras pago por transferencia bancaria (envío a domicilio).",
-            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✅ Pago recibido via Transferencia\n\n✔ Correo Argentino — envío a domicilio\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs para retirar.\n\n✅ Ya queda en curso tu pedido 🌱 Apenas lo despachemos te pasamos el código de seguimiento. ¡Gracias por confiar en Herbalis!"
+            "_note": "Confirmación tras pago por transferencia (fuera de zona, prepago). Mismo {{ENVIO_LINE}} que la de tarjeta.",
+            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✅ Pago recibido via Transferencia\n\n{{ENVIO_LINE}}{{POSTDATADO_LINE}}\n✅ Ya queda en curso tu pedido 🌱 Apenas lo despachemos te pasamos el código de seguimiento. ¡Gracias por confiar en Herbalis!"
+        },
+        "order_confirmation_reparto": {
+            "step": "waiting_admin_validation",
+            "_note": "Confirmación de REPARTO PROPIO (Rosario y 60 km): paga al recibir (efectivo, tarjeta o transferencia al repartidor). El bot cierra solo al tener nombre y calle. {{LOCALIDAD}} = localidad del cliente. {{POSTDATADO_LINE}} solo aparece si pidió una fecha.",
+            "response": "📦 CONFIRMACIÓN DE PEDIDO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal a pagar al recibir: *${{TOTAL}}* (efectivo, tarjeta o transferencia)\n\n✔ Reparto propio a tu domicilio en {{LOCALIDAD}}, sin costo\n{{POSTDATADO_LINE}}\nAntes de salir te escribimos para acordar día y horario 🚚\n\n✅ Ya queda en curso tu pedido 🌱 ¡Gracias por confiar en Herbalis!"
         },
         "order_confirmation_cod": {
             "step": "waiting_admin_validation",
-            "_note": "Confirmación de retiro en sucursal (modelo nuevo may-2026): cliente paga el TOTAL en efectivo al retirar. Sin anticipo. La sucursal de Correo Argentino se asigna automáticamente por el código postal.",
+            "_note": "LEGACY (pre sep-2026): retiro en sucursal contrarreembolso, paga el total en efectivo al retirar. Ya no lo dispara ningún camino nuevo; queda para conversaciones viejas con paymentMethod=contrarembolso y calle \"A sucursal\".",
             "response": "📦 CONFIRMACIÓN DE PEDIDO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal a pagar al retirar: *${{TOTAL}}*\n\n✔ Retiro en sucursal de Correo Argentino — se asigna automáticamente la más cercana a tu código postal.\n{{POSTDATADO_LINE}}\nCuando llegue te avisamos y te pasamos el código de retiro. Tenés 72 hs para retirarlo; pasado ese plazo el paquete vuelve y se genera un costo de ${{COSTO_LOGISTICO}}.\n\n✅ Ya queda en curso tu pedido 🌱 Te avisamos apenas esté en el correo para retirar y te pasamos el código. ¡Gracias por confiar en Herbalis!"
         },
         "order_confirmation_fallback": {
             "step": "waiting_admin_validation",
             "_note": "Fallback si el paymentMethod del state no matchea con ninguno conocido. Logueamos warn en código.",
-            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✔ Correo Argentino\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs.\n\n✅ Ya queda en curso tu pedido 🌱 Apenas lo despachemos te pasamos el seguimiento. ¡Gracias por confiar en Herbalis!"
+            "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n{{ENVIO_LINE}}{{POSTDATADO_LINE}}\n✅ Ya queda en curso tu pedido 🌱 Apenas lo despachemos te pasamos el seguimiento. ¡Gracias por confiar en Herbalis!"
         }
     },
     "faq": [
@@ -233,8 +292,9 @@
                 "duda 4",
                 "opcion 4"
             ],
-            "_note": "FAQ menu opción 4 — '¿Cómo lo recibo y cuánto tarda?'. Modelo jun-2026: retiro en sucursal 7 a 10 días hábiles; envío a domicilio PREPAGO 4 días hábiles. Dos opciones de envío. Ambos son gratis.",
-            "response": "📦 *Envíos por Correo Argentino* — *7 a 10 días hábiles*.\n\nTenés 2 opciones:\n1️⃣ *Retiro en sucursal* — pagás al retirar (contrarreembolso) → 7 a 10 días hábiles\n2️⃣ *Envío a domicilio* — se abona previamente y, al estar pago, *sale antes: llega en 4 días hábiles* 🚚\n\n‼️ Ambos envíos son *GRATIS* ‼️\n\nSi el cartero no te encuentra, te avisamos y tenés 72 hs para retirarlo en la sucursal más cercana, sin costo.\n\n👉 ¿Avanzamos?"
+            "_note": "FAQ menu opción 4 — '¿Cómo lo recibo y cuánto tarda?'. Modelo sep-2026 por zona: Rosario y 60 km reparto propio con pago al recibir; resto del país Correo Argentino prepago, 4 días hábiles, a domicilio o sucursal. Ambos gratis.",
+            "response": "📦 Depende de dónde estés:\n\n🚚 *Rosario y hasta 60 km*: te lo llevamos nosotros a tu casa, sin costo, y lo pagás al recibirlo. Coordinamos día y horario con vos.\n✉️ *Resto del país*: va por Correo Argentino, sin costo, a tu domicilio o a la sucursal más cercana. Se abona antes y llega en *4 días hábiles*.\n\n¿De qué localidad sos?",
+            "zoneAware": true
         },
         {
             "keywords": [
@@ -246,10 +306,11 @@
                 "metodo de pago",
                 "cuotas"
             ],
-            "_note": "Resumen del modelo (jun-2026): 2 tipos de envío con sus medios asociados. Domicilio = tarjeta de crédito o transferencia. Retiro = efectivo al retirar (y transferencia si el cliente lo pide). Si el cliente ya eligió, no responder esto.",
-            "response": "Tenemos 2 opciones de envío 📦\n\n1️⃣ *Retiro en sucursal* → pagás el total *en efectivo al retirar* (contrarreembolso)\n2️⃣ *Envío a domicilio* → se abona previamente con *tarjeta de crédito* o *transferencia bancaria*\n\n‼️ Ambos envíos son GRATIS ‼️\n\n¿Cuál te queda más cómoda?",
-            "_noteNoMp": "Variante usada cuando el switch 'Pago con tarjeta' está APAGADO en Configuración (cuenta de MP bloqueada).",
-            "responseNoMp": "Tenemos 2 opciones de envío 📦\n\n1️⃣ *Retiro en sucursal* → pagás el total *en efectivo al retirar* (contrarreembolso)\n2️⃣ *Envío a domicilio* → se abona previamente por *transferencia bancaria*\n\n‼️ Ambos envíos son GRATIS ‼️\n\n¿Cuál te queda más cómoda?"
+            "_note": "Resumen del modelo sep-2026 por zona. Dentro (Rosario + 60 km): paga al recibir en efectivo, tarjeta o transferencia. Fuera: prepago con tarjeta de crédito o transferencia, a domicilio o sucursal. Si el cliente ya eligió, no responder esto.",
+            "response": "Depende de la zona 😊\n\n🚚 *Rosario y alrededores (hasta 60 km)*: lo pagás *al recibirlo* en tu casa, en efectivo, tarjeta o transferencia.\n✉️ *Resto del país*: va por Correo Argentino y se abona antes, con *tarjeta de crédito* o *transferencia*. Llega en 4 días hábiles.\n\n¿De qué localidad sos?",
+            "_noteNoMp": "Variante usada cuando el switch \"Pago con tarjeta\" está APAGADO en Configuración.",
+            "responseNoMp": "Depende de la zona 😊\n\n🚚 *Rosario y alrededores (hasta 60 km)*: lo pagás *al recibirlo* en tu casa, en efectivo o transferencia.\n✉️ *Resto del país*: va por Correo Argentino y se abona antes por *transferencia*. Llega en 4 días hábiles.\n\n¿De qué localidad sos?",
+            "zoneAware": true
         },
         {
             "keywords": [
@@ -271,10 +332,18 @@
                 "al recibir",
                 "pagar al recibir",
                 "efectivo al cartero",
-                "cuando llega"
+                "cuando llega",
+                "contrarreembolso",
+                "contrareembolso",
+                "contra-reembolso",
+                "cuando me llega",
+                "cuando me llegue",
+                "pago cuando llega",
+                "pago cuando me llega"
             ],
-            "_note": "Contrarreembolso modelo nuevo (may-2026): retiro en sucursal de Correo Argentino, paga el TOTAL en efectivo al retirar. Sin anticipo previo. Si el cliente prefiere entrega a domicilio, debe abonar previamente (MP o transferencia).",
-            "response": "Dale, podemos coordinar pago al recibir 😊\n\nLa modalidad es: te dejamos el paquete en una *sucursal de Correo Argentino* cerca tuyo, y pagás el *total en efectivo al retirar*. El envío sale gratis.\n\nLa sucursal se asigna sola, la más cercana a tu código postal. ¿Avanzamos así?"
+            "_note": "Pago al recibir (sep-2026): SOLO dentro de la zona de reparto propio (Rosario y 60 km), lo cobra el repartidor. Fuera de zona el Correo va prepago; si el cliente de afuera insiste con contrarreembolso, el flujo manda prepay_objection y después prepay_refusal_close. zoneAware: con la zona ya resuelta (deliveryZone in/out) la FAQ no contesta; lo hace el paso, que sabe si hay pago al recibir o no.",
+            "response": "El pago al recibir lo tenemos para *Rosario y hasta 60 km a la redonda*: te lo lleva nuestro repartidor y le pagás en la puerta, en efectivo, tarjeta o transferencia 🚚\n\nPara el resto del país el envío va por Correo Argentino con pago anticipado (tarjeta o transferencia) y llega en 4 días hábiles.\n\n¿De qué localidad sos?",
+            "zoneAware": true
         },
         {
             "keywords": [
@@ -320,8 +389,8 @@
                 "engaño",
                 "chanta"
             ],
-            "_note": "NO promocionar contra reembolso como solución de confianza. Liderar con trust signals. Si insiste, ofrecer retiro en sucursal: paga el total en efectivo cuando lo retira.",
-            "response": "Te entiendo, hoy se ven cosas raras por internet 😊\n\nMirá, llevamos *13 años* distribuyendo este producto y pasaron casi *70 mil clientes*. Es serio, no somos un kiosco que abrió ayer.\n\nSi te queda más tranqui, podemos coordinar *retiro en sucursal*: te dejamos el paquete en una sucursal de Correo Argentino cerca tuyo y pagás el total *en efectivo al retirar*. ¿Cómo querés avanzar?"
+            "_note": "Liderar con trust signals. Si es de la zona, recordar que no paga nada hasta tener el paquete (reparto propio, paga al recibir). Si es de afuera, la tarjeta va por link protegido.",
+            "response": "Te entiendo, hoy se ven cosas raras por internet 😊\n\nMirá, llevamos *13 años* distribuyendo este producto y pasaron casi *70 mil clientes*. Es serio, no somos un kiosco que abrió ayer.\n\nSi sos de Rosario o alrededores, no pagás nada hasta tener el paquete en la mano: te lo llevamos y pagás al recibir. Y si va por Correo, con tarjeta el pago es por link protegido: si algo pasa con el envío, te devuelven la plata. ¿De qué localidad sos?"
         },
         {
             "keywords": [
@@ -383,7 +452,22 @@
                 "punto de venta",
                 "local fisico"
             ],
-            "response": "No tenemos local de venta al público. Trabajamos 100% online y los envíos son por Correo Argentino a todo el país 📦"
+            "response": "No tenemos local de venta al público. En Rosario y hasta 60 km te lo llevamos nosotros a tu casa 🚚 y al resto del país lo mandamos por Correo Argentino 📦\n\n¿De qué localidad sos?"
+        },
+        {
+            "keywords": [
+                "llegan a",
+                "hacen envios a",
+                "envian a",
+                "mandan a",
+                "llega a mi ciudad",
+                "envios al interior",
+                "envian al interior",
+                "envios a todo el pais"
+            ],
+            "_note": "Cliente pregunta si llegan a su ciudad/provincia. Modelo sep-2026: reparto propio en Rosario y 60 km, Correo prepago al resto.",
+            "response": "Sí, llegamos a todo el país 😊\n\nEn Rosario y hasta 60 km te lo llevamos nosotros y lo pagás al recibir. Al resto del país va por Correo Argentino, sin costo, y llega en 4 días hábiles.\n\n¿De qué localidad sos?",
+            "zoneAware": true
         }
     ],
     "rules": {
@@ -394,8 +478,8 @@
         "noCreditCard": false,
         "noArgue": true,
         "keepResponsesShort": true,
-        "defaultPaymentMethod": "shipping_first",
-        "_note_defaultPayment": "Modelo (jun-2026): el menú pregunta primero por TIPO DE ENVÍO. (1) Retiro en sucursal = contrarreembolso 100% al retirar en efectivo, sin anticipo (y transferencia si el cliente lo pide). (2) Envío a domicilio = prepago con TARJETA DE CRÉDITO (link de pago) o TRANSFERENCIA (alias HERBALIS.TIENDA — BIO ORIGEN S.A.S.). De cara al cliente el medio online se llama 'Tarjeta de crédito' (NO 'Mercado Pago'); ya NO se ofrecen débito, saldo en app, Pago Fácil ni Rapipago. El bot NUNCA menciona cuotas.",
+        "defaultPaymentMethod": "zone_first",
+        "_note_defaultPayment": "Modelo sep-2026 por ZONA: el menú de pago pregunta la LOCALIDAD (payment_menu) y el bot decide con rules.repartoPropio. (1) Rosario y hasta 60 km → reparto propio a domicilio sin costo, paga AL RECIBIR al repartidor (efectivo, tarjeta o transferencia); datos: nombre + calle y número; el bot cierra solo. (2) Fuera de zona → Correo Argentino sin costo, SIEMPRE PREPAGO con tarjeta de crédito (link) o transferencia (alias HERBALIS.TIENDA — BIO ORIGEN S.A.S.), a domicilio o a sucursal (la asigna el Correo por CP), 4 días hábiles. Fuera de zona NO existe contrarreembolso: al que lo pide se le manda prepay_objection y, si insiste, prepay_refusal_close + asesor. No se nombra el servicio del Correo (Paq.ar). El bot NUNCA menciona cuotas.",
         "bankAlias": {
             "alias": "HERBALIS.TIENDA",
             "titular": "BIO ORIGEN S.A.S."
@@ -405,8 +489,8 @@
             "spontaneous": true,
             "senaTransfer": 0,
             "adicional": 0,
-            "appliesTo": "all",
-            "description": "Contrarreembolso (modelo nuevo may-2026): retiro en sucursal de Correo Argentino. El cliente paga el TOTAL en efectivo al retirar. Sin anticipo. Aplica a TODOS los planes (60d y 120d) y a TODOS los clientes."
+            "appliesTo": "zone_in",
+            "description": "Pago al recibir (sep-2026): SOLO dentro de la zona de reparto propio (rules.repartoPropio). Lo cobra el repartidor en efectivo, tarjeta o transferencia. Sin anticipo ni adicional. Fuera de zona no existe: el Correo va prepago."
         },
         "costoLogisticoRechazo": 18000,
         "ageLimits": {
@@ -417,6 +501,98 @@
             "enabled": false,
             "_note": "DESACTIVADO. Ya no hay descuento ni regalo por prepagar — la tarjeta de crédito es la modalidad por defecto, no una alternativa premiada."
         },
-        "closeIfNotAccepted": "Trabajamos bajo estas modalidades.\n\nSi en algún momento te resulta cómodo avanzar, acá estamos 😊"
+        "closeIfNotAccepted": "Trabajamos bajo estas modalidades.\n\nSi en algún momento te resulta cómodo avanzar, acá estamos 😊",
+        "repartoPropio": {
+            "_note": "Zona de reparto propio: centro + radio en línea recta (el recorrido real ronda los 90 km). `localidades` = con reparto; `localidadesBorde` = justo afuera del radio, van por Correo, listadas aparte para poder pasarlas a `localidades` el día que el reparto llegue. Lo que no está en ninguna lista ni es un lugar obviamente lejano, el bot lo resuelve preguntando los km (zone_km). Los CP 2000-2009 cuentan como Rosario. Lo lee src/flows/utils/deliveryZone.ts; si esta sección falta, usa su copia de respaldo.",
+            "centro": "Rosario",
+            "radioKm": 60,
+            "cobraAlRecibir": [
+                "efectivo",
+                "tarjeta",
+                "transferencia"
+            ],
+            "localidades": [
+                "Rosario",
+                "Funes",
+                "Roldán",
+                "Pérez",
+                "Soldini",
+                "Piñero",
+                "Álvarez",
+                "Villa Gobernador Gálvez",
+                "Alvear",
+                "Pueblo Esther",
+                "General Lagos",
+                "Arroyo Seco",
+                "Fighiera",
+                "Ibarlucea",
+                "Granadero Baigorria",
+                "Capitán Bermúdez",
+                "Fray Luis Beltrán",
+                "San Lorenzo",
+                "Puerto General San Martín",
+                "Puerto San Martín",
+                "Ricardone",
+                "Timbúes",
+                "Aldao",
+                "Zavalla",
+                "Pujato",
+                "Coronel Arnold",
+                "Carcarañá",
+                "San Jerónimo Sud",
+                "Luis Palacios",
+                "Casilda",
+                "Sanford",
+                "Acebal",
+                "Carmen del Sauce",
+                "Uranga",
+                "Coronel Domínguez",
+                "Pavón",
+                "Pavón Arriba",
+                "Empalme Villa Constitución",
+                "Villa Constitución",
+                "Theobald",
+                "Godoy",
+                "Peyrano",
+                "Cepeda",
+                "Coronel Bogado",
+                "Villa Amelia",
+                "Albarellos",
+                "Arminda",
+                "Bigand",
+                "Villa Mugueta",
+                "Fuentes",
+                "Oliveros",
+                "Serodino",
+                "Andino",
+                "Maciel",
+                "Totoras",
+                "Salto Grande",
+                "Clarke",
+                "Lucio V. López",
+                "Sargento Cabral",
+                "Rueda",
+                "General Gelly",
+                "Juncal",
+                "Santa Teresa",
+                "Chabás",
+                "Los Molinos",
+                "Arteaga"
+            ],
+            "localidadesBorde": [
+                "Cañada de Gómez",
+                "Correa",
+                "Villa Eloísa",
+                "San Nicolás",
+                "San Nicolás de los Arroyos",
+                "Victoria",
+                "Barrancas",
+                "Monje",
+                "Díaz",
+                "Máximo Paz",
+                "Arequito",
+                "Alcorta"
+            ]
+        }
     }
 }

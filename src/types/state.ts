@@ -16,6 +16,7 @@ export enum FlowStep {
     CLOSING = "closing",
     COMPLETED = "completed",
     WAITING_MAPS_CONFIRMATION = "waiting_maps_confirmation",
+    WAITING_ZONE = "waiting_zone",
     WAITING_PAYMENT_METHOD = "waiting_payment_method",
     WAITING_MP_PAYMENT = "waiting_mp_payment",
     WAITING_TRANSFER_CONFIRMATION = "waiting_transfer_confirmation",
@@ -97,10 +98,24 @@ export interface UserState {
     secondFollowUpSent?: boolean;
     cashRetryShown?: boolean; // [LEGACY] flujo anticipo $10k (deprecated may-2026)
     codAnticipoMethodAsked?: boolean; // [LEGACY] flujo anticipo $10k (deprecated may-2026)
-    // Modelo nuevo de envío (may-2026): el menú pregunta primero el tipo de envío.
-    // 'retiro' = sucursal Correo Argentino, paga total en efectivo al retirar.
-    // 'domicilio' = se abona previamente por MP o transferencia.
-    shippingChoice?: 'retiro' | 'domicilio' | null;
+    // Modelo por zona (sep-2026, ver flows/utils/deliveryZone):
+    // 'reparto'   = Rosario y hasta 60 km: vehículo propio, sin costo, paga al recibir.
+    // 'domicilio' = fuera de zona, Correo Argentino a domicilio, PREPAGO.
+    // 'retiro'    = fuera de zona, Correo Argentino a sucursal, PREPAGO. (Antes de
+    //               sep-2026 era contrarreembolso en efectivo al retirar; los estados
+    //               viejos con paymentMethod='contrarembolso' se siguen cerrando así.)
+    shippingChoice?: 'retiro' | 'domicilio' | 'reparto' | null;
+    // Resultado de la clasificación de zona: 'in' = reparto propio, 'out' = Correo.
+    deliveryZone?: 'in' | 'out' | null;
+    // Qué le preguntamos en waiting_zone: la localidad, o los km hasta Rosario
+    // cuando la localidad no está en la lista.
+    zoneQuestion?: 'localidad' | 'km' | null;
+    // Envío que el cliente nombró ANTES de que supiéramos su zona ("120, a
+    // domicilio"). Lo consume la resolución de zona para no re-preguntarlo.
+    shippingHint?: 'retiro' | 'domicilio' | null;
+    // Veces que el cliente fuera de zona rechazó el prepago (pide contrarreembolso).
+    // A la segunda va el mensaje de cierre del guion y se deriva a un asesor.
+    prepayObjections?: number;
     // True cuando ya mostramos el submenú MP/Transferencia tras elegir domicilio.
     paymentSubChoiceAsked?: boolean;
     lastInteraction?: number;

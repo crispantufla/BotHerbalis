@@ -3,38 +3,28 @@ import { _getPrice } from '../utils/pricing';
 import { _setStep, _pauseAndAlert, _pushHistory } from '../utils/flowHelpers';
 import { buildCartFromSelection, calculateTotal } from '../utils/cartHelpers';
 import { _isDuplicate } from '../utils/messages';
-import { buildPaymentMessage } from '../../utils/messageTemplates';
+import { getFlowTemplate } from '../../utils/messageTemplates';
+import { _formatMessage } from '../utils/messages';
 import { isMpEnabled } from '../utils/paymentOptions';
+import { _startZoneStep } from './stepWaitingZone';
 import logger from '../../utils/logger';
 
-// Detector de intención de retiro en persona / cliente de Rosario.
-// La empresa NO tiene local público abierto — los envíos son SIEMPRE por
-// Correo Argentino. Si el cliente quiere "ir al local" o menciona que es de
-// Rosario y quiere retirar, pausamos para que el admin coordine retiro en
-// sucursal o aclare. EXCEPCIÓN: si ya pagó por Mercado Pago, no pausamos
-// (el pago ya entró, sólo es tema logístico).
+// Cliente que quiere venir a buscar el producto. No hay local de venta al
+// público: si es de Rosario o alrededores se lo llevamos con reparto propio, y
+// si no va por Correo. Hasta sep-2026 esto (y la sola mención de "soy de
+// Rosario") PAUSABA al cliente para que un asesor coordinara; con la publicidad
+// apuntada a Rosario eso frenaba justo al lead típico. Ahora contesta y sigue.
 const PICKUP_INTENT = /\b(voy\s+(?:yo|al?\s+local|a\s+(?:buscar|retirar))|paso\s+(?:a\s+)?(?:buscar|retirar)|retir(?:ar|o)\s+(?:yo|en\s+persona|directamente|allá|allí|ahí)|ir\s+al?\s+local|ir\s+a\s+buscar|busco\s+yo|llevárselo|llev[aá]rmelo\s+yo)\b/i;
-const ROSARIO_INTENT = /\b(soy\s+de\s+rosario|estoy\s+en\s+rosario|vivo\s+en\s+rosario|de\s+rosario(?:\s+(?:capital|provincia|centro))?|en\s+rosario\s+(?:capital|centro|provincia))\b/i;
 
-function _isPickupOrRosarioIntent(text: string): boolean {
-    return PICKUP_INTENT.test(text) || ROSARIO_INTENT.test(text);
-}
-
-async function _handlePickupIntent(userId: string, text: string, currentState: UserState, dependencies: any): Promise<boolean> {
-    // Si el cliente ya pagó por MP, no pausamos — el tema es solo logístico
-    // y el admin manual puede coordinar mejor con el pago ya hecho.
-    const alreadyPaidMp = currentState.paymentMethod === 'mercadopago' && (currentState as any).mpStatus === 'approved';
-    if (alreadyPaidMp) return false;
-
+async function _handlePickupIntent(userId: string, currentState: UserState, knowledge: any, dependencies: any): Promise<boolean> {
     const { sendMessageWithDelay, saveState } = dependencies;
-    const reply = 'Te aviso: no tenemos local de venta al público — todos los pedidos van por Correo Argentino con envío gratis 📦\n\nUn asesor te va a contactar enseguida para coordinar la mejor opción (sucursal cerca tuyo o entrega a domicilio) 😊';
+    const tpl = getFlowTemplate('zone_no_local', knowledge) ||
+        'No tenemos local para retirar 🙈 Pero si sos de Rosario o alrededores te lo llevamos nosotros a tu casa sin costo y lo pagás al recibir 🚚\n\n¿De qué localidad sos?';
+    const planAsk = currentState.selectedPlan ? '' : '\n\nY decime con qué plan vas, ¿60 o 120 días?';
     saveState(userId);
-    await sendMessageWithDelay(userId, reply);
-    await _pauseAndAlert(userId, currentState, dependencies, text, 'Cliente quiere retirar en persona / es de Rosario. No tenemos local público — admin debe coordinar logística (sucursal Correo o domicilio).');
+    await sendMessageWithDelay(userId, _formatMessage(tpl, currentState).replace(/\n\n¿De qué localidad sos\?$/, '') + '\n\n¿De qué localidad sos?' + planAsk);
     return true;
 }
-
-const _buildPaymentMsg = (state: UserState, knowledge?: any, mpOff?: boolean) => buildPaymentMessage(state, knowledge, mpOff);
 
 function _handleExtractedData(userId: string, extractedData: string, currentState: UserState) {
     if (!extractedData || extractedData === 'null') return;
@@ -70,9 +60,9 @@ export async function handleWaitingPlanChoice(
     // tarjeta (variante responseNoMp del guion). Ver flows/utils/paymentOptions.
     const _mpOff = !isMpEnabled(dependencies.config);
 
-    // ── Check temprano: cliente quiere ir al local / es de Rosario ──────
-    if (_isPickupOrRosarioIntent(text)) {
-        const handled = await _handlePickupIntent(userId, text, currentState, dependencies);
+    // ── Check temprano: cliente quiere venir a buscarlo ──────────────────
+    if (PICKUP_INTENT.test(text)) {
+        const handled = await _handlePickupIntent(userId, currentState, knowledge, dependencies);
         if (handled) return { matched: true };
     }
 
@@ -88,11 +78,12 @@ export async function handleWaitingPlanChoice(
         const plan = planInMsg ? planInMsg[1] : (currentState.selectedPlan || null);
         if (plan && currentState.selectedProduct) {
             buildCartFromSelection(currentState.selectedProduct, plan, currentState);
-            _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
-            saveState(userId);
-            logger.info(`[PLAN_CHOICE] ${userId} ya indicó envío/pago con plan ${plan} ("${text.slice(0, 40)}") → delego a waiting_payment_method (sin re-preguntar el menú).`);
-            const { handleWaitingPaymentMethod } = require('./stepWaitingPaymentMethod');
-            return await handleWaitingPaymentMethod(userId, text, normalizedText, currentState, knowledge, dependencies);
+            // Modelo por zona (sep-2026): antes de hablar de envío hace falta la
+            // localidad. _startZoneStep guarda lo que dijo (domicilio/sucursal)
+            // como pista y la usa cuando la zona resulte fuera de Rosario.
+            logger.info(`[PLAN_CHOICE] ${userId} ya indicó envío/pago con plan ${plan} ("${text.slice(0, 40)}") → paso de zona con pista.`);
+            await _startZoneStep(userId, text, currentState, knowledge, dependencies);
+            return { matched: true };
         }
     }
 
@@ -149,10 +140,7 @@ export async function handleWaitingPlanChoice(
         }
         calculateTotal(currentState);
 
-        const paymentMsg = _buildPaymentMsg(currentState, knowledge, _mpOff);
-        _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
-        saveState(userId);
-        await sendMessageWithDelay(userId, paymentMsg);
+        await _startZoneStep(userId, text, currentState, knowledge, dependencies);
         return { matched: true };
     }
 
@@ -220,14 +208,8 @@ export async function handleWaitingPlanChoice(
 
         if (hasAddress) {
             logger.info(`[FLOW-SKIP] Address already collected for ${userId}, asking payment method.`);
-            const paymentMsg = _buildPaymentMsg(currentState, knowledge, _mpOff);
-            await sendMessageWithDelay(userId, paymentMsg);
-            _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
-        } else {
-            const paymentMsg = _buildPaymentMsg(currentState, knowledge, _mpOff);
-            await sendMessageWithDelay(userId, paymentMsg);
-            _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
         }
+        await _startZoneStep(userId, text, currentState, knowledge, dependencies);
 
         saveState(userId);
         return { matched: true };
@@ -263,14 +245,9 @@ export async function handleWaitingPlanChoice(
 
             if (hasAddress) {
                 logger.info(`[FLOW-SKIP] Address already collected for ${userId}, asking payment method after upsell.`);
-                const paymentMsg = `¡Genial! 😊 Entonces confirmamos el plan de 120 días. Ya tengo tus datos de envío de antes.\n\n` + _buildPaymentMsg(currentState, knowledge, _mpOff);
-                await sendMessageWithDelay(userId, paymentMsg);
-                _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
-            } else {
-                const paymentMsg = `¡Genial! 😊 Entonces confirmamos el plan de 120 días.\n\n` + _buildPaymentMsg(currentState, knowledge, _mpOff);
-                await sendMessageWithDelay(userId, paymentMsg);
-                _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
             }
+            // El payment_menu ya confirma producto y plan, no hace falta prefijo.
+            await _startZoneStep(userId, text, currentState, knowledge, dependencies);
 
             saveState(userId);
             return { matched: true };
@@ -296,9 +273,9 @@ RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.
 2) SI PREGUNTA CUÁNTOS KILOS BAJARÁ o pide garantías: Respondé textualmente "Cada cuerpo tiene su ritmo. Quienes tienen más kilos para bajar suelen notar cambios más visibles al inicio, y quienes necesitan bajar menos ven descensos más progresivos. Lo importante es que el descenso sea natural y sostenido." Luego preguntale con cuál plan quiere avanzar. goalMet=false.
 3) CAMBIO DE PRODUCTO: Si el usuario dice "quiero semillas" o "gotas", confirmá el cambio usando extractedData="CHANGE_PRODUCT: [Producto]" (SIN preguntarle de nuevo) y dale los precios de ese nuevo producto para que elija el plan. goalMet=false.
 4) Si el usuario confirma explícitamente un plan (ej: "el de 60" o "120") en su mensaje y también pregunta algo: respondé su pregunta explayándote todo lo necesario, PERO OBLIGATORIAMENTE DEBES PONER el número de plan en "extractedData" (ej: "60" o "120") y establecer goalMet=true. NUNCA pongas goalMet=true si en extractedData devuelves null.
-5) COBRO/SUELDO CERCANO ("cobro el viernes", "cobro el lunes", "me depositan el jueves"): Si el usuario dice que cobra en los próximos días, NO es excusa para postdatar. El envío tarda *7 a 10 días hábiles* por Correo Argentino (4 días hábiles si lo pagás antes, a domicilio). Además, si elige *retiro en sucursal* paga recién cuando lo retira — le da tiempo de sobra para cobrar. Tranquilizalo y preguntale con cuál plan quiere avanzar. goalMet=false, NO extraigas POSTDATADO.
+5) COBRO/SUELDO CERCANO ("cobro el viernes", "cobro el lunes", "me depositan el jueves"): Si el usuario dice que cobra en los próximos días, NO es excusa para postdatar. Si es de Rosario o alrededores no paga nada ahora: se lo llevamos y paga al recibir, y el día se coordina. Si va por Correo, llega en 4 días hábiles desde el pago. Tranquilizalo y preguntale con cuál plan quiere avanzar. goalMet=false, NO extraigas POSTDATADO.
 6) EXCUSAS TEMPORALES LEJANAS ("recién el mes que viene", "no tengo ahora", "a fin de mes", "cobro el 15", "después te aviso"): Si la fecha es a más de 10 días, ofrecé POSTDATAR directo. Respondé: "¡Tranqui! Te lo agendamos para la fecha que vos me digas y lo despacho recién ese día. ¿A partir de qué día te queda cómodo recibirlo?". Si dicen SÍ o dan fecha → extraé POSTDATADO: [fecha] y preguntá con cuál plan avanzar. Si insisten en NO definitivamente, recién ahí aceptá. PROHIBIDO mencionar "congelar precio" / "congelar promo".
-7) OBJECCIÓN DE ENVÍO O CONVENIENCIA (ej: "el de 60 no me conviene por el envío", "es caro el envío"): Respondé con mucha empatía explicando que el costo del envío en el plan de 60 es por el servicio de pago en destino que cobra el correo, y recalca que por eso el de 120 es la opción más elegida ya que tiene el ENVÍO GRATIS y rinde el doble. Intentá que elija el de 120 pero sé amable si insiste en el de 60. goalMet=false.
+7) OBJECCIÓN DE ENVÍO O CONVENIENCIA (ej: "el de 60 no me conviene por el envío", "es caro el envío"): Respondé con mucha empatía aclarando que el envío es GRATIS en los dos planes (no hay ningún costo de envío), y recalcá que el de 120 es la opción más elegida porque rinde el doble. Intentá que elija el de 120 pero sé amable si insiste en el de 60. goalMet=false.
 8) HORARIO DE ENVÍO: Si pregunta cuándo o a qué hora llega, aclará que Correo Argentino maneja su propia logística y no podemos asegurar el horario, pero que avisamos si hay que retirar. Luego volvé al plan. goalMet=false.${_antiRepeat}`,
                 history: currentState.history,
                 summary: currentState.summary,
@@ -333,9 +310,7 @@ RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.
                     if (planAI.response) {
                         await sendMessageWithDelay(userId, planAI.response);
                     }
-                    const paymentMsgPost = _buildPaymentMsg(currentState, knowledge, _mpOff);
-                    await sendMessageWithDelay(userId, paymentMsgPost);
-                    _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
+                    await _startZoneStep(userId, text, currentState, knowledge, dependencies);
                     saveState(userId);
                     return { matched: true };
                 }
@@ -351,20 +326,11 @@ RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.
 
                     if (hasAddress) {
                         logger.info(`[FLOW-SKIP] Address already collected for ${userId}, asking payment method after AI plan.`);
-                        if (planAI.response) {
-                            await sendMessageWithDelay(userId, planAI.response);
-                        }
-                        const paymentMsg = _buildPaymentMsg(currentState, knowledge, _mpOff);
-                        await sendMessageWithDelay(userId, paymentMsg);
-                        _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
-                    } else {
-                        if (planAI.response) {
-                            await sendMessageWithDelay(userId, planAI.response);
-                        }
-                        const paymentMsgAI = _buildPaymentMsg(currentState, knowledge, _mpOff);
-                        await sendMessageWithDelay(userId, paymentMsgAI);
-                        _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
                     }
+                    if (planAI.response) {
+                        await sendMessageWithDelay(userId, planAI.response);
+                    }
+                    await _startZoneStep(userId, text, currentState, knowledge, dependencies);
 
                     saveState(userId);
                     return { matched: true };

@@ -419,8 +419,8 @@ module.exports = (clientPool) => {
     });
 
     // POST /config/mercadopago - Activa/desactiva el pago con tarjeta. Con OFF el
-    // bot deja de ofrecer y de generar links de MP: el guion queda con retiro en
-    // sucursal (efectivo al retirar) y transferencia (domicilio prepago). Se usa
+    // bot deja de ofrecer y de generar links de MP: fuera de zona queda solo la
+    // transferencia (el reparto propio de Rosario cobra al recibir). Se usa
     // cuando la cuenta de MP está bloqueada. Body: { enabled: true|false }.
     router.post('/config/mercadopago', ...withSeller(clientPool), (req, res) => {
         try {

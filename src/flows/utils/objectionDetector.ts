@@ -153,9 +153,9 @@ export function detectPostponeDeferral(normalizedText: string): boolean {
 // una pregunta que retoma el paso.
 const REBUTTALS: Record<ObjectionMatch['type'], string[]> = {
     caro: [
-        '¡Entiendo! 😊 Pensalo así: es menos que un café por día durante el tratamiento. Y si te queda más cómodo, también podemos coordinar *retiro en sucursal* — pagás el total en efectivo recién cuando lo retirás. ¿Te tiro los datos del plan que más te conviene?',
-        'Te re entiendo 🙌 Tenemos 2 opciones de envío: retiro en sucursal (pagás al retirar) o envío a domicilio prepago (tarjeta de crédito o transferencia). Es una inversión en vos, con más de 13 años de aval. ¿Te paso los datos para reservarlo?',
-        'Dale, escuchame bien: el de 120 días sale más conveniente por cápsula que el de 60, y si te queda más cómodo podés elegir retiro en sucursal (pagás al retirar). ¿Avanzamos con ese? 😊',
+        '¡Entiendo! 😊 Pensalo así: es menos que un café por día durante el tratamiento. Y si sos de Rosario o alrededores, te lo llevamos nosotros y lo pagás recién cuando lo recibís. ¿Te tiro los datos del plan que más te conviene?',
+        'Te re entiendo 🙌 Va con envío gratis a todo el país: en Rosario y 60 km te lo llevamos y pagás al recibir; al resto va por Correo con tarjeta de crédito o transferencia. Es una inversión en vos, con más de 13 años de aval. ¿Te paso los datos para reservarlo?',
+        'Dale, escuchame bien: el de 120 días sale más conveniente por cápsula que el de 60, y el envío es gratis a todo el país. ¿Avanzamos con ese? 😊',
     ],
     consultar: [
         '¡Dale, obvio! 😊 Mirá, podemos dejar el pedido reservado a tu nombre mientras lo charlás, y lo despacho cuando me des el OK. ¿Te parece que te lo aguarde así?',
@@ -170,7 +170,7 @@ const REBUTTALS: Record<ObjectionMatch['type'], string[]> = {
         'Dale, es un miedo súper válido 🙌 El pago con tarjeta de crédito tiene protección al comprador integrada. Si querés podés buscarnos en Google o Instagram. ¿Seguimos con los datos?',
     ],
     postergar: [
-        '¡No hay drama! 😊 Si te queda más cómodo, podemos coordinar *retiro en sucursal* — te dejamos el paquete en una sucursal de Correo Argentino cerca tuyo y pagás el total *en efectivo cuando lo retirás*. ¿Te cargo el pedido?',
+        '¡No hay drama! 😊 Si sos de Rosario o alrededores no pagás nada ahora: te lo llevamos nosotros y lo pagás cuando lo recibís. Y si estás más lejos, te lo agendo para la fecha que me digas. ¿Te cargo el pedido?',
         '¡Tranqui! 🙌 Si preferís, podemos dejar el pedido cargado y te lo enviamos para la fecha que vos me digas que cobrás. Lo despacho recién ese día. ¿Te parece así? 😊',
     ],
     pensar: [
@@ -227,32 +227,32 @@ const ESCALATED_REBUTTALS: Record<ObjectionMatch['type'], string[]> = {
 // Varios rebuttals se apoyan en la "protección al comprador" del pago con
 // tarjeta. Con MP bloqueado ese argumento no existe, y prometerlo sería
 // venderle algo que no le vamos a poder dar. El reemplazo usa la palanca de
-// confianza que SÍ está viva —y que además convierte mejor—: retiro en
-// sucursal, donde no adelanta un peso hasta tener el paquete en la mano.
+// confianza que SÍ está viva: en Rosario y 60 km el reparto propio, donde no
+// adelanta un peso hasta tener el paquete en la mano (modelo por zona, sep-2026).
 // Solo se listan las entradas que nombran la tarjeta; el resto se reusa igual.
 const REBUTTALS_NO_MP: Partial<Record<ObjectionMatch['type'], string[]>> = {
     caro: [
-        '¡Entiendo! 😊 Pensalo así: es menos que un café por día durante el tratamiento. Y si te queda más cómodo, también podemos coordinar *retiro en sucursal* — pagás el total en efectivo recién cuando lo retirás. ¿Te tiro los datos del plan que más te conviene?',
-        'Te re entiendo 🙌 Tenemos 2 opciones de envío: retiro en sucursal (pagás al retirar, en efectivo) o envío a domicilio abonando antes por transferencia. Es una inversión en vos, con más de 13 años de aval. ¿Te paso los datos para reservarlo?',
-        'Dale, escuchame bien: el de 120 días sale más conveniente por cápsula que el de 60, y si te queda más cómodo podés elegir retiro en sucursal (pagás al retirar). ¿Avanzamos con ese? 😊',
+        '¡Entiendo! 😊 Pensalo así: es menos que un café por día durante el tratamiento. Y si sos de Rosario o alrededores, te lo llevamos nosotros y lo pagás recién cuando lo recibís. ¿Te tiro los datos del plan que más te conviene?',
+        'Te re entiendo 🙌 Va con envío gratis a todo el país: en Rosario y 60 km te lo llevamos y pagás al recibir; al resto va por Correo abonando antes por transferencia. Es una inversión en vos, con más de 13 años de aval. ¿Te paso los datos para reservarlo?',
+        'Dale, escuchame bien: el de 120 días sale más conveniente por cápsula que el de 60, y el envío es gratis a todo el país. ¿Avanzamos con ese? 😊',
     ],
     miedo: [
         '¡Tranqui, te entiendo! 😊 Hace más de 13 años que distribuimos en todo el país, con más de 70 mil clientes satisfechos. El producto es 100% natural y lo único que podés notar los primeros días es un leve efecto laxante/diurético que se va tomando agua. ¿Qué duda puntual tenés?',
-        'Es re entendible tener dudas la primera vez 🙌 Te cuento: es 100% natural, no tiene químicos. Y si querés máxima tranquilidad, lo mandamos a *retiro en sucursal*: no pagás un peso hasta que lo tenés en la mano. ¿Qué duda puntual tenés?',
+        'Es re entendible tener dudas la primera vez 🙌 Te cuento: es 100% natural, no tiene químicos. Y si sos de Rosario o alrededores, no pagás un peso hasta tener el paquete en la mano: te lo llevamos y pagás al recibir. ¿Qué duda puntual tenés?',
     ],
     no_confio: [
-        '¡Te re entiendo, hay mucho trucho por ahí! 😊 Por eso te ofrezco la opción más segura para vos: *retiro en sucursal* — el paquete llega al Correo y recién ahí pagás, en efectivo. Si nunca llega, no perdiste nada. 13 años haciendo esto, más de 70 mil clientes. ¿Te tomo los datos?',
-        'Dale, es un miedo súper válido 🙌 Lo hacemos como te quede más tranquila: *retiro en sucursal* y pagás recién cuando lo retirás. Si querés, mientras tanto buscanos en Google o Instagram. ¿Seguimos con los datos?',
+        '¡Te re entiendo, hay mucho trucho por ahí! 😊 Llevamos 13 años haciendo esto, más de 70 mil clientes. Y si sos de Rosario o alrededores, te lo llevamos y pagás recién al recibirlo: si no llega, no perdiste nada. ¿Te tomo los datos?',
+        'Dale, es un miedo súper válido 🙌 Buscanos en Google o Instagram (@herbalis), vas a ver clientas reales. Y si sos de la zona de Rosario, pagás recién cuando lo recibís. ¿Seguimos con los datos?',
     ],
 };
 
 const ESCALATED_REBUTTALS_NO_MP: Partial<Record<ObjectionMatch['type'], string[]>> = {
     miedo: [
-        'Te entiendo. Te propongo lo más seguro para vos: *retiro en sucursal*. El paquete viaja al Correo, te avisamos cuando llega y pagás el total en efectivo recién cuando lo retirás — no adelantás nada. ¿Eso te da más tranquilidad?',
+        'Te entiendo. Si sos de Rosario o alrededores, te propongo lo más seguro: te lo llevamos nosotros y pagás el total recién cuando lo tenés en la mano, no adelantás nada. ¿Eso te da más tranquilidad?',
         'Te re entiendo. Mirá, *podés googlear "Herbalis" y ver nuestro Instagram* (@herbalis) con clientas reales etiquetadas. Si después de eso seguís con dudas, no avanzamos y listo, cero compromiso. ¿Te parece?',
     ],
     no_confio: [
-        'Te entiendo perfectamente. *Lo más sólido que puedo ofrecerte es que no pagues nada por adelantado*: lo mandamos a retiro en sucursal y abonás el total en efectivo cuando lo retirás. Si el paquete no llega, no perdiste un peso. ¿Eso te alcanza para que probemos?',
+        'Te entiendo perfectamente. Si sos de Rosario o alrededores, *no pagás nada por adelantado*: te lo llevamos y abonás cuando lo recibís; si no llega, no perdiste un peso. Y si estás más lejos, 13 años y más de 70 mil clientes te avalan que llega. ¿Eso te alcanza para que probemos?',
         'Dale, mirá: *te invito a buscar "Herbalis" en Google y en Instagram (@herbalis)* — vas a encontrar testimonios reales con foto. Si después de revisar no te convencen, no avanzamos. ¿Te parece justo?',
     ],
 };

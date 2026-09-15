@@ -417,13 +417,12 @@ async function _maybeSendPaymentMenuV7(
     dependencies: any
 ): Promise<void> {
     if (nextStep !== 'waiting_payment_method') return;
-    const { buildPaymentMessage } = require('../../utils/messageTemplates');
-    const { isMpEnabled } = require('./paymentOptions');
-    const { sendMessageWithDelay, saveState } = dependencies;
-    const paymentMsg = buildPaymentMessage(currentState, knowledge, !isMpEnabled(dependencies.config));
-    saveState(userId);
-    await sendMessageWithDelay(userId, paymentMsg);
-    logger.info(`[V7-AUTO-PAYMENT] User ${userId} → payment_menu enviado tras confirmar producto.`);
+    // Desde sep-2026 el "menú de pago" es la pregunta de localidad (o su atajo si
+    // el cliente ya dijo de dónde es). require inline: stepWaitingZone importa
+    // flowHelpers, y este helper se llama desde stepWaitingWeight/Preference.
+    const { _startZoneStep } = require('../steps/stepWaitingZone');
+    await _startZoneStep(userId, '', currentState, knowledge, dependencies);
+    logger.info(`[V7-AUTO-PAYMENT] User ${userId} → paso de zona iniciado tras confirmar producto.`);
 }
 
 // ── Cambio de opinión de envío/pago en steps posteriores (jun-2026) ──────────
@@ -595,10 +594,15 @@ async function _closeSaleAndNotify(
 
     if (notifyAdmin) {
         const postdataLabel = currentState.postdatado ? `\n📅 POSTDATADO: ${currentState.postdatado}` : '';
+        const entregaLabel = currentState.shippingChoice === 'reparto'
+            ? `\n🚚 REPARTO PROPIO a ${o.calle || '?'}, ${o.ciudad || '?'} — cobra el repartidor (efectivo/tarjeta/transferencia). Coordinar día y horario.`
+            : (o.calle || '').toLowerCase() === 'a sucursal'
+                ? '\n📦 Correo Argentino — retiro en sucursal (por CP)'
+                : '';
         await notifyAdmin(
             '✅ VENTA CERRADA por el bot',
             userId,
-            `Cliente: ${o.nombre || '?'}\nCiudad: ${o.ciudad || '?'} | CP: ${o.cp || '?'}\nItems: ${orderData.producto} (${orderData.plan})\nTotal: $${currentState.totalPrice || '0'}\nPago: ${orderData.paymentMethod}${postdataLabel}`
+            `Cliente: ${o.nombre || '?'}\nCiudad: ${o.ciudad || '?'} | CP: ${o.cp || '?'}\nItems: ${orderData.producto} (${orderData.plan})\nTotal: $${currentState.totalPrice || '0'}\nPago: ${orderData.paymentMethod}${entregaLabel}${postdataLabel}`
         );
     }
 

@@ -1,18 +1,17 @@
 /**
  * Modo SIN Mercado Pago — interruptor `config.mpEnabled = false` (jul-2026).
  *
- * Se apaga desde Configuración cuando la cuenta de MP está bloqueada. El guion
- * tiene que seguir vendiendo con las dos formas vivas:
- *   · Retiro en sucursal → efectivo al retirar
- *   · Envío a domicilio  → transferencia al alias (prepago)
+ * Se apaga desde Configuración cuando la cuenta de MP está bloqueada. Fuera de
+ * la zona de reparto propio (modelo sep-2026) queda una sola forma prepago:
+ *   · Domicilio o sucursal por Correo → transferencia al alias
+ * (El reparto propio de Rosario cobra al recibir y no depende de MP.)
  *
  * Lo que se verifica acá:
- *  - Domicilio NO abre el submenú de medios: manda el alias y pasa a esperar
- *    la transferencia.
+ *  - Domicilio y sucursal NO abren el submenú de medios: mandan el alias y
+ *    pasan a esperar la transferencia.
  *  - Pedir tarjeta (en payment_method o en transfer_confirmation) responde que
  *    no está disponible y NO deriva a waiting_mp_payment.
  *  - waiting_mp_payment (estados viejos) no genera link nuevo.
- *  - Retiro en sucursal sigue intacto.
  *  - Con el interruptor ENCENDIDO todo se comporta como siempre (regresión).
  */
 
@@ -100,6 +99,7 @@ const knowledge = { flow: {} }; // sin overrides: los templates salen de knowled
 function makePaymentState(overrides = {}) {
     return {
         step: 'waiting_payment_method',
+        deliveryZone: 'out',
         history: [],
         cart: [{ product: 'Cápsulas', plan: '60', price: '46.900' }],
         selectedProduct: 'Cápsulas',
@@ -134,8 +134,8 @@ describe('Interruptor de Mercado Pago', () => {
     });
 
     test('getFlowTemplate prefiere la variante responseNoMp del guion', () => {
-        const conTarjeta = getFlowTemplate('payment_menu', knowledge, false);
-        const sinTarjeta = getFlowTemplate('payment_menu', knowledge, true);
+        const conTarjeta = getFlowTemplate('zone_out', knowledge, false);
+        const sinTarjeta = getFlowTemplate('zone_out', knowledge, true);
         expect(conTarjeta).toMatch(CARD_RE);
         expect(sinTarjeta).not.toMatch(CARD_RE);
         expect(sinTarjeta).toMatch(/transferencia/i);
@@ -156,9 +156,9 @@ describe('waiting_payment_method con MP apagado', () => {
         expect(lastMsg()).not.toMatch(CARD_RE);
     });
 
-    test('opción "2" (domicilio) también va derecho a transferencia', async () => {
+    test('opción "1" (domicilio) también va derecho a transferencia', async () => {
         const state = makePaymentState();
-        await handleWaitingPaymentMethod(USER, '2', '2', state, knowledge, depsMpOff);
+        await handleWaitingPaymentMethod(USER, '1', '1', state, knowledge, depsMpOff);
 
         expect(state.paymentMethod).toBe('transferencia');
         expect(state.step).toBe('waiting_transfer_confirmation');
@@ -174,8 +174,8 @@ describe('waiting_payment_method con MP apagado', () => {
         expect(state.paymentMethod).toBeUndefined();
         expect(mockPreferenceCreate).not.toHaveBeenCalled();
         expect(lastMsg()).toMatch(/fuera de servicio/i);
-        expect(lastMsg()).toMatch(/retiro en sucursal/i);
         expect(lastMsg()).toMatch(/transferencia/i);
+        expect(lastMsg()).not.toMatch(/efectivo/i);
     });
 
     test('pedir "mercado pago" por nombre tiene el mismo tratamiento', async () => {
@@ -197,23 +197,26 @@ describe('waiting_payment_method con MP apagado', () => {
         expect(lastMsg()).toMatch(/fuera de servicio/i);
     });
 
-    test('retiro en sucursal sigue funcionando igual', async () => {
+    test('retiro en sucursal (prepago) va derecho al alias, sin submenú', async () => {
         const state = makePaymentState();
         await handleWaitingPaymentMethod(USER, 'retiro en sucursal', 'retiro en sucursal', state, knowledge, depsMpOff);
 
-        expect(state.paymentMethod).toBe('contrarembolso');
+        expect(state.paymentMethod).toBe('transferencia');
         expect(state.shippingChoice).toBe('retiro');
-        expect(state.step).toBe('waiting_data');
+        expect(state.partialAddress.calle).toBe('A sucursal');
+        expect(state.step).toBe('waiting_transfer_confirmation');
+        expect(allMsgs()).toMatch(/HERBALIS\.TIENDA/);
         expect(allMsgs()).not.toMatch(CARD_RE);
     });
 
-    test('"no tengo efectivo" encauza a transferencia, no a un submenú de una opción', async () => {
+    test('"no tengo efectivo" aclara que todo va prepago por transferencia y pregunta el envío', async () => {
         const state = makePaymentState();
         await handleWaitingPaymentMethod(USER, 'no tengo efectivo', 'no tengo efectivo', state, knowledge, depsMpOff);
 
-        expect(state.shippingChoice).toBe('domicilio');
-        expect(state.paymentMethod).toBe('transferencia');
-        expect(state.step).toBe('waiting_transfer_confirmation');
+        expect(state.shippingChoice).toBeFalsy();
+        expect(state.step).toBe('waiting_payment_method');
+        expect(lastMsg()).toMatch(/transferencia/i);
+        expect(lastMsg()).toMatch(/casa o en sucursal/i);
         expect(lastMsg()).not.toMatch(CARD_RE);
     });
 
@@ -244,7 +247,7 @@ describe('waiting_mp_payment con MP apagado', () => {
         };
     }
 
-    test('no genera link nuevo: deriva a transferencia / retiro', async () => {
+    test('no genera link nuevo: deriva a transferencia', async () => {
         const state = makeMpState();
         const res = await handleWaitingMpPayment(USER, 'hola', 'hola', state, knowledge, depsMpOff);
 
@@ -255,7 +258,7 @@ describe('waiting_mp_payment con MP apagado', () => {
         expect(state.step).toBe('waiting_transfer_confirmation');
         expect(state.mpReminderStage).toBe(99);
         expect(lastMsg()).toMatch(/HERBALIS\.TIENDA/);
-        expect(lastMsg()).toMatch(/retiro en sucursal/i);
+        expect(lastMsg()).not.toMatch(/retiro en sucursal/i);
     });
 
     test('con link viejo NO lo reenvía aunque lo pidan', async () => {

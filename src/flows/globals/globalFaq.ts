@@ -74,6 +74,16 @@ export async function handleFaq(
 
     if (!bestEntry) return null;
 
+    // FAQ de envío/pago marcadas `zoneAware` (modelo por zona, sep-2026): valen
+    // mientras NO sabemos la localidad (terminan preguntándola). Con la zona ya
+    // resuelta las contesta el paso o la IA con el contexto del cliente: fuera de
+    // zona, "quiero contrarreembolso" es una objeción que el paso de pago maneja,
+    // no una FAQ que vuelva a preguntar "¿de qué localidad sos?".
+    if (bestEntry.zoneAware && (currentState.deliveryZone === 'in' || currentState.deliveryZone === 'out')) {
+        logger.info(`[FAQ] Skip FAQ zoneAware — ${userId} ya tiene zona ${currentState.deliveryZone}; lo maneja el paso ${currentState.step}`);
+        return null;
+    }
+
     // "tarda" / "demora" / "tiempo" son ambiguas: pueden referirse al tiempo del ENVÍO
     // o a cuánto TARDA EN BAJAR DE PESO. Si la pregunta es sobre el ritmo de descenso,
     // NO dispares la FAQ de envío — que la responda el paso/IA (ej. "4 a 6 kg el primer
@@ -97,7 +107,7 @@ export async function handleFaq(
     const STEPS_PAST_WEIGHT = new Set<string>([
         'waiting_preference', 'waiting_preference_consultation',
         'waiting_plan_choice', 'waiting_price_confirmation', 'waiting_ok',
-        'waiting_payment_method', 'waiting_mp_payment',
+        'waiting_zone', 'waiting_payment_method', 'waiting_mp_payment',
         'waiting_transfer_confirmation', 'waiting_data',
         'waiting_maps_confirmation', 'waiting_final_confirmation',
     ]);

@@ -7,6 +7,7 @@ import { handleWaitingData } from './stepWaitingData';
 import { handleWaitingFinalConfirmation } from './stepWaitingFinalConfirmation';
 import { handleWaitingMapsConfirmation } from './stepWaitingMapsConfirmation';
 import { handleWaitingPaymentMethod } from './stepWaitingPaymentMethod';
+import { handleWaitingZone } from './stepWaitingZone';
 import { handleWaitingMpPayment } from './stepWaitingMpPayment';
 import { handleWaitingTransferConfirmation } from './stepWaitingTransferConfirmation';
 import { handleAdminSteps } from './stepAdmin';
@@ -44,6 +45,9 @@ export async function processStep(
             break;
         case 'waiting_maps_confirmation':
             result = await handleWaitingMapsConfirmation(userId, text, normalizedText, currentState, knowledge, dependencies);
+            break;
+        case 'waiting_zone':
+            result = await handleWaitingZone(userId, text, normalizedText, currentState, knowledge, dependencies);
             break;
         case 'waiting_payment_method':
             result = await handleWaitingPaymentMethod(userId, text, normalizedText, currentState, knowledge, dependencies);
