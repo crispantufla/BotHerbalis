@@ -643,7 +643,6 @@ class ClientPool {
         // que queden en el historial y se reflejen en el dashboard en tiempo real.
         const outgoingHandler = createOutgoingMessageHandler({
             sellerId,
-            client,
             userState: stateManager.userState,
             pausedUsers: stateManager.pausedUsers,
             sharedState,

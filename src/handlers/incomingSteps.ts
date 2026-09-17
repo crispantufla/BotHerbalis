@@ -103,16 +103,8 @@ export async function isDuplicateDelivery(msg: any, rt: HandlerRuntime): Promise
 
 /** El id del chat, con los @lid y los ids de proxy resueltos al teléfono real. */
 export async function resolveUserId(msg: any, rt: HandlerRuntime): Promise<string> {
-    return resolveUserIdFrom(msg.from, () => msg.getContact(), rt.sellerId);
-}
-
-/**
- * resolveUserId para cualquier id de chat. La usa también lo que el vendedor
- * escribe a mano (createOutgoingMessageHandler, con msg.to): el mensaje del
- * cliente y la respuesta del vendedor tienen que caer en la misma conversación.
- */
-export async function resolveUserIdFrom(rawId: string, getContact: () => Promise<any>, sellerId: string): Promise<string> {
-    let userId = rawId;
+    const { sellerId } = rt;
+    let userId = msg.from;
 
     // Resolve Meta @lid / proxy identifiers to real phone numbers — con
     // resolución PEGAJOSA en Redis. getContact() es best-effort: puede
@@ -123,10 +115,10 @@ export async function resolveUserIdFrom(rawId: string, getContact: () => Promise
     // que el @lid se resolvió a un teléfono, TODOS los mensajes siguientes
     // mapean al mismo userId aunque getContact vuelva a fallar.
     if (userId.includes('@lid') || userId.length > 18) {
-        const stickyKey = `lidmap:${sellerId}:${rawId}`;
+        const stickyKey = `lidmap:${sellerId}:${msg.from}`;
         let resolved: string | null = null;
         try {
-            const contact = await getContact();
+            const contact = await msg.getContact();
             if (userId.includes('@lid')) {
                 if (contact && contact.number) resolved = `${contact.number}@c.us`;
             } else {
@@ -134,11 +126,11 @@ export async function resolveUserIdFrom(rawId: string, getContact: () => Promise
                 if (cleanName.length >= 10 && cleanName.length <= 13) resolved = `${cleanName}@c.us`;
             }
         } catch (e: any) {
-            logger.warn(`[ID-RESOLVE][${sellerId}] getContact falló para ${rawId}: ${e.message}`);
+            logger.warn(`[ID-RESOLVE][${sellerId}] getContact falló para ${msg.from}: ${e.message}`);
         }
         if (resolved) {
             userId = resolved;
-            logger.info(`[ID-RESOLVE][${sellerId}] ${rawId} → ${userId}`);
+            logger.info(`[ID-RESOLVE][${sellerId}] ${msg.from} → ${userId}`);
             try { await redisConnection.set(stickyKey, userId, 'EX', 604800); } catch { /* noop */ }
         } else {
             // No se pudo resolver ahora → reusar la última resolución conocida
@@ -147,7 +139,7 @@ export async function resolveUserIdFrom(rawId: string, getContact: () => Promise
                 const cached = await redisConnection.get(stickyKey);
                 if (cached) {
                     userId = cached;
-                    logger.info(`[ID-STICKY][${sellerId}] ${rawId} → ${userId} (cache)`);
+                    logger.info(`[ID-STICKY][${sellerId}] ${msg.from} → ${userId} (cache)`);
                 }
             } catch { /* noop */ }
         }
