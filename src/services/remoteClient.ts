@@ -85,7 +85,7 @@ export class RemoteClient extends EventEmitter implements AgentSink {
      * content puede ser un string o un MessageMedia (objeto con {mimetype,data,filename}).
      * options: { caption, sendAudioAsVoice }.
      * Devuelve { id: { _serialized } } como wwebjs (el wrap de clientPool lo usa
-     * para trackear botSentMessageIds).
+     * para reconocer el eco, ver trackBotSends en messageHandler.ts).
      */
     async sendMessage(chatId: string, content: any, options: any = {}): Promise<{ id: { _serialized: string } }> {
         const isMedia = content && typeof content === 'object' && content.data && content.mimetype;

@@ -109,6 +109,77 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
     };
 }
 
+/** Lo que mandó el bot, para no confundirlo con lo que el vendedor escribe a mano. */
+export interface BotSends {
+    /** Ids confirmados de los envíos del bot (se olvidan a los 30 s). */
+    ids: Set<string>;
+    /** Envíos del bot que todavía no volvieron con su id. */
+    pending: Set<Promise<unknown>>;
+    /** Qué mandó el bot a cada chat en el último minuto. */
+    recent: { chatId: string; text: string; media: boolean; at: number }[];
+}
+
+const BOT_SEND_ID_TTL_MS = 30000;
+const BOT_SEND_RECENT_MS = 60000;
+// Tope de la espera a los envíos en curso: un RPC colgado (30 s de timeout en
+// remoto) no puede demorar tanto el registro y la pausa de un mensaje manual.
+const PENDING_SEND_WAIT_MS = 10000;
+
+/**
+ * Envuelve client.sendMessage para anotar todo lo que manda el bot: flujo,
+ * panel, comandos y avisos al admin pasan por ahí. Lo usa
+ * createOutgoingMessageHandler para reconocer los ecos.
+ */
+export function trackBotSends(client: any): BotSends {
+    const sends: BotSends = { ids: new Set(), pending: new Set(), recent: [] };
+    const send = client.sendMessage.bind(client);
+    client.sendMessage = function (...args: any[]) {
+        const [chatId, content, options] = args;
+        const now = Date.now();
+        const media = !!content && typeof content === 'object';
+        sends.recent = sends.recent.filter(s => now - s.at < BOT_SEND_RECENT_MS);
+        sends.recent.push({ chatId, text: media ? (options?.caption || '') : String(content ?? ''), media, at: now });
+
+        const sending = (async () => {
+            const result = await send(...args);
+            const id = result?.id?._serialized;
+            if (id) {
+                sends.ids.add(id);
+                setTimeout(() => sends.ids.delete(id), BOT_SEND_ID_TTL_MS);
+            }
+            return result;
+        })();
+        sends.pending.add(sending);
+        const settled = () => { sends.pending.delete(sending); };
+        sending.then(settled, settled);
+        return sending;
+    };
+    return sends;
+}
+
+/** Espera a que terminen los envíos del bot en curso, con tope. */
+async function waitForBotSends(sends: BotSends): Promise<void> {
+    if (!sends.pending.size) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([
+        Promise.allSettled([...sends.pending]),
+        new Promise(r => { timer = setTimeout(r, PENDING_SEND_WAIT_MS); }),
+    ]);
+    clearTimeout(timer);
+}
+
+const _sameText = (a: any, b: any) => String(a ?? '').replace(/\s+/g, ' ').trim() === String(b ?? '').replace(/\s+/g, ' ').trim();
+
+/** ¿El bot le mandó a este chat lo mismo hace menos de un minuto? */
+function isRecentBotSend(sends: BotSends, chatIds: string[], msg: any): boolean {
+    const now = Date.now();
+    const phones = chatIds.map(id => _cleanPhone(id));
+    return sends.recent.some(s => now - s.at < BOT_SEND_RECENT_MS
+        && phones.includes(_cleanPhone(s.chatId))
+        && s.media === !!msg.hasMedia
+        && _sameText(s.text, msg.body));
+}
+
 /**
  * createOutgoingMessageHandler
  *
@@ -120,44 +191,61 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
  *   2. Cualquier chat con alertas pendientes → descartarlas. Si el admin
  *      contestó, ya vio la notificación; mantenerla en cola es ruido.
  *
- * Distinguir bot vs admin: `botSentMessageIds` registra los IDs que el
- * bot envió via client.sendMessage (wrappeado en clientPool). Si el ID
- * del mensaje saliente está en ese set, lo ignoramos.
+ * Distinguir bot vs admin: lo que manda el bot también vuelve acá, y se
+ * reconoce con lo que anotó trackBotSends (ver los dos resguardos abajo).
+ *
+ * Cubierto por tests/manual_chat.test.js.
  */
 export function createOutgoingMessageHandler(ctx: {
     sellerId: string;
+    client: any;
     userState: any;
     pausedUsers: Set<string>;
     sharedState: any;
-    botSentMessageIds: Set<string>;
+    botSends: BotSends;
     logAndEmit: (chatId: string, sender: string, text: string, step?: string, messageId?: string | null, overrideTimestamp?: number) => void;
 }): (msg: any) => Promise<void> {
-    const { sellerId, userState, pausedUsers, sharedState, botSentMessageIds, logAndEmit } = ctx;
+    const { sellerId, client, userState, pausedUsers, sharedState, botSends, logAndEmit } = ctx;
     const { dismissAlertsForUser } = require('../services/adminService');
 
     return async function outgoingHandler(msg: any): Promise<void> {
         try {
-            // Solo nos interesan outgoing messages a chats individuales.
+            // Solo nos interesan outgoing messages a chats individuales. WhatsApp
+            // arma el mensaje con `to: chat.id`, así que en los chats migrados a
+            // @lid el destino llega como <lid>@lid (se resuelve más abajo). Hasta
+            // el 2026-09-17 acá se exigía @c.us, y todo lo que el vendedor
+            // escribía a mano en esos chats se perdía: ni ChatLog ni pausa.
             if (!msg.fromMe) return;
             if (!msg.to || typeof msg.to !== 'string') return;
-            if (!msg.to.endsWith('@c.us')) return;
-            if (msg.to.endsWith('@g.us') || msg.to.endsWith('@broadcast')) return;
+            if (!msg.to.endsWith('@c.us') && !msg.to.endsWith('@lid')) return;
 
             // Skip si la conexión recién se inició (mensajes históricos).
             if (sharedState.connectedAt && msg.timestamp && msg.timestamp < sharedState.connectedAt) return;
 
-            // 'message_create' puede dispararse antes de que el wrapper de
-            // client.sendMessage termine el await y agregue el ID al set.
-            // Diferimos el chequeo 100ms para evitar esa race (el wrapper
-            // resuelve y registra el ID dentro de microsegundos del evento).
-            await new Promise(r => setTimeout(r, 100));
-
-            // Si el ID está en botSentMessageIds, este mensaje lo envió el bot
-            // mismo via client.sendMessage. No es manual.
+            // Lo que manda el bot vuelve acá como mensaje propio, y su id se
+            // conoce recién cuando termina el envío. En remoto el eco puede llegar
+            // ANTES que ese ack: acá se esperaban 100 ms fijos, y el 17-sep el eco
+            // del saludo les ganó y el chat quedó pausado como si lo hubiera
+            // escrito el vendedor. Se espera a que terminen los envíos en curso.
+            await waitForBotSends(botSends);
             const msgId = msg.id?._serialized;
-            if (msgId && botSentMessageIds.has(msgId)) return;
+            if (msgId && botSends.ids.has(msgId)) return;
 
-            const targetId = msg.to;
+            // El chat bajo el mismo id que usa el entrante para este cliente (su
+            // userState, su pausa, su ChatLog): el @lid, resuelto al teléfono.
+            // Recién acá, con los ecos del bot ya descartados, para no gastar un
+            // RPC al agente por cada mensaje que manda el bot. msg.getContact()
+            // no sirve: en un mensaje propio es el contacto del vendedor.
+            const targetId = await steps.resolveUserIdFrom(msg.to, () => client.getContactById(msg.to), sellerId);
+
+            // Segundo resguardo, que no depende del id: lo mismo que el bot le
+            // mandó a este chat hace menos de un minuto es su eco. Cubre un ack
+            // que volvió sin id (RemoteClient le inventa `remote_<ts>`, que nunca
+            // cruza). Si pasa, queda en el log.
+            if (isRecentBotSend(botSends, [msg.to, targetId], msg)) {
+                logger.warn(`[MANUAL-CHAT][${sellerId}] Eco de un envío del bot a ${targetId} sin id que lo cruce (${msgId}) — no es manual`);
+                return;
+            }
 
             // Registrar el mensaje manual del admin (escrito desde el teléfono del
             // bot) en el historial + emitirlo al dashboard en tiempo real. Antes NO

@@ -13,7 +13,8 @@ const qrcode = require('qrcode-terminal');
 const { prisma } = require('../../db');
 const { createStateManager, SellerStateManager } = require('./stateManager');
 const { createBotHelpers } = require('../handlers/botHelpers');
-const { createMessageHandler, createOutgoingMessageHandler } = require('../handlers/messageHandler');
+const { createMessageHandler, createOutgoingMessageHandler, trackBotSends } = require('../handlers/messageHandler');
+import type { BotSends } from '../handlers/messageHandler';
 const { createQueue, createWorker, shutdownSellerQueue } = require('./queueService');
 const { processSalesFlow } = require('../flows/salesFlow');
 const { aiService } = require('./ai');
@@ -100,7 +101,7 @@ export interface SellerInstance {
     schedulerHandle: { stop: () => void } | null;  // handle de startScheduler — stopSeller frena los crons per-seller para que un restart no acumule schedulers zombie sobre sharedState viejo
     reconnectAttempts: number;
     qrTimer: ReturnType<typeof setTimeout> | null;
-    botSentMessageIds: Set<string>;  // IDs of messages sent via client.sendMessage — used to distinguish bot vs manual admin in 'message_create'
+    botSends: BotSends;  // lo que mandó el bot por client.sendMessage — distingue sus ecos de lo que el vendedor escribe a mano en 'message_create'
     stop: () => Promise<void>;
 }
 
@@ -334,21 +335,10 @@ class ClientPool {
             });
         }
 
-        // Track IDs of messages that the bot itself sends via client.sendMessage.
-        // Used by the 'message_create' handler to skip echoes of bot-sent messages
-        // and only act on messages the admin typed manually from the WhatsApp app.
-        const botSentMessageIds = new Set<string>();
-        const _origSendMessage = client.sendMessage.bind(client);
-        client.sendMessage = async function(...args: any[]) {
-            const result = await _origSendMessage(...args);
-            const id = result?.id?._serialized;
-            if (id) {
-                botSentMessageIds.add(id);
-                // Auto-evict after 30s — the outgoing handler fires within ms, so 30s is generous.
-                setTimeout(() => botSentMessageIds.delete(id), 30000);
-            }
-            return result;
-        };
+        // Todo lo que manda el bot pasa por client.sendMessage: se anota para que
+        // el handler de 'message_create' no confunda sus ecos con lo que el
+        // vendedor escribe a mano desde el celular.
+        const botSends: BotSends = trackBotSends(client);
 
         // SharedState
         const sharedState: any = {
@@ -457,7 +447,7 @@ class ClientPool {
             queue, worker, pendingMessages, helpers,
             schedulerStarted: false, schedulerHandle: null, reconnectAttempts: 0,
             qrTimer: null,
-            botSentMessageIds,
+            botSends,
             stop: async () => this.stopSeller(sellerId)
         };
 
@@ -643,10 +633,11 @@ class ClientPool {
         // que queden en el historial y se reflejen en el dashboard en tiempo real.
         const outgoingHandler = createOutgoingMessageHandler({
             sellerId,
+            client,
             userState: stateManager.userState,
             pausedUsers: stateManager.pausedUsers,
             sharedState,
-            botSentMessageIds,
+            botSends,
             logAndEmit: helpers.logAndEmit,
         });
         client.on('message_create', outgoingHandler);
