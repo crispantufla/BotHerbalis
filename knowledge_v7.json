@@ -2,7 +2,7 @@
     "meta": {
         "name": "Guión V8 — Elena · zona Rosario (reparto propio / Correo prepago)",
         "description": "Guión sep-2026 sobre la base V7 (persona Elena, 2 tiers 60d/120d). La publicidad apunta a Rosario y 60 km a la redonda, así que el menú de pago dejó de ser \"retiro vs domicilio\" y pasó a ser una pregunta de LOCALIDAD: dentro de la zona, reparto propio a domicilio sin costo y pago al recibir (efectivo, tarjeta o transferencia); fuera, Correo Argentino prepago (tarjeta o transferencia) a domicilio o a sucursal, 4 días hábiles. El bot clasifica la zona con rules.repartoPropio; el cliente nunca tiene que decir si está \"dentro de la zona de influencia\".",
-        "version": "8.0"
+        "version": "8.1"
     },
     "flow": {
         "greeting": {
@@ -246,9 +246,11 @@
         {
             "keywords": [
                 "funciona de verdad",
+                "de verdad funciona",
+                "sirve de verdad",
+                "de verdad sirve",
+                "realmente sirve",
                 "funciona",
-                "sirve",
-                "verdad",
                 "posta",
                 "es real",
                 "duda 1",

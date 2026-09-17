@@ -74,7 +74,9 @@ Máquina de estados lineal con fallbacks a IA. Orden típico:
   contrarreembolso: al que lo pide se le manda `prepay_objection` y, si insiste,
   `prepay_refusal_close` (texto del dueño) + pausa. "Soy de Rosario" ya NO pausa (lo hacía desde
   may-2026). Entrar al paso siempre por `_startZoneStep`, que saltea la pregunta si el cliente ya
-  dijo de dónde es. Cubierto por `tests/zone_flow.test.js` y `tests/sim_horacio_jun21.test.js`.
+  dijo de dónde es. Cubierto por `tests/zone_flow.test.js` y `tests/sim_horacio_jun21.test.js`; los
+  casos reales de las primeras 48 h (frenos, provincia sola, calle junto a la localidad, doble
+  mensaje, recordatorios de `waiting_zone`) están en `tests/v8_review_sep17.test.js`.
 
 - `processGlobals` corre antes de cada step — maneja cancelaciones, seguimiento, cliente recurrente, etc.
 - Cada step devuelve `{ matched: boolean }`. Si no matchea, cae a IA vía `dependencies.aiService.chat()` con un `goal` específico al step.
@@ -94,7 +96,10 @@ Máquina de estados lineal con fallbacks a IA. Orden típico:
 - **Guion guardado vs guion del repo**: `stateManager.loadKnowledge` prefiere la copia de
   `DATA_DIR/knowledge_v7_<seller>.json` si existe; desde sep-2026, si `meta.version` del repo es
   más nueva que la de la copia, gana el repo y la copia queda como `.bak`. Al cambiar el guion,
-  subir `meta.version`, o prod sigue con el viejo.
+  subir `meta.version`, o prod sigue con el viejo. La versión y una huella de `prices.json` son
+  parte del namespace del cache semántico (`_cacheContentTag` en `ai.ts`): subirla o cambiar un
+  precio deja de servir las respuestas guardadas con lo anterior (hasta sep-2026 una de julio
+  seguía dando el precio viejo).
 - **Pausas NO se auto-liberan**. Un user pausado con `pauseReason` requiere intervención manual del admin. Si un outage (ej: OpenAI 429) pausa users, hay que despausarlos a mano. Única excepción: al arrancar, `restorePausedUsersFromDB` borra las pausas de más de 7 días (`STALE_PAUSE_DAYS` en `pauseService.ts`).
 - **Pricing**: siempre leer con `_getPrice/_getPrices/_getAdicionalMAX` de `pricing.ts`. NUNCA inventar precios en código ni en prompts de IA. Tampoco umbrales derivados de precios: para deducir el plan (60/120) de un monto usar `_inferPlanFromPrice`, y para el nombre canónico del producto `_normalizeProductName` (ambos en `pricing.ts`). Hasta el 2026-09-09 esa lógica estaba duplicada con umbrales hardcodeados en `botHelpers.ts` y `order.routes.js` (ver `stepWaitingFinalConfirmation.ts` para el patrón: se inyecta `pricingContext` en el prompt). El respaldo si falta `data/prices.json` es `FALLBACK_PRICES` (también en `pricing.ts`) y tiene que igualar al JSON. `GET /prices`, los flujos y los prompts leen por la misma función, así que un cambio en el Editor de Precios se ve en la lectura siguiente (cubierto por `tests/prices_single_source.test.js`). En el panel, los textos del guion con precios pasan por `fillPricePlaceholders` (`client/src/utils/scriptPlaceholders.js`) con lo que devuelve `/api/prices`: sin precios cargados, el placeholder queda visible.
 - **Interruptor de Mercado Pago**: `config.mpEnabled` (switch "Pago con tarjeta" en Configuración, default ON). En OFF el bot no ofrece ni genera links: fuera de zona domicilio y sucursal ⇒ transferencia directa, y quien pida tarjeta recibe un aviso de "fuera de servicio" (el reparto propio de Rosario cobra al recibir y no cambia). Leerlo SIEMPRE con `isMpEnabled(dependencies.config)` de `flows/utils/paymentOptions.ts`. Si agregás copy que nombre la tarjeta: en código usá `prepayMeans/prepayMenu`; en `knowledge_v7.json` agregá una variante `responseNoMp` (la eligen `getFlowTemplate(key, knowledge, mpOff)` y `globalFaq`). Los prompts de IA lo reciben vía `context.mpEnabled`, que inyecta el proxy de `salesFlow` — no hace falta pasarlo por call site.
@@ -125,7 +130,7 @@ Máquina de estados lineal con fallbacks a IA. Orden típico:
 - `npm run dev` — concurrente server (tsx watch en index.ts) + client (vite)
 - `npm run dev:server` — solo server (sin watch)
 - `npm start` — producción: `prisma generate && migrate deploy && tsx index.ts`
-- `npm test` — Jest. Suite verde (40 suites, 518 tests; 1 suite skipped es la `.live`). Corre contra la DB de prod (`DATABASE_URL` del `.env` apunta a Railway), así que **ninguna suite puede escribir**: si el código bajo test escribe, el test mockea `../db`. Hasta el 2026-09-13 `web_order_notify.test.js` no lo hacía y dejó una pausa real en prod. **Solo V7**: las suites acopladas a `archive/knowledge_v3.json`/v4 (simulaciones, recommendation, multi_product, salesFlow, etc.) se retiraron el 2026-05-31 — testeaban un guion muerto. Cobertura de flujo V7: `sena_flow_smoke.test.js` + `payment_flow.test.js`; el resto cubre utilidades (address, pricing, objection escalation, order flow). Pendiente: rehacer un harness de simulación contra V7. Para refactors hay tests de caracterización: `message_handler.test.js` y `ai_chat_payloads.test.js` graban una traza de efectos (`MH_TRACE_FILE` / `AI_TRACE_FILE`) para comparar byte a byte antes y después de mover código.
+- `npm test` — Jest. Suite verde (43 suites, 618 tests; 1 suite skipped es la `.live`). Corre contra la DB de prod (`DATABASE_URL` del `.env` apunta a Railway), así que **ninguna suite puede escribir**: si el código bajo test escribe, el test mockea `../db`. Hasta el 2026-09-13 `web_order_notify.test.js` no lo hacía y dejó una pausa real en prod. **Solo V7**: las suites acopladas a `archive/knowledge_v3.json`/v4 (simulaciones, recommendation, multi_product, salesFlow, etc.) se retiraron el 2026-05-31 — testeaban un guion muerto. Cobertura de flujo V7: `sena_flow_smoke.test.js` + `payment_flow.test.js`; el resto cubre utilidades (address, pricing, objection escalation, order flow). Pendiente: rehacer un harness de simulación contra V7. Para refactors hay tests de caracterización: `message_handler.test.js` y `ai_chat_payloads.test.js` graban una traza de efectos (`MH_TRACE_FILE` / `AI_TRACE_FILE`) para comparar byte a byte antes y después de mover código.
 - `npx prisma migrate dev --name <x>` — nueva migración
 - `railway logs --lines 300` — logs de producción
 

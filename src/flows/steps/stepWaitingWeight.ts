@@ -85,6 +85,32 @@ async function _sendTierRecommendation(
     // solo lo que pidió.
 }
 
+/**
+ * El cliente nombró el producto antes (o junto con) los kilos: se le asigna ese
+ * producto + el plan del tier y se le mandan los precios de ESE producto, sin el
+ * menú de las tres opciones.
+ */
+async function _sendSuggestedProductPrices(
+    userId: string,
+    currentState: UserState,
+    knowledge: any,
+    dependencies: any,
+    suggested: string
+): Promise<void> {
+    const { sendMessageWithDelay, saveState } = dependencies;
+    _assignProductAndPlanByTier(currentState, suggested);
+    const cp = currentState.selectedProduct || '';
+    const priceNode = cp.includes('Cápsulas') ? knowledge.flow.preference_capsulas
+        : cp.includes('Gotas') ? knowledge.flow.preference_gotas
+        : knowledge.flow.preference_semillas;
+    const pmsg = _formatMessage(priceNode.response, currentState);
+    _setStep(currentState, priceNode.nextStep);
+    saveState(userId);
+    await sendMessageWithDelay(userId, pmsg);
+    await _maybeSendPaymentMenuV7(userId, priceNode.nextStep, currentState, knowledge, dependencies);
+    logger.info(`[TIER] User ${userId} ya eligió ${suggested}; weightGoal=${currentState.weightGoal}kg → plan ${currentState.selectedPlan}; salto recomendación genérica.`);
+}
+
 export async function handleWaitingWeight(
     userId: string,
     text: string,
@@ -179,11 +205,19 @@ export async function handleWaitingWeight(
     // hace que el bot empuje productos y la clienta se frustre (reporte 5491136769277:
     // "Por ahora no puedo comprar, yo pregunté precio, gracias" → el bot mostró
     // productos en vez de soltar). Back-off cordial + pausa.
+    // "Solo quería saber el precio" cierra la consulta únicamente si YA le dimos
+    // el precio o si trae una señal de cierre ("gracias", "por ahora"). Antes de
+    // eso es la pregunta de alguien interesado. Y "yo quería saber el precio" es
+    // siempre una pregunta: el bot despidió y pausó a quien escribió "Yo quería
+    // saber el precio de las gotas" (caso 5492657232296, 16-sep-2026).
+    const _priceAlreadyGiven = (currentState.history || []).some((h: any) => h && h.role === 'bot' && /\$\s?\d/.test(String(h.content || '')));
+    const _closingCue = /\b(gracias|por ahora|nada mas|nom[aá]s eso|era eso)\b/i.test(normalizedText);
     const isPriceCheckDecline =
         /\bno (puedo|voy a|podr[ií]a|pienso) (comprar|comprarlo|adquirir|seguir|avanzar)\b/i.test(normalizedText)
         || /\bpor ahora no (puedo|compro|voy|quiero comprar)\b/i.test(normalizedText)
         || /\bno (compro|comprar[ée]|voy a comprar)(\s+(ahora|por ahora|nada))?\b/i.test(normalizedText)
-        || /\b(solo|solamente|yo|nomas|nom[áa]s|[úu]nicamente)\s+(pregunt[ée]|preguntaba|consult\w*|quer[ií]a)\b.{0,20}(precio|saber|info|averiguar)/i.test(normalizedText)
+        || /\byo\s+(pregunt[ée]|preguntaba|consult[ée]|consultaba)\b.{0,20}(precio|saber|info|averiguar)/i.test(normalizedText)
+        || ((_priceAlreadyGiven || _closingCue) && /\b(solo|solamente|nomas|nom[áa]s|[úu]nicamente)\s+(pregunt[ée]|preguntaba|consult\w*|quer[ií]a)\b.{0,20}(precio|saber|info|averiguar)/i.test(normalizedText))
         || /\b(era|fue)\s+(solo\s+)?(una\s+)?(consulta|pregunta|para\s+(saber|averiguar))\b/i.test(normalizedText);
 
     // Hard rejection = not interested in the product at all → pause & alert admin
@@ -222,7 +256,8 @@ export async function handleWaitingWeight(
         // "más de 10" cae en tier 2, no en 10/tier 1). Sólo con cue de piso, para
         // no romper "bajar 8, tengo 45 años" (sin cue → primer número). Reporte
         // real 5491168816042 (01-jun-2026).
-        const moreThan = _weightText.match(/\b(?:mas de|m[áa]s de|arriba de|mas que|m[áa]s que)\s+(\d{1,3})/i);
+        // "más d 10" (abreviado) también es piso: sin la "d" caía en 10 → plan de 60.
+        const moreThan = _weightText.match(/\b(?:mas de|m[áa]s de|mas d|m[áa]s d|arriba de|mas que|m[áa]s que)\s+(\d{1,3})/i);
         const hasFloorCue = !!moreThan || /\b(m[ií]nimo|minino|por lo menos|al menos|mucho mas)\b/i.test(_weightText);
         if (hasFloorCue) {
             const candidates = [...inRangeNums];
@@ -241,7 +276,11 @@ export async function handleWaitingWeight(
         const extracted = _extractWeightGoal();
         if (extracted != null) currentState.weightGoal = extracted;
         logger.info(`[LOGIC] User ${userId} gave weight (${currentState.weightGoal}kg) AND asked a question. Responding to both.`);
-        const dualGoal = `El usuario dijo cuántos kilos quiere bajar (${currentState.weightGoal} kg) PERO TAMBIÉN hizo una pregunta sobre salud, contraindicaciones o el producto. DEBES responder su pregunta con MUCHA empatía y detalle PRIMERO. Si pregunta si es dañino/seguro para alguna condición de salud (riñón, presión, diabetes, etc.): "No hay ninguna contraindicación para tu condición. Es un producto 100% natural, las únicas contraindicaciones son embarazo y lactancia." Después confirmá su objetivo de peso y preguntá qué formato prefiere: "Perfecto, ${currentState.weightGoal} kg es un objetivo totalmente alcanzable 👌 ¿Preferís algo súper práctico (cápsulas o gotas) o más natural (semillas)?"."`;
+        // El mensaje que sigue (recomendación con las 3 opciones, o los precios del
+        // producto que ya nombró) hace la pregunta. Si la IA también pregunta, el
+        // cliente recibe dos preguntas seguidas ("¿Arrancamos con cápsulas?" +
+        // "¿Qué opción preferís?", caso 5493413552069).
+        const dualGoal = `El usuario dijo cuántos kilos quiere bajar (${currentState.weightGoal} kg) PERO TAMBIÉN hizo una pregunta sobre salud, contraindicaciones o el producto. DEBES responder su pregunta con MUCHA empatía y detalle PRIMERO. Si pregunta si es dañino/seguro para alguna condición de salud (riñón, presión, diabetes, etc.): "No hay ninguna contraindicación para tu condición. Es un producto 100% natural, las únicas contraindicaciones son embarazo y lactancia." Después confirmá su objetivo de peso en UNA frase corta: "Perfecto, ${currentState.weightGoal} kg es un objetivo totalmente alcanzable 👌". 🛑 NO termines con ninguna pregunta ni le pidas que elija producto o plan: el mensaje siguiente, aparte, le muestra las opciones.`;
         const aiDual = await aiService.chat(text, {
             step: FlowStep.WAITING_WEIGHT,
             goal: dualGoal,
@@ -257,6 +296,14 @@ export async function handleWaitingWeight(
             // genérico, sin auto-prices ni tier — bug detectado en review V7.
             saveState(userId);
             await sendMessageWithDelay(userId, aiDual.response);
+            // Si ya nombró el producto ("me conviene más pastillas"), van los precios
+            // de ESE producto, no el menú de las tres.
+            // "tomo pastillas para la presión" es un remedio, no el producto elegido.
+            const _suggestedDual = /\bpastillas?\s+(para|de|del|que tomo)\b/i.test(text) ? null : (currentState as any).suggestedProduct;
+            if (_suggestedDual) {
+                await _sendSuggestedProductPrices(userId, currentState, knowledge, dependencies, _suggestedDual);
+                return { matched: true };
+            }
             await _sendTierRecommendation(userId, currentState, knowledge, dependencies, text);
             return { matched: true };
         }
@@ -321,17 +368,7 @@ export async function handleWaitingWeight(
             // recibía igual el menú genérico (reporte 5491168816042, 01-jun-2026).
             const _suggested = (currentState as any).suggestedProduct;
             if (_suggested) {
-                _assignProductAndPlanByTier(currentState, _suggested);
-                const cp = currentState.selectedProduct || '';
-                const priceNode = cp.includes('Cápsulas') ? knowledge.flow.preference_capsulas
-                    : cp.includes('Gotas') ? knowledge.flow.preference_gotas
-                    : knowledge.flow.preference_semillas;
-                const pmsg = _formatMessage(priceNode.response, currentState);
-                _setStep(currentState, priceNode.nextStep);
-                saveState(userId);
-                await sendMessageWithDelay(userId, pmsg);
-                await _maybeSendPaymentMenuV7(userId, priceNode.nextStep, currentState, knowledge, dependencies);
-                logger.info(`[TIER] User ${userId} ya eligió ${_suggested}; weightGoal=${currentState.weightGoal}kg → plan ${currentState.selectedPlan}; salto recomendación genérica.`);
+                await _sendSuggestedProductPrices(userId, currentState, knowledge, dependencies, _suggested);
                 return { matched: true };
             }
 

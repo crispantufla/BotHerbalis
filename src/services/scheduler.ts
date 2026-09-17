@@ -42,11 +42,17 @@ interface SchedulerDependencies {
     [key: string]: any;
 }
 
+// waiting_zone y waiting_payment_method entraron el 2026-09-17: con el guion por
+// zona son el paso siguiente a elegir el plan, y quien no contestaba "¿de qué
+// localidad sos?" no recibía ningún recordatorio (5 leads con plan elegido en
+// las primeras 48 h del V8).
 const RE_ENGAGEABLE_STEPS = new Set([
     'waiting_weight',
     'waiting_preference',
     'waiting_price_confirmation',
     'waiting_plan_choice',
+    'waiting_zone',
+    'waiting_payment_method',
     'waiting_ok',
     'waiting_data',
     'waiting_mp_payment',
@@ -108,12 +114,31 @@ function _detectAbandonReason(state: UserState): 'payment_timing' | 'hesitation'
  * _withName
  * Personalizes a message by inserting the user's first name after the greeting.
  * e.g. "¡Hola! 😊 ..." → "¡Hola, María! 😊 ..."
+ * El nombre va antes del "!" y del emoji. La versión anterior usaba una clase
+ * `[👋😊]` sin flag `u`, que matchea media unidad UTF-16: partía el emoji y el
+ * cliente recibía "¡Hola! � Acosta,� Solo me faltaban…" (sep-2026).
  */
 function _withName(msg: string, state: UserState): string {
-    const fullName = state.userName || state.partialAddress?.nombre;
+    const fullName = (state.userName || state.partialAddress?.nombre || '').trim();
     if (!fullName) return msg;
-    const firstName = fullName.split(' ')[0];
-    return msg.replace(/^(¡?hola[!]?\s*[👋😊]?)/i, `$1 ${firstName},`);
+    const first = fullName.split(/\s+/)[0];
+    const firstName = first.charAt(0).toUpperCase() + first.slice(1);
+    return msg.replace(/^(¡?hola)(!?)/i, `$1, ${firstName}$2`);
+}
+
+/**
+ * Recordatorio de datos para el reparto propio (Rosario y 60 km): nombra solo lo
+ * que falta de nombre + calle y recuerda que paga al recibir. El texto genérico
+ * de waiting_data pide "nombre, dirección, ciudad, CP", que en la zona no hacen
+ * falta (la localidad ya la dio y no hay código postal que pedir).
+ */
+function _repartoDataFollowUps(state: UserState): string[] {
+    const addr: any = state.partialAddress || {};
+    const faltan = [!addr.nombre && 'tu nombre completo', !addr.calle && 'la calle y número'].filter(Boolean).join(' y ') || 'tus datos';
+    return [
+        `¡Hola! 😊 Para llevártelo solo me falta ${faltan}. No pagás nada ahora: lo pagás cuando te lo entregamos 🚚 ¿Me lo pasás?`,
+        `Hola 👋 Te escribo por tu pedido: me falta ${faltan} para coordinar la entrega. Lo pagás al recibirlo, en efectivo, tarjeta o transferencia 📦`,
+    ];
 }
 
 /** Contextual messages by abandon reason (for abandoned cart + cold lead recovery) */
@@ -156,6 +181,14 @@ const CONTEXTUAL_FOLLOW_UPS: Record<string, string[]> = {
     'waiting_plan_choice': [
         '¡Hola! 😊 ¿Pudiste revisar los tratamientos? Avisame si querés arrancar con el de 60 o el de 120 días.',
         'Hola 👋 Te escribo cortito por si te quedó alguna duda con los planes. ¿Con cuál te gustaría avanzar?'
+    ],
+    'waiting_zone': [
+        '¡Hola! 😊 Me quedó pendiente de qué localidad sos, así te digo cómo te llega. Si sos de Rosario o alrededores te lo llevamos nosotros y lo pagás cuando lo recibís 🚚',
+        'Hola 👋 Para armarte el envío solo me falta saber de qué ciudad o pueblo sos. ¿Me contás? 📦'
+    ],
+    'waiting_payment_method': [
+        '¡Hola! 😊 ¿Pudiste ver lo del envío? Te lo mandamos sin costo por Correo Argentino y llega en 4 días hábiles. ¿Seguimos?',
+        'Hola 👋 Te escribo por tu pedido: ¿te ayudo con algo para terminarlo? El envío es sin costo y llega en 4 días hábiles 📦'
     ],
     'waiting_ok': [
         '¡Hola! 😊 Tengo anotado tu producto pero me faltó tu confirmación para armar el pedido. ¿Avanzamos?',
@@ -346,7 +379,9 @@ async function checkAbandonedCarts(sharedState: SchedulerSharedState, dependenci
         // Contextual message: first check abandon reason, fall back to step-specific
         const reason = _detectAbandonReason(state);
         const reasonMessages = ABANDON_REASON_MESSAGES[reason];
-        const stepMessages = CONTEXTUAL_FOLLOW_UPS[state.step];
+        const stepMessages = (state.step === 'waiting_data' && state.shippingChoice === 'reparto')
+            ? _repartoDataFollowUps(state)
+            : CONTEXTUAL_FOLLOW_UPS[state.step];
         const pool = (reason !== 'generic' ? reasonMessages : null) || stepMessages || ABANDON_REASON_MESSAGES.generic;
         const { msg: rawMsg, variantIndex } = _pickVariant(pool);
         const msg = _withName(rawMsg, state);

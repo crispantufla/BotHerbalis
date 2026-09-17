@@ -184,8 +184,13 @@ function _classifyMessage(text: string, normalizedText: string): MessageClassifi
         || /\b(no puedo comprar|no puedo ahora|ahora no puedo|ahora no|no tengo plata|no tengo la plata|no tengo dinero|no tengo el dinero|no me alcanza|semana que viene)\b/i.test(normalizedText);
 
     const cleanText = normalizedText.replace(/[.,;?!]/g, ' ');
+    // "Cuando tenga el dinero le mando dire" y "voy a hacer la compra en los
+    // próximos días cuando tenga el dinero" no entraban: sin "dinero" en la lista,
+    // el bot re-pedía los datos o contestaba sin decir que en la zona se paga al
+    // recibir (casos 5493417504028 y 5493364634777, 15-sep-2026).
     const isPaymentTiming = /\b(no cobro|cobro el|cobro a|cobro la|cuando cobre|hasta que cobre|sueldo|quincena|cobrar|depositan|depósito|deposito|me pagan|me depositan)\b/i.test(cleanText)
-        || (/\b(cobro|pago|sueldo|plata|efectivo)\b/i.test(cleanText) && /\b(todavía|aun|aún|después|despues|próximo|proximo|el \d+|fin de mes)\b/i.test(cleanText));
+        || /\bcuando (tenga|junte|consiga) (el |la )?(dinero|plata|efectivo)\b/i.test(cleanText)
+        || (/\b(cobro|pago|sueldo|plata|dinero|efectivo)\b/i.test(cleanText) && /\b(todavía|todavia|aun|aún|después|despues|próximo|proximo|próximos|proximos|el \d+|fin de mes)\b/i.test(cleanText));
 
     const isObjectionOrComment = /\b(resultado|miedo|desconfianza|seguro|funciona|funcionará|efecto|rebote|garantía|garantia|probar|probando|duda|dudas|riesgo)\b/i.test(normalizedText)
         || /\b(si me va bien|si me funciona|si resulta|mas adelante|despues compro|luego compro)\b/i.test(normalizedText);
@@ -244,7 +249,9 @@ async function _handleAiFallback(
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
 
     let aiGoal = "";
-    if (classification.isPaymentTiming) {
+    if (classification.isPaymentTiming && currentState.shippingChoice === 'reparto') {
+        aiGoal = `El cliente dice que todavía no tiene la plata, que está esperando cobrar, o que va a comprar cuando la tenga. IMPORTANTE: es de la zona de reparto propio, así que NO tiene que pagar nada ahora: paga recién cuando el repartidor le entrega el pedido (efectivo, tarjeta o transferencia) y el día de entrega se acuerda con él. Decíselo PRIMERO y con calidez, por ejemplo: "¡No hace falta que tengas la plata hoy! 😊 Lo pagás recién cuando te lo llevamos, y el día lo acordamos con vos." Después ofrecé dejar la entrega agendada para el día que cobra y pedí lo que falta para dejarlo cargado (nombre completo y calle y número; no pidas lo que ya dio). UNA sola pregunta al final. PROHIBIDO mencionar Correo, sucursal, "congelar precio" o "congelar promo".`;
+    } else if (classification.isPaymentTiming) {
         aiGoal = `El cliente dice que todavía no cobró, que está esperando su sueldo, o que va a esperar a cobrar para escribirte. DEBES INSISTIR y ofrecerle postdatar el envío. Respondé directo: "¡No hace falta que esperes! 😊 Te lo agendamos y lo despacho la fecha que vos me digas. ¿A partir de qué día te queda cómodo recibirlo?". NO aceptes un "te escribo después" sin antes ofrecer postdatar. PROHIBIDO mencionar "congelar precio" / "congelar promo" — el mensaje debe ser directo sin urgencia falsa.`;
     } else if (classification.isHesitation) {
         aiGoal = currentState.shippingChoice === 'reparto'
@@ -816,6 +823,32 @@ export async function _handleRepartoData(
     if (addr.calle === 'A sucursal') addr.calle = undefined;
 
     const already = !!(addr.nombre && addr.calle);
+
+    // Contesta la oferta de agendar con una fecha ("después del 5"): se anota y se
+    // piden los datos que faltan. Antes el bot le volvía a ofrecer agendar como si
+    // no hubiera contestado y nunca pedía los datos (caso 5493364634777).
+    if (!already) {
+        const pd = (_detectPostdatado(normalizedText) || '').trim();
+        const lastBot: any = [...(currentState.history || [])].reverse().find((h: any) => h && h.role === 'bot');
+        const offeredSchedule = !!lastBot && /agend|program|postdat|a partir de (qu[eé]|cu[aá]ndo)|qu[eé] (d[ií]a|fecha)|para (qu[eé]|la) fecha/i.test(String(lastBot.content || ''));
+        // Fechas que se entienden solas, y las cortas ("el 10") solo si el bot
+        // acababa de ofrecer agendar. "cobro el 5" no entra: lo contesta la IA
+        // con el argumento de pagar al recibir.
+        const explicitDate = /^(despu[eé]s del|a partir del)\s+\d{1,2}$|^\d{1,2}\s+de\s+[a-z]+$|^(principio|fin|final|fines|mediados)\s+de\s+mes$/i.test(pd);
+        const shortDate = /^(el|del|para el)\s+\d{1,2}$|^(la\s+)?(quincena|mes\s+que\s+viene|pr[oó]ximo\s+mes)$/i.test(pd);
+        const concreteDate = explicitDate || (shortDate && offeredSchedule);
+        const bringsStreet = /\d{3,5}/.test(text) || /\b(calle|av|avenida|barrio)\b/i.test(normalizedText);
+        if (concreteDate && !bringsStreet) {
+            currentState.postdatado = pd;
+            const faltan = [!addr.nombre && '*nombre completo*', !addr.calle && '*calle y número*'].filter(Boolean).join(' y ');
+            const fecha = pd.replace(/^para\s+/i, '').replace(/^despues\b/i, 'después').replace(/^(mes que viene|pr[oó]ximo mes)$/i, 'el $1');
+            saveState(userId);
+            await sendMessageWithDelay(userId, `¡Listo! Lo dejamos agendado para *${fecha}* 📅 No pagás nada hasta recibirlo. Para dejarlo cargado pasame tu ${faltan} 🙌`);
+            logger.info(`[REPARTO-DATA] ${userId} agendó la entrega para "${pd}" — pido ${faltan}.`);
+            return { matched: true };
+        }
+    }
+
     const looksLikeData = /\d/.test(text) || /\n/.test(text) || text.trim().split(/\s+/).length >= 2;
     let progressed = false;
     if (!already && looksLikeData) {

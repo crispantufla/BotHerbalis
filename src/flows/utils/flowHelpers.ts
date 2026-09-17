@@ -112,7 +112,10 @@ function _detectPostdatado(normalizedText: string): string | null {
     // bloqueaba "cuando cobre" / "apenas cobre" aunque los patrones de extracción
     // de abajo SÍ los manejan (quedaba devolviendo null por el gate, no por falta
     // de patrón). Caso: el cliente confirma "dale, cuando cobre" tras la oferta.
-    const hasActionContext = /\b(recibir|recibirlo|llega|llegue|enviar|enviame|envialo|enviamela|enviamelo|mandalo|mandame|mandamela|mandamelo|entregar|cobro|cobre|cobrar|depositan|sueldo|pago|puedo|pueden|venir|mandar|comprar|no tengo|para el|a partir|no puedo ahora|no puedo comprar|juntar|junte|junto|consigo|consiga|conseguir|ahorre|ahorrar|cuente con|me alcance|me alcance la plata|mucho inter[eé]s|cuotas|me comunico|aviso cuando|cuando tenga)\b/i.test(normalizedText);
+    // "después del 5" solo, como respuesta a "¿a partir de cuándo te queda cómodo
+    // recibirlo?", es una fecha aunque no traiga verbo (caso 5493364634777).
+    const hasActionContext = /\b(recibir|recibirlo|llega|llegue|enviar|enviame|envialo|enviamela|enviamelo|mandalo|mandame|mandamela|mandamelo|entregar|cobro|cobre|cobrar|depositan|sueldo|pago|puedo|pueden|venir|mandar|comprar|no tengo|para el|a partir|no puedo ahora|no puedo comprar|juntar|junte|junto|consigo|consiga|conseguir|ahorre|ahorrar|cuente con|me alcance|me alcance la plata|mucho inter[eé]s|cuotas|me comunico|aviso cuando|cuando tenga)\b/i.test(normalizedText)
+        || /\bdespu[eé]s\s+del\s+\d{1,2}\b/i.test(normalizedText);
     if (!hasActionContext) return null;
 
     // FECHAS CERCANAS = NO postdatar (regla del dueño, caso 1131381951): el envío
@@ -385,7 +388,10 @@ function _assignProductAndPlanByTier(state: any, productFullName: string): void 
  * emiten con pendingOrder seteado, en steps de cierre (excluidos), o fuera del
  * flujo (al aprobar la orden ya creada).
  */
-const _GHOST_CLOSE_LANG = /(pedido confirmado|listo,?\s+todo|todo listo|ya est[aá] todo listo|ya est[aá] tu pedido|tu pedido qued[oó]|tu pedido est[aá] (confirmado|listo)|queda confirmado|pedido ingresado|ya qued[oó] (tu pedido|todo))/i;
+// "todo listo" condicional ("cuando tengas todo listo me escribís") NO es un
+// cierre: bloquearlo reemplazaba una respuesta correcta por "Dame un segundito
+// que reviso bien tu pedido" y nadie retomaba (caso 5493549532731, 16-sep-2026).
+const _GHOST_CLOSE_LANG = /(pedido confirmado|listo,?\s+todo|(?<!\b(?:cuando|si|apenas|en cuanto)\b[^.!?\n]{0,25})todo listo|ya est[aá] todo listo|ya est[aá] tu pedido|tu pedido qued[oó]|tu pedido est[aá] (confirmado|listo)|queda confirmado|pedido ingresado|ya qued[oó] (tu pedido|todo))/i;
 const _GHOST_CLOSE_CLOSED_STEPS = ['waiting_admin_validation', 'waiting_admin_ok', 'completed', 'rejected_medical', 'rejected_abusive', 'rejected_geo'];
 function _isGhostClose(botMsg: string | null | undefined, step: string, hasPendingOrder: boolean): boolean {
     if (!botMsg) return false;
