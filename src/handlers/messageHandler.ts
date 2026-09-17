@@ -123,25 +123,31 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
  * Distinguir bot vs admin: `botSentMessageIds` registra los IDs que el
  * bot envió via client.sendMessage (wrappeado en clientPool). Si el ID
  * del mensaje saliente está en ese set, lo ignoramos.
+ *
+ * Cubierto por tests/manual_chat.test.js.
  */
 export function createOutgoingMessageHandler(ctx: {
     sellerId: string;
+    client: any;
     userState: any;
     pausedUsers: Set<string>;
     sharedState: any;
     botSentMessageIds: Set<string>;
     logAndEmit: (chatId: string, sender: string, text: string, step?: string, messageId?: string | null, overrideTimestamp?: number) => void;
 }): (msg: any) => Promise<void> {
-    const { sellerId, userState, pausedUsers, sharedState, botSentMessageIds, logAndEmit } = ctx;
+    const { sellerId, client, userState, pausedUsers, sharedState, botSentMessageIds, logAndEmit } = ctx;
     const { dismissAlertsForUser } = require('../services/adminService');
 
     return async function outgoingHandler(msg: any): Promise<void> {
         try {
-            // Solo nos interesan outgoing messages a chats individuales.
+            // Solo nos interesan outgoing messages a chats individuales. WhatsApp
+            // arma el mensaje con `to: chat.id`, así que en los chats migrados a
+            // @lid el destino llega como <lid>@lid (se resuelve más abajo). Hasta
+            // el 2026-09-17 acá se exigía @c.us, y todo lo que el vendedor
+            // escribía a mano en esos chats se perdía: ni ChatLog ni pausa.
             if (!msg.fromMe) return;
             if (!msg.to || typeof msg.to !== 'string') return;
-            if (!msg.to.endsWith('@c.us')) return;
-            if (msg.to.endsWith('@g.us') || msg.to.endsWith('@broadcast')) return;
+            if (!msg.to.endsWith('@c.us') && !msg.to.endsWith('@lid')) return;
 
             // Skip si la conexión recién se inició (mensajes históricos).
             if (sharedState.connectedAt && msg.timestamp && msg.timestamp < sharedState.connectedAt) return;
@@ -157,7 +163,12 @@ export function createOutgoingMessageHandler(ctx: {
             const msgId = msg.id?._serialized;
             if (msgId && botSentMessageIds.has(msgId)) return;
 
-            const targetId = msg.to;
+            // El chat bajo el mismo id que usa el entrante para este cliente (su
+            // userState, su pausa, su ChatLog): el @lid, resuelto al teléfono.
+            // Recién acá, con los ecos del bot ya descartados, para no gastar un
+            // RPC al agente por cada mensaje que manda el bot. msg.getContact()
+            // no sirve: en un mensaje propio es el contacto del vendedor.
+            const targetId = await steps.resolveUserIdFrom(msg.to, () => client.getContactById(msg.to), sellerId);
 
             // Registrar el mensaje manual del admin (escrito desde el teléfono del
             // bot) en el historial + emitirlo al dashboard en tiempo real. Antes NO
