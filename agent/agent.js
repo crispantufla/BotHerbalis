@@ -490,10 +490,35 @@ client.on('message', (m) => {
     send({ t: 'incoming', msg });
 });
 // Salientes — incluye lo que el bot manda y lo que el vendedor escribe a mano desde el
-// celular. Railway deduplica los del bot por msgId (botSentMessageIds); los manuales
-// los trata como intervención.
+// celular. Railway distingue unos de otros con el msgId del ack; los manuales los
+// trata como intervención (los registra y le cede el chat al vendedor).
+//
+// Mensajes propios recién vistos, para el respaldo del ack: al mandar a
+// <telefono>@c.us un chat que WhatsApp guarda bajo @lid, client.sendMessage
+// devuelve undefined (busca el mensaje por una clave armada con el teléfono), así
+// que el ack se iba sin id y Railway no podía reconocer su propio eco. Este evento
+// SÍ trae el id y llega ANTES de que sendMessage resuelva.
+const _ownRecent = [];
+function _rememberOwn(m, id) {
+    _ownRecent.push({ id, body: m.body || '', hasMedia: !!m.hasMedia, t: Date.now() });
+    while (_ownRecent.length > 50) _ownRecent.shift();
+}
+/** El id del envío: el que devuelve wwebjs o, si vino vacío, el del eco que disparó ESTE envío. */
+function _sentMsgId(sent, body, hasMedia, since) {
+    if (sent && sent.id && sent.id._serialized) return sent.id._serialized;
+    for (let i = _ownRecent.length - 1; i >= 0; i--) {
+        const o = _ownRecent[i];
+        if (o.t < since) break;   // anterior al envío: no es su eco
+        if (o.hasMedia === !!hasMedia && o.body === (body || '')) return o.id;
+    }
+    return null;
+}
+
 client.on('message_create', (m) => {
-    if (m.fromMe) send({ t: 'outgoing', msg: serializeMsg(m) });
+    if (!m.fromMe) return;
+    const msg = serializeMsg(m);
+    _rememberOwn(m, msg.id._serialized);
+    send({ t: 'outgoing', msg });
 });
 
 // ── Comandos del gateway → acciones wwebjs ───────────────────────────────────
@@ -505,18 +530,20 @@ async function handleCommand(frame) {
                 if (waReady) send({ t: 'ready', phone: client.info && client.info.wid ? client.info.wid.user : '' });
                 return;
             case 'send_text': {
+                const since = Date.now();
                 const sent = await client.sendMessage(frame.chatId, frame.text);
-                ack(id, true, { msgId: sent && sent.id ? sent.id._serialized : null });
+                ack(id, true, { msgId: _sentMsgId(sent, frame.text, false, since) });
                 return;
             }
             case 'send_media': {
                 const media = new MessageMedia(frame.mimetype, frame.data, frame.filename || undefined);
                 const opts = frame.opts || {};
+                const since = Date.now();
                 const sent = await client.sendMessage(frame.chatId, media, {
                     caption: opts.caption || undefined,
                     sendAudioAsVoice: !!opts.isPtt,
                 });
-                ack(id, true, { msgId: sent && sent.id ? sent.id._serialized : null });
+                ack(id, true, { msgId: _sentMsgId(sent, opts.caption || '', true, since) });
                 return;
             }
             case 'typing': {

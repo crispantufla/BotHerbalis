@@ -250,15 +250,43 @@ describe('lo que mandó el bot no es manual', () => {
     });
 
     test('el ack vuelve sin id: lo reconoce por el contenido y lo deja en el log', async () => {
-        const warn = jest.spyOn(logger, 'warn');
+        const info = jest.spyOn(logger, 'info');
         const s = mkSeller({ userState: { [TEL]: { step: 'greeting' } } });
         s.sendMock.mockResolvedValueOnce({ id: { _serialized: 'remote_1789000000000' } });
         await s.client.sendMessage(TEL, '¡Hola! 😊 Soy Elena de Herbalis.\n\nTe ayudo a bajar de peso');
         await deliver(s.outgoing, manual({ body: '¡Hola! 😊 Soy Elena de Herbalis.\n\nTe ayudo a bajar de peso' }));
 
         nothingHappened(s);
-        expect(warn).toHaveBeenCalledWith(expect.stringContaining('Eco de un envío del bot'));
-        warn.mockRestore();
+        expect(info).toHaveBeenCalledWith(expect.stringContaining('Eco de un envío del bot'));
+        info.mockRestore();
+    });
+
+    test('envío lento (una imagen pesada): el eco llega antes del ack y más de un minuto después del envío', async () => {
+        const s = mkSeller();
+        s.sendMock.mockImplementationOnce(ackIn(90000, 'remote_1789000000004'));
+        const sending = s.client.sendMessage(TEL, { mimetype: 'image/jpeg', data: 'AAAA' }, { caption: 'Mirá el producto' });
+
+        await jest.advanceTimersByTimeAsync(70000);
+        const done = s.outgoing(manual({ body: 'Mirá el producto', type: 'image', hasMedia: true }));
+        await jest.advanceTimersByTimeAsync(20000);
+        await done;
+        await sending;
+
+        nothingHappened(s);
+    });
+
+    test('un envío que nunca vuelve deja de tapar ecos a los 10 minutos', async () => {
+        const s = mkSeller();
+        s.sendMock.mockImplementationOnce(() => new Promise(() => {}));
+        s.client.sendMessage(TEL, 'Te paso el precio');
+        await jest.advanceTimersByTimeAsync(10 * 60 * 1000 + 1000);
+
+        const done = s.outgoing(manual({ body: 'Te paso el precio' }));
+        await jest.advanceTimersByTimeAsync(10000);
+        await done;
+        await jest.advanceTimersByTimeAsync(0);
+
+        expect([...s.pausedUsers]).toEqual([TEL]);
     });
 
     test('imagen del bot cuyo ack vuelve sin id: tampoco', async () => {

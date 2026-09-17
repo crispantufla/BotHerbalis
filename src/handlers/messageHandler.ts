@@ -109,21 +109,46 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
     };
 }
 
+/** Un envío del bot, para reconocer su eco. */
+interface BotSend {
+    chatId: string;
+    text: string;
+    media: boolean;
+    /** Cuándo se llamó a sendMessage. */
+    at: number;
+    /** Cuándo volvió (con o sin id). Mientras no vuelve, el eco todavía está por llegar. */
+    settledAt?: number;
+}
+
 /** Lo que mandó el bot, para no confundirlo con lo que el vendedor escribe a mano. */
 export interface BotSends {
     /** Ids confirmados de los envíos del bot (se olvidan a los 30 s). */
     ids: Set<string>;
     /** Envíos del bot que todavía no volvieron con su id. */
     pending: Set<Promise<unknown>>;
-    /** Qué mandó el bot a cada chat en el último minuto. */
-    recent: { chatId: string; text: string; media: boolean; at: number }[];
+    /** Qué mandó el bot a cada chat, mientras sirva para reconocer su eco. */
+    recent: BotSend[];
 }
 
 const BOT_SEND_ID_TTL_MS = 30000;
+// Cuánto sigue sirviendo un envío YA confirmado para reconocer su eco.
 const BOT_SEND_RECENT_MS = 60000;
+// Tope para uno que nunca volvió (una imagen pesada tarda, pero no diez minutos).
+const BOT_SEND_MAX_PENDING_MS = 600000;
 // Tope de la espera a los envíos en curso: un RPC colgado (30 s de timeout en
 // remoto) no puede demorar tanto el registro y la pausa de un mensaje manual.
 const PENDING_SEND_WAIT_MS = 10000;
+
+/**
+ * Un envío sirve para reconocer su eco mientras no volvió — el eco llega ANTES
+ * que el ack, y un envío lento puede tardar más de un minuto — y hasta un minuto
+ * después de haber vuelto.
+ */
+function _isLiveSend(s: BotSend, now: number): boolean {
+    return s.settledAt === undefined
+        ? now - s.at < BOT_SEND_MAX_PENDING_MS
+        : now - s.settledAt < BOT_SEND_RECENT_MS;
+}
 
 /**
  * Envuelve client.sendMessage para anotar todo lo que manda el bot: flujo,
@@ -137,8 +162,9 @@ export function trackBotSends(client: any): BotSends {
         const [chatId, content, options] = args;
         const now = Date.now();
         const media = !!content && typeof content === 'object';
-        sends.recent = sends.recent.filter(s => now - s.at < BOT_SEND_RECENT_MS);
-        sends.recent.push({ chatId, text: media ? (options?.caption || '') : String(content ?? ''), media, at: now });
+        const entry: BotSend = { chatId, text: media ? (options?.caption || '') : String(content ?? ''), media, at: now };
+        sends.recent = sends.recent.filter(s => _isLiveSend(s, now));
+        sends.recent.push(entry);
 
         const sending = (async () => {
             const result = await send(...args);
@@ -150,7 +176,7 @@ export function trackBotSends(client: any): BotSends {
             return result;
         })();
         sends.pending.add(sending);
-        const settled = () => { sends.pending.delete(sending); };
+        const settled = () => { sends.pending.delete(sending); entry.settledAt = Date.now(); };
         sending.then(settled, settled);
         return sending;
     };
@@ -170,11 +196,11 @@ async function waitForBotSends(sends: BotSends): Promise<void> {
 
 const _sameText = (a: any, b: any) => String(a ?? '').replace(/\s+/g, ' ').trim() === String(b ?? '').replace(/\s+/g, ' ').trim();
 
-/** ¿El bot le mandó a este chat lo mismo hace menos de un minuto? */
+/** ¿Este mensaje es el eco de algo que el bot le mandó a este chat? */
 function isRecentBotSend(sends: BotSends, chatIds: string[], msg: any): boolean {
     const now = Date.now();
     const phones = chatIds.map(id => _cleanPhone(id));
-    return sends.recent.some(s => now - s.at < BOT_SEND_RECENT_MS
+    return sends.recent.some(s => _isLiveSend(s, now)
         && phones.includes(_cleanPhone(s.chatId))
         && s.media === !!msg.hasMedia
         && _sameText(s.text, msg.body));
@@ -238,12 +264,15 @@ export function createOutgoingMessageHandler(ctx: {
             // no sirve: en un mensaje propio es el contacto del vendedor.
             const targetId = await steps.resolveUserIdFrom(msg.to, () => client.getContactById(msg.to), sellerId);
 
-            // Segundo resguardo, que no depende del id: lo mismo que el bot le
-            // mandó a este chat hace menos de un minuto es su eco. Cubre un ack
-            // que volvió sin id (RemoteClient le inventa `remote_<ts>`, que nunca
-            // cruza). Si pasa, queda en el log.
+            // Resguardo que no depende del id: lo que el bot le mandó a este chat
+            // es su eco. En remoto este es el camino NORMAL, no la excepción: al
+            // mandar a <telefono>@c.us un chat que WhatsApp guarda bajo @lid, el
+            // sendMessage de wwebjs devuelve undefined (busca el mensaje por una
+            // clave con el teléfono), el agente ackea sin id y RemoteClient le
+            // inventa un `remote_<ts>` que no cruza con nada. Medido en prod el
+            // 17-sep: 20 de 20 ecos reconocidos por acá, ninguno por el id.
             if (isRecentBotSend(botSends, [msg.to, targetId], msg)) {
-                logger.warn(`[MANUAL-CHAT][${sellerId}] Eco de un envío del bot a ${targetId} sin id que lo cruce (${msgId}) — no es manual`);
+                logger.info(`[MANUAL-CHAT][${sellerId}] Eco de un envío del bot a ${targetId} (ack sin id que cruce: ${msgId}) — no es manual`);
                 return;
             }
 
