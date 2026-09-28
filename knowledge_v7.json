@@ -1,8 +1,8 @@
 {
     "meta": {
         "name": "Guión V7 — Elena · 2 tiers (60d / 120d)",
-        "description": "Guión simplificado may-2026: persona Elena (tono cálido argentino), 2 tiers (hasta 10 kg → plan 60 días; más de 10 kg → plan 120 días). Tras pedir kilos, el bot envía dos mensajes seguidos (recomendación + precios). Cuando el cliente elige producto, confirma el total y va directo al menú de pago. Modelo de pago nuevo: retiro en sucursal (paga total al retirar) o envío a domicilio (prepago MP/transferencia).",
-        "version": "7.0"
+        "description": "Guión simplificado may-2026: persona Elena (tono cálido argentino), 2 tiers (hasta 10 kg → plan 60 días; más de 10 kg → plan 120 días). Tras pedir kilos, el bot envía dos mensajes seguidos (recomendación + precios). Cuando el cliente elige producto, confirma el total y va directo al menú de pago. Modelo de pago nuevo: retiro en sucursal (paga total al retirar) o envío a domicilio (prepago MP/transferencia). (Restaurado el 28-sep-2026 tras revertir el guion V8 por zona; la versión es 8.2 para que gane sobre la copia V8 guardada en DATA_DIR.)",
+        "version": "8.2"
     },
     "flow": {
         "greeting": {

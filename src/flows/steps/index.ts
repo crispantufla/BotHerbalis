@@ -20,6 +20,23 @@ export async function processStep(
     knowledge: any,
     dependencies: any
 ): Promise<{ matched: boolean; staleReprocess?: boolean; paused?: boolean }> {
+    // Clientes que quedaron a mitad del guion por zona (V8, 15 al 28-sep-2026, se
+    // revirtió): con reparto propio ya elegido no encajan en ningún camino del
+    // guion actual (domicilio = prepago, contrarreembolso = retiro), así que
+    // vuelven al menú de retiro/domicilio. Los que estaban en `waiting_zone`
+    // los migra el default del switch.
+    if ((currentState as any).shippingChoice === 'reparto'
+        && ['waiting_data', 'waiting_final_confirmation', 'waiting_maps_confirmation'].includes(currentState.step)) {
+        const { _setStep } = require('../utils/flowHelpers');
+        logger.info(`[STALE-STEP] User ${userId} venía del reparto propio (guion por zona) en "${currentState.step}". Vuelve al menú de pago.`);
+        currentState.shippingChoice = null;
+        currentState.paymentMethod = null;
+        (currentState as any).deliveryZone = null;
+        _setStep(currentState, 'waiting_payment_method');
+        dependencies.saveState(userId);
+        return { matched: false, staleReprocess: true };
+    }
+
     const step = currentState.step;
     let result: { matched: boolean; staleReprocess?: boolean; paused?: boolean } | null = null;
 
@@ -85,6 +102,9 @@ export async function processStep(
                 // plan de forma segura, sin perder weightGoal). V7 nunca rutea acá.
                 'waiting_ok': 'waiting_preference',
                 'waiting_price_confirmation': 'waiting_preference',
+                // Paso del guion por zona (sep-2026, revertido): la pregunta de la
+                // localidad vuelve a ser el menú de retiro/domicilio.
+                'waiting_zone': 'waiting_payment_method',
             };
             const migratedStep = stepMigrations[currentState.step];
 
