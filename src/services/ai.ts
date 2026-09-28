@@ -16,7 +16,7 @@ import { _getPrices } from '../flows/utils/pricing';
  * Parte del namespace del cache semántico que cambia cuando cambia lo que las
  * respuestas afirman: la versión del guion y la tabla de precios. Sin esto, una
  * respuesta de julio ("$36.900 a $58.900", precio viejo) se siguió sirviendo 27
- * veces, hasta dos meses después del cambio de precio y del guion V8.
+ * veces, hasta dos meses después del cambio de precio.
  */
 function _cacheContentTag(knowledge: any): string {
     let prices = '';

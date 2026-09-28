@@ -158,9 +158,6 @@ function detectRetiro({ state, addr }) {
     // elija transferencia (falso positivo real en el caso Nora Aguirre).
     const domicilioCommitted =
         state.shippingChoice === 'domicilio'
-        // Reparto propio (sep-2026): contrarreembolso con entrega en el domicilio.
-        || state.shippingChoice === 'reparto'
-        || state.deliveryZone === 'in'
         || state.paymentMethod === 'mercadopago'
         || state.paymentMethod === 'transferencia'
         || !!state.mpPaymentLinkUrl

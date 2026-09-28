@@ -27,8 +27,8 @@ interface BotConfig {
     // números nuevos para no exhibir actividad proactiva ante Meta.
     proactiveFollowUps?: boolean;
     // Interruptor de Mercado Pago (jul-2026): si está en false, el bot NO ofrece
-    // ni genera links de pago con tarjeta — fuera de zona queda solo la
-    // transferencia (el reparto propio de Rosario cobra al recibir). Se apaga cuando
+    // ni genera links de pago con tarjeta — el guion queda con retiro en sucursal
+    // (efectivo al retirar) y transferencia (domicilio prepago). Se apaga cuando
     // la cuenta de MP está bloqueada. ENCENDIDO por default.
     mpEnabled?: boolean;
     [key: string]: any;
@@ -179,9 +179,10 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
                 const paths = knowledgeFiles[name];
                 let filePath = fs.existsSync(paths.save) ? paths.save : paths.source;
                 // La copia guardada en DATA_DIR gana sobre el archivo del repo,
-                // así que un guion nuevo deployado (ej. V8, sep-2026) no llegaría
-                // a prod si alguna vez se guardó una copia. Si meta.version del
-                // repo es más nueva, gana el repo y la copia queda como .bak.
+                // así que un guion deployado (ej. V8 en sep-2026, o volver a V7
+                // después) no llegaría a prod si alguna vez se guardó una copia.
+                // Si meta.version del repo es más nueva, gana el repo y la copia
+                // queda como .bak.
                 if (filePath === paths.save && fs.existsSync(paths.source)) {
                     try {
                         const savedMeta = JSON.parse(await fs.promises.readFile(paths.save, 'utf-8')).meta || {};

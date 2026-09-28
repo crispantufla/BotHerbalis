@@ -129,14 +129,6 @@ async function _handleSucursalIntent(
 
     if (!isSucursalIntent || currentState.partialAddress?.calle) return null;
 
-    // Zona de reparto propio (sep-2026): no hay sucursal ni local, se lo llevamos.
-    if (currentState.shippingChoice === 'reparto') {
-        const msg = 'No hace falta que vayas a ningún lado 😊 Te lo llevamos nosotros a tu casa sin costo y lo pagás al recibir. Pasame tu *nombre completo* y *calle y número* 🙌';
-        saveState(userId);
-        await sendMessageWithDelay(userId, msg);
-        return { matched: true };
-    }
-
     logger.info(`[SUCURSAL] Detected sucursal pickup intent for ${userId}`);
     if (!currentState.partialAddress) currentState.partialAddress = {};
     currentState.partialAddress.calle = 'A sucursal';
@@ -186,8 +178,8 @@ function _classifyMessage(text: string, normalizedText: string): MessageClassifi
     const cleanText = normalizedText.replace(/[.,;?!]/g, ' ');
     // "Cuando tenga el dinero le mando dire" y "voy a hacer la compra en los
     // próximos días cuando tenga el dinero" no entraban: sin "dinero" en la lista,
-    // el bot re-pedía los datos o contestaba sin decir que en la zona se paga al
-    // recibir (casos 5493417504028 y 5493364634777, 15-sep-2026).
+    // el bot re-pedía los datos en vez de ofrecer agendar (casos 5493417504028 y
+    // 5493364634777, 15-sep-2026).
     const isPaymentTiming = /\b(no cobro|cobro el|cobro a|cobro la|cuando cobre|hasta que cobre|sueldo|quincena|cobrar|depositan|depósito|deposito|me pagan|me depositan)\b/i.test(cleanText)
         || /\bcuando (tenga|junte|consiga) (el |la )?(dinero|plata|efectivo)\b/i.test(cleanText)
         || (/\b(cobro|pago|sueldo|plata|dinero|efectivo)\b/i.test(cleanText) && /\b(todavía|todavia|aun|aún|después|despues|próximo|proximo|próximos|proximos|el \d+|fin de mes)\b/i.test(cleanText));
@@ -249,18 +241,14 @@ async function _handleAiFallback(
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
 
     let aiGoal = "";
-    if (classification.isPaymentTiming && currentState.shippingChoice === 'reparto') {
-        aiGoal = `El cliente dice que todavía no tiene la plata, que está esperando cobrar, o que va a comprar cuando la tenga. IMPORTANTE: es de la zona de reparto propio, así que NO tiene que pagar nada ahora: paga recién cuando el repartidor le entrega el pedido (efectivo, tarjeta o transferencia) y el día de entrega se acuerda con él. Decíselo PRIMERO y con calidez, por ejemplo: "¡No hace falta que tengas la plata hoy! 😊 Lo pagás recién cuando te lo llevamos, y el día lo acordamos con vos." Después ofrecé dejar la entrega agendada para el día que cobra y pedí lo que falta para dejarlo cargado (nombre completo y calle y número; no pidas lo que ya dio). UNA sola pregunta al final. PROHIBIDO mencionar Correo, sucursal, "congelar precio" o "congelar promo".`;
-    } else if (classification.isPaymentTiming) {
+    if (classification.isPaymentTiming) {
         aiGoal = `El cliente dice que todavía no cobró, que está esperando su sueldo, o que va a esperar a cobrar para escribirte. DEBES INSISTIR y ofrecerle postdatar el envío. Respondé directo: "¡No hace falta que esperes! 😊 Te lo agendamos y lo despacho la fecha que vos me digas. ¿A partir de qué día te queda cómodo recibirlo?". NO aceptes un "te escribo después" sin antes ofrecer postdatar. PROHIBIDO mencionar "congelar precio" / "congelar promo" — el mensaje debe ser directo sin urgencia falsa.`;
     } else if (classification.isHesitation) {
-        aiGoal = currentState.shippingChoice === 'reparto'
-            ? `El cliente dice que ahora no puede, que la semana que viene, que no tiene plata, o alguna variación de "todavía no". IMPORTANTE: es de la zona de reparto propio, así que NO paga nada ahora: paga recién cuando el repartidor le entrega el pedido (efectivo, tarjeta o transferencia), y el día y horario se acuerdan con él. Respondé con MUCHA empatía y decíselo: "no tenés que pagar nada ahora, lo pagás cuando te lo llevamos, y el día lo acordamos con vos". Si aún así dice que no puede, ofrecé postdatar: "Si preferís, dejamos la entrega para la fecha que te quede mejor, por ejemplo principio de mes. ¿Qué te parece?". NO aceptes un rechazo directo sin antes ofrecer postdatar.`
-            : `El cliente dice que ahora no puede, que la semana que viene, que no tiene plata, o alguna variación de "todavía no". IMPORTANTE: el pedido va por Correo Argentino prepago (${prepayMeans(isMpEnabled(dependencies.config))}) y llega en *4 días hábiles* desde el pago; fuera de Rosario y 60 km NO hay pago al recibir. Respondé con MUCHA empatía y ofrecé postdatar: "Si preferís, podemos agendar el envío para la fecha que te quede mejor, por ejemplo principio de mes. ¿Qué te parece?". NO aceptes un rechazo directo sin antes ofrecer postdatar.`;
+        aiGoal = `El cliente dice que ahora no puede, que la semana que viene, que no tiene plata, o alguna variación de "todavía no". IMPORTANTE: El envío tarda *7 a 10 días hábiles* y existe la opción de *retiro en sucursal* (paga el total en efectivo cuando va a buscar el paquete a la sucursal de Correo Argentino, sin anticipo previo). Respondé con MUCHA empatía y mencioná estos dos puntos: (1) "El envío tarda 7 a 10 días hábiles, así que para cuando te llegue ya vas a poder" y (2) "Tenés la opción de retiro en sucursal: pagás el total cuando lo retirás, no necesitás pagar nada ahora". Si aún así dice que no puede, ofrecé postdatar: "Si preferís, podemos agendar el envío para la fecha que te quede mejor, por ejemplo principio de mes. ¿Qué te parece?". NO aceptes un rechazo directo sin antes explicarle la opción de retiro en sucursal y ofrecer postdatar.`;
     } else if (classification.isObjectionOrComment) {
         aiGoal = `El usuario hizo un comentario sobre probar el producto primero, o expresó dudas sobre los resultados (ej: "si me da resultado compro más"). Respondé validando su decisión con extrema seguridad y empatía. A continuación, VOLVÉ a pedir sutilmente los datos de envío que estaban pendientes (Nombre, Dirección, Ciudad). NO ofrezcas otros productos.`;
     } else {
-        aiGoal = `El usuario tiene una duda o expresa una preocupación en plena toma de datos (ej: pregunta cómo se paga, cuándo llega, si le entregan en el trabajo, o cuenta un largo problema personal). DEBES RESPONDER SU TEXTO DIRECTAMENTE de forma EXTENSA Y MUY EMPÁTICA usando el Knowledge. Si expresa miedos sobre demoras o recepción, redactá un párrafo largo brindando tranquilidad absoluta. Si pregunta si puede recibir en su TRABAJO, responde sus opciones. Si pregunta sobre la función del producto o qué hace: "La Nuez de la India ayuda a acompañar el proceso natural del cuerpo para eliminar excesos. Muchas personas notan menos hinchazón, más liviandad y un descenso progresivo de peso. Es un apoyo natural para sentirte mejor sin métodos agresivos.". Si pregunta sobre dieta/comidas: "La Nuez de la India puede utilizarse sin hacer dietas estrictas...". Si pregunta dónde queda la oficina/local: "Somos Herbalis...". Si pregunta formas de pago o tiempos: ${_shippingAnswerForGoal(currentState, isMpEnabled(dependencies.config))}. Si pregunta contraindicaciones: "Es un producto 100% natural...". Nunca lo obligues a dar los datos bruscamente, respondé su duda con muchísima calidez, y cerrá sutilmente preguntando: "¿Te parece que lo dejemos anotado?" o "¿Te tomo los datos?".\n\nEXCEPCIÓN CRÍTICA - HESITACIÓN TIPO "TE AVISO": Si el cliente dice "luego te escribo", "te confirmo después", o "lo pienso y te aviso": NO LO ACEPTES A LA PRIMERA. Respondé directo ofreciendo postdatar: "¡Dale! Igual, si querés te lo dejamos agendado para la fecha que vos prefieras y lo despacho ese día. ¿A partir de qué día te queda cómodo recibirlo?". PROHIBIDO mencionar "congelar precio" / "congelar promo".`;
+        aiGoal = `El usuario tiene una duda o expresa una preocupación en plena toma de datos (ej: pregunta cómo se paga, cuándo llega, si le entregan en el trabajo, o cuenta un largo problema personal). DEBES RESPONDER SU TEXTO DIRECTAMENTE de forma EXTENSA Y MUY EMPÁTICA usando el Knowledge. Si expresa miedos sobre demoras o recepción, redactá un párrafo largo brindando tranquilidad absoluta. Si pregunta si puede recibir en su TRABAJO, responde sus opciones. Si pregunta sobre la función del producto o qué hace: "La Nuez de la India ayuda a acompañar el proceso natural del cuerpo para eliminar excesos. Muchas personas notan menos hinchazón, más liviandad y un descenso progresivo de peso. Es un apoyo natural para sentirte mejor sin métodos agresivos.". Si pregunta sobre dieta/comidas: "La Nuez de la India puede utilizarse sin hacer dietas estrictas...". Si pregunta dónde queda la oficina/local: "Somos Herbalis...". Si pregunta formas de pago: "Tenemos 2 opciones de envío: retiro en sucursal (pagás el total en efectivo al retirar, 7 a 10 días hábiles) o envío a domicilio prepago con ${prepayMeans(isMpEnabled(dependencies.config))} (más rápido, 4 días hábiles). Ambos gratis."${isMpEnabled(dependencies.config) ? '' : ' 🛑 El pago con tarjeta está fuera de servicio en estos días: NO lo ofrezcas ni lo menciones.'}. Si pregunta tiempos: "Los envíos se realizan cuanto antes. Si retirás en sucursal, 7 a 10 días hábiles; si lo pagás antes (a domicilio), sale más rápido y llega en 4 días hábiles.". Si pregunta contraindicaciones: "Es un producto 100% natural...". Nunca lo obligues a dar los datos bruscamente, respondé su duda con muchísima calidez, y cerrá sutilmente preguntando: "¿Te parece que lo dejemos anotado?" o "¿Te tomo los datos?".\n\nEXCEPCIÓN CRÍTICA - HESITACIÓN TIPO "TE AVISO": Si el cliente dice "luego te escribo", "te confirmo después", o "lo pienso y te aviso": NO LO ACEPTES A LA PRIMERA. Respondé directo ofreciendo postdatar: "¡Dale! Igual, si querés te lo dejamos agendado para la fecha que vos prefieras y lo despacho ese día. ¿A partir de qué día te queda cómodo recibirlo?". PROHIBIDO mencionar "congelar precio" / "congelar promo".`;
     }
 
     const aiData = await aiService.chat(text, {
@@ -490,7 +478,7 @@ async function _handleSafetyNet(
     if (currentState.addressAttempts < 2 || hasAddressPatterns) return null;
 
     logger.info(`[AI-SAFETY-NET] waiting_data: Message doesn't look like address for ${userId}: "${text}". Trying AI fallback before pausing.`);
-    const safetyGoal = `El usuario NO está dando datos de envío, sino que hace una pregunta o comentario. Respondé su pregunta con empatía usando el Knowledge. Si pregunta sobre la función del producto o qué hace: "La Nuez de la India ayuda a acompañar el proceso natural del cuerpo para eliminar excesos. Muchas personas notan menos hinchazón, más liviandad y un descenso progresivo de peso. Es un apoyo natural para sentirte mejor sin métodos agresivos." Si pregunta sobre dieta/comidas/si tiene que cuidarse: "La Nuez de la India puede utilizarse sin hacer dietas estrictas, porque ayuda a acompañar el proceso natural del metabolismo. Obviamente, si además cuidás un poco la alimentación o sumás algo de movimiento, los resultados suelen verse más rápido." Si pregunta dónde queda la oficina/local/de dónde son: "Somos Herbalis, una empresa internacional especializada en productos naturales a base de Nuez de la India. Nuestra central está en Barcelona (España) y en Argentina distribuimos desde Rosario: ahí y hasta 60 km entregamos con reparto propio y pago al recibir. Al resto del país enviamos hace 13 años por Correo Argentino, sin costo." Si pregunta por contraindicaciones: "Es 100% natural. Las únicas contraindicaciones son embarazo y lactancia." Si pregunta sobre envíos, tiempos o formas de pago: ${_shippingAnswerForGoal(currentState, isMpEnabled(dependencies.config))}. Para CUALQUIER OTRA pregunta, respondé con naturalidad usando el Knowledge. Al final, cerrá sutilmente retomando los datos de envío: "¿Te paso a tomar los datos para el envío?" o "¿Me pasás los datos de envío?".`;
+    const safetyGoal = `El usuario NO está dando datos de envío, sino que hace una pregunta o comentario. Respondé su pregunta con empatía usando el Knowledge. Si pregunta sobre la función del producto o qué hace: "La Nuez de la India ayuda a acompañar el proceso natural del cuerpo para eliminar excesos. Muchas personas notan menos hinchazón, más liviandad y un descenso progresivo de peso. Es un apoyo natural para sentirte mejor sin métodos agresivos." Si pregunta sobre dieta/comidas/si tiene que cuidarse: "La Nuez de la India puede utilizarse sin hacer dietas estrictas, porque ayuda a acompañar el proceso natural del metabolismo. Obviamente, si además cuidás un poco la alimentación o sumás algo de movimiento, los resultados suelen verse más rápido." Si pregunta dónde queda la oficina/local/de dónde son: "Somos Herbalis, una empresa internacional especializada en productos naturales a base de Nuez de la India. Nuestra central está en Barcelona (España) y en Argentina distribuimos desde Rosario. NO tenemos revendedores. Hace 13 años enviamos a todo el país por Correo Argentino, con envío sin costo y la posibilidad de pago al recibir." Si pregunta por contraindicaciones: "Es 100% natural. Las únicas contraindicaciones son embarazo y lactancia." Si pregunta sobre envíos o si tienen día especial: "Los envíos se realizan cuanto antes, sin día especial. Si retirás en sucursal, tardan 7 a 10 días hábiles; si lo pagás antes (a domicilio), sale más rápido y llega en 4 días hábiles." Si pregunta formas de pago: "Depende de cómo lo recibís: si lo retirás en una sucursal del Correo, pagás el total en efectivo al retirar (el Correo solo acepta efectivo, 7 a 10 días hábiles); si lo querés a domicilio, se abona antes con ${prepayMeans(isMpEnabled(dependencies.config))} y al estar pago llega más rápido, en 4 días hábiles. Los dos envíos son gratis."${isMpEnabled(dependencies.config) ? '' : ' 🛑 El pago con tarjeta está fuera de servicio en estos días: NO lo ofrezcas ni lo menciones.'} Para CUALQUIER OTRA pregunta, respondé con naturalidad usando el Knowledge. Al final, cerrá sutilmente retomando los datos de envío: "¿Te paso a tomar los datos para el envío?" o "¿Me pasás los datos de envío?".`;
     try {
         const safetyAiData = await aiService.chat(text, {
             step: FlowStep.WAITING_DATA,
@@ -795,115 +783,6 @@ function _orderPriceCoherent(state: UserState): boolean {
     return norm(it.price) === norm(_getPrice(it.product, it.plan));
 }
 
-// Frase de envío/pago para los goals de la IA de este step, según cómo le llega
-// el pedido a ESTE cliente (modelo por zona, sep-2026).
-function _shippingAnswerForGoal(state: UserState, mpOn: boolean): string {
-    if (state.shippingChoice === 'reparto') {
-        return '"Te lo llevamos nosotros a tu casa sin costo y lo pagás al recibirlo, en efectivo, tarjeta o transferencia. Antes te escribimos para acordar día y horario." (NO hables de Correo, sucursal ni prepago: es zona de reparto propio)';
-    }
-    const donde = state.shippingChoice === 'retiro' ? 'a la sucursal más cercana a tu código postal' : 'a tu domicilio';
-    return `"Va por Correo Argentino sin costo, ${donde}; al estar pago sale enseguida y llega en 4 días hábiles." (fuera de Rosario y 60 km NO hay pago al recibir; el prepago es con ${mpOn ? 'tarjeta de crédito o transferencia' : 'transferencia — 🛑 el pago con tarjeta está fuera de servicio: NO lo menciones'})`;
-}
-
-// --- Helper: Reparto propio (Rosario y 60 km) — nombre + calle y cierre ---
-// Espejo de _handleRetiroData para la zona de reparto (sep-2026): la localidad
-// ya la dio en waiting_zone, así que solo faltan nombre y calle y número. Sin
-// validación por Maps: el equipo de envíos coordina día y horario por teléfono
-// y confirma la dirección ahí. Paga al recibir → el bot cierra solo (orden
-// 'Confirmado' + aviso al admin), igual que hacía con el retiro contrarreembolso.
-export async function _handleRepartoData(
-    userId: string, text: string, normalizedText: string,
-    currentState: UserState, knowledge: any, dependencies: any
-): Promise<{ matched: boolean } | null> {
-    const { sendMessageWithDelay, aiService, saveState } = dependencies;
-    if (currentState.shippingChoice !== 'reparto') return null;
-
-    if (!currentState.partialAddress) currentState.partialAddress = {};
-    const addr = currentState.partialAddress;
-    if (addr.calle === 'A sucursal') addr.calle = undefined;
-
-    const already = !!(addr.nombre && addr.calle);
-
-    // Contesta la oferta de agendar con una fecha ("después del 5"): se anota y se
-    // piden los datos que faltan. Antes el bot le volvía a ofrecer agendar como si
-    // no hubiera contestado y nunca pedía los datos (caso 5493364634777).
-    if (!already) {
-        const pd = (_detectPostdatado(normalizedText) || '').trim();
-        const lastBot: any = [...(currentState.history || [])].reverse().find((h: any) => h && h.role === 'bot');
-        const offeredSchedule = !!lastBot && /agend|program|postdat|a partir de (qu[eé]|cu[aá]ndo)|qu[eé] (d[ií]a|fecha)|para (qu[eé]|la) fecha/i.test(String(lastBot.content || ''));
-        // Fechas que se entienden solas, y las cortas ("el 10") solo si el bot
-        // acababa de ofrecer agendar. "cobro el 5" no entra: lo contesta la IA
-        // con el argumento de pagar al recibir.
-        const explicitDate = /^(despu[eé]s del|a partir del)\s+\d{1,2}$|^\d{1,2}\s+de\s+[a-z]+$|^(principio|fin|final|fines|mediados)\s+de\s+mes$/i.test(pd);
-        const shortDate = /^(el|del|para el)\s+\d{1,2}$|^(la\s+)?(quincena|mes\s+que\s+viene|pr[oó]ximo\s+mes)$/i.test(pd);
-        const concreteDate = explicitDate || (shortDate && offeredSchedule);
-        const bringsStreet = /\d{3,5}/.test(text) || /\b(calle|av|avenida|barrio)\b/i.test(normalizedText);
-        if (concreteDate && !bringsStreet) {
-            currentState.postdatado = pd;
-            const faltan = [!addr.nombre && '*nombre completo*', !addr.calle && '*calle y número*'].filter(Boolean).join(' y ');
-            const fecha = pd.replace(/^para\s+/i, '').replace(/^despues\b/i, 'después').replace(/^(mes que viene|pr[oó]ximo mes)$/i, 'el $1');
-            saveState(userId);
-            await sendMessageWithDelay(userId, `¡Listo! Lo dejamos agendado para *${fecha}* 📅 No pagás nada hasta recibirlo. Para dejarlo cargado pasame tu ${faltan} 🙌`);
-            logger.info(`[REPARTO-DATA] ${userId} agendó la entrega para "${pd}" — pido ${faltan}.`);
-            return { matched: true };
-        }
-    }
-
-    const looksLikeData = /\d/.test(text) || /\n/.test(text) || text.trim().split(/\s+/).length >= 2;
-    let progressed = false;
-    if (!already && looksLikeData) {
-        try {
-            const parsed = await (dependencies.mockAiService || aiService).parseAddress(text);
-            if (parsed && !parsed._error) {
-                if (parsed.nombre && !addr.nombre) { addr.nombre = parsed.nombre; if (!currentState.userName) currentState.userName = parsed.nombre; progressed = true; }
-                if (parsed.calle && !addr.calle) { addr.calle = parsed.calle; progressed = true; }
-                if (parsed.ciudad && !addr.ciudad) { addr.ciudad = parsed.ciudad; progressed = true; }
-                if (parsed.cp && !addr.cp) { addr.cp = parsed.cp; progressed = true; }
-                if (parsed.provincia && !addr.provincia) addr.provincia = parsed.provincia;
-            }
-        } catch (e: any) {
-            logger.warn(`[REPARTO-DATA] parseAddress falló para ${userId}: ${e.message}`);
-        }
-    }
-
-    if (addr.nombre && addr.calle) {
-        if (!currentState.cart || currentState.cart.length === 0) {
-            const product = currentState.selectedProduct;
-            const plan = currentState.selectedPlan || '60';
-            const price = _getPrice(product, plan);
-            currentState.cart = [{ product, plan, price } as any];
-        }
-        currentState.pendingOrder = {
-            ...addr,
-            calleOriginal: addr.calle,
-            cart: currentState.cart,
-        } as any;
-        const total = currentState.cart.reduce((sum: number, i: any) => sum + parseInt(i.price.toString().replace(/\./g, '')), 0);
-        currentState.totalPrice = _formatPrice(total);
-        currentState.partialAddress = {} as any;
-        currentState.fieldReaskCount = {};
-        if (!_orderPriceCoherent(currentState)) {
-            logger.error(`[ORDER-COHERENCE] ${userId}: cart precio≠plan ${JSON.stringify(currentState.cart)} — pauso en vez de confirmar.`);
-            await _pauseAndAlert(userId, currentState, dependencies, text, '⚠️ Orden incoherente (plan/precio no coinciden). Revisión manual antes de confirmar.');
-            return { matched: true };
-        }
-        if (!currentState.paymentMethod) currentState.paymentMethod = 'contrarembolso';
-        await _closeSaleAndNotify(userId, currentState, knowledge, dependencies);
-        logger.info(`[REPARTO-DATA] Venta de reparto propio CERRADA por el bot para ${userId}: ${addr.nombre} / ${addr.calle} / ${currentState.pendingOrder?.ciudad || '?'}.`);
-        return { matched: true };
-    }
-
-    if (progressed) {
-        const missing: string[] = [];
-        if (!addr.nombre) missing.push('Nombre y apellido');
-        if (!addr.calle) missing.push('Calle y número');
-        saveState(userId);
-        await sendMessageWithDelay(userId, `¡Genial! Para el reparto me falta: *${missing.join(', ')}* 🙌`);
-        return { matched: true };
-    }
-    return null;
-}
-
 // --- Helper: Retiro en sucursal — captura robusta de datos + armado de orden ---
 // El retiro solo necesita nombre + ciudad + CP (la calle no aplica: queda 'A
 // sucursal'). El flujo normal de waiting_data está pensado para domicilio y, si
@@ -981,20 +860,7 @@ export async function _handleRetiroData(
             await _pauseAndAlert(userId, currentState, dependencies, text, '⚠️ Orden incoherente (plan/precio no coinciden). Revisión manual antes de confirmar.');
             return { matched: true };
         }
-        // Modelo por zona (sep-2026): el retiro va prepago. Cerramos solo si el
-        // pago está verificado (MP approved) o es un retiro contrarreembolso viejo;
-        // con transferencia sin verificar mandamos el resumen y esperamos, igual
-        // que el domicilio. NUNCA cerrar sin pago verificado (venta fantasma).
-        const paid = currentState.paymentMethod === 'contrarembolso'
-            || (currentState.paymentMethod === 'mercadopago' && ((currentState as any).mpStatus === 'approved' || !!currentState.senaPaid));
-        if (!paid) {
-            const summaryMsg = buildConfirmationMessage(currentState, knowledge);
-            _setStep(currentState, FlowStep.WAITING_FINAL_CONFIRMATION);
-            saveState(userId);
-            await sendMessageWithDelay(userId, summaryMsg);
-            logger.info(`[RETIRO-DATA] Datos de sucursal completos para ${userId} con pago sin verificar (${currentState.paymentMethod}) — resumen y espera.`);
-            return { matched: true };
-        }
+        // Retiro/COD: el bot cierra la venta solo (sin pago anticipado que verificar).
         await _closeSaleAndNotify(userId, currentState, knowledge, dependencies);
         logger.info(`[RETIRO-DATA] Venta de retiro CERRADA por el bot para ${userId}: ${addr.nombre} / ${addr.ciudad} / CP ${addr.cp}.`);
         return { matched: true };
@@ -1105,11 +971,6 @@ export async function handleWaitingData(
     // 3. Sucursal intent
     const sucursalResult = await _handleSucursalIntent(userId, normalizedText, currentState, dependencies);
     if (sucursalResult) return sucursalResult;
-
-    // 3.4 Reparto propio (Rosario y 60 km): nombre + calle y cierre. Antes que el
-    // retiro y que la clasificación, por el mismo motivo que 3.5.
-    const repartoResult = await _handleRepartoData(userId, text, normalizedText, currentState, knowledge, dependencies);
-    if (repartoResult) return repartoResult;
 
     // 3.5 Retiro en sucursal: captura robusta de datos (nombre+ciudad+CP) y armado
     // de la orden, sin depender de la clasificación de domicilio (que perdía los

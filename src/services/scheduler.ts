@@ -42,17 +42,11 @@ interface SchedulerDependencies {
     [key: string]: any;
 }
 
-// waiting_zone y waiting_payment_method entraron el 2026-09-17: con el guion por
-// zona son el paso siguiente a elegir el plan, y quien no contestaba "¿de qué
-// localidad sos?" no recibía ningún recordatorio (5 leads con plan elegido en
-// las primeras 48 h del V8).
 const RE_ENGAGEABLE_STEPS = new Set([
     'waiting_weight',
     'waiting_preference',
     'waiting_price_confirmation',
     'waiting_plan_choice',
-    'waiting_zone',
-    'waiting_payment_method',
     'waiting_ok',
     'waiting_data',
     'waiting_mp_payment',
@@ -126,29 +120,14 @@ function _withName(msg: string, state: UserState): string {
     return msg.replace(/^(¡?hola)(!?)/i, `$1, ${firstName}$2`);
 }
 
-/**
- * Recordatorio de datos para el reparto propio (Rosario y 60 km): nombra solo lo
- * que falta de nombre + calle y recuerda que paga al recibir. El texto genérico
- * de waiting_data pide "nombre, dirección, ciudad, CP", que en la zona no hacen
- * falta (la localidad ya la dio y no hay código postal que pedir).
- */
-function _repartoDataFollowUps(state: UserState): string[] {
-    const addr: any = state.partialAddress || {};
-    const faltan = [!addr.nombre && 'tu nombre completo', !addr.calle && 'la calle y número'].filter(Boolean).join(' y ') || 'tus datos';
-    return [
-        `¡Hola! 😊 Para llevártelo solo me falta ${faltan}. No pagás nada ahora: lo pagás cuando te lo entregamos 🚚 ¿Me lo pasás?`,
-        `Hola 👋 Te escribo por tu pedido: me falta ${faltan} para coordinar la entrega. Lo pagás al recibirlo, en efectivo, tarjeta o transferencia 📦`,
-    ];
-}
-
 /** Contextual messages by abandon reason (for abandoned cart + cold lead recovery) */
 const ABANDON_REASON_MESSAGES: Record<string, string[]> = {
     payment_timing: [
-        '¡Hola! 😊 Una cosa importante: si sos de Rosario o alrededores no pagás nada por adelantado, te lo llevamos nosotros y lo pagás *cuando lo recibís*. ¿Seguimos?',
-        'Hola 👋 Si te queda más cómodo, te lo agendo para la fecha que cobrás y lo despacho recién ese día. ¿Te tomamos los datos? 📦',
+        '¡Hola! 😊 Una cosa importante: tenemos retiro en sucursal — dejás el paquete en una sucursal de Correo Argentino cerca tuyo y pagás el total *en efectivo cuando lo retirás*. No pagás nada por adelantado. ¿Seguimos?',
+        'Hola 👋 Si te queda más cómodo, podés elegir *retiro en sucursal*: pagás recién cuando vas a buscarlo. ¿Te tomamos los datos? 📦',
     ],
     hesitation: [
-        '¡Hola! 😊 Sin apuro. El envío es gratis a todo el país: en Rosario y alrededores te lo llevamos nosotros, y al resto va por Correo Argentino y llega en *4 días hábiles*. ¿Avanzamos cuando quieras?',
+        '¡Hola! 😊 Sin apuro. El envío tarda *7 a 10 días hábiles* por Correo Argentino, y más rápido —4 días— si lo pagás por adelantado. ¿Avanzamos cuando quieras?',
         'Hola 👋 Si te quedó alguna duda para decidir, contame y te ayudo. Y si querés, te lo puedo agendar para la fecha que te quede cómoda 😊',
     ],
     objection: [
@@ -181,14 +160,6 @@ const CONTEXTUAL_FOLLOW_UPS: Record<string, string[]> = {
     'waiting_plan_choice': [
         '¡Hola! 😊 ¿Pudiste revisar los tratamientos? Avisame si querés arrancar con el de 60 o el de 120 días.',
         'Hola 👋 Te escribo cortito por si te quedó alguna duda con los planes. ¿Con cuál te gustaría avanzar?'
-    ],
-    'waiting_zone': [
-        '¡Hola! 😊 Me quedó pendiente de qué localidad sos, así te digo cómo te llega. Si sos de Rosario o alrededores te lo llevamos nosotros y lo pagás cuando lo recibís 🚚',
-        'Hola 👋 Para armarte el envío solo me falta saber de qué ciudad o pueblo sos. ¿Me contás? 📦'
-    ],
-    'waiting_payment_method': [
-        '¡Hola! 😊 ¿Pudiste ver lo del envío? Te lo mandamos sin costo por Correo Argentino y llega en 4 días hábiles. ¿Seguimos?',
-        'Hola 👋 Te escribo por tu pedido: ¿te ayudo con algo para terminarlo? El envío es sin costo y llega en 4 días hábiles 📦'
     ],
     'waiting_ok': [
         '¡Hola! 😊 Tengo anotado tu producto pero me faltó tu confirmación para armar el pedido. ¿Avanzamos?',
@@ -379,9 +350,7 @@ async function checkAbandonedCarts(sharedState: SchedulerSharedState, dependenci
         // Contextual message: first check abandon reason, fall back to step-specific
         const reason = _detectAbandonReason(state);
         const reasonMessages = ABANDON_REASON_MESSAGES[reason];
-        const stepMessages = (state.step === 'waiting_data' && state.shippingChoice === 'reparto')
-            ? _repartoDataFollowUps(state)
-            : CONTEXTUAL_FOLLOW_UPS[state.step];
+        const stepMessages = CONTEXTUAL_FOLLOW_UPS[state.step];
         const pool = (reason !== 'generic' ? reasonMessages : null) || stepMessages || ABANDON_REASON_MESSAGES.generic;
         const { msg: rawMsg, variantIndex } = _pickVariant(pool);
         const msg = _withName(rawMsg, state);
@@ -1007,7 +976,7 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
         // una vez y dejamos el stage en 1, para que el stage 2 lo escale al
         // vendedor a las 4h si no contesta. (stage 99 = "no molestar más".)
         if (!mpOn && mpReminderStage < 2 && mpReminderStage !== 99 && !(state as any).mpAlternativeOffered) {
-            const msg = `¡Hola! 👋 Te aviso que el *pago con tarjeta* lo tenemos fuera de servicio en estos días, así que ese link no te va a andar 🙈 Disculpá.\n\nLo resolvemos por *transferencia bancaria*: alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*. Apenas se acredita, el pedido sale 📦\n\n¿Seguimos así?`;
+            const msg = `¡Hola! 👋 Te aviso que el *pago con tarjeta* lo tenemos fuera de servicio en estos días, así que ese link no te va a andar 🙈 Disculpá.\n\nLo resolvemos por otro lado:\n\n💸 *Transferencia bancaria* — al alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*\n🏪 *Retiro en sucursal* — lo retirás en una sucursal de Correo Argentino cerca tuyo y pagás el total en efectivo al retirar (sin adelantar nada)\n\n¿Cuál te queda más cómoda?`;
             try {
                 const sent = await sendMessageWithDelay(userId, msg, undefined, stillWaitingMp);
                 if (sent) {
@@ -1042,12 +1011,12 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
             continue;
         }
 
-        // Stage 1.5: 90 minutos sin pagar — ofrecer la alternativa (transferencia)
+        // Stage 1.5: 90 minutos sin pagar — ofrecer alternativas (transferencia/COD)
         // antes de escalar a vendedor a las 4h. Idea: rescatar la venta de quien
         // no completó MP por razones técnicas (no tiene tarjeta a mano, problema
         // con el link, etc.). Una sola vez vía flag mpAlternativeOffered.
         if (mpReminderStage === 1 && !(state as any).mpAlternativeOffered && minsSince >= 90) {
-            const msg = `¡Hola! 👋 Si tuviste alguna dificultad con el link de pago, no hay drama 😊\n\nPodés pagar por *transferencia bancaria* al alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*, y apenas se acredita sale el envío 📦\n\n¿Te queda más cómodo así, o seguimos con la tarjeta de crédito?`;
+            const msg = `¡Hola! 👋 Si tuviste alguna dificultad con el link de pago, no hay drama 😊\n\nTenés dos alternativas:\n\n💸 *Transferencia bancaria* — al alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*\n🏪 *Retiro en sucursal* — lo retirás en una sucursal de Correo Argentino cerca tuyo y pagás el total en efectivo al retirar (sin anticipo previo)\n\n¿Te queda más cómoda alguna de estas, o seguimos con la tarjeta de crédito?`;
             try {
                 const sent = await sendMessageWithDelay(userId, msg, undefined, stillWaitingMp);
                 if (sent) {
