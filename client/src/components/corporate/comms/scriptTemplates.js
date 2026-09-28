@@ -25,15 +25,12 @@ export function formatScriptMessage(text, { chat, prices }) {
         .replace(/{{TOTAL}}/g, total ? total : '0');
 
     // Datos bancarios y entrega standard.
-    // POSTDATADO_LINE: muestra la entrega estándar por Correo (4 días hábiles,
-    // prepago). Para el preview no contamos con state.postdatado — el server lo
-    // resuelve en runtime (y en reparto propio la línea va vacía).
+    // POSTDATADO_LINE: muestra entrega standard (7-10 días). Para el preview
+    // no contamos con state.postdatado — el server lo resuelve en runtime.
     result = result
         .replace(/{{ALIAS}}/g, BANK_ALIAS)
         .replace(/{{TITULAR}}/g, BANK_HOLDER)
-        .replace(/{{POSTDATADO_LINE}}/g, '✔ Entrega estimada: 4 días hábiles desde la confirmación\n')
-        .replace(/{{ENVIO_LINE}}/g, '✔ Correo Argentino — envío a domicilio\n')
-        .replace(/{{LOCALIDAD}}/g, 'tu localidad')
+        .replace(/{{POSTDATADO_LINE}}/g, '✔ Entrega estimada: 7 a 10 días hábiles desde la confirmación\n')
         .replace(/{{LINK}}/g, '(link se genera al confirmar el pago)');
 
     // Sweep defensivo: cualquier {{X}} residual queda invisible en el preview
