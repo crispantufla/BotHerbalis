@@ -65,7 +65,8 @@ Máquina de estados lineal con fallbacks a IA. Orden típico:
   localidad (`waiting_zone`, reparto propio en Rosario). Se volvió al menú retiro/domicilio. Los
   estados que quedaron a mitad (`waiting_zone`, o `shippingChoice='reparto'` en datos) vuelven a
   `waiting_payment_method` en `processStep` (`src/flows/steps/index.ts`). El código V8 está en
-  los commits `31cfd17` y `85b1f98`.
+  los commits `31cfd17` y `85b1f98`; los arreglos de `85b1f98` que no eran de la zona se
+  trajeron de vuelta (`tests/sep17_fixes_v7.test.js`).
 - `processGlobals` corre antes de cada step — maneja cancelaciones, seguimiento, cliente recurrente, etc.
 - Cada step devuelve `{ matched: boolean }`. Si no matchea, cae a IA vía `dependencies.aiService.chat()` con un `goal` específico al step.
 - El AI devuelve `{ goalMet, response, extractedData }`. `extractedData` es un string con tags tipo `POSTDATADO: 2026-05-20` que el step parsea con regex.
@@ -86,7 +87,7 @@ Máquina de estados lineal con fallbacks a IA. Orden típico:
 - **Guion guardado vs guion del repo**: `stateManager.loadKnowledge` prefiere la copia de
   `DATA_DIR/knowledge_v7_<seller>.json` si existe; si `meta.version` del repo es más nueva que la
   de la copia, gana el repo y la copia queda como `.bak`. Al cambiar el guion, subir
-  `meta.version`, o prod sigue con el viejo (por eso el V7 restaurado lleva 8.2: la copia de prod
+  `meta.version`, o prod sigue con el viejo (por eso el V7 restaurado lleva 8.2 o más: la copia de prod
   podía ser 8.x). La versión y una huella de `prices.json` son parte del namespace del cache
   semántico (`_cacheContentTag` en `ai.ts`).
 - **Pausas NO se auto-liberan**. Un user pausado con `pauseReason` requiere intervención manual del admin. Si un outage (ej: OpenAI 429) pausa users, hay que despausarlos a mano. Única excepción: al arrancar, `restorePausedUsersFromDB` borra las pausas de más de 7 días (`STALE_PAUSE_DAYS` en `pauseService.ts`).
@@ -118,7 +119,7 @@ Máquina de estados lineal con fallbacks a IA. Orden típico:
 - `npm run dev` — concurrente server (tsx watch en index.ts) + client (vite)
 - `npm run dev:server` — solo server (sin watch)
 - `npm start` — producción: `prisma generate && migrate deploy && tsx index.ts`
-- `npm test` — Jest. Suite verde (43 suites, 561 tests; 1 suite skipped es la `.live`). Corre contra la DB de prod (`DATABASE_URL` del `.env` apunta a Railway), así que **ninguna suite puede escribir**: si el código bajo test escribe, el test mockea `../db`. Hasta el 2026-09-13 `web_order_notify.test.js` no lo hacía y dejó una pausa real en prod. **Solo V7**: las suites acopladas a `archive/knowledge_v3.json`/v4 (simulaciones, recommendation, multi_product, salesFlow, etc.) se retiraron el 2026-05-31 — testeaban un guion muerto. Cobertura de flujo V7: `sena_flow_smoke.test.js` + `payment_flow.test.js`; el resto cubre utilidades (address, pricing, objection escalation, order flow). Pendiente: rehacer un harness de simulación contra V7. Para refactors hay tests de caracterización: `message_handler.test.js` y `ai_chat_payloads.test.js` graban una traza de efectos (`MH_TRACE_FILE` / `AI_TRACE_FILE`) para comparar byte a byte antes y después de mover código.
+- `npm test` — Jest. Suite verde (44 suites, 576 tests; 1 suite skipped es la `.live`). Corre contra la DB de prod (`DATABASE_URL` del `.env` apunta a Railway), así que **ninguna suite puede escribir**: si el código bajo test escribe, el test mockea `../db`. Hasta el 2026-09-13 `web_order_notify.test.js` no lo hacía y dejó una pausa real en prod. **Solo V7**: las suites acopladas a `archive/knowledge_v3.json`/v4 (simulaciones, recommendation, multi_product, salesFlow, etc.) se retiraron el 2026-05-31 — testeaban un guion muerto. Cobertura de flujo V7: `sena_flow_smoke.test.js` + `payment_flow.test.js`; el resto cubre utilidades (address, pricing, objection escalation, order flow). Pendiente: rehacer un harness de simulación contra V7. Para refactors hay tests de caracterización: `message_handler.test.js` y `ai_chat_payloads.test.js` graban una traza de efectos (`MH_TRACE_FILE` / `AI_TRACE_FILE`) para comparar byte a byte antes y después de mover código.
 - `npx prisma migrate dev --name <x>` — nueva migración
 - `railway logs --lines 300` — logs de producción
 

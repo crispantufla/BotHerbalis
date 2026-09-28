@@ -108,12 +108,16 @@ function _detectAbandonReason(state: UserState): 'payment_timing' | 'hesitation'
  * _withName
  * Personalizes a message by inserting the user's first name after the greeting.
  * e.g. "¡Hola! 😊 ..." → "¡Hola, María! 😊 ..."
+ * El nombre va antes del "!" y del emoji. La versión anterior usaba una clase
+ * `[👋😊]` sin flag `u`, que matchea media unidad UTF-16: partía el emoji y el
+ * cliente recibía "¡Hola! � Acosta,� Solo me faltaban…" (sep-2026).
  */
 function _withName(msg: string, state: UserState): string {
-    const fullName = state.userName || state.partialAddress?.nombre;
+    const fullName = (state.userName || state.partialAddress?.nombre || '').trim();
     if (!fullName) return msg;
-    const firstName = fullName.split(' ')[0];
-    return msg.replace(/^(¡?hola[!]?\s*[👋😊]?)/i, `$1 ${firstName},`);
+    const first = fullName.split(/\s+/)[0];
+    const firstName = first.charAt(0).toUpperCase() + first.slice(1);
+    return msg.replace(/^(¡?hola)(!?)/i, `$1, ${firstName}$2`);
 }
 
 /** Contextual messages by abandon reason (for abandoned cart + cold lead recovery) */

@@ -176,8 +176,13 @@ function _classifyMessage(text: string, normalizedText: string): MessageClassifi
         || /\b(no puedo comprar|no puedo ahora|ahora no puedo|ahora no|no tengo plata|no tengo la plata|no tengo dinero|no tengo el dinero|no me alcanza|semana que viene)\b/i.test(normalizedText);
 
     const cleanText = normalizedText.replace(/[.,;?!]/g, ' ');
+    // "Cuando tenga el dinero le mando dire" y "voy a hacer la compra en los
+    // próximos días cuando tenga el dinero" no entraban: sin "dinero" en la lista,
+    // el bot re-pedía los datos en vez de ofrecer agendar (casos 5493417504028 y
+    // 5493364634777, 15-sep-2026).
     const isPaymentTiming = /\b(no cobro|cobro el|cobro a|cobro la|cuando cobre|hasta que cobre|sueldo|quincena|cobrar|depositan|depósito|deposito|me pagan|me depositan)\b/i.test(cleanText)
-        || (/\b(cobro|pago|sueldo|plata|efectivo)\b/i.test(cleanText) && /\b(todavía|aun|aún|después|despues|próximo|proximo|el \d+|fin de mes)\b/i.test(cleanText));
+        || /\bcuando (tenga|junte|consiga) (el |la )?(dinero|plata|efectivo)\b/i.test(cleanText)
+        || (/\b(cobro|pago|sueldo|plata|dinero|efectivo)\b/i.test(cleanText) && /\b(todavía|todavia|aun|aún|después|despues|próximo|proximo|próximos|proximos|el \d+|fin de mes)\b/i.test(cleanText));
 
     const isObjectionOrComment = /\b(resultado|miedo|desconfianza|seguro|funciona|funcionará|efecto|rebote|garantía|garantia|probar|probando|duda|dudas|riesgo)\b/i.test(normalizedText)
         || /\b(si me va bien|si me funciona|si resulta|mas adelante|despues compro|luego compro)\b/i.test(normalizedText);

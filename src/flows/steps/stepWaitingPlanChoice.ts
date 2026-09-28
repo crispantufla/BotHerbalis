@@ -170,8 +170,12 @@ export async function handleWaitingPlanChoice(
 
     // PRE-GUARD: If the user says exactly "el de 60", "plan de 60", "quiero el 60", bypass the question guard
     // for the plan selection (we still want AI to answer the question, but we lock the cart first)
-    const strictPlanMatch = normalizedText.match(/\b(el de|plan de|quiero el|opcion de|promo de)\s*(60|120|180|240|300|360|420|480|540|600)\b/i);
-    const planMatch = normalizedText.match(/\b(60|120|180|240|300|360|420|480|540|600)\b/);
+    // "60dias", "x 60dias", "60ndias": con el número pegado a la palabra no hay
+    // límite de palabra y el plan caía a la IA (casos 5493417504028 y 5493445430402).
+    const planText = normalizedText.replace(/(\d)([a-z])/gi, '$1 $2');
+
+    const strictPlanMatch = planText.match(/\b(el de|plan de|quiero el|opcion de|promo de)\s*(60|120|180|240|300|360|420|480|540|600)\b/i);
+    const planMatch = planText.match(/\b(60|120|180|240|300|360|420|480|540|600)\b/);
 
     // Semantic shortcuts — captura formas naturales sin necesidad de IA.
     // El plan "recomendado" en los mensajes es siempre el 120 (envío bonificado).
@@ -186,17 +190,21 @@ export async function handleWaitingPlanChoice(
     const semantic60Strict = /\b(el (de )?(?:60|sesenta|dos meses|2 meses)|plan (de )?(?:60|dos meses|2 meses)|dos meses|2 meses|el de dos|el de 2|el de inicio|arrancamos con (el )?60|empiezo con (el )?60|el corto)\b/i;
     const semantic120Weak = /\b(?:el|al)\s+(?:m[áa]s\s+)?(largo|grande|completo|recomendado|caro|bonificado)\b/i;
     const semantic60Weak = /\b(?:el|al)\s+(?:m[áa]s\s+)?(chico|barato|inicial|peque[ñn]o)\b/i;
-    const has120Strict = semantic120Strict.test(normalizedText);
-    const has60Strict = semantic60Strict.test(normalizedText);
+    const has120Strict = semantic120Strict.test(planText);
+    const has60Strict = semantic60Strict.test(planText);
     // Los "weak" matcheán cuando hay verbo de elección, O cuando el mensaje es
     // corto (≤4 palabras): "el más barato" solo casi siempre es elección de plan.
     const hasVerb = planVerbAnchor.test(normalizedText);
     const wordCount = normalizedText.trim().split(/\s+/).length;
     const isShortReply = wordCount <= 4;
-    const has120Weak = (hasVerb || isShortReply) && semantic120Weak.test(normalizedText);
-    const has60Weak = (hasVerb || isShortReply) && semantic60Weak.test(normalizedText);
-    const has120 = has120Strict || has120Weak;
-    const has60 = has60Strict || has60Weak;
+    const has120Weak = (hasVerb || isShortReply) && semantic120Weak.test(planText);
+    const has60Weak = (hasVerb || isShortReply) && semantic60Weak.test(planText);
+    // Preguntar por la duración no es elegir: "¿Ese será dos meses?" armaba el
+    // carrito de 60 (caso 5493400497043). Con "?" y sin verbo de elección, los
+    // atajos semánticos no cuentan y contesta la IA.
+    const semanticAllowed = !text.includes('?') || hasVerb;
+    const has120 = semanticAllowed && (has120Strict || has120Weak);
+    const has60 = semanticAllowed && (has60Strict || has60Weak);
 
     if (strictPlanMatch && !isVeryLongMessage) {
         selectedPlanId = strictPlanMatch[2];
@@ -252,7 +260,13 @@ export async function handleWaitingPlanChoice(
             || (recentBotMessages.includes('120') && !recentBotMessages.includes('60'))
             || (recentBotMessages.includes('120') && recentBotMessages.includes('recomen'));
 
-        if (isAffirmative && aiRecommended120) {
+        // "Ah bueno gracias" o "genial, muchas gracias" después de la recomendación
+        // es un acuse, no una compra: armaba el plan de 120 (caso 5493364210653).
+        // Con un sí explícito ("sí, gracias") sigue contando.
+        const isThanksAck = /\bgracias\b/.test(normalizedText)
+            && !/\b(si|sisi|dale|listo|de una|va|vamos|quiero|lo quiero|me lo llevo)\b/.test(normalizedText);
+
+        if (isAffirmative && aiRecommended120 && !isThanksAck) {
             logger.info(`[FLOW-INTERCEPT] User said OK to 120-day plan upsell/AI recommendation: ${userId}`);
 
             const product = currentState.selectedProduct || "Nuez de la India";

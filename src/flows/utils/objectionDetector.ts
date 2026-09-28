@@ -274,6 +274,18 @@ function _pick<T>(arr: T[]): T {
     return arr[Math.floor(Math.random() * arr.length)];
 }
 
+// El cliente contesta la oferta de agendar con una fecha concreta ("después del
+// 5", "el 10 de octubre"). Es un sí: si lo tratamos como otra postergación, el bot
+// le vuelve a ofrecer agendar y nunca anota la fecha (caso 5493364634777).
+const CONCRETE_DATE = /\b(despues del|a partir del|para el|el)\s+\d{1,2}\b|\b\d{1,2}\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\b|\b(principio|fin|fines|mediados)\s+de(l)?\s+mes\b|\bla quincena\b/;
+const SCHEDULE_OFFER = /agend|program|postdat|a partir de (qu[eé]|cu[aá]ndo)|qu[eé] (d[ií]a|fecha)|para (qu[eé]|la) fecha/i;
+
+function _answersScheduleOffer(normalizedText: string, state: UserState): boolean {
+    if (!CONCRETE_DATE.test(normalizedText)) return false;
+    const lastBot = [...(state.history || [])].reverse().find((h: any) => h && h.role === 'bot');
+    return !!lastBot && SCHEDULE_OFFER.test(String((lastBot as any).content || ''));
+}
+
 /**
  * Try to classify the user's text as a known objection. Returns an
  * `ObjectionMatch` with the appropriate tier (standard / escalated / pause)
@@ -307,6 +319,7 @@ export function detectObjection(
     const viaDeferral = !matchedType && detectPostponeDeferral(normalizedText);
     if (viaDeferral) matchedType = 'postergar';
     if (!matchedType) return null;
+    if (matchedType === 'postergar' && _answersScheduleOffer(normalizedText, state)) return null;
 
     const handled = state.objectionsHandled || {};
     const count = handled[matchedType] || 0;
