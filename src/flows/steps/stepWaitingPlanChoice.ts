@@ -30,7 +30,7 @@ async function _handlePickupIntent(userId: string, text: string, currentState: U
     const reply = 'Te aviso: no tenemos local de venta al público — todos los pedidos van por Correo Argentino con envío gratis 📦\n\nUn asesor te va a contactar enseguida para coordinar la mejor opción (sucursal cerca tuyo o entrega a domicilio) 😊';
     saveState(userId);
     await sendMessageWithDelay(userId, reply);
-    await _pauseAndAlert(userId, currentState, dependencies, text, 'Cliente quiere retirar en persona / es de Rosario. No tenemos local público — admin debe coordinar logística (sucursal Correo o domicilio).');
+    await _pauseAndAlert(userId, currentState, dependencies, text, 'Cliente quiere retirar en persona o pasar a buscar. No tenemos local público — admin debe coordinar logística (sucursal Correo o domicilio).');
     return true;
 }
 

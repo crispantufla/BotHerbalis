@@ -222,6 +222,8 @@ function isRecentBotSend(sends: BotSends, chatIds: string[], msg: any): boolean 
  *
  * Cubierto por tests/manual_chat.test.js.
  */
+const { _isScriptGreeting } = require('../flows/utils/messages');
+
 export function createOutgoingMessageHandler(ctx: {
     sellerId: string;
     client: any;
@@ -283,13 +285,22 @@ export function createOutgoingMessageHandler(ctx: {
             // horacio: "lo que mando desde el móvil no se refleja"). Se loguea como
             // 'admin'. El de-dup de /history (sameRole + body + 60s) evita duplicar
             // con el mensaje que igual trae el fetch en vivo de WhatsApp.
+            let logText = '';
             try {
-                let logText = (msg.body || '').trim();
-                if (!logText && msg.hasMedia) {
-                    if (msg.type === 'image' || msg.type === 'sticker') logText = '📷 Imagen enviada';
+                logText = (msg.body || '').trim();
+                // En remoto el `body` de una imagen trae la miniatura en base64
+                // (JPEG: empieza con "/9j/"), no el epígrafe: en prod había 201
+                // filas de ChatLog de ~7 KB con esa tira, ilegibles en el panel.
+                // Un mensaje con media (o que parezca base64) se registra como
+                // marcador; el epígrafe real se conserva solo si es texto corto.
+                const looksBase64 = /^[A-Za-z0-9+/]{200,}={0,2}$/.test(logText) || logText.startsWith('/9j/');
+                if (msg.hasMedia || looksBase64 || ['image', 'sticker', 'video', 'audio', 'ptt', 'document'].includes(msg.type)) {
+                    const caption = (!looksBase64 && logText && logText.length <= 300) ? `: ${logText}` : '';
+                    if (msg.type === 'image' || msg.type === 'sticker') logText = `📷 Imagen enviada${caption}`;
+                    else if (msg.type === 'video') logText = `🎬 Video enviado${caption}`;
                     else if (msg.type === 'audio' || msg.type === 'ptt') logText = '🎤 Audio enviado';
-                    else if (msg.type === 'document') logText = '📄 Documento enviado';
-                    else logText = '[archivo enviado]';
+                    else if (msg.type === 'document') logText = `📄 Documento enviado${caption}`;
+                    else logText = `[archivo enviado]${caption}`;
                 }
                 // Hora REAL de envío del dispositivo (msg.timestamp viene en
                 // segundos desde whatsapp-web.js). Sin esto el mensaje manual se
@@ -323,6 +334,31 @@ export function createOutgoingMessageHandler(ctx: {
             // retome, se despausa a mano desde el panel.
             if (pausedUsers.has(targetId)) return; // ya pausado, nada que hacer
             const wasBotActive = !!userState[targetId];
+
+            // El vendedor manda a mano el SALUDO del guion (prospección saliente a
+            // números nuevos, 12 en una noche el 7-oct). Antes eso pausaba el chat
+            // como "iniciada por el admin" y cuando el lead contestaba con sus
+            // kilos nadie respondía (8 casos en 48 h). Si el texto es el saludo
+            // del guion y el chat es nuevo (o sigue en el saludo), el bot lo toma
+            // como propio: estado en waiting_weight, saludo en el historial, sin
+            // pausa. Cualquier otro texto manual sigue cediendo el chat.
+            if (_isScriptGreeting(logText, sharedState.knowledge) && (!wasBotActive || ['greeting', 'waiting_weight'].includes(userState[targetId]?.step))) {
+                try {
+                    const { createInitialUserState } = require('../flows/leadClassifier');
+                    const { _pushHistory, _setStep } = require('../flows/utils/flowHelpers');
+                    if (!userState[targetId]) {
+                        userState[targetId] = createInitialUserState({ step: 'waiting_weight', assignedScript: sharedState.config?.activeScript });
+                    } else if (userState[targetId].step === 'greeting') {
+                        _setStep(userState[targetId], 'waiting_weight');
+                    }
+                    _pushHistory(userState[targetId], { role: 'bot', content: logText });
+                    if (typeof sharedState.saveState === 'function') sharedState.saveState(targetId);
+                    logger.info(`[MANUAL-CHAT][${sellerId}] Vendedor mandó a mano el saludo del guion a ${targetId} — el bot lo toma como propio (waiting_weight, sin pausa)`);
+                } catch (e: any) {
+                    logger.warn(`[MANUAL-CHAT][${sellerId}] No pude adoptar el saludo manual de ${targetId}: ${e?.message}`);
+                }
+                return;
+            }
             pausedUsers.add(targetId);
             try {
                 const { prisma } = require('../../db');

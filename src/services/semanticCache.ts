@@ -115,6 +115,15 @@ async function _getCandidates(step: string): Promise<CandidateRow[]> {
  * Look up a cached response for the given step + user text. Returns null on miss.
  * Safe to call even when the step is not cacheable — just returns null immediately.
  */
+// Respuestas con contexto PERSONAL (salud, edad, medicación) no se cachean ni se
+// sirven: el 6-oct una clienta que nunca habló de salud recibió "considerando tu
+// gastritis y colon irritable" — era la respuesta guardada de otra persona para
+// "¿cuál es más efectiva?" (HIT sim=1.000) y no volvió a escribir.
+const PERSONAL_CONTEXT = /\b(gastritis|colon|[uú]lcera|reflujo|acidez|\w*tiroid\w*|diabet\w*|hipertens\w*|presi[oó]n|colesterol|triglic\w*|embaraz\w*|lactancia|amamant\w*|menopaus\w*|h[ií]gado|ri[ñn][oó]n\w*|coraz[oó]n|c[aá]ncer|quimio\w*|cirug[ií]a|operad[oa]|bypass|medicaci[oó]n|medicamento\w*|pastillas?\s+(?:de|para)|tratamiento\s+m[eé]dico|(?:ten[eé]s|tengo|tiene|con|a\s+tus|tus|mis)\s+\d{2,3}\s*a[ñn]os|tu\s+(?:edad|peso|hermano|hermana|mam[aá]|pap[aá]|hij[oa]|marido|esposa)|en\s+tu\s+caso)\b/i;
+export function _hasPersonalContext(text: string): boolean {
+    return PERSONAL_CONTEXT.test(String(text || ''));
+}
+
 export async function lookupSemanticCache(
     openai: OpenAI,
     step: string,
@@ -137,6 +146,7 @@ export async function lookupSemanticCache(
 
     let best: { row: CandidateRow; sim: number } | null = null;
     for (const row of candidates) {
+        if (_hasPersonalContext(row.response)) continue; // fila vieja contaminada
         const sim = _cosine(embedding, row.embedding);
         if (!best || sim > best.sim) best = { row, sim };
     }
@@ -174,6 +184,10 @@ export async function storeSemanticCache(
     if (!CACHEABLE_STEPS.has(step)) return;
     if (!userText || userText.trim().length < WRITE_MIN_USER_CHARS) return;
     if (!response || response.trim().length < 10) return;
+    if (_hasPersonalContext(response) || _hasPersonalContext(userText)) {
+        logger.info(`[SEM-CACHE] SKIP step=${step} — contexto personal, no se cachea`);
+        return;
+    }
 
     const embedding = await _embed(openai, userText);
     if (!embedding) return;

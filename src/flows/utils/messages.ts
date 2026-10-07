@@ -278,5 +278,45 @@ function _getQuickReplies(step: string, userMessage: string): QuickReplyItem[] {
     ];
 }
 
-export { _formatMessage, _isDuplicate, _getAdminSuggestions, _getQuickReplies };
+/** Texto comparable: sin emojis ni espacios, en minúsculas y sin tildes. */
+function _comparable(text: string): string {
+    return String(text || '')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^\p{L}\p{N}]/gu, '')
+        .toLowerCase();
+}
+
+/**
+ * ¿Este texto es el saludo del guion activo (el que manda el bot al primer
+ * mensaje)? Se compara sin emojis ni puntuación, por el arranque del texto, así
+ * un copiado desde el panel o una respuesta rápida de WhatsApp Business cuentan
+ * aunque difieran en espacios o saltos de línea.
+ */
+function _isScriptGreeting(text: string, knowledge: any): boolean {
+    const tpl = knowledge?.flow?.greeting?.response;
+    if (!tpl || !text) return false;
+    const a = _comparable(text);
+    const b = _comparable(tpl);
+    if (a.length < 40 || b.length < 40) return false;
+    const n = Math.min(a.length, b.length, 120);
+    return a.slice(0, n) === b.slice(0, n);
+}
+
+/**
+ * Tabla completa de precios (las 3 presentaciones, 60 y 120 días) seguida de la
+ * pregunta de kilos. Para quien abre pidiendo el precio: en 48 h de chats (6-7
+ * oct) 5 de 7 que recibieron "de $36.900 a $68.900, ¿cuántos kilos?" no
+ * volvieron a escribir, y los que vieron la tabla siguieron. Sale de
+ * `flow.prices_both` del guion (sin su pregunta de cierre, que pide producto y
+ * plan: acá todavía falta el tier). Null si el guion no la trae.
+ */
+function _buildPriceTableWithWeightAsk(knowledge: any, state: any): string | null {
+    const tpl = knowledge?.flow?.prices_both?.response;
+    if (!tpl) return null;
+    const cut = tpl.indexOf('\n\n¿Con cuál');
+    const table = _formatMessage(cut > 0 ? tpl.slice(0, cut) : tpl, state);
+    return `${table}\n\nPara recomendarte el plan justo, contame cuánto querés bajar:\n\n1️⃣ Hasta 10 kg\n2️⃣ Más de 10 kg`;
+}
+
+export { _formatMessage, _isDuplicate, _getAdminSuggestions, _getQuickReplies, _isScriptGreeting, _buildPriceTableWithWeightAsk };
 

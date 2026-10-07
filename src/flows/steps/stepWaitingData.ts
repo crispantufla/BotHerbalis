@@ -828,11 +828,13 @@ export async function _handleRetiroData(
         // suelto es el código postal (caso "Merlo libertad 1716" → 1716, que el
         // parser tomaba como altura de calle). 5491122475361.
         if (!addr.cp) {
-            const cpMatch = text.match(/\b(\d{4})\b/);
+            // "34 40 santa Lucia" (59172908964, 6-oct): el CP escrito con un
+            // espacio en el medio tumbó tres intentos y terminó en pausa.
+            const cpMatch = text.match(/\b(\d{4})\b/) || text.match(/\b(\d{2})\s(\d{2})\b(?!\s*\d)/);
             if (cpMatch) {
-                addr.cp = cpMatch[1];
+                addr.cp = cpMatch[2] ? cpMatch[1] + cpMatch[2] : cpMatch[1];
                 progressed = true;
-                logger.info(`[RETIRO-DATA] CP ${cpMatch[1]} extraído por fallback regex para ${userId}.`);
+                logger.info(`[RETIRO-DATA] CP ${addr.cp} extraído por fallback regex para ${userId}.`);
             }
         }
     }

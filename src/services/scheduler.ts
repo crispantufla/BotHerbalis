@@ -150,7 +150,7 @@ const CONTEXTUAL_FOLLOW_UPS: Record<string, string[]> = {
         '¡Hola! Vi que consultaste. Seguimos acá para ayudarte. ¿Cuántos kilos buscás bajar más o menos?'
     ],
     'waiting_preference': [
-        '¡Hola! 😊 ¿Pudiste pensar con cuál preferís arrancar, cápsulas o semillas? Acordate que el envío es gratis.',
+        '¡Hola! 😊 ¿Pudiste pensar con cuál preferís arrancar: cápsulas, gotas o semillas? Acordate que el envío es gratis.',
         'Hola 👋 Vi que estabas viendo las opciones. Cualquier duda que tengas sobre cuál es mejor para vos, decime y te ayudo.'
     ],
     'waiting_price_confirmation': [

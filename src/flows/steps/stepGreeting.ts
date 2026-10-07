@@ -2,7 +2,7 @@ import path from 'path';
 import fs from 'fs';
 import { UserState } from '../../types/state';
 import { MessageMedia } from 'whatsapp-web.js';
-import { _formatMessage } from '../utils/messages';
+import { _formatMessage, _isScriptGreeting, _buildPriceTableWithWeightAsk } from '../utils/messages';
 import { _setStep, _pushHistory } from '../utils/flowHelpers';
 import logger from '../../utils/logger';
 
@@ -33,9 +33,12 @@ export async function handleGreeting(
 
     // --- CHECK: Manual greeting already sent by admin ---
     const existingHistory = currentState.history || [];
+    // El saludo del guion actual (copiado por el vendedor) o los textos de los
+    // guiones viejos que todavía pueden estar en historiales persistidos.
     const hasManualGreeting = existingHistory.some(m =>
         m.role === 'bot' &&
-        (m.content.includes('Buscás bajar hasta 10 kg') ||
+        (_isScriptGreeting(m.content, knowledge) ||
+            m.content.includes('Buscás bajar hasta 10 kg') ||
             m.content.includes('Cuántos kilos buscás bajar') ||
             m.content.includes('cuántos kilos buscás bajar'))
     );
@@ -44,6 +47,14 @@ export async function handleGreeting(
         logger.info(`[GREETING] Manual greeting detected for ${userId}, skipping to waiting_weight.`);
         _setStep(currentState, 'waiting_weight');
         saveState(userId);
+
+        // Si lo que trae es el click del anuncio ("Quiero más información"), no
+        // hay nada que procesar en waiting_weight: re-preguntamos los kilos y
+        // listo. Re-entrar al flujo con ese texto disparaba AD-RE-ENTRY otra vez.
+        if (/vengo de un anuncio|quiero m[aá]s informaci[oó]n|conseguir m[aá]s informaci[oó]n/i.test(text)) {
+            await sendMessageWithDelay(userId, '¡Genial! 😊 ¿Cuántos kilos querés bajar?\n\n1️⃣ Hasta 10 kg\n2️⃣ Más de 10 kg');
+            return { matched: true };
+        }
 
         // Defer to salesFlow to avoid circular promise loops
         const fakeUserStateMap = { [userId]: currentState };
@@ -78,6 +89,24 @@ export async function handleGreeting(
         /\?/.test(text) ||
         /\b(cuanto (sale|cuesta|vale|es)|que precio|el precio|precios?|estudios?|anmat|cientific|chamuyo|estafa|trucho|mentira|sirve|funciona de verdad|es seguro|seguro que|contraindicaci|hace mal|da[ñn]in|garant[ií]a|devuelven|devoluci[oó]n|reembolso|sos un bot|sos real|sos human|sos una maquina|es real esto|de donde son|donde estan|tienen local|consulta|pregunta|contiene|ingredientes|componentes|de que esta hecho|iodo|yodo|gluten|azucar|diabetes|diabetica|diabetico|hipertension|hipertensa|hipertenso|tiroides|colesterol|embarazo|embarazada|amamantando|amamanta|lactancia|puedo tomar|me sirve|como se toma|como tomar|como lo tomo|indicaciones|dosis)\b/i.test(_norm)
     );
+    // Abre pidiendo el PRECIO sin nombrar producto: va la tabla completa y
+    // después los kilos. El rango evasivo de la IA ("de $36.900 a $68.900,
+    // ¿cuántos kilos?") perdía 5 de 7 (6-7 oct). Con producto nombrado ("precio
+    // de las gotas") sigue por la IA, que contesta ese producto puntual.
+    const _asksPriceOnly = _substantiveOpening
+        && /\b(precios?|cuanto\s+(sale|cuesta|vale|es|salen|cuestan)|que\s+precio|costo|valor|presio)\b/i.test(_norm)
+        && !/capsul|gota|semilla|pastilla/i.test(_norm);
+    if (_asksPriceOnly) {
+        const tableMsg = _buildPriceTableWithWeightAsk(knowledge, currentState);
+        if (tableMsg) {
+            _setStep(currentState, knowledge.flow.greeting.nextStep);
+            saveState(userId);
+            await sendMessageWithDelay(userId, tableMsg);
+            logger.info(`[GREETING-PRICE] User ${userId} abrió pidiendo precio — tabla completa + pregunta de kilos.`);
+            return { matched: true };
+        }
+    }
+
     const _ai = (dependencies as any).aiService;
     if (_substantiveOpening && _ai && typeof _ai.chat === 'function') {
         try {

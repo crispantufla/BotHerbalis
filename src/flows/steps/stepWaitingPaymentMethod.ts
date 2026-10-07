@@ -87,6 +87,12 @@ const SOFT_BAILOUT = /\b(gracias|voy a (ver|hacer|pensar|fijarme)|despu[eé]s te
 // caracteres de palabra y el borde fallaría (no matchearía el plural).
 const DISTRUST_PREPAY = /no me gust\w*\s+(las?\s+)?transferenci|no me gusta\s+transferir|no (quiero|me animo a)\s+transferir|\bno confi[oa]\b|\bdesconfi[oa]\b|\bno me f[ií][oa]\b|\bme da (miedo|cosa|desconfianza)\b|\btengo miedo\b|\bmala experiencia\b|no me gusta\s+pagar\s+(por\s+)?(adelantad|anticipad|antes|online)|\bmiedo a (la\s+)?estafa\b|\bque sea (una\s+)?estafa\b/i;
 
+// "No tengo tarjeta ni trabajo con transferencia" (5493834703540, 7-oct): el
+// cliente NO tiene los medios del prepago. La IA leyó "no tengo" como NO_CASH y
+// le ofreció domicilio prepago — lo contrario. Sin tarjeta ni transferencia, lo
+// que le queda es retiro en sucursal (efectivo al retirar). Sobre normalizedText.
+const NO_PREPAY_MEANS = /\b(?:no\s+(?:tengo|uso|manejo|trabajo\s+con|poseo|cuento\s+con|dispongo\s+de)|sin)\s+(?:la\s+|una\s+)?(?:tarjeta|cuenta\s+(?:bancaria|en\s+el\s+banco|banco)|banco|home\s*banking|mercado\s*pago|transferencia|cbu|cvu)\b|\bno\s+(?:hago|puedo\s+hacer|s[eé]\s+hacer)\s+transferencia/i;
+
 // ── Negación dirigida a un medio de pago ─────────────────────────────────────
 // "no me gusta la transferencia" / "no quiero pagar con tarjeta": el keyword-match
 // pelado elegía la opción NEGADA y mandaba el alias/link — lo contrario de lo
@@ -244,7 +250,7 @@ export async function handleWaitingPaymentMethod(
         const reply = 'Te aviso: no tenemos local de venta al público — todos los pedidos van por Correo Argentino con envío gratis 📦\n\nUn asesor te va a contactar enseguida para coordinar la mejor opción (retiro en sucursal cerca tuyo o entrega a domicilio) 😊';
         saveState(userId);
         await sendMessageWithDelay(userId, reply);
-        await _pauseAndAlert(userId, currentState, dependencies, text, 'Cliente quiere retirar en persona / es de Rosario en waiting_payment_method. Admin coordinar logística.');
+        await _pauseAndAlert(userId, currentState, dependencies, text, 'Cliente quiere retirar en persona o pasar a buscar (no tenemos local) en waiting_payment_method. Admin coordinar logística.');
         return { matched: true };
     }
 
@@ -337,6 +343,19 @@ export async function handleWaitingPaymentMethod(
             `Cliente posterga decisión en waiting_payment_method (${currentState.postdatado ? 'postdatado ' + currentState.postdatado : 'sin fecha'}). Mensaje: "${text}". Pausado para que el admin retome cuando reescriba.`
         );
         logger.info(`[PAYMENT_METHOD] ${userId} → soft bailout detectado, pausado.`);
+        return { matched: true };
+    }
+
+    // ── Sin tarjeta ni transferencia → RETIRO EN SUCURSAL (efectivo al retirar) ──
+    // Aplica también dentro del submenú: si ya eligió domicilio y recién ahí dice
+    // que no tiene con qué prepagar, volvemos a retiro en vez de insistir.
+    if (!alreadyPaidMp && !RETIRO_KEYWORDS.test(text) && !optionNum && NO_PREPAY_MEANS.test(normalizedText)) {
+        currentState.paymentSubChoiceAsked = false;
+        currentState.shippingChoice = null;
+        const msg = `¡No hay problema! 😊 No necesitás tarjeta ni transferencia: con *retiro en sucursal* te lo mandamos a la sucursal de Correo Argentino más cercana y pagás el total *${currentState.totalPrice || '?'}* en *efectivo* recién cuando lo retirás 💵\n\n¿Lo dejamos así, retiro en sucursal y pagás al retirar?`;
+        saveState(userId);
+        await sendMessageWithDelay(userId, msg);
+        logger.info(`[PAYMENT_METHOD] ${userId} → sin tarjeta/transferencia → ofrecido RETIRO en sucursal (efectivo al retirar).`);
         return { matched: true };
     }
 
@@ -456,8 +475,8 @@ export async function handleWaitingPaymentMethod(
         const aiSub = await aiService.chat(text, {
             step: 'waiting_payment_method',
             goal: mpOn
-                ? `El cliente eligió ENVÍO A DOMICILIO y debe elegir cómo abonar (es PREPAGO, antes del envío): 1) *Tarjeta de crédito* (link de pago protegido) o 2) *Transferencia* al alias *HERBALIS.TIENDA* (BIO ORIGEN S.A.S.). De cara al cliente el medio online se llama "Tarjeta de crédito" (NUNCA "Mercado Pago", débito, Pago Fácil ni Rapipago). A domicilio NO se paga en efectivo al recibir; el pago en efectivo SOLO existe con *retiro en sucursal* (pagás al retirar). VENTAJA DEL PREPAGO (usala para cerrar): al estar pago, el pedido sale antes y llega más rápido, en *4 días hábiles* (el retiro en sucursal tarda 7 a 10). Total del pedido: $${currentState.totalPrice || '?'}. Respondé su duda puntual con calidez y cerrá preguntando con cuál de los 2 medios quiere abonar. NUNCA menciones cuotas ni anticipo.`
-                : `El cliente eligió ENVÍO A DOMICILIO. El pago es PREPAGO por *transferencia bancaria* al alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.* — total $${currentState.totalPrice || '?'}. 🛑 EL PAGO CON TARJETA ESTÁ FUERA DE SERVICIO: NO lo ofrezcas, NO menciones "tarjeta", "link de pago", "Mercado Pago", débito, Pago Fácil ni Rapipago. Si el cliente pide pagar con tarjeta, decile con naturalidad que en estos días no está disponible y ofrecele las dos que sí andan: *transferencia* (domicilio, llega en 4 días hábiles) o *retiro en sucursal* (pagás el total en efectivo al retirar, 7 a 10 días hábiles). A domicilio NO se paga en efectivo al recibir. Respondé su duda puntual con calidez y cerrá confirmando si le paso el alias para transferir o si prefiere el retiro. NUNCA menciones cuotas ni anticipo.`,
+                ? `El cliente eligió ENVÍO A DOMICILIO y debe elegir cómo abonar (es PREPAGO, antes del envío): 1) *Tarjeta de crédito* (link de pago protegido) o 2) *Transferencia* al alias *HERBALIS.TIENDA* (BIO ORIGEN S.A.S.). De cara al cliente el medio online se llama "Tarjeta de crédito" (NUNCA "Mercado Pago", débito, Pago Fácil ni Rapipago). A domicilio NO se paga en efectivo al recibir; el pago en efectivo SOLO existe con *retiro en sucursal* (pagás al retirar). VENTAJA DEL PREPAGO (usala para cerrar): al estar pago, el pedido sale antes y llega más rápido, en *4 días hábiles* (el retiro en sucursal tarda 7 a 10). Total del pedido: $${currentState.totalPrice || '?'}. Respondé su duda puntual con calidez y cerrá preguntando con cuál de los 2 medios quiere abonar. NUNCA menciones cuotas ni anticipo. Si dice que va a pagar más adelante ("el 22", "cuando cobre"), acusá recibo ("cuando hagas el pago avisame y sale enseguida") SIN inventar cronograma: NUNCA calcules ni prometas fechas de salida o de llegada.`
+                : `El cliente eligió ENVÍO A DOMICILIO. El pago es PREPAGO por *transferencia bancaria* al alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.* — total $${currentState.totalPrice || '?'}. 🛑 EL PAGO CON TARJETA ESTÁ FUERA DE SERVICIO: NO lo ofrezcas, NO menciones "tarjeta", "link de pago", "Mercado Pago", débito, Pago Fácil ni Rapipago. Si el cliente pide pagar con tarjeta, decile con naturalidad que en estos días no está disponible y ofrecele las dos que sí andan: *transferencia* (domicilio, llega en 4 días hábiles) o *retiro en sucursal* (pagás el total en efectivo al retirar, 7 a 10 días hábiles). A domicilio NO se paga en efectivo al recibir. Respondé su duda puntual con calidez y cerrá confirmando si le paso el alias para transferir o si prefiere el retiro. NUNCA menciones cuotas ni anticipo. Si dice que va a pagar más adelante, acusá recibo SIN inventar cronograma: NUNCA calcules ni prometas fechas de salida o de llegada.`,
             history: currentState.history,
             summary: currentState.summary,
             knowledge,

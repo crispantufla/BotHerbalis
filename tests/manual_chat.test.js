@@ -513,3 +513,57 @@ describe('modo remoto, con los frames del agente', () => {
         expect(roles()).toEqual([[PHONE, 'admin', 'Esperá que te lo confirmo yo']]);
     });
 });
+
+describe('arreglos del 7-oct-2026 en el handler de salientes', () => {
+    const knowledge = require('../knowledge_v7.json');
+    const GREETING = knowledge.flow.greeting.response;
+
+    test('el saludo del guion mandado a mano a un chat nuevo NO pausa: el bot lo adopta y espera los kilos', async () => {
+        const s = mkSeller();
+        s.sharedState.knowledge = knowledge;
+        s.sharedState.config = { activeScript: 'v7' };
+        s.sharedState.saveState = jest.fn();
+        await deliver(s.outgoing, manual({ body: GREETING }));
+
+        expect([...s.pausedUsers]).toEqual([]);
+        expect(pauseWrites()).toEqual([]);
+        expect(s.userState[TEL].step).toBe('waiting_weight');
+        expect(s.userState[TEL].history).toEqual([{ role: 'bot', content: GREETING, timestamp: expect.any(Number) }]);
+        expect(s.sharedState.saveState).toHaveBeenCalledWith(TEL);
+        // Igual queda en el ChatLog, como lo que es: un mensaje salido del vendedor.
+        expect(s.logAndEmit.mock.calls.map(c => c.slice(0, 2))).toEqual([[TEL, 'admin']]);
+    });
+
+    test('el saludo del guion a un chat que el bot ya venía atendiendo más adelante sí pausa (es intervención)', async () => {
+        const s = mkSeller({ userState: { [TEL]: { step: 'waiting_plan_choice', history: [] } } });
+        s.sharedState.knowledge = knowledge;
+        await deliver(s.outgoing, manual({ body: GREETING }));
+
+        expect([...s.pausedUsers]).toEqual([TEL]);
+        expect(pauseWrites().map(a => a.update.pauseReason)).toEqual([TOMA_CHARLA]);
+    });
+
+    test('cualquier otro texto a un chat nuevo sigue pausando como antes', async () => {
+        const s = mkSeller();
+        s.sharedState.knowledge = knowledge;
+        await deliver(s.outgoing, manual({ body: 'Buen dia Mirta, te aviso cuando este para retirar' }));
+
+        expect([...s.pausedUsers]).toEqual([TEL]);
+        expect(pauseWrites().map(a => a.update.pauseReason)).toEqual([CHAT_NUEVO]);
+    });
+
+    test('una imagen manual se registra como marcador, nunca como la miniatura en base64', async () => {
+        const s = mkSeller({ userState: { [TEL]: { step: 'completed' } } });
+        const thumb = '/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHI' + 'A'.repeat(400);
+        await deliver(s.outgoing, manual({ body: thumb, type: 'image', hasMedia: true }));
+
+        expect(s.logAndEmit.mock.calls.map(c => c.slice(0, 3))).toEqual([[TEL, 'admin', '📷 Imagen enviada']]);
+    });
+
+    test('una imagen manual con epígrafe corto conserva el epígrafe', async () => {
+        const s = mkSeller({ userState: { [TEL]: { step: 'completed' } } });
+        await deliver(s.outgoing, manual({ body: 'Tu código de retiro', type: 'image', hasMedia: true }));
+
+        expect(s.logAndEmit.mock.calls.map(c => c[2])).toEqual(['📷 Imagen enviada: Tu código de retiro']);
+    });
+});

@@ -1,5 +1,5 @@
 import { UserState, FlowStep } from '../../types/state';
-import { _formatMessage } from '../utils/messages';
+import { _formatMessage, _buildPriceTableWithWeightAsk } from '../utils/messages';
 import { _setStep, _maybeUpsell, _pauseAndAlert, _assignProductAndPlanByTier, _maybeSendPaymentMenuV7, _pushHistory } from '../utils/flowHelpers';
 import logger from '../../utils/logger';
 
@@ -438,6 +438,17 @@ export async function handleWaitingWeight(
             await sendMessageWithDelay(userId, skipMsg);
             return { matched: true };
         } else {
+            // Pide el precio sin decir kilos ni producto ("Precio", "cuánto sale"):
+            // tabla completa + re-pregunta de kilos, sin IA (ver _buildPriceTableWithWeightAsk).
+            const asksPriceOnly = /\b(precios?|cuanto\s+(sale|cuesta|vale|es|salen|cuestan)|que\s+precio|costo|valor|presio)\b/i.test(normalizedText)
+                && !implicitProduct && !(currentState as any).suggestedProduct;
+            const tableMsg = asksPriceOnly ? _buildPriceTableWithWeightAsk(knowledge, currentState) : null;
+            if (tableMsg) {
+                saveState(userId);
+                await sendMessageWithDelay(userId, tableMsg);
+                logger.info(`[PRICE-TABLE] waiting_weight: ${userId} pidió precio sin kilos — tabla completa + re-pregunta.`);
+                return { matched: true };
+            }
             logger.info(`[AI-FALLBACK] waiting_weight: No number detected for ${userId}`);
             const aiWeight = await aiService.chat(text, {
                 step: FlowStep.WAITING_WEIGHT,

@@ -216,7 +216,11 @@ export async function processSalesFlow(
     // que retoma desde un click-to-WhatsApp y NO había dado kilos en sesión previa
     // debe volver al saludo. Sin este reset, stepWaitingWeight quedaba mascando
     // "Quiero más información" sin tier y la IA alucinaba un weightGoal.
-    if (_detectAdSource(text) && !currentState.weightGoal && currentState.step !== 'greeting') {
+    // Solo en la entrada de primer nivel: en una re-entrada interna (stepGreeting
+    // ya detectó el saludo manual y pasó a waiting_weight) volver a resetear al
+    // saludo arma el ping-pong greeting → waiting_weight → greeting que terminó
+    // en "Recursion limit" y pausa (5493435354900, 7-oct).
+    if (_recursionDepth === 0 && _detectAdSource(text) && !currentState.weightGoal && currentState.step !== 'greeting') {
         logger.info(`[AD-RE-ENTRY] User ${userId} re-entró desde ${_detectAdSource(text)} sin weightGoal (step previo: ${currentState.step}). Reset a greeting.`);
         _setStep(currentState, FlowStep.GREETING);
         saveState(userId);
