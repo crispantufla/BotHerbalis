@@ -10,6 +10,11 @@ Bot de WhatsApp multi-tenant para ventas. Un único proceso Node corre N vendedo
 
 - **Runtime**: Node 20+, TypeScript via `tsx` (sin build step en dev). `type: commonjs` en package.json — mezcla `require()` y `import` (tech debt conocido).
 - **WhatsApp**: `whatsapp-web.js` + `puppeteer-extra` con stealth plugin inyectado en `index.ts` sobreescribiendo `require.cache` de puppeteer.
+  El agente remoto (`agent/package.json`) lleva `whatsapp-web.js` fijado a un COMMIT de `main`
+  (tarball de codeload, sin git en la PC del vendedor): la release 1.34.7 (abr-2026) no tiene los
+  arreglos para el WhatsApp Web de julio de 2026 (`id._serialized` → `id.$1`, descarga de media por
+  el cache de WA), y sin ellos `downloadMedia` y `fetchMessages` tiran `r` para todo (audios mudos
+  desde el 2026-07). Si sale una release ≥1.34.8 volver al semver; si vuelve el `r`, mover el commit.
 - **DB**: PostgreSQL via Prisma 7. Todas las tablas están particionadas por `instanceId` (= `sellerId`).
 - **Queue**: BullMQ sobre Redis. Una queue por seller: `whatsapp-messages-${sellerId}`.
 - **Locks**: Redlock sobre Redis, compartido entre sellers. Lock keys incluyen `sellerId`.
