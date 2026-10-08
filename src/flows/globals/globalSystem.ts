@@ -76,8 +76,10 @@ export async function handleSystemGlobals(
     const NO_CANCEL_PHRASE = /\b(no\s+(quiero|quería)\s+cancelar|sin\s+cancelar|no\s+cancelar)\b/i;
     const EXPLICIT_CANCEL_REGEX = /\b(cancelar|cancelarlo|anular|dar de baja|no quiero (el|mi) pedido|baja al pedido)\b/i;
     const IMPLICIT_CANCEL_REGEX = /\b(ya no quiero|me arrepenti|no me interesa mas|no me interesa más)\b/i;
+    // En promo_offer no hay pedido que cancelar: un "ya no quiero" es un rechazo
+    // de la promo y lo cierra el step sin la repregunta "¿estás seguro?".
     if (((EXPLICIT_CANCEL_REGEX.test(normalizedText) && !NO_CANCEL_PHRASE.test(normalizedText))
-        || IMPLICIT_CANCEL_REGEX.test(normalizedText)) && currentState.step !== 'completed') {
+        || IMPLICIT_CANCEL_REGEX.test(normalizedText)) && currentState.step !== 'completed' && currentState.step !== 'promo_offer') {
         logger.info(`[GLOBAL] User ${userId} requested cancellation.`);
         currentState.pendingCancelConfirm = true;
         const msg = '¿Estás seguro/a de que no querés continuar? Antes de decidir, puedo responder cualquier duda que tengas 😊\n\nRespondé *sí* para cancelar o *no* para seguir.';

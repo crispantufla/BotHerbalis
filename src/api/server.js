@@ -21,6 +21,7 @@ const quickRepliesRoutes = require('./routes/quickReplies.routes');
 const guionRoutes = require('./routes/guion.routes');
 const playgroundRoutes = require('./routes/playground.routes');
 const agentDistRoutes = require('./routes/agentDist.routes');
+const promoRoutes = require('./routes/promo.routes');
 
 const { jwtAuthMiddleware } = require('../middleware/jwtAuth');
 const { verifyToken } = require('../middleware/jwtAuth');
@@ -117,6 +118,7 @@ function startServer(clientPool) {
     app.use('/api', sellersRoutes(clientPool));
     app.use('/api', quickRepliesRoutes(clientPool));
     app.use('/api', guionRoutes(clientPool));
+    app.use('/api', promoRoutes(clientPool));
     app.use('/api', playgroundRoutes());
     app.use('/api', apiTokensRoutes());
 

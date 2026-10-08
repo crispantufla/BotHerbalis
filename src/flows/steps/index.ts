@@ -10,6 +10,7 @@ import { handleWaitingPaymentMethod } from './stepWaitingPaymentMethod';
 import { handleWaitingMpPayment } from './stepWaitingMpPayment';
 import { handleWaitingTransferConfirmation } from './stepWaitingTransferConfirmation';
 import { handleAdminSteps } from './stepAdmin';
+import { handlePromoOffer } from './stepPromoOffer';
 import logger from '../../utils/logger';
 
 export async function processStep(
@@ -74,6 +75,10 @@ export async function processStep(
         case 'waiting_admin_ok':
         case 'waiting_admin_validation':
             result = await handleAdminSteps(userId, text, normalizedText, currentState, knowledge, dependencies);
+            break;
+        case 'promo_offer':
+            // Respuesta a una promo que mandó el bot (campañas, oct-2026).
+            result = await handlePromoOffer(userId, text, normalizedText, currentState, knowledge, dependencies);
             break;
         case 'completed':
             // Caso muerto: salesFlow.ts intercepta `step === 'completed'` antes

@@ -1,5 +1,5 @@
 import { UserState } from '../../types/state';
-import { _getPrice } from './pricing';
+import { _getPrice, _getEffectivePrice } from './pricing';
 
 /**
  * _formatPrice
@@ -22,7 +22,8 @@ function _formatPrice(n: number): string {
 function buildCartFromSelection(product: string, plan: string, state: UserState): void {
     const planDays = parseInt(plan, 10);
     const raw120 = _getPrice(product, '120');
-    const raw60 = _getPrice(product, '60');
+    // Plan 60 al precio promo si el chat vino de una campaña (state.promo.active).
+    const raw60 = _getEffectivePrice(product, '60', state);
     const base120 = parseInt((raw120 || '0').replace(/\./g, ''), 10);
     const base60 = parseInt((raw60 || '0').replace(/\./g, ''), 10);
 

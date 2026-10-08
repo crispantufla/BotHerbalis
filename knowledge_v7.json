@@ -2,7 +2,7 @@
     "meta": {
         "name": "Guión V7 — Elena · 2 tiers (60d / 120d)",
         "description": "Guión simplificado may-2026: persona Elena (tono cálido argentino), 2 tiers (hasta 10 kg → plan 60 días; más de 10 kg → plan 120 días). Tras pedir kilos, el bot envía dos mensajes seguidos (recomendación + precios). Cuando el cliente elige producto, confirma el total y va directo al menú de pago. Modelo de pago nuevo: retiro en sucursal (paga total al retirar) o envío a domicilio (prepago MP/transferencia). (Restaurado el 28-sep-2026 tras revertir el guion V8 por zona; la versión es 8.2+ para que gane sobre la copia V8 guardada en DATA_DIR.)",
-        "version": "8.4"
+        "version": "8.5"
     },
     "flow": {
         "greeting": {
@@ -181,6 +181,26 @@
             "step": "waiting_admin_validation",
             "_note": "Fallback si el paymentMethod del state no matchea con ninguno conocido. Logueamos warn en código.",
             "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✔ Correo Argentino\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs.\n\n✅ Ya queda en curso tu pedido 🌱 Apenas lo despachemos te pasamos el seguimiento. ¡Gracias por confiar en Herbalis!"
+        },
+        "promo_product_ask": {
+            "step": "promo_offer",
+            "_note": "Campañas promo (oct-2026). El cliente respondió con interés (PROMO / sí / quiero) sin decir presentación. {{PROMO_60}} es el precio promo del plan de 60 (promoPrice60 en el Editor de Precios). Sin kilos: la promo es el plan de 60 para todos.",
+            "response": "¡Buenísimo! 🎉 La promo es el tratamiento completo de *60 días* a *${{PROMO_60}}*, en la presentación que prefieras:\n\n1️⃣ *Cápsulas* — 1 al día, 30 min antes del almuerzo o la cena.\n2️⃣ *Gotas* — 10 gotas al día, 30 min antes del almuerzo o la cena.\n3️⃣ *Semillas* — una infusión antes de dormir.\n\nLas tres son 100% naturales y funcionan igual 🌿 ¿Con cuál arrancamos?"
+        },
+        "promo_product_confirm": {
+            "step": "promo_offer",
+            "_note": "Campañas promo. El cliente eligió presentación: confirma el plan de 60 al precio promo ({{TOTAL}} ya viene calculado) y a continuación el bot manda payment_menu.",
+            "response": "¡Genial! 🎁 Te armo el plan de *60 días* de *{{PRODUCT_SHORT}}* a *${{TOTAL}}* (precio promo)."
+        },
+        "promo_declined": {
+            "step": "promo_offer",
+            "_note": "Campañas promo. El cliente dijo que no le interesa: cierre cordial y el chat se pausa sin alerta. No insistir.",
+            "response": "Todo bien, ¡gracias por responderme! 😊 Si más adelante querés retomarlo, escribime por acá nomás."
+        },
+        "promo_opted_out": {
+            "step": "promo_offer",
+            "_note": "Campañas promo. El cliente pidió que no le escribamos más: se lo confirma y queda excluido de toda campaña futura. NO usar \"Disculpá la molestia\": esa frase dispara la pausa con alerta de salesFlow.",
+            "response": "Listo, no te escribo más. ¡Que estés muy bien! 🙏"
         }
     },
     "faq": [

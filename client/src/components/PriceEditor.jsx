@@ -122,6 +122,23 @@ const PriceEditor = () => {
                                     </div>
                                     <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Costo por rechazo o no retiro.</p>
                                 </div>
+                                {/* Precio promo del plan 60 (pestaña Promos). Solo rige en los chats que recibieron la promo. */}
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-wide">
+                                        Precio promo — plan 60 días
+                                    </label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-2 text-slate-400 dark:text-slate-500">$</span>
+                                        <input
+                                            type="text"
+                                            className="w-full pl-7 pr-3 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                                            value={prices.promoPrice60 || ''}
+                                            onChange={(e) => setPrices(prev => ({ ...prev, promoPrice60: e.target.value }))}
+                                            placeholder="44.900"
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Lo usan las campañas de Promos. Cápsulas y gotas bajan a este precio; semillas sigue con el de lista si es más bajo.</p>
+                                </div>
                             </div>
                         </div>
                     </>

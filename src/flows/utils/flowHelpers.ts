@@ -365,7 +365,7 @@ function _resolveNewProductPlan(normalizedText: string, currentProduct: string |
  * de kilos y la lógica del weight step no extrajo nada), default a 120d.
  */
 function _assignProductAndPlanByTier(state: any, productFullName: string): void {
-    const { _getPrice } = require('./pricing');
+    const { _getEffectivePrice } = require('./pricing');
     const { calculateTotal } = require('./cartHelpers');
     const w = typeof state.weightGoal === 'number' ? state.weightGoal : parseInt(String(state.weightGoal || 0), 10) || 0;
     // Si el cliente eligió plan explícito (vio ambos en prices_both y dijo 60/120),
@@ -375,7 +375,7 @@ function _assignProductAndPlanByTier(state: any, productFullName: string): void 
     const plan = (override === '60' || override === '120') ? override : (w > 0 && w <= 10 ? '60' : '120');
     state.selectedProduct = productFullName;
     state.selectedPlan = plan;
-    state.cart = [{ product: productFullName, plan, price: _getPrice(productFullName, plan) }];
+    state.cart = [{ product: productFullName, plan, price: _getEffectivePrice(productFullName, plan, state) }];
     calculateTotal(state);
 }
 

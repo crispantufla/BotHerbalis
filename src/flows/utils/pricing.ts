@@ -64,7 +64,10 @@ export const FALLBACK_PRICES: Record<string, any> = {
     'Cápsulas': { '60': '54.900', '120': '68.900' },
     'Semillas': { '60': '36.900', '120': '49.900' },
     'Gotas': { '60': '54.900', '120': '68.900' },
-    'costoLogistico': '18.000'
+    'costoLogistico': '18.000',
+    // Precio promo del plan de 60 días (campañas de reactivación, oct-2026). Rige
+    // solo en los chats con state.promo activo: ver _getEffectivePrice.
+    'promoPrice60': '44.900'
 };
 
 function _getPrices(): Record<string, any> {
@@ -96,6 +99,35 @@ function _getPrice(product: string | null | undefined, plan: string): string {
         result = prices['Semillas']?.[plan] || prices['Semillas']?.['60'];
     }
     return result || FALLBACK_PRICES['Semillas']['60'];
+}
+
+/**
+ * Precio promo del plan de 60 días para un producto (campañas de reactivación).
+ * Nunca por encima del precio de lista: la promo baja Cápsulas y Gotas, y a
+ * Semillas (que ya cuesta menos) la deja como está. Null si no hay promo cargada.
+ */
+function _getPromoPrice60(product: string | null | undefined): string | null {
+    const prices = _getPrices();
+    const promo = _parseAmount(prices.promoPrice60);
+    if (!promo) return null;
+    const list = _parseAmount(_getPrice(product, '60'));
+    const effective = list ? Math.min(list, promo) : promo;
+    return effective.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+/**
+ * El precio que rige para ESTE chat: el promo si el cliente vino de una campaña
+ * (state.promo.active) y el plan es el de 60, el de lista en cualquier otro
+ * caso. Todo lo que arma o verifica el cart tiene que pasar por acá: con
+ * _getPrice a secas, el chequeo de coherencia de waiting_data "corregía" el
+ * precio promo al de lista en la confirmación.
+ */
+function _getEffectivePrice(product: string | null | undefined, plan: string, state?: any): string {
+    if (state?.promo?.active && String(plan) === '60') {
+        const promo = _getPromoPrice60(product);
+        if (promo) return promo;
+    }
+    return _getPrice(product, plan);
 }
 
 // "54.900" / "$ 54.900" / 54900 → 54900
@@ -144,6 +176,8 @@ function _normalizeProductName(rawProduct: string, rawPlan: string, price: numbe
 export {
     _getPrices,
     _getPrice,
+    _getPromoPrice60,
+    _getEffectivePrice,
     _inferPlanFromPrice,
     _normalizeProductName
 };

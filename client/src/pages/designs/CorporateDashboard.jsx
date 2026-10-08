@@ -17,6 +17,7 @@ import WebOrdersView from '../../components/corporate/WebOrdersView';
 import AiReportsView from '../../components/corporate/AiReportsView';
 import GuionView from '../../components/corporate/GuionView';
 import PlaygroundView from '../../components/corporate/PlaygroundView';
+import PromoView from '../../components/corporate/PromoView';
 import AccountsView from '../../components/admin/AccountsView';
 import AccountStatsView from '../../components/admin/AccountStatsView';
 import FunnelAnalyticsView from '../../components/admin/FunnelAnalyticsView';
@@ -24,7 +25,7 @@ import RescueQueueView from '../../components/admin/RescueQueueView';
 import ManualOrderEntryModal from '../../components/corporate/components/ManualOrderEntryModal';
 import LazyBoundary from '../../components/ui/LazyBoundary';
 
-import { Wifi, MessageCircle, ShoppingCart, Settings, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Bell, AlertTriangle, BookOpen, MoreHorizontal, CreditCard, Users, LifeBuoy, MessagesSquare, FlaskConical, Package } from 'lucide-react';
+import { Gift, Wifi, MessageCircle, ShoppingCart, Settings, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, PhoneCall, Bell, AlertTriangle, BookOpen, MoreHorizontal, CreditCard, Users, LifeBuoy, MessagesSquare, FlaskConical, Package } from 'lucide-react';
 
 // Estadísticas es la única vista con recharts (~400 KB): se descarga al abrir la
 // pestaña, no con el panel.
@@ -326,6 +327,7 @@ const CorporateDashboard = () => {
             );
             case 'guion': return <GuionView />;
             case 'playground': return <PlaygroundView />;
+            case 'promos': return <PromoView onGoToChat={(chatId) => handleQuickAction(chatId, 'chat')} />;
             case 'accounts': return <AccountsView />;
             case 'account-stats': return <AccountStatsView />;
             case 'funnel-analytics': return <FunnelAnalyticsView />;
@@ -417,6 +419,7 @@ const CorporateDashboard = () => {
                     <NavItem tab="web-orders" icon={Package} label="Pedidos web" />
                     <NavItem tab="guion" icon={MessagesSquare} label="Guiones (notas)" />
                     <NavItem tab="playground" icon={FlaskConical} label="Probar bot" />
+                    <NavItem tab="promos" icon={Gift} label="Promos" />
                     <NavItem tab="gallery" icon={ImageIcon} label="Galería de Medios" />
                     <NavItem tab="manuals" icon={BookOpen} label="Manuales" />
                     {isAdmin && <NavItem tab="ai-reports" icon={AlertTriangle} label="Errores de IA" />}

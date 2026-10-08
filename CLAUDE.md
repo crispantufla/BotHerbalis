@@ -110,6 +110,26 @@ Máquina de estados lineal con fallbacks a IA. Orden típico:
   `(origen, externalId=Order.id)`: reenviar devuelve el pedido que ya creó, así que
   `externalId` NO se puede recalcular ni derivar. Una venta cargada queda con
   `sistemaOrderId` y status `En sistema`, y el botón se deshabilita.
+- **Campañas promo (pestaña Promos, oct-2026)**: el bot le escribe PRIMERO a quien habló y no
+  compró, con el plan de 60 días a `promoPrice60` (Editor de Precios). Vive en
+  `src/services/promo/`: `promoAudience` arma la lista (default: últimos 180 días menos los
+  últimos 30, que pueden tener un pedido en curso) desde `FunnelEvent` + `User.profileData`.
+  FunnelEvent es la ÚNICA memoria de quién habló hace más de ~40 días: los estados se limpian
+  a los 30 y ChatLog se purga; medido el 8-oct: 6.285 personas, 95% solo con rastro del
+  embudo (sin nombre ni estado: el despachador les crea uno limpio). `promoTemplates` arma un
+  texto distinto por persona (bloques + spintax,
+  determinístico por campaña+teléfono, el precio solo por placeholder) y `promoDispatcher`
+  manda de a uno desde un cron por minuto del scheduler: ventana horaria ARG, tope diario,
+  pausa sorteada entre envíos, cortes largos, y re-validación del destinatario al momento de
+  mandar. La respuesta cae en el step `promo_offer` (`stepPromoOffer.ts`): sin kilos, elige
+  presentación y pasa directo al menú de pago. Mientras `state.promo.active`, el plan 60 se
+  cotiza con `_getEffectivePrice(product, plan, state)` (pricing.ts): TODO lo que arma o
+  verifica el cart tiene que usar esa función y no `_getPrice`, o la confirmación "corrige"
+  el precio promo al de lista. Los rechazos pausan SIN alerta (`_quietPause`) y "no me
+  escribas más" deja al teléfono fuera de toda campaña futura (`PromoRecipient.opted_out`).
+  Esto manda fuera de la ventana de 24 h de WhatsApp (lo que `checkColdLeads` dejó de hacer
+  en jun-2026 por riesgo de bloqueo): arrancar con tope bajo y mirar entregas. Tests:
+  `tests/promo_*.test.js`. ADR-0002.
 - **Prompt cache de Claude**: el system del `chat()` va en 2 bloques (`_buildSystemBlocks` en `aiPrompts.ts`): core compartido entre steps + módulo del step, cada uno con `cache_control` de 1h. NADA que dependa del mensaje, del cliente o de la hora puede entrar al system (rompe el prefijo para todas las llamadas); eso va al turno user. Verificar con `scripts/ai-cache-probe.ts` y con las líneas `[AI][usage]` de los logs (`cache_r` debe dominar a `in`).
 
 ## Multi-tenant scoping

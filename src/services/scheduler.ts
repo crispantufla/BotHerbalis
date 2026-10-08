@@ -17,6 +17,7 @@ import { differenceInMinutes, differenceInHours, differenceInDays } from 'date-f
 import { buildConfirmationMessage } from '../utils/messageTemplates';
 import { UserState } from '../types/state';
 import { _setStep, _pushHistory } from '../flows/utils/flowHelpers';
+import { promoTick } from './promo/promoDispatcher';
 
 // ── Constants ──
 const TIMEZONE = 'America/Argentina/Buenos_Aires';
@@ -690,6 +691,16 @@ function startScheduler(sharedState: SchedulerSharedState, dependencies: Schedul
         checkAbandonedCarts(sharedState, dependencies);
     }, { timezone: TIMEZONE }));
     logger.info('[SCHEDULER] ✅ checkAbandonedCarts → cada hora de 10 a 21 ARG (solo dentro de 24h)');
+
+    // ── CAMPAÑAS PROMO: cada minuto ──
+    // El despachador decide solo si le toca mandar (campaña running, ventana
+    // horaria, tope diario, hora sorteada del próximo envío). Un tick sin nada
+    // que hacer es una consulta liviana. Ver services/promo/promoDispatcher.ts.
+    tasks.push(cron.schedule('* * * * *', () => {
+        promoTick(sharedState, dependencies).catch((e: any) =>
+            logger.error(`[PROMO][${sharedState.sellerId || '?'}] tick error: ${e.message}`));
+    }, { timezone: TIMEZONE }));
+    logger.info('[SCHEDULER] ✅ promoTick → cada minuto (manda solo dentro de la ventana de la campaña)');
 
     // ── RESCUE METRICS ROLLUP: a las 23:50 Argentina ──
     // Aggrega followUpData pendiente en config.rescueStats para métricas durables.

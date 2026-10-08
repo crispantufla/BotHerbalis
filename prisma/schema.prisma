@@ -343,3 +343,47 @@ model AiSemanticCache {
   @@index([step])
   @@index([lastHit])
 }
+
+// ── Campañas promo (oct-2026) ────────────────────────────────────────────────
+// Reactivación de leads que hablaron con el bot y no compraron: un mensaje de
+// promo por persona, espaciado al ritmo de una persona que escribe de a poco
+// (ver src/services/promo/). Los destinatarios se congelan al crear la campaña
+// para que la lista no cambie mientras corre.
+model PromoCampaign {
+  id            String   @id @default(uuid())
+  instanceId    String
+  name          String
+  status        String   @default("draft") // draft | running | paused | finished | cancelled
+  config        String   // JSON: ventana horaria, tope diario, pausas, textos, filtros de audiencia
+  createdAt     DateTime @default(now())
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  nextSendAt    DateTime?
+  sentToday     Int      @default(0)
+  sentTodayDate String?  // 'yyyy-MM-dd' (Argentina) al que corresponde sentToday
+  totalSent     Int      @default(0)
+  failStreak    Int      @default(0) // envíos fallidos seguidos — al llegar al tope la campaña se pausa sola
+
+  recipients    PromoRecipient[]
+
+  @@index([instanceId, status])
+}
+
+model PromoRecipient {
+  id          String   @id @default(uuid())
+  campaignId  String
+  campaign    PromoCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  instanceId  String
+  phone       String
+  position    Int      // orden de envío (ya mezclado al azar)
+  status      String   @default("pending") // pending | sent | skipped | failed | opted_out
+  messageText String?  // el texto exacto que salió (cada destinatario recibe una variante distinta)
+  sentAt      DateTime?
+  repliedAt   DateTime?
+  outcome     String?  // interested | declined | opted_out | question
+  skipReason  String?
+
+  @@unique([campaignId, phone])
+  @@index([instanceId, phone])
+  @@index([campaignId, status, position])
+}

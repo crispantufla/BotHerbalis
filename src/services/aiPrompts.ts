@@ -488,6 +488,10 @@ function _getStepModule(step: string, prices: Record<string, any>, mpOn: boolean
         case 'waiting_weight':
         case 'waiting_preference':
         case 'waiting_preference_consultation':
+        // Respuesta a una promo: mismo módulo que el arranque del embudo (las tres
+        // presentaciones). El precio promo viaja en el goal del turno user, nunca
+        // acá: este bloque se cachea y es común a todos los chats.
+        case 'promo_offer':
             module = _getModuleEarlyFunnel(prices, mpOn);
             break;
         case 'waiting_plan_choice':

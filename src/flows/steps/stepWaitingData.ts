@@ -2,7 +2,7 @@ import { UserState, FlowStep } from '../../types/state';
 import { validateAddress, suggestCPByCity, lookupCPFromMaps } from '../../services/addressValidator';
 import { buildConfirmationMessage } from '../../utils/messageTemplates';
 import { _setStep, _pauseAndAlert, _detectProductPlanChange, _resolveNewProductPlan, _detectPostdatado, _handleShipPaySwitch, _closeSaleAndNotify, _pushHistory } from '../utils/flowHelpers';
-import { _getPrice } from '../utils/pricing';
+import { _getEffectivePrice } from '../utils/pricing';
 import { _formatPrice, buildCartFromSelection, calculateTotal } from '../utils/cartHelpers';
 import { _isDuplicate } from '../utils/messages';
 import { isMpEnabled, prepayMeans } from '../utils/paymentOptions';
@@ -643,7 +643,7 @@ async function _validateAndAssembleOrder(
             return { matched: true };
         }
         const plan = currentState.selectedPlan || "60";
-        const price = _getPrice(product, plan); // F2: precio SIEMPRE coherente con el plan (no usar un currentState.price viejo)
+        const price = _getEffectivePrice(product, plan, currentState); // F2: precio SIEMPRE coherente con el plan (no usar un currentState.price viejo); promo si el chat vino de una campaña
         currentState.cart = [{ product, plan, price }];
     }
 
@@ -771,7 +771,7 @@ async function _askMissingFields(
 }
 
 // F2: guard de coherencia de precio. Si el cart de UN solo ítem tiene un precio que
-// NO coincide con _getPrice(producto, plan) (ej: plan 120 con precio de 60), la
+// NO coincide con _getEffectivePrice(producto, plan, state) (ej: plan 120 con precio de 60), la
 // confirmación saldría incoherente ("Plan: 120 días / Total: $44.900"). No validamos
 // carts multi-ítem (descuentos por volumen). Caso 3446661083.
 function _orderPriceCoherent(state: UserState): boolean {
@@ -780,7 +780,7 @@ function _orderPriceCoherent(state: UserState): boolean {
     const it = cart[0];
     if (!it || !it.product || !it.plan || it.price == null) return true;
     const norm = (v: any) => String(v).replace(/\./g, '');
-    return norm(it.price) === norm(_getPrice(it.product, it.plan));
+    return norm(it.price) === norm(_getEffectivePrice(it.product, it.plan, state));
 }
 
 // --- Helper: Retiro en sucursal — captura robusta de datos + armado de orden ---
@@ -844,7 +844,7 @@ export async function _handleRetiroData(
         if (!currentState.cart || currentState.cart.length === 0) {
             const product = currentState.selectedProduct;
             const plan = currentState.selectedPlan || '60';
-            const price = _getPrice(product, plan); // F2: precio SIEMPRE coherente con el plan (no usar un currentState.price viejo)
+            const price = _getEffectivePrice(product, plan, currentState); // F2: precio SIEMPRE coherente con el plan (no usar un currentState.price viejo); promo si el chat vino de una campaña
             currentState.cart = [{ product, plan, price } as any];
         }
         currentState.pendingOrder = {

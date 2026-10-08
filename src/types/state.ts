@@ -21,7 +21,10 @@ export enum FlowStep {
     WAITING_TRANSFER_CONFIRMATION = "waiting_transfer_confirmation",
     REJECTED_MEDICAL = "rejected_medical",
     REJECTED_ABUSIVE = "rejected_abusive",
-    REJECTED_GEO = "rejected_geo"
+    REJECTED_GEO = "rejected_geo",
+    // Campañas promo (oct-2026): el bot le escribió primero con la oferta y
+    // espera su respuesta. Ver src/flows/steps/stepPromoOffer.ts.
+    PROMO_OFFER = "promo_offer"
 }
 
 export interface Address {
@@ -158,6 +161,20 @@ export interface UserState {
     // Rolling summary: timestamp of last successful background summarization,
     // used to rate-limit repeat calls to the summarizer.
     lastSummarizedAt?: number;
+
+    // Campaña promo (oct-2026). Lo setea el despachador al mandar la oferta.
+    // Mientras `active` sea true, el plan de 60 días se cotiza al precio promo
+    // (_getEffectivePrice en pricing.ts). `prevStep` es donde estaba el cliente
+    // antes de la promo, por si hay que entender la conversación vieja.
+    promo?: {
+        active: boolean;
+        campaignId: string;
+        sentAt: number;
+        price60: string;
+        prevStep?: string | null;
+        repliedAt?: number;
+        outcome?: 'interested' | 'declined' | 'opted_out' | 'question' | null;
+    } | null;
 }
 
 export interface AlertOrderData {
