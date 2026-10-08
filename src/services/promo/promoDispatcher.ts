@@ -24,6 +24,7 @@ import { _setStep, _cleanPhone } from '../../flows/utils/flowHelpers';
 import { createInitialUserState } from '../../flows/leadClassifier';
 import { _getPromoPrice60 } from '../../flows/utils/pricing';
 import { renderPromoMessage, PromoTemplates } from './promoTemplates';
+import { generatePromoVariation, DEFAULT_BASE_MESSAGE } from './promoVariation';
 import { AudienceFilters, DEFAULT_AUDIENCE_FILTERS, normalizeAudienceFilters } from './promoAudience';
 import logger from '../../utils/logger';
 
@@ -53,7 +54,16 @@ export interface PromoCampaignConfig {
     skipIfInboundHours: number;
     /** Envíos fallidos seguidos que pausan la campaña. */
     maxFailStreak: number;
-    /** Textos propios (reemplazan a los de promoTemplates por bloque). */
+    /**
+     * Cómo se arma el texto de cada envío:
+     *   'ai'        → Claude reescribe `baseMessage` con ligeras diferencias (default);
+     *                 si falla o devuelve algo inválido, cae a las plantillas.
+     *   'templates' → solo las variantes por bloques de promoTemplates.
+     */
+    variationMode: 'ai' | 'templates';
+    /** El mensaje del vendedor; {{PROMO_60}} es el precio y {{NAME_COMMA}} el nombre (opcional). */
+    baseMessage: string;
+    /** Textos propios por bloque (modo 'templates' y respaldo del modo 'ai'). */
     templates?: Partial<PromoTemplates> | null;
     /** Con qué filtros se armó la lista. */
     audience: Omit<AudienceFilters, 'instanceId'>;
@@ -71,6 +81,8 @@ export const DEFAULT_PROMO_CONFIG: PromoCampaignConfig = {
     skipWeekends: false,
     skipIfInboundHours: 48,
     maxFailStreak: 3,
+    variationMode: 'ai',
+    baseMessage: DEFAULT_BASE_MESSAGE,
     templates: null,
     audience: { ...DEFAULT_AUDIENCE_FILTERS },
 };
@@ -94,6 +106,8 @@ export function normalizePromoConfig(raw: any, instanceId: string = 'default'): 
         skipWeekends: raw?.skipWeekends === true,
         skipIfInboundHours: num(raw?.skipIfInboundHours, d.skipIfInboundHours, 0, 24 * 30),
         maxFailStreak: num(raw?.maxFailStreak, d.maxFailStreak, 1, 50),
+        variationMode: raw?.variationMode === 'templates' ? 'templates' : 'ai',
+        baseMessage: typeof raw?.baseMessage === 'string' && raw.baseMessage.trim().length >= 40 ? raw.baseMessage.replace(/\r/g, '').trim() : d.baseMessage,
         templates: raw?.templates && typeof raw.templates === 'object' ? raw.templates : null,
         audience: (() => { const { instanceId: _i, ...rest } = normalizeAudienceFilters(instanceId, raw?.audience); return rest; })(),
     };
@@ -214,6 +228,52 @@ export async function preparePromoState(
     return { state, prevStep };
 }
 
+// ── Texto del envío ──────────────────────────────────────────────────────────
+
+/** Modelo barato de Claude: el mismo que usa ai.ts para lo simple. */
+export const PROMO_AI_MODEL = process.env.CLAUDE_MODEL_SIMPLE || 'claude-haiku-4-5-20251001';
+
+/** Cliente de Anthropic del servicio de IA (require diferido: ai.ts es pesado y los tests lo mockean). */
+function _anthropicClient(): any {
+    try {
+        return require('../ai').aiService?.anthropic || null;
+    } catch {
+        return null;
+    }
+}
+
+export interface BuildTextArgs {
+    cfg: PromoCampaignConfig;
+    campaignId: string;
+    phone: string;
+    name?: string | null;
+    price60: string;
+    anthropic?: any;
+    rand?: () => number;
+}
+
+/**
+ * El texto para un destinatario. En modo 'ai' lo reescribe Claude a partir del
+ * mensaje base; si la IA falla o devuelve algo inválido, sale una variante de
+ * las plantillas (nunca el mismo texto para todos, y la campaña no se frena).
+ */
+export async function buildPromoText(args: BuildTextArgs): Promise<{ text: string; via: 'ai' | 'templates' }> {
+    const { cfg } = args;
+    if (cfg.variationMode === 'ai') {
+        try {
+            const anthropic = args.anthropic === undefined ? _anthropicClient() : args.anthropic;
+            const text = await generatePromoVariation({
+                baseMessage: cfg.baseMessage, price60: args.price60, name: args.name, anthropic, model: PROMO_AI_MODEL, rand: args.rand,
+            });
+            return { text, via: 'ai' };
+        } catch (e: any) {
+            logger.warn(`[PROMO-IA] Sin reescritura para ${args.phone} (${e.message}) — sale una variante de plantilla.`);
+        }
+    }
+    const text = renderPromoMessage({ phone: args.phone, campaignId: args.campaignId, name: args.name, templates: cfg.templates, price60: args.price60 });
+    return { text, via: 'templates' };
+}
+
 // ── Tick ─────────────────────────────────────────────────────────────────────
 
 interface TickDeps {
@@ -242,7 +302,11 @@ async function _finishCampaign(c: any, sharedState: any, deps: TickDeps): Promis
  * Un tick del despachador. Exportado para los tests y para el botón "mandar
  * ahora" del panel (que lo llama con `force`, saltando ventana y hora).
  */
-export async function promoTick(sharedState: any, deps: TickDeps, opts: { now?: Date; force?: boolean; rand?: () => number } = {}): Promise<{ sent: boolean; reason: string }> {
+export async function promoTick(
+    sharedState: any,
+    deps: TickDeps,
+    opts: { now?: Date; force?: boolean; rand?: () => number; /** cliente de Anthropic a usar (tests); undefined = el del servicio de IA, null = sin IA */ anthropic?: any } = {}
+): Promise<{ sent: boolean; reason: string }> {
     const now = opts.now || new Date();
     const rand = opts.rand || Math.random;
     const sellerId = sharedState.sellerId;
@@ -317,8 +381,15 @@ export async function promoTick(sharedState: any, deps: TickDeps, opts: { now?: 
         deps.saveState(userId);
 
         let text: string;
+        let via: 'ai' | 'templates' = 'templates';
         try {
-            text = renderPromoMessage({ phone: recipient.phone, campaignId: campaign.id, name: state.userName || state.partialAddress?.nombre || null, templates: cfg.templates, price60 });
+            const built = await buildPromoText({
+                cfg, campaignId: campaign.id, phone: recipient.phone, price60, rand,
+                name: state.userName || state.partialAddress?.nombre || null,
+                anthropic: opts.anthropic,
+            });
+            text = built.text;
+            via = built.via;
         } catch (e: any) {
             // Sin texto válido no se manda nada: dejar el estado como estaba.
             _setStep(state, prevStep || 'greeting');
@@ -337,7 +408,7 @@ export async function promoTick(sharedState: any, deps: TickDeps, opts: { now?: 
                 prisma.promoRecipient.update({ where: { id: recipient.id }, data: { status: 'sent', sentAt: new Date(), messageText: text } }),
                 prisma.promoCampaign.update({ where: { id: campaign.id }, data: { sentToday: { increment: 1 }, totalSent: { increment: 1 }, failStreak: 0, nextSendAt: next, sentTodayDate: today } }),
             ]);
-            logger.info(`[PROMO][${sellerId}] Promo enviada a ${recipient.phone} (${sentToday + 1}/${cfg.dailyCap} hoy). Próximo: ${formatInTimeZone(next, ARG_TZ, 'HH:mm:ss')}`);
+            logger.info(`[PROMO][${sellerId}] Promo enviada a ${recipient.phone} vía ${via} (${sentToday + 1}/${cfg.dailyCap} hoy). Próximo: ${formatInTimeZone(next, ARG_TZ, 'HH:mm:ss')}`);
             return { sent: true, reason: 'enviado' };
         }
 

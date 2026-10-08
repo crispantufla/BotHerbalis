@@ -69,8 +69,11 @@ const PromoView = ({ onGoToChat }) => {
     const [recipientFilter, setRecipientFilter] = useState('');
     const [showCreate, setShowCreate] = useState(false);
     const [form, setForm] = useState(DEFAULT_FORM);
-    const [templates, setTemplates] = useState(null); // null = textos por defecto
+    const [templates, setTemplates] = useState(null); // null = textos por defecto (respaldo del modo IA)
     const [showTemplates, setShowTemplates] = useState(false);
+    // Modo IA: Claude reescribe el mensaje base con ligeras diferencias en cada envío.
+    const [variationMode, setVariationMode] = useState('ai');
+    const [baseMessage, setBaseMessage] = useState('');
     const [audience, setAudience] = useState(null);
     const [samples, setSamples] = useState(null);
     const [busy, setBusy] = useState(false);
@@ -81,6 +84,8 @@ const PromoView = ({ onGoToChat }) => {
             const r = await api.get('/api/promo/campaigns');
             setCampaigns(r.data.campaigns || []);
             setPrice60(r.data.price60 || null);
+            // Prefill del mensaje base con el del servidor (solo la primera vez).
+            setBaseMessage(prev => prev || r.data.baseMessageDefault || '');
         } catch (e) {
             toast.error('Error cargando campañas: ' + (e.response?.data?.error || e.message));
         } finally {
@@ -114,6 +119,8 @@ const PromoView = ({ onGoToChat }) => {
         windowStartHour: form.windowStartHour, windowEndHour: form.windowEndHour, dailyCap: form.dailyCap,
         minGapMinutes: form.minGapMinutes, maxGapMinutes: form.maxGapMinutes, longBreakEvery: form.longBreakEvery,
         skipWeekends: form.skipWeekends, skipIfInboundHours: form.skipIfInboundHours,
+        variationMode,
+        baseMessage: baseMessage.trim() || undefined,
         templates: templates || null,
         audience: { minDaysSinceLastSeen: form.minDaysSinceLastSeen, maxDaysSinceLastSeen: form.maxDaysSinceLastSeen, limit: form.limit, cooldownDays: form.cooldownDays },
     });
@@ -132,8 +139,9 @@ const PromoView = ({ onGoToChat }) => {
     const previewTexts = async () => {
         setBusy(true);
         try {
-            const r = await api.post('/api/promo/preview', { templates: templates || null, count: 4 });
+            const r = await api.post('/api/promo/preview', { variationMode, baseMessage: baseMessage.trim() || undefined, templates: templates || null, count: 3 });
             setSamples(r.data);
+            if (variationMode === 'ai' && r.data.aiAvailable === false) toast.warning('No hay IA disponible (falta ANTHROPIC_API_KEY): se usarían las plantillas.');
         } catch (e) {
             toast.error(e.response?.data?.error || e.message);
         } finally { setBusy(false); }
@@ -220,8 +228,34 @@ const PromoView = ({ onGoToChat }) => {
                         <NumField label="Sin repetir promo por (días)" value={form.cooldownDays} onChange={setF('cooldownDays')} min={0} max={3650} />
                     </div>
 
+                    <div className="mt-5">
+                        <div className="flex flex-wrap items-center gap-3 mb-2">
+                            <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">Mensaje base</label>
+                            <div className="flex gap-1.5">
+                                {[['ai', 'La IA lo reescribe en cada envío'], ['templates', 'Variantes por bloques']].map(([v, l]) => (
+                                    <button key={v} type="button" onClick={() => setVariationMode(v)}
+                                        className={cn('text-xs px-2.5 py-1 rounded-full border', variationMode === v ? 'bg-accent-500 text-white border-accent-500' : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300')}>
+                                        {l}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <textarea
+                            rows={9}
+                            className="w-full text-sm rounded-control border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 p-2"
+                            value={baseMessage}
+                            onChange={(e) => setBaseMessage(e.target.value)}
+                            disabled={variationMode !== 'ai'}
+                        />
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                            {variationMode === 'ai'
+                                ? <>Cada persona recibe una reescritura distinta de este texto, hecha por la IA: cambia palabras, orden y emojis, pero mantiene el precio, las condiciones y la palabra PROMO. <code>{'{{PROMO_60}}'}</code> es el precio promo y <code>{'{{NAME_COMMA}}'}</code> el nombre si lo tenemos. Si la IA falla en un envío, sale una variante por bloques.</>
+                                : <>Se arma el texto combinando las variantes por bloques de abajo (sin IA).</>}
+                        </p>
+                    </div>
+
                     <button type="button" onClick={() => setShowTemplates(s => !s)} className="mt-4 text-sm font-medium text-accent-600 dark:text-accent-400 flex items-center gap-1">
-                        {showTemplates ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />} Textos (una variante por bloque, separadas con una línea <code>---</code>)
+                        {showTemplates ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />} Variantes por bloques{variationMode === 'ai' ? ' (respaldo si la IA falla)' : ''} — una por línea, separadas con <code>---</code>
                     </button>
                     {showTemplates && (
                         <div className="mt-3 space-y-3">
@@ -263,9 +297,16 @@ const PromoView = ({ onGoToChat }) => {
                     )}
                     {samples && (
                         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <p className="md:col-span-2 text-xs text-slate-500 dark:text-slate-400">{samples.combinations.toLocaleString('es-AR')} combinaciones posibles. Cada persona recibe una distinta.</p>
+                            <p className="md:col-span-2 text-xs text-slate-500 dark:text-slate-400">
+                                {samples.mode === 'ai'
+                                    ? 'Reescrituras de la IA del mensaje base. Cada envío genera una nueva.'
+                                    : `${samples.combinations.toLocaleString('es-AR')} combinaciones posibles. Cada persona recibe una distinta.`}
+                            </p>
                             {samples.samples.map((t, i) => (
-                                <pre key={i} className="whitespace-pre-wrap text-xs font-sans p-3 rounded-control bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200">{t}</pre>
+                                <div key={i} className="p-3 rounded-control bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                                    <div className="text-[10px] uppercase tracking-wide text-slate-400 mb-1">{samples.via?.[i] === 'ai' ? 'IA' : 'plantilla'}</div>
+                                    <pre className="whitespace-pre-wrap text-xs font-sans text-slate-800 dark:text-slate-200">{t}</pre>
+                                </div>
                             ))}
                         </div>
                     )}

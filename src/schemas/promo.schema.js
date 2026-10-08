@@ -31,6 +31,8 @@ const promoConfigSchema = z.object({
     skipWeekends: z.boolean().optional(),
     skipIfInboundHours: z.number().min(0).max(720).optional(),
     maxFailStreak: z.number().min(1).max(50).optional(),
+    variationMode: z.enum(['ai', 'templates']).optional(),
+    baseMessage: z.string().min(40, 'El mensaje base es muy corto').max(2000).optional(),
     templates: templatesSchema.nullable().optional(),
     audience: audienceSchema.optional(),
 }).partial();
@@ -41,8 +43,10 @@ const createCampaignSchema = z.object({
 });
 
 const previewSchema = z.object({
+    variationMode: z.enum(['ai', 'templates']).optional(),
+    baseMessage: z.string().min(40, 'El mensaje base es muy corto').max(2000).optional(),
     templates: templatesSchema.nullable().optional(),
-    count: z.number().min(1).max(10).optional(),
+    count: z.number().min(1).max(6).optional(),
 });
 
 module.exports = { createCampaignSchema, promoConfigSchema, previewSchema, audienceSchema };

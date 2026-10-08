@@ -19,8 +19,9 @@ const logger = require('../../utils/logger');
 const validate = require('../../middleware/validate');
 const { createCampaignSchema, previewSchema } = require('../../schemas/promo.schema');
 const { selectPromoAudience, normalizeAudienceFilters } = require('../../services/promo/promoAudience');
-const { samplePromoMessages, countCombinations } = require('../../services/promo/promoTemplates');
-const { normalizePromoConfig, promoTick, DEFAULT_PROMO_CONFIG } = require('../../services/promo/promoDispatcher');
+const { countCombinations } = require('../../services/promo/promoTemplates');
+const { normalizePromoConfig, promoTick, buildPromoText, DEFAULT_PROMO_CONFIG } = require('../../services/promo/promoDispatcher');
+const { DEFAULT_BASE_MESSAGE } = require('../../services/promo/promoVariation');
 const { _getPromoPrice60 } = require('../../flows/utils/pricing');
 
 module.exports = (clientPool) => {
@@ -85,13 +86,33 @@ module.exports = (clientPool) => {
         }
     });
 
-    // POST /promo/preview
-    router.post('/promo/preview', ...withSeller(clientPool), validate(previewSchema), (req, res) => {
+    // POST /promo/preview — muestras del texto. En modo 'ai' le pide a Claude
+    // `count` reescrituras del mensaje base (cada una cuesta una llamada al
+    // modelo simple); en modo 'templates', variantes de las plantillas.
+    router.post('/promo/preview', ...withSeller(clientPool), validate(previewSchema), async (req, res) => {
         try {
             const price = _getPromoPrice60('Cápsulas');
             if (!price) return res.status(400).json({ error: 'No hay precio promo cargado (Editor de Precios → promoPrice60)' });
-            const samples = samplePromoMessages(req.body.count || 5, req.body.templates || null);
-            res.json({ price60: price, combinations: countCombinations(req.body.templates || null), samples, defaults: DEFAULT_PROMO_CONFIG });
+            const instanceId = getInstanceId(req) || 'default';
+            const cfg = normalizePromoConfig(req.body, instanceId);
+            const count = req.body.count || 3;
+            const names = ['María', null, 'Jorge', null, 'Rosa', null];
+            const samples = [];
+            const via = [];
+            for (let i = 0; i < count; i++) {
+                const built = await buildPromoText({ cfg, campaignId: `preview-${Date.now()}-${i}`, phone: `549341000${String(1000 + i * 7919).slice(-4)}`, name: names[i % names.length], price60: price });
+                samples.push(built.text);
+                via.push(built.via);
+            }
+            res.json({
+                price60: price,
+                mode: cfg.variationMode,
+                via,
+                combinations: countCombinations(req.body.templates || null),
+                samples,
+                defaults: { ...DEFAULT_PROMO_CONFIG, baseMessage: DEFAULT_BASE_MESSAGE },
+                aiAvailable: !!(require('../../services/ai').aiService?.anthropic),
+            });
         } catch (e) {
             res.status(400).json({ error: e.message });
         }
@@ -104,7 +125,7 @@ module.exports = (clientPool) => {
             const campaigns = await prisma.promoCampaign.findMany({ where: { instanceId }, orderBy: { createdAt: 'desc' }, take: 50 });
             const out = [];
             for (const c of campaigns) out.push({ ...serialize(c), stats: await campaignStats(c) });
-            res.json({ campaigns: out, price60: _getPromoPrice60('Cápsulas') });
+            res.json({ campaigns: out, price60: _getPromoPrice60('Cápsulas'), baseMessageDefault: DEFAULT_BASE_MESSAGE });
         } catch (e) {
             logger.error('[PROMO] list:', e);
             res.status(500).json({ error: e.message });

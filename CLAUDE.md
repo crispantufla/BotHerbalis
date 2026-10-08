@@ -116,9 +116,11 @@ Máquina de estados lineal con fallbacks a IA. Orden típico:
   últimos 30, que pueden tener un pedido en curso) desde `FunnelEvent` + `User.profileData`.
   FunnelEvent es la ÚNICA memoria de quién habló hace más de ~40 días: los estados se limpian
   a los 30 y ChatLog se purga; medido el 8-oct: 6.285 personas, 95% solo con rastro del
-  embudo (sin nombre ni estado: el despachador les crea uno limpio). `promoTemplates` arma un
-  texto distinto por persona (bloques + spintax,
-  determinístico por campaña+teléfono, el precio solo por placeholder) y `promoDispatcher`
+  embudo (sin nombre ni estado: el despachador les crea uno limpio). El texto de cada envío lo
+  reescribe Claude (modelo simple) a partir del mensaje base del vendedor (`promoVariation`:
+  valida precio, PROMO, largo y que no aparezca otro precio; 2 intentos) y si falla cae a
+  `promoTemplates` (bloques + spintax, determinístico por campaña+teléfono); en los dos caminos
+  el precio entra solo por placeholder. `promoDispatcher`
   manda de a uno desde un cron por minuto del scheduler: ventana horaria ARG, tope diario,
   pausa sorteada entre envíos, cortes largos, y re-validación del destinatario al momento de
   mandar. La respuesta cae en el step `promo_offer` (`stepPromoOffer.ts`): sin kilos, elige
