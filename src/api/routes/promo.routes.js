@@ -20,7 +20,7 @@ const validate = require('../../middleware/validate');
 const { createCampaignSchema, previewSchema } = require('../../schemas/promo.schema');
 const { selectPromoAudience, normalizeAudienceFilters } = require('../../services/promo/promoAudience');
 const { countCombinations } = require('../../services/promo/promoTemplates');
-const { normalizePromoConfig, promoTick, buildPromoText, DEFAULT_PROMO_CONFIG } = require('../../services/promo/promoDispatcher');
+const { normalizePromoConfig, promoTick, buildPromoText, loadPromoImage, DEFAULT_PROMO_CONFIG } = require('../../services/promo/promoDispatcher');
 const { DEFAULT_BASE_MESSAGE } = require('../../services/promo/promoVariation');
 const { _getPromoPrice60 } = require('../../flows/utils/pricing');
 
@@ -224,12 +224,22 @@ module.exports = (clientPool) => {
                 sendMessageWithDelay: inst.helpers.sendMessageWithDelay,
                 saveState: inst.stateManager.saveState.bind(inst.stateManager),
                 notifyAdmin: inst.helpers.notifyAdmin,
+                client: inst.client,
             }, { force: true });
             res.json(result);
         } catch (e) {
             logger.error('[PROMO] send-now:', e);
             res.status(500).json({ error: e.message });
         }
+    });
+
+    // GET /promo/image — el flyer que se adjunta a la promo (para la vista previa del panel).
+    router.get('/promo/image', ...withSeller(clientPool), (req, res) => {
+        const media = loadPromoImage();
+        if (!media) return res.status(404).json({ error: 'No hay imagen de la promo' });
+        res.setHeader('Content-Type', media.mimetype);
+        res.setHeader('Cache-Control', 'private, max-age=3600');
+        res.send(Buffer.from(media.data, 'base64'));
     });
 
     return router;

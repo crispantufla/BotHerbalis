@@ -18,9 +18,11 @@
  * número está bloqueado o la sesión cayó, seguir insistiendo es lo peor.
  */
 
+import fs from 'fs';
+import path from 'path';
 import { formatInTimeZone } from 'date-fns-tz';
 import { UserState } from '../../types/state';
-import { _setStep, _cleanPhone } from '../../flows/utils/flowHelpers';
+import { _setStep, _cleanPhone, _pushHistory } from '../../flows/utils/flowHelpers';
 import { createInitialUserState } from '../../flows/leadClassifier';
 import { _getPromoPrice60 } from '../../flows/utils/pricing';
 import { renderPromoMessage, PromoTemplates } from './promoTemplates';
@@ -65,6 +67,8 @@ export interface PromoCampaignConfig {
     baseMessage: string;
     /** Textos propios por bloque (modo 'templates' y respaldo del modo 'ai'). */
     templates?: Partial<PromoTemplates> | null;
+    /** Mandar la imagen del flyer (public/promo/promo-60-dias.jpg) unos segundos después del texto. */
+    imageEnabled: boolean;
     /** Con qué filtros se armó la lista. */
     audience: Omit<AudienceFilters, 'instanceId'>;
 }
@@ -84,8 +88,26 @@ export const DEFAULT_PROMO_CONFIG: PromoCampaignConfig = {
     variationMode: 'ai',
     baseMessage: DEFAULT_BASE_MESSAGE,
     templates: null,
+    imageEnabled: true,
     audience: { ...DEFAULT_AUDIENCE_FILTERS },
 };
+
+/** El flyer de la promo, commiteado en el repo (public/media está ignorado; public/promo no). */
+export const PROMO_IMAGE_PATH = path.join(__dirname, '../../../public/promo/promo-60-dias.jpg');
+
+let _imageCache: { mimetype: string; data: string; filename: string } | null = null;
+/** La imagen como MessageMedia ({mimetype, data, filename}); null si no está. Cacheada en memoria. */
+export function loadPromoImage(filePath: string = PROMO_IMAGE_PATH): { mimetype: string; data: string; filename: string } | null {
+    if (_imageCache) return _imageCache;
+    try {
+        if (!fs.existsSync(filePath)) return null;
+        _imageCache = { mimetype: 'image/jpeg', data: fs.readFileSync(filePath).toString('base64'), filename: 'promo-60-dias.jpg' };
+        return _imageCache;
+    } catch (e: any) {
+        logger.warn(`[PROMO] No pude leer la imagen de la promo: ${e.message}`);
+        return null;
+    }
+}
 
 export function normalizePromoConfig(raw: any, instanceId: string = 'default'): PromoCampaignConfig {
     const d = DEFAULT_PROMO_CONFIG;
@@ -109,6 +131,7 @@ export function normalizePromoConfig(raw: any, instanceId: string = 'default'): 
         variationMode: raw?.variationMode === 'templates' ? 'templates' : 'ai',
         baseMessage: typeof raw?.baseMessage === 'string' && raw.baseMessage.trim().length >= 40 ? raw.baseMessage.replace(/\r/g, '').trim() : d.baseMessage,
         templates: raw?.templates && typeof raw.templates === 'object' ? raw.templates : null,
+        imageEnabled: raw?.imageEnabled !== false,
         audience: (() => { const { instanceId: _i, ...rest } = normalizeAudienceFilters(instanceId, raw?.audience); return rest; })(),
     };
     if (cfg.windowEndHour <= cfg.windowStartHour) cfg.windowEndHour = Math.min(24, cfg.windowStartHour + 1);
@@ -280,6 +303,36 @@ interface TickDeps {
     sendMessageWithDelay: (userId: string, msg: string, startTime?: number, stillValid?: () => boolean) => Promise<boolean>;
     saveState: (userId?: string) => void;
     notifyAdmin?: (title: string, userId: string, msg: string) => Promise<any>;
+    /** Cliente de WhatsApp del seller, para mandar la imagen (sendMessageWithDelay solo manda texto). */
+    client?: any;
+}
+
+/**
+ * Manda el flyer unos segundos después del texto, como quien adjunta la foto
+ * después de escribir. Nunca hace fallar el envío: sin imagen o con error, el
+ * texto ya salió y la campaña sigue. Deja marcador en el historial y en el
+ * panel (misma convención que la imagen del saludo).
+ */
+async function _sendPromoImage(userId: string, state: UserState, sharedState: any, deps: TickDeps, rand: () => number): Promise<boolean> {
+    if (!deps.client) return false;
+    const media = loadPromoImage();
+    if (!media) {
+        logger.warn(`[PROMO][${sharedState.sellerId}] Sin imagen de la promo en ${PROMO_IMAGE_PATH} — va solo el texto.`);
+        return false;
+    }
+    try {
+        await new Promise(r => setTimeout(r, 2000 + Math.floor(rand() * 4000)));
+        if (sharedState.pausedUsers?.has(userId)) return false;
+        await deps.client.sendMessage(userId, media, { caption: '' });
+        _pushHistory(state, { role: 'bot', content: '[Imagen adjunta: flyer de la promo 60 días]' });
+        if (typeof sharedState.logAndEmit === 'function') {
+            try { sharedState.logAndEmit(userId, 'bot', '📷 Imagen enviada: flyer de la promo', 'promo_offer'); } catch { /* best effort */ }
+        }
+        return true;
+    } catch (e: any) {
+        logger.warn(`[PROMO][${sharedState.sellerId}] No salió la imagen a ${userId}: ${e.message}`);
+        return false;
+    }
 }
 
 const MAX_SKIPS_PER_TICK = 15;
@@ -403,12 +456,14 @@ export async function promoTick(
         const ok = await deps.sendMessageWithDelay(userId, text);
 
         if (ok) {
+            const withImage = cfg.imageEnabled ? await _sendPromoImage(userId, state, sharedState, deps, rand) : false;
+            if (withImage) deps.saveState(userId);
             const next = computeNextSendAt(cfg, new Date(), rand);
             await Promise.all([
                 prisma.promoRecipient.update({ where: { id: recipient.id }, data: { status: 'sent', sentAt: new Date(), messageText: text } }),
                 prisma.promoCampaign.update({ where: { id: campaign.id }, data: { sentToday: { increment: 1 }, totalSent: { increment: 1 }, failStreak: 0, nextSendAt: next, sentTodayDate: today } }),
             ]);
-            logger.info(`[PROMO][${sellerId}] Promo enviada a ${recipient.phone} vía ${via} (${sentToday + 1}/${cfg.dailyCap} hoy). Próximo: ${formatInTimeZone(next, ARG_TZ, 'HH:mm:ss')}`);
+            logger.info(`[PROMO][${sellerId}] Promo enviada a ${recipient.phone} vía ${via}${withImage ? ' + imagen' : ''} (${sentToday + 1}/${cfg.dailyCap} hoy). Próximo: ${formatInTimeZone(next, ARG_TZ, 'HH:mm:ss')}`);
             return { sent: true, reason: 'enviado' };
         }
 

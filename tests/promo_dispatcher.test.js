@@ -249,3 +249,48 @@ describe('preparePromoState', () => {
         expect(ss.userState['5493410000040@c.us']).toBe(state);
     });
 });
+
+describe('imagen del flyer', () => {
+    const { loadPromoImage, PROMO_IMAGE_PATH } = require('../src/services/promo/promoDispatcher');
+    const fs = require('fs');
+
+    test('el flyer está en el repo y se carga como MessageMedia', () => {
+        expect(fs.existsSync(PROMO_IMAGE_PATH)).toBe(true);
+        const m = loadPromoImage();
+        expect(m).toEqual(expect.objectContaining({ mimetype: 'image/jpeg', filename: 'promo-60-dias.jpg' }));
+        expect(m.data.length).toBeGreaterThan(1000);
+    });
+
+    test('tras el texto manda la imagen por el cliente y deja marcador en el historial', async () => {
+        mockDb.promoCampaign.findFirst.mockResolvedValue(campaign());
+        mockDb.promoRecipient.findFirst.mockResolvedValueOnce(recipient('5493410000050')).mockResolvedValueOnce(null);
+        const ss = shared({ logAndEmit: jest.fn() });
+        const d = { ...deps(true), client: { sendMessage: jest.fn().mockResolvedValue({ id: { _serialized: 'x' } }) } };
+        const r = await promoTick(ss, d, { now: WED_1430, rand: () => 0 });
+        expect(r.sent).toBe(true);
+        expect(d.client.sendMessage).toHaveBeenCalledTimes(1);
+        const [to, media] = d.client.sendMessage.mock.calls[0];
+        expect(to).toBe('5493410000050@c.us');
+        expect(media.mimetype).toBe('image/jpeg');
+        const st = ss.userState['5493410000050@c.us'];
+        expect(st.history.some(h => h.role === 'bot' && /flyer de la promo/.test(h.content))).toBe(true);
+        expect(ss.logAndEmit).toHaveBeenCalledWith('5493410000050@c.us', 'bot', expect.stringMatching(/Imagen/), 'promo_offer');
+    });
+
+    test('si la imagen falla, el envío igual cuenta como hecho', async () => {
+        mockDb.promoCampaign.findFirst.mockResolvedValue(campaign());
+        mockDb.promoRecipient.findFirst.mockResolvedValueOnce(recipient('5493410000051')).mockResolvedValueOnce(null);
+        const d = { ...deps(true), client: { sendMessage: jest.fn().mockRejectedValue(new Error('media fail')) } };
+        const r = await promoTick(shared(), d, { now: WED_1430, rand: () => 0 });
+        expect(r.sent).toBe(true);
+        expect(mockDb.promoRecipient.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'sent' }) }));
+    });
+
+    test('con imageEnabled=false no manda la imagen', async () => {
+        mockDb.promoCampaign.findFirst.mockResolvedValue(campaign({ config: JSON.stringify({ ...cfg(), imageEnabled: false }) }));
+        mockDb.promoRecipient.findFirst.mockResolvedValueOnce(recipient('5493410000052')).mockResolvedValueOnce(null);
+        const d = { ...deps(true), client: { sendMessage: jest.fn() } };
+        await promoTick(shared(), d, { now: WED_1430 });
+        expect(d.client.sendMessage).not.toHaveBeenCalled();
+    });
+});

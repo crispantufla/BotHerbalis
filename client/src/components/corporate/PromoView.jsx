@@ -50,6 +50,22 @@ const DEFAULT_FORM = {
 
 const fmtTime = (iso) => iso ? new Date(iso).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
 
+// Miniatura del flyer. La imagen la sirve la API con JWT, así que no alcanza un
+// <img src>: se baja con axios y se muestra como object URL.
+function PromoImageThumb() {
+    const [url, setUrl] = useState(null);
+    useEffect(() => {
+        let objectUrl = null;
+        let cancelled = false;
+        api.get('/api/promo/image', { responseType: 'blob' })
+            .then((r) => { if (cancelled) return; objectUrl = URL.createObjectURL(r.data); setUrl(objectUrl); })
+            .catch(() => {});
+        return () => { cancelled = true; if (objectUrl) URL.revokeObjectURL(objectUrl); };
+    }, []);
+    if (!url) return <div className="w-16 h-20 rounded-control bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex-shrink-0" />;
+    return <img src={url} alt="Flyer de la promo" className="w-16 h-20 object-cover rounded-control border border-slate-200 dark:border-slate-700 flex-shrink-0" />;
+}
+
 function NumField({ label, value, onChange, min, max, hint }) {
     return (
         <Input
@@ -74,6 +90,8 @@ const PromoView = ({ onGoToChat }) => {
     // Modo IA: Claude reescribe el mensaje base con ligeras diferencias en cada envío.
     const [variationMode, setVariationMode] = useState('ai');
     const [baseMessage, setBaseMessage] = useState('');
+    // El flyer va unos segundos después del texto.
+    const [imageEnabled, setImageEnabled] = useState(true);
     const [audience, setAudience] = useState(null);
     const [samples, setSamples] = useState(null);
     const [busy, setBusy] = useState(false);
@@ -122,6 +140,7 @@ const PromoView = ({ onGoToChat }) => {
         variationMode,
         baseMessage: baseMessage.trim() || undefined,
         templates: templates || null,
+        imageEnabled,
         audience: { minDaysSinceLastSeen: form.minDaysSinceLastSeen, maxDaysSinceLastSeen: form.maxDaysSinceLastSeen, limit: form.limit, cooldownDays: form.cooldownDays },
     });
 
@@ -252,6 +271,14 @@ const PromoView = ({ onGoToChat }) => {
                                 ? <>Cada persona recibe una reescritura distinta de este texto, hecha por la IA: cambia palabras, orden y emojis, pero mantiene el precio, las condiciones y la palabra PROMO. <code>{'{{PROMO_60}}'}</code> es el precio promo y <code>{'{{NAME_COMMA}}'}</code> el nombre si lo tenemos. Si la IA falla en un envío, sale una variante por bloques.</>
                                 : <>Se arma el texto combinando las variantes por bloques de abajo (sin IA).</>}
                         </p>
+                    </div>
+
+                    <div className="mt-4 flex items-start gap-3">
+                        <PromoImageThumb />
+                        <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 mt-1">
+                            <input type="checkbox" checked={imageEnabled} onChange={(e) => setImageEnabled(e.target.checked)} />
+                            Adjuntar el flyer de la promo (sale unos segundos después del texto)
+                        </label>
                     </div>
 
                     <button type="button" onClick={() => setShowTemplates(s => !s)} className="mt-4 text-sm font-medium text-accent-600 dark:text-accent-400 flex items-center gap-1">

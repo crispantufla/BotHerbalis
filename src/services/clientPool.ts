@@ -520,6 +520,8 @@ class ClientPool {
                 instance.schedulerHandle = startScheduler(sharedState, {
                     notifyAdmin: helpers.notifyAdmin,
                     sendMessageWithDelay: helpers.sendMessageWithDelay,
+                    // Para la imagen de las campañas promo (sendMessageWithDelay solo manda texto).
+                    client,
                     saveState: stateManager.saveState.bind(stateManager),
                     flushState: stateManager.flushState.bind(stateManager),
                     saveOrderToLocal: helpers.saveOrderToLocal

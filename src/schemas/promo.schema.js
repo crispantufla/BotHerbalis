@@ -34,6 +34,7 @@ const promoConfigSchema = z.object({
     variationMode: z.enum(['ai', 'templates']).optional(),
     baseMessage: z.string().min(40, 'El mensaje base es muy corto').max(2000).optional(),
     templates: templatesSchema.nullable().optional(),
+    imageEnabled: z.boolean().optional(),
     audience: audienceSchema.optional(),
 }).partial();
 
