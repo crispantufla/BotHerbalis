@@ -62,10 +62,11 @@ function _detectProduct(normalizedText: string, knowledge: any): string | null {
 const DEFAULT_PRODUCT_ASK =
     '¡Buenísimo! 🎉 La promo es el tratamiento completo de *60 días* a *${{PROMO_60}}*, en la presentación que prefieras:\n\n' +
     '1️⃣ *Cápsulas* — 1 al día, 30 min antes del almuerzo o la cena.\n' +
-    '2️⃣ *Gotas* — 10 gotas al día, 30 min antes del almuerzo o la cena.\n' +
-    '3️⃣ *Semillas* — una infusión antes de dormir.\n\n' +
-    'Las tres son 100% naturales y funcionan igual 🌿 ¿Con cuál arrancamos?';
+    '2️⃣ *Gotas* — 10 gotas al día, 30 min antes del almuerzo o la cena.\n\n' +
+    'Las dos son 100% naturales y funcionan igual 🌿 ¿Con cuál arrancamos?';
 const DEFAULT_PRODUCT_CONFIRM = '¡Genial! 🎁 Te armo el plan de *60 días* de *{{PRODUCT_SHORT}}* a *${{TOTAL}}* (precio promo).';
+// Las semillas no entran en la promo: van a su precio de lista (que es más bajo).
+const DEFAULT_PRODUCT_CONFIRM_SEMILLAS = '¡Dale! Las *semillas* no entran en la promo, pero van a su precio normal, que es menor: plan de *60 días* a *${{TOTAL}}*, con envío gratis igual 🌿';
 const DEFAULT_DECLINED = 'Todo bien, ¡gracias por responderme! 😊 Si más adelante querés retomarlo, escribime por acá nomás.';
 const DEFAULT_OPTED_OUT = 'Listo, no te escribo más. ¡Que estés muy bien! 🙏';
 
@@ -101,7 +102,10 @@ async function _chooseProduct(userId: string, product: string, currentState: Use
     _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
     saveState(userId);
 
-    const confirm = _render(_tpl('promo_product_confirm', knowledge, DEFAULT_PRODUCT_CONFIRM), currentState);
+    const isSemillas = /semilla/i.test(product);
+    const confirm = isSemillas
+        ? _render(_tpl('promo_product_confirm_semillas', knowledge, DEFAULT_PRODUCT_CONFIRM_SEMILLAS), currentState)
+        : _render(_tpl('promo_product_confirm', knowledge, DEFAULT_PRODUCT_CONFIRM), currentState);
     await sendMessageWithDelay(userId, confirm);
     const paymentMsg = buildPaymentMessage(currentState, knowledge, !isMpEnabled(dependencies.config));
     await sendMessageWithDelay(userId, paymentMsg);
@@ -182,10 +186,10 @@ export async function handlePromoOffer(
     const mpOn = isMpEnabled(dependencies.config);
     const goal =
         `El cliente recibió de nuestra parte un mensaje de PROMO (le escribimos nosotros primero, porque meses atrás consultó y no compró) y acaba de responder: "${text}". ` +
-        `LA PROMO: tratamiento completo de *60 días* a *$${price}* en Cápsulas o Gotas (las Semillas de 60 días ya cuestan menos y quedan a su precio de lista). Envío gratis a todo el país. ` +
+        `LA PROMO: tratamiento completo de *60 días* a *$${price}* en *Cápsulas* o *Gotas* solamente. Las Semillas NO entran en la promo: si las pide, van a su precio de lista normal (que es menor), aclarándoselo. Envío gratis a todo el país. ` +
         `Cómo se paga: *retiro en sucursal de Correo Argentino* pagando el total en efectivo al retirar (sin adelantar nada), o *envío a domicilio* prepago por ${mpOn ? 'tarjeta de crédito o transferencia' : 'transferencia'}. ` +
         `🛑 En esta conversación el precio del plan de 60 días es $${price}: NO cites el precio de lista del plan de 60. El plan de 120 días sigue a su precio de lista normal (solo si lo pide). ` +
-        `Tu tarea: (1) respondé su consulta u objeción con calidez, honestidad y BREVEDAD, sin inventar nada; (2) cerrá con UNA sola pregunta: con qué presentación arranca, cápsulas, gotas o semillas. ` +
+        `Tu tarea: (1) respondé su consulta u objeción con calidez, honestidad y BREVEDAD, sin inventar nada; (2) cerrá con UNA sola pregunta: con qué presentación arranca, cápsulas o gotas. ` +
         `Si elige una presentación, devolvé en extractedData "PRODUCTO: Cápsulas" / "PRODUCTO: Gotas" / "PRODUCTO: Semillas" y goalMet=true. Si dice que no le interesa, despedite cordialmente sin insistir y devolvé extractedData "PROMO_DECLINED". 🛑 NO derives al médico salvo contraindicación real.`;
 
     try {

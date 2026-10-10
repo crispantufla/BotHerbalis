@@ -54,7 +54,8 @@ describe('promo_offer', () => {
         expect(st.step).toBe('promo_offer');
         expect(sent(d)).toHaveLength(1);
         expect(sent(d)[0]).toMatch(/44\.900/);
-        expect(sent(d)[0]).toMatch(/Cápsulas[\s\S]*Gotas[\s\S]*Semillas/);
+        expect(sent(d)[0]).toMatch(/Cápsulas[\s\S]*Gotas/);
+        expect(sent(d)[0]).not.toMatch(/Semillas/); // la promo es solo cápsulas o gotas
         expect(sent(d)[0]).not.toMatch(/kilos/i);
         expect(st.promo.outcome).toBe('interested');
         expect(st.promo.repliedAt).toBeTruthy();
@@ -76,6 +77,7 @@ describe('promo_offer', () => {
         expect(st.totalPrice).toBe(price);
         expect(sent(d)).toHaveLength(2);
         expect(sent(d)[0]).toMatch(new RegExp(price.replace('.', '\\.')));
+        if (/semilla/i.test(product)) expect(sent(d)[0]).toMatch(/no entran en la promo/i); else expect(sent(d)[0]).toMatch(/precio promo/);
         expect(sent(d)[1]).toMatch(/Retiro en sucursal/i);
         expect(sent(d)[1]).toMatch(/domicilio/i);
     });

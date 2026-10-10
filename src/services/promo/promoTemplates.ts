@@ -63,12 +63,12 @@ export const DEFAULT_PROMO_TEMPLATES: PromoTemplates = {
         'Para que puedas probarlo sin pensarlo tanto, armamos esto por tiempo limitado:',
     ],
     offer: [
-        '🎁 Tratamiento completo por 60 días a solo ${{PROMO_60}}.-',
-        '🎁 Plan completo de *60 días* por ${{PROMO_60}}',
-        '🎁 *60 días de tratamiento* por ${{PROMO_60}} (precio promo)',
-        '🎁 El tratamiento completo de 60 días, a ${{PROMO_60}} nada más.',
-        '🎁 Tratamiento de 60 días completo: ${{PROMO_60}}.-',
-        '🎁 60 días de tratamiento por solo ${{PROMO_60}}',
+        '🎁 Tratamiento completo por 60 días (cápsulas o gotas) a solo ${{PROMO_60}}.-',
+        '🎁 Plan completo de *60 días* en cápsulas o gotas por ${{PROMO_60}}',
+        '🎁 *60 días de tratamiento* (cápsulas o gotas) por ${{PROMO_60}} (precio promo)',
+        '🎁 El tratamiento completo de 60 días, en cápsulas o gotas, a ${{PROMO_60}} nada más.',
+        '🎁 Tratamiento de 60 días completo, cápsulas o gotas: ${{PROMO_60}}.-',
+        '🎁 60 días de tratamiento en cápsulas o gotas por solo ${{PROMO_60}}',
     ],
     reassure: [
         'Para que compres con total tranquilidad:\n🚚 Envío gratis a todo el país.\n🤝 Pagás al recibirlo: no adelantás nada, lo abonás cuando lo tenés en tus manos.',
