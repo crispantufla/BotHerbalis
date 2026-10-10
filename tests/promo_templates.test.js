@@ -13,10 +13,12 @@ const {
 const { _getPromoPrice60 } = require('../src/flows/utils/pricing');
 
 describe('precio promo (pricing.ts)', () => {
-    test('cápsulas y gotas bajan al precio promo; semillas se queda con el de lista (más bajo)', () => {
-        expect(_getPromoPrice60('Cápsulas de nuez de la india')).toBe('44.900');
+    test('la promo es solo para las gotas: cápsulas y semillas no tienen precio promo', () => {
+        expect(_getPromoPrice60('Gotas de nuez de la india')).toBe('44.900');
         expect(_getPromoPrice60('Gotas')).toBe('44.900');
-        expect(_getPromoPrice60('Semillas')).toBe('36.900');
+        expect(_getPromoPrice60('Cápsulas de nuez de la india')).toBeNull();
+        expect(_getPromoPrice60('Semillas')).toBeNull();
+        expect(_getPromoPrice60(null)).toBeNull();
     });
 });
 

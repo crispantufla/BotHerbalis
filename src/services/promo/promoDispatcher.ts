@@ -421,7 +421,7 @@ export async function promoTick(
             return { sent: false, reason: pendingLeft === 0 ? 'terminada' : 'solo_salteados' };
         }
 
-        const price60 = _getPromoPrice60('Cápsulas');
+        const price60 = _getPromoPrice60('Gotas');
         if (!price60) {
             await prisma.promoCampaign.update({ where: { id: campaign.id }, data: { status: 'paused' } });
             logger.error(`[PROMO][${sellerId}] Sin promoPrice60 en prices.json — campaña pausada.`);

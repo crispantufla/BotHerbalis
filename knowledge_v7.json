@@ -2,7 +2,7 @@
     "meta": {
         "name": "Guión V7 — Elena · 2 tiers (60d / 120d)",
         "description": "Guión simplificado may-2026: persona Elena (tono cálido argentino), 2 tiers (hasta 10 kg → plan 60 días; más de 10 kg → plan 120 días). Tras pedir kilos, el bot envía dos mensajes seguidos (recomendación + precios). Cuando el cliente elige producto, confirma el total y va directo al menú de pago. Modelo de pago nuevo: retiro en sucursal (paga total al retirar) o envío a domicilio (prepago MP/transferencia). (Restaurado el 28-sep-2026 tras revertir el guion V8 por zona; la versión es 8.2+ para que gane sobre la copia V8 guardada en DATA_DIR.)",
-        "version": "8.6"
+        "version": "8.7"
     },
     "flow": {
         "greeting": {
@@ -182,15 +182,10 @@
             "_note": "Fallback si el paymentMethod del state no matchea con ninguno conocido. Logueamos warn en código.",
             "response": "📦 CONFIRMACIÓN DE ENVÍO\n\nProducto: {{PRODUCT_DETAIL}}\nPlan: {{PLAN_DETAIL}}\nTotal: ${{TOTAL}}\n\n✔ Correo Argentino\n{{POSTDATADO_LINE}}\nImportante:\nSi el cartero no te encuentra, el paquete queda en sucursal 72 hs.\n\n✅ Ya queda en curso tu pedido 🌱 Apenas lo despachemos te pasamos el seguimiento. ¡Gracias por confiar en Herbalis!"
         },
-        "promo_product_ask": {
-            "step": "promo_offer",
-            "_note": "Campañas promo (oct-2026). El cliente respondió con interés (PROMO / sí / quiero) sin decir presentación. La promo es SOLO cápsulas o gotas; las semillas, si las pide, van a su precio de lista (promo_product_confirm_semillas). {{PROMO_60}} es el precio promo (promoPrice60 en el Editor de Precios). Sin kilos: la promo es el plan de 60 para todos.",
-            "response": "¡Buenísimo! 🎉 La promo es el tratamiento completo de *60 días* a *${{PROMO_60}}*, en la presentación que prefieras:\n\n1️⃣ *Cápsulas* — 1 al día, 30 min antes del almuerzo o la cena.\n2️⃣ *Gotas* — 10 gotas al día, 30 min antes del almuerzo o la cena.\n\nLas dos son 100% naturales y funcionan igual 🌿 ¿Con cuál arrancamos?"
-        },
         "promo_product_confirm": {
             "step": "promo_offer",
-            "_note": "Campañas promo. El cliente eligió presentación: confirma el plan de 60 al precio promo ({{TOTAL}} ya viene calculado) y a continuación el bot manda payment_menu.",
-            "response": "¡Genial! 🎁 Te armo el plan de *60 días* de *{{PRODUCT_SHORT}}* a *${{TOTAL}}* (precio promo)."
+            "_note": "Campañas promo (oct-2026, solo GOTAS). El cliente respondió PROMO / sí / quiero: el bot arma directo el plan de 60 de gotas al precio promo ({{TOTAL}} ya viene calculado) y después manda payment_menu. Sin pregunta de presentación ni de kilos.",
+            "response": "¡Genial! 🎁 Te armo el plan de *60 días* de *Gotas* a *${{TOTAL}}* (precio promo)."
         },
         "promo_declined": {
             "step": "promo_offer",
@@ -202,10 +197,15 @@
             "_note": "Campañas promo. El cliente pidió que no le escribamos más: se lo confirma y queda excluido de toda campaña futura. NO usar \"Disculpá la molestia\": esa frase dispara la pausa con alerta de salesFlow.",
             "response": "Listo, no te escribo más. ¡Que estés muy bien! 🙏"
         },
-        "promo_product_confirm_semillas": {
+        "promo_other_product": {
             "step": "promo_offer",
-            "_note": "Campañas promo. El cliente pidió semillas, que NO entran en la promo: se le aclara y se cobra el precio de lista ({{TOTAL}} ya viene calculado, es menor que el promo). Después el bot manda payment_menu.",
-            "response": "¡Dale! Las *semillas* no entran en la promo, pero van a su precio normal, que es menor: plan de *60 días* a *${{TOTAL}}*, con envío gratis igual 🌿"
+            "_note": "Campañas promo. El cliente pidió cápsulas o semillas, que NO entran en la promo. Se le aclara y se le deja elegir; si insiste con la otra presentación, el bot la cobra a precio de lista (promo_product_confirm_list). {{PROMO_60}} es el precio promo; {{OTHER_PRODUCT}} y {{OTHER_PRICE}} los de la presentación pedida.",
+            "response": "La promo es solo para las *gotas*: plan de 60 días a *${{PROMO_60}}* 💧\n\nLas *{{OTHER_PRODUCT}}* van a su precio normal, *${{OTHER_PRICE}}* el plan de 60 días, también con envío gratis.\n\n¿Seguimos con las gotas en promo o preferís las {{OTHER_PRODUCT}}?"
+        },
+        "promo_product_confirm_list": {
+            "step": "promo_offer",
+            "_note": "Campañas promo. El cliente eligió una presentación fuera de la promo: se confirma a precio de lista ({{TOTAL}} ya viene calculado) y después payment_menu.",
+            "response": "¡Dale! Te armo el plan de *60 días* de *{{PRODUCT_SHORT}}* a *${{TOTAL}}* (precio normal, con envío gratis) 🌿"
         }
     },
     "faq": [

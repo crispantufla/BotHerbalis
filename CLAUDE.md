@@ -124,9 +124,11 @@ Máquina de estados lineal con fallbacks a IA. Orden típico:
   manda de a uno desde un cron por minuto del scheduler: ventana horaria ARG, tope diario,
   pausa sorteada entre envíos, cortes largos, y re-validación del destinatario al momento de
   mandar. La respuesta cae en el step `promo_offer` (`stepPromoOffer.ts`): sin kilos, elige
-  presentación y pasa directo al menú de pago. La promo es SOLO cápsulas o gotas (decisión
-  del 10-oct): las semillas, si las piden, van a su precio de lista y el bot lo aclara
-  (`promo_product_confirm_semillas`); el flyer de `public/promo/` ya dice "Cápsulas · Gotas". Mientras `state.promo.active`, el plan 60 se
+  presentación y pasa directo al menú de pago. La promo es SOLO gotas (decisión del
+  10-oct, tras pasar por "las tres" y "cápsulas o gotas"): `_getPromoPrice60` devuelve null para
+  cualquier otra presentación, así que cápsulas y semillas van a lista. PROMO/sí arma las
+  gotas directo (sin preguntar presentación); si piden otra, `promo_other_product` aclara y, si
+  insisten, `promo_product_confirm_list`. El flyer de `public/promo/` es el de gotas. Mientras `state.promo.active`, el plan 60 se
   cotiza con `_getEffectivePrice(product, plan, state)` (pricing.ts): TODO lo que arma o
   verifica el cart tiene que usar esa función y no `_getPrice`, o la confirmación "corrige"
   el precio promo al de lista. Los rechazos pausan SIN alerta (`_quietPause`) y "no me

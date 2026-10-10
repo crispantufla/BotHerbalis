@@ -1,5 +1,7 @@
 /**
  * Campañas promo — el guion de quien contesta (step promo_offer, oct-2026).
+ * La promo es SOLO gotas (10-oct): PROMO/sí → gotas directo; cápsulas o
+ * semillas → se aclara y, si insiste, a precio de lista.
  */
 jest.mock('../safeWrite', () => ({ atomicWriteFile: jest.fn() }));
 jest.mock('../src/services/funnelLogger');
@@ -18,11 +20,12 @@ const { processStep } = require('../src/flows/steps');
 const knowledge = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'knowledge_v7.json'), 'utf8'));
 
 const USER = '5493410000001@c.us';
+const GOTAS = 'Gotas de nuez de la india';
 const norm = (t) => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
 function promoState(over = {}) {
     return {
-        step: 'promo_offer', history: [{ role: 'bot', content: 'Hola 👋 … promo …', timestamp: Date.now() - 3600000 }],
+        step: 'promo_offer', history: [{ role: 'bot', content: 'Hola 👋 … promo gotas …', timestamp: Date.now() - 3600000 }],
         cart: [], partialAddress: {}, summary: '',
         promo: { active: true, campaignId: 'c1', sentAt: Date.now() - 3600000, price60: '44.900', prevStep: 'waiting_plan_choice', outcome: null },
         ...over,
@@ -46,40 +49,53 @@ const flush = () => new Promise(r => setImmediate(r));
 
 beforeEach(() => jest.clearAllMocks());
 
-describe('promo_offer', () => {
-    test('"PROMO" → pregunta la presentación con el precio promo, sin pedir kilos', async () => {
+describe('promo_offer (solo gotas)', () => {
+    test.each(['PROMO', 'Si', 'dale quiero', 'las gotas'])('"%s" → gotas × 60 a precio promo y menú de pago, sin preguntar nada', async (text) => {
         const st = promoState(); const d = deps();
-        const r = await run('PROMO', st, d);
+        const r = await run(text, st, d);
         expect(r.matched).toBe(true);
-        expect(st.step).toBe('promo_offer');
-        expect(sent(d)).toHaveLength(1);
+        expect(st.step).toBe('waiting_payment_method');
+        expect(st.selectedProduct).toBe(GOTAS);
+        expect(st.cart).toEqual([{ product: GOTAS, plan: '60', price: '44.900' }]);
+        expect(st.totalPrice).toBe('44.900');
+        expect(sent(d)).toHaveLength(2);
+        expect(sent(d)[0]).toMatch(/Gotas/);
         expect(sent(d)[0]).toMatch(/44\.900/);
-        expect(sent(d)[0]).toMatch(/Cápsulas[\s\S]*Gotas/);
-        expect(sent(d)[0]).not.toMatch(/Semillas/); // la promo es solo cápsulas o gotas
-        expect(sent(d)[0]).not.toMatch(/kilos/i);
+        expect(sent(d)[0]).toMatch(/precio promo/);
+        expect(sent(d)[0]).not.toMatch(/kilos|cápsulas/i);
+        expect(sent(d)[1]).toMatch(/Retiro en sucursal/i);
         expect(st.promo.outcome).toBe('interested');
-        expect(st.promo.repliedAt).toBeTruthy();
         await flush();
         expect(mockDb.promoRecipient.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ outcome: 'interested' }) }));
     });
 
     test.each([
-        ['cápsulas', 'Cápsulas de nuez de la india', '44.900'],
-        ['2', 'Gotas de nuez de la india', '44.900'],
-        ['las semillas', 'Semillas de nuez de la india', '36.900'],
-    ])('"%s" → carrito del plan 60 a precio promo y menú de pago', async (text, product, price) => {
+        ['quiero las cápsulas', 'Cápsulas de nuez de la india', 'cápsulas', '54.900'],
+        ['prefiero las semillas', 'Semillas de nuez de la india', 'semillas', '36.900'],
+    ])('"%s" → aclara que la promo es solo gotas y da el precio normal; si insiste, a lista', async (text, product, short, listPrice) => {
         const st = promoState(); const d = deps();
         await run(text, st, d);
+        expect(st.step).toBe('promo_offer');
+        expect(sent(d)).toHaveLength(1);
+        expect(sent(d)[0]).toMatch(/solo para las \*gotas\*/i);
+        expect(sent(d)[0]).toMatch(new RegExp(`${short}[\\s\\S]*\\$${listPrice.replace('.', '\\.')}`));
+        expect(sent(d)[0]).toMatch(/44\.900/);
+
+        // Insiste con la misma presentación → carrito a precio de lista.
+        await run(text, st, d);
         expect(st.step).toBe('waiting_payment_method');
-        expect(st.selectedProduct).toBe(product);
-        expect(st.selectedPlan).toBe('60');
-        expect(st.cart).toEqual([{ product, plan: '60', price }]);
-        expect(st.totalPrice).toBe(price);
-        expect(sent(d)).toHaveLength(2);
-        expect(sent(d)[0]).toMatch(new RegExp(price.replace('.', '\\.')));
-        if (/semilla/i.test(product)) expect(sent(d)[0]).toMatch(/no entran en la promo/i); else expect(sent(d)[0]).toMatch(/precio promo/);
-        expect(sent(d)[1]).toMatch(/Retiro en sucursal/i);
-        expect(sent(d)[1]).toMatch(/domicilio/i);
+        expect(st.cart).toEqual([{ product, plan: '60', price: listPrice }]);
+        expect(sent(d)).toHaveLength(3);
+        expect(sent(d)[1]).toMatch(/precio normal/);
+        expect(sent(d)[1]).not.toMatch(/precio promo/);
+        expect(sent(d)[2]).toMatch(/domicilio/i);
+    });
+
+    test('tras la aclaración, "dale gotas" vuelve a la promo', async () => {
+        const st = promoState(); const d = deps();
+        await run('las capsulas', st, d);
+        await run('dale, las gotas entonces', st, d);
+        expect(st.cart).toEqual([{ product: GOTAS, plan: '60', price: '44.900' }]);
     });
 
     test('"no gracias" → cierre cordial, pausa silenciosa (sin alerta al admin)', async () => {
@@ -90,7 +106,6 @@ describe('promo_offer', () => {
         expect(d.sharedState.pausedUsers.has(USER)).toBe(true);
         expect(d.notifyAdmin).not.toHaveBeenCalled();
         expect(st.promo.outcome).toBe('declined');
-        expect(st.promo.active).toBe(true); // el precio promo sigue valiendo si vuelve
     });
 
     test('"ya no quiero" no dispara la repregunta de cancelación del global', async () => {
@@ -112,24 +127,24 @@ describe('promo_offer', () => {
         expect(mockDb.promoRecipient.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'opted_out', outcome: 'opted_out' }) }));
     });
 
-    test('pregunta → la IA responde con el precio promo en el goal y sigue en promo_offer', async () => {
+    test('pregunta → la IA responde con el contexto (solo gotas, lista para el resto) y sigue en promo_offer', async () => {
         const st = promoState(); const d = deps();
         await run('¿Cuánto tarda en llegar?', st, d);
         expect(d.aiService.chat).toHaveBeenCalledTimes(1);
         const ctx = d.aiService.chat.mock.calls[0][1];
         expect(ctx.step).toBe('promo_offer');
         expect(ctx.goal).toMatch(/\$44\.900/);
-        expect(ctx.goal).toMatch(/NO cites el precio de lista/);
+        expect(ctx.goal).toMatch(/SOLO en gotas/);
+        expect(ctx.goal).toMatch(/54\.900/);
         expect(sent(d)).toEqual(['Respuesta IA']);
         expect(st.step).toBe('promo_offer');
-        expect(d.sharedState.pausedUsers.has(USER)).toBe(false);
     });
 
-    test('la IA extrae PRODUCTO → mismo cierre que la elección directa', async () => {
+    test('la IA extrae PRODUCTO: Gotas → mismo cierre que el PROMO directo', async () => {
         const st = promoState(); const d = deps({ response: 'Dale, gotas entonces', goalMet: true, extractedData: 'PRODUCTO: Gotas' });
         await run('las gotas sirven para la panza?', st, d);
         expect(st.step).toBe('waiting_payment_method');
-        expect(st.cart[0]).toEqual({ product: 'Gotas de nuez de la india', plan: '60', price: '44.900' });
+        expect(st.cart[0]).toEqual({ product: GOTAS, plan: '60', price: '44.900' });
         expect(sent(d)).toHaveLength(3); // IA + confirmación + menú de pago
     });
 
@@ -149,16 +164,18 @@ describe('promo_offer', () => {
     });
 });
 
-describe('el precio promo sobrevive al resto del flujo', () => {
-    test('buildCartFromSelection cotiza plan 60 al promo solo con promo activa; el 120 no cambia', () => {
+describe('el precio promo rige solo para las gotas', () => {
+    test('buildCartFromSelection: gotas × 60 al promo con promo activa; cápsulas y 120 a lista', () => {
         const { buildCartFromSelection } = require('../src/flows/utils/cartHelpers');
         const promo = { promo: { active: true } };
-        buildCartFromSelection('Cápsulas de nuez de la india', '60', promo);
+        buildCartFromSelection(GOTAS, '60', promo);
         expect(promo.totalPrice).toBe('44.900');
-        buildCartFromSelection('Cápsulas de nuez de la india', '120', promo);
+        buildCartFromSelection(GOTAS, '120', promo);
         expect(promo.totalPrice).toBe('68.900');
+        buildCartFromSelection('Cápsulas de nuez de la india', '60', promo);
+        expect(promo.totalPrice).toBe('54.900');
         const plain = {};
-        buildCartFromSelection('Cápsulas de nuez de la india', '60', plain);
+        buildCartFromSelection(GOTAS, '60', plain);
         expect(plain.totalPrice).toBe('54.900');
     });
 });

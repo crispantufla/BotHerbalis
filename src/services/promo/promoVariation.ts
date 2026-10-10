@@ -18,7 +18,7 @@ import { firstNameFor } from './promoTemplates';
 export const DEFAULT_BASE_MESSAGE =
     'Hola 👋 ¡Espero que estés muy bien!\n\n' +
     'Te escribo porque nos quedó pendiente tu consulta sobre el tratamiento. Sabemos que empezar a cuidarse a veces cuesta, por eso preparamos una oportunidad única para que puedas probarlo:\n\n' +
-    '🎁 Tratamiento completo por 60 días (cápsulas o gotas) a solo ${{PROMO_60}}.-\n\n' +
+    '🎁 Tratamiento completo en gotas por 60 días a solo ${{PROMO_60}}.-\n\n' +
     'Para que compres con total tranquilidad:\n' +
     '🚚 Envío gratis a todo el país.\n' +
     '🤝 Pago contra entrega: Pagás recién cuando recibís el paquete en tu puerta.\n\n' +
@@ -41,7 +41,7 @@ const STYLE_HINTS = [
 const SYSTEM = `Sos Elena, vendedora de Herbalis (Argentina). Te pasan un mensaje de WhatsApp que ya está escrito y tenés que devolver UNA reescritura con ligeras diferencias, como si la misma persona lo escribiera de nuevo sin copiarlo: cambiá palabras por sinónimos, el orden de algunas frases, los emojis, el saludo y el cierre.
 
 Reglas que no se negocian:
-- Mantené EXACTAMENTE el precio tal cual aparece (con el signo $ y los puntos), la duración del tratamiento, que la promo es en cápsulas o gotas (si el original lo dice), "envío gratis a todo el país", el pago contra entrega y que las unidades son limitadas.
+- Mantené EXACTAMENTE el precio tal cual aparece (con el signo $ y los puntos), la duración del tratamiento, que la promo es en gotas (si el original lo dice), "envío gratis a todo el país", el pago contra entrega y que las unidades son limitadas.
 - La respuesta que se le pide al cliente es la palabra PROMO, en mayúsculas, siempre.
 - No agregues datos, descuentos, plazos, productos ni promesas que no estén en el original. No inventes el nombre del cliente: si te lo dan, usalo una vez; si no, no lo pongas.
 - Español rioplatense con voseo, tono cálido, 1 a 3 emojis en total, sin markdown salvo *negrita* opcional en el precio o en PROMO.

@@ -91,7 +91,7 @@ module.exports = (clientPool) => {
     // modelo simple); en modo 'templates', variantes de las plantillas.
     router.post('/promo/preview', ...withSeller(clientPool), validate(previewSchema), async (req, res) => {
         try {
-            const price = _getPromoPrice60('Cápsulas');
+            const price = _getPromoPrice60('Gotas');
             if (!price) return res.status(400).json({ error: 'No hay precio promo cargado (Editor de Precios → promoPrice60)' });
             const instanceId = getInstanceId(req) || 'default';
             const cfg = normalizePromoConfig(req.body, instanceId);
@@ -125,7 +125,7 @@ module.exports = (clientPool) => {
             const campaigns = await prisma.promoCampaign.findMany({ where: { instanceId }, orderBy: { createdAt: 'desc' }, take: 50 });
             const out = [];
             for (const c of campaigns) out.push({ ...serialize(c), stats: await campaignStats(c) });
-            res.json({ campaigns: out, price60: _getPromoPrice60('Cápsulas'), baseMessageDefault: DEFAULT_BASE_MESSAGE });
+            res.json({ campaigns: out, price60: _getPromoPrice60('Gotas'), baseMessageDefault: DEFAULT_BASE_MESSAGE });
         } catch (e) {
             logger.error('[PROMO] list:', e);
             res.status(500).json({ error: e.message });
@@ -137,7 +137,7 @@ module.exports = (clientPool) => {
         try {
             const instanceId = needSeller(req, res); if (!instanceId) return;
             const cfg = normalizePromoConfig(req.body.config || {}, instanceId);
-            if (!_getPromoPrice60('Cápsulas')) return res.status(400).json({ error: 'Cargá el precio promo en el Editor de Precios antes de crear la campaña' });
+            if (!_getPromoPrice60('Gotas')) return res.status(400).json({ error: 'Cargá el precio promo en el Editor de Precios antes de crear la campaña' });
 
             const { members, summary } = await selectPromoAudience({ instanceId, ...cfg.audience, excludePhones: adminPhones(req) });
             if (members.length === 0) return res.status(400).json({ error: 'Con estos filtros no queda nadie a quien mandarle', summary });

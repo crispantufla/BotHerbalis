@@ -106,10 +106,16 @@ function _getPrice(product: string | null | undefined, plan: string): string {
  * Nunca por encima del precio de lista: la promo baja Cápsulas y Gotas, y a
  * Semillas (que ya cuesta menos) la deja como está. Null si no hay promo cargada.
  */
+// La promo es SOLO para las gotas (decisión del 10-oct-2026; antes cápsulas y
+// gotas, y antes las tres). Cualquier otra presentación va a precio de lista.
+const PROMO_PRODUCT_RE = /gota/;
+
 function _getPromoPrice60(product: string | null | undefined): string | null {
     const prices = _getPrices();
     const promo = _parseAmount(prices.promoPrice60);
     if (!promo) return null;
+    const normProduct = (product || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    if (!PROMO_PRODUCT_RE.test(normProduct)) return null;
     const list = _parseAmount(_getPrice(product, '60'));
     const effective = list ? Math.min(list, promo) : promo;
     return effective.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
