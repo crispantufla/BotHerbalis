@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Gift, RefreshCw, Play, Pause, Square, Send, Users, MessageCircle, Eye, ChevronDown, ChevronUp, Plus } from 'lucide-react';
+import { Gift, RefreshCw, Play, Pause, Square, Send, Users, MessageCircle, Eye, ChevronDown, ChevronUp, Plus, Pencil } from 'lucide-react';
 import api from '../../config/axios';
 import { Card, Button, Badge, Input, KpiCard, EmptyState, useToast, cn } from '../ui';
 
@@ -66,10 +66,10 @@ function PromoImageThumb() {
     return <img src={url} alt="Flyer de la promo" className="w-16 h-20 object-cover rounded-control border border-slate-200 dark:border-slate-700 flex-shrink-0" />;
 }
 
-function NumField({ label, value, onChange, min, max, hint }) {
+function NumField({ label, value, onChange, min, max, hint, disabled = false }) {
     return (
         <Input
-            type="number" label={label} value={value} min={min} max={max} helperText={hint}
+            type="number" label={label} value={value} min={min} max={max} helperText={hint} disabled={disabled}
             onChange={(e) => onChange(e.target.value === '' ? '' : Number(e.target.value))}
         />
     );
@@ -92,6 +92,9 @@ const PromoView = ({ onGoToChat }) => {
     const [baseMessage, setBaseMessage] = useState('');
     // El flyer va unos segundos después del texto.
     const [imageEnabled, setImageEnabled] = useState(true);
+    // Campaña que se está editando (null = el formulario crea una nueva). Se
+    // puede editar una campaña corriendo: el próximo envío usa los valores nuevos.
+    const [editingId, setEditingId] = useState(null);
     const [audience, setAudience] = useState(null);
     const [samples, setSamples] = useState(null);
     const [busy, setBusy] = useState(false);
@@ -181,6 +184,60 @@ const PromoView = ({ onGoToChat }) => {
         } finally { setBusy(false); }
     };
 
+    const openEdit = (c) => {
+        const cfg = c.config || {};
+        setEditingId(c.id);
+        setForm({
+            name: c.name,
+            windowStartHour: cfg.windowStartHour ?? DEFAULT_FORM.windowStartHour,
+            windowEndHour: cfg.windowEndHour ?? DEFAULT_FORM.windowEndHour,
+            dailyCap: cfg.dailyCap ?? DEFAULT_FORM.dailyCap,
+            minGapMinutes: cfg.minGapMinutes ?? DEFAULT_FORM.minGapMinutes,
+            maxGapMinutes: cfg.maxGapMinutes ?? DEFAULT_FORM.maxGapMinutes,
+            longBreakEvery: cfg.longBreakEvery ?? DEFAULT_FORM.longBreakEvery,
+            skipWeekends: !!cfg.skipWeekends,
+            skipIfInboundHours: cfg.skipIfInboundHours ?? DEFAULT_FORM.skipIfInboundHours,
+            minDaysSinceLastSeen: cfg.audience?.minDaysSinceLastSeen ?? DEFAULT_FORM.minDaysSinceLastSeen,
+            maxDaysSinceLastSeen: cfg.audience?.maxDaysSinceLastSeen ?? DEFAULT_FORM.maxDaysSinceLastSeen,
+            limit: cfg.audience?.limit ?? DEFAULT_FORM.limit,
+            cooldownDays: cfg.audience?.cooldownDays ?? DEFAULT_FORM.cooldownDays,
+        });
+        setVariationMode(cfg.variationMode === 'templates' ? 'templates' : 'ai');
+        setBaseMessage(cfg.baseMessage || '');
+        setImageEnabled(cfg.imageEnabled !== false);
+        setTemplates(cfg.templates || null);
+        setAudience(null);
+        setSamples(null);
+        setShowCreate(true);
+    };
+
+    const startNew = () => {
+        setEditingId(null);
+        setForm(DEFAULT_FORM);
+        setTemplates(null);
+        setVariationMode('ai');
+        setImageEnabled(true);
+        setAudience(null);
+        setSamples(null);
+        setShowCreate(s => !s);
+    };
+
+    const saveEdit = async () => {
+        if (!editingId) return;
+        setBusy(true);
+        try {
+            const { audience: _a, ...config } = buildConfig();
+            const r = await api.patch(`/api/promo/campaigns/${editingId}`, { name: form.name.trim() || undefined, config });
+            toast.success(`Campaña "${r.data.campaign.name}" actualizada`);
+            setShowCreate(false);
+            setEditingId(null);
+            await fetchCampaigns();
+            if (selectedId === editingId) await fetchDetail(editingId, recipientFilter);
+        } catch (e) {
+            toast.error(e.response?.data?.error || e.message);
+        } finally { setBusy(false); }
+    };
+
     const act = async (id, action) => {
         setBusy(true);
         try {
@@ -221,13 +278,18 @@ const PromoView = ({ onGoToChat }) => {
                 </div>
                 <div className="flex gap-2">
                     <Button variant="secondary" size="sm" leftIcon={RefreshCw} onClick={fetchCampaigns} loading={loading}>Actualizar</Button>
-                    <Button size="sm" leftIcon={Plus} onClick={() => setShowCreate(s => !s)}>Nueva campaña</Button>
+                    <Button size="sm" leftIcon={Plus} onClick={startNew}>Nueva campaña</Button>
                 </div>
             </div>
 
             {showCreate && (
                 <Card padding="md">
-                    <Card.Header title="Nueva campaña" subtitle="La lista de destinatarios se congela al crearla y se mezcla al azar." />
+                    <Card.Header
+                        title={editingId ? 'Editar campaña' : 'Nueva campaña'}
+                        subtitle={editingId
+                            ? 'Los cambios valen desde el próximo envío. La lista de destinatarios no se toca: quedó congelada al crearla.'
+                            : 'La lista de destinatarios se congela al crearla y se mezcla al azar.'}
+                    />
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
                         <Input label="Nombre" value={form.name} onChange={(e) => setF('name')(e.target.value)} placeholder="Promo 60 días — octubre" />
                         <NumField label="Desde las (hs)" value={form.windowStartHour} onChange={setF('windowStartHour')} min={0} max={23} />
@@ -241,10 +303,10 @@ const PromoView = ({ onGoToChat }) => {
                             <input type="checkbox" checked={form.skipWeekends} onChange={(e) => setF('skipWeekends')(e.target.checked)} />
                             No mandar los fines de semana
                         </label>
-                        <NumField label="Último contacto hace al menos (días)" value={form.minDaysSinceLastSeen} onChange={setF('minDaysSinceLastSeen')} min={0} max={365} />
-                        <NumField label="Último contacto hace como máximo (días)" value={form.maxDaysSinceLastSeen} onChange={setF('maxDaysSinceLastSeen')} min={1} max={3650} />
-                        <NumField label="Tope de destinatarios" value={form.limit} onChange={setF('limit')} min={1} max={20000} />
-                        <NumField label="Sin repetir promo por (días)" value={form.cooldownDays} onChange={setF('cooldownDays')} min={0} max={3650} />
+                        <NumField label="Último contacto hace al menos (días)" value={form.minDaysSinceLastSeen} onChange={setF('minDaysSinceLastSeen')} min={0} max={365} disabled={!!editingId} />
+                        <NumField label="Último contacto hace como máximo (días)" value={form.maxDaysSinceLastSeen} onChange={setF('maxDaysSinceLastSeen')} min={1} max={3650} disabled={!!editingId} />
+                        <NumField label="Tope de destinatarios" value={form.limit} onChange={setF('limit')} min={1} max={20000} disabled={!!editingId} />
+                        <NumField label="Sin repetir promo por (días)" value={form.cooldownDays} onChange={setF('cooldownDays')} min={0} max={3650} disabled={!!editingId} />
                     </div>
 
                     <div className="mt-5">
@@ -306,9 +368,14 @@ const PromoView = ({ onGoToChat }) => {
                     )}
 
                     <div className="flex flex-wrap gap-2 mt-4">
-                        <Button variant="secondary" leftIcon={Users} onClick={checkAudience} loading={busy}>Medir audiencia</Button>
+                        {!editingId && <Button variant="secondary" leftIcon={Users} onClick={checkAudience} loading={busy}>Medir audiencia</Button>}
                         <Button variant="secondary" leftIcon={Eye} onClick={previewTexts} loading={busy}>Ver textos de muestra</Button>
-                        <Button leftIcon={Gift} onClick={createCampaign} loading={busy} disabled={!price60}>Crear campaña</Button>
+                        {editingId
+                            ? <>
+                                <Button leftIcon={Pencil} onClick={saveEdit} loading={busy}>Guardar cambios</Button>
+                                <Button variant="ghost" onClick={() => { setEditingId(null); setShowCreate(false); }} disabled={busy}>Cancelar</Button>
+                            </>
+                            : <Button leftIcon={Gift} onClick={createCampaign} loading={busy} disabled={!price60}>Crear campaña</Button>}
                     </div>
 
                     {audience && (
@@ -360,6 +427,7 @@ const PromoView = ({ onGoToChat }) => {
                                 <div className="flex flex-wrap gap-1.5 mt-3" onClick={(e) => e.stopPropagation()}>
                                     {(c.status === 'draft' || c.status === 'paused') && <Button size="sm" leftIcon={Play} onClick={() => act(c.id, c.status === 'draft' ? 'start' : 'resume')} loading={busy}>{c.status === 'draft' ? 'Iniciar' : 'Reanudar'}</Button>}
                                     {c.status === 'running' && <Button size="sm" variant="secondary" leftIcon={Pause} onClick={() => act(c.id, 'pause')} loading={busy}>Pausar</Button>}
+                                    {!['finished', 'cancelled'].includes(c.status) && <Button size="sm" variant="ghost" leftIcon={Pencil} onClick={() => openEdit(c)} disabled={busy}>Editar</Button>}
                                     {c.status === 'running' && <Button size="sm" variant="ghost" leftIcon={Send} onClick={() => act(c.id, 'send-now')} loading={busy}>Mandar ahora</Button>}
                                     {!['finished', 'cancelled'].includes(c.status) && <Button size="sm" variant="danger" leftIcon={Square} onClick={() => { if (window.confirm('¿Cancelar la campaña? Los que no recibieron la promo quedan sin recibirla.')) act(c.id, 'cancel'); }} loading={busy}>Cancelar</Button>}
                                 </div>

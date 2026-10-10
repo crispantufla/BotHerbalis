@@ -50,4 +50,11 @@ const previewSchema = z.object({
     count: z.number().min(1).max(6).optional(),
 });
 
-module.exports = { createCampaignSchema, promoConfigSchema, previewSchema, audienceSchema };
+// Edición de una campaña existente: nombre y configuración de envío/textos. La
+// audiencia no se toca (la lista quedó congelada al crearla).
+const updateCampaignSchema = z.object({
+    name: z.string().min(2).max(80).optional(),
+    config: promoConfigSchema.omit({ audience: true }).optional(),
+});
+
+module.exports = { createCampaignSchema, updateCampaignSchema, promoConfigSchema, previewSchema, audienceSchema };

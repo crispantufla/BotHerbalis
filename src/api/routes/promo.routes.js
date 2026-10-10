@@ -17,7 +17,7 @@ const express = require('express');
 const { prisma } = require('../../../db');
 const logger = require('../../utils/logger');
 const validate = require('../../middleware/validate');
-const { createCampaignSchema, previewSchema } = require('../../schemas/promo.schema');
+const { createCampaignSchema, updateCampaignSchema, previewSchema } = require('../../schemas/promo.schema');
 const { selectPromoAudience, normalizeAudienceFilters } = require('../../services/promo/promoAudience');
 const { countCombinations } = require('../../services/promo/promoTemplates');
 const { normalizePromoConfig, promoTick, buildPromoText, loadPromoImage, DEFAULT_PROMO_CONFIG } = require('../../services/promo/promoDispatcher');
@@ -171,6 +171,28 @@ module.exports = (clientPool) => {
             res.json({ campaign: { ...serialize(c), stats: await campaignStats(c) }, recipients });
         } catch (e) {
             logger.error('[PROMO] detail:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // PATCH /promo/campaigns/:id — edita nombre y configuración de una campaña
+    // (también corriendo: el próximo envío ya usa los valores nuevos). La
+    // audiencia no cambia: la lista se congeló al crearla.
+    router.patch('/promo/campaigns/:id', ...withSeller(clientPool), validate(updateCampaignSchema), async (req, res) => {
+        try {
+            const instanceId = needSeller(req, res); if (!instanceId) return;
+            const c = await prisma.promoCampaign.findFirst({ where: { id: req.params.id, instanceId } });
+            if (!c) return res.status(404).json({ error: 'Campaña no encontrada' });
+            if (['finished', 'cancelled'].includes(c.status)) return res.status(409).json({ error: 'La campaña ya terminó' });
+            const current = JSON.parse(c.config || '{}');
+            const merged = normalizePromoConfig({ ...current, ...(req.body.config || {}), audience: current.audience }, instanceId);
+            const data = { config: JSON.stringify(merged) };
+            if (req.body.name) data.name = req.body.name.trim();
+            const updated = await prisma.promoCampaign.update({ where: { id: c.id }, data });
+            logger.info(`[PROMO][${instanceId}] Campaña "${updated.name}" editada (${Object.keys(req.body.config || {}).join(', ') || 'sin cambios de config'})`);
+            res.json({ campaign: { ...serialize(updated), stats: await campaignStats(updated) } });
+        } catch (e) {
+            logger.error('[PROMO] update:', e);
             res.status(500).json({ error: e.message });
         }
     });
