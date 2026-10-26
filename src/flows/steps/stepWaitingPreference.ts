@@ -47,7 +47,8 @@ export async function handleWaitingPreference(
     const numericReply =
         trimmed.match(/^([123])\s*[.)\-:°]?\s*$/) ||           // "1", "1.", "1)", "1-"
         trimmed.match(/^([123])[️⃣]+/) ||              // "1️⃣"
-        trimmed.match(/^(?:opci[oó]n\s+|la\s+|el\s+|opc\s*)?([123])\b/);  // "opcion 1", "el 1"
+        trimmed.match(/^(?:opci[oó]n\s+|la\s+|el\s+|opc\s*)?([123])\b/) ||  // "opcion 1", "el 1"
+        trimmed.match(/\bopci[oó]n\s*([123])\b/);  // "elegiría la opción 3" (caso 5493424784464)
     let numericCapsulas = false, numericSemillas = false, numericGotas = false;
     if (numericReply && !hasQuestionOrConcern && trimmed.length <= 30) {
         const choice = numericReply[1];
@@ -217,8 +218,12 @@ export async function handleWaitingPreference(
         });
 
         if (aiPref.goalMet && aiPref.extractedData) {
-            // First send the AI's natural response if it exists (e.g., to answer a health question)
-            if (aiPref.response) {
+            // First send the AI's natural response if it exists (e.g., to answer a health question).
+            // Si el cliente solo eligió ("la natural", "esa") no hay nada que responder:
+            // la plantilla de precios confirma la elección. Mandar las dos generaba
+            // doble mensaje y la IA a veces preguntaba la localidad antes de tiempo.
+            const onlyChose = !hasQuestionOrConcern && text.trim().split(/\s+/).length <= 8;
+            if (aiPref.response && !onlyChose) {
                 await sendMessageWithDelay(userId, aiPref.response);
             }
 

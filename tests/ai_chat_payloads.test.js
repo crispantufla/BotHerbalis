@@ -248,24 +248,35 @@ describe('fallbacks entre motores', () => {
 });
 
 describe('cache semántico, A/B y embudo', () => {
+    // El namespace lleva la versión del guion y una huella de los precios: una
+    // respuesta guardada con otro guion u otros precios no se vuelve a servir.
+    const { _getPrices } = require('../src/flows/utils/pricing');
+    const TAG = `g${knowledge.meta.version}:p${crypto.createHash('md5').update(JSON.stringify(_getPrices())).digest('hex').slice(0, 6)}`;
+
     test('A/B → Claude: miss, y guarda la respuesta con namespace claude', async () => {
         const h = stub(aiService, { useClaude: true });
         const r = await aiService.chat('de dónde son?', base({ step: 'waiting_weight', history: [] }));
-        expect(lookupSemanticCache).toHaveBeenCalledWith(expect.anything(), 'waiting_weight', 'de dónde son?', 'claude');
-        expect(storeSemanticCache).toHaveBeenCalledWith(expect.anything(), 'waiting_weight', 'de dónde son?', '**Hola** desde Claude', 'claude');
+        expect(lookupSemanticCache).toHaveBeenCalledWith(expect.anything(), 'waiting_weight', 'de dónde son?', `claude:${TAG}`);
+        expect(storeSemanticCache).toHaveBeenCalledWith(expect.anything(), 'waiting_weight', 'de dónde son?', '**Hola** desde Claude', `claude:${TAG}`);
         record('semantico claude miss', h, r);
     });
     test('A/B → OpenAI: namespace openai', async () => {
         const h = stub(aiService, { useClaude: false });
         const r = await aiService.chat('de dónde son?', base({ history: [] }));
-        expect(lookupSemanticCache.mock.calls[0][3]).toBe('openai');
+        expect(lookupSemanticCache.mock.calls[0][3]).toBe(`openai:${TAG}`);
         record('semantico openai miss', h, r);
     });
     test('MP apagado separa el namespace (:nomp)', async () => {
         const h = stub(aiService, { useClaude: false });
         const r = await aiService.chat('de dónde son?', base({ history: [], mpEnabled: false }));
-        expect(lookupSemanticCache.mock.calls[0][3]).toBe('openai:nomp');
+        expect(lookupSemanticCache.mock.calls[0][3]).toBe(`openai:nomp:${TAG}`);
         record('semantico nomp', h, r);
+    });
+    test('otra versión del guion u otros precios cambian el namespace', async () => {
+        stub(aiService, { useClaude: false });
+        await aiService.chat('de dónde son?', base({ history: [], knowledge: { ...knowledge, meta: { ...knowledge.meta, version: '0.1' } } }));
+        expect(lookupSemanticCache.mock.calls[0][3]).not.toBe(`openai:${TAG}`);
+        expect(lookupSemanticCache.mock.calls[0][3]).toMatch(/^openai:g0\.1:p[0-9a-f]{6}$/);
     });
     test('hit: devuelve la cacheada y no llama a ningún proveedor', async () => {
         lookupSemanticCache.mockResolvedValueOnce({ response: '**cacheada**' });

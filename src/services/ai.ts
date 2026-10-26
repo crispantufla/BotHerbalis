@@ -10,6 +10,20 @@ import { UserState, HistoryMessage } from '../types/state';
 import { lookupSemanticCache, storeSemanticCache } from './semanticCache';
 import { buildHistoryTurns, ChatTurn } from './historyTurns';
 import { _buildSystemBlocks, _buildSystemPrompt, _buildKnowledgeContext, _buildStateContext, _buildChatUserPrompts } from './aiPrompts';
+import { _getPrices } from '../flows/utils/pricing';
+
+/**
+ * Parte del namespace del cache semántico que cambia cuando cambia lo que las
+ * respuestas afirman: la versión del guion y la tabla de precios. Sin esto, una
+ * respuesta de julio ("$36.900 a $58.900", precio viejo) se siguió sirviendo 27
+ * veces, hasta dos meses después del cambio de precio y del guion V8.
+ */
+function _cacheContentTag(knowledge: any): string {
+    let prices = '';
+    try { prices = JSON.stringify(_getPrices()); } catch { /* sin precios: solo la versión */ }
+    const p = crypto.createHash('md5').update(prices).digest('hex').slice(0, 6);
+    return `g${knowledge?.meta?.version || '0'}:p${p}`;
+}
 
 // WhatsApp usa "*" para negrita, no "**" (markdown estándar). Si la IA devuelve
 // **bold** o ## heading, en WhatsApp se renderiza con los asteriscos literales:
@@ -501,7 +515,7 @@ class AIService {
             // MP: las respuestas cacheadas de los steps tempranos suelen incluir los
             // medios de pago, así que una guardada con tarjeta no puede servirse
             // cuando la tarjeta está apagada (ni al revés cuando vuelve).
-            const cacheEngine = (useClaudeNow ? 'claude' : 'openai') + (mpOn ? '' : ':nomp');
+            const cacheEngine = (useClaudeNow ? 'claude' : 'openai') + (mpOn ? '' : ':nomp') + ':' + _cacheContentTag(context.knowledge);
 
             // ── Semantic cache lookup (FAQs / paraphrased questions) ──
             // Only hits cacheable steps; skipped automatically otherwise.

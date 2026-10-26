@@ -28,6 +28,26 @@ const PICKUP_INTENT = /\b(voy\s+(?:yo|al?\s+local|a\s+(?:buscar|retirar))|paso\s
 const RETIRO_HINT = /\b(retiro|retir(?:ar|o)\s+en\s+sucursal|en\s+sucursal|a\s+sucursal|sucursal)\b/i;
 const DOMICILIO_HINT = /\b(domicilio|a\s+(?:mi\s+)?casa|en\s+mi\s+casa|que\s+lo\s+manden|me\s+lo\s+mand[aá]n)\b/i;
 
+// El cliente frena o no quiere seguir. Antes caía en "Perdoná, no me quedó claro
+// 🙈 ¿De qué localidad sos?" y, al segundo mensaje sin localidad, el chat se
+// pausaba (casos 5493400497043 "No no todavía no, gracias" y 5493436431292
+// "Estoy viajando, apenas llegue te escribo", 15/16-sep-2026). Corren sobre el
+// texto normalizado (minúsculas, sin acentos).
+const ZONE_DECLINE = /\b(no gracias|no,\s*gracias|no me interesa|no quiero (nada|comprar|comprarlo|seguir)|no lo voy a (comprar|pedir))\b/;
+// Si nombra un lugar ("sí, soy de Las Parejas", "cuando pueda te paso, vivo en
+// Bigand") no es un freno ni un sí vacío: lo resuelve el parser de más abajo.
+const MENTIONS_PLACE = /\b(soy|somos|vivo|vivimos|estoy|estamos)\s+(de|en)\b|\bdesde\b|\blocalidad\b|\bpueblo\b|\bciudad\b/;
+const ZONE_DEFER = /\b(todavia no|aun no|por ahora no|ahora no|no por ahora|mas adelante|otro dia|lo pienso|lo voy a pensar|dejame pensar|despues (te )?(escribo|aviso|hablo|veo|confirmo)|te (escribo|aviso|hablo|confirmo) (despues|mas tarde|luego)|apenas (llegue|pueda|vuelva|cobre)|cuando (llegue|vuelva|pueda|cobre)|estoy (viajando|de viaje|trabajando|ocupad[oa])|no puedo ahora)\b/;
+// Dice que sí pero no dice de dónde ("Si si esa me interesa"): se le vuelve a
+// preguntar sin el "no me quedó claro", que suena a que contestó mal.
+const ZONE_ACK = /^(si|sisi|si si|dale|ok|okey|bueno|buenisimo|genial|perfecto|claro|de una|listo)\b[^?]{0,40}$|\bme interesa\b/;
+// Provincia sola: todas las localidades de la zona son de Santa Fe, y Entre Ríos
+// entera queda afuera, pero la ciudad hace falta igual para el envío.
+const PROVINCE_ONLY = /\b(entre rios|santa fe)\b/;
+// Última línea del zone_in del guion, para cambiarla cuando ya tenemos parte de
+// los datos.
+const ZONE_IN_ASK = /Pasame tu \*nombre completo\* y \*calle y n[uú]mero\*[^\n]*$/;
+
 function _tplOr(key: string, knowledge: any, mpOff: boolean, fallback: string): string {
     return getFlowTemplate(key, knowledge, mpOff) || fallback;
 }
@@ -63,13 +83,30 @@ export async function _resolveZone(
         currentState.paymentSubChoiceAsked = false;
         // Un estado que venía de retiro tenía la calle fijada en 'A sucursal'.
         if (addr.calle === 'A sucursal') addr.calle = undefined;
-        const tpl = _tplOr('zone_in', knowledge, mpOff,
-            'Dale, a *{{LOCALIDAD}}* llegamos con reparto propio 🚚\n\nTe lo llevamos a tu casa sin costo y lo pagás al recibirlo: efectivo, tarjeta o transferencia. Antes te escribimos para acordar día y horario.\n\nPasame tu *nombre completo* y *calle y número* 🙌');
-        const msg = prefix + _formatMessage(tpl, currentState);
         _setStep(currentState, FlowStep.WAITING_DATA);
+
+        // Ya dio nombre y calle (junto con la localidad o antes): se cierra acá,
+        // sin volver a pedirlos.
+        if (addr.nombre && addr.calle) {
+            saveState(userId);
+            const { _handleRepartoData } = require('./stepWaitingData');
+            const closed = await _handleRepartoData(userId, '', '', currentState, knowledge, dependencies);
+            if (closed) {
+                logger.info(`[ZONE] ${userId} → DENTRO de zona (${addr.ciudad || '?'}) con nombre y calle ya dados → cierre directo.`);
+                return;
+            }
+        }
+
+        let tpl = _tplOr('zone_in', knowledge, mpOff,
+            'Dale, a *{{LOCALIDAD}}* llegamos con reparto propio 🚚\n\nTe lo llevamos a tu casa sin costo y lo pagás al recibirlo: efectivo, tarjeta o transferencia. Antes te escribimos para acordar día y horario.\n\nPasame tu *nombre completo* y *calle y número* 🙌');
+        // Pedir solo lo que falta: "Sona oseste rosario provincia de misiones 2240"
+        // traía la calle y el bot la volvió a pedir (caso 5493415788327).
+        if (addr.calle && !addr.nombre) tpl = tpl.replace(ZONE_IN_ASK, `Anoté *${addr.calle}*. Pasame tu *nombre completo* así lo dejo cargado 🙌`);
+        else if (addr.nombre && !addr.calle) tpl = tpl.replace(ZONE_IN_ASK, 'Pasame la *calle y número* 🙌');
+        const msg = prefix + _formatMessage(tpl, currentState);
         saveState(userId);
         await sendMessageWithDelay(userId, msg);
-        logger.info(`[ZONE] ${userId} → DENTRO de zona (${addr.ciudad || '?'}) → reparto propio, pidiendo nombre + calle.`);
+        logger.info(`[ZONE] ${userId} → DENTRO de zona (${addr.ciudad || '?'}) → reparto propio, pidiendo ${addr.calle ? 'nombre' : addr.nombre ? 'calle' : 'nombre + calle'}.`);
         return;
     }
 
@@ -132,7 +169,10 @@ export async function _startZoneStep(
     currentState: UserState,
     knowledge: any,
     dependencies: any,
-    prefix: string = ''
+    prefix: string = '',
+    // skipQuestion: el mensaje que se acaba de mandar (respuesta de la IA) ya le
+    // preguntó la localidad; se pasa al paso sin repetirla.
+    opts: { skipQuestion?: boolean } = {}
 ): Promise<void> {
     const { sendMessageWithDelay, saveState } = dependencies;
     const mpOff = !isMpEnabled(dependencies.config);
@@ -157,11 +197,16 @@ export async function _startZoneStep(
         return;
     }
 
+    currentState.zoneQuestion = 'localidad';
+    _setStep(currentState, FlowStep.WAITING_ZONE);
+    if (opts.skipQuestion && !prefix) {
+        saveState(userId);
+        logger.info(`[ZONE] ${userId} → la respuesta anterior ya preguntó la localidad; no la repito.`);
+        return;
+    }
     const tpl = _tplOr('payment_menu', knowledge, mpOff,
         '¡Genial! 🙌 Contame de qué localidad sos, así te digo cómo te llega 📦');
     const msg = prefix + _formatMessage(tpl, currentState);
-    currentState.zoneQuestion = 'localidad';
-    _setStep(currentState, FlowStep.WAITING_ZONE);
     saveState(userId);
     await sendMessageWithDelay(userId, msg);
     logger.info(`[ZONE] ${userId} → preguntando localidad.`);
@@ -231,9 +276,45 @@ export async function handleWaitingZone(
 
     // ── Localidad en el mensaje ────────────────────────────────────────────────
     const cls: ZoneClassification = classifyZoneText(text, knowledge);
+    if (cls.zone === 'in') {
+        // Si con la localidad vino la dirección ("Rosario, Mitre 1234"), se guarda
+        // para no volver a pedirla. El CP de Rosario (2000-2009) no cuenta como
+        // número de calle.
+        const hasStreetNumber = /\d{2,5}/.test(text.replace(/\b200\d\b/g, ''));
+        if (hasStreetNumber && text.trim().split(/\s+/).length >= 3) {
+            try {
+                const parsed = await (dependencies.mockAiService || aiService).parseAddress(text);
+                if (parsed && !parsed._error) {
+                    if (!currentState.partialAddress) currentState.partialAddress = {} as any;
+                    const addr: any = currentState.partialAddress;
+                    if (parsed.calle && parsed.calle !== 'A sucursal' && !addr.calle) addr.calle = parsed.calle;
+                    if (parsed.nombre && !addr.nombre) {
+                        addr.nombre = parsed.nombre;
+                        if (!currentState.userName) currentState.userName = parsed.nombre;
+                    }
+                }
+            } catch (e: any) {
+                logger.warn(`[ZONE] parseAddress (datos junto a la localidad) falló para ${userId}: ${e.message}`);
+            }
+        }
+    }
     if (cls.zone === 'in' || cls.zone === 'out') {
         await _resolveZone(userId, cls as any, currentState, knowledge, dependencies);
         return { matched: true };
+    }
+
+    // ── Solo la provincia ──────────────────────────────────────────────────────
+    // "Soy de la provincia de Entre Ríos" pausaba el chat (caso 5493436431292).
+    if (PROVINCE_ONLY.test(normalizedText)) {
+        const prov = /entre rios/.test(normalizedText) ? 'Entre Ríos' : 'Santa Fe';
+        const askCity = `¿De qué ciudad o pueblo de ${prov}? Así te digo cómo te llega 📦`;
+        if (!_isDuplicate(askCity, currentState.history)) {
+            currentState.zoneQuestion = 'localidad';
+            saveState(userId);
+            await sendMessageWithDelay(userId, askCity);
+            logger.info(`[ZONE] ${userId} dijo solo la provincia (${prov}) → pregunto la ciudad.`);
+            return { matched: true };
+        }
     }
 
     // ── No reconocimos nada ────────────────────────────────────────────────────
@@ -265,6 +346,34 @@ export async function handleWaitingZone(
         }
         await _pauseAndAlert(userId, currentState, dependencies, text, 'Cliente en waiting_zone con una pregunta que la IA no pudo responder. Revisar.');
         return { matched: true };
+    }
+
+    // ── Frena o no quiere seguir ───────────────────────────────────────────────
+    // Se afloja sin pausar y sin contar como respuesta fallida. El plan elegido
+    // queda guardado y el recordatorio del scheduler lo retoma (salvo que haya
+    // dicho que no).
+    const mentionsPlace = MENTIONS_PLACE.test(normalizedText);
+    if (!mentionsPlace && (ZONE_DECLINE.test(normalizedText) || ZONE_DEFER.test(normalizedText))) {
+        const declined = ZONE_DECLINE.test(normalizedText);
+        const backOff = declined
+            ? _tplOr('zone_decline', knowledge, mpOff, '¡Dale, sin problema! 😊 Si más adelante lo querés, escribime y lo armamos.')
+            : _tplOr('zone_defer', knowledge, mpOff, `¡Dale, sin apuro! 😊 Cuando quieras seguimos. Te dejo el dato: si sos de ${cfg.centro} o alrededores te lo llevamos nosotros y lo pagás recién cuando lo recibís 🚚`);
+        if (declined) currentState.cartRecovered = true; // sin recordatorio a quien dijo que no
+        saveState(userId);
+        if (!_isDuplicate(backOff, currentState.history)) await sendMessageWithDelay(userId, _formatMessage(backOff, currentState));
+        logger.info(`[ZONE] ${userId} ${declined ? 'no quiere seguir' : 'posterga'} ("${text.slice(0, 50)}") → aflojo sin pausar.`);
+        return { matched: true };
+    }
+
+    // ── Dice que sí pero no dice de dónde ──────────────────────────────────────
+    if (!mentionsPlace && ZONE_ACK.test(normalizedText.trim())) {
+        const ackAsk = _tplOr('zone_ack', knowledge, mpOff, '¡Genial! 🙌 Para decirte cómo te llega necesito saber de qué ciudad o pueblo sos 📦');
+        if (!_isDuplicate(ackAsk, currentState.history)) {
+            currentState.zoneQuestion = 'localidad';
+            saveState(userId);
+            await sendMessageWithDelay(userId, _formatMessage(ackAsk, currentState));
+            return { matched: true };
+        }
     }
 
     // Parser de direcciones: saca ciudad/provincia de texto libre ("Soy de Las
