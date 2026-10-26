@@ -27,8 +27,8 @@ interface BotConfig {
     // números nuevos para no exhibir actividad proactiva ante Meta.
     proactiveFollowUps?: boolean;
     // Interruptor de Mercado Pago (jul-2026): si está en false, el bot NO ofrece
-    // ni genera links de pago con tarjeta — el guion queda con retiro en sucursal
-    // (efectivo al retirar) y transferencia (domicilio prepago). Se apaga cuando
+    // ni genera links de pago con tarjeta — fuera de zona queda solo la
+    // transferencia (el reparto propio de Rosario cobra al recibir). Se apaga cuando
     // la cuenta de MP está bloqueada. ENCENDIDO por default.
     mpEnabled?: boolean;
     [key: string]: any;
@@ -162,11 +162,40 @@ export function createStateManager(sellerId: string, dataDir: string): SellerSta
     };
     const availableScripts = Object.keys(knowledgeFiles);
 
+    // "8.0" > "7.0". Sin versión cuenta como la más vieja.
+    function _guionVersionNewer(a?: string, b?: string): boolean {
+        const pa = String(a || '0').split('.').map((n) => parseInt(n, 10) || 0);
+        const pb = String(b || '0').split('.').map((n) => parseInt(n, 10) || 0);
+        for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+            const x = pa[i] || 0, y = pb[i] || 0;
+            if (x !== y) return x > y;
+        }
+        return false;
+    }
+
     async function loadKnowledge(_scriptName: string | null = null) {
         try {
             for (const name of Object.keys(knowledgeFiles)) {
                 const paths = knowledgeFiles[name];
-                const filePath = fs.existsSync(paths.save) ? paths.save : paths.source;
+                let filePath = fs.existsSync(paths.save) ? paths.save : paths.source;
+                // La copia guardada en DATA_DIR gana sobre el archivo del repo,
+                // así que un guion nuevo deployado (ej. V8, sep-2026) no llegaría
+                // a prod si alguna vez se guardó una copia. Si meta.version del
+                // repo es más nueva, gana el repo y la copia queda como .bak.
+                if (filePath === paths.save && fs.existsSync(paths.source)) {
+                    try {
+                        const savedMeta = JSON.parse(await fs.promises.readFile(paths.save, 'utf-8')).meta || {};
+                        const sourceMeta = JSON.parse(await fs.promises.readFile(paths.source, 'utf-8')).meta || {};
+                        if (_guionVersionNewer(sourceMeta.version, savedMeta.version)) {
+                            const bak = `${paths.save}.v${savedMeta.version || '0'}.bak`;
+                            await fs.promises.rename(paths.save, bak);
+                            filePath = paths.source;
+                            logger.warn(`[STATE][${sellerId}] Guion ${name}: el repo trae la versión ${sourceMeta.version} y la copia guardada era ${savedMeta.version || '?'} — uso el repo; la copia quedó en ${path.basename(bak)}.`);
+                        }
+                    } catch (e: any) {
+                        logger.warn(`[STATE][${sellerId}] No pude comparar versiones del guion ${name}: ${e.message}`);
+                    }
+                }
                 if (fs.existsSync(filePath)) {
                     multiKnowledge[name] = JSON.parse(await fs.promises.readFile(filePath, 'utf-8'));
                     logger.info(`[STATE][${sellerId}] Knowledge loaded: ${name} from ${path.basename(filePath)}`);

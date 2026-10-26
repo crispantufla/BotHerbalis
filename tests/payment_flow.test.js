@@ -1,10 +1,14 @@
 /**
- * Payment method flow tests — modelo vigente (may-2026 rev 2).
+ * Payment method flow tests — modelo por zona (sep-2026).
+ *
+ * stepWaitingPaymentMethod atiende al cliente FUERA de la zona de reparto propio
+ * (deliveryZone='out'): todo va por Correo Argentino y SIEMPRE prepago.
  *
  * Cobertura:
- *  - stepWaitingPaymentMethod → menú de envío 2-opciones (retiro vs domicilio)
- *      · "1" / "retiro" / "sucursal" → contrarrembolso, paga total al retirar (pause+alert)
- *      · "2" / "domicilio" / "casa" → submenú MP/Transferencia (paymentSubChoiceAsked=true)
+ *  - stepWaitingPaymentMethod → ¿domicilio o sucursal? + submenú de medio
+ *      · "1" / "domicilio" / "casa" → submenú Tarjeta/Transferencia (paymentSubChoiceAsked=true)
+ *      · "2" / "retiro" / "sucursal" → mismo submenú, calle="A sucursal" (retiro PREPAGO)
+ *      · "contra reembolso" / "al recibir" → objeción del dueño (prepay_objection), 2ª vez cierre + pausa
  *      · Atajos: "mp"/"mercadopago" → MP directo; "transferencia" → alias directo
  *  - stepWaitingMpPayment — link normal por el total
  *  - Subflow email + retry/error handling MP
@@ -117,6 +121,7 @@ function makeOkState(overrides = {}) {
 function makePaymentState(plan = '60', overrides = {}) {
     return {
         step: 'waiting_payment_method',
+        deliveryZone: 'out',
         history: [],
         cart: [{ product: 'Cápsulas', plan, price: plan === '60' ? '46.900' : '66.900' }],
         selectedProduct: 'Cápsulas',
@@ -199,24 +204,28 @@ afterAll(() => { delete process.env.MP_ACCESS_TOKEN; });
 describe('Aclaración "pago al recibir" con MP/domicilio', () => {
     const norm = (t) => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
-    test('"Envío a domicilio pago con mercado pago al recibir" → aclara, NO avanza al link/submenú', async () => {
+    test('"Envío a domicilio pago con mercado pago al recibir" → explica el prepago, NO avanza al link/submenú', async () => {
         const state = makePaymentState('60');
         const txt = 'Envio a domicilio pago con mercado pago al recibir';
         await handleWaitingPaymentMethod('m1', txt, norm(txt), state, knowledge, deps);
         expect(state.step).toBe('waiting_payment_method');
         expect(state.paymentMethod).not.toBe('mercadopago');
         expect(state.paymentSubChoiceAsked).toBeFalsy();
+        expect(state.prepayObjections).toBe(1);
         const sent = mockSend.mock.calls.map(([, m]) => m).join(' ');
-        expect(sent).toMatch(/antes del env[íi]o|al cartero no se le paga/i);
-        expect(sent).toMatch(/retiro en sucursal/i);
+        expect(sent).toMatch(/pago anticipado/i);
+        expect(sent).toMatch(/4 días hábiles/);
+        expect(sent).not.toMatch(/efectivo cuando lo retir/i);
     });
 
-    test('"retiro en sucursal y pago al recibir en efectivo" → NO es malentendido, va a retiro', async () => {
+    test('"retiro en sucursal y pago al recibir en efectivo" → fuera de zona tampoco existe: misma objeción', async () => {
         const state = makePaymentState('60');
         const txt = 'retiro en sucursal y pago al recibir en efectivo';
         await handleWaitingPaymentMethod('m2', txt, norm(txt), state, knowledge, deps);
-        expect(state.shippingChoice).toBe('retiro');
-        expect(state.paymentMethod).toBe('contrarembolso');
+        expect(state.paymentMethod).toBeFalsy();
+        expect(state.prepayObjections).toBe(1);
+        const sent = mockSend.mock.calls.map(([, m]) => m).join(' ');
+        expect(sent).toMatch(/13 años/);
     });
 });
 
@@ -231,7 +240,7 @@ describe('Aclaración "pago al recibir" con MP/domicilio', () => {
 describe('Aclaración "pago en mi domicilio / en casa" (caso 5492915126300)', () => {
     const norm = (t) => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
-    test('"Lo pago en mi domicilio" → aclara retiro en sucursal, NO asume domicilio ni muestra submenú', async () => {
+    test('"Lo pago en mi domicilio" → objeción de prepago, NO asume domicilio ni muestra submenú', async () => {
         const state = makePaymentState('60');
         mockSend.mockClear();
         const txt = 'Lo pago en mi domicilio';
@@ -241,22 +250,23 @@ describe('Aclaración "pago en mi domicilio / en casa" (caso 5492915126300)', ()
         expect(state.paymentSubChoiceAsked).toBeFalsy();
         expect(state.paymentMethod).toBeFalsy();
         expect(state.step).toBe('waiting_payment_method');
+        expect(state.prepayObjections).toBe(1);
         const sent = mockSend.mock.calls.map(([, m]) => m).join(' ');
-        expect(sent).toMatch(/retiro en sucursal/i);
-        expect(sent).toMatch(/al cartero.*no se le paga|en la puerta de tu casa/i);
-        // No debe haber mandado el submenú "lo mandamos a tu domicilio".
-        expect(sent).not.toMatch(/lo mandamos a tu domicilio/i);
+        expect(sent).toMatch(/pago anticipado/i);
+        // No debe haber mandado el submenú "te lo mandamos a tu domicilio".
+        expect(sent).not.toMatch(/te lo mandamos a tu domicilio/i);
     });
 
-    test('"pago en casa" → misma aclaración', async () => {
+    test('"pago en casa" → misma objeción', async () => {
         const state = makePaymentState('60');
         mockSend.mockClear();
         const txt = 'pago en casa';
         await handleWaitingPaymentMethod('ph2', txt, norm(txt), state, knowledge, deps);
         expect(state.paymentSubChoiceAsked).toBeFalsy();
+        expect(state.prepayObjections).toBe(1);
         const sent = mockSend.mock.calls.map(([, m]) => m).join(' ');
-        expect(sent).toMatch(/retiro en sucursal/i);
-        expect(sent).toMatch(/efectivo/i);
+        expect(sent).toMatch(/Correo Argentino/);
+        expect(sent).not.toMatch(/efectivo/i);
     });
 
     test('"lo pago en mi domicilio con tarjeta" → NO dispara la aclaración (nombró prepago, sigue como domicilio)', async () => {
@@ -312,10 +322,10 @@ describe('Ambigüedad de envío — nombra LAS DOS opciones (caso 5493815010702)
 // ..he tenido problema". El bot insistía con tarjeta (otro prepago); la vendedora
 // a mano ofreció "pagás cuando retirás / sucursal". El bot debe hacer lo mismo.
 // ════════════════════════════════════════════════════════════════════════════
-describe('Desconfía del pago anticipado → ofrece retiro en sucursal (caso 5492262484928)', () => {
+describe('Desconfía del pago anticipado → argumento del dueño, sin pago al recibir (fuera de zona)', () => {
     const norm = (t) => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
-    test('"no me gustan transferencias, he tenido problema" → ofrece retiro, NO insiste con prepago', async () => {
+    test('"no me gustan transferencias, he tenido problema" → tarjeta protegida + 13 años, NO transfiere ni abre submenú', async () => {
         const state = makePaymentState('60');
         mockSend.mockClear();
         const txt = 'Soy de pcia Bs As..no me gustan transferencias..he tenido problema';
@@ -324,28 +334,43 @@ describe('Desconfía del pago anticipado → ofrece retiro en sucursal (caso 549
         expect(state.paymentMethod).toBeFalsy();
         expect(state.paymentSubChoiceAsked).toBeFalsy();
         expect(state.step).toBe('waiting_payment_method');
+        expect(state.prepayObjections).toBe(1);
         const sent = mockSend.mock.calls.map(([, m]) => m).join(' ');
-        expect(sent).toMatch(/retiro en sucursal/i);
-        expect(sent).toMatch(/al retir[áa]s|cuando lo retir[áa]s|efectivo/i);
-        expect(sent).toMatch(/no .*por adelantado|sin transferencias/i);
+        expect(sent).toMatch(/13 años/);
+        expect(sent).toMatch(/tarjeta de crédito/i);
+        expect(sent).not.toMatch(/retiro en sucursal.*efectivo|efectivo cuando lo retir/i);
     });
 
-    test('"me da miedo pagar por adelantado" → ofrece retiro en sucursal', async () => {
+    test('"me da miedo pagar por adelantado" → misma objeción', async () => {
         const state = makePaymentState('60');
         mockSend.mockClear();
         const txt = 'me da miedo pagar por adelantado';
         await handleWaitingPaymentMethod('dp2', txt, norm(txt), state, knowledge, deps);
         expect(state.paymentMethod).toBeFalsy();
+        expect(state.prepayObjections).toBe(1);
         const sent = mockSend.mock.calls.map(([, m]) => m).join(' ');
-        expect(sent).toMatch(/retiro en sucursal/i);
+        expect(sent).toMatch(/pago anticipado/i);
     });
 
-    test('"prefiero sucursal, no me gustan las transferencias" → va a RETIRO (no intercepta el guard)', async () => {
+    test('insiste una segunda vez → mensaje de cierre del dueño y pausa para un asesor', async () => {
+        const state = makePaymentState('60', { prepayObjections: 1 });
+        mockSend.mockClear();
+        const txt = 'no, yo no pago antes, contrarreembolso o nada';
+        await handleWaitingPaymentMethod('dp2b', txt, norm(txt), state, knowledge, deps);
+        expect(state.prepayObjections).toBe(2);
+        const sent = mockSend.mock.calls.map(([, m]) => m).join(' ');
+        expect(sent).toMatch(/Desde hace 13 años realizamos envíos por contrarreembolso/);
+        expect(sent).toMatch(/Atentamente/);
+        expect(mockPauseUsers.has('dp2b')).toBe(true);
+    });
+
+    test('"prefiero sucursal, no me gustan las transferencias" → va a RETIRO prepago (no intercepta el guard)', async () => {
         const state = makePaymentState('60');
         const txt = 'prefiero sucursal, no me gustan las transferencias';
         await handleWaitingPaymentMethod('dp3', txt, norm(txt), state, knowledge, deps);
         expect(state.shippingChoice).toBe('retiro');
-        expect(state.paymentMethod).toBe('contrarembolso');
+        expect(state.paymentMethod).toBeFalsy();
+        expect(state.paymentSubChoiceAsked).toBe(true);
     });
 
     test('"no me gustan las transferencias, pago con tarjeta" → respeta la tarjeta (no fuerza sucursal)', async () => {
@@ -358,14 +383,15 @@ describe('Desconfía del pago anticipado → ofrece retiro en sucursal (caso 549
     });
 });
 
-describe('Menú envío → Retiro en sucursal (opción 1)', () => {
+describe('Menú envío → Retiro en sucursal (opción 2, PREPAGO)', () => {
 
-    test('[2.1] "1" → retiro en sucursal (contrarrembolso, sin anticipo)', async () => {
+    test('[2.1] "2" → retiro en sucursal prepago: submenú de medio, sin contrarreembolso', async () => {
         const state = makePaymentState('60');
-        await handleWaitingPaymentMethod('r1', '1', '1', state, knowledge, deps);
+        await handleWaitingPaymentMethod('r1', '2', '2', state, knowledge, deps);
         expect(state.shippingChoice).toBe('retiro');
-        expect(state.paymentMethod).toBe('contrarembolso');
-        expect(state.senaAmount).toBe(0);
+        expect(state.paymentMethod).toBeFalsy();
+        expect(state.paymentSubChoiceAsked).toBe(true);
+        expect(state.senaAmount).toBeNull();
         expect(state.senaPaid).toBe(false);
     });
 
@@ -373,55 +399,51 @@ describe('Menú envío → Retiro en sucursal (opción 1)', () => {
         const state = makePaymentState('60');
         await handleWaitingPaymentMethod('r2', 'retiro en sucursal', 'retiro en sucursal', state, knowledge, deps);
         expect(state.shippingChoice).toBe('retiro');
-        expect(state.paymentMethod).toBe('contrarembolso');
+        expect(state.paymentSubChoiceAsked).toBe(true);
     });
 
-    test('[2.3] "contra reembolso" → retiro (mismo branch que sucursal)', async () => {
+    test('[2.3] "contra reembolso" → NO es retiro: es la objeción de prepago', async () => {
         const state = makePaymentState('60');
         await handleWaitingPaymentMethod('r3', 'contra reembolso', 'contra reembolso', state, knowledge, deps);
-        expect(state.shippingChoice).toBe('retiro');
-        expect(state.paymentMethod).toBe('contrarembolso');
+        expect(state.shippingChoice).toBeFalsy();
+        expect(state.paymentMethod).toBeFalsy();
+        expect(state.prepayObjections).toBe(1);
     });
 
-    test('[2.4] Mensaje de confirmación incluye total a pagar al retirar', async () => {
+    test('[2.4] Mensaje de sucursal: código postal, 4 días hábiles, medios prepago; sin efectivo ni anticipo', async () => {
         const state = makePaymentState('60');
-        await handleWaitingPaymentMethod('r4', '1', '1', state, knowledge, deps);
+        await handleWaitingPaymentMethod('r4', '2', '2', state, knowledge, deps);
         const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
         expect(sent).toMatch(/sucursal/i);
-        expect(sent).toMatch(/efectivo/i);
-        // El bot NO debe mencionar anticipo en el flow nuevo.
+        expect(sent).toMatch(/4 días hábiles/);
+        expect(sent).toMatch(/Tarjeta de cr[ée]dito/);
+        expect(sent).toMatch(/Transferencia/);
+        expect(sent).not.toMatch(/efectivo/i);
         expect(sent).not.toMatch(/anticipo/i);
         expect(sent).not.toMatch(/10\.000/);
     });
 
-    test('[2.5] Tras elegir retiro, pide SOLO localidad + CP (no calle) y pre-setea calle="A sucursal"', async () => {
-        // Rev. 2026-05-31: retiro NO pide calle/número. Con localidad + CP se
-        // asigna la sucursal que corresponde. Pre-setea partialAddress.calle="A
-        // sucursal" para que waiting_data no pida ni valide la calle.
+    test('[2.5] Tras elegir retiro, pre-setea calle="A sucursal" y NO pide datos todavía (van después del pago)', async () => {
         const state = makePaymentState('60', { partialAddress: {} });
-        await handleWaitingPaymentMethod('r5', '1', '1', state, knowledge, deps);
+        await handleWaitingPaymentMethod('r5', '2', '2', state, knowledge, deps);
         expect(state.shippingChoice).toBe('retiro');
-        expect(state.paymentMethod).toBe('contrarembolso');
-        expect(state.step).toBe('waiting_data');
+        expect(state.step).toBe('waiting_payment_method');
         expect(state.partialAddress.calle).toBe('A sucursal');
         expect(deps.sharedState.pausedUsers.has('r5')).toBe(false);
         const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
-        expect(sent).toMatch(/retiro en sucursal/i);
-        expect(sent).toMatch(/localidad/i);
-        expect(sent).toMatch(/c[óo]digo postal/i);
-        // NO debe pedir calle y número
         expect(sent).not.toMatch(/calle y n[úu]mero/i);
+        expect(sent).not.toMatch(/Nombre completo:/);
     });
 });
 
 // ════════════════════════════════════════════════════════════════════════════
 // BLOQUE 3: stepWaitingPaymentMethod — Envío a domicilio (opción 2 + submenú)
 // ════════════════════════════════════════════════════════════════════════════
-describe('Menú envío → Envío a domicilio (opción 2) + submenú prepago', () => {
+describe('Menú envío → Envío a domicilio (opción 1) + submenú prepago', () => {
 
-    test('[3.1] "2" → setea shippingChoice=domicilio y muestra submenú Tarjeta/Transfer', async () => {
+    test('[3.1] "1" → setea shippingChoice=domicilio y muestra submenú Tarjeta/Transfer', async () => {
         const state = makePaymentState('60');
-        await handleWaitingPaymentMethod('d1', '2', '2', state, knowledge, deps);
+        await handleWaitingPaymentMethod('d1', '1', '1', state, knowledge, deps);
         expect(state.shippingChoice).toBe('domicilio');
         expect(state.paymentSubChoiceAsked).toBe(true);
         expect(state.step).toBe('waiting_payment_method'); // sigue esperando submenú
@@ -473,10 +495,9 @@ describe('Menú envío → Envío a domicilio (opción 2) + submenú prepago', (
         expect(sent).toMatch(/BIO ORIGEN S.A.S./);
     });
 
-    // Combo jun-2026: el cliente puede pedir RETIRO en sucursal pagando por
-    // TRANSFERENCIA. No es el flujo estándar (retiro = efectivo) → damos el alias,
-    // pedimos datos para la sucursal y derivamos a un asesor (no auto-confirmamos).
-    test('[3.7] "retiro en sucursal pero pago por transferencia" → retiro + transferencia + alias + pausa', async () => {
+    // Sep-2026: retiro en sucursal + transferencia es un camino normal (todo va
+    // prepago): alias directo, sin pausa. El comprobante se verifica al "listo".
+    test('[3.7] "retiro en sucursal pero pago por transferencia" → retiro + transferencia + alias, sin pausa', async () => {
         mockPauseUsers.clear();
         const state = makePaymentState('60');
         const txt = 'quiero retiro en sucursal pero pagar por transferencia';
@@ -484,12 +505,11 @@ describe('Menú envío → Envío a domicilio (opción 2) + submenú prepago', (
         expect(state.shippingChoice).toBe('retiro');
         expect(state.paymentMethod).toBe('transferencia');
         expect(state.partialAddress.calle).toBe('A sucursal');
+        expect(state.step).toBe('waiting_transfer_confirmation');
         const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
         expect(sent).toMatch(/HERBALIS\.TIENDA/);
         expect(sent).toMatch(/sucursal/i);
-        expect(sent).toMatch(/transferencia/i);
-        // Combo no estándar → derivado a un asesor para coordinar/verificar.
-        expect(mockPauseUsers.has('combo1')).toBe(true);
+        expect(mockPauseUsers.has('combo1')).toBe(false);
     });
 
     test('[3.7] Submenú "transferencia" → transfer', async () => {
@@ -512,13 +532,14 @@ describe('Menú envío → Envío a domicilio (opción 2) + submenú prepago', (
 
     // Regresión bucle 5491156581277: el cliente preguntaba si podía pagar en
     // efectivo en el domicilio y el bot re-mandaba el submenú 5 veces.
-    test('[3.8b] Submenú "sería al contado" → aclara retiro en sucursal (no bucle)', async () => {
+    test('[3.8b] Submenú "sería al contado" → objeción de prepago (no bucle, no efectivo)', async () => {
         const state = makePaymentState('60', { shippingChoice: 'domicilio', paymentSubChoiceAsked: true });
         mockSend.mockClear();
         await handleWaitingPaymentMethod('d8b', 'Sería al contado', 'seria al contado', state, knowledge, deps);
         const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
-        expect(sent).toMatch(/sucursal/i);
-        expect(sent).toMatch(/retiro/i);
+        expect(sent).toMatch(/pago anticipado/i);
+        expect(sent).not.toMatch(/efectivo cuando lo retir/i);
+        expect(state.prepayObjections).toBe(1);
         expect(state.paymentSubChoiceAsked).toBe(false);
     });
 
@@ -734,39 +755,49 @@ describe('stepWaitingMpPayment — retry/error handling', () => {
 // limpia el link MP y manda al cliente a retiro en sucursal directamente,
 // pausando para coordinación admin. Sin anticipo, sin submenú.
 // ════════════════════════════════════════════════════════════════════════════
-describe('stepWaitingMpPayment — cliente cambia a Retiro en sucursal', () => {
+describe('stepWaitingMpPayment — cliente pide pagar al recibir (modelo por zona)', () => {
 
-    test('[6d.1] "3" en MP → retiro en sucursal + pause+alert (sin nuevo link MP)', async () => {
+    test('[6d.1] fuera de zona: "contra reembolso" en MP → explica el prepago, conserva el link, NO pausa', async () => {
         const state = makeMpState({
+            deliveryZone: 'out',
             mpPaymentLinkId: 'pl-1',
             mpPaymentLinkUrl: 'https://mp.com/x',
-            partialAddress: { calle: 'Belgrano 123', ciudad: 'Rosario', cp: '2000' },
+            partialAddress: { calle: 'Belgrano 123', ciudad: 'Córdoba', cp: '5000' },
         });
         mockPreferenceCreate.mockClear();
-        await handleWaitingMpPayment('cod_switch', '3', '3', state, knowledge, deps);
+        await handleWaitingMpPayment('cod_switch', 'contra reembolso', 'contra reembolso', state, knowledge, deps);
+
+        expect(state.paymentMethod).toBe('mercadopago');
+        expect(state.mpPaymentLinkUrl).toBe('https://mp.com/x');
+        expect(state.step).toBe('waiting_mp_payment');
+        const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
+        expect(sent).toMatch(/no tenemos pago al recibir/i);
+        expect(sent).toMatch(/transferencia/i);
+        expect(sent).not.toMatch(/efectivo/i);
+        expect(mockPreferenceCreate).not.toHaveBeenCalled();
+        expect(deps.sharedState.pausedUsers.has('cod_switch')).toBe(false);
+    });
+
+    test('[6d.2] dentro de zona: "3" / "efectivo" en MP → suelta el link, reparto propio, pide nombre + calle', async () => {
+        const state = makeMpState({
+            deliveryZone: 'in',
+            mpPaymentLinkId: 'pl-1',
+            mpPaymentLinkUrl: 'https://mp.com/x',
+            partialAddress: { ciudad: 'Rosario' },
+        });
+        mockPreferenceCreate.mockClear();
+        await handleWaitingMpPayment('cod_switch_in', 'prefiero efectivo', 'prefiero efectivo', state, knowledge, deps);
 
         expect(state.paymentMethod).toBe('contrarembolso');
-        expect(state.shippingChoice).toBe('retiro');
-        expect(state.senaAmount).toBe(0);
-        expect(state.senaPaid).toBe(false);
+        expect(state.shippingChoice).toBe('reparto');
         expect(state.mpPaymentLinkUrl).toBeNull();
         expect(state.mpPaymentLinkId).toBeNull();
-
+        expect(state.mpReminderStage).toBe(99);
+        expect(state.step).toBe('waiting_data');
         const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
-        expect(sent).toMatch(/sucursal/i);
-        expect(sent).toMatch(/efectivo/i);
-        // NO debe mencionar anticipo o seña.
-        expect(sent).not.toMatch(/anticipo/i);
-        expect(sent).not.toMatch(/10\.000/);
-
-        // NO regeneró link MP automáticamente.
-        expect(mockPreferenceCreate).not.toHaveBeenCalled();
-
-        // Cliente pausado para coordinación admin.
-        expect(deps.sharedState.pausedUsers.has('cod_switch')).toBe(true);
-        const adminArgs = mockNotify.mock.calls.map(args => args.join(' ')).join(' ');
-        expect(adminArgs).toMatch(/RETIRO EN SUCURSAL/i);
-        expect(adminArgs).toMatch(/Belgrano 123/);
+        expect(sent).toMatch(/reparto propio/i);
+        expect(sent).toMatch(/calle y número/i);
+        expect(deps.sharedState.pausedUsers.has('cod_switch_in')).toBe(false);
     });
 });
 

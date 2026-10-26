@@ -4,9 +4,9 @@
  * A Herbalis le bloquearon la cuenta de MP de forma temporal, así que el bot
  * tiene que poder dejar de ofrecer el pago con tarjeta sin tocar código: el
  * vendedor apaga el switch en Configuración (`config.mpEnabled = false`) y el
- * guion queda con las dos formas que siguen vivas:
- *   1) Retiro en sucursal → efectivo al retirar
- *   2) Envío a domicilio  → transferencia al alias (prepago)
+ * guion queda sin el medio online. Desde sep-2026 (modelo por zona) eso deja:
+ *   - Rosario y 60 km → reparto propio, paga al recibir (no depende de MP)
+ *   - Resto del país  → Correo prepago por transferencia al alias
  *
  * Es un INTERRUPTOR, no un cambio de modelo: cuando MP vuelva se prende y todo
  * el copy de tarjeta revive tal cual. Por eso las variantes de texto viven acá
@@ -42,15 +42,14 @@ export function prepayMenu(mpOn: boolean): string {
 }
 
 /**
- * Respuesta cuando el cliente pide expresamente pagar con tarjeta / MP y el
- * interruptor está apagado. No inventamos excusas ni prometemos fecha de
- * vuelta: decimos que no está disponible y ofrecemos las dos que sí andan.
+ * Respuesta cuando el cliente (fuera de zona) pide expresamente pagar con
+ * tarjeta / MP y el interruptor está apagado. No inventamos excusas ni
+ * prometemos fecha de vuelta: decimos que no está disponible y ofrecemos la
+ * transferencia, que es lo único prepago que queda.
  */
 export function cardUnavailableMessage(totalPrice?: string | number | null): string {
     const total = totalPrice ? `*$${totalPrice}*` : 'el total';
     return `¡Uy, justo el pago con tarjeta lo tenemos fuera de servicio en estos días! 🙈 Disculpá.\n\n` +
-        `Pero tenés dos formas igual de simples:\n\n` +
-        `1️⃣ *Retiro en sucursal* → no pagás nada ahora, abonás ${total} *en efectivo cuando lo retirás* 💵\n` +
-        `2️⃣ *Envío a tu casa* → lo abonás por *transferencia* al alias y, al estar pago, sale enseguida (*4 días hábiles*) 🚚\n\n` +
-        `¿Cuál te queda más cómoda?`;
+        `Lo resolvemos por *transferencia*: te paso el alias, abonás ${total} y, apenas se acredita, el pedido sale y llega en *4 días hábiles* 🚚\n\n` +
+        `¿Te lo paso?`;
 }

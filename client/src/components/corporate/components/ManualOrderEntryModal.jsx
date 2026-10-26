@@ -9,8 +9,10 @@ import { X, Save, Home, Store, CreditCard, Banknote, Send, Pill, Droplet, Leaf }
  * crea la orden.
  *
  * Reglas de negocio (acopladas):
- *   - Envío a DOMICILIO  → pago: Mercado Pago o Transferencia. Pide dirección completa.
- *   - Retiro en SUCURSAL → pago: Efectivo al retirar. Pide ciudad + CP + provincia.
+ *   - Envío a DOMICILIO  → pago: Mercado Pago, Transferencia o pago al recibir
+ *     (reparto propio en Rosario y 60 km, modelo sep-2026). Pide dirección completa.
+ *   - Retiro en SUCURSAL → pago: Mercado Pago o Transferencia (prepago; el
+ *     "efectivo al retirar" quedó para ventas viejas). Pide ciudad + CP + provincia.
  *   (Nombre y apellido se pide siempre — la orden lo necesita.)
  *   - Si el bot NO detectó el producto, el admin lo elige (producto + plan) y el
  *     precio sale de la lista oficial.
@@ -18,11 +20,14 @@ import { X, Save, Home, Store, CreditCard, Banknote, Send, Pill, Droplet, Leaf }
  */
 const PAY_OPTIONS = {
     domicilio: [
+        { value: 'contrarembolso', label: 'Pago al recibir (reparto)', icon: Banknote },
         { value: 'mercadopago', label: 'Mercado Pago', icon: CreditCard },
         { value: 'transferencia', label: 'Transferencia', icon: Banknote },
     ],
     sucursal: [
-        { value: 'contrarembolso', label: 'Efectivo al retirar', icon: Banknote },
+        { value: 'mercadopago', label: 'Mercado Pago', icon: CreditCard },
+        { value: 'transferencia', label: 'Transferencia', icon: Banknote },
+        { value: 'contrarembolso', label: 'Efectivo al retirar (viejo)', icon: Banknote },
     ],
 };
 

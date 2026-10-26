@@ -130,14 +130,28 @@ function _formatMessage(text: string | string[], state: any): string {
             formatted = formatted.replace(/{{PRODUCT_DETAIL}}/g, state.selectedProduct || 'Nuez de la India');
             formatted = formatted.replace(/{{PLAN_DETAIL}}/g, state.selectedPlan ? `${state.selectedPlan} días` : '60 días');
         }
-        // Línea condicional postdatado vs entrega estándar (confirmación final).
-        // Modelo jun-2026: domicilio PREPAGO (tarjeta/transferencia) 4 días; retiro 7-10.
-        const _isRetiro = state.shippingChoice === 'retiro' || state.paymentMethod === 'contrarembolso';
-        const _entrega = _isRetiro ? '7 a 10 días hábiles' : '4 días hábiles';
+        // Localidad del cliente (zona de reparto, sep-2026).
+        const _localidad = state.partialAddress?.ciudad || state.pendingOrder?.ciudad || 'tu zona';
+        formatted = formatted.replace(/{{LOCALIDAD}}/g, _localidad);
+        // Modelo por zona (sep-2026): reparto propio (Rosario y 60 km) no tiene plazo
+        // fijo, se coordina día y horario; todo lo que va por Correo es prepago y
+        // llega en 4 días hábiles. El retiro contrarreembolso viejo (estados
+        // anteriores a sep-2026) conserva sus 7 a 10.
+        const _isReparto = state.shippingChoice === 'reparto';
+        const _isSucursal = state.shippingChoice === 'retiro' || state.pendingOrder?.calle?.toLowerCase() === 'a sucursal';
+        const _isLegacyRetiroCod = _isSucursal && state.paymentMethod === 'contrarembolso';
+        const _entrega = _isLegacyRetiroCod ? '7 a 10 días hábiles' : '4 días hábiles';
         const postdatadoLine = state.postdatado
-            ? `📅 Envío programado: ${state.postdatado}\n`
-            : `✔ Entrega estimada: ${_entrega} desde la confirmación\n`;
+            ? `📅 ${_isReparto ? 'Entrega programada' : 'Envío programado'}: ${state.postdatado}\n`
+            : (_isReparto ? '' : `✔ Entrega estimada: ${_entrega} desde la confirmación\n`);
         formatted = formatted.replace(/{{POSTDATADO_LINE}}/g, postdatadoLine);
+        // Línea de envío de las confirmaciones prepago: domicilio o sucursal del Correo.
+        const envioLine = _isReparto
+            ? `✔ Reparto propio a tu domicilio en ${_localidad}, sin costo\n`
+            : _isSucursal
+                ? `✔ Correo Argentino — retiro en la sucursal más cercana a tu código postal\nCuando llegue te avisamos y te pasamos el código de retiro. Tenés 72 hs para retirarlo.\n`
+                : `✔ Correo Argentino — envío a domicilio\nImportante: si el cartero no te encuentra, el paquete queda en sucursal 72 hs para retirar.\n`;
+        formatted = formatted.replace(/{{ENVIO_LINE}}/g, envioLine);
         // Línea condicional saldo al cartero vs retiro en sucursal (confirmación COD).
         const isSucursal = state.pendingOrder?.calle?.toLowerCase() === 'a sucursal';
         if (state.senaAmount && state.senaAmount > 0) {
@@ -247,7 +261,7 @@ function _getQuickReplies(step: string, userMessage: string): QuickReplyItem[] {
     if (step === 'waiting_data') {
         return [
             { label: 'Aclarar privacidad', message: 'Tus datos solo se usan para el envío, no los compartimos con nadie.' },
-            { label: 'Retiro en sucursal', message: 'Si preferís, podés retirar en sucursal y no necesitás dar dirección.' },
+            { label: 'Cómo llega', message: 'Si sos de Rosario o alrededores te lo llevamos nosotros y pagás al recibir; si no, va por Correo a tu casa o a la sucursal más cercana.' },
             { label: 'Ayudar con datos', message: '¿Necesitás ayuda para completar los datos? Te guío paso a paso.' },
         ];
     }
@@ -255,7 +269,7 @@ function _getQuickReplies(step: string, userMessage: string): QuickReplyItem[] {
     // Waiting for OK — close the sale
     if (step === 'waiting_ok') {
         return [
-            { label: 'Opciones de envío', message: 'Podés recibir en tu domicilio o retirar en sucursal, lo que te quede mejor.' },
+            { label: 'Opciones de envío', message: 'En Rosario y hasta 60 km te lo llevamos nosotros; al resto del país va por Correo, a tu casa o a sucursal.' },
             { label: 'Urgencia amable', message: 'Te comento que este precio es por tiempo limitado. ¿Seguimos?' },
             { label: 'Resolver duda', message: '¿Tenés alguna duda antes de confirmar? Estoy para ayudarte.' },
         ];

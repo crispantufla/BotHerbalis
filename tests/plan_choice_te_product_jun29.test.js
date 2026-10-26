@@ -44,7 +44,7 @@ const baseState = (over = {}) => ({
     ...over,
 });
 
-const KNOW = { flow: {} }; // payment_menu ausente → buildPaymentMessage cae al fallback fijo
+const KNOW = { flow: {} }; // sin overrides → los templates salen de knowledge_v7.json
 
 describe('stepWaitingPlanChoice — "te" NO debe interpretarse como Semillas', () => {
 
@@ -61,7 +61,7 @@ describe('stepWaitingPlanChoice — "te" NO debe interpretarse como Semillas', (
         expect(state.cart[0].product).not.toBe('Semillas');
         expect(state.cart[0].price).toBe(_getPrice('Cápsulas', '60'));
         expect(state.cart[0].price).not.toBe('36.900'); // no es el precio de Semillas
-        expect(state.step).toBe('waiting_payment_method');
+        expect(state.step).toBe('waiting_zone'); // sep-2026: tras el plan se pregunta la localidad
     });
 
     test('mensaje exacto del caso: "Con tarjeta te puedo pagar 60 sale 49.900" → NUNCA arma cart de Semillas', async () => {

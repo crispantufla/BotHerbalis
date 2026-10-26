@@ -66,7 +66,10 @@ function _getFlowResponse(knowledge: any, key: string, mpOff?: boolean): string 
 
 
 /**
- * TEXTO 4 — Menú de las 3 opciones de pago. Plantilla: knowledge.flow.payment_menu.response.
+ * TEXTO 4 — Menú de pago. Desde sep-2026 es la pregunta de LOCALIDAD (el bot
+ * decide solo reparto propio vs Correo, ver flows/utils/deliveryZone). Plantilla:
+ * knowledge.flow.payment_menu.response. Los steps entran por
+ * stepWaitingZone._startZoneStep, que la saltea si el cliente ya dijo de dónde es.
  */
 function buildPaymentMessage(state: any, knowledge?: any, mpOff?: boolean): string {
     const k = knowledge || _loadDefaultKnowledge();
@@ -91,12 +94,12 @@ function buildConfirmationMessage(state: any, knowledge?: any): string {
         key = 'order_confirmation_mp';
     } else if (state.paymentMethod === 'transferencia') {
         key = 'order_confirmation_transfer';
+    } else if (state.paymentMethod === 'contrarembolso' && state.shippingChoice === 'reparto') {
+        // Modelo por zona (sep-2026): reparto propio en Rosario y 60 km, paga al recibir.
+        key = 'order_confirmation_reparto';
     } else if (state.paymentMethod === 'contrarembolso') {
-        // Modelo nuevo (may-2026): contrarrembolso = retiro en sucursal, paga total al retirar.
-        // Modelo legacy (pre-may-2026): contrarrembolso = seña $10k + saldo al cartero.
-        // En ambos casos se usa la misma plantilla 'order_confirmation_cod' (el texto fue
-        // reescrito para el modelo nuevo; senaAmount=0 en retiro hace que {{CARTO_LINE}}
-        // quede vacío).
+        // Legacy: retiro en sucursal contrarreembolso (may-2026 a sep-2026) y, más
+        // atrás, seña $10k + saldo al cartero. Misma plantilla 'order_confirmation_cod'.
         key = 'order_confirmation_cod';
     } else {
         logger.warn(`[CONFIRMATION] paymentMethod inesperado: "${state.paymentMethod}" (senaPaid=${state.senaPaid}, senaAmount=${state.senaAmount}) — usando fallback`);

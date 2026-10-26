@@ -44,8 +44,12 @@ const { _getPrice } = require('../src/flows/utils/pricing');
 // así que el fixture no puede hardcodear un valor.
 const PRICE_120 = _getPrice('Cápsulas de nuez de la india', '120');
 
+// Modelo por zona (sep-2026): este step atiende fuera de la zona de reparto
+// propio, donde el retiro en sucursal también es PREPAGO. La elección de envío
+// ya no cierra la venta: abre el submenú de medio y los datos van tras el pago.
 const makePaymentState = (over = {}) => ({
     step: 'waiting_payment_method',
+    deliveryZone: 'out',
     history: [],
     cart: [{ product: 'Cápsulas de nuez de la india', plan: '120', price: PRICE_120 }],
     selectedProduct: 'Cápsulas de nuez de la india',
@@ -74,15 +78,16 @@ const makeDeps = (over = {}) => {
 // 1. "Me conviene ir a la sucursal..." es ELECCIÓN, no pregunta
 // ════════════════════════════════════════════════════════════════════════════
 describe('waiting_payment_method — elección decisiva aunque parezca pregunta', () => {
-    test('"Me conviene ir a la sucursal del correo y abonar ahí" → retiro + waiting_data', async () => {
+    test('"Me conviene ir a la sucursal del correo y abonar ahí" → retiro (prepago) + submenú de medio', async () => {
         const { sent, deps } = makeDeps();
         const state = makePaymentState();
         const text = 'Me conviene ir a la sucursal del correo y abonar ahí';
         const res = await handleWaitingPaymentMethod('a1@c.us', text, norm(text), state, { flow: {} }, deps);
         expect(res.matched).toBe(true);
         expect(state.shippingChoice).toBe('retiro');
-        expect(state.paymentMethod).toBe('contrarembolso');
-        expect(state.step).toBe('waiting_data');
+        expect(state.paymentMethod).toBeFalsy();
+        expect(state.paymentSubChoiceAsked).toBe(true);
+        expect(state.step).toBe('waiting_payment_method');
         expect(state.partialAddress.calle).toBe('A sucursal');
         // No debe haber caído al AI fallback
         expect(deps.aiService.chat).not.toHaveBeenCalled();
@@ -127,13 +132,14 @@ describe('waiting_payment_method — elección decisiva aunque parezca pregunta'
         expect(state.step).toBe('waiting_payment_method');
     });
 
-    test('"Me conviene la 1" → elección por número de opción → retiro', async () => {
+    test('"Me conviene la 2" → elección por número de opción → retiro (la 1 es domicilio)', async () => {
         const { deps } = makeDeps();
         const state = makePaymentState();
-        const text = 'Me conviene la 1';
+        const text = 'Me conviene la 2';
         await handleWaitingPaymentMethod('a6@c.us', text, norm(text), state, { flow: {} }, deps);
-        expect(state.step).toBe('waiting_data');
+        expect(state.step).toBe('waiting_payment_method');
         expect(state.shippingChoice).toBe('retiro');
+        expect(state.paymentSubChoiceAsked).toBe(true);
         expect(deps.aiService.chat).not.toHaveBeenCalled();
     });
 });
@@ -151,7 +157,7 @@ describe('waiting_payment_method — sync vía extractedData del AI fallback', (
         expect(parseShippingChoice(null)).toBeNull();
     });
 
-    test('IA responde con "ENVIO: retiro" → step pasa a waiting_data con retiro', async () => {
+    test('IA responde con "ENVIO: retiro" → retiro prepago con el submenú habilitado', async () => {
         const { deps } = makeDeps({
             aiService: {
                 chat: jest.fn().mockResolvedValue({
@@ -167,9 +173,10 @@ describe('waiting_payment_method — sync vía extractedData del AI fallback', (
         const res = await handleWaitingPaymentMethod('b1@c.us', text, norm(text), state, { flow: {} }, deps);
         expect(res.matched).toBe(true);
         expect(deps.aiService.chat).toHaveBeenCalled();
-        expect(state.step).toBe('waiting_data');
+        expect(state.step).toBe('waiting_payment_method');
         expect(state.shippingChoice).toBe('retiro');
-        expect(state.paymentMethod).toBe('contrarembolso');
+        expect(state.paymentMethod).toBeFalsy();
+        expect(state.paymentSubChoiceAsked).toBe(true);
         expect(state.partialAddress.calle).toBe('A sucursal');
     });
 
@@ -212,46 +219,47 @@ describe('waiting_payment_method — retiro rescata datos del historial reciente
         { role: 'user', content: '1925 2215731759', timestamp: 3000 },
     ];
 
-    test('nombre y CP en historial → pide SOLO la localidad', async () => {
+    test('nombre y CP en historial → quedan guardados para después del pago', async () => {
         const { sent, deps } = makeDeps({
             mockAiService: { parseAddress: async () => ({ nombre: 'Calderón Andrea' }) },
         });
         const state = makePaymentState({ history: [...historyWithData] });
-        const text = 'Si pago en efectivo en sucursal';
+        const text = 'Si, retiro en sucursal';
         const res = await handleWaitingPaymentMethod('c1@c.us', text, norm(text), state, { flow: {} }, deps);
         expect(res.matched).toBe(true);
-        expect(state.step).toBe('waiting_data');
+        expect(state.step).toBe('waiting_payment_method');
+        expect(state.shippingChoice).toBe('retiro');
         expect(state.partialAddress.nombre).toBe('Calderón Andrea');
         expect(state.partialAddress.cp).toBe('1925'); // fallback regex de 4 dígitos
         const all = sent.join(' ');
-        expect(all).toMatch(/Localidad \/ Ciudad:/);
+        expect(all).toMatch(/Tarjeta de cr[ée]dito/);
         expect(all).not.toMatch(/Nombre completo:/);
-        expect(all).not.toMatch(/Código postal:/);
     });
 
-    test('historial con TODO (nombre+ciudad+CP) → cierra la venta directo', async () => {
+    test('historial con TODO (nombre+ciudad+CP) → NO cierra: el retiro va prepago, primero el medio', async () => {
         const { deps } = makeDeps({
             mockAiService: { parseAddress: async () => ({ nombre: 'Calderón Andrea', ciudad: 'Ensenada', cp: '1925' }) },
         });
         const state = makePaymentState({ history: [...historyWithData] });
-        const text = 'Si pago en efectivo en sucursal';
+        const text = 'Si, retiro en sucursal';
         const res = await handleWaitingPaymentMethod('c2@c.us', text, norm(text), state, { flow: {} }, deps);
         expect(res.matched).toBe(true);
-        expect(state.step).toBe('completed');
-        expect(state.pendingOrder).toBeTruthy();
-        expect(state.pendingOrder.nombre).toBe('Calderón Andrea');
-        expect(state.pendingOrder.ciudad).toBe('Ensenada');
-        expect(state.pendingOrder.cp).toBe('1925');
-        expect(state.pendingOrder.calle).toBe('A sucursal');
+        expect(state.step).toBe('waiting_payment_method');
+        expect(state.pendingOrder).toBeFalsy();
+        expect(state.partialAddress.nombre).toBe('Calderón Andrea');
+        expect(state.partialAddress.ciudad).toBe('Ensenada');
+        expect(state.partialAddress.cp).toBe('1925');
+        expect(state.partialAddress.calle).toBe('A sucursal');
     });
 
-    test('sin historial previo en el step → mensaje idéntico al de siempre (3 campos)', async () => {
+    test('sin historial previo en el step → submenú de medio, sin pedir datos', async () => {
         const { sent, deps } = makeDeps();
         const state = makePaymentState();
         const text = 'retiro en sucursal';
         await handleWaitingPaymentMethod('c3@c.us', text, norm(text), state, { flow: {} }, deps);
         const all = sent.join(' ');
-        expect(all).toMatch(/Nombre completo:\nLocalidad \/ Ciudad:\nCódigo postal:/);
+        expect(all).toMatch(/Tarjeta de cr[ée]dito/);
+        expect(all).not.toMatch(/Nombre completo:/);
     });
 
     test('estado legacy SIN stepEnteredAt → no prefillea (evita falsos positivos)', async () => {
@@ -262,7 +270,7 @@ describe('waiting_payment_method — retiro rescata datos del historial reciente
         const text = 'retiro en sucursal';
         await handleWaitingPaymentMethod('c4@c.us', text, norm(text), state, { flow: {} }, deps);
         expect(deps.mockAiService.parseAddress).not.toHaveBeenCalled();
-        expect(sent.join(' ')).toMatch(/Nombre completo:\nLocalidad \/ Ciudad:\nCódigo postal:/);
+        expect(sent.join(' ')).toMatch(/Tarjeta de cr[ée]dito/);
     });
 });
 

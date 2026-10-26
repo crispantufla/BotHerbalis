@@ -76,6 +76,13 @@ function buildNotas(order: any): string {
     if (order.seller) lines.push(`Número que vendió: ${order.seller}`);
     if (order.paymentMethod) lines.push(`Pago (bot): ${order.paymentMethod}`);
 
+    // Modelo por zona (sep-2026): contrarreembolso con calle real = reparto
+    // propio en Rosario y 60 km (lo cobra el repartidor). El panel no tiene un
+    // tipo de envío para eso, así que va en las notas.
+    if (order.paymentMethod === 'contrarembolso' && !isSucursal(order)) {
+        lines.push('Entrega: REPARTO PROPIO (Rosario y alrededores) — cobra el repartidor (efectivo/tarjeta/transferencia). Coordinar día y horario.');
+    }
+
     if (order.senaPaid && order.senaAmount) {
         lines.push(`Seña cobrada: $${order.senaAmount}`);
         if (order.cashRemainder) lines.push(`Saldo a cobrar en efectivo: $${order.cashRemainder}`);

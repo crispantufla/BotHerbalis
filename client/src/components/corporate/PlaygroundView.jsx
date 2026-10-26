@@ -9,6 +9,7 @@ const FORCE_STEPS = [
     'greeting',
     'waiting_weight',
     'waiting_preference',
+    'waiting_zone',
     'waiting_payment_method',
     'waiting_mp_payment',
     'waiting_transfer_confirmation',
