@@ -20,12 +20,20 @@ function _formatPrice(n: number): string {
  * @param state - UserState to update with cart, plan, price, and MAX surcharge
  */
 function buildCartFromSelection(product: string, plan: string, state: UserState): void {
-    const planDays = parseInt(plan, 10);
+    let planDays = parseInt(plan, 10);
     const raw120 = _getPrice(product, '120');
     // Plan 60 al precio promo si el chat vino de una campaña (state.promo.active).
     const raw60 = _getEffectivePrice(product, '60', state);
     const base120 = parseInt((raw120 || '0').replace(/\./g, ''), 10);
-    const base60 = parseInt((raw60 || '0').replace(/\./g, ''), 10);
+    let base60 = parseInt((raw60 || '0').replace(/\./g, ''), 10);
+
+    // Producto que viene SOLO en plan de 120 días (semillas, oct-2026): se cotiza
+    // en múltiplos de 120 aunque hayan pedido 60.
+    if ((!raw60 || base60 === 0) && base120 > 0) {
+        planDays = Math.max(120, Math.ceil(planDays / 120) * 120);
+        plan = String(planDays);
+        base60 = Math.round(base120 / 2);   // solo para la cuenta interna; con 120s no se usa
+    }
 
     if (isNaN(base120) || isNaN(base60) || base60 === 0) {
         const logger = require('../../utils/logger');

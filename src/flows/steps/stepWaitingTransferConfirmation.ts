@@ -21,6 +21,64 @@ const MP_KEYWORDS = /\b(mercadopago|mercado.?pago|mp|link|online|digital|qr|tarj
 // substring matcheaba montos/horas; solo cuenta como mensaje exacto, abajo).
 const RETIRO_OR_CASH_KEYWORDS = /\b(retiro|retirar|sucursal|contra.?reembolso|contrarembolso|efectivo|cash|primero|primera|al recibir|cartero)\b/i;
 
+// ── Club Herbys (28-oct): fuera de zona, Correo con transferencia previa ─────────
+// Con el alias se piden los datos del envío; acá se toman, se guarda el pedido
+// (Pendiente, transferencia) y se le avisa a Horacio. El comprobante lo verifica él.
+
+const _digits = (s: any) => String(s || '').replace(/\D/g, '');
+
+/** Qué falta para despachar por Correo: nombre, código postal y, si va a domicilio, la calle. */
+function _missingCorreoData(state: any): string[] {
+    const a = state.partialAddress || {};
+    const missing: string[] = [];
+    if (!a.nombre) missing.push('tu *nombre completo*');
+    if (state.shippingChoice !== 'retiro' && (!a.calle || a.calle === 'A sucursal')) missing.push('*calle y número*');
+    if (!a.cp) missing.push('el *código postal*');
+    return missing;
+}
+
+function _correoSummary(state: any): string {
+    const a = state.partialAddress || {};
+    const where = state.shippingChoice === 'retiro' ? `Sucursal del Correo en ${a.ciudad || '?'}` : `${a.calle || '?'}, ${a.ciudad || '?'}`;
+    return `Nombre: ${a.nombre || '?'}\nEnvío: ${where}${a.cp ? ` (CP ${a.cp})` : ''}${a.provincia ? `, ${a.provincia}` : ''}\n` +
+        `Items: ${state.selectedProduct || '?'} · ${state.selectedPlan || '?'} días\nTotal por transferencia: $${state.totalPrice || '?'}`;
+}
+
+/** Toma datos de envío del mensaje. true = el mensaje era de datos y ya se contestó. */
+async function _clubTakeCorreoData(userId: string, text: string, currentState: any, dependencies: any): Promise<boolean> {
+    const { sendMessageWithDelay, saveState, aiService } = dependencies;
+    if (!/\d{3,}|,|\n/.test(text) || typeof aiService?.parseAddress !== 'function') return false;
+    let parsed: any = {};
+    try { parsed = (await aiService.parseAddress(text)) || {}; } catch { return false; }
+    const keys = ['nombre', 'calle', 'ciudad', 'cp', 'provincia'].filter((k) => parsed[k]);
+    if (!keys.length) return false;
+    const a = (currentState.partialAddress = currentState.partialAddress || {});
+    for (const k of keys) a[k] = k === 'cp' ? _digits(parsed[k]) || parsed[k] : parsed[k];
+    if (currentState.shippingChoice === 'retiro') a.calle = 'A sucursal';
+
+    const missing = _missingCorreoData(currentState);
+    if (missing.length) {
+        saveState(userId);
+        await sendMessageWithDelay(userId, `¡Gracias! 🙌 Me falta ${missing.join(' y ')} para el envío.`);
+        return true;
+    }
+    currentState.correoOrderSaved = true;
+    saveState(userId);
+    if (dependencies.saveOrderToLocal) {
+        dependencies.saveOrderToLocal({
+            cliente: _digits(userId), nombre: a.nombre, calle: a.calle, ciudad: a.ciudad, cp: a.cp, provincia: a.provincia || null,
+            producto: currentState.selectedProduct || '', plan: `${currentState.selectedPlan || '60'} días`, precio: currentState.totalPrice || '0',
+            paymentMethod: 'transferencia', status: 'Pendiente',
+        });
+    }
+    if (dependencies.notifyAdmin) {
+        await dependencies.notifyAdmin('🛒 PEDIDO NUEVO — Correo Argentino (espera transferencia)', userId, _correoSummary(currentState)).catch(() => {});
+    }
+    await sendMessageWithDelay(userId, `¡Anotado, ${String(a.nombre).split(' ')[0]}! 📦\n\nApenas hagas la transferencia de *$${currentState.totalPrice}*, mandame el comprobante 📸 y lo despachamos: llega en *4 días hábiles*.`);
+    logger.info(`[CLUB-CORREO] ${userId} → datos completos, pedido guardado (espera transferencia).`);
+    return true;
+}
+
 export async function handleWaitingTransferConfirmation(
     userId: string,
     text: string,
@@ -37,6 +95,21 @@ export async function handleWaitingTransferConfirmation(
     // el mensaje al cliente es neutro, no menciona "anticipo / saldo al cartero".
     const normalizedForPaid = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     const isLegacyCodAnticipo = currentState.paymentMethod === 'contrarembolso' && currentState.senaAmount === 10000;
+    if ((currentState as any).zoneLead && (PAID_KEYWORDS.test(text) || PAID_KEYWORDS.test(normalizedForPaid))) {
+        // Club Herbys: aviso limpio a Horacio con los datos del envío; el bot se corre.
+        const missing = _missingCorreoData(currentState);
+        const msg = missing.length
+            ? `¡Perfecto! 🙌 Mandame *el comprobante* 📸 y, para el envío, ${missing.join(' y ')}.\n\nApenas verificamos la transferencia lo despachamos.`
+            : '¡Perfecto! 🙌 Mandame *el comprobante* 📸 así lo verificamos y lo despachamos enseguida.';
+        saveState(userId);
+        await sendMessageWithDelay(userId, msg);
+        if (dependencies.notifyAdmin) {
+            await dependencies.notifyAdmin('💸 Avisó que transfirió — verificar y despachar', userId, `${_correoSummary(currentState)}\n💬 «${text}»`).catch(() => {});
+        }
+        const { pauseUser } = require('../../services/pauseService');
+        await pauseUser(userId, 'Avisó la transferencia: lo verifica Horacio', { sharedState: dependencies.sharedState });
+        return { matched: true };
+    }
     if (PAID_KEYWORDS.test(text) || PAID_KEYWORDS.test(normalizedForPaid)) {
         const { _formatMessage: _fmt } = require('../utils/messages');
         const { getFlowTemplate: _gft } = require('../../utils/messageTemplates');
@@ -50,6 +123,12 @@ export async function handleWaitingTransferConfirmation(
             ? '[LEGACY] Cliente avisó pago de Order pre-may-2026 con senaAmount=$10.000 — verificar comprobante y coordinar saldo manualmente.'
             : 'Cliente avisó que hizo la transferencia — verificar comprobante y confirmar envío.';
         await _pauseAndAlert(userId, currentState, dependencies, text, adminMsg);
+        return { matched: true };
+    }
+
+    // ── Club Herbys: datos para el envío por Correo ─────────────────────────────
+    if ((currentState as any).zoneLead && !(currentState as any).correoOrderSaved
+        && await _clubTakeCorreoData(userId, text, currentState, dependencies)) {
         return { matched: true };
     }
 

@@ -4,6 +4,29 @@ import { _setStep, _maybeUpsell, _detectPostdatado, _assignProductAndPlanByTier,
 import { isMpEnabled, prepayMeans } from '../utils/paymentOptions';
 import logger from '../../utils/logger';
 
+/**
+ * Club Herbys (28-oct): si el cliente ya dijo el plan ("gotas de 60") o el producto
+ * viene en un solo plan (semillas, solo 120 días), no se pregunta "¿60 o 120?": se
+ * arma el carrito y se pasa directo a la localidad. Solo para los leads de zona.
+ */
+async function _clubSkipPlanQuestion(userId: string, text: string, product: string, currentState: UserState, knowledge: any, dependencies: any): Promise<boolean> {
+    if (!(currentState as any).zoneLead) return false;
+    const { _getEffectivePrice } = require('../utils/pricing');
+    const singlePlan = !_getEffectivePrice(product, '60', currentState);
+    const choice = (currentState as any)._planChoice;
+    if (!singlePlan && choice !== '60' && choice !== '120') return false;
+    const { buildCartFromSelection } = require('../utils/cartHelpers');
+    buildCartFromSelection(product, singlePlan ? '120' : choice, currentState);
+    _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
+    const prefix = singlePlan && knowledge?.flow?.preference_semillas && product.startsWith('Semillas')
+        ? _formatMessage(knowledge.flow.preference_semillas.response, currentState) + '\n\n'
+        : '';
+    const { _startZoneStep } = require('./stepWaitingZone');
+    await _startZoneStep(userId, text, currentState, knowledge, dependencies, prefix);
+    logger.info(`[CLUB-PLAN] ${userId} → ${product} × ${currentState.selectedPlan} sin preguntar el plan → localidad.`);
+    return true;
+}
+
 export async function handleWaitingPreference(
     userId: string,
     text: string,
@@ -165,6 +188,7 @@ export async function handleWaitingPreference(
 
     if (mentionsCapsulas) {
         _assignProductAndPlanByTier(currentState, "Cápsulas de nuez de la india");
+        if (await _clubSkipPlanQuestion(userId, text, "Cápsulas de nuez de la india", currentState, knowledge, dependencies)) return { matched: true };
         const node = knowledge.flow.preference_capsulas;
         const msg = _formatMessage(node.response, currentState);
 
@@ -176,6 +200,7 @@ export async function handleWaitingPreference(
         return { matched: true };
     } else if (mentionsSemillas) {
         _assignProductAndPlanByTier(currentState, "Semillas de nuez de la india");
+        if (await _clubSkipPlanQuestion(userId, text, "Semillas de nuez de la india", currentState, knowledge, dependencies)) return { matched: true };
         const node = knowledge.flow.preference_semillas;
         const msg = _formatMessage(node.response, currentState);
 
@@ -187,6 +212,7 @@ export async function handleWaitingPreference(
         return { matched: true };
     } else if (knowledge.flow.preference_gotas && mentionsGotas) {
         _assignProductAndPlanByTier(currentState, "Gotas de nuez de la india");
+        if (await _clubSkipPlanQuestion(userId, text, "Gotas de nuez de la india", currentState, knowledge, dependencies)) return { matched: true };
         const node = knowledge.flow.preference_gotas;
         const msg = _formatMessage(node.response, currentState);
 

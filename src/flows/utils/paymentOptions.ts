@@ -19,6 +19,9 @@
 
 /** ¿Este seller puede cobrar con tarjeta (link de MP) ahora mismo? */
 export function isMpEnabled(config?: any): boolean {
+    // Club Herbys: sin cuenta de Mercado Pago (MP_ACCESS_TOKEN) no hay tarjeta,
+    // diga lo que diga el interruptor del panel. Fuera de zona se paga por transferencia.
+    if (!process.env.MP_ACCESS_TOKEN && process.env.NODE_ENV !== 'test') return false;
     return config?.mpEnabled !== false;
 }
 

@@ -372,7 +372,9 @@ function _assignProductAndPlanByTier(state: any, productFullName: string): void 
     // se respeta; si no, lo define el tier. Habilita el upsell al 120 aunque
     // recomendemos 60 (rev 2026-05-30).
     const override = state._planChoice;
-    const plan = (override === '60' || override === '120') ? override : (w > 0 && w <= 10 ? '60' : '120');
+    let plan = (override === '60' || override === '120') ? override : (w > 0 && w <= 10 ? '60' : '120');
+    // Producto sin plan de 60 (semillas, oct-2026): va a 120.
+    if (plan === '60' && !_getEffectivePrice(productFullName, '60', state)) plan = '120';
     state.selectedProduct = productFullName;
     state.selectedPlan = plan;
     state.cart = [{ product: productFullName, plan, price: _getEffectivePrice(productFullName, plan, state) }];

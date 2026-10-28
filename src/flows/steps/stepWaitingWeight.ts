@@ -121,6 +121,23 @@ export async function handleWaitingWeight(
 ): Promise<{ matched: boolean }> {
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
 
+    // Club Herbys (28-oct): el saludo ya no pregunta los kilos, termina en "¿Te paso
+    // los precios?". Si en la respuesta ya nombra un producto, vamos directo a ese
+    // producto; si no ("sí", "dale", "¿cuánto sale?"), mandamos la lista de precios.
+    if (currentState.zoneLead && knowledge?.flow?.prices_club) {
+        if (/\b(got\w*|c[aá]psul\w*|pastill\w*|semill\w*)\b/i.test(text)) {
+            _setStep(currentState, FlowStep.WAITING_PREFERENCE);
+            saveState(userId);
+            const { handleWaitingPreference } = require('./stepWaitingPreference');
+            return handleWaitingPreference(userId, text, normalizedText, currentState, knowledge, dependencies);
+        }
+        await sendMessageWithDelay(userId, _formatMessage(knowledge.flow.prices_club.response, currentState));
+        _setStep(currentState, FlowStep.WAITING_PREFERENCE);
+        saveState(userId);
+        logger.info(`[CLUB-PRECIOS] ${userId} → lista de precios, esperando producto.`);
+        return { matched: true };
+    }
+
     // No confundir el número de un descuento/porcentaje con kilos: "haceme 50% de
     // descuento" NO es "bajar 50 kg" (bug del test off-script 2026-05-30). Sacamos
     // los "\d+%" antes de detectar/extraer peso.

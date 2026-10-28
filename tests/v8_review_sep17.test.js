@@ -360,7 +360,7 @@ describe('transiciones con un solo mensaje', () => {
         expect(st.selectedProduct).toMatch(/Semillas/);
         // Plantilla de semillas (+ la recomendación del 120 que sale siempre con
         // más de 10 kg). Lo que no puede haber es la IA preguntando la localidad.
-        expect(sent[0]).toMatch(/las \*semillas\*/);
+        expect(sent[0]).toMatch(/las \*semillas\*/i);
         expect(sent.join('\n')).not.toMatch(/localidad|de qué ciudad|sos de rosario/i);
     });
 });

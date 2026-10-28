@@ -2,7 +2,7 @@
     "meta": {
         "name": "Guión V8 — Elena · zona Rosario (Club Herbys: anuncio con video)",
         "description": "Guión sep-2026 sobre la base V7 (persona Elena, 2 tiers 60d/120d). La publicidad apunta a Rosario y 60 km a la redonda, así que el menú de pago dejó de ser \"retiro vs domicilio\" y pasó a ser una pregunta de LOCALIDAD: dentro de la zona, reparto propio a domicilio sin costo y pago al recibir (efectivo, tarjeta o transferencia); fuera, Correo Argentino prepago (tarjeta o transferencia) a domicilio o a sucursal, 4 días hábiles. El bot clasifica la zona con rules.repartoPropio; el cliente nunca tiene que decir si está \"dentro de la zona de influencia\".",
-        "version": "9.0",
+        "version": "9.1",
         "clubHerbys": "Restaurado el 2026-10-26 en el bot de Club Herbys SOLO para los leads del anuncio con video. Pago siempre al recibir (reparto de Horacio); fuera de zona se deriva a Horacio."
     },
     "flow": {
@@ -24,8 +24,8 @@
                 "capsulas",
                 "capsula"
             ],
-            "_note": "Saludo V7. Presenta producto + 3 formas + pregunta kilos en 2 tiers. Persona Elena.",
-            "response": "¡Hola! 😊 Soy Elena de Herbalis.\n\nTe ayudo a bajar de peso de forma natural.\n\nTe ofrezco la Nuez de la India en tres opciones:\n\n🌿 En estado natural (semillas)\n💊 En cápsulas\n💧 En gotas\n\nTodas 100% naturales.\n\nPara recomendarte bien, contame cuánto te gustaría bajar:\n\n1️⃣ Hasta 10 kg\n2️⃣ Más de 10 kg\n\n13 años acompañando, casi 70.000 clientes. Envío gratis a todo el país.",
+            "_note": "Club Herbys (28-oct): sin la pregunta de kilos. La respuesta del cliente la toma stepWaitingWeight (zoneLead) y manda prices_club.",
+            "response": "¡Hola! 😊 Soy Elena de Herbalis.\n\nTe ayudo a bajar de peso de forma natural con la Nuez de la India, en tres opciones:\n\n💧 En gotas\n💊 En cápsulas\n🌿 En estado natural (semillas)\n\nTodas 100% naturales. 13 años acompañando, casi 70.000 clientes. Envío gratis a todo el país 🚚\n\n¿Te paso los precios? 😊",
             "nextStep": "waiting_weight"
         },
         "recommendation_1": {
@@ -82,7 +82,7 @@
         },
         "preference_semillas": {
             "step": "waiting_preference",
-            "_note": "Cliente eligió semillas. Muestra ambos planes (60 y 120) + instructivo de preparación + warning de colon irritable. nextStep: waiting_plan_choice (rev. 2026-06-04).",
+            "_note": "Club Herbys (28-oct): semillas solo en 120 días. Para los leads de zona va pegado al pedido de localidad (payment_menu), sin preguntar el plan.",
             "match": [
                 "semilla",
                 "semillas",
@@ -91,7 +91,7 @@
                 "te de semilla",
                 "natural"
             ],
-            "response": "¡Genial, las *semillas*! 🌿\n\n*Cómo se prepara:* la primera semana partís una nuez en 8 partes, las siguientes en 4. Cada noche hervís un pedacito 5 min (o 3 en microondas) — cuanta más agua, mejor. Te tomás el agua y tragás el trocito antes de dormir, lo más lejos de la cena. *No apta en casos de colon irritable.*\n\nVienen en dos planes:\n🔹 *60 días* → ${{PRICE_SEMILLAS_60}}\n🔹 *120 días* → ${{PRICE_SEMILLAS_120}}\n\nEnvío gratis a todo el país.\n\n¿Con cuál vas, 60 o 120 días?",
+            "response": "Las *semillas* 🌿 vienen en plan de *120 días*.\n\n*Cómo se prepara:* la primera semana partís una nuez en 8 partes, las siguientes en 4. Cada noche hervís un pedacito 5 min (o 3 en microondas) — cuanta más agua, mejor. Te tomás el agua y tragás el trocito antes de dormir, lo más lejos de la cena. *No apta en casos de colon irritable.*",
             "nextStep": "waiting_plan_choice"
         },
         "payment_menu": {
@@ -159,8 +159,8 @@
         },
         "payment_transfer_alias": {
             "step": "waiting_transfer_confirmation",
-            "_note": "TEXTO 5b — Cliente eligió transferencia bancaria. Le pasamos alias + titular + monto total. Placeholders: {{ALIAS}}, {{TITULAR}}, {{TOTAL}}.",
-            "response": "¡Perfecto! Para transferir usá el alias *{{ALIAS}}* a nombre de *{{TITULAR}}* 🏦\n\nMonto: ${{TOTAL}}\n\nUna vez que realices la transferencia, escribime *\"listo\"* y coordinamos el envío 😊",
+            "_note": "TEXTO 5b — Cliente eligió transferencia bancaria. Le pasamos alias + titular + monto total. Placeholders: {{ALIAS}}, {{TITULAR}}, {{TOTAL}}. | Club Herbys (28-oct): pide los datos del envío junto con el alias; stepWaitingTransferConfirmation los toma y guarda el pedido.",
+            "response": "Para transferir usá el alias *{{ALIAS}}* a nombre de *{{TITULAR}}* 🏦\n\nMonto: *${{TOTAL}}*\n\nMientras tanto, pasame los datos para el envío 📦\n• Nombre completo\n• Calle y número (si va a tu casa)\n• Localidad y código postal\n\nCuando hagas la transferencia, mandame el comprobante 📸 y lo despachamos.",
             "nextStep": "waiting_transfer_confirmation"
         },
         "payment_mp_link": {
@@ -266,6 +266,11 @@
             "step": "promo_offer",
             "_note": "Campañas promo. El cliente eligió una presentación fuera de la promo: se confirma a precio de lista ({{TOTAL}} ya viene calculado) y después payment_menu.",
             "response": "¡Dale! Te armo el plan de *60 días* de *{{PRODUCT_SHORT}}* a *${{TOTAL}}* (precio normal, con envío gratis) 🌿"
+        },
+        "prices_club": {
+            "_note": "Club Herbys (28-oct): lista de precios que sigue al saludo. Precios por placeholder (data/prices.json). Semillas solo 120 días.",
+            "response": "¡Claro! Estos son los precios 👇\n\n💧 *Gotas* — 60 días *${{PRICE_GOTAS_60}}* · 120 días *${{PRICE_GOTAS_120}}*\n💊 *Cápsulas* — 60 días *${{PRICE_CAPSULAS_60}}* · 120 días *${{PRICE_CAPSULAS_120}}*\n🌿 *Semillas* — 120 días *${{PRICE_SEMILLAS_120}}*\n\nPara bajar hasta 10 kg alcanza con el de 60 días; para más, el de 120.\n\nEnvío gratis 🚚 ¿Con cuál querés arrancar?",
+            "nextStep": "waiting_preference"
         }
     },
     "faq": [
