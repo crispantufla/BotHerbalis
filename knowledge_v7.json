@@ -2,7 +2,7 @@
     "meta": {
         "name": "Guión V8 — Elena · zona Rosario (Club Herbys: anuncio con video)",
         "description": "Guión sep-2026 sobre la base V7 (persona Elena, 2 tiers 60d/120d). La publicidad apunta a Rosario y 60 km a la redonda, así que el menú de pago dejó de ser \"retiro vs domicilio\" y pasó a ser una pregunta de LOCALIDAD: dentro de la zona, reparto propio a domicilio sin costo y pago al recibir (efectivo, tarjeta o transferencia); fuera, Correo Argentino prepago (tarjeta o transferencia) a domicilio o a sucursal, 4 días hábiles. El bot clasifica la zona con rules.repartoPropio; el cliente nunca tiene que decir si está \"dentro de la zona de influencia\".",
-        "version": "9.1",
+        "version": "9.2",
         "clubHerbys": "Restaurado el 2026-10-26 en el bot de Club Herbys SOLO para los leads del anuncio con video. Pago siempre al recibir (reparto de Horacio); fuera de zona se deriva a Horacio."
     },
     "flow": {
@@ -353,8 +353,8 @@
                 "alias",
                 "banco"
             ],
-            "_note": "Transferencia es una de las 3 opciones espontáneas. Alias oficial: HERBALIS.TIENDA a nombre de BIO ORIGEN S.A.S..",
-            "response": "¡Dale, podemos por *transferencia bancaria* 🏦\n\nAlias: *HERBALIS.TIENDA*\nTitular: *BIO ORIGEN S.A.S.*\n\nCuando confirmes el pedido te recuerdo el monto. ¿Avanzamos así?"
+            "_note": "Transferencia es una de las 3 opciones espontáneas. Alias oficial: herbalis a nombre de Horacio Giosue.",
+            "response": "¡Dale, podemos por *transferencia bancaria* 🏦\n\nAlias: *herbalis*\nTitular: *Horacio Giosue*\n\nCuando confirmes el pedido te recuerdo el monto. ¿Avanzamos así?"
         },
         {
             "keywords": [
@@ -512,10 +512,10 @@
         "noArgue": true,
         "keepResponsesShort": true,
         "defaultPaymentMethod": "zone_first",
-        "_note_defaultPayment": "Modelo sep-2026 por ZONA: el menú de pago pregunta la LOCALIDAD (payment_menu) y el bot decide con rules.repartoPropio. (1) Rosario y hasta 60 km → reparto propio a domicilio sin costo, paga AL RECIBIR al repartidor (efectivo, tarjeta o transferencia); datos: nombre + calle y número; el bot cierra solo. (2) Fuera de zona → Correo Argentino sin costo, SIEMPRE PREPAGO con tarjeta de crédito (link) o transferencia (alias HERBALIS.TIENDA — BIO ORIGEN S.A.S.), a domicilio o a sucursal (la asigna el Correo por CP), 4 días hábiles. Fuera de zona NO existe contrarreembolso: al que lo pide se le manda prepay_objection y, si insiste, prepay_refusal_close + asesor. No se nombra el servicio del Correo (Paq.ar). El bot NUNCA menciona cuotas.",
+        "_note_defaultPayment": "Modelo sep-2026 por ZONA: el menú de pago pregunta la LOCALIDAD (payment_menu) y el bot decide con rules.repartoPropio. (1) Rosario y hasta 60 km → reparto propio a domicilio sin costo, paga AL RECIBIR al repartidor (efectivo, tarjeta o transferencia); datos: nombre + calle y número; el bot cierra solo. (2) Fuera de zona → Correo Argentino sin costo, SIEMPRE PREPAGO con tarjeta de crédito (link) o transferencia (alias herbalis — Horacio Giosue), a domicilio o a sucursal (la asigna el Correo por CP), 4 días hábiles. Fuera de zona NO existe contrarreembolso: al que lo pide se le manda prepay_objection y, si insiste, prepay_refusal_close + asesor. No se nombra el servicio del Correo (Paq.ar). El bot NUNCA menciona cuotas.",
         "bankAlias": {
-            "alias": "HERBALIS.TIENDA",
-            "titular": "BIO ORIGEN S.A.S."
+            "alias": "herbalis",
+            "titular": "Horacio Giosue"
         },
         "contraReembolsoMAX": {
             "enabled": true,

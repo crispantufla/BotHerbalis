@@ -3,8 +3,8 @@
 // del Editor de Precios (/api/prices): si uno no está cargado, su placeholder queda
 // visible tal cual, para que nadie mande un número viejo o inventado sin darse cuenta.
 
-export const BANK_ALIAS = 'HERBALIS.TIENDA';
-export const BANK_HOLDER = 'BIO ORIGEN S.A.S.';
+export const BANK_ALIAS = 'herbalis';
+export const BANK_HOLDER = 'Horacio Giosue';
 
 const PRICE_TAGS = [
     ['PRICE_CAPSULAS_60', (p) => p['Cápsulas']?.['60']],

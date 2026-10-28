@@ -2,7 +2,7 @@
  * Smoke test para el modelo de pago vigente (may-2026 rev 2):
  * - Menú de envío 2-opciones: retiro en sucursal vs envío a domicilio
  * - Retiro en sucursal → contrarrembolso, paga total en efectivo al retirar (sin anticipo)
- * - Envío a domicilio → prepago por Mercado Pago o transferencia (alias HERBALIS.TIENDA)
+ * - Envío a domicilio → prepago por Mercado Pago o transferencia (alias herbalis)
  * - 7 a 10 días hábiles uniforme
  * - Sin adicional $6.000, sin anticipo $10.000, sin cuotas
  *
@@ -110,8 +110,8 @@ describe('Modelo nuevo — rules en V5 y V6', () => {
         ['V7', v7],
     ])('%s: defaultPaymentMethod = zone_first + bankAlias oficial', (_n, guion) => {
         expect(guion.rules.defaultPaymentMethod).toBe('zone_first');
-        expect(guion.rules.bankAlias.alias).toBe('HERBALIS.TIENDA');
-        expect(guion.rules.bankAlias.titular).toBe('BIO ORIGEN S.A.S.');
+        expect(guion.rules.bankAlias.alias).toBe('herbalis');
+        expect(guion.rules.bankAlias.titular).toBe('Horacio Giosue');
     });
 });
 
@@ -150,8 +150,8 @@ describe('Modelo nuevo — FAQ en V5 y V6', () => {
     ])('%s: FAQ "transferencia" expone el alias oficial', (_n, guion) => {
         const trfFaq = guion.faq.find(f => f.keywords.some(k => k === 'transferencia'));
         expect(trfFaq).toBeDefined();
-        expect(trfFaq.response).toMatch(/HERBALIS\.TIENDA/);
-        expect(trfFaq.response).toMatch(/BIO ORIGEN S.A.S./);
+        expect(trfFaq.response).toMatch(/herbalis/);
+        expect(trfFaq.response).toMatch(/Horacio Giosue/);
     });
 
     test.each([
@@ -230,8 +230,8 @@ describe('_formatMessage — defensa contra placeholder leak (regresión Silvina
     test('{{ALIAS}} y {{TITULAR}} siempre se sustituyen con constantes', () => {
         const txt = 'alias {{ALIAS}} titular {{TITULAR}}';
         const out = _formatMessage(txt, null);
-        expect(out).toMatch(/HERBALIS\.TIENDA/);
-        expect(out).toMatch(/BIO ORIGEN S\.A\.S\./);
+        expect(out).toMatch(/herbalis/);
+        expect(out).toMatch(/Horacio Giosue/);
     });
 });
 

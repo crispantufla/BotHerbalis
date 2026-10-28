@@ -152,7 +152,7 @@ describe('waiting_payment_method con MP apagado', () => {
         expect(state.shippingChoice).toBe('domicilio');
         expect(state.paymentMethod).toBe('transferencia');
         expect(state.step).toBe('waiting_transfer_confirmation');
-        expect(lastMsg()).toMatch(/HERBALIS\.TIENDA/);
+        expect(lastMsg()).toMatch(/herbalis/);
         expect(lastMsg()).not.toMatch(CARD_RE);
     });
 
@@ -205,7 +205,7 @@ describe('waiting_payment_method con MP apagado', () => {
         expect(state.shippingChoice).toBe('retiro');
         expect(state.partialAddress.calle).toBe('A sucursal');
         expect(state.step).toBe('waiting_transfer_confirmation');
-        expect(allMsgs()).toMatch(/HERBALIS\.TIENDA/);
+        expect(allMsgs()).toMatch(/herbalis/);
         expect(allMsgs()).not.toMatch(CARD_RE);
     });
 
@@ -227,7 +227,7 @@ describe('waiting_payment_method con MP apagado', () => {
         expect(aiService.chat).toHaveBeenCalled();
         const goal = aiService.chat.mock.calls[0][1].goal;
         expect(goal).toMatch(/FUERA DE SERVICIO/);
-        expect(goal).toMatch(/HERBALIS\.TIENDA/);
+        expect(goal).toMatch(/herbalis/);
     });
 });
 
@@ -257,7 +257,7 @@ describe('waiting_mp_payment con MP apagado', () => {
         expect(state.paymentMethod).toBe('transferencia');
         expect(state.step).toBe('waiting_transfer_confirmation');
         expect(state.mpReminderStage).toBe(99);
-        expect(lastMsg()).toMatch(/HERBALIS\.TIENDA/);
+        expect(lastMsg()).toMatch(/herbalis/);
         expect(lastMsg()).not.toMatch(/retiro en sucursal/i);
     });
 
