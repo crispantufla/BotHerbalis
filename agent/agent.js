@@ -125,6 +125,36 @@ const client = new Client({
 const PROFILE_DIR = path.join(__dirname, '.wwebjs_auth', 'session-' + cfg.sellerId);
 let browserPid = null;
 
+// ── Auto-wipe ante fallos de arranque consecutivos ───────────────────────────
+// Si el perfil queda corrupto (re-pair a medias, IndexedDB roto), WA Web se queda
+// con la ruedita en la pantalla del QR, wwebjs tira "Waiting failed: 30000ms
+// exceeded", run.bat relanza → MISMO perfil roto → loop infinito sin QR (caso
+// horacio nov-2026). El vendedor no puede borrar carpetas a mano, así que tras
+// INIT_FAIL_LIMIT fallos SEGUIDOS de initialize() borramos el perfil + cache de
+// WA Web y arrancamos limpio (pedirá QR nuevo). El contador se resetea apenas
+// sale un QR o 'ready', así que una sesión sana con un fallo aislado no se toca.
+const INIT_FAIL_FILE = path.join(__dirname, '.init-failures');
+const INIT_FAIL_LIMIT = 3;
+function readInitFailures() {
+    try { return parseInt(fs.readFileSync(INIT_FAIL_FILE, 'utf8'), 10) || 0; } catch { return 0; }
+}
+function writeInitFailures(n) {
+    try { fs.writeFileSync(INIT_FAIL_FILE, String(n)); } catch { /* noop */ }
+}
+function resetInitFailures() {
+    try { fs.unlinkSync(INIT_FAIL_FILE); } catch { /* noop */ }
+}
+function wipeSessionIfLooping() {
+    const n = readInitFailures();
+    if (n < INIT_FAIL_LIMIT) return;
+    log(`WhatsApp falló al iniciar ${n} veces seguidas — borro la sesión local para forzar un QR nuevo`);
+    for (const p of [PROFILE_DIR, path.join(__dirname, '.wwebjs_cache')]) {
+        try { fs.rmSync(p, { recursive: true, force: true, maxRetries: 3, retryDelay: 300 }); log('  borrado:', p); }
+        catch (e) { log('  no pude borrar', p, '-', e.message); }
+    }
+    resetInitFailures();
+}
+
 function cleanupStaleProfile() {
     if (process.platform !== 'win32') return;
     try {
@@ -360,6 +390,7 @@ function serializeMsg(m) {
 
 client.on('qr', (qr) => {
     awaitingQr = true; // esperando escaneo humano → pausa el stuck-watchdog
+    resetInitFailures(); // WA Web arrancó bien: el perfil no está en loop
     log('escaneá este QR con el WhatsApp del vendedor (en ESTA ventana, no en el dashboard):');
     qrcode.generate(qr, { small: true });
     // NO se reenvía al dashboard: el QR se escanea acá, en la ventana del agente.
@@ -373,6 +404,7 @@ client.on('ready', async () => {
     try { const p = client.pupBrowser && client.pupBrowser.process(); if (p && p.pid) browserPid = p.pid; } catch { /* noop */ }
     const phone = client.info && client.info.wid ? client.info.wid.user : '';
     log('✅ WhatsApp listo. Número:', phone);
+    resetInitFailures();
     send({ t: 'ready', phone });
     startFrameWatchdog();
     // Panel lateral (botonera) en la ventana de WhatsApp del agente.
@@ -728,7 +760,12 @@ function stopKeepAwake() { if (keepAwakeProc) { try { keepAwakeProc.kill(); } ca
     // si no, initialize() tira "The browser is already running" y entramos en el
     // loop de reinicio (ver cleanupStaleProfile). Sincrónico y fail-open.
     cleanupStaleProfile();
-    client.initialize().catch((e) => fail(`no pude iniciar WhatsApp: ${e.message}`));
+    wipeSessionIfLooping();   // perfil corrupto en loop → borrar y pedir QR nuevo
+    client.initialize().catch((e) => {
+        writeInitFailures(readInitFailures() + 1);
+        killBrowserSync();
+        fail(`no pude iniciar WhatsApp: ${e.message}`);
+    });
     startStuckWatchdog();   // vigila "gateway conectado pero WA nunca ready" y relanza si se cuelga
 
     // Apenas exista la ventana de Chrome (antes del QR/ready), abrir el dashboard al lado.
