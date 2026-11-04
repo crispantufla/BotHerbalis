@@ -88,7 +88,7 @@ module.exports = (clientPool) => {
                 chats: summary.chats,
                 byMonth: summary.byMonth,
                 byStep: {},
-                excluded: { ya_compraron: summary.buyers, sin_telefono_visible: summary.unresolved, avisos_o_propio: summary.excluded, pidio_no_recibir: summary.optedOut, fuera_de_zona: all.length - members.length },
+                excluded: { pedido_ultimo_mes: summary.buyers, en_otra_campana: summary.recentCampaign, sin_telefono_visible: summary.unresolved, avisos_o_propio: summary.excluded, pidio_no_recibir: summary.optedOut, fuera_de_zona: all.length - members.length },
                 ...(codes.length ? { areaCodes: codes } : {}),
             },
         };

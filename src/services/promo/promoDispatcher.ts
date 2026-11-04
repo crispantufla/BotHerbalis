@@ -28,6 +28,9 @@ import { _getPromoPrice60 } from '../../flows/utils/pricing';
 import { renderPromoMessage, PromoTemplates } from './promoTemplates';
 import { generatePromoVariation, DEFAULT_BASE_MESSAGE } from './promoVariation';
 import { AudienceFilters, DEFAULT_AUDIENCE_FILTERS, normalizeAudienceFilters } from './promoAudience';
+
+/** Quien hizo un pedido hace menos de esto no recibe la oferta (pedido del 4-nov-2026: "mientras el pedido sea anterior a 1 mes"). Lo usan la audiencia y el chequeo al mandar. */
+export const BUYER_RECENT_DAYS = 30;
 import logger from '../../utils/logger';
 
 const { prisma } = require('../../../db');
@@ -446,7 +449,8 @@ export async function promoTick(
             const userId = `${r.phone}@c.us`;
 
             if (sharedState.pausedUsers?.has(userId)) { await _skipRecipient(r, 'pausado'); continue; }
-            const order = await prisma.order.findFirst({ where: { userPhone: r.phone, instanceId: { in: [sellerId, '__legacy_import__'] } }, select: { id: true } });
+            // Pedido en el último mes (BUYER_RECENT_DAYS, igual que la audiencia): puede tener uno en curso.
+            const order = await prisma.order.findFirst({ where: { userPhone: r.phone, instanceId: { in: [sellerId, '__legacy_import__'] }, createdAt: { gte: new Date(now.getTime() - BUYER_RECENT_DAYS * 24 * 3600 * 1000) } }, select: { id: true } });
             if (order) { await _skipRecipient(r, 'ya_compro'); continue; }
             const optedOut = await prisma.promoRecipient.findFirst({ where: { instanceId: sellerId, phone: r.phone, OR: [{ status: 'opted_out' }, { outcome: 'opted_out' }] }, select: { id: true } });
             if (optedOut) { await _skipRecipient(r, 'pidio_no_recibir'); continue; }

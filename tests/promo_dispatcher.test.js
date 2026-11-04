@@ -196,6 +196,9 @@ describe('promoTick — manda y prepara el estado', () => {
         const r = await promoTick(ss, d, { now: WED_1430 });
         expect(r.sent).toBe(true);
         expect(d.sendMessageWithDelay.mock.calls[0][0]).toBe('5493410000014@c.us');
+        // Solo cuentan los pedidos del último mes (4-nov-2026): con uno más viejo, se le manda.
+        const since = mockDb.order.findFirst.mock.calls[0][0].where.createdAt.gte.getTime();
+        expect(WED_1430 - since).toBe(30 * 24 * 3600 * 1000);
         const skipped = mockDb.promoRecipient.update.mock.calls.filter(c => c[0].data.status === 'skipped').map(c => [c[0].where.id, c[0].data.skipReason]);
         expect(skipped).toEqual([
             ['r-5493410000010', 'pausado'],

@@ -14,6 +14,7 @@
 
 import logger from '../../utils/logger';
 import { resolveUserIdFrom } from '../../handlers/incomingSteps';
+import { BUYER_RECENT_DAYS } from './promoDispatcher';
 
 const { prisma } = require('../../../db');
 const { redisConnection } = require('../queueService');
@@ -25,6 +26,8 @@ export interface ChatAudienceSummary {
     excluded: number;
     optedOut: number;
     buyers: number;
+    /** Ya están en una campaña de los últimos RECENT_CAMPAIGN_DAYS (pendientes o enviados). */
+    recentCampaign: number;
     members: number;
     /** Chats individuales por mes del último mensaje (AAAA-MM), para ver hasta dónde sincronizó WA Web. */
     byMonth: Record<string, number>;
@@ -34,6 +37,9 @@ export interface ChatAudienceMember { phone: string; name: string | null; lastCh
 
 const digits = (s: any) => String(s || '').replace(/\D/g, '');
 const CACHE_MS = 10 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** Quien ya está en una campaña creada hace menos de esto no entra en otra (sin dobles envíos). */
+export const RECENT_CAMPAIGN_DAYS = 90;
 const _cache = new Map<string, { at: number; members: ChatAudienceMember[]; summary: ChatAudienceSummary }>();
 
 /** Corre fn sobre items con como mucho `n` en paralelo (cada resolución es un RPC al agente). */
@@ -71,14 +77,23 @@ export async function selectChatAudience(opts: {
         select: { phone: true },
     });
     const optedOut = new Set(optedOutRows.map((r: any) => r.phone));
-    // Quien ya compró no recibe la oferta: pedidos de este seller o de la lista de
-    // compradores importada (__legacy_import__, p. ej. el Excel "Pedidos" del 25-oct).
+    // Quien hizo un pedido en el último mes no recibe la oferta (puede tener uno en
+    // curso); con pedidos más viejos, sí. Pedidos de este seller o de la lista de
+    // compradores importada (__legacy_import__). Cuenta cualquier estado.
+    const now = Date.now();
     const buyerRows = await prisma.order.findMany({
-        where: { instanceId: { in: [instanceId, '__legacy_import__'] } },
+        where: { instanceId: { in: [instanceId, '__legacy_import__'] }, createdAt: { gte: new Date(now - BUYER_RECENT_DAYS * DAY_MS) } },
         select: { userPhone: true },
         distinct: ['userPhone'],
     });
     const buyers = new Set(buyerRows.map((r: any) => r.userPhone));
+    // Quien ya está en otra campaña reciente (pendiente o ya enviado) no entra de nuevo.
+    const recentRows = await prisma.promoRecipient.findMany({
+        where: { instanceId, status: { in: ['pending', 'sent'] }, campaign: { createdAt: { gte: new Date(now - RECENT_CAMPAIGN_DAYS * DAY_MS) } } },
+        select: { phone: true },
+        distinct: ['phone'],
+    });
+    const recentCampaign = new Set(recentRows.map((r: any) => r.phone));
 
     const resolved = await _mapLimit(individuals, 5, async (c) => {
         const id = String(c.id._serialized);
@@ -101,7 +116,7 @@ export async function selectChatAudience(opts: {
     });
 
     const byPhone = new Map<string, ChatAudienceMember>();
-    let unresolved = 0, nExcluded = 0, nOptedOut = 0, nBuyers = 0;
+    let unresolved = 0, nExcluded = 0, nOptedOut = 0, nBuyers = 0, nRecent = 0;
     individuals.forEach((c, k) => {
         const uid = resolved[k];
         if (!uid || !uid.endsWith('@c.us')) { unresolved++; return; }
@@ -109,6 +124,7 @@ export async function selectChatAudience(opts: {
         if (excluded.has(phone)) { nExcluded++; return; }
         if (optedOut.has(phone)) { nOptedOut++; return; }
         if (buyers.has(phone)) { nBuyers++; return; }
+        if (recentCampaign.has(phone)) { nRecent++; return; }
         const at = Number(c.timestamp || c.lastMessage?.timestamp || 0);
         const prev = byPhone.get(phone);
         if (!prev || at > prev.lastChatAt) byPhone.set(phone, { phone, name: c.name || null, lastChatAt: at });
@@ -121,7 +137,7 @@ export async function selectChatAudience(opts: {
         [members[i], members[j]] = [members[j], members[i]];
     }
     const summary: ChatAudienceSummary = {
-        chats: chats.length, individuals: individuals.length, unresolved, excluded: nExcluded, optedOut: nOptedOut, buyers: nBuyers, members: members.length,
+        chats: chats.length, individuals: individuals.length, unresolved, excluded: nExcluded, optedOut: nOptedOut, buyers: nBuyers, recentCampaign: nRecent, members: members.length,
         byMonth: individuals.reduce((acc: Record<string, number>, c: any) => {
             const t = Number(c.timestamp || c.lastMessage?.timestamp || 0);
             const k = t ? new Date(t * 1000).toISOString().slice(0, 7) : "sin fecha";
