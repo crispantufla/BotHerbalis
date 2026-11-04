@@ -180,13 +180,16 @@ describe('promoTick — manda y prepara el estado', () => {
         const buyer = recipient('5493410000011');
         const recent = recipient('5493410000012');
         const optout = recipient('5493410000013');
+        const otherPromo = recipient('5493410000015');
         const good = recipient('5493410000014');
+        // Por destinatario: el pendiente, y después (si llega) la baja y la otra promo reciente.
         mockDb.promoRecipient.findFirst
             .mockResolvedValueOnce(paused)
             .mockResolvedValueOnce(buyer)
-            .mockResolvedValueOnce(recent).mockResolvedValueOnce(null)
+            .mockResolvedValueOnce(recent).mockResolvedValueOnce(null).mockResolvedValueOnce(null)
             .mockResolvedValueOnce(optout).mockResolvedValueOnce({ id: 'old' })
-            .mockResolvedValueOnce(good).mockResolvedValueOnce(null);
+            .mockResolvedValueOnce(otherPromo).mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 'oct' })
+            .mockResolvedValueOnce(good).mockResolvedValueOnce(null).mockResolvedValueOnce(null);
         mockDb.order.findFirst.mockImplementation(({ where }) => Promise.resolve(where.userPhone === buyer.phone ? { id: 'o1' } : null));
         const ss = shared({
             pausedUsers: new Set(['5493410000010@c.us']),
@@ -205,7 +208,12 @@ describe('promoTick — manda y prepara el estado', () => {
             ['r-5493410000011', 'ya_compro'],
             ['r-5493410000012', 'charla_reciente'],
             ['r-5493410000013', 'pidio_no_recibir'],
+            ['r-5493410000015', 'otra_promo_reciente'],
         ]);
+        // La otra promo se busca en OTRAS campañas y solo entre los envíos de los últimos 90 días.
+        const priorQ = mockDb.promoRecipient.findFirst.mock.calls.map(c => c[0].where).find(w => w.status === 'sent');
+        expect(priorQ.campaignId).toEqual({ not: campaign().id });
+        expect(WED_1430 - priorQ.sentAt.gte.getTime()).toBe(90 * 24 * 3600 * 1000);
     });
 
     test('sin pendientes → la campaña termina y se avisa al admin', async () => {

@@ -14,7 +14,7 @@
 
 import logger from '../../utils/logger';
 import { resolveUserIdFrom } from '../../handlers/incomingSteps';
-import { BUYER_RECENT_DAYS } from './promoDispatcher';
+import { BUYER_RECENT_DAYS, RECENT_CAMPAIGN_DAYS } from './promoDispatcher';
 
 const { prisma } = require('../../../db');
 const { redisConnection } = require('../queueService');
@@ -38,8 +38,6 @@ export interface ChatAudienceMember { phone: string; name: string | null; lastCh
 const digits = (s: any) => String(s || '').replace(/\D/g, '');
 const CACHE_MS = 10 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
-/** Quien recibió una promo hace menos de esto no entra en otra campaña (sin dobles envíos). */
-export const RECENT_CAMPAIGN_DAYS = 90;
 const _cache = new Map<string, { at: number; members: ChatAudienceMember[]; summary: ChatAudienceSummary }>();
 
 /** Corre fn sobre items con como mucho `n` en paralelo (cada resolución es un RPC al agente). */

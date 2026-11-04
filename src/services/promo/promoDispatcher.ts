@@ -31,6 +31,8 @@ import { AudienceFilters, DEFAULT_AUDIENCE_FILTERS, normalizeAudienceFilters } f
 
 /** Quien hizo un pedido hace menos de esto no recibe la oferta (pedido del 4-nov-2026: "mientras el pedido sea anterior a 1 mes"). Lo usan la audiencia y el chequeo al mandar. */
 export const BUYER_RECENT_DAYS = 30;
+/** Quien recibió una promo hace menos de esto no entra en otra campaña (sin dobles envíos). La usan la audiencia y el chequeo al mandar. */
+export const RECENT_CAMPAIGN_DAYS = 90;
 import logger from '../../utils/logger';
 
 const { prisma } = require('../../../db');
@@ -454,6 +456,10 @@ export async function promoTick(
             if (order) { await _skipRecipient(r, 'ya_compro'); continue; }
             const optedOut = await prisma.promoRecipient.findFirst({ where: { instanceId: sellerId, phone: r.phone, OR: [{ status: 'opted_out' }, { outcome: 'opted_out' }] }, select: { id: true } });
             if (optedOut) { await _skipRecipient(r, 'pidio_no_recibir'); continue; }
+            // Recibió otra promo hace poco (p. ej. "Promo Octubre"): sin dobles ofertas,
+            // aunque la lista de esta campaña se haya armado antes de esa regla (4-nov-2026).
+            const prior = await prisma.promoRecipient.findFirst({ where: { instanceId: sellerId, phone: r.phone, status: 'sent', campaignId: { not: campaign.id }, sentAt: { gte: new Date(now.getTime() - RECENT_CAMPAIGN_DAYS * 24 * 3600 * 1000) } }, select: { id: true } });
+            if (prior) { await _skipRecipient(r, 'otra_promo_reciente'); continue; }
             const st = sharedState.userState?.[userId];
             if (st?.promo?.active) { await _skipRecipient(r, 'ya_recibio_promo'); continue; }
             const lastIn = _lastInboundAt(st);
