@@ -41,6 +41,8 @@ const promoConfigSchema = z.object({
 const createCampaignSchema = z.object({
     name: z.string().min(2, 'La campaña necesita un nombre').max(80),
     config: promoConfigSchema.optional(),
+    // Características (sin 0 ni 15: "341", "3476") a las que se limita la lista. Vacío = todo el país.
+    areaCodes: z.array(z.string().regex(/^\d{2,4}$/)).max(40).optional(),
 });
 
 const previewSchema = z.object({

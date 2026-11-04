@@ -74,20 +74,26 @@ module.exports = (clientPool) => {
 
     // Club Herbys: la audiencia sale de los chats del WhatsApp (chatAudience.ts).
     // El resumen se devuelve con la forma que ya espera el panel.
-    async function chatAudience(req, instanceId, fresh) {
+    // areaCodes (nov-2026): limita la lista a esas características argentinas
+    // (549 + característica + número), p. ej. Rosario y zona para la oferta de Club Herbys.
+    async function chatAudience(req, instanceId, fresh, areaCodes = []) {
         const client = req.sellerInstance?.client;
-        const { members, summary } = await selectChatAudience({ client, instanceId, excludePhones: adminPhones(req), fresh });
+        const { members: all, summary } = await selectChatAudience({ client, instanceId, excludePhones: adminPhones(req), fresh });
+        const codes = (areaCodes || []).map((c) => String(c).replace(/\D/g, '')).filter(Boolean);
+        const members = codes.length ? all.filter((m) => codes.some((c) => m.phone.startsWith(`549${c}`))) : all;
         return {
             members,
             summary: {
-                total: summary.members,
+                total: members.length,
                 chats: summary.chats,
                 byMonth: summary.byMonth,
                 byStep: {},
-                excluded: { ya_compraron: summary.buyers, sin_telefono_visible: summary.unresolved, avisos_o_propio: summary.excluded, pidio_no_recibir: summary.optedOut },
+                excluded: { ya_compraron: summary.buyers, sin_telefono_visible: summary.unresolved, avisos_o_propio: summary.excluded, pidio_no_recibir: summary.optedOut, fuera_de_zona: all.length - members.length },
+                ...(codes.length ? { areaCodes: codes } : {}),
             },
         };
     }
+    const _areaCodesFromQuery = (q) => String(q || '').split(',').map((s) => s.trim()).filter((s) => /^\d{2,4}$/.test(s));
 
     const serialize = (c) => ({ ...c, config: (() => { try { return JSON.parse(c.config); } catch { return {}; } })() });
 
@@ -96,7 +102,7 @@ module.exports = (clientPool) => {
         try {
             const instanceId = needSeller(req, res); if (!instanceId) return;
             const filters = normalizeAudienceFilters(instanceId, { ...req.query, excludePhones: adminPhones(req) });
-            const { members, summary } = await chatAudience(req, instanceId, req.query.fresh === '1');
+            const { members, summary } = await chatAudience(req, instanceId, req.query.fresh === '1', _areaCodesFromQuery(req.query.areaCodes));
             res.json({ filters, summary, sample: members.slice(0, 10).map(m => ({ phone: m.phone, name: m.name, step: null, lastSeen: m.lastChatAt ? new Date(m.lastChatAt * 1000) : null })) });
         } catch (e) {
             logger.error(`[PROMO] audience: ${e.message}`);
@@ -154,11 +160,11 @@ module.exports = (clientPool) => {
         try {
             const instanceId = needSeller(req, res); if (!instanceId) return;
             const cfg = normalizePromoConfig(req.body.config || {}, instanceId);
-            const { members, summary } = await chatAudience(req, instanceId, true);
+            const { members, summary } = await chatAudience(req, instanceId, true, req.body.areaCodes || []);
             if (members.length === 0) return res.status(400).json({ error: 'Con estos filtros no queda nadie a quien mandarle', summary });
 
             const campaign = await prisma.promoCampaign.create({
-                data: { instanceId, name: req.body.name.trim(), status: 'draft', config: JSON.stringify(cfg) },
+                data: { instanceId, name: req.body.name.trim(), status: 'draft', config: JSON.stringify(req.body.areaCodes?.length ? { ...cfg, areaCodes: req.body.areaCodes } : cfg) },
             });
             const CHUNK = 500;
             for (let i = 0; i < members.length; i += CHUNK) {
