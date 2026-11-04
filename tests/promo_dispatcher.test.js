@@ -145,11 +145,14 @@ describe('promoTick — manda y prepara el estado', () => {
         const [to, text] = d.sendMessageWithDelay.mock.calls[0];
         expect(to).toBe('5493410000001@c.us');
         expect(text).toMatch(/Carla/);
-        expect(text).toMatch(/44\.900/);
+        // Club Herbys: el texto sale del mensaje base con sus montos (no del precio promo de Herbalis).
+        expect(text).toMatch(/\$18\.900/);
+        expect(text).toMatch(/4 cuotas semanales de \$7\.900/);
 
         const st = ss.userState['5493410000001@c.us'];
         expect(st.step).toBe('promo_offer');
-        expect(st.promo).toEqual(expect.objectContaining({ active: true, campaignId: 'c1', price60: '44.900', prevStep: 'waiting_plan_choice' }));
+        // price60 sale de data/prices.json (Club Herbys no lo usa: los montos van en el texto).
+        expect(st.promo).toEqual(expect.objectContaining({ active: true, campaignId: 'c1', price60: expect.any(String), prevStep: 'waiting_plan_choice' }));
         expect(st.cart).toEqual([]);
         expect(st.selectedPlan).toBeNull();
         expect(d.saveState).toHaveBeenCalledWith('5493410000001@c.us');
@@ -257,7 +260,7 @@ describe('imagen del flyer', () => {
     test('el flyer está en el repo y se carga como MessageMedia', () => {
         expect(fs.existsSync(PROMO_IMAGE_PATH)).toBe(true);
         const m = loadPromoImage();
-        expect(m).toEqual(expect.objectContaining({ mimetype: 'image/jpeg', filename: 'promo-60-dias.jpg' }));
+        expect(m).toEqual(expect.objectContaining({ mimetype: 'image/jpeg', filename: 'flyer.jpg' }));
         expect(m.data.length).toBeGreaterThan(1000);
     });
 

@@ -36,6 +36,9 @@ interface RemoteMessage {
     timestamp: number;
     author?: string;
     fromMe: boolean;
+    /** Ficha del anuncio de Meta (click-to-WhatsApp) si el mensaje llegó por uno. */
+    ad?: { sourceId?: string; title?: string; mediaType?: number; sourceUrl?: string; greetingMessageBody?: string } | null;
+    isNewChat?: boolean;
     downloadMedia: () => Promise<{ mimetype: string; data: string; filename?: string } | undefined>;
 }
 
@@ -137,6 +140,8 @@ export class RemoteClient extends EventEmitter implements AgentSink {
             isGroup: !!c.isGroup,
             timestamp: c.timestamp || 0,
             unreadCount: c.unreadCount || 0,
+            // Teléfono de un chat @lid, resuelto por el agente desde WA Web (null si no lo sabe).
+            phone: c.phone || null,
             lastMessage: c.lastMessage
                 ? {
                       body: c.lastMessage.body || '',
@@ -149,6 +154,17 @@ export class RemoteClient extends EventEmitter implements AgentSink {
 
     /** Contacto por id — lo usan resolveChatId y /api/chats para resolver
      *  @lid → @c.us (sin esto las pausas quedaban clavadas bajo el lid). */
+    /** Diagnóstico: chats con actividad desde `sinceSec` (epoch s), con primer mensaje y ficha del anuncio. */
+    async scanInbound(sinceSec: number): Promise<any[]> {
+        const r = await this._rpc({ t: 'scan_inbound', since: sinceSec });
+        return r?.chats || [];
+    }
+
+    /** Diagnóstico (solo lectura): busca el chat de `phone` y le pide al teléfono su historial viejo. */
+    async probeHistory(phone: string, waitMs = 8000): Promise<any> {
+        return this._rpc({ t: 'probe_history', phone, waitMs });
+    }
+
     async getContactById(contactId: string): Promise<any> {
         const r = await this._rpc({ t: 'get_contact', contactId });
         if (!r || !r.found) throw new Error(`contacto ${contactId} no encontrado`);
@@ -242,6 +258,10 @@ export class RemoteClient extends EventEmitter implements AgentSink {
             timestamp: m.timestamp ?? Math.floor(Date.now() / 1000),
             author: m.author,
             fromMe: !!m.fromMe,
+            // Ficha del anuncio de Meta si llegó por uno (agent.js adContextOf), o null.
+            ad: m.ad || null,
+            // Persona nueva para el número: sin charla previa y no agendada (agent.js isNewChatOf).
+            isNewChat: m.isNewChat === true,
             downloadMedia: async () => {
                 if (!m.hasMedia) return undefined;
                 const r = await self._rpc({ t: 'download', msgId: serialized });

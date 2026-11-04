@@ -374,6 +374,151 @@ function _msgId(m) {
     return `remote_noid_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/**
+ * La lista de chats leída directo de WhatsApp Web (los mismos módulos que usa
+ * wwebjs por dentro: WAWebCollections, WAWebApiContact), con el teléfono de cada
+ * chat @lid ya resuelto desde la caché local de WA. No depende de window.WWebJS.
+ */
+async function getChatsDirect() {
+    return client.pupPage.evaluate(() => {
+        const Chat = window.require('WAWebCollections').Chat;
+        let Api = null;
+        try { Api = window.require('WAWebApiContact'); } catch (e) { /* sin resolución de @lid */ }
+        return Chat.getModelsArray().map((c) => {
+            const wid = c.id;
+            let phone = null;
+            try {
+                if (wid.server === 'c.us') phone = wid.user;
+                else if (wid.server === 'lid' && Api) {
+                    const pn = Api.getPhoneNumber(wid);
+                    if (pn) phone = pn.user || String(pn._serialized || '').split('@')[0] || null;
+                }
+            } catch (e) { /* queda sin teléfono */ }
+            const contact = c.contact || {};
+            return {
+                id: wid._serialized,
+                name: c.formattedTitle || c.name || contact.name || contact.pushname || '',
+                isGroup: !!(c.isGroup || wid.server === 'g.us'),
+                timestamp: c.t || 0,
+                unreadCount: c.unreadCount || 0,
+                phone,
+                lastMessage: null,
+            };
+        });
+    });
+}
+
+/**
+ * Chats individuales con actividad desde `sinceSec`: primer mensaje entrante y,
+ * si llegó por un anuncio de Meta (click-to-WhatsApp), la ficha del anuncio
+ * (ctwaContext: de qué anuncio viene, si es video). Solo lee la caché de WA Web.
+ */
+async function scanInbound(sinceSec) {
+    return client.pupPage.evaluate((since) => {
+        const Chat = window.require('WAWebCollections').Chat;
+        let Api = null;
+        try { Api = window.require('WAWebApiContact'); } catch (e) { /* sin @lid → teléfono */ }
+        const pick = (o) => {
+            if (!o || typeof o !== 'object') return null;
+            const out = {};
+            for (const k of Object.keys(o)) {
+                const v = o[k];
+                if (v == null || ['string', 'number', 'boolean'].includes(typeof v)) out[k] = typeof v === 'string' ? v.slice(0, 300) : v;
+            }
+            return out;
+        };
+        return Chat.getModelsArray()
+            .filter((c) => c.id && c.id.server !== 'g.us' && c.id.server !== 'broadcast' && (c.t || 0) >= since)
+            .map((c) => {
+                let phone = null;
+                try {
+                    if (c.id.server === 'c.us') phone = c.id.user;
+                    else if (Api) { const pn = Api.getPhoneNumber(c.id); if (pn) phone = pn.user || null; }
+                } catch (e) { /* noop */ }
+                const msgs = c.msgs && c.msgs.getModelsArray ? c.msgs.getModelsArray() : [];
+                const inbound = msgs.filter((m) => m.id && !m.id.fromMe);
+                const first = inbound[0];
+                const withAd = inbound.find((m) => m.ctwaContext);
+                return {
+                    id: c.id._serialized, phone, name: c.formattedTitle || c.name || '', t: c.t || 0,
+                    nIn: inbound.length, nOut: msgs.length - inbound.length,
+                    first: first ? { body: String(first.body || '').slice(0, 200), type: first.type, t: first.t } : null,
+                    ad: withAd ? pick(withAd.ctwaContext) : null,
+                };
+            });
+    }, sinceSec);
+}
+
+/** Teléfono de un @lid (o @c.us) desde la caché de WhatsApp Web; null si no lo tiene. */
+async function phoneFromWid(id) {
+    return client.pupPage.evaluate((raw) => {
+        const wid = window.require('WAWebWidFactory').createWid(raw);
+        if (wid.server === 'c.us') return wid.user;
+        const pn = window.require('WAWebApiContact').getPhoneNumber(wid);
+        return pn ? (pn.user || String(pn._serialized || '').split('@')[0] || null) : null;
+    }, id);
+}
+
+/**
+ * ¿Este teléfono habló alguna vez con el número? Solo lee: busca el chat en WA Web
+ * (por teléfono o por su @lid), y si no está lo abre en la caché local (no aparece
+ * en el celular ni le llega nada a la persona). Después le pide al teléfono el
+ * historial viejo de ese chat (el mismo pedido que el "Hacé clic para ver mensajes
+ * anteriores" de WA Web) y espera `waitMs` a ver si llegan mensajes.
+ */
+async function probeHistory(phone, waitMs) {
+    return client.pupPage.evaluate(async (phone, waitMs) => {
+        const C = window.require('WAWebCollections');
+        const wid = window.require('WAWebWidFactory').createWid(phone + '@c.us');
+        let Api = null;
+        try { Api = window.require('WAWebApiContact'); } catch (e) { /* sin @lid */ }
+        const snap = (chat) => {
+            // Solo mensajes de verdad: abrir un chat crea avisos del sistema (cifrado, etc.) con fecha de hoy.
+            const SYS = ['e2e_notification', 'notification_template', 'gp2', 'protocol', 'ciphertext', 'notification', 'call_log'];
+            const all = chat && chat.msgs && chat.msgs.getModelsArray ? chat.msgs.getModelsArray() : [];
+            const msgs = all.filter((m) => !SYS.includes(m.type) && !m.isNotification);
+            const ts = msgs.map((m) => m.t || 0).filter(Boolean);
+            return {
+                id: chat ? chat.id._serialized : null,
+                types: [...new Set(all.map((m) => m.type))],
+                n: msgs.length,
+                oldest: ts.length ? Math.min(...ts) : 0,
+                newest: ts.length ? Math.max(...ts) : 0,
+                t: chat ? (chat.t || 0) : 0,
+                endOfHistory: chat ? (chat.endOfHistoryTransferType ?? null) : null,
+            };
+        };
+        const err = (e) => String((e && e.message) || e).slice(0, 200);
+        const out = { phone };
+        let chat = C.Chat.get(wid);
+        if (!chat && Api && Api.getCurrentLid) {
+            try {
+                const lid = Api.getCurrentLid(wid);
+                if (lid) { out.lid = lid._serialized; chat = C.Chat.get(lid); }
+            } catch (e) { out.lidError = err(e); }
+        }
+        out.local = !!chat;
+        try { const ct = C.Contact.get(wid); out.isMyContact = ct ? !!ct.isMyContact : null; } catch (e) { /* noop */ }
+        if (!chat) {
+            try {
+                const F = window.require('WAWebFindChatAction');
+                const r = await F.findOrCreateLatestChat(wid);
+                chat = (r && r.chat) || r || null;
+            } catch (e) { out.findError = err(e); }
+        }
+        if (!chat) return out;
+        out.before = snap(chat);
+        try {
+            await window.require('WAWebSendNonMessageDataRequest').sendPeerDataOperationRequest(3, { chatId: chat.id });
+            out.requested = true;
+        } catch (e) { out.requestError = err(e); }
+        try { await window.require('WAWebChatLoadMessages').loadEarlierMsgs(chat); } catch (e) { out.loadError = err(e); }
+        await new Promise((r) => setTimeout(r, waitMs));
+        out.after = snap(chat);
+        return out;
+    }, phone, waitMs);
+}
+
 function serializeMsg(m) {
     return {
         id: { _serialized: _msgId(m) },
@@ -512,10 +657,63 @@ function _dupIncoming(id) {
     _seenIncoming.set(id, now);
     return false;
 }
-client.on('message', (m) => {
+/**
+ * Ficha del anuncio de Meta (click-to-WhatsApp) de un mensaje entrante, o null.
+ * Railway la usa para reconocer a quién llega por un anuncio en particular.
+ */
+async function adContextOf(m) {
+    const fields = ['sourceId', 'title', 'mediaType', 'sourceUrl', 'conversionSource', 'greetingMessageBody'];
+    const pick = (o) => {
+        if (!o || typeof o !== 'object') return null;
+        const out = {};
+        for (const k of fields) if (o[k] != null) out[k] = typeof o[k] === 'string' ? o[k].slice(0, 300) : o[k];
+        return Object.keys(out).length ? out : null;
+    };
+    const raw = (m && (m._data || m.rawData)) || {};
+    if (raw.ctwaContext) return pick(raw.ctwaContext);
+    const id = m.id && m.id._serialized;
+    if (!id || !client.pupPage) return null;
+    const ctx = await client.pupPage.evaluate((mid) => {
+        try {
+            const msg = window.require('WAWebCollections').Msg.get(mid);
+            const c = msg && msg.ctwaContext;
+            if (!c) return null;
+            const out = {};
+            for (const k of Object.keys(c)) if (c[k] == null || ['string', 'number', 'boolean'].includes(typeof c[k])) out[k] = c[k];
+            return out;
+        } catch (e) { return null; }
+    }, id);
+    return pick(ctx);
+}
+
+/**
+ * ¿Es una persona nueva para este número? Sin mensajes anteriores en el chat
+ * (más de 2 min antes de este) y no agendada. Lo usa Railway para que la gente
+ * nueva entre al guion de venta. Ante la duda: false (no es nueva).
+ */
+async function isNewChatOf(m) {
+    const id = m.id && m.id._serialized;
+    if (!id || !client.pupPage) return false;
+    return client.pupPage.evaluate((mid, from, t) => {
+        try {
+            const C = window.require('WAWebCollections');
+            const chat = C.Chat.get(from);
+            if (!chat) return false;
+            if (chat.contact && chat.contact.isMyContact) return false;
+            const msgs = chat.msgs && chat.msgs.getModelsArray ? chat.msgs.getModelsArray() : [];
+            const before = msgs.filter((x) => x.id && x.id._serialized !== mid && (x.t || 0) < (t - 120));
+            return before.length === 0;
+        } catch (e) { return false; }
+    }, id, m.from, m.timestamp || Math.floor(Date.now() / 1000));
+}
+
+client.on('message', async (m) => {
     const msg = serializeMsg(m);
     const _id = msg.id && msg.id._serialized;
     if (_dupIncoming(_id)) { log(`⊘ incoming duplicado ignorado: ${_id}`); return; }
+    try { msg.ad = await adContextOf(m); } catch (e) { msg.ad = null; }
+    try { msg.isNewChat = await isNewChatOf(m); } catch (e) { msg.isNewChat = false; }
+    if (msg.ad) log(`◀ llegó por un anuncio: ${msg.ad.title || '?'} (${msg.ad.sourceId || '?'})`);
     // from se deja tal cual (incluye @lid): es lo que enruta bien al enviar de vuelta.
     // La resolución a teléfono real, si hace falta, se hace del lado de Railway (resolveChatId).
     log(`◀ incoming de ${msg.from}: ${JSON.stringify(msg.body)}`);
@@ -606,26 +804,61 @@ async function handleCommand(frame) {
                 return;
             }
             case 'get_chats': {
-                // Para GET /api/chats del dashboard. Solo los campos que la ruta lee.
-                const chats = await client.getChats();
-                const out = (chats || []).map((c) => ({
-                    id: c.id && c.id._serialized,
-                    name: c.name || '',
-                    isGroup: !!c.isGroup,
-                    timestamp: c.timestamp || 0,
-                    unreadCount: c.unreadCount || 0,
-                    lastMessage: c.lastMessage ? {
-                        body: c.lastMessage.body || '',
-                        hasMedia: !!c.lastMessage.hasMedia,
-                        timestamp: c.lastMessage.timestamp || 0,
-                    } : null,
-                }));
+                // Para la audiencia de la promo (y GET /api/chats del dashboard).
+                // Primero directo desde WhatsApp Web (trae el teléfono de los @lid
+                // y no depende de window.WWebJS, que se pierde cuando WA Web se
+                // recarga: "Cannot read properties of undefined (reading
+                // 'getChats')", visto el 25-oct). Si eso falla, el camino de wwebjs.
+                let out;
+                try {
+                    out = await getChatsDirect();
+                } catch (e) {
+                    log('get_chats directo falló, uso wwebjs:', e.message);
+                    const chats = await client.getChats();
+                    out = (chats || []).map((c) => ({
+                        id: c.id && c.id._serialized,
+                        name: c.name || '',
+                        isGroup: !!c.isGroup,
+                        timestamp: c.timestamp || 0,
+                        unreadCount: c.unreadCount || 0,
+                        phone: null,
+                        lastMessage: c.lastMessage ? {
+                            body: c.lastMessage.body || '',
+                            hasMedia: !!c.lastMessage.hasMedia,
+                            timestamp: c.lastMessage.timestamp || 0,
+                        } : null,
+                    }));
+                }
+                log(`get_chats: ${out.length} chats`);
                 ack(id, true, { chats: out });
+                return;
+            }
+            case 'scan_inbound': {
+                // Diagnóstico: chats recientes con su primer mensaje y la ficha del anuncio (si vino de uno).
+                const chats = await scanInbound(Number(frame.since) || 0);
+                log(`scan_inbound: ${chats.length} chats`);
+                ack(id, true, { chats });
+                return;
+            }
+            case 'probe_history': {
+                // Diagnóstico de solo lectura: ¿hubo charla con este teléfono antes de lo que sincronizó WA Web?
+                const r = await probeHistory(String(frame.phone), Math.min(20000, Number(frame.waitMs) || 8000));
+                log(`probe_history ${frame.phone}: ${JSON.stringify(r)}`);
+                ack(id, true, r);
                 return;
             }
             case 'get_contact': {
                 // Para resolveChatId / resolución @lid→@c.us en Railway.
-                const contact = await client.getContactById(frame.contactId);
+                let contact = null;
+                try {
+                    contact = await client.getContactById(frame.contactId);
+                } catch (e) {
+                    // Mismo caso que get_chats: sin window.WWebJS, el teléfono sale de WA Web directo.
+                    const phone = await phoneFromWid(frame.contactId).catch(() => null);
+                    if (!phone) throw e;
+                    ack(id, true, { found: true, id: `${phone}@c.us`, number: phone, name: null, pushname: null });
+                    return;
+                }
                 if (!contact) { ack(id, true, { found: false }); return; }
                 const realId = (contact.id && contact.id._serialized) || null;
                 // OJO: contact.number puede traer los dígitos del LID (no el teléfono).

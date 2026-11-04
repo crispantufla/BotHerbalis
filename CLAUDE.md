@@ -121,6 +121,16 @@ Máquina de estados lineal con fallbacks a IA. Orden típico:
   `(origen, externalId=Order.id)`: reenviar devuelve el pedido que ya creó, así que
   `externalId` NO se puede recalcular ni derivar. Una venta cargada queda con
   `sistemaOrderId` y status `En sistema`, y el botón se deshabilita.
+- **Campañas = las de Club Herbys (desde el 2026-11-04)**: la pestaña Promos corre el sistema de
+  bot-promo (`D:\club-herbys-bot`). Audiencia: los chats del WhatsApp (`chatAudience.ts`, el
+  agente los lista con `get_chats`; excluye a quien tiene pedido). Texto: el mensaje base con
+  `{a|b}` y `{nombre}` (`renderBaseMessage`) + `public/promo/flyer.jpg`; la reescritura por IA de
+  abajo quedó detrás de `PROMO_TEXT_MODE=herbalis`. Quien recibió la campaña (`state.promo.active`)
+  conversa con `flows/clubHerbys.ts` (Gotas 60 días, $18.900 al recibir + 4 cuotas semanales de
+  $7.900, nunca el total) y NO con el guion de venta; al aceptar o pedir asesora se deriva a Club
+  Herbys: el aviso de WhatsApp va a `CLUB_ALERT_NUMBERS` (default 5493412619405), no a Horacio
+  (`notifyAdmin`). `stepPromoOffer` ya no recibe a nadie. Montos en DOS lugares: el mensaje base
+  de la campaña y `clubHerbys.ts`. Tests: `tests/club_herbys.test.js`. Lo de abajo es la historia.
 - **Campañas promo (pestaña Promos, oct-2026)**: el bot le escribe PRIMERO a quien habló y no
   compró, con el plan de 60 días a `promoPrice60` (Editor de Precios). Vive en
   `src/services/promo/`: `promoAudience` arma la lista (default: últimos 180 días menos los

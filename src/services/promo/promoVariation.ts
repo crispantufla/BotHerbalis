@@ -15,14 +15,19 @@
 import logger from '../../utils/logger';
 import { firstNameFor } from './promoTemplates';
 
+// Club Herbys: la oferta del guion (docs/guion-rosario.pdf, texto A) con un
+// saludo variable adelante. {a|b} y {nombre}: ver renderBaseMessage.
+// Cada frase tiene variantes ({a|b|c}) para que no salgan cientos de mensajes
+// idénticos (lo que WhatsApp marca como spam). Los montos y el producto van
+// fijos en todas: tests/club_herbys.test.js lo verifica sobre muchas tiradas.
 export const DEFAULT_BASE_MESSAGE =
-    'Hola 👋 ¡Espero que estés muy bien!\n\n' +
-    'Te escribo porque nos quedó pendiente tu consulta sobre el tratamiento. Sabemos que empezar a cuidarse a veces cuesta, por eso preparamos una oportunidad única para que puedas probarlo:\n\n' +
-    '🎁 Tratamiento completo en gotas por 60 días a solo ${{PROMO_60}}.-\n\n' +
-    'Para que compres con total tranquilidad:\n' +
-    '🚚 Envío gratis a todo el país.\n' +
-    '🤝 Pago contra entrega: Pagás recién cuando recibís el paquete en tu puerta.\n\n' +
-    'Las unidades con esta promo son limitadas. Si querés aprovecharlo hoy, respondé este mensaje con la palabra PROMO y te tomamos el pedido en 1 minuto.';
+    '{¡Hola|Hola|Buenas|¡Qué tal} {nombre}! {👋|😊|🙌}\n\n' +
+    '{🎁|✨|🌿} {BENEFICIO ESPECIAL HERBALIS + CLUB HERBYS|Beneficio especial Herbalis + Club Herbys|BENEFICIO HERBALIS + CLUB HERBYS}\n' +
+    '{Ahora podés|Podés|Te cuento que podés} {comenzar|empezar|arrancar} tu plan de Gotas Herbalis por 60 días sin pagar todo junto. ' +
+    '{Recibís tu producto y abonás $18.900 al momento de la entrega.|Al recibir tu pedido abonás $18.900.|Pagás $18.900 cuando te llega el producto.} ' +
+    '{Después completás el pago en 4 cuotas semanales de $7.900.|El resto lo completás en 4 cuotas semanales de $7.900.|Y después, 4 cuotas semanales de $7.900.} ' +
+    '{Sin tarjeta. Sin trámites.|Sin tarjeta y sin trámites.|No necesitás tarjeta ni hacer trámites.} ' +
+    '{¿Querés aprovecharlo?|¿Te interesa?|¿Lo querés aprovechar?|¿Te sumás?}';
 
 // Un matiz distinto por envío para que las reescrituras no converjan al mismo texto.
 const STYLE_HINTS = [

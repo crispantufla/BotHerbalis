@@ -188,7 +188,11 @@ export interface UserState {
         price60: string;
         prevStep?: string | null;
         repliedAt?: number;
-        outcome?: 'interested' | 'declined' | 'opted_out' | 'question' | null;
+        outcome?: 'interested' | 'declined' | 'opted_out' | 'question' | 'accepted' | 'handed_off' | null;
+        /** Campaña Club Herbys: respuestas de la IA en esta conversación (tope MAX_AI_TURNS). */
+        aiTurns?: number;
+        /** Campaña Club Herbys: el bot terminó (aceptó, derivó, no quiso, baja). Ya no contesta. */
+        closed?: boolean;
     } | null;
 }
 

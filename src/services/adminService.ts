@@ -188,6 +188,23 @@ export async function notifyAdmin(
 
     _emitScoped(sharedState, 'new_alert', newAlert);
 
+    // Campaña Club Herbys (flows/clubHerbys.ts): el aviso por WhatsApp lo lee una
+    // asesora de Club Herbys, que le escribe a la persona desde su número. Va a
+    // CLUB_ALERT_NUMBERS (default 341 261-9405), no a los números de Horacio, y
+    // sin respuestas rápidas: quién es, cómo escribirle y qué dijo.
+    if (state.promo?.active) {
+        const cleanPhone = userPhone.split('@')[0];
+        const who = /^\d{8,15}$/.test(cleanPhone)
+            ? `*Cliente:* ${state.userName ? `${state.userName} · ` : ''}+${cleanPhone}\nhttps://wa.me/${cleanPhone}\n`
+            : '';
+        const alertMsg = `🔔 *${reason}*\n${who}${details ? `\n${details}` : ''}`;
+        const clubTargets = (process.env.CLUB_ALERT_NUMBERS || '5493412619405').split(',').map((s) => s.replace(/\D/g, '')).filter(Boolean);
+        for (const num of clubTargets) {
+            client.sendMessage(`${num}@c.us`, alertMsg).catch((e: Error) => logger.error(`[ALERT] Failed to forward to ${num}:`, e.message));
+        }
+        return;
+    }
+
     if (config.alertNumbers && config.alertNumbers.length > 0) {
         // The new alert is at index 0 (unshifted), so its queue number is #1
         const alertNum = 1;

@@ -8,6 +8,7 @@ import { detectObjection } from './utils/objectionDetector';
 import { isMpEnabled } from './utils/paymentOptions';
 import { parseControlTag } from './utils/extractedData';
 import { classifyNewLead, createInitialUserState } from './leadClassifier';
+import { handleClubHerbys } from './clubHerbys';
 
 interface SalesFlowDependencies {
     saveState: (userId?: string) => void;
@@ -68,6 +69,25 @@ export async function processSalesFlow(
     // Copia local con la profundidad actual: los steps que re-invocan
     // processSalesFlow (stepGreeting) la leen de dependencies para propagarla.
     dependencies = { ...dependencies, _recursionDepth };
+
+    // ── Campaña Club Herbys (nov-2026) ────────────────────────────────────────
+    // Quien recibió la promo de la pestaña Promos conversa con el guion de Club
+    // Herbys (flows/clubHerbys.ts) y no con el de venta: al aceptar se deriva a
+    // una asesora de Club Herbys. El resto de los chats sigue el guion por zona.
+    const _promoState = userState[userId];
+    if (_promoState?.promo?.active) {
+        _pushHistory(_promoState, { role: 'user', content: text });
+        _promoState.lastActivityAt = Date.now();
+        saveState(userId);
+        if (_promoState.promo.closed) {
+            // Ya lo tomó (o lo tiene que tomar) una asesora: el bot no contesta, le reenvía.
+            if (dependencies.notifyAdmin) {
+                await dependencies.notifyAdmin('💬 Volvió a escribir (el bot ya no le contesta)', userId, `💬 «${text}»`).catch(() => {});
+            }
+            return { matched: true, paused: true };
+        }
+        return handleClubHerbys(userId, text, _promoState, dependencies);
+    }
 
     // Remove accents and lowercase
     const normalizedText = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");

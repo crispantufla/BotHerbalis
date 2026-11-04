@@ -88,12 +88,24 @@ export const DEFAULT_PROMO_CONFIG: PromoCampaignConfig = {
     variationMode: 'ai',
     baseMessage: DEFAULT_BASE_MESSAGE,
     templates: null,
+    // Club Herbys: el flyer de la promo (public/promo/flyer.*). Sin archivo, sale solo el texto.
     imageEnabled: true,
     audience: { ...DEFAULT_AUDIENCE_FILTERS },
 };
 
-/** El flyer de la promo, commiteado en el repo (public/media está ignorado; public/promo no). */
-export const PROMO_IMAGE_PATH = path.join(__dirname, '../../../public/promo/promo-60-dias.jpg');
+/**
+ * El flyer de la promo, commiteado en el repo (public/media está ignorado; public/promo no).
+ * Club Herbys: public/promo/flyer.jpg, .png o .webp — el primero que exista.
+ */
+const PROMO_DIR = path.join(__dirname, '../../../public/promo');
+const IMAGE_TYPES: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
+export const PROMO_IMAGE_PATH = (() => {
+    for (const ext of Object.keys(IMAGE_TYPES)) {
+        const p = path.join(PROMO_DIR, `flyer.${ext}`);
+        if (fs.existsSync(p)) return p;
+    }
+    return path.join(PROMO_DIR, 'flyer.jpg');
+})();
 
 let _imageCache: { mimetype: string; data: string; filename: string } | null = null;
 /** La imagen como MessageMedia ({mimetype, data, filename}); null si no está. Cacheada en memoria. */
@@ -101,7 +113,8 @@ export function loadPromoImage(filePath: string = PROMO_IMAGE_PATH): { mimetype:
     if (_imageCache) return _imageCache;
     try {
         if (!fs.existsSync(filePath)) return null;
-        _imageCache = { mimetype: 'image/jpeg', data: fs.readFileSync(filePath).toString('base64'), filename: 'promo-60-dias.jpg' };
+        const ext = path.extname(filePath).slice(1).toLowerCase();
+        _imageCache = { mimetype: IMAGE_TYPES[ext] || 'image/jpeg', data: fs.readFileSync(filePath).toString('base64'), filename: path.basename(filePath) };
         return _imageCache;
     } catch (e: any) {
         logger.warn(`[PROMO] No pude leer la imagen de la promo: ${e.message}`);
@@ -280,8 +293,39 @@ export interface BuildTextArgs {
  * mensaje base; si la IA falla o devuelve algo inválido, sale una variante de
  * las plantillas (nunca el mismo texto para todos, y la campaña no se frena).
  */
+/** Primer nombre del contacto, o '' si el "nombre" es un teléfono, un emoji o vacío. */
+function _firstName(name?: string | null): string {
+    const s = String(name || '').trim();
+    if (!s || /^[+\d\s()-]+$/.test(s)) return '';
+    const first = s.split(/\s+/)[0].replace(/[^\p{L}'-]/gu, '');
+    if (first.length < 2) return '';
+    return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
+}
+
+/**
+ * Club Herbys: el mensaje base de la campaña, tal cual lo escribió el
+ * vendedor, con variaciones para que no salgan cientos de mensajes idénticos:
+ * {Hola|Buenas|Qué tal} elige una al azar (se puede anidar) y {nombre} pone el
+ * primer nombre del contacto si lo tiene. Los montos no los toca nadie.
+ */
+export function renderBaseMessage(base: string, name?: string | null, rand: () => number = Math.random): string {
+    let out = String(base || '');
+    const GROUP = /\{([^{}]*\|[^{}]*)\}/;
+    for (let g = 0; GROUP.test(out) && g < 1000; g++) {
+        out = out.replace(GROUP, (_m, inner: string) => { const o = inner.split('|'); return o[Math.floor(rand() * o.length)]; });
+    }
+    const n = _firstName(name);
+    out = out.replace(/\{nombre\}/gi, n).replace(/\{\{NAME_COMMA\}\}/g, n ? `${n}, ` : '');
+    if (!n) out = out.replace(/[ \t]+([!?,.])/g, '$1').replace(/[ \t]{2,}/g, ' ');
+    return out.trim();
+}
+
 export async function buildPromoText(args: BuildTextArgs): Promise<{ text: string; via: 'ai' | 'templates' }> {
     const { cfg } = args;
+    // Club Herbys: siempre el mensaje base con sus variaciones (ver renderBaseMessage).
+    if (process.env.PROMO_TEXT_MODE !== 'herbalis') {
+        return { text: renderBaseMessage(cfg.baseMessage, args.name, args.rand), via: 'templates' };
+    }
     if (cfg.variationMode === 'ai') {
         try {
             const anthropic = args.anthropic === undefined ? _anthropicClient() : args.anthropic;
@@ -421,7 +465,8 @@ export async function promoTick(
             return { sent: false, reason: pendingLeft === 0 ? 'terminada' : 'solo_salteados' };
         }
 
-        const price60 = _getPromoPrice60('Gotas');
+        // Club Herbys no usa el precio promo de Herbalis: los montos van en el texto.
+        const price60 = _getPromoPrice60('Gotas') || '-';
         if (!price60) {
             await prisma.promoCampaign.update({ where: { id: campaign.id }, data: { status: 'paused' } });
             logger.error(`[PROMO][${sellerId}] Sin promoPrice60 en prices.json — campaña pausada.`);

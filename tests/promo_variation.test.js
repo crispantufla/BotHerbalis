@@ -11,10 +11,25 @@ jest.mock('../safeWrite', () => ({ atomicWriteFile: jest.fn() }));
 jest.mock('../db', () => ({ prisma: {} }));
 
 const { generatePromoVariation, validateVariation, resolveBaseMessage, DEFAULT_BASE_MESSAGE } = require('../src/services/promo/promoVariation');
+// El camino de reescritura por IA (PROMO_TEXT_MODE=herbalis) se prueba con el mensaje base
+// de la promo de Herbalis de oct-2026; el default ahora es el de Club Herbys.
+const HERBALIS_BASE = [
+    'Hola 👋 ¡Espero que estés muy bien!',
+    '',
+    'Te escribo porque nos quedó pendiente tu consulta sobre el tratamiento. Sabemos que empezar a cuidarse a veces cuesta, por eso preparamos una oportunidad única para que puedas probarlo:',
+    '',
+    '🎁 Tratamiento completo en gotas por 60 días a solo ${{PROMO_60}}.-',
+    '',
+    'Para que compres con total tranquilidad:',
+    '🚚 Envío gratis a todo el país.',
+    '🤝 Pago contra entrega: Pagás recién cuando recibís el paquete en tu puerta.',
+    '',
+    'Las unidades con esta promo son limitadas. Si querés aprovecharlo hoy, respondé este mensaje con la palabra PROMO y te tomamos el pedido en 1 minuto.',
+].join('\n');
 const { buildPromoText, normalizePromoConfig } = require('../src/services/promo/promoDispatcher');
 
 const PRICE = '44.900';
-const base = resolveBaseMessage(DEFAULT_BASE_MESSAGE, PRICE, null);
+const base = resolveBaseMessage(HERBALIS_BASE, PRICE, null);
 const good = 'Hola 😊 ¿cómo estás? Nos quedó pendiente tu consulta por el tratamiento y, como arrancar cuesta, armamos algo para que lo pruebes: tratamiento completo de 60 días a $44.900. Envío gratis a todo el país y pago contra entrega: pagás cuando te llega. Hay pocas unidades. Si querés aprovecharla hoy, respondé PROMO y te tomo el pedido en un minuto.';
 
 const client = (...texts) => {
@@ -52,7 +67,7 @@ describe('validateVariation', () => {
 describe('generatePromoVariation', () => {
     test('manda el mensaje base con el precio y devuelve la reescritura válida', async () => {
         const c = client(good);
-        const out = await generatePromoVariation({ baseMessage: DEFAULT_BASE_MESSAGE, price60: PRICE, name: 'Rosa', anthropic: c, model: 'm' });
+        const out = await generatePromoVariation({ baseMessage: HERBALIS_BASE, price60: PRICE, name: 'Rosa', anthropic: c, model: 'm' });
         expect(out).toBe(good);
         const call = c.messages.create.mock.calls[0][0];
         expect(call.model).toBe('m');
@@ -64,23 +79,25 @@ describe('generatePromoVariation', () => {
 
     test('reintenta una vez si la primera reescritura no pasa', async () => {
         const c = client(good.replace('$44.900', '$44900'), good);
-        const out = await generatePromoVariation({ baseMessage: DEFAULT_BASE_MESSAGE, price60: PRICE, anthropic: c, model: 'm' });
+        const out = await generatePromoVariation({ baseMessage: HERBALIS_BASE, price60: PRICE, anthropic: c, model: 'm' });
         expect(out).toBe(good);
         expect(c.messages.create).toHaveBeenCalledTimes(2);
     });
 
     test('dos reescrituras inválidas → lanza', async () => {
         const c = client('nada', 'nada');
-        await expect(generatePromoVariation({ baseMessage: DEFAULT_BASE_MESSAGE, price60: PRICE, anthropic: c, model: 'm' })).rejects.toThrow(/válida/);
+        await expect(generatePromoVariation({ baseMessage: HERBALIS_BASE, price60: PRICE, anthropic: c, model: 'm' })).rejects.toThrow(/válida/);
     });
 
     test('sin cliente de Anthropic → lanza', async () => {
-        await expect(generatePromoVariation({ baseMessage: DEFAULT_BASE_MESSAGE, price60: PRICE, anthropic: null, model: 'm' })).rejects.toThrow(/Anthropic/);
+        await expect(generatePromoVariation({ baseMessage: HERBALIS_BASE, price60: PRICE, anthropic: null, model: 'm' })).rejects.toThrow(/Anthropic/);
     });
 });
 
 describe('buildPromoText', () => {
-    const cfg = normalizePromoConfig({}, 'horacio');
+    const cfg = normalizePromoConfig({ baseMessage: HERBALIS_BASE }, 'horacio');
+    beforeAll(() => { process.env.PROMO_TEXT_MODE = 'herbalis'; });
+    afterAll(() => { delete process.env.PROMO_TEXT_MODE; });
 
     test('modo ai: usa la reescritura de la IA', async () => {
         const r = await buildPromoText({ cfg, campaignId: 'c', phone: '5493410000001', price60: PRICE, anthropic: client(good) });
@@ -102,7 +119,7 @@ describe('buildPromoText', () => {
 
     test('modo templates: no llama a la IA', async () => {
         const c = client(good);
-        const r = await buildPromoText({ cfg: normalizePromoConfig({ variationMode: 'templates' }, 'horacio'), campaignId: 'c', phone: '5493410000001', price60: PRICE, anthropic: c });
+        const r = await buildPromoText({ cfg: normalizePromoConfig({ variationMode: 'templates', baseMessage: HERBALIS_BASE }, 'horacio'), campaignId: 'c', phone: '5493410000001', price60: PRICE, anthropic: c });
         expect(r.via).toBe('templates');
         expect(c.messages.create).not.toHaveBeenCalled();
     });

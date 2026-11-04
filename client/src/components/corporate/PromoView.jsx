@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Gift, RefreshCw, Play, Pause, Square, Send, Users, MessageCircle, Eye, ChevronDown, ChevronUp, Plus, Pencil } from 'lucide-react';
 import api from '../../config/axios';
+import PromoResponses from './PromoResponses';
+import AdStats from './AdStats';
 import { Card, Button, Badge, Input, KpiCard, EmptyState, useToast, cn } from '../ui';
 
 // Campañas promo: reactivación de leads que hablaron con el bot y no compraron.
@@ -78,7 +80,6 @@ function NumField({ label, value, onChange, min, max, hint, disabled = false }) 
 const PromoView = ({ onGoToChat }) => {
     const { toast } = useToast();
     const [campaigns, setCampaigns] = useState([]);
-    const [price60, setPrice60] = useState(null);
     const [loading, setLoading] = useState(false);
     const [selectedId, setSelectedId] = useState(null);
     const [detail, setDetail] = useState(null);
@@ -86,7 +87,6 @@ const PromoView = ({ onGoToChat }) => {
     const [showCreate, setShowCreate] = useState(false);
     const [form, setForm] = useState(DEFAULT_FORM);
     const [templates, setTemplates] = useState(null); // null = textos por defecto (respaldo del modo IA)
-    const [showTemplates, setShowTemplates] = useState(false);
     // Modo IA: Claude reescribe el mensaje base con ligeras diferencias en cada envío.
     const [variationMode, setVariationMode] = useState('ai');
     const [baseMessage, setBaseMessage] = useState('');
@@ -104,7 +104,6 @@ const PromoView = ({ onGoToChat }) => {
         try {
             const r = await api.get('/api/promo/campaigns');
             setCampaigns(r.data.campaigns || []);
-            setPrice60(r.data.price60 || null);
             // Prefill del mensaje base con el del servidor (solo la primera vez).
             setBaseMessage(prev => prev || r.data.baseMessageDefault || '');
         } catch (e) {
@@ -254,11 +253,6 @@ const PromoView = ({ onGoToChat }) => {
         } finally { setBusy(false); }
     };
 
-    const editTemplate = (key, text) => {
-        const lines = text.split('\n---\n');
-        setTemplates(prev => ({ ...(prev || {}), [key]: lines }));
-    };
-
     const stats = detail?.campaign?.stats;
 
     return (
@@ -271,8 +265,8 @@ const PromoView = ({ onGoToChat }) => {
                     <div>
                         <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Promos</h2>
                         <p className="text-xs text-slate-500 dark:text-slate-400">
-                            Le escribe a quien consultó y no compró, de a uno y con pausas al azar.
-                            {price60 ? <> Precio promo plan 60: <strong>${price60}</strong>.</> : <> <strong>Falta cargar el precio promo</strong> en el Editor de Precios.</>}
+                            Le escribe la oferta de Club Herbys a todas las personas que hablaron con el número, de a uno y con pausas al azar.
+                            Cuando responden, la IA contesta dudas y avisa al número de avisos cuando alguien acepta o pide una asesora.
                         </p>
                     </div>
                 </div>
@@ -281,6 +275,10 @@ const PromoView = ({ onGoToChat }) => {
                     <Button size="sm" leftIcon={Plus} onClick={startNew}>Nueva campaña</Button>
                 </div>
             </div>
+
+            <PromoResponses onGoToChat={onGoToChat} />
+
+            <AdStats />
 
             {showCreate && (
                 <Card padding="md">
@@ -303,35 +301,21 @@ const PromoView = ({ onGoToChat }) => {
                             <input type="checkbox" checked={form.skipWeekends} onChange={(e) => setF('skipWeekends')(e.target.checked)} />
                             No mandar los fines de semana
                         </label>
-                        <NumField label="Último contacto hace al menos (días)" value={form.minDaysSinceLastSeen} onChange={setF('minDaysSinceLastSeen')} min={0} max={365} disabled={!!editingId} />
-                        <NumField label="Último contacto hace como máximo (días)" value={form.maxDaysSinceLastSeen} onChange={setF('maxDaysSinceLastSeen')} min={1} max={3650} disabled={!!editingId} />
-                        <NumField label="Tope de destinatarios" value={form.limit} onChange={setF('limit')} min={1} max={20000} disabled={!!editingId} />
-                        <NumField label="Sin repetir promo por (días)" value={form.cooldownDays} onChange={setF('cooldownDays')} min={0} max={3650} disabled={!!editingId} />
                     </div>
 
                     <div className="mt-5">
                         <div className="flex flex-wrap items-center gap-3 mb-2">
-                            <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">Mensaje base</label>
-                            <div className="flex gap-1.5">
-                                {[['ai', 'La IA lo reescribe en cada envío'], ['templates', 'Variantes por bloques']].map(([v, l]) => (
-                                    <button key={v} type="button" onClick={() => setVariationMode(v)}
-                                        className={cn('text-xs px-2.5 py-1 rounded-full border', variationMode === v ? 'bg-accent-500 text-white border-accent-500' : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300')}>
-                                        {l}
-                                    </button>
-                                ))}
-                            </div>
+                            <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">Mensaje de la promo</label>
                         </div>
                         <textarea
                             rows={9}
                             className="w-full text-sm rounded-control border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 p-2"
                             value={baseMessage}
                             onChange={(e) => setBaseMessage(e.target.value)}
-                            disabled={variationMode !== 'ai'}
                         />
                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                            {variationMode === 'ai'
-                                ? <>Cada persona recibe una reescritura distinta de este texto, hecha por la IA: cambia palabras, orden y emojis, pero mantiene el precio, las condiciones y la palabra PROMO. <code>{'{{PROMO_60}}'}</code> es el precio promo y <code>{'{{NAME_COMMA}}'}</code> el nombre si lo tenemos. Si la IA falla en un envío, sale una variante por bloques.</>
-                                : <>Se arma el texto combinando las variantes por bloques de abajo (sin IA).</>}
+                            Sale tal cual, con dos variaciones para que no lleguen todos idénticos: <code>{'{Hola|Buenas|Qué tal}'}</code> elige una opción al azar en cada envío y <code>{'{nombre}'}</code> pone el nombre del contacto si lo tiene.
+                            Si cambiás los montos acá, cambialos también en el guion de la IA (src/flows/clubHerbys.ts): las respuestas salen de ahí.
                         </p>
                     </div>
 
@@ -343,30 +327,6 @@ const PromoView = ({ onGoToChat }) => {
                         </label>
                     </div>
 
-                    <button type="button" onClick={() => setShowTemplates(s => !s)} className="mt-4 text-sm font-medium text-accent-600 dark:text-accent-400 flex items-center gap-1">
-                        {showTemplates ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />} Variantes por bloques{variationMode === 'ai' ? ' (respaldo si la IA falla)' : ''} — una por línea, separadas con <code>---</code>
-                    </button>
-                    {showTemplates && (
-                        <div className="mt-3 space-y-3">
-                            <p className="text-xs text-slate-500 dark:text-slate-400">
-                                Dejá un bloque vacío para usar las variantes por defecto. Podés usar <code>{'{{NAME_COMMA}}'}</code> (", Nombre"), <code>{'{{PROMO_60}}'}</code> (precio promo) y <code>{'{a|b|c}'}</code> para alternar palabras.
-                                No prometas nada que la operación no cumpla: a domicilio va prepago, el pago al recibir es retirando en el Correo.
-                            </p>
-                            {TEMPLATE_BLOCKS.map(([key, label]) => (
-                                <div key={key}>
-                                    <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">{label}</label>
-                                    <textarea
-                                        rows={3}
-                                        className="w-full text-sm rounded-control border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 p-2"
-                                        placeholder="(variantes por defecto)"
-                                        value={(templates?.[key] || []).join('\n---\n')}
-                                        onChange={(e) => editTemplate(key, e.target.value)}
-                                    />
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
                     <div className="flex flex-wrap gap-2 mt-4">
                         {!editingId && <Button variant="secondary" leftIcon={Users} onClick={checkAudience} loading={busy}>Medir audiencia</Button>}
                         <Button variant="secondary" leftIcon={Eye} onClick={previewTexts} loading={busy}>Ver textos de muestra</Button>
@@ -375,15 +335,12 @@ const PromoView = ({ onGoToChat }) => {
                                 <Button leftIcon={Pencil} onClick={saveEdit} loading={busy}>Guardar cambios</Button>
                                 <Button variant="ghost" onClick={() => { setEditingId(null); setShowCreate(false); }} disabled={busy}>Cancelar</Button>
                             </>
-                            : <Button leftIcon={Gift} onClick={createCampaign} loading={busy} disabled={!price60}>Crear campaña</Button>}
+                            : <Button leftIcon={Gift} onClick={createCampaign} loading={busy}>Crear campaña</Button>}
                     </div>
 
                     {audience && (
                         <div className="mt-4 text-sm text-slate-700 dark:text-slate-300">
-                            <p><strong>{audience.summary.total}</strong> personas recibirían la promo.</p>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                                Por paso en que quedaron: {Object.entries(audience.summary.byStep).map(([s, n]) => `${s} (${n})`).join(' · ') || '—'}
-                            </p>
+                            <p><strong>{audience.summary.total}</strong> personas recibirían la promo{audience.summary.chats ? <> (de {audience.summary.chats} chats del WhatsApp; sin grupos, canales ni chats vacíos)</> : null}.</p>
                             <p className="text-xs text-slate-500 dark:text-slate-400">
                                 Quedan afuera: {Object.entries(audience.summary.excluded).map(([s, n]) => `${s.replace(/_/g, ' ')} (${n})`).join(' · ') || '—'}
                             </p>
@@ -392,13 +349,10 @@ const PromoView = ({ onGoToChat }) => {
                     {samples && (
                         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
                             <p className="md:col-span-2 text-xs text-slate-500 dark:text-slate-400">
-                                {samples.mode === 'ai'
-                                    ? 'Reescrituras de la IA del mensaje base. Cada envío genera una nueva.'
-                                    : `${samples.combinations.toLocaleString('es-AR')} combinaciones posibles. Cada persona recibe una distinta.`}
+                                Así le puede llegar a tres personas distintas.
                             </p>
                             {samples.samples.map((t, i) => (
                                 <div key={i} className="p-3 rounded-control bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
-                                    <div className="text-[10px] uppercase tracking-wide text-slate-400 mb-1">{samples.via?.[i] === 'ai' ? 'IA' : 'plantilla'}</div>
                                     <pre className="whitespace-pre-wrap text-xs font-sans text-slate-800 dark:text-slate-200">{t}</pre>
                                 </div>
                             ))}

@@ -18,7 +18,8 @@ const { prisma } = require('../../../db');
 const logger = require('../../utils/logger');
 const validate = require('../../middleware/validate');
 const { createCampaignSchema, updateCampaignSchema, previewSchema } = require('../../schemas/promo.schema');
-const { selectPromoAudience, normalizeAudienceFilters } = require('../../services/promo/promoAudience');
+const { normalizeAudienceFilters } = require('../../services/promo/promoAudience');
+const { selectChatAudience } = require('../../services/promo/chatAudience');
 const { countCombinations } = require('../../services/promo/promoTemplates');
 const { normalizePromoConfig, promoTick, buildPromoText, loadPromoImage, DEFAULT_PROMO_CONFIG } = require('../../services/promo/promoDispatcher');
 const { DEFAULT_BASE_MESSAGE } = require('../../services/promo/promoVariation');
@@ -71,6 +72,23 @@ module.exports = (clientPool) => {
         };
     }
 
+    // Club Herbys: la audiencia sale de los chats del WhatsApp (chatAudience.ts).
+    // El resumen se devuelve con la forma que ya espera el panel.
+    async function chatAudience(req, instanceId, fresh) {
+        const client = req.sellerInstance?.client;
+        const { members, summary } = await selectChatAudience({ client, instanceId, excludePhones: adminPhones(req), fresh });
+        return {
+            members,
+            summary: {
+                total: summary.members,
+                chats: summary.chats,
+                byMonth: summary.byMonth,
+                byStep: {},
+                excluded: { ya_compraron: summary.buyers, sin_telefono_visible: summary.unresolved, avisos_o_propio: summary.excluded, pidio_no_recibir: summary.optedOut },
+            },
+        };
+    }
+
     const serialize = (c) => ({ ...c, config: (() => { try { return JSON.parse(c.config); } catch { return {}; } })() });
 
     // GET /promo/audience
@@ -78,10 +96,10 @@ module.exports = (clientPool) => {
         try {
             const instanceId = needSeller(req, res); if (!instanceId) return;
             const filters = normalizeAudienceFilters(instanceId, { ...req.query, excludePhones: adminPhones(req) });
-            const { members, summary } = await selectPromoAudience(filters);
-            res.json({ filters, summary, sample: members.slice(0, 10).map(m => ({ phone: m.phone, name: m.name, step: m.step, lastSeen: m.lastSeen })) });
+            const { members, summary } = await chatAudience(req, instanceId, req.query.fresh === '1');
+            res.json({ filters, summary, sample: members.slice(0, 10).map(m => ({ phone: m.phone, name: m.name, step: null, lastSeen: m.lastChatAt ? new Date(m.lastChatAt * 1000) : null })) });
         } catch (e) {
-            logger.error('[PROMO] audience:', e);
+            logger.error(`[PROMO] audience: ${e.message}`);
             res.status(500).json({ error: e.message });
         }
     });
@@ -91,8 +109,7 @@ module.exports = (clientPool) => {
     // modelo simple); en modo 'templates', variantes de las plantillas.
     router.post('/promo/preview', ...withSeller(clientPool), validate(previewSchema), async (req, res) => {
         try {
-            const price = _getPromoPrice60('Gotas');
-            if (!price) return res.status(400).json({ error: 'No hay precio promo cargado (Editor de Precios → promoPrice60)' });
+            const price = _getPromoPrice60('Gotas') || '';
             const instanceId = getInstanceId(req) || 'default';
             const cfg = normalizePromoConfig(req.body, instanceId);
             const count = req.body.count || 3;
@@ -137,9 +154,7 @@ module.exports = (clientPool) => {
         try {
             const instanceId = needSeller(req, res); if (!instanceId) return;
             const cfg = normalizePromoConfig(req.body.config || {}, instanceId);
-            if (!_getPromoPrice60('Gotas')) return res.status(400).json({ error: 'Cargá el precio promo en el Editor de Precios antes de crear la campaña' });
-
-            const { members, summary } = await selectPromoAudience({ instanceId, ...cfg.audience, excludePhones: adminPhones(req) });
+            const { members, summary } = await chatAudience(req, instanceId, true);
             if (members.length === 0) return res.status(400).json({ error: 'Con estos filtros no queda nadie a quien mandarle', summary });
 
             const campaign = await prisma.promoCampaign.create({
@@ -155,7 +170,7 @@ module.exports = (clientPool) => {
             logger.info(`[PROMO][${instanceId}] Campaña "${campaign.name}" creada con ${members.length} destinatarios`);
             res.json({ campaign: { ...serialize(campaign), stats: await campaignStats(campaign) }, summary });
         } catch (e) {
-            logger.error('[PROMO] create:', e);
+            logger.error(`[PROMO] create: ${e.message}`);
             res.status(500).json({ error: e.message });
         }
     });
@@ -256,7 +271,135 @@ module.exports = (clientPool) => {
     });
 
     // GET /promo/image — el flyer que se adjunta a la promo (para la vista previa del panel).
-    router.get('/promo/image', ...withSeller(clientPool), (req, res) => {
+    // GET /promo/responses?campaignId=&all=1 — quiénes respondieron a la promo y en qué
+    // quedó cada uno (lo que dice el estado de la conversación, flows/clubHerbys.ts).
+    // Por defecto solo los interesados: aceptaron o pidieron una asesora/consulta.
+    router.get('/promo/responses', ...withSeller(clientPool), async (req, res) => {
+        try {
+            const instanceId = needSeller(req, res); if (!instanceId) return;
+            const where = { instanceId, repliedAt: { not: null } };
+            if (req.query.campaignId) where.campaignId = String(req.query.campaignId);
+            const rows = await prisma.promoRecipient.findMany({
+                where, orderBy: { repliedAt: 'desc' }, take: 500,
+                select: { phone: true, campaignId: true, sentAt: true, repliedAt: true, outcome: true, campaign: { select: { name: true } } },
+            });
+            const userState = req.sellerInstance?.sharedState?.userState || {};
+            const client = req.sellerInstance?.client;
+            const OUTCOME = {
+                accepted: 'Aceptó', handed_off: 'Pidió asesora / consulta', declined: 'No le interesa', opted_out: 'Pidió la baja',
+            };
+            const out = [];
+            for (const r of rows) {
+                const st = userState[`${r.phone}@c.us`];
+                const key = st?.promo?.outcome || (r.outcome === 'opted_out' ? 'opted_out' : r.outcome === 'declined' ? 'declined' : r.outcome === 'interested' ? 'accepted' : null);
+                const interested = key === 'accepted' || key === 'handed_off';
+                if (!interested && req.query.all !== '1') continue;
+                const last = await prisma.chatLog.findFirst({
+                    where: { instanceId, userPhone: r.phone, role: 'user' }, orderBy: { timestamp: 'desc' }, select: { content: true, timestamp: true },
+                });
+                let name = st?.userName || st?.partialAddress?.nombre || null;
+                if (!name && client?.getContactById) {
+                    try {
+                        const ct = await Promise.race([client.getContactById(`${r.phone}@c.us`), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 3000))]);
+                        name = ct?.name || ct?.pushname || null;
+                    } catch { /* sin nombre */ }
+                }
+                out.push({
+                    phone: r.phone, name, campaign: r.campaign?.name || '', sentAt: r.sentAt, repliedAt: r.repliedAt,
+                    status: key || 'talking', statusLabel: key ? OUTCOME[key] : 'Charlando con el bot', interested,
+                    lastMessage: last ? String(last.content || '').replace(/^MEDIA_AUDIO:[^|]*\|TRANSCRIPTION:/, '🎤 ').slice(0, 200) : null,
+                    lastMessageAt: last?.timestamp || null,
+                });
+            }
+            res.json({ responses: out });
+        } catch (e) {
+            logger.error(`[PROMO] responses: ${e.message}`);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // GET /promo/ad-stats?days=30 — contactos por anuncio de Meta (y personas nuevas
+    // sin anuncio) y cuántos terminaron en pedido. Ver services/adStats.ts.
+    router.get('/promo/ad-stats', ...withSeller(clientPool), async (req, res) => {
+        try {
+            const instanceId = needSeller(req, res); if (!instanceId) return;
+            const days = Math.min(365, Math.max(1, Number(req.query.days) || 30));
+            const { getAdStats } = require('../../services/adStats');
+            res.json({ days, ads: await getAdStats(instanceId, days) });
+        } catch (e) {
+            logger.error(`[PROMO] ad-stats: ${e.message}`);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // POST /promo/ad-backfill?days=7 — solo admin: anota en AdLead los anuncios que
+    // el agente todavía ve en la caché de WA Web (parcial: solo los chats cuyo
+    // primer mensaje está cargado). Idempotente.
+    router.post('/promo/ad-backfill', ...withSeller(clientPool), async (req, res) => {
+        try {
+            if (req.account?.role !== 'admin') return res.status(403).json({ error: 'Solo admin' });
+            const instanceId = needSeller(req, res); if (!instanceId) return;
+            const client = req.sellerInstance?.client;
+            if (!client || typeof client.scanInbound !== 'function') return res.status(400).json({ error: 'El WhatsApp de este vendedor no está conectado' });
+            const days = Math.min(30, Math.max(1, Number(req.query.days) || 7));
+            const chats = await client.scanInbound(Math.floor(Date.now() / 1000) - days * 86400);
+            let added = 0;
+            for (const c of chats) {
+                if (!c.ad?.sourceId || !c.phone) continue;
+                const firstAt = new Date(((c.first && c.first.t) || c.t) * 1000);
+                const r = await prisma.adLead.upsert({
+                    where: { instanceId_phone_sourceId: { instanceId, phone: String(c.phone), sourceId: String(c.ad.sourceId) } },
+                    create: { instanceId, phone: String(c.phone), sourceId: String(c.ad.sourceId), title: c.ad.title || null, mediaType: typeof c.ad.mediaType === 'number' ? c.ad.mediaType : null, firstAt, lastAt: firstAt },
+                    update: {},
+                });
+                if (r && r.firstAt.getTime() === firstAt.getTime()) added++;
+            }
+            res.json({ scanned: chats.length, withAd: chats.filter((c) => c.ad?.sourceId).length, added });
+        } catch (e) {
+            logger.error(`[PROMO] ad-backfill: ${e.message}`);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // GET /promo/inbound-scan?days=3 — diagnóstico (solo admin): chats con actividad
+    // reciente, su primer mensaje y, si llegaron por un anuncio de Meta, la ficha del
+    // anuncio (ctwaContext). Sirve para separar los leads de cada anuncio. No envía nada.
+    router.get('/promo/inbound-scan', ...withSeller(clientPool), async (req, res) => {
+        try {
+            if (req.account?.role !== 'admin') return res.status(403).json({ error: 'Solo admin' });
+            const client = req.sellerInstance?.client;
+            if (!client || typeof client.scanInbound !== 'function') return res.status(400).json({ error: 'El WhatsApp de este vendedor no está conectado (o no es remoto)' });
+            const days = Math.min(30, Math.max(1, Number(req.query.days) || 3));
+            const chats = await client.scanInbound(Math.floor(Date.now() / 1000) - days * 86400);
+            res.json({ days, chats });
+        } catch (e) {
+            logger.error(`[PROMO] inbound-scan: ${e.message}`);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // POST /promo/probe-history { phones: [...] } — diagnóstico (solo admin): para
+    // cada teléfono (hasta 5 por llamada) abre el chat en WA Web y le pide al
+    // teléfono el historial viejo, para ver si hubo charla antes de julio. No envía nada.
+    router.post('/promo/probe-history', ...withSeller(clientPool), async (req, res) => {
+        try {
+            if (req.account?.role !== 'admin') return res.status(403).json({ error: 'Solo admin' });
+            const client = req.sellerInstance?.client;
+            if (!client || typeof client.probeHistory !== 'function') return res.status(400).json({ error: 'El WhatsApp de este vendedor no está conectado (o no es remoto)' });
+            const phones = (Array.isArray(req.body?.phones) ? req.body.phones : []).map((p) => String(p).replace(/\D/g, '')).filter(Boolean).slice(0, 5);
+            const results = [];
+            for (const phone of phones) {
+                try { results.push(await client.probeHistory(phone, Number(req.body?.waitMs) || 8000)); }
+                catch (e) { results.push({ phone, error: e.message }); }
+            }
+            res.json({ results });
+        } catch (e) {
+            logger.error(`[PROMO] probe-history: ${e.message}`);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    router.get('/promo/image',...withSeller(clientPool), (req, res) => {
         const media = loadPromoImage();
         if (!media) return res.status(404).json({ error: 'No hay imagen de la promo' });
         res.setHeader('Content-Type', media.mimetype);
