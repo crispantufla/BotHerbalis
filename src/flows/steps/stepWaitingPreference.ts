@@ -5,12 +5,11 @@ import { isMpEnabled, prepayMeans } from '../utils/paymentOptions';
 import logger from '../../utils/logger';
 
 /**
- * Club Herbys (28-oct): si el cliente ya dijo el plan ("gotas de 60") o el producto
+ * Guion de bot-promo (28-oct): si el cliente ya dijo el plan ("gotas de 60") o el producto
  * viene en un solo plan (semillas, solo 120 días), no se pregunta "¿60 o 120?": se
- * arma el carrito y se pasa directo a la localidad. Solo para los leads de zona.
+ * arma el carrito y se pasa directo a la localidad.
  */
 async function _clubSkipPlanQuestion(userId: string, text: string, product: string, currentState: UserState, knowledge: any, dependencies: any): Promise<boolean> {
-    if (!(currentState as any).zoneLead) return false;
     const { _getEffectivePrice } = require('../utils/pricing');
     const singlePlan = !_getEffectivePrice(product, '60', currentState);
     const choice = (currentState as any)._planChoice;

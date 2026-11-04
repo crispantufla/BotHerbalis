@@ -21,7 +21,7 @@ const MP_KEYWORDS = /\b(mercadopago|mercado.?pago|mp|link|online|digital|qr|tarj
 // substring matcheaba montos/horas; solo cuenta como mensaje exacto, abajo).
 const RETIRO_OR_CASH_KEYWORDS = /\b(retiro|retirar|sucursal|contra.?reembolso|contrarembolso|efectivo|cash|primero|primera|al recibir|cartero)\b/i;
 
-// ── Club Herbys (28-oct): fuera de zona, Correo con transferencia previa ─────────
+// ── Guion de bot-promo (28-oct): fuera de zona, Correo con transferencia previa ─────────
 // Con el alias se piden los datos del envío; acá se toman, se guarda el pedido
 // (Pendiente, transferencia) y se le avisa a Horacio. El comprobante lo verifica él.
 
@@ -95,8 +95,8 @@ export async function handleWaitingTransferConfirmation(
     // el mensaje al cliente es neutro, no menciona "anticipo / saldo al cartero".
     const normalizedForPaid = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     const isLegacyCodAnticipo = currentState.paymentMethod === 'contrarembolso' && currentState.senaAmount === 10000;
-    if ((currentState as any).zoneLead && (PAID_KEYWORDS.test(text) || PAID_KEYWORDS.test(normalizedForPaid))) {
-        // Club Herbys: aviso limpio a Horacio con los datos del envío; el bot se corre.
+    if ((PAID_KEYWORDS.test(text) || PAID_KEYWORDS.test(normalizedForPaid))) {
+        // Aviso limpio a Horacio con los datos del envío; el bot se corre.
         const missing = _missingCorreoData(currentState);
         const msg = missing.length
             ? `¡Perfecto! 🙌 Mandame *el comprobante* 📸 y, para el envío, ${missing.join(' y ')}.\n\nApenas verificamos la transferencia lo despachamos.`
@@ -126,8 +126,8 @@ export async function handleWaitingTransferConfirmation(
         return { matched: true };
     }
 
-    // ── Club Herbys: datos para el envío por Correo ─────────────────────────────
-    if ((currentState as any).zoneLead && !(currentState as any).correoOrderSaved
+    // ── Datos para el envío por Correo ─────────────────────────────
+    if (!(currentState as any).correoOrderSaved
         && await _clubTakeCorreoData(userId, text, currentState, dependencies)) {
         return { matched: true };
     }

@@ -34,7 +34,7 @@ const { handleGreeting } = require('../src/flows/steps/stepGreeting');
 const { handleWaitingWeight } = require('../src/flows/steps/stepWaitingWeight');
 const { handleWaitingPreference } = require('../src/flows/steps/stepWaitingPreference');
 
-const v7 = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'knowledge_v7.json'), 'utf8'));
+const v7 = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'archive', 'knowledge_v7_elena_2026-11-04.json'), 'utf8'));
 
 function freshState() {
     return {

@@ -66,6 +66,7 @@ const makeDeps = (over = {}) => {
             saveState: jest.fn(),
             notifyAdmin: jest.fn().mockResolvedValue(undefined),
             aiService: { chat: jest.fn().mockResolvedValue({ response: 'AI genérico', goalMet: false }) },
+            sharedState: { pausedUsers: new Set(), io: null, saveState: jest.fn(), config: { alertNumbers: [] } },
             ...over,
         },
     };
@@ -231,9 +232,11 @@ describe('steps de pago — el aviso llega al paid-branch tras el skip', () => {
         // que verifica — nunca re-manda las instrucciones del alias.
         expect(sent.join(' ')).toMatch(/comprobante|Recibimos tu aviso/i);
         expect(sent.join(' ')).not.toMatch(/HERBALIS\.TIENDA/); // sin instrucciones repetidas
+        // Guion por zona (nov-2026): aviso "Avisó que transfirió" con los datos y pausa.
         expect(deps.notifyAdmin).toHaveBeenCalledWith(
-            expect.stringMatching(/BOT PAUSADO/), 'p5@c.us', expect.stringMatching(/transferencia/i)
+            expect.stringMatching(/Avisó que transfirió/), 'p5@c.us', expect.stringMatching(/transferencia/i)
         );
+        expect(deps.sharedState.pausedUsers.has('p5@c.us')).toBe(true);
     });
 
     test('E2E mp: el paid-branch verifica el pago (pendiente → pide esperar)', async () => {

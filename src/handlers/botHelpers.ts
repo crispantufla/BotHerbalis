@@ -178,41 +178,9 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
                 sharedState.io.to(sellerId).emit('new_order', legacyOrder);
                 sharedState.io.to('admin').emit('new_order', { ...legacyOrder, sellerId });
             }
-
-            // Club Herbys: los pedidos de los leads del anuncio con video son del
-            // reparto de Horacio, que no usa este panel → se cargan solos en el
-            // panel de ventas (lo mismo que el botón "Enviar a sistema"). Fuera del lock.
-            if (userState[`${cleanPhone}@c.us`]?.zoneLead) {
-                setImmediate(() => { _autoPushSistema(newOrderData.id).catch(() => {}); });
-            }
         } finally {
             if (lock) await lock.release().catch((e: any) => logger.warn('Failed to release lock:', e));
         }
-    }
-
-    async function _autoPushSistema(orderId: string): Promise<void> {
-        const { pushOrderToSistema, isSistemaConfigured } = require('../services/sistemaSync');
-        if (!isSistemaConfigured()) {
-            logger.warn(`[SISTEMA][${sellerId}] Pedido ${orderId} de lead del anuncio sin cargar: falta SISTEMA_URL/SISTEMA_TOKEN.`);
-            return;
-        }
-        try {
-            const order = await prisma.order.findUnique({ where: { id: orderId } });
-            if (!order || order.sistemaOrderId) return;
-            const result = await pushOrderToSistema(order);
-            await prisma.order.update({
-                where: { id: orderId },
-                data: { sistemaOrderId: result.orderId, sistemaSyncedAt: new Date(), ...(['Pendiente', 'Confirmado'].includes(order.status) ? { status: 'En sistema' } : {}) },
-            });
-            logger.info(`[SISTEMA][${sellerId}] Pedido ${orderId} cargado solo en el panel de ventas (#${result.orderId}).`);
-        } catch (e: any) {
-            logger.error(`[SISTEMA][${sellerId}] No pude cargar el pedido ${orderId} en el panel de ventas: ${e.message}`);
-            notifyAdminSafe(`⚠️ Pedido sin cargar en el panel de ventas`, `${orderId}`, `Cargalo a mano desde Ventas → "Enviar a sistema". Error: ${e.message}`);
-        }
-    }
-
-    function notifyAdminSafe(reason: string, who: string, details: string): void {
-        try { (sharedState.notifyAdmin || (() => Promise.resolve()))(reason, who, details).catch?.(() => {}); } catch { /* best effort */ }
     }
 
     async function cancelLatestOrder(userId: string): Promise<{ success: boolean; order?: any; reason?: string; currentStatus?: string }> {

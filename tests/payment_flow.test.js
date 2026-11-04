@@ -74,7 +74,7 @@ const { aiService } = require('../src/services/ai');
 // ─── Shared mocks ────────────────────────────────────────────────────────────
 const mockSend = jest.fn();
 const mockSave = jest.fn();
-const mockNotify = jest.fn();
+const mockNotify = jest.fn().mockResolvedValue(undefined);
 const mockPauseUsers = new Set();
 
 const deps = {

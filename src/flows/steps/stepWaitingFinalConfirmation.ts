@@ -126,12 +126,9 @@ export async function handleWaitingFinalConfirmation(
             await _pauseAndAlert(userId, currentState, dependencies, text, `⚠️ Confirmación final SIN pendingOrder (estado inconsistente). Cliente dijo: "${text.substring(0, 100)}". Cargar el pedido a mano.`);
             return { matched: true };
         }
-        // Club Herbys (leads del anuncio con video): nadie aprueba pedidos por comando
-        // en este número; el pedido le llega a Horacio, que coordina el reparto. El
-        // cliente queda confirmado acá mismo.
-        const msg = currentState.zoneLead
-            ? '¡Perfecto! 🙌 Tu pedido quedó registrado.\n\nAntes de salir te escribimos para acordar día y horario de entrega 🚚 ¡Gracias por confiar en Herbalis! 🌱'
-            : "¡Perfecto! Recibimos tu confirmación.\n\nAguardame un instante que verificamos los datos y te confirmamos el ingreso ⏳";
+        // Guion por zona (de bot-promo, nov-2026): nadie aprueba el pedido por comando;
+        // le llega a Horacio, que coordina el reparto, y el cliente queda confirmado acá.
+        const msg = '¡Perfecto! 🙌 Tu pedido quedó registrado.\n\nAntes de salir te escribimos para acordar día y horario de entrega 🚚 ¡Gracias por confiar en Herbalis! 🌱';
         await sendMessageWithDelay(userId, msg);
 
         if (currentState.pendingOrder) {
@@ -141,7 +138,7 @@ export async function handleWaitingFinalConfirmation(
 
             const o = currentState.pendingOrder || currentState.partialAddress || {};
             const postdataLabel = currentState.postdatado ? `\n📅 POSTDATADO: ${currentState.postdatado}` : '';
-            const title = currentState.zoneLead ? '🛒 PEDIDO NUEVO — reparto Rosario (anuncio video)' : '⌛ Pedido Requiere Aprobación';
+            const title = '🛒 PEDIDO NUEVO — reparto Rosario';
             if (notifyAdmin) await notifyAdmin(title, userId, `Nombre: ${o.nombre}\nDirección: ${o.calle}, ${o.ciudad || '?'}${o.cp ? ` (CP ${o.cp})` : ''}\nItems: ${orderData.producto} · ${orderData.plan || ''}\nTotal a cobrar al entregar: $${currentState.totalPrice || '0'}${postdataLabel}${_buildPayLabel()}`);
 
             const _trackScript = dependencies.effectiveScript || dependencies.config?.activeScript;
@@ -151,7 +148,7 @@ export async function handleWaitingFinalConfirmation(
             }
         }
 
-        _setStep(currentState, currentState.zoneLead ? FlowStep.COMPLETED : FlowStep.WAITING_ADMIN_VALIDATION);
+        _setStep(currentState, FlowStep.COMPLETED);
         saveState(userId);
         return { matched: true };
     } else {

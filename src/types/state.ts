@@ -110,10 +110,6 @@ export interface UserState {
     shippingChoice?: 'retiro' | 'domicilio' | 'reparto' | null;
     // Resultado de la clasificación de zona: 'in' = reparto propio, 'out' = Correo.
     deliveryZone?: 'in' | 'out' | null;
-    // Club Herbys (26-oct): lead que llegó por el anuncio con video de cápsulas
-    // (ficha ctwaContext). Solo estos chats siguen el flujo de venta (guion V8 por
-    // zona); sus avisos van a Horacio (ZONE_ALERT_NUMBERS), no a Club Herbys.
-    zoneLead?: boolean;
     // Qué le preguntamos en waiting_zone: la localidad, o los km hasta Rosario
     // cuando la localidad no está en la lista.
     zoneQuestion?: 'localidad' | 'km' | null;

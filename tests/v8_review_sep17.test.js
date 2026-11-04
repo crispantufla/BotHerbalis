@@ -234,11 +234,14 @@ describe('waiting_zone — frena, provincia sola, sí sin localidad', () => {
 // ─── 3. Pausas indebidas en el saludo ─────────────────────────────────────────
 describe('waiting_weight — preguntar el precio no es despedirse', () => {
     const weightState = (history = []) => ({ step: 'waiting_weight', history, partialAddress: {}, summary: '' });
+    // El guion por zona de bot-promo (nov-2026) no pregunta los kilos: con prices_club el
+    // step manda la lista de precios. Esto cubre el camino de kilos (guion sin prices_club).
+    const kiloKnowledge = { ...knowledge, flow: { ...knowledge.flow, prices_club: undefined } };
 
     test('"Yo quería saber el precio de las botas" → NO pausa (5492657232296)', async () => {
         const st = weightState();
         const t = 'Yo quería saber el precio de las botas';
-        await handleWaitingWeight(USER, t, norm(t), st, knowledge, deps);
+        await handleWaitingWeight(USER, t, norm(t), st, kiloKnowledge, deps);
         expect(pausedUsers.size).toBe(0);
         expect(lastSent()).not.toMatch(/que tengas un lindo día/i);
     });
@@ -246,13 +249,13 @@ describe('waiting_weight — preguntar el precio no es despedirse', () => {
     test('"solo quería saber el precio, gracias" después de darle el precio → sigue soltando', async () => {
         const st = weightState([{ role: 'bot', content: '$36.900 a $68.900 según el producto y plan 😊 ¿Cuántos kilos querés bajar?', timestamp: 1 }]);
         const t = 'solo quería saber el precio, gracias';
-        await handleWaitingWeight(USER, t, norm(t), st, knowledge, deps);
+        await handleWaitingWeight(USER, t, norm(t), st, kiloKnowledge, deps);
         expect(pausedUsers.has(USER)).toBe(true);
     });
 
     test('"más d 10" es más de 10 → plan de 120 (5493364634777)', async () => {
         const st = weightState();
-        await handleWaitingWeight(USER, 'más d 10', norm('más d 10'), st, knowledge, deps);
+        await handleWaitingWeight(USER, 'más d 10', norm('más d 10'), st, kiloKnowledge, deps);
         expect(st.weightGoal).toBeGreaterThan(10);
         expect(aiService.chat.mock.calls[0][1].goal).toMatch(/plan de \*120 días\*/);
     });
@@ -261,7 +264,7 @@ describe('waiting_weight — preguntar el precio no es despedirse', () => {
         aiService.chat.mockResolvedValue({ response: '¡Qué bueno que se animen los dos! 💪', goalMet: false, extractedData: null });
         const st = weightState();
         const t = 'Más de 10 kilo tengo que bajar más de 40 quilos yo y mi marido que me conviene más pastillas!';
-        await handleWaitingWeight(USER, t, norm(t), st, knowledge, deps);
+        await handleWaitingWeight(USER, t, norm(t), st, kiloKnowledge, deps);
         expect(aiService.chat).toHaveBeenCalledTimes(1);
         expect(aiService.chat.mock.calls[0][1].goal).toMatch(/NO termines con ninguna pregunta/);
         expect(st.selectedProduct).toMatch(/Cápsulas/);

@@ -121,10 +121,10 @@ export async function handleWaitingWeight(
 ): Promise<{ matched: boolean }> {
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
 
-    // Club Herbys (28-oct): el saludo ya no pregunta los kilos, termina en "¿Te paso
+    // Guion de bot-promo (28-oct): el saludo ya no pregunta los kilos, termina en "¿Te paso
     // los precios?". Si en la respuesta ya nombra un producto, vamos directo a ese
     // producto; si no ("sí", "dale", "¿cuánto sale?"), mandamos la lista de precios.
-    if (currentState.zoneLead && knowledge?.flow?.prices_club) {
+    if (knowledge?.flow?.prices_club) {
         if (/\b(got\w*|c[aá]psul\w*|pastill\w*|semill\w*)\b/i.test(text)) {
             _setStep(currentState, FlowStep.WAITING_PREFERENCE);
             saveState(userId);

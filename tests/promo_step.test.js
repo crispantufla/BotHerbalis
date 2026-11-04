@@ -63,7 +63,7 @@ describe('promo_offer (solo gotas)', () => {
         expect(sent(d)[0]).toMatch(/44\.900/);
         expect(sent(d)[0]).toMatch(/precio promo/);
         expect(sent(d)[0]).not.toMatch(/kilos|cápsulas/i);
-        expect(sent(d)[1]).toMatch(/Retiro en sucursal/i);
+        expect(sent(d)[1]).toMatch(/de qué localidad/i);   // guion por zona (nov-2026): el menú de pago pregunta la localidad
         expect(st.promo.outcome).toBe('interested');
         await flush();
         expect(mockDb.promoRecipient.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ outcome: 'interested' }) }));
@@ -88,7 +88,7 @@ describe('promo_offer (solo gotas)', () => {
         expect(sent(d)).toHaveLength(3);
         expect(sent(d)[1]).toMatch(/precio normal/);
         expect(sent(d)[1]).not.toMatch(/precio promo/);
-        expect(sent(d)[2]).toMatch(/domicilio/i);
+        expect(sent(d)[2]).toMatch(/de qué localidad/i);
     });
 
     test('tras la aclaración, "dale gotas" vuelve a la promo', async () => {

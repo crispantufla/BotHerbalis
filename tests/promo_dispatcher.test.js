@@ -149,8 +149,7 @@ describe('promoTick — manda y prepara el estado', () => {
 
         const st = ss.userState['5493410000001@c.us'];
         expect(st.step).toBe('promo_offer');
-        // price60 sale de data/prices.json (Club Herbys no lo usa: los montos van en el texto).
-        expect(st.promo).toEqual(expect.objectContaining({ active: true, campaignId: 'c1', price60: expect.any(String), prevStep: 'waiting_plan_choice' }));
+        expect(st.promo).toEqual(expect.objectContaining({ active: true, campaignId: 'c1', price60: '44.900', prevStep: 'waiting_plan_choice' }));
         expect(st.cart).toEqual([]);
         expect(st.selectedPlan).toBeNull();
         expect(d.saveState).toHaveBeenCalledWith('5493410000001@c.us');

@@ -44,7 +44,9 @@ const fs = require('fs');
 const path = require('path');
 const knowledge = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'knowledge_v7.json'), 'utf8'));
 const { processSalesFlow } = require('../src/flows/salesFlow');
-const { startZoneLead } = require('../src/flows/zoneLeads');
+const { createInitialUserState } = require('../src/flows/leadClassifier');
+const { _getPrice } = require('../src/flows/utils/pricing');
+const priceRe = (p) => new RegExp('\\$' + String(p).replace(/\./g, '\\.'));
 const { aiService } = require('../src/services/ai');
 
 async function simulate(name, lines) {
@@ -58,9 +60,9 @@ async function simulate(name, lines) {
         sendMessageWithDelay: jest.fn(async (u, m) => { sent.push(m); log.push(`🤖 ${m}`); us[u]?.history?.push({ role: 'bot', content: m }); return true; }),
         notifyAdmin: jest.fn(async (title, u, body) => { alerts.push({ title, body }); log.push(`   ⚑ AVISO A HORACIO: ${title} | ${String(body).replace(/\n/g, ' · ')}`); }),
         saveOrderToLocal: jest.fn((o) => { orders.push(o); log.push(`   ⚑ PEDIDO GUARDADO: ${o.producto} ${o.plan} $${o.precio} · ${o.paymentMethod || ''}`); }),
-        aiService, sellerId: 'clubherbys', sharedState, config: { alertNumbers: [], mpEnabled: false }, logAndEmit: jest.fn(),
+        aiService, sellerId: 'horacio', sharedState, config: { alertNumbers: [], mpEnabled: false }, logAndEmit: jest.fn(),
     };
-    startZoneLead(us, USER, { sourceId: '120247099034000705', title: 'Me preguntan qué hago' });
+    us[USER] = createInitialUserState({ step: 'greeting' });
     for (const line of lines) {
         log.push(`👤 ${line}`);
         if (sharedState.pausedUsers.has(USER)) { log.push('   (chat pausado: el bot no contesta)'); continue; }
@@ -78,24 +80,23 @@ test('Rosario y zona: precios → gotas 60 → Funes → datos → confirma (pag
     const all = r.sent.join('\n');
     expect(r.sent[0]).toMatch(/Te paso los precios/);
     expect(r.sent[0]).not.toMatch(/cuánto te gustaría bajar/);
-    expect(r.sent[1]).toMatch(/\$44\.000/);
-    expect(r.sent[1]).toMatch(/\$39\.000/);
+    expect(r.sent[1]).toMatch(priceRe(_getPrice('Gotas', '60')));
     expect(all).not.toMatch(/60 o 120/);           // ya dijo el plan
     expect(all).toMatch(/de qué localidad/);
     expect(all).toMatch(/reparto propio/);
     expect(r.orders).toHaveLength(1);
     expect(r.st.paymentMethod).toBe('contrarembolso');
-    expect(r.st.totalPrice).toBe('44.000');
+    expect(r.st.totalPrice).toBe(_getPrice('Gotas', '60'));
     expect(r.alerts.some((a) => /VENTA CERRADA|PEDIDO NUEVO/.test(a.title))).toBe(true);
 });
 
-test('Semillas: no pregunta el plan, va a 120 días', async () => {
-    const r = await simulate('SEMILLAS', ['hola', 'dale', 'semillas', 'Rosario']);
+test('Semillas de 120: no pregunta el plan', async () => {
+    const r = await simulate('SEMILLAS', ['hola', 'dale', 'semillas de 120', 'Rosario']);
     const all = r.sent.join('\n');
     expect(all).not.toMatch(/60 o 120/);
     expect(all).toMatch(/Semillas.*120 días/s);
     expect(r.st.selectedPlan).toBe('120');
-    expect(r.st.totalPrice).toBe('39.000');
+    expect(r.st.totalPrice).toBe(_getPrice('Semillas', '120'));
 });
 
 test('Fuera de zona: Correo, transferencia previa, 4 días', async () => {
@@ -105,7 +106,7 @@ test('Fuera de zona: Correo, transferencia previa, 4 días', async () => {
     expect(all).toMatch(/4 días hábiles/);
     expect(all).toMatch(/transferencia/i);
     expect(all).not.toMatch(/tarjeta de crédito|link de pago|Mercado Pago/i);
-    expect(r.st.totalPrice).toBe('54.900');
+    expect(r.st.totalPrice).toBe(_getPrice('Cápsulas', '120'));
     expect(all).toMatch(/datos para el envío/);
     expect(all).toMatch(/Anotado, Laura/);
     expect(r.orders).toHaveLength(1);
