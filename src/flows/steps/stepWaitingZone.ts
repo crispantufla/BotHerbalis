@@ -111,6 +111,25 @@ export async function _resolveZone(
     }
 
     currentState.deliveryZone = 'out';
+
+    // Club Herbys (leads del anuncio con video): solo se vende con pago al recibir
+    // y el reparto es el de Horacio en Rosario y 60 km. Fuera de esa zona no hay
+    // Correo prepago: se le avisa al cliente y se deriva a Horacio (decisión del 26-oct).
+    if (currentState.zoneLead) {
+        const where = addr.ciudad ? `a *${addr.ciudad}*` : 'hasta ahí';
+        const msg = prefix + `Uy, ${where} no llega nuestro reparto 🙏\n\nLe paso tu consulta a un asesor de Herbalis, que te va a escribir para ver cómo hacértelo llegar. ¡Gracias por tu paciencia! 😊`;
+        saveState(userId);
+        await sendMessageWithDelay(userId, msg);
+        if (dependencies.notifyAdmin) {
+            const item = currentState.selectedProduct ? `${currentState.selectedProduct} · ${currentState.selectedPlan || '?'} días · $${currentState.totalPrice || '?'}` : 'todavía sin producto elegido';
+            await dependencies.notifyAdmin('🚚 Fuera de zona — escribile vos', userId, `Localidad: ${addr.ciudad || '(no la reconocí)'}\nEligió: ${item}\nEl bot no le va a contestar más.`).catch(() => {});
+        }
+        const { pauseUser } = require('../../services/pauseService');
+        await pauseUser(userId, 'Fuera de la zona de reparto: derivado a Horacio', { sharedState: dependencies.sharedState });
+        logger.info(`[ZONE] ${userId} → FUERA de zona (${addr.ciudad || '?'}) → lead del anuncio: derivado a Horacio.`);
+        return;
+    }
+
     // Todo lo que venga de la zona no aplica afuera.
     if (currentState.shippingChoice === 'reparto') currentState.shippingChoice = null;
     if (currentState.paymentMethod === 'contrarembolso') currentState.paymentMethod = null;

@@ -870,7 +870,7 @@ export async function _handleRepartoData(
         if (!currentState.cart || currentState.cart.length === 0) {
             const product = currentState.selectedProduct;
             const plan = currentState.selectedPlan || '60';
-            const price = _getPrice(product, plan);
+            const price = _getEffectivePrice(product, plan, currentState);
             currentState.cart = [{ product, plan, price } as any];
         }
         currentState.pendingOrder = {
