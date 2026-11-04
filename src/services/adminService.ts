@@ -192,7 +192,7 @@ export async function notifyAdmin(
     // asesora de Club Herbys, que le escribe a la persona desde su número. Va a
     // CLUB_ALERT_NUMBERS (default 341 261-9405), no a los números de Horacio, y
     // sin respuestas rápidas: quién es, cómo escribirle y qué dijo.
-    if (state.promo?.active) {
+    if (state.promo?.active && state.promo.club) {
         const cleanPhone = userPhone.split('@')[0];
         const who = /^\d{8,15}$/.test(cleanPhone)
             ? `*Cliente:* ${state.userName ? `${state.userName} · ` : ''}+${cleanPhone}\nhttps://wa.me/${cleanPhone}\n`

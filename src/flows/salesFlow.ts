@@ -75,7 +75,7 @@ export async function processSalesFlow(
     // Herbys (flows/clubHerbys.ts) y no con el de venta: al aceptar se deriva a
     // una asesora de Club Herbys. El resto de los chats sigue el guion por zona.
     const _promoState = userState[userId];
-    if (_promoState?.promo?.active) {
+    if (_promoState?.promo?.active && _promoState.promo.club) {
         _pushHistory(_promoState, { role: 'user', content: text });
         _promoState.lastActivityAt = Date.now();
         saveState(userId);

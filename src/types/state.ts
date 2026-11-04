@@ -191,6 +191,8 @@ export interface UserState {
         outcome?: 'interested' | 'declined' | 'opted_out' | 'question' | 'accepted' | 'handed_off' | null;
         /** Campaña Club Herbys: respuestas de la IA en esta conversación (tope MAX_AI_TURNS). */
         aiTurns?: number;
+        /** Campaña Club Herbys: la respuesta la atiende flows/clubHerbys.ts (las promos de Herbalis de oct-2026 no lo tienen). */
+        club?: boolean;
         /** Campaña Club Herbys: el bot terminó (aceptó, derivó, no quiso, baja). Ya no contesta. */
         closed?: boolean;
     } | null;

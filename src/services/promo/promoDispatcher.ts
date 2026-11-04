@@ -258,7 +258,9 @@ export async function preparePromoState(
     state.mpPaymentLinkUrl = null;
     state.senaAmount = null;
     state.senaPaid = false;
-    state.promo = { active: true, campaignId, sentAt: now, price60, prevStep, outcome: null };
+    // club: la respuesta la atiende el guion de Club Herbys (flows/clubHerbys.ts). Los
+    // estados de la promo de Herbalis de oct-2026 no lo tienen y siguen con stepPromoOffer.
+    state.promo = { active: true, club: true, campaignId, sentAt: now, price60, prevStep, outcome: null };
     state.lastActivityAt = now;
     _setStep(state, 'promo_offer');
     return { state, prevStep };

@@ -27,7 +27,7 @@ function promoState(over = {}) {
     return {
         step: 'promo_offer', history: [{ role: 'bot', content: 'BENEFICIO ESPECIAL HERBALIS + CLUB HERBYS …', timestamp: Date.now() - 3600000 }],
         cart: [], partialAddress: {}, summary: '',
-        promo: { active: true, campaignId: 'c1', sentAt: Date.now() - 3600000, price60: '-', prevStep: null, outcome: null },
+        promo: { active: true, club: true, campaignId: 'c1', sentAt: Date.now() - 3600000, price60: '-', prevStep: null, outcome: null },
         ...over,
     };
 }
@@ -73,6 +73,17 @@ describe('quién recibe respuesta', () => {
         expect(sent).toMatch(/Soy Elena de Herbalis/);
         expect(sent).not.toMatch(/Club Herbys/);
         expect(ctx.userState[USER].promo).toBeFalsy();
+    });
+
+    test('promo de Herbalis (oct-2026, sin club) no entra al guion de Club Herbys', async () => {
+        const ctx = deps([J('acepta')]);
+        ctx.userState[USER] = promoState();
+        delete ctx.userState[USER].promo.club;
+        const knowledge = require('../knowledge_v7.json');
+        await processSalesFlow(USER, 'PROMO', ctx.userState, knowledge, ctx.d).catch(() => {});
+        expect(ctx.create).not.toHaveBeenCalled();
+        const sent = ctx.d.sendMessageWithDelay.mock.calls.map((c) => c[1]).join('\n');
+        expect(sent).not.toMatch(/Club Herbys|asesora/);
     });
 
     test('chat cerrado: no contesta, le reenvía el mensaje a la asesora', async () => {
