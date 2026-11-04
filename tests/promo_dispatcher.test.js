@@ -201,19 +201,20 @@ describe('promoTick — manda y prepara el estado', () => {
         expect(d.sendMessageWithDelay.mock.calls[0][0]).toBe('5493410000014@c.us');
         // Solo cuentan los pedidos del último mes (4-nov-2026): con uno más viejo, se le manda.
         const since = mockDb.order.findFirst.mock.calls[0][0].where.createdAt.gte.getTime();
-        expect(WED_1430 - since).toBe(30 * 24 * 3600 * 1000);
+        expect(WED_1430 - since).toBe(45 * 24 * 3600 * 1000);
         const skipped = mockDb.promoRecipient.update.mock.calls.filter(c => c[0].data.status === 'skipped').map(c => [c[0].where.id, c[0].data.skipReason]);
         expect(skipped).toEqual([
             ['r-5493410000010', 'pausado'],
             ['r-5493410000011', 'ya_compro'],
             ['r-5493410000012', 'charla_reciente'],
             ['r-5493410000013', 'pidio_no_recibir'],
-            ['r-5493410000015', 'otra_promo_reciente'],
+            ['r-5493410000015', 'ya_recibio_club'],
         ]);
-        // La otra promo se busca en OTRAS campañas y solo entre los envíos de los últimos 90 días.
+        // Se busca en OTRAS campañas y solo en las de Club Herbys (creadas desde el 4-nov-2026).
         const priorQ = mockDb.promoRecipient.findFirst.mock.calls.map(c => c[0].where).find(w => w.status === 'sent');
         expect(priorQ.campaignId).toEqual({ not: campaign().id });
-        expect(WED_1430 - priorQ.sentAt.gte.getTime()).toBe(90 * 24 * 3600 * 1000);
+        expect(priorQ.campaign.createdAt.gte.toISOString()).toBe('2026-11-04T00:00:00.000Z');
+        expect(priorQ.sentAt).toBeUndefined();
     });
 
     test('sin pendientes → la campaña termina y se avisa al admin', async () => {

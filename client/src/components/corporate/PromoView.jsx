@@ -32,7 +32,7 @@ const OUTCOME = {
 };
 const SKIP_REASONS = {
     pausado: 'estaba pausado', ya_compro: 'ya compró', charla_reciente: 'escribió hace poco',
-    pidio_no_recibir: 'pidió no recibir', ya_recibio_promo: 'ya tenía la promo', estado_terminal: 'estado terminal',
+    pidio_no_recibir: 'pidió no recibir', ya_recibio_promo: 'ya tenía la promo', ya_recibio_club: 'ya recibió Club Herbys', otra_promo_reciente: 'otra promo reciente', estado_terminal: 'estado terminal',
     pedido_en_curso: 'pedido en curso', envio_fallido: 'el envío falló',
 };
 const TEMPLATE_BLOCKS = [

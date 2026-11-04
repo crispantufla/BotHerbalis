@@ -130,7 +130,10 @@ Máquina de estados lineal con fallbacks a IA. Orden típico:
   $7.900, nunca el total) y NO con el guion de venta; al aceptar o pedir asesora se deriva a Club
   Herbys: el aviso de WhatsApp va a `CLUB_ALERT_NUMBERS` (default 5493412619405), no a Horacio
   (`notifyAdmin`). `stepPromoOffer` ya no recibe a nadie. Montos en DOS lugares: el mensaje base
-  de la campaña y `clubHerbys.ts`. Tests: `tests/club_herbys.test.js`. Lo de abajo es la historia.
+  de la campaña y `clubHerbys.ts`. Tests: `tests/club_herbys.test.js`. Fuera de toda campaña: pedido
+  en los últimos 45 días (`BUYER_RECENT_DAYS`) y quien ya recibió una de Club Herbys (campañas
+  creadas desde `CLUB_CAMPAIGNS_SINCE` = 4-nov; "Promo Octubre", la de Herbalis, no cuenta y quedó
+  pausada). Lo de abajo es la historia.
 - **Campañas promo (pestaña Promos, oct-2026)**: el bot le escribe PRIMERO a quien habló y no
   compró, con el plan de 60 días a `promoPrice60` (Editor de Precios). Vive en
   `src/services/promo/`: `promoAudience` arma la lista (default: últimos 180 días menos los

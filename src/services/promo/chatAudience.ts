@@ -14,7 +14,7 @@
 
 import logger from '../../utils/logger';
 import { resolveUserIdFrom } from '../../handlers/incomingSteps';
-import { BUYER_RECENT_DAYS, RECENT_CAMPAIGN_DAYS } from './promoDispatcher';
+import { BUYER_RECENT_DAYS, CLUB_CAMPAIGNS_SINCE } from './promoDispatcher';
 
 const { prisma } = require('../../../db');
 const { redisConnection } = require('../queueService');
@@ -26,7 +26,7 @@ export interface ChatAudienceSummary {
     excluded: number;
     optedOut: number;
     buyers: number;
-    /** Recibieron una promo en los últimos RECENT_CAMPAIGN_DAYS o están pendientes en una campaña activa. */
+    /** Ya recibieron una campaña de Club Herbys o están pendientes en una activa. */
     recentCampaign: number;
     members: number;
     /** Chats individuales por mes del último mensaje (AAAA-MM), para ver hasta dónde sincronizó WA Web. */
@@ -75,7 +75,7 @@ export async function selectChatAudience(opts: {
         select: { phone: true },
     });
     const optedOut = new Set(optedOutRows.map((r: any) => r.phone));
-    // Quien hizo un pedido en el último mes no recibe la oferta (puede tener uno en
+    // Quien hizo un pedido en los últimos BUYER_RECENT_DAYS no recibe la oferta (puede tener uno en
     // curso); con pedidos más viejos, sí. Pedidos de este seller o de la lista de
     // compradores importada (__legacy_import__). Cuenta cualquier estado.
     const now = Date.now();
@@ -85,15 +85,15 @@ export async function selectChatAudience(opts: {
         distinct: ['userPhone'],
     });
     const buyers = new Set(buyerRows.map((r: any) => r.userPhone));
-    // Sin dobles envíos: fuera quien recibió una promo en los últimos
-    // RECENT_CAMPAIGN_DAYS o está pendiente en una campaña que va a mandar (borrador
-    // o corriendo). Los pendientes de una campaña pausada o cancelada no cuentan:
-    // nunca recibieron nada (p. ej. los 6.029 de "Promo Octubre", pausada el 4-nov).
+    // Sin dobles envíos: fuera quien ya recibió una campaña de Club Herbys
+    // (CLUB_CAMPAIGNS_SINCE; "Promo Octubre" de Herbalis no cuenta) o está pendiente
+    // en una campaña que va a mandar (borrador o corriendo). Los pendientes de una
+    // campaña pausada o cancelada no cuentan: nunca recibieron nada.
     const recentRows = await prisma.promoRecipient.findMany({
         where: {
             instanceId,
             OR: [
-                { status: 'sent', sentAt: { gte: new Date(now - RECENT_CAMPAIGN_DAYS * DAY_MS) } },
+                { status: 'sent', campaign: { createdAt: { gte: CLUB_CAMPAIGNS_SINCE } } },
                 { status: 'pending', campaign: { status: { in: ['draft', 'running'] } } },
             ],
         },
