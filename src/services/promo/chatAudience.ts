@@ -26,7 +26,7 @@ export interface ChatAudienceSummary {
     excluded: number;
     optedOut: number;
     buyers: number;
-    /** Ya están en una campaña de los últimos RECENT_CAMPAIGN_DAYS (pendientes o enviados). */
+    /** Recibieron una promo en los últimos RECENT_CAMPAIGN_DAYS o están pendientes en una campaña activa. */
     recentCampaign: number;
     members: number;
     /** Chats individuales por mes del último mensaje (AAAA-MM), para ver hasta dónde sincronizó WA Web. */
@@ -38,7 +38,7 @@ export interface ChatAudienceMember { phone: string; name: string | null; lastCh
 const digits = (s: any) => String(s || '').replace(/\D/g, '');
 const CACHE_MS = 10 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
-/** Quien ya está en una campaña creada hace menos de esto no entra en otra (sin dobles envíos). */
+/** Quien recibió una promo hace menos de esto no entra en otra campaña (sin dobles envíos). */
 export const RECENT_CAMPAIGN_DAYS = 90;
 const _cache = new Map<string, { at: number; members: ChatAudienceMember[]; summary: ChatAudienceSummary }>();
 
@@ -87,9 +87,18 @@ export async function selectChatAudience(opts: {
         distinct: ['userPhone'],
     });
     const buyers = new Set(buyerRows.map((r: any) => r.userPhone));
-    // Quien ya está en otra campaña reciente (pendiente o ya enviado) no entra de nuevo.
+    // Sin dobles envíos: fuera quien recibió una promo en los últimos
+    // RECENT_CAMPAIGN_DAYS o está pendiente en una campaña que va a mandar (borrador
+    // o corriendo). Los pendientes de una campaña pausada o cancelada no cuentan:
+    // nunca recibieron nada (p. ej. los 6.029 de "Promo Octubre", pausada el 4-nov).
     const recentRows = await prisma.promoRecipient.findMany({
-        where: { instanceId, status: { in: ['pending', 'sent'] }, campaign: { createdAt: { gte: new Date(now - RECENT_CAMPAIGN_DAYS * DAY_MS) } } },
+        where: {
+            instanceId,
+            OR: [
+                { status: 'sent', sentAt: { gte: new Date(now - RECENT_CAMPAIGN_DAYS * DAY_MS) } },
+                { status: 'pending', campaign: { status: { in: ['draft', 'running'] } } },
+            ],
+        },
         select: { phone: true },
         distinct: ['phone'],
     });
