@@ -52,7 +52,7 @@ function bootstrap(initW) {
     }
 
     // Constantes del negocio (siempre resolubles — nunca van al modal).
-    const HB_CONST = { ALIAS: 'herbalis', TITULAR: 'Horacio Giosue', ANTICIPO: '10.000' };
+    const HB_CONST = { ALIAS: 'HERBALIS.TIENDA', TITULAR: 'BIO ORIGEN S.A.S.', ANTICIPO: '10.000' };
     // Labels legibles para el modal de relleno.
     const HB_LABELS = {
         PRODUCT_DETAIL: 'Producto', PLAN_DETAIL: 'Plan (días)',

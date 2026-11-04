@@ -491,8 +491,8 @@ describe('Menú envío → Envío a domicilio (opción 1) + submenú prepago', (
         expect(state.senaAmount).toBeNull();
         expect(state.step).toBe('waiting_transfer_confirmation');
         const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
-        expect(sent).toMatch(/herbalis/);
-        expect(sent).toMatch(/Horacio Giosue/);
+        expect(sent).toMatch(/HERBALIS\.TIENDA/);
+        expect(sent).toMatch(/BIO ORIGEN S.A.S./);
     });
 
     // Sep-2026: retiro en sucursal + transferencia es un camino normal (todo va
@@ -507,7 +507,7 @@ describe('Menú envío → Envío a domicilio (opción 1) + submenú prepago', (
         expect(state.partialAddress.calle).toBe('A sucursal');
         expect(state.step).toBe('waiting_transfer_confirmation');
         const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
-        expect(sent).toMatch(/herbalis/);
+        expect(sent).toMatch(/HERBALIS\.TIENDA/);
         expect(sent).toMatch(/sucursal/i);
         expect(mockPauseUsers.has('combo1')).toBe(false);
     });
@@ -617,7 +617,7 @@ describe('Atajos de pago (sin elegir envío explícito → asume domicilio)', ()
         expect(state.paymentMethod).toBe('transferencia');
         expect(state.step).toBe('waiting_transfer_confirmation');
         const sent = mockSend.mock.calls.map(([, msg]) => msg).join(' ');
-        expect(sent).toMatch(/herbalis/);
+        expect(sent).toMatch(/HERBALIS\.TIENDA/);
     });
 
     test('[4.5] "alias" → transferencia', async () => {

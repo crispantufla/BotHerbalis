@@ -52,7 +52,7 @@ const KNOWLEDGE = {
     flow: {},
     faq: [
         { keywords: ['cuanto tarda', 'tarda', 'demora el envio'], response: '📦 El envío tarda de 7 a 10 días hábiles por Correo Argentino.' },
-        { keywords: ['transferencia', 'alias'], response: '🏦 Para transferir usá el alias herbalis a nombre de Horacio Giosue' },
+        { keywords: ['transferencia', 'alias'], response: '🏦 Para transferir usá el alias HERBALIS.TIENDA a nombre de BIO ORIGEN S.A.S.' },
         { keywords: ['como pago', 'comprobante', 'pago'], response: '💳 Podés pagar con tarjeta de crédito o transferencia.' },
     ],
 };
@@ -194,7 +194,7 @@ describe('globalFaq — claim de pago en waiting_transfer_confirmation / waiting
         const text = '¿me pasás el alias?';
         const res = await handleFaq('p2@c.us', text, norm(text), state, KNOWLEDGE, deps);
         expect(res).toEqual({ matched: true });
-        expect(sent.join(' ')).toMatch(/herbalis/);
+        expect(sent.join(' ')).toMatch(/HERBALIS\.TIENDA/);
     });
 
     test('"Ya hice el pago ¿me confirmás?" en waiting_mp_payment → null silencioso', async () => {
@@ -230,7 +230,7 @@ describe('steps de pago — el aviso llega al paid-branch tras el skip', () => {
         // Según haya template transfer_received o no: pide comprobante o avisa
         // que verifica — nunca re-manda las instrucciones del alias.
         expect(sent.join(' ')).toMatch(/comprobante|Recibimos tu aviso/i);
-        expect(sent.join(' ')).not.toMatch(/herbalis/); // sin instrucciones repetidas
+        expect(sent.join(' ')).not.toMatch(/HERBALIS\.TIENDA/); // sin instrucciones repetidas
         expect(deps.notifyAdmin).toHaveBeenCalledWith(
             expect.stringMatching(/BOT PAUSADO/), 'p5@c.us', expect.stringMatching(/transferencia/i)
         );

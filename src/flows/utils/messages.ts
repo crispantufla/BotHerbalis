@@ -167,8 +167,8 @@ function _formatMessage(text: string | string[], state: any): string {
     }
 
     // Alias bancario + titular oficiales (constantes).
-    formatted = formatted.replace(/{{ALIAS}}/g, 'herbalis');
-    formatted = formatted.replace(/{{TITULAR}}/g, 'Horacio Giosue');
+    formatted = formatted.replace(/{{ALIAS}}/g, 'HERBALIS.TIENDA');
+    formatted = formatted.replace(/{{TITULAR}}/g, 'BIO ORIGEN S.A.S.');
     formatted = formatted.replace(/{{ANTICIPO}}/g, '10.000');
 
     // Sweep defensivo final: si quedó algún placeholder {{X}} sin resolver

@@ -366,7 +366,7 @@ describe('handleWaitingPaymentMethod — fuera de zona, todo prepago', () => {
         expect(st.shippingChoice).toBe('retiro');
         expect(st.paymentMethod).toBe('transferencia');
         expect(st.step).toBe('waiting_transfer_confirmation');
-        expect(lastSent()).toMatch(/herbalis/);
+        expect(lastSent()).toMatch(/HERBALIS\.TIENDA/);
         expect(pausedUsers.size).toBe(0);
     });
 

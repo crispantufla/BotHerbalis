@@ -177,7 +177,7 @@ describe('SIM — cliente de Merlo (fuera de zona): Correo prepago, sin cierre a
 
     test('con transferencia manda el alias y espera el "listo"; no hay orden todavía', () => {
         const lastBot = rig.transcript.filter(t => t.who === 'BOT').slice(-1)[0].text;
-        expect(lastBot).toMatch(/herbalis/);
+        expect(lastBot).toMatch(/HERBALIS\.TIENDA/);
         expect(rig.userState[uid].step).toBe('waiting_transfer_confirmation');
         expect(rig.userState[uid].shippingChoice).toBe('retiro');
         expect(rig.userState[uid].partialAddress.calle).toBe('A sucursal');

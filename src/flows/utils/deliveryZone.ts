@@ -246,8 +246,8 @@ function _titleCase(s: string): string {
  */
 export function shippingPolicyForPrompt(mpOn: boolean): string {
     const prepago = mpOn
-        ? '*tarjeta de crédito* (link de pago protegido) o *transferencia bancaria* al alias herbalis a nombre de Horacio Giosue'
-        : '*transferencia bancaria* al alias herbalis a nombre de Horacio Giosue (🛑 el pago con tarjeta está FUERA DE SERVICIO: no lo ofrezcas ni lo nombres)';
+        ? '*tarjeta de crédito* (link de pago protegido) o *transferencia bancaria* al alias HERBALIS.TIENDA a nombre de BIO ORIGEN S.A.S.'
+        : '*transferencia bancaria* al alias HERBALIS.TIENDA a nombre de BIO ORIGEN S.A.S. (🛑 el pago con tarjeta está FUERA DE SERVICIO: no lo ofrezcas ni lo nombres)';
     return `ENVÍO Y PAGO (modelo sep-2026, depende de la ZONA del cliente):
 - ROSARIO Y HASTA 60 KM A LA REDONDA (Funes, Roldán, San Lorenzo, Villa Gobernador Gálvez, Arroyo Seco, Casilda, Villa Constitución, etc.): entrega con *reparto propio* de Herbalis, en el domicilio, SIN costo. Se paga *al recibir* (efectivo, tarjeta o transferencia al repartidor). Antes de salir, el equipo de envíos le escribe para acordar día y horario. Datos que necesitamos: nombre completo y calle y número. No hace falta CP.
 - FUERA DE ESA ZONA: envío por *Correo Argentino*, SIN costo, SIEMPRE PREPAGO con ${prepago}. El cliente elige recibirlo *en su domicilio* o *retirarlo en la sucursal* más cercana a su código postal (la asigna el Correo sola). Al estar pago, sale enseguida y llega en *4 días hábiles*. NO existe pago al recibir ni contrarreembolso fuera de la zona: el Correo volvió ese servicio lento y caro para el cliente, por eso lo dejamos de ofrecer.

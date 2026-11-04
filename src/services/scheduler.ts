@@ -1018,7 +1018,7 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
         // una vez y dejamos el stage en 1, para que el stage 2 lo escale al
         // vendedor a las 4h si no contesta. (stage 99 = "no molestar más".)
         if (!mpOn && mpReminderStage < 2 && mpReminderStage !== 99 && !(state as any).mpAlternativeOffered) {
-            const msg = `¡Hola! 👋 Te aviso que el *pago con tarjeta* lo tenemos fuera de servicio en estos días, así que ese link no te va a andar 🙈 Disculpá.\n\nLo resolvemos por *transferencia bancaria*: alias *herbalis* a nombre de *Horacio Giosue*. Apenas se acredita, el pedido sale 📦\n\n¿Seguimos así?`;
+            const msg = `¡Hola! 👋 Te aviso que el *pago con tarjeta* lo tenemos fuera de servicio en estos días, así que ese link no te va a andar 🙈 Disculpá.\n\nLo resolvemos por *transferencia bancaria*: alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*. Apenas se acredita, el pedido sale 📦\n\n¿Seguimos así?`;
             try {
                 const sent = await sendMessageWithDelay(userId, msg, undefined, stillWaitingMp);
                 if (sent) {
@@ -1058,7 +1058,7 @@ async function checkPendingMpPayments(sharedState: SchedulerSharedState, depende
         // no completó MP por razones técnicas (no tiene tarjeta a mano, problema
         // con el link, etc.). Una sola vez vía flag mpAlternativeOffered.
         if (mpReminderStage === 1 && !(state as any).mpAlternativeOffered && minsSince >= 90) {
-            const msg = `¡Hola! 👋 Si tuviste alguna dificultad con el link de pago, no hay drama 😊\n\nPodés pagar por *transferencia bancaria* al alias *herbalis* a nombre de *Horacio Giosue*, y apenas se acredita sale el envío 📦\n\n¿Te queda más cómodo así, o seguimos con la tarjeta de crédito?`;
+            const msg = `¡Hola! 👋 Si tuviste alguna dificultad con el link de pago, no hay drama 😊\n\nPodés pagar por *transferencia bancaria* al alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*, y apenas se acredita sale el envío 📦\n\n¿Te queda más cómodo así, o seguimos con la tarjeta de crédito?`;
             try {
                 const sent = await sendMessageWithDelay(userId, msg, undefined, stillWaitingMp);
                 if (sent) {
