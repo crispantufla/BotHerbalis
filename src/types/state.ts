@@ -195,6 +195,8 @@ export interface UserState {
         club?: boolean;
         /** Campaña Club Herbys: el bot terminó (aceptó, derivó, no quiso, baja). Ya no contesta. */
         closed?: boolean;
+        /** Campaña Club Herbys: 'in' recibió la oferta con pago al recibir (reparto propio), 'out' la de pago al hacer el pedido. */
+        zone?: 'in' | 'out';
     } | null;
 }
 

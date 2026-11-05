@@ -214,10 +214,10 @@ describe('waiting_zone — frena, provincia sola, sí sin localidad', () => {
         expect(lastSent()).toMatch(/cuántos km/i);
     });
 
-    test('"cuando pueda te paso, vivo en Bigand" no es un freno', async () => {
-        mockParseAddress.mockResolvedValue({ ciudad: 'Bigand', provincia: 'Santa Fe' });
+    test('"cuando pueda te paso, vivo en Funes" no es un freno', async () => {
+        mockParseAddress.mockResolvedValue({ ciudad: 'Funes', provincia: 'Santa Fe' });
         const st = makeState();
-        const t = 'cuando pueda te paso los datos, vivo en Bigand';
+        const t = 'cuando pueda te paso los datos, vivo en Funes';
         await handleWaitingZone(USER, t, norm(t), st, knowledge, deps);
         expect(st.deliveryZone).toBe('in');
         expect(lastSent()).not.toMatch(/sin apuro/i);

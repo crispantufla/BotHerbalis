@@ -129,8 +129,16 @@ Máquina de estados lineal con fallbacks a IA. Orden típico:
   conversa con `flows/clubHerbys.ts` (Gotas 60 días, $18.900 al recibir + 4 cuotas semanales de
   $7.900, nunca el total) y NO con el guion de venta; al aceptar o pedir asesora se deriva a Club
   Herbys: el aviso de WhatsApp va a `CLUB_ALERT_NUMBERS` (default 5493412619405), no a Horacio
-  (`notifyAdmin`). `stepPromoOffer` ya no recibe a nadie. Montos en DOS lugares: el mensaje base
-  de la campaña y `clubHerbys.ts`. Tests: `tests/club_herbys.test.js`. Fuera de toda campaña: pedido
+  (`notifyAdmin`). `stepPromoOffer` ya no recibe a nadie. **Dos ofertas por zona (5-nov-2026)**:
+  quien tiene característica de la zona de reparto (`phoneZone` en `deliveryZone.ts`) recibe la de
+  pago al recibir; el resto, `DEFAULT_BASE_MESSAGE_OUT` (anticipo al hacer el pedido por
+  transferencia o tarjeta, cuotas por transferencia), y `clubHerbys.ts` conversa con
+  `SYSTEM_OUT`/`TEXTS.C_OUT`. La zona queda en `state.promo.zone`. El panel solo edita el mensaje
+  de la zona (`baseMessage`); el de fuera sale del default del código salvo que la config de la
+  campaña traiga `baseMessageOut`. Montos en TRES lugares: los dos mensajes base y `clubHerbys.ts`.
+  La zona de reparto es la lista oficial "LOCALIDADES DE DISTRIBUCION" (`rules.repartoPropio` en
+  `knowledge_v7.json` = `FALLBACK_LOCALIDADES`; las que tienen menos de 60 km pero no tienen reparto van en
+  `localidadesBorde`). Tests: `tests/club_herbys.test.js`. Fuera de toda campaña: pedido
   en los últimos 45 días (`BUYER_RECENT_DAYS`) y quien ya recibió una de Club Herbys (campañas
   creadas desde `CLUB_CAMPAIGNS_SINCE` = 4-nov; "Promo Octubre", la de Herbalis, no cuenta y quedó
   pausada). Lo de abajo es la historia.

@@ -112,8 +112,16 @@ describe('deliveryZone.classifyZoneText', () => {
         expect(c.localidad).toBe(expectedLoc);
     });
 
-    test('las localidades de borde (San Nicolás, Cañada de Gómez, Victoria) quedan FUERA: el radio es de 60 km', () => {
-        for (const t of ['San Nicolás', 'cañada de gomez', 'Victoria']) {
+    test('San Nicolás y Cañada de Gómez tienen reparto (lista oficial del 5-nov-2026)', () => {
+        for (const [t, loc] of [['San Nicolás', 'San Nicolás'], ['cañada de gomez', 'Cañada de Gómez'], ['soy de San Nicolás de los Arroyos', 'San Nicolás de los Arroyos']]) {
+            const c = zone.classifyZoneText(t, knowledge);
+            expect(c.zone).toBe('in');
+            expect(c.localidad).toBe(loc);
+        }
+    });
+
+    test('sin reparto: las de borde y las de menos de 60 km que no están en la lista oficial van por Correo', () => {
+        for (const t of ['Victoria', 'Casilda', 'Oliveros', 'Totoras', 'Pujato', 'Acebal']) {
             const c = zone.classifyZoneText(t, knowledge);
             expect(c.zone).toBe('out');
             expect(c.borde).toBe(true);
@@ -268,12 +276,12 @@ describe('handleWaitingZone', () => {
     });
 
     test('pregunta en vez de contestar → la IA responde; si trae LOCALIDAD en el tag, se resuelve', async () => {
-        aiService.chat.mockResolvedValue({ response: 'Llega en 4 días. ¿De qué localidad sos?', goalMet: false, extractedData: 'LOCALIDAD: Casilda' });
+        aiService.chat.mockResolvedValue({ response: 'Llega en 4 días. ¿De qué localidad sos?', goalMet: false, extractedData: 'LOCALIDAD: Funes' });
         const st = makeState();
-        await handleWaitingZone(USER, '¿cuánto tarda en llegar? soy de casilda', norm('¿cuánto tarda en llegar? soy de casilda'), st, knowledge, deps);
-        // "casilda" está en el texto, así que resuelve sin pasar por la IA.
+        await handleWaitingZone(USER, '¿cuánto tarda en llegar? soy de funes', norm('¿cuánto tarda en llegar? soy de funes'), st, knowledge, deps);
+        // "funes" está en el texto, así que resuelve sin pasar por la IA.
         expect(st.deliveryZone).toBe('in');
-        expect(st.partialAddress.ciudad).toBe('Casilda');
+        expect(st.partialAddress.ciudad).toBe('Funes');
     });
 
     test('pregunta sin localidad → la IA responde y sigue en el step', async () => {
@@ -535,6 +543,11 @@ describe('knowledge_v7.json — guion por zona', () => {
         expect(knowledge.rules.repartoPropio.localidades).toContain('Rosario');
         expect(knowledge.rules.repartoPropio.localidades).toContain('Funes');
         expect(knowledge.rules.repartoPropio.radioKm).toBe(60);
+        // La lista oficial de LOCALIDADES DE DISTRIBUCION (5-nov-2026) y la copia de respaldo son la misma.
+        const { FALLBACK_LOCALIDADES, FALLBACK_LOCALIDADES_BORDE } = zone;
+        expect([...knowledge.rules.repartoPropio.localidades].sort()).toEqual([...FALLBACK_LOCALIDADES].sort());
+        expect([...knowledge.rules.repartoPropio.localidadesBorde].sort()).toEqual([...FALLBACK_LOCALIDADES_BORDE].sort());
+        expect(knowledge.rules.repartoPropio.localidades).not.toContain('Casilda');
     });
     test('ninguna FAQ ni texto del flujo ofrece retiro en efectivo ni promete 7 a 10 días (salvo la confirmación legacy)', () => {
         const texts = [];

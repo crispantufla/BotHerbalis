@@ -29,6 +29,19 @@ export const DEFAULT_BASE_MESSAGE =
     '{Sin tarjeta. Sin trámites.|Sin tarjeta y sin trámites.|No necesitás tarjeta ni hacer trámites.} ' +
     '{¿Querés aprovecharlo?|¿Te interesa?|¿Lo querés aprovechar?|¿Te sumás?}';
 
+// Fuera de la zona de reparto (5-nov-2026): no hay pago al recibir. Los $18.900
+// se abonan al hacer el pedido (transferencia o tarjeta) y las cuotas van por
+// transferencia. A quién le toca cuál lo decide la característica del teléfono
+// (phoneZone en deliveryZone.ts). No dice "sin tarjeta": se puede pagar con una.
+export const DEFAULT_BASE_MESSAGE_OUT =
+    '{¡Hola|Hola|Buenas|¡Qué tal} {nombre}! {👋|😊|🙌}\n\n' +
+    '{🎁|✨|🌿} {BENEFICIO ESPECIAL HERBALIS + CLUB HERBYS|Beneficio especial Herbalis + Club Herbys|BENEFICIO HERBALIS + CLUB HERBYS}\n' +
+    '{Ahora podés|Podés|Te cuento que podés} {comenzar|empezar|arrancar} tu plan de Gotas Herbalis por 60 días sin pagar todo junto. ' +
+    '{Abonás $18.900 al momento de realizar el pedido (transferencia o tarjeta).|Al hacer el pedido abonás $18.900, por transferencia o tarjeta.|Pagás $18.900 cuando hacés el pedido (con transferencia o tarjeta).} ' +
+    '{Después completás el pago en 4 cuotas semanales de $7.900 por transferencia.|El resto lo completás en 4 cuotas semanales de $7.900, por transferencia.|Y después, 4 cuotas semanales de $7.900 por transferencia.} ' +
+    '{Sin trámites.|Sin vueltas ni trámites.|No hay que hacer trámites.} ' +
+    '{¿Querés aprovecharlo?|¿Te interesa?|¿Lo querés aprovechar?|¿Te sumás?}';
+
 // Un matiz distinto por envío para que las reescrituras no converjan al mismo texto.
 const STYLE_HINTS = [
     'un poco más cálido y cercano',

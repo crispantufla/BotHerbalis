@@ -35,33 +35,55 @@ export interface ZoneConfig {
     localidadesBorde: string[];
 }
 
-// Localidades a menos de ~60 km de Rosario. Cordón del Gran Rosario y el sur
-// santafesino que cubre el reparto propio.
+// Las localidades con reparto propio: la lista oficial "LOCALIDADES DE
+// DISTRIBUCION" que pasó el vendedor el 5-nov-2026, ni una más. Cañada de Gómez
+// y San Nicolás entran aunque rondan el borde del radio.
 export const FALLBACK_LOCALIDADES: string[] = [
-    'Rosario', 'Funes', 'Roldán', 'Pérez', 'Soldini', 'Piñero', 'Álvarez',
+    'Rosario', 'Funes', 'Roldán', 'San Jerónimo Sud', 'Carcarañá',
+    'Cañada de Gómez', 'Pérez', 'Soldini', 'Zavalla', 'Álvarez',
     'Villa Gobernador Gálvez', 'Alvear', 'Pueblo Esther', 'General Lagos',
-    'Arroyo Seco', 'Fighiera', 'Ibarlucea', 'Granadero Baigorria',
-    'Capitán Bermúdez', 'Fray Luis Beltrán', 'San Lorenzo',
-    'Puerto General San Martín', 'Puerto San Martín', 'Ricardone', 'Timbúes',
-    'Aldao', 'Zavalla', 'Pujato', 'Coronel Arnold', 'Carcarañá',
-    'San Jerónimo Sud', 'Luis Palacios', 'Casilda', 'Sanford', 'Acebal',
-    'Carmen del Sauce', 'Uranga', 'Coronel Domínguez', 'Pavón', 'Pavón Arriba',
-    'Empalme Villa Constitución', 'Villa Constitución', 'Theobald', 'Godoy',
-    'Peyrano', 'Cepeda', 'Coronel Bogado', 'Villa Amelia', 'Albarellos',
-    'Arminda', 'Bigand', 'Villa Mugueta', 'Fuentes', 'Oliveros', 'Serodino',
-    'Andino', 'Maciel', 'Totoras', 'Salto Grande', 'Clarke', 'Lucio V. López',
-    'Sargento Cabral', 'Rueda', 'General Gelly', 'Juncal', 'Santa Teresa',
-    'Chabás', 'Los Molinos', 'Arteaga',
+    'Arroyo Seco', 'Villa Constitución', 'Fighiera', 'San Nicolás',
+    'San Nicolás de los Arroyos', 'Granadero Baigorria', 'Ibarlucea',
+    'Capitán Bermúdez', 'Fray Luis Beltrán', 'San Lorenzo', 'Puerto San Martín',
+    'Puerto General San Martín',
 ];
 
-// Justo afuera del radio (el radio es de 60 km en línea recta, y el recorrido
-// real ya ronda los 90): NO entran. Van por Correo como cualquier lugar lejano.
-// Están en lista aparte para que el vendedor las vea en el guion y pueda
+// SIN reparto propio: van por Correo como cualquier lugar lejano. Son las que
+// quedan justo afuera del radio y las que están dentro de los 60 km pero el
+// reparto no cubre (Casilda, Oliveros...). Se listan para que no caigan en la
+// pregunta de los km (que las daría por dentro) y para que el vendedor pueda
 // pasarlas a `localidades` el día que el reparto llegue hasta ahí.
 export const FALLBACK_LOCALIDADES_BORDE: string[] = [
-    'Cañada de Gómez', 'Correa', 'Villa Eloísa', 'San Nicolás', 'San Nicolás de los Arroyos',
+    'Piñero', 'Ricardone', 'Timbúes', 'Aldao', 'Pujato', 'Coronel Arnold',
+    'Luis Palacios', 'Casilda', 'Sanford', 'Acebal', 'Carmen del Sauce', 'Uranga',
+    'Coronel Domínguez', 'Pavón', 'Pavón Arriba', 'Empalme Villa Constitución',
+    'Theobald', 'Godoy', 'Peyrano', 'Cepeda', 'Coronel Bogado', 'Villa Amelia',
+    'Albarellos', 'Arminda', 'Bigand', 'Villa Mugueta', 'Fuentes', 'Oliveros',
+    'Serodino', 'Andino', 'Maciel', 'Totoras', 'Salto Grande', 'Clarke',
+    'Lucio V. López', 'Sargento Cabral', 'Rueda', 'General Gelly', 'Juncal',
+    'Santa Teresa', 'Chabás', 'Los Molinos', 'Arteaga', 'Correa', 'Villa Eloísa',
     'Victoria', 'Barrancas', 'Monje', 'Díaz', 'Máximo Paz', 'Arequito', 'Alcorta',
 ];
+
+// Característica (código de área) de las localidades con reparto propio. Sirve
+// cuando no hay otra cosa que el teléfono: la campaña de Club Herbys le escribe
+// PRIMERO a gente que todavía no dijo de dónde es. Es aproximado: una
+// característica cubre también pueblos sin reparto (3476 = San Lorenzo pero
+// también Timbúes y Oliveros; 3471 = Cañada de Gómez y también Correa).
+// 341: Rosario y el Gran Rosario · 3476: San Lorenzo, Fray Luis Beltrán, Puerto
+// San Martín · 3402: Arroyo Seco, Fighiera, General Lagos · 3400: Villa
+// Constitución · 3471: Cañada de Gómez · 336: San Nicolás. Casilda (3464) y
+// Acebal (3469) no tienen reparto.
+export const ZONE_AREA_CODES = ['341', '3476', '3402', '3400', '3471', '336'];
+
+/** Zona de un teléfono argentino (549 + característica + número) por su característica. */
+export function phoneZone(phone: string | null | undefined): 'in' | 'out' {
+    const digits = String(phone || '').split('@')[0].replace(/\D/g, '');
+    const m = digits.match(/^549?(\d+)$/);
+    if (!m) return 'out';
+    const national = m[1].replace(/^0/, '');
+    return ZONE_AREA_CODES.some((c) => national.startsWith(c)) ? 'in' : 'out';
+}
 
 // Barrios de Rosario que la gente nombra en vez de la ciudad.
 const ROSARIO_BARRIOS = [
@@ -249,7 +271,7 @@ export function shippingPolicyForPrompt(mpOn: boolean): string {
         ? '*tarjeta de crédito* (link de pago protegido) o *transferencia bancaria* al alias HERBALIS.TIENDA a nombre de BIO ORIGEN S.A.S.'
         : '*transferencia bancaria* al alias HERBALIS.TIENDA a nombre de BIO ORIGEN S.A.S. (🛑 el pago con tarjeta está FUERA DE SERVICIO: no lo ofrezcas ni lo nombres)';
     return `ENVÍO Y PAGO (modelo sep-2026, depende de la ZONA del cliente):
-- ROSARIO Y HASTA 60 KM A LA REDONDA (Funes, Roldán, San Lorenzo, Villa Gobernador Gálvez, Arroyo Seco, Casilda, Villa Constitución, etc.): entrega con *reparto propio* de Herbalis, en el domicilio, SIN costo. Se paga *al recibir* (efectivo, tarjeta o transferencia al repartidor). Antes de salir, el equipo de envíos le escribe para acordar día y horario. Datos que necesitamos: nombre completo y calle y número. No hace falta CP.
+- ROSARIO Y HASTA 60 KM A LA REDONDA (Funes, Roldán, San Lorenzo, Villa Gobernador Gálvez, Arroyo Seco, Villa Constitución, San Nicolás, Cañada de Gómez, etc.): entrega con *reparto propio* de Herbalis, en el domicilio, SIN costo. Se paga *al recibir* (efectivo, tarjeta o transferencia al repartidor). Antes de salir, el equipo de envíos le escribe para acordar día y horario. Datos que necesitamos: nombre completo y calle y número. No hace falta CP.
 - FUERA DE ESA ZONA: envío por *Correo Argentino*, SIN costo, SIEMPRE PREPAGO con ${prepago}. El cliente elige recibirlo *en su domicilio* o *retirarlo en la sucursal* más cercana a su código postal (la asigna el Correo sola). Al estar pago, sale enseguida y llega en *4 días hábiles*. NO existe pago al recibir ni contrarreembolso fuera de la zona: el Correo volvió ese servicio lento y caro para el cliente, por eso lo dejamos de ofrecer.
 - Para decirle cómo le llega, primero necesitás su LOCALIDAD. Si no la sabés, preguntala ("¿de qué localidad sos?"). NUNCA le pidas que se clasifique "dentro o fuera de la zona de influencia": eso lo resolvemos nosotros. Si no reconocés la localidad, preguntá a cuántos km de Rosario queda.
 - Objeción "quiero contrarreembolso / pagar al recibir" de un cliente FUERA de zona: explicá con calidez que hace 13 años enviamos contrarreembolso, pero el Correo tomó medidas que lo volvieron lento y muy caro para el cliente, y por eso hoy fuera de Rosario y alrededores el envío va prepago y llega en 4 días. Ofrecé ${mpOn ? 'tarjeta (pago protegido) o transferencia' : 'transferencia'}. Si insiste, no discutas: el flujo manda el mensaje de cierre y deriva a un asesor.

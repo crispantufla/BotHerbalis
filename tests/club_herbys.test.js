@@ -215,3 +215,70 @@ describe('texto de la promo', () => {
         expect(b.startsWith('Buenas! 😊')).toBe(true);
     });
 });
+
+// ─── Fuera de la zona de reparto (5-nov-2026) ────────────────────────────────
+describe('fuera de zona: sin pago al recibir', () => {
+    const { phoneZone } = require('../src/flows/utils/deliveryZone');
+    const { buildPromoText, normalizePromoConfig } = require('../src/services/promo/promoDispatcher');
+    const { DEFAULT_BASE_MESSAGE_OUT } = require('../src/services/promo/promoVariation');
+    const { SYSTEM, SYSTEM_OUT } = require('../src/flows/clubHerbys');
+    const USER_OUT = '5491130000001@c.us';   // CABA
+
+    test.each([
+        ['5493416721288', 'in'],      // Rosario
+        ['5493476123456@c.us', 'in'], // San Lorenzo
+        ['5493402123456', 'in'],      // Arroyo Seco
+        ['5493400123456', 'in'],      // Villa Constitución
+        ['5493471123456', 'in'],      // Cañada de Gómez
+        ['5493364123456', 'in'],      // San Nicolás
+        ['5491137761432', 'out'],     // CABA
+        ['5493865368317', 'out'],     // Tucumán
+        ['5493464123456', 'out'],     // Casilda: sin reparto
+        ['5493469123456', 'out'],     // Acebal: sin reparto
+        ['34612345678', 'out'],       // extranjero
+    ])('phoneZone(%s) = %s', (phone, zone) => {
+        expect(phoneZone(phone)).toBe(zone);
+    });
+
+    test('el mensaje de fuera de zona: anticipo al hacer el pedido, cuotas por transferencia, nunca al recibir', () => {
+        for (let i = 0; i < 300; i++) {
+            const t = renderBaseMessage(DEFAULT_BASE_MESSAGE_OUT, i % 2 ? 'Ana' : null);
+            expect(t).toContain('$18.900');
+            expect(t).toMatch(/transferencia o tarjeta/);
+            expect(t).toMatch(/4 cuotas semanales de \$7\.900,? por transferencia/);
+            expect(t).toContain('Gotas Herbalis por 60 días');
+            expect(t).not.toMatch(/recib|entrega|te llega|sin tarjeta|necesitás tarjeta/i);
+            expect(t).not.toMatch(/[{}|]/);
+        }
+    });
+
+    test('la campaña elige el mensaje por la característica del destinatario (también en las campañas ya creadas)', async () => {
+        // Config de una campaña creada antes del cambio: sin baseMessageOut.
+        const cfg = normalizePromoConfig({ baseMessage: DEFAULT_BASE_MESSAGE });
+        const out = await buildPromoText({ cfg, campaignId: 'c1', phone: '5491137761432', price60: '-', rand: () => 0 });
+        const inn = await buildPromoText({ cfg, campaignId: 'c1', phone: '5493416721288', price60: '-', rand: () => 0 });
+        expect(out.text).toMatch(/al momento de realizar el pedido \(transferencia o tarjeta\)/);
+        expect(out.text).not.toMatch(/entrega|recib/i);
+        expect(inn.text).toMatch(/al momento de la entrega/);
+    });
+
+    test('acepta fuera de zona → confirmación sin entrega coordinada, y la IA recibe las condiciones de fuera de zona', async () => {
+        const ctx = deps([J('responder', 'Abonás $18.900 al hacer el pedido y después 4 cuotas de $7.900 por transferencia 😊 ¿Te sumás?'), J('acepta')]);
+        ctx.userState[USER_OUT] = promoState();
+        await processSalesFlow(USER_OUT, '¿y cómo se paga?', ctx.userState, {}, ctx.d);
+        expect(ctx.create.mock.calls[0][0].system[0].text).toBe(SYSTEM_OUT);
+        await processSalesFlow(USER_OUT, 'dale', ctx.userState, {}, ctx.d);
+        expect(sent(ctx.d)[1]).toBe(TEXTS.C_OUT);
+        expect(TEXTS.C_OUT).not.toMatch(/día y horario|lugar de entrega/);
+        expect(SYSTEM_OUT).toMatch(/NO existe para esta persona/);
+        expect(SYSTEM).not.toMatch(/NO existe para esta persona/);
+    });
+
+    test('la zona guardada al enviar manda sobre la característica', async () => {
+        const ctx = deps([J('acepta')]);
+        ctx.userState[USER_OUT] = promoState({ promo: { active: true, club: true, campaignId: 'c1', sentAt: Date.now(), price60: '-', prevStep: null, outcome: null, zone: 'in' } });
+        await processSalesFlow(USER_OUT, 'dale', ctx.userState, {}, ctx.d);
+        expect(ctx.create.mock.calls[0][0].system[0].text).toBe(SYSTEM);
+        expect(sent(ctx.d)).toEqual([TEXTS.C]);
+    });
+});

@@ -26,7 +26,8 @@ import { _setStep, _cleanPhone, _pushHistory } from '../../flows/utils/flowHelpe
 import { createInitialUserState } from '../../flows/leadClassifier';
 import { _getPromoPrice60 } from '../../flows/utils/pricing';
 import { renderPromoMessage, PromoTemplates } from './promoTemplates';
-import { generatePromoVariation, DEFAULT_BASE_MESSAGE } from './promoVariation';
+import { generatePromoVariation, DEFAULT_BASE_MESSAGE, DEFAULT_BASE_MESSAGE_OUT } from './promoVariation';
+import { phoneZone } from '../../flows/utils/deliveryZone';
 import { AudienceFilters, DEFAULT_AUDIENCE_FILTERS, normalizeAudienceFilters } from './promoAudience';
 
 /** Quien hizo un pedido hace menos de esto no recibe la oferta (pedido del 4-nov-2026: "que no compraron en los últimos 45 días"). Lo usan la audiencia y el chequeo al mandar. */
@@ -76,6 +77,8 @@ export interface PromoCampaignConfig {
     variationMode: 'ai' | 'templates';
     /** El mensaje del vendedor; {{PROMO_60}} es el precio y {{NAME_COMMA}} el nombre (opcional). */
     baseMessage: string;
+    /** Club Herbys: el mensaje para quien está FUERA de la zona de reparto (característica del teléfono, phoneZone). */
+    baseMessageOut: string;
     /** Textos propios por bloque (modo 'templates' y respaldo del modo 'ai'). */
     templates?: Partial<PromoTemplates> | null;
     /** Mandar la imagen del flyer (public/promo/promo-60-dias.jpg) unos segundos después del texto. */
@@ -98,6 +101,7 @@ export const DEFAULT_PROMO_CONFIG: PromoCampaignConfig = {
     maxFailStreak: 3,
     variationMode: 'ai',
     baseMessage: DEFAULT_BASE_MESSAGE,
+    baseMessageOut: DEFAULT_BASE_MESSAGE_OUT,
     templates: null,
     // Club Herbys: el flyer de la promo (public/promo/flyer.*). Sin archivo, sale solo el texto.
     imageEnabled: true,
@@ -154,6 +158,7 @@ export function normalizePromoConfig(raw: any, instanceId: string = 'default'): 
         maxFailStreak: num(raw?.maxFailStreak, d.maxFailStreak, 1, 50),
         variationMode: raw?.variationMode === 'templates' ? 'templates' : 'ai',
         baseMessage: typeof raw?.baseMessage === 'string' && raw.baseMessage.trim().length >= 40 ? raw.baseMessage.replace(/\r/g, '').trim() : d.baseMessage,
+        baseMessageOut: typeof raw?.baseMessageOut === 'string' && raw.baseMessageOut.trim().length >= 40 ? raw.baseMessageOut.replace(/\r/g, '').trim() : d.baseMessageOut,
         templates: raw?.templates && typeof raw.templates === 'object' ? raw.templates : null,
         imageEnabled: raw?.imageEnabled !== false,
         audience: (() => { const { instanceId: _i, ...rest } = normalizeAudienceFilters(instanceId, raw?.audience); return rest; })(),
@@ -271,7 +276,8 @@ export async function preparePromoState(
     state.senaPaid = false;
     // club: la respuesta la atiende el guion de Club Herbys (flows/clubHerbys.ts). Los
     // estados de la promo de Herbalis de oct-2026 no lo tienen y siguen con stepPromoOffer.
-    state.promo = { active: true, club: true, campaignId, sentAt: now, price60, prevStep, outcome: null };
+    // zone: qué oferta recibió (con o sin pago al recibir), por la característica del teléfono.
+    state.promo = { active: true, club: true, campaignId, sentAt: now, price60, prevStep, outcome: null, zone: phoneZone(userId) };
     state.lastActivityAt = now;
     _setStep(state, 'promo_offer');
     return { state, prevStep };
@@ -336,8 +342,10 @@ export function renderBaseMessage(base: string, name?: string | null, rand: () =
 export async function buildPromoText(args: BuildTextArgs): Promise<{ text: string; via: 'ai' | 'templates' }> {
     const { cfg } = args;
     // Club Herbys: siempre el mensaje base con sus variaciones (ver renderBaseMessage).
+    // Fuera de la zona de reparto no hay pago al recibir: sale el otro mensaje.
     if (process.env.PROMO_TEXT_MODE !== 'herbalis') {
-        return { text: renderBaseMessage(cfg.baseMessage, args.name, args.rand), via: 'templates' };
+        const base = phoneZone(args.phone) === 'in' ? cfg.baseMessage : cfg.baseMessageOut;
+        return { text: renderBaseMessage(base, args.name, args.rand), via: 'templates' };
     }
     if (cfg.variationMode === 'ai') {
         try {

@@ -16,6 +16,7 @@
 import { UserState } from '../types/state';
 import { pauseUser } from '../services/pauseService';
 import { markPromoReply } from '../services/promo/promoDispatcher';
+import { phoneZone } from './utils/deliveryZone';
 import logger from '../utils/logger';
 
 export const CLUB_PHONE_TEXT = '341 261-9405';
@@ -27,6 +28,12 @@ export const OFFER_TEXT =
     '🎁 BENEFICIO ESPECIAL HERBALIS + CLUB HERBYS\n' +
     'Ahora podés comenzar tu plan de Gotas Herbalis por 60 días sin pagar todo junto. Recibís tu producto y abonás $18.900 al momento de la entrega. ' +
     'Después completás el pago en 4 cuotas semanales de $7.900. Sin tarjeta. Sin trámites. ¿Querés aprovecharlo?';
+
+/** La oferta para quien está FUERA de la zona de reparto: sin pago al recibir. */
+export const OFFER_TEXT_OUT =
+    '🎁 BENEFICIO ESPECIAL HERBALIS + CLUB HERBYS\n' +
+    'Ahora podés comenzar tu plan de Gotas Herbalis por 60 días sin pagar todo junto. Abonás $18.900 al momento de realizar el pedido (transferencia o tarjeta). ' +
+    'Después completás el pago en 4 cuotas semanales de $7.900 por transferencia. Sin trámites. ¿Querés aprovecharlo?';
 
 /** Textos fijos del guion (las letras son las del PDF). */
 export const TEXTS = {
@@ -41,25 +48,44 @@ export const TEXTS = {
         'Así vas a reconocer el mensaje cuando te llegue.',
     F: '¡Gracias por responder! 😊 Si más adelante te interesa, escribinos por acá. ¡Que tengas un lindo día!',
     G: 'Entendido, no te vamos a volver a escribir. ¡Disculpá la molestia! 🙏',
+    /** Aceptación FUERA de zona: no hay entrega coordinada ni pago al recibir. */
+    C_OUT: '¡Perfecto! 💗\nTu solicitud quedó registrada.\n\n' +
+        'Ahora vamos a derivarte con una asesora de Club Herbys, que se va a comunicar con vos desde nuestro número de atención para:\n\n' +
+        '• confirmar tus datos;\n• pasarte cómo abonar los $18.900 (transferencia o tarjeta);\n• coordinar el envío a tu domicilio;\n• dejar confirmado tu pedido.\n\n' +
+        'No necesitás hacer nada más por ahora. En breve te escribimos para continuar.\n\n' +
+        `Te vamos a escribir desde el WhatsApp oficial de Club Herbys: ${CLUB_PHONE_TEXT}.\n` +
+        'Así vas a reconocer el mensaje cuando te llegue 😊',
 };
 
-const REFERENCE = `BENEFICIO: Herbalis + Club Herbys, para Rosario y zona.
-PRODUCTO: Gotas Herbalis, plan de 60 días. Es el único producto de este beneficio.
+const REFERENCE_COMMON = `PRODUCTO: Gotas Herbalis, plan de 60 días. Es el único producto de este beneficio.
 PARA QUÉ SIRVE: son gotas de nuez de la india para bajar de peso de forma natural. El plan de 60 días es el que recomendamos para bajar hasta 10 kg (lo mismo que dice el guion de Herbalis).
 INGREDIENTES: clorofila, menta, nuez de la india y vitamina C. 100% naturales.
 CÓMO SE TOMA: 10 gotas al día, 30 minutos antes del almuerzo o de la cena.
+NO DIGAS EL TOTAL: si preguntan cuánto es en total, respondé con el anticipo y las cuotas, sin sumarlos.`;
+
+const REFERENCE = `BENEFICIO: Herbalis + Club Herbys, para Rosario y zona.
+${REFERENCE_COMMON}
 PAGO: $18.900 de anticipo al recibir el pedido, y después 4 cuotas semanales de $7.900. Sin tarjeta de crédito y sin trámites.
-NO DIGAS EL TOTAL: si preguntan cuánto es en total, respondé con el anticipo y las cuotas, sin sumarlos.
 CÓMO SIGUE: cuando la persona acepta, una asesora de Club Herbys le escribe desde el WhatsApp oficial ${CLUB_PHONE_TEXT} para confirmar los datos, verificar el domicilio o lugar de entrega, coordinar día y horario y dejar confirmado el pedido y la modalidad de pago.`;
 
-export const SYSTEM = `Atendés por WhatsApp a personas que recibieron esta oferta:
+// Fuera de la zona de reparto (5-nov-2026). La persona es de una característica
+// sin reparto propio: no hay pago al recibir. Los primeros envíos de la campaña
+// de noviembre salieron con el texto de la zona a todo el mundo; si en la charla
+// aparece "pagás al recibir", la IA lo aclara con estas condiciones.
+const REFERENCE_OUT = `BENEFICIO: Herbalis + Club Herbys, para fuera de Rosario y zona.
+${REFERENCE_COMMON}
+PAGO: $18.900 de anticipo AL MOMENTO DE REALIZAR EL PEDIDO, por transferencia o tarjeta. Después, 4 cuotas semanales de $7.900 por transferencia. Sin trámites.
+PAGO AL RECIBIR: NO existe para esta persona. El pago al recibir es solo para Rosario y la zona de reparto. Si la charla dice otra cosa (le llegó un mensaje que decía que pagaba al recibir), aclaralo con amabilidad: fuera de Rosario y zona el anticipo se abona al hacer el pedido. Si la persona dice que es de Rosario o de la zona, decisión "derivar".
+CÓMO SIGUE: cuando la persona acepta, una asesora de Club Herbys le escribe desde el WhatsApp oficial ${CLUB_PHONE_TEXT} para confirmar los datos, pasarle cómo abonar los $18.900, coordinar el envío y dejar confirmado el pedido.`;
 
-"${OFFER_TEXT}"
+const _system = (offer: string, reference: string) => `Atendés por WhatsApp a personas que recibieron esta oferta:
+
+"${offer}"
 
 Tu único trabajo es responder dudas sobre la oferta y llevar a la persona a aceptarla o a hablar con una asesora. Escribís como una persona de Rosario: cálida, simple, mensajes cortos (2 a 4 líneas), con algún emoji suelto, en castellano rioplatense (vos).
 
 REFERENCIA (lo único que sabés):
-${REFERENCE}
+${reference}
 
 REGLAS:
 - Respondé SOLO con la información de REFERENCIA. Si te preguntan algo que no está ahí (si llega a una localidad, otros medios de pago, otros productos, descuentos, efectos secundarios), NO lo inventes: decisión "derivar".
@@ -77,6 +103,14 @@ DECISIÓN (mirá el último mensaje de la persona, en el contexto de la charla):
 
 Respondé SOLO con un JSON, sin nada antes ni después:
 {"decision": "responder" | "acepta" | "derivar" | "no" | "baja", "respuesta": "texto para la persona (solo si decision es responder; si no, vacío)"}`;
+
+export const SYSTEM = _system(OFFER_TEXT, REFERENCE);
+export const SYSTEM_OUT = _system(OFFER_TEXT_OUT, REFERENCE_OUT);
+
+/** La zona de la oferta que recibió: la que guardó el despachador, o la característica del teléfono (envíos anteriores al 5-nov). */
+export function promoZoneOf(userId: string, state: UserState): 'in' | 'out' {
+    return state.promo?.zone || phoneZone(userId);
+}
 
 export type Decision = 'responder' | 'acepta' | 'derivar' | 'no' | 'baja';
 
@@ -128,13 +162,13 @@ function _historyForAi(state: UserState): Array<{ role: 'user' | 'assistant'; co
     return out;
 }
 
-async function _askClaude(anthropic: any, state: UserState): Promise<string | null> {
+async function _askClaude(anthropic: any, state: UserState, zone: 'in' | 'out'): Promise<string | null> {
     const messages = _historyForAi(state);
     if (!messages.length || messages[messages.length - 1].role !== 'user') return null;
     const res = await anthropic.messages.create({
         model: CLUB_AI_MODEL,
         max_tokens: 2000,
-        system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral', ttl: '1h' } }],
+        system: [{ type: 'text', text: zone === 'in' ? SYSTEM : SYSTEM_OUT, cache_control: { type: 'ephemeral', ttl: '1h' } }],
         messages,
     });
     const block = (res.content || []).find((b: any) => b.type === 'text');
@@ -169,6 +203,7 @@ export async function handleClubHerbys(userId: string, text: string, state: User
         markPromoReply(instanceId, userId, 'question');
     }
     promo.aiTurns = promo.aiTurns || 0;
+    const zone = promoZoneOf(userId, state);
 
     let decision: Decision = 'derivar';
     let respuesta = '';
@@ -177,7 +212,7 @@ export async function handleClubHerbys(userId: string, text: string, state: User
         logger.error('[CLUB] Sin cliente de Anthropic (¿falta ANTHROPIC_API_KEY?) — derivo.');
     } else {
         try {
-            ({ decision, respuesta } = parseDecision(await _askClaude(anthropic, state)));
+            ({ decision, respuesta } = parseDecision(await _askClaude(anthropic, state, zone)));
         } catch (e: any) {
             logger.error(`[CLUB] La IA falló para ${userId}: ${e.message} — derivo.`);
         }
@@ -201,7 +236,7 @@ export async function handleClubHerbys(userId: string, text: string, state: User
             promo.outcome = 'accepted';
             markPromoReply(instanceId, userId, 'interested');
             saveState(userId);
-            await sendMessageWithDelay(userId, TEXTS.C);
+            await sendMessageWithDelay(userId, zone === 'in' ? TEXTS.C : TEXTS.C_OUT);
             if (notify) await notify('✅ ACEPTÓ el beneficio — contactarla', userId, '💬 «' + text + '»').catch(() => {});
             await _close(userId, 'Aceptó el beneficio: lo toma una asesora de Club Herbys', dependencies);
             return { matched: true, paused: true };
