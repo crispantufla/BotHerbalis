@@ -99,6 +99,15 @@ async function boot() {
         if (fs.existsSync(sessionDir)) sessionsWithHistory.push(id);
     }
 
+    // Un seller en modo remoto no tiene sesión acá: la sostiene el agente en su PC.
+    // Si quedaba lazy, después de cada reinicio no arrancaba hasta que alguien abría
+    // el panel, y la campaña promo no mandaba nada (bot-promo, 26-oct: 0 envíos de
+    // 10 a 10:27 con el agente conectado desde las 8:00).
+    for (const id of sellerIds) {
+        const mode = process.env[`WA_MODE_${id.toUpperCase()}`] || process.env.WA_MODE;
+        if ((mode || '').toLowerCase() === 'remote' && !sessionsWithHistory.includes(id)) sessionsWithHistory.push(id);
+    }
+
     const lazyIds = sellerIds.filter(id => !sessionsWithHistory.includes(id));
     if (lazyIds.length > 0) {
         logger.info(`[BOOT] ${lazyIds.length} seller(s) have no session — staying lazy: ${lazyIds.join(', ')}`);

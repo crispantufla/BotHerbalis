@@ -728,8 +728,18 @@ function startScheduler(sharedState: SchedulerSharedState, dependencies: Schedul
     // horaria, tope diario, hora sorteada del próximo envío). Un tick sin nada
     // que hacer es una consulta liviana. Ver services/promo/promoDispatcher.ts.
     tasks.push(cron.schedule('* * * * *', () => {
-        promoTick(sharedState, dependencies).catch((e: any) =>
-            logger.error(`[PROMO][${sharedState.sellerId || '?'}] tick error: ${e.message}`));
+        promoTick(sharedState, dependencies)
+            .then((r: { sent: boolean; reason: string }) => {
+                // Un tick que no manda vuelve sin loguear: se anota solo cuando cambia
+                // el motivo, para que una campaña trabada se vea en los logs
+                // (en bot-promo, del 26 al 28-oct, estuvo dos días sin mandar y no quedó rastro).
+                if (r.reason !== sharedState._promoLastReason) {
+                    logger.info(`[PROMO][${sharedState.sellerId || '?'}] tick: ${r.reason}`);
+                    sharedState._promoLastReason = r.reason;
+                }
+            })
+            .catch((e: any) =>
+                logger.error(`[PROMO][${sharedState.sellerId || '?'}] tick error: ${e.message}`));
     }, { timezone: TIMEZONE }));
     logger.info('[SCHEDULER] ✅ promoTick → cada minuto (manda solo dentro de la ventana de la campaña)');
 
