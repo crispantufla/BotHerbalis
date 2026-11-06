@@ -371,6 +371,15 @@ describe('lo que no es un chat con un cliente', () => {
         expect(s.pausedUsers.size).toBe(0);
     });
 
+    test('el chat con uno mismo (avisos de Club Herbys al número del bot): se ignora', async () => {
+        const s = mkSeller({ client: fakeClient({ info: { wid: { user: '5493412619394' } } }) });
+        await deliver(s.outgoing, manual({ to: '5493412619394@c.us', body: '🔔 *Club Herbys: aceptó*' }));
+
+        expect(s.logAndEmit).not.toHaveBeenCalled();
+        expect(s.pausedUsers.size).toBe(0);
+        expect(s.client.getContactById).not.toHaveBeenCalled();
+    });
+
     test('anterior a la conexión (historial del teléfono): se ignora', async () => {
         const s = mkSeller();
         await deliver(s.outgoing, manual({ timestamp: 999 }));

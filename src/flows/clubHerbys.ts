@@ -4,7 +4,7 @@
  * Este bot es una copia del de Herbalis recortada a una sola cosa: manda la
  * promo (services/promo/) y, cuando la persona contesta, conversa hasta que
  * acepta o pide hablar con alguien. Ahí terminó su función: confirma, avisa a
- * Club Herbys (CLUB_ALERT_NUMBERS en adminService → 341 261-9405) y pausa el chat para que lo
+ * Club Herbys (CLUB_ALERT_NUMBERS en adminService → el número del bot y el 341 375-5757) y pausa el chat para que lo
  * tome una asesora. No toma datos, no arma pedidos, no cobra.
  *
  * Claude contesta las dudas, pero SOLO con la información de REFERENCIA de abajo,

@@ -128,7 +128,9 @@ Máquina de estados lineal con fallbacks a IA. Orden típico:
   abajo quedó detrás de `PROMO_TEXT_MODE=herbalis`. Quien recibió la campaña (`state.promo.active`)
   conversa con `flows/clubHerbys.ts` (Gotas 60 días, $18.900 al recibir + 4 cuotas semanales de
   $7.900, nunca el total) y NO con el guion de venta; al aceptar o pedir asesora se deriva a Club
-  Herbys: el aviso de WhatsApp va a `CLUB_ALERT_NUMBERS` (default 5493412619405), no a Horacio
+  Herbys: el aviso de WhatsApp va a `CLUB_ALERT_NUMBERS` (default desde el 6-nov: 5493412619394 —el propio número del
+  bot, por eso el handler de salientes ignora el chat con uno mismo— y 5493413755757), no a los
+  `alertNumbers`
   (`notifyAdmin`). `stepPromoOffer` ya no recibe a nadie. **Dos ofertas por zona (5-nov-2026)**:
   quien tiene característica de la zona de reparto (`phoneZone` en `deliveryZone.ts`) recibe la de
   pago al recibir; el resto, `DEFAULT_BASE_MESSAGE_OUT` (anticipo al hacer el pedido por

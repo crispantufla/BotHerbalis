@@ -264,7 +264,15 @@ export function createOutgoingMessageHandler(ctx: {
             // Recién acá, con los ecos del bot ya descartados, para no gastar un
             // RPC al agente por cada mensaje que manda el bot. msg.getContact()
             // no sirve: en un mensaje propio es el contacto del vendedor.
+            // El chat con uno mismo no es un cliente: ahí llegan los avisos de
+            // Club Herbys (CLUB_ALERT_NUMBERS incluye el número del bot). Sin esto
+            // cada aviso quedaba en ChatLog como manual y "pausaba" al propio bot.
+            const ownNumber = client.info?.wid?.user;
+            const isOwn = (id: string) => !!ownNumber && String(id || '').split('@')[0] === ownNumber;
+            if (isOwn(msg.to)) return;
+
             const targetId = await steps.resolveUserIdFrom(msg.to, () => client.getContactById(msg.to), sellerId);
+            if (isOwn(targetId)) return;
 
             // Resguardo que no depende del id: lo que el bot le mandó a este chat
             // es su eco. En remoto este es el camino NORMAL, no la excepción: al

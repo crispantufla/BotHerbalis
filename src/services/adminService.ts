@@ -190,7 +190,8 @@ export async function notifyAdmin(
 
     // Campaña Club Herbys (flows/clubHerbys.ts): el aviso por WhatsApp lo lee una
     // asesora de Club Herbys, que le escribe a la persona desde su número. Va a
-    // CLUB_ALERT_NUMBERS (default 341 261-9405), no a los números de Horacio, y
+    // CLUB_ALERT_NUMBERS (default: el número del bot, 341 261-9394, y el 341 375-5757;
+    // pedido del 6-nov), no a los alertNumbers de la config, y
     // sin respuestas rápidas: quién es, cómo escribirle y qué dijo.
     if (state.promo?.active && state.promo.club) {
         const cleanPhone = userPhone.split('@')[0];
@@ -198,7 +199,7 @@ export async function notifyAdmin(
             ? `*Cliente:* ${state.userName ? `${state.userName} · ` : ''}+${cleanPhone}\nhttps://wa.me/${cleanPhone}\n`
             : '';
         const alertMsg = `🔔 *${reason}*\n${who}${details ? `\n${details}` : ''}`;
-        const clubTargets = (process.env.CLUB_ALERT_NUMBERS || '5493412619405').split(',').map((s) => s.replace(/\D/g, '')).filter(Boolean);
+        const clubTargets = (process.env.CLUB_ALERT_NUMBERS || '5493412619394,5493413755757').split(',').map((s) => s.replace(/\D/g, '')).filter(Boolean);
         for (const num of clubTargets) {
             client.sendMessage(`${num}@c.us`, alertMsg).catch((e: Error) => logger.error(`[ALERT] Failed to forward to ${num}:`, e.message));
         }
