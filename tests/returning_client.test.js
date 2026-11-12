@@ -1,10 +1,10 @@
 /**
  * Teléfono que está en Orders y vuelve a escribir (CHECK 1 de salesFlow).
  *
- * Regla vigente (rev 2026-06-04, reporte 5493564578992):
+ * Regla vigente (rev 2026-11-12):
  *   - SOLO en __legacy_import__ (padrón histórico importado de Clientes_AR.txt):
- *     es un CLIENTE VIEJO → el bot NO lo atiende, se PAUSA y se alerta al admin
- *     para que lo tome un humano.
+ *     se lo atiende como a cualquier lead nuevo. Hasta el 12-nov-2026 se le
+ *     mandaba un aviso de derivación y se lo pausaba.
  *   - Comprador REAL del seller (Order con instanceId del seller):
  *       · CON intención de compra → recompra: NO pausa, salta a waiting_weight.
  *       · SIN intención de compra → pausa como post-venta (lo atiende un humano).
@@ -59,32 +59,26 @@ function greetingWasSent(deps) {
 }
 
 describe('CHECK 1 — contacto del padrón histórico (import legacy) que escribe', () => {
-    test('legacy + "quiero más información" → PAUSA + alerta admin (no saluda, no fast-track)', async () => {
-        prisma.order.findFirst.mockResolvedValueOnce(LEGACY_ORDER);
-        const userState = {};
-        const pausedUsers = new Set();
-        const userId = '5493564578992@c.us';
-        const deps = makeDeps(pausedUsers);
-        await processSalesFlow(userId, '¡Hola! Quiero más información.', userState, knowledge, deps);
-        expect(pausedUsers.has(userId)).toBe(true);
-        expect(deps.notifyAdmin).toHaveBeenCalled();
-        expect(greetingWasSent(deps)).toBe(false);
-        // Le avisa al cliente que lo deriva a atención al cliente (no lo deja en visto)
-        expect(deps.sendMessageWithDelay).toHaveBeenCalledWith(userId, expect.stringMatching(/atenci[oó]n al cliente/i));
-    });
+    // La DB de mentira contesta como la real: el pedido legacy solo aparece si
+    // la consulta incluye el namespace __legacy_import__.
+    const legacyOnlyDb = ({ where }) => {
+        const ids = typeof where.instanceId === 'string' ? [where.instanceId] : (where.instanceId?.in || []);
+        return Promise.resolve(ids.includes('__legacy_import__') ? LEGACY_ORDER : null);
+    };
 
-    test('legacy + saludo suelto ("buenas") → PAUSA + alerta admin', async () => {
-        prisma.order.findFirst.mockResolvedValueOnce(LEGACY_ORDER);
+    test.each([
+        ['"quiero más información"', '¡Hola! Quiero más información.', '5493564578992@c.us'],
+        ['saludo suelto', 'buenas', '5493564500001@c.us'],
+    ])('legacy + %s → se lo atiende como a cualquier lead: saludo, sin pausa ni derivación', async (_n, text, userId) => {
+        prisma.order.findFirst.mockImplementationOnce(legacyOnlyDb);
         const userState = {};
         const pausedUsers = new Set();
-        // Número distinto al test anterior: el alerta admin tiene debounce a nivel
-        // módulo (pauseService.adminNotifiedAt) keyed por sellerId:userId.
-        const userId = '5493564500001@c.us';
         const deps = makeDeps(pausedUsers);
-        await processSalesFlow(userId, 'buenas', userState, knowledge, deps);
-        expect(pausedUsers.has(userId)).toBe(true);
-        expect(deps.notifyAdmin).toHaveBeenCalled();
-        expect(deps.sendMessageWithDelay).toHaveBeenCalledWith(userId, expect.stringMatching(/atenci[oó]n al cliente/i));
+        await processSalesFlow(userId, text, userState, knowledge, deps);
+        expect(pausedUsers.has(userId)).toBe(false);
+        expect(deps.notifyAdmin).not.toHaveBeenCalled();
+        expect(greetingWasSent(deps)).toBe(true);
+        expect(deps.sendMessageWithDelay).not.toHaveBeenCalledWith(userId, expect.stringMatching(/ya sos cliente/i));
     });
 });
 

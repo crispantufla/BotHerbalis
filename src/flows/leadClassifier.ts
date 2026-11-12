@@ -77,44 +77,20 @@ async function _checkExistingOrders(
     dependencies: any,
     saveState: (userId?: string) => void
 ): Promise<{ stop: boolean }> {
-    // Si el phone tiene Order en este seller O en el namespace legacy
-    // (__legacy_import__ — clientes históricos importados desde Clientes_AR.txt),
-    // es un cliente conocido → ruta post-sale para que el bot no le hable.
+    // Solo cuentan los pedidos de ESTE seller. El padrón histórico importado
+    // (__legacy_import__, Clientes_AR.txt, 21 mil teléfonos) ya no desvía a
+    // nadie: hasta el 12-nov-2026 recibían "Teniendo en cuenta que ya sos
+    // cliente, te derivo..." y quedaban pausados; ahora se los atiende como a
+    // cualquier lead (decisión de Cristian).
     try {
         const cleanPhone = _cleanPhone(userId);
         const instanceId = _instanceId(dependencies);
         const existingOrder = await prisma.order.findFirst({
-            where: {
-                userPhone: cleanPhone,
-                instanceId: { in: [instanceId, '__legacy_import__'] },
-            },
+            where: { userPhone: cleanPhone, instanceId },
             orderBy: { createdAt: 'desc' }
         });
 
         if (!existingOrder) return { stop: false };
-
-        if (existingOrder.instanceId === '__legacy_import__') {
-            // Contacto del padrón histórico importado (Clientes_AR.txt,
-            // __legacy_import__): es un CLIENTE VIEJO, no un lead nuevo. El bot
-            // NO lo atiende (ni saludo ni flujo de venta): se PAUSA y se alerta
-            // al admin para que lo tome un humano. (rev 2026-06-04, reporte
-            // 5493564578992 — antes el match amplio de PURCHASE_INTENT_KEYWORDS
-            // lo mandaba a waiting_weight y la IA respondía "de nuevo, ¿cuántos
-            // kilos?" en vez de derivarlo.)
-            logger.info(`[ORDER-CHECK] User ${userId} es cliente del padrón histórico (import legacy) → mensaje de derivación + pausa + alerta admin.`);
-            // Mensaje al cliente: avisarle que se lo deriva a una oficial de
-            // atención (no dejarlo en visto). Después se pausa para que lo tome
-            // un humano (rev 2026-06-04).
-            const derivMsg = 'Teniendo en cuenta que ya sos cliente, te derivo con una oficial de atención al cliente que te va a ayudar enseguida 😊';
-            await dependencies.sendMessageWithDelay(userId, derivMsg);
-            await pauseUser(
-                userId,
-                '📇 Cliente del padrón histórico (import)',
-                { sharedState: dependencies.sharedState, notifyAdmin: dependencies.notifyAdmin },
-                `Teléfono del import histórico (Clientes_AR.txt). Volvió a escribir: "${text.substring(0, 100)}". Se le avisó la derivación y se pausó para atención humana.`
-            );
-            return { stop: true };
-        }
 
         if (PURCHASE_INTENT_KEYWORDS.test(normalizedText)) {
             // Comprador real que VUELVE con intención de compra (pidió precio,
