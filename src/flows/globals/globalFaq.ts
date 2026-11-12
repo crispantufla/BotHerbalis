@@ -1,5 +1,5 @@
 import { UserState } from '../../types/state';
-import { _isInfoQuestion, _startsAffirmative, _pushHistory } from '../utils/flowHelpers';
+import { _isInfoQuestion, _asksSomething, _startsAffirmative, _pushHistory } from '../utils/flowHelpers';
 import { PAID_KEYWORDS as MP_PAID_KEYWORDS } from '../steps/stepWaitingMpPayment';
 import { PAID_KEYWORDS as TRANSFER_PAID_KEYWORDS } from '../steps/stepWaitingTransferConfirmation';
 import { isMpEnabled } from '../utils/paymentOptions';
@@ -47,7 +47,7 @@ export async function handleFaq(
     // sobre datos de envío, números de plan, afirmaciones, etc. _isInfoQuestion
     // capta interrogativos en medio de la frase ("con tarjeta cuanto tardan"),
     // no solo al inicio o con "?" final.
-    if (!_isInfoQuestion(trimmed)) return null;
+    if (!_asksSomething(trimmed, dependencies)) return null;
 
     // No interferir en pasos finales: ya está pausado o esperando admin.
     const skipSteps = new Set(['waiting_admin_validation', 'completed', 'rejected_medical', 'rejected_abusive', 'rejected_geo', 'closing']);

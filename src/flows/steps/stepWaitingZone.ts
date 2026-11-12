@@ -1,5 +1,5 @@
 import { UserState, FlowStep } from '../../types/state';
-import { _setStep, _pauseAndAlert, _isInfoQuestion, _detectPostdatado } from '../utils/flowHelpers';
+import { _setStep, _pauseAndAlert, _isInfoQuestion, _asksSomething, _detectPostdatado } from '../utils/flowHelpers';
 import {
     classifyZoneText, parseDistanceAnswer, findZoneInHistory, getZoneConfig, isFarPlace, phoneZone,
     ZoneClassification,
@@ -298,7 +298,12 @@ export async function handleWaitingZone(
     }
 
     // ── Respuesta a "¿a cuántos km?" ───────────────────────────────────────────
-    if (currentState.zoneQuestion === 'km') {
+    // La IA leyó el mensaje como pregunta u objeción y el cliente no habla en
+    // primera persona ("Se abona al recibir", "llegan a Funes"): un nombre de
+    // lugar ahí adentro no es su localidad. Lo contesta la IA, que si de verdad
+    // dijo de dónde es lo devuelve en el tag LOCALIDAD.
+    const notAnAnswer = !_isInfoQuestion(text) && _asksSomething(text, dependencies) && !FIRST_PERSON_PLACE.test(normalizedText);
+    if (currentState.zoneQuestion === 'km' && !notAnAnswer) {
         const named = classifyZoneText(text, knowledge);
         if (named.zone === 'in' || named.zone === 'out') {
             await _resolveZone(userId, named as any, currentState, knowledge, dependencies);
@@ -315,7 +320,7 @@ export async function handleWaitingZone(
     }
 
     // ── Localidad en el mensaje ────────────────────────────────────────────────
-    const cls: ZoneClassification = classifyZoneText(text, knowledge);
+    const cls: ZoneClassification = notAnAnswer ? { zone: 'unknown', localidad: null } : classifyZoneText(text, knowledge);
     if (cls.zone === 'in') {
         // Si con la localidad vino la dirección ("Rosario, Mitre 1234"), se guarda
         // para no volver a pedirla. El CP de Rosario (2000-2009) no cuenta como
@@ -368,7 +373,7 @@ export async function handleWaitingZone(
             knowledge,
             userState: currentState
         });
-    if (_isInfoQuestion(text)) {
+    if (_isInfoQuestion(text) || notAnAnswer) {
         const aiRes = await askAi();
         const tag = String(aiRes.extractedData || '').match(/LOCALIDAD:\s*(.+)/i);
         if (tag) {

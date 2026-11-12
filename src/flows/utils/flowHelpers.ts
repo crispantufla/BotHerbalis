@@ -539,6 +539,18 @@ function _isInfoQuestion(text: string): boolean {
     return _Q_STARTERS.test(t) || _Q_ANYWHERE.test(t);
 }
 
+/**
+ * ¿El cliente está preguntando u objetando en vez de contestar? Suma al detector
+ * por palabras la lectura de la IA (`dependencies.intent`, ver
+ * services/intentClassifier): "Se toma una x dia" no tiene forma de pregunta
+ * pero lo es. Sin clasificación disponible queda igual que _isInfoQuestion.
+ */
+function _asksSomething(text: string, dependencies: any): boolean {
+    if (_isInfoQuestion(text)) return true;
+    const i = dependencies?.intent;
+    return !!i && !i.chooses && (i.asks === true || i.objects === true);
+}
+
 // ── "Sí" afirmativo al inicio vs "si" condicional ───────────────────────────
 // Para mensajes que ARRANCAN confirmando y siguen con más texto (típicamente
 // una pregunta): "Si, es correcta ¿cuánto tarda?" confirma; "y si tarda mucho?"
@@ -640,6 +652,7 @@ async function _closeSaleAndNotify(
 }
 
 export {
+    _asksSomething,
     _captureWeightGoal,
     _cleanPhone,
     _isAdminPhone,

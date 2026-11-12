@@ -1,5 +1,5 @@
 import { UserState } from '../../types/state';
-import { _setStep, _pauseAndAlert, _isInfoQuestion, _captureWeightGoal, _assignProductAndPlanByTier, _maybeSendPaymentMenuV7 } from '../utils/flowHelpers';
+import { _setStep, _pauseAndAlert, _asksSomething, _captureWeightGoal, _assignProductAndPlanByTier, _maybeSendPaymentMenuV7 } from '../utils/flowHelpers';
 import { _formatMessage } from '../utils/messages';
 import logger from '../../utils/logger';
 
@@ -52,7 +52,7 @@ export async function handleAgeRule(
     if (PRE_PLAN_STEPS.has(step)) {
         // Mensaje con dudas y sin elección: lo contesta la IA, que recibe la edad
         // y la regla en el contexto del cliente (aiPrompts._buildStateContext).
-        if (!picksOther && (hasGotas || !saidNow || _isInfoQuestion(text) || text.trim().split(/\s+/).length > 25)) return null;
+        if (!picksOther && (hasGotas || !saidNow || _asksSomething(text, dependencies) || text.trim().split(/\s+/).length > 25)) return null;
 
         const lead = picksOther
             ? `Después de los 70 no indicamos las cápsulas ni las semillas 🙏 Con ${age} años te recomiendo las *gotas* 💧, que son la opción más suave.`

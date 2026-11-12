@@ -772,6 +772,18 @@ function startScheduler(sharedState: SchedulerSharedState, dependencies: Schedul
     }, { timezone: TIMEZONE }));
     logger.info('[SCHEDULER] ✅ cleanStalePausedUsers → 05:00 ARG (diario)');
 
+    // ── REVISIÓN DE CHARLAS: todos los días a las 8:15 Argentina ──
+    // Claude lee las conversaciones de las últimas 24 h y le manda al admin dónde
+    // el bot contestó mal (services/nightlyReview). Solo lee. NIGHTLY_REVIEW=0 la apaga.
+    if (process.env.NIGHTLY_REVIEW !== '0' && process.env.NIGHTLY_REVIEW !== 'false') {
+        tasks.push(cron.schedule('15 8 * * *', () => {
+            const { runNightlyReview } = require('./nightlyReview');
+            runNightlyReview(sharedState.sellerId || 'default', dependencies)
+                .catch((e: any) => logger.error(`[SCHEDULER] Error en la revisión de charlas: ${e?.message}`));
+        }, { timezone: TIMEZONE }));
+        logger.info('[SCHEDULER] ✅ revisión de charlas → 8:15 ARG (diario)');
+    }
+
     // ── MP PAYMENT REFRESH: cada 5 minutos de 9-23h Argentina ──
     // Polls MercadoPago for pending payments and updates status automatically.
     if (process.env.MP_ACCESS_TOKEN) {

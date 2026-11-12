@@ -149,7 +149,9 @@ export async function handleWaitingWeight(
         const asksOrTells = /[?¿]/.test(text)
             || /\b(como|para que|sirve|funciona|contiene|efectos?|se toma|tomar(lo|la)?|que hace|quita|ansiedad|apetito|dieta|rebote|h?abl[ae]me|explic\w+|contame|cuentame|decime|dime|miedo|desconfi\w+|estafa)\b/.test(normalizedText)
             || /\b(diabet\w+|presion|hipertens\w+|tiroides|triglicerid\w+|colesterol|operad\w+|cirugia|enferm\w+|medicamento|medicacion|embaraz\w+|lactan\w+|gastritis|corazon|higado|rinon|a[ñn]os|edad|soy (una persona )?(mayor|grande))\b/.test(normalizedText);
-        if (!looksLikeBlob && !justPrice && (asksOrTells || words > 12) && aiService?.chat) {
+        const it = dependencies.intent;
+        const aiSaysDoubt = !!it && (it.asks || it.objects || it.health);
+        if (!looksLikeBlob && !justPrice && (asksOrTells || aiSaysDoubt || words > 12) && aiService?.chat) {
             try {
                 const aiRes = await aiService.chat(text, {
                     step: FlowStep.WAITING_WEIGHT,

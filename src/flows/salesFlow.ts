@@ -11,6 +11,8 @@ import { classifyNewLead, createInitialUserState } from './leadClassifier';
 import { handleClubHerbys } from './clubHerbys';
 
 interface SalesFlowDependencies {
+    /** Lectura de la IA del mensaje actual (services/intentClassifier); null si no hubo. */
+    intent?: { chooses: boolean; asks: boolean; objects: boolean; health: boolean } | null;
     saveState: (userId?: string) => void;
     client?: Record<string, any>;
     sharedState?: SharedState;
@@ -244,6 +246,19 @@ export async function processSalesFlow(
         logger.info(`[AD-RE-ENTRY] User ${userId} re-entró desde ${_detectAdSource(text)} sin weightGoal (step previo: ${currentState.step}). Reset a greeting.`);
         _setStep(currentState, FlowStep.GREETING);
         saveState(userId);
+    }
+
+    // 1.9 Qué está HACIENDO el cliente con este mensaje (elige, pregunta, objeta,
+    // habla de su salud): una llamada corta a la IA antes de que actúen las
+    // reglas, que leen palabras sueltas. Los pasos lo consultan por
+    // `dependencies.intent`; si la IA no contesta queda en null y todo sigue
+    // como antes. No corre en las charlas de campaña (flujo aparte), ni en las
+    // re-entradas internas, ni en los tests salvo que inyecten `intent`.
+    if (_recursionDepth === 0 && dependencies.intent === undefined && !(currentState as any).promo?.active && process.env.NODE_ENV !== 'test') {
+        const lastBot = [...(currentState.history || [])].reverse().find((h: any) => h && h.role === 'bot');
+        const { classifyMessage } = require('../services/intentClassifier');
+        const intent = await classifyMessage(text, { lastBotMessage: lastBot?.content || null, step: String(currentState.step || '') });
+        dependencies = { ...dependencies, intent };
     }
 
     // 2. Execute Global Interceptors (Priority 0 and 1)

@@ -328,6 +328,22 @@ describe('handleWaitingZone', () => {
             expect(lastSent()).toMatch(/de qué ciudad o barrio sos/i);
         });
 
+    test('"Se abona al recibir" leído por la IA como pregunta no se toma como localidad: responde la IA', async () => {
+        aiService.chat.mockResolvedValue({ response: 'Depende de dónde estés 😊 ¿De qué localidad sos?', goalMet: false, extractedData: null });
+        const st = makeState();
+        await handleWaitingZone(USER, 'Se abona al recibir', norm('Se abona al recibir'), st, knowledge, { ...deps, intent: { chooses: false, asks: true, objects: false, health: false } });
+        expect(aiService.chat).toHaveBeenCalledTimes(1);
+        expect(st.step).toBe('waiting_zone');
+        expect(sent.join(' ')).not.toMatch(/no me quedó claro/);
+    });
+
+    test('una pregunta que nombra una localidad de la zona no resuelve la zona si la IA la lee como pregunta', async () => {
+        aiService.chat.mockResolvedValue({ response: 'Sí, a Funes llegamos 😊 ¿Vos de qué localidad sos?', goalMet: false, extractedData: null });
+        const st = makeState();
+        await handleWaitingZone(USER, 'llegan hasta Funes', norm('llegan hasta Funes'), st, knowledge, { ...deps, intent: { chooses: false, asks: true, objects: false, health: false } });
+        expect(st.deliveryZone).toBeUndefined();
+    });
+
     test('"Soy de Rosario" sigue siendo la localidad del cliente', async () => {
         const st = makeState({ zoneQuestion: 'km', partialAddress: { ciudad: 'Pueblo X' } });
         await handleWaitingZone(USER, 'Soy de Rosario', norm('Soy de Rosario'), st, knowledge, deps);
@@ -429,6 +445,40 @@ describe('handleWaitingPlanChoice — la mención de Rosario ya no pausa', () =>
 // ─── Pago fuera de zona ───────────────────────────────────────────────────────
 describe('handleWaitingPaymentMethod — fuera de zona, todo prepago', () => {
     const outState = (o = {}) => makeState({ step: 'waiting_payment_method', deliveryZone: 'out', zoneQuestion: null, partialAddress: { ciudad: 'Córdoba' }, ...o });
+
+    // 12-nov-2026: en el submenú de pago, una clienta dijo por audio que tiene
+    // tarjeta pero ya le robaron una vez, y preguntó cuánto sale pagando en
+    // efectivo en su casa. El bot leyó "tarjeta" y le mandó el link de pago.
+    const CARD_FEAR = 'Yo tengo tarjeta, pero viste cómo están ahora las cosas que te agarran el número de tarjeta y te la utilizan para otra cosa, ya me pasó una vez, no sé de qué otra forma puedo pagarla, si viene a domicilio y yo doy el efectivo, ¿cuánto me saldría?';
+    const DOUBT = { chooses: false, asks: true, objects: true, health: false };
+
+    test('con la lectura de la IA, nombrar la tarjeta para decir que da miedo NO es elegirla', async () => {
+        const st = outState({ shippingChoice: 'retiro', paymentSubChoiceAsked: true });
+        await handleWaitingPaymentMethod(USER, CARD_FEAR, norm(CARD_FEAR), st, knowledge, { ...deps, intent: DOUBT });
+        expect(st.paymentMethod).not.toBe('mercadopago');
+        expect(st.step).toBe('waiting_payment_method');
+        expect(sent.join(' ')).not.toMatch(/te paso el link de pago/);
+        // Pidió efectivo en su casa fuera de zona: va el argumento del prepago.
+        expect(st.prepayObjections).toBe(1);
+    });
+
+    test('"con tarjeta" leído por la IA como elección sigue generando el pago', async () => {
+        const st = outState({ shippingChoice: 'retiro', paymentSubChoiceAsked: true });
+        await handleWaitingPaymentMethod(USER, 'con tarjeta', 'con tarjeta', st, knowledge, { ...deps, intent: { chooses: true, asks: false, objects: false, health: false } });
+        expect(st.paymentMethod).toBe('mercadopago');
+    });
+
+    test('un número de opción manda aunque la IA lo lea como duda', async () => {
+        const st = outState({ shippingChoice: 'retiro', paymentSubChoiceAsked: true });
+        await handleWaitingPaymentMethod(USER, '2', '2', st, knowledge, { ...deps, intent: DOUBT });
+        expect(st.paymentMethod).toBe('transferencia');
+    });
+
+    test('sin clasificación (la IA no contestó) el paso se comporta como antes', async () => {
+        const st = outState({ shippingChoice: 'retiro', paymentSubChoiceAsked: true });
+        await handleWaitingPaymentMethod(USER, 'con tarjeta', 'con tarjeta', st, knowledge, { ...deps, intent: null });
+        expect(st.paymentMethod).toBe('mercadopago');
+    });
 
     test('"casa" → domicilio + submenú tarjeta/transferencia', async () => {
         const st = outState();

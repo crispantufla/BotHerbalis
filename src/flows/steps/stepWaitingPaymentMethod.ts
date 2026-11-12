@@ -284,7 +284,14 @@ export async function handleWaitingPaymentMethod(
         && DECISIVE_CHOICE.test(normalizedText)
         && !DECISIVE_BLOCKERS.test(normalizedText)
         && ((_retiroKw !== _domicilioKw) || _detectOptionNumber(text) !== null);
-    const infoQuestion = !currentState.paymentSubChoiceAsked && !decisiveShippingChoice && _isInfoQuestion(text);
+    // La IA leyó el mensaje como pregunta u objeción, no como elección: nombrar
+    // la tarjeta para decir que da miedo usarla NO es elegirla. El 12-nov-2026
+    // "yo tengo tarjeta, pero ya me robaron una vez... ¿y en efectivo cuánto
+    // sale?" recibió el link de pago. Vale también con el submenú ya mostrado,
+    // donde el detector por palabras está apagado. Un número de opción manda.
+    const _it = dependencies.intent;
+    const aiSaysNotChoice = !!_it && !_it.chooses && (_it.asks || _it.objects) && _detectOptionNumber(text) === null;
+    const infoQuestion = !decisiveShippingChoice && (aiSaysNotChoice || (!currentState.paymentSubChoiceAsked && _isInfoQuestion(text)));
 
     // ── Estado sin zona resuelta ───────────────────────────────────────────────
     // Conversaciones abiertas antes de sep-2026, o reencauzadas acá por un cambio
@@ -432,8 +439,10 @@ export async function handleWaitingPaymentMethod(
             await sendMessageWithDelay(userId, _formatMessage(tpl, currentState));
             return { matched: true };
         } else {
-        const choseMp = (optionNum === '1') || (MP_KEYWORDS.test(text) && !mpNegated);
-        const choseTransfer = (optionNum === '2') || (TRANSFER_KEYWORDS.test(normalizedText) && !transferNegated);
+        // Si la IA leyó el mensaje como duda u objeción, nombrar un medio no es
+        // elegirlo: sigue a las ramas de abajo (efectivo, precio, IA).
+        const choseMp = (optionNum === '1') || (!aiSaysNotChoice && MP_KEYWORDS.test(text) && !mpNegated);
+        const choseTransfer = (optionNum === '2') || (!aiSaysNotChoice && TRANSFER_KEYWORDS.test(normalizedText) && !transferNegated);
 
         // MP apagado + el cliente eligió tarjeta: solo puede pasar en conversaciones
         // que ya tenían el submenú servido cuando se apagó el interruptor. Se lo
@@ -476,7 +485,7 @@ export async function handleWaitingPaymentMethod(
         // COD a domicilio NO existe → aclaramos y ofrecemos retiro en sucursal.
         const wantsCashAtHome = /\b(contado|al contado|efectivo|en\s+(el|mi)\s+(domicilio|casa)|en\s+casa|al\s+recibir|contra\s?entrega|cuando\s+(lo|me)\s+(reciba|llegue|entreguen|traigan))\b/i.test(normalizedText)
             && !NO_CASH.test(normalizedText)
-            && !MP_KEYWORDS.test(text) && !TRANSFER_KEYWORDS.test(normalizedText);
+            && (aiSaysNotChoice || (!MP_KEYWORDS.test(text) && !TRANSFER_KEYWORDS.test(normalizedText)));
         if (wantsCashAtHome) {
             logger.info(`[PAYMENT_METHOD] ${userId} → submenú: pidió pagar en efectivo / al recibir fuera de zona.`);
             return await _handlePrepayObjection(userId, text, currentState, knowledge, dependencies, 'efectivo/al recibir en el submenú');

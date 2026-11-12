@@ -243,7 +243,8 @@ export async function handleSystemGlobals(
     // otra cosa: "quiero/prefiero otra cosa".
     const CHANGE_REGEX = /\b(cambiar|cambiarlo|modificar|otro producto|en vez de|quiero otra|(?:quiero|prefiero|mejor|dame|llevo)\s+otra cosa)\b/i;
     const hasChoice = !!currentState.selectedProduct || (Array.isArray(currentState.cart) && currentState.cart.length > 0);
-    if (hasChoice && CHANGE_REGEX.test(normalizedText) && currentState.step !== 'greeting' && currentState.step !== 'waiting_data' && !isNegative) {
+    const aiSaysQuestion = (() => { const i = (dependencies as any).intent; return !!i && !i.chooses && (i.asks || i.objects); })();
+    if (hasChoice && !aiSaysQuestion && CHANGE_REGEX.test(normalizedText) && currentState.step !== 'greeting' && currentState.step !== 'waiting_data' && !isNegative) {
         logger.info(`[GLOBAL] User ${userId} requested change.`);
         currentState.cart = [];
         currentState.pendingOrder = null;
