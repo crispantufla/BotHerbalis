@@ -1004,6 +1004,9 @@ module.exports = (clientPool) => {
             if (!req.body.chatId || !text) return res.status(400).json({ error: 'Faltan chatId o text' });
             const chatId = await resolveChatId(req.body.chatId, cl, req.sellerId);
             if (chatId.includes('@lid')) return res.status(400).json({ error: 'No pude resolver el chat a un teléfono' });
+            // Mismo guard que /send: solo contactos que ya son de este vendedor.
+            const ownErr = await _verifyChatOwnership(chatId, ss, instanceId);
+            if (ownErr) return res.status(ownErr.status).json(ownErr.body);
 
             const { unpauseUser } = require('../../services/pauseService');
             await unpauseUser(chatId, ss, instanceId);
