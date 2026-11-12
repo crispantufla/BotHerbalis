@@ -169,6 +169,23 @@ export async function validateWithGoogleMaps(address: string): Promise<MapsValid
 }
 
 /**
+ * Distancia en km (línea recta) entre un lugar nombrado por el cliente y un
+ * punto. Null si Maps no lo encuentra, no está en Argentina o no hay clave.
+ * La usa waiting_zone para no preguntarle "¿queda cerca de Rosario?" a alguien
+ * de un lugar que no está en nuestras listas pero Maps sí conoce.
+ */
+export async function placeDistanceKm(place: string, lat: number, lng: number): Promise<number | null> {
+    const res = await validateWithGoogleMaps(place);
+    // Con un texto que no reconoce, Maps devuelve el país entero ("Argentina").
+    const loc: any = res.valid && res.formatted !== 'Argentina' ? res.location : null;
+    if (!loc || typeof loc.lat !== 'number' || typeof loc.lng !== 'number') return null;
+    const rad = (d: number) => (d * Math.PI) / 180;
+    const a = Math.sin(rad(loc.lat - lat) / 2) ** 2
+        + Math.cos(rad(lat)) * Math.cos(rad(loc.lat)) * Math.sin(rad(loc.lng - lng) / 2) ** 2;
+    return Math.round(6371 * 2 * Math.asin(Math.sqrt(a)));
+}
+
+/**
  * lookupCPFromMaps
  * Uses Google Maps Geocoding to find the postal code for a street + city.
  * Returns the CP string (4 digits) or null if not found.

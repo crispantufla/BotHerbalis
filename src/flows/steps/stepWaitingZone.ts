@@ -1,7 +1,7 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _setStep, _pauseAndAlert, _isInfoQuestion, _detectPostdatado } from '../utils/flowHelpers';
 import {
-    classifyZoneText, parseDistanceAnswer, findZoneInHistory, getZoneConfig, isFarPlace,
+    classifyZoneText, parseDistanceAnswer, findZoneInHistory, getZoneConfig, isFarPlace, phoneZone,
     ZoneClassification,
 } from '../utils/deliveryZone';
 import { getFlowTemplate } from '../../utils/messageTemplates';
@@ -49,6 +49,7 @@ const PROVINCE_ONLY = /\b(entre rios|santa fe)\b/;
 // mandó a reparto propio a un cliente de Mataderos (caso 5491161826864).
 const ASKS_SELLER_PLACE = /\b(son|sos|estan|ustedes|uds|quedan|se encuentran)\b[^.]{0,20}\b(de|en)\s+rosario\b|\bde donde (son|sos|envian|mandan|despachan)\b/;
 const FIRST_PERSON_PLACE = /\b(soy|somos|vivo|vivimos|estoy|estamos)\b/;
+const ROSARIO_COORDS = { lat: -32.9468, lng: -60.6393 };
 // Última línea del zone_in del guion, para cambiarla cuando ya tenemos parte de
 // los datos.
 const ZONE_IN_ASK = /Pasame tu \*nombre completo\* y \*calle y n[uú]mero\*[^\n]*$/;
@@ -222,8 +223,31 @@ async function _askKm(userId: string, currentState: UserState, knowledge: any, d
     const { sendMessageWithDelay, saveState } = dependencies;
     if (!currentState.partialAddress) currentState.partialAddress = {} as any;
     if (candidate) (currentState.partialAddress as any).ciudad = candidate;
-    currentState.zoneQuestion = 'km';
     const cfg = getZoneConfig(knowledge);
+
+    // Antes de preguntarle al cliente, le preguntamos a Maps. Solo decide lo
+    // LEJANO sin ambigüedad (más del doble del radio): la zona de reparto es una
+    // lista de localidades, no un círculo, así que lo cercano que no está en la
+    // lista se sigue preguntando. En los tests no sale a la red salvo que se
+    // inyecte `dependencies.placeDistanceKm`.
+    const distFn = dependencies.placeDistanceKm
+        || (process.env.NODE_ENV === 'test' ? null : require('../../services/addressValidator').placeDistanceKm);
+    // Con característica de la zona (341...) no se decide por Maps: hay nombres
+    // repetidos ("Belgrano" es un barrio de Rosario y otro de Capital).
+    if (candidate && distFn && cfg.centro === 'Rosario' && phoneZone(userId) === 'out') {
+        try {
+            const km = await distFn(candidate, ROSARIO_COORDS.lat, ROSARIO_COORDS.lng);
+            if (typeof km === 'number' && km > cfg.radioKm * 2) {
+                logger.info(`[ZONE] ${userId} → "${candidate}" está a ~${km} km según Maps → fuera de zona sin preguntar.`);
+                await _resolveZone(userId, { zone: 'out', localidad: candidate }, currentState, knowledge, dependencies);
+                return { matched: true };
+            }
+        } catch (e: any) {
+            logger.warn(`[ZONE] Maps falló para "${candidate}" (${userId}): ${e.message}`);
+        }
+    }
+
+    currentState.zoneQuestion = 'km';
     const tpl = _tplOr('zone_km', knowledge, false, `¿Y eso queda cerca de ${cfg.centro}? ¿A cuántos km, más o menos? 🙂`);
     saveState(userId);
     await sendMessageWithDelay(userId, _formatMessage(tpl, currentState));

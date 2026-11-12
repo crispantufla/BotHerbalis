@@ -245,6 +245,30 @@ describe('handleWaitingZone', () => {
         expect(lastSent()).toMatch(/cuántos km/i);
     });
 
+    test('localidad desconocida que Maps ubica lejos → fuera de zona sin preguntar los km', async () => {
+        mockParseAddress.mockResolvedValue({ ciudad: 'Ramos Mejía' });
+        const placeDistanceKm = jest.fn().mockResolvedValue(290);
+        const st = makeState();
+        await handleWaitingZone('5491100000001@c.us', 'Soy de Ramos Mejía', norm('Soy de Ramos Mejía'), st, knowledge, { ...deps, placeDistanceKm });
+        expect(placeDistanceKm).toHaveBeenCalledWith('Ramos Mejía', expect.any(Number), expect.any(Number));
+        expect(st.deliveryZone).toBe('out');
+        expect(st.step).toBe('waiting_payment_method');
+        expect(sent.join(' ')).not.toMatch(/cuántos km/i);
+
+        // Con característica de Rosario (341) no se decide por Maps: se pregunta.
+        const local = makeState();
+        await handleWaitingZone(USER, 'Soy de Ramos Mejía', norm('Soy de Ramos Mejía'), local, knowledge, { ...deps, placeDistanceKm });
+        expect(local.zoneQuestion).toBe('km');
+    });
+
+    test.each([[40], [100], [null]])('si Maps dice %s km (cerca, dudoso o no lo encuentra) se siguen preguntando los km', async (km) => {
+        mockParseAddress.mockResolvedValue({ ciudad: 'Las Parejas' });
+        const st = makeState();
+        await handleWaitingZone('5491100000001@c.us', 'Soy de Las Parejas', norm('Soy de Las Parejas'), st, knowledge, { ...deps, placeDistanceKm: jest.fn().mockResolvedValue(km) });
+        expect(st.zoneQuestion).toBe('km');
+        expect(lastSent()).toMatch(/cuántos km/i);
+    });
+
     test('respuesta de km ≤ 60 → dentro de zona; > 60 → fuera', async () => {
         const stIn = makeState({ zoneQuestion: 'km', partialAddress: { ciudad: 'Pueblo X' } });
         await handleWaitingZone(USER, 'unos 40 km', norm('unos 40 km'), stIn, knowledge, deps);
