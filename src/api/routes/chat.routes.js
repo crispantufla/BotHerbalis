@@ -989,6 +989,38 @@ module.exports = (clientPool) => {
         }
     });
 
+    // POST /resume-chat — despausa y hace que el bot conteste YA el mensaje que
+    // quedó sin respuesta. Despausar solo no alcanza: el bot responde recién
+    // cuando el cliente vuelve a escribir. Nació el 12-nov-2026: la bienvenida
+    // automática de WhatsApp Business había pausado 18 leads que preguntaron
+    // el precio. `text` es lo que escribió el cliente; entra a la cola igual
+    // que si acabara de llegar (mismo payload que `processDebounced`).
+    router.post('/resume-chat', ...withSeller(clientPool), async (req, res) => {
+        try {
+            const { sharedState: ss, client: cl, queue } = req.sellerInstance || {};
+            const instanceId = getInstanceId(req);
+            const text = String(req.body.text || '').trim();
+            if (!instanceId || !ss || !queue) return res.status(400).json({ error: 'Seleccioná un vendedor conectado' });
+            if (!req.body.chatId || !text) return res.status(400).json({ error: 'Faltan chatId o text' });
+            const chatId = await resolveChatId(req.body.chatId, cl, req.sellerId);
+            if (chatId.includes('@lid')) return res.status(400).json({ error: 'No pude resolver el chat a un teléfono' });
+
+            const { unpauseUser } = require('../../services/pauseService');
+            await unpauseUser(chatId, ss, instanceId);
+            for (const room of [req.sellerId, 'admin'].filter(Boolean)) {
+                ss.io?.to(room).emit('bot_status_change', { chatId, paused: false, sellerId: req.sellerId });
+            }
+            await queue.add('process-message', { userId: chatId, combinedText: text, effectiveScript: 'v7', startTime: Date.now() }, {
+                removeOnComplete: true,
+                removeOnFail: 100
+            });
+            logger.info(`[API] resume-chat: ${chatId} despausado y reencolado: "${text.slice(0, 80)}"`);
+            res.json({ success: true, chatId });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     // DELETE /messages (Delete for everyone)
     router.delete('/messages', ...withSeller(clientPool), async (req, res) => {
         try {
