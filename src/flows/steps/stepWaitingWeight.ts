@@ -1,6 +1,6 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _formatMessage, _buildPriceTableWithWeightAsk } from '../utils/messages';
-import { _setStep, _maybeUpsell, _pauseAndAlert, _assignProductAndPlanByTier, _maybeSendPaymentMenuV7, _pushHistory } from '../utils/flowHelpers';
+import { _setStep, _maybeUpsell, _pauseAndAlert, _captureWeightGoal, _assignProductAndPlanByTier, _maybeSendPaymentMenuV7, _pushHistory } from '../utils/flowHelpers';
 import logger from '../../utils/logger';
 
 /**
@@ -125,6 +125,10 @@ export async function handleWaitingWeight(
     // los precios?". Si en la respuesta ya nombra un producto, vamos directo a ese
     // producto; si no ("sí", "dale", "¿cuánto sale?"), mandamos la lista de precios.
     if (knowledge?.flow?.prices_club) {
+        // El guion ya no pregunta los kilos, pero si el cliente los dice se
+        // anotan: definen qué plan se le sugiere después ("Hasta 10k" terminó con
+        // el de 120 días precargado).
+        _captureWeightGoal(normalizedText, currentState);
         if (/\b(got\w*|c[aá]psul\w*|pastill\w*|semill\w*)\b/i.test(text)) {
             _setStep(currentState, FlowStep.WAITING_PREFERENCE);
             saveState(userId);

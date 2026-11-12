@@ -96,6 +96,21 @@ export async function handleGreeting(
     const _asksPriceOnly = _substantiveOpening
         && /\b(precios?|cuanto\s+(sale|cuesta|vale|es|salen|cuestan)|que\s+precio|costo|valor|presio)\b/i.test(_norm)
         && !/capsul|gota|semilla|pastilla/i.test(_norm);
+    // Guion por zona: el precio va PRIMERO. El mensaje prearmado de los anuncios
+    // es "¿Cuánto cuesta la cápsula?": al nombrar un producto no entraba acá
+    // abajo, la IA contestaba "depende del plan, ¿cuántos kilos?" y el cliente
+    // tenía que pedir el precio dos veces (12-nov-2026).
+    // Solo para preguntas cortas de precio; si trae otras dudas responde la IA.
+    const _asksPrice = _substantiveOpening
+        && /\b(precios?|cuanto\s+(sale|cuesta|vale|es|salen|cuestan)|que\s+precio|costo|valor|presio)\b/i.test(_norm);
+    if (_asksPrice && knowledge?.flow?.prices_club?.response && text.trim().split(/\s+/).length <= 8) {
+        const { FlowStep } = require('../../types/state');
+        _setStep(currentState, FlowStep.WAITING_PREFERENCE);
+        saveState(userId);
+        await sendMessageWithDelay(userId, `¡Hola! 😊 Soy Elena de Herbalis.\n\n${_formatMessage(knowledge.flow.prices_club.response, currentState)}`);
+        logger.info(`[GREETING-PRICE] User ${userId} abrió pidiendo precio — lista de precios directo.`);
+        return { matched: true };
+    }
     if (_asksPriceOnly) {
         const tableMsg = _buildPriceTableWithWeightAsk(knowledge, currentState);
         if (tableMsg) {

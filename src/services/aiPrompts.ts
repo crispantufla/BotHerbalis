@@ -612,6 +612,10 @@ export function _buildStateContext(context: APIContext): string {
     if (context.userState) {
         const s = context.userState;
         if (s.selectedProduct) stateContext += `- Producto elegido: ${s.selectedProduct} \n`;
+        // Va acá (turno user) y no en el system: depende del cliente.
+        if (Number(s.clientAge) >= 70 && Number(s.clientAge) < 80) {
+            stateContext += `- EDAD DEL CLIENTE: ${s.clientAge} años → SOLO GOTAS (la opción más suave). NUNCA le ofrezcas ni le confirmes cápsulas ni semillas; si las pide, explicale con calidez que después de los 70 solo indicamos las gotas.\n`;
+        }
         if (s.cart && s.cart.length > 0) {
             stateContext += `- Carrito (precios base por ítem, NO son el total a pagar): ${s.cart.map(i => `${i.product} (${i.plan} días) $${i.price}`).join(', ')} \n`;
         }

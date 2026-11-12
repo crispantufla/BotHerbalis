@@ -4,6 +4,7 @@ import { handleSafetyCheck } from './globalSafety';
 import { handleMediaGlobals } from './globalMedia';
 import { handleFaq } from './globalFaq';
 import { handleScheduleRequest } from './globalScheduleRequest';
+import { handleAgeRule } from './globalAge';
 
 export async function processGlobals(
     userId: string,
@@ -19,6 +20,10 @@ export async function processGlobals(
     if (result && result.matched) return result;
 
     result = await handleSafetyCheck(userId, text, normalizedText, currentState, knowledge, dependencies);
+    if (result && result.matched) return result;
+
+    // Entre 70 y 79 años, solo gotas (regla del dueño, cumplida desde el código).
+    result = await handleAgeRule(userId, text, normalizedText, currentState, knowledge, dependencies);
     if (result && result.matched) return result;
 
     // Cliente pide horario específico de entrega (ej: "vengan mañana a las 17:30").

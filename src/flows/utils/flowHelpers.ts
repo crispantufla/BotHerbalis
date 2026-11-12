@@ -364,6 +364,19 @@ function _resolveNewProductPlan(normalizedText: string, currentProduct: string |
  * Si no hay weightGoal todavía (caso edge: cliente mencionó producto antes
  * de kilos y la lógica del weight step no extrajo nada), default a 120d.
  */
+/**
+ * Anota los kilos si el cliente los dice de pasada ("Hasta 10k", "12 kilos").
+ * El guion por zona ya no los pregunta, pero definen qué plan se le sugiere.
+ * No pisa un valor ya guardado. Texto normalizado (minúsculas, sin acentos).
+ */
+function _captureWeightGoal(normalizedText: string, state: any): void {
+    if (state.weightGoal) return;
+    const kg = normalizedText.match(/\b(\d{1,3})\s*(?:kgs?|kilos?|k)\b/) || normalizedText.match(/\b(?:hasta|menos de|unos|como)\s+(\d{1,2})\b(?!\s*a[ñn]os)/);
+    if (!kg) return;
+    const n = parseInt(kg[1], 10);
+    if (n >= 1 && n <= 150) state.weightGoal = n;
+}
+
 function _assignProductAndPlanByTier(state: any, productFullName: string): void {
     const { _getEffectivePrice } = require('./pricing');
     const { calculateTotal } = require('./cartHelpers');
@@ -627,6 +640,7 @@ async function _closeSaleAndNotify(
 }
 
 export {
+    _captureWeightGoal,
     _cleanPhone,
     _isAdminPhone,
     _isInfoQuestion,

@@ -146,7 +146,8 @@ export interface UserState {
     // Flags de estados especiales del cliente
     hasSoldBefore?: boolean;         // true si ya se concretó al menos una venta exitosa
     pendingCancelConfirm?: boolean;  // true si el bot está esperando confirmación de cancelación
-    currentWeight?: number;          // Peso corporal actual del cliente (distinto de weightGoal)
+    clientAge?: number | null;       // Edad dicha por el cliente, solo si es 70+ (regla de solo gotas, globalAge.ts)
+    currentWeight?: number;         // Peso corporal actual del cliente (distinto de weightGoal)
     userName?: string;               // Nombre del cliente extraído del chat
 
     // Payment method flow

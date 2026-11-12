@@ -1,6 +1,6 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _formatMessage } from '../utils/messages';
-import { _setStep, _maybeUpsell, _detectPostdatado, _assignProductAndPlanByTier, _maybeSendPaymentMenuV7, _pushHistory } from '../utils/flowHelpers';
+import { _setStep, _maybeUpsell, _detectPostdatado, _captureWeightGoal, _assignProductAndPlanByTier, _maybeSendPaymentMenuV7, _pushHistory } from '../utils/flowHelpers';
 import { isMpEnabled, prepayMeans } from '../utils/paymentOptions';
 import logger from '../../utils/logger';
 
@@ -26,6 +26,16 @@ async function _clubSkipPlanQuestion(userId: string, text: string, product: stri
     return true;
 }
 
+/**
+ * A quien dijo que quiere bajar hasta 10 kg no se le empuja el plan de 120 días:
+ * la lista de precios le acaba de decir que con el de 60 alcanza.
+ */
+function _pitchForGoal(msg: string, state: UserState): string {
+    const w = Number(state.weightGoal) || 0;
+    if (w <= 0 || w > 10) return msg;
+    return msg.replace(/El de \*120 días\* es el tratamiento completo y el que más eligen 💪/, 'Para lo que querés bajar, con el de *60 días* te alcanza 💪');
+}
+
 export async function handleWaitingPreference(
     userId: string,
     text: string,
@@ -35,6 +45,7 @@ export async function handleWaitingPreference(
     dependencies: any
 ): Promise<{ matched: boolean }> {
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
+    _captureWeightGoal(normalizedText, currentState);
 
     // Plan elegido por el cliente: si pide explícitamente el otro plan (ej: "dale
     // pero el de 120" aunque le hayamos recomendado 60), lo guardamos en _planChoice
@@ -189,7 +200,7 @@ export async function handleWaitingPreference(
         _assignProductAndPlanByTier(currentState, "Cápsulas de nuez de la india");
         if (await _clubSkipPlanQuestion(userId, text, "Cápsulas de nuez de la india", currentState, knowledge, dependencies)) return { matched: true };
         const node = knowledge.flow.preference_capsulas;
-        const msg = _formatMessage(node.response, currentState);
+        const msg = _pitchForGoal(_formatMessage(node.response, currentState), currentState);
 
         _setStep(currentState, node.nextStep);
         saveState(userId);
@@ -201,7 +212,7 @@ export async function handleWaitingPreference(
         _assignProductAndPlanByTier(currentState, "Semillas de nuez de la india");
         if (await _clubSkipPlanQuestion(userId, text, "Semillas de nuez de la india", currentState, knowledge, dependencies)) return { matched: true };
         const node = knowledge.flow.preference_semillas;
-        const msg = _formatMessage(node.response, currentState);
+        const msg = _pitchForGoal(_formatMessage(node.response, currentState), currentState);
 
         _setStep(currentState, node.nextStep);
         saveState(userId);
@@ -213,7 +224,7 @@ export async function handleWaitingPreference(
         _assignProductAndPlanByTier(currentState, "Gotas de nuez de la india");
         if (await _clubSkipPlanQuestion(userId, text, "Gotas de nuez de la india", currentState, knowledge, dependencies)) return { matched: true };
         const node = knowledge.flow.preference_gotas;
-        const msg = _formatMessage(node.response, currentState);
+        const msg = _pitchForGoal(_formatMessage(node.response, currentState), currentState);
 
         _setStep(currentState, node.nextStep);
         saveState(userId);

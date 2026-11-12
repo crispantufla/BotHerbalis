@@ -236,8 +236,14 @@ export async function handleSystemGlobals(
     }
 
     // 4. CHANGE ORDER
-    const CHANGE_REGEX = /\b(cambiar|cambiarlo|modificar|otro producto|otra cosa|en vez de|quiero otra)\b/i;
-    if (CHANGE_REGEX.test(normalizedText) && currentState.step !== 'greeting' && currentState.step !== 'waiting_data' && !isNegative) {
+    // Solo si ya eligió algo: sin producto no hay pedido que cambiar. Y "otra
+    // cosa" a secas no es un pedido de cambio: el 12-nov-2026 una clienta mandó
+    // un audio con cinco dudas ("son de Herbalife o es otra cosa? tengo miedo
+    // que me haga mal...") y recibió "Volvamos a elegir". Ahora tiene que pedir
+    // otra cosa: "quiero/prefiero otra cosa".
+    const CHANGE_REGEX = /\b(cambiar|cambiarlo|modificar|otro producto|en vez de|quiero otra|(?:quiero|prefiero|mejor|dame|llevo)\s+otra cosa)\b/i;
+    const hasChoice = !!currentState.selectedProduct || (Array.isArray(currentState.cart) && currentState.cart.length > 0);
+    if (hasChoice && CHANGE_REGEX.test(normalizedText) && currentState.step !== 'greeting' && currentState.step !== 'waiting_data' && !isNegative) {
         logger.info(`[GLOBAL] User ${userId} requested change.`);
         currentState.cart = [];
         currentState.pendingOrder = null;
