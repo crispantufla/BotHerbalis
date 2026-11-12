@@ -94,6 +94,7 @@ const MAX_RETRIES = 3;
 // Excepción: parseAddress cae a Claude si OpenAI falla (ver _claudeParseAddress).
 const CLAUDE_MODEL_PREMIUM = process.env.CLAUDE_MODEL_PREMIUM || "claude-sonnet-4-6";
 const CLAUDE_MODEL_SIMPLE = process.env.CLAUDE_MODEL_SIMPLE || "claude-haiku-4-5-20251001";
+const CLAUDE_SIMPLE_STEPS_ON_HAIKU = (process.env.CLAUDE_SIMPLE_STEPS || '').toLowerCase() === 'haiku';
 const CLAUDE_AB_SELLERS = new Set(
     (process.env.CLAUDE_AB_SELLERS || "").split(",").map(s => s.trim()).filter(Boolean)
 );
@@ -291,7 +292,13 @@ class AIService {
      */
     async _claudeChat(systemPrompt: string | string[], userPrompt: string, step: string, sellerId: string, historyTurns?: ChatTurn[]): Promise<{ response?: string; goalMet?: boolean; extractedData?: string | null } | null> {
         try {
-            const model = PREMIUM_STEPS.has(step) ? CLAUDE_MODEL_PREMIUM : CLAUDE_MODEL_SIMPLE;
+            // Desde el 12-nov-2026 TODA la conversación de venta va al modelo
+            // premium (Sonnet): localidad y pago —el tramo nuevo del guion por
+            // zona, donde se decide la plata— corrían en Haiku por no estar en
+            // PREMIUM_STEPS. Con el volumen actual el costo no es el freno.
+            // CLAUDE_SIMPLE_STEPS=haiku en Railway vuelve al reparto anterior
+            // sin deploy. Las campañas (PROMO_AI_MODEL) no pasan por acá.
+            const model = (PREMIUM_STEPS.has(step) || !CLAUDE_SIMPLE_STEPS_ON_HAIKU) ? CLAUDE_MODEL_PREMIUM : CLAUDE_MODEL_SIMPLE;
             // Modo turnos estructurados (flag WA_STRUCTURED_TURNS): el historial va
             // como turnos user/assistant reales antes del mensaje actual, y el system
             // (estable por step) se cachea. Si no, comportamiento clásico (blob aplanado).
