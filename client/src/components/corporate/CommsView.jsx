@@ -68,8 +68,11 @@ const CommsView = ({ initialChatId, onChatSelected, onChatOpened, alerts = [], o
         chats, setChats, messages, setMessages,
         isLoadingChats, isLoadingMessages,
         globalPause,
-        sendMessage, sendMedia, deleteMessage, toggleBot, clearChat
+        sendMessage, sendMedia, deleteMessage, toggleBot, resumeChat, clearChat
     } = useChat(selectedChatId);
+    // Id del chat con un "Retomar" en curso (por chat: cambiar de conversación
+    // no deja el botón del otro chat girando).
+    const [resumingChatId, setResumingChatId] = useState(null);
 
     // Objeto derivado: siempre la versión viva del array `chats` (los updates
     // de bot_status_change / new_log fluyen al chat abierto). El fallback solo
@@ -227,6 +230,28 @@ const CommsView = ({ initialChatId, onChatSelected, onChatOpened, alerts = [], o
                 : prev);
             toast.success(newStatus ? 'Bot pausado' : 'Bot reactivado');
         } catch { toast.error('Error cambiando estado del bot'); }
+    };
+
+    // Despausa y hace que el bot conteste lo que el cliente dejó sin respuesta.
+    // Si no hay nada pendiente el servidor contesta 409 y el chat sigue pausado.
+    const handleResumeChat = async () => {
+        if (!selectedChat || resumingChatId) return;
+        const chatId = selectedChat.id;
+        setResumingChatId(chatId);
+        try {
+            await resumeChat(chatId);
+            setChats(prev => Array.isArray(prev)
+                ? prev.map(c => c.id === chatId ? { ...c, isPaused: false } : c)
+                : prev);
+            setSelectedChatFallback(prev => prev && prev.id === chatId
+                ? { ...prev, isPaused: false }
+                : prev);
+            toast.success('Bot reactivado: le está contestando al cliente');
+        } catch (e) {
+            toast.error(e.response?.data?.error || 'No se pudo retomar el chat');
+        } finally {
+            setResumingChatId(null);
+        }
     };
 
     const handleClearChat = async () => {
@@ -398,6 +423,8 @@ Teléfono: ${phoneDisplay}`;
                             onToggleOrders={() => setShowOrdersPanel(v => !v)}
                             onClearChat={handleClearChat}
                             onToggleBot={handleToggleBot}
+                            onResumeChat={handleResumeChat}
+                            resuming={resumingChatId === selectedChat.id}
                             onToggleScriptPanel={() => setShowScriptPanel(v => !v)}
                             onSummarize={handleSummarize}
                         />

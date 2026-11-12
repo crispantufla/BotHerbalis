@@ -178,6 +178,14 @@ export interface UserState {
     // used to rate-limit repeat calls to the summarizer.
     lastSummarizedAt?: number;
 
+    // Respuestas con nota de voz (A/B nov-2026, ver services/tts.ts).
+    // lastInboundWasAudio: lo último que mandó el cliente fue un audio (lo apaga
+    // un mensaje de texto); lastInboundAudioAt dice cuándo, porque la señal vence.
+    // voiceAB: el grupo que le tocó, anotado la primera vez que escribió por audio.
+    lastInboundWasAudio?: boolean;
+    lastInboundAudioAt?: number;
+    voiceAB?: 'voice' | 'text';
+
     // Campaña promo (oct-2026). Lo setea el despachador al mandar la oferta.
     // Mientras `active` sea true, el plan de 60 días se cotiza al precio promo
     // (_getEffectivePrice en pricing.ts). `prevStep` es donde estaba el cliente

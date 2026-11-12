@@ -173,6 +173,43 @@ function cleanChromeLocks(authPath: string): void {
     }
 }
 
+/**
+ * Pasa a la cola de BullMQ los mensajes que estaban esperando en el agrupado
+ * (`pendingMessages`, en memoria) para que no se pierdan cuando el proceso se
+ * apaga. El 12-nov-2026 un deploy mató el contenedor con un audio de una
+ * clienta recién llegado: estaba en esa espera, nunca llegó a la cola y ella
+ * quedó sin respuesta en el paso de pago.
+ *
+ * Primero pausa el worker: si no, este mismo proceso —que se está apagando—
+ * tomaría el trabajo y lo dejaría a medias. El worker del proceso nuevo (o el
+ * que se crea en un restartSeller) lo levanta de Redis. Mismo payload que
+ * `processDebounced` (incomingSteps).
+ */
+export async function flushPendingToQueue(instance: { sellerId: string; pendingMessages: Map<string, any>; queue: any; worker?: any }): Promise<number> {
+    const pending = instance.pendingMessages;
+    if (!pending || pending.size === 0) return 0;
+    try { await instance.worker?.pause(true); } catch (e) { /* si no se puede pausar, igual encolamos */ }
+    let flushed = 0;
+    for (const [userId, entry] of Array.from(pending.entries())) {
+        try { clearTimeout(entry?.timer); } catch (e) { /* ignore */ }
+        pending.delete(userId);
+        const msgs = Array.isArray(entry?.messages) ? [...entry.messages].sort((a: any, b: any) => (a.timestamp || 0) - (b.timestamp || 0)) : [];
+        const combinedText = msgs.map((m: any) => m.text).filter(Boolean).join(' ');
+        if (!combinedText) continue;
+        try {
+            await instance.queue.add('process-message', { userId, combinedText, effectiveScript: 'v7', startTime: entry.startTime || Date.now() }, {
+                removeOnComplete: true,
+                removeOnFail: 100
+            });
+            flushed++;
+        } catch (e: any) {
+            logger.error(`[POOL][${instance.sellerId}] No pude encolar el mensaje pendiente de ${userId}: ${e?.message}`);
+        }
+    }
+    if (flushed) logger.info(`[POOL][${instance.sellerId}] ${flushed} mensaje(s) en espera pasaron a la cola antes de apagar.`);
+    return flushed;
+}
+
 class ClientPool {
     private instances: Map<string, SellerInstance> = new Map();
     private knownSellers: Set<string> = new Set();
@@ -720,6 +757,9 @@ class ClientPool {
         // estado fresco de la instancia nueva tras un restartSeller).
         try { instance.schedulerHandle?.stop(); } catch (e) { /* ignore */ }
         instance.schedulerHandle = null;
+        // Lo primero y lo más rápido: los mensajes de clientes que estaban en la
+        // espera de agrupado pasan a la cola de Redis, que sobrevive al reinicio.
+        try { await flushPendingToQueue(instance); } catch (e: any) { logger.error(`[POOL][${sellerId}] flushPendingToQueue: ${e?.message}`); }
         try { await instance.stateManager.flushState(); } catch (e) { /* ignore */ }
         // Remove all listeners before destroy to prevent stale reconnect handlers from firing
         try { instance.client.removeAllListeners(); } catch (e) { /* ignore */ }

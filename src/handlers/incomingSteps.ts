@@ -230,9 +230,48 @@ export async function handleAdminMessage(msg: any, userId: string, msgText: stri
  */
 export async function handleNonTextContent(msg: any, userId: string, msgText: string, rt: HandlerRuntime): Promise<string | null> {
     if (msg.type === 'ptt' || msg.type === 'audio') return handleClientAudio(msg, userId, rt);
+    // En remoto el `body` de una imagen puede traer la miniatura en base64 en
+    // vez del epígrafe, y a veces el mensaje ni llega con type 'image'. El
+    // 12-nov-2026 una de esas tiras entró al flujo como si fuera texto y el bot
+    // le contestó con la lista de precios. Se trata como imagen sin epígrafe.
+    if (_looksLikeImageBlob(msg.body) || _looksLikeImageBlob(msgText)) {
+        return handleImageOrSticker({ type: 'image', body: '' }, userId, rt);
+    }
     if (msg.type === 'image' || msg.type === 'sticker') return handleImageOrSticker(msg, userId, rt);
     if (msg.type === 'document') return handleDocument(msg, userId, rt);
+    noteInboundKind(userId, false, rt);
     return msgText;
+}
+
+/**
+ * Anota si lo último que mandó el cliente fue un audio: es la señal que mira
+ * sendMessageWithDelay para contestar con nota de voz (A/B, ver services/tts.ts).
+ * Un mensaje de texto la apaga. Si el cliente todavía no tiene estado (su primer
+ * mensaje es un audio) no se le inventa uno acá — el estado inicial lo arma solo
+ * el flujo —: la marca queda en sharedState y sendMessageWithDelay la pasa al
+ * estado cuando ya existe.
+ */
+function noteInboundKind(userId: string, wasAudio: boolean, rt: HandlerRuntime): void {
+    const { userState, sharedState } = rt;
+    const st = userState[userId];
+    if (!wasAudio) {
+        if (st?.lastInboundWasAudio) st.lastInboundWasAudio = false;
+        sharedState?.audioInboundNoState?.delete(userId);
+        return;
+    }
+    if (st) {
+        st.lastInboundWasAudio = true;
+        st.lastInboundAudioAt = Date.now();
+        return;
+    }
+    if (!sharedState) return;
+    const noState: Map<string, number> = sharedState.audioInboundNoState || (sharedState.audioInboundNoState = new Map());
+    // Techo por si el flujo nunca llega a contestarles (pausa global, descartes).
+    if (noState.size > 2000) {
+        const oldest = noState.keys().next().value;
+        if (oldest) noState.delete(oldest);
+    }
+    noState.set(userId, Date.now());
 }
 
 async function handleClientAudio(msg: any, userId: string, rt: HandlerRuntime): Promise<string | null> {
@@ -286,11 +325,18 @@ async function handleClientAudio(msg: any, userId: string, rt: HandlerRuntime): 
     const audioLog = audioUrl ? `MEDIA_AUDIO:${audioUrl}` : '🎤 Audio recibido';
     if (transcription) {
         logAndEmit(userId, 'user', `${audioLog}|TRANSCRIPTION:${transcription}`, userState[userId]?.step || 'new');
+        noteInboundKind(userId, true, rt);
         return transcription;
     }
     logAndEmit(userId, 'user', audioLog, userState[userId]?.step || 'new');
     await client.sendMessage(userId, 'Disculpá, no pude escuchar bien el audio. ¿Me lo escribís?');
     return null;
+}
+
+/** ¿Es la miniatura de una imagen en base64 (JPEG empieza con "/9j/") y no un texto del cliente? */
+function _looksLikeImageBlob(s: any): boolean {
+    const t = typeof s === 'string' ? s.trim() : '';
+    return t.startsWith('/9j/') || /^[A-Za-z0-9+/]{200,}={0,2}$/.test(t);
 }
 
 async function handleImageOrSticker(msg: any, userId: string, rt: HandlerRuntime): Promise<string | null> {

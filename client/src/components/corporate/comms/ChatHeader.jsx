@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { Bot, Play, Pause, Trash2, FileText, Type, ShoppingCart, ChevronLeft } from 'lucide-react';
-import { IconButton, Card, Badge, cn } from '../../ui';
+import { Bot, Play, Pause, Reply, Trash2, FileText, Type, ShoppingCart, ChevronLeft } from 'lucide-react';
+import { IconButton, Button, Card, Badge, cn } from '../../ui';
 
 // Encabezado del chat abierto: contacto, estado del bot y las acciones (compras,
 // reiniciar, pausar, tamaño de letra, panel de guion y resumen).
 export default function ChatHeader({
     chat, globalPause, chatFontSize, onChatFontSizeChange, summarizing,
     onBack, onToggleOrders, onClearChat, onToggleBot, onToggleScriptPanel, onSummarize,
+    onResumeChat, resuming = false,
 }) {
     const [showFontSlider, setShowFontSlider] = useState(false);
 
@@ -71,6 +72,20 @@ export default function ChatHeader({
                     size="sm"
                     onClick={onClearChat}
                 />
+                {chat.isPaused && (
+                    <Button
+                        variant="subtle"
+                        size="sm"
+                        leftIcon={Reply}
+                        loading={resuming}
+                        onClick={onResumeChat}
+                        aria-label="Retomar"
+                        title="Despausa y hace que el bot conteste lo último que escribió el cliente"
+                        className="px-2 sm:px-3"
+                    >
+                        <span className="hidden sm:inline">Retomar</span>
+                    </Button>
+                )}
                 <IconButton
                     label={chat.isPaused ? 'Reactivar bot' : 'Pausar bot'}
                     icon={(globalPause || chat.isPaused) ? Play : Pause}

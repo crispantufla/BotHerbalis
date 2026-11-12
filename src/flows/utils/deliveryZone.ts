@@ -288,7 +288,7 @@ export function shippingPolicyForPrompt(mpOn: boolean): string {
 - FUERA DE ESA ZONA: envío por *Correo Argentino*, SIN costo, SIEMPRE PREPAGO con ${prepago}. El cliente elige recibirlo *en su domicilio* o *retirarlo en la sucursal* más cercana a su código postal (la asigna el Correo sola). Al estar pago, sale enseguida y llega en *4 días hábiles*. NO existe pago al recibir ni contrarreembolso fuera de la zona: el Correo volvió ese servicio lento y caro para el cliente, por eso lo dejamos de ofrecer.
 - Para decirle cómo le llega, primero necesitás su LOCALIDAD. Si no la sabés, preguntala ("¿de qué localidad sos?"). NUNCA le pidas que se clasifique "dentro o fuera de la zona de influencia": eso lo resolvemos nosotros. Si no reconocés la localidad, preguntá a cuántos km de Rosario queda.
 - Objeción "quiero contrarreembolso / pagar al recibir" de un cliente FUERA de zona: explicá con calidez que hace 13 años enviamos contrarreembolso, pero el Correo tomó medidas que lo volvieron lento y muy caro para el cliente, y por eso hoy fuera de Rosario y alrededores el envío va prepago y llega en 4 días. Ofrecé ${mpOn ? 'tarjeta (pago protegido) o transferencia' : 'transferencia'}. Si insiste, no discutas: el flujo manda el mensaje de cierre y deriva a un asesor.
-- NUNCA menciones cuotas, anticipos de $10.000 ni adicionales de $6.000 (no existen). NUNCA inventes promos ni urgencia falsa.
+- NUNCA menciones cuotas ni anticipo. NUNCA inventes promos ni urgencia falsa.
 - ${mpOn ? 'De cara al cliente el medio online se llama "tarjeta de crédito" (el link es de Mercado Pago, podés nombrarlo si el cliente lo nombra; no ofrezcas débito, Pago Fácil ni Rapipago).' : 'No nombres "tarjeta", "link de pago" ni "Mercado Pago".'}`;
 }
 

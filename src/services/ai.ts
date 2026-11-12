@@ -123,13 +123,13 @@ const CLAUDE_CACHE_CONTROL = { type: "ephemeral", ttl: "1h" } as const;
 // system en el prefijo cacheado, así que también tiene que ser byte-estable.
 const CLAUDE_DIALOG_TOOL = {
     name: "control_dialog_flow",
-    description: "Emite la respuesta al cliente y gestiona el embudo de ventas",
+    description: "Emite la respuesta al cliente y gestiona el embudo de ventas. Se llama una vez por turno: `response` es el texto que se le manda al cliente por WhatsApp tal cual, `goalMet` le dice al flujo si avanza de paso y `extractedData` lleva las etiquetas que el flujo lee para actuar.",
     input_schema: {
         type: "object",
         properties: {
             response: { type: "string", description: "Tu respuesta para el cliente. Proporcional al mensaje: corta si es una pregunta rápida, extensa y empática solo en momentos emocionales/objeciones." },
-            goalMet: { type: "boolean", description: "Si el cliente cumplió el objetivo del paso actual" },
-            extractedData: { type: "string", description: "Datos extraídos de la intención del usuario (producto, quejas, edad, tags), o vacío" }
+            goalMet: { type: "boolean", description: "true si el cliente cumplió el OBJETIVO DEL PASO actual: con true el flujo avanza al paso siguiente; con false se queda en este." },
+            extractedData: { type: "string", description: "Etiquetas que el código del flujo parsea, con el formato exacto que indican las instrucciones y el objetivo del paso (ej: \"PRODUCTO: Gotas\", \"POSTDATADO: 5 de diciembre\", el número de plan \"60\" o \"120\", \"NEED_ADMIN\", \"REJECT_MEDICAL\"). No es texto libre ni un resumen. Vacío si no hay nada que extraer." }
         },
         required: ["response", "goalMet"]
     }
@@ -529,7 +529,13 @@ class AIService {
             // Respects conversation-specific state: if totalPrice, cart items,
             // or a postdatado are present, we skip the cache because a cached
             // reply could leak the wrong numbers/context into another chat.
-            const hasOrderContext = _hasOrderContext(context.userState);
+            // Apagado por defecto desde el 12-nov-2026: reutilizaba para un cliente
+            // la respuesta dada a otro con una pregunta parecida, sin mirar su
+            // charla, y a ~1 centavo por respuesta el ahorro no lo justifica. De
+            // paso la conversación deja de depender de los embeddings de OpenAI.
+            // SEMANTIC_CACHE=1 lo vuelve a prender (tratarlo como "hay contexto de
+            // pedido" saltea tanto la lectura como la escritura de más abajo).
+            const hasOrderContext = process.env.SEMANTIC_CACHE !== '1' || _hasOrderContext(context.userState);
             // En el playground (context.forceClaude definido) NO usamos el semantic
             // cache: si no, GPT y Claude devolverían la MISMA respuesta cacheada y no
             // se podrían comparar. Tampoco queremos contaminar el cache de prod con
@@ -906,12 +912,12 @@ CRÍTICO: Usá la "Fecha Actual" provista arriba para calcular el día exacto y 
                     input_schema: {
                         type: "object",
                         properties: {
-                            nombre: { type: "string", description: "Nombre y apellido de la persona, o null si no se proporcionó" },
-                            calle: { type: "string", description: "Calle, altura, vivienda, manzana, o null si no se proporcionó" },
-                            ciudad: { type: "string", description: "Ciudad o localidad, o null si no se proporcionó" },
-                            provincia: { type: "string", description: "Provincia argentina, o null si no se proporcionó" },
-                            cp: { type: "string", description: "Codigo postal, o null si no se proporcionó" },
-                            postdatado: { type: "string", description: "Fecha de postergacion futura, o null si no se proporcionó" }
+                            nombre: { type: ["string", "null"], description: "Nombre y apellido de la persona, o null si no se proporcionó" },
+                            calle: { type: ["string", "null"], description: "Calle, altura, vivienda, manzana, o null si no se proporcionó" },
+                            ciudad: { type: ["string", "null"], description: "Ciudad o localidad, o null si no se proporcionó" },
+                            provincia: { type: ["string", "null"], description: "Provincia argentina, o null si no se proporcionó" },
+                            cp: { type: ["string", "null"], description: "Codigo postal, o null si no se proporcionó" },
+                            postdatado: { type: ["string", "null"], description: "Fecha de postergacion futura, o null si no se proporcionó" }
                         }
                     }
                 }],
@@ -919,7 +925,7 @@ CRÍTICO: Usá la "Fecha Actual" provista arriba para calcular el día exacto y 
             });
             const toolUse = (result?.content || []).find((c: any) => c.type === 'tool_use');
             if (!toolUse?.input) return null;
-            // El schema declara strings, así que Claude puede emitir el literal "null".
+            // El schema admite null; igual se tolera el literal "null" por si lo emite como string.
             const norm = (v: any) => (!v || v === 'null') ? null : v;
             const args = toolUse.input;
             logger.info("🟢 [AI] parseAddress rescatado vía Claude");

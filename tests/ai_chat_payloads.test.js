@@ -12,6 +12,9 @@
  * para comparar byte a byte antes y después de un refactor.
  */
 require('dotenv').config();
+// El cache semántico está apagado por defecto desde el 12-nov-2026; este test
+// sigue fijando cómo se comporta cuando se lo prende.
+process.env.SEMANTIC_CACHE = '1';
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');

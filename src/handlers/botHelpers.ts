@@ -9,6 +9,7 @@ const logger = require('../utils/logger');
 const { prisma } = require('../../db');
 const { _cleanPhone, _isAdminPhone, _pushHistory } = require('../flows/utils/flowHelpers');
 const { _normalizeProductName } = require('../flows/utils/pricing');
+const tts = require('../services/tts');
 
 // logAndEmit, saveOrderToLocal, cancelLatestOrder, sendMessageWithDelay, notifyAdmin
 
@@ -20,6 +21,13 @@ export interface BotHelpersContext {
     config: any;
     pausedUsers: Set<string>;
     redlock: any;               // Redlock instance (shared across all sellers)
+    // Respuestas con nota de voz (ver services/tts.ts). Sin esto manda el
+    // interruptor VOICE_REPLIES + la clave de ElevenLabs, que en los tests está
+    // siempre apagado: un test que quiera voz inyecta acá su sintetizador.
+    voice?: {
+        enabled?: boolean;
+        synthesize?: (text: string) => Promise<{ base64: string; mimetype: string } | null>;
+    };
 }
 
 export interface BotHelpers {
@@ -38,6 +46,57 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
     // ignoran al cliente — caso 5491156581277). Por seller (este closure es por
     // instancia), en memoria, sólo bloquea duplicados CONSECUTIVOS.
     const _lastBotMsgByChat = new Map<string, string>();
+
+    const voiceEnabled: boolean = ctx.voice ? ctx.voice.enabled !== false : tts.isVoiceRepliesEnabled();
+    const synthesizeVoice = ctx.voice?.synthesize || tts.synthesizeVoice;
+
+    /**
+     * A/B de notas de voz: si lo último que mandó el cliente fue un audio y le
+     * tocó el grupo "voz", arranca la síntesis de `content` y devuelve su
+     * promesa (resuelve a null si falla: se manda el texto). Devuelve null si
+     * este mensaje va por texto. Nunca tira.
+     */
+    function _startVoiceReply(chatId: string, content: string): Promise<{ base64: string; mimetype: string } | null> | null {
+        try {
+            if (!voiceEnabled || !content) return null;
+            const st: any = userState[chatId];
+
+            // El audio pudo llegar antes de que el cliente tuviera estado (su
+            // primer mensaje): incomingSteps deja la marca aparte y acá, que el
+            // flujo ya le creó el estado, se pasa adonde corresponde.
+            const noState: Map<string, number> | undefined = sharedState.audioInboundNoState;
+            let audioAt: number = st?.lastInboundWasAudio ? (st.lastInboundAudioAt || 0) : 0;
+            const marked = noState?.get(chatId);
+            if (marked) {
+                audioAt = Math.max(audioAt, marked);
+                if (st) {
+                    st.lastInboundWasAudio = true;
+                    st.lastInboundAudioAt = audioAt;
+                    noState!.delete(chatId);
+                }
+            }
+            if (!audioAt || Date.now() - audioAt > tts.VOICE_INBOUND_WINDOW_MS) return null;
+
+            // El grupo se anota la primera vez que al cliente le aplica el
+            // experimento (escribió por audio con la función prendida), salga o
+            // no este mensaje por voz: es lo que después permite comparar.
+            let group = st?.voiceAB;
+            if (group !== 'voice' && group !== 'text') {
+                group = tts.voiceGroupFor(_cleanPhone(chatId));
+                if (st) st.voiceAB = group;
+                logger.info(`[VOICE-AB][${sellerId}] ${chatId} → grupo ${group}`);
+            }
+            if (group !== 'voice' || !tts.isVoiceFriendly(content)) return null;
+
+            return Promise.resolve(synthesizeVoice(content)).catch((e: any) => {
+                logger.warn(`[VOICE][${sellerId}] Síntesis falló para ${chatId}: ${e?.message}`);
+                return null;
+            });
+        } catch (e: any) {
+            logger.warn(`[VOICE][${sellerId}] Error decidiendo la nota de voz (va texto): ${e?.message}`);
+            return null;
+        }
+    }
 
     function logAndEmit(chatId: string, sender: string, text: string, step?: string, messageId: string | null = null, overrideTimestamp?: number): void {
         logger.logMessage(chatId, sender, text, step);
@@ -277,9 +336,15 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
             .then((chat: any) => chat?.sendStateTyping())
             .catch(() => {});
 
+        // La síntesis corre DURANTE el delay humanizado, para no sumarle su
+        // demora a la respuesta. Se espera antes del chequeo de pausa de abajo,
+        // que tiene que seguir siendo lo último antes de enviar.
+        const voicePending = _startVoiceReply(chatId, content);
+
         if (remainingDelay > 0) {
             await new Promise(resolve => setTimeout(resolve, remainingDelay));
         }
+        const voiceAudio = voicePending ? await voicePending : null;
 
         const isAdminChat = _isAdminPhone(chatId, config.alertNumbers);
         if (pausedUsers.has(chatId) || (config.globalPause && !isAdminChat)) {
@@ -291,8 +356,24 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
             return false;
         }
 
+        // Nota de voz en vez del texto. Sale por el mismo client.sendMessage que
+        // todo lo demás, así que trackBotSends la anota como envío del bot y su
+        // eco (un message_create con media y sin cuerpo) no pausa el chat. Si el
+        // envío falla, sigue abajo y manda el texto: el cliente nunca queda sin
+        // respuesta.
+        let sentAsVoice = false;
+        if (voiceAudio) {
+            try {
+                const { MessageMedia } = require('whatsapp-web.js');
+                await client.sendMessage(chatId, new MessageMedia(voiceAudio.mimetype, voiceAudio.base64), { sendAudioAsVoice: true });
+                sentAsVoice = true;
+            } catch (e: any) {
+                logger.warn(`[VOICE][${sellerId}] No salió la nota de voz a ${chatId} (${e?.message}) — va el texto`);
+            }
+        }
+
         try {
-            await client.sendMessage(chatId, content);
+            if (!sentAsVoice) await client.sendMessage(chatId, content);
             // Log + emit DESPUÉS del envío real: así el timestamp del ChatLog y
             // del evento socket en vivo coinciden con la hora de envío que
             // devuelve el fetch de WhatsApp en GET /history. Antes se logueaba
@@ -301,7 +382,11 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
             // dashboard reordenaba los mensajes al recargar. Además, si la pausa
             // de arriba abortaba el envío, ya no queda un log "fantasma" de un
             // mensaje que el cliente nunca recibió.
-            logAndEmit(chatId, 'bot', content, userState[chatId]?.step);
+            // Una nota de voz queda en el ChatLog con el texto que se dijo y un
+            // 🎤 adelante, para que en el panel se vea que salió como audio. El
+            // history de abajo lleva el texto solo: lo lee la IA, y con el emoji
+            // adelante lo copiaría en sus respuestas.
+            logAndEmit(chatId, 'bot', sentAsVoice ? `🎤 ${content}` : content, userState[chatId]?.step);
             // Mismo criterio para el history que ve la IA: se anota lo que
             // REALMENTE salió. Antes lo empujaba cada call site antes de llamar
             // acá, así que los cinco caminos que abortan el envío (ghost-close,
@@ -309,7 +394,7 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
             // el historial un mensaje que el cliente nunca recibió — y la IA
             // arrancaba el turno siguiente creyendo que ya lo había dicho.
             if (userState[chatId]) _pushHistory(userState[chatId], { role: 'bot', content });
-            logger.info(`[SENT][${sellerId}] Message sent to ${chatId}`);
+            logger.info(`[SENT][${sellerId}] Message sent to ${chatId}${sentAsVoice ? ' (nota de voz)' : ''}`);
             return true;
         } catch (e: any) {
             logger.error(`[ERROR][${sellerId}] Failed to send message:`, e.message);

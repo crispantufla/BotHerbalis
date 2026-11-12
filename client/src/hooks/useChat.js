@@ -303,6 +303,13 @@ export const useChat = (selectedChatId) => {
         }
     });
 
+    // Sin `text`: el servidor arma lo que el cliente dejó sin responder.
+    const resumeChatMutation = useMutation({
+        mutationFn: async (chatId) => {
+            await api.post('/api/resume-chat', { chatId });
+        }
+    });
+
     const clearChatMutation = useMutation({
         mutationFn: async (chatId) => {
             await api.post('/api/reset-chat', { chatId });
@@ -322,6 +329,7 @@ export const useChat = (selectedChatId) => {
         sendMedia: sendMediaMutation.mutateAsync,
         deleteMessage: deleteMessageMutation.mutateAsync,
         toggleBot: toggleBotMutation.mutateAsync,
+        resumeChat: resumeChatMutation.mutateAsync,
         clearChat: clearChatMutation.mutateAsync,
     };
 };

@@ -995,18 +995,62 @@ module.exports = (clientPool) => {
     // automática de WhatsApp Business había pausado 18 leads que preguntaron
     // el precio. `text` es lo que escribió el cliente; entra a la cola igual
     // que si acabara de llegar (mismo payload que `processDebounced`).
+    // Sin `text` (botón "Retomar" del panel) el servidor lo arma con lo que el
+    // cliente escribió después de la última respuesta, leído de ChatLog.
+
+    // Lo que el cliente escribió y nadie contestó: sus mensajes posteriores a
+    // la última fila 'bot' o 'admin' de ChatLog, en orden y unidos con un
+    // espacio. De un audio queda solo la transcripción; las filas que son puro
+    // marcador (imagen, documento, audio sin transcribir) no aportan texto.
+    // Las filas 'system' no cortan ni suman. Devuelve '' si no hay nada.
+    const PENDING_LOOKBACK = 50;
+    async function _pendingClientText(chatId, instanceId) {
+        const { prisma } = require('../../../db');
+        const rows = await prisma.chatLog.findMany({
+            where: { userPhone: chatId.replace(/@.*/, ''), instanceId },
+            orderBy: { timestamp: 'desc' },
+            take: PENDING_LOOKBACK,
+            select: { role: true, content: true },
+        });
+        const { _isBusinessAutoReply } = require('../../flows/utils/messages');
+        const parts = [];
+        for (const row of rows) {
+            // La bienvenida automática de WhatsApp Business queda como 'admin'
+            // pero no es una respuesta: no corta la búsqueda (es justo el caso
+            // que dio origen a este endpoint, el 12-nov-2026).
+            if (row.role === 'admin' && _isBusinessAutoReply(row.content)) continue;
+            if (row.role === 'bot' || row.role === 'admin') break;
+            if (row.role !== 'user') continue;
+            const content = String(row.content || '');
+            const cut = content.indexOf('|TRANSCRIPTION:');
+            let piece;
+            if (cut !== -1) piece = content.slice(cut + '|TRANSCRIPTION:'.length);
+            else if (/^(MEDIA_[A-Z]+:|📷|🎤|📄|📎)/u.test(content)) piece = '';
+            else piece = content;
+            piece = piece.trim();
+            if (piece) parts.unshift(piece);
+        }
+        return parts.join(' ');
+    }
+
     router.post('/resume-chat', ...withSeller(clientPool), async (req, res) => {
         try {
             const { sharedState: ss, client: cl, queue } = req.sellerInstance || {};
             const instanceId = getInstanceId(req);
-            const text = String(req.body.text || '').trim();
+            let text = String(req.body.text || '').trim();
             if (!instanceId || !ss || !queue) return res.status(400).json({ error: 'Seleccioná un vendedor conectado' });
-            if (!req.body.chatId || !text) return res.status(400).json({ error: 'Faltan chatId o text' });
+            if (!req.body.chatId) return res.status(400).json({ error: 'Falta chatId' });
             const chatId = await resolveChatId(req.body.chatId, cl, req.sellerId);
             if (chatId.includes('@lid')) return res.status(400).json({ error: 'No pude resolver el chat a un teléfono' });
             // Mismo guard que /send: solo contactos que ya son de este vendedor.
             const ownErr = await _verifyChatOwnership(chatId, ss, instanceId);
             if (ownErr) return res.status(ownErr.status).json(ownErr.body);
+
+            // Antes de despausar: sin nada que contestar, el chat queda como estaba.
+            if (!text) {
+                text = await _pendingClientText(chatId, instanceId);
+                if (!text) return res.status(409).json({ error: 'No hay ningún mensaje del cliente sin responder' });
+            }
 
             const { unpauseUser } = require('../../services/pauseService');
             await unpauseUser(chatId, ss, instanceId);

@@ -58,6 +58,36 @@ Módulos que se separaron en la limpieza de septiembre de 2026 para sacar funcio
   textos del guion en `scriptTemplates.js`, búsqueda, encabezado, modales), `GuionView` en
   `guion/` y los interruptores de `SettingsView` en `settings/`.
 
+Entraron el 2026-11-12, tras revisar a mano las charlas del guion por zona:
+
+- `src/services/intentClassifier.ts` — una llamada corta a Claude lee cada mensaje ANTES de
+  las reglas por palabras (elige / pregunta / objeta / habla de salud). `salesFlow` la deja en
+  `dependencies.intent`; la consultan el paso de pago, el de localidad, el que sigue al saludo,
+  el cambio de pedido y las FAQ (`_asksSomething` en `flowHelpers`). Solo SUMA señal: si falla
+  o tarda más de 4 s queda en null y todo sigue como antes. No corre en tests salvo que se
+  inyecte `intent`. `INTENT_CLASSIFIER=0` la apaga. Las fallas que la motivaron: "otra cosa"
+  leído como cambio de pedido, "Son de Rosario" como localidad del cliente, "tengo tarjeta pero
+  me da miedo" como elección de tarjeta.
+- `src/services/nightlyReview.ts` — todos los días 8:15 ARG Claude revisa las charlas de las
+  últimas 24 h y manda por `notifyAdmin` dónde falló el bot; el informe queda en
+  `DATA_DIR/reviews/<seller>/<fecha>.json`. Solo lee. La salida es TEXTO con formato fijo, no
+  tool: con tool el modelo devolvía la lista como JSON mal formado. `NIGHTLY_REVIEW=0` la apaga.
+- `src/flows/globals/globalAge.ts` — de 70 a 79 años, solo gotas: la edad se guarda en
+  `state.clientAge` y la regla se cumple desde el código (los textos fijos de precios no
+  pasan por la IA). De 80 en adelante rechaza el MEDICAL REJECT de `globalSystem`.
+- `src/services/tts.ts` — respuesta con nota de voz (ElevenLabs) a quien escribió por audio,
+  A/B 50 % por teléfono. **Apagado**: se prende con `VOICE_REPLIES=1`. Antes de prenderlo en
+  serio hay que ver en prod que el eco del audio se reconozca como del bot (líneas
+  `[MANUAL-CHAT]`) y que WhatsApp lo muestre como nota de voz.
+- `POST /api/resume-chat` (botón "Retomar" del panel) — despausa y reencola lo que el cliente
+  escribió y quedó sin respuesta. Sin `text`, lo arma de ChatLog.
+- `flushPendingToQueue` (`clientPool.ts`) — al apagar, los mensajes en la espera de agrupado
+  pasan a BullMQ. Hasta entonces cada deploy perdía lo que estuviera en esos segundos.
+- El cache semántico quedó **apagado por defecto** (`SEMANTIC_CACHE=1` lo prende): reutilizaba
+  respuestas entre clientes sin mirar la charla.
+- Toda la conversación de venta va en Sonnet (`CLAUDE_SIMPLE_STEPS=haiku` vuelve al reparto
+  anterior).
+
 Flujo de un mensaje: `client.on('message')` → `messageHandler` (debounce ~N segundos para agrupar mensajes consecutivos) → encola en BullMQ → worker pulls → `processSalesFlow` → step correspondiente en `src/flows/steps/` → `sendMessageWithDelay` (4-8s delay humanizado).
 
 ## Flujo de venta (`src/flows/steps/`)
@@ -107,10 +137,9 @@ Máquina de estados lineal con fallbacks a IA. Orden típico:
   podía ser 8.x). La versión y una huella de `prices.json` son parte del namespace del cache
   semántico (`_cacheContentTag` en `ai.ts`).
 - **Pausas NO se auto-liberan**. Un user pausado con `pauseReason` requiere intervención manual del admin. Si un outage (ej: OpenAI 429) pausa users, hay que despausarlos a mano. Única excepción: al arrancar, `restorePausedUsersFromDB` borra las pausas de más de 7 días (`STALE_PAUSE_DAYS` en `pauseService.ts`).
-- **Pricing**: siempre leer con `_getPrice/_getPrices/_getAdicionalMAX` de `pricing.ts`. NUNCA inventar precios en código ni en prompts de IA. Tampoco umbrales derivados de precios: para deducir el plan (60/120) de un monto usar `_inferPlanFromPrice`, y para el nombre canónico del producto `_normalizeProductName` (ambos en `pricing.ts`). Hasta el 2026-09-09 esa lógica estaba duplicada con umbrales hardcodeados en `botHelpers.ts` y `order.routes.js` (ver `stepWaitingFinalConfirmation.ts` para el patrón: se inyecta `pricingContext` en el prompt). El respaldo si falta `data/prices.json` es `FALLBACK_PRICES` (también en `pricing.ts`) y tiene que igualar al JSON. `GET /prices`, los flujos y los prompts leen por la misma función, así que un cambio en el Editor de Precios se ve en la lectura siguiente (cubierto por `tests/prices_single_source.test.js`). En el panel, los textos del guion con precios pasan por `fillPricePlaceholders` (`client/src/utils/scriptPlaceholders.js`) con lo que devuelve `/api/prices`: sin precios cargados, el placeholder queda visible.
+- **Pricing**: siempre leer con `_getPrice/_getPrices` de `pricing.ts`. NUNCA inventar precios en código ni en prompts de IA. Tampoco umbrales derivados de precios: para deducir el plan (60/120) de un monto usar `_inferPlanFromPrice`, y para el nombre canónico del producto `_normalizeProductName` (ambos en `pricing.ts`). Hasta el 2026-09-09 esa lógica estaba duplicada con umbrales hardcodeados en `botHelpers.ts` y `order.routes.js` (ver `stepWaitingFinalConfirmation.ts` para el patrón: se inyecta `pricingContext` en el prompt). El respaldo si falta `data/prices.json` es `FALLBACK_PRICES` (también en `pricing.ts`) y tiene que igualar al JSON. `GET /prices`, los flujos y los prompts leen por la misma función, así que un cambio en el Editor de Precios se ve en la lectura siguiente (cubierto por `tests/prices_single_source.test.js`). En el panel, los textos del guion con precios pasan por `fillPricePlaceholders` (`client/src/utils/scriptPlaceholders.js`) con lo que devuelve `/api/prices`: sin precios cargados, el placeholder queda visible.
 - **Interruptor de Mercado Pago**: `config.mpEnabled` (switch "Pago con tarjeta" en Configuración, default ON). En OFF el bot no ofrece ni genera links: domicilio ⇒ transferencia directa, y quien pida tarjeta recibe un aviso de "fuera de servicio". Leerlo SIEMPRE con `isMpEnabled(dependencies.config)` de `flows/utils/paymentOptions.ts`. Si agregás copy que nombre la tarjeta: en código usá `prepayMeans/prepayMenu`; en `knowledge_v7.json` agregá una variante `responseNoMp` (la eligen `getFlowTemplate(key, knowledge, mpOff)` y `globalFaq`). Los prompts de IA lo reciben vía `context.mpEnabled`, que inyecta el proxy de `salesFlow` — no hace falta pasarlo por call site.
-- **Adicional contrarembolso**: solo aplica a plan 60 + pagos en efectivo/contrarembolso. MP/transferencia lo exime. Recalcular tras cambios de plan/producto (no confiar en `isContraReembolsoMAX` previo).
-- **DB upserts bajo race**: código P2002 de Prisma = concurrent upsert race. Ignorar (ver `botHelpers.ts:65`).
+- **DB upserts bajo race**: código P2002 de Prisma = concurrent upsert race. Ignorar (ver `src/handlers/botHelpers.ts`).
 - **Locks**: `order_lock:${phone}:${sellerId}` TTL 3000ms. Queries internas al lock deben tener timeout < TTL (ver `cancelLatestOrder` con 2500ms).
 - **Socket.IO rooms**: emitir siempre a `sellerId` room y a `admin` room (admins ven todo). Payload del admin debe incluir `sellerId`.
 - **Auth: solo JWT**, en la API REST (`jwtAuthMiddleware`) y en el socket. El fallback `x-api-key` (API_KEY = admin global) se sacó el 2026-09-14 porque el dashboard mandaba la clave incrustada en el JS público. `API_KEY` sigue solo como respaldo del secreto JWT cuando falta `JWT_SECRET`. Nada secreto puede ir en una variable `VITE_*`: Vite la escribe en el bundle que baja cualquiera.
@@ -184,7 +213,7 @@ Máquina de estados lineal con fallbacks a IA. Orden típico:
 - `npm run dev` — concurrente server (tsx watch en index.ts) + client (vite)
 - `npm run dev:server` — solo server (sin watch)
 - `npm start` — producción: `prisma generate && migrate deploy && tsx index.ts`
-- `npm test` — Jest. Suite verde (44 suites, 576 tests; 1 suite skipped es la `.live`). Corre contra la DB de prod (`DATABASE_URL` del `.env` apunta a Railway), así que **ninguna suite puede escribir**: si el código bajo test escribe, el test mockea `../db`. Hasta el 2026-09-13 `web_order_notify.test.js` no lo hacía y dejó una pausa real en prod. **Solo V7**: las suites acopladas a `archive/knowledge_v3.json`/v4 (simulaciones, recommendation, multi_product, salesFlow, etc.) se retiraron el 2026-05-31 — testeaban un guion muerto. Cobertura de flujo V7: `sena_flow_smoke.test.js` + `payment_flow.test.js`; el resto cubre utilidades (address, pricing, objection escalation, order flow). Pendiente: rehacer un harness de simulación contra V7. Para refactors hay tests de caracterización: `message_handler.test.js` y `ai_chat_payloads.test.js` graban una traza de efectos (`MH_TRACE_FILE` / `AI_TRACE_FILE`) para comparar byte a byte antes y después de mover código.
+- `npm test` — Jest. Suite verde (1 suite skipped es la `.live`). Corre contra la DB de prod (`DATABASE_URL` del `.env` apunta a Railway), así que **ninguna suite puede escribir**: si el código bajo test escribe, el test mockea `../db`. Hasta el 2026-09-13 `web_order_notify.test.js` no lo hacía y dejó una pausa real en prod. **Solo V7**: las suites acopladas a `archive/knowledge_v3.json`/v4 (simulaciones, recommendation, multi_product, salesFlow, etc.) se retiraron el 2026-05-31 — testeaban un guion muerto. Cobertura de flujo V7: `sena_flow_smoke.test.js` + `payment_flow.test.js`; el resto cubre utilidades (address, pricing, objection escalation, order flow). Pendiente: rehacer un harness de simulación contra V7. Para refactors hay tests de caracterización: `message_handler.test.js` y `ai_chat_payloads.test.js` graban una traza de efectos (`MH_TRACE_FILE` / `AI_TRACE_FILE`) para comparar byte a byte antes y después de mover código.
 - `npx prisma migrate dev --name <x>` — nueva migración
 - `railway logs --lines 300` — logs de producción
 
