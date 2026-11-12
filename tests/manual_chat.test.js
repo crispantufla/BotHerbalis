@@ -552,6 +552,17 @@ describe('arreglos del 7-oct-2026 en el handler de salientes', () => {
         expect(pauseWrites().map(a => a.update.pauseReason)).toEqual([TOMA_CHARLA]);
     });
 
+    test('la bienvenida automática de WhatsApp Business no pausa ni crea estado (11-nov-2026)', async () => {
+        const s = mkSeller();
+        s.sharedState.knowledge = knowledge;
+        await deliver(s.outgoing, manual({ body: '¡Hola! ¿Cómo podemos ayudarte?' }));
+
+        expect([...s.pausedUsers]).toEqual([]);
+        expect(pauseWrites()).toEqual([]);
+        expect(s.userState[TEL]).toBeUndefined();
+        expect(s.logAndEmit.mock.calls.map(c => c.slice(0, 3))).toEqual([[TEL, 'admin', '¡Hola! ¿Cómo podemos ayudarte?']]);
+    });
+
     test('cualquier otro texto a un chat nuevo sigue pausando como antes', async () => {
         const s = mkSeller();
         s.sharedState.knowledge = knowledge;

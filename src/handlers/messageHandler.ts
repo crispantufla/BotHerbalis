@@ -222,7 +222,7 @@ function isRecentBotSend(sends: BotSends, chatIds: string[], msg: any): boolean 
  *
  * Cubierto por tests/manual_chat.test.js.
  */
-const { _isScriptGreeting } = require('../flows/utils/messages');
+const { _isScriptGreeting, _isBusinessAutoReply } = require('../flows/utils/messages');
 
 export function createOutgoingMessageHandler(ctx: {
     sellerId: string;
@@ -320,6 +320,14 @@ export function createOutgoingMessageHandler(ctx: {
                 if (logText) logAndEmit(targetId, 'admin', logText, userState[targetId]?.step, msgId, deviceTs);
             } catch (e: any) {
                 logger.warn(`[MANUAL-CHAT][${sellerId}] No se pudo registrar mensaje manual a ${targetId}: ${e?.message}`);
+            }
+
+            // La bienvenida/ausencia automática de WhatsApp Business no la
+            // escribió nadie: queda en el ChatLog (el cliente la recibió) pero no
+            // descarta alertas ni cede el chat. El 11-nov-2026 pausó 18 leads.
+            if (_isBusinessAutoReply(logText, sharedState.config)) {
+                logger.info(`[MANUAL-CHAT][${sellerId}] Mensaje automático de WhatsApp Business a ${targetId} — no es manual, el bot sigue`);
+                return;
             }
 
             // Admin contestó manualmente → descartar cualquier alerta pendiente

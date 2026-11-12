@@ -317,6 +317,26 @@ function _isScriptGreeting(text: string, knowledge: any): boolean {
 }
 
 /**
+ * Mensajes automáticos de WhatsApp Business (bienvenida y ausencia). Los manda
+ * la app sola al primer mensaje del cliente y llegan como `message_create`
+ * propio, igual que lo que el vendedor escribe a mano. El 11-nov-2026 se activó
+ * la bienvenida en el teléfono de Horacio y pausó 18 chats nuevos en 12 horas
+ * ("el bot se pausa solo"). Son los textos por defecto de la app; si el vendedor
+ * los personaliza, van en `config.waAutoReplies`.
+ */
+const WA_BUSINESS_AUTO_REPLIES = [
+    '¡Hola! ¿Cómo podemos ayudarte?',
+    'Gracias por tu mensaje. No estamos disponibles en este momento, pero te responderemos lo antes posible.',
+];
+
+function _isBusinessAutoReply(text: string, config?: any): boolean {
+    const a = _comparable(text);
+    if (!a) return false;
+    const extra = Array.isArray(config?.waAutoReplies) ? config.waAutoReplies : [];
+    return [...WA_BUSINESS_AUTO_REPLIES, ...extra].some(t => _comparable(t) === a);
+}
+
+/**
  * Tabla completa de precios (las 3 presentaciones, 60 y 120 días) seguida de la
  * pregunta de kilos. Para quien abre pidiendo el precio: en 48 h de chats (6-7
  * oct) 5 de 7 que recibieron "de $36.900 a $68.900, ¿cuántos kilos?" no
@@ -332,5 +352,5 @@ function _buildPriceTableWithWeightAsk(knowledge: any, state: any): string | nul
     return `${table}\n\nPara recomendarte el plan justo, contame cuánto querés bajar:\n\n1️⃣ Hasta 10 kg\n2️⃣ Más de 10 kg`;
 }
 
-export { _formatMessage, _isDuplicate, _getAdminSuggestions, _getQuickReplies, _isScriptGreeting, _buildPriceTableWithWeightAsk };
+export { _formatMessage, _isDuplicate, _getAdminSuggestions, _getQuickReplies, _isScriptGreeting, _isBusinessAutoReply, _buildPriceTableWithWeightAsk };
 
