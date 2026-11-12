@@ -824,6 +824,24 @@ export async function _handleRepartoData(
 
     const already = !!(addr.nombre && addr.calle);
 
+    // Corrige la zona: le ofrecimos reparto y avisa que es de otro lado ("Soy de
+    // capital"). Antes el bot seguía pidiendo nombre y calle para un reparto que
+    // no existe y el cliente se iba (caso 5491161826864, 12-nov-2026). Solo con
+    // "soy/vivo/estoy de/en" y sin número de calle: "Córdoba 1234" o "San Martín
+    // 300" son direcciones de Rosario, no una corrección.
+    if (!already && /\b(soy|somos|vivo|vivimos|estoy|estamos)\s+(de|en)\b/.test(normalizedText) && !/\d{3,5}/.test(text)) {
+        const { classifyZoneText } = require('../utils/deliveryZone');
+        const cls = classifyZoneText(text, knowledge);
+        if (cls.zone === 'out') {
+            addr.cp = undefined;
+            addr.provincia = undefined;
+            logger.info(`[REPARTO-DATA] ${userId} corrige la zona ("${text.slice(0, 50)}") → fuera de zona (${cls.localidad}).`);
+            const { _resolveZone } = require('./stepWaitingZone');
+            await _resolveZone(userId, cls, currentState, knowledge, dependencies, '¡Ah, perdón! Te había entendido mal 🙈 ');
+            return { matched: true };
+        }
+    }
+
     // Contesta la oferta de agendar con una fecha ("después del 5"): se anota y se
     // piden los datos que faltan. Antes el bot le volvía a ofrecer agendar como si
     // no hubiera contestado y nunca pedía los datos (caso 5493364634777).

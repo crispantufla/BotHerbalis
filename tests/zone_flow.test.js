@@ -284,6 +284,67 @@ describe('handleWaitingZone', () => {
         expect(st.partialAddress.ciudad).toBe('Funes');
     });
 
+    // Caso 5491161826864 (12-nov-2026): "Mataderos" → "¿queda cerca de Rosario?"
+    // → "Son de Rosario" (pregunta) → reparto propio → "Soy de capital" → ignorado.
+    test('un barrio de Capital Federal es fuera de zona, sin preguntar los km', async () => {
+        const st = makeState();
+        await handleWaitingZone(USER, 'Mataderos', norm('Mataderos'), st, knowledge, deps);
+        expect(st.deliveryZone).toBe('out');
+        expect(st.step).toBe('waiting_payment_method');
+        expect(lastSent()).toMatch(/Correo Argentino/);
+    });
+
+    test.each(['Son de Rosario', 'Ustedes están en Rosario?', 'de donde son?'])(
+        '"%s" es una pregunta sobre nosotros: no se toma como la localidad del cliente', async (text) => {
+            const st = makeState({ zoneQuestion: 'km', partialAddress: { ciudad: 'Pueblo X' } });
+            await handleWaitingZone(USER, text, norm(text), st, knowledge, deps);
+            expect(st.deliveryZone).toBeUndefined();
+            expect(st.step).toBe('waiting_zone');
+            expect(lastSent()).toMatch(/estamos en Rosario/);
+            expect(lastSent()).toMatch(/de qué ciudad o barrio sos/i);
+        });
+
+    test('"Soy de Rosario" sigue siendo la localidad del cliente', async () => {
+        const st = makeState({ zoneQuestion: 'km', partialAddress: { ciudad: 'Pueblo X' } });
+        await handleWaitingZone(USER, 'Soy de Rosario', norm('Soy de Rosario'), st, knowledge, deps);
+        expect(st.deliveryZone).toBe('in');
+    });
+
+    test('en waiting_data con reparto, "Soy de capital" corrige la zona y pasa a Correo', async () => {
+        const st = makeState({ step: 'waiting_data', deliveryZone: 'in', shippingChoice: 'reparto', paymentMethod: 'contrarembolso', partialAddress: { ciudad: 'Rosario', cp: '2000' } });
+        await handleWaitingData(USER, 'Soy de capital', norm('Soy de capital'), st, knowledge, deps);
+        expect(st.deliveryZone).toBe('out');
+        expect(st.step).toBe('waiting_payment_method');
+        expect(st.partialAddress.cp).toBeUndefined();
+        expect(lastSent()).toMatch(/perdón/i);
+        expect(lastSent()).toMatch(/Correo Argentino/);
+        expect(orders).toEqual([]);
+    });
+
+    test('en waiting_data con reparto, una calle con nombre de ciudad lejana NO cambia la zona', async () => {
+        mockParseAddress.mockResolvedValue({ nombre: 'Ana Pérez', calle: 'Córdoba 1234' });
+        const st = makeState({ step: 'waiting_data', deliveryZone: 'in', shippingChoice: 'reparto', paymentMethod: 'contrarembolso', partialAddress: { ciudad: 'Rosario' } });
+        await handleWaitingData(USER, 'Ana Pérez, vivo en Córdoba 1234', norm('Ana Pérez, vivo en Córdoba 1234'), st, knowledge, deps);
+        expect(st.deliveryZone).toBe('in');
+    });
+
+    test('duda escrita sin signos ("Se toma una x dia") → la responde la IA, no "no me quedó claro"', async () => {
+        aiService.chat.mockResolvedValue({ response: 'Sí, una por día 😊 ¿De qué localidad sos?', goalMet: false, extractedData: null });
+        const st = makeState();
+        await handleWaitingZone(USER, 'Se toma una x dia', norm('Se toma una x dia'), st, knowledge, deps);
+        expect(st.step).toBe('waiting_zone');
+        expect(lastSent()).toMatch(/una por día/);
+        expect(sent.join(' ')).not.toMatch(/no me quedó claro/);
+        expect(pausedUsers.size).toBe(0);
+    });
+
+    test('si la IA no devuelve nada, cae a la re-pregunta de siempre', async () => {
+        aiService.chat.mockResolvedValue({ response: '', goalMet: false, extractedData: null });
+        const st = makeState();
+        await handleWaitingZone(USER, 'bla bla bla', 'bla bla bla', st, knowledge, deps);
+        expect(lastSent()).toMatch(/no me quedó claro/);
+    });
+
     test('pregunta sin localidad → la IA responde y sigue en el step', async () => {
         aiService.chat.mockResolvedValue({ response: 'Depende de la zona 😊 ¿De qué localidad sos?', goalMet: false, extractedData: null });
         const st = makeState();

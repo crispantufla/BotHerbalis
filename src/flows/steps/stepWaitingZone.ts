@@ -44,6 +44,11 @@ const ZONE_ACK = /^(si|sisi|si si|dale|ok|okey|bueno|buenisimo|genial|perfecto|c
 // Provincia sola: todas las localidades de la zona son de Santa Fe, y Entre Ríos
 // entera queda afuera, pero la ciudad hace falta igual para el envío.
 const PROVINCE_ONLY = /\b(entre rios|santa fe)\b/;
+// El cliente pregunta de dónde somos NOSOTROS ("Son de Rosario", "¿ustedes están
+// en Rosario?"). Nombra Rosario pero no es su localidad: el 12-nov-2026 eso
+// mandó a reparto propio a un cliente de Mataderos (caso 5491161826864).
+const ASKS_SELLER_PLACE = /\b(son|sos|estan|ustedes|uds|quedan|se encuentran)\b[^.]{0,20}\b(de|en)\s+rosario\b|\bde donde (son|sos|envian|mandan|despachan)\b/;
+const FIRST_PERSON_PLACE = /\b(soy|somos|vivo|vivimos|estoy|estamos)\b/;
 // Última línea del zone_in del guion, para cambiarla cuando ya tenemos parte de
 // los datos.
 const ZONE_IN_ASK = /Pasame tu \*nombre completo\* y \*calle y n[uú]mero\*[^\n]*$/;
@@ -258,6 +263,16 @@ export async function handleWaitingZone(
         return { matched: true };
     }
 
+    // ── Pregunta de dónde somos nosotros ───────────────────────────────────────
+    if (ASKS_SELLER_PLACE.test(normalizedText) && !FIRST_PERSON_PLACE.test(normalizedText)) {
+        const weAre = `Sí, nosotros estamos en ${cfg.centro} 😊 y enviamos a todo el país sin costo.\n\n¿Vos de qué ciudad o barrio sos?`;
+        currentState.zoneQuestion = 'localidad';
+        saveState(userId);
+        await sendMessageWithDelay(userId, weAre);
+        logger.info(`[ZONE] ${userId} preguntó de dónde somos ("${text.slice(0, 50)}") → no lo tomo como su localidad.`);
+        return { matched: true };
+    }
+
     // ── Respuesta a "¿a cuántos km?" ───────────────────────────────────────────
     if (currentState.zoneQuestion === 'km') {
         const named = classifyZoneText(text, knowledge);
@@ -321,8 +336,7 @@ export async function handleWaitingZone(
     // ── No reconocimos nada ────────────────────────────────────────────────────
     // Pregunta del cliente → la IA responde y vuelve a pedir la localidad. Si en
     // la pregunta venía la localidad, la trae en el tag.
-    if (_isInfoQuestion(text)) {
-        const aiRes = await aiService.chat(text, {
+    const askAi = () => aiService.chat(text, {
             step: 'waiting_zone',
             goal: `Estás por decirle al cliente cómo le llega el pedido y para eso necesitás su LOCALIDAD (ciudad o pueblo). El cliente te preguntó algo en vez de contestar: respondé su pregunta con calidez y cerrá volviendo a preguntar de qué localidad es. Si pregunta cómo se paga o cómo llega, explicá las dos modalidades: en ${cfg.centro} y hasta ${cfg.radioKm} km lo llevamos nosotros a su casa sin costo y paga al recibir (efectivo, tarjeta o transferencia); al resto del país va por Correo Argentino sin costo, prepago (${mpOff ? 'transferencia' : 'tarjeta de crédito o transferencia'}), a domicilio o sucursal, en 4 días hábiles. NUNCA le pidas que diga si está "dentro de la zona": la localidad alcanza. Si en su mensaje dice de dónde es, incluí en extractedData exactamente "LOCALIDAD: <nombre>" (solo el nombre de la localidad). Si no la dice, extractedData=null. goalMet=false siempre (la zona la resuelve el sistema).`,
             history: currentState.history,
@@ -330,6 +344,8 @@ export async function handleWaitingZone(
             knowledge,
             userState: currentState
         });
+    if (_isInfoQuestion(text)) {
+        const aiRes = await askAi();
         const tag = String(aiRes.extractedData || '').match(/LOCALIDAD:\s*(.+)/i);
         if (tag) {
             const fromTag = classifyZoneText(tag[1], knowledge);
@@ -401,6 +417,24 @@ export async function handleWaitingZone(
         logger.warn(`[ZONE] parseAddress falló para ${userId}: ${e.message}`);
     }
     if (candidate) return await _askKm(userId, currentState, knowledge, dependencies, candidate);
+
+    // Frase que no es una localidad ni tiene forma de pregunta: suele ser una
+    // duda escrita sin signos ("Se toma una x dia", caso 5491161826864). La
+    // contesta la IA y vuelve a pedir la localidad, en vez de "no me quedó claro".
+    if (text.trim().split(/\s+/).length >= 3) {
+        try {
+            const aiRes = await askAi();
+            if (aiRes?.response && !_isDuplicate(aiRes.response, currentState.history)) {
+                currentState.zoneQuestion = 'localidad';
+                saveState(userId);
+                await sendMessageWithDelay(userId, aiRes.response);
+                logger.info(`[ZONE] ${userId} escribió algo que no es localidad ("${text.slice(0, 50)}") → respondió la IA.`);
+                return { matched: true };
+            }
+        } catch (e: any) {
+            logger.warn(`[ZONE] IA falló con "${text.slice(0, 50)}" de ${userId}: ${e.message}`);
+        }
+    }
 
     // Nada reconocible. Re-preguntamos una vez; a la segunda derivamos.
     const reask = _tplOr('zone_reask', knowledge, false, 'Perdoná, no me quedó claro 🙈 ¿De qué localidad sos? (ciudad o pueblo)');

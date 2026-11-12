@@ -115,6 +115,19 @@ const FAR_PLACES = [
     'florencio varela', 'almirante brown', 'esteban echeverria', 'ezeiza', 'ituzaingo',
     'hurlingham', 'tres de febrero', 'vicente lopez', 'san isidro', 'san fernando',
     'malvinas argentinas', 'general rodriguez', 'lujan', 'mercedes', 'chivilcoy',
+    // Barrios de Capital Federal: la gente de CABA nombra el barrio, no la
+    // ciudad. "Mataderos" terminó en "¿queda cerca de Rosario?" y la venta se
+    // perdió (caso 5491161826864, 12-nov-2026). Fuera a propósito los que chocan
+    // con algo de la zona o del guion: Belgrano y Flores (barrios de Rosario),
+    // Retiro (retiro en sucursal), San Cristóbal/Constitución (nombres de calles).
+    'mataderos', 'palermo', 'caballito', 'villa crespo', 'liniers', 'villa lugano',
+    'lugano', 'almagro', 'boedo', 'recoleta', 'villa urquiza', 'villa devoto', 'devoto',
+    'nueva pompeya', 'pompeya', 'barracas', 'la boca', 'san telmo', 'balvanera',
+    'chacarita', 'colegiales', 'saavedra', 'villa del parque', 'floresta',
+    'parque patricios', 'parque chacabuco', 'villa soldati', 'monte castro', 'versalles',
+    'villa luro', 'la paternal', 'agronomia', 'puerto madero', 'monserrat',
+    'velez sarsfield', 'villa pueyrredon', 'villa ortuzar', 'coghlan', 'villa real',
+    'villa riachuelo', 'parque avellaneda', 'villa general mitre', 'villa santa rita',
 ];
 
 export function normalizePlace(s: string): string {
