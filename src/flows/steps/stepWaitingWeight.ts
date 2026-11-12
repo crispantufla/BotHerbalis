@@ -135,6 +135,38 @@ export async function handleWaitingWeight(
             const { handleWaitingPreference } = require('./stepWaitingPreference');
             return handleWaitingPreference(userId, text, normalizedText, currentState, knowledge, dependencies);
         }
+        // Si en vez de "sí, pasame los precios" trae una duda o un comentario de
+        // salud, primero se le contesta y DESPUÉS va la lista. Desde el 4-nov-2026
+        // esta rama mandaba la lista a cualquier cosa: "Quita el apetito?",
+        // "Tengo los triglicéridos alto y diabetes", un audio con cinco
+        // preguntas... todos recibieron solo los precios (revisión del 12-nov).
+        // Antes del guion por zona este paso se lo pasaba a la IA.
+        const words = text.trim().split(/\s+/).length;
+        const looksLikeBlob = /^\/9j\//.test(text) || /^[A-Za-z0-9+/=]{200,}$/.test(text.trim());
+        const justPrice = words <= 6
+            && /\b(precios?|cuanto\s+(sale|cuesta|vale|es|salen|cuestan)|q(ue)?\s+sale|que\s+precio|valor|costo)\b/.test(normalizedText)
+            && !/\b(como|contiene|tomar?|sirve|efecto)\b/.test(normalizedText);
+        const asksOrTells = /[?¿]/.test(text)
+            || /\b(como|para que|sirve|funciona|contiene|efectos?|se toma|tomar(lo|la)?|que hace|quita|ansiedad|apetito|dieta|rebote|h?abl[ae]me|explic\w+|contame|cuentame|decime|dime|miedo|desconfi\w+|estafa)\b/.test(normalizedText)
+            || /\b(diabet\w+|presion|hipertens\w+|tiroides|triglicerid\w+|colesterol|operad\w+|cirugia|enferm\w+|medicamento|medicacion|embaraz\w+|lactan\w+|gastritis|corazon|higado|rinon|a[ñn]os|edad|soy (una persona )?(mayor|grande))\b/.test(normalizedText);
+        if (!looksLikeBlob && !justPrice && (asksOrTells || words > 12) && aiService?.chat) {
+            try {
+                const aiRes = await aiService.chat(text, {
+                    step: FlowStep.WAITING_WEIGHT,
+                    goal: `El cliente contestó al saludo con una duda o un comentario en vez de pedir los precios. Su mensaje: "${text}". Respondé TODO lo que pregunta o comenta (qué es, cómo se toma, qué efecto tiene, su salud, su edad, su desconfianza) con calidez y usando el knowledge, sin inventar. NO escribas precios ni planes: el sistema manda la lista de precios en el mensaje siguiente. NO preguntes cuántos kilos quiere bajar. Cerrá con una frase corta que anuncie los precios (por ejemplo "Te paso los precios 👇"), SIN hacer preguntas. 🛑 NO derives al médico.`,
+                    history: currentState.history,
+                    summary: currentState.summary,
+                    knowledge,
+                    userState: currentState,
+                });
+                if (aiRes?.response) {
+                    await sendMessageWithDelay(userId, aiRes.response);
+                    logger.info(`[CLUB-PRECIOS] ${userId} trajo una duda ("${text.slice(0, 50)}") → respondió la IA antes de la lista.`);
+                }
+            } catch (e: any) {
+                logger.warn(`[CLUB-PRECIOS] IA falló con la duda de ${userId}: ${e.message} — va la lista sola.`);
+            }
+        }
         await sendMessageWithDelay(userId, _formatMessage(knowledge.flow.prices_club.response, currentState));
         _setStep(currentState, FlowStep.WAITING_PREFERENCE);
         saveState(userId);
