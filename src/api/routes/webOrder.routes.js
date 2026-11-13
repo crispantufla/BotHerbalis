@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const { prisma } = require('../../../db');
 const logger = require('../../utils/logger');
 const { notifyWebOrder } = require('../../services/webOrderNotify');
+const { _getPrices } = require('../../flows/utils/pricing');
 
 /** Comparación en tiempo constante del token compartido con la web. */
 function _tokenMatches(given, expected) {
@@ -82,6 +83,30 @@ module.exports = (clientPool) => {
         } catch (e) {
             logger.error('[WEB-NOTIFY] error inesperado:', e);
             res.status(500).json({ error: e.message });
+        }
+    });
+
+    // GET /web-prices — precios vigentes (los del Editor de Precios) para la tienda web.
+    // La web los consulta server-to-server para mostrar y cobrar SIEMPRE lo mismo que
+    // cotiza el bot. Misma auth que /notify: WEB_NOTIFY_TOKEN en x-web-notify-token.
+    // Devuelve solo las tablas por producto (sin costo logístico ni precio promo).
+    router.get('/web-prices', (req, res) => {
+        const expected = process.env.WEB_NOTIFY_TOKEN;
+        if (!expected) return res.status(503).json({ error: 'WEB_NOTIFY_TOKEN no configurado' });
+        if (!_tokenMatches(req.headers['x-web-notify-token'], expected)) {
+            logger.warn(`[WEB-PRICES] token inválido desde ${req.ip}`);
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+        try {
+            const all = _getPrices();
+            const prices = {};
+            for (const [producto, tabla] of Object.entries(all)) {
+                if (tabla && typeof tabla === 'object') prices[producto] = { '60': tabla['60'], '120': tabla['120'] };
+            }
+            res.set('Cache-Control', 'no-store').json({ prices });
+        } catch (e) {
+            logger.error('[WEB-PRICES] error leyendo precios:', e);
+            res.status(500).json({ error: 'No se pudieron leer los precios' });
         }
     });
 
