@@ -87,6 +87,18 @@ Entraron el 2026-11-12, tras revisar a mano las charlas del guion por zona:
   respuestas entre clientes sin mirar la charla.
 - Toda la conversación de venta va en Sonnet (`CLAUDE_SIMPLE_STEPS=haiku` vuelve al reparto
   anterior).
+- **Sonnet 5.5 (13-nov)**: el modelo de la conversación es `claude-sonnet-5-5`. Los 5.x piden
+  otra forma de pedido y cada diferencia da un 400 si se manda como antes: sin `temperature`,
+  la herramienta no se puede forzar (`tool_choice: auto` + `strict` + un aviso al final del
+  turno user, nunca en el system) y el razonamiento no se apaga con `disabled` sino con
+  `between_tools`. Todo eso vive en `_claudeRequestShape` (`ai.ts`). Los pasos de
+  `THINKING_STEPS` (zona, pago, datos, confirmaciones) razonan antes de contestar; el resto no.
+  Si 5.5 falla o se niega, se reintenta en `CLAUDE_MODEL_LEGACY` (Sonnet 4.6) con la forma
+  vieja, y recién después OpenAI. Direcciones (`parseAddress`), imágenes (`analyzeImage`) y
+  resúmenes van primero a Claude y OpenAI queda de respaldo. Vueltas atrás por variable, sin
+  deploy de código: `CLAUDE_MODEL_PREMIUM=claude-sonnet-4-6`, `CLAUDE_THINKING=0`,
+  `PARSE_ADDRESS_PROVIDER=openai`, `CLAUDE_AUX=0`. Tests: `tests/claude5_shape.test.js`
+  (`ai_chat_payloads` y `structured_turns_integration` fijan la forma 4.x a propósito).
 - **La zona de reparto es la LISTA, no la distancia (13-nov)**: "Soy de Uranga, 40 km de Rosario"
   se leía como Rosario y el bot confirmó un reparto a un pueblo sin reparto. Ahora
   `classifyZoneText` descarta "N km de Rosario" / "cerca de Rosario" como referencia; una

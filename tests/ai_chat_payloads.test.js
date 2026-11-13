@@ -15,6 +15,9 @@ require('dotenv').config();
 // El cache semántico está apagado por defecto desde el 12-nov-2026; este test
 // sigue fijando cómo se comporta cuando se lo prende.
 process.env.SEMANTIC_CACHE = '1';
+// Este test fija la forma de pedido de los modelos 4.x (temperature + herramienta
+// forzada), que sigue viva como respaldo. La de los 5.x está en claude5_shape.test.js.
+process.env.CLAUDE_MODEL_PREMIUM = 'claude-sonnet-4-6';
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');

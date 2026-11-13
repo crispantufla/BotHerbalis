@@ -14,6 +14,10 @@
  * determinista y lo que de hecho se rompió: cómo se le entrega el contexto a Claude.
  */
 
+// Este test fija el cableado con la forma de pedido de los modelos 4.x, que sigue
+// viva como respaldo. La de los 5.x está en claude5_shape.test.js.
+process.env.CLAUDE_MODEL_PREMIUM = 'claude-sonnet-4-6';
+
 const { aiService, _buildSystemBlocks, _buildSystemPrompt, CLAUDE_CACHE_CONTROL, CLAUDE_DIALOG_TOOL } = require('../src/services/ai');
 
 // Activa el path Claude sin red real: mockeamos el SDK de Anthropic.

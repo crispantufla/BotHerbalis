@@ -92,7 +92,67 @@ const MAX_RETRIES = 3;
 // El resto de las llamadas (whisper, embeddings, visión, summary, parseAddress)
 // se mantienen en OpenAI — Anthropic no tiene audio ni embeddings.
 // Excepción: parseAddress cae a Claude si OpenAI falla (ver _claudeParseAddress).
-const CLAUDE_MODEL_PREMIUM = process.env.CLAUDE_MODEL_PREMIUM || "claude-sonnet-4-6";
+// Desde el 13-nov-2026 la conversación va en Sonnet 5.5. Los Claude 5.x cambian
+// la forma del pedido (ver _claudeRequestShape): no aceptan temperature ni forzar
+// la herramienta, y el razonamiento se regula con `effort`. Si una llamada al
+// modelo nuevo falla o se niega a responder, se reintenta en CLAUDE_MODEL_LEGACY
+// con la forma de siempre. Volver atrás sin deploy: CLAUDE_MODEL_PREMIUM=claude-sonnet-4-6.
+const CLAUDE_MODEL_PREMIUM = process.env.CLAUDE_MODEL_PREMIUM || "claude-sonnet-5-5";
+const CLAUDE_MODEL_LEGACY = process.env.CLAUDE_MODEL_LEGACY || "claude-sonnet-4-6";
+// Pasos donde el modelo razona antes de contestar: localidad, pago, datos y
+// cierre, que es donde se decide la plata y donde aparecen las objeciones
+// difíciles. En el resto contesta directo. CLAUDE_THINKING=0 lo apaga en todos.
+const CLAUDE_THINKING_ON = process.env.CLAUDE_THINKING !== '0' && process.env.CLAUDE_THINKING !== 'false';
+const THINKING_STEPS = new Set([
+    'waiting_zone', 'waiting_payment_method', 'waiting_mp_payment', 'waiting_transfer_confirmation',
+    'waiting_data', 'waiting_final_confirmation', 'waiting_price_confirmation', 'waiting_ok', 'closing',
+]);
+
+/** Los modelos Claude 5.x (Sonnet/Haiku/Opus 5 en adelante) usan la forma nueva del pedido. */
+function _isClaude5(model: string): boolean {
+    return /^claude-[a-z]+-5(?:-|$)/.test(model);
+}
+
+/**
+ * Lo que cambia del pedido según la familia del modelo.
+ *   - 4.x: temperature + herramienta forzada, como siempre.
+ *   - 5.x: sin temperature (da 400); `tool_choice` forzado da 400, así que va en
+ *     `auto` con `strict: true` y el aviso de llamar a la herramienta en el turno
+ *     del usuario; el razonamiento se prende con `effort` en los pasos de
+ *     THINKING_STEPS y se apaga en el resto (`between_tools` solo existe en
+ *     Sonnet 5.5; en otro 5.x se baja el esfuerzo). `max_tokens` cubre también
+ *     lo que el modelo piensa.
+ */
+function _claudeRequestShape(model: string, step: string, tool: any): any {
+    if (!_isClaude5(model)) {
+        return { max_tokens: 800, temperature: 0.6, tools: [tool], tool_choice: { type: "tool", name: tool.name } };
+    }
+    const strictTool = {
+        ...tool,
+        strict: true,
+        input_schema: {
+            ...tool.input_schema,
+            properties: Object.fromEntries(Object.entries(tool.input_schema.properties).map(([k, v]: [string, any]) =>
+                [k, tool.input_schema.required?.includes(k) ? v : { ...v, type: [...(Array.isArray(v.type) ? v.type : [v.type]).filter((t: string) => t !== 'null'), 'null'] }])),
+            required: Object.keys(tool.input_schema.properties),
+            additionalProperties: false,
+        },
+    };
+    const thinks = CLAUDE_THINKING_ON && THINKING_STEPS.has(step);
+    const shape: any = { tools: [strictTool], tool_choice: { type: "auto" } };
+    if (thinks) {
+        shape.max_tokens = 5000;
+        shape.output_config = { effort: 'medium' };
+    } else {
+        shape.max_tokens = 2000;
+        shape.output_config = { effort: 'low' };
+        if (model.startsWith('claude-sonnet-5-5')) shape.thinking = { type: 'between_tools' };
+    }
+    return shape;
+}
+
+/** Recordatorio para los 5.x, que ya no se pueden forzar a usar la herramienta. Va al final del turno del usuario (fuera del prefijo cacheado). */
+const CALL_TOOL_REMINDER = '\n\n(Respondé llamando a la herramienta control_dialog_flow; no contestes con texto suelto.)';
 const CLAUDE_MODEL_SIMPLE = process.env.CLAUDE_MODEL_SIMPLE || "claude-haiku-4-5-20251001";
 const CLAUDE_SIMPLE_STEPS_ON_HAIKU = (process.env.CLAUDE_SIMPLE_STEPS || '').toLowerCase() === 'haiku';
 const CLAUDE_AB_SELLERS = new Set(
@@ -318,28 +378,62 @@ class AIService {
             const cacheKey = structured
                 ? `claude_chat_${step}_${JSON.stringify(historyTurns)}_${userPrompt}`
                 : `claude_chat_${step}_${userPrompt}`;
+            const primary = await this._claudeCreate(model, step, system, messages, cacheKey, sellerId);
+            if (primary) return primary;
+            // El modelo nuevo falló, se negó o no devolvió nada usable: una vez
+            // más en el modelo anterior, con la forma de pedido de siempre.
+            if (_isClaude5(model) && CLAUDE_MODEL_LEGACY && CLAUDE_MODEL_LEGACY !== model) {
+                logger.warn(`[AI][CLAUDE] ${model} no respondió en ${step} para ${sellerId} — reintento en ${CLAUDE_MODEL_LEGACY}`);
+                return await this._claudeCreate(CLAUDE_MODEL_LEGACY, step, system, messages, `legacy_${cacheKey}`, sellerId);
+            }
+            return null;
+        } catch (e: any) {
+            logger.error(`[AI][CLAUDE-AB] error para ${sellerId} (step ${step}): ${e.message}`);
+            return null;
+        }
+    }
+
+    /**
+     * Una llamada de chat a un modelo de Claude, con la forma de pedido que le
+     * corresponde a su familia. Devuelve null (nunca tira) si falla, si el
+     * modelo se niega (`stop_reason: "refusal"`) o si no hay nada que mandar.
+     */
+    async _claudeCreate(model: string, step: string, system: any, messages: any[], cacheKey: string, sellerId: string): Promise<{ response?: string; goalMet?: boolean; extractedData?: string | null } | null> {
+        try {
+            const is5 = _isClaude5(model);
+            let msgs = messages;
+            if (is5) {
+                // El aviso de usar la herramienta va pegado al último turno del usuario.
+                const last = messages[messages.length - 1];
+                msgs = [...messages.slice(0, -1), { ...last, content: `${last.content}${CALL_TOOL_REMINDER}` }];
+            }
             const result: any = await this._callQueued(
-                () => this.anthropic.messages.create({
-                    model,
-                    max_tokens: 800,
-                    temperature: 0.6,
-                    system,
-                    messages,
-                    tools: [CLAUDE_DIALOG_TOOL],
-                    tool_choice: { type: "tool", name: "control_dialog_flow" }
-                }),
+                () => this.anthropic.messages.create({ model, system, messages: msgs, ..._claudeRequestShape(model, step, CLAUDE_DIALOG_TOOL) }),
                 cacheKey, // namespace de caché distinto al de OpenAI (incluye historial en modo estructurado)
                 undefined,
                 sellerId
             );
-            const toolUse = (result?.content || []).find((c: any) => c.type === 'tool_use');
-            if (toolUse && toolUse.input) {
-                return { response: toolUse.input.response, goalMet: toolUse.input.goalMet, extractedData: toolUse.input.extractedData || null };
+            if (result?.stop_reason === 'refusal') {
+                logger.warn(`[AI][CLAUDE] ${model} se negó a responder en ${step} para ${sellerId} (${result?.stop_details?.category || 'sin categoría'})`);
+                return null;
             }
-            logger.warn(`[AI][CLAUDE-AB] respuesta sin tool_use para ${sellerId} (step ${step})`);
+            // Se lee por tipo de bloque: en los 5.x la respuesta puede empezar con bloques de razonamiento.
+            const blocks: any[] = result?.content || [];
+            const toolUse = blocks.find((c: any) => c.type === 'tool_use');
+            if (toolUse && toolUse.input && toolUse.input.response) {
+                return { response: toolUse.input.response, goalMet: toolUse.input.goalMet === true, extractedData: toolUse.input.extractedData || null };
+            }
+            // Con `tool_choice: auto` el modelo puede contestar en texto. Se usa ese
+            // texto como respuesta, sin avanzar de paso.
+            const text = blocks.filter((c: any) => c.type === 'text').map((c: any) => c.text).join('\n').trim();
+            if (is5 && text) {
+                logger.warn(`[AI][CLAUDE] ${model} contestó en texto, sin la herramienta, en ${step} para ${sellerId}`);
+                return { response: text, goalMet: false, extractedData: null };
+            }
+            logger.warn(`[AI][CLAUDE-AB] respuesta sin tool_use para ${sellerId} (step ${step}, ${model})`);
             return null;
         } catch (e: any) {
-            logger.error(`[AI][CLAUDE-AB] error para ${sellerId} (step ${step}): ${e.message}`);
+            logger.error(`[AI][CLAUDE-AB] error para ${sellerId} (step ${step}, ${model}): ${e.message}`);
             return null;
         }
     }
@@ -441,9 +535,13 @@ class AIService {
                 const cacheW1h = usage.cache_creation?.ephemeral_1h_input_tokens ?? cacheW;
                 const cacheW5m = usage.cache_creation?.ephemeral_5m_input_tokens ?? 0;
                 const isBig = model.includes('sonnet') || model.includes('opus');
-                const inputRate  = isBig ? 0.000003 : 0.000001;
-                const outputRate = isBig ? 0.000015 : 0.000005;
-                const cost = (inTok + cacheW1h * 2 + cacheW5m * 1.25 + cacheR * 0.1) * inputRate + outTok * outputRate;
+                // Sonnet 5.5: $2/$10 por M y lectura de caché a $0.10 (0.05x);
+                // Haiku 5.5: $0.10/$0.50. Los 4.x siguen con sus tarifas.
+                const is55 = model.includes('-5-5');
+                const inputRate  = is55 ? (isBig ? 0.000002 : 0.0000001) : (isBig ? 0.000003 : 0.000001);
+                const outputRate = is55 ? (isBig ? 0.00001 : 0.0000005) : (isBig ? 0.000015 : 0.000005);
+                const readFactor = is55 && isBig ? 0.05 : 0.1;
+                const cost = (inTok + cacheW1h * 2 + cacheW5m * 1.25 + cacheR * readFactor) * inputRate + outTok * outputRate;
                 this.stats.promptTokens += inTok + cacheW + cacheR;
                 this.stats.completionTokens += outTok;
                 this.stats.estimatedCostUSD += cost;
@@ -745,6 +843,10 @@ ${conversationText}
 RESUMEN:
 `;
 
+        // Primero Claude (el modelo simple alcanza para resumir); OpenAI queda de respaldo.
+        const viaClaude = await this._claudePlain(CLAUDE_MODEL_SIMPLE, "Sos un asistente que resume conversaciones de ventas de forma concisa.", prompt, 400, 'Summary');
+        if (viaClaude) return viaClaude;
+
         try {
             const result = await this._callQueued(
                 () => this.client.chat.completions.create({
@@ -828,6 +930,16 @@ CRÍTICO: Usá la "Fecha Actual" provista arriba para calcular el día exacto y 
         10. CRÍTICO — FORMATO LISTA: si el texto viene en líneas separadas (respondiendo a un formulario tipo "Calle:\\nNúmero:\\nLocalidad:\\nCP:"), uní las líneas adyacentes que correspondan al mismo campo. En particular: si una línea contiene SOLO un nombre de calle SIN altura, y la línea SIGUIENTE contiene SOLO un número (1-5 dígitos sin texto adicional), interpretá ambas como una sola dirección "<calle> <número>". Ejemplo: "Alumine\\n1101\\nNeuquen\\n8300" → calle: "Alumine 1101", ciudad: "Neuquen", cp: "8300". NUNCA dejes la calle sin altura si la altura aparece en la línea siguiente.
         11. AMBIGÜEDAD CALLE vs LOCALIDAD: si el nombre de la "calle" coincide con el nombre de una localidad argentina conocida (ej: "Aluminé", "Tigre", "Pilar", "Salta") PERO el usuario también dio una ciudad/localidad distinta en otra línea, asumí que ese nombre es CALLE de la ciudad indicada (no localidad). Solo tratá ese nombre como localidad si NO hay otra ciudad explícita en el texto.
         `;
+        // Desde el 13-nov-2026 lee primero Claude y OpenAI queda de respaldo (antes
+        // era al revés). Se comparó sobre mensajes reales antes de cambiarlo.
+        // PARSE_ADDRESS_PROVIDER=openai vuelve al orden anterior sin deploy.
+        const claudeFirst = (process.env.PARSE_ADDRESS_PROVIDER || 'claude') !== 'openai';
+        let triedClaude = false;
+        if (claudeFirst && this.anthropic) {
+            triedClaude = true;
+            const viaClaude = await this._claudeParseAddress(prompt);
+            if (viaClaude) return viaClaude;
+        }
         try {
             // Parser de dirección — usamos GPT-4o full porque mini falla con
             // direcciones desordenadas tipo "San Martín 865, Comte. Luis Piedra
@@ -885,8 +997,10 @@ CRÍTICO: Usá la "Fecha Actual" provista arriba para calcular el día exacto y 
             // OpenAI caído (429/outage): probamos Claude antes de rendirnos. Sin esto,
             // el rescate de datos del manual-complete queda ciego justo cuando más se
             // lo necesita (caso Pablo Martinez 23-jul: 429 x3 → modal vacío).
-            const viaClaude = await this._claudeParseAddress(prompt);
-            if (viaClaude) return viaClaude;
+            if (!triedClaude) {
+                const viaClaude = await this._claudeParseAddress(prompt);
+                if (viaClaude) return viaClaude;
+            }
             return { _error: true };
         }
     }
@@ -897,20 +1011,58 @@ CRÍTICO: Usá la "Fecha Actual" provista arriba para calcular el día exacto y 
      * seller, no por proveedor, y cuando corre este fallback ya está abierto por
      * los fallos de OpenAI — pasar por la cola lo haría fallar en seco.
      */
+    /**
+     * Una llamada simple a Claude que devuelve texto (resumen, lectura de una
+     * imagen). Sin herramientas y sin razonamiento. Devuelve null si no hay
+     * cliente de Anthropic, si falla o si el modelo se niega: el que llama cae a
+     * OpenAI. Llamada directa, fuera de la cola: no debe abrir el circuit
+     * breaker de la conversación por una tarea auxiliar.
+     */
+    async _claudePlain(model: string, system: string | null, content: any, maxTokens: number, label: string): Promise<string | null> {
+        if (!this.anthropic || process.env.CLAUDE_AUX === '0') return null;
+        try {
+            const is5 = _isClaude5(model);
+            const req: any = { model, max_tokens: is5 ? Math.max(maxTokens, 1000) : maxTokens, messages: [{ role: "user", content }] };
+            if (system) req.system = system;
+            if (is5) {
+                req.output_config = { effort: 'low' };
+                if (model.startsWith('claude-sonnet-5-5')) req.thinking = { type: 'between_tools' };
+            } else {
+                req.temperature = 0.3;
+            }
+            const result: any = await this.anthropic.messages.create(req);
+            if (result?.stop_reason === 'refusal') {
+                logger.warn(`[AI][CLAUDE] ${label}: ${model} se negó a responder — cae a OpenAI`);
+                return null;
+            }
+            const text = (result?.content || []).filter((c: any) => c.type === 'text').map((c: any) => c.text).join('\n').trim();
+            return text || null;
+        } catch (e: any) {
+            logger.warn(`[AI][CLAUDE] ${label} falló en ${model} (${e.message}) — cae a OpenAI`);
+            return null;
+        }
+    }
+
     async _claudeParseAddress(prompt: string): Promise<AIParsedResponse | null> {
         if (!this.anthropic) return null;
         try {
+            const is5 = _isClaude5(CLAUDE_MODEL_PREMIUM);
             const result: any = await this.anthropic.messages.create({
                 model: CLAUDE_MODEL_PREMIUM,
                 max_tokens: 300,
-                temperature: 0,
+                ...(is5 ? {} : { temperature: 0 }),
                 system: "Sos un parser de datos de envío experto en geografía argentina. Extraé cada valor TAL CUAL lo escribió el cliente: no reformatees, no agregues puntuación ni abreviaturas, no recortes palabras (ej: 'av belgrano 45D' queda 'av belgrano 45D', no 'Av. Belgrano 45D'; 'cordoba capital' queda 'cordoba capital', no 'Córdoba').",
-                messages: [{ role: "user", content: prompt }],
+                messages: [{ role: "user", content: is5 ? `${prompt}\n\n(Devolvé el resultado llamando a la herramienta extract_address.)` : prompt }],
+                // Los 5.x no aceptan forzar la herramienta: va en auto, con el
+                // esquema estricto y sin razonamiento (es una extracción).
+                ...(is5 ? { output_config: { effort: 'low' }, ...(CLAUDE_MODEL_PREMIUM.startsWith('claude-sonnet-5-5') ? { thinking: { type: 'between_tools' } } : {}) } : {}),
                 tools: [{
                     name: "extract_address",
                     description: "Extrae los datos de direccion y nombre de la persona",
+                    ...(is5 ? { strict: true } : {}),
                     input_schema: {
                         type: "object",
+                        ...(is5 ? { additionalProperties: false, required: ["nombre", "calle", "ciudad", "provincia", "cp", "postdatado"] } : {}),
                         properties: {
                             nombre: { type: ["string", "null"], description: "Nombre y apellido de la persona, o null si no se proporcionó" },
                             calle: { type: ["string", "null"], description: "Calle, altura, vivienda, manzana, o null si no se proporcionó" },
@@ -921,14 +1073,15 @@ CRÍTICO: Usá la "Fecha Actual" provista arriba para calcular el día exacto y 
                         }
                     }
                 }],
-                tool_choice: { type: "tool", name: "extract_address" }
-            });
+                tool_choice: is5 ? { type: "auto" } : { type: "tool", name: "extract_address" }
+            } as any);
+            if (result?.stop_reason === 'refusal') return null;
             const toolUse = (result?.content || []).find((c: any) => c.type === 'tool_use');
             if (!toolUse?.input) return null;
             // El schema admite null; igual se tolera el literal "null" por si lo emite como string.
             const norm = (v: any) => (!v || v === 'null') ? null : v;
             const args = toolUse.input;
-            logger.info("🟢 [AI] parseAddress rescatado vía Claude");
+            logger.info("🟢 [AI] parseAddress vía Claude");
             return {
                 nombre: norm(args.nombre),
                 calle: norm(args.calle),
@@ -978,6 +1131,12 @@ CRÍTICO: Usá la "Fecha Actual" provista arriba para calcular el día exacto y 
      * Analyze Image — Uses OpenAI Vision to extract text or describe an image
      */
     async analyzeImage(mediaData: string, mimeType: string, prompt: string, sellerId?: string): Promise<string | null> {
+        // Primero Claude; OpenAI queda de respaldo.
+        const viaClaude = await this._claudePlain(CLAUDE_MODEL_PREMIUM, null, [
+            { type: "image", source: { type: "base64", media_type: mimeType, data: mediaData } },
+            { type: "text", text: prompt },
+        ], 600, 'Vision');
+        if (viaClaude) return viaClaude;
         try {
             const result = await this._callQueued(
                 () => this.client.chat.completions.create({
