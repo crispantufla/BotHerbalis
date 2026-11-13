@@ -368,6 +368,16 @@ export async function processSalesFlow(
         (currentState as any)._aiControlTag = null;
         await _pauseAndAlert(userId, currentState, dependencies, text, 'El cliente está interesado en reventa/compras por mayor. Derivado a Horacio.');
         saveState(userId);
+    } else if (_controlTag === 'NEED_ADMIN') {
+        // La IA marcó el caso como dudoso o como reclamo y no avanzó. Sin esto se
+        // quedaba ahí: el cliente esperando y nadie avisado. waiting_mp_payment
+        // ya lo manejaba por su cuenta; si el chat ya quedó pausado no se repite.
+        (currentState as any)._aiControlTag = null;
+        if (!dependencies.sharedState?.pausedUsers?.has(userId)) {
+            logger.info(`[NEED-ADMIN] User ${userId}: la IA pidió que lo vea una persona. Pauso y aviso.`);
+            await _pauseAndAlert(userId, currentState, dependencies, text, 'La IA marcó el caso como dudoso o reclamo y no avanzó (NEED_ADMIN). Revisar y contestarle.');
+            saveState(userId);
+        }
     }
 
     // Si ya actuó un tag de control arriba, NO repetimos el match por prosa de

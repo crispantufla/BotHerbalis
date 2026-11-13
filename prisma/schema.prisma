@@ -387,3 +387,21 @@ model PromoRecipient {
   @@index([instanceId, phone])
   @@index([campaignId, status, position])
 }
+
+// De qué anuncio de Meta llegó cada persona (ficha ctwaContext que manda el
+// agente), o 'sin_anuncio' si es alguien nuevo para el número. Una fila por
+// (vendedor, teléfono, anuncio). La llena services/adStats.ts.
+model AdLead {
+  id         String   @id @default(uuid())
+  instanceId String
+  phone      String
+  sourceId   String
+  title      String?
+  mediaType  Int?
+  firstAt    DateTime @default(now())
+  lastAt     DateTime @default(now())
+  messages   Int      @default(1)
+
+  @@unique([instanceId, phone, sourceId])
+  @@index([instanceId, sourceId, firstAt])
+}

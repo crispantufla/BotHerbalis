@@ -874,6 +874,32 @@ export async function _handleRepartoData(
             const parsed = await (dependencies.mockAiService || aiService).parseAddress(text);
             if (parsed && !parsed._error) {
                 if (parsed.nombre && !addr.nombre) { addr.nombre = parsed.nombre; if (!currentState.userName) currentState.userName = parsed.nombre; progressed = true; }
+                // La dirección trae OTRA localidad que la del reparto ("San Martín
+                // 452, Uranga" con la zona resuelta como Rosario): no se cierra un
+                // reparto a un lugar que no lo tiene. Si la conocemos como fuera de
+                // zona pasa a Correo; si no la conocemos, lo confirma una persona.
+                // El 12-nov-2026 se confirmó "reparto propio en Rosario" a una
+                // clienta de Uranga y la venta se cayó.
+                if (parsed.ciudad && addr.ciudad) {
+                    const { classifyZoneText, normalizePlace } = require('../utils/deliveryZone');
+                    const given = classifyZoneText(parsed.ciudad, knowledge);
+                    const differs = normalizePlace(parsed.ciudad) !== normalizePlace(addr.ciudad);
+                    if (differs && given.zone === 'out') {
+                        addr.cp = undefined;
+                        addr.provincia = undefined;
+                        if (parsed.nombre && !addr.nombre) { addr.nombre = parsed.nombre; if (!currentState.userName) currentState.userName = parsed.nombre; }
+                        logger.info(`[REPARTO-DATA] ${userId} dio una dirección de ${given.localidad}, fuera de la zona de reparto (tenía ${addr.ciudad}) → Correo.`);
+                        const { _resolveZone } = require('./stepWaitingZone');
+                        await _resolveZone(userId, given, currentState, knowledge, dependencies, `Veo que sos de *${given.localidad}* 😊 `);
+                        return { matched: true };
+                    }
+                    if (differs && given.zone === 'unknown') {
+                        saveState(userId);
+                        await sendMessageWithDelay(userId, `Veo que la dirección es de *${parsed.ciudad}* 😊 Dame un momento que confirmo con el equipo de envíos cómo te llega y te escribo enseguida.`);
+                        await _pauseAndAlert(userId, currentState, dependencies, text, `Le ofrecí reparto propio como ${addr.ciudad}, pero la dirección que mandó es de ${parsed.ciudad}, que no está en ninguna lista. Confirmar si tiene reparto o va por Correo.`);
+                        return { matched: true };
+                    }
+                }
                 if (parsed.calle && !addr.calle) { addr.calle = parsed.calle; progressed = true; }
                 if (parsed.ciudad && !addr.ciudad) { addr.ciudad = parsed.ciudad; progressed = true; }
                 if (parsed.cp && !addr.cp) { addr.cp = parsed.cp; progressed = true; }

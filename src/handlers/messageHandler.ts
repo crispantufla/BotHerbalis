@@ -60,6 +60,14 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
 
             // 2. Quién escribe.
             const userId = await steps.resolveUserId(msg, rt);
+            // De qué anuncio viene (o que es una persona nueva sin anuncio): se
+            // anota antes de decidir si el bot contesta. Hasta el 13-nov-2026 el
+            // agente mandaba la ficha del anuncio y acá no se guardaba: faltaban
+            // la tabla y esta llamada. Nunca puede frenar el mensaje.
+            if (!msg.fromMe && (msg.ad?.sourceId || msg.isNewChat)) {
+                try { require('../services/adStats').recordAdLead(rt.sellerId, userId, msg); }
+                catch (e: any) { logger.warn(`[ADS][${sellerId}] recordAdLead: ${e?.message}`); }
+            }
             const isAdmin = msg.fromMe || _isAdminPhone(userId, config.alertNumbers);
             let msgText = steps.normalizeBody(msg.body);
 

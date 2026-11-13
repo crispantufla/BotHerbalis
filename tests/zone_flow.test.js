@@ -269,12 +269,34 @@ describe('handleWaitingZone', () => {
         expect(lastSent()).toMatch(/cuántos km/i);
     });
 
-    test('respuesta de km ≤ 60 → dentro de zona; > 60 → fuera', async () => {
+    // 13-nov-2026: "Soy de Uranga, 40 km de Rosario" se leyó como Rosario y el bot
+    // confirmó un reparto propio a una localidad que no lo tiene.
+    test('"Soy de Uranga, 40 km de Rosario": Rosario es una referencia, manda Uranga (sin reparto) → Correo', async () => {
+        expect(zone.classifyZoneText('Soy de Uranga ,40 km de Rosario', knowledge)).toMatchObject({ zone: 'out', localidad: 'Uranga', borde: true });
+        expect(zone.findZoneInHistory([{ role: 'user', content: 'Soy de Uranga ,40 km de Rosario' }], knowledge)).toMatchObject({ zone: 'out', localidad: 'Uranga' });
+        const st = makeState();
+        await handleWaitingZone(USER, 'Soy de Uranga ,40 km de Rosario', norm('Soy de Uranga ,40 km de Rosario'), st, knowledge, deps);
+        expect(st.deliveryZone).toBe('out');
+        expect(lastSent()).toMatch(/Correo Argentino/);
+    });
+
+    test.each(['cerca de Rosario', 'a 20 km de rosario', 'al lado de Rosario'])('"%s" a secas no es una localidad', (t) => {
+        expect(zone.classifyZoneText(t, knowledge).zone).toBe('unknown');
+    });
+
+    test('"Juan Díaz, Mitre 1234, Rosario" sigue siendo Rosario aunque Díaz sea una localidad sin reparto', () => {
+        expect(zone.classifyZoneText('Juan Díaz, Mitre 1234, Rosario', knowledge)).toMatchObject({ zone: 'in', localidad: 'Rosario' });
+    });
+
+    test('respuesta de km ≤ 60 de una localidad que no está en la lista → NO promete reparto: confirma una persona; > 60 → fuera', async () => {
         const stIn = makeState({ zoneQuestion: 'km', partialAddress: { ciudad: 'Pueblo X' } });
         await handleWaitingZone(USER, 'unos 40 km', norm('unos 40 km'), stIn, knowledge, deps);
-        expect(stIn.deliveryZone).toBe('in');
-        expect(stIn.step).toBe('waiting_data');
-        expect(lastSent()).toMatch(/Pueblo X/);
+        expect(stIn.deliveryZone).toBeUndefined();
+        expect(stIn.step).toBe('waiting_zone');
+        expect(sent.join(' ')).toMatch(/confirmo con el equipo de envíos.*Pueblo X/);
+        expect(pausedUsers.has(USER)).toBe(true);
+        expect(alerts.length).toBe(1);
+        pausedUsers.clear();
 
         const stOut = makeState({ zoneQuestion: 'km', partialAddress: { ciudad: 'Pueblo Y' } });
         await handleWaitingZone(USER, 'como 90 km', norm('como 90 km'), stOut, knowledge, deps);
@@ -359,6 +381,46 @@ describe('handleWaitingZone', () => {
         expect(lastSent()).toMatch(/perdón/i);
         expect(lastSent()).toMatch(/Correo Argentino/);
         expect(orders).toEqual([]);
+    });
+
+    test('en waiting_data con reparto, la dirección trae una localidad sin reparto (Uranga) → no cierra: pasa a Correo', async () => {
+        mockParseAddress.mockResolvedValue({ nombre: 'Alicia Andreoli', calle: 'San Martin 452', ciudad: 'Uranga' });
+        const st = makeState({ step: 'waiting_data', deliveryZone: 'in', shippingChoice: 'reparto', paymentMethod: 'contrarembolso', partialAddress: { ciudad: 'Rosario' } });
+        await handleWaitingData(USER, 'Alicia Andreoli ,San Martin 452 Uranga', norm('Alicia Andreoli ,San Martin 452 Uranga'), st, knowledge, deps);
+        expect(orders).toEqual([]);
+        expect(st.deliveryZone).toBe('out');
+        expect(st.partialAddress.ciudad).toBe('Uranga');
+        expect(lastSent()).toMatch(/Veo que sos de \*Uranga\*/);
+        expect(lastSent()).toMatch(/Correo Argentino/);
+        expect(sent.join(' ')).not.toMatch(/CONFIRMACIÓN DE PEDIDO/);
+    });
+
+    test('en waiting_data con reparto, la dirección trae una localidad desconocida → no cierra: confirma una persona', async () => {
+        mockParseAddress.mockResolvedValue({ nombre: 'Ana Pérez', calle: 'Belgrano 10', ciudad: 'Pueblo Inventado' });
+        const st = makeState({ step: 'waiting_data', deliveryZone: 'in', shippingChoice: 'reparto', paymentMethod: 'contrarembolso', partialAddress: { ciudad: 'Rosario' } });
+        await handleWaitingData(USER, 'Ana Pérez, Belgrano 10, Pueblo Inventado', norm('Ana Pérez, Belgrano 10, Pueblo Inventado'), st, knowledge, deps);
+        expect(orders).toEqual([]);
+        expect(pausedUsers.has(USER)).toBe(true);
+        expect(sent.join(' ')).toMatch(/confirmo con el equipo de envíos/);
+    });
+
+    test('en waiting_data con reparto, la misma localidad (o una de la zona) cierra normal', async () => {
+        mockParseAddress.mockResolvedValue({ nombre: 'Ana Pérez', calle: 'Mitre 1234', ciudad: 'Rosario' });
+        const st = makeState({ step: 'waiting_data', deliveryZone: 'in', shippingChoice: 'reparto', paymentMethod: 'contrarembolso', partialAddress: { ciudad: 'Rosario' } });
+        await handleWaitingData(USER, 'Ana Pérez, Mitre 1234, Rosario', norm('Ana Pérez, Mitre 1234, Rosario'), st, knowledge, deps);
+        expect(orders.length).toBe(1);
+    });
+
+    test('un "ok" que cierra la charla no vuelve a pedir la localidad', async () => {
+        const st = makeState({ history: [{ role: 'bot', content: '¡Claro! Cuando necesites, acá estamos 😊' }] });
+        await handleWaitingZone(USER, 'Ok', 'ok', st, knowledge, deps);
+        expect(sent).toEqual([]);
+    });
+
+    test('un "sí" a una pregunta del bot sigue pidiendo la localidad', async () => {
+        const st = makeState({ history: [{ role: 'bot', content: '¿Avanzamos con esas?' }] });
+        await handleWaitingZone(USER, 'si', 'si', st, knowledge, deps);
+        expect(lastSent()).toMatch(/de qué ciudad o pueblo sos/i);
     });
 
     test('en waiting_data con reparto, una calle con nombre de ciudad lejana NO cambia la zona', async () => {

@@ -204,10 +204,32 @@ function _findPlaceWithContext(normalizedText: string, places: string[]): string
  * nombra un lugar claramente lejano (incluidas las de borde, que vuelven con
  * `borde: true`), y 'unknown' si no reconoce nada.
  */
+/**
+ * Saca del texto las menciones de Rosario que son una REFERENCIA y no la
+ * localidad del cliente: "a 40 km de Rosario", "cerca de Rosario", "al lado de
+ * Rosario". El 12-nov-2026 "Soy de Uranga, 40 km de Rosario" se leyó como
+ * Rosario: el bot confirmó un pedido con reparto propio a una localidad que no
+ * lo tiene (Uranga está en `localidadesBorde`) y la venta se cayó.
+ */
+function _stripCenterReference(n: string, centro: string): string {
+    const c = normalizePlace(centro).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (!c) return n;
+    const lead = '(?:la\\s+ciudad\\s+de\\s+)?';
+    return n
+        .replace(new RegExp(`\\b(?:a\\s+)?(?:unos\\s+|como\\s+|mas\\s+o\\s+menos\\s+|aprox\\w*\\s+)?\\d{1,3}\\s*(?:kms?|kilometros?|k|minutos?|min|cuadras)?\\s+(?:de|a)\\s+${lead}${c}\\b`, 'g'), ' ')
+        .replace(new RegExp(`\\b(?:cerca|cerquita|al\\s+lado|pegad[oa]|afueras|alrededores)\\s+(?:de|a)\\s+${lead}${c}\\b`, 'g'), ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
 export function classifyZoneText(text: string, knowledge?: any): ZoneClassification {
-    const n = normalizePlace(text);
-    if (!n) return { zone: 'unknown', localidad: null };
+    const raw = normalizePlace(text);
+    if (!raw) return { zone: 'unknown', localidad: null };
     const cfg = getZoneConfig(knowledge);
+    // Las búsquedas van sobre el texto sin las referencias a Rosario; si no queda
+    // nada ("cerca de Rosario" a secas) no hay localidad que clasificar.
+    const n = _stripCenterReference(raw, cfg.centro);
+    if (!n) return { zone: 'unknown', localidad: null };
 
     const inHit = _findPlace(n, cfg.localidades);
     if (inHit) return { zone: 'in', localidad: inHit };
@@ -256,7 +278,7 @@ export function findZoneInHistory(history: any[] | undefined, knowledge?: any): 
     const cfg = getZoneConfig(knowledge);
     const userMsgs = history.filter((h) => h && h.role === 'user' && typeof h.content === 'string');
     for (let i = userMsgs.length - 1; i >= 0; i--) {
-        const n = normalizePlace(userMsgs[i].content);
+        const n = _stripCenterReference(normalizePlace(userMsgs[i].content), cfg.centro);
         if (!n) continue;
         const inHit = _findPlaceWithContext(n, cfg.localidades);
         if (inHit) return { zone: 'in', localidad: inHit };
@@ -286,6 +308,7 @@ export function shippingPolicyForPrompt(mpOn: boolean): string {
     return `ENVÍO Y PAGO (modelo sep-2026, depende de la ZONA del cliente):
 - ROSARIO Y HASTA 60 KM A LA REDONDA (Funes, Roldán, San Lorenzo, Villa Gobernador Gálvez, Arroyo Seco, Villa Constitución, San Nicolás, Cañada de Gómez, etc.): entrega con *reparto propio* de Herbalis, en el domicilio, SIN costo. Se paga *al recibir* (efectivo, tarjeta o transferencia al repartidor). Antes de salir, el equipo de envíos le escribe para acordar día y horario. Datos que necesitamos: nombre completo y calle y número. No hace falta CP.
 - FUERA DE ESA ZONA: envío por *Correo Argentino*, SIN costo, SIEMPRE PREPAGO con ${prepago}. El cliente elige recibirlo *en su domicilio* o *retirarlo en la sucursal* más cercana a su código postal (la asigna el Correo sola). Al estar pago, sale enseguida y llega en *4 días hábiles*. NO existe pago al recibir ni contrarreembolso fuera de la zona: el Correo volvió ese servicio lento y caro para el cliente, por eso lo dejamos de ofrecer.
+- El reparto propio llega SOLO a las localidades de nuestra lista, no a todo lo que queda a menos de 60 km: hay pueblos cercanos sin reparto, que van por Correo. Por eso NUNCA le prometas reparto propio ni pago al recibir a alguien por la distancia que dice ("estoy a 40 km"): eso lo decide el sistema cuando sabe la localidad.
 - Para decirle cómo le llega, primero necesitás su LOCALIDAD. Si no la sabés, preguntala ("¿de qué localidad sos?"). NUNCA le pidas que se clasifique "dentro o fuera de la zona de influencia": eso lo resolvemos nosotros. Si no reconocés la localidad, preguntá a cuántos km de Rosario queda.
 - Objeción "quiero contrarreembolso / pagar al recibir" de un cliente FUERA de zona: explicá con calidez que hace 13 años enviamos contrarreembolso, pero el Correo tomó medidas que lo volvieron lento y muy caro para el cliente, y por eso hoy fuera de Rosario y alrededores el envío va prepago y llega en 4 días. Ofrecé ${mpOn ? 'tarjeta (pago protegido) o transferencia' : 'transferencia'}. Si insiste, no discutas: el flujo manda el mensaje de cierre y deriva a un asesor.
 - NUNCA menciones cuotas ni anticipo. NUNCA inventes promos ni urgencia falsa.

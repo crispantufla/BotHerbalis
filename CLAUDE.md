@@ -87,6 +87,20 @@ Entraron el 2026-11-12, tras revisar a mano las charlas del guion por zona:
   respuestas entre clientes sin mirar la charla.
 - Toda la conversación de venta va en Sonnet (`CLAUDE_SIMPLE_STEPS=haiku` vuelve al reparto
   anterior).
+- **La zona de reparto es la LISTA, no la distancia (13-nov)**: "Soy de Uranga, 40 km de Rosario"
+  se leía como Rosario y el bot confirmó un reparto a un pueblo sin reparto. Ahora
+  `classifyZoneText` descarta "N km de Rosario" / "cerca de Rosario" como referencia; una
+  localidad que no está en ninguna lista y queda cerca NO recibe reparto por decir los km: se
+  pausa y lo confirma una persona; y si en la toma de datos la dirección trae otra localidad
+  que la de la zona, el pedido no se cierra (`_handleRepartoData`).
+- `src/flows/globals/globalExistingCustomer.ts` — "ya lo compré / lo estoy tomando": la IA
+  contesta sin vender y el chat queda `completed` (lo sigue una persona). No mira Orders: hay
+  clientes a los que se les vendió a mano.
+- `NEED_ADMIN` es un tag de control más (`extractedData.ts` → `salesFlow` pausa y avisa). Antes
+  solo lo leía `waiting_mp_payment`.
+- `AdLead` (migración `20261113120000`) + `recordAdLead` en `messageHandler`: de qué anuncio
+  llega cada persona. El módulo `adStats.ts` y los endpoints `/promo/ad-stats` y
+  `/promo/ad-backfill` habían venido de bot-promo sin la tabla ni la llamada.
 
 Flujo de un mensaje: `client.on('message')` → `messageHandler` (debounce ~N segundos para agrupar mensajes consecutivos) → encola en BullMQ → worker pulls → `processSalesFlow` → step correspondiente en `src/flows/steps/` → `sendMessageWithDelay` (4-8s delay humanizado).
 

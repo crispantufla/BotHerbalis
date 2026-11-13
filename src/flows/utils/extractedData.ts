@@ -16,7 +16,11 @@
 // comprador legítimo (rechazo médico, abuso, cancelación, reventa). La
 // "indecisión" y el rechazo genérico NO se rigen por tag a propósito: ahí un
 // disparo de más pausaría a un comprador dudoso y golpearía la conversión.
-const CONTROL_TAGS = ['REJECT_MEDICAL', 'ADVERSE_REACTION', 'ABUSE', 'CANCEL_ORDER', 'RESELLER'] as const;
+// NEED_ADMIN (13-nov-2026): el prompt le dice a la IA que lo use ante un caso
+// dudoso o un reclamo, pero solo lo leía waiting_mp_payment: en el resto de los
+// pasos la IA "avisaba" y nadie se enteraba. Va último: si viene con otro tag
+// más específico, gana el otro.
+const CONTROL_TAGS = ['REJECT_MEDICAL', 'ADVERSE_REACTION', 'ABUSE', 'CANCEL_ORDER', 'RESELLER', 'NEED_ADMIN'] as const;
 export type ControlTag = typeof CONTROL_TAGS[number];
 
 /** Devuelve el primer tag de control presente en extractedData, o null. */

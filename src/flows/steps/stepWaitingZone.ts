@@ -310,8 +310,20 @@ export async function handleWaitingZone(
             return { matched: true };
         }
         const dist = parseDistanceAnswer(text, cfg.radioKm);
-        if (dist === 'in' || dist === 'out') {
-            await _resolveZone(userId, { zone: dist, localidad: currentState.partialAddress?.ciudad || null }, currentState, knowledge, dependencies);
+        if (dist === 'out') {
+            await _resolveZone(userId, { zone: 'out', localidad: currentState.partialAddress?.ciudad || null }, currentState, knowledge, dependencies);
+            return { matched: true };
+        }
+        if (dist === 'in') {
+            // Queda cerca pero NO está en la lista de reparto: la distancia no
+            // alcanza para prometerle reparto propio (hay pueblos a menos de 60 km
+            // sin reparto, como Uranga). Lo confirma una persona, que además puede
+            // sumar la localidad a la lista. Hasta el 12-nov-2026 esto daba reparto.
+            const loc = currentState.partialAddress?.ciudad || 'tu localidad';
+            saveState(userId);
+            await sendMessageWithDelay(userId, `Dame un momento que confirmo con el equipo de envíos si llegamos con reparto propio hasta *${loc}* 🙌 Enseguida te escribo.`);
+            await _pauseAndAlert(userId, currentState, dependencies, text, `Localidad que no está en la lista de reparto y queda cerca de ${cfg.centro} (${loc}: "${text.slice(0, 60)}"). Confirmar si tiene reparto propio o va por Correo; si tiene reparto, agregarla a la lista.`);
+            logger.info(`[ZONE] ${userId} → "${loc}" cerca pero fuera de la lista → confirma una persona.`);
             return { matched: true };
         }
         // Ni km ni localidad: si es pregunta la responde la IA; si no, con la
@@ -413,6 +425,15 @@ export async function handleWaitingZone(
 
     // ── Dice que sí pero no dice de dónde ──────────────────────────────────────
     if (!mentionsPlace && ZONE_ACK.test(normalizedText.trim())) {
+        // Un "ok" que cierra la charla no es un "sí, sigamos": si lo último que
+        // dijo el bot no era una pregunta ("Cuando necesites, acá estamos"), no
+        // se le vuelve a pedir la localidad. El 12-nov-2026 una clienta que ya
+        // había comprado recibió dos veces "necesito saber de qué ciudad sos".
+        const lastBot: any = [...(currentState.history || [])].reverse().find((h: any) => h && h.role === 'bot');
+        if (lastBot && !/[?¿]/.test(String(lastBot.content || ''))) {
+            logger.info(`[ZONE] ${userId} cerró con "${text.slice(0, 30)}" y no había pregunta pendiente → no insisto.`);
+            return { matched: true };
+        }
         const ackAsk = _tplOr('zone_ack', knowledge, mpOff, '¡Genial! 🙌 Para decirte cómo te llega necesito saber de qué ciudad o pueblo sos 📦');
         if (!_isDuplicate(ackAsk, currentState.history)) {
             currentState.zoneQuestion = 'localidad';

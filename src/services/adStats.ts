@@ -19,6 +19,8 @@ export function recordAdLead(instanceId: string, userId: string, msg: { ad?: any
     const ad = msg?.ad;
     const sourceId = ad?.sourceId ? String(ad.sourceId) : (msg?.isNewChat ? NO_AD : null);
     if (!phone || !sourceId) return;
+    // Los tests mockean `../db` sin este modelo: ahí no hay nada que anotar.
+    if (!prisma?.adLead) return;
     const now = new Date();
     prisma.adLead.upsert({
         where: { instanceId_phone_sourceId: { instanceId, phone, sourceId } },

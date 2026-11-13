@@ -168,8 +168,10 @@ const ABANDON_REASON_MESSAGES: Record<string, string[]> = {
 
 const CONTEXTUAL_FOLLOW_UPS: Record<string, string[]> = {
     'waiting_weight': [
-        '¡Hola! 😊 Quedó pendiente saber cuántos kilos te gustaría bajar para recomendarte lo mejor. ¿Estás por ahí?',
-        '¡Hola! Vi que consultaste. Seguimos acá para ayudarte. ¿Cuántos kilos buscás bajar más o menos?'
+        // El guion por zona ya no pregunta los kilos: el saludo termina en
+        // "¿Te paso los precios?", así que el recordatorio retoma eso.
+        '¡Hola! 😊 Quedó pendiente pasarte los precios. ¿Te los mando?',
+        '¡Hola! Vi que consultaste. Seguimos acá para ayudarte. ¿Te paso los precios?'
     ],
     'waiting_preference': [
         '¡Hola! 😊 ¿Pudiste pensar con cuál preferís arrancar: cápsulas, gotas o semillas? Acordate que el envío es gratis.',
