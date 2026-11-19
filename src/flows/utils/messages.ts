@@ -329,11 +329,47 @@ const WA_BUSINESS_AUTO_REPLIES = [
     'Gracias por tu mensaje. No estamos disponibles en este momento, pero te responderemos lo antes posible.',
 ];
 
-function _isBusinessAutoReply(text: string, config?: any): boolean {
+function _isBusinessAutoReply(text: string, config?: any, adGreeting?: string | null): boolean {
     const a = _comparable(text);
     if (!a) return false;
     const extra = Array.isArray(config?.waAutoReplies) ? config.waAutoReplies : [];
-    return [...WA_BUSINESS_AUTO_REPLIES, ...extra].some(t => _comparable(t) === a);
+    return [...WA_BUSINESS_AUTO_REPLIES, ...extra, adGreeting || ''].some(t => !!t && _comparable(t) === a);
+}
+
+/**
+ * El saludo propio de un anuncio de Meta. La ficha del anuncio que llega con el
+ * primer mensaje del cliente (`msg.ad.greetingMessageBody`) trae el texto que
+ * WhatsApp manda solo en nombre del vendedor; no es ninguno de los dos textos
+ * por defecto de arriba, así que sin anotarlo saldría como "el vendedor tomó el
+ * chat" y pausaría al lead recién llegado. Viene del bot de Club Herbys
+ * (zoneLeads.ts, 26-oct-2026), que lo guardaba en el estado; acá el cliente
+ * nuevo todavía no tiene estado cuando sale el saludo, así que va en
+ * `sharedState.adGreetings`, bajo cada id con que se conoce al chat (@lid y teléfono).
+ */
+function _noteAdGreeting(sharedState: any, chatIds: Array<string | null | undefined>, ad: any): void {
+    const body = typeof ad?.greetingMessageBody === 'string' ? ad.greetingMessageBody.trim() : '';
+    if (!body || !sharedState) return;
+    const map: Map<string, string> = sharedState.adGreetings || (sharedState.adGreetings = new Map());
+    for (const id of chatIds) {
+        if (!id) continue;
+        // Techo: lo más viejo se va primero (un Map itera en orden de inserción).
+        if (map.size >= 2000 && !map.has(id)) {
+            const oldest = map.keys().next().value;
+            if (oldest) map.delete(oldest);
+        }
+        map.set(id, body);
+    }
+}
+
+/** El saludo del anuncio anotado para este chat, bajo cualquiera de sus ids. */
+function _adGreetingFor(sharedState: any, chatIds: Array<string | null | undefined>): string | null {
+    const map: Map<string, string> | undefined = sharedState?.adGreetings;
+    if (!map) return null;
+    for (const id of chatIds) {
+        const g = id ? map.get(id) : undefined;
+        if (g) return g;
+    }
+    return null;
 }
 
 /**
@@ -352,5 +388,5 @@ function _buildPriceTableWithWeightAsk(knowledge: any, state: any): string | nul
     return `${table}\n\nPara recomendarte el plan justo, contame cuánto querés bajar:\n\n1️⃣ Hasta 10 kg\n2️⃣ Más de 10 kg`;
 }
 
-export { _formatMessage, _isDuplicate, _getAdminSuggestions, _getQuickReplies, _isScriptGreeting, _isBusinessAutoReply, _buildPriceTableWithWeightAsk };
+export { _formatMessage, _isDuplicate, _getAdminSuggestions, _getQuickReplies, _isScriptGreeting, _isBusinessAutoReply, _noteAdGreeting, _adGreetingFor, _buildPriceTableWithWeightAsk };
 

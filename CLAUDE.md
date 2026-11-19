@@ -114,6 +114,17 @@ Entraron el 2026-11-12, tras revisar a mano las charlas del guion por zona:
   llega cada persona. El módulo `adStats.ts` y los endpoints `/promo/ad-stats` y
   `/promo/ad-backfill` habían venido de bot-promo sin la tabla ni la llamada.
 
+- **Ventas compartida con el bot de Club Herbys (19-nov)**: `src/services/peerOrders.ts`. Cada
+  servidor le pide los pedidos al otro por `GET /api/peer/orders` (sin JWT: secreto compartido en
+  `x-peer-token`) y `GET /orders` los mezcla por fecha con los propios; cada pedido lleva `bot` y
+  los ajenos `peer: true`, que el panel deja en solo lectura (se gestionan en su panel). Hace
+  falta en los DOS despliegues: `BOT_NAME`, `PEER_BOT_URL` y `PEER_BOT_TOKEN` (mismo valor). Sin
+  esas variables cada panel ve solo lo suyo. Si el otro bot no contesta en 4 s el listado sale con
+  lo propio y un aviso. Tests: `tests/peer_orders.test.js`.
+- **Saludo propio del anuncio** (traído de Herbys el 19-nov): `msg.ad.greetingMessageBody` se
+  anota en `sharedState.adGreetings` (`_noteAdGreeting`) y el handler de salientes lo trata como la
+  bienvenida automática de WhatsApp Business: no pausa.
+
 Flujo de un mensaje: `client.on('message')` → `messageHandler` (debounce ~N segundos para agrupar mensajes consecutivos) → encola en BullMQ → worker pulls → `processSalesFlow` → step correspondiente en `src/flows/steps/` → `sendMessageWithDelay` (4-8s delay humanizado).
 
 ## Flujo de venta (`src/flows/steps/`)

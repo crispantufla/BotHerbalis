@@ -563,6 +563,27 @@ describe('arreglos del 7-oct-2026 en el handler de salientes', () => {
         expect(s.logAndEmit.mock.calls.map(c => c.slice(0, 3))).toEqual([[TEL, 'admin', '¡Hola! ¿Cómo podemos ayudarte?']]);
     });
 
+    // Traído del bot de Club Herbys (19-nov-2026): el saludo que el anunciante
+    // configuró en el anuncio llega en la ficha del primer mensaje del cliente.
+    test('el saludo propio del anuncio (ficha del primer mensaje) tampoco pausa', async () => {
+        const { _noteAdGreeting } = require('../src/flows/utils/messages');
+        const AD_GREETING = '¡Hola! Gracias por escribirnos 🌿 ¿En qué te ayudamos?';
+        const s = mkSeller();
+        s.sharedState.knowledge = knowledge;
+        _noteAdGreeting(s.sharedState, [LID], { sourceId: '120', greetingMessageBody: AD_GREETING });
+        await deliver(s.outgoing, manual({ body: AD_GREETING }));
+
+        expect([...s.pausedUsers]).toEqual([]);
+        expect(pauseWrites()).toEqual([]);
+        expect(s.logAndEmit.mock.calls.map(c => c.slice(0, 3))).toEqual([[TEL, 'admin', AD_GREETING]]);
+
+        // El mismo texto en un chat que no vino de ese anuncio sí es el vendedor escribiendo.
+        const other = mkSeller();
+        other.sharedState.knowledge = knowledge;
+        await deliver(other.outgoing, manual({ body: AD_GREETING }));
+        expect([...other.pausedUsers]).toEqual([TEL]);
+    });
+
     test('cualquier otro texto a un chat nuevo sigue pausando como antes', async () => {
         const s = mkSeller();
         s.sharedState.knowledge = knowledge;

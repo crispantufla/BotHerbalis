@@ -29,6 +29,7 @@ module.exports = (clientPool) => {
     const router = express.Router();
     const { withSeller, getInstanceId, isOwnerOrAdmin, toLegacyOrder } = require('./routeHelpers');
     const { requireAdmin } = require('../../middleware/jwtAuth');
+    const peerOrders = require('../../services/peerOrders');
 
     // Access io dynamically via the seller's sharedState
     const io = (req) => req.sellerInstance?.sharedState?.io || null;
@@ -66,6 +67,81 @@ module.exports = (clientPool) => {
         }
     });
 
+    // Filtros del listado, compartidos por GET /orders y GET /peer/orders.
+    // Sin instanceId se excluye el namespace "no-seller" (__legacy_import__: el
+    // padrón histórico, que está en la DB solo para detectar clientes viejos).
+    const buildOrdersWhere = (instanceId, status, search) => {
+        const where = instanceId
+            ? { instanceId }
+            : { instanceId: { notIn: ['__legacy_import__'] } };
+        // Filtro de status server-side. Antes era client-side sobre la página
+        // actual, así que filtrar "Pendiente" mostraba solo los pending de
+        // las 50 órdenes cargadas (3-5 por página) en vez de todos juntos.
+        if (status && status !== 'Todos') where.status = status;
+        // Búsqueda libre contra DB — match case-insensitive en nombre,
+        // userPhone (cliente), seller (teléfono del bot), tracking, calle
+        // y ciudad. Esto evita el bug previo de que el buscador solo
+        // encontraba clientes en la página actual.
+        if (search) {
+            where.OR = [
+                { nombre: { contains: search, mode: 'insensitive' } },
+                { userPhone: { contains: search } },   // teléfono del cliente
+                { seller: { contains: search } },      // teléfono del bot/vendedor
+                { tracking: { contains: search, mode: 'insensitive' } },
+                { calle: { contains: search, mode: 'insensitive' } },
+                { ciudad: { contains: search, mode: 'insensitive' } },
+            ];
+        }
+        return where;
+    };
+
+    // Cuenta + página de pedidos en el formato que espera el panel.
+    const loadLegacyOrders = async (where, skip, take) => {
+        const { prisma } = require('../../../db');
+        // Run count + findMany in parallel (independent queries)
+        const [total, orders] = await Promise.all([
+            prisma.order.count({ where }),
+            prisma.order.findMany({ where, orderBy: { createdAt: 'desc' }, skip, take })
+        ]);
+
+        // Workaround for Prisma adapter-pg composite key bug with include: { user: true }
+        const userPhones = [...new Set(orders.map(o => o.userPhone).filter(Boolean))];
+        const instanceIds = [...new Set(orders.map(o => o.instanceId).filter(Boolean))];
+
+        let users = [];
+        if (userPhones.length > 0 && instanceIds.length > 0) {
+            users = await prisma.user.findMany({
+                where: {
+                    OR: userPhones.map(phone => ({
+                        phone,
+                        instanceId: { in: instanceIds }
+                    }))
+                }
+            });
+        }
+
+        const userMap = new Map();
+        users.forEach(u => userMap.set(`${u.phone}_${u.instanceId}`, u));
+
+        // Map to legacy format expected by dashboard to avoid breaking frontend fields.
+        // Campos de seña expuestos al frontend para que el cartero vea el saldo
+        // a cobrar en efectivo en lugar del totalPrice (caso COD con anticipo).
+        const data = orders.map(o => {
+            const user = userMap.get(`${o.userPhone}_${o.instanceId}`);
+            // Mismo mapeo que el resto de las rutas, con tres agregados propios
+            // del listado: instanceId (columna de vendedor en SalesView), el
+            // fallback al nombre del User cuando la orden no lo trae, y el bot
+            // del que es el pedido (la pestaña Ventas es compartida, ver peerOrders.ts).
+            return {
+                ...toLegacyOrder(o),
+                instanceId: o.instanceId,
+                nombre: o.nombre || user?.name || '',
+                bot: peerOrders.botName(),
+            };
+        });
+        return { total, data };
+    };
+
     // GET /orders (List orders from PostgreSQL with Pagination)
     router.get('/orders', ...withSeller(clientPool), async (req, res) => {
         try {
@@ -81,8 +157,6 @@ module.exports = (clientPool) => {
             const requestedInstanceId = (req.query.instanceId || '').toString().trim();
             const isAdmin = req.account?.role === 'admin';
 
-            const { prisma } = require('../../../db');
-
             // Filtro base de instanceId:
             //   - Sellers (no admin): siempre el del contexto (no overrideable)
             //   - Admin con seller global seleccionado: el del contexto
@@ -91,92 +165,59 @@ module.exports = (clientPool) => {
             const effectiveInstanceId = isAdmin
                 ? (instanceIdFromCtx || requestedInstanceId || null)
                 : instanceIdFromCtx;
-            // Vista agregada sin seller específico: excluimos namespaces "no-seller"
-            // (__legacy_import__ tiene los 21k clientes históricos de Argentina —
-            // están en DB solo para el gate de detección, no son pedidos reales).
-            const where = effectiveInstanceId
-                ? { instanceId: effectiveInstanceId }
-                : { instanceId: { notIn: ['__legacy_import__'] } };
+            const where = buildOrdersWhere(effectiveInstanceId, status, search);
 
-            // Filtro de status server-side. Antes era client-side sobre la página
-            // actual, así que filtrar "Pendiente" mostraba solo los pending de
-            // las 50 órdenes cargadas (3-5 por página) en vez de todos juntos.
-            if (status && status !== 'Todos') {
-                where.status = status;
-            }
-
-            // Búsqueda libre contra DB — match case-insensitive en nombre,
-            // userPhone (cliente), seller (teléfono del bot), tracking, calle
-            // y ciudad. Esto evita el bug previo de que el buscador solo
-            // encontraba clientes en la página actual.
-            if (search) {
-                where.OR = [
-                    { nombre: { contains: search, mode: 'insensitive' } },
-                    { userPhone: { contains: search } },   // teléfono del cliente
-                    { seller: { contains: search } },      // teléfono del bot/vendedor
-                    { tracking: { contains: search, mode: 'insensitive' } },
-                    { calle: { contains: search, mode: 'insensitive' } },
-                    { ciudad: { contains: search, mode: 'insensitive' } },
-                ];
-            }
-
-            // Run count + findMany in parallel (independent queries)
-            const [total, orders] = await Promise.all([
-                prisma.order.count({ where }),
-                prisma.order.findMany({
-                    where,
-                    orderBy: { createdAt: 'desc' },
-                    skip,
-                    take: limit
-                })
-            ]);
-
-            // Workaround for Prisma adapter-pg composite key bug with include: { user: true }
-            const userPhones = [...new Set(orders.map(o => o.userPhone).filter(Boolean))];
-            const instanceIds = [...new Set(orders.map(o => o.instanceId).filter(Boolean))];
-
-            let users = [];
-            if (userPhones.length > 0 && instanceIds.length > 0) {
-                users = await prisma.user.findMany({
-                    where: {
-                        OR: userPhones.map(phone => ({
-                            phone,
-                            instanceId: { in: instanceIds }
-                        }))
-                    }
+            // Sin el otro bot configurado, el listado de siempre.
+            if (!peerOrders.isPeerConfigured()) {
+                const { total, data } = await loadLegacyOrders(where, skip, limit);
+                return res.json({
+                    data,
+                    pagination: { total, page, limit, totalPages: Math.ceil(total / limit) }
                 });
             }
 
-            const userMap = new Map();
-            users.forEach(u => userMap.set(`${u.phone}_${u.instanceId}`, u));
-
-            // Map to legacy format expected by dashboard to avoid breaking frontend fields.
-            // Campos de seña expuestos al frontend para que el cartero vea el saldo
-            // a cobrar en efectivo en lugar del totalPrice (caso COD con anticipo).
-            const legacyOrders = orders.map(o => {
-                const user = userMap.get(`${o.userPhone}_${o.instanceId}`);
-                // Mismo mapeo que el resto de las rutas, con dos agregados propios
-                // del listado: instanceId (columna de vendedor en SalesView) y el
-                // fallback al nombre del User cuando la orden no lo trae.
-                return {
-                    ...toLegacyOrder(o),
-                    instanceId: o.instanceId,
-                    nombre: o.nombre || user?.name || '',
-                };
-            });
-
+            // Ventas compartida: los pedidos del otro bot se mezclan por fecha con
+            // los propios. Para que la página N sea la correcta hacen falta los
+            // primeros N*limit de cada lado. Si el admin filtró por un vendedor,
+            // el filtro viaja también: el otro bot solo devuelve algo si es suyo.
+            const take = Math.min(page * limit, peerOrders.PEER_MAX_TAKE);
+            const [local, peer] = await Promise.all([
+                loadLegacyOrders(where, 0, take),
+                peerOrders.fetchPeerOrders({ search, status, instanceId: isAdmin ? requestedInstanceId : '', take }),
+            ]);
+            const total = local.total + peer.total;
             res.json({
-                data: legacyOrders,
-                pagination: {
-                    total,
-                    page,
-                    limit,
-                    totalPages: Math.ceil(total / limit)
-                }
+                data: peerOrders.mergeOrderPage(local.data, peer.orders, page, limit),
+                pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
+                peer: { ok: peer.ok, bot: peer.bot },
             });
         } catch (error) {
             logger.error('[ROUTES] Error fetching orders from DB:', error);
             res.status(500).json({ error: "Failed to fetch orders" });
+        }
+    });
+
+    // GET /peer/orders — los pedidos de ESTE bot, para la pestaña Ventas del otro
+    // (ver services/peerOrders.ts). Servidor a servidor: no lleva JWT, lleva el
+    // secreto compartido PEER_BOT_TOKEN en x-peer-token. Sin la variable, no existe.
+    router.get('/peer/orders', async (req, res) => {
+        if (!process.env.PEER_BOT_TOKEN) return res.status(404).json({ error: 'Not found' });
+        if (!peerOrders.peerTokenMatches(req.headers['x-peer-token'])) {
+            logger.warn(`[PEER-ORDERS] token inválido desde ${req.ip}`);
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+        try {
+            const take = Math.min(Math.max(parseInt(req.query.take) || 100, 1), peerOrders.PEER_MAX_TAKE);
+            const search = (req.query.search || '').toString().trim();
+            const status = (req.query.status || '').toString().trim();
+            const instanceId = (req.query.instanceId || '').toString().trim();
+            // Nunca el padrón importado, aunque lo pidan por nombre.
+            if (instanceId === '__legacy_import__') return res.json({ bot: peerOrders.botName(), data: [], total: 0 });
+            const { total, data } = await loadLegacyOrders(buildOrdersWhere(instanceId || null, status, search), 0, take);
+            res.set('Cache-Control', 'no-store').json({ bot: peerOrders.botName(), data, total });
+        } catch (error) {
+            logger.error('[PEER-ORDERS] Error listando pedidos para el otro bot:', error);
+            res.status(500).json({ error: 'Failed to fetch orders' });
         }
     });
 

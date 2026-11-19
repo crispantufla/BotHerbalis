@@ -141,9 +141,13 @@ const SalesView = ({ onGoToChat }) => {
     const apiInstanceId = isAdmin ? sellerFilter : '';
 
     const {
-        orders, pagination, isLoading, isFetching,
+        orders, pagination, isLoading, isFetching, peer,
         updateDetails, updateStatus, deleteOrder, pushToSistema, refetch
     } = useOrders(page, 50, debouncedSearch, statusFilter, apiInstanceId);
+    // Ventas compartida con el otro bot (Herbalis / Club Herbys): cada pedido
+    // dice de qué bot es, y los del otro (`order.peer`) son de solo lectura acá:
+    // se editan, se cambian de estado y se mandan al sistema desde su panel.
+    const sharedSales = !!peer;
 
     // instanceIds históricos — incluye sellers borrados como `denis` cuyas
     // ventas se preservaron pero la Account ya no existe.
@@ -236,8 +240,9 @@ const SalesView = ({ onGoToChat }) => {
             const total = res.data.pagination?.total ?? exportOrders.length;
             if (exportOrders.length === 0) { toast.warning('No hay pedidos para exportar con estos filtros'); return; }
 
-            const csvHeaders = ['Fecha', 'Cliente', 'Nombre', 'Producto', 'Plan', 'Precio', 'Método pago', 'Verificación', 'Postdatado', 'Estado', 'Envío', 'Tracking', 'Ciudad', 'Calle', 'CP'];
+            const csvHeaders = ['Bot', 'Fecha', 'Cliente', 'Nombre', 'Producto', 'Plan', 'Precio', 'Método pago', 'Verificación', 'Postdatado', 'Estado', 'Envío', 'Tracking', 'Ciudad', 'Calle', 'CP'];
             const rows = exportOrders.map(o => [
+                o.bot || '',
                 o.createdAt ? new Date(o.createdAt).toLocaleDateString() : '',
                 o.cliente || '', o.nombre || '', o.producto || '', o.plan || '', o.precio || '',
                 paymentMeta(o.paymentMethod).label,
@@ -462,6 +467,12 @@ CP: ${order.cp || '—'}`;
 
             {/* Tabla / Mobile cards */}
             <Card padding="none" className="flex-1 flex flex-col overflow-hidden">
+                {peer && !peer.ok && (
+                    <p role="status" className="px-4 py-2.5 text-sm flex items-center gap-2 flex-shrink-0 bg-warning-50 dark:bg-warning-900/20 text-warning-700 dark:text-warning-500 border-b border-warning-100 dark:border-warning-900/50">
+                        <AlertTriangle className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
+                        No se pudieron traer los pedidos del otro bot. Estás viendo solo los de este; probá refrescar en un momento.
+                    </p>
+                )}
                 <div className="overflow-auto custom-scrollbar flex-1">
                     {/* Desktop table — tipografía agrandada para usuarios 50+ años.
                         Lo más chico (hora, producto, teléfono del vendedor) sube a
@@ -537,8 +548,13 @@ CP: ${order.cp || '—'}`;
                                                 </span>
                                             </td>
                                             <td className="px-4 py-3.5 text-center">
-                                                {order.instanceId || order.seller ? (
+                                                {order.instanceId || order.seller || (sharedSales && order.bot) ? (
                                                     <div className="flex flex-col items-center gap-0.5">
+                                                        {sharedSales && order.bot && (
+                                                            <Badge tone={order.peer ? 'accent' : 'neutral'} size="md" className="mb-0.5">
+                                                                {order.bot}
+                                                            </Badge>
+                                                        )}
                                                         {order.instanceId && (
                                                             <span className="text-sm font-medium text-slate-600 dark:text-slate-300 capitalize">
                                                                 {labelForSeller(order.instanceId)}
@@ -572,6 +588,11 @@ CP: ${order.cp || '—'}`;
                                                 </Badge>
                                             </td>
                                             <td className="px-4 py-3.5 text-right">
+                                                {order.peer ? (
+                                                    <span className="text-xs text-slate-500 dark:text-slate-400">
+                                                        Se gestiona en {order.bot}
+                                                    </span>
+                                                ) : (
                                                 <div className="flex justify-end gap-1.5">
                                                     <IconButton
                                                         label={order.sistemaOrderId
@@ -601,6 +622,7 @@ CP: ${order.cp || '—'}`;
                                                         onClick={() => openEdit(order)}
                                                     />
                                                 </div>
+                                                )}
                                             </td>
                                         </tr>
                                     );
@@ -660,9 +682,12 @@ CP: ${order.cp || '—'}`;
                                                 </span>
                                             </div>
                                         </div>
-                                        {(order.instanceId || order.seller) && (
-                                            <p className="text-xs text-slate-500 dark:text-slate-400">
-                                                {order.instanceId && <span className="capitalize font-medium">{labelForSeller(order.instanceId)}</span>}
+                                        {(order.instanceId || order.seller || (sharedSales && order.bot)) && (
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                                                {sharedSales && order.bot && (
+                                                    <Badge tone={order.peer ? 'accent' : 'neutral'} size="md">{order.bot}</Badge>
+                                                )}
+                                                {order.instanceId &&<span className="capitalize font-medium">{labelForSeller(order.instanceId)}</span>}
                                                 {order.seller && <span className="font-mono ml-1 tabular-nums">(+{order.seller.replace(/\D/g, '').slice(-10)})</span>}
                                             </p>
                                         )}
@@ -675,6 +700,7 @@ CP: ${order.cp || '—'}`;
                                             >
                                                 Detalles
                                             </Button>
+                                            {!order.peer && (<>
                                             <IconButton
                                                 label={order.sistemaOrderId
                                                     ? `Ya está en el sistema (pedido #${order.sistemaOrderId})`
@@ -702,7 +728,11 @@ CP: ${order.cp || '—'}`;
                                                 size="sm"
                                                 onClick={() => openEdit(order)}
                                             />
+                                            </>)}
                                         </div>
+                                        {order.peer && (
+                                            <p className="text-xs text-slate-500 dark:text-slate-400">Se gestiona en {order.bot}</p>
+                                        )}
                                     </div>
                                 );
                             })
@@ -825,6 +855,9 @@ CP: ${order.cp || '—'}`;
                             const pv = transferVerifiedMeta(viewingOrder);
                             return (
                                 <>
+                                    {sharedSales && viewingOrder.bot && (
+                                        <Badge tone={viewingOrder.peer ? 'accent' : 'neutral'} size="md">{viewingOrder.bot}</Badge>
+                                    )}
                                     <Badge tone={s.tone} dot={s.dot} size="md">{s.label}</Badge>
                                     <Badge tone={p.tone} size="md">{p.label}</Badge>
                                     {pv && (
@@ -853,8 +886,12 @@ CP: ${order.cp || '—'}`;
                 {viewingOrder && (
                     <>
                         {/* Action bar — edit toggle */}
-                        <div className="px-5 py-2 border-b border-slate-200 dark:border-slate-700 flex justify-end gap-1.5 flex-shrink-0">
-                            {!isDetailEditing ? (
+                        <div className="px-5 py-2 border-b border-slate-200 dark:border-slate-700 flex justify-end items-center gap-1.5 flex-shrink-0">
+                            {viewingOrder.peer ? (
+                                <p className="text-sm text-slate-600 dark:text-slate-300 mr-auto py-1">
+                                    Pedido de {viewingOrder.bot}. Se edita y se envía al sistema desde su panel.
+                                </p>
+                            ) : !isDetailEditing ? (
                                 <IconButton
                                     label="Editar"
                                     icon={Edit2}
@@ -1039,6 +1076,7 @@ CP: ${order.cp || '—'}`;
                                     >
                                         Copiar todo
                                     </Button>
+                                    {!viewingOrder.peer && (
                                     <Button
                                         variant={viewingOrder.sistemaOrderId ? 'secondary' : 'primary'}
                                         leftIcon={viewingOrder.sistemaOrderId ? Check : Send}
@@ -1050,6 +1088,7 @@ CP: ${order.cp || '—'}`;
                                             ? `En el sistema (#${viewingOrder.sistemaOrderId})`
                                             : 'Enviar a sistema'}
                                     </Button>
+                                    )}
                                     <Button variant="ghost" onClick={() => { setViewingOrder(null); cancelDetailEdit(); }}>
                                         Cerrar
                                     </Button>

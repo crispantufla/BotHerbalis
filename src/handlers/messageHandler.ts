@@ -52,6 +52,11 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
 
     return async function messageHandler(msg: any): Promise<void> {
         try {
+            // El saludo propio del anuncio se anota ANTES de cualquier espera: sale
+            // como mensaje del vendedor casi junto con este entrante, y el handler
+            // de salientes tiene que poder reconocerlo aunque llegue primero.
+            if (!msg.fromMe && msg.ad?.greetingMessageBody) _noteAdGreeting(sharedState, [msg.from], msg.ad);
+
             // 1. Lo que no es una conversación, o ya se procesó.
             if (steps.isNotAConversation(msg, rt)) return;
             if (await steps.isDuplicateDelivery(msg, rt)) return;
@@ -60,6 +65,7 @@ export function createMessageHandler(ctx: MessageHandlerContext): (msg: any) => 
 
             // 2. Quién escribe.
             const userId = await steps.resolveUserId(msg, rt);
+            if (!msg.fromMe && msg.ad?.greetingMessageBody) _noteAdGreeting(sharedState, [userId], msg.ad);
             // De qué anuncio viene (o que es una persona nueva sin anuncio): se
             // anota antes de decidir si el bot contesta. Hasta el 13-nov-2026 el
             // agente mandaba la ficha del anuncio y acá no se guardaba: faltaban
@@ -230,7 +236,7 @@ function isRecentBotSend(sends: BotSends, chatIds: string[], msg: any): boolean 
  *
  * Cubierto por tests/manual_chat.test.js.
  */
-const { _isScriptGreeting, _isBusinessAutoReply } = require('../flows/utils/messages');
+const { _isScriptGreeting, _isBusinessAutoReply, _noteAdGreeting, _adGreetingFor } = require('../flows/utils/messages');
 
 export function createOutgoingMessageHandler(ctx: {
     sellerId: string;
@@ -333,7 +339,7 @@ export function createOutgoingMessageHandler(ctx: {
             // La bienvenida/ausencia automática de WhatsApp Business no la
             // escribió nadie: queda en el ChatLog (el cliente la recibió) pero no
             // descarta alertas ni cede el chat. El 11-nov-2026 pausó 18 leads.
-            if (_isBusinessAutoReply(logText, sharedState.config)) {
+            if (_isBusinessAutoReply(logText, sharedState.config, _adGreetingFor(sharedState, [msg.to, targetId]))) {
                 logger.info(`[MANUAL-CHAT][${sellerId}] Mensaje automático de WhatsApp Business a ${targetId} — no es manual, el bot sigue`);
                 return;
             }

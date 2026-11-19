@@ -23,7 +23,10 @@ export const useOrders = (page = 1, limit = 50, search = '', status = '', instan
             if (res.data.data) {
                 return {
                     orders: res.data.data,
-                    pagination: res.data.pagination
+                    pagination: res.data.pagination,
+                    // Ventas compartida con el otro bot: { ok, bot } si está
+                    // configurada en el servidor; si no, no viene.
+                    peer: res.data.peer || null
                 };
             }
             // Fallback legacy structure
@@ -90,6 +93,7 @@ export const useOrders = (page = 1, limit = 50, search = '', status = '', instan
         ...query,
         orders: query.data?.orders || [],
         pagination: query.data?.pagination || { page, totalPages: 1, total: 0 },
+        peer: query.data?.peer || null,
         updateDetails: updateDetailsMutation.mutateAsync,
         updateStatus: updateStatusMutation.mutateAsync,
         deleteOrder: deleteOrderMutation.mutateAsync,
