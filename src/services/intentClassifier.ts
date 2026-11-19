@@ -23,6 +23,8 @@ export interface MessageIntent {
     objects: boolean;
     /** Menciona su edad, una enfermedad, medicación, embarazo o un efecto en su salud. */
     health: boolean;
+    /** Dice que compra, decide o avisa MÁS ADELANTE (lo consulta, espera a cobrar, lo piensa). */
+    defers: boolean;
 }
 
 const MODEL = process.env.INTENT_MODEL || process.env.CLAUDE_MODEL_SIMPLE || 'claude-haiku-4-5-20251001';
@@ -32,12 +34,21 @@ const ENABLED = () => process.env.INTENT_CLASSIFIER !== '0' && process.env.INTEN
 const SYSTEM = `Clasificás UN mensaje de un cliente en una venta por WhatsApp en Argentina (producto natural para bajar de peso: cápsulas, gotas o semillas). Recibís el último mensaje del vendedor y la respuesta del cliente. La gente escribe sin signos, con errores y a veces por audio transcripto.
 
 Marcá cada campo por separado; pueden ser varios verdaderos a la vez:
+- defers: dice que va a comprar, decidir o avisar MÁS ADELANTE: lo tiene que consultar con alguien, espera a cobrar, lo va a pensar, "la semana que viene", "te aviso". NO es defers si pide que se lo traigan o agenden para una fecha ("traeme uno para el 19"): eso es comprar ahora con fecha de entrega.
 - chooses: el cliente CONTESTA lo que se le preguntó o ELIGE algo (un producto, un plan, cómo pagar, dónde recibirlo), da su localidad o sus datos, o acepta/rechaza. Nombrar una opción para preguntar por ella o para decir que le da miedo NO es elegirla.
 - asks: pregunta algo o pide que le expliquen, aunque no ponga signos ("se toma una x dia", "son de rosario", "y eso quita el apetito").
 - objects: expresa desconfianza, miedo, enojo, una queja o una traba para seguir ("me da miedo dar la tarjeta", "no paso mis datos a nadie", "es caro").
 - health: menciona su edad, una enfermedad, medicación, embarazo, lactancia o un efecto del producto en su salud.
 
+En los ejemplos defers=false salvo que se diga.
+
 Ejemplos:
+Vendedor: "¿Con cuál querés arrancar?" / Cliente: "las capsulas de 60 dias pero dejame que mañana le hablo a mi hna y seguro te pedimos las de 120" → chooses=false asks=false objects=false health=false defers=true (nombra un producto pero todavía no compra)
+Vendedor: "¿De qué localidad sos?" / Cliente: "vivo en rosario, pero te digo que las voy a encargar la semana proxima" → chooses=true asks=false objects=false health=false defers=true (contesta la localidad y avisa que compra después)
+Vendedor: "Pasame tu nombre completo y calle y número" / Cliente: "te comunico que lo pedire la semana proxima" → chooses=false asks=false objects=false health=false defers=true
+Vendedor: "¿Con cuál querés arrancar?" / Cliente: "me interesa cuando cobre les aviso gracias" → chooses=false asks=false objects=false health=false defers=true
+Vendedor: "¿Lo armamos así?" / Cliente: "bueno para el 19 entonces traeme uno de 60" → chooses=true asks=false objects=false health=false defers=false (lo pide ahora, con fecha de entrega)
+Vendedor: "¿Con cuál vas, 60 o 120 días?" / Cliente: "que son naturales porque yo tomo pastillas para el corazon" → chooses=false asks=true objects=false health=true defers=false ("pastillas" son su medicación, no una elección)
 Vendedor: "¿Con cuál querés arrancar?" / Cliente: "son de Herbalife o es otra cosa? tengo miedo que me haga mal, como se toma" → chooses=false asks=true objects=true health=true
 Vendedor: "¿De qué localidad sos?" / Cliente: "Son de Rosario" → chooses=false asks=true objects=false health=false
 Vendedor: "¿Y eso queda cerca de Rosario? ¿A cuántos km?" / Cliente: "Son de Rosario" → chooses=false asks=true objects=false health=false (habla del VENDEDOR: "son", "están", "tienen" en plural no es el cliente)
@@ -61,8 +72,9 @@ const TOOL = {
             asks: { type: 'boolean' },
             objects: { type: 'boolean' },
             health: { type: 'boolean' },
+            defers: { type: 'boolean' },
         },
-        required: ['chooses', 'asks', 'objects', 'health'],
+        required: ['chooses', 'asks', 'objects', 'health', 'defers'],
     },
 };
 
@@ -119,8 +131,9 @@ export async function classifyMessage(
             asks: input.asks === true,
             objects: input.objects === true,
             health: input.health === true,
+            defers: input.defers === true,
         };
-        logger.info(`[INTENT] step=${ctx.step || '?'} chooses=${intent.chooses} asks=${intent.asks} objects=${intent.objects} health=${intent.health} — "${text.replace(/\s+/g, ' ').slice(0, 60)}"`);
+        logger.info(`[INTENT] step=${ctx.step || '?'} chooses=${intent.chooses} asks=${intent.asks} objects=${intent.objects} health=${intent.health} defers=${intent.defers} — "${text.replace(/\s+/g, ' ').slice(0, 60)}"`);
         return intent;
     } catch (e: any) {
         logger.warn(`[INTENT] falló (${e?.message}) — sigo sin clasificación.`);
@@ -128,6 +141,11 @@ export async function classifyMessage(
     } finally {
         clearTimeout(timer);
     }
+}
+
+/** La IA dice que el cliente compra más adelante: no se le arma el pedido por regla. */
+export function isDeferral(intent: MessageIntent | null | undefined): boolean {
+    return !!intent && intent.defers === true;
 }
 
 /** La IA dice que NO es una elección sino una pregunta u objeción. */

@@ -2,6 +2,7 @@ import { UserState, FlowStep } from '../../types/state';
 import { _formatMessage } from '../utils/messages';
 import { _setStep, _maybeUpsell, _detectPostdatado, _captureWeightGoal, _assignProductAndPlanByTier, _maybeSendPaymentMenuV7, _pushHistory } from '../utils/flowHelpers';
 import { isMpEnabled, prepayMeans } from '../utils/paymentOptions';
+import { isNotAChoice, isDeferral } from '../../services/intentClassifier';
 import logger from '../../utils/logger';
 
 /**
@@ -68,7 +69,22 @@ export async function handleWaitingPreference(
     }
 
     // SCRIPT FIRST: Check if the user has a health concern or explicit question that must be answered
-    const hasQuestionOrConcern = /\b(diabetes|diabetica|presion|hipertens|salud|enfermedad|tiroides|hipotiroidismo|operada|cirugia|bypass|manga|estomago|gastritis|acidez|contraindicacion|lactancia|embarazo|peligro|efecto|secundario|laxante|diarrea|consulta|duda|pregunta|horario)\b|[?¿]/i.test(normalizedText);
+    // La IA leyó el mensaje como pregunta u objeción y NO como elección
+    // (dependencies.intent): nombrar un producto para preguntar por él no es
+    // elegirlo. "Que son naturales porque yo tomo pastillas para el corazón" y
+    // "contame un poquito sobre las gotas" recibían "¡Genial, las cápsulas!"
+    // (revisión de charlas del 13 al 19-nov-2026).
+    // Lo mismo si avisa que compra más adelante (intent.defers): "las cápsulas
+    // de 60 pero dejame que mañana le hablo a mi hermana" armó un pedido que la
+    // clienta nunca hizo.
+    const aiSaysLater = isDeferral(dependencies.intent);
+    const aiSaysNotChoice = isNotAChoice(dependencies.intent) || aiSaysLater;
+    const notChoiceHint = aiSaysLater
+        ? `\n0) ⚠️ EL CLIENTE AVISA QUE COMPRA MÁS ADELANTE (lo consulta con alguien, espera a cobrar, lo va a pensar). Aunque nombre un producto, todavía NO lo está pidiendo: no des el pedido por hecho ni pidas datos. Respondé con calidez y sin presionar; podés ofrecerle UNA sola vez dejarlo agendado para la fecha que le quede cómoda (si es de Rosario o alrededores, recordale que paga recién al recibir). goalMet=false y extractedData=null. Esto manda sobre las reglas de abajo.`
+        : aiSaysNotChoice
+        ? `\n0) ⚠️ ESTE MENSAJE ES UNA PREGUNTA O UNA DUDA, NO UNA ELECCIÓN. Aunque nombre un producto ("pastillas", "gotas"), el cliente todavía NO eligió: respondé primero lo que pregunta o le preocupa y recién después preguntá con cuál quiere avanzar. goalMet=false y extractedData=null. Esto manda sobre las reglas de abajo.`
+        : '';
+    const hasQuestionOrConcern = aiSaysNotChoice || /\b(diabetes|diabetica|presion|hipertens|salud|enfermedad|tiroides|hipotiroidismo|operada|cirugia|bypass|manga|estomago|gastritis|acidez|contraindicacion|lactancia|embarazo|peligro|efecto|secundario|laxante|diarrea|consulta|duda|pregunta|horario)\b|[?¿]/i.test(normalizedText);
 
     // SCRIPT FIRST: Check keywords for capsulas or semillas
     const isMatch = (keywords: string[], text: string) => keywords.some((k: string) => new RegExp(`\\b${k}\\b`, 'i').test(text));
@@ -145,7 +161,7 @@ export async function handleWaitingPreference(
 
         const aiRecommendation = await aiService.chat(text, {
             step: FlowStep.WAITING_PREF_CONSULT,
-            goal: `El usuario está indeciso entre productos o pide recomendaciones. Modelo V5 (rev. 2026-05-26): las 3 opciones (Cápsulas / Gotas / Semillas) se ofrecen IGUALES — no empujes una en particular. REGLAS:
+            goal: `El usuario está indeciso entre productos o pide recomendaciones. Modelo V5 (rev. 2026-05-26): las 3 opciones (Cápsulas / Gotas / Semillas) se ofrecen IGUALES — no empujes una en particular. REGLAS:${notChoiceHint}
             1) Si el usuario MENCIONÓ EXPLÍCITAMENTE un producto (ej: "capsulas", "gotas", "semillas"), goalMet=true con extractedData del producto que dijo.
             2) Si el usuario está aceptando con un genérico ("dale", "bueno", "ok") SIN nombrar producto, NO ASUMAS — goalMet=false y re-preguntá "¿con cuál vas, cápsulas, gotas o semillas?".
             3) Si pide "lo más efectivo/mejor/rápido", "cualquiera" o "elegí vos": el cliente está DELEGANDO. Asumí Cápsulas (forma más práctica) PERO sin decir que son "más efectivas" — decí "Te traigo cápsulas que es la forma más práctica, las 3 funcionan igual". goalMet=true, extractedData="Cápsulas de nuez de la india".
@@ -160,7 +176,7 @@ export async function handleWaitingPreference(
             userState: currentState
         });
 
-        if (aiRecommendation.goalMet && aiRecommendation.extractedData) {
+        if (aiRecommendation.goalMet && aiRecommendation.extractedData && !aiSaysNotChoice) {
             // First send the AI's natural response if it exists (e.g., to answer a health question)
             if (aiRecommendation.response) {
                 await sendMessageWithDelay(userId, aiRecommendation.response);
@@ -236,7 +252,7 @@ export async function handleWaitingPreference(
         logger.info(`[AI-FALLBACK] waiting_preference: No keyword match for ${userId}`);
         const aiPref = await aiService.chat(text, {
             step: FlowStep.WAITING_PREFERENCE,
-            goal: `Determinar qué producto prefiere el usuario: Cápsulas, Gotas o Semillas. Modelo V5 (rev. 2026-05-26): las 3 opciones se ofrecen IGUALES — no empujes una en particular.
+            goal: `Determinar qué producto prefiere el usuario: Cápsulas, Gotas o Semillas. Modelo V5 (rev. 2026-05-26): las 3 opciones se ofrecen IGUALES — no empujes una en particular.${notChoiceHint}
 1) EMOCIÓN Y SALUD: Si hace un descargo sobre su peso, operaciones o inseguridades médicas, REDACTÁ MÚLTIPLES PÁRRAFOS demostrando altísima empatía y contención. Tono explayado y compasivo antes de cerrar nada.
 2) Usá muletillas argentinas naturales ("dale", "tranqui", "te cuento") sin exagerar.
 3) Si MENCIONA explícitamente un producto ("capsulas", "gotas", "semillas"), goalMet=true, extractedData con el producto.
@@ -253,7 +269,7 @@ export async function handleWaitingPreference(
             userState: currentState
         });
 
-        if (aiPref.goalMet && aiPref.extractedData) {
+        if (aiPref.goalMet && aiPref.extractedData && !aiSaysNotChoice) {
             // First send the AI's natural response if it exists (e.g., to answer a health question).
             // Si el cliente solo eligió ("la natural", "esa") no hay nada que responder:
             // la plantilla de precios confirma la elección. Mandar las dos generaba

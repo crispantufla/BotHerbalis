@@ -65,7 +65,13 @@ Entraron el 2026-11-12, tras revisar a mano las charlas del guion por zona:
   `dependencies.intent`; la consultan el paso de pago, el de localidad, el que sigue al saludo,
   el cambio de pedido y las FAQ (`_asksSomething` en `flowHelpers`). Solo SUMA señal: si falla
   o tarda más de 4 s queda en null y todo sigue como antes. No corre en tests salvo que se
-  inyecte `intent`. `INTENT_CLASSIFIER=0` la apaga. Las fallas que la motivaron: "otra cosa"
+  inyecte `intent`. `INTENT_CLASSIFIER=0` la apaga.
+  **19-nov**: tras revisar las charlas del 13 al 19 se conectó también a la elección de producto,
+  la de plan y la toma de datos (el clasificador leía bien "yo tomo pastillas para el corazón"
+  como pregunta de salud, pero esos pasos no lo consultaban y salía "¡Genial, las cápsulas!"), y
+  se sumó un quinto campo, `defers` (compra más adelante: lo consulta, espera a cobrar): con él
+  las reglas no arman el pedido y contesta la IA del paso. En el reparto, si los datos vienen con
+  una pregunta, se contesta antes de la confirmación. Tests: `tests/intent_steps.test.js`. Las fallas que la motivaron: "otra cosa"
   leído como cambio de pedido, "Son de Rosario" como localidad del cliente, "tengo tarjeta pero
   me da miedo" como elección de tarjeta.
 - `src/services/nightlyReview.ts` — todos los días 8:15 ARG Claude revisa las charlas de las

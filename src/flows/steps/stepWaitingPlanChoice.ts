@@ -7,6 +7,7 @@ import { getFlowTemplate } from '../../utils/messageTemplates';
 import { _formatMessage } from '../utils/messages';
 import { isMpEnabled } from '../utils/paymentOptions';
 import { _startZoneStep } from './stepWaitingZone';
+import { isNotAChoice, isDeferral } from '../../services/intentClassifier';
 import logger from '../../utils/logger';
 
 // Cliente que quiere venir a buscar el producto. No hay local de venta al
@@ -64,6 +65,16 @@ export async function handleWaitingPlanChoice(
     // Interruptor de MP apagado → el menú de pago se manda sin la opción de
     // tarjeta (variante responseNoMp del guion). Ver flows/utils/paymentOptions.
     const _mpOff = !isMpEnabled(dependencies.config);
+    // La IA leyó el mensaje como pregunta u objeción y NO como elección
+    // (dependencies.intent): un "60" o un "cápsulas de 120" dentro de una duda
+    // no arma el carrito por regla. Contesta la IA del paso, que igual puede
+    // cerrar el plan si el cliente además lo eligió.
+    // Lo mismo si avisa que compra más adelante (intent.defers).
+    const aiSaysLater = isDeferral(dependencies.intent);
+    const aiSaysNotChoice = isNotAChoice(dependencies.intent) || aiSaysLater;
+    const laterHint = aiSaysLater
+        ? `\n0) ⚠️ EL CLIENTE AVISA QUE COMPRA MÁS ADELANTE (lo consulta con alguien, espera a cobrar, lo va a pensar). Aunque nombre un plan, todavía NO lo está pidiendo: no des el pedido por hecho. Aplicá los puntos 5 y 6 (pago al recibir / agendar) UNA sola vez y sin presionar. goalMet=true solo si acepta agendarlo o pide que se lo carguen ahora.`
+        : '';
 
     // ── Check temprano: cliente quiere venir a buscarlo ──────────────────
     if (PICKUP_INTENT.test(text)) {
@@ -134,7 +145,7 @@ export async function handleWaitingPlanChoice(
         }
     }
 
-    if (foundItems.length > 0) {
+    if (foundItems.length > 0 && !aiSaysNotChoice) {
         currentState.cart = foundItems;
         // Setear selectedProduct/Plan + recalcular totalPrice. Sin esta línea
         // el state quedaba con `totalPrice` undefined y al elegir MP el bot
@@ -209,6 +220,8 @@ export async function handleWaitingPlanChoice(
     } else if (planMatch && !hasQuestionText && !isVeryLongMessage) {
         selectedPlanId = planMatch[1];
     }
+
+    if (aiSaysNotChoice) selectedPlanId = null;
 
     if (selectedPlanId) {
         const product = currentState.selectedProduct || "Nuez de la India";
@@ -288,7 +301,7 @@ export async function handleWaitingPlanChoice(
             const planAI = await aiService.chat(text, {
                 step: 'waiting_plan_choice',
                 goal: `El usuario debe elegir un plan (60 o 120 días).
-RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.
+RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.${laterHint}
 1) SI EL USUARIO HACE PREGUNTAS (ej: "cómo se toma", "tiene contraindicaciones", sobre su salud, o pide info de otro producto): TÓMATE TODO EL ESPACIO NECESARIO. Respóndele con párrafos detallados y con muchísima empatía. Explayate sobre los efectos del producto, dietas o garantías si lo piden. ETAPA DE CONSULTA — VARIÁ EL CIERRE, NO LO REPITAS TEXTUAL: respondé la duda con calidez y cerrá invitando a elegir plan, PERO cambiá la frase en CADA turno. NUNCA repitas palabra por palabra "¿te gustaría avanzar con el plan de 60 o 120 días?" en mensajes seguidos — suena a copy-paste robótico (queja real del admin 2026-06-13). Alterná formas humanas y naturales: "entonces, ¿qué plan te tienta, el de 60 o el de 120?", "¿lo armamos por 60 o por 120?", "¿con cuál te quedás?", y cada tanto una válvula suave sin plan ("¿alguna otra duda antes de seguir? 😊"). MIRÁ TU CIERRE ANTERIOR en el historial: si tu último mensaje ya cerró con una de esas frases, usá una DISTINTA ahora — NUNCA repitas la misma fórmula de cierre dos turnos seguidos. Que se sienta una charla, no un machaque. goalMet=false.
 2) SI PREGUNTA CUÁNTOS KILOS BAJARÁ o pide garantías: Respondé textualmente "Cada cuerpo tiene su ritmo. Quienes tienen más kilos para bajar suelen notar cambios más visibles al inicio, y quienes necesitan bajar menos ven descensos más progresivos. Lo importante es que el descenso sea natural y sostenido." Luego preguntale con cuál plan quiere avanzar. goalMet=false.
 3) CAMBIO DE PRODUCTO: Si el usuario dice "quiero semillas" o "gotas", confirmá el cambio usando extractedData="CHANGE_PRODUCT: [Producto]" (SIN preguntarle de nuevo) y dale los precios de ese nuevo producto para que elija el plan. goalMet=false.
@@ -315,7 +328,7 @@ RESPONDÉ NATURALMENTE Y COMO HUMANO. NO SEAS ROBÓTICA.
             // del 15 al 17-sep-2026). Si el cliente no preguntó nada, alcanza con la
             // plantilla, que confirma producto, plan y total. Si preguntó, va la
             // respuesta de la IA y la plantilla no repite la pregunta.
-            const customerAsked = hasQuestionText || text.includes('?');
+            const customerAsked = hasQuestionText || text.includes('?') || aiSaysNotChoice;
 
             if (planAI.goalMet && planAI.extractedData && !planAI.extractedData.startsWith('CHANGE_PRODUCT:')) {
                 const extractedStr = String(planAI.extractedData);

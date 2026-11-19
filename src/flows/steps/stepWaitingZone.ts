@@ -109,6 +109,12 @@ export async function _resolveZone(
         // traía la calle y el bot la volvió a pedir (caso 5493415788327).
         if (addr.calle && !addr.nombre) tpl = tpl.replace(ZONE_IN_ASK, `Anoté *${addr.calle}*. Pasame tu *nombre completo* así lo dejo cargado 🙌`);
         else if (addr.nombre && !addr.calle) tpl = tpl.replace(ZONE_IN_ASK, 'Pasame la *calle y número* 🙌');
+        // Dio la localidad y avisó que compra más adelante ("Vivo en Rosario, pero
+        // las voy a encargar la semana próxima", 16-nov-2026): no se le piden los
+        // datos como si comprara hoy; se le ofrece agendar y los datos son para
+        // dejarlo cargado. No se cambia por una pregunta suelta de fecha: "Ciudad
+        // de Pérez pero para el lunes voy a tener el dinero" terminó en venta.
+        else if ((dependencies as any).intent?.defers === true) tpl = tpl.replace(ZONE_IN_ASK, 'Si preferís recibirlo más adelante, te lo dejo agendado para el día que me digas 📅 Para dejarlo cargado pasame tu *nombre completo* y *calle y número* 🙌');
         const msg = prefix + _formatMessage(tpl, currentState);
         saveState(userId);
         await sendMessageWithDelay(userId, msg);

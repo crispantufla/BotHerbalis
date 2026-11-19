@@ -12,7 +12,7 @@ import { handleClubHerbys } from './clubHerbys';
 
 interface SalesFlowDependencies {
     /** Lectura de la IA del mensaje actual (services/intentClassifier); null si no hubo. */
-    intent?: { chooses: boolean; asks: boolean; objects: boolean; health: boolean } | null;
+    intent?: { chooses: boolean; asks: boolean; objects: boolean; health: boolean; defers?: boolean } | null;
     saveState: (userId?: string) => void;
     client?: Record<string, any>;
     sharedState?: SharedState;

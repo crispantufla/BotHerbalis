@@ -26,7 +26,7 @@ describe('classifyMessage', () => {
     test('devuelve los cuatro campos como booleanos y manda el último mensaje del vendedor', async () => {
         const client = fakeClient({ chooses: false, asks: true, objects: true, health: 'sí' });
         const res = await classifyMessage('tengo tarjeta pero me da miedo', { lastBotMessage: '¿Cómo querés abonar?', step: 'waiting_payment_method' }, client);
-        expect(res).toEqual({ chooses: false, asks: true, objects: true, health: false });
+        expect(res).toEqual({ chooses: false, asks: true, objects: true, health: false, defers: false });
         const req = client.messages.create.mock.calls[0][0];
         expect(req.tool_choice).toEqual({ type: 'tool', name: 'clasificar' });
         expect(req.messages[0].content).toContain('¿Cómo querés abonar?');

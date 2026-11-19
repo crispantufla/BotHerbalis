@@ -6,6 +6,7 @@ import { _getEffectivePrice } from '../utils/pricing';
 import { _formatPrice, buildCartFromSelection, calculateTotal } from '../utils/cartHelpers';
 import { _isDuplicate } from '../utils/messages';
 import { isMpEnabled, prepayMeans } from '../utils/paymentOptions';
+import { isNotAChoice, isDeferral } from '../../services/intentClassifier';
 import logger from '../../utils/logger';
 
 // --- Helper types ---
@@ -867,6 +868,10 @@ export async function _handleRepartoData(
         }
     }
 
+    // Avisa que compra más adelante y no trae una dirección: no se le busca un
+    // nombre en la frase ni se le vuelve a pedir la calle; contesta la IA del paso.
+    if (!already && isDeferral(dependencies.intent) && !/\d{3,5}/.test(text)) return null;
+
     const looksLikeData = /\d/.test(text) || /\n/.test(text) || text.trim().split(/\s+/).length >= 2;
     let progressed = false;
     if (!already && looksLikeData) {
@@ -932,6 +937,31 @@ export async function _handleRepartoData(
             return { matched: true };
         }
         if (!currentState.paymentMethod) currentState.paymentMethod = 'contrarembolso';
+        // Los datos vinieron con una pregunta ("...Paraguay al 2300. Dime, ¿las
+        // diabéticas pueden tomar?"): se contesta ANTES de la confirmación. El
+        // 18-nov-2026 dos pedidos se confirmaron pisando la duda del cliente. Si la
+        // IA marca el caso para una persona, no se cierra: salesFlow lo pausa.
+        const _it = dependencies.intent;
+        if (_it && (_it.asks || _it.health)) {
+            try {
+                const ans = await aiService.chat(text, {
+                    step: FlowStep.WAITING_DATA,
+                    goal: `El cliente mandó sus datos de entrega junto con una pregunta o un comentario sobre su salud. Los datos YA están tomados y el pedido se confirma en el mensaje que sigue a este. Respondé SOLO esa pregunta, en 1 a 3 líneas, con lo que dice el Knowledge. NO pidas datos, NO confirmes el pedido, NO repitas precio ni producto y NO cierres con una pregunta. Si pregunta cuándo llega: el equipo de envíos le escribe para acordar día y horario. goalMet=false.`,
+                    history: currentState.history,
+                    summary: currentState.summary,
+                    knowledge: knowledge,
+                    userState: currentState
+                });
+                if (ans?.response) await sendMessageWithDelay(userId, ans.response);
+                if (/NEED_ADMIN|REJECT_MEDICAL|ADVERSE_REACTION/.test(String(ans?.extractedData || ''))) {
+                    logger.info(`[REPARTO-DATA] ${userId}: la duda que vino con los datos quedó marcada (${ans.extractedData}) — no cierro el pedido.`);
+                    saveState(userId);
+                    return { matched: true };
+                }
+            } catch (e: any) {
+                logger.warn(`[REPARTO-DATA] no pude contestar la duda previa al cierre de ${userId}: ${e.message}`);
+            }
+        }
         await _closeSaleAndNotify(userId, currentState, knowledge, dependencies);
         logger.info(`[REPARTO-DATA] Venta de reparto propio CERRADA por el bot para ${userId}: ${addr.nombre} / ${addr.calle} / ${currentState.pendingOrder?.ciudad || '?'}.`);
         return { matched: true };
@@ -1145,8 +1175,19 @@ export async function handleWaitingData(
     // Cualquier otro mensaje sustantivo: el cliente volvió, retomamos normal.
     if (currentState.awaitingResume) currentState.awaitingResume = false;
 
+    // La IA leyó el mensaje como pregunta u objeción y NO como respuesta
+    // (dependencies.intent). Dos reglas por palabras lo pisaban (revisión de
+    // charlas del 13 al 19-nov-2026): "Quiero saber la fórmula que tiene la
+    // cápsula" se tomaba como cambio de producto ("Cambiamos a cápsulas"), y
+    // "Me hacés desconfiar con tanta insistencia" recibía otro pedido de nombre
+    // y dirección.
+    // Lo mismo si avisa que compra más adelante (intent.defers): "Te comunico
+    // que lo pediré la semana próxima" recibía otro pedido de datos.
+    const aiSaysLater = isDeferral(dependencies.intent);
+    const aiSaysNotChoice = isNotAChoice(dependencies.intent) || aiSaysLater;
+
     // 2. Product/plan change detection
-    await _handleProductPlanChange(userId, normalizedText, currentState, dependencies);
+    if (!aiSaysNotChoice) await _handleProductPlanChange(userId, normalizedText, currentState, dependencies);
 
     // 3. Sucursal intent
     const sucursalResult = await _handleSucursalIntent(userId, normalizedText, currentState, dependencies);
@@ -1165,6 +1206,11 @@ export async function handleWaitingData(
 
     // 4. Classify message
     const classification = _classifyMessage(text, normalizedText);
+    // Sin palabra clave pero es una duda: la contesta la IA del paso (7) en vez
+    // de re-pedir los datos. Si además trae datos, el paso 6 los parsea igual.
+    if (aiSaysNotChoice && !classification.isShortConfirmation) classification.isDataQuestionOrEmotion = true;
+    // Quien posterga recibe el argumento de "todavía no" (pago al recibir / agendar).
+    if (aiSaysLater && !classification.isShortConfirmation && !classification.isHardRejection) classification.isHesitation = true;
 
     // 5. Image OCR
     const textToAnalyze = await _handleImageOCR(text, currentState, aiService);
