@@ -24,6 +24,12 @@ export interface BotHelpersContext {
     // Respuestas con nota de voz (ver services/tts.ts). Sin esto manda el
     // interruptor VOICE_REPLIES + la clave de ElevenLabs, que en los tests está
     // siempre apagado: un test que quiera voz inyecta acá su sintetizador.
+    // Carga automática en el panel de ventas (ver _autoPushSistema). Sin esto se usa
+    // services/sistemaSync; un test que quiera probarla inyecta acá su doble.
+    sistema?: {
+        isSistemaConfigured: () => boolean;
+        pushOrderToSistema: (order: any) => Promise<{ orderId: number }>;
+    };
     voice?: {
         enabled?: boolean;
         synthesize?: (text: string) => Promise<{ base64: string; mimetype: string } | null>;
@@ -237,8 +243,54 @@ export function createBotHelpers(ctx: BotHelpersContext): BotHelpers {
                 sharedState.io.to(sellerId).emit('new_order', legacyOrder);
                 sharedState.io.to('admin').emit('new_order', { ...legacyOrder, sellerId });
             }
+
+            // El pedido que toma el bot se carga solo en el panel de ventas: lo mismo
+            // que el botón "Enviar a sistema", sin esperar a que alguien lo apriete.
+            // Fuera del lock y sin frenar el guardado.
+            setImmediate(() => { _autoPushSistema(newOrderData.id).catch(() => {}); });
         } finally {
             if (lock) await lock.release().catch((e: any) => logger.warn('Failed to release lock:', e));
+        }
+    }
+
+    /**
+     * Carga automática en el panel de ventas (ventas-app). Viene del bot de Club
+     * Herbys, donde corría para los leads de los anuncios desde el 26-oct-2026;
+     * acá es para todo pedido que guarda el bot (pedido del 21-nov-2026). El panel
+     * es idempotente sobre el id de la orden, así que el botón sigue sirviendo de
+     * reintento. Si falla, el pedido queda como estaba y se avisa al admin.
+     * `SISTEMA_AUTO_PUSH=0` la apaga. En los tests no corre salvo que inyecten
+     * `ctx.sistema`: un test nunca le puede escribir al panel real.
+     */
+    async function _autoPushSistema(orderId: string): Promise<void> {
+        const injected = ctx.sistema;
+        if (!injected && process.env.NODE_ENV === 'test') return;
+        if (process.env.SISTEMA_AUTO_PUSH === '0' || process.env.SISTEMA_AUTO_PUSH === 'false') return;
+        const sync = injected || require('../services/sistemaSync');
+        if (!sync.isSistemaConfigured()) {
+            logger.warn(`[SISTEMA][${sellerId}] Pedido ${orderId} sin cargar en el panel de ventas: falta SISTEMA_URL/SISTEMA_TOKEN.`);
+            return;
+        }
+        try {
+            const order = await prisma.order.findUnique({ where: { id: orderId } });
+            if (!order || order.sistemaOrderId) return;
+            const result = await sync.pushOrderToSistema(order);
+            // "En sistema" va antes de Enviado/Entregado: solo se mueve desde los dos
+            // estados previos (mismo criterio que POST /orders/:id/sistema).
+            const updated = await prisma.order.update({
+                where: { id: orderId },
+                data: { sistemaOrderId: result.orderId, sistemaSyncedAt: new Date(), ...(['Pendiente', 'Confirmado'].includes(order.status) ? { status: 'En sistema' } : {}) },
+            });
+            logger.info(`[SISTEMA][${sellerId}] Pedido ${orderId} cargado solo en el panel de ventas (#${result.orderId}).`);
+            if (sharedState.io && updated) {
+                const { toLegacyOrder } = require('../api/routes/routeHelpers');
+                const legacy = toLegacyOrder(updated);
+                sharedState.io.to(sellerId).emit('order_update', legacy);
+                sharedState.io.to('admin').emit('order_update', { ...legacy, sellerId });
+            }
+        } catch (e: any) {
+            logger.error(`[SISTEMA][${sellerId}] No pude cargar el pedido ${orderId} en el panel de ventas: ${e.message}`);
+            notifyAdmin('⚠️ Pedido sin cargar en el panel de ventas', 'system', `Pedido ${orderId}. Cargalo a mano desde Ventas → "Enviar a sistema". Error: ${e.message}`).catch(() => {});
         }
     }
 

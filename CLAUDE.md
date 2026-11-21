@@ -145,8 +145,8 @@ Máquina de estados lineal con fallbacks a IA. Orden típico:
   localidad (`waiting_zone`). Rosario y 60 km: reparto propio, paga al recibir, el pedido queda
   `completed` sin aprobación (`🛒 PEDIDO NUEVO`). Fuera de zona: Correo con transferencia previa,
   4 días; los datos del envío se piden con el alias y `stepWaitingTransferConfirmation` guarda el
-  pedido. NO se trajo de bot-promo: sus precios, su alias (herbalis / Horacio Giosue), la carga
-  automática en el panel de ventas ni la detección de leads por anuncio. Un producto sin plan de
+  pedido. NO se trajo de bot-promo: sus precios, su alias (herbalis / Horacio Giosue) ni la
+  detección de leads por anuncio (la carga automática en el panel de ventas entró el 21-nov). Un producto sin plan de
   60 en `prices.json` se cotiza en 120 sin preguntar el plan. Simulación de punta a punta:
   `SIM_PRINT=1 npx jest tests/zone_sales_sim.test.js`.
   **El V7 anterior (Elena 8.7, retiro/domicilio) está archivado** en
@@ -193,6 +193,11 @@ Máquina de estados lineal con fallbacks a IA. Orden típico:
   `(origen, externalId=Order.id)`: reenviar devuelve el pedido que ya creó, así que
   `externalId` NO se puede recalcular ni derivar. Una venta cargada queda con
   `sistemaOrderId` y status `En sistema`, y el botón se deshabilita.
+  **Carga automática (21-nov)**: todo pedido que guarda el bot (`saveOrderToLocal`) se manda
+  solo al panel (`_autoPushSistema` en `botHelpers.ts`, traído de Herbys). El botón queda de
+  reintento y para los pedidos cargados a mano. Si el panel falla, el pedido queda como estaba
+  y sale un aviso al admin. `SISTEMA_AUTO_PUSH=0` la apaga. No corre en tests salvo con
+  `ctx.sistema` inyectado. Tests: `tests/auto_push_sistema.test.js`.
 - **Campañas = las de Club Herbys (desde el 2026-11-04)**: la pestaña Promos corre el sistema de
   bot-promo (`D:\club-herbys-bot`). Audiencia: los chats del WhatsApp (`chatAudience.ts`, el
   agente los lista con `get_chats`; excluye a quien tiene pedido). Texto: el mensaje base con
