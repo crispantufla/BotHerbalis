@@ -225,12 +225,64 @@ describe('lo que mostró la segunda tanda', () => {
         expect(st2.deliveryZone).toBe('in');
     });
 
-    test('dos productos en un mensaje: no se arma solo un pedido de uno', async () => {
+    test('dos productos en un mensaje: la IA dice el total y el pedido lo arma una persona', async () => {
         aiService.chat.mockResolvedValue({ response: 'Las dos cosas te salen $X en total 📦', goalMet: true, extractedData: 'Cápsulas de nuez de la india' });
         const h = harness({ step: 'waiting_preference', history: [{ role: 'bot', content: 'Estos son los precios 👇' }], cart: [] });
         await say(h, 'quiero las cápsulas de 60 para mí y las gotas de 60 para mi mamá. Cuánto me sale todo junto?');
-        expect(h.sent.join('\n')).not.toMatch(/Vamos con \*Cápsulas/);
-        expect(h.userState[USER].step).not.toBe('waiting_zone');
+        expect(h.sent).toHaveLength(2);
+        expect(h.sent[0]).toBe('Las dos cosas te salen $X en total 📦');
+        expect(h.sent[1]).toMatch(/dos productos/);
+        expect(h.sent.join('\n')).not.toMatch(/Vamos con \*Cápsulas|60 o 120/);
+        expect(pauseUser).toHaveBeenCalledTimes(1);
+        expect(pauseUser.mock.calls[0][1]).toMatch(/DOS productos/);
+    });
+
+    test('"tengo 17 años, esta bien igual?" en la toma de datos corta la venta, no dice "Anotado"', async () => {
+        const h = harness({ step: 'waiting_data', deliveryZone: 'in', shippingChoice: 'reparto', paymentMethod: 'contrarembolso', partialAddress: { ciudad: 'Rosario' }, history: [{ role: 'bot', content: 'Pasame tu *nombre completo* y *calle y número* 🙌' }], ...cart('Cápsulas de nuez de la india', '60', '54.900') });
+        await say(h, 'tengo 17 años, esta bien igual?');
+        expect(h.sent).toHaveLength(1);
+        expect(h.sent[0]).toMatch(/menores de 18/);
+        expect(h.userState[USER].step).toBe('rejected_medical');
+    });
+
+    test('comparar dos productos no es pedir los dos', async () => {
+        aiService.chat.mockResolvedValue({ response: 'Funcionan igual 😊 ¿Con cuál vas?', goalMet: false, extractedData: null });
+        const h = harness({ step: 'waiting_preference', history: [{ role: 'bot', content: 'Estos son los precios 👇' }], cart: [] });
+        await say(h, 'cual es mejor, las capsulas o las gotas?');
+        expect(pauseUser).not.toHaveBeenCalled();
+        expect(h.sent).toEqual(['Funcionan igual 😊 ¿Con cuál vas?']);
+    });
+
+    test('el plan dicho en un mensaje que contestó una respuesta fija queda anotado', async () => {
+        const h = harness({ step: 'waiting_preference', history: [{ role: 'bot', content: 'Estos son los precios 👇' }], cart: [] });
+        await say(h, 'quiero las gotas de 120 dias, cuanto me saldria el envio?');
+        expect(h.sent[0]).toMatch(/Depende de dónde estés/);
+        expect(h.userState[USER]._planChoice).toBe('120');
+        aiService.chat.mockResolvedValue({ response: 'Dale 😊', goalMet: true, extractedData: 'Gotas de nuez de la india' });
+        await say(h, 'Soy de Córdoba capital, así que por correo estaría bien');
+        expect(h.sent.join('\n')).not.toMatch(/Con cuál vas, 60 o 120/);
+        expect(h.userState[USER].selectedPlan).toBe('120');
+        expect(h.userState[USER].deliveryZone).toBe('out');
+    });
+
+    test('"quiero bajar 60 kilos" no es elegir el plan de 60', async () => {
+        const h = harness({ step: 'waiting_preference', history: [{ role: 'bot', content: 'Estos son los precios 👇' }], cart: [] });
+        await say(h, 'cuanto sale el envio? tengo que bajar como 60 kilos');
+        expect(h.userState[USER]._planChoice).toBeUndefined();
+    });
+
+    test('"el 5 del mes que viene te aviso, gracias" en la toma de datos no vuelve a pedir nombre y calle', async () => {
+        const h = harness({ step: 'waiting_data', deliveryZone: 'in', shippingChoice: 'reparto', paymentMethod: 'contrarembolso', deferredAt: Date.now() - 60000, partialAddress: { ciudad: 'Rosario' }, history: [{ role: 'bot', content: '¿Te parece que me los pases cuando puedas?' }], ...cart('Gotas de nuez de la india', '120', '68.900') });
+        await say(h, 'mira, el 5 del mes que viene te aviso, gracias');
+        expect(h.sent).toHaveLength(1);
+        expect(h.sent[0]).toMatch(/quedamos así/);
+        expect(h.sent[0]).not.toMatch(/Nombre completo/i);
+    });
+
+    test('esperando el pago, "seguro que se acreditó, revisá bien" no recibe "es 100% natural"', async () => {
+        const h = harness({ step: 'waiting_mp_payment', deliveryZone: 'out', paymentMethod: 'mercadopago', mpPaymentLinkUrl: 'https://mpago.la/x', mpPaymentLinkId: 'x', history: [{ role: 'bot', content: '⏳ Todavía no veo el pago confirmado en el sistema.' }], ...cart('Cápsulas de nuez de la india', '60', '54.900') });
+        await say(h, 'che, ya pasaron 10 min. seguro que se acreditó. revisá bien');
+        expect(h.sent.join('\n')).not.toMatch(/100% natural/);
     });
 
     test('el plan dicho en un mensaje anterior se recuerda: no se pregunta "60 o 120"', async () => {
@@ -476,10 +528,12 @@ describe('el rechazo por salud o edad no se repite', () => {
         await say(h, 'pero es natural, no debería pasar nada :/');
         await say(h, 'dale no seas mala');
         await say(h, 'hola?');
-        expect(h.sent).toHaveLength(2);
+        expect(h.sent).toHaveLength(3);
         expect(h.sent[0]).toMatch(REJECT);
         expect(h.sent[1]).toMatch(/preferimos no indicarla/);
-        expect(pauseUser).not.toHaveBeenCalled();
+        // Tercera vez: lo ve una persona, y después ya no se contesta.
+        expect(h.sent[2]).toMatch(/lo vea una asesora/);
+        expect(pauseUser).toHaveBeenCalledTimes(1);
         expect(h.userState[USER].step).toBe('rejected_medical');
     });
 });

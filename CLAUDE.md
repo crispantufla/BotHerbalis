@@ -185,6 +185,16 @@ Entraron el 2026-11-12, tras revisar a mano las charlas del guion por zona:
   - La FAQ no contesta una pregunta por descuento con una respuesta que no habla de descuentos, y
     `detectObjection` no corre ante una pregunta por descuento, promo o cuotas.
   - La tabla de precios con la pregunta de los kilos (V7) ya no sale en el saludo del guion por zona.
+  - Dos productos en un pedido ("cápsulas para mí y gotas para mi mamá"): la IA dice el total y el
+    chat se pausa para que el pedido lo arme una persona (`wantsBoth` en `stepWaitingPreference`);
+    el flujo arma pedidos de un producto.
+  - `_planChoice` se anota en `salesFlow` (bloque 1.95) aunque al mensaje lo conteste una FAQ.
+  - `rejected_medical` a la tercera insistencia pausa y avisa; una edad con regla (menor de 18, 70
+    o más) o dicha con pregunta no recibe el "¡Anotado! Seguimos..." de la extracción silenciosa.
+  - `waiting_mp_payment`: el segundo "ya pagué" sin pago acreditado pausa y lo verifica una
+    persona; hablar del pago no dispara `detectObjection` ("seguro que se acreditó").
+  - Un lugar lejano dicho con contexto gana sobre un barrio de Rosario ("soy de Córdoba capital,
+    barrio Alberdi"), salvo que vaya seguido de un número (calle).
 
 Flujo de un mensaje: `client.on('message')` → `messageHandler` (debounce ~N segundos para agrupar mensajes consecutivos) → encola en BullMQ → worker pulls → `processSalesFlow` → step correspondiente en `src/flows/steps/` → `sendMessageWithDelay` (4-8s delay humanizado).
 

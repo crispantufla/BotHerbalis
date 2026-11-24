@@ -84,6 +84,15 @@ export async function handleWaitingMpPayment(
 
         } else if (verified === 'pending') {
             const msg = '⏳ Todavía no veo el pago confirmado en el sistema.\n\nEsperá unos minutos y escribime *"listo"* cuando esté acreditado. Los pagos con tarjeta de crédito pueden demorar hasta 5 minutos.';
+            // Segunda vez que avisa y sigue sin verse: no se le repite lo mismo,
+            // lo verifica una persona (simulación del 24-nov-2026).
+            const alreadyTold = (currentState.history || []).slice(-6).some((h: any) => h && h.role === 'bot' && String(h.content || '').startsWith('⏳ Todavía no veo el pago'));
+            if (alreadyTold) {
+                saveState(userId);
+                await sendMessageWithDelay(userId, 'Dame un momento que lo reviso a mano con el equipo 🙏 Enseguida te confirmo.');
+                await _pauseAndAlert(userId, currentState, dependencies, text, 'El cliente insiste en que pagó con tarjeta y el sistema todavía no ve el pago acreditado. Verificar en Mercado Pago y confirmarle.');
+                return { matched: true };
+            }
             saveState(userId);
             await sendMessageWithDelay(userId, msg);
             return { matched: true };

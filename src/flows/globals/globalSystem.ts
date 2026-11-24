@@ -108,8 +108,15 @@ export async function handleSystemGlobals(
         if (!botMsgs.some((m: string) => m === closing)) {
             await sendMessageWithDelay(userId, closing);
             saveState(userId);
+        } else if (botMsgs.some((m: string) => m.startsWith('Lo dejo anotado para que lo vea una asesora'))) {
+            logger.info(`[MEDICAL REJECT] User ${userId} ya derivado. No respondo.`);
         } else {
-            logger.info(`[MEDICAL REJECT] User ${userId} ya rechazado y ya se le explicó. No respondo.`);
+            // Sigue insistiendo: no se discute ni se lo deja hablando solo. Lo
+            // ve una persona (la pausa corta los mensajes siguientes).
+            logger.info(`[MEDICAL REJECT] User ${userId} ya rechazado insiste → pausa y aviso.`);
+            await sendMessageWithDelay(userId, 'Lo dejo anotado para que lo vea una asesora 🙏');
+            await _pauseAndAlert(userId, currentState, dependencies, text, 'Cliente rechazado por salud o edad (embarazo, lactancia, menor de 18 o mayor de 80) que insiste en comprar. No vender; contestarle a mano si hace falta.');
+            saveState(userId);
         }
         return { matched: true };
     }

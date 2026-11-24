@@ -229,6 +229,22 @@ export async function handleWaitingPreference(
             userState: currentState
         });
 
+        // Quiere DOS productos en un pedido ("cápsulas para mí y gotas para mi
+        // mamá, ¿cuánto todo junto?"). El pedido se arma de a un producto: en la
+        // simulación del 24-nov-2026 salió una confirmación solo con las
+        // cápsulas después de haberle dicho el total de las dos. La IA contesta
+        // (el total) y el pedido lo arma una persona.
+        const wantsBoth = !!knowledge?.flow?.prices_club && totalMatches > 1
+            && /\b(las dos|los dos|ambas|ambos|todo junto|juntas|juntos)\b|\bpara\s+mi\b.*\bpara\s+(mi|la|el)\b|\b(capsul\w*|got\w*|semill\w*)\s+(?:de\s+\d+\s+)?(?:y|mas|\+)\s+(?:las\s+|unas\s+)?(capsul\w*|got\w*|semill\w*)/.test(normalizedText)
+            && !/\b(cual|diferencia|mejor|conviene|recomend\w*)\b/.test(normalizedText);
+        if (wantsBoth && aiRecommendation.response) {
+            saveState(userId);
+            await sendMessageWithDelay(userId, aiRecommendation.response);
+            await sendMessageWithDelay(userId, 'Como son dos productos, el pedido te lo arma una asesora para que salga todo junto 🙌 Enseguida te escribe.');
+            const { _pauseAndAlert } = require('../utils/flowHelpers');
+            await _pauseAndAlert(userId, currentState, dependencies, text, `Quiere DOS productos en un mismo pedido ("${text.slice(0, 80)}"). Armar el pedido a mano.`);
+            return { matched: true };
+        }
         if (aiRecommendation.goalMet && aiRecommendation.extractedData && !aiSaysNotChoice) {
             // First send the AI's natural response if it exists (e.g., to answer a health question)
             if (aiRecommendation.response) {

@@ -209,7 +209,12 @@ export async function processSalesFlow(
             saveState(userId);
             // If the user's message was merely "tengo 40 años" we don't want to confuse the AI
             // We just ACK and repeat the state's main question if it was merely a correction
-            if (extraction.isSolelyCorrection) {
+            // "tengo 17 años, está bien igual?" recibió "¡Anotado! 😊 Seguimos..."
+            // (simulación del 24-nov-2026): una edad con regla propia (menor de
+            // 18, 70 o más) o dicha con una pregunta sigue de largo, a las reglas
+            // de edad y al paso.
+            const ageWithRule = /\b(1[0-7]|[7-9]\d)\s*anos?\b/.test(normalizedText) || /[?¿]/.test(text);
+            if (extraction.isSolelyCorrection && !ageWithRule) {
                 logger.info(`[GLOBAL EXTRACTION] Intercepted sole correction for ${userId}. Age:${extraction.ageUpdated ?? false}, Weight:${extraction.weightUpdated ?? false}`);
                 let ackMsg = "¡Anotado! 😊\n\nEntonces, decime...";
 
@@ -275,6 +280,14 @@ export async function processSalesFlow(
         if (rememberZoneFromMessage(text, currentState, knowledge)) {
             logger.info(`[ZONE] ${userId} dijo su localidad de pasada (${currentState.partialAddress?.ciudad || '?'}, ${currentState.deliveryZone}) en ${currentState.step} → queda anotada.`);
         }
+        // El plan dicho antes de que se lo pregunten ("quiero las gotas de 120
+        // dias, cuanto sale el envio?"): si a ese mensaje lo contesta una
+        // respuesta fija, el paso de producto nunca lo veía y después preguntaba
+        // "¿60 o 120?" (simulación del 24-nov-2026).
+        if (['greeting', 'waiting_weight', 'waiting_preference'].includes(String(currentState.step))) {
+            const pm = normalizedText.match(/\b(?:de|del|plan(?:\s+de)?|los|x|por)\s+(60|120)\b(?!\s*(?:kilos?|kgs?|kg|anos|pesos|mil))|\b(60|120)\s*(?:dias|d)\b/);
+            if (pm) (currentState as any)._planChoice = pm[1] || pm[2];
+        }
         if (dependencies.intent?.defers === true || detectPostponeDeferral(normalizedText)) {
             currentState.deferredAt = Date.now();
         }
@@ -315,7 +328,11 @@ export async function processSalesFlow(
     // la respuesta fija de desconfianza habla de la tarjeta y los 13 años y no
     // contesta lo que preguntó.
     const asksSafety = /\b(anmat|prohibid\w*|toxic\w*|venenos\w*|ilegal)\b/.test(normalizedText);
-    const objection = (healthQuestion || answersZone || asksDeal || asksSafety) ? null : detectObjection(currentState.step, normalizedText, currentState, isMpEnabled(dependencies.config));
+    // Esperando un pago, "seguro que se acreditó, revisá bien" habla del pago y
+    // no de si el producto es seguro: recibió "Sí, es seguro 🌿 100% natural".
+    const aboutPayment = ['waiting_mp_payment', 'waiting_transfer_confirmation'].includes(String(currentState.step))
+        && /\b(acredit\w*|pague|pago|pagado|transfer\w*|comprobante|listo|banco|revisa\w*|fijate)\b/.test(normalizedText);
+    const objection = (healthQuestion || answersZone || asksDeal || asksSafety || aboutPayment) ? null : detectObjection(currentState.step, normalizedText, currentState, isMpEnabled(dependencies.config));
     if (objection) {
         if (objection.type === 'postergar') currentState.deferredAt = Date.now();
         logger.info(`[OBJECTION] Intercepted "${objection.type}" for ${userId} at step ${currentState.step} (tier=${objection.tier})`);

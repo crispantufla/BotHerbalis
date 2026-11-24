@@ -1177,8 +1177,10 @@ export async function handleWaitingData(
     // El 22-nov-2026 "Ya te agendé" recibió "¡Dale! Pasame tu Nombre completo".
     // Un "sí/dale" no entra acá: puede estar aceptando que se lo agenden.
     const _recentlyDeferred = !!currentState.deferredAt && (Date.now() - Number(currentState.deferredAt)) < 48 * 3600_000;
-    const _LATER_ACK = /\b(te (aviso|escribo|mando|hablo|confirmo|agende)|ya te agende|cuando (cobre|pueda)|despues|luego|mas adelante)\b/;
-    if (_recentlyDeferred && !/\d/.test(text) && text.trim().split(/\s+/).length <= 8
+    // Una fecha suelta ("el 5 del mes que viene te aviso") no es un dato de
+    // envío; un número de calle (3 o más cifras) sí.
+    const _LATER_ACK = /\b(te (aviso|escribo|mando|hablo|confirmo|agende|los paso|lo paso)|ya te agende|cuando (cobre|pueda|este list[oa]|me llam\w+)|despues|luego|mas adelante|ahora no puedo)\b/;
+    if (_recentlyDeferred && !/\d{3,}/.test(text) && text.trim().split(/\s+/).length <= 14
         && (_LATER_ACK.test(normalizedText) || _PURE_COURTESY.test(normalizedText))) {
         currentState.awaitingResume = true;
         dependencies.saveState(userId);
