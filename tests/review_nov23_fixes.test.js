@@ -393,3 +393,13 @@ describe('dos mensajes cortos seguidos en plena elección se juntan', () => {
         expect(rt.botQueue.add).toHaveBeenCalledTimes(1);
     });
 });
+
+test('reporte diario: la postura de salud del negocio no se marca como falla', async () => {
+    const { runNightlyReview: run } = require('../src/services/nightlyReview');
+    const logs = [{ userPhone: '5493410000001', role: 'user', content: 'hola', timestamp: new Date('2026-11-22T13:00:00Z') }];
+    const client = { messages: { create: jest.fn().mockResolvedValue({ content: [{ type: 'text', text: 'RESUMEN: Bien.\n\nSIN RESPUESTA: ninguno' }], usage: {} }) } };
+    await run('horacio', {}, { client, prisma: { chatLog: { findMany: jest.fn().mockResolvedValue(logs) } }, now: new Date('2026-11-22T23:59:00Z'), dataDir: fs.mkdtempSync(path.join(require('os').tmpdir(), 'review-')) });
+    const system = client.messages.create.mock.calls[0][0].system;
+    expect(system).toMatch(/Postura del negocio sobre salud/);
+    expect(system).toMatch(/NO deriva al médico/);
+});
