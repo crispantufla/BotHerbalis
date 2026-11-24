@@ -115,7 +115,28 @@ export async function handleGreeting(
         logger.info(`[GREETING-PRICE] User ${userId} abrió pidiendo precio — lista de precios directo.`);
         return { matched: true };
     }
-    if (_asksPriceOnly) {
+    // Abre con el pedido ya armado ("Hola quiero las gotas de 120 dias soy de
+    // Funes, Laura Sosa, Galindo 1820"): la presentación con "¿Te paso los
+    // precios?" lo ignoraba y después se le volvía a pedir todo (simulación del
+    // 24-nov-2026). Se saluda en una línea y el mensaje lo lee la elección de
+    // producto, que toma plan, localidad y datos si vinieron.
+    const _namesProduct = /\b(got\w*|capsul\w*|pastill\w*|semill\w*)\b/.test(_norm);
+    const _namesPlan = /\b(60|120)\b|\b(2|4|dos|cuatro)\s*meses\b/.test(_norm);
+    const _wantsIt = /\b(quiero|quisiera|queria|necesito|me\s+(?:llevo|mandas|envias|traes)|encargar|pedir|comprar)\b/.test(_norm);
+    if (knowledge?.flow?.prices_club && !_substantiveOpening && !_isAdTrigger && _namesProduct && (_namesPlan || _wantsIt)
+        && (currentState.history || []).filter(m => m.role === 'bot').length === 0) {
+        const { FlowStep } = require('../../types/state');
+        await sendMessageWithDelay(userId, '¡Hola! 😊 Soy Elena de Herbalis.');
+        _setStep(currentState, FlowStep.WAITING_PREFERENCE);
+        saveState(userId);
+        logger.info(`[GREETING-ORDER] User ${userId} abrió con el pedido armado — saludo corto y lo toma la elección de producto.`);
+        const { handleWaitingPreference } = require('./stepWaitingPreference');
+        return handleWaitingPreference(userId, text, _norm, currentState, knowledge, dependencies);
+    }
+    // La tabla con la pregunta de los kilos es del guion viejo: en el guion por
+    // zona una apertura larga con precio y otras dudas (un audio con cinco
+    // preguntas) la recibía sin que nadie le contestara nada.
+    if (_asksPriceOnly && !knowledge?.flow?.prices_club) {
         const tableMsg = _buildPriceTableWithWeightAsk(knowledge, currentState);
         if (tableMsg) {
             _setStep(currentState, knowledge.flow.greeting.nextStep);
@@ -145,7 +166,11 @@ export async function handleGreeting(
             if (aiOpen.response) {
                 const { FlowStep } = require('../../types/state');
                 await sendMessageWithDelay(userId, aiOpen.response);
-                await sendMessageWithDelay(userId, _formatMessage(knowledge.flow.prices_club.response, currentState));
+                // Revendedor, reclamo, insulto: la IA ya derivó (tag de control) y
+                // el flujo pausa al volver. La lista minorista detrás no va.
+                if (!(currentState as any)._aiControlTag) {
+                    await sendMessageWithDelay(userId, _formatMessage(knowledge.flow.prices_club.response, currentState));
+                }
                 _setStep(currentState, FlowStep.WAITING_PREFERENCE);
                 saveState(userId);
                 logger.info(`[GREETING-AI] User ${userId} abrió con consulta sustantiva — IA respondió + lista de precios.`);

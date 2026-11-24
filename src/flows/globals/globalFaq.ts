@@ -3,6 +3,7 @@ import { _isInfoQuestion, _asksSomething, _startsAffirmative, _pushHistory } fro
 import { PAID_KEYWORDS as MP_PAID_KEYWORDS } from '../steps/stepWaitingMpPayment';
 import { PAID_KEYWORDS as TRANSFER_PAID_KEYWORDS } from '../steps/stepWaitingTransferConfirmation';
 import { isMpEnabled } from '../utils/paymentOptions';
+import { statesOwnLocality, centerReference } from '../utils/deliveryZone';
 import logger from '../../utils/logger';
 
 // Claims de pago que los PAID_KEYWORDS de los steps no cubren pero que también
@@ -60,6 +61,17 @@ export async function handleFaq(
     // solo el párrafo de salud y no siguió (21-nov-2026).
     if (currentState.step === 'greeting' && knowledge?.flow?.prices_club) return null;
 
+    // En el paso de localidad, un mensaje que DICE la localidad es la respuesta
+    // que el paso espera, aunque traiga una pregunta: "soy de chabás, santa fe.
+    // cuánto tarda en llegar?" recibía la respuesta fija de envíos, que termina
+    // en "¿De qué localidad sos?" (simulación del 24-nov-2026). El mensaje de la
+    // zona ya dice cómo llega y cuánto tarda.
+    if (currentState.step === 'waiting_zone' && (statesOwnLocality(text, knowledge) || centerReference(text, knowledge)
+        || /\b(soy|somos|vivo|vivimos)\s+(de|en)\s+[a-zñ]/.test(_normalize(text)))) {
+        logger.info(`[FAQ] Skip FAQ en waiting_zone — "${trimmed.slice(0, 50)}" trae la localidad; lo resuelve el paso`);
+        return null;
+    }
+
     const norm = _normalize(text);
 
     // Buscar el FAQ cuyo keyword más largo matchea (más específico gana).
@@ -80,6 +92,16 @@ export async function handleFaq(
     }
 
     if (!bestEntry) return null;
+
+    // Pregunta puntual por un descuento o una promo y la respuesta fija no habla
+    // de eso: que conteste el paso. "36 lucas es mucha plata... si llevo 2 de
+    // las semillas hay descuento?" recibió el argumento de "la plata cuesta
+    // ganarla" y la pregunta quedó sin contestar (simulación del 24-nov-2026).
+    if (/\b(descuento|descuentos|rebaja|promo|promocion|oferta|2x1|(?:llevo|llevando|compro)\s+(?:2|dos|3|tres))\b/.test(norm)
+        && !/descuento|promo|%|rebaja/i.test(String(bestEntry.response))) {
+        logger.info(`[FAQ] Skip FAQ — "${trimmed.slice(0, 50)}" pregunta por un descuento y la respuesta fija no lo contesta`);
+        return null;
+    }
 
     // FAQ de envío/pago marcadas `zoneAware` (modelo por zona, sep-2026): valen
     // mientras NO sabemos la localidad (terminan preguntándola). Con la zona ya

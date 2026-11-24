@@ -128,6 +128,11 @@ const FAR_PLACES = [
     'villa luro', 'la paternal', 'agronomia', 'puerto madero', 'monserrat',
     'velez sarsfield', 'villa pueyrredon', 'villa ortuzar', 'coghlan', 'villa real',
     'villa riachuelo', 'parque avellaneda', 'villa general mitre', 'villa santa rita',
+    // Gran Buenos Aires como lo dice la gente: "Soy de Lomas" no se reconoció y
+    // la localidad se preguntó tres veces (simulación del 24-nov-2026). Fuera a
+    // propósito los que también son calles de Rosario (Caseros, Wilde, Ramos Mejía).
+    'lomas', 'banfield', 'adrogue', 'temperley', 'laferrere', 'gonzalez catan',
+    'monte grande', 'burzaco',
 ];
 
 export function normalizePlace(s: string): string {
@@ -185,7 +190,7 @@ export function isFarPlace(name: string | null | undefined): boolean {
 // En un mensaje cualquiera del historial, un nombre de localidad suelto puede
 // ser un apellido ("Marta Pérez", "Álvarez") o una calle ("San Lorenzo 1200").
 // Solo cuenta si viene con contexto de lugar: "soy de X", "vivo en X", "de X".
-const PLACE_CONTEXT = '(?:\\b(?:soy|somos|vivo|vivimos|estoy|estamos|resido|escribo|te escribo)\\s+(?:de|en|desde)\\s+|\\b(?:de|en|desde|para|hasta|hacia|zona\\s+de|barrio\\s+de)\\s+(?:la\\s+ciudad\\s+de\\s+|la\\s+localidad\\s+de\\s+|el\\s+pueblo\\s+de\\s+|la\\s+|el\\s+)?)';
+const PLACE_CONTEXT = '(?:\\b(?:soy|somos|vivo|vivimos|estoy|estamos|resido|escribo|te escribo)\\s+(?:de|en|desde)\\s+|\\b(?:envio|envios|envian|envias|mandan|mandas|llega|llegan|llegas|despachan|despachas)\\s+a\\s+|\\b(?:de|en|desde|para|hasta|hacia|zona\\s+de|barrio\\s+de)\\s+(?:la\\s+ciudad\\s+de\\s+|la\\s+localidad\\s+de\\s+|el\\s+pueblo\\s+de\\s+|la\\s+|el\\s+)?)';
 
 function _findPlaceWithContext(normalizedText: string, places: string[]): string | null {
     const sorted = [...places].sort((a, b) => normalizePlace(b).length - normalizePlace(a).length);
@@ -211,15 +216,68 @@ function _findPlaceWithContext(normalizedText: string, places: string[]): string
  * Rosario: el bot confirmó un pedido con reparto propio a una localidad que no
  * lo tiene (Uranga está en `localidadesBorde`) y la venta se cayó.
  */
-function _stripCenterReference(n: string, centro: string): string {
+function _centerRefPatterns(centro: string): RegExp[] {
     const c = normalizePlace(centro).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    if (!c) return n;
+    if (!c) return [];
     const lead = '(?:la\\s+ciudad\\s+de\\s+)?';
-    return n
-        .replace(new RegExp(`\\b(?:a\\s+)?(?:unos\\s+|como\\s+|mas\\s+o\\s+menos\\s+|aprox\\w*\\s+)?\\d{1,3}\\s*(?:kms?|kilometros?|k|minutos?|min|cuadras)?\\s+(?:de|a)\\s+${lead}${c}\\b`, 'g'), ' ')
-        .replace(new RegExp(`\\b(?:cerca|cerquita|al\\s+lado|pegad[oa]|afueras|alrededores)\\s+(?:de|a)\\s+${lead}${c}\\b`, 'g'), ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
+    const approx = '(?:unos\\s+|como\\s+|mas\\s+o\\s+menos\\s+|masomenos\\s+|aprox\\w*\\s+|casi\\s+)?';
+    // Lo que puede ir entre el número y "de Rosario": "70 mas o menos de
+    // rosario", "70 km aprox de rosario", "70 y pico de rosario".
+    const filler = '(?:\\s+(?:mas\\s+o\\s+menos|masomenos|aprox\\w*|y\\s+pico|maso))?';
+    return [
+        new RegExp(`\\b(?:a\\s+)?${approx}\\d{1,3}\\s*(?:kms?|kilometros?|k|minutos?|min|cuadras)?${filler}\\s+(?:de|a)\\s+${lead}${c}\\b`, 'g'),
+        new RegExp(`\\b(?:a\\s+)?${approx}(?:una|media|dos|tres|\\d)\\s+horas?(?:\\s+y\\s+media)?${filler}\\s+(?:de|a)\\s+${lead}${c}\\b`, 'g'),
+        new RegExp(`\\b(?:cerca|cerquita|al\\s+lado|pegad[oa]|afueras|alrededores|lejos|fuera|afuera|camino)\\s+(?:de|a)\\s+${lead}${c}\\b`, 'g'),
+        new RegExp(`\\bno\\s+(?:soy|somos|vivo|vivimos|estoy|estamos|es)\\s+(?:de|en)\\s+${lead}${c}\\b`, 'g'),
+    ];
+}
+
+function _stripCenterReference(n: string, centro: string): string {
+    let out = n;
+    for (const re of _centerRefPatterns(centro)) out = out.replace(re, ' ');
+    return out.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * ¿El mensaje nombra a Rosario solo como REFERENCIA ("70 mas o menos de
+ * Rosario", "cerca de Rosario", "no soy de Rosario")? Devuelve los km si los
+ * dice, `far: true` si dice que queda lejos o que no es de ahí, y null si no
+ * hay referencia. En la simulación del 24-nov-2026 "70 mas o menos de rosario,
+ * me conviene mas que me lo lleven a casa" se leyó como Rosario: pedido con
+ * pago al recibir a Chabás, que no tiene reparto.
+ */
+export function centerReference(text: string, knowledge?: any): { km: number | null; far: boolean } | null {
+    const raw = normalizePlace(text);
+    if (!raw) return null;
+    const cfg = getZoneConfig(knowledge);
+    let km: number | null = null;
+    let far = false;
+    let found = false;
+    for (const re of _centerRefPatterns(cfg.centro)) {
+        const m = raw.match(re);
+        if (!m) continue;
+        found = true;
+        const seg = m[0];
+        const num = seg.match(/(\d{1,3})/);
+        if (num && !/horas?|minutos?|\bmin\b|cuadras/.test(seg)) km = parseInt(num[1], 10);
+        if (/\b(lejos|fuera|afuera)\b|\bno\s+(soy|somos|vivo|vivimos|estoy|estamos|es)\b/.test(seg)) far = true;
+    }
+    return found ? { km, far } : null;
+}
+
+/**
+ * ¿El cliente dice en ESTE mensaje de dónde es, con contexto ("soy de Lomas de
+ * Zamora", "envío a Córdoba")? Lo usan la FAQ y el detector de objeciones en el
+ * paso de localidad para no taparle la respuesta al paso: "soy de chabás, santa
+ * fe. cuánto tarda en llegar?" recibía la respuesta fija de envíos, que termina
+ * en "¿De qué localidad sos?".
+ */
+export function statesOwnLocality(text: string, knowledge?: any): ZoneClassification | null {
+    const raw = String(text || '');
+    if (!raw.trim() || raw.length > 300) return null;
+    const n = normalizePlace(raw);
+    if (ASKS_OUR_PLACE.test(n) && !/\b(soy|somos|vivo|vivimos|estoy|estamos)\b/.test(n)) return null;
+    return findZoneInHistory([{ role: 'user', content: raw }], knowledge);
 }
 
 export function classifyZoneText(text: string, knowledge?: any): ZoneClassification {
@@ -233,6 +291,15 @@ export function classifyZoneText(text: string, knowledge?: any): ZoneClassificat
 
     const inHit = _findPlace(n, cfg.localidades);
     if (inHit) return { zone: 'in', localidad: inHit };
+
+    // "soy de córdoba capital, barrio alberdi": Alberdi también es un barrio de
+    // Rosario y ganaba (simulación del 24-nov-2026). Un lugar lejano dicho con
+    // contexto ("soy de", "vivo en") manda sobre el nombre de un barrio; sin
+    // contexto no, porque "Alberdi, Córdoba 1200" es una calle de Rosario.
+    const farWithContext = _findPlaceWithContext(n, FAR_PLACES);
+    // "vivo en San Juan 1234, Fisherton": seguido de un número es una calle.
+    const farIsStreet = !!farWithContext && new RegExp(`${normalizePlace(farWithContext)}\\s+\\d{2,5}\\b`).test(n);
+    if (farWithContext && !farIsStreet) return { zone: 'out', localidad: _titleCase(farWithContext) };
 
     if (_findPlace(n, ROSARIO_BARRIOS)) return { zone: 'in', localidad: cfg.centro };
 
@@ -287,6 +354,8 @@ export function findZoneInHistory(history: any[] | undefined, knowledge?: any): 
         if (bordeHit) return { zone: 'out', localidad: bordeHit, borde: true };
         const farHit = _findPlaceWithContext(n, FAR_PLACES);
         if (farHit) return { zone: 'out', localidad: _titleCase(farHit) };
+        // "soy de capital" = Capital Federal (salvo "Rosario capital").
+        if (/\b(soy|somos|vivo|vivimos|estoy|estamos)\s+(de|en)\s+(la\s+)?capital\b/.test(n) && !/rosario/.test(n)) return { zone: 'out', localidad: 'Capital Federal' };
     }
     return null;
 }

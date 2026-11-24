@@ -113,3 +113,4 @@ ventas-horacio*.txt
 conversaciones-*.txt
 agent/cdp-eval.js
 docs/_render-*.js
+sim-output/

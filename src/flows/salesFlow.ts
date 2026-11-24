@@ -5,7 +5,7 @@ import { processGlobals } from './globals';
 import { processStep } from './steps';
 import { _pauseAndAlert, _setStep, _extractSilentVariables, _cleanPhone, _isGhostClose, _pushHistory } from './utils/flowHelpers';
 import { detectObjection, detectPostponeDeferral } from './utils/objectionDetector';
-import { rememberZoneFromMessage } from './utils/deliveryZone';
+import { rememberZoneFromMessage, statesOwnLocality, centerReference } from './utils/deliveryZone';
 import { isMpEnabled } from './utils/paymentOptions';
 import { parseControlTag } from './utils/extractedData';
 import { classifyNewLead, createInitialUserState } from './leadClassifier';
@@ -302,7 +302,20 @@ export async function processSalesFlow(
     const healthQuestion = dependencies.intent?.health === true
         || /\b\d{2}\s*anos\b/.test(normalizedText)
         || /\b(medic[oa]|doctor|doctora|cardiolog[oa]|clinic[oa]|nutricionista|endocrinolog[oa])\b/.test(normalizedText);
-    const objection = healthQuestion ? null : detectObjection(currentState.step, normalizedText, currentState, isMpEnabled(dependencies.config));
+    // En el paso de localidad, el mensaje que dice de dónde es va al paso: "soy
+    // de lomas de zamora, zona sur. tenes el codigo postal? es 1832 creo" recibió
+    // "Sí, funciona y posta" y la localidad se volvió a preguntar.
+    const answersZone = currentState.step === 'waiting_zone'
+        && !!(statesOwnLocality(text, knowledge) || centerReference(text, knowledge));
+    // Pregunta puntual por descuento, promo o cuotas: la contesta el paso. "si
+    // llevo 2 de las semillas hay descuento?" recibió el argumento de "la plata
+    // cuesta ganarla" y hubo que preguntarlo de nuevo.
+    const asksDeal = /[?¿]/.test(text) && /\b(descuento|descuentos|rebaja|promo|promocion|oferta|2x1|cuotas?|llevo\s+(2|dos|3|tres)|llevando\s+(2|dos|3|tres))\b/.test(normalizedText);
+    // Duda puntual sobre el producto (ANMAT, si es tóxico, si está prohibido):
+    // la respuesta fija de desconfianza habla de la tarjeta y los 13 años y no
+    // contesta lo que preguntó.
+    const asksSafety = /\b(anmat|prohibid\w*|toxic\w*|venenos\w*|ilegal)\b/.test(normalizedText);
+    const objection = (healthQuestion || answersZone || asksDeal || asksSafety) ? null : detectObjection(currentState.step, normalizedText, currentState, isMpEnabled(dependencies.config));
     if (objection) {
         if (objection.type === 'postergar') currentState.deferredAt = Date.now();
         logger.info(`[OBJECTION] Intercepted "${objection.type}" for ${userId} at step ${currentState.step} (tier=${objection.tier})`);

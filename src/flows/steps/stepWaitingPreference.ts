@@ -31,6 +31,46 @@ async function _clubSkipPlanQuestion(userId: string, text: string, product: stri
  * A quien dijo que quiere bajar hasta 10 kg no se le empuja el plan de 120 días:
  * la lista de precios le acaba de decir que con el de 60 alcanza.
  */
+/**
+ * La IA ya contestó la duda y devolvió el producto elegido. Hasta el
+ * 24-nov-2026 después salía la plantilla "¡Genial, las gotas! … ¿Con cuál vas,
+ * 60 o 120 días?" aunque el cliente ya hubiera dicho el plan o la IA hubiera
+ * cerrado con otra pregunta (cinco charlas de la simulación). Ahora:
+ *  - con el plan dicho (o producto de un solo plan) se arma el pedido y se pasa
+ *    a la localidad, sin volver a preguntar el plan;
+ *  - sin plan, si la IA ya cerró con una pregunta no se le suma otra: el
+ *    cliente queda en la elección de plan y su respuesta se lee ahí.
+ * Devuelve true si se hizo cargo. Solo guion por zona.
+ */
+async function _advanceAfterAiAnswer(userId: string, text: string, product: string, aiResponse: string | null, aiSent: boolean, currentState: UserState, knowledge: any, dependencies: any): Promise<boolean> {
+    if (!knowledge?.flow?.prices_club) return false;
+    const { _getEffectivePrice } = require('../utils/pricing');
+    const singlePlan = !_getEffectivePrice(product, '60', currentState);
+    const choice = (currentState as any)._planChoice;
+    if (singlePlan || choice === '60' || choice === '120') {
+        const { buildCartFromSelection } = require('../utils/cartHelpers');
+        buildCartFromSelection(product, singlePlan ? '120' : choice, currentState);
+        _setStep(currentState, FlowStep.WAITING_PAYMENT_METHOD);
+        const { _startZoneStep } = require('./stepWaitingZone');
+        const askedPlace = aiSent && /de qu[eé] (localidad|ciudad|pueblo|zona)|de d[oó]nde sos|tu localidad/i.test(aiResponse || '');
+        await _startZoneStep(userId, text, currentState, knowledge, dependencies, '', { skipQuestion: askedPlace });
+        logger.info(`[CLUB-PLAN] ${userId} → ${product} × ${currentState.selectedPlan} tras la respuesta de la IA → localidad.`);
+        return true;
+    }
+    if (aiSent && aiResponse && /[?¿]/.test(aiResponse.slice(-160))) {
+        const node = product.startsWith('Cápsulas') ? knowledge.flow.preference_capsulas : product.startsWith('Gotas') ? knowledge.flow.preference_gotas : knowledge.flow.preference_semillas;
+        _setStep(currentState, node?.nextStep || FlowStep.WAITING_PLAN_CHOICE);
+        dependencies.saveState(userId);
+        logger.info(`[CLUB-PLAN] ${userId} → ${product}: la IA ya cerró con una pregunta, no mando la plantilla de planes.`);
+        return true;
+    }
+    return false;
+}
+
+// "nooo gracias me equivoqué" después de la lista de precios: la IA se despedía
+// bien pero marcaba NEED_ADMIN y el chat quedaba pausado con aviso al vendedor.
+const SOFT_DECLINE = /\b(no+,?\s*gracias|me equivoque|numero equivocado|chat equivocado|no me interesa|no quiero nada|no necesito|era para otr[oa])\b/;
+
 function _pitchForGoal(msg: string, state: UserState): string {
     const w = Number(state.weightGoal) || 0;
     if (w <= 0 || w > 10) return msg;
@@ -47,6 +87,17 @@ export async function handleWaitingPreference(
 ): Promise<{ matched: boolean }> {
     const { sendMessageWithDelay, aiService, saveState } = dependencies;
     _captureWeightGoal(normalizedText, currentState);
+
+    if (knowledge?.flow?.prices_club && normalizedText.trim().split(/\s+/).length <= 8 && SOFT_DECLINE.test(normalizedText)
+        && !/\b(got\w*|capsul\w*|semill\w*|pastill\w*|precios?|cuanto)\b/.test(normalizedText) && !/[?¿]/.test(text)) {
+        currentState.cartRecovered = true; // sin recordatorio a quien dijo que no
+        saveState(userId);
+        const bye = '¡Tranqui, no pasa nada! 😊 Si más adelante querés saber algo, acá estoy.';
+        const lastBot: any = [...(currentState.history || [])].reverse().find((h: any) => h && h.role === 'bot');
+        if (String(lastBot?.content || '').trim() !== bye) await sendMessageWithDelay(userId, bye);
+        logger.info(`[CLUB-PRECIOS] ${userId} no quiere seguir ("${text.slice(0, 50)}") en la elección de producto → me despido sin pausar.`);
+        return { matched: true };
+    }
 
     // Plan elegido por el cliente: si pide explícitamente el otro plan (ej: "dale
     // pero el de 120" aunque le hayamos recomendado 60), lo guardamos en _planChoice
@@ -169,7 +220,9 @@ export async function handleWaitingPreference(
             5) Si tiene GASTRITIS / úlcera / acidez: recomendá cápsulas o gotas (semillas pueden irritar — es una contraindicación real). goalMet=false hasta que confirme.
             6) Si pide "info de las 3", "precio de las 3" o "todas": dale un resumen breve de las 3 opciones con sus precios de 60 días (del knowledge). NO empujes ninguna. Después preguntá cuál prefiere.
             7) Si pregunta por envío o medios de pago: envío gratis a todo el país. En Rosario y hasta 60 km lo llevamos nosotros y paga al recibir (efectivo, tarjeta o transferencia); al resto del país va por Correo Argentino prepago por ${prepayMeans(isMpEnabled(dependencies.config))}, a domicilio o sucursal, 4 días hábiles.${isMpEnabled(dependencies.config) ? '' : ' 🛑 El pago con tarjeta está fuera de servicio en estos días: NO lo ofrezcas ni lo menciones.'} NUNCA menciones cuotas ni anticipo. Después preguntá con cuál producto avanzar (la localidad se pregunta más adelante, no acá).
-            8) HORARIOS DE ENVÍO: si pregunta a qué hora llega o pide un horario, respondé que no controlamos al cartero del Correo Argentino, pero que avisamos si no lo encuentran. Después preguntá con cuál producto avanzar.`,
+            8) HORARIOS DE ENVÍO: si pregunta a qué hora llega o pide un horario, respondé que no controlamos al cartero del Correo Argentino, pero que avisamos si no lo encuentran. Después preguntá con cuál producto avanzar.
+            9) Si pide el TOTAL de dos productos o pregunta por un descuento, contestalo en ESTE mensaje con los precios de lista del knowledge (sumalos vos); nunca digas "te lo paso en el próximo mensaje".
+            10) Si el cliente ya nombró producto Y plan (60 o 120 días), respondé su duda y NO cierres con una pregunta ni pidas la localidad ni los datos: el sistema manda el paso siguiente.`,
             history: currentState.history,
             summary: currentState.summary,
             knowledge: knowledge,
@@ -196,6 +249,7 @@ export async function handleWaitingPreference(
             }
 
             if (priceNode) {
+                if (totalMatches <= 1 && await _advanceAfterAiAnswer(userId, text, currentState.selectedProduct as string, aiRecommendation.response, !!aiRecommendation.response, currentState, knowledge, dependencies)) return { matched: true };
                 const msg = _formatMessage(priceNode.response, currentState);
                 _setStep(currentState, priceNode.nextStep);
                 saveState(userId);
@@ -262,7 +316,9 @@ export async function handleWaitingPreference(
 7) Si tiene gastritis/úlcera/acidez: recomendá cápsulas o gotas (semillas pueden irritar). goalMet=false hasta que confirme.
 8) Si pide información o precios de "las 3", brindá explicación breve de las 3 formas con precios de 60 días (knowledge). Después preguntá cuál prefiere.
 9) Si pregunta si puede pagar/recibir un día concreto: dale el OK y volvé a la elección de producto.
-10) Si pregunta por envío o medios de pago: envío gratis a todo el país (Rosario y 60 km → lo llevamos nosotros, paga al recibir; resto → Correo prepago por ${prepayMeans(isMpEnabled(dependencies.config))}, 4 días hábiles).${isMpEnabled(dependencies.config) ? '' : ' 🛑 El pago con tarjeta está fuera de servicio en estos días: NO lo ofrezcas ni lo menciones.'} NUNCA menciones anticipo ni cuotas. Después preguntá producto.`,
+10) Si pregunta por envío o medios de pago: envío gratis a todo el país (Rosario y 60 km → lo llevamos nosotros, paga al recibir; resto → Correo prepago por ${prepayMeans(isMpEnabled(dependencies.config))}, 4 días hábiles).${isMpEnabled(dependencies.config) ? '' : ' 🛑 El pago con tarjeta está fuera de servicio en estos días: NO lo ofrezcas ni lo menciones.'} NUNCA menciones anticipo ni cuotas. Después preguntá producto.
+11) Si pide el TOTAL de dos productos o pregunta por un descuento, contestalo en ESTE mensaje con los precios de lista del knowledge (sumalos vos); nunca digas "te lo paso en el próximo mensaje".
+12) Si el cliente ya nombró producto Y plan (60 o 120 días), respondé su duda y NO cierres con una pregunta ni pidas la localidad ni los datos: el sistema manda el paso siguiente.`,
             history: currentState.history,
             summary: currentState.summary,
             knowledge: knowledge,
@@ -293,6 +349,7 @@ export async function handleWaitingPreference(
             }
 
             if (priceNode) {
+                if (totalMatches <= 1 && await _advanceAfterAiAnswer(userId, text, currentState.selectedProduct as string, aiPref.response, !!aiPref.response && !onlyChose, currentState, knowledge, dependencies)) return { matched: true };
                 const msg = _formatMessage(priceNode.response, currentState);
                 _setStep(currentState, priceNode.nextStep);
                 saveState(userId);

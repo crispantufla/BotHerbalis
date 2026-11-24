@@ -1,7 +1,7 @@
 import { UserState, FlowStep } from '../../types/state';
 import { _setStep, _pauseAndAlert, _isInfoQuestion, _asksSomething, _detectPostdatado } from '../utils/flowHelpers';
 import {
-    classifyZoneText, parseDistanceAnswer, findZoneInHistory, getZoneConfig, isFarPlace, phoneZone,
+    classifyZoneText, parseDistanceAnswer, findZoneInHistory, getZoneConfig, isFarPlace, phoneZone, centerReference,
     ZoneClassification,
 } from '../utils/deliveryZone';
 import { getFlowTemplate } from '../../utils/messageTemplates';
@@ -56,6 +56,42 @@ const ZONE_IN_ASK = /Pasame tu \*nombre completo\* y \*calle y n[uú]mero\*[^\n]
 
 function _tplOr(key: string, knowledge: any, mpOff: boolean, fallback: string): string {
     return getFlowTemplate(key, knowledge, mpOff) || fallback;
+}
+
+// "Galindo 1820", "Av. Pellegrini 1245": palabra + número que no es un plan, una
+// edad, kilos ni una distancia. Decide si vale la pena pasar el mensaje por el
+// parser de direcciones.
+const STREET_LIKE = /\b[a-zñ]{3,}\.?\s+\d{2,5}\b(?!\s*(?:anos?|kilos?|kgs?|kg|dias?|meses|km|kms|cuotas|pesos|mil|lucas|capsulas|gotas))/;
+export function looksLikeStreet(text: string): boolean {
+    const n = String(text || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/\$\s?[\d.]+/g, ' ')
+        .replace(/\b(?:de|plan|los|las|el|por|x)\s+(?:60|120)\b/g, ' ')
+        .replace(/\b(?:60|120)\s*(?:dias?|d)\b/g, ' ')
+        .replace(/\b(?:tengo|peso|pesar|bajar|perder|cumpli|unos|como|son|a)\s+\d{2,3}\b/g, ' ')
+        .replace(/\b200\d\b/g, ' ');
+    return STREET_LIKE.test(n) && n.trim().split(/\s+/).length >= 3;
+}
+
+/**
+ * Guarda nombre y calle si vinieron en el mensaje, para no volver a pedirlos.
+ * Devuelve la ciudad que leyó el parser (o null).
+ */
+async function _captureAddress(userId: string, text: string, currentState: UserState, dependencies: any): Promise<string | null> {
+    try {
+        const parsed = await (dependencies.mockAiService || dependencies.aiService).parseAddress(text);
+        if (!parsed || parsed._error) return null;
+        if (!currentState.partialAddress) currentState.partialAddress = {} as any;
+        const addr: any = currentState.partialAddress;
+        if (parsed.calle && parsed.calle !== 'A sucursal' && !addr.calle) addr.calle = parsed.calle;
+        if (parsed.nombre && !addr.nombre) {
+            addr.nombre = parsed.nombre;
+            if (!currentState.userName) currentState.userName = parsed.nombre;
+        }
+        return parsed.ciudad || null;
+    } catch (e: any) {
+        logger.warn(`[ZONE] parseAddress (datos junto a la localidad) falló para ${userId}: ${e.message}`);
+        return null;
+    }
 }
 
 /**
@@ -204,6 +240,16 @@ export async function _startZoneStep(
         const fromHistory = findZoneInHistory(currentState.history, knowledge);
         if (fromHistory) known = { zone: fromHistory.zone as 'in' | 'out', localidad: fromHistory.localidad };
     }
+    // Con el pedido vinieron los datos ("las semillas de 60. Beatriz Luna,
+    // Belgrano 880, Pérez"): se guardan nombre y calle, y la ciudad que lee el
+    // parser vale como localidad. Hasta el 24-nov-2026 se le volvía a pedir todo.
+    if (text && looksLikeStreet(text) && (!known || known.zone === 'in')) {
+        const ciudad = await _captureAddress(userId, text, currentState, dependencies);
+        if (!known && ciudad) {
+            const byCity = classifyZoneText(ciudad, knowledge);
+            if (byCity.zone === 'in' || byCity.zone === 'out') known = { zone: byCity.zone, localidad: byCity.localidad };
+        }
+    }
     if (known) {
         logger.info(`[ZONE] ${userId} ya había dicho su localidad (${known.localidad || '?'}, ${known.zone}) — salteo la pregunta.`);
         await _resolveZone(userId, known, currentState, knowledge, dependencies, prefix);
@@ -309,6 +355,43 @@ export async function handleWaitingZone(
     // lugar ahí adentro no es su localidad. Lo contesta la IA, que si de verdad
     // dijo de dónde es lo devuelve en el tag LOCALIDAD.
     const notAnAnswer = !_isInfoQuestion(text) && _asksSomething(text, dependencies) && !FIRST_PERSON_PLACE.test(normalizedText);
+
+    // ── Nombra a Rosario como referencia, no como su localidad ────────────────
+    // "70 mas o menos de rosario, me conviene mas que me lo lleven a casa": no es
+    // de Rosario y la distancia sola no da reparto (la zona es la lista). Se
+    // resuelve acá, sin IA ni parser, que podían devolver "Rosario".
+    const ref = currentState.zoneQuestion === 'km' ? null : centerReference(text, knowledge);
+    if (ref) {
+        const named = classifyZoneText(text, knowledge);
+        if (named.zone === 'in' || named.zone === 'out') {
+            await _resolveZone(userId, named as any, currentState, knowledge, dependencies);
+            return { matched: true };
+        }
+        const prev = currentState.partialAddress?.ciudad || null;
+        const candidate = prev && classifyZoneText(prev, knowledge).zone !== 'in' ? prev : null;
+        if (ref.far || (ref.km !== null && ref.km > cfg.radioKm)) {
+            await _resolveZone(userId, { zone: 'out', localidad: candidate }, currentState, knowledge, dependencies);
+            logger.info(`[ZONE] ${userId} → "${text.slice(0, 50)}" queda lejos de ${cfg.centro} → fuera de zona.`);
+            return { matched: true };
+        }
+        if (candidate) {
+            saveState(userId);
+            await sendMessageWithDelay(userId, `Dame un momento que confirmo con el equipo de envíos si llegamos con reparto propio hasta *${candidate}* 🙌 Enseguida te escribo.`);
+            await _pauseAndAlert(userId, currentState, dependencies, text, `Localidad que no está en la lista de reparto y queda cerca de ${cfg.centro} (${candidate}: "${text.slice(0, 60)}"). Confirmar si tiene reparto propio o va por Correo; si tiene reparto, agregarla a la lista.`);
+            return { matched: true };
+        }
+        const askName = `¿Cómo se llama tu localidad? 🙂 El reparto propio llega a algunas localidades cerca de ${cfg.centro}, con el nombre te confirmo cómo te llega 📦`;
+        if (_isDuplicate(askName, currentState.history)) {
+            await _pauseAndAlert(userId, currentState, dependencies, text, `El cliente dice que queda cerca de ${cfg.centro} pero no nombra la localidad ("${text.slice(0, 80)}"). Resolver la zona a mano.`);
+            return { matched: true };
+        }
+        currentState.zoneQuestion = 'localidad';
+        saveState(userId);
+        await sendMessageWithDelay(userId, askName);
+        logger.info(`[ZONE] ${userId} → dio la distancia a ${cfg.centro} sin nombrar la localidad → pregunto el nombre.`);
+        return { matched: true };
+    }
+
     if (currentState.zoneQuestion === 'km' && !notAnAnswer) {
         const named = classifyZoneText(text, knowledge);
         if (named.zone === 'in' || named.zone === 'out') {
@@ -344,22 +427,7 @@ export async function handleWaitingZone(
         // para no volver a pedirla. El CP de Rosario (2000-2009) no cuenta como
         // número de calle.
         const hasStreetNumber = /\d{2,5}/.test(text.replace(/\b200\d\b/g, ''));
-        if (hasStreetNumber && text.trim().split(/\s+/).length >= 3) {
-            try {
-                const parsed = await (dependencies.mockAiService || aiService).parseAddress(text);
-                if (parsed && !parsed._error) {
-                    if (!currentState.partialAddress) currentState.partialAddress = {} as any;
-                    const addr: any = currentState.partialAddress;
-                    if (parsed.calle && parsed.calle !== 'A sucursal' && !addr.calle) addr.calle = parsed.calle;
-                    if (parsed.nombre && !addr.nombre) {
-                        addr.nombre = parsed.nombre;
-                        if (!currentState.userName) currentState.userName = parsed.nombre;
-                    }
-                }
-            } catch (e: any) {
-                logger.warn(`[ZONE] parseAddress (datos junto a la localidad) falló para ${userId}: ${e.message}`);
-            }
-        }
+        if (hasStreetNumber && text.trim().split(/\s+/).length >= 3) await _captureAddress(userId, text, currentState, dependencies);
     }
     if (cls.zone === 'in' || cls.zone === 'out') {
         await _resolveZone(userId, cls as any, currentState, knowledge, dependencies);
@@ -401,6 +469,14 @@ export async function handleWaitingZone(
                 if (aiRes.response) { saveState(userId); await sendMessageWithDelay(userId, aiRes.response); }
                 await _resolveZone(userId, fromTag as any, currentState, knowledge, dependencies);
                 return { matched: true };
+            }
+            // Dijo de dónde es pero no está en ninguna lista: no se le vuelve a
+            // preguntar la localidad (la respuesta de la IA cierra con eso), se le
+            // preguntan los km. Si el nombre es Rosario no se toma: vino de una
+            // referencia ("cerca de Rosario").
+            const tagName = tag[1].trim().replace(/[.*_]+$/g, '');
+            if (tagName && fromTag.zone === 'unknown' && tagName.length <= 40) {
+                return await _askKm(userId, currentState, knowledge, dependencies, tagName);
             }
         }
         if (aiRes.response && !_isDuplicate(aiRes.response, currentState.history)) {

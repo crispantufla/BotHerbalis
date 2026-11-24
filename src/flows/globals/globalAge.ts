@@ -57,6 +57,17 @@ export async function handleAgeRule(
         const lead = picksOther
             ? `Después de los 70 no indicamos las cápsulas ni las semillas 🙏 Con ${age} años te recomiendo las *gotas* 💧, que son la opción más suave.`
             : `Con ${age} años te recomiendo las *gotas* 💧: son la opción más suave y la única que indicamos después de los 70.`;
+        // Insiste con las cápsulas ("mi vecina tiene 76 y las toma"): la regla no
+        // se repite palabra por palabra (simulación del 24-nov-2026). Una
+        // respuesta corta, y si vuelve a insistir contesta la IA con la regla.
+        const botMsgs = (currentState.history || []).filter((h: any) => h && h.role === 'bot').map((h: any) => String(h.content || ''));
+        if (picksOther && botMsgs.some((b: string) => b.includes('Después de los 70 no indicamos'))) {
+            const insist = 'Te entiendo 😊 Pero después de los 70 la única que indicamos son las *gotas*: es por cuidarte, y funcionan igual. ¿Te las dejo de 60 o de 120 días?';
+            if (botMsgs.includes(insist)) return null;
+            saveState(userId);
+            await sendMessageWithDelay(userId, insist);
+            return { matched: true };
+        }
         _captureWeightGoal(normalizedText, currentState);
         _assignProductAndPlanByTier(currentState, GOTAS);
         const nextStep = knowledge?.flow?.preference_gotas?.nextStep || 'waiting_plan_choice';

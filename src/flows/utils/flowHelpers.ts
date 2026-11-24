@@ -406,7 +406,7 @@ function _assignProductAndPlanByTier(state: any, productFullName: string): void 
 // "todo listo" condicional ("cuando tengas todo listo me escribís") NO es un
 // cierre: bloquearlo reemplazaba una respuesta correcta por "Dame un segundito
 // que reviso bien tu pedido" y nadie retomaba (caso 5493549532731, 16-sep-2026).
-const _GHOST_CLOSE_LANG = /(pedido confirmado|listo,?\s+todo|(?<!\b(?:cuando|si|apenas|en cuanto)\b[^.!?\n]{0,25})todo listo|ya est[aá] todo listo|ya est[aá] tu pedido|tu pedido qued[oó]|tu pedido est[aá] (confirmado|listo)|queda confirmado|pedido ingresado|ya qued[oó] (tu pedido|todo))/i;
+const _GHOST_CLOSE_LANG = /(pedido confirmado|listo,?\s+todo|(?<!\b(?:cuando|si|apenas|en cuanto|asi|para|dejamos|dejar)\b[^.!?\n]{0,25})todo listo|ya est[aá] todo listo|ya est[aá] tu pedido|tu pedido qued[oó]|tu pedido est[aá] (confirmado|listo)|queda confirmado|pedido ingresado|ya qued[oó] (tu pedido|todo))/i;
 const _GHOST_CLOSE_CLOSED_STEPS = ['waiting_admin_validation', 'waiting_admin_ok', 'completed', 'rejected_medical', 'rejected_abusive', 'rejected_geo'];
 function _isGhostClose(botMsg: string | null | undefined, step: string, hasPendingOrder: boolean): boolean {
     if (!botMsg) return false;

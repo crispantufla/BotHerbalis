@@ -156,6 +156,36 @@ Entraron el 2026-11-12, tras revisar a mano las charlas del guion por zona:
   - `zone_flow.test.js` tiene un test que depende de la hora ("insiste con pagar al recibir"): de
     noche (hora ARG) falla porque sale el mensaje de fuera de horario.
 
+- **Simulador de clientes (24-nov)**: `npm run test:clientes` (con `ANTHROPIC_API_KEY` exportada;
+  gasta saldo). Una IA hace de cliente con los personajes de `tests/sim/personas.js` contra el
+  flujo real con Claude; nada sale a WhatsApp ni toca la base. Cada charla pasa por
+  `tests/sim/checks.js` y por el juez del reporte diario; deja `sim-output/` (charlas, informe,
+  json). `SIM_ONLY=id1,id2` corre solo esos personajes. No es parte de `npm test`.
+  Lo que encontró la primera tanda y se arregló (tests: `tests/sim_nov24_fixes.test.js`):
+  - **Rosario como referencia**: `centerReference` (`deliveryZone.ts`) reconoce "70 mas o menos de
+    rosario", "a una hora de", "lejos de", "no soy de". En `waiting_zone` eso se resuelve sin IA ni
+    parser (podían devolver "Rosario"): más de 60 km o "lejos" → Correo; cerca y con el pueblo ya
+    nombrado → pausa y lo confirma una persona; cerca sin nombre → se pregunta el nombre. Había
+    salido un pedido con pago al recibir a Chabás.
+  - En `waiting_zone`, el mensaje que DICE la localidad (`statesOwnLocality`, o "soy de X") va al
+    paso aunque traiga una pregunta: ni la FAQ ni `detectObjection` lo tapan.
+  - `_advanceAfterAiAnswer` (`stepWaitingPreference`): después de la respuesta de la IA no sale la
+    plantilla "¡Genial, las gotas! … ¿60 o 120?" si el plan ya está dicho (pasa a la localidad) o
+    si la IA ya cerró con una pregunta (queda en la elección de plan).
+  - Pedido armado en el primer mensaje (producto + plan o "quiero"): saludo de una línea y lo lee la
+    elección de producto. `_startZoneStep` pasa por `parseAddress` un mensaje con forma de calle
+    (`looksLikeStreet`) y guarda nombre, calle y ciudad: con todo dado, el pedido se cierra solo.
+  - "¿Esto es una estafa?" / "tengo miedo de que sea mentira" ya no bloquean (duda ≠ insulto); la
+    acusación sin pregunta sí.
+  - "Estoy tomando las cápsulas y tengo diarrea" (`ADVERSE` en `globalExistingCustomer`): pausa y
+    aviso desde el primer mensaje, sin IA. Solo junto a "ya lo estoy tomando".
+  - `rejected_medical`: el texto del rechazo sale una vez. "Es para mi hija" → pausa y lo ve una
+    persona; si insiste, una respuesta corta y después silencio.
+  - "no gracias / me equivoqué" en `waiting_preference` se despide sin IA ni pausa.
+  - La FAQ no contesta una pregunta por descuento con una respuesta que no habla de descuentos, y
+    `detectObjection` no corre ante una pregunta por descuento, promo o cuotas.
+  - La tabla de precios con la pregunta de los kilos (V7) ya no sale en el saludo del guion por zona.
+
 Flujo de un mensaje: `client.on('message')` → `messageHandler` (debounce ~N segundos para agrupar mensajes consecutivos) → encola en BullMQ → worker pulls → `processSalesFlow` → step correspondiente en `src/flows/steps/` → `sendMessageWithDelay` (4-8s delay humanizado).
 
 ## Flujo de venta (`src/flows/steps/`)

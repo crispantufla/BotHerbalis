@@ -173,7 +173,11 @@ export async function handleWaitingMpPayment(
     }
 
     // ── Cliente pide que le reenvíen el link ───────────────────────────────────
-    if (mpOn && /\b(link|enlace|reenv[ií]a|reenviar|de nuevo|el link|manda|m[áa]ndame)\b/i.test(text) && currentState.mpPaymentLinkUrl) {
+    // Nombrar el link para desconfiar de él no es pedirlo: "no voy a clickear un
+    // link sin saber bien quien sos, me da cosa" recibió el link otra vez
+    // (simulación del 24-nov-2026). Eso lo contesta la IA del paso.
+    const distrustsLink = /\b(no voy a|no pienso|no quiero|sin saber|me da (cosa|miedo|desconfianza)|miedo|desconfi\w+|estafa|trucho|quien sos|es seguro)\b/.test(normalizedText);
+    if (mpOn && !distrustsLink && /\b(link|enlace|reenv[ií]a|reenviar|de nuevo|el link|manda|m[áa]ndame)\b/i.test(text) && currentState.mpPaymentLinkUrl) {
         const msg = `Acá está tu enlace de pago:\n\n${currentState.mpPaymentLinkUrl}\n\nCuando completes el pago escribime *"listo"* 👍`;
         saveState(userId);
         await sendMessageWithDelay(userId, msg);

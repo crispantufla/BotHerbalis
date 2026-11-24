@@ -90,7 +90,30 @@ export async function handleSystemGlobals(
 
     // 2. MEDICAL REJECT
     const MEDICAL_REJECT_REGEX = /\b(embarazada|embarazo|lactancia|lactar|amamantar|amamantando|dando la teta|dando el pecho|8[0-9]\s*a[ñn]os|9[0-9]\s*a[ñn]os)\b/i;
-    if ((MEDICAL_REJECT_REGEX.test(normalizedText) && !isNegative) || currentState.step === 'rejected_medical') {
+    // Ya se le dijo que no. El texto del rechazo no se repite: a un señor de 82
+    // que preguntó si podía comprarlo para la hija de 50 le llegó cuatro veces
+    // (simulación del 24-nov-2026). Si ahora lo pide para otra persona lo ve una
+    // asesora; si insiste, una sola respuesta corta y después silencio.
+    if (currentState.step === 'rejected_medical') {
+        const FOR_SOMEONE_ELSE = /\b(para|a)\s+(mi|mis|una?|otra|el|la)\s+(hij[oa]s?|herman[oa]s?|espos[oa]|marido|mujer|pareja|novi[oa]|mama|papa|madre|padre|amig[oa]s?|vecin[oa]|sobrin[oa]|niet[oa]|persona|cunad[oa]|suegr[oa]|ti[oa])\b|\b(mi|una)\s+(hij[oa]|herman[oa]|espos[oa]|marido|mama|papa|madre|padre|amig[oa]|sobrin[oa]|niet[oa]|cunad[oa])\b[^.]{0,40}\b(puede|quiere|tiene|tomar|comprar|escrib)\w*|\bes\s+para\s+regal\w+|\bno\s+es\s+para\s+mi\b/;
+        const botMsgs = (currentState.history || []).filter((h: any) => h && h.role === 'bot').map((h: any) => String(h.content || ''));
+        if (FOR_SOMEONE_ELSE.test(normalizedText) && !botMsgs.some((m: string) => m.includes('Si es para otra persona'))) {
+            logger.info(`[MEDICAL REJECT] User ${userId} ya rechazado pide para otra persona → lo ve una asesora.`);
+            await sendMessageWithDelay(userId, '¡Dale! 😊 Si es para otra persona, le paso tu consulta a una asesora para que lo vea con vos. Enseguida te escribe.');
+            await _pauseAndAlert(userId, currentState, dependencies, text, 'Cliente rechazado por salud o edad dice que el producto es para OTRA persona. Revisar y seguir la venta a mano si corresponde.');
+            saveState(userId);
+            return { matched: true };
+        }
+        const closing = 'Te entiendo 🙏 Aunque sea natural, en estos casos preferimos no indicarla: es por cuidarte. ¡Gracias por escribirnos!';
+        if (!botMsgs.some((m: string) => m === closing)) {
+            await sendMessageWithDelay(userId, closing);
+            saveState(userId);
+        } else {
+            logger.info(`[MEDICAL REJECT] User ${userId} ya rechazado y ya se le explicó. No respondo.`);
+        }
+        return { matched: true };
+    }
+    if (MEDICAL_REJECT_REGEX.test(normalizedText) && !isNegative) {
         logger.info(`[MEDICAL REJECT] User ${userId} mentioned contraindicated condition or is already rejected.`);
         const msg = 'Lamentablemente, por estricta precaución, no recomendamos ni permitimos el uso de la Nuez de la India durante el embarazo, la lactancia, en menores de 18 ni en personas mayores de 80 años. Priorizamos tu salud por encima de todo. 🌿😊\n\nPor este motivo, damos por finalizada la consulta y no podremos avanzar con el envío. ¡Cuidate mucho!';
         await sendMessageWithDelay(userId, msg);
@@ -128,7 +151,15 @@ export async function handleSystemGlobals(
     const normWithoutIdioms = normalizedText
         .replace(/\bcomo\s+(con\s+|que\s+)?(un|una)\s+(hij[oa]\s+de\s+puta|animal|bestia|condenad[oa])\b/gi, ' ')
         .replace(/\b(de|la)\s+puta\s+madre\b/gi, ' ');
-    if (ABUSIVE_REGEX.test(normWithoutIdioms) && currentState.step !== 'rejected_abusive') {
+    // Desconfiar no es insultar: "¿esto es una estafa?", "tengo miedo de que sea
+    // mentira" son la duda más común de un lead y se contestan (la IA tiene los
+    // 13 años y los 70.000 clientes). Hasta el 24-nov-2026 bloqueaban el chat.
+    // La acusación ("son unos estafadores", "esto es una estafa" sin pregunta)
+    // sigue bloqueando.
+    const SOFT_WORDS_ONLY = !/\b(estafador|estafadores|ladron|ladrones|mierda|puta|puto|boludos|boludeo|boludear|mentirosos|chantas|chanta|garcas|garca|denunciar|defensa al consumidor)\b/i.test(normWithoutIdioms);
+    const isDoubt = SOFT_WORDS_ONLY && (/[?¿]/.test(text)
+        || /\b(miedo|temor|desconfi\w+|no sera|no seran|sera que|espero que no|me da cosa|dudo|tengo dudas|como se que no|parece|me dijeron|lei que|vi que)\b/.test(normalizedText));
+    if (ABUSIVE_REGEX.test(normWithoutIdioms) && !isDoubt && currentState.step !== 'rejected_abusive') {
         logger.info(`[ABUSIVE REJECT] User ${userId} used aggressive language.`);
         const msg = 'Lamento mucho que te sientas de esta manera. Voy a suspender la interacción automática para que un asesor humano atienda y analice tu caso a la brevedad.';
         await sendMessageWithDelay(userId, msg);
